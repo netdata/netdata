@@ -194,6 +194,44 @@ When the user request does not limit queries to a specific url host, ALWAYS prov
 - Include both absolute numbers and percentages
 - Highlight anomalies or significant changes
 
+### Example: Finding hits for a specific URL
+
+To find the hits for a specific URL path, use the following GraphQL query structure:
+
+```graphql
+{
+  viewer {
+    zones(filter: {zoneTag: "0d34f7095fc51f49f7e929a1c67abc5c"}) {
+      httpRequestsAdaptiveGroups(
+        limit: 100
+        filter: {
+          datetime_geq: "2025-09-16T00:00:00Z"
+          datetime_lt: "2025-09-18T23:59:59Z"
+          clientRequestHTTPHost: "www.netdata.cloud"
+          clientRequestPath: "/llms.txt"
+        }
+        orderBy: [count_DESC]
+      ) {
+        count
+        dimensions {
+          userAgent
+          clientRequestPath
+          clientRequestHTTPHost
+        }
+      }
+    }
+  }
+}
+```
+
+This query retrieves:
+- Traffic for a specific host (`www.netdata.cloud`)
+- For a specific path (`/llms.txt`)
+- Within a date range (September 16-18, 2025)
+- Grouped by User-Agent, path, and host
+- Ordered by count (highest first)
+- Limited to 100 results
+
 ## Important Notes
 
 - www.netdata.cloud was in DNS-only mode until Sep 12, 2025 - data before this date will be missing

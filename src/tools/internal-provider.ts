@@ -19,6 +19,7 @@ export class InternalToolProvider extends ToolProvider {
       updateStatus: (text: string) => void;
       setTitle: (title: string, emoji?: string) => void;
       setFinalReport: (payload: { status: 'success'|'failure'|'partial'; format: string; content?: string; content_json?: Record<string, unknown>; metadata?: Record<string, unknown>; messages?: unknown[] }) => void;
+      logError: (message: string) => void;
       orchestrator: ToolsOrchestrator;
       toolTimeoutMs?: number;
     }
@@ -104,15 +105,43 @@ if (name === 'agent__final_report') {
       const content = typeof args.report_content === 'string' ? args.report_content : (typeof args.content === 'string' ? args.content : undefined);
       const content_json = (args.content_json !== null && typeof args.content_json === 'object' && !Array.isArray(args.content_json)) ? (args.content_json as Record<string, unknown>) : undefined;
       const metadata = (args.metadata !== null && typeof args.metadata === 'object' && !Array.isArray(args.metadata)) ? (args.metadata as Record<string, unknown>) : undefined;
-      const messages = Array.isArray(args.messages) ? args.messages : undefined;
+      const originalMessages = Array.isArray(args.messages) ? args.messages : undefined;
       // Enforce required payload per format
       if (format === 'slack-block-kit') {
-        // Accept either structured messages or a plain content fallback, then normalize to metadata.slack.messages
-        const normalizedMessages: unknown[] = (() => {
-          if (Array.isArray(messages) && messages.length > 0) {
-            const msgs: unknown[] = messages;
-            return msgs.filter((m) => m !== null && typeof m === 'object');
+        const asString = (value: unknown): string | undefined => {
+          if (typeof value !== 'string') return undefined;
+          const trimmed = value.trim();
+          return trimmed.length > 0 ? trimmed : undefined;
+        };
+        const safeParseJson = (value: string): unknown => {
+          try { return JSON.parse(value) as unknown; } catch { return value; }
+        };
+        const isObj = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);
+        const expandMessages = (candidate: unknown): Record<string, unknown>[] => {
+          if (candidate === undefined || candidate === null) return [];
+          const str = asString(candidate);
+          const parsed = str !== undefined ? safeParseJson(str) : candidate;
+          if (typeof parsed === 'string') {
+            const text = asString(parsed);
+            return text !== undefined ? [ { blocks: [ { type: 'section', text: { type: 'mrkdwn', text } } ] } ] : [];
           }
+          if (Array.isArray(parsed)) {
+            const expanded = parsed.flatMap((entry) => expandMessages(entry));
+            if (expanded.length > 0) return expanded;
+            const blocks = parsed.flatMap((entry) => {
+              const blockCandidate: unknown = typeof entry === 'string' ? safeParseJson(entry) : entry;
+              if (Array.isArray(blockCandidate)) return blockCandidate as unknown[];
+              return blockCandidate !== undefined ? [blockCandidate] : [];
+            });
+            return blocks.length > 0 ? [ { blocks } ] : [];
+          }
+          if (isObj(parsed)) return [parsed];
+          return [];
+        };
+        // Accept structured messages, strings containing JSON, or plain text content (fallback)
+        const normalizedMessages: Record<string, unknown>[] = (() => {
+          const fromMessages = expandMessages(args.messages).slice(0, 20);
+          if (fromMessages.length > 0) return fromMessages;
           if (typeof content === 'string' && content.trim().length > 0) {
             return [ { blocks: [ { type: 'section', text: { type: 'mrkdwn', text: content } } ] } ];
           }
@@ -120,15 +149,34 @@ if (name === 'agent__final_report') {
         })();
         if (normalizedMessages.length === 0) throw new Error('final_report(slack-block-kit) requires `messages` or non-empty `content`.');
         // Auto-repair to prevent slack_invalid_blocks loops
-        const repairedMessages: unknown[] = (() => {
+        const repairedMessages: Record<string, unknown>[] = (() => {
           const clamp = (s: unknown, max: number): string => {
             const t = typeof s === 'string' ? s : (typeof s === 'number' || typeof s === 'boolean') ? String(s) : '';
             return t.length <= max ? t : `${t.slice(0, Math.max(0, max - 1))}…`;
           };
           const toMrkdwn = (v: unknown, max: number) => ({ type: 'mrkdwn', text: clamp(v, max) });
-          const isObj = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);
-          const asArr = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
+          const asArr = (v: unknown): unknown[] => {
+            if (Array.isArray(v)) return v;
+            const str = asString(v);
+            if (str !== undefined && (str.startsWith('[') || str.startsWith('{'))) {
+              const parsed = safeParseJson(str);
+              if (Array.isArray(parsed)) return parsed;
+              if (isObj(parsed)) return [parsed];
+            }
+            return [];
+          };
           const coerceBlock = (b: unknown): Record<string, unknown> | undefined => {
+            if (typeof b === 'string') {
+              const trimmed = asString(b);
+              if (trimmed !== undefined) {
+                const parsed = safeParseJson(trimmed);
+                if (isObj(parsed)) return coerceBlock(parsed);
+                if (Array.isArray(parsed)) {
+                  return parsed.map(coerceBlock).find((x) => x !== undefined);
+                }
+                return { type: 'section', text: { type: 'mrkdwn', text: clamp(trimmed, 2900) } };
+              }
+            }
             const blk = isObj(b) ? b : {};
             const bb = blk as { type?: unknown; text?: unknown; elements?: unknown; fields?: unknown };
             const typ: string = (typeof bb.type === 'string') ? bb.type : '';
@@ -154,16 +202,29 @@ if (name === 'agent__final_report') {
             return out;
           };
           const coerceMsg = (m: unknown): Record<string, unknown> | undefined => {
+            if (typeof m === 'string') {
+              const trimmed = asString(m);
+              if (trimmed !== undefined) {
+                const parsed = safeParseJson(trimmed);
+                if (isObj(parsed) || Array.isArray(parsed)) return coerceMsg(parsed);
+                const block = coerceBlock(trimmed);
+                return block !== undefined ? { blocks: [block] } : undefined;
+              }
+            }
             const msg = isObj(m) ? m : {};
             const mm = msg as { blocks?: unknown };
-            const blocks = asArr(mm.blocks)
+            const blocksSource = mm.blocks !== undefined ? mm.blocks : msg;
+            const blocks = asArr(blocksSource)
               .map(coerceBlock)
               .filter((x): x is Record<string, unknown> => x !== undefined)
               .slice(0, 50);
             if (blocks.length === 0) return undefined;
             return { blocks };
           };
-          return asArr(normalizedMessages).map(coerceMsg).filter((x): x is Record<string, unknown> => x !== undefined).slice(0, 20);
+          return normalizedMessages
+            .map(coerceMsg)
+            .filter((x): x is Record<string, unknown> => x !== undefined)
+            .slice(0, 20);
         })();
         // Validate Slack constraints: blocks<=50, mrkdwn<=2900 (section), header<=150, context<=2000
         const slackSchema: Record<string, unknown> = {
@@ -189,7 +250,7 @@ if (name === 'agent__final_report') {
         try {
           const validate = this.ajv.compile(slackSchema);
           let ok = validate(repairedMessages);
-          let finalMsgs: unknown[] = repairedMessages;
+          let finalMsgs: Record<string, unknown>[] = repairedMessages;
           if (!ok) { ok = validate(normalizedMessages); finalMsgs = normalizedMessages; }
           if (!ok) {
             const errs = (validate.errors ?? []).map((e) => `${e.instancePath} ${e.message ?? ''}`.trim()).join('; ');
@@ -227,12 +288,89 @@ if (name === 'agent__final_report') {
       } else {
         if (typeof content !== 'string' || content.trim().length === 0) throw new Error(`agent__final_report requires non-empty report_content field.`);
       }
-      this.opts.setFinalReport({ status, format, content, content_json, metadata, messages });
+      this.opts.setFinalReport({ status, format, content, content_json, metadata, messages: originalMessages });
       return { ok: true, result: JSON.stringify({ ok: true }), latencyMs: Date.now() - start, kind: this.kind, providerId: this.id };
     }
     if (this.opts.enableBatch && name === 'agent__batch') {
       // Minimal batch: always use orchestrator for inner calls
-      const calls = Array.isArray((args as { calls?: unknown }).calls) ? ((args as { calls: unknown[] }).calls) : [];
+      const rawCalls = (args as { calls?: unknown }).calls;
+      let calls: unknown[] = [];
+
+      // Handle both array and JSON string formats
+      if (Array.isArray(rawCalls)) {
+        calls = rawCalls;
+      } else if (typeof rawCalls === 'string') {
+        // Try to extract and parse JSON array from the string
+        // Look for array boundaries and try to parse
+        const trimmed = rawCalls.trim();
+
+        // Find the last valid closing bracket for the JSON array
+        let lastValidIndex = -1;
+        let bracketCount = 0;
+        let inString = false;
+        let escapeNext = false;
+
+        // eslint-disable-next-line functional/no-loop-statements
+        for (let i = 0; i < trimmed.length; i++) {
+          const char = trimmed[i];
+
+          if (!inString) {
+            if (char === '[') bracketCount++;
+            else if (char === ']') {
+              bracketCount--;
+              if (bracketCount === 0) {
+                lastValidIndex = i;
+              }
+            }
+            else if (char === '"') inString = true;
+          } else {
+            if (escapeNext) {
+              escapeNext = false;
+            } else if (char === '\\') {
+              escapeNext = true;
+            } else if (char === '"') {
+              inString = false;
+            }
+          }
+        }
+
+        if (lastValidIndex > 0) {
+          try {
+            const jsonStr = trimmed.substring(0, lastValidIndex + 1);
+            const parsed = JSON.parse(jsonStr) as unknown;
+            if (Array.isArray(parsed)) {
+              calls = parsed;
+            }
+          } catch {
+            // Silently ignore parse errors
+          }
+        }
+      }
+
+      // Log error if batch is empty
+      if (calls.length === 0) {
+        const errorMsg = typeof rawCalls === 'string'
+          ? `agent__batch received empty or unparseable calls array (raw string length: ${String(rawCalls.length)})`
+          : `agent__batch received empty calls array (type: ${typeof rawCalls})`;
+
+        // Log the error
+        this.opts.logError(errorMsg);
+
+        // Return error result for empty batch
+        return {
+          ok: false,
+          result: JSON.stringify({
+            error: {
+              code: 'EMPTY_BATCH',
+              message: errorMsg
+            }
+          }),
+          latencyMs: Date.now() - start,
+          kind: this.kind,
+          providerId: this.id
+        };
+      }
+
       interface R { id: string; tool: string; ok: boolean; elapsedMs: number; output?: string; error?: { code: string; message: string } }
       const results: R[] = await Promise.all(calls.map(async (cUnknown) => {
         const c = (cUnknown !== null && typeof cUnknown === 'object') ? (cUnknown as Record<string, unknown>) : {};
@@ -246,7 +384,7 @@ if (name === 'agent__final_report') {
         if (tool === 'agent__progress_report') {
           const progress = typeof (a.progress) === 'string' ? a.progress : '';
           this.opts.updateStatus(progress);
-          return { id, tool, ok: true, elapsedMs: 0, output: JSON.stringify({ ok: true }) };
+          return { id, tool, ok: true, elapsedMs: Date.now() - t0, output: JSON.stringify({ ok: true }) };
         }
         try {
           if (!(this.opts.orchestrator.hasTool(tool))) return { id, tool, ok: false, elapsedMs: 0, error: { code: 'UNKNOWN_TOOL', message: `Unknown tool: ${tool}` } };

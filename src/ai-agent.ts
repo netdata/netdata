@@ -241,6 +241,20 @@ export class AIAgentSession {
       const internalProvider = new InternalToolProvider('agent', {
         enableBatch,
         expectedJsonSchema,
+        logError: (message: string) => {
+          const entry: LogEntry = {
+            timestamp: Date.now(),
+            severity: 'ERR',
+            turn: this.currentTurn,
+            subturn: 0,
+            direction: 'response',
+            type: 'tool',
+            remoteIdentifier: 'agent:batch',
+            fatal: false,
+            message,
+          };
+          this.log(entry);
+        },
         updateStatus: (text: string) => {
           const t = text.trim();
           if (t.length > 0) {

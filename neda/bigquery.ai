@@ -17,7 +17,7 @@ tools:
   - bigquery
   - batch
 llmTimeout: 120000
-toolTimeout: 120000
+toolTimeout: 30000
 toolResponseMaxBytes: 16384
 maxConcurrentTools: 2
 temperature: 0.3
@@ -34,6 +34,28 @@ ${include:tone-and-language.md}
 
 Output Format: ${FORMAT}
 Current Date and Time: ${DATETIME}, ${DAY}
+
+🔴 MANDATORY DATA FRESHNESS REQUIREMENT 🔴
+YOU MUST ALWAYS include the BigQuery last sync timestamp at the beginning of EVERY response.
+This is CRITICAL because:
+- BigQuery is updated in batches every few hours (not real-time)
+- New customers may not appear if they joined after the last sync
+- Subscription information may be outdated if changed after the last sync
+- Other agents rely on knowing the data cutoff time to avoid confusion
+
+ALWAYS start your response by running this query FIRST:
+```sql
+SELECT MAX(bd_data_ingested_at) AS last_ingested_at,
+       TIMESTAMP_DIFF(CURRENT_TIMESTAMP(), MAX(bd_data_ingested_at), MINUTE) AS age_minutes,
+       'watch_towers.spaces_latest' AS source_table
+FROM `netdata-analytics-bi.watch_towers.spaces_latest`;
+```
+
+Then ALWAYS include in your response:
+"📊 Data freshness: Last synced [TIMESTAMP] ([X] minutes ago)"
+
+If the data is older than 6 hours, add a warning:
+"⚠️ Data may be stale (last sync >6 hours ago). Recent changes may not be reflected."
 
 CRITICAL READ-ONLY POLICY
 - You MUST NOT modify any data in BigQuery. Only SELECT queries are allowed.
@@ -401,6 +423,15 @@ REPLICATED TABLES (DETAILED)
     WHERE space_id = (SELECT space_id FROM params)
       AND _TABLE_SUFFIX BETWEEN (SELECT start_ymd FROM params) AND (SELECT end_ymd FROM params)
     ORDER BY asat;
+  - Example – find Netdata Cloud Space ID from Stripe customer ID:
+    -- Stripe customer IDs look like 'cus_XXXXXXXXXXXXXX'
+    WITH params AS (SELECT 'cus_XXXXXXXXXXXXXX' AS stripe_customer_id)  -- replace with actual customer ID
+    SELECT space_id, customer_id, plan, period, committed_nodes,
+           discount_percentage, created_at
+    FROM `netdata-analytics-bi.app_db_replication.spaceroom_space_active_subscriptions_latest`
+    WHERE customer_id = (SELECT stripe_customer_id FROM params)
+    ORDER BY created_at DESC
+    LIMIT 50;
 
 - spaceroom_labra_subscriptions_latest / _asat_YYYYMMDD
   - Scope: AWS Marketplace (Labra) subs. Fields: `monthly_price_per_committed_node`, `monthly_overage_price_per_node`, `is_private_offer`, `commitment`, `status`, `marketplace`, `expires_at`.
@@ -633,6 +664,14 @@ LIMIT 1;
 
 FRESHNESS CHECKS
 
+🔴 REMEMBER: You MUST run the primary freshness check at the beginning of EVERY query response:
+SELECT MAX(bd_data_ingested_at) AS last_ingested_at,
+       TIMESTAMP_DIFF(CURRENT_TIMESTAMP(), MAX(bd_data_ingested_at), MINUTE) AS age_minutes,
+       'watch_towers.spaces_latest' AS source_table
+FROM `netdata-analytics-bi.watch_towers.spaces_latest`;
+
+Additional freshness checks (optional, for deeper investigation):
+
 -- Latest Watch Towers snapshot (spaces_asat) age in minutes
 SELECT table_name,
        TIMESTAMP_DIFF(CURRENT_TIMESTAMP(), creation_time, MINUTE) AS age_minutes
@@ -648,11 +687,6 @@ FROM `netdata-analytics-bi.app_db_replication.INFORMATION_SCHEMA.TABLES`
 WHERE table_name LIKE 'spaceroom_spaces_asat_%'
 ORDER BY creation_time DESC
 LIMIT 1;
-
--- Ingest timestamp from Watch Towers latest (when available)
-SELECT MAX(bd_data_ingested_at) AS last_ingested_at,
-       TIMESTAMP_DIFF(CURRENT_TIMESTAMP(), MAX(bd_data_ingested_at), MINUTE) AS age_minutes
-FROM `netdata-analytics-bi.watch_towers.spaces_latest`;
 
 ARCHETYPE QUERIES
 
