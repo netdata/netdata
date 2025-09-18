@@ -21,6 +21,7 @@ import (
 func New(snmpClient gosnmp.Handler, profiles []*ddsnmp.Profile, log *logger.Logger, sysobjectid string) *Collector {
 	coll := &Collector{
 		log:         log.With(slog.String("ddsnmp", "collector")),
+		snmpClient:  snmpClient,
 		profiles:    make(map[string]*profileState),
 		missingOIDs: make(map[string]bool),
 		tableCache:  newTableCache(30*time.Minute, 1),
@@ -44,6 +45,7 @@ func New(snmpClient gosnmp.Handler, profiles []*ddsnmp.Profile, log *logger.Logg
 type (
 	Collector struct {
 		log         *logger.Logger
+		snmpClient  gosnmp.Handler
 		profiles    map[string]*profileState
 		missingOIDs map[string]bool
 		tableCache  *tableCache
@@ -120,21 +122,6 @@ func (c *Collector) Collect() ([]*ddsnmp.ProfileMetrics, error) {
 	return metrics, nil
 }
 
-func (c *Collector) SetSNMPClient(snmpClient gosnmp.Handler) {
-	if c.globalTagsCollector != nil {
-		c.globalTagsCollector.snmpClient = snmpClient
-	}
-	if c.deviceMetadataCollector != nil {
-		c.deviceMetadataCollector.snmpClient = snmpClient
-	}
-	if c.scalarCollector != nil {
-		c.scalarCollector.snmpClient = snmpClient
-	}
-	if c.tableCollector != nil {
-		c.tableCollector.snmpClient = snmpClient
-	}
-}
-
 func (c *Collector) collectProfile(ps *profileState) (*ddsnmp.ProfileMetrics, error) {
 	if !ps.initialized {
 		globalTag, err := c.globalTagsCollector.Collect(ps.profile)
@@ -197,6 +184,27 @@ func (c *Collector) updateProfileMetrics(pm *ddsnmp.ProfileMetrics) {
 			m.Tags[k] = metricMetaReplacer.Replace(v)
 		}
 	}
+}
+
+func (c *Collector) snmpGet(oids []string) (map[string]gosnmp.SnmpPDU, error) {
+	pdus := make(map[string]gosnmp.SnmpPDU)
+
+	for chunk := range slices.Chunk(oids, c.snmpClient.MaxOids()) {
+		result, err := c.snmpClient.Get(chunk)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, pdu := range result.Variables {
+			if !isPduWithData(pdu) {
+				c.missingOIDs[trimOID(pdu.Name)] = true
+				continue
+			}
+			pdus[trimOID(pdu.Name)] = pdu
+		}
+	}
+
+	return pdus, nil
 }
 
 var metricMetaReplacer = strings.NewReplacer(
