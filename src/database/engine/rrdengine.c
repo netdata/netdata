@@ -231,9 +231,6 @@ static void work_standard_worker(uv_work_t *req) {
 
     __atomic_sub_fetch(&rrdeng_main.work_cmd.atomics.dispatched, 1, __ATOMIC_RELAXED);
     __atomic_sub_fetch(&rrdeng_main.work_cmd.atomics.executing, 1, __ATOMIC_RELAXED);
-
-    // signal the event loop a worker is available
-    fatal_assert(0 == uv_async_send(&rrdeng_main.async));
 }
 
 static void after_work_standard_callback(uv_work_t* req, int status) {
