@@ -140,7 +140,16 @@ No action required.
 
 
 
-There are no configuration options.
+<details open><summary></summary>
+
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
+| per cpu core utilization | Collects CPU usage metrics for each individual core, in addition to the system-wide averages. | no | no |
+
+
+</details>
 
 
 
