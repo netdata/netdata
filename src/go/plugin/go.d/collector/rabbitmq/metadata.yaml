@@ -67,22 +67,23 @@ modules:
               description: Data collection interval (seconds).
               default_value: 1
               required: false
-              group: Base
+              group: Collection
             - name: autodetection_retry
               description: Autodetection retry interval (seconds). Set 0 to disable.
               default_value: 0
               required: false
-              group: Base
+              group: Collection
+
             - name: url
               description: Target endpoint URL.
               default_value: http://localhost:15672"
               required: true
-              group: Base
+              group: Target
             - name: timeout
               description: HTTP request timeout (seconds).
               default_value: 1
               required: false
-              group: Base
+              group: Target
 
             - name: collect_queues_metrics
               description: Collect per-vhost, per-queue metrics. May cause significant overhead if many queues exist.

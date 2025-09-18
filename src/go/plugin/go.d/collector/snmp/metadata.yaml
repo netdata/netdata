@@ -83,17 +83,18 @@ modules:
             enabled: true
           list:
             - name: update_every
-              group: Base
+              group: Collection
               description: Data collection frequency.
               default_value: 10
               required: false
             - name: autodetection_retry
-              group: Base
+              group: Collection
               description: Recheck interval in seconds. Zero means no recheck will be scheduled.
               default_value: 0
               required: false
+
             - name: hostname
-              group: Base
+              group: Target
               description: Target host (IP or DNS name, IPv4/IPv6).
               default_value: ""
               required: true

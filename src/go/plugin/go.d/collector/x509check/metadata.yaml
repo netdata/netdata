@@ -54,22 +54,23 @@ modules:
               description: Data collection interval (seconds).
               default_value: 1
               required: false
-              group: Base
+              group: Collection
             - name: autodetection_retry
               description: Autodetection retry interval (seconds). Set 0 to disable.
               default_value: 0
               required: false
-              group: Base
+              group: Collection
+
             - name: source
               description: "Certificate source. Allowed schemes: https, tcp, tcp4, tcp6, udp, udp4, udp6, file, smtp."
               default_value: ""
               required: false
-              group: Base
+              group: Target
             - name: timeout
               description: SSL connection timeout (seconds).
               default_value: 2
               required: false
-              group: Base
+              group: Target
 
             - name: check_full_chain
               description: Monitor expiration time for all certificates in the chain (including intermediates and root).

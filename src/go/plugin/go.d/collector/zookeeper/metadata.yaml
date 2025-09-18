@@ -64,22 +64,23 @@ modules:
               description: Data collection interval (seconds).
               default_value: 1
               required: false
-              group: Base
+              group: Collection
             - name: autodetection_retry
               description: Autodetection retry interval (seconds). Set 0 to disable.
               default_value: 0
               required: false
-              group: Base
+              group: Collection
+
             - name: address
               description: Zookeeper server address (`IP:PORT`).
               default_value: 127.0.0.1:2181
               required: true
-              group: Base
+              group: Target
             - name: timeout
               description: Connection, read, write, and TLS handshake timeout (seconds).
               default_value: 1
               required: false
-              group: Base
+              group: Target
 
             - name: use_tls
               description: Enable TLS for the connection.

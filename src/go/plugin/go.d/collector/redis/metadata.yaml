@@ -69,17 +69,18 @@ modules:
               description: Data collection interval (seconds).
               default_value: 5
               required: false
-              group: Base
+              group: Collection
             - name: autodetection_retry
               description: Autodetection retry interval (seconds). Set 0 to disable.
               default_value: 0
               required: false
-              group: Base
+              group: Collection
+
             - name: address
               description: Redis server address (TCP or Unix socket).
               default_value: redis://@localhost:6379
               required: true
-              group: Base
+              group: Target
               details: |
                 There are two connection types: TCP socket and Unix socket.
                 
@@ -89,7 +90,7 @@ modules:
               description: Dial, read, and write timeout (seconds).
               default_value: 1
               required: false
-              group: Base
+              group: Target
 
             - name: username
               description: Username for authentication.
