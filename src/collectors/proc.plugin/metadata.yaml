@@ -70,7 +70,11 @@ modules:
           folding:
             title: ""
             enabled: true
-          list: []
+          list:
+            - name: per cpu core utilization
+              description: Collects CPU usage metrics for each individual core, in addition to the system-wide averages.
+              default_value: no
+              required: false
         examples:
           folding:
             enabled: true
