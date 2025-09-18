@@ -109,7 +109,7 @@ No action required.
 The following options can be defined globally: update_every, autodetection_retry.
 
 
-<details open><summary></summary>
+<details open><summary>Config options</summary>
 
 
 
