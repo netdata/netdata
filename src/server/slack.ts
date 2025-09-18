@@ -944,9 +944,11 @@ const elog = (msg: string): void => { try { process.stderr.write(`[SRV] ← [0.0
     try {
       const userId: string | undefined = body?.user?.id;
       const channelId: string | undefined = body?.channel?.id ?? body?.message?.channel ?? body?.channel_id;
-      const msg = (body?.message ?? {}) as { ts?: string; thread_ts?: string; text?: string };
+      const msg = (body?.message ?? {}) as { ts?: string; thread_ts?: string; text?: string; blocks?: unknown };
       if (!channelId || !userId || !msg?.ts) return;
-      const text = typeof msg.text === 'string' ? msg.text : '';
+      const originalText = typeof msg.text === 'string' ? msg.text : '';
+      const blocksText = extractTextFromBlocks(msg.blocks);
+      const text = originalText.trim().length > 0 ? originalText : blocksText;
       if (text.length === 0) return;
       const chName = await getChannelName(client, channelId);
       const permalink = await getPermalink(client, channelId, msg.ts as string);
