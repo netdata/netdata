@@ -128,6 +128,13 @@ export function formatAgentResultHumanReadable(result: AIAgentResult): string {
       // Successful + non-empty: return only the final report (no appended activity section)
       return fr.content;
     }
+    const serialized = (() => {
+      try { return JSON.stringify(fr, null, 2); } catch { return undefined; }
+    })();
+    if (serialized !== undefined) return serialized;
+    const keys = Object.keys(fr);
+    const meta = keys.length > 0 ? `keys=${keys.join(', ')}` : 'empty object';
+    return `[unserializable final report (${meta})]`;
   }
 
   // Build description of what has been done

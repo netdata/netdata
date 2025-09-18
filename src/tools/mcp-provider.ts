@@ -41,6 +41,10 @@ export class MCPProvider extends ToolProvider {
     this.onLog = opts?.onLog;
   }
 
+  override getInstructions(): string {
+    return this.getCombinedInstructions();
+  }
+
   private sanitizeNamespace(name: string): string {
     return name
       .replace(/[^A-Za-z0-9]/g, '_')

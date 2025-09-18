@@ -442,17 +442,15 @@ export class ToolsOrchestrator {
     if (next !== undefined) { try { next(); } catch (e) { warn(`releaseSlot waiter failed: ${e instanceof Error ? e.message : String(e)}`); } }
   }
 
-  // Aggregate instructions from MCP providers
-  getMCPInstructions(): string {
+  // Aggregate instructions across providers
+  getCombinedInstructions(): string {
     const parts: string[] = [];
     // eslint-disable-next-line functional/no-loop-statements
     for (const p of this.providers) {
-      if (p.kind === 'mcp' && typeof (p as unknown as { getCombinedInstructions?: () => string }).getCombinedInstructions === 'function') {
-        try {
-          const s = (p as unknown as { getCombinedInstructions: () => string }).getCombinedInstructions();
-          if (s && s.length > 0) parts.push(s);
-        } catch (e) { warn(`getMCPInstructions failed: ${e instanceof Error ? e.message : String(e)}`); }
-      }
+      try {
+        const instr = p.getInstructions();
+        if (typeof instr === 'string' && instr.trim().length > 0) parts.push(instr.trim());
+      } catch (e) { warn(`getCombinedInstructions failed: ${e instanceof Error ? e.message : String(e)}`); }
     }
     return parts.join('\n\n');
   }

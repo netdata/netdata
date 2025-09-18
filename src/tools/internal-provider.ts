@@ -1,34 +1,64 @@
 import Ajv from 'ajv';
 
+import type { OutputFormatId } from '../formats.js';
 import type { MCPTool } from '../types.js';
 import type { ToolsOrchestrator } from './tools.js';
 import type { ToolExecuteOptions, ToolExecuteResult } from './types.js';
 
+import { describeFormat } from '../formats.js';
+
 import { ToolProvider } from './types.js';
+
+interface InternalToolProviderOptions {
+  enableBatch: boolean;
+  outputFormat: OutputFormatId;
+  expectedOutputFormat?: OutputFormatId;
+  expectedJsonSchema?: Record<string, unknown>;
+  updateStatus: (text: string) => void;
+  setTitle: (title: string, emoji?: string) => void;
+  setFinalReport: (payload: { status: 'success'|'failure'|'partial'; format: string; content?: string; content_json?: Record<string, unknown>; metadata?: Record<string, unknown>; messages?: unknown[] }) => void;
+  logError: (message: string) => void;
+  orchestrator: ToolsOrchestrator;
+  toolTimeoutMs?: number;
+}
+
+const PROGRESS_TOOL = 'agent__progress_report';
+const FINAL_REPORT_TOOL = 'agent__final_report';
+const BATCH_TOOL = 'agent__batch';
+const SLACK_BLOCK_KIT_FORMAT: OutputFormatId = 'slack-block-kit';
+const REPORT_FORMAT_LABEL = '`report_format`';
 
 export class InternalToolProvider extends ToolProvider {
   readonly kind = 'agent' as const;
   private readonly ajv = new Ajv({ allErrors: true, strict: false });
+  private readonly formatId: OutputFormatId;
+  private readonly formatDescription: string;
+  private readonly instructions: string;
 
   constructor(
     public readonly id: string,
-    private readonly opts: {
-      enableBatch: boolean;
-      expectedJsonSchema?: Record<string, unknown>;
-      // Callbacks into session
-      updateStatus: (text: string) => void;
-      setTitle: (title: string, emoji?: string) => void;
-      setFinalReport: (payload: { status: 'success'|'failure'|'partial'; format: string; content?: string; content_json?: Record<string, unknown>; metadata?: Record<string, unknown>; messages?: unknown[] }) => void;
-      logError: (message: string) => void;
-      orchestrator: ToolsOrchestrator;
-      toolTimeoutMs?: number;
+    private readonly opts: InternalToolProviderOptions
+  ) {
+    super();
+    this.formatId = opts.outputFormat;
+    this.formatDescription = describeFormat(this.formatId);
+    const expected = opts.expectedOutputFormat;
+    if (expected !== undefined && expected !== this.formatId) {
+      throw new Error(`Output format mismatch: expectedOutput.format=${expected} but session outputFormat=${this.formatId}`);
     }
-  ) { super(); }
+    if (opts.expectedJsonSchema !== undefined && this.formatId !== 'json') {
+      throw new Error('JSON schema provided but output format is not json');
+    }
+    if (this.formatId === 'json' && expected !== undefined && expected !== 'json') {
+      throw new Error(`JSON output required but expected format is ${expected}`);
+    }
+    this.instructions = this.buildInstructions();
+  }
 
   listTools(): MCPTool[] {
     const tools: MCPTool[] = [
       {
-        name: 'agent__progress_report',
+        name: PROGRESS_TOOL,
         description: 'Report current progress to user (max 15 words). MUST call in parallel with primary actions for real-time visibility.',
         inputSchema: {
           type: 'object',
@@ -39,27 +69,11 @@ export class InternalToolProvider extends ToolProvider {
           },
         },
       },
-      {
-        name: 'agent__final_report',
-        description: 'You MUST use agent__final_report to provide your final response to the user request.',
-        inputSchema: {
-          type: 'object',
-          additionalProperties: true,
-          required: ['status', 'format'],
-          properties: {
-            status: { type: 'string', enum: ['success', 'failure', 'partial'] },
-            format: { type: 'string', enum: ['json', 'markdown', 'markdown+mermaid', 'slack-block-kit', 'tty', 'pipe', 'sub-agent', 'text'] },
-            content: { type: 'string' },
-            content_json: { type: 'object' },
-            metadata: { type: 'object' },
-            messages: { type: 'array', items: { type: 'object', additionalProperties: true } }
-          }
-        }
-      }
+      this.buildFinalReportTool()
     ];
     if (this.opts.enableBatch) {
       tools.push({
-        name: 'agent__batch',
+        name: BATCH_TOOL,
         description: 'Execute multiple tools in one call (always parallel). Use exposed tool names.',
         inputSchema: {
           type: 'object',
@@ -87,7 +101,226 @@ export class InternalToolProvider extends ToolProvider {
   }
 
   hasTool(name: string): boolean {
-    return name === 'agent__progress_report' || name === 'agent__final_report' || (this.opts.enableBatch && name === 'agent__batch');
+    return name === PROGRESS_TOOL || name === FINAL_REPORT_TOOL || (this.opts.enableBatch && name === BATCH_TOOL);
+  }
+
+  override getInstructions(): string {
+    return this.instructions;
+  }
+
+  getFormatInfo(): { formatId: OutputFormatId; description: string } {
+    return { formatId: this.formatId, description: this.formatDescription };
+  }
+
+  private buildInstructions(): string {
+    const lines: string[] = ['## INTERNAL TOOLS', ''];
+    lines.push(`- Finish ONLY by calling \`${FINAL_REPORT_TOOL}\` exactly once.`);
+    lines.push(`- Do NOT end with plain text. The session ends only after \`${FINAL_REPORT_TOOL}\`.`);
+    lines.push('- Arguments:');
+    lines.push('  - `status`: one of `success`, `failure`, `partial`.');
+    if (this.formatId === 'json') {
+      lines.push(`  - ${REPORT_FORMAT_LABEL}: "json".`);
+      lines.push('  - `content_json`: MUST match the required JSON Schema exactly.');
+    } else if (this.formatId === SLACK_BLOCK_KIT_FORMAT) {
+      lines.push(`  - ${REPORT_FORMAT_LABEL}: "${SLACK_BLOCK_KIT_FORMAT}".`);
+      lines.push('  - `messages`: array of Slack Block Kit messages (no plain `report_content`).');
+      lines.push('    • Up to 20 messages, each with ≤50 blocks. Sections/context mrkdwn ≤2000 chars; headers plain_text ≤150.');
+    } else {
+      lines.push(`  - ${REPORT_FORMAT_LABEL}: "${this.formatId}".`);
+      lines.push('  - `report_content`: complete deliverable in the requested format.');
+    }
+    lines.push('');
+    lines.push(`- Use tool \`${PROGRESS_TOOL}\` to provide real-time progress updates and next steps.`);
+    lines.push('  - Real-time updates keep users informed about ongoing actions and plans.');
+    lines.push(`  - **CRITICAL**: Call \`${PROGRESS_TOOL}\` on EVERY turn, in PARALLEL with other tools.`);
+    lines.push('  - Keep progress brief: max 20 words.');
+    lines.push('  - Examples of good parallel usage:');
+    lines.push('    When using batch:');
+    lines.push('    {');
+    lines.push('      "calls": [');
+    lines.push(`        { "id": 1, "tool": "${PROGRESS_TOOL}", "args": { "progress": "Searching documentation for XYZ" } },`);
+    lines.push('        { "id": 2, "tool": "jina__jina_search_web", "args": { "query": "..." } }');
+    lines.push('      ]');
+    lines.push('    }');
+    lines.push('    When calling multiple tools:');
+    lines.push(`    - Call \`${PROGRESS_TOOL}\` with "Analyzing config files for ABC"`);
+    lines.push('    - AND call your actual analysis tools in the same turn');
+    lines.push(`  - BAD usage (wastes turns): Calling \`${PROGRESS_TOOL}\` alone.`);
+    if (this.opts.enableBatch) {
+      lines.push('');
+      lines.push(`- Use tool \`${BATCH_TOOL}\` to call multiple tools in one go.`);
+      lines.push('  - `calls[]`: items with `id`, `tool` (exposed name), `args`. Execution is parallel.');
+      lines.push('  - Keep `args` minimal; they are validated against real schemas.');
+      lines.push('  - Example with progress_report + searches:');
+      lines.push('    {');
+      lines.push('      "calls": [');
+      lines.push(`        { "id": 1, "tool": "${PROGRESS_TOOL}", "args": { "progress": "Researching Netdata and eBPF" } },`);
+      lines.push('        { "id": 2, "tool": "jina__jina_search_web", "args": { "query": "Netdata real-time monitoring features", "num": 10 } },');
+      lines.push('        { "id": 3, "tool": "jina__jina_search_arxiv", "args": { "query": "eBPF monitoring 2024", "num": 20 } },');
+      lines.push('        { "id": 4, "tool": "brave__brave_web_search", "args": { "query": "Netdata Cloud pricing", "count": 8, "offset": 0 } },');
+      lines.push('        { "id": 5, "tool": "brave__brave_local_search", "args": { "query": "coffee near Athens", "count": 5 } },');
+      lines.push('        { "id": 6, "tool": "fetcher__fetch_url", "args": { "url": "https://www.netdata.cloud" } },');
+      lines.push('        { "id": 7, "tool": "fetcher__fetch_url", "args": { "url": "https://learn.netdata.cloud/" } }');
+      lines.push('      ]');
+      lines.push('    }');
+    }
+    return lines.join('\n');
+  }
+
+  private buildFinalReportTool(): MCPTool {
+    const statusProp = { type: 'string', enum: ['success', 'failure', 'partial'] } as const;
+    const metadataProp = { type: 'object' };
+    const baseDescription = 'You MUST use agent__final_report to provide your final response to the user request.';
+
+    if (this.formatId === 'json') {
+      const schema = this.opts.expectedJsonSchema ?? { type: 'object' };
+      return {
+        name: FINAL_REPORT_TOOL,
+        description: `${baseDescription} Use the exact JSON expected. ${this.formatDescription}`.trim(),
+        inputSchema: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['status', 'report_format', 'content_json'],
+          properties: {
+            status: statusProp,
+            report_format: { type: 'string', const: 'json', description: this.formatDescription },
+            content_json: schema,
+            metadata: metadataProp,
+          },
+        },
+      };
+    }
+
+    if (this.formatId === SLACK_BLOCK_KIT_FORMAT) {
+      const desc = `${baseDescription} Use Slack mrkdwn (not GitHub markdown). ${this.formatDescription}`.trim();
+      return {
+        name: FINAL_REPORT_TOOL,
+        description: desc,
+        inputSchema: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['status', 'report_format', 'messages'],
+          properties: {
+            status: statusProp,
+            report_format: { type: 'string', const: SLACK_BLOCK_KIT_FORMAT, description: this.formatDescription },
+            messages: {
+              type: 'array',
+              minItems: 1,
+              maxItems: 20,
+              items: {
+                type: 'object',
+                additionalProperties: true,
+                required: ['blocks'],
+                properties: {
+                  blocks: {
+                    type: 'array',
+                    minItems: 1,
+                    maxItems: 50,
+                    items: {
+                      oneOf: [
+                        {
+                          type: 'object',
+                          additionalProperties: true,
+                          required: ['type', 'text'],
+                          properties: {
+                            type: { const: 'section' },
+                            text: {
+                              type: 'object',
+                              additionalProperties: true,
+                              required: ['type', 'text'],
+                              properties: {
+                                type: { const: 'mrkdwn' },
+                                text: { type: 'string', minLength: 1, maxLength: 2900 }
+                              }
+                            },
+                            fields: {
+                              type: 'array',
+                              maxItems: 10,
+                              items: {
+                                type: 'object',
+                                additionalProperties: true,
+                                required: ['type', 'text'],
+                                properties: {
+                                  type: { const: 'mrkdwn' },
+                                  text: { type: 'string', minLength: 1, maxLength: 2000 }
+                                }
+                              }
+                            }
+                          }
+                        },
+                        {
+                          type: 'object',
+                          additionalProperties: true,
+                          required: ['type', 'text'],
+                          properties: {
+                            type: { const: 'header' },
+                            text: {
+                              type: 'object',
+                              additionalProperties: true,
+                              required: ['type', 'text'],
+                              properties: {
+                                type: { const: 'plain_text' },
+                                text: { type: 'string', minLength: 1, maxLength: 150 }
+                              }
+                            }
+                          }
+                        },
+                        {
+                          type: 'object',
+                          additionalProperties: true,
+                          required: ['type'],
+                          properties: { type: { const: 'divider' } }
+                        },
+                        {
+                          type: 'object',
+                          additionalProperties: true,
+                          required: ['type', 'elements'],
+                          properties: {
+                            type: { const: 'context' },
+                            elements: {
+                              type: 'array',
+                              minItems: 1,
+                              maxItems: 10,
+                              items: {
+                                type: 'object',
+                                additionalProperties: true,
+                                required: ['type', 'text'],
+                                properties: {
+                                  type: { const: 'mrkdwn' },
+                                  text: { type: 'string', minLength: 1, maxLength: 2000 }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            },
+            metadata: metadataProp,
+          },
+        },
+      };
+    }
+
+    const descSuffix = this.formatDescription.length > 0 ? this.formatDescription : this.formatId;
+    return {
+      name: FINAL_REPORT_TOOL,
+      description: `${baseDescription} Final deliverable must be ${descSuffix}.`.trim(),
+      inputSchema: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['status', 'report_format', 'report_content'],
+        properties: {
+          status: statusProp,
+          report_format: { type: 'string', const: this.formatId, description: this.formatDescription },
+          report_content: { type: 'string', minLength: 1, description: 'Complete final deliverable in the requested format.' },
+          metadata: metadataProp,
+        },
+      },
+    };
   }
 
   async execute(name: string, args: Record<string, unknown>, _opts?: ToolExecuteOptions): Promise<ToolExecuteResult> {
@@ -97,17 +330,18 @@ export class InternalToolProvider extends ToolProvider {
       this.opts.updateStatus(progress);
       return { ok: true, result: JSON.stringify({ ok: true }), latencyMs: Date.now() - start, kind: this.kind, providerId: this.id };
     }
-if (name === 'agent__final_report') {
+    if (name === 'agent__final_report') {
       const status = (typeof args.status === 'string' ? args.status : 'success') as 'success'|'failure'|'partial';
-      // Support both old 'format' and new 'report_format' field names
-      const format = (typeof args.report_format === 'string' ? args.report_format : (typeof args.format === 'string' ? args.format : 'markdown'));
-      // Support both old 'content' and new 'report_content' field names
+      const requestedFormat = typeof args.report_format === 'string' ? args.report_format : (typeof args.format === 'string' ? args.format : undefined);
+      if (requestedFormat !== undefined && requestedFormat !== this.formatId) {
+        this.opts.logError(`agent__final_report: received report_format='${requestedFormat}', expected '${this.formatId}'. Proceeding with expected format.`);
+      }
       const content = typeof args.report_content === 'string' ? args.report_content : (typeof args.content === 'string' ? args.content : undefined);
-      const content_json = (args.content_json !== null && typeof args.content_json === 'object' && !Array.isArray(args.content_json)) ? (args.content_json as Record<string, unknown>) : undefined;
+      const contentJson = (args.content_json !== null && typeof args.content_json === 'object' && !Array.isArray(args.content_json)) ? (args.content_json as Record<string, unknown>) : undefined;
       const metadata = (args.metadata !== null && typeof args.metadata === 'object' && !Array.isArray(args.metadata)) ? (args.metadata as Record<string, unknown>) : undefined;
       const originalMessages = Array.isArray(args.messages) ? args.messages : undefined;
-      // Enforce required payload per format
-      if (format === 'slack-block-kit') {
+
+      if (this.formatId === SLACK_BLOCK_KIT_FORMAT) {
         const asString = (value: unknown): string | undefined => {
           if (typeof value !== 'string') return undefined;
           const trimmed = value.trim();
@@ -138,9 +372,8 @@ if (name === 'agent__final_report') {
           if (isObj(parsed)) return [parsed];
           return [];
         };
-        // Accept structured messages, strings containing JSON, or plain text content (fallback)
         const normalizedMessages: Record<string, unknown>[] = (() => {
-          const fromMessages = expandMessages(args.messages).slice(0, 20);
+          const fromMessages = expandMessages(originalMessages).slice(0, 20);
           if (fromMessages.length > 0) return fromMessages;
           if (typeof content === 'string' && content.trim().length > 0) {
             return [ { blocks: [ { type: 'section', text: { type: 'mrkdwn', text: content } } ] } ];
@@ -148,7 +381,6 @@ if (name === 'agent__final_report') {
           return [];
         })();
         if (normalizedMessages.length === 0) throw new Error('final_report(slack-block-kit) requires `messages` or non-empty `content`.');
-        // Auto-repair to prevent slack_invalid_blocks loops
         const repairedMessages: Record<string, unknown>[] = (() => {
           const clamp = (s: unknown, max: number): string => {
             const t = typeof s === 'string' ? s : (typeof s === 'number' || typeof s === 'boolean') ? String(s) : '';
@@ -190,7 +422,6 @@ if (name === 'agent__final_report') {
               if (elems.length === 0) return undefined;
               return { type: 'context', elements: elems };
             }
-            // default to section
             const textObj = isObj(bb.text) ? (bb.text as { text?: unknown }) : undefined;
             const rawText = (textObj?.text !== undefined ? textObj.text : bb.text);
             const fields = asArr(bb.fields).map((f) => toMrkdwn(isObj(f) ? (f as { text?: unknown }).text : f, 2000)).slice(0, 10);
@@ -226,7 +457,6 @@ if (name === 'agent__final_report') {
             .filter((x): x is Record<string, unknown> => x !== undefined)
             .slice(0, 20);
         })();
-        // Validate Slack constraints: blocks<=50, mrkdwn<=2900 (section), header<=150, context<=2000
         const slackSchema: Record<string, unknown> = {
           type: 'array', minItems: 1, maxItems: 20,
           items: {
@@ -256,7 +486,6 @@ if (name === 'agent__final_report') {
             const errs = (validate.errors ?? []).map((e) => `${e.instancePath} ${e.message ?? ''}`.trim()).join('; ');
             throw new Error(`slack_invalid_blocks: ${errs}`);
           }
-          // Use the successfully validated set for downstream metadata
           normalizedMessages.splice(0, normalizedMessages.length, ...finalMsgs);
         } catch (e) {
           const msg = e instanceof Error ? e.message : String(e);
@@ -265,17 +494,17 @@ if (name === 'agent__final_report') {
         const metaBase: Record<string, unknown> = (metadata ?? {});
         const slackVal = (metaBase as Record<string, unknown> & { slack?: unknown }).slack;
         const slackExisting: Record<string, unknown> = (slackVal !== undefined && slackVal !== null && typeof slackVal === 'object' && !Array.isArray(slackVal)) ? (slackVal as Record<string, unknown>) : {};
-        const metaSlack: Record<string, unknown> = { ...slackExisting };
-        metaSlack.messages = normalizedMessages;
+        const metaSlack: Record<string, unknown> = { ...slackExisting, messages: normalizedMessages };
         const mergedMeta: Record<string, unknown> = { ...metaBase, slack: metaSlack };
-        this.opts.setFinalReport({ status, format, content, content_json, metadata: mergedMeta, messages: normalizedMessages });
+        this.opts.setFinalReport({ status, format: this.formatId, content, content_json: contentJson, metadata: mergedMeta });
         return { ok: true, result: JSON.stringify({ ok: true }), latencyMs: Date.now() - start, kind: this.kind, providerId: this.id };
-      } else if (format === 'json') {
-        if (content_json === undefined) throw new Error('final_report(json) requires `content_json` (object).');
-        // Optional schema validation
+      }
+
+      if (this.formatId === 'json') {
+        if (contentJson === undefined) throw new Error('final_report(json) requires `content_json` (object).');
         if (this.opts.expectedJsonSchema !== undefined) {
           const validate = this.ajv.compile(this.opts.expectedJsonSchema);
-          const ok = validate(content_json);
+          const ok = validate(contentJson);
           if (!ok) {
             const errs = (validate.errors ?? []).map((e) => {
               const inst = typeof e.instancePath === 'string' ? e.instancePath : '';
@@ -285,10 +514,12 @@ if (name === 'agent__final_report') {
             throw new Error(`final_report(json) schema validation failed: ${errs}`);
           }
         }
-      } else {
-        if (typeof content !== 'string' || content.trim().length === 0) throw new Error(`agent__final_report requires non-empty report_content field.`);
+        this.opts.setFinalReport({ status, format: this.formatId, content, content_json: contentJson, metadata });
+        return { ok: true, result: JSON.stringify({ ok: true }), latencyMs: Date.now() - start, kind: this.kind, providerId: this.id };
       }
-      this.opts.setFinalReport({ status, format, content, content_json, metadata, messages: originalMessages });
+
+      if (typeof content !== 'string' || content.trim().length === 0) throw new Error('agent__final_report requires non-empty report_content field.');
+      this.opts.setFinalReport({ status, format: this.formatId, content, content_json: contentJson, metadata });
       return { ok: true, result: JSON.stringify({ ok: true }), latencyMs: Date.now() - start, kind: this.kind, providerId: this.id };
     }
     if (this.opts.enableBatch && name === 'agent__batch') {

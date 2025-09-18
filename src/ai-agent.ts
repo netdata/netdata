@@ -8,7 +8,7 @@ import Ajv from 'ajv';
 
 import type { OutputFormatId } from './formats.js';
 import type { SessionNode } from './session-tree.js';
-import type { AIAgentSessionConfig, AIAgentResult, ConversationMessage, LogEntry, AccountingEntry, Configuration, TurnRequest, MCPTool, LLMAccountingEntry, ToolAccountingEntry, RestToolConfig } from './types.js';
+import type { AIAgentSessionConfig, AIAgentResult, ConversationMessage, LogEntry, AccountingEntry, Configuration, TurnRequest, LLMAccountingEntry, ToolAccountingEntry, RestToolConfig } from './types.js';
 
 // Exit codes according to DESIGN.md
 type ExitCode = 
@@ -240,6 +240,8 @@ export class AIAgentSession {
       const expectedJsonSchema = (eo !== undefined && eo.format === 'json') ? eo.schema : undefined;
       const internalProvider = new InternalToolProvider('agent', {
         enableBatch,
+        outputFormat: this.sessionConfig.outputFormat,
+        expectedOutputFormat: eo?.format === 'json' ? 'json' : undefined,
         expectedJsonSchema,
         logError: (message: string) => {
           const entry: LogEntry = {
@@ -258,15 +260,12 @@ export class AIAgentSession {
         updateStatus: (text: string) => {
           const t = text.trim();
           if (t.length > 0) {
-            // Update the latest status in the opTree
             this.opTree.setLatestStatus(t);
-            // Trigger callback to notify listeners (like Slack progress updates)
             try {
               this.sessionConfig.callbacks?.onOpTree?.(this.opTree.getSession());
             } catch (e) {
               warn(`onOpTree callback failed: ${e instanceof Error ? e.message : String(e)}`);
             }
-            // Log progress update in VRB, bold, without truncation
             const ts = Date.now();
             const entry: LogEntry = {
               timestamp: ts,
@@ -287,7 +286,6 @@ export class AIAgentSession {
           const clean = title.trim();
           if (clean.length === 0) return;
           this.sessionTitle = { title: clean, emoji, ts: Date.now() };
-          // Update the opTree with the new title
           this.opTree.setSessionTitle(clean);
           const entry: LogEntry = {
             timestamp: Date.now(),
@@ -307,6 +305,9 @@ export class AIAgentSession {
         orchestrator: orch,
         toolTimeoutMs: sessionConfig.toolTimeout
       });
+      const formatInfo = internalProvider.getFormatInfo();
+      this.resolvedFormat = formatInfo.formatId;
+      this.resolvedFormatDescription = formatInfo.description;
       orch.register(internalProvider);
     }
     if (this.subAgents !== undefined) {
@@ -740,17 +741,11 @@ export class AIAgentSession {
         }
       } catch (e) { warn(`pricing coverage check failed: ${e instanceof Error ? e.message : String(e)}`); }
 
-      // Resolve FORMAT centrally from configuration (with sane fallback)
-      const { describeFormat } = await import('./formats.js');
-      const resolvedFmt: OutputFormatId = this.sessionConfig.outputFormat;
-      const fmtDesc = describeFormat(resolvedFmt);
-      this.resolvedFormat = resolvedFmt;
-      this.resolvedFormatDescription = fmtDesc;
-
       // Apply ${FORMAT} replacement first, then expand variables
       // Safety: strip any shebang/frontmatter from system prompt to avoid leaking YAML to the LLM
       const sysBody = extractBodyWithoutFrontmatter(this.sessionConfig.systemPrompt);
       // Inject plain format description only where ${FORMAT} or {{FORMAT}} exists; do not prepend extra text
+      const fmtDesc = this.resolvedFormatDescription ?? '';
       const withFormat = applyFormat(sysBody, fmtDesc);
       const vars = { ...buildPromptVars(), MAX_TURNS: String(this.sessionConfig.maxTurns ?? 10) };
       const systemExpanded = expandVars(withFormat, vars);
@@ -780,7 +775,7 @@ export class AIAgentSession {
           } catch (e) { warn(`startup verbose log failed: ${e instanceof Error ? e.message : String(e)}`); }
 
       // Build enhanced system prompt with tool instructions
-      const toolInstructions = this.toolsOrchestrator?.getMCPInstructions() ?? '';
+      const toolInstructions = this.toolsOrchestrator?.getCombinedInstructions() ?? '';
       const enhancedSystemPrompt = this.enhanceSystemPrompt(systemExpanded, toolInstructions);
       this.resolvedSystemPrompt = enhancedSystemPrompt;
 
@@ -1750,11 +1745,9 @@ export class AIAgentSession {
     }
   }
 
-  private enhanceSystemPrompt(systemPrompt: string, mcpInstructions: string): string {
-    const internal = this.buildInternalToolsInstructions();
+  private enhanceSystemPrompt(systemPrompt: string, toolsInstructions: string): string {
     const blocks: string[] = [systemPrompt];
-    if (mcpInstructions.trim().length > 0) blocks.push(`## TOOLS' INSTRUCTIONS\n\n${mcpInstructions}`);
-    if (internal.trim().length > 0) blocks.push(`## INTERNAL TOOLS\n\n${internal}`);
+    if (toolsInstructions.trim().length > 0) blocks.push(`## TOOLS' INSTRUCTIONS\n\n${toolsInstructions}`);
     return blocks.join('\n\n');
   }
 
@@ -1868,360 +1861,6 @@ export class AIAgentSession {
     );
   }
 
-  // Build internal tools list dynamically based on expected output
-  private getInternalTools(): MCPTool[] {
-    const tools: MCPTool[] = [
-      {
-        name: 'agent__progress_report',
-        description: 'Provide a brief text summary (up to 20 words) of your current status and next steps.',
-        inputSchema: {
-          type: 'object',
-          additionalProperties: false,
-          required: ['progress'],
-          properties: {
-            progress: { type: 'string', minLength: 1 }
-          },
-        },
-      }
-    ];
-
-    const exp = this.sessionConfig.expectedOutput;
-    const common = { status: { type: 'string', enum: ['success','failure','partial'] }, metadata: { type: 'object' } } as Record<string, unknown>;
-    const rf: OutputFormatId = this.sessionConfig.outputFormat;
-    if ((exp?.format === 'json') && rf !== 'json') {
-      const rfStr = rf as string;
-      throw new Error(`Output format mismatch: expectedOutput.format=json but session outputFormat=${rfStr}`);
-    }
-    if ((exp?.format === 'json') || rf === 'json') {
-      {
-        const descStr = (typeof this.resolvedFormatDescription === 'string' && this.resolvedFormatDescription.length > 0) ? ` ${this.resolvedFormatDescription}` : '';
-        tools.push({
-          name: 'agent__final_report',
-          description: (`You MUST use agent__final_report to provide your final response to the user, and complete this task. Use the exact JSON expected.` + descStr).trim(),
-          inputSchema: {
-            type: 'object',
-            additionalProperties: false,
-            required: ['status', 'report_format', 'content_json'],
-            properties: {
-              status: common.status,
-              report_format: { type: 'string', const: 'json', description: this.resolvedFormatDescription },
-              content_json: (exp?.schema ?? { type: 'object' }),
-              metadata: common.metadata,
-            },
-          },
-        });
-      }
-    } else {
-      // Non-JSON: expose resolved format id and description; content is string
-      const id = this.sessionConfig.outputFormat as string;
-      const desc = this.resolvedFormatDescription;
-      {
-        const suffix = (typeof desc === 'string' && desc.length > 0) ? ` ${desc}` : '';
-        // Specialize Slack schema and instructions to support Block Kit messages array
-        if (id === 'slack' || id === 'slack-block-kit') {
-          const S_TYPE_MRKDWN = '\\"type\\": \\"mrkdwn\\"';
-          const S_TYPE_SECTION = '\\"type\\": \\"section\\"';
-          const slackInstructions = (
-            'Use Slack\'s block kit with Slack mrkdwn (not GitHub markdown) like this:\n\n'
-            + '"messages": [\n'
-            + '  {\n'
-            + '    "blocks": [\n'
-            + '      {\n'
-            + '        "type": "header",\n'
-            + '        "text": {\n'
-            + '          "type": "plain_text",\n'
-            + '          "text": "Company Intelligence: *Acme Corp*"\n'
-            + '        }\n'
-            + '      },\n'
-            + '      {\n'
-            + '        "type": "context",\n'
-            + '        "elements": [\n'
-            + '          {\n'
-            + `            ${S_TYPE_MRKDWN},\n`
-            + '            "text": "Generated: 2025-01-05 | Domain: acme.com"\n'
-            + '          }\n'
-            + '        ]\n'
-            + '      },\n'
-            + '      { "type": "divider" },\n'
-            + '      {\n'
-            + `        ${S_TYPE_SECTION},\n`
-            + '        "text": { "type": "mrkdwn", "text": "*🏢 Company Profile*" }\n'
-            + '      },\n'
-            + '      {\n'
-            + `        ${S_TYPE_SECTION},\n`
-            + '        "text": {\n'
-            + `          ${S_TYPE_MRKDWN},\n`
-            + '          "text": "• Industry: *B2B SaaS*\\n• Employees: *500-1000*\\n• Revenue: *$50M ARR*\\n• Funding: *Series C ($75M)*"\n'
-            + '        }\n'
-            + '      },\n'
-            + '      { "type": "divider" },\n'
-            + '      {\n'
-            + `        ${S_TYPE_SECTION},\n`
-            + '        "text": { "type": "mrkdwn", "text": "*📊 Netdata Usage*" }\n'
-            + '      },\n'
-            + '      {\n'
-            + `        ${S_TYPE_SECTION},\n`
-            + '        "text": {\n'
-            + `          ${S_TYPE_MRKDWN},\n`
-            + '          "text": "```\\nSpace: *Acme Corp*\\nReachable Nodes: *247*\\nUsers: *12*\\nLast Activity: *today*\\n```"\n'
-            + '        }\n'
-            + '      }\n'
-            + '    ]\n'
-            + '  },\n'
-            + '  {\n'
-            + '    "blocks": [ /* next message blocks */ ]\n'
-            + '  }\n'
-            + ']\n\n'
-            + 'Split long output into multiple messages. You can post up to 20 messages, each message having up to 50 blocks, each block having up to 2000 characters in Slack mrkdwn (not GitHub markdown).\n\n'
-            + 'Slack mrkdwn (not GitHub markdown) format:\n'
-            + '- *bold* → bold (**CRITICAL**: single asterisk * for bold, NOT double **)\n'
-            + '- _italic_ → italic\n'
-            + '- ~strikethrough~ → strikethrough\n'
-            + '- `inline code`\n'
-            + '- ```code block```\n'
-            + '- > quoted text (at line start)\n'
-            + '- <https://example.com|Link Text> → clickable links\n'
-            + '- Lists: Use •, -, or numbers (no nesting)\n\n'
-            + 'GitHub markdown is *NOT* supported:\n'
-            + '- No Tables\n'
-            + '- No Headers (#, ##)\n'
-            + '- No Horizontal rules (---)\n'
-            + '- No Nested lists\n'
-            + '- No Image embedding\n'
-            + '- No HTML tags\n'
-            + 'CRITICAL: ALL STRINGS MUST BE IN SLACK MRKDWN FORMAT (not GitHub markdown). CRITICAL: Use single asterisk * for bold, NOT double **.\n'
-          );
-          tools.push({
-            name: 'agent__final_report',
-            description: (
-              'You MUST use agent__final_report to provide your final response to the user request. Use Slack mrkdwn (not GitHub markdown). ' + suffix
-              + '\nREQUIREMENT: Provide up to 20 `messages` with Block Kit + mrkdwn only (not GitHub markdown). Do NOT provide plain `content`. Do NOT use GitHub markdown. Single asterisks * MUST be used for bold text.\n\n'
-              + slackInstructions
-            ).trim(),
-            inputSchema: {
-              type: 'object',
-              additionalProperties: false,
-              required: ['status', 'report_format', 'messages'],
-              properties: {
-                status: common.status,
-                report_format: { type: 'string', const: 'slack-block-kit', description: desc },
-                // Block Kit messages for multi-message output
-                messages: {
-                  type: 'array',
-                  minItems: 1,
-                  maxItems: 20,
-                  items: {
-                    type: 'object',
-                    additionalProperties: true,
-                    required: ['blocks'],
-                    properties: {
-                      blocks: {
-                        type: 'array',
-                        minItems: 1,
-                        maxItems: 50,
-                        items: {
-                          oneOf: [
-                            {
-                              type: 'object',
-                              additionalProperties: true,
-                              required: ['type', 'text'],
-                              properties: {
-                                type: { const: 'section' },
-                                text: {
-                                  type: 'object',
-                                  additionalProperties: true,
-                                  required: ['type', 'text'],
-                                  properties: {
-                                    type: { const: 'mrkdwn' },
-                                    text: { type: 'string', minLength: 1, maxLength: 2900 }
-                                  }
-                                },
-                                fields: {
-                                  type: 'array',
-                                  maxItems: 10,
-                                  items: {
-                                    type: 'object',
-                                    additionalProperties: true,
-                                    required: ['type', 'text'],
-                                    properties: {
-                                      type: { const: 'mrkdwn' },
-                                      text: { type: 'string', minLength: 1, maxLength: 2000 }
-                                    }
-                                  }
-                                }
-                              }
-                            },
-                            {
-                              type: 'object',
-                              additionalProperties: true,
-                              required: ['type', 'text'],
-                              properties: {
-                                type: { const: 'header' },
-                                text: {
-                                  type: 'object',
-                                  additionalProperties: true,
-                                  required: ['type', 'text'],
-                                  properties: {
-                                    type: { const: 'plain_text' },
-                                    text: { type: 'string', minLength: 1, maxLength: 150 }
-                                  }
-                                }
-                              }
-                            },
-                            {
-                              type: 'object',
-                              additionalProperties: true,
-                              required: ['type'],
-                              properties: { type: { const: 'divider' } }
-                            },
-                            {
-                              type: 'object',
-                              additionalProperties: true,
-                              required: ['type', 'elements'],
-                              properties: {
-                                type: { const: 'context' },
-                                elements: {
-                                  type: 'array',
-                                  minItems: 1,
-                                  maxItems: 10,
-                                  items: {
-                                    type: 'object',
-                                    additionalProperties: true,
-                                    required: ['type', 'text'],
-                                    properties: {
-                                      type: { const: 'mrkdwn' },
-                                      text: { type: 'string', minLength: 1, maxLength: 2000 }
-                                    }
-                                  }
-                                }
-                              }
-                            }
-                          ]
-                        }
-                      }
-                    }
-                  }
-                },
-                metadata: common.metadata,
-              },
-              // Enforce messages only
-            },
-          });
-        } else {
-          const formatDesc = (typeof desc === 'string' && desc.length > 0) ? desc : id;
-          const prepend = 'Use this field for your final report. Do NOT output anything else. Insert your final report in this field, formatted as required.';
-          tools.push({
-            name: 'agent__final_report',
-            // Keep tool-level description as before (no prepend)
-            description: ('Finalize the task with a ' + id + ' report.' + suffix).trim(),
-            inputSchema: {
-              type: 'object',
-              additionalProperties: false,
-              required: ['status', 'report_format', 'report_content'],
-              properties: {
-                status: common.status,
-                // Do NOT prepend for the format field; it already describes the format itself
-                report_format: { type: 'string', const: id, description: formatDesc },
-                // Prepend ONLY for content to emphasize what must be produced; do NOT add the format again here
-                report_content: { type: 'string', minLength: 1, description: prepend },
-                metadata: common.metadata,
-              },
-            },
-          });
-        }
-      }
-    }
-    return tools;
-  }
-
-  private buildInternalToolsInstructions(): string {
-    const exp = this.sessionConfig.expectedOutput;
-    const lines: string[] = [];
-    const FINISH_ONLY = '- Finish ONLY by calling `agent__final_report` exactly once.';
-    const ARGS = '- Arguments:';
-    const STATUS_LINE = '  - `status`: one of `success`, `failure`, `partial`.';
-    // No extra context lines here; schema carries any prepended guidance when needed
-    lines.push('- Use tool `agent__progress_report` to provide real-time progress updates (max 15 words) in parallel with your primary actions.');
-    const rf2: OutputFormatId = this.sessionConfig.outputFormat;
-    const rdesc = this.resolvedFormatDescription;
-    if ((exp?.format === 'json') || rf2 === 'json') {
-      lines.push(FINISH_ONLY);
-      lines.push(ARGS);
-      lines.push(STATUS_LINE);
-      lines.push('  - `report_format`: "json".');
-      lines.push('  - `content_json`: MUST match the required JSON Schema exactly.');
-    } else {
-      lines.push(FINISH_ONLY);
-      lines.push(ARGS);
-      lines.push(STATUS_LINE);
-      const id2 = this.sessionConfig.outputFormat as string;
-      const descLine = (typeof rdesc === 'string' && rdesc.length > 0) ? ` ${rdesc}` : '';
-      lines.push('  - `report_format`: "' + id2 + '".' + descLine);
-      if (id2 === 'slack') {
-        lines.push('  - `messages`: array of Slack Block Kit messages (no plain `report_content`).');
-        lines.push('    • Max 50 blocks per message; mrkdwn per section ≤ 2800 chars.');
-      } else {
-        lines.push('  - `report_content`: complete deliverable.');
-      }
-    }
-    lines.push('- Do NOT end with plain text. The session ends only after `agent__final_report`.');
-
-    // Add progress_report tool guidance
-    lines.push('');
-    lines.push('- Use tool `agent__progress_report` to provide real-time progress updates and next steps.');
-    lines.push('  - Real-time progress updates are crucial for user awareness. They help users understand what you are doing, the challenges you are facing and what you plan to do, especially during long tasks.');
-    lines.push('  - **CRITICAL**: You **MUST** call `agent__progress_report` on EVERY turn to ensure users know what you are doing.');
-    lines.push('  - **CRITICAL**: You **MUST** call `agent__progress_report` in PARALLEL with your other tools and actions.');
-    lines.push('  - Keep progress brief: max 20 words.');
-    lines.push('  - Examples of good parallel usage:');
-    lines.push('    When using batch:');
-    lines.push('    {');
-    lines.push('      "calls": [');
-    lines.push('        { "id": 1, "tool": "agent__progress_report", "args": { "progress": "Searching documentation for XYZ" } },');
-    lines.push('        { "id": 2, "tool": "jina__jina_search_web", "args": { "query": "..." } }');
-    lines.push('      ]');
-    lines.push('    }');
-    lines.push('    When calling multiple tools:');
-    lines.push('    - Call agent__progress_report with "Analyzing config files for ABC"');
-    lines.push('    - AND call your actual analysis tools in the same turn');
-    lines.push('  - BAD usage (wastes turns): Calling agent__progress_report alone');
-
-    // If user enabled batch tool, add concise usage guidance with a compact example
-    if (this.sessionConfig.tools.includes('batch')) {
-      lines.push('');
-      lines.push('- Use tool `agent__batch` to call multiple tools in one go.');
-      lines.push('  - `calls[]`: items with `id`, `tool` (exposed name), `args`.');
-      lines.push('  - Execution is always parallel.');
-      lines.push('  - Keep `args` minimal; they are validated server-side against real schemas.');
-      lines.push('  - Examples (with progress_report + search tools):');
-      lines.push('    {');
-      lines.push('      "calls": [');
-      lines.push('        { "id": 1, "tool": "agent__progress_report",');
-      lines.push('          "args": { "progress": "Researching Netdata and eBPF" } },');
-      lines.push('');
-      lines.push('        { "id": 2, "tool": "jina__jina_search_web",');
-      lines.push('          "args": { "query": "Netdata real-time monitoring features", "num": 10 } },');
-      lines.push('');
-      lines.push('        { "id": 3, "tool": "jina__jina_search_arxiv",');
-      lines.push('          "args": { "query": "eBPF monitoring 2024", "num": 20 } },');
-      lines.push('');
-      lines.push('        { "id": 4, "tool": "brave__brave_web_search",');
-      lines.push('          "args": { "query": "Netdata Cloud pricing", "count": 8, "offset": 0 } },');
-      lines.push('');
-      lines.push('        { "id": 5, "tool": "brave__brave_local_search",');
-      lines.push('          "args": { "query": "coffee near Athens", "count": 5 } },');
-      lines.push('');
-      lines.push('        { "id": 6, "tool": "fetcher__fetch_url",');
-      lines.push('          "args": { "url": "https://www.netdata.cloud" } },');
-      lines.push('');
-      lines.push('        { "id": 7, "tool": "fetcher__fetch_url",');
-      lines.push('          "args": { "url": "https://learn.netdata.cloud/" } }');
-      lines.push('      ]');
-      lines.push('    }');
-      lines.push('');
-    }
-    return lines.join('\n');
-  }
 }
 
 // Export session class as main interface
