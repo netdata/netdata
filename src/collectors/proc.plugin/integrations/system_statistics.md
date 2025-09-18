@@ -140,7 +140,7 @@ No action required.
 
 
 
-<details open><summary></summary>
+<details open><summary>Config options</summary>
 
 
 
