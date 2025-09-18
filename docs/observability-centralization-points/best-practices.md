@@ -60,14 +60,22 @@ Netdata supports three retention strategies:
    ```ini
    [db]
    dbengine tier 0 retention time = 30d
-   # Do NOT set retention size, or set to 0 to disable space limits
+   dbengine tier 0 retention size = 0
+   dbengine tier 1 retention time = 6mo
+   dbengine tier 1 retention size = 0
+   dbengine tier 2 retention time = 5y
+   dbengine tier 2 retention size = 0
    ```
 
 2. **Space-based retention** (recommended for predictable disk usage):
    ```ini
    [db]
    dbengine tier 0 retention size = 500GB
-   # Do NOT set retention time, or set to 0 to disable time limits
+   dbengine tier 0 retention time = 0
+   dbengine tier 1 retention size = 200GB
+   dbengine tier 1 retention time = 0
+   dbengine tier 2 retention size = 100GB
+   dbengine tier 2 retention time = 0
    ```
 
 3. **Combined retention** (use with caution):
@@ -75,6 +83,10 @@ Netdata supports three retention strategies:
    [db]
    dbengine tier 0 retention time = 30d
    dbengine tier 0 retention size = 500GB  # Must be large enough to hold 30 days of data!
+   dbengine tier 1 retention time = 6mo
+   dbengine tier 1 retention size = 200GB  # Must be large enough to hold 6 months of data!
+   dbengine tier 2 retention time = 5y
+   dbengine tier 2 retention size = 100GB  # Must be large enough to hold 5 years of data!
    ```
 
 :::tip
