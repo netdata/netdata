@@ -167,14 +167,14 @@ void netdata_collect_cpu_chart()
     }
 
     const uint32_t MSR_THERM_STATUS = 0x19C;
-    const int TJMAX = 100;
+    const ULONG TJMAX = 100;
     DWORD bytes;
 
     for (size_t cpu = 0; cpu < ncpus; cpu++) {
-        MSR_REQUEST req = { MSR_THERM_STATUS, (uint32_t)cpu, 0, 0 };
+        MSR_REQUEST req = { MSR_THERM_STATUS, (ULONG)cpu, 0, 0 };
 
         if (DeviceIoControl(device, IOCTL_MSR_READ, &req, sizeof(req), &req, sizeof(req), &bytes, NULL)) {
-            int digital_readout = (req.low >> 16) & 0x7F;  // bits [22:16]
+            ULONG digital_readout = (req.low >> 16) & 0x7F;  // bits [22:16]
             cpus[cpu].cpu_temp = (collected_number)(TJMAX - digital_readout);
         }
     }

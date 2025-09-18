@@ -43,12 +43,6 @@ NTSTATUS NetdataMsrCreateClose(_In_ PDEVICE_OBJECT DeviceObject, _Inout_ PIRP Ir
     return STATUS_SUCCESS;
 }
 
-NTSTATUS SafeReadMsr(_In_ ULONG reg, _Out_ PULONGLONG outVal)
-{
-    *outVal = __readmsr(reg);
-    return STATUS_SUCCESS;
-}
-
 NTSTATUS NetdataMsrDeviceControl(_In_ PDEVICE_OBJECT DeviceObject, _Inout_ PIRP Irp)
 {
     UNREFERENCED_PARAMETER(DeviceObject);

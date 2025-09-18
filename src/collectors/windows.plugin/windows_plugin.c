@@ -55,7 +55,7 @@ static struct proc_module {
      .func = do_GetHardwareInfo,
      .rd = NULL,
      .thread = NULL,
-     .cleanup = NULL},
+     .cleanup = do_GetHardwareInfo_cleanup},
     {.name = "PerflibServices",
      .dim = "PerflibServices",
      .enabled = CONFIG_BOOLEAN_YES,

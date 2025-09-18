@@ -14,10 +14,10 @@
 #define IOCTL_MSR_READ   CTL_CODE(FILE_DEVICE_UNKNOWN, 0x800, METHOD_BUFFERED, FILE_ANY_ACCESS)
 
 typedef struct {
-    uint32_t msr;
-    uint32_t cpu;
-    uint32_t low;
-    uint32_t high;
+    ULONG msr;
+    ULONG cpu;
+    ULONG low;
+    ULONG high;
 } MSR_REQUEST;
 
 #endif // OS_WINDOWS
