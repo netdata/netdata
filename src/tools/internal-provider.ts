@@ -414,8 +414,13 @@ export class InternalToolProvider extends ToolProvider {
                 if (Array.isArray(parsed)) {
                   return parsed.map(coerceBlock).find((x) => x !== undefined);
                 }
-                return { type: 'section', text: { type: 'mrkdwn', text: clamp(trimmed, 2900) } };
+                const text = clamp(trimmed, 2900);
+                return text.length > 0 ? { type: 'section', text: { type: 'mrkdwn', text } } : undefined;
               }
+            }
+            if (typeof b !== 'object' || b === null) {
+              const text = clamp(b, 2900);
+              return text.length > 0 ? { type: 'section', text: { type: 'mrkdwn', text } } : undefined;
             }
             const blk = isObj(b) ? b : {};
             const bb = blk as { type?: unknown; text?: unknown; elements?: unknown; fields?: unknown };
@@ -435,9 +440,17 @@ export class InternalToolProvider extends ToolProvider {
             const fields = asArr(bb.fields).map((f) => toMrkdwn(isObj(f) ? (f as { text?: unknown }).text : f, 2000)).slice(0, 10);
             const out: Record<string, unknown> = { type: 'section' };
             const t = clamp(rawText, 2900);
-            if (t.length > 0) (out).text = { type: 'mrkdwn', text: t } as unknown;
-            if (fields.length > 0) out.fields = fields;
-            if ((out as { text?: unknown; fields?: unknown }).text === undefined && out.fields === undefined) return undefined;
+            const mergedFieldText = fields
+              .map((f) => (typeof f.text === 'string' ? f.text : ''))
+              .filter((s) => s.length > 0)
+              .join('\n');
+            if (mergedFieldText.length > 0) {
+              const combined = [t, mergedFieldText].filter((s) => s.length > 0).join('\n');
+              if (combined.length > 0) (out).text = { type: 'mrkdwn', text: clamp(combined, 2900) } as unknown;
+            } else if (t.length > 0) {
+              (out).text = { type: 'mrkdwn', text: t } as unknown;
+            }
+            if ((out as { text?: unknown }).text === undefined) return undefined;
             return out;
           };
           const coerceMsg = (m: unknown): Record<string, unknown> | undefined => {
