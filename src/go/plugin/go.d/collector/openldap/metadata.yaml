@@ -58,22 +58,23 @@ modules:
               description: Data collection interval (seconds).
               default_value: 1
               required: false
-              group: Base
+              group: Collection
             - name: autodetection_retry
               description: Autodetection retry interval (seconds). Set 0 to disable.
               default_value: 0
               required: false
-              group: Base
+              group: Collection
+
             - name: url
               description: LDAP server URL.
               default_value: ldap://127.0.0.1:389
               required: true
-              group: Base
+              group: Target
             - name: timeout
               description: Connection and communication timeout (seconds).
               default_value: 2
               required: false
-              group: Base
+              group: Target
 
             - name: username
               description: Distinguished Name (DN) of the user authorized to query the monitor database.

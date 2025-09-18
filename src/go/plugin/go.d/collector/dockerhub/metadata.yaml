@@ -53,27 +53,28 @@ modules:
               description: Data collection interval (seconds).
               default_value: 5
               required: false
-              group: Base
+              group: Collection
             - name: autodetection_retry
               description: Autodetection retry interval (seconds). Set 0 to disable.
               default_value: 0
               required: false
-              group: Base
+              group: Collection
+
             - name: repositories
               description: List of Docker Hub repositories to monitor.
               default_value: ""
               required: true
-              group: Base
+              group: Target
             - name: url
               description: DockerHub repositories endpoint URL
               default_value: https://hub.docker.com/v2/repositories
               required: true
-              group: Base
+              group: Target
             - name: timeout
               description: HTTP request timeout (seconds).
               default_value: 5
               required: false
-              group: Base
+              group: Target
 
             - name: username
               description: Username for Basic HTTP authentication.

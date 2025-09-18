@@ -53,43 +53,44 @@ modules:
               description: Data collection interval (seconds).
               default_value: 1
               required: false
-              group: Base
+              group: Collection
             - name: autodetection_retry
               description: Autodetection retry interval (seconds). Set 0 to disable.
               default_value: 0
               required: false
-              group: Base
+              group: Collection
+
             - name: domains
               description: One or more domains/subdomains to query. A random domain from the list is selected on each iteration.
-              default_value: ""
+              default_value: "[]"
               required: true
-              group: Base
+              group: Target
             - name: servers
               description: DNS servers to query. If empty, servers from `/etc/resolv.conf` are used automatically.
-              default_value: ""
+              default_value: "[]"
               required: false
-              group: Base
-
+              group: Target
+            - name: timeout
+              description: Query timeout (seconds).
+              default_value: 2
+              required: false
+              group: Target
             - name: port
               description: DNS server port.
               default_value: 53
               required: false
-              group: Advanced
+              group: Target
             - name: network
-              description: "Network protocol to use. Available options: udp, tcp, tcp-tls."
+              description: "DNS query transport protocol. Options: `udp`, `tcp`, `tcp-tls`."
               default_value: udp
               required: false
-              group: Advanced
+              group: Target
+
             - name: record_types
-              description: "DNS record type to query. Available options: A, AAAA, CNAME, MX, NS, PTR, TXT, SOA, SPF, SRV."
+              description: "DNS record types to query. Options: A, AAAA, CNAME, MX, NS, PTR, TXT, SOA, SPF, SRV."
               default_value: A
               required: false
-              group: Advanced
-            - name: timeout
-              description: Query read timeout (seconds).
-              default_value: 2
-              required: false
-              group: Advanced
+              group: DNS Query
 
             - name: vnode
               description: Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).

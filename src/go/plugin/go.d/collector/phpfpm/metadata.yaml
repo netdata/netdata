@@ -57,37 +57,38 @@ modules:
               description: Data collection interval (seconds).
               default_value: 1
               required: false
-              group: Base
+              group: Collection
             - name: autodetection_retry
               description: Autodetection retry interval (seconds). Set 0 to disable.
               default_value: 0
               required: false
-              group: Base
+              group: Collection
+
             - name: url
               description: PHP-FPM URL.
               default_value: http://127.0.0.1/server-status?auto
               required: true
-              group: Base
+              group: Target
             - name: address
               description: PHP-FPM TCP listening address in IP:PORT format. Preferred over `url` if set.
               default_value: ""
               required: false
-              group: Base
+              group: Target
             - name: socket
               description: PHP-FPM Unix socket. Preferred over both `url` and `address` if set.
               default_value: ""
               required: false
-              group: Base
+              group: Target
             - name: fcgi_path
               description: URI path to the [FPM status page](https://www.php.net/manual/en/fpm.status.php).
               default_value: /status
               required: false
-              group: Base
+              group: Target
             - name: timeout
               description: HTTP request timeout (seconds).
               default_value: 1
               required: false
-              group: Base
+              group: Target
 
             - name: username
               description: Username for Basic HTTP authentication.

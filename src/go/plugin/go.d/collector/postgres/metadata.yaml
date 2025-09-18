@@ -83,24 +83,25 @@ modules:
           list:
             - name: update_every
               description: Data collection interval (seconds).
-              default_value: 5
+              default_value: 1
               required: false
-              group: Base
+              group: Collection
             - name: autodetection_retry
               description: Autodetection retry interval (seconds). Set 0 to disable.
               default_value: 0
               required: false
-              group: Base
+              group: Collection
+
             - name: dsn
               description: Postgres connection string (DSN). See [DSN syntax](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING).
               default_value: postgres://postgres:postgres@127.0.0.1:5432/postgres
               required: true
-              group: Base
+              group: Target
             - name: timeout
               description: Query timeout (seconds).
               default_value: 2
               required: false
-              group: Base
+              group: Target
 
             - name: collect_databases_matching
               description: Database selector. Controls which databases are included. Uses [simple patterns](https://github.com/netdata/netdata/tree/master/src/go/pkg/matcher#simple-patterns-matcher).

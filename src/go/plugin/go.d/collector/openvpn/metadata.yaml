@@ -61,29 +61,36 @@ modules:
             enabled: true
           list:
             - name: update_every
-              description: Data collection frequency.
+              description: Data collection interval (seconds).
               default_value: 1
               required: false
+              group: Collection
             - name: autodetection_retry
-              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              description: Autodetection retry interval (seconds). Set 0 to disable.
               default_value: 0
               required: false
+              group: Collection
+
             - name: address
-              description: Server address in IP:PORT format.
+              description: OpenVPN server address (`IP:PORT`).
               default_value: 127.0.0.1:7505
               required: true
+              group: Target
             - name: timeout
-              description: Connection, read, and write timeout duration in seconds. The timeout includes name resolution.
+              description: Connection, read, write, and name resolution timeout (seconds).
               default_value: 1
               required: false
+              group: Target
+
             - name: per_user_stats
-              description: User selector. Determines which user metrics will be collected.
+              description: User selector. Defines which user metrics to collect.
               default_value: ""
               required: false
+              group: Filters
               details: |
                 Metrics of users matching the selector will be collected.
 
-                - Logic: (pattern1 OR pattern2) AND !(pattern3 or pattern4)
+                - Logic: (pattern1 OR pattern2) AND !(pattern3 OR pattern4)
                 - Pattern syntax: [matcher](https://github.com/netdata/netdata/tree/master/src/go/pkg/matcher#supported-format).
                 - Syntax:
 
@@ -96,6 +103,12 @@ modules:
                       - pattern3
                       - pattern4
                   ```
+
+            - name: vnode
+              description: Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).
+              default_value: ""
+              required: false
+              group: Virtual Node
         examples:
           folding:
             title: Config

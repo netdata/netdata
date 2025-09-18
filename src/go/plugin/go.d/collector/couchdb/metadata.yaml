@@ -54,28 +54,29 @@ modules:
               description: Data collection interval (seconds).
               default_value: 10
               required: false
-              group: Base
+              group: Collection
             - name: autodetection_retry
               description: Autodetection retry interval (seconds). Set 0 to disable.
               default_value: 0
               required: false
-              group: Base
+              group: Collection
+
             - name: url
               description: Target endpoint URL.
               default_value: http://127.0.0.1:5984
               required: true
-              group: Base
-            - name: timeout
-              description: HTTP request timeout (seconds).
-              default_value: 1
-              required: false
-              group: Base
-
+              group: Target
             - name: node
               description: CouchDB node name (same as the `-name` argument in `vm.args`).
               default_value: "_local"
+              required: true
+              group: Target
+            - name: timeout
+              description: HTTP request timeout (seconds).
+              default_value: 2
               required: false
-              group: Filters
+              group: Target
+
             - name: databases
               description: Space-separated list of databases to collect stats for.
               default_value: ""
