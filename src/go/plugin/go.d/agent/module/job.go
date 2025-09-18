@@ -450,7 +450,7 @@ func (j *Job) processMetrics(metrics map[string]int64, startTime time.Time, sinc
 
 	elapsed := int64(durationTo(time.Since(startTime), time.Millisecond))
 
-	var i, updated int
+	var i, updated, created int
 	for _, chart := range *j.charts {
 		if !chart.created || createChart {
 			typeID := fmt.Sprintf("%s.%s", j.FullName(), chart.ID)
@@ -460,6 +460,7 @@ func (j *Job) processMetrics(metrics map[string]int64, startTime time.Time, sinc
 				chart.ignore = true
 			}
 			j.createChart(chart)
+			created++
 		}
 		if chart.remove {
 			continue
@@ -475,7 +476,7 @@ func (j *Job) processMetrics(metrics map[string]int64, startTime time.Time, sinc
 	}
 	*j.charts = (*j.charts)[:i]
 
-	if updated == 0 && j.vnode.GUID != "" {
+	if updated == 0 && created == 0 && j.vnode.GUID != "" {
 		j.buf.Truncate(bufLenBeforeHost)
 	}
 
