@@ -19,42 +19,29 @@ def cleanup(only_base_paths=None):
     - If only_base_paths is provided (list of base dirs), clean ONLY those.
     - Otherwise, do a full cleanup (legacy behavior).
     """
-    if only_base_paths:
-        for base in only_base_paths:
-            p = Path(base) / "integrations"
-            if p.exists():
-                shutil.rmtree(p)
-        return
-
-    for element in Path("src/go/plugin/go.d/collector").glob("**/*/"):
-        if "integrations" in str(element):
-            shutil.rmtree(element)
-    for element in Path("src/collectors").glob("**/*/"):
-        if "integrations" in str(element):
-            shutil.rmtree(element)
-    for element in Path("src/exporting").glob("**/*/"):
-        if "integrations" in str(element):
-            shutil.rmtree(element)
-    for element in Path("integrations/cloud-notifications").glob("**/*/"):
-        if "integrations" in str(element) and "metadata.yaml" not in str(element):
-            shutil.rmtree(element)
-    for element in Path("integrations/logs").glob("**/*/"):
-        if "integrations" in str(element) and "metadata.yaml" not in str(element):
-            shutil.rmtree(element)
-    for element in Path("integrations/cloud-authentication").glob("**/*/"):
-        if "integrations" in str(element) and "metadata.yaml" not in str(element):
-            shutil.rmtree(element)
+    targets = [
+        "src/go/plugin/go.d/collector",
+        "src/collectors",
+        "src/exporting",
+        "integrations/cloud-notifications",
+        "integrations/logs",
+        "integrations/cloud-authentication",
+    ]
+    bases = only_base_paths if only_base_paths else targets
+    for base in bases:
+        for p in Path(base).glob("**/integrations"):
+            shutil.rmtree(p, ignore_errors=True)
 
 
 def clean_and_write(md: str, path: Path):
     """
     Convert custom {% details %} markers to HTML <details> and write file.
     """
-    md = md.replace('{% details summary="', "<details><summary>")
     md = md.replace('{% details open=true summary="', "<details open><summary>")
+    md = md.replace('{% details summary="', "<details><summary>")
     md = md.replace('" %}', "</summary>\n")
     md = md.replace("{% /details %}", "</details>\n")
-    path.write_text(md)
+    path.write_text(md, encoding="utf-8")
 
 
 def build_path(meta_yaml_link: str) -> str:
@@ -320,6 +307,8 @@ def create_overview_banner(md: str, community_badge: str) -> str:
     """
     Insert the community badge right before the first '##' section.
     """
+    if "##" not in md:
+        return f"{md}\n\n{community_badge}\n"
     upper, lower = md.split("##", 1)
     return f"{upper}{community_badge}\n\n##{lower}"
 
