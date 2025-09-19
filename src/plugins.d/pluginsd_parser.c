@@ -296,6 +296,7 @@ static inline PARSER_RC pluginsd_host(char **words, size_t num_words, PARSER *pa
                         rrdhost_flag_clear(virtual_host, RRDHOST_FLAG_COLLECTOR_ONLINE);
                         nd_log_daemon(NDLP_INFO, "VNODE: Marking node \"%s\" as STALE, last seen %u seconds ago", rrdhost_hostname(virtual_host), seen_seconds_ago);
                         schedule_node_state_update(virtual_host, 1000);
+                        stream_sender_signal_to_stop_and_wait(virtual_host, STREAM_HANDSHAKE_SND_VNODE_IS_STALE, false);
                     }
                 }
             }
