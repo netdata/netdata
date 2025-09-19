@@ -290,17 +290,11 @@ static inline PARSER_RC pluginsd_host(char **words, size_t num_words, PARSER *pa
                 if (rrdhost_option_check(virtual_host, RRDHOST_OPTION_VIRTUAL_HOST)) {
                     time_t last_seen = (*Pvalue + VNODE_BASE_EPOCH);
                     uint32_t seen_seconds_ago = (uint32_t) (now - last_seen);
-                    nd_log_daemon(
-                        NDLP_INFO,
-                        "VNODE: Checking if node \"%s\" is stale. Seen %u seconds ago, stale is after %u seconds",
-                        rrdhost_hostname(virtual_host),
-                        seen_seconds_ago,
-                        stale_after_seconds);
 
                     if (seen_seconds_ago >= stale_after_seconds) {
                         rrdhost_option_clear(virtual_host, RRDHOST_OPTION_VIRTUAL_HOST);
                         rrdhost_flag_clear(virtual_host, RRDHOST_FLAG_COLLECTOR_ONLINE);
-                        nd_log_daemon(NDLP_INFO, "VNODE: Marking node \"%s\" as STALE", rrdhost_hostname(virtual_host));
+                        nd_log_daemon(NDLP_INFO, "VNODE: Marking node \"%s\" as STALE, last seen %u seconds ago", rrdhost_hostname(virtual_host), seen_seconds_ago);
                         schedule_node_state_update(virtual_host, 1000);
                     }
                 }
