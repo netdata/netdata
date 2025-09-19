@@ -5,7 +5,8 @@
 
 #include "netdata_win_driver.h"
 
-static const char *srv_name = "NetdataDriver";
+static const char *srv_name = "NetdataDriverV1";
+const char *drv_path = "C:\\Windows\\System32\\netdata_driver.sys";
 
 struct cpu_data {
     RRDDIM *rd_cpu_temp;
@@ -16,7 +17,7 @@ struct cpu_data {
 struct cpu_data *cpus = NULL;
 size_t ncpus = 0 ;
 
-static void netdata_unload_driver()
+static void netdata_stop_driver()
 {
     SC_HANDLE scm = OpenSCManager(NULL, NULL, SC_MANAGER_ALL_ACCESS);
     if (scm == NULL) {
@@ -27,7 +28,7 @@ static void netdata_unload_driver()
         return;
     }
 
-    SC_HANDLE service = OpenService(scm, srv_name, SERVICE_STOP | SERVICE_QUERY_STATUS | DELETE);
+    SC_HANDLE service = OpenService(scm, srv_name, SERVICE_STOP | SERVICE_QUERY_STATUS);
     if (service == NULL) {
         nd_log(
                 NDLS_COLLECTORS,
@@ -39,35 +40,24 @@ static void netdata_unload_driver()
 
     SERVICE_STATUS_PROCESS ss_status;
     if (ControlService(service, SERVICE_CONTROL_STOP, (LPSERVICE_STATUS)&ss_status) == 0) {
-        nd_log(
-                NDLS_COLLECTORS,
-                NDLP_ERR,
-                "Cannot stop the service. GetLastError= %lu \n", GetLastError());
-    }
-
-    if (!DeleteService(service)) {
-        nd_log(
-                NDLS_COLLECTORS,
-                NDLP_ERR,
-                "Cannot delete the service. GetLastError= %lu \n", GetLastError());
+        if (GetLastError() != ERROR_SERVICE_NOT_ACTIVE) {
+            nd_log(
+                    NDLS_COLLECTORS,
+                    NDLP_ERR,
+                    "Cannot stop the service. GetLastError= %lu \n", GetLastError());
+        }
     }
 
     CloseServiceHandle(service);
     CloseServiceHandle(scm);
 }
 
-static void netdata_unload_hardware()
+int netdata_install_driver()
 {
-    netdata_unload_driver();
-}
-
-int netdata_load_driver()
-{
-    const char *drv_path = "C:\\Windows\\System32\\netdata_driver.sys";
     SC_HANDLE scm = OpenSCManager(
             NULL,
             NULL,
-            SC_MANAGER_ALL_ACCESS
+            SC_MANAGER_CREATE_SERVICE
     );
 
     if (unlikely(!scm)) {
@@ -83,7 +73,7 @@ int netdata_load_driver()
             scm,
             srv_name,
             srv_name,
-            SERVICE_ALL_ACCESS,
+            SERVICE_START | SERVICE_STOP | DELETE,
             SERVICE_KERNEL_DRIVER,
             SERVICE_DEMAND_START,
             SERVICE_ERROR_NORMAL,
@@ -98,32 +88,14 @@ int netdata_load_driver()
     if (unlikely(!service)) {
         if (GetLastError() == ERROR_SERVICE_EXISTS) {
             service = OpenService(scm, srv_name, SERVICE_ALL_ACCESS);
-            if (unlikely(!service)) {
-                CloseServiceHandle(scm);
-                nd_log(
-                        NDLS_COLLECTORS,
-                        NDLP_ERR,
-                        "Cannot open Service. GetLastError= %lu \n", GetLastError());
-                return -1;
-            }
-        } else {
             CloseServiceHandle(scm);
-            nd_log(
-                    NDLS_COLLECTORS,
-                    NDLP_ERR,
-                    "Cannot create Service. GetLastError= %lu \n", GetLastError());
-            CloseServiceHandle(scm);
-            return -1;
+            return 0;
         }
-    }
 
-    if (!StartService(service, 0, NULL)) {
         nd_log(
                 NDLS_COLLECTORS,
                 NDLP_ERR,
-                "Cannot start Service. GetLastError= %lu \n", GetLastError());
-        DeleteService(service);
-        CloseServiceHandle(service);
+                "Cannot create Service. GetLastError= %lu \n", GetLastError());
         CloseServiceHandle(scm);
         return -1;
     }
@@ -132,6 +104,37 @@ int netdata_load_driver()
     CloseServiceHandle(scm);
 
     return 0;
+}
+
+int netdata_start_driver()
+{
+    SC_HANDLE scm = OpenSCManagerA(NULL, NULL, SC_MANAGER_CONNECT);
+    if (unlikely(!scm)) {
+        nd_log(
+                NDLS_COLLECTORS,
+                NDLP_ERR,
+                "Cannot open Service Manager. GetLastError= %lu \n", GetLastError());
+        return -1;
+    }
+
+    SC_HANDLE service = OpenServiceA(scm, srv_name, SERVICE_START | SERVICE_QUERY_STATUS);
+    if (unlikely(!service)) {
+        CloseServiceHandle(scm);
+        nd_log(
+                NDLS_COLLECTORS,
+                NDLP_ERR,
+                "Cannot open Service. GetLastError= %lu \n", GetLastError());
+        return -1;
+    }
+
+    int ret = 0;
+    if (!StartServiceA(service, 0, NULL)) {
+        ret = (GetLastError() == ERROR_SERVICE_EXISTS)? 0 : -1;
+    }
+
+    CloseServiceHandle(service);
+    CloseServiceHandle(scm);
+    return ret;
 }
 
 static inline HANDLE netdata_open_device()
@@ -149,7 +152,11 @@ static inline HANDLE netdata_open_device()
 
 static int initialize(int update_every)
 {
-    if (netdata_load_driver()) {
+    if (netdata_install_driver()) {
+        return -1;
+    }
+
+    if (netdata_start_driver()) {
         return -1;
     }
 
@@ -242,5 +249,5 @@ int do_GetHardwareInfo(int update_every, usec_t dt __maybe_unused)
 
 void do_GetHardwareInfo_cleanup()
 {
-    netdata_unload_hardware();
+    netdata_stop_driver();
 }
