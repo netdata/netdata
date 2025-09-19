@@ -76,46 +76,60 @@ modules:
               description: Data collection frequency.
               default_value: 5
               required: false
+              group: Collection
             - name: autodetection_retry
               description: Recheck interval in seconds. Zero means no recheck will be scheduled.
               default_value: 0
               required: false
+              group: Collection
+
             - name: address
               description: Server address in IP:PORT format.
               default_value: 127.0.0.1:8953
               required: true
+              group: Target
             - name: timeout
-              description: Connection/read/write/ssl handshake timeout.
+              description: Connection/read/write/SSL handshake timeout.
               default_value: 1
               required: false
+              group: Target
             - name: conf_path
-              description: Absolute path to the unbound configuration file.
+              description: Absolute path to the Unbound configuration file. Used to adjust behavior based on the `remote-control` section.
               default_value: /etc/unbound/unbound.conf
               required: false
+              group: Target
+
             - name: cumulative_stats
-              description: Statistics collection mode. Should have the same value as the `statistics-cumulative` parameter in the unbound configuration file.
+              description: Statistics collection mode. Should match the `statistics-cumulative` parameter in the Unbound configuration file.
               default_value: false
               required: false
+              group: Customization
+
             - name: use_tls
               description: Whether to use TLS or not.
               default_value: true
               required: false
+              group: TLS
             - name: tls_skip_verify
               description: Server certificate chain and hostname validation policy. Controls whether the client performs this check.
               default_value: true
               required: false
+              group: TLS
             - name: tls_ca
-              description: Certificate authority that client use when verifying server certificates.
+              description: Certificate authority that the client uses when verifying server certificates.
               default_value: ""
               required: false
+              group: TLS
             - name: tls_cert
-              description: Client tls certificate.
+              description: Client TLS certificate.
               default_value: /etc/unbound/unbound_control.pem
               required: false
+              group: TLS
             - name: tls_key
-              description: Client tls key.
+              description: Client TLS key.
               default_value: /etc/unbound/unbound_control.key
               required: false
+              group: TLS
         examples:
           folding:
             title: Config

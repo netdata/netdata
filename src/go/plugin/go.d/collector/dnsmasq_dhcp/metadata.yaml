@@ -58,25 +58,31 @@ modules:
             enabled: true
           list:
             - name: update_every
-              description: Data collection frequency.
+              description: Data collection interval (seconds).
               default_value: 1
               required: false
+              group: Collection
             - name: autodetection_retry
-              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              description: Autodetection retry interval (seconds). Set 0 to disable.
               default_value: 0
               required: false
+              group: Collection
+
             - name: leases_path
               description: Path to dnsmasq DHCP leases file.
               default_value: /var/lib/misc/dnsmasq.leases
               required: false
+              group: Target
             - name: conf_path
-              description: Path to dnsmasq configuration file.
+              description: Path to dnsmasq configuration file (used to extract configured DHCP pools).
               default_value: /etc/dnsmasq.conf
               required: false
+              group: Target
             - name: conf_dir
-              description: Path to dnsmasq configuration directory.
+              description: Path to dnsmasq configuration directory (used to extract configured DHCP pools).
               default_value: /etc/dnsmasq.d,.dpkg-dist,.dpkg-old,.dpkg-new
               required: false
+              group: Target
         examples:
           folding:
             title: Config

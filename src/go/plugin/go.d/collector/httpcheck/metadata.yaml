@@ -62,101 +62,147 @@ modules:
             enabled: true
           list:
             - name: update_every
-              description: Data collection frequency.
+              description: Data collection interval (seconds).
               default_value: 5
               required: false
+              group: Collection
             - name: autodetection_retry
-              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              description: Autodetection retry interval (seconds). Set 0 to disable.
               default_value: 0
               required: false
+              group: Collection
+
             - name: url
-              description: Server URL.
+              description: Target endpoint URL.
               default_value: ""
               required: true
+              group: Target
+            - name: timeout
+              description: HTTP request timeout (seconds).
+              default_value: 1
+              required: false
+              group: Target
+
             - name: status_accepted
-              description: "HTTP accepted response statuses. Anything else will result in 'bad status' in the status chart."
+              description: "HTTP accepted response statuses. Anything else results in 'bad status' in the status chart."
               default_value: "[200]"
               required: false
+              group: Validation
             - name: response_match
-              description: If the status code is accepted, the content of the response will be matched against this regular expression.
+              description: If the status code is accepted, match the response body against this regular expression.
               default_value: ""
               required: false
+              group: Validation
             - name: header_match
-              description: "This option defines a set of rules that check for specific key-value pairs in the HTTP headers of the response."
+              description: "A set of rules to check for specific key-value pairs in response headers."
               default_value: "[]"
               required: false
+              group: Validation
             - name: header_match.exclude
-              description: "This option determines whether the rule should check for the presence of the specified key-value pair or the absence of it."
-              default_value: false
+              description: "When yes, the rule asserts the key-value pair must be absent."
+              default_value: no
               required: false
+              group: Validation
             - name: header_match.key
-              description: "The exact name of the HTTP header to check for."
+              description: "Exact HTTP header name to check."
               default_value: ""
               required: true
+              group: Validation
             - name: header_match.value
-              description: "The [pattern](https://github.com/netdata/netdata/tree/master/src/go/pkg/matcher#supported-format) to match against the value of the specified header."
+              description: "The [pattern](https://github.com/netdata/netdata/tree/master/src/go/pkg/matcher#supported-format) to match against the header's value."
               default_value: ""
               required: false
+              group: Validation
+
+            - name: username
+              description: Username for Basic HTTP authentication.
+              default_value: ""
+              required: false
+              group: HTTP Auth
+            - name: password
+              description: Password for Basic HTTP authentication.
+              default_value: ""
+              required: false
+              group: HTTP Auth
+            - name: bearer_token_file
+              description: "Path to a file containing a bearer token (used for `Authorization: Bearer`)."
+              default_value: ""
+              required: false
+              group: HTTP Auth
+
+            - name: tls_skip_verify
+              description: Skip TLS certificate and hostname verification (insecure).
+              default_value: no
+              required: false
+              group: TLS
+            - name: tls_ca
+              description: Path to CA bundle used to validate the server certificate.
+              default_value: ""
+              required: false
+              group: TLS
+            - name: tls_cert
+              description: Path to client TLS certificate (for mTLS).
+              default_value: ""
+              required: false
+              group: TLS
+            - name: tls_key
+              description: Path to client TLS private key (for mTLS).
+              default_value: ""
+              required: false
+              group: TLS
+
+            - name: proxy_url
+              description: HTTP proxy URL.
+              default_value: ""
+              required: false
+              group: Proxy
+            - name: proxy_username
+              description: Username for proxy Basic HTTP authentication.
+              default_value: ""
+              required: false
+              group: Proxy
+            - name: proxy_password
+              description: Password for proxy Basic HTTP authentication.
+              default_value: ""
+              required: false
+              group: Proxy
+
+            - name: method
+              description: HTTP method to use.
+              default_value: GET
+              required: false
+              group: Request
+            - name: body
+              description: Request body (e.g., for POST/PUT).
+              default_value: ""
+              required: false
+              group: Request
+            - name: headers
+              description: "Additional HTTP headers (one per line as key: value)."
+              default_value: ""
+              required: false
+              group: Request
             - name: cookie_file
               description: Path to cookie file. See [cookie file format](https://everything.curl.dev/http/cookies/fileformat).
               default_value: ""
               required: false
-            - name: timeout
-              description: HTTP request timeout.
-              default_value: 1
-              required: false
-            - name: username
-              description: Username for basic HTTP authentication.
-              default_value: ""
-              required: false
-            - name: password
-              description: Password for basic HTTP authentication.
-              default_value: ""
-              required: false
-            - name: proxy_url
-              description: Proxy URL.
-              default_value: ""
-              required: false
-            - name: proxy_username
-              description: Username for proxy basic HTTP authentication.
-              default_value: ""
-              required: false
-            - name: proxy_password
-              description: Password for proxy basic HTTP authentication.
-              default_value: ""
-              required: false
-            - name: method
-              description: HTTP request method.
-              default_value: "GET"
-              required: false
-            - name: body
-              description: HTTP request body.
-              default_value: ""
-              required: false
-            - name: headers
-              description: HTTP request headers.
-              default_value: ""
-              required: false
+              group: Request
             - name: not_follow_redirects
-              description: Redirect handling policy. Controls whether the client follows redirects.
+              description: Do not follow HTTP redirects.
               default_value: no
               required: false
-            - name: tls_skip_verify
-              description: Server certificate chain and hostname validation policy. Controls whether the client performs this check.
+              group: Request
+            - name: force_http2
+              description: Force HTTP/2 (including h2c over TCP).
               default_value: no
               required: false
-            - name: tls_ca
-              description: Certification authority that the client uses when verifying the server's certificates.
+              group: Request
+
+            - name: vnode
+              description: Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).
               default_value: ""
               required: false
-            - name: tls_cert
-              description: Client TLS certificate.
-              default_value: ""
-              required: false
-            - name: tls_key
-              description: Client TLS key.
-              default_value: ""
-              required: false
+              group: Virtual Node
         examples:
           folding:
             title: Config

@@ -75,107 +75,84 @@ modules:
             enabled: true
           list:
             - name: update_every
-              description: Data collection frequency.
+              description: Data collection frequency (seconds).
               default_value: 1
               required: false
+              group: Collection
             - name: autodetection_retry
-              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              description: Autodetection retry interval (seconds). Set 0 to disable.
               default_value: 0
               required: false
+              group: Collection
+
             - name: path
               description: Path to the Squid access log file.
               default_value: /var/log/squid/access.log
               required: true
+              group: Target
             - name: exclude_path
-              description: Path to exclude.
+              description: File path patterns to exclude.
               default_value: "*.gz"
               required: false
+              group: Target
+
             - name: parser
-              description: Log parser configuration.
+              description: Log parser configuration block.
               default_value: ""
               required: false
+              group: Parser
             - name: parser.log_type
-              description: Log parser type.
+              description: Log parser type (`csv`, `ltsv`, `regexp`, or `auto`).
               default_value: auto
               required: false
-              detailed_description: |
-                Weblog supports 3 different log parsers:
-
-                | Parser type | Description                               |
-                |-------------|-------------------------------------------|
-                | csv         | A comma-separated values                  |
-                | ltsv        | [LTSV](http://ltsv.org/)                  |
-                | regexp      | Regular expression with named groups      |
-                
-                Syntax:
-
-                ```yaml
-                parser:
-                  log_type: csv
-                ```
+              group: Parser
             - name: parser.csv_config
-              description: CSV log parser config.
+              description: CSV log parser configuration block.
               default_value: ""
               required: false
+              group: Parser
             - name: parser.csv_config.delimiter
               description: CSV field delimiter.
               default_value: space
               required: false
+              group: Parser
             - name: parser.csv_config.format
-              description: CSV log format.
+              description: CSV log format string.
               default_value: "- $resp_time $client_address $result_code $resp_size $req_method - - $hierarchy $mime_type"
               required: true
-              detailed_description: ""
+              group: Parser
+
             - name: parser.ltsv_config
-              description: LTSV log parser config.
+              description: LTSV log parser configuration block.
               default_value: ""
               required: false
+              group: Parser
             - name: parser.ltsv_config.field_delimiter
               description: LTSV field delimiter.
               default_value: "\\t"
               required: false
+              group: Parser
             - name: parser.ltsv_config.value_delimiter
               description: LTSV value delimiter.
               default_value: ":"
               required: false
+              group: Parser
             - name: parser.ltsv_config.mapping
-              description: LTSV fields mapping to **known fields**.
+              description: LTSV fields mapping to known fields.
               default_value: ""
               required: true
-              detailed_description: |
-                The mapping is a dictionary where the key is a field, as in logs, and the value is the corresponding **known field**.
+              group: Parser
 
-                > **Note**: don't use `$` and `%` prefixes for mapped field names.
-
-                ```yaml
-                parser:
-                  log_type: ltsv
-                  ltsv_config:
-                    mapping:
-                      label1: field1
-                      label2: field2
-                ```
             - name: parser.regexp_config
-              description: RegExp log parser config.
+              description: RegExp log parser configuration block.
               default_value: ""
               required: false
+              group: Parser
             - name: parser.regexp_config.pattern
-              description: RegExp pattern with named groups.
+              description: RegExp pattern with named groups mapped to known fields.
               default_value: ""
               required: true
-              detailed_description: |
-                Use pattern with subexpressions names. These names should be **known fields**.
-                
-                > **Note**: don't use `$` and `%` prefixes for mapped field names.
-
-                Syntax:
-
-                ```yaml
-                parser:
-                  log_type: regexp
-                  regexp_config:
-                    pattern: PATTERN
-                ```
+              group: Parser
         examples:
           folding:
             title: Config

@@ -63,22 +63,29 @@ modules:
               description: Data collection frequency.
               default_value: 1
               required: false
+              group: Collection
             - name: autodetection_retry
               description: Recheck interval in seconds. Zero means no recheck will be scheduled.
               default_value: 0
               required: false
+              group: Collection
+
             - name: address
-              description: The IP address and port where the Tor's Control Port listens for connections.
+              description: The IP address and port where the Tor Control Port listens for connections.
               default_value: 127.0.0.1:9051
               required: true
+              group: Target
             - name: timeout
               description: Connection, read, and write timeout duration in seconds. The timeout includes name resolution.
               default_value: 1
               required: false
+              group: Target
+
             - name: password
               description: Password for authentication.
               default_value: ""
               required: false
+              group: Auth
         examples:
           folding:
             title: Config

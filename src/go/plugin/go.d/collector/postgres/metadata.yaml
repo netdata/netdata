@@ -82,33 +82,49 @@ modules:
             enabled: true
           list:
             - name: update_every
-              description: Data collection frequency.
-              default_value: 5
+              description: Data collection interval (seconds).
+              default_value: 1
               required: false
+              group: Collection
             - name: autodetection_retry
-              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              description: Autodetection retry interval (seconds). Set 0 to disable.
               default_value: 0
               required: false
+              group: Collection
+
             - name: dsn
-              description: Postgres server DSN (Data Source Name). See [DSN syntax](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING).
+              description: Postgres connection string (DSN). See [DSN syntax](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING).
               default_value: postgres://postgres:postgres@127.0.0.1:5432/postgres
               required: true
+              group: Target
             - name: timeout
-              description: Query timeout in seconds.
+              description: Query timeout (seconds).
               default_value: 2
               required: false
+              group: Target
+
             - name: collect_databases_matching
-              description: Databases selector. Determines which database metrics will be collected. Syntax is [simple patterns](https://github.com/netdata/netdata/tree/master/src/go/pkg/matcher#simple-patterns-matcher).
+              description: Database selector. Controls which databases are included. Uses [simple patterns](https://github.com/netdata/netdata/tree/master/src/go/pkg/matcher#simple-patterns-matcher).
               default_value: ""
               required: false
+              group: Filters
+
             - name: max_db_tables
-              description: Maximum number of tables in the database. Table metrics will not be collected for databases that have more tables than max_db_tables. 0 means no limit.
+              description: Maximum number of tables per database to collect metrics for (0 = no limit).
               default_value: 50
               required: false
+              group: Limits
             - name: max_db_indexes
-              description: Maximum number of indexes in the database. Index metrics will not be collected for databases that have more indexes than max_db_indexes. 0 means no limit.
+              description: Maximum number of indexes per database to collect metrics for (0 = no limit).
               default_value: 250
               required: false
+              group: Limits
+
+            - name: vnode
+              description: Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).
+              default_value: ""
+              required: false
+              group: Virtual Node
         examples:
           folding:
             title: Config
