@@ -70,7 +70,15 @@ modules:
           folding:
             title: ""
             enabled: true
-          list: []
+          list:
+            - name: per cpu core utilization
+              description: Collects CPU usage metrics for each individual core, in addition to the system-wide averages.
+              default_value: no
+              required: false
+            - name: cpu idle states
+              description: Collects CPU idle state residency metrics for each individual core, showing how much time each core spends in different idle states (C-states).
+              default_value: no
+              required: false
         examples:
           folding:
             enabled: true
@@ -165,10 +173,10 @@ modules:
               dimensions:
                 - name: a dimension per cpu core
         - name: cpu core
-          description: ""
+          description: Per-core CPU metrics. Disabled by default, can be enabled in the [configuration options](#configuration).
           labels:
             - name: cpu
-              description: TBD
+              description: Identifier of the CPU core (e.g., core0, core1, core2).
           metrics:
             - name: cpu.cpu
               description: Core utilization

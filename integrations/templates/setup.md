@@ -53,7 +53,7 @@ No action required.
 
 [% if entry.setup.configuration.options.list %]
 [% if entry.setup.configuration.options.folding.enabled and not clean %]
-{% details open=true summary="[[ entry.setup.configuration.options.folding.title ]]" %}
+{% details open=true summary="[[ entry.setup.configuration.options.folding.title or 'Config options' ]]" %}
 [% endif %]
 
 [% set has_groups = entry.setup.configuration.options.list | selectattr("group","defined") | list | length > 0 %]

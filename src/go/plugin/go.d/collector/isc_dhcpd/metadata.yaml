@@ -51,21 +51,26 @@ modules:
             enabled: true
           list:
             - name: update_every
-              description: Data collection frequency.
+              description: Data collection interval (seconds).
               default_value: 1
               required: false
+              group: Collection
             - name: autodetection_retry
-              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              description: Autodetection retry interval (seconds). Set 0 to disable.
               default_value: 0
               required: false
+              group: Collection
+
             - name: leases_path
               description: Path to DHCP client lease database.
               default_value: /var/lib/dhcp/dhcpd.leases
               required: false
+              group: Target
             - name: pools
-              description: List of IP pools to monitor.
+              description: DHCP IP pools to monitor.
               default_value: ""
               required: true
+              group: Target
               detailed_description: |
                 List of IP pools to monitor.
 

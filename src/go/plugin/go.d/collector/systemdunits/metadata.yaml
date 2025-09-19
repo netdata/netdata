@@ -53,18 +53,23 @@ modules:
               description: Data collection frequency.
               default_value: 1
               required: false
+              group: Collection
             - name: autodetection_retry
               description: Recheck interval in seconds. Zero means no recheck will be scheduled.
               default_value: 0
               required: false
+              group: Collection
             - name: timeout
               description: System bus requests timeout.
               default_value: 1
               required: false
+              group: Collection
+
             - name: include
               description: Systemd units selector.
               default_value: "*.service"
               required: false
+              group: Units
               detailed_description: |
                 Systemd units matching the selector will be monitored.
 
@@ -81,18 +86,23 @@ modules:
               description: If set, skip data collection for systemd transient units.
               default_value: "false"
               required: false
+              group: Units
+
             - name: collect_unit_files
               description: If set to true, collect the state of installed unit files. Enabling this may increase system overhead.
               default_value: "false"
               required: false
+              group: Unit Files
             - name: collect_unit_files_every
               description: Interval for querying systemd about unit files and their enablement state, measured in seconds. Data is cached for this interval to reduce system overhead.
               default_value: 300
               required: false
+              group: Unit Files
             - name: include_unit_files
               description: Systemd unit files selector.
               default_value: "*.service"
               required: false
+              group: Unit Files
               detailed_description: |
                 Systemd unit files matching the selector will be monitored.
 

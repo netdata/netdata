@@ -58,91 +58,138 @@ modules:
             enabled: true
           list:
             - name: update_every
-              description: Data collection frequency.
+              description: Data collection interval (seconds).
               default_value: 1
               required: false
+              group: Collection
             - name: autodetection_retry
-              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              description: Autodetection retry interval (seconds). Set 0 to disable.
               default_value: 0
               required: false
+              group: Collection
+
             - name: url
-              description: Server URL.
-              default_value: http://localhost:8161
+              description: Target endpoint URL.
+              default_value: http://127.0.0.1:8161
               required: true
+              group: Target
+            - name: timeout
+              description: HTTP request timeout (seconds).
+              default_value: 1
+              required: false
+              group: Target
             - name: webadmin
               description: Webadmin root path.
               default_value: admin
               required: true
+              group: Target
+
             - name: max_queues
-              description: Maximum number of concurrently collected queues.
+              description: Maximum number of queues to collect concurrently.
               default_value: 50
               required: false
+              group: Limits
             - name: max_topics
-              description: Maximum number of concurrently collected topics.
+              description: Maximum number of topics to collect concurrently.
               default_value: 50
               required: false
+              group: Limits
+
             - name: queues_filter
-              description: |
-                Queues filter. Syntax is [simple patterns](/src/libnetdata/simple_pattern/README.md#simple-patterns).
+              description: Queue selector. Uses [simple patterns](/src/libnetdata/simple_pattern/README.md#simple-patterns).
               default_value: ""
               required: false
+              group: Filters
             - name: topics_filter
-              description: |
-                Topics filter. Syntax is [simple patterns](/src/libnetdata/simple_pattern/README.md#simple-patterns).
+              description: Topic selector. Uses [simple patterns](/src/libnetdata/simple_pattern/README.md#simple-patterns).
               default_value: ""
               required: false
+              group: Filters
+
             - name: username
-              description: Username for basic HTTP authentication.
+              description: Username for Basic HTTP authentication.
               default_value: ""
               required: false
+              group: HTTP Auth
             - name: password
-              description: Password for basic HTTP authentication.
+              description: Password for Basic HTTP authentication.
               default_value: ""
               required: false
-            - name: proxy_username
-              description: Username for proxy basic HTTP authentication.
+              group: HTTP Auth
+            - name: bearer_token_file
+              description: "Path to a file containing a bearer token (used for `Authorization: Bearer`)."
               default_value: ""
               required: false
-            - name: proxy_password
-              description: Password for proxy basic HTTP authentication.
-              default_value: ""
-              required: false
-            - name: method
-              description: HTTP request method.
-              default_value: GET
-              required: false
-            - name: timeout
-              description: HTTP request timeout.
-              default_value: 1
-              required: false
-            - name: body
-              description: HTTP request body.
-              default_value: ""
-              required: false
-            - name: headers
-              description: HTTP request headers.
-              default_value: ""
-              required: false
-            - name: not_follow_redirects
-              description: Redirect handling policy. Controls whether the client follows redirects.
-              default_value: false
-              required: false
+              group: HTTP Auth
+
             - name: tls_skip_verify
-              description: Server certificate chain and hostname validation policy. Controls whether the client performs this check.
-              default_value: false
+              description: Skip TLS certificate and hostname verification (insecure).
+              default_value: no
               required: false
+              group: TLS
             - name: tls_ca
-              description: Certification authority that the client uses when verifying the server's certificates.
+              description: Path to CA bundle used to validate the server certificate.
               default_value: ""
               required: false
+              group: TLS
             - name: tls_cert
-              description: Client TLS certificate.
+              description: Path to client TLS certificate (for mTLS).
               default_value: ""
               required: false
+              group: TLS
             - name: tls_key
-              description: Client TLS key.
+              description: Path to client TLS private key (for mTLS).
               default_value: ""
               required: false
+              group: TLS
+
+            - name: proxy_url
+              description: HTTP proxy URL.
+              default_value: ""
+              required: false
+              group: Proxy
+            - name: proxy_username
+              description: Username for proxy Basic HTTP authentication.
+              default_value: ""
+              required: false
+              group: Proxy
+            - name: proxy_password
+              description: Password for proxy Basic HTTP authentication.
+              default_value: ""
+              required: false
+              group: Proxy
+
+            - name: method
+              description: HTTP method to use.
+              default_value: "GET"
+              required: false
+              group: Request
+            - name: body
+              description: Request body (e.g., for POST/PUT).
+              default_value: ""
+              required: false
+              group: Request
+            - name: headers
+              description: "Additional HTTP headers (one per line as key: value)."
+              default_value: ""
+              required: false
+              group: Request
+            - name: not_follow_redirects
+              description: Do not follow HTTP redirects.
+              default_value: no
+              required: false
+              group: Request
+            - name: force_http2
+              description: Force HTTP/2 (including h2c over TCP).
+              default_value: no
+              required: false
+              group: Request
+
+            - name: vnode
+              description: Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).
+              default_value: ""
+              required: false
+              group: Virtual Node
         examples:
           folding:
             title: Config

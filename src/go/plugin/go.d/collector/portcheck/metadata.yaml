@@ -71,29 +71,42 @@ modules:
             enabled: true
           list:
             - name: update_every
-              description: Data collection frequency.
+              description: Data collection frequency (seconds).
               default_value: 5
               required: false
+              group: Collection
             - name: autodetection_retry
-              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              description: Autodetection retry interval (seconds). Set 0 to disable.
               default_value: 0
               required: false
+              group: Collection
+
             - name: host
-              description: Remote host address in IPv4, IPv6 format, or DNS name.
+              description: Remote host address (IPv4, IPv6, or DNS name).
               default_value: ""
               required: true
+              group: Target
             - name: ports
-              description: Target TCP ports. Must be specified in numeric format.
-              default_value: ""
+              description: List of TCP ports to check (numeric format).
+              default_value: "[]"
               required: false
+              group: Target
             - name: udp_ports
-              description: Target UDP ports. Must be specified in numeric format.
-              default_value: ""
+              description: List of UDP ports to check (numeric format).
+              default_value: "[]"
               required: false
+              group: Target
             - name: timeout
-              description: HTTP request timeout.
+              description: Port check timeout (seconds).
               default_value: 2
               required: false
+              group: Target
+
+            - name: vnode
+              description: Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).
+              default_value: ""
+              required: false
+              group: Virtual Node
         examples:
           folding:
             title: Config

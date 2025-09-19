@@ -213,27 +213,27 @@ Notes:
 
 
 
-| Option | Description | Default | Required |
-|:-----|:------------|:--------|:---------:|
-| update_every | Data collection frequency. | 1 | no |
-| autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
-| path | Path to the web server log file. |  | yes |
-| exclude_path | Path to exclude. | *.gz | no |
-| url_patterns | List of URL patterns. | [] | no |
-| url_patterns.name | Used as a dimension name. |  | yes |
-| url_patterns.pattern | Used to match against full original request URI. Pattern syntax in [matcher](https://github.com/netdata/netdata/tree/master/src/go/pkg/matcher#supported-format). |  | yes |
-| log_type | Log parser type. | auto | no |
-| csv_config | CSV log parser config. |  | no |
-| csv_config.delimiter | CSV field delimiter. | , | no |
-| csv_config.format | CSV log format. |  | no |
-| ltsv_config | LTSV log parser config. |  | no |
-| ltsv_config.field_delimiter | LTSV field delimiter. | \t | no |
-| ltsv_config.value_delimiter | LTSV value delimiter. | : | no |
-| ltsv_config.mapping | LTSV fields mapping to **known fields**. |  | yes |
-| json_config | JSON log parser config. |  | no |
-| json_config.mapping | JSON fields mapping to **known fields**. |  | yes |
-| regexp_config | RegExp log parser config. |  | no |
-| regexp_config.pattern | RegExp pattern with named groups. |  | yes |
+| Group | Option | Description | Default | Required |
+|:------|:-----|:------------|:--------|:---------:|
+| **Collection** | update_every | Data collection frequency. | 1 | no |
+|  | autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
+| **Target** | path | Path to the web server log file. |  | yes |
+|  | exclude_path | Path to exclude. | *.gz | no |
+| **Customization** | url_patterns | List of URL patterns. | [] | no |
+|  | url_patterns.name | Used as a dimension name. |  | yes |
+|  | url_patterns.pattern | Used to match against full original request URI. Pattern syntax in [matcher](https://github.com/netdata/netdata/tree/master/src/go/pkg/matcher#supported-format). |  | yes |
+| **Parser** | log_type | Log parser type. | auto | no |
+|  | csv_config | CSV log parser config. |  | no |
+|  | csv_config.delimiter | CSV field delimiter. | , | no |
+|  | csv_config.format | CSV log format. |  | no |
+|  | ltsv_config | LTSV log parser config. |  | no |
+|  | ltsv_config.field_delimiter | LTSV field delimiter. | \t | no |
+|  | ltsv_config.value_delimiter | LTSV value delimiter. | : | no |
+|  | ltsv_config.mapping | LTSV fields mapping to **known fields**. |  | yes |
+|  | json_config | JSON log parser config. |  | no |
+|  | json_config.mapping | JSON fields mapping to **known fields**. |  | yes |
+|  | regexp_config | RegExp log parser config. |  | no |
+|  | regexp_config.pattern | RegExp pattern with named groups. |  | yes |
 
 ##### url_patterns
 
@@ -288,10 +288,6 @@ If `log_type` parameter set to `auto` (which is default), weblog will try to aut
   ```
 
   If you're using the default Apache/NGINX log format, auto-detect will work for you. If it doesn't work you need to set the format manually.
-
-
-##### csv_config.format
-
 
 
 ##### ltsv_config.mapping

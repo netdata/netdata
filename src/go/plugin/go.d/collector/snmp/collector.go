@@ -6,7 +6,6 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
-	"strings"
 
 	"github.com/gosnmp/gosnmp"
 
@@ -150,14 +149,6 @@ func (c *Collector) Collect(ctx context.Context) map[string]int64 {
 	mx, err := c.collect()
 	if err != nil {
 		c.Error(err)
-		// Some buggy SNMPv3 devices occasionally get stuck with
-		// "packet is not authentic" errors. Closing and dropping
-		// the client here forces a reconnect on the next scrape,
-		// which usually recovers the session.
-		if strings.Contains(err.Error(), "packet is not authentic") {
-			c.Cleanup(ctx)
-			c.snmpClient = nil
-		}
 	}
 
 	if len(mx) == 0 {

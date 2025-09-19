@@ -59,21 +59,32 @@ modules:
             enabled: true
           list:
             - name: update_every
-              description: Data collection frequency.
+              description: Data collection interval (seconds).
               default_value: 1
               required: false
+              group: Collection
             - name: autodetection_retry
-              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              description: Autodetection retry interval (seconds). Set 0 to disable.
               default_value: 0
               required: false
+              group: Collection
+
             - name: url
-              description: Server URL.
+              description: Supervisord XML-RPC endpoint URL.
               default_value: http://127.0.0.1:9001/RPC2
               required: true
+              group: Target
             - name: timeout
-              description: System bus requests timeout.
+              description: Request timeout (seconds).
               default_value: 1
               required: false
+              group: Target
+
+            - name: vnode
+              description: Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).
+              default_value: ""
+              required: false
+              group: Virtual Node
         examples:
           folding:
             title: Config

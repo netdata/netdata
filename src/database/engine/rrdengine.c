@@ -34,6 +34,9 @@ struct rrdeng_main {
     ND_THREAD *thread;
     uv_loop_t loop;
     uv_async_t async;
+#if defined(OS_WINDOWS)
+    bool async_ready;
+#endif
     uv_timer_t timer;
     uv_timer_t retention_timer;
     pid_t tid;
@@ -94,6 +97,42 @@ struct rrdeng_main {
                 },
         }
 };
+
+#if defined(OS_WINDOWS)
+netdata_mutex_t rrdeng_async_mutex;
+
+__attribute__((constructor)) void initialize_rrdeng_async_mutex(void)
+{
+    netdata_mutex_init(&rrdeng_async_mutex);
+}
+
+__attribute__((destructor)) void destroy_rrdeng_async_mutex(void)
+{
+    netdata_mutex_destroy(&rrdeng_async_mutex);
+}
+
+void rrdeng_async_wakeup()
+{
+
+    if (__atomic_load_n(&rrdeng_main.async_ready, __ATOMIC_RELAXED)) {
+        netdata_mutex_lock(&rrdeng_async_mutex);
+        int rc = uv_async_send(&rrdeng_main.async);
+        if (rc)
+            nd_log_daemon(NDLP_ERR,"DBENGINE: wakeup async error = %d", rc);
+
+        netdata_mutex_unlock(&rrdeng_async_mutex);
+    } else {
+        nd_log_daemon(NDLP_WARNING,"DBENGINE: wakeup async handler is being reset");
+    }
+}
+#else
+void rrdeng_async_wakeup()
+{
+    int rc = uv_async_send(&rrdeng_main.async);
+    if (rc)
+        nd_log_daemon(NDLP_ERR,"DBENGINE: wakeup async error = %d", rc);
+}
+#endif
 
 static void sanity_check(void)
 {
@@ -233,7 +272,7 @@ static void work_standard_worker(uv_work_t *req) {
     __atomic_sub_fetch(&rrdeng_main.work_cmd.atomics.executing, 1, __ATOMIC_RELAXED);
 
     // signal the event loop a worker is available
-    fatal_assert(0 == uv_async_send(&rrdeng_main.async));
+    rrdeng_async_wakeup();
 }
 
 static void after_work_standard_callback(uv_work_t* req, int status) {
@@ -523,7 +562,7 @@ ALWAYS_INLINE void rrdeng_enq_cmd(struct rrdengine_instance *ctx, enum rrdeng_op
         enqueue_cb(cmd);
     spinlock_unlock(&rrdeng_main.cmd_queue.unsafe.spinlock);
 
-    fatal_assert(0 == uv_async_send(&rrdeng_main.async));
+    rrdeng_async_wakeup();
 }
 
 static inline bool rrdeng_cmd_has_waiting_opcodes_in_lower_priorities(STORAGE_PRIORITY priority, STORAGE_PRIORITY max_priority) {
@@ -1818,12 +1857,36 @@ void finalize_rrd_files(struct rrdengine_instance *ctx)
     return finalize_data_files(ctx);
 }
 
+#if defined(OS_WINDOWS)
+uint64_t last_async_callback;
+
+void async_cb(uv_async_t *handle)
+{
+    uv_stop(handle->loop);
+    uv_update_time(handle->loop);
+
+    last_async_callback = uv_hrtime();
+
+    netdata_log_debug(D_RRDENGINE, "%s called, active=%d.", __func__, uv_is_active((uv_handle_t *)handle));
+}
+
+static void async_closed_cb(uv_handle_t *handle)
+{
+    struct rrdeng_main *main = handle->data;
+
+    int ret = uv_async_init(handle->loop, &main->async, async_cb);
+    if (ret)
+        netdata_log_error("DBENGINE: reinitializing uv_async_init(): %s", uv_strerror(ret));
+    __atomic_store_n(&main->async_ready, true, __ATOMIC_RELEASE);
+}
+#else
 void async_cb(uv_async_t *handle)
 {
     uv_stop(handle->loop);
     uv_update_time(handle->loop);
     netdata_log_debug(D_RRDENGINE, "%s called, active=%d.", __func__, uv_is_active((uv_handle_t *)handle));
 }
+#endif
 
 #define TIMER_PERIOD_MS (1000)
 
@@ -2175,6 +2238,9 @@ bool rrdeng_dbengine_spawn(struct rrdengine_instance *ctx __maybe_unused) {
             return false;
         }
         rrdeng_main.async.data = &rrdeng_main;
+#if defined(OS_WINDOWS)
+        rrdeng_main.async_ready = true;
+#endif
 
         ret = uv_timer_init(&rrdeng_main.loop, &rrdeng_main.timer);
         if (ret) {
@@ -2340,6 +2406,10 @@ void dbengine_event_loop(void* arg) {
         mlt[i].finished = false;
     }
 
+#if defined(OS_WINDOWS)
+    last_async_callback = uv_hrtime();
+#endif
+
     while (likely(!shutdown)) {
         worker_is_idle();
         uv_run(&main->loop, UV_RUN_DEFAULT);
@@ -2365,7 +2435,19 @@ void dbengine_event_loop(void* arg) {
                     worker_dispatch_extent_read(cmd, false);
                     break;
 
-                case RRDENG_OPCODE_QUERY:
+                case RRDENG_OPCODE_QUERY:;
+#if defined(OS_WINDOWS)
+                    static int max_timeout_count = 0;
+                    if (uv_hrtime() - last_async_callback > 1000UL * NSEC_PER_MSEC) {
+                        if (++max_timeout_count > 30) {
+                            netdata_log_error("DBENGINE: async callback timeout detected, re-initializing the async handle");
+                            __atomic_store_n(&main->async_ready, false, __ATOMIC_RELEASE);
+                            uv_close((uv_handle_t *)&main->async, async_closed_cb);
+                            max_timeout_count = 0;
+                        } else
+                            netdata_log_error("DBENGINE: async callback timeout detected count = %d", max_timeout_count);
+                    }
+#endif
                     worker_dispatch_query_prep(cmd, false);
                     break;
 
