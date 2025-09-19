@@ -69,6 +69,7 @@ typedef struct parser_user_object {
 
     struct {
         bool parsing_host;
+        uint32_t node_stale_after_seconds;
         nd_uuid_t machine_guid;
         char machine_guid_str[UUID_STR_LEN];
         STRING *hostname;
@@ -95,6 +96,11 @@ typedef struct parser_user_object {
         time_t wall_clock_time;
         bool ml_locked;
     } v2;
+
+    struct {
+        Pvoid_t JudyL;
+    } vnodes;
+
 } PARSER_USER_OBJECT;
 
 typedef void (*parser_deferred_action_t)(struct parser *parser, void *action_data);
