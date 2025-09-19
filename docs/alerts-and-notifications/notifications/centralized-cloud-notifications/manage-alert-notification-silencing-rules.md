@@ -5,57 +5,58 @@ From the Cloud interface, you can manage your space's Alert notification silenci
 ## Rule Hierarchy
 
 ```mermaid
-%%{init: {'theme': 'dark', 'themeVariables': { 'primaryColor': '#2b2b2b', 'primaryTextColor': '#fff', 'primaryBorderColor': '#7C0000', 'lineColor': '#F8B229', 'secondaryColor': '#006100', 'tertiaryColor': '#333'}}}%%
 flowchart TD
-    Space[Space Level] --> Room[Room Level]
-    Room --> Node[Node Level]
-    Node --> Alert[Alert Level]
+    Space("Space Level") --> Room("Room Level")
+    Room --> Node("Node Level")
+    Node --> Alert("Alert Level")
     
-    Space --> SpaceRules[Space Silencing Rules<br/>Affects All Users]
-    Room --> RoomRules[Room-Specific Rules<br/>Target Specific Teams]
-    Node --> NodeRules[Node-Specific Rules<br/>Individual Servers]
-    Alert --> AlertRules[Alert-Specific Rules<br/>Granular Control]
+    Space --> SpaceRules("Space Silencing Rules<br/>Affects All Users")
+    Room --> RoomRules("Room-Specific Rules<br/>Target Specific Teams")
+    Node --> NodeRules("Node-Specific Rules<br/>Individual Servers")
+    Alert --> AlertRules("Alert-Specific Rules<br/>Granular Control")
     
-    style Space fill:#f44336,stroke:#333,color:#fff,stroke-width:1px,rx:10,ry:10
-    style Room fill:#ffeb3b,stroke:#555,color:#333,stroke-width:1px,rx:10,ry:10
-    style Node fill:#4caf50,stroke:#333,color:#fff,stroke-width:1px,rx:10,ry:10
-    style Alert fill:#2196F3,stroke:#333,color:#fff,stroke-width:1px,rx:10,ry:10
-    
-    style SpaceRules fill:#f9f9f9,stroke:#444,color:#333,stroke-width:1px,rx:10,ry:10
-    style RoomRules fill:#f9f9f9,stroke:#444,color:#333,stroke-width:1px,rx:10,ry:10
-    style NodeRules fill:#f9f9f9,stroke:#444,color:#333,stroke-width:1px,rx:10,ry:10
-    style AlertRules fill:#f9f9f9,stroke:#444,color:#333,stroke-width:1px,rx:10,ry:10
+    %% Style definitions
+    classDef alert fill:#ffeb3b,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+    classDef neutral fill:#f9f9f9,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+    classDef complete fill:#4caf50,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+    classDef database fill:#2196F3,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+
+    %% Apply styles
+    class Space alert
+    class Room,Node complete
+    class Alert database
+    class SpaceRules,RoomRules,NodeRules,AlertRules neutral
 ```
 
 ## Decision Flowchart
 
 ```mermaid
-%%{init: {'theme': 'dark', 'themeVariables': { 'primaryColor': '#2b2b2b', 'primaryTextColor': '#fff', 'primaryBorderColor': '#7C0000', 'lineColor': '#F8B229', 'secondaryColor': '#006100', 'tertiaryColor': '#333'}}}%%
 flowchart TD
-    Start[Need to Silence Alerts?] --> Scope{Who Should Be Affected?}
-    style Start fill:#f44336,stroke:#333,color:#fff,stroke-width:1px,rx:10,ry:10
-    style Scope fill:#2196F3,stroke:#333,color:#fff,stroke-width:1px,rx:10,ry:10
+    Start("Need to Silence Alerts?") --> Scope("Who Should Be Affected?")
     
-    Scope -->|All Users| SpaceRule[Create Space Rule<br/>Admin/Manager Required]
-    Scope -->|Just Me| PersonalRule[Create Personal Rule<br/>Any Role Except Billing]
+    Scope -->|"All Users"| SpaceRule("Create Space Rule<br/>Admin/Manager Required")
+    Scope -->|"Just Me"| PersonalRule("Create Personal Rule<br/>Any Role Except Billing")
     
-    style SpaceRule fill:#f44336,stroke:#333,color:#fff,stroke-width:1px,rx:10,ry:10
-    style PersonalRule fill:#4caf50,stroke:#333,color:#fff,stroke-width:1px,rx:10,ry:10
-    
-    SpaceRule --> Target{What to Target?}
+    SpaceRule --> Target("What to Target?")
     PersonalRule --> Target
     
-    style Target fill:#ffeb3b,stroke:#555,color:#333,stroke-width:1px,rx:10,ry:10
+    Target -->|"All Infrastructure"| AllNodes("All Rooms + All Nodes")
+    Target -->|"Specific Team"| SpecificRoom("Target Specific Room")
+    Target -->|"Individual Server"| SpecificNode("Target Specific Node")
+    Target -->|"Alert Type"| SpecificAlert("Target Alert Context/Name")
     
-    Target -->|All Infrastructure| AllNodes[All Rooms + All Nodes]
-    Target -->|Specific Team| SpecificRoom[Target Specific Room]
-    Target -->|Individual Server| SpecificNode[Target Specific Node]
-    Target -->|Alert Type| SpecificAlert[Target Alert Context/Name]
-    
-    style AllNodes fill:#f9f9f9,stroke:#444,color:#333,stroke-width:1px,rx:10,ry:10
-    style SpecificRoom fill:#f9f9f9,stroke:#444,color:#333,stroke-width:1px,rx:10,ry:10
-    style SpecificNode fill:#f9f9f9,stroke:#444,color:#333,stroke-width:1px,rx:10,ry:10
-    style SpecificAlert fill:#f9f9f9,stroke:#444,color:#333,stroke-width:1px,rx:10,ry:10
+    %% Style definitions
+    classDef alert fill:#ffeb3b,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+    classDef neutral fill:#f9f9f9,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+    classDef complete fill:#4caf50,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+    classDef database fill:#2196F3,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+
+    %% Apply styles
+    class Start alert
+    class Scope,Target database
+    class SpaceRule complete
+    class PersonalRule complete
+    class AllNodes,SpecificRoom,SpecificNode,SpecificAlert neutral
 ```
 
 ## Prerequisites

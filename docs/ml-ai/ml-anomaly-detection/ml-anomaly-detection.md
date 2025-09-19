@@ -43,26 +43,26 @@ Netdata avoids deep learning models to maintain lightweight operation on any Lin
 
 ```mermaid
 flowchart TD
-    Raw("**Raw Metrics**<br/><br/>Last 6 Hours")
-    Preprocess("**Preprocess**<br/><br/>Feature Vectors")
-    Train("**Train k-means<br/><br/>k=2**")
-    Model("**Trained Model**")
+    Raw("Raw Metrics<br/>Last 6 Hours")
+    Preprocess("Preprocess<br/>Feature Vectors")
+    Train("Train k-means<br/>k=2")
+    Model("Trained Model")
     
-    M1("Model 1<br/><br/>**Recent Data**") 
-    M2("Model 2<br/><br/>**Older Data**")
-    M3("Model 3<br/><br/>**Even Older Data**")
-    MN("Model N<br/><br/>**Up to 54 Hours Old**")
+    M1("Model 1<br/>Recent Data") 
+    M2("Model 2<br/>Older Data")
+    M3("Model 3<br/>Even Older Data")
+    MN("Model N<br/>Up to 54 Hours Old")
     
-    NewData("**New Metrics**")
-    DistCalc("**Calculate**<br/><br/>Euclidean Distance<br/>to Cluster Centers")
-    Threshold("**Distance > 99th**<br/><br/>Percentile?")
-    FlagA("**Flag as Anomalous**<br/><br/>in This Model")
-    FlagN("**Flag as Normal**<br/><br/>in This Model")
+    NewData("New Metrics")
+    DistCalc("Calculate<br/>Euclidean Distance<br/>to Cluster Centers")
+    Threshold("Distance > 99th<br/>Percentile?")
+    FlagA("Flag as Anomalous<br/>in This Model")
+    FlagN("Flag as Normal<br/>in This Model")
     
-    AllResults("**Results from All Models**")
-    AllAgree("**All Models<br/><br/>Agree it's<br/><br/>Anomalous?**")
-    SetBit("**Set Anomaly Bit = 1**<br/><br/>True")
-    ClearBit("**Set Anomaly Bit = 0**<br/><br/>False")
+    AllResults("Results from All Models")
+    AllAgree("All Models<br/>Agree it's<br/>Anomalous?")
+    SetBit("Set Anomaly Bit = 1<br/>True")
+    ClearBit("Set Anomaly Bit = 0<br/>False")
     
     Raw --> Preprocess
     Preprocess --> Train
@@ -79,26 +79,26 @@ flowchart TD
     
     NewData --> DistCalc
     DistCalc --> Threshold
-    Threshold -->|Yes| FlagA
-    Threshold -->|No| FlagN
+    Threshold -->|"Yes"| FlagA
+    Threshold -->|"No"| FlagN
     
     FlagA --> AllResults
-    FlagN --> ClearBit
+    FlagN --> AllResults
     AllResults --> AllAgree
-    AllAgree -->|Yes| SetBit
-    AllAgree -->|No| ClearBit
+    AllAgree -->|"Yes"| SetBit
+    AllAgree -->|"No"| ClearBit
     
     %% Style definitions
-    classDef neutral fill:#f9f9f9,stroke:#000000,stroke-width:3px,color:#000000,font-size:16px
-    classDef process fill:#ffeb3b,stroke:#000000,stroke-width:3px,color:#000000,font-size:16px
-    classDef complete fill:#4caf50,stroke:#000000,stroke-width:3px,color:#000000,font-size:16px
-    classDef anomaly fill:#f44336,stroke:#000000,stroke-width:3px,color:#000000,font-size:16px
-    
+    classDef alert fill:#ffeb3b,stroke:#000000,stroke-width:3px,color:#000000,font-size:14px
+    classDef neutral fill:#f9f9f9,stroke:#000000,stroke-width:3px,color:#000000,font-size:14px
+    classDef complete fill:#4caf50,stroke:#000000,stroke-width:3px,color:#000000,font-size:14px
+    classDef database fill:#2196F3,stroke:#000000,stroke-width:3px,color:#000000,font-size:14px
+
     %% Apply styles
-    class Raw,Preprocess,NewData,AllResults neutral
-    class Train,Model,M1,M2,M3,MN,DistCalc,Threshold,AllAgree process
-    class FlagN,ClearBit complete
-    class FlagA,SetBit anomaly
+    class Raw,NewData,AllResults alert
+    class Train,Model,M1,M2,M3,MN,DistCalc,Threshold,AllAgree neutral
+    class Preprocess,FlagN,ClearBit complete
+    class FlagA,SetBit database
 ```
 
 ### Training & Detection Process

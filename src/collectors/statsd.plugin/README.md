@@ -39,17 +39,22 @@ Want a hands-on example? [Jump to the K6 StatsD Walkthrough](#step-by-step-guide
 ### How StatsD Works with Netdata
 
 ```mermaid
-graph TD
-    A[Your Application] -->|Sends metrics| B[Netdata StatsD]
-    B -->|Creates| C[Private Charts]
-    B -->|Creates| D[Synthetic Charts]
-    B -->|Stores in| E[Database]
+flowchart TD
+    A("Your Application") -->|"Sends metrics"| B("Netdata StatsD")
+    B -->|"Creates"| C("Private Charts")
+    B -->|"Creates"| D("Synthetic Charts")
+    B -->|"Stores in"| E("Database")
     
-    style A fill:#f9f9f9,stroke:#333,stroke-width:1px
-    style B fill:#4caf50,stroke:#333,stroke-width:1px,color:black
-    style C fill:#4caf50,stroke:#333,stroke-width:1px,color:black
-    style D fill:#4caf50,stroke:#333,stroke-width:1px,color:black
-    style E fill:#4caf50,stroke:#333,stroke-width:1px,color:black
+    %% Style definitions
+    classDef alert fill:#ffeb3b,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+    classDef neutral fill:#f9f9f9,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+    classDef complete fill:#4caf50,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+    classDef database fill:#2196F3,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+
+    %% Apply styles
+    class A alert
+    class B,C,D neutral
+    class E complete
 ```
 
 ## Netdata as a StatsD Server
@@ -90,23 +95,25 @@ Currently available applications:
 Netdata fully supports the StatsD protocol and extends it for more advanced use cases. All StatsD client libraries are compatible with Netdata.
 
 ```mermaid
-graph TD
-    A[Application] -->|Sends| B[Metrics]
-    B --> C[Gauges]
-    B --> D[Counters]
-    B --> E[Timers]
-    B --> F[Histograms]
-    B --> G[Sets]
-    B --> H[Dictionaries]
+flowchart TD
+    A("Application") -->|"Sends"| B("Metrics")
+    B --> C("Gauges")
+    B --> D("Counters")
+    B --> E("Timers")
+    B --> F("Histograms")
+    B --> G("Sets")
+    B --> H("Dictionaries")
     
-    style A fill:#f9f9f9,stroke:#333,stroke-width:1px
-    style B fill:#4caf50,stroke:#333,stroke-width:1px,color:black
-    style C fill:#4caf50,stroke:#333,stroke-width:1px,color:black
-    style D fill:#4caf50,stroke:#333,stroke-width:1px,color:black
-    style E fill:#4caf50,stroke:#333,stroke-width:1px,color:black
-    style F fill:#4caf50,stroke:#333,stroke-width:1px,color:black
-    style G fill:#4caf50,stroke:#333,stroke-width:1px,color:black
-    style H fill:#4caf50,stroke:#333,stroke-width:1px,color:black
+    %% Style definitions
+    classDef alert fill:#ffeb3b,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+    classDef neutral fill:#f9f9f9,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+    classDef complete fill:#4caf50,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+    classDef database fill:#2196F3,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+
+    %% Apply styles
+    class A alert
+    class B neutral
+    class C,D,E,F,G,H complete
 ```
 
 <details>
@@ -284,19 +291,24 @@ You can find the StatsD configuration in `/etc/netdata/netdata.conf`:
 Netdata's StatsD chart system uses three key sections in its configuration:
 
 ```mermaid
-graph TD
-    A[[statsd.d config]] --> B[app]
-    A --> C[dictionary]
-    A --> D[chart definitions]
-    B --> E[metric filtering]
-    C --> F[renaming for display]
-    D --> G[chart family/context/units/priorities]
+flowchart TD
+    A("statsd.d config") --> B("app")
+    A --> C("dictionary")
+    A --> D("chart definitions")
+    B --> E("metric filtering")
+    C --> F("renaming for display")
+    D --> G("chart family/context/units/priorities")
     
-    classDef default fill:#4caf50,stroke:#333,stroke-width:1px,color:black
-    classDef config fill:#f9f9f9,stroke:#333,stroke-width:1px
-    
-    class A config
-    class B,C,D,E,F,G default
+    %% Style definitions
+    classDef alert fill:#ffeb3b,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+    classDef neutral fill:#f9f9f9,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+    classDef complete fill:#4caf50,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+    classDef database fill:#2196F3,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+
+    %% Apply styles
+    class A alert
+    class B,C,D neutral
+    class E,F,G complete
 ```
 
 The diagram shows how the configuration flows:
@@ -387,18 +399,23 @@ For ephemeral metrics, use `set charts as obsolete after` and `cleanup obsolete 
 Use synthetic charts to create dedicated sections on the dashboard to render your StatsD charts.
 
 ```mermaid
-graph TD
-    A[StatsD Metrics] --> B[App]
-    A --> C[Dictionary]
-    B --> D[Chart]
+flowchart TD
+    A("StatsD Metrics") --> B("App")
+    A --> C("Dictionary")
+    B --> D("Chart")
     C --> D
-    D --> E[Dashboard]
+    D --> E("Dashboard")
     
-    style A fill:#f9f9f9,stroke:#333,stroke-width:1px
-    style B fill:#4caf50,stroke:#333,stroke-width:1px,color:black
-    style C fill:#4caf50,stroke:#333,stroke-width:1px,color:black
-    style D fill:#4caf50,stroke:#333,stroke-width:1px,color:black
-    style E fill:#4caf50,stroke:#333,stroke-width:1px,color:black
+    %% Style definitions
+    classDef alert fill:#ffeb3b,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+    classDef neutral fill:#f9f9f9,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+    classDef complete fill:#4caf50,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+    classDef database fill:#2196F3,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+
+    %% Apply styles
+    class A alert
+    class B,C neutral
+    class D,E complete
 ```
 
 Synthetic charts are organized in:
