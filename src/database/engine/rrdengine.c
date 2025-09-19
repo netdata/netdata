@@ -95,6 +95,35 @@ struct rrdeng_main {
         }
 };
 
+#if defined(OS_WINDOWS)
+netdata_mutex_t rrdeng_async_mutex;
+
+__attribute__((constructor)) void initialize_rrdeng_async_mutex(void)
+{
+    netdata_mutex_init(&rrdeng_async_mutex);
+}
+
+__attribute__((destructor)) void destroy_rrdeng_async_mutex(void)
+{
+    netdata_mutex_destroy(&rrdeng_async_mutex);
+}
+#endif
+
+void rrdeng_async_wakeup()
+{
+#if defined(OS_WINDOWS)
+    netdata_mutex_lock(&rrdeng_async_mutex);
+#endif
+
+    int rc = uv_async_send(&rrdeng_main.async);
+    if (rc)
+        nd_log_daemon(NDLP_ERR,"DBENGINE: wakeup async error = %d", rc);
+
+#if defined(OS_WINDOWS)
+    netdata_mutex_unlock(&rrdeng_async_mutex);
+#endif
+}
+
 static void sanity_check(void)
 {
     BUILD_BUG_ON(WORKER_UTILIZATION_MAX_JOB_TYPES < (RRDENG_OPCODE_MAX + 2));
@@ -231,6 +260,9 @@ static void work_standard_worker(uv_work_t *req) {
 
     __atomic_sub_fetch(&rrdeng_main.work_cmd.atomics.dispatched, 1, __ATOMIC_RELAXED);
     __atomic_sub_fetch(&rrdeng_main.work_cmd.atomics.executing, 1, __ATOMIC_RELAXED);
+
+    // signal the event loop a worker is available
+    rrdeng_async_wakeup();
 }
 
 static void after_work_standard_callback(uv_work_t* req, int status) {
@@ -520,7 +552,7 @@ ALWAYS_INLINE void rrdeng_enq_cmd(struct rrdengine_instance *ctx, enum rrdeng_op
         enqueue_cb(cmd);
     spinlock_unlock(&rrdeng_main.cmd_queue.unsafe.spinlock);
 
-    fatal_assert(0 == uv_async_send(&rrdeng_main.async));
+    rrdeng_async_wakeup();
 }
 
 static inline bool rrdeng_cmd_has_waiting_opcodes_in_lower_priorities(STORAGE_PRIORITY priority, STORAGE_PRIORITY max_priority) {
