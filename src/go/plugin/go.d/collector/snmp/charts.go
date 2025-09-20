@@ -416,7 +416,7 @@ func (c *Collector) addProfileTableMetricChart(m ddsnmp.Metric) {
 			if !seen[k] {
 				seen[k] = true
 				id := fmt.Sprintf("snmp_device_prof_%s_%s", key, k)
-				chart.Dims = append(chart.Dims, &module.Dim{ID: id, Name: k, Algo: module.Absolute})
+				chart.Dims = append(chart.Dims, &module.Dim{ID: id, Name: k, Algo: dimAlgoFromDdSnmpType(m)})
 			}
 		}
 	} else {
