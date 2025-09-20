@@ -33,9 +33,9 @@ As Richard Hackathorn wrote in _[The BI Watch: Real-Time to Real-Value](https://
 
 Wikipedia defines **[real-time business intelligence](https://en.wikipedia.org/wiki/Real-time_business_intelligence)** as a range from _milliseconds to ≤ 5 seconds_ after an event has occurred, and identifies three types of latency involved:
 
--   **Data latency** — time to collect and store data
--   **Analysis latency** — time to process data into information
--   **Action latency** — time to act on the data (e.g., visualize or alert in observability)
+-   **Data latency** - time to collect and store data
+-   **Analysis latency** - time to process data into information
+-   **Action latency** - time to act on the data (e.g., visualize or alert in observability)
 
 For a system to qualify as _real-time_, the **sum of all three latencies** must remain within the real-time window.
 
@@ -246,7 +246,7 @@ We believe real-time monitoring is a right, not a premium feature. Our principle
 ### Global Scale
 
 -   **Billions of Metrics:** Processes over 4.5 billion metrics per second across all installations.
--   **100% Sampling Rate:** No statistical sampling—every data point is captured.
+-   **100% Sampling Rate:** No statistical sampling - every data point is captured.
 -   **Unlimited Metrics:** No artificial limits or pricing tiers based on volume.
 -   **Proven at Scale:** Monitors infrastructures with 100,000+ nodes seamlessly.
 
@@ -296,7 +296,7 @@ Netdata doesn't just claim to be real-time; it defines the category through engi
 
 -   **Bounded Latency:** Guaranteed under 2 seconds from event to insight.
 -   **Universal 1-Second Granularity:** For all metrics, across your entire stack.
--   **100% Fidelity:** No averages, no samples, no approximations—only truth.
+-   **100% Fidelity:** No averages, no samples, no approximations - only truth.
 -   **Distributed Scale:** Provides real-time performance at any scale, from one node to one million.
 -   **Production-Safe:** Engineered for efficiency that ensures it never becomes the problem it is designed to solve.
 
