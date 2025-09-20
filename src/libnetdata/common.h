@@ -254,7 +254,7 @@ typedef uint32_t uid_t;
 
 #include <zlib.h>
 
-#ifdef HAVE_SYS_CAPABILITY_H
+#ifdef HAVE_CAPABILITY
 #include <sys/capability.h>
 #endif
 

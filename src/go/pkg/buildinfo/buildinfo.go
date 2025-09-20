@@ -2,13 +2,19 @@
 
 package buildinfo
 
-// Version stores the agent's version number. It's set during the build process using build flags.
+// The variables in this file are set during the build process using linker flags.
+
+// Version stores the agent's version number.
 var Version = "v0.0.0"
 
 // UserConfigDir stores the path to the user configuration directory.
-// This value is set during the build process using build flags.
 var UserConfigDir = ""
 
 // StockConfigDir stores the path to the stock (default) configuration directory.
-// This value is set during the build process using build flags.
 var StockConfigDir = ""
+
+// PluginsDir stores the directory where pulgins were installed at build time.
+var PluginsDir = "/usr/libexec/netdata/plugins.d"
+
+// NetdataBinDir stores the directory where executables were installed at build time.
+var NetdataBinDir = "/usr/sbin"
