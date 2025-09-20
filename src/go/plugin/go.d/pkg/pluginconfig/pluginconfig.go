@@ -54,6 +54,10 @@ type directories struct {
 	varLibDir       string
 }
 
+func IsStock(path string) bool {
+	return strings.HasPrefix(path, StockConfigDir())
+}
+
 // MustInit parses env, applies CLI overrides, discovers directories, and stores them.
 // Safe to call multiple times; only the first call has effect.
 func MustInit(opts *cli.Option) {
