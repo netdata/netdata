@@ -6,8 +6,6 @@ Each chart in the [Metrics tab](/docs/dashboards-and-charts/metrics-tab-and-sing
 
 For configuration details, see the [ML documentation](/src/ml/README.md).
 
----
-
 ## How Anomaly Advisor Works
 
 The Anomaly Advisor leverages Netdata’s machine learning to evaluate anomaly rates across your nodes. It provides three key visualizations:
@@ -24,8 +22,6 @@ The Anomaly Advisor leverages Netdata’s machine learning to evaluate anomaly r
 
 :::
 
----
-
 ## Workflow Overview
 
 1. **Highlight a timeframe of interest** on the anomaly charts.
@@ -40,8 +36,6 @@ Use the [node filter](/docs/dashboards-and-charts/node-filter.md) to focus on sp
 
 :::
 
----
-
 ## Usage Tips
 
 | Tip                                           | Why It Matters                                                   |
@@ -49,16 +43,25 @@ Use the [node filter](/docs/dashboards-and-charts/node-filter.md) to focus on sp
 | Filter to specific nodes before highlighting. | Reduces noise by limiting averaging across unrelated nodes.      |
 | Highlight close to the anomaly spike.         | Improves ranking accuracy by focusing on the relevant timeframe. |
 
----
-
 ## Anomaly Advisor Diagram
 
 ```mermaid
-graph TD
-    A[Highlight **Timeframe**] --> B[**Rank** Metrics by Score]
-    B --> C[Show Ordered Charts]
-    C --> D[**Pick** from Anomaly Index]
-    D --> E[**Investigate** Metrics]
+flowchart TD
+    A("Highlight Timeframe") --> B("Rank Metrics by Score")
+    B --> C("Show Ordered Charts")
+    C --> D("Pick from Anomaly Index")
+    D --> E("Investigate Metrics")
+
+    %% Style definitions
+    classDef alert fill:#ffeb3b,stroke:#000000,stroke-width:3px,color:#000000,font-size:14px
+    classDef neutral fill:#f9f9f9,stroke:#000000,stroke-width:3px,color:#000000,font-size:14px
+    classDef complete fill:#4caf50,stroke:#000000,stroke-width:3px,color:#000000,font-size:14px
+    classDef database fill:#2196F3,stroke:#000000,stroke-width:3px,color:#000000,font-size:14px
+
+    %% Apply styles
+    class A alert
+    class B,C neutral
+    class D,E complete
 ```
 
 :::tip

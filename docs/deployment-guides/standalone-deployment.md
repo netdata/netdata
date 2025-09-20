@@ -21,10 +21,7 @@ Get the best experience - one dashboard for all your systems, mobile alerts, and
 
 ```mermaid
 flowchart TB
-    NC[NC]
-    Users[Users]
-    Notifications[Notifications]
-    NC("**Netdata Cloud**<br/>• Unified dashboards<br/>• Central notifications<br/>• Access from anywhere")
+    NC("**Netdata Cloud**<br/>Unified dashboards<br/>Central notifications<br/>Access from anywhere")
     Users("**One Dashboard**<br/>for all your systems")
     Notifications("**Alert Notifications**<br/>Email, Slack, Mobile App")
     Users <--> NC
@@ -32,26 +29,24 @@ flowchart TB
 
     subgraph infrastructure["Your Infrastructure"]
         direction TB
-        Agents[Agents]
-        Data[Data]
-        Agents("**Netdata Agents**<br/>Agent 1, Agent 2, Agent 3")
+        Agents("**Netdata Agents**<br/>Agent 1, Agent 2,<br/>Agent 3")
         Data("**Your Metrics**<br/>Stay on your servers")
         Agents <--> Data
     end
 
     NC <--> Agents
-    classDef cloud fill: #e8f4fd, stroke: #4a90e2, stroke-width: 2px, color: #2c3e50, rx: 10, ry: 10
-    classDef users fill: #fff2e8, stroke: #f39c12, stroke-width: 2px, color: #2c3e50, rx: 10, ry: 10
-    classDef notifications fill: #ffe8e8, stroke: #e74c3c, stroke-width: 2px, color: #2c3e50, rx: 10, ry: 10
-    classDef agents fill: #e8f5e8, stroke: #27ae60, stroke-width: 2px, color: #2c3e50, rx: 10, ry: 10
-    classDef data fill: #f3e8ff, stroke: #9b59b6, stroke-width: 2px, color: #2c3e50, rx: 10, ry: 10
-    classDef subgraphStyle fill: #f8f9fa, stroke: #6c757d, stroke-width: 2px, color: #2c3e50, rx: 15, ry: 15
-    class NC cloud
-    class Users users
-    class Notifications notifications
-    class Agents agents
-    class Data data
-    class infrastructure subgraphStyle
+
+    %% Style definitions
+    classDef alert fill:#ffeb3b,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+    classDef neutral fill:#f9f9f9,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+    classDef complete fill:#4caf50,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+    classDef database fill:#2196F3,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+
+    %% Apply styles
+    class Users,Agents alert
+    class NC,Notifications neutral
+    class Data complete
+    class infrastructure database
 ```
 
 </details>

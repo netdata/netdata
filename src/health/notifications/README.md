@@ -21,80 +21,63 @@ This script handles:
 ## Role-Based Routing Visualization
 
 ```mermaid
-%%{init: {'theme': 'dark', 'themeVariables': { 'primaryColor': '#2b2b2b', 'primaryTextColor': '#fff', 'primaryBorderColor': '#7C0000', 'lineColor': '#F8B229', 'secondaryColor': '#006100', 'tertiaryColor': '#333'}}}%%
 flowchart TD
-    Alert[High CPU Usage Alert] --> Check{Severity Level}
-    style Alert fill:#f44336,stroke:#333,color:#fff,stroke-width:1px,rx:10,ry:10
-    style Check fill:#ffeb3b,stroke:#555,color:#333,stroke-width:1px,rx:10,ry:10
+    Alert("High CPU Usage Alert") --> Check("Severity Level")
     
-    Check -->|WARNING| WarningRouting{Role: SysAdmin}
-    Check -->|CRITICAL| CriticalRouting{Multiple Roles}
+    Check -->|"WARNING"| WarningRouting("Role: SysAdmin")
+    Check -->|"CRITICAL"| CriticalRouting("Multiple Roles")
     
-    style WarningRouting fill:#4caf50,stroke:#333,color:#fff,stroke-width:1px,rx:10,ry:10
-    style CriticalRouting fill:#f44336,stroke:#333,color:#fff,stroke-width:1px,rx:10,ry:10
+    WarningRouting --> SlackChannel("Slack")
+    WarningRouting --> EmailOps("Email")
     
-    WarningRouting --> SlackChannel[Slack]
-    WarningRouting --> EmailOps[Email]
+    CriticalRouting --> PagerDuty("PagerDuty")
+    CriticalRouting --> EmailManagers("Email")
+    CriticalRouting --> SlackUrgent("Slack")
+    CriticalRouting --> SMS("SMS")
     
-    CriticalRouting --> PagerDuty[PagerDuty]
-    CriticalRouting --> EmailManagers[Email]
-    CriticalRouting --> SlackUrgent[Slack]
-    CriticalRouting --> SMS[SMS]
-    
-    style SlackChannel fill:#f9f9f9,stroke:#444,color:#333,stroke-width:1px,rx:10,ry:10
-    style EmailOps fill:#f9f9f9,stroke:#444,color:#333,stroke-width:1px,rx:10,ry:10
-    style PagerDuty fill:#f9f9f9,stroke:#444,color:#333,stroke-width:1px,rx:10,ry:10
-    style EmailManagers fill:#f9f9f9,stroke:#444,color:#333,stroke-width:1px,rx:10,ry:10
-    style SlackUrgent fill:#f9f9f9,stroke:#444,color:#333,stroke-width:1px,rx:10,ry:10
-    style SMS fill:#f9f9f9,stroke:#444,color:#333,stroke-width:1px,rx:10,ry:10
+    %% Style definitions
+    classDef alert fill:#ffeb3b,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+    classDef neutral fill:#f9f9f9,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+    classDef complete fill:#4caf50,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+    classDef database fill:#2196F3,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+
+    %% Apply styles
+    class Alert alert
+    class Check database
+    class WarningRouting,CriticalRouting complete
+    class SlackChannel,EmailOps,PagerDuty,EmailManagers,SlackUrgent,SMS neutral
 ```
 
 ## Health Management API Workflow
 
 ```mermaid
-%%{init: {'theme': 'dark', 'themeVariables': { 'primaryColor': '#2b2b2b', 'primaryTextColor': '#fff', 'primaryBorderColor': '#7C0000', 'lineColor': '#F8B229', 'secondaryColor': '#006100', 'tertiaryColor': '#333'}}}%%
 flowchart TD
-    Start[Normal Operation] --> Maintenance{Maintenance<br/>Window?}
-    style Start fill:#4caf50,stroke:#333,color:#fff,stroke-width:1px,rx:10,ry:10
-    style Maintenance fill:#ffeb3b,stroke:#555,color:#333,stroke-width:1px,rx:10,ry:10
+    Start("Normal Operation") --> Maintenance("Maintenance Window?")
     
-    Maintenance -->|No| NormalOps[Continue Normal Alerting]
-    Maintenance -->|Yes| ApiAction{Choose API Action}
+    Maintenance -->|"No"| NormalOps("Continue Normal Alerting")
+    Maintenance -->|"Yes"| ApiAction("Choose Action")
     
-    style NormalOps fill:#4caf50,stroke:#333,color:#fff,stroke-width:1px,rx:10,ry:10
-    style ApiAction fill:#f44336,stroke:#333,color:#fff,stroke-width:1px,rx:10,ry:10
+    ApiAction --> SilenceAll("SILENCE ALL")
+    ApiAction --> DisableAll("DISABLE ALL")
+    ApiAction --> SilenceSelect("SILENCE Specific")
     
-    ApiAction -->|Silence All| SilenceAll[SILENCE ALL]
-    ApiAction -->|Disable All| DisableAll[DISABLE ALL]
-    ApiAction -->|Selective Silence| SilenceSelect[SILENCE Specific]
+    SilenceAll --> Reset("RESET when done")
+    DisableAll --> Reset
+    SilenceSelect --> Reset
     
-    SilenceAll --> AlertMode["Alerts: Yes<br/>Notifications: No"]
-    DisableAll --> CheckMode["Alerts: No<br/>Notifications: No"]
-    SilenceSelect --> SelectMode["Selected: Silenced<br/>Others: Normal"]
+    Reset --> Restored("Normal Operations Restored")
     
-    style SilenceAll fill:#f9f9f9,stroke:#444,color:#333,stroke-width:1px,rx:10,ry:10
-    style DisableAll fill:#f9f9f9,stroke:#444,color:#333,stroke-width:1px,rx:10,ry:10
-    style SilenceSelect fill:#f9f9f9,stroke:#444,color:#333,stroke-width:1px,rx:10,ry:10
-    
-    style AlertMode fill:#ffeb3b,stroke:#555,color:#333,stroke-width:1px,rx:10,ry:10
-    style CheckMode fill:#ffeb3b,stroke:#555,color:#333,stroke-width:1px,rx:10,ry:10
-    style SelectMode fill:#ffeb3b,stroke:#555,color:#333,stroke-width:1px,rx:10,ry:10
-    
-    AlertMode --> MaintenanceEnd{Maintenance<br/>Complete?}
-    CheckMode --> MaintenanceEnd
-    SelectMode --> MaintenanceEnd
-    
-    style MaintenanceEnd fill:#ffeb3b,stroke:#555,color:#333,stroke-width:1px,rx:10,ry:10
-    
-    MaintenanceEnd -->|Yes| Reset[RESET]
-    MaintenanceEnd -->|No| Continue[Continue Maintenance]
-    
-    style Reset fill:#f9f9f9,stroke:#444,color:#333,stroke-width:1px,rx:10,ry:10
-    style Continue fill:#f44336,stroke:#333,color:#fff,stroke-width:1px,rx:10,ry:10
-    
-    Reset --> Restored[Normal Operations Restored]
-    
-    style Restored fill:#4caf50,stroke:#333,color:#fff,stroke-width:1px,rx:10,ry:10
+    %% Style definitions
+    classDef alert fill:#ffeb3b,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+    classDef neutral fill:#f9f9f9,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+    classDef complete fill:#4caf50,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+    classDef database fill:#2196F3,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+
+    %% Apply styles
+    class Start,Restored complete
+    class Maintenance database
+    class ApiAction alert
+    class NormalOps,SilenceAll,DisableAll,SilenceSelect,Reset neutral
 ```
 
 ## Quick Setup
