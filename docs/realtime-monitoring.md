@@ -238,8 +238,8 @@ We believe real-time monitoring is a right, not a premium feature. Our principle
 
 -   **Granularity:** 1-second for all metrics, without exception.
 -   **Volume:** 3,000-20,000+ metrics collected per second per node.
--   **CPU Overhead:** <5% of a single core, typical for 3,000 metrics/s.
--   **RAM Footprint:** <200 MB, typical for 3,000 metrics/s.
+-   **CPU Overhead:** Less than 5% of a single core, typical for 3,000 metrics/s.
+-   **RAM Footprint:** Less than 200 MB, typical for 3,000 metrics/s.
 -   **Fault Tolerance:** Zero data loss during network issues (local buffering + replay).
 -   **Storage Efficiency:** ~0.6 bytes per sample on disk, enabling years of retention for gigabytes, not terabytes.
 
