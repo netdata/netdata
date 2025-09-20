@@ -1,4 +1,4 @@
-# Top Monitoring (Netdata Functions)
+# Top Consumers (Functions)
 
 Netdata Agent collectors provide on-demand, runtime executable functions on the host where they are deployed. Available since v1.37.1.
 
