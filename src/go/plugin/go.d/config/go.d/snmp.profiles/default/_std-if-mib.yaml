@@ -131,6 +131,60 @@ virtual_metrics:
       family: 'Network/Total/Traffic'
       unit: "bit/s"
 
+  # Unicast packets total (prefer 64-bit HC; fallback to 32-bit)
+  - name: ifTotalPacketsUcast
+    alternatives:
+      - sources:
+          - { metric: _ifHCInUcastPkts,  table: ifXTable, as: in }
+          - { metric: _ifHCOutUcastPkts, table: ifXTable, as: out }
+      - sources:
+          - { metric: _ifInUcastPkts,  table: ifTable, as: in }
+          - { metric: _ifOutUcastPkts, table: ifTable, as: out }
+    chart_meta:
+      description: Total unicast packets across all interfaces
+      family: 'Network/Total/Packet/Unicast'
+      unit: "{packet}/s"
+
+  # Multicast packets total (HC only from ifXTable)
+  - name: ifTotalPacketsMulticast
+    sources:
+      - { metric: _ifHCInMulticastPkts,  table: ifXTable, as: in }
+      - { metric: _ifHCOutMulticastPkts, table: ifXTable, as: out }
+    chart_meta:
+      description: Total multicast packets across all interfaces
+      family: 'Network/Total/Packet/Multicast'
+      unit: "{packet}/s"
+
+  # Broadcast packets total (HC only from ifXTable)
+  - name: ifTotalPacketsBroadcast
+    sources:
+      - { metric: _ifHCInBroadcastPkts,  table: ifXTable, as: in }
+      - { metric: _ifHCOutBroadcastPkts, table: ifXTable, as: out }
+    chart_meta:
+      description: Total broadcast packets across all interfaces
+      family: 'Network/Total/Packet/Broadcast'
+      unit: "{packet}/s"
+
+  # Errors total (ifTable only)
+  - name: ifTotalErrors
+    sources:
+      - { metric: _ifInErrors,  table: ifTable, as: in }
+      - { metric: _ifOutErrors, table: ifTable, as: out }
+    chart_meta:
+      description: Total packets with errors across all interfaces
+      family: 'Network/Total/Error'
+      unit: "{error}/s"
+
+  # Discards total (ifTable only)
+  - name: ifTotalDiscards
+    sources:
+      - { metric: _ifInDiscards,  table: ifTable, as: in }
+      - { metric: _ifOutDiscards, table: ifTable, as: out }
+    chart_meta:
+      description: Total packets discarded across all interfaces
+      family: 'Network/Total/Discard'
+      unit: "{discard}/s"
+
   # Operational status total
   - name: ifTotalOperStatus
     sources:
