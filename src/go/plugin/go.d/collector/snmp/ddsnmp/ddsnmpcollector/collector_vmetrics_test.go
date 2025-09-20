@@ -1174,6 +1174,268 @@ func TestVirtualMetricsCollector_Collect(t *testing.T) {
 			},
 			expected: []ddsnmp.Metric{}, // VM skipped in build phase
 		},
+
+		"alternatives prefer 64-bit ifXTable over 32-bit ifTable": {
+			profileDef: &ddprofiledefinition.ProfileDefinition{
+				Metrics: []ddprofiledefinition.MetricsConfig{
+					{
+						Table: ddprofiledefinition.SymbolConfig{Name: "ifXTable"},
+						Symbols: []ddprofiledefinition.SymbolConfig{
+							{Name: "ifHCInOctets"},
+						},
+					},
+					{
+						Table: ddprofiledefinition.SymbolConfig{Name: "ifTable"},
+						Symbols: []ddprofiledefinition.SymbolConfig{
+							{Name: "ifInOctets"},
+						},
+					},
+				},
+				VirtualMetrics: []ddprofiledefinition.VirtualMetricConfig{
+					{
+						Name: "ifTotalTrafficIn",
+						Alternatives: []ddprofiledefinition.VirtualMetricAlternativeSourcesConfig{
+							{Sources: []ddprofiledefinition.VirtualMetricSourceConfig{
+								{Metric: "ifHCInOctets", Table: "ifXTable"},
+							}},
+							{Sources: []ddprofiledefinition.VirtualMetricSourceConfig{
+								{Metric: "ifInOctets", Table: "ifTable"},
+							}},
+						},
+						ChartMeta: ddprofiledefinition.ChartMeta{
+							Description: "Total inbound traffic across all interfaces",
+							Family:      "Network/Total/Traffic/In",
+							Unit:        "bit/s",
+						},
+					},
+				},
+			},
+			collectedMetrics: []ddsnmp.Metric{
+				// both present; should choose ifXTable (64-bit) only
+				{Name: "ifHCInOctets", Value: 1000, IsTable: true, Table: "ifXTable"},
+				{Name: "ifHCInOctets", Value: 3000, IsTable: true, Table: "ifXTable"},
+				{Name: "ifInOctets", Value: 500, IsTable: true, Table: "ifTable"},
+				{Name: "ifInOctets", Value: 700, IsTable: true, Table: "ifTable"},
+			},
+			expected: []ddsnmp.Metric{
+				{
+					Name:        "ifTotalTrafficIn",
+					Value:       4000, // 1000 + 3000 (32-bit ignored)
+					Description: "Total inbound traffic across all interfaces",
+					Family:      "Network/Total/Traffic/In",
+					Unit:        "bit/s",
+				},
+			},
+		},
+
+		// fallback to second alternative (32-bit) when 64-bit missing
+		"alternatives fallback to 32-bit if only ifTable present": {
+			profileDef: &ddprofiledefinition.ProfileDefinition{
+				Metrics: []ddprofiledefinition.MetricsConfig{
+					{
+						Table: ddprofiledefinition.SymbolConfig{Name: "ifTable"},
+						Symbols: []ddprofiledefinition.SymbolConfig{
+							{Name: "ifInOctets"},
+						},
+					},
+				},
+				VirtualMetrics: []ddprofiledefinition.VirtualMetricConfig{
+					{
+						Name: "ifTotalTrafficIn",
+						Alternatives: []ddprofiledefinition.VirtualMetricAlternativeSourcesConfig{
+							{Sources: []ddprofiledefinition.VirtualMetricSourceConfig{
+								{Metric: "ifHCInOctets", Table: "ifXTable"},
+							}},
+							{Sources: []ddprofiledefinition.VirtualMetricSourceConfig{
+								{Metric: "ifInOctets", Table: "ifTable"},
+							}},
+						},
+						ChartMeta: ddprofiledefinition.ChartMeta{
+							Description: "Total inbound traffic across all interfaces",
+							Family:      "Network/Total/Traffic/In",
+							Unit:        "bit/s",
+						},
+					},
+				},
+			},
+			collectedMetrics: []ddsnmp.Metric{
+				// only 32-bit values exist
+				{Name: "ifInOctets", Value: 111, IsTable: true, Table: "ifTable"},
+				{Name: "ifInOctets", Value: 222, IsTable: true, Table: "ifTable"},
+			},
+			expected: []ddsnmp.Metric{
+				{
+					Name:        "ifTotalTrafficIn",
+					Value:       333,
+					Description: "Total inbound traffic across all interfaces",
+					Family:      "Network/Total/Traffic/In",
+					Unit:        "bit/s",
+				},
+			},
+		},
+
+		// composite dims: choose first alt that has *any* data, emit present dims only
+		"alternatives composite dims: pick 64-bit alt even if only one dim present": {
+			profileDef: &ddprofiledefinition.ProfileDefinition{
+				Metrics: []ddprofiledefinition.MetricsConfig{
+					{
+						Table: ddprofiledefinition.SymbolConfig{Name: "ifXTable"},
+						Symbols: []ddprofiledefinition.SymbolConfig{
+							{Name: "ifHCInOctets"},
+							// ifHCOutOctets intentionally not defined/collected
+						},
+					},
+					{
+						Table: ddprofiledefinition.SymbolConfig{Name: "ifTable"},
+						Symbols: []ddprofiledefinition.SymbolConfig{
+							{Name: "ifInOctets"},
+							{Name: "ifOutOctets"},
+						},
+					},
+				},
+				VirtualMetrics: []ddprofiledefinition.VirtualMetricConfig{
+					{
+						Name: "ifTotalTraffic",
+						Alternatives: []ddprofiledefinition.VirtualMetricAlternativeSourcesConfig{
+							{Sources: []ddprofiledefinition.VirtualMetricSourceConfig{
+								{Metric: "ifHCInOctets", Table: "ifXTable", As: "in"},
+								{Metric: "ifHCOutOctets", Table: "ifXTable", As: "out"},
+							}},
+							{Sources: []ddprofiledefinition.VirtualMetricSourceConfig{
+								{Metric: "ifInOctets", Table: "ifTable", As: "in"},
+								{Metric: "ifOutOctets", Table: "ifTable", As: "out"},
+							}},
+						},
+						ChartMeta: ddprofiledefinition.ChartMeta{
+							Description: "Total traffic by direction",
+							Family:      "Network/Total/Traffic",
+							Unit:        "bit/s",
+						},
+					},
+				},
+			},
+			collectedMetrics: []ddsnmp.Metric{
+				// only 64-bit IN present → first alt has data → choose it; OUT dimension omitted
+				{Name: "ifHCInOctets", Value: 9001, IsTable: true, Table: "ifXTable"},
+				// 32-bit values exist but must be ignored because first alt had data
+				{Name: "ifInOctets", Value: 1, IsTable: true, Table: "ifTable"},
+				{Name: "ifOutOctets", Value: 2, IsTable: true, Table: "ifTable"},
+			},
+			expected: []ddsnmp.Metric{
+				{
+					Name:        "ifTotalTraffic",
+					MultiValue:  map[string]int64{"in": 9001}, // only present dim
+					Description: "Total traffic by direction",
+					Family:      "Network/Total/Traffic",
+					Unit:        "bit/s",
+				},
+			},
+		},
+
+		// no child alternative received data → VM skipped
+		"alternatives: no child has data -> no metric": {
+			profileDef: &ddprofiledefinition.ProfileDefinition{
+				VirtualMetrics: []ddprofiledefinition.VirtualMetricConfig{
+					{
+						Name: "ifTotalTrafficIn",
+						Alternatives: []ddprofiledefinition.VirtualMetricAlternativeSourcesConfig{
+							{Sources: []ddprofiledefinition.VirtualMetricSourceConfig{
+								{Metric: "ifHCInOctets", Table: "ifXTable"},
+							}},
+							{Sources: []ddprofiledefinition.VirtualMetricSourceConfig{
+								{Metric: "ifInOctets", Table: "ifTable"},
+							}},
+						},
+						ChartMeta: ddprofiledefinition.ChartMeta{Description: "Total inbound"},
+					},
+				},
+			},
+			collectedMetrics: nil,
+			expected:         nil,
+		},
+
+		// grouped/per_row: enforce same-table per alternative; bad child skipped, good child used
+		"alternatives: grouped per_row single-table rule enforced per child": {
+			profileDef: &ddprofiledefinition.ProfileDefinition{
+				Metrics: []ddprofiledefinition.MetricsConfig{
+					{
+						Table: ddprofiledefinition.SymbolConfig{Name: "ifXTable"},
+						Symbols: []ddprofiledefinition.SymbolConfig{
+							{Name: "ifHCInOctets"},
+							{Name: "ifHCOutOctets"},
+						},
+					},
+				},
+				VirtualMetrics: []ddprofiledefinition.VirtualMetricConfig{
+					{
+						Name:   "ifTrafficPerRow",
+						PerRow: true,
+						// child #1 (bad): spans tables -> should be rejected by builder
+						Alternatives: []ddprofiledefinition.VirtualMetricAlternativeSourcesConfig{
+							{Sources: []ddprofiledefinition.VirtualMetricSourceConfig{
+								{Metric: "ifHCInOctets", Table: "ifXTable", As: "in"},
+								{Metric: "ifOutOctets", Table: "ifTable", As: "out"}, // wrong table on purpose
+							}},
+							// child #2 (good): single table
+							{Sources: []ddprofiledefinition.VirtualMetricSourceConfig{
+								{Metric: "ifHCInOctets", Table: "ifXTable", As: "in"},
+								{Metric: "ifHCOutOctets", Table: "ifXTable", As: "out"},
+							}},
+						},
+						ChartMeta: ddprofiledefinition.ChartMeta{
+							Description: "Per-row traffic (in/out)",
+							Family:      "Network/Interface/Traffic",
+							Unit:        "bit/s",
+						},
+					},
+				},
+			},
+			collectedMetrics: []ddsnmp.Metric{
+				{Name: "ifHCInOctets", Value: 10, IsTable: true, Table: "ifXTable",
+					Tags: map[string]string{"interface": "eth0", "ifType": "ethernetCsmacd", "ifIndex": "1"}},
+				{Name: "ifHCOutOctets", Value: 20, IsTable: true, Table: "ifXTable",
+					Tags: map[string]string{"interface": "eth0", "ifType": "ethernetCsmacd", "ifIndex": "1"}},
+			},
+			expected: []ddsnmp.Metric{
+				{
+					Name:        "ifTrafficPerRow",
+					IsTable:     true,
+					Table:       "ifXTable",
+					Tags:        map[string]string{"interface": "eth0", "ifType": "ethernetCsmacd", "ifIndex": "1"},
+					MultiValue:  map[string]int64{"in": 10, "out": 20},
+					Description: "Per-row traffic (in/out)",
+					Family:      "Network/Interface/Traffic",
+					Unit:        "bit/s",
+				},
+			},
+		},
+
+		// if both sources and alternatives are present, alternatives win (warning logged, deterministic)
+		"alternatives preferred over sources when both defined": {
+			profileDef: &ddprofiledefinition.ProfileDefinition{
+				VirtualMetrics: []ddprofiledefinition.VirtualMetricConfig{
+					{
+						Name: "ifTotalTrafficIn",
+						Sources: []ddprofiledefinition.VirtualMetricSourceConfig{
+							{Metric: "ifInOctets", Table: "ifTable"}, // would sum 32-bit
+						},
+						Alternatives: []ddprofiledefinition.VirtualMetricAlternativeSourcesConfig{
+							{Sources: []ddprofiledefinition.VirtualMetricSourceConfig{
+								{Metric: "ifHCInOctets", Table: "ifXTable"}, // preferred 64-bit
+							}},
+						},
+						ChartMeta: ddprofiledefinition.ChartMeta{Description: "Total inbound"},
+					},
+				},
+			},
+			collectedMetrics: []ddsnmp.Metric{
+				{Name: "ifHCInOctets", Value: 123, IsTable: true, Table: "ifXTable"},
+				{Name: "ifInOctets", Value: 999, IsTable: true, Table: "ifTable"},
+			},
+			expected: []ddsnmp.Metric{
+				{Name: "ifTotalTrafficIn", Value: 123, Description: "Total inbound"},
+			},
+		},
 	}
 
 	for name, tc := range tests {
