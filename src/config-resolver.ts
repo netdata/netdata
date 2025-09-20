@@ -15,6 +15,25 @@ interface ConfigLayer {
   env?: Record<string, string>;
 }
 
+class MissingVariableError extends Error {
+  public readonly scope: 'provider' | 'mcp' | 'defaults' | 'accounting';
+
+  public readonly id: string;
+
+  public readonly origin: LayerOrigin;
+
+  public readonly variable: string;
+
+  constructor(scope: 'provider' | 'mcp' | 'defaults' | 'accounting', id: string, origin: LayerOrigin, variable: string, message: string) {
+    super(message);
+    this.scope = scope;
+    this.id = id;
+    this.origin = origin;
+    this.variable = variable;
+    this.name = 'MissingVariableError';
+  }
+}
+
 interface ResolverOptions {
   verbose?: boolean;
   log?: (msg: string) => void;
@@ -124,64 +143,108 @@ function expandPlaceholders(obj: unknown, vars: (name: string) => string): unkno
   return obj;
 }
 
-function buildMissingVarError(scope: 'provider'|'mcp'|'defaults'|'accounting', id: string, origin: LayerOrigin, name: string): Error {
-  return new Error(`Unresolved variable \${${name}} for ${scope} '${id}' at ${origin}. Define it in ${origin === '--config' ? 'the specified config path' : '.ai-agent.env or environment'}.`);
+function buildMissingVarError(scope: 'provider'|'mcp'|'defaults'|'accounting', id: string, origin: LayerOrigin, name: string): MissingVariableError {
+  const message = `Unresolved variable \${${name}} for ${scope} '${id}' at ${origin}. Define it in ${origin === '--config' ? 'the specified config path' : '.ai-agent.env or environment'}.`;
+  return new MissingVariableError(scope, id, origin, name, message);
 }
 
 function resolveProvider(id: string, layers: ConfigLayer[], _opts?: ResolverOptions): ProviderConfig | undefined {
-  const found = layers.find((layer) => {
+  let missingVarError: MissingVariableError | undefined;
+  // eslint-disable-next-line functional/no-loop-statements -- Early exit once a valid provider configuration is resolved
+  for (const layer of layers) {
     const provs = layer.json?.providers as Record<string, unknown> | undefined;
-    return provs !== undefined && Object.prototype.hasOwnProperty.call(provs, id);
-  });
-  if (found === undefined) return undefined;
-  const j = found.json as { providers?: Record<string, unknown> } | undefined;
-  const provs = j?.providers ?? {};
-  const obj = provs[id] as Record<string, unknown>;
-  const env = found.env ?? {};
-  const expanded = expandPlaceholders(obj, (name: string) => {
-    const envVal = Object.prototype.hasOwnProperty.call(env, name) ? env[name] : undefined;
-    const v = envVal ?? process.env[name];
-    if (v === undefined) throw buildMissingVarError('provider', id, found.origin, name);
-    return v;
-  }) as ProviderConfig;
-  return expanded;
+    if (provs === undefined || !Object.prototype.hasOwnProperty.call(provs, id)) continue;
+    const obj = provs[id] as Record<string, unknown>;
+    const env = layer.env ?? {};
+    try {
+      const expanded = expandPlaceholders(obj, (name: string) => {
+        const envVal = Object.prototype.hasOwnProperty.call(env, name) ? env[name] : undefined;
+        const v = envVal ?? process.env[name];
+        if (v === undefined) throw buildMissingVarError('provider', id, layer.origin, name);
+        return v;
+      }) as ProviderConfig;
+      return expanded;
+    } catch (error) {
+      if (error instanceof MissingVariableError) {
+        missingVarError ??= error;
+        continue;
+      }
+      throw error;
+    }
+  }
+  if (missingVarError !== undefined) throw missingVarError;
+  return undefined;
 }
 
-function resolveMCPServer(id: string, layers: ConfigLayer[], _opts?: ResolverOptions): MCPServerConfig | undefined {
-  const found = layers.find((layer) => {
+function resolveMCPServer(id: string, layers: ConfigLayer[], opts?: ResolverOptions): MCPServerConfig | undefined {
+  let missingVarError: MissingVariableError | undefined;
+  // eslint-disable-next-line functional/no-loop-statements -- Early exit once a valid MCP server configuration is resolved
+  for (const layer of layers) {
     const srvs = layer.json?.mcpServers as Record<string, unknown> | undefined;
-    return srvs !== undefined && Object.prototype.hasOwnProperty.call(srvs, id);
-  });
-  if (found === undefined) return undefined;
-  const j = found.json as { mcpServers?: Record<string, unknown> } | undefined;
-  const srvs = j?.mcpServers ?? {};
-  const obj = srvs[id] as Record<string, unknown>;
-  const env = found.env ?? {};
-  const expanded = expandPlaceholders(obj, (name: string) => {
-    // Preserve existing precedence: layer env first, then process.env
-    const envVal = Object.prototype.hasOwnProperty.call(env, name) ? env[name] : undefined;
-    const v = envVal ?? process.env[name];
-    // Special-case MCP_ROOT: if empty or missing after expansion, default to current working directory
-    if (name === 'MCP_ROOT') {
-      const resolved = typeof v === 'string' ? v : '';
-      const trimmed = resolved.trim();
-      if (trimmed.length > 0) return trimmed;
-      // Verbose log for fallback behavior (mirrors other VRB config logs)
-      if (_opts?.verbose === true) {
-        try {
-          const msg = `[VRB] \u2192 [0.0] tool mcp:${id}: MCP_ROOT empty or blank; defaulting to current working directory: ${process.cwd()}\n`;
-          // Gray color in TTY to match VRB style used elsewhere
-          // eslint-disable-next-line no-constant-binary-expression
-          const out = process.stderr.isTTY ? `\x1b[90m${msg}\x1b[0m` : msg;
-          process.stderr.write(out);
-        } catch (e) { warn(`MCP_ROOT default warning write failed: ${e instanceof Error ? e.message : String(e)}`); }
+    if (srvs === undefined || !Object.prototype.hasOwnProperty.call(srvs, id)) continue;
+    const obj = srvs[id] as Record<string, unknown>;
+    const env = layer.env ?? {};
+    try {
+      const expanded = expandPlaceholders(obj, (name: string) => {
+        const envVal = Object.prototype.hasOwnProperty.call(env, name) ? env[name] : undefined;
+        const v = envVal ?? process.env[name];
+        if (name === 'MCP_ROOT') {
+          const resolved = typeof v === 'string' ? v : '';
+          const trimmed = resolved.trim();
+          if (trimmed.length > 0) return trimmed;
+          if (opts?.verbose === true) {
+            try {
+              const msg = `[VRB] \u2192 [0.0] tool mcp:${id}: MCP_ROOT empty or blank; defaulting to current working directory: ${process.cwd()}\n`;
+              // eslint-disable-next-line no-constant-binary-expression
+              const out = process.stderr.isTTY ? `\x1b[90m${msg}\x1b[0m` : msg;
+              process.stderr.write(out);
+            } catch (e) { warn(`MCP_ROOT default warning write failed: ${e instanceof Error ? e.message : String(e)}`); }
+          }
+          return process.cwd();
+        }
+        if (v === undefined) throw buildMissingVarError('mcp', id, layer.origin, name);
+        return v;
+      }) as MCPServerConfig;
+      return expanded;
+    } catch (error) {
+      if (error instanceof MissingVariableError) {
+        missingVarError ??= error;
+        continue;
       }
-      return process.cwd();
+      throw error;
     }
-    if (v === undefined) throw buildMissingVarError('mcp', id, found.origin, name);
-    return v;
-  }) as MCPServerConfig;
-  return expanded;
+  }
+  if (missingVarError !== undefined) throw missingVarError;
+  return undefined;
+}
+
+function resolveRestTool(id: string, layers: ConfigLayer[]): RestToolConfig | undefined {
+  let missingVarError: MissingVariableError | undefined;
+  // eslint-disable-next-line functional/no-loop-statements -- Early exit once a valid REST tool configuration is resolved
+  for (const layer of layers) {
+    const tools = layer.json?.restTools as Record<string, unknown> | undefined;
+    if (tools === undefined || !Object.prototype.hasOwnProperty.call(tools, id)) continue;
+    const raw = tools[id];
+    const env = layer.env ?? {};
+    try {
+      const expanded = expandPlaceholders(raw, (name: string) => {
+        if (name.startsWith('args.')) return `\${${name}}`;
+        const envVal = Object.prototype.hasOwnProperty.call(env, name) ? env[name] : undefined;
+        const v = envVal ?? process.env[name];
+        if (v === undefined) throw buildMissingVarError('defaults', id, layer.origin, name);
+        return v;
+      }) as RestToolConfig;
+      return expanded;
+    } catch (error) {
+      if (error instanceof MissingVariableError) {
+        missingVarError ??= error;
+        continue;
+      }
+      throw error;
+    }
+  }
+  if (missingVarError !== undefined) throw missingVarError;
+  return undefined;
 }
 
 export function resolveDefaults(layers: ConfigLayer[]): NonNullable<Configuration['defaults']> {
@@ -246,7 +309,7 @@ function resolvePricing(layers: ConfigLayer[]): Configuration['pricing'] {
 }
 
 export function buildUnifiedConfiguration(
-  needs: { providers: string[]; mcpServers: string[] },
+  needs: { providers: string[]; mcpServers: string[]; restTools: string[] },
   layers: ConfigLayer[],
   opts?: ResolverOptions
 ): Configuration {
@@ -264,24 +327,9 @@ export function buildUnifiedConfiguration(
     if (conf !== undefined) mcpServers[s] = conf;
   });
 
-  // Merge restTools from highest-priority layer that contains them; last file wins by key
-  layers.forEach((layer) => {
-    const j = layer.json as { restTools?: Record<string, unknown> } | undefined;
-    const tools = j?.restTools;
-    if (tools !== undefined) {
-      const env = layer.env ?? {};
-      Object.entries(tools).forEach(([name, raw]) => {
-        const expanded = expandPlaceholders(raw, (varName: string) => {
-          // Preserve runtime arg placeholders like ${args.foo}
-          if (varName.startsWith('args.')) return `\${${varName}}`;
-          const envVal = Object.prototype.hasOwnProperty.call(env, varName) ? env[varName] : undefined;
-          const v = envVal ?? process.env[varName];
-          if (v === undefined) throw buildMissingVarError('defaults', name, layer.origin, varName);
-          return v;
-        }) as RestToolConfig;
-        restTools[name] = expanded;
-      });
-    }
+  needs.restTools.forEach((r) => {
+    const conf = resolveRestTool(r, layers);
+    if (conf !== undefined) restTools[r] = conf;
   });
 
   // Merge openapiSpecs similarly; last file wins by key

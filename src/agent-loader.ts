@@ -149,9 +149,12 @@ export function loadAgent(aiPath: string, registry?: AgentRegistry, options?: Lo
   const effAgents = Array.isArray(options?.agents) && options.agents.length > 0 ? options.agents : fmAgents;
   const selectedAgents = effAgents.map((rel) => path.resolve(path.dirname(aiPath), rel));
   const needProviders = Array.from(new Set(selectedTargets.map((t) => t.provider)));
+  const externalToolNames = Array.from(new Set(
+    selectedTools.filter((tool) => !tool.includes(':') && !isReservedAgentName(tool))
+  ));
 
   const layers = discoverLayers({ configPath: options?.configPath, promptPath: aiPath });
-  const config = buildUnifiedConfiguration({ providers: needProviders, mcpServers: selectedTools }, layers, { verbose: options?.verbose });
+  const config = buildUnifiedConfiguration({ providers: needProviders, mcpServers: externalToolNames, restTools: externalToolNames }, layers, { verbose: options?.verbose });
   const dfl = resolveDefaults(layers);
   validateNoPlaceholders(config);
   // Apply persistence overrides from CLI
@@ -429,9 +432,12 @@ export function loadAgentFromContent(id: string, content: string, options?: Load
   const effAgents2 = Array.isArray(options?.agents) && options.agents.length > 0 ? options.agents : fmAgents;
   const selectedAgents = effAgents2.map((rel) => path.resolve(options?.baseDir ?? process.cwd(), rel));
   const needProviders = Array.from(new Set(selectedTargets.map((t) => t.provider)));
+  const externalToolNames = Array.from(new Set(
+    selectedTools.filter((tool) => !tool.includes(':') && !isReservedAgentName(tool))
+  ));
 
   const layers = discoverLayers({ configPath: options?.configPath, promptPath: id });
-  const config = buildUnifiedConfiguration({ providers: needProviders, mcpServers: selectedTools }, layers, { verbose: options?.verbose });
+  const config = buildUnifiedConfiguration({ providers: needProviders, mcpServers: externalToolNames, restTools: externalToolNames }, layers, { verbose: options?.verbose });
   const dfl = resolveDefaults(layers);
   validateNoPlaceholders(config);
   
