@@ -6,9 +6,12 @@
 
 **Merged pull requests:**
 
+- chore\(go.d/snmp\): remove recreating client on "packet is not authentic" [\#21010](https://github.com/netdata/netdata/pull/21010) ([ilyam8](https://github.com/ilyam8))
+- chore\(go.d\): use forked gosnmp to fix SNMPv3 REPORT handling for UniFi APs [\#21009](https://github.com/netdata/netdata/pull/21009) ([ilyam8](https://github.com/ilyam8))
 - fix\(go.d\): correct buf truncate in processMetrics [\#21008](https://github.com/netdata/netdata/pull/21008) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations docs [\#21007](https://github.com/netdata/netdata/pull/21007) ([netdatabot](https://github.com/netdatabot))
 - deps\(mcp/bridge/stdio-golang\): switch to github.com/coder/websocket [\#21006](https://github.com/netdata/netdata/pull/21006) ([ilyam8](https://github.com/ilyam8))
+- Rework dbengine async wakeup on windows [\#21003](https://github.com/netdata/netdata/pull/21003) ([stelfrag](https://github.com/stelfrag))
 - Regenerate integrations docs [\#21002](https://github.com/netdata/netdata/pull/21002) ([netdatabot](https://github.com/netdatabot))
 - docs: add "cpu idle state" procstat config option [\#21001](https://github.com/netdata/netdata/pull/21001) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations docs [\#21000](https://github.com/netdata/netdata/pull/21000) ([netdatabot](https://github.com/netdatabot))
@@ -23,6 +26,7 @@
 - docs: add grouped headers to config options [\#20987](https://github.com/netdata/netdata/pull/20987) ([ilyam8](https://github.com/ilyam8))
 - Update welcome-to-netdata.md [\#20986](https://github.com/netdata/netdata/pull/20986) ([kanelatechnical](https://github.com/kanelatechnical))
 - Update best-practices.md [\#20984](https://github.com/netdata/netdata/pull/20984) ([kanelatechnical](https://github.com/kanelatechnical))
+- chore: refactor get\_doc\_integrations.py to use main\(\) and improve structure [\#20983](https://github.com/netdata/netdata/pull/20983) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations docs [\#20982](https://github.com/netdata/netdata/pull/20982) ([netdatabot](https://github.com/netdatabot))
 - chore: add `-c` option to gen docs for a single collector [\#20981](https://github.com/netdata/netdata/pull/20981) ([ilyam8](https://github.com/ilyam8))
 - docs: improve config options table with grouped section headers [\#20980](https://github.com/netdata/netdata/pull/20980) ([ilyam8](https://github.com/ilyam8))
@@ -109,6 +113,7 @@
 - Update documentation \(Windows.plugin\) [\#20864](https://github.com/netdata/netdata/pull/20864) ([thiagoftsm](https://github.com/thiagoftsm))
 - chore\(go.d/snmp\): more vendor-scoped meta yaml files [\#20863](https://github.com/netdata/netdata/pull/20863) ([ilyam8](https://github.com/ilyam8))
 - improve\(go.d/snmp\): update snmp meta copilot [\#20861](https://github.com/netdata/netdata/pull/20861) ([ilyam8](https://github.com/ilyam8))
+- Handle virtual host disconnection [\#20860](https://github.com/netdata/netdata/pull/20860) ([stelfrag](https://github.com/stelfrag))
 - Add cargo lock file. [\#20855](https://github.com/netdata/netdata/pull/20855) ([vkalintiris](https://github.com/vkalintiris))
 - build\(deps\): bump github.com/vmware/govmomi from 0.51.0 to 0.52.0 in /src/go [\#20852](https://github.com/netdata/netdata/pull/20852) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Add build-time check to reject known bad compiler flags. [\#20851](https://github.com/netdata/netdata/pull/20851) ([Ferroin](https://github.com/Ferroin))
@@ -442,11 +447,6 @@
 - improvement\(go.d/snmp\): create table charts [\#20471](https://github.com/netdata/netdata/pull/20471) ([ilyam8](https://github.com/ilyam8))
 - Remove static build timeouts from regular builds. [\#20470](https://github.com/netdata/netdata/pull/20470) ([Ferroin](https://github.com/Ferroin))
 - Add MCP documentation [\#20469](https://github.com/netdata/netdata/pull/20469) ([kanelatechnical](https://github.com/kanelatechnical))
-- SNMP: 3com profiles [\#20468](https://github.com/netdata/netdata/pull/20468) ([Ancairon](https://github.com/Ancairon))
-- Modify Uninstall Action \(windows.installer\) [\#20467](https://github.com/netdata/netdata/pull/20467) ([thiagoftsm](https://github.com/thiagoftsm))
-- Regenerate integrations docs [\#20466](https://github.com/netdata/netdata/pull/20466) ([netdatabot](https://github.com/netdatabot))
-- improvement\(go.d/ddsnmp\): add table metrics and tags caching optimization [\#20465](https://github.com/netdata/netdata/pull/20465) ([ilyam8](https://github.com/ilyam8))
-- Improve datafile rotation and indexing during shutdown [\#20464](https://github.com/netdata/netdata/pull/20464) ([stelfrag](https://github.com/stelfrag))
 
 ## [v2.5.4](https://github.com/netdata/netdata/tree/v2.5.4) (2025-06-24)
 
