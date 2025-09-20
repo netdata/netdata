@@ -1,0 +1,90 @@
+pattern: "(?P<timestamp>\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2})\\s+\\[(?P<level>\\w+)\\]\\s+(?P<component>\\w+):\\s+(?P<message>.*)"
+
+# Test complex rewrite pipeline with multiple stages
+
+inject:
+  - key: HOSTNAME
+    value: "${HOSTNAME:-localhost}"
+  - key: APPLICATION
+    value: "log2journal-test"
+
+rename:
+  - old_key: level
+    new_key: LOG_LEVEL
+  - old_key: component  
+    new_key: MODULE
+  - old_key: message
+    new_key: MSG
+
+rewrite:
+  # Stage 1: Normalize log levels
+  - key: LOG_LEVEL
+    match: "(?i)(warn|warning)"
+    value: "WARNING"
+    stop: no
+    
+  - key: LOG_LEVEL
+    match: "(?i)(err|error)"
+    value: "ERROR"
+    stop: no
+    
+  - key: LOG_LEVEL
+    match: "(?i)(info|information)"
+    value: "INFO"
+    stop: yes
+    
+  # Stage 2: Extract additional fields from message
+  - key: MSG
+    match: "user\\s+(\\w+)\\s+from\\s+(\\d+\\.\\d+\\.\\d+\\.\\d+)"
+    value: "${0}"
+    stop: no
+    
+  - key: USERNAME
+    match: "user\\s+(\\w+)\\s+from"
+    value: "${1}"
+    inject: yes
+    stop: no
+    
+  - key: CLIENT_IP
+    match: "from\\s+(\\d+\\.\\d+\\.\\d+\\.\\d+)"
+    value: "${1}"
+    inject: yes
+    
+  # Stage 3: Add severity scores
+  - key: SEVERITY
+    match: ".*"
+    value: "0"
+    inject: yes
+    stop: no
+    
+  - key: SEVERITY
+    match: "${LOG_LEVEL}"
+    value: "3"
+    stop: no
+    
+  - key: SEVERITY
+    match: "WARNING"
+    value: "4"
+    stop: no
+    
+  - key: SEVERITY
+    match: "ERROR|CRITICAL"
+    value: "5"
+    stop: yes
+    
+  # Stage 4: Create formatted message
+  - key: FORMATTED_MSG
+    value: "[${timestamp}] ${HOSTNAME}/${APPLICATION}/${MODULE} (${LOG_LEVEL}): ${MSG}"
+    inject: yes
+
+filter:
+  include: "LOG_LEVEL|MODULE|MSG|FORMATTED_MSG|USERNAME|CLIENT_IP|SEVERITY"
+  exclude: "timestamp|message|component|level"
+
+unmatched:
+  key: PARSE_ERROR
+  inject:
+    - key: ERROR_TYPE
+      value: "INVALID_LOG_FORMAT"
+    - key: RAW_LINE
+      value: "${LINE}"

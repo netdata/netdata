@@ -1,77 +1,14 @@
-pattern: |
-  (?x)                                   # Enable PCRE2 extended mode
-  ^
-  (?<NGINX_REMOTE_ADDR>[^ ]+) \s - \s    # NGINX_REMOTE_ADDR
-  (?<NGINX_REMOTE_USER>[^ ]+) \s         # NGINX_REMOTE_USER
-  \[
-    (?<NGINX_TIME_LOCAL>[^\]]+)          # NGINX_TIME_LOCAL
-  \]
-  \s+ "
-  (?<MESSAGE>
-    (?<NGINX_METHOD>[A-Z]+) \s+          # NGINX_METHOD
-    (?<NGINX_URL>[^ ]+) \s+
-    HTTP/(?<NGINX_HTTP_VERSION>[^"]+)
-  )
-  " \s+
-  (?<NGINX_STATUS>\d+) \s+               # NGINX_STATUS
-  (?<NGINX_BODY_BYTES_SENT>\d+) \s+      # NGINX_BODY_BYTES_SENT
-  "(?<NGINX_HTTP_REFERER>[^"]*)" \s+     # NGINX_HTTP_REFERER
-  "(?<NGINX_HTTP_USER_AGENT>[^"]*)"      # NGINX_HTTP_USER_AGENT
+NGINX_MESSAGE=GET /index.html HTTP/1.1
+NGINX_NGINX_BODY_BYTES_SENT=1234
+NGINX_NGINX_HTTP_REFERER=https://example.com
+NGINX_NGINX_HTTP_USER_AGENT=Mozilla/5.0
+NGINX_NGINX_HTTP_VERSION=1.1
+NGINX_NGINX_METHOD=GET
+NGINX_NGINX_REMOTE_ADDR=192.168.1.1
+NGINX_NGINX_REMOTE_USER=user1
+NGINX_NGINX_STATUS=200
+NGINX_NGINX_TIME_LOCAL=01/Jan/2024:10:00:00 +0000
+NGINX_NGINX_URL=/index.html
+SYSLOG_IDENTIFIER=nginx-log
+SYSLOG_IDENTIFIER2=nginx-log2
 
-prefix: NGINX_
-
-filename:
-  key: NGINX_LOG_FILENAME
-
-filter:
-  include: '.*'
-  exclude: '.*HELLO.*WORLD.*'
-
-rename:
-  - new_key: TEST1
-    old_key: TEST2
-  - new_key: TEST3
-    old_key: TEST4
-
-inject:
-  - key: SYSLOG_IDENTIFIER
-    value: nginx-log
-  - key: SYSLOG_IDENTIFIER2
-    value: nginx-log2
-  - key: PRIORITY
-    value: '${NGINX_STATUS}'
-  - key: NGINX_STATUS_FAMILY
-    value: '${NGINX_STATUS}${NGINX_METHOD}'
-
-rewrite:
-  - key: PRIORITY
-    value: '${NGINX_STATUS}'
-    inject: yes
-    stop: no
-  - key: PRIORITY
-    match: '^[123]'
-    value: 6
-  - key: PRIORITY
-    match: '^4'
-    value: 5
-  - key: PRIORITY
-    match: '^5'
-    value: 3
-  - key: PRIORITY
-    match: '.*'
-    value: 4
-  - key: NGINX_STATUS_FAMILY
-    match: '^(?<first_digit>[1-5])'
-    value: '${first_digit}xx'
-  - key: NGINX_STATUS_FAMILY
-    match: '.*'
-    value: UNKNOWN
-
-unmatched:
-  key: MESSAGE
-
-  inject:
-    - key: PRIORITY
-      value: 1
-    - key: PRIORITY2
-      value: 2

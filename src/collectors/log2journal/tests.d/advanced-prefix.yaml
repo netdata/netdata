@@ -1,0 +1,35 @@
+---
+# Advanced prefix feature test
+# Tests prefix application to captured groups and injected keys
+
+pattern: "(?P<level>\\w+)\\s+(?P<code>\\d+)\\s+(?P<message>.*)"
+
+# All keys should get this prefix
+prefix: TEST_
+
+inject:
+  - key: VERSION
+    value: "1.0"
+  - key: HOST
+    value: "localhost"
+
+rewrite:
+  # Test prefix in variable substitution
+  - key: SUMMARY
+    value: "${TEST_level} ${TEST_code}: ${TEST_message}"
+    inject: yes
+    
+  # Test that injected keys also get the prefix
+  - key: FULL_VERSION
+    value: "v${TEST_VERSION}"
+    inject: yes
+
+rename:
+  # Rename should work with prefixed names
+  - old_key: TEST_level
+    new_key: TEST_SEVERITY
+  - old_key: TEST_code
+    new_key: TEST_ERROR_CODE
+
+filename:
+  key: TEST_FILENAME
