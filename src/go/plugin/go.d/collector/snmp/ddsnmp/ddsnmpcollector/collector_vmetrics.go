@@ -231,14 +231,6 @@ func (agg *vmetricsAggregator) emitInto(out *[]ddsnmp.Metric) {
 	agg.emitIntoAs(out, agg.config.Name, agg.config.ChartMeta)
 }
 
-func (agg *vmetricsAggregator) emitGrouped(out *[]ddsnmp.Metric) {
-	agg.emitGroupedAs(out, agg.config.Name, agg.config.ChartMeta)
-}
-
-func (agg *vmetricsAggregator) emitTotal(out *[]ddsnmp.Metric) {
-	agg.emitTotalAs(out, agg.config.Name, agg.config.ChartMeta)
-}
-
 func (agg *vmetricsAggregator) emitIntoAs(out *[]ddsnmp.Metric, name string, meta ddprofiledefinition.ChartMeta) {
 	if agg.grouped {
 		agg.emitGroupedAs(out, name, meta)
