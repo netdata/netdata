@@ -73,6 +73,8 @@ export interface LogEntry {
   message: string;                      // Human readable message
   // Optional emphasis hint for TTY renderers (bold in same severity color)
   bold?: boolean;
+  // Optional headend identifier for multi-headend logging (e.g., "mcp:stdio")
+  headendId?: string;
   // Optional tracing fields (multi-agent)
   agentId?: string;
   callPath?: string;

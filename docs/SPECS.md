@@ -33,32 +33,47 @@ No other hardcoded content is sent to the LLM.
 
 ## Command Line Interface
 
-```bash
-ai-agent [options] provider(s) model(s) mcp-tool(s) system-prompt user-prompt
-```
+The CLI supports two operating modes:
 
-### Parameters (Positionals vs Flags)
+1. **Headend mode** – register one or more `.ai` prompts as services via repeatable `--agent` flags, then start the desired headends.
+2. **Direct invocation** – run a single agent immediately by providing system and user prompts (legacy CLI flow).
 
-- Positionals (in order; required unless noted):
-  - **provider(s)**: Comma-separated list of LLM providers (must be defined in config)
-  - **model(s)**: Comma-separated list of model names (tried sequentially; see fallback)
-  - **mcp-tool(s)**: Comma-separated list of MCP tools (must be defined in config)
-  - **system-prompt**: System prompt string or `@filename` or `-` for stdin
-  - **user-prompt**: User prompt string or `@filename` or `-` for stdin
-- Flags: Any parameter starting with `--` is a non-positional option (see below).
-
-### Example Usage
+### Headend Mode
 
 ```bash
-# Basic usage with OpenAI
-ai-agent openai gpt-4o-mini file-operations "You are a helpful assistant" "List files in current directory"
-
-# Multiple providers with fallback
-ai-agent openai,anthropic gpt-4o,claude-3-sonnet netdata-tools @system.txt "What's the CPU usage?"
-
-# Using stdin for prompt
-echo "Analyze this log file" | ai-agent openai gpt-4o file-ops @system.txt -
+ai-agent \
+  --agent agents/master.ai \
+  --agent agents/sub/task.ai \
+  --api 8123 \
+  --mcp stdio \
+  --mcp http:8124 \
+  --openai-tool 8081 \
+  --openai-completions 8082 \
+  --anthropic-completions 8083
 ```
+
+Every headend flag is repeatable. The headend manager instantiates each endpoint independently while sharing the same agent registry.
+
+| Flag | Purpose | Notes |
+|------|---------|-------|
+| `--agent <path>` | Register an `.ai` file (repeat as needed) | Sub-agents referenced in frontmatter are auto-loaded. |
+| `--api <port>` | REST API headend | `GET /health`, `GET /v1/:agent?q=...&format=...`. `format` defaults to `markdown`; when you request `format=json` ensure the agent advertises a JSON schema. |
+| `--mcp <transport>` | MCP headend | Accepted values: `stdio`, `http:PORT`, `sse:PORT`, `ws:PORT`. Tool calls **must** include a `format` argument; when `format=json` the payload must also provide a `schema` object. |
+| `--openai-tool <port>` | OpenAI function-calling compatibility | `GET /v1/tools`, `POST /v1/chat/completions`. Tool arguments follow the same `format`/`schema` rule as MCP. |
+| `--openai-completions <port>` | OpenAI Chat Completions compatibility | `/v1/models`, `/v1/chat/completions` (supports SSE streaming). |
+| `--anthropic-completions <port>` | Anthropic Messages compatibility | `/v1/models`, `/v1/messages` (streams via SSE). |
+
+Optional per-headend concurrency guards are available: `--api-concurrency <n>`, `--openai-tool-concurrency <n>`, `--openai-completions-concurrency <n>`, `--anthropic-completions-concurrency <n>`. Each incoming request acquires a slot before spawning an agent session.
+
+### Direct Invocation
+
+When no headends are requested, the CLI expects system and user prompts:
+
+```bash
+ai-agent --agent prompt.ai @system.txt "Summarize the attached notes"
+```
+
+System prompts can be passed inline, via `@file`, or `-` (stdin). The final positional argument is the user prompt. Provider/model/tool selections are supplied with the existing options registry (`--models`, `--tools`, etc.).
 
 ## Configuration File (.ai-agent.json)
 
@@ -127,30 +142,41 @@ All string values in the configuration support environment variable expansion us
 ### Command Line vs Configuration Priority
 - **Flags override config**: Command line options override configuration file settings
 - **Defaults in config**: All timeout, limit, and model parameters can be set in the config file under `"defaults"`
-- **Positionals only via CLI**: Providers, models, MCP tools, and prompts are specified via positional CLI arguments (not in the config)
+- **Agent registration vs. direct prompts**: Headend mode discovers agents through repeatable `--agent` flags. Direct invocation still accepts positional system/user prompts, while providers/models/tools are driven by CLI options (e.g., `--models`, `--tools`).
 
 ## Command Line Options
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `--llm-timeout <ms>` | Inactivity timeout per LLM call (resets on each streamed chunk) | 120000 |
+| `--agent <path>` | Register an agent file for headend mode (repeatable) | - |
+| `--api <port>` | Start REST API headend on `<port>` (repeatable) | 4 concurrent requests (configurable via `--api-concurrency`) |
+| `--mcp <transport>` | Start MCP headend (`stdio`, `http:PORT`, `sse:PORT`, `ws:PORT`) | HTTP uses `POST /mcp`; SSE pair (`GET /mcp/sse`, `POST /mcp/sse/message`); WebSocket speaks the `mcp` subprotocol. |
+| `--openai-tool <port>` | Start OpenAI tool-calling compatible headend | 4 concurrent requests (configurable via `--openai-tool-concurrency`) |
+| `--openai-completions <port>` | Start OpenAI Chat Completions compatible headend | 4 concurrent requests (configurable via `--openai-completions-concurrency`) |
+| `--anthropic-completions <port>` | Start Anthropic Messages compatible headend | 4 concurrent requests (configurable via `--anthropic-completions-concurrency`) |
+| `--api-concurrency <n>` | Max concurrent REST sessions per headend | 4 |
+| `--openai-tool-concurrency <n>` | Max concurrent OpenAI tool sessions | 4 |
+| `--openai-completions-concurrency <n>` | Max concurrent OpenAI chat sessions | 4 |
+| `--anthropic-completions-concurrency <n>` | Max concurrent Anthropic chat sessions | 4 |
+| `--llm-timeout <ms>` | Inactivity timeout per LLM call (resets on stream) | 120000 |
 | `--tool-timeout <ms>` | Timeout for tool execution | 60000 |
 | `--trace-llm` | Trace LLM HTTP requests and responses (Authorization redacted) | off |
-| `--trace-mcp` | Trace MCP connect, tools/prompts list, stderr, callTool | off |
-| `--parallel-tool-calls` | Enable parallel tool calls (OpenAI-compatible) | true (default) |
-| `--no-parallel-tool-calls` | Disable parallel tool calls | - |
-| `--temperature <n>` | LLM temperature (0.0-2.0) | 0.7 |
-| `--top-p <n>` | LLM top-p sampling (0.0-1.0) | 1.0 |
-| `--stream` | Force streaming responses | on by default |
-| `--no-stream` | Disable streaming (use non-streaming responses) | - |
-| `--save <filename>` | Save conversation to JSON file | - |
-| `--load <filename>` | Load conversation from JSON file | - |
-| `--config <filename>` | Configuration file path | See resolution order |
-| `--accounting <filename>` | Override accounting file from config | - |
-| `--dry-run` | Validate inputs only; skip MCP spawn and LLM | - |
+| `--trace-mcp` | Trace MCP connect/list operations and callTool payloads | off |
+| `--parallel-tool-calls` | Enable provider-native parallel tool calls | true |
+| `--no-parallel-tool-calls` | Disable provider parallelism | - |
+| `--temperature <n>` | LLM temperature (0.0–2.0) | 0.7 |
+| `--top-p <n>` | LLM top-p sampling (0.0–1.0) | 1.0 |
+| `--stream` | Force streaming responses | on |
+| `--no-stream` | Disable streaming | - |
+| `--save <filename>` | Save conversation transcript (direct mode) | - |
+| `--load <filename>` | Load conversation history (direct mode) | - |
+| `--config <filename>` | Explicit configuration file | See resolution order |
+| `--accounting <filename>` | Override accounting file path | - |
+| `--dry-run` | Validate inputs only; skip MCP spawn and LLM work | - |
 
 Notes:
 - `--save/--load`: When loading a conversation, the system prompt is replaced by the provided system prompt (or loaded one if none provided) and the new user prompt is appended. MCP tool instructions are appended to the system prompt at runtime (once) and are not stored as separate messages.
+- MCP and OpenAI tool calls that declare `format=json` must also provide a `schema` object so the agent can validate the response.
 
 ## Main Processing Loop
 

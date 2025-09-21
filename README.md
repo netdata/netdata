@@ -240,6 +240,32 @@ docker run -e OPENAI_API_KEY=$OPENAI_API_KEY \
            ai-agent ./assistant.ai "help me"
 ```
 
+### Headend Server Mode
+
+Expose one or more agents as network services by combining `--agent` registrations with the headend flags you need:
+
+```bash
+ai-agent \
+  --agent agents/master.ai \
+  --agent agents/sub/research.ai \
+  --api 8123 \
+  --mcp stdio \
+  --mcp http:8124 \
+  --openai-tool 8081 \
+  --openai-completions 8082 \
+  --anthropic-completions 8083
+```
+
+Each flag is repeatable—every port or transport spins up an independent headend managed by a shared supervisor:
+
+- `--api <port>` – REST API serving `GET /health` and `GET /v1/:agent?q=...&format=...`. The `format` query parameter defaults to `markdown`; pass `format=json` when the agent advertises a JSON schema.
+- `--mcp stdio|http:PORT|sse:PORT|ws:PORT` – Model Context Protocol servers. Tool invocations must include a `format` argument, and when `format=json` the payload must also provide a `schema` object.
+- `--openai-tool <port>` – OpenAI tool-calling compatibility layer (`GET /v1/tools`, `POST /v1/chat/completions`). Tool arguments follow the same `format`/`schema` contract as MCP.
+- `--openai-completions <port>` – OpenAI Chat Completions compatible endpoint exposing agents as models via `/v1/models` and `/v1/chat/completions` (supports SSE streaming).
+- `--anthropic-completions <port>` – Anthropic Messages compatible endpoint with `/v1/models` and `/v1/messages`, including SSE streaming events.
+
+Per-headend concurrency guards are available (e.g., `--api-concurrency 8`, `--openai-tool-concurrency 16`). Each incoming request acquires a slot before the agent session is spawned, keeping the system responsive under load.
+
 ### Your First Agent
 Create `assistant.ai`:
 ```yaml

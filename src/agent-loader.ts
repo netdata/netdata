@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
+import type { AIAgentSession } from './ai-agent.js';
 // keep type imports grouped at top
 import type { OutputFormatId } from './formats.js';
 import type { AIAgentCallbacks, AIAgentResult, AIAgentSessionConfig, Configuration, ConversationMessage, OpenAPISpecConfig } from './types.js';
@@ -21,11 +22,15 @@ export interface LoadedAgent {
   systemTemplate: string;
   description?: string;
   usage?: string;
+  toolName?: string;
   expectedOutput?: { format: 'json' | 'markdown' | 'text'; schema?: Record<string, unknown> };
+  input: { format: 'json' | 'text'; schema: Record<string, unknown> };
+  outputSchema?: Record<string, unknown>;
   config: Configuration;
   targets: { provider: string; model: string }[];
   tools: string[];
   accountingFile?: string;
+  subAgentPaths: string[];
   effective: {
     temperature: number;
     topP: number;
@@ -46,6 +51,11 @@ export interface LoadedAgent {
     mcpInitConcurrency?: number;
   };
   subTools: { name: string; description?: string }[]; // placeholder for future
+  createSession: (
+    systemPrompt: string,
+    userPrompt: string,
+    opts?: { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; trace?: AIAgentSessionConfig['trace']; renderTarget?: 'cli' | 'slack' | 'api' | 'web' | 'sub-agent'; outputFormat: OutputFormatId; abortSignal?: AbortSignal; stopRef?: { stopping: boolean }; initialTitle?: string; ancestors?: string[] }
+  ) => Promise<AIAgentSession>;
   run: (
     systemPrompt: string,
     userPrompt: string,
@@ -53,7 +63,7 @@ export interface LoadedAgent {
   ) => Promise<AIAgentResult>;
 }
 
-export class AgentRegistry {
+export class LoadedAgentCache {
   private readonly cache = new Map<string, LoadedAgent>();
 
   get(key: string): LoadedAgent | undefined { return this.cache.get(key); }
@@ -66,7 +76,7 @@ function canonical(p: string): string {
 
 function readFileText(p: string): string { return fs.readFileSync(p, 'utf-8'); }
 
-interface LoadAgentOptions {
+export interface LoadAgentOptions {
   configPath?: string;
   verbose?: boolean;
   targets?: { provider: string; model: string }[];
@@ -106,6 +116,32 @@ interface LoadAgentOptions {
   };
 }
 
+const FALLBACK_INPUT_SCHEMA: Record<string, unknown> = Object.freeze({
+  type: 'object',
+  properties: {
+    prompt: { type: 'string' },
+    format: { type: 'string', enum: ['markdown', 'json', 'text'], default: 'markdown' },
+  },
+  required: ['prompt'],
+  additionalProperties: false,
+});
+
+const cloneSchemaStrict = (schema: Record<string, unknown>): Record<string, unknown> => JSON.parse(JSON.stringify(schema)) as Record<string, unknown>;
+const cloneSchemaOptional = (schema?: Record<string, unknown>): Record<string, unknown> | undefined => (schema === undefined ? undefined : cloneSchemaStrict(schema));
+
+const resolveInputContract = (
+  spec?: { format: 'text' | 'json'; schema?: Record<string, unknown> }
+): { format: 'json' | 'text'; schema: Record<string, unknown> } => {
+  if (spec?.format === 'json') {
+    const schema = spec.schema !== undefined ? cloneSchemaStrict(spec.schema) : cloneSchemaStrict(FALLBACK_INPUT_SCHEMA);
+    return { format: 'json', schema };
+  }
+  if (spec?.format === 'text') {
+    return { format: 'text', schema: cloneSchemaStrict(FALLBACK_INPUT_SCHEMA) };
+  }
+  return { format: 'json', schema: cloneSchemaStrict(FALLBACK_INPUT_SCHEMA) };
+};
+
 function containsPlaceholder(val: unknown): boolean {
   if (typeof val === 'string') return /\$\{[^}]+\}/.test(val);
   if (Array.isArray(val)) return val.some((v) => containsPlaceholder(v));
@@ -127,8 +163,8 @@ function validateNoPlaceholders(config: Configuration): void {
   }
 }
 
-export function loadAgent(aiPath: string, registry?: AgentRegistry, options?: LoadAgentOptions): LoadedAgent {
-  const reg = registry ?? new AgentRegistry();
+export function loadAgent(aiPath: string, registry?: LoadedAgentCache, options?: LoadAgentOptions): LoadedAgent {
+  const reg = registry ?? new LoadedAgentCache();
   const id = canonical(aiPath);
   const cached = reg.get(id);
   if (cached !== undefined) return cached;
@@ -227,16 +263,176 @@ export function loadAgent(aiPath: string, registry?: AgentRegistry, options?: Lo
   const accountingFile: string | undefined = config.persistence?.billingFile ?? config.accounting?.file;
 
   const agentName = path.basename(id).replace(/\.[^.]+$/, '');
+  const resolvedInput = resolveInputContract(fm?.inputSpec);
+  const resolvedExpectedOutput = fm?.expectedOutput !== undefined
+    ? { ...fm.expectedOutput, schema: cloneSchemaOptional(fm.expectedOutput.schema) }
+    : undefined;
+  const resolvedOutputSchema = resolvedExpectedOutput?.format === 'json'
+    ? cloneSchemaOptional(resolvedExpectedOutput.schema)
+    : undefined;
+
+  const createSession = (
+    systemPrompt: string,
+    userPrompt: string,
+    opts?: { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; trace?: AIAgentSessionConfig['trace']; renderTarget?: 'cli' | 'slack' | 'api' | 'web' | 'sub-agent'; outputFormat: OutputFormatId; abortSignal?: AbortSignal; stopRef?: { stopping: boolean }; initialTitle?: string; ancestors?: string[] }
+  ): Promise<AIAgentSession> => {
+    const o = (opts ?? {}) as { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; trace?: AIAgentSessionConfig['trace']; renderTarget?: 'cli'|'slack'|'api'|'web'|'sub-agent'; outputFormat?: OutputFormatId; abortSignal?: AbortSignal; stopRef?: { stopping: boolean }; initialTitle?: string; ancestors?: string[] };
+    if (o.outputFormat === undefined) throw new Error('outputFormat is required');
+
+    let dynamicConfig = config;
+    let dynamicTools = [...selectedTools];
+
+    const selectedOpenAPIProviders = new Set<string>();
+    selectedTools.forEach((toolName) => {
+      if (typeof toolName === 'string' && toolName.startsWith('openapi:')) {
+        const providerName = toolName.slice(8);
+        selectedOpenAPIProviders.add(providerName);
+      }
+    });
+
+    const openapiSpecs = (dynamicConfig as unknown as { openapiSpecs?: Record<string, OpenAPISpecConfig> }).openapiSpecs;
+    if (o.callbacks?.onLog !== undefined && openapiSpecs !== undefined) {
+      o.callbacks.onLog({
+        timestamp: Date.now(),
+        severity: 'VRB',
+        turn: 0,
+        subturn: 0,
+        direction: 'request',
+        type: 'tool',
+        remoteIdentifier: 'openapi',
+        fatal: false,
+        message: `Found OpenAPI specs in config: ${JSON.stringify(Object.keys(openapiSpecs))}, selected providers: ${JSON.stringify(Array.from(selectedOpenAPIProviders))}`
+      });
+    }
+    if (openapiSpecs !== undefined && selectedOpenAPIProviders.size > 0) {
+      const configLayer = layers.find((ly) => {
+        const json = ly.json;
+        return json !== undefined && typeof json === 'object' && 'openapiSpecs' in json;
+      });
+      const configDir = configLayer !== undefined ? path.dirname(configLayer.jsonPath) : baseDir;
+      const entries = Object.entries(openapiSpecs);
+      // eslint-disable-next-line functional/no-loop-statements
+      for (const [name, specCfg] of entries) {
+        if (!selectedOpenAPIProviders.has(name)) continue;
+        try {
+          const loc = specCfg.spec;
+          let text: string;
+          if (loc.startsWith('http://') || loc.startsWith('https://')) {
+            throw new Error('Remote OpenAPI specs violate PR-001. Use local cached files instead.');
+          } else {
+            const p = path.isAbsolute(loc) ? loc : path.resolve(configDir, loc);
+            if (o.callbacks?.onLog !== undefined) {
+              o.callbacks.onLog({
+                timestamp: Date.now(),
+                severity: 'VRB',
+                turn: 0,
+                subturn: 0,
+                direction: 'request',
+                type: 'tool',
+                remoteIdentifier: `openapi:${name}`,
+                fatal: false,
+                message: `Loading OpenAPI spec from: ${p} (loc=${loc}, configDir=${configDir})`
+              });
+            }
+            text = readFileText(p);
+          }
+          const spec = parseOpenAPISpec(text);
+          const toolsMap = openApiToRestTools(spec, {
+            toolNamePrefix: name,
+            baseUrlOverride: specCfg.baseUrl,
+            includeMethods: specCfg.includeMethods,
+            tagFilter: specCfg.tagFilter
+          });
+          const defaultHeadersRaw = specCfg.headers ?? {};
+          const defaultHeaders: Record<string, string> = {};
+          Object.entries(defaultHeadersRaw).forEach(([k, v]) => { defaultHeaders[k] = expandVars(v); });
+          Object.values(toolsMap).forEach((t) => {
+            const merged = { ...(defaultHeaders), ...(t.headers ?? {}) };
+            t.headers = Object.keys(merged).length > 0 ? merged : undefined;
+          });
+          const mergedRest = { ...(dynamicConfig.restTools ?? {}), ...toolsMap };
+          dynamicConfig = { ...dynamicConfig, restTools: mergedRest };
+          const newTools = Object.keys(toolsMap);
+          dynamicTools = dynamicTools.filter((t) => t !== `openapi:${name}`).concat(newTools);
+          if (o.callbacks?.onLog !== undefined) {
+            o.callbacks.onLog({
+              timestamp: Date.now(),
+              severity: 'VRB',
+              turn: 0,
+              subturn: 0,
+              direction: 'response',
+              type: 'tool',
+              remoteIdentifier: `openapi:${name}`,
+              fatal: false,
+              message: `Loaded ${String(newTools.length)} tools from OpenAPI provider: ${name}`
+            });
+          }
+        } catch (e) {
+          throw new Error(`Failed to import OpenAPI spec '${name}': ${e instanceof Error ? e.message : String(e)}`);
+        }
+      }
+    }
+
+    const sessionConfig: AIAgentSessionConfig = {
+      config: dynamicConfig,
+      targets: selectedTargets,
+      tools: dynamicTools,
+      agentId: agentName,
+      subAgentPaths: selectedAgents,
+      systemPrompt,
+      userPrompt,
+      outputFormat: o.outputFormat,
+      renderTarget: o.renderTarget,
+      conversationHistory: o.history,
+      expectedOutput: resolvedExpectedOutput,
+      callbacks: o.callbacks,
+      trace: o.trace,
+      stopRef: o.stopRef,
+      initialTitle: o.initialTitle,
+      abortSignal: (opts as { abortSignal?: AbortSignal } | undefined)?.abortSignal,
+      temperature: eff.temperature,
+      topP: eff.topP,
+      maxOutputTokens: eff.maxOutputTokens,
+      repeatPenalty: eff.repeatPenalty,
+      maxRetries: eff.maxRetries,
+      maxTurns: eff.maxToolTurns,
+      maxToolCallsPerTurn: eff.maxToolCallsPerTurn,
+      maxConcurrentTools: eff.maxConcurrentTools,
+      llmTimeout: eff.llmTimeout,
+      toolTimeout: eff.toolTimeout,
+      parallelToolCalls: eff.parallelToolCalls,
+      stream: eff.stream,
+      traceLLM: eff.traceLLM,
+      traceMCP: eff.traceMCP,
+      verbose: eff.verbose,
+      toolResponseMaxBytes: eff.toolResponseMaxBytes,
+      mcpInitConcurrency: eff.mcpInitConcurrency,
+    };
+    return Promise.resolve(Agent.create(sessionConfig));
+  };
+
+  const runSession = async (
+    systemPrompt: string,
+    userPrompt: string,
+    opts?: { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; trace?: AIAgentSessionConfig['trace']; renderTarget?: 'cli' | 'slack' | 'api' | 'web' | 'sub-agent'; outputFormat: OutputFormatId; abortSignal?: AbortSignal; stopRef?: { stopping: boolean }; initialTitle?: string; ancestors?: string[] }
+  ): Promise<AIAgentResult> => {
+    const session = await createSession(systemPrompt, userPrompt, opts);
+    return await session.run();
+  };
   const loaded: LoadedAgent = {
     id,
     promptPath: id,
     systemTemplate,
     description: fm?.description,
     usage: fm?.usage,
-    expectedOutput: fm?.expectedOutput,
+    toolName: fm?.toolName,
+    expectedOutput: resolvedExpectedOutput,
+    input: resolvedInput,
+    outputSchema: resolvedOutputSchema,
     config,
     targets: selectedTargets,
     tools: selectedTools,
+    subAgentPaths: [...selectedAgents],
     accountingFile,
   effective: {
       temperature: eff.temperature,
@@ -258,164 +454,15 @@ export function loadAgent(aiPath: string, registry?: AgentRegistry, options?: Lo
       mcpInitConcurrency: eff.mcpInitConcurrency,
     },
     subTools: [],
-    run: async (systemPrompt: string, userPrompt: string, opts?: { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; trace?: AIAgentSessionConfig['trace']; renderTarget?: 'cli' | 'slack' | 'api' | 'web' | 'sub-agent'; outputFormat: OutputFormatId; abortSignal?: AbortSignal; stopRef?: { stopping: boolean }; initialTitle?: string; ancestors?: string[] }): Promise<AIAgentResult> => {
-      const o = (opts ?? {}) as { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; trace?: AIAgentSessionConfig['trace']; renderTarget?: 'cli'|'slack'|'api'|'web'|'sub-agent'; outputFormat?: OutputFormatId; abortSignal?: AbortSignal; stopRef?: { stopping: boolean }; initialTitle?: string; ancestors?: string[] };
-      if (o.outputFormat === undefined) throw new Error('outputFormat is required');
-      // Support dynamic OpenAPI tool import from config.openapiSpecs
-      // PR-002: Only load OpenAPI tools if agent explicitly selects the provider
-      let dynamicConfig = config;
-      let dynamicTools = [...selectedTools];
-      
-      // Check if agent has selected any OpenAPI providers (format: "openapi:provider_name")
-      const selectedOpenAPIProviders = new Set<string>();
-      selectedTools.forEach(toolName => {
-        if (typeof toolName === 'string' && toolName.startsWith('openapi:')) {
-          const providerName = toolName.slice(8); // Remove 'openapi:' prefix
-          selectedOpenAPIProviders.add(providerName);
-        }
-      });
-      
-      // Load OpenAPI specs from config (these should be local files, not URLs - PR-001)
-      const openapiSpecs = (dynamicConfig as unknown as { openapiSpecs?: Record<string, OpenAPISpecConfig> }).openapiSpecs;
-      if (o.callbacks?.onLog !== undefined && openapiSpecs !== undefined) {
-        o.callbacks.onLog({
-          timestamp: Date.now(),
-          severity: 'VRB',
-          turn: 0,
-          subturn: 0,
-          direction: 'request',
-          type: 'tool',
-          remoteIdentifier: 'openapi',
-          fatal: false,
-          message: `Found OpenAPI specs in config: ${JSON.stringify(Object.keys(openapiSpecs))}, selected providers: ${JSON.stringify(Array.from(selectedOpenAPIProviders))}`
-        });
-      }
-      if (openapiSpecs !== undefined && selectedOpenAPIProviders.size > 0) {
-        // Find the config file path to resolve relative paths
-        const configLayer = layers.find(l => {
-          const json = l.json;
-          return json !== undefined && typeof json === 'object' && 'openapiSpecs' in json;
-        });
-        const configDir = configLayer !== undefined ? path.dirname(configLayer.jsonPath) : baseDir;
-        
-        const entries = Object.entries(openapiSpecs);
-        // eslint-disable-next-line functional/no-loop-statements
-        for (const [name, specCfg] of entries) {
-          // PR-002: Only load tools for explicitly selected providers
-          if (!selectedOpenAPIProviders.has(name)) {
-            continue;
-          }
-          
-          try {
-            const loc = specCfg.spec;
-            let text: string;
-            // PR-001: Only support local files, not URLs
-            if (loc.startsWith('http://') || loc.startsWith('https://')) {
-              throw new Error('Remote OpenAPI specs violate PR-001. Use local cached files instead.');
-            } else {
-              // Resolve relative paths relative to the config file location
-              const p = path.isAbsolute(loc) ? loc : path.resolve(configDir, loc);
-              if (o.callbacks?.onLog !== undefined) {
-                o.callbacks.onLog({
-                  timestamp: Date.now(),
-                  severity: 'VRB',
-                  turn: 0,
-                  subturn: 0,
-                  direction: 'request',
-                  type: 'tool',
-                  remoteIdentifier: `openapi:${name}`,
-                  fatal: false,
-                  message: `Loading OpenAPI spec from: ${p} (loc=${loc}, configDir=${configDir})`
-                });
-              }
-              text = readFileText(p);
-            }
-            const spec = parseOpenAPISpec(text);
-            const toolsMap = openApiToRestTools(spec, { 
-              toolNamePrefix: name, 
-              baseUrlOverride: specCfg.baseUrl, 
-              includeMethods: specCfg.includeMethods, 
-              tagFilter: specCfg.tagFilter 
-            });
-            // Merge default headers (with ${VAR} expansion)
-            const defaultHeadersRaw = specCfg.headers ?? {};
-            const defaultHeaders: Record<string, string> = {};
-            Object.entries(defaultHeadersRaw).forEach(([k, v]) => { defaultHeaders[k] = expandVars(v); });
-            Object.values(toolsMap).forEach((t) => {
-              const merged = { ...(defaultHeaders), ...(t.headers ?? {}) };
-              t.headers = Object.keys(merged).length > 0 ? merged : undefined;
-            });
-            const mergedRest = { ...(dynamicConfig.restTools ?? {}), ...toolsMap };
-            dynamicConfig = { ...dynamicConfig, restTools: mergedRest };
-            // Add the generated tools (but not the openapi:provider selector itself)
-            const newTools = Object.keys(toolsMap);
-            dynamicTools = dynamicTools.filter(t => t !== `openapi:${name}`).concat(newTools);
-            
-            if (o.callbacks?.onLog !== undefined) {
-              o.callbacks.onLog({
-                timestamp: Date.now(),
-                severity: 'VRB',
-                turn: 0,
-                subturn: 0,
-                direction: 'response',
-                type: 'tool',
-                remoteIdentifier: `openapi:${name}`,
-                fatal: false,
-                message: `Loaded ${String(newTools.length)} tools from OpenAPI provider: ${name}`
-              });
-            }
-          } catch (e) {
-            throw new Error(`Failed to import OpenAPI spec '${name}': ${e instanceof Error ? e.message : String(e)}`);
-          }
-        }
-      }
-
-      const sessionConfig: AIAgentSessionConfig = {
-        config: dynamicConfig,
-        targets: selectedTargets,
-        tools: dynamicTools,
-        agentId: agentName,
-        subAgentPaths: selectedAgents,
-        systemPrompt,
-        userPrompt,
-        outputFormat: o.outputFormat,
-        renderTarget: o.renderTarget,
-        conversationHistory: o.history,
-        expectedOutput: fm?.expectedOutput,
-        callbacks: o.callbacks,
-        trace: o.trace,
-        stopRef: o.stopRef,
-        initialTitle: o.initialTitle,
-        // Propagate headend abort signal if present
-        abortSignal: (opts as unknown as { abortSignal?: AbortSignal } | undefined)?.abortSignal,
-        temperature: eff.temperature,
-        topP: eff.topP,
-        maxOutputTokens: eff.maxOutputTokens,
-        repeatPenalty: eff.repeatPenalty,
-        maxRetries: eff.maxRetries,
-        maxTurns: eff.maxToolTurns,
-        maxToolCallsPerTurn: eff.maxToolCallsPerTurn,
-        maxConcurrentTools: eff.maxConcurrentTools,
-        llmTimeout: eff.llmTimeout,
-        toolTimeout: eff.toolTimeout,
-        parallelToolCalls: eff.parallelToolCalls,
-        stream: eff.stream,
-        traceLLM: eff.traceLLM,
-        traceMCP: eff.traceMCP,
-        verbose: eff.verbose,
-        toolResponseMaxBytes: eff.toolResponseMaxBytes,
-        mcpInitConcurrency: eff.mcpInitConcurrency,
-      };
-      const session = Agent.create(sessionConfig);
-      return await session.run();
-    }
+    createSession,
+    run: runSession,
   };
   reg.set(id, loaded);
   return loaded;
 }
 
 export function loadAgentFromContent(id: string, content: string, options?: LoadAgentOptions & { baseDir?: string }): LoadedAgent {
-  const reg = new AgentRegistry();
+  const reg = new LoadedAgentCache();
   const cached = reg.get(id);
   if (cached !== undefined) return cached;
 
@@ -440,6 +487,17 @@ export function loadAgentFromContent(id: string, content: string, options?: Load
   const config = buildUnifiedConfiguration({ providers: needProviders, mcpServers: externalToolNames, restTools: externalToolNames }, layers, { verbose: options?.verbose });
   const dfl = resolveDefaults(layers);
   validateNoPlaceholders(config);
+
+  const mergedEnvForContent: Record<string, string> = {};
+  layers.forEach((ly) => {
+    const env = ly.env ?? {};
+    Object.keys(env).forEach((k) => { mergedEnvForContent[k] = env[k]; });
+  });
+  Object.keys(process.env).forEach((k) => {
+    const val = process.env[k];
+    if (typeof val === 'string') mergedEnvForContent[k] = val;
+  });
+  const expandVarsLocal = (s: string): string => s.replace(/\$\{([^}]+)\}/g, (_m, name: string) => mergedEnvForContent[name] ?? '');
   
   // Validate that all requested MCP tools exist in configuration
   const missingTools: string[] = [];
@@ -493,16 +551,139 @@ export function loadAgentFromContent(id: string, content: string, options?: Load
 
   const accountingFile: string | undefined = config.persistence?.billingFile ?? config.accounting?.file;
 
+  const resolvedInput = resolveInputContract(fm?.inputSpec);
+  const resolvedExpectedOutput = fm?.expectedOutput !== undefined
+    ? { ...fm.expectedOutput, schema: cloneSchemaOptional(fm.expectedOutput.schema) }
+    : undefined;
+  const resolvedOutputSchema = resolvedExpectedOutput?.format === 'json'
+    ? cloneSchemaOptional(resolvedExpectedOutput.schema)
+    : undefined;
+
+  const createSession = (
+    systemPrompt: string,
+    userPrompt: string,
+    opts?: { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; trace?: AIAgentSessionConfig['trace']; renderTarget?: 'cli' | 'slack' | 'api' | 'web' | 'sub-agent'; outputFormat: OutputFormatId; abortSignal?: AbortSignal; stopRef?: { stopping: boolean }; initialTitle?: string; ancestors?: string[] }
+  ): Promise<AIAgentSession> => {
+    const o = (opts ?? {}) as { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; trace?: AIAgentSessionConfig['trace']; renderTarget?: 'cli'|'slack'|'api'|'web'|'sub-agent'; outputFormat?: OutputFormatId; abortSignal?: AbortSignal; stopRef?: { stopping: boolean }; initialTitle?: string; ancestors?: string[] };
+    if (o.outputFormat === undefined) throw new Error('outputFormat is required');
+
+    let dynamicConfig = config;
+    let dynamicTools = [...selectedTools];
+
+    const selectedOpenAPIProviders = new Set<string>();
+    selectedTools.forEach((toolName) => {
+      if (typeof toolName === 'string' && toolName.startsWith('openapi:')) {
+        const providerName = toolName.slice(8);
+        selectedOpenAPIProviders.add(providerName);
+      }
+    });
+
+    const openapiSpecs = (dynamicConfig as unknown as { openapiSpecs?: Record<string, OpenAPISpecConfig> }).openapiSpecs;
+    if (openapiSpecs !== undefined && selectedOpenAPIProviders.size > 0) {
+      const configLayer = layers.find((ly) => {
+        const json = ly.json;
+        return json !== undefined && typeof json === 'object' && 'openapiSpecs' in json;
+      });
+      const configDir = configLayer !== undefined ? path.dirname(configLayer.jsonPath) : (options?.baseDir ?? process.cwd());
+      const entries = Object.entries(openapiSpecs);
+      // eslint-disable-next-line functional/no-loop-statements
+      for (const [name, specCfg] of entries) {
+        if (!selectedOpenAPIProviders.has(name)) continue;
+        try {
+          const loc = specCfg.spec;
+          let text: string;
+          if (loc.startsWith('http://') || loc.startsWith('https://')) {
+            throw new Error('Remote OpenAPI specs violate PR-001. Use local cached files instead.');
+          } else {
+            const p = path.isAbsolute(loc) ? loc : path.resolve(configDir, loc);
+            text = readFileText(p);
+          }
+          const spec = parseOpenAPISpec(text);
+          const toolsMap = openApiToRestTools(spec, {
+            toolNamePrefix: name,
+            baseUrlOverride: specCfg.baseUrl,
+            includeMethods: specCfg.includeMethods,
+            tagFilter: specCfg.tagFilter,
+          });
+          const defaultHeadersRaw = specCfg.headers ?? {};
+          const defaultHeaders: Record<string, string> = {};
+          Object.entries(defaultHeadersRaw).forEach(([k, v]) => { defaultHeaders[k] = expandVarsLocal(v); });
+          Object.values(toolsMap).forEach((t) => {
+            const merged = { ...(defaultHeaders), ...(t.headers ?? {}) };
+            t.headers = Object.keys(merged).length > 0 ? merged : undefined;
+          });
+          const mergedRest = { ...(dynamicConfig.restTools ?? {}), ...toolsMap };
+          dynamicConfig = { ...dynamicConfig, restTools: mergedRest };
+          const newTools = Object.keys(toolsMap);
+          dynamicTools = dynamicTools.filter((t) => t !== `openapi:${name}`).concat(newTools);
+        } catch (e) {
+          throw new Error(`Failed to import OpenAPI spec '${name}': ${e instanceof Error ? e.message : String(e)}`);
+        }
+      }
+    }
+
+    const sessionConfig: AIAgentSessionConfig = {
+      config: dynamicConfig,
+      targets: selectedTargets,
+      tools: dynamicTools,
+      agentId: path.basename(id).replace(/\.[^.]+$/, ''),
+      subAgentPaths: selectedAgents,
+      systemPrompt,
+      userPrompt,
+      outputFormat: o.outputFormat,
+      renderTarget: o.renderTarget,
+      conversationHistory: o.history,
+      expectedOutput: resolvedExpectedOutput,
+      callbacks: o.callbacks,
+      trace: o.trace,
+      initialTitle: o.initialTitle,
+      ancestors: Array.isArray(o.ancestors) ? o.ancestors : undefined,
+      abortSignal: o.abortSignal,
+      stopRef: o.stopRef,
+      temperature: eff.temperature,
+      topP: eff.topP,
+      maxOutputTokens: eff.maxOutputTokens,
+      repeatPenalty: eff.repeatPenalty,
+      maxRetries: eff.maxRetries,
+      maxTurns: eff.maxToolTurns,
+      maxToolCallsPerTurn: eff.maxToolCallsPerTurn,
+      maxConcurrentTools: eff.maxConcurrentTools,
+      llmTimeout: eff.llmTimeout,
+      toolTimeout: eff.toolTimeout,
+      parallelToolCalls: eff.parallelToolCalls,
+      stream: eff.stream,
+      traceLLM: eff.traceLLM,
+      traceMCP: eff.traceMCP,
+      verbose: eff.verbose,
+      toolResponseMaxBytes: eff.toolResponseMaxBytes,
+      mcpInitConcurrency: eff.mcpInitConcurrency,
+    };
+    return Promise.resolve(Agent.create(sessionConfig));
+  };
+
+  const runSession = async (
+    systemPrompt: string,
+    userPrompt: string,
+    opts?: { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; trace?: AIAgentSessionConfig['trace']; renderTarget?: 'cli' | 'slack' | 'api' | 'web' | 'sub-agent'; outputFormat: OutputFormatId; abortSignal?: AbortSignal; stopRef?: { stopping: boolean }; initialTitle?: string; ancestors?: string[] }
+  ): Promise<AIAgentResult> => {
+    const session = await createSession(systemPrompt, userPrompt, opts);
+    return await session.run();
+  };
+
   const loaded: LoadedAgent = {
     id,
     promptPath: id,
     systemTemplate,
     description: fm?.description,
     usage: fm?.usage,
-    expectedOutput: fm?.expectedOutput,
+    toolName: fm?.toolName,
+    expectedOutput: resolvedExpectedOutput,
+    input: resolvedInput,
+    outputSchema: resolvedOutputSchema,
     config,
     targets: selectedTargets,
     tools: selectedTools,
+    subAgentPaths: [...selectedAgents],
     accountingFile,
     subTools: [],
     effective: {
@@ -524,129 +705,8 @@ export function loadAgentFromContent(id: string, content: string, options?: Load
       verbose: eff.verbose,
       mcpInitConcurrency: eff.mcpInitConcurrency,
     },
-    run: async (systemPrompt: string, userPrompt: string, opts?: { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; trace?: AIAgentSessionConfig['trace']; renderTarget?: 'cli' | 'slack' | 'api' | 'web' | 'sub-agent'; outputFormat: OutputFormatId; abortSignal?: AbortSignal; stopRef?: { stopping: boolean }; initialTitle?: string; ancestors?: string[] }): Promise<AIAgentResult> => {
-      const o = (opts ?? {}) as { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; trace?: AIAgentSessionConfig['trace']; renderTarget?: 'cli'|'slack'|'api'|'web'|'sub-agent'; outputFormat?: OutputFormatId; abortSignal?: AbortSignal; stopRef?: { stopping: boolean }; initialTitle?: string; ancestors?: string[] };
-      if (o.outputFormat === undefined) throw new Error('outputFormat is required');
-      
-      // Support dynamic OpenAPI tool import from config.openapiSpecs
-      // PR-002: Only load OpenAPI tools if agent explicitly selects the provider
-      let dynamicConfig = config;
-      let dynamicTools = [...selectedTools];
-      
-      // Helper for expanding ${VAR} in strings
-      const expandVars = (s: string): string => {
-        // For loadAgentFromContent, we need to get env from layers
-        const layers = discoverLayers({ configPath: options?.configPath, promptPath: id });
-        const mergedEnv: Record<string, string> = {};
-        layers.forEach(l => { if (l.env !== undefined) Object.assign(mergedEnv, l.env); });
-        return s.replace(/\$\{([^}]+)\}/g, (_m, name: string) => mergedEnv[name] ?? '');
-      };
-      
-      // Check if agent has selected any OpenAPI providers (format: "openapi:provider_name")
-      const selectedOpenAPIProviders = new Set<string>();
-      selectedTools.forEach(toolName => {
-        if (typeof toolName === 'string' && toolName.startsWith('openapi:')) {
-          const providerName = toolName.slice(8); // Remove 'openapi:' prefix
-          selectedOpenAPIProviders.add(providerName);
-        }
-      });
-      
-      // Load OpenAPI specs from config (these should be local files, not URLs - PR-001)
-      const openapiSpecs = (dynamicConfig as unknown as { openapiSpecs?: Record<string, OpenAPISpecConfig> }).openapiSpecs;
-      if (openapiSpecs !== undefined && selectedOpenAPIProviders.size > 0) {
-        // For loadAgentFromContent, we need to find config from layers
-        const layers = discoverLayers({ configPath: options?.configPath, promptPath: id });
-        const configLayer = layers.find(l => {
-          const json = l.json;
-          return json !== undefined && typeof json === 'object' && 'openapiSpecs' in json;
-        });
-        const configDir = configLayer !== undefined ? path.dirname(configLayer.jsonPath) : (options?.baseDir ?? process.cwd());
-        
-        const entries = Object.entries(openapiSpecs);
-        // eslint-disable-next-line functional/no-loop-statements
-        for (const [name, specCfg] of entries) {
-          // PR-002: Only load tools for explicitly selected providers
-          if (!selectedOpenAPIProviders.has(name)) {
-            continue;
-          }
-          
-          try {
-            const loc = specCfg.spec;
-            let text: string;
-            // PR-001: Only support local files, not URLs
-            if (loc.startsWith('http://') || loc.startsWith('https://')) {
-              throw new Error('Remote OpenAPI specs violate PR-001. Use local cached files instead.');
-            } else {
-              // Resolve relative paths relative to the config file location
-              const p = path.isAbsolute(loc) ? loc : path.resolve(configDir, loc);
-              text = readFileText(p);
-            }
-            const spec = parseOpenAPISpec(text);
-            const toolsMap = openApiToRestTools(spec, { 
-              toolNamePrefix: name, 
-              baseUrlOverride: specCfg.baseUrl, 
-              includeMethods: specCfg.includeMethods, 
-              tagFilter: specCfg.tagFilter 
-            });
-            // Merge default headers (with ${VAR} expansion)
-            const defaultHeadersRaw = specCfg.headers ?? {};
-            const defaultHeaders: Record<string, string> = {};
-            Object.entries(defaultHeadersRaw).forEach(([k, v]) => { defaultHeaders[k] = expandVars(v); });
-            Object.values(toolsMap).forEach((t) => {
-              const merged = { ...(defaultHeaders), ...(t.headers ?? {}) };
-              t.headers = Object.keys(merged).length > 0 ? merged : undefined;
-            });
-            const mergedRest = { ...(dynamicConfig.restTools ?? {}), ...toolsMap };
-            dynamicConfig = { ...dynamicConfig, restTools: mergedRest };
-            // Add the generated tools (but not the openapi:provider selector itself)
-            const newTools = Object.keys(toolsMap);
-            dynamicTools = dynamicTools.filter(t => t !== `openapi:${name}`).concat(newTools);
-          } catch (e) {
-            throw new Error(`Failed to import OpenAPI spec '${name}': ${e instanceof Error ? e.message : String(e)}`);
-          }
-        }
-      }
-
-      const sessionConfig: AIAgentSessionConfig = {
-        config: dynamicConfig,
-        targets: selectedTargets,
-        tools: dynamicTools,
-        agentId: path.basename(id).replace(/\.[^.]+$/, ''),
-        subAgentPaths: selectedAgents,
-        systemPrompt,
-        userPrompt,
-        outputFormat: o.outputFormat,
-        renderTarget: o.renderTarget,
-        conversationHistory: o.history,
-        expectedOutput: fm?.expectedOutput,
-        callbacks: o.callbacks,
-        trace: o.trace,
-        initialTitle: o.initialTitle,
-        ancestors: Array.isArray(o.ancestors) ? o.ancestors : undefined,
-        // Propagate control signals to child sessions
-        abortSignal: o.abortSignal,
-        stopRef: o.stopRef,
-        temperature: eff.temperature,
-        topP: eff.topP,
-        maxOutputTokens: eff.maxOutputTokens,
-        repeatPenalty: eff.repeatPenalty,
-        maxRetries: eff.maxRetries,
-        maxTurns: eff.maxToolTurns,
-        maxToolCallsPerTurn: eff.maxToolCallsPerTurn,
-        maxConcurrentTools: eff.maxConcurrentTools,
-        llmTimeout: eff.llmTimeout,
-        toolTimeout: eff.toolTimeout,
-        parallelToolCalls: eff.parallelToolCalls,
-        stream: eff.stream,
-        traceLLM: eff.traceLLM,
-        traceMCP: eff.traceMCP,
-        verbose: eff.verbose,
-        toolResponseMaxBytes: eff.toolResponseMaxBytes,
-        mcpInitConcurrency: eff.mcpInitConcurrency,
-      };
-      const session = Agent.create(sessionConfig);
-      return await session.run();
-    }
+    createSession,
+    run: runSession,
   };
   reg.set(id, loaded);
   return loaded;

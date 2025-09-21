@@ -19,6 +19,7 @@ The library performs no direct I/O (no stdout/stderr/file writes). All output, l
   - `config: Configuration` – providers + MCP servers
   - `targets: { provider: string; model: string }[]` – provider/model pairs
   - `tools: string[]` – MCP servers to expose
+  - `headendId?: string` – optional identifier propagated to logging when the session is created from a headend (REST/MCP/OpenAI/Anthropic)
   - `systemPrompt: string`
   - `userPrompt: string`
   - `conversationHistory?: ConversationMessage[]`
@@ -46,6 +47,7 @@ The library performs no direct I/O (no stdout/stderr/file writes). All output, l
   - `type: 'llm' | 'mcp'`
   - `remoteIdentifier: string`
   - `message: string`
+  - `headendId?: string` – populated when invoked via a headend so consumers can correlate activity with the entry point
 - `AccountingEntry`
   - `type: 'llm'` (with tokens, cost, latency) or `type: 'tool'` (with characters in/out, latency)
 
@@ -195,6 +197,7 @@ Recommendation for JSON output: include an explicit error structure in the schem
   - Returns the response with a prefix and the head of the original content, total within the limit:
     - Prefix: `[TRUNCATED] Original size {actual} bytes; truncated to {limit} bytes.`
   - Counts occurrences; `FIN` MCP summary includes `capped=<count>`.
+- Headend surfaces (REST/MCP/OpenAI/Anthropic) apply the same cap via their session configuration and surface errors through HTTP/SSE/WebSocket semantics. Their incoming request payloads must include `format`, and when `format` is `json`, a `schema` object is required so the library can validate structured content.
 
 ## Using the Library (minimal example)
 

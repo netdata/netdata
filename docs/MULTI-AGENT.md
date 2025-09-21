@@ -186,12 +186,20 @@ Slack Bot:
 - Each Slack thread represents a parent session.
 - Stream tokens and child call events as messages.
 - Controls: stop, retry, show child details, download JSON outputs.
-- Per‑user budgets and rate‑limits; secret redaction.
+- Per-user budgets and rate-limits; secret redaction.
 
 Web Chat:
 - SSE/WebSocket streaming from parent session.
 - “Timeline” UI showing child calls, streamed outputs, and FIN summaries.
 - Controls: stop, retry, set budgets; view frontmatter templates.
+
+## External Headends for Multi-Agent Systems
+
+- The headend manager allows a single CLI invocation to expose multiple agents (parent and sub-agents) over REST, MCP, or provider-compatible endpoints. Register each agent with `--agent` so the headends share the preloaded registry.
+- REST clients can call `GET /v1/:agent?q=...&format=...` for any registered agent. When requesting JSON (`format=json`), the caller must supply a `schema` to match the agent’s output contract.
+- MCP clients connect via the configured transport (`stdio`, `/mcp` HTTP, `/mcp/sse`, or WebSocket). Tool arguments must contain `format`, and JSON mode must include a `schema` field.
+- OpenAI-compatible and Anthropic-compatible headends map agents to models/tools. These surfaces respect the same concurrency caps and stream semantics as the in-process orchestration layer.
+- Because each request spawns an isolated `AIAgentSession`, agents invoked via headends remain composable: a REST call can trigger the parent agent, which in turn can call sub-agents as internal tools.
 
 ## Validation & Startup Flow
 

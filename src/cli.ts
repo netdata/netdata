@@ -8,14 +8,24 @@ import * as yaml from 'js-yaml';
 // Keep import order: builtins, external, type, internal
 // (moved below to maintain import order)
 
+import type { LoadAgentOptions } from './agent-loader.js';
 import type { FrontmatterOptions } from './frontmatter.js';
+import type { McpTransportSpec } from './headends/mcp-headend.js';
+import type { Headend, HeadendLogSink } from './headends/types.js';
 import type { LogEntry, AccountingEntry, AIAgentCallbacks, ConversationMessage, Configuration } from './types.js';
 import type { CommanderError } from 'commander';
 
 import { loadAgentFromContent } from './agent-loader.js';
+import { AgentRegistry } from './agent-registry.js';
 import { discoverLayers, resolveDefaults } from './config-resolver.js';
 import { describeFormat, resolveFormatIdForCli } from './formats.js';
 import { parseFrontmatter, stripFrontmatter, parseList, parsePairs, buildFrontmatterTemplate } from './frontmatter.js';
+import { AnthropicCompletionsHeadend } from './headends/anthropic-completions-headend.js';
+import { HeadendManager } from './headends/headend-manager.js';
+import { McpHeadend } from './headends/mcp-headend.js';
+import { OpenAICompletionsHeadend } from './headends/openai-completions-headend.js';
+import { OpenAIToolHeadend } from './headends/openai-tool-headend.js';
+import { RestHeadend } from './headends/rest-headend.js';
 import { resolveIncludes } from './include-resolver.js';
 import { formatLog } from './log-formatter.js';
 import { makeTTYLogCallbacks } from './log-sink-tty.js';
@@ -79,6 +89,28 @@ function addOptionsFromRegistry(prog: Command): void {
     }
   });
 }
+
+const appendValue = <T>(value: T, previous?: T[]): T[] => {
+  const base = Array.isArray(previous) ? [...previous] : [];
+  base.push(value);
+  return base;
+};
+
+const parsePort = (value: string): number => {
+  const port = Number.parseInt(value, 10);
+  if (!Number.isFinite(port) || port <= 0 || port > 65535) {
+    throw new Error(`invalid port '${value}'`);
+  }
+  return port;
+};
+
+const parsePositive = (value: string): number => {
+  const num = Number.parseInt(value, 10);
+  if (!Number.isFinite(num) || num <= 0) {
+    throw new Error(`invalid positive number '${value}'`);
+  }
+  return num;
+};
 
 // Build a Resolved Defaults section using frontmatter + config (if available)
 function buildResolvedDefaultsHelp(): string {
@@ -274,6 +306,258 @@ program
   .version('1.0.0')
   .hook('preSubcommand', () => { /* placeholder */ });
 
+const agentOption = new Option('--agent <path>', 'Register an agent (.ai) file; repeat to add multiple agents')
+  .argParser((value: string, previous: string[]) => appendValue(value, previous))
+  .default([], undefined);
+
+const apiHeadendOption = new Option('--api <port>', 'Start REST API headend on the given port (repeatable)')
+  .argParser((value: string, previous: number[]) => appendValue(parsePort(value), previous))
+  .default([], undefined);
+
+const mcpHeadendOption = new Option('--mcp <transport>', 'Start MCP headend (stdio|http:port|sse:port|ws:port)')
+  .argParser((value: string, previous: string[]) => appendValue(value, previous))
+  .default([], undefined);
+
+const openaiToolHeadendOption = new Option('--openai-tool <port>', 'Start OpenAI tool headend on the given port (repeatable)')
+  .argParser((value: string, previous: number[]) => appendValue(parsePort(value), previous))
+  .default([], undefined);
+
+const openaiCompletionsHeadendOption = new Option('--openai-completions <port>', 'Start OpenAI chat completions headend on the given port (repeatable)')
+  .argParser((value: string, previous: number[]) => appendValue(parsePort(value), previous))
+  .default([], undefined);
+
+const anthropicCompletionsHeadendOption = new Option('--anthropic-completions <port>', 'Start Anthropic messages headend on the given port (repeatable)')
+  .argParser((value: string, previous: number[]) => appendValue(parsePort(value), previous))
+  .default([], undefined);
+
+const apiConcurrencyOption = new Option('--api-concurrency <n>', 'Maximum concurrent REST API sessions')
+  .argParser(parsePositive);
+
+const openaiToolConcurrencyOption = new Option('--openai-tool-concurrency <n>', 'Maximum concurrent OpenAI tool sessions')
+  .argParser(parsePositive);
+
+const openaiCompletionsConcurrencyOption = new Option('--openai-completions-concurrency <n>', 'Maximum concurrent OpenAI chat sessions')
+  .argParser(parsePositive);
+
+const anthropicCompletionsConcurrencyOption = new Option('--anthropic-completions-concurrency <n>', 'Maximum concurrent Anthropic chat sessions')
+  .argParser(parsePositive);
+
+program.addOption(agentOption);
+program.addOption(apiHeadendOption);
+program.addOption(mcpHeadendOption);
+program.addOption(openaiToolHeadendOption);
+program.addOption(openaiCompletionsHeadendOption);
+program.addOption(anthropicCompletionsHeadendOption);
+program.addOption(apiConcurrencyOption);
+program.addOption(openaiToolConcurrencyOption);
+program.addOption(openaiCompletionsConcurrencyOption);
+program.addOption(anthropicCompletionsConcurrencyOption);
+
+interface HeadendModeConfig {
+  agentPaths: string[];
+  apiPorts: number[];
+  mcpTargets: string[];
+  openaiToolPorts: number[];
+  openaiCompletionsPorts: number[];
+  anthropicCompletionsPorts: number[];
+  options: Record<string, unknown>;
+}
+
+const readCliTools = (opts: Record<string, unknown>): string | undefined => {
+  const keys = ['tools', 'tool', 'mcp', 'mcpTool', 'mcpTools'] as const;
+  const candidate = keys
+    .map((key) => opts[key])
+    .find((value): value is string => typeof value === 'string' && value.length > 0);
+  return candidate;
+};
+
+async function runHeadendMode(config: HeadendModeConfig): Promise<void> {
+  const uniqueAgents = Array.from(new Set(config.agentPaths.map((p) => path.resolve(p))));
+  if (uniqueAgents.length === 0) {
+    exitWith(4, 'headend mode requires at least one --agent <file>', 'EXIT-HEADEND-NO-AGENTS');
+  }
+  const missingAgents = uniqueAgents.filter((p) => !fs.existsSync(p));
+  if (missingAgents.length > 0) {
+    const missing = missingAgents.join(', ');
+    exitWith(4, `agent file not found: ${missing}`, 'EXIT-HEADEND-MISSING-AGENT');
+  }
+  if (
+    config.apiPorts.length === 0
+    && config.mcpTargets.length === 0
+    && config.openaiToolPorts.length === 0
+    && config.openaiCompletionsPorts.length === 0
+    && config.anthropicCompletionsPorts.length === 0
+  ) {
+    exitWith(4, 'no headends specified; add --api/--mcp/--openai-tool/--openai-completions/--anthropic-completions', 'EXIT-HEADEND-NO-HEADENDS');
+  }
+
+  const configPathValue = typeof config.options.config === 'string' && config.options.config.length > 0
+    ? config.options.config
+    : undefined;
+  const verbose = config.options.verbose === true;
+  const traceLLMFlag = config.options.traceLlm === true;
+  const traceMCPFlag = config.options.traceMcp === true;
+
+  let parsedTargets: LoadAgentOptions['targets'];
+  const cliModels = typeof config.options.models === 'string' && config.options.models.length > 0
+    ? config.options.models
+    : undefined;
+  if (cliModels !== undefined) {
+    try {
+      parsedTargets = parsePairs(cliModels);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      exitWith(4, `invalid --models value: ${message}`, 'EXIT-HEADEND-BAD-MODELS');
+    }
+  }
+
+  let parsedTools: LoadAgentOptions['tools'];
+  const cliTools = readCliTools(config.options);
+  if (cliTools !== undefined) {
+    try {
+      parsedTools = parseList(cliTools);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      exitWith(4, `invalid tools specification: ${message}`, 'EXIT-HEADEND-BAD-TOOLS');
+    }
+  }
+
+  const loadOptions: LoadAgentOptions = {
+    configPath: configPathValue,
+    verbose,
+    traceLLM: traceLLMFlag,
+    traceMCP: traceMCPFlag,
+  };
+  if (parsedTargets !== undefined) {
+    loadOptions.targets = parsedTargets;
+  }
+  if (parsedTools !== undefined) {
+    loadOptions.tools = parsedTools;
+  }
+
+  const registry = new AgentRegistry(uniqueAgents, loadOptions);
+  const parseMcpTarget = (raw: string): McpTransportSpec => {
+    if (raw === 'stdio') return { type: 'stdio' };
+    const [kind, portRaw] = raw.split(':');
+    if ((kind === 'http' || kind === 'sse' || kind === 'ws') && typeof portRaw === 'string' && portRaw.length > 0) {
+      const port = Number.parseInt(portRaw, 10);
+      if (!Number.isFinite(port) || port <= 0 || port > 65535) {
+        exitWith(4, `invalid port '${portRaw}' for --mcp`, 'EXIT-HEADEND-MCP-PORT');
+      }
+      if (kind === 'http') return { type: 'streamable-http', port };
+      if (kind === 'sse') return { type: 'sse', port };
+      return { type: 'ws', port };
+    }
+    exitWith(4, `unsupported MCP transport '${raw}'`, 'EXIT-HEADEND-MCP-TRANSPORT');
+  };
+  const mcpSpecs = config.mcpTargets.map((raw) => parseMcpTarget(raw));
+
+  const readConcurrency = (key: string): number | undefined => {
+    const raw = config.options[key];
+    if (typeof raw === 'number' && Number.isFinite(raw) && raw > 0) return Math.floor(raw);
+    if (typeof raw === 'string' && raw.length > 0) {
+      const parsed = Number.parseInt(raw, 10);
+      if (Number.isFinite(parsed) && parsed > 0) return Math.floor(parsed);
+    }
+    return undefined;
+  };
+
+  const apiConcurrency = readConcurrency('apiConcurrency');
+  const openaiToolConcurrency = readConcurrency('openaiToolConcurrency');
+  const openaiCompletionsConcurrency = readConcurrency('openaiCompletionsConcurrency');
+  const anthropicCompletionsConcurrency = readConcurrency('anthropicCompletionsConcurrency');
+
+  const headends = [] as Headend[];
+  config.apiPorts.forEach((port) => {
+    headends.push(new RestHeadend(registry, { port, concurrency: apiConcurrency }));
+  });
+  mcpSpecs.forEach((spec) => {
+    headends.push(new McpHeadend({ registry, transport: spec }));
+  });
+  config.openaiToolPorts.forEach((port) => {
+    headends.push(new OpenAIToolHeadend(registry, { port, concurrency: openaiToolConcurrency }));
+  });
+  config.openaiCompletionsPorts.forEach((port) => {
+    headends.push(new OpenAICompletionsHeadend(registry, { port, concurrency: openaiCompletionsConcurrency }));
+  });
+  config.anthropicCompletionsPorts.forEach((port) => {
+    headends.push(new AnthropicCompletionsHeadend(registry, { port, concurrency: anthropicCompletionsConcurrency }));
+  });
+  const ttyLog = makeTTYLogCallbacks({
+    color: true,
+    verbose: config.options.verbose === true,
+    traceLlm: config.options.traceLlm === true,
+    traceMcp: config.options.traceMcp === true,
+  });
+  const logSink: HeadendLogSink = (entry) => { ttyLog.onLog?.(entry); };
+  const emit = (message: string, severity: LogEntry['severity'] = 'VRB'): void => {
+    logSink({
+      timestamp: Date.now(),
+      severity,
+      turn: 0,
+      subturn: 0,
+      direction: 'response',
+      type: 'tool',
+      remoteIdentifier: 'headend:cli',
+      fatal: severity === 'ERR',
+      message,
+      headendId: 'cli',
+    });
+  };
+
+  const manager = new HeadendManager(headends, {
+    log: logSink,
+    onFatal: (event) => {
+      const desc = event.headend.describe();
+      emit(`headend ${desc.label} fatal error: ${event.error.message}`, 'ERR');
+    },
+  });
+
+  __RUNNING_SERVER = true;
+
+  const stopManager = async () => {
+    await manager.stopAll();
+  };
+
+  const handleSignal = (signal: NodeJS.Signals) => {
+    emit(`received ${signal}, shutting down headends`, 'WRN');
+    void stopManager();
+  };
+
+  const registeredSignals: NodeJS.Signals[] = ['SIGINT', 'SIGTERM'];
+  const signalHandlers = new Map<NodeJS.Signals, () => void>();
+  registeredSignals.forEach((sig) => {
+    const handler = () => { handleSignal(sig); };
+    signalHandlers.set(sig, handler);
+    process.once(sig, handler);
+  });
+
+  try {
+    emit(`starting headends: ${headends.map((h) => h.describe().label).join(', ')}`);
+    await manager.startAll();
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    await stopManager();
+    emit(`failed to start headends: ${message}`, 'ERR');
+    exitWith(1, `failed to start headends: ${message}`, 'EXIT-HEADEND-START');
+  }
+
+  const fatal = await manager.waitForFatal();
+  await stopManager();
+  signalHandlers.forEach((handler, sig) => {
+    process.removeListener(sig, handler);
+  });
+
+  if (fatal !== undefined) {
+    const desc = fatal.headend.describe();
+    const message = fatal.error.message;
+    emit(`headend ${desc.label} failed: ${message}`, 'ERR');
+    exitWith(1, `headend '${desc.label}' failed: ${message}`, 'EXIT-HEADEND-FATAL');
+  }
+  emit('all headends stopped gracefully', 'FIN');
+  __RUNNING_SERVER = false;
+}
+
 // Global flag: suppress fatal exits in server mode
 let __RUNNING_SERVER = false;
 
@@ -313,13 +597,37 @@ program
   });
 
 program
-  .argument('<system-prompt>', 'System prompt (string, @filename, or - for stdin)')
-  .argument('<user-prompt>', 'User prompt (string, @filename, or - for stdin)')
+  .argument('[system-prompt]', 'System prompt (string, @filename, or - for stdin)')
+  .argument('[user-prompt]', 'User prompt (string, @filename, or - for stdin)')
   .option('--save-all <dir>', 'Save all agent and sub-agent conversations to directory')
   .option('--show-tree', 'Dump the full execution tree (ASCII) at the end')
   .hook('preAction', () => { /* placeholder to ensure options added first */ })
-  .action(async (systemPrompt: string, userPrompt: string, options: Record<string, unknown>) => {
+  .action(async (systemPrompt: string | undefined, userPrompt: string | undefined, options: Record<string, unknown>) => {
     try {
+      const agentFlags = Array.isArray(options.agent) ? (options.agent as string[]) : [];
+      const apiPorts = Array.isArray(options.api) ? (options.api as number[]) : [];
+      const mcpTargets = Array.isArray(options.mcp) ? (options.mcp as string[]) : [];
+      const openaiToolPorts = Array.isArray(options.openaiTool) ? (options.openaiTool as number[]) : [];
+      const openaiCompletionsPorts = Array.isArray(options.openaiCompletions) ? (options.openaiCompletions as number[]) : [];
+      const anthropicCompletionsPorts = Array.isArray(options.anthropicCompletions) ? (options.anthropicCompletions as number[]) : [];
+
+      if (apiPorts.length > 0 || mcpTargets.length > 0 || openaiToolPorts.length > 0 || openaiCompletionsPorts.length > 0 || anthropicCompletionsPorts.length > 0) {
+        await runHeadendMode({
+          agentPaths: agentFlags,
+          apiPorts,
+          mcpTargets,
+          openaiToolPorts,
+          openaiCompletionsPorts,
+          anthropicCompletionsPorts,
+          options,
+        });
+        return;
+      }
+
+      if (systemPrompt === undefined || userPrompt === undefined) {
+        exitWith(4, 'system and user prompts are required when no headends are enabled', 'EXIT-INVALID-ARGS');
+      }
+
       if (systemPrompt === '-' && userPrompt === '-') {
         exitWith(4, 'invalid arguments: cannot use stdin for both system and user prompts', 'EXIT-INVALID-ARGS');
       }

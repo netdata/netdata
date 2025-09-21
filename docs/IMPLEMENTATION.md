@@ -179,6 +179,18 @@ Alternative designs considered
 - Always sequential tool calls
   - Cons: slower for providers/models that natively support parallel calls. We expose `parallelToolCalls` for OpenAI‑compatible providers and default to true.
 
+## Headend Surfaces
+
+The CLI’s headend mode is implemented as a set of focused classes managed by `HeadendManager`:
+
+- **`RestHeadend`** – lightweight REST API on `/v1/:agent` with optional `format` query parameter and `/health` probe. Each request acquires a `ConcurrencyLimiter` slot before starting an agent session.
+- **`McpHeadend`** – wraps the MCP TypeScript SDK server and supports `stdio`, streamable HTTP (`POST /mcp`), SSE (`GET /mcp/sse` + `POST /mcp/sse/message`), and WebSocket transports. Every tool invocation must include a `format`; when `format=json`, callers must also send a `schema` object so the agent can validate structured output.
+- **`OpenAIToolHeadend`** – exposes agents as OpenAI function-calling tools (`GET /v1/tools`, `POST /v1/chat/completions`). Tool arguments follow the same `format`/`schema` contract enforced by MCP.
+- **`OpenAICompletionsHeadend`** – surfaces agents as OpenAI Chat Completions models (`/v1/models`, `/v1/chat/completions`) with optional SSE streaming.
+- **`AnthropicCompletionsHeadend`** – provides Anthropic Messages compatibility (`/v1/models`, `/v1/messages`) and emits Anthropic-style SSE events.
+
+Each headend is repeatable; the CLI can spin up multiple instances (e.g., multiple MCP ports plus REST). Concurrency guards are per-headend (`--api-concurrency`, `--openai-tool-concurrency`, etc.) and default to four in-flight sessions per headend instance.
+
 Edge cases and compatibility
 
 - Legacy servers returning `parameters` instead of `inputSchema` are supported.
@@ -249,4 +261,3 @@ Tool-calling
 
 - Full agentic loop: assistant tool_calls and tool messages are preserved and returned to Ollama in the next turn. No synthetic user messages are used for tool results.
 - On the final allowed turn, tools are disabled for the request and a single user message instructs the model to conclude using existing tool outputs.
-

@@ -46,6 +46,7 @@ Each AI agent session is a **completely independent universe** with ZERO shared 
 - Loading/saving of conversation history
 - Log filtering and colored output formatting
 - **Pure I/O and configuration management**
+- Headend manager (`HeadendManager`) coordinates REST/MCP/OpenAI/Anthropic headends; each headend implements `Headend` with `start/stop/describe`, runs on its own port/transport, and enforces per-headend concurrency via `ConcurrencyLimiter`. JSON formats (`format=json`) require callers to include a `schema` definition, ensuring tool results are validated before reaching clients.
 
 ### Clear Status Interfaces
 
@@ -116,6 +117,7 @@ interface ToolResult {
    - Creates sessions with **ai-agent.ts**
    - Handles all I/O, configuration, and presentation
    - Never directly calls **llm-client.ts** or **mcp-client.ts**
+   - Headend manager supervises network entry points (REST, MCP stdio/HTTP/SSE/WS, OpenAI tool/completions, Anthropic completions). Each headend registers with `HeadendManager`, shares the common agent registry, and uses per-headend concurrency guards so independent services cannot starve each other.
 
 ## Session Isolation Requirements
 
