@@ -30,29 +30,54 @@ func OidMatches(sysObjId, id string) bool {
 
 // FindProfiles returns profiles matching the given sysObjectID.
 // Profiles are sorted by match specificity: most specific first.
-func FindProfiles(sysObjId string) []*Profile {
+func FindProfiles(sysObjID string, manualProfiles []string) []*Profile {
 	loadProfiles()
 
+	finalize := func(profiles []*Profile) []*Profile {
+		if len(profiles) == 0 {
+			return nil
+		}
+		enrichProfiles(profiles)
+		deduplicateMetricsAcrossProfiles(profiles)
+		return profiles
+	}
+
+	// Fallback/manual path (no sysObjectID)
+	if sysObjID == "" {
+		if len(manualProfiles) == 0 {
+			log.Warning("empty sysObjectID and no manual profiles specified, cannot select any profile")
+			return nil
+		}
+
+		var selected []*Profile
+		for _, prof := range ddProfiles {
+			name := stripFileNameExt(prof.SourceFile)
+			if slices.ContainsFunc(manualProfiles, func(p string) bool { return stripFileNameExt(p) == name }) {
+				selected = append(selected, prof.clone())
+			}
+		}
+
+		return finalize(selected)
+	}
+
+	// Auto-detect path
 	matchedOIDs := make(map[*Profile]string)
-	var profiles []*Profile
+	var selected []*Profile
 
 	for _, prof := range ddProfiles {
 		// Use first matching OID (profile author's responsibility to order them)
 		for _, id := range prof.Definition.SysObjectIDs {
-			if OidMatches(sysObjId, id) {
+			if OidMatches(sysObjID, id) {
 				cloned := prof.clone()
-				profiles = append(profiles, cloned)
+				selected = append(selected, cloned)
 				matchedOIDs[cloned] = id
 				break
 			}
 		}
 	}
 
-	sortProfilesBySpecificity(profiles, matchedOIDs)
-
-	enrichProfiles(profiles)
-	deduplicateMetricsAcrossProfiles(profiles)
-	return profiles
+	sortProfilesBySpecificity(selected, matchedOIDs)
+	return finalize(selected)
 }
 
 type (

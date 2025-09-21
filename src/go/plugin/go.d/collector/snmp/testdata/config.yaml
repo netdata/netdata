@@ -5,6 +5,8 @@ vnode_device_down_threshold: 123
 enable_profiles: yes
 enable_profiles_table_metrics: yes
 disable_legacy_collection: yes
+manual_profiles:
+  - "ok"
 vnode:
   name: "ok"
   guid: "ok"

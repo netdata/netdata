@@ -6,18 +6,20 @@ import "github.com/netdata/netdata/go/plugins/plugin/go.d/agent/vnodes"
 
 type (
 	Config struct {
-		UpdateEvery                int                    `yaml:"update_every,omitempty" json:"update_every"`
-		Hostname                   string                 `yaml:"hostname" json:"hostname"`
-		CreateVnode                bool                   `yaml:"create_vnode,omitempty" json:"create_vnode"`
-		VnodeDeviceDownThreshold   int                    `yaml:"vnode_device_down_threshold,omitempty" json:"vnode_device_down_threshold"`
-		Vnode                      vnodes.VirtualNode     `yaml:"vnode,omitempty" json:"vnode"`
-		Community                  string                 `yaml:"community,omitempty" json:"community"`
-		User                       User                   `yaml:"user,omitempty" json:"user"`
-		Options                    Options                `yaml:"options,omitempty" json:"options"`
+		UpdateEvery              int                `yaml:"update_every,omitempty" json:"update_every"`
+		Hostname                 string             `yaml:"hostname" json:"hostname"`
+		CreateVnode              bool               `yaml:"create_vnode,omitempty" json:"create_vnode"`
+		VnodeDeviceDownThreshold int                `yaml:"vnode_device_down_threshold,omitempty" json:"vnode_device_down_threshold"`
+		Vnode                    vnodes.VirtualNode `yaml:"vnode,omitempty" json:"vnode"`
+		Community                string             `yaml:"community,omitempty" json:"community"`
+		User                     User               `yaml:"user,omitempty" json:"user"`
+		Options                  Options            `yaml:"options,omitempty" json:"options"`
+
 		ChartsInput                []ChartConfig          `yaml:"charts,omitempty" json:"charts"`
 		NetworkInterfaceFilter     NetworkInterfaceFilter `yaml:"network_interface_filter,omitempty" json:"network_interface_filter"`
 		EnableProfiles             bool                   `yaml:"enable_profiles,omitempty" json:"enable_profiles"`
 		EnableProfilesTableMetrics bool                   `yaml:"enable_profiles_table_metrics,omitempty" json:"enable_profiles_table_metrics"`
+		ManualProfiles             []string               `yaml:"manual_profiles,omitempty" json:"manual_profiles"`
 		DisableLegacyCollection    bool                   `yaml:"disable_legacy_collection,omitempty" json:"disable_legacy_collection"`
 	}
 	NetworkInterfaceFilter struct {
