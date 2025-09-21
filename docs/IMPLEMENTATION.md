@@ -185,12 +185,11 @@ The CLI’s headend mode is implemented as a set of focused classes managed by `
 
 - **`RestHeadend`** – lightweight REST API on `/v1/:agent` with optional `format` query parameter and `/health` probe. Each request acquires a `ConcurrencyLimiter` slot before starting an agent session.
 - **`McpHeadend`** – wraps the MCP TypeScript SDK server and supports `stdio`, streamable HTTP (`POST /mcp`), SSE (`GET /mcp/sse` + `POST /mcp/sse/message`), and WebSocket transports. Every tool invocation must include a `format`; when `format=json`, callers must also send a `schema` object so the agent can validate structured output.
-- **`OpenAIToolHeadend`** – exposes agents as OpenAI function-calling tools (`GET /v1/tools`, `POST /v1/chat/completions`). Tool arguments follow the same `format`/`schema` contract enforced by MCP.
 - **`OpenAICompletionsHeadend`** – surfaces agents as OpenAI Chat Completions models (`/v1/models`, `/v1/chat/completions`) with optional SSE streaming.
 - **`AnthropicCompletionsHeadend`** – provides Anthropic Messages compatibility (`/v1/models`, `/v1/messages`) and emits Anthropic-style SSE events.
 - **`SlackHeadend`** – wraps the existing Slack bot logic behind the headend manager. Socket Mode traffic shares the same concurrency limiter, and slash commands mount on the first REST headend (fallback listener on `api.port` when no REST headend is configured).
 
-Each headend is repeatable; the CLI can spin up multiple instances (e.g., multiple MCP ports plus REST). Concurrency guards are per-headend (`--api-concurrency`, `--openai-tool-concurrency`, etc.) and default to ten in-flight sessions per headend instance.
+Each headend is repeatable; the CLI can spin up multiple instances (e.g., multiple MCP ports plus REST). Concurrency guards are per-headend (`--api-concurrency`, etc.) and default to ten in-flight sessions per headend instance.
 
 Edge cases and compatibility
 

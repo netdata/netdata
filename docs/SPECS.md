@@ -47,7 +47,6 @@ ai-agent \
   --api 8123 \
   --mcp stdio \
   --mcp http:8124 \
-  --openai-tool 8081 \
   --openai-completions 8082 \
   --anthropic-completions 8083
 ```
@@ -59,11 +58,10 @@ Every headend flag is repeatable. The headend manager instantiates each endpoint
 | `--agent <path>` | Register an `.ai` file (repeat as needed) | Sub-agents referenced in frontmatter are auto-loaded. |
 | `--api <port>` | REST API headend | `GET /health`, `GET /v1/:agent?q=...&format=...`. `format` defaults to `markdown`; when you request `format=json` ensure the agent advertises a JSON schema. |
 | `--mcp <transport>` | MCP headend | Accepted values: `stdio`, `http:PORT`, `sse:PORT`, `ws:PORT`. Tool calls **must** include a `format` argument; when `format=json` the payload must also provide a `schema` object. |
-| `--openai-tool <port>` | OpenAI function-calling compatibility | `GET /v1/tools`, `POST /v1/chat/completions`. Tool arguments follow the same `format`/`schema` rule as MCP. |
 | `--openai-completions <port>` | OpenAI Chat Completions compatibility | `/v1/models`, `/v1/chat/completions` (supports SSE streaming). |
 | `--anthropic-completions <port>` | Anthropic Messages compatibility | `/v1/models`, `/v1/messages` (streams via SSE). |
 
-Optional per-headend concurrency guards are available: `--api-concurrency <n>`, `--openai-tool-concurrency <n>`, `--openai-completions-concurrency <n>`, `--anthropic-completions-concurrency <n>`. Each incoming request acquires a slot before spawning an agent session.
+Optional per-headend concurrency guards are available: `--api-concurrency <n>`, `--openai-completions-concurrency <n>`, `--anthropic-completions-concurrency <n>`. Each incoming request acquires a slot before spawning an agent session.
 
 ### Direct Invocation
 
@@ -151,11 +149,9 @@ All string values in the configuration support environment variable expansion us
 | `--agent <path>` | Register an agent file for headend mode (repeatable) | - |
 | `--api <port>` | Start REST API headend on `<port>` (repeatable) | 4 concurrent requests (configurable via `--api-concurrency`) |
 | `--mcp <transport>` | Start MCP headend (`stdio`, `http:PORT`, `sse:PORT`, `ws:PORT`) | HTTP uses `POST /mcp`; SSE pair (`GET /mcp/sse`, `POST /mcp/sse/message`); WebSocket speaks the `mcp` subprotocol. |
-| `--openai-tool <port>` | Start OpenAI tool-calling compatible headend | 4 concurrent requests (configurable via `--openai-tool-concurrency`) |
 | `--openai-completions <port>` | Start OpenAI Chat Completions compatible headend | 4 concurrent requests (configurable via `--openai-completions-concurrency`) |
 | `--anthropic-completions <port>` | Start Anthropic Messages compatible headend | 4 concurrent requests (configurable via `--anthropic-completions-concurrency`) |
 | `--api-concurrency <n>` | Max concurrent REST sessions per headend | 4 |
-| `--openai-tool-concurrency <n>` | Max concurrent OpenAI tool sessions | 4 |
 | `--openai-completions-concurrency <n>` | Max concurrent OpenAI chat sessions | 4 |
 | `--anthropic-completions-concurrency <n>` | Max concurrent Anthropic chat sessions | 4 |
 | `--llm-timeout <ms>` | Inactivity timeout per LLM call (resets on stream) | 120000 |

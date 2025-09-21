@@ -46,6 +46,7 @@ export interface OpenAIToolDefinition {
     name: string;
     description?: string;
     parameters: Record<string, unknown>;
+    strict?: boolean;
   };
 }
 
@@ -55,6 +56,7 @@ export const toOpenAIToolDefinition = (agent: AgentSchemaSummary): OpenAIToolDef
     name: resolveToolName(agent),
     description: buildDescription(agent),
     parameters: cloneSchema(agent.input.schema) ?? {},
+    strict: true,
   }
 });
 

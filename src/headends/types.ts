@@ -2,7 +2,6 @@ import type { LogEntry } from '../types.js';
 
 export type HeadendKind =
   | 'mcp'
-  | 'openai-tool'
   | 'openai-completions'
   | 'anthropic-completions'
   | 'api'

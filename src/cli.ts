@@ -24,7 +24,6 @@ import { AnthropicCompletionsHeadend } from './headends/anthropic-completions-he
 import { HeadendManager } from './headends/headend-manager.js';
 import { McpHeadend } from './headends/mcp-headend.js';
 import { OpenAICompletionsHeadend } from './headends/openai-completions-headend.js';
-import { OpenAIToolHeadend } from './headends/openai-tool-headend.js';
 import { RestHeadend } from './headends/rest-headend.js';
 import { SlackHeadend } from './headends/slack-headend.js';
 import { resolveIncludes } from './include-resolver.js';
@@ -319,10 +318,6 @@ const mcpHeadendOption = new Option('--mcp <transport>', 'Start MCP headend (std
   .argParser((value: string, previous: string[]) => appendValue(value, previous))
   .default([], undefined);
 
-const openaiToolHeadendOption = new Option('--openai-tool <port>', 'Start OpenAI tool headend on the given port (repeatable)')
-  .argParser((value: string, previous: number[]) => appendValue(parsePort(value), previous))
-  .default([], undefined);
-
 const openaiCompletionsHeadendOption = new Option('--openai-completions <port>', 'Start OpenAI chat completions headend on the given port (repeatable)')
   .argParser((value: string, previous: number[]) => appendValue(parsePort(value), previous))
   .default([], undefined);
@@ -332,9 +327,6 @@ const anthropicCompletionsHeadendOption = new Option('--anthropic-completions <p
   .default([], undefined);
 
 const apiConcurrencyOption = new Option('--api-concurrency <n>', 'Maximum concurrent REST API sessions')
-  .argParser(parsePositive);
-
-const openaiToolConcurrencyOption = new Option('--openai-tool-concurrency <n>', 'Maximum concurrent OpenAI tool sessions')
   .argParser(parsePositive);
 
 const openaiCompletionsConcurrencyOption = new Option('--openai-completions-concurrency <n>', 'Maximum concurrent OpenAI chat sessions')
@@ -348,11 +340,9 @@ const slackHeadendOption = new Option('--slack', 'Start Slack Socket Mode headen
 program.addOption(agentOption);
 program.addOption(apiHeadendOption);
 program.addOption(mcpHeadendOption);
-program.addOption(openaiToolHeadendOption);
 program.addOption(openaiCompletionsHeadendOption);
 program.addOption(anthropicCompletionsHeadendOption);
 program.addOption(apiConcurrencyOption);
-program.addOption(openaiToolConcurrencyOption);
 program.addOption(openaiCompletionsConcurrencyOption);
 program.addOption(anthropicCompletionsConcurrencyOption);
 program.addOption(slackHeadendOption);
@@ -361,7 +351,6 @@ interface HeadendModeConfig {
   agentPaths: string[];
   apiPorts: number[];
   mcpTargets: string[];
-  openaiToolPorts: number[];
   openaiCompletionsPorts: number[];
   anthropicCompletionsPorts: number[];
   enableSlack: boolean;
@@ -389,12 +378,11 @@ async function runHeadendMode(config: HeadendModeConfig): Promise<void> {
   if (
     config.apiPorts.length === 0
     && config.mcpTargets.length === 0
-    && config.openaiToolPorts.length === 0
     && config.openaiCompletionsPorts.length === 0
     && config.anthropicCompletionsPorts.length === 0
     && !config.enableSlack
   ) {
-    exitWith(4, 'no headends specified; add --api/--mcp/--openai-tool/--openai-completions/--anthropic-completions/--slack', 'EXIT-HEADEND-NO-HEADENDS');
+    exitWith(4, 'no headends specified; add --api/--mcp/--openai-completions/--anthropic-completions/--slack', 'EXIT-HEADEND-NO-HEADENDS');
   }
 
   const configPathValue = typeof config.options.config === 'string' && config.options.config.length > 0
@@ -469,7 +457,6 @@ async function runHeadendMode(config: HeadendModeConfig): Promise<void> {
   };
 
   const apiConcurrency = readConcurrency('apiConcurrency');
-  const openaiToolConcurrency = readConcurrency('openaiToolConcurrency');
   const openaiCompletionsConcurrency = readConcurrency('openaiCompletionsConcurrency');
   const anthropicCompletionsConcurrency = readConcurrency('anthropicCompletionsConcurrency');
 
@@ -494,9 +481,6 @@ async function runHeadendMode(config: HeadendModeConfig): Promise<void> {
   });
   mcpSpecs.forEach((spec) => {
     headends.push(new McpHeadend({ registry, transport: spec }));
-  });
-  config.openaiToolPorts.forEach((port) => {
-    headends.push(new OpenAIToolHeadend(registry, { port, concurrency: openaiToolConcurrency }));
   });
   config.openaiCompletionsPorts.forEach((port) => {
     headends.push(new OpenAICompletionsHeadend(registry, { port, concurrency: openaiCompletionsConcurrency }));
@@ -602,16 +586,14 @@ program
       const agentFlags = Array.isArray(options.agent) ? (options.agent as string[]) : [];
       const apiPorts = Array.isArray(options.api) ? (options.api as number[]) : [];
       const mcpTargets = Array.isArray(options.mcp) ? (options.mcp as string[]) : [];
-      const openaiToolPorts = Array.isArray(options.openaiTool) ? (options.openaiTool as number[]) : [];
       const openaiCompletionsPorts = Array.isArray(options.openaiCompletions) ? (options.openaiCompletions as number[]) : [];
       const anthropicCompletionsPorts = Array.isArray(options.anthropicCompletions) ? (options.anthropicCompletions as number[]) : [];
 
-      if (apiPorts.length > 0 || mcpTargets.length > 0 || openaiToolPorts.length > 0 || openaiCompletionsPorts.length > 0 || anthropicCompletionsPorts.length > 0) {
+      if (apiPorts.length > 0 || mcpTargets.length > 0 || openaiCompletionsPorts.length > 0 || anthropicCompletionsPorts.length > 0) {
         await runHeadendMode({
           agentPaths: agentFlags,
           apiPorts,
           mcpTargets,
-          openaiToolPorts,
           openaiCompletionsPorts,
           anthropicCompletionsPorts,
           enableSlack: options.slack === true,

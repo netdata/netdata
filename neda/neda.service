@@ -21,9 +21,8 @@ ExecStart=/opt/neda/bin/neda \
   --mcp http:8801 \
   --mcp sse:8802 \
   --mcp ws:8803 \
-  --openai-tool 8804 \
-  --openai-completions 8805 \
-  --anthropic-completions 8806 \
+  --openai-completions 8804 \
+  --anthropic-completions 8805 \
   --verbose
 
 # Restart policy
