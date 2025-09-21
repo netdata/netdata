@@ -399,6 +399,7 @@
       "ui:help": "Table metrics include interface statistics, routing tables, and other tabular data."
     },
     "manual_profiles": {
+      "ui:listFlavour": "list",
       "ui:help": "**Profiles are always applied automatically** based on the device sysObjectID. **If no sysObjectID is provided** (rare case, e.g. some printers), the profiles listed here will be applied instead. In most cases, **leave this empty**."
     },
     "network_interface_filter": {
