@@ -209,6 +209,19 @@
       },
       "enabled": true
     },
+    "reddit": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "reddit-mcp-buddy"
+      ],
+      "env": {
+        "REDDIT_CLIENT_ID": "${REDDIT_CLIENT_ID}",
+        "REDDIT_CLIENT_SECRET": "${REDDIT_CLIENT_SECRET}",
+        "REDDIT_USER_AGENT": "${REDDIT_USER_AGENT}"
+      },
+      "enabled": true
+    },
     "freshdesk": {
       "type": "stdio",
       "command": "uvx",

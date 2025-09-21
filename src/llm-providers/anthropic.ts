@@ -5,6 +5,10 @@ import type { LanguageModel } from 'ai';
 
 import { BaseLLMProvider, type ResponseMessage } from './base.js';
 
+interface OptionsWithAnthropic extends Record<string, unknown> {
+  anthropic?: Record<string, unknown>;
+}
+
 export class AnthropicProvider extends BaseLLMProvider {
   name = 'anthropic';
   private provider: (model: string) => LanguageModel;
@@ -30,18 +34,46 @@ export class AnthropicProvider extends BaseLLMProvider {
       const filteredTools = this.filterToolsForFinalTurn(request.tools, request.isFinalTurn);
       const tools = this.convertTools(filteredTools, request.toolExecutor);
       const messages = super.convertMessages(request.messages);
-      // Inject cache control on system prompt to encourage caching of system content
-      // AI SDK maps message.providerOptions.anthropic.cacheControl to cache_control on Anthropic messages
-      // eslint-disable-next-line functional/no-loop-statements
-      for (const m of messages as unknown as ({ role: string; providerOptions?: Record<string, unknown> }[])) {
-        if (m.role === 'system') {
-          m.providerOptions = { ...(m.providerOptions ?? {}), anthropic: { cacheControl: { type: 'ephemeral' } } };
-          break;
-        }
-      }
-      
-      // Add final turn message if needed
+
+      // Apply cache control to the last message only and remove any prior cache controls to stay within Anthropic limits
       const finalMessages = this.buildFinalTurnMessages(messages, request.isFinalTurn);
+      interface ProviderMessage { providerOptions?: Record<string, unknown>; }
+      const extendedMessages = finalMessages as unknown as ProviderMessage[];
+      const isRecord = (val: unknown): val is Record<string, unknown> => val !== null && typeof val === 'object' && !Array.isArray(val);
+      const cloneOptions = (opts: Record<string, unknown>): OptionsWithAnthropic => ({ ...opts });
+
+      // eslint-disable-next-line functional/no-loop-statements
+      for (const msg of extendedMessages) {
+        if (!isRecord(msg.providerOptions)) {
+          msg.providerOptions = undefined;
+          continue;
+        }
+
+        const nextOptions = cloneOptions(msg.providerOptions);
+        const anthropicOptions = nextOptions.anthropic;
+        if (isRecord(anthropicOptions)) {
+          const rest: Record<string, unknown> = { ...anthropicOptions };
+          delete rest.cacheControl;
+          if (Object.keys(rest).length > 0) {
+            nextOptions.anthropic = rest;
+          } else {
+            delete nextOptions.anthropic;
+          }
+        }
+
+        msg.providerOptions = Object.keys(nextOptions).length > 0 ? nextOptions : undefined;
+      }
+
+      if (extendedMessages.length > 0) {
+        const lastMessage = extendedMessages[extendedMessages.length - 1];
+        const baseOptions: OptionsWithAnthropic = isRecord(lastMessage.providerOptions) ? cloneOptions(lastMessage.providerOptions) : {};
+        const existingAnthropic = isRecord(baseOptions.anthropic) ? baseOptions.anthropic : {};
+        baseOptions.anthropic = {
+          ...existingAnthropic,
+          cacheControl: { type: 'ephemeral' }
+        };
+        lastMessage.providerOptions = baseOptions;
+      }
 
       const providerOptions = (() => {
         const base: Record<string, unknown> = { anthropic: {} };

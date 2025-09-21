@@ -14,6 +14,7 @@ tools:
   - brave
   - fetcher
   - batch
+  - reddit
   - cloudflare-browser
 agents: []
 llmTimeout: 120000
