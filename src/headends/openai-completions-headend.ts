@@ -266,26 +266,31 @@ export class OpenAICompletionsHeadend implements Headend {
     const created = Math.floor(Date.now() / 1000);
     const responseId = randomUUID();
     const streamed = body.stream === true;
+    this.log(`chat completion request stream=${String(streamed)}`, 'VRB');
     let output = '';
+    let streamedChunks = 0;
     const accounting: AccountingEntry[] = [];
     const callbacks: AIAgentCallbacks = {
       onOutput: (chunk) => {
         output += chunk;
-      if (streamed) {
-        const chunkPayload = {
-          id: responseId,
-          object: CHAT_CHUNK_OBJECT,
-          created,
-          model: body.model,
-          choices: [
-            {
-              index: 0,
+        if (streamed) {
+          const chunkPayload = {
+            id: responseId,
+            object: CHAT_CHUNK_OBJECT,
+            created,
+            model: body.model,
+            choices: [
+              {
+                index: 0,
                 delta: { role: 'assistant', content: chunk },
                 finish_reason: null,
               },
             ],
           };
           writeSseChunk(res, chunkPayload);
+          if (chunk.length > 0) {
+            streamedChunks += 1;
+          }
         }
       },
       onLog: (entry) => { this.logEntry(entry); },
@@ -320,6 +325,22 @@ export class OpenAICompletionsHeadend implements Headend {
       const finalText = this.resolveContent(output, result.finalReport);
       const usage = collectUsage(accounting);
       if (streamed) {
+        if (streamedChunks === 0 && finalText.length > 0) {
+          const contentChunk = {
+            id: responseId,
+            object: CHAT_CHUNK_OBJECT,
+            created,
+            model: body.model,
+            choices: [
+              {
+                index: 0,
+                delta: { role: 'assistant', content: finalText },
+                finish_reason: null,
+              },
+            ],
+          };
+          writeSseChunk(res, contentChunk);
+        }
         const finalChunk = {
           id: responseId,
           object: CHAT_CHUNK_OBJECT,
