@@ -53,7 +53,7 @@ import { InternalToolProvider } from './tools/internal-provider.js';
 import { MCPProvider } from './tools/mcp-provider.js';
 import { RestProvider } from './tools/rest-provider.js';
 import { ToolsOrchestrator } from './tools/tools.js';
-import { formatToolRequestCompact, truncateUtf8WithNotice, warn } from './utils.js';
+import { formatToolRequestCompact, sanitizeToolName, truncateUtf8WithNotice, warn } from './utils.js';
 
 // Immutable session class according to DESIGN.md
 export class AIAgentSession {
@@ -87,7 +87,8 @@ export class AIAgentSession {
   // Per-turn planned subturns (tool call count) discovered when LLM yields toolCalls
   private plannedSubturns: Map<number, number> = new Map<number, number>();
   private resolvedFormat?: OutputFormatId;
-  private resolvedFormatDescription?: string;
+  private resolvedFormatPromptValue?: string;
+  private resolvedFormatParameterDescription?: string;
   private resolvedUserPrompt?: string;
   private resolvedSystemPrompt?: string;
   private masterLlmStartLogged = false;
@@ -307,7 +308,8 @@ export class AIAgentSession {
       });
       const formatInfo = internalProvider.getFormatInfo();
       this.resolvedFormat = formatInfo.formatId;
-      this.resolvedFormatDescription = formatInfo.description;
+      this.resolvedFormatPromptValue = formatInfo.promptValue;
+      this.resolvedFormatParameterDescription = formatInfo.parameterDescription;
       orch.register(internalProvider);
     }
     if (this.subAgents !== undefined) {
@@ -745,7 +747,7 @@ export class AIAgentSession {
       // Safety: strip any shebang/frontmatter from system prompt to avoid leaking YAML to the LLM
       const sysBody = extractBodyWithoutFrontmatter(this.sessionConfig.systemPrompt);
       // Inject plain format description only where ${FORMAT} or {{FORMAT}} exists; do not prepend extra text
-      const fmtDesc = this.resolvedFormatDescription ?? '';
+      const fmtDesc = this.resolvedFormatPromptValue ?? '';
       const withFormat = applyFormat(sysBody, fmtDesc);
       const vars = { ...buildPromptVars(), MAX_TURNS: String(this.sessionConfig.maxTurns ?? 10) };
       const systemExpanded = expandVars(withFormat, vars);
@@ -1631,8 +1633,7 @@ export class AIAgentSession {
       // (no local preview helpers needed)
 
       // Normalize tool name to strip router/provider wrappers like <|constrain|>
-      const normalizeToolName = (n: string): string => n.replace(/<\|[^|]+\|>/g, '').trim();
-      const effectiveToolName = normalizeToolName(toolName);
+      const effectiveToolName = sanitizeToolName(toolName);
       const startTime = Date.now();
       try {
         // Internal tools are handled by InternalToolProvider via orchestrator

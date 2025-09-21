@@ -2,7 +2,7 @@ import type { SessionTreeBuilder, SessionNode } from '../session-tree.js';
 import type { MCPTool, LogEntry, AccountingEntry } from '../types.js';
 import type { ToolExecuteOptions, ToolExecuteResult, ToolKind, ToolProvider, ToolExecutionContext } from './types.js';
 
-import { truncateUtf8WithNotice, formatToolRequestCompact, warn } from '../utils.js';
+import { truncateUtf8WithNotice, formatToolRequestCompact, sanitizeToolName, warn } from '../utils.js';
 
 export class ToolsOrchestrator {
   private readonly providers: ToolProvider[] = [];
@@ -46,21 +46,26 @@ export class ToolsOrchestrator {
     this.providers.forEach((p) => {
       p.listTools().forEach((t) => {
         this.mapping.set(t.name, { provider: p, kind: p.kind });
+        const sanitized = sanitizeToolName(t.name);
+        if (!this.mapping.has(sanitized)) {
+          this.mapping.set(sanitized, { provider: p, kind: p.kind });
+        }
       });
     });
     return tools;
   }
 
   private resolveName(name: string): string {
-    if (this.mapping.has(name)) return name;
-    const alias = this.aliases.get(name);
+    const sanitized = sanitizeToolName(name);
+    if (this.mapping.has(sanitized)) return sanitized;
+    const alias = this.aliases.get(sanitized);
     if (alias !== undefined && this.mapping.has(alias)) return alias;
     // Heuristics: try common prefixes for sub-agents and REST tools when the model omits them
-    const tryAgent = `agent__${name}`;
+    const tryAgent = `agent__${sanitized}`;
     if (this.mapping.has(tryAgent)) return tryAgent;
-    const tryRest = `rest__${name}`;
+    const tryRest = `rest__${sanitized}`;
     if (this.mapping.has(tryRest)) return tryRest;
-    return name;
+    return sanitized;
   }
 
   hasTool(name: string): boolean {

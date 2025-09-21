@@ -5,7 +5,7 @@ import type { MCPTool } from '../types.js';
 import type { ToolsOrchestrator } from './tools.js';
 import type { ToolExecuteOptions, ToolExecuteResult } from './types.js';
 
-import { describeFormat } from '../formats.js';
+import { describeFormatParameter, formatPromptValue } from '../formats.js';
 
 import { ToolProvider } from './types.js';
 
@@ -41,7 +41,7 @@ export class InternalToolProvider extends ToolProvider {
   ) {
     super();
     this.formatId = opts.outputFormat;
-    this.formatDescription = describeFormat(this.formatId);
+    this.formatDescription = describeFormatParameter(this.formatId);
     const expected = opts.expectedOutputFormat;
     if (expected !== undefined && expected !== this.formatId) {
       throw new Error(`Output format mismatch: expectedOutput.format=${expected} but session outputFormat=${this.formatId}`);
@@ -108,8 +108,12 @@ export class InternalToolProvider extends ToolProvider {
     return this.instructions;
   }
 
-  getFormatInfo(): { formatId: OutputFormatId; description: string } {
-    return { formatId: this.formatId, description: this.formatDescription };
+  getFormatInfo(): { formatId: OutputFormatId; promptValue: string; parameterDescription: string } {
+    return {
+      formatId: this.formatId,
+      promptValue: formatPromptValue(this.formatId),
+      parameterDescription: this.formatDescription,
+    };
   }
 
   private buildInstructions(): string {

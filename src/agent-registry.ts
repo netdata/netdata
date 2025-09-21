@@ -6,7 +6,7 @@ import type { OutputFormatId } from './formats.js';
 import type { AIAgentCallbacks, ConversationMessage } from './types.js';
 
 import { loadAgent, LoadedAgentCache } from './agent-loader.js';
-import { describeFormat } from './formats.js';
+import { formatPromptValue } from './formats.js';
 import { applyFormat, buildPromptVars, expandVars } from './prompt-builder.js';
 
 const OUTPUT_FORMAT_VALUES: readonly OutputFormatId[] = ['markdown', 'markdown+mermaid', 'slack-block-kit', 'tty', 'pipe', 'json', 'sub-agent'] as const;
@@ -121,7 +121,7 @@ export class AgentRegistry {
   }
 
   private buildSystemPrompt(agent: LoadedAgent, format: OutputFormatId, payload: Record<string, unknown>): string {
-    const templ = applyFormat(agent.systemTemplate, describeFormat(format));
+    const templ = applyFormat(agent.systemTemplate, formatPromptValue(format));
     const vars = { ...buildPromptVars() } as Record<string, string>;
     Object.entries(payload).forEach(([key, value]) => {
       if (typeof value !== 'string') return;

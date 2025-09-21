@@ -16,6 +16,13 @@ function bytesPreview(s: string, maxBytes: number): string {
 
 function ensureTrailingNewline(s: string): string { return s.endsWith('\n') ? s : (s + '\n'); }
 
+export const sanitizeToolName = (raw: string): string => {
+  const withoutPrefix = raw.replace(/<\|[^|]+\|>/g, '').trim();
+  const pattern = /^[A-Za-z0-9][A-Za-z0-9_\-]*(?:__[A-Za-z0-9_\-]+)*/;
+  const match = pattern.exec(withoutPrefix);
+  return match !== null ? match[0] : withoutPrefix;
+};
+
 
 
 interface ToolCallSummary {

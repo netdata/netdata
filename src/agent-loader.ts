@@ -120,7 +120,11 @@ const FALLBACK_INPUT_SCHEMA: Record<string, unknown> = Object.freeze({
   type: 'object',
   properties: {
     prompt: { type: 'string' },
-    format: { type: 'string', enum: ['markdown', 'json', 'text'], default: 'markdown' },
+    format: {
+      type: 'string',
+      enum: ['markdown', 'markdown+mermaid', 'slack-block-kit', 'tty', 'pipe', 'json', 'sub-agent'],
+      default: 'markdown',
+    },
   },
   required: ['prompt'],
   additionalProperties: false,

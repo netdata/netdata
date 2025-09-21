@@ -2,28 +2,66 @@ export type OutputFormatId = 'markdown' | 'markdown+mermaid' | 'slack-block-kit'
 
 interface OutputFormat {
   id: OutputFormatId;
-  description: string;
+  toolDescription: string;
+  promptValue: string;
+  parameterDescription: string;
 }
 
 const OUTPUT_FORMATS: Record<OutputFormatId, OutputFormat> = {
-  markdown: { id: 'markdown', description: 'markdown' },
-  'markdown+mermaid': { id: 'markdown+mermaid', description: 'markdown with mermaid charts' },
-  'slack-block-kit': { id: 'slack-block-kit', description: [
-    'Slack Block Kit only. Finish by calling agent__final_report with `messages` (no plain content).',
-    'Allowed blocks: header (plain_text ≤150), divider, section (mrkdwn ≤2000), context (mrkdwn ≤2000, ≤10), fields (≤10, mrkdwn ≤2000).',
-    'Do not use markdown headers (#, ##), tables, HTML, or images.'
-  ].join(' ') },
-  tty: { id: 'tty', description: 'Fixed-width monospaced terminal, with ANSI colors, and ASCII-art for tables and diagrams. No markdown. ' +
-     'When adding ANSI colors, emit literal \\x1b[...m codes (e.g., \\x1b[33m for yellow) instead of raw ESC characters. ' +
-     'IMPORTANT: Do not create unecessary boxes that wrap the content, let it breathe - on tables that need vertical alignment remember that the ANSI colors do not count in the width. Do not wrap long lines - let them wrap naturally depending on terminal size.' },
-  pipe: { id: 'pipe', description: 'plain text' },
-  
-  json: { id: 'json', description: 'json' },
-  'sub-agent': { id: 'sub-agent', description: 'agent to agent communication, use optimal format' },
+  markdown: {
+    id: 'markdown',
+    toolDescription: 'GitHub Markdown.',
+    promptValue: 'GitHub Markdown',
+    parameterDescription: 'Render the final report in GitHub Markdown.'
+  },
+  'markdown+mermaid': {
+    id: 'markdown+mermaid',
+    toolDescription: 'GitHub Markdown with Mermaid diagrams.',
+    promptValue: 'GiHub Markdown with Mermaid diagrams',
+    parameterDescription: 'Render GitHub Markdown and include Mermaid diagrams where useful.'
+  },
+  'slack-block-kit': {
+    id: 'slack-block-kit',
+    toolDescription: 'Slack Block Kit payload.',
+    promptValue: 'Slack Block Kit JSON array of messages (not raw text or GitHub markdown).',
+    parameterDescription: 'Produce Slack Block Kit array of messages. Use multiple Block Kit messages and Slack-mrkdwn sections/context (≤2000 chars), headers (plain_text ≤150), dividers, and fields (≤10). Do not emit raw text or GitHub markdown.'
+  },
+  tty: {
+    id: 'tty',
+    toolDescription: 'TTY-compatible monospaced text with ANSI colours. Emit literal "\\x1b[...m" sequences for colour codes (not raw ESC characters).',
+    promptValue: 'a TTY-compatible plain monospaced text response. Use literal "\\x1b[...m" sequences for ANSI colours and avoid decorative boxes. Do not output markdown. Do not wrap long lines.',
+    parameterDescription: 'Render output for a monospaced terminal using ANSI colour codes. Emit literal "\\x1b[...m" sequences (do not insert raw ESC characters) for colour styling. No Markdown tables. No bounded boxes. Do not wrap long lines.'
+  },
+  pipe: {
+    id: 'pipe',
+    toolDescription: 'Plain text (no formatting).',
+    promptValue: 'Plain text without any formatting or markdown. Do not wrap long lines.',
+    parameterDescription: 'Return unformatted plain text suitable for shell piping into other tools. Do not wrap long lines.'
+  },
+  json: {
+    id: 'json',
+    toolDescription: 'JSON object.',
+    promptValue: 'json',
+    parameterDescription: 'Return JSON that matches the declared schema exactly.'
+  },
+  'sub-agent': {
+    id: 'sub-agent',
+    toolDescription: 'Internal agent-to-agent exchange format.',
+    promptValue: 'Internal agent-to-agent exchange format (not user-facing).',
+    parameterDescription: 'Use the optimal internal sub-agent communication format (not user-facing).'
+  },
 };
 
 export function describeFormat(id: OutputFormatId): string {
-  return OUTPUT_FORMATS[id].description;
+  return OUTPUT_FORMATS[id].toolDescription;
+}
+
+export function formatPromptValue(id: OutputFormatId): string {
+  return OUTPUT_FORMATS[id].promptValue;
+}
+
+export function describeFormatParameter(id: OutputFormatId): string {
+  return OUTPUT_FORMATS[id].parameterDescription;
 }
 
 export function resolveFormatIdForCli(override: string | undefined, expectedJson: boolean, isTTY: boolean): OutputFormatId {
@@ -31,4 +69,3 @@ export function resolveFormatIdForCli(override: string | undefined, expectedJson
   if (typeof override === 'string' && override in OUTPUT_FORMATS) return override as OutputFormatId;
   return isTTY ? 'tty' : 'pipe';
 }
-

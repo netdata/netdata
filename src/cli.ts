@@ -18,7 +18,7 @@ import type { CommanderError } from 'commander';
 import { loadAgentFromContent } from './agent-loader.js';
 import { AgentRegistry } from './agent-registry.js';
 import { discoverLayers, resolveDefaults } from './config-resolver.js';
-import { describeFormat, resolveFormatIdForCli } from './formats.js';
+import { formatPromptValue, resolveFormatIdForCli } from './formats.js';
 import { parseFrontmatter, stripFrontmatter, parseList, parsePairs, buildFrontmatterTemplate } from './frontmatter.js';
 import { AnthropicCompletionsHeadend } from './headends/anthropic-completions-headend.js';
 import { HeadendManager } from './headends/headend-manager.js';
@@ -753,7 +753,7 @@ program
       const fmtOpt = typeof fmtRaw === 'string' && fmtRaw.length > 0 ? fmtRaw : undefined;
       const chosenFormatId = resolveFormatIdForCli(fmtOpt, expectedJson, process.stdout.isTTY ? true : false);
       const vars = buildPromptVariables(loaded.effective.maxToolTurns);
-      vars.FORMAT = describeFormat(chosenFormatId);
+      vars.FORMAT = formatPromptValue(chosenFormatId);
       const resolvedSystem = expandPrompt(stripFrontmatter(resolvedSystemRaw), vars);
       const resolvedUser = expandPrompt(stripFrontmatter(resolvedUserRaw), vars);
 

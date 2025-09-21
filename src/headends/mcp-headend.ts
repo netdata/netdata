@@ -13,6 +13,7 @@ import type { AIAgentCallbacks, LogEntry } from '../types.js';
 import type { Headend, HeadendClosedEvent, HeadendContext, HeadendDescription } from './types.js';
 import type { AuthInfo } from '@modelcontextprotocol/sdk/server/auth/types.js';
 
+import { describeFormat } from '../formats.js';
 import { resolveToolName } from '../schema-adapters.js';
 
 import { ConcurrencyLimiter } from './concurrency.js';
@@ -35,6 +36,121 @@ const createDeferred = <T>(): Deferred<T> => {
 };
 
 const STREAMABLE_HTTP = 'streamable-http' as const;
+
+const cloneJson = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
+
+const isPlainObject = (value: unknown): value is Record<string, unknown> => (
+  value !== null && typeof value === 'object' && !Array.isArray(value)
+);
+
+const isSimplePromptSchema = (schema: Record<string, unknown>): boolean => {
+  if (schema.type !== 'object') return false;
+  const properties = isPlainObject(schema.properties) ? schema.properties : undefined;
+  if (properties === undefined) return false;
+  if (!('prompt' in properties)) return false;
+  const extraKeys = Object.keys(properties).filter((key) => key !== 'prompt' && key !== 'format');
+  if (extraKeys.length > 0) return false;
+  const prompt = properties.prompt;
+  if (!isPlainObject(prompt)) return false;
+  if (prompt.type !== undefined && prompt.type !== 'string') return false;
+  return true;
+};
+
+const buildEnumSchema = (values: unknown[]): z.ZodType => {
+  if (values.length === 0) return z.never();
+  if (values.every((val) => typeof val === 'string')) {
+    const tuple = values as [string, ...string[]];
+    return z.enum(tuple);
+  }
+  const literals = values.map((val) => z.literal(val as never));
+  if (literals.length === 1) return literals[0];
+  const [first, second, ...rest] = literals as unknown as [z.ZodType, z.ZodType, ...z.ZodType[]];
+  return z.union([first, second, ...rest]);
+};
+
+const jsonSchemaToZod = (schema: Record<string, unknown>): z.ZodType => {
+  if (Array.isArray(schema.enum) && schema.enum.length > 0) {
+    return buildEnumSchema(schema.enum);
+  }
+  if (schema.const !== undefined) {
+    return z.literal(schema.const as never);
+  }
+  const rawType = schema.type;
+  if (Array.isArray(rawType) && rawType.length > 0) {
+    const members = rawType.map((t) => {
+      if (typeof t !== 'string') return z.unknown();
+      return jsonSchemaToZod({ ...schema, type: t });
+    });
+    if (members.length === 1) return members[0];
+    return z.union(members as [z.ZodType, z.ZodType, ...z.ZodType[]]);
+  }
+  const type = typeof rawType === 'string' ? rawType : undefined;
+  switch (type) {
+    case 'object': {
+      const properties = isPlainObject(schema.properties) ? schema.properties : {};
+      const required = new Set(Array.isArray(schema.required) ? schema.required.filter((v): v is string => typeof v === 'string') : []);
+      const shape: Record<string, z.ZodType> = {};
+      Object.entries(properties).forEach(([key, value]) => {
+        if (!isPlainObject(value)) return;
+        let child = jsonSchemaToZod(value);
+        if (typeof value.description === 'string' && value.description.length > 0) {
+          child = child.describe(value.description);
+        }
+        if (!required.has(key)) {
+          child = child.optional();
+        }
+        shape[key] = child;
+      });
+      let obj = z.object(shape);
+      if (schema.additionalProperties === false) {
+        obj = obj.strict();
+      } else if (schema.additionalProperties === true || schema.additionalProperties === undefined) {
+        obj = obj.loose();
+      } else if (isPlainObject(schema.additionalProperties)) {
+        const additional = jsonSchemaToZod(schema.additionalProperties);
+        obj = obj.catchall(additional);
+      } else {
+        obj = obj.loose();
+      }
+      return obj;
+    }
+    case 'array': {
+      const items = schema.items;
+      if (Array.isArray(items) && items.length > 0) {
+        const tuple = items.map((item) => (isPlainObject(item) ? jsonSchemaToZod(item) : z.unknown()));
+        return z.tuple(tuple as [z.ZodType, ...z.ZodType[]]);
+      }
+      if (isPlainObject(items)) {
+        return z.array(jsonSchemaToZod(items));
+      }
+      return z.array(z.unknown());
+    }
+    case 'string': {
+      let str = z.string();
+      if (typeof schema.minLength === 'number') str = str.min(schema.minLength);
+      if (typeof schema.maxLength === 'number') str = str.max(schema.maxLength);
+      return str;
+    }
+    case 'number': {
+      let num = z.number();
+      if (typeof schema.minimum === 'number') num = num.min(schema.minimum);
+      if (typeof schema.maximum === 'number') num = num.max(schema.maximum);
+      return num;
+    }
+    case 'integer': {
+      let intSchema = z.number().int();
+      if (typeof schema.minimum === 'number') intSchema = intSchema.min(schema.minimum);
+      if (typeof schema.maximum === 'number') intSchema = intSchema.max(schema.maximum);
+      return intSchema;
+    }
+    case 'boolean':
+      return z.boolean();
+    case 'null':
+      return z.null();
+    default:
+      return z.unknown();
+  }
+};
 
 export type McpTransportSpec =
   | { type: 'stdio' }
@@ -195,11 +311,57 @@ export class McpHeadend implements Headend {
         outputSchema: meta.outputSchema,
       });
       const description = meta.description ?? meta.usage ?? `Agent ${meta.id}`;
-      const paramsShape = {
-        format: z.enum(formatValues),
-        payload: z.record(z.string(), z.unknown()).describe('Payload forwarded to the agent (must include prompt)').optional(),
-      } as const;
-      const paramsSchema = z.object(paramsShape);
+      const promptDescription = meta.usage ?? 'User prompt for the agent';
+      const formatDetails = formatValues
+        .map((id) => `${id}: ${describeFormat(id)}`)
+        .join('\n');
+      const formatField = z.enum(formatValues).describe(`Output format to request from the agent. Choose one of:\n${formatDetails}`);
+
+      const isPromptOnly = meta.input.format === 'text' || isSimplePromptSchema(meta.input.schema);
+
+      const { paramsShape, paramsSchema } = (() => {
+        const responseSchemaField = z
+          .record(z.string(), z.unknown())
+          .describe('Optional JSON schema describing the expected JSON response format')
+          .optional();
+
+        if (!isPromptOnly) {
+          const schemaClone = cloneJson(meta.input.schema);
+          if (isPlainObject(schemaClone.properties)) {
+            delete schemaClone.properties.format;
+            if (Array.isArray(schemaClone.required)) {
+              schemaClone.required = schemaClone.required.filter((item) => item !== 'format');
+            }
+            const promptProp = schemaClone.properties.prompt;
+            if (isPlainObject(promptProp)) {
+              promptProp.description = promptDescription;
+            }
+          }
+          const payloadZod = jsonSchemaToZod(schemaClone).describe(`${promptDescription}. Provide the JSON payload matching the agent's input schema.`);
+          const shape = {
+            format: formatField,
+            payload: payloadZod,
+            schema: responseSchemaField,
+          } as const;
+          return { paramsShape: shape, paramsSchema: z.object(shape) };
+        }
+
+        const promptField = z
+          .string()
+          .min(1, 'prompt is required')
+          .describe(promptDescription);
+        const extrasField = z
+          .record(z.string(), z.unknown())
+          .describe('Optional extra parameters forwarded unchanged to the agent')
+          .optional();
+        const shape = {
+          format: formatField,
+          prompt: promptField,
+          payload: extrasField,
+          schema: responseSchemaField,
+        } as const;
+        return { paramsShape: shape, paramsSchema: z.object(shape) };
+      })();
 
       server.tool(normalized, description, paramsShape, async (rawArgs, extra) => {
         const parsed = paramsSchema.safeParse(rawArgs);
@@ -207,7 +369,14 @@ export class McpHeadend implements Headend {
           const message = parsed.error.issues.map((issue) => issue.message).join('; ');
           throw new Error(message);
         }
-        const { format, payload: payloadFromArgs } = parsed.data;
+        const { format } = parsed.data as { format: typeof formatValues[number] };
+        let rawPayload: Record<string, unknown> | undefined;
+        if (isPromptOnly) {
+          rawPayload = (parsed.data as { payload?: Record<string, unknown> }).payload;
+        } else {
+          rawPayload = (parsed.data as { payload: Record<string, unknown> }).payload;
+        }
+        const responseSchema = (parsed.data as { schema?: Record<string, unknown> }).schema;
 
         const abortSignal = extra.signal;
         const stopRef = { stopping: false };
@@ -220,7 +389,7 @@ export class McpHeadend implements Headend {
         };
         try {
           if (format === 'json') {
-            const schemaCandidate = payloadFromArgs?.schema;
+            const schemaCandidate = responseSchema ?? (rawPayload !== undefined ? (rawPayload as { schema?: unknown }).schema : undefined);
             const hasSchema = schemaCandidate !== undefined
               && schemaCandidate !== null
               && typeof schemaCandidate === 'object'
@@ -230,7 +399,18 @@ export class McpHeadend implements Headend {
             }
           }
 
-          const payload: Record<string, unknown> = payloadFromArgs !== undefined ? { ...payloadFromArgs } : {};
+          let payload: Record<string, unknown>;
+          if (isPromptOnly) {
+            const extras = rawPayload !== undefined ? { ...rawPayload } : {};
+            const promptValue = (parsed.data as unknown as { prompt: string }).prompt;
+            extras.prompt = promptValue;
+            payload = extras;
+          } else {
+            payload = { ...(rawPayload ?? {}) };
+          }
+          if (responseSchema !== undefined) {
+            payload.schema = responseSchema;
+          }
           payload.format = format;
 
           const session = await this.registry.spawnSession({
