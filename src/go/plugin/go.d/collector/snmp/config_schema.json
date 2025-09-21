@@ -362,6 +362,12 @@
         "type": "boolean",
         "default": true
       },
+      "disable_legacy_collection": {
+        "title": "Disable Legacy SNMP Collection",
+        "description": "Disable the legacy SNMP collection method, forcing the collector to use only SNMP profiles (YAML-based configuration). When enabled, the collector will ignore any non-profile based collection logic.",
+        "type": "boolean",
+        "default": false
+      },
       "manual_profiles": {
         "title": "Manual SNMP Profiles",
         "description": "Profiles to apply if automatic detection cannot be used.",
@@ -374,12 +380,6 @@
           "type": "string"
         },
         "uniqueItems": true
-      },
-      "disable_legacy_collection": {
-        "title": "Disable Legacy SNMP Collection",
-        "description": "Disable the legacy SNMP collection method, forcing the collector to use only SNMP profiles (YAML-based configuration). When enabled, the collector will ignore any non-profile based collection logic.",
-        "type": "boolean",
-        "default": false
       }
     },
     "required": [
@@ -515,7 +515,8 @@
           "fields": [
             "enable_profiles",
             "enable_profiles_table_metrics",
-            "disable_legacy_collection"
+            "disable_legacy_collection",
+            "manual_profiles"
           ]
         }
       ]
