@@ -19,11 +19,11 @@ tools:
 agents: []
 llmTimeout: 120000
 toolTimeout: 60000
-toolResponseMaxBytes: 16384
+toolResponseMaxBytes: 32768
 maxConcurrentTools: 1
 temperature: 0.7
 topP: 1
-maxOutputTokens: 16384
+maxOutputTokens: 8192
 repeatPenalty: 1.1
 maxRetries: 3
 maxToolTurns: 20
