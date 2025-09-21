@@ -1569,6 +1569,81 @@ func TestVirtualMetricsCollector_Collect(t *testing.T) {
 	}
 }
 
+func Test_vmBuildGroupKey(t *testing.T) {
+	const sep = '\x1F'
+
+	tests := map[string]struct {
+		agg     vmetricsAggregator
+		tags    map[string]string
+		wantOK  bool
+		wantKey string
+	}{
+		"not grouped -> no key": {
+			agg:     vmetricsAggregator{grouped: false},
+			tags:    map[string]string{"iface": "eth0"},
+			wantOK:  false,
+			wantKey: "",
+		},
+
+		"per_row + no groupBy: builds key from all non-underscore tags (k=v), sorted": {
+			agg:     vmetricsAggregator{grouped: true, perRow: true},
+			tags:    map[string]string{"iface": "eth0", "_if_type": "loopback", "zone": "a"},
+			wantOK:  true,
+			wantKey: "iface=eth0" + string(sep) + "zone=a",
+		},
+
+		"per_row + no groupBy: all tags underscore -> no key": {
+			agg:     vmetricsAggregator{grouped: true, perRow: true},
+			tags:    map[string]string{"_if_type": "loopback", "_role": "infra"},
+			wantOK:  false,
+			wantKey: "",
+		},
+
+		"per_row + groupBy: uses configured labels exactly; underscore NOT special": {
+			agg:     vmetricsAggregator{grouped: true, perRow: true, groupBy: []string{"_if_type", "iface"}},
+			tags:    map[string]string{"iface": "eth0", "_if_type": "ethernetCsmacd"},
+			wantOK:  true,
+			wantKey: "ethernetCsmacd" + string(sep) + "eth0",
+		},
+
+		"per_row + groupBy: missing required tag -> no key": {
+			agg:     vmetricsAggregator{grouped: true, perRow: true, groupBy: []string{"iface", "zone"}},
+			tags:    map[string]string{"iface": "eth0"},
+			wantOK:  false,
+			wantKey: "",
+		},
+
+		"non per_row + groupBy(1): returns that label value": {
+			agg:     vmetricsAggregator{grouped: true, perRow: false, groupBy: []string{"iface"}},
+			tags:    map[string]string{"iface": "eth1", "zone": "b"},
+			wantOK:  true,
+			wantKey: "eth1",
+		},
+
+		"non per_row + groupBy(2): underscore label NOT special and included": {
+			agg:     vmetricsAggregator{grouped: true, perRow: false, groupBy: []string{"_if_type", "zone"}},
+			tags:    map[string]string{"_if_type": "ethernetCsmacd", "zone": "edge"},
+			wantOK:  true,
+			wantKey: "ethernetCsmacd" + string(sep) + "edge",
+		},
+
+		"non per_row + groupBy: missing one value -> no key": {
+			agg:     vmetricsAggregator{grouped: true, perRow: false, groupBy: []string{"iface", "zone"}},
+			tags:    map[string]string{"iface": "eth2"},
+			wantOK:  false,
+			wantKey: "",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			key, ok := vmBuildGroupKey(tc.tags, &tc.agg)
+			assert.Equal(t, tc.wantOK, ok, "ok mismatch")
+			assert.Equal(t, tc.wantKey, key, "key mismatch")
+		})
+	}
+}
+
 var (
 	benchSinkString string
 	benchSinkBucket *vmetricsGroupBucket

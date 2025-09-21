@@ -310,28 +310,23 @@ func (p *vmetricsCollector) getDefinedMetricNames(profMetrics []ddprofiledefinit
 
 // vmBuildGroupKey returns a stable group key.
 func vmBuildGroupKey(tags map[string]string, agg *vmetricsAggregator) (string, bool) {
-	if !agg.grouped {
+	if !agg.grouped || len(tags) == 0 {
 		return "", false
 	}
 
 	const (
-		groupKeySep = '\x1F' // ASCII Unit Separator: safe delimiter between label values/pairs
-		kvSep       = '='    // used only in per-row fallback "k=v"
+		groupKeySep = '\x1F' // ASCII Unit Separator between values/pairs
+		kvSep       = '='    // used in per-row fallback "k=v"
 	)
 
-	if agg.perRow {
-		if len(tags) == 0 {
-			return "", false
-		}
+	agg.keyBuf.Reset()
 
+	if agg.perRow {
 		if len(agg.groupBy) > 0 {
-			agg.keyBuf.Reset()
 			for i, l := range agg.groupBy {
 				v := tags[l]
 				if v == "" {
-					// missing hint
-					agg.keyBuf.Reset()
-					goto perRowFallback
+					return "", false
 				}
 				if i > 0 {
 					agg.keyBuf.WriteByte(groupKeySep)
@@ -341,14 +336,18 @@ func vmBuildGroupKey(tags map[string]string, agg *vmetricsAggregator) (string, b
 			return agg.keyBuf.String(), true
 		}
 
-	perRowFallback:
-		// Fallback: stable key from all tags (sorted k=v)
+		// per-row without group_by: stable key from all non-underscore tags
 		keys := make([]string, 0, len(tags))
 		for k := range tags {
-			keys = append(keys, k)
+			if !strings.HasPrefix(k, "_") {
+				keys = append(keys, k)
+			}
 		}
+		if len(keys) == 0 {
+			return "", false
+		}
+
 		sort.Strings(keys)
-		agg.keyBuf.Reset()
 		for i, k := range keys {
 			if i > 0 {
 				agg.keyBuf.WriteByte(groupKeySep)
@@ -360,14 +359,15 @@ func vmBuildGroupKey(tags map[string]string, agg *vmetricsAggregator) (string, b
 		return agg.keyBuf.String(), true
 	}
 
+	// non per-row: respect group_by exactly; underscore labels are NOT special
 	switch len(agg.groupBy) {
 	case 0:
 		return "", false
 	case 1:
-		v := tags[agg.groupBy[0]]
+		l := agg.groupBy[0]
+		v := tags[l]
 		return v, v != ""
 	default:
-		agg.keyBuf.Reset()
 		for i, l := range agg.groupBy {
 			v := tags[l]
 			if v == "" {
