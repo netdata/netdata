@@ -45,7 +45,7 @@ func FindProfiles(sysObjID string, manualProfiles []string) []*Profile {
 	// Fallback/manual path (no sysObjectID)
 	if sysObjID == "" {
 		if len(manualProfiles) == 0 {
-			log.Warning("empty sysObjectID and no manual profiles specified, cannot select any profile")
+			log.Warning("No sysObjectID found and no manual_profiles configured. Either ensure the device provides sysObjectID or configure manual_profiles option.")
 			return nil
 		}
 
