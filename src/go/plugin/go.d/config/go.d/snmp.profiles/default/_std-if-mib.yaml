@@ -8,7 +8,7 @@ metrics:
       name: ifNumber
       chart_meta:
         description: Number of network interfaces regardless of their current state present on this system
-        family: 'Network/Interface/Count/Total'
+        family: 'Network/Interface/Count'
         unit: "{interface}"
 
   # =========================
