@@ -53,7 +53,7 @@ SLACK_APP_TOKEN=<xapp-token>  # App-Level Token for Socket Mode
 3. Enable Socket Mode for real-time events
 4. Install app to workspace
 5. Get tokens from Slack App settings
-6. Run ai-agent with: `ai-agent server ./neda.ai --slack --api --verbose`
+6. Run ai-agent with: `ai-agent --agent ./neda.ai --slack --api 8800 --verbose`
 
 ### Operation
 
@@ -73,10 +73,10 @@ SLACK_APP_TOKEN=<xapp-token>  # App-Level Token for Socket Mode
 
 ```bash
 # Start Neda with Slack integration and API server
-ai-agent server ./neda.ai --slack --api --verbose
+ai-agent --agent ./neda.ai --slack --api 8800 --verbose
 
 # Or as the neda user:
-su neda -c 'cd /opt/neda && ai-agent server ./neda.ai --slack --api --verbose'
+su neda -c 'cd /opt/neda && ai-agent --agent ./neda.ai --slack --api 8800 --verbose'
 
 # In Slack, invite Neda to a channel:
 /invite @Neda

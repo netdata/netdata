@@ -81,7 +81,11 @@ Details
 - Start ai-agent with Slack and API:
 
 ```bash
-ai-agent server ./neda/neda.ai --slack --api --verbose
+ai-agent \
+  --agent ./neda/neda.ai \
+  --slack \
+  --api 8800 \
+  --verbose
 ```
 
 -------------------------------------------------------------------------------

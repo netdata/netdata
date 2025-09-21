@@ -588,43 +588,8 @@ async function runHeadendMode(config: HeadendModeConfig): Promise<void> {
   __RUNNING_SERVER = false;
 }
 
-// Global flag: suppress fatal exits in server mode
+// Global flag: suppress fatal exits when running long-lived headends
 let __RUNNING_SERVER = false;
-
-program
-  .command('server')
-  .description('Start the server headend (Slack + REST API)')
-  .argument('<agentPath>', 'Path to the .ai file to serve')
-  .option('--slack', 'Enable Slack headend (Socket Mode)')
-  .option('--no-slack', 'Disable Slack headend')
-  .option('--api', 'Enable REST API headend')
-  .option('--no-api', 'Disable REST API headend')
-  .option('--trace-llm', 'Trace LLM requests/responses (server mode)')
-  .option('--trace-mcp', 'Trace MCP requests/responses (server mode)')
-  .action(async (agentPath: string, opts: Record<string, unknown>) => {
-    try {
-      __RUNNING_SERVER = true;
-      const mod = await import('./server/index.js');
-      const enableSlack = opts.slack === true ? true : (opts.slack === false ? false : undefined);
-      const enableApi = opts.api === true ? true : (opts.api === false ? false : undefined);
-      // Merge root (global) flags with subcommand flags so users can pass --verbose/--trace-llm either before or after 'server'
-      const rootOptsObj = typeof program.opts === 'function' ? program.opts() : {};
-      const rootOpts: Record<string, unknown> = rootOptsObj as Record<string, unknown>;
-      const verbose = (opts as { verbose?: boolean }).verbose === true || (rootOpts.verbose === true);
-      const traceLlm = (opts as { traceLlm?: boolean }).traceLlm === true || (rootOpts.traceLlm === true);
-      const traceMcp = (opts as { traceMcp?: boolean }).traceMcp === true || (rootOpts.traceMcp === true);
-      await (mod.startServer as (p: string, o?: { enableSlack?: boolean; enableApi?: boolean; verbose?: boolean; traceLlm?: boolean; traceMcp?: boolean }) => Promise<void>)(agentPath, {
-        enableSlack,
-        enableApi,
-        verbose,
-        traceLlm,
-        traceMcp,
-      });
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      exitWith(1, `failed to start server: ${msg}`, 'EXIT-SERVER-START');
-    }
-  });
 
 program
   .argument('[system-prompt]', 'System prompt (string, @filename, or - for stdin)')
