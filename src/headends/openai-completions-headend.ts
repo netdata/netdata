@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import http from 'node:http';
+import path from 'node:path';
 import { URL } from 'node:url';
 
 import type { AgentMetadata, AgentRegistry } from '../agent-registry.js';
@@ -77,15 +78,17 @@ const CHAT_COMPLETION_OBJECT = 'chat.completion';
 const CHAT_CHUNK_OBJECT = 'chat.completion.chunk';
 const CLIENT_CLOSED_ERROR = 'client_closed_request';
 
-const collectUsage = (entries: AccountingEntry[]): { prompt: number; completion: number; total: number } => entries
-  .filter((entry): entry is LLMAccountingEntry => entry.type === 'llm')
-  .reduce<{ prompt: number; completion: number; total: number }>((acc, entry) => {
-    const tokens = entry.tokens;
-    acc.prompt += tokens.inputTokens;
-    acc.completion += tokens.outputTokens;
-    acc.total += tokens.totalTokens;
-    return acc;
-  }, { prompt: 0, completion: 0, total: 0 });
+const collectUsage = (entries: AccountingEntry[]): { prompt: number; completion: number; total: number } => {
+  const usage = entries
+    .filter((entry): entry is LLMAccountingEntry => entry.type === 'llm')
+    .reduce<{ prompt: number; completion: number }>((acc, entry) => {
+      const tokens = entry.tokens;
+      acc.prompt += tokens.inputTokens;
+      acc.completion += tokens.outputTokens;
+      return acc;
+    }, { prompt: 0, completion: 0 });
+  return { ...usage, total: usage.prompt + usage.completion };
+};
 
 interface FormatResolution {
   format: string;
@@ -101,6 +104,7 @@ export class OpenAICompletionsHeadend implements Headend {
   private readonly options: { port: number; concurrency?: number };
   private readonly limiter: ConcurrencyLimiter;
   private readonly closeDeferred = createDeferred<HeadendClosedEvent>();
+  private readonly modelIdMap = new Map<string, string>();
   private context?: HeadendContext;
   private server?: http.Server;
   private stopping = false;
@@ -115,6 +119,7 @@ export class OpenAICompletionsHeadend implements Headend {
       : 10;
     this.limiter = new ConcurrencyLimiter(limit);
     this.closed = this.closeDeferred.promise;
+    this.refreshModelMap();
   }
 
   public describe(): HeadendDescription {
@@ -199,8 +204,9 @@ export class OpenAICompletionsHeadend implements Headend {
   }
 
   private handleModels(res: http.ServerResponse): void {
-    const models = this.registry.list().map((meta) => ({
-      id: meta.id,
+    this.refreshModelMap();
+    const models = Array.from(this.modelIdMap.keys()).map((modelId) => ({
+      id: modelId,
       object: 'model',
       created: Math.floor(Date.now() / 1000),
       owned_by: 'ai-agent',
@@ -382,12 +388,16 @@ export class OpenAICompletionsHeadend implements Headend {
   }
 
   private resolveAgent(model: string): AgentMetadata | undefined {
-    const list = this.registry.list();
-    const index = new Map<string, AgentMetadata>();
-    list.forEach((meta) => {
-      index.set(meta.id, meta);
-    });
-    return index.get(model);
+    this.refreshModelMap();
+    const direct = this.modelIdMap.get(model);
+    if (direct !== undefined) {
+      return this.registry.getMetadata(direct);
+    }
+    const resolved = this.registry.resolveAgentId(model);
+    if (resolved !== undefined) {
+      return this.registry.getMetadata(resolved);
+    }
+    return undefined;
   }
 
   private buildPrompt(messages: OpenAIChatRequestMessage[]): string {
@@ -444,6 +454,39 @@ export class OpenAICompletionsHeadend implements Headend {
       throw new HttpError(400, 'missing_schema', 'Agent expects JSON output but no schema provided');
     }
     return { format: fallback, schema };
+  }
+
+  private refreshModelMap(): void {
+    this.modelIdMap.clear();
+    const seen = new Set<string>();
+    this.registry.list().forEach((meta) => {
+      const modelId = this.buildModelId(meta, seen);
+      this.modelIdMap.set(modelId, meta.id);
+    });
+  }
+
+  private buildModelId(meta: AgentMetadata, seen: Set<string>): string {
+    const baseSources = [
+      typeof meta.toolName === 'string' ? meta.toolName : undefined,
+      typeof meta.promptPath === 'string' ? path.basename(meta.promptPath) : undefined,
+      (() => {
+        const parts = meta.id.split(/[/\\]/);
+        return parts[parts.length - 1];
+      })(),
+    ].filter((value): value is string => typeof value === 'string' && value.length > 0);
+    let base = baseSources[0] ?? 'agent';
+    base = base.replace(/\.ai$/i, '');
+    if (base.length === 0) base = 'agent';
+    let candidate = base;
+    let counter = 2;
+    // eslint-disable-next-line functional/no-loop-statements
+    while (seen.has(candidate)) {
+      const suffix = String(counter);
+      candidate = `${base}-${suffix}`;
+      counter += 1;
+    }
+    seen.add(candidate);
+    return candidate;
   }
 
   private pickSchema(body: OpenAIChatRequest, agent: AgentMetadata): Record<string, unknown> | undefined {

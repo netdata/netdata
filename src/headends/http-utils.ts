@@ -66,4 +66,5 @@ export const writeSseChunk = (res: http.ServerResponse, payload: unknown): void 
 export const writeSseDone = (res: http.ServerResponse): void => {
   if (res.writableEnded || res.writableFinished) return;
   res.write('data: [DONE]\n\n');
+  res.end();
 };

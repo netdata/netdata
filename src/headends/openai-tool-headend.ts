@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import http from 'node:http';
+import path from 'node:path';
 import { URL } from 'node:url';
 
 import type { AgentRegistry, AgentMetadata } from '../agent-registry.js';
@@ -98,6 +99,7 @@ export class OpenAIToolHeadend implements Headend {
   private readonly options: OpenAIToolHeadendOptions;
   private readonly limiter: ConcurrencyLimiter;
   private readonly closeDeferred = createDeferred<HeadendClosedEvent>();
+  private readonly toolIdMap = new Map<string, string>();
   private context?: HeadendContext;
   private server?: http.Server;
   private stopping = false;
@@ -112,6 +114,7 @@ export class OpenAIToolHeadend implements Headend {
       : 10;
     this.limiter = new ConcurrencyLimiter(limit);
     this.closed = this.closeDeferred.promise;
+    this.refreshToolMap();
   }
 
   public describe(): HeadendDescription {
@@ -196,22 +199,26 @@ export class OpenAIToolHeadend implements Headend {
   }
 
   private handleListTools(res: http.ServerResponse): void {
-    const metadata = this.registry.list();
-    const data = metadata.map((meta) => {
+    this.refreshToolMap();
+    const data: { object: 'tool'; agent_id: string; type: 'function'; function: { name: string; description?: string; parameters: Record<string, unknown> } }[] = [];
+    this.toolIdMap.forEach((agentId, toolId) => {
+      const meta = this.registry.getMetadata(agentId);
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- registry could change between list() and lookup
+      if (meta === undefined) return;
       const def = toOpenAIToolDefinition({
-        id: meta.id,
-        toolName: meta.toolName,
+        id: toolId,
+        toolName: undefined,
         description: meta.description,
         usage: meta.usage,
         input: meta.input,
         outputSchema: meta.outputSchema,
       });
-      return {
+      data.push({
         object: 'tool',
-        agent_id: meta.id,
+        agent_id: toolId,
         type: def.type,
         function: def.function,
-      };
+      });
     });
     writeJson(res, 200, { object: 'list', data });
   }
@@ -439,21 +446,16 @@ export class OpenAIToolHeadend implements Headend {
   }
 
   private resolveAgent(toolName: string): AgentMetadata | undefined {
-    const metadata = this.registry.list();
-    const index = new Map<string, AgentMetadata>();
-    metadata.forEach((meta) => {
-      const normalized = resolveToolName({
-        id: meta.id,
-        toolName: meta.toolName,
-        description: meta.description,
-        usage: meta.usage,
-        input: meta.input,
-        outputSchema: meta.outputSchema,
-      });
-      index.set(normalized, meta);
-      index.set(meta.id, meta);
-    });
-    return index.get(toolName);
+    this.refreshToolMap();
+    const direct = this.toolIdMap.get(toolName);
+    if (direct !== undefined) {
+      return this.registry.getMetadata(direct);
+    }
+    const resolved = this.registry.resolveAgentId(toolName);
+    if (resolved !== undefined) {
+      return this.registry.getMetadata(resolved);
+    }
+    return undefined;
   }
 
   private resolveFinalText(output: string, finalReport: unknown): string {
@@ -481,5 +483,45 @@ export class OpenAIToolHeadend implements Headend {
     if (this.closedSignaled) return;
     this.closedSignaled = true;
     this.closeDeferred.resolve(event);
+  }
+
+  private refreshToolMap(): void {
+    this.toolIdMap.clear();
+    const seen = new Set<string>();
+    this.registry.list().forEach((meta) => {
+      const toolId = this.buildToolId(meta, seen);
+      this.toolIdMap.set(toolId, meta.id);
+    });
+  }
+
+  private buildToolId(meta: AgentMetadata, seen: Set<string>): string {
+    const preferred = [
+      typeof meta.toolName === 'string' ? meta.toolName : undefined,
+      typeof meta.promptPath === 'string' ? path.basename(meta.promptPath) : undefined,
+      (() => {
+        const parts = meta.id.split(/[/\\]/);
+        return parts[parts.length - 1];
+      })(),
+    ].find((value): value is string => typeof value === 'string' && value.length > 0) ?? 'agent';
+    const base = preferred.replace(/\.ai$/i, '') || 'agent';
+    let suffix = 0;
+    let sanitized = '';
+    // eslint-disable-next-line functional/no-loop-statements
+    do {
+      const suffixLabel = suffix === 0 ? '' : `_${String(suffix + 1)}`;
+      const candidate = `${base}${suffixLabel}`;
+      const summary = {
+        id: candidate,
+        toolName: undefined,
+        description: meta.description,
+        usage: meta.usage,
+        input: meta.input,
+        outputSchema: meta.outputSchema,
+      };
+      sanitized = resolveToolName(summary);
+      suffix += 1;
+    } while (seen.has(sanitized));
+    seen.add(sanitized);
+    return sanitized;
   }
 }

@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import http from 'node:http';
+import path from 'node:path';
 import { URL } from 'node:url';
 
 import type { AgentMetadata, AgentRegistry } from '../agent-registry.js';
@@ -75,15 +76,17 @@ const SYSTEM_PREFIX = 'System context:\n';
 const HISTORY_PREFIX = 'Conversation so far:\n';
 const USER_PREFIX = 'User request:\n';
 
-const collectUsage = (entries: AccountingEntry[]): { input: number; output: number; total: number } => entries
-  .filter((entry): entry is LLMAccountingEntry => entry.type === 'llm')
-  .reduce<{ input: number; output: number; total: number }>((acc, entry) => {
-    const tokens = entry.tokens;
-    acc.input += tokens.inputTokens;
-    acc.output += tokens.outputTokens;
-    acc.total += tokens.totalTokens;
-    return acc;
-  }, { input: 0, output: 0, total: 0 });
+const collectUsage = (entries: AccountingEntry[]): { input: number; output: number; total: number } => {
+  const usage = entries
+    .filter((entry): entry is LLMAccountingEntry => entry.type === 'llm')
+    .reduce<{ input: number; output: number }>((acc, entry) => {
+      const tokens = entry.tokens;
+      acc.input += tokens.inputTokens;
+      acc.output += tokens.outputTokens;
+      return acc;
+    }, { input: 0, output: 0 });
+  return { ...usage, total: usage.input + usage.output };
+};
 
 export class AnthropicCompletionsHeadend implements Headend {
   public readonly id: string;
@@ -94,6 +97,7 @@ export class AnthropicCompletionsHeadend implements Headend {
   private readonly options: { port: number; concurrency?: number };
   private readonly limiter: ConcurrencyLimiter;
   private readonly closeDeferred = createDeferred<HeadendClosedEvent>();
+  private readonly modelIdMap = new Map<string, string>();
   private context?: HeadendContext;
   private server?: http.Server;
   private stopping = false;
@@ -108,6 +112,7 @@ export class AnthropicCompletionsHeadend implements Headend {
       : 10;
     this.limiter = new ConcurrencyLimiter(limit);
     this.closed = this.closeDeferred.promise;
+    this.refreshModelMap();
   }
 
   public describe(): HeadendDescription {
@@ -192,11 +197,15 @@ export class AnthropicCompletionsHeadend implements Headend {
   }
 
   private handleModels(res: http.ServerResponse): void {
-    const models = this.registry.list().map((meta) => ({
-      id: meta.id,
-      type: 'model',
-      display_name: meta.description ?? meta.id,
-    }));
+    this.refreshModelMap();
+    const models = Array.from(this.modelIdMap.entries()).map(([modelId, agentId]) => {
+      const meta = this.registry.getMetadata(agentId);
+      return {
+        id: modelId,
+        type: 'model',
+        display_name: meta?.description ?? modelId,
+      };
+    });
     writeJson(res, 200, { data: models });
   }
 
@@ -359,10 +368,16 @@ export class AnthropicCompletionsHeadend implements Headend {
   }
 
   private resolveAgent(model: string): AgentMetadata | undefined {
-    const list = this.registry.list();
-    const map = new Map<string, AgentMetadata>();
-    list.forEach((meta) => { map.set(meta.id, meta); });
-    return map.get(model);
+    this.refreshModelMap();
+    const direct = this.modelIdMap.get(model);
+    if (direct !== undefined) {
+      return this.registry.getMetadata(direct);
+    }
+    const resolved = this.registry.resolveAgentId(model);
+    if (resolved !== undefined) {
+      return this.registry.getMetadata(resolved);
+    }
+    return undefined;
   }
 
   private composePrompt(system: string | string[] | undefined, messages: AnthropicRequestMessage[]): string {
@@ -431,6 +446,38 @@ export class AnthropicCompletionsHeadend implements Headend {
   private logEntry(entry: LogEntry): void {
     if (this.context === undefined) return;
     this.context.log(entry);
+  }
+
+  private refreshModelMap(): void {
+    this.modelIdMap.clear();
+    const seen = new Set<string>();
+    this.registry.list().forEach((meta) => {
+      const modelId = this.buildModelId(meta, seen);
+      this.modelIdMap.set(modelId, meta.id);
+    });
+  }
+
+  private buildModelId(meta: AgentMetadata, seen: Set<string>): string {
+    const baseSources = [
+      typeof meta.toolName === 'string' ? meta.toolName : undefined,
+      typeof meta.promptPath === 'string' ? path.basename(meta.promptPath) : undefined,
+      (() => {
+        const parts = meta.id.split(/[/\\]/);
+        return parts[parts.length - 1];
+      })(),
+    ];
+    const primary = baseSources.find((value): value is string => typeof value === 'string' && value.length > 0) ?? 'agent';
+    const root = primary.replace(/\.ai$/i, '') || 'agent';
+    let candidate = root;
+    let counter = 2;
+    // eslint-disable-next-line functional/no-loop-statements
+    while (seen.has(candidate)) {
+      const suffix = String(counter);
+      candidate = `${root}_${suffix}`;
+      counter += 1;
+    }
+    seen.add(candidate);
+    return candidate;
   }
 
   private signalClosed(event: HeadendClosedEvent): void {
