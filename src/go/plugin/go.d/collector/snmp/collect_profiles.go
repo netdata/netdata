@@ -105,7 +105,7 @@ func tableMetricKey(m ddsnmp.Metric) string {
 			continue
 		}
 		include = append(include, k)
-		totalLen += 1 + len(v) // "_" + value
+		totalLen += len("_") + len(v)
 	}
 	if len(include) == 0 {
 		return m.Name

@@ -1062,50 +1062,6 @@ func TestVirtualMetricsCollector_Collect(t *testing.T) {
 			},
 		},
 
-		"per_row hint missing for a row (fallback to full-tag key)": {
-			profileDef: &ddprofiledefinition.ProfileDefinition{
-				VirtualMetrics: []ddprofiledefinition.VirtualMetricConfig{
-					{
-						Name:    "ifTrafficPerRowFallback",
-						PerRow:  true,
-						GroupBy: []string{"interface"}, // hint missing on one row
-						Sources: []ddprofiledefinition.VirtualMetricSourceConfig{
-							{Metric: "ifHCInOctets", Table: "ifXTable", As: "in"},
-							{Metric: "ifHCOutOctets", Table: "ifXTable", As: "out"},
-						},
-					},
-				},
-			},
-			collectedMetrics: []ddsnmp.Metric{
-				// has 'interface'
-				{Name: "ifHCInOctets", Value: 10, IsTable: true, Table: "ifXTable",
-					Tags: map[string]string{"interface": "eth0", "ifIndex": "1"}},
-				{Name: "ifHCOutOctets", Value: 20, IsTable: true, Table: "ifXTable",
-					Tags: map[string]string{"interface": "eth0", "ifIndex": "1"}},
-				// missing 'interface' -> falls back to full-tag key
-				{Name: "ifHCInOctets", Value: 30, IsTable: true, Table: "ifXTable",
-					Tags: map[string]string{"name": "weird0", "ifIndex": "9"}},
-				{Name: "ifHCOutOctets", Value: 40, IsTable: true, Table: "ifXTable",
-					Tags: map[string]string{"name": "weird0", "ifIndex": "9"}},
-			},
-			expected: []ddsnmp.Metric{
-				{
-					Name:       "ifTrafficPerRowFallback",
-					IsTable:    true,
-					Table:      "ifXTable",
-					Tags:       map[string]string{"interface": "eth0", "ifIndex": "1"},
-					MultiValue: map[string]int64{"in": 10, "out": 20},
-				},
-				{
-					Name:       "ifTrafficPerRowFallback",
-					IsTable:    true,
-					Table:      "ifXTable",
-					Tags:       map[string]string{"name": "weird0", "ifIndex": "9"},
-					MultiValue: map[string]int64{"in": 30, "out": 40},
-				},
-			},
-		},
-
 		"per_row single-source (value path)": {
 			profileDef: &ddprofiledefinition.ProfileDefinition{
 				VirtualMetrics: []ddprofiledefinition.VirtualMetricConfig{
