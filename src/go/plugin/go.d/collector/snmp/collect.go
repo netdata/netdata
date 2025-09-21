@@ -168,7 +168,7 @@ func (c *Collector) setupVnode(si *snmputils.SysInfo, deviceMeta map[string]ddsn
 }
 
 func (c *Collector) setupProfiles(sysObjectID string) []*ddsnmp.Profile {
-	snmpProfiles := ddsnmp.FindProfiles(sysObjectID)
+	snmpProfiles := ddsnmp.FindProfiles(sysObjectID, c.ManualProfiles)
 	var profInfo []string
 
 	for _, prof := range snmpProfiles {
@@ -180,7 +180,7 @@ func (c *Collector) setupProfiles(sysObjectID string) []*ddsnmp.Profile {
 		}
 	}
 
-	c.Infof("device matched %d profile(s): %s (sysObjectID: %s)", len(snmpProfiles), strings.Join(profInfo, ", "), sysObjectID)
+	c.Infof("device matched %d profile(s): %s (sysObjectID: '%s')", len(snmpProfiles), strings.Join(profInfo, ", "), sysObjectID)
 
 	return snmpProfiles
 }

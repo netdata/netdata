@@ -44,8 +44,9 @@ func Test_loadDDSnmpProfiles(t *testing.T) {
 
 func Test_FindProfiles(t *testing.T) {
 	test := map[string]struct {
-		sysObjOId   string
-		wanProfiles int
+		sysObjOId      string
+		manualProfiles []string
+		wanProfiles    int
 	}{
 		"mikrotik": {
 			sysObjOId:   "1.3.6.1.4.1.14988.1",
@@ -63,11 +64,16 @@ func Test_FindProfiles(t *testing.T) {
 			sysObjOId:   "1.3.6.1.4.1.9.1.2170",
 			wanProfiles: 3,
 		},
+		"no sysObjectID, manual profile applied": {
+			sysObjOId:      "",
+			manualProfiles: []string{"generic-device"},
+			wanProfiles:    1,
+		},
 	}
 
 	for name, test := range test {
 		t.Run(name, func(t *testing.T) {
-			profiles := FindProfiles(test.sysObjOId)
+			profiles := FindProfiles(test.sysObjOId, test.manualProfiles)
 
 			require.Len(t, profiles, test.wanProfiles)
 		})
@@ -75,7 +81,7 @@ func Test_FindProfiles(t *testing.T) {
 }
 
 func Test_Profile_merge(t *testing.T) {
-	profiles := FindProfiles("1.3.6.1.4.1.9.1.1216") // cisco-nexus
+	profiles := FindProfiles("1.3.6.1.4.1.9.1.1216", nil) // cisco-nexus
 
 	i := slices.IndexFunc(profiles, func(p *Profile) bool {
 		return strings.HasSuffix(p.SourceFile, "cisco-nexus.yaml")

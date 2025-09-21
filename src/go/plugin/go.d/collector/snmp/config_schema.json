@@ -367,6 +367,19 @@
         "description": "Disable the legacy SNMP collection method, forcing the collector to use only SNMP profiles (YAML-based configuration). When enabled, the collector will ignore any non-profile based collection logic.",
         "type": "boolean",
         "default": false
+      },
+      "manual_profiles": {
+        "title": "Manual SNMP Profiles",
+        "description": "Profiles to apply if automatic detection cannot be used.",
+        "type": [
+          "array",
+          "null"
+        ],
+        "items": {
+          "title": "Profile",
+          "type": "string"
+        },
+        "uniqueItems": true
       }
     },
     "required": [
@@ -384,6 +397,10 @@
     },
     "enable_profiles_table_metrics": {
       "ui:help": "Table metrics include interface statistics, routing tables, and other tabular data."
+    },
+    "manual_profiles": {
+      "ui:listFlavour": "list",
+      "ui:help": "**Profiles are always applied automatically** based on the device sysObjectID. **If no sysObjectID is provided** (rare case, e.g. some printers), the profiles listed here will be applied instead. In most cases, **leave this empty**."
     },
     "network_interface_filter": {
       "ui:collapsible": true
@@ -499,7 +516,8 @@
           "fields": [
             "enable_profiles",
             "enable_profiles_table_metrics",
-            "disable_legacy_collection"
+            "disable_legacy_collection",
+            "manual_profiles"
           ]
         }
       ]
