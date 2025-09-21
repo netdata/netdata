@@ -14,7 +14,17 @@ Environment="HOME=/opt/neda"
 Environment="NODE_ENV=production"
 
 # Execute
-ExecStart=/opt/neda/bin/neda server ./neda.ai --slack --api --verbose
+ExecStart=/opt/neda/bin/neda \
+  --agent ./neda.ai \
+  --slack \
+  --api 8800 \
+  --mcp http:8801 \
+  --mcp sse:8802 \
+  --mcp ws:8803 \
+  --openai-tool 8804 \
+  --openai-completions 8805 \
+  --anthropic-completions 8806 \
+  --verbose
 
 # Restart policy
 Restart=always

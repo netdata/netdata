@@ -188,16 +188,18 @@ The CLI’s headend mode is implemented as a set of focused classes managed by `
 - **`OpenAIToolHeadend`** – exposes agents as OpenAI function-calling tools (`GET /v1/tools`, `POST /v1/chat/completions`). Tool arguments follow the same `format`/`schema` contract enforced by MCP.
 - **`OpenAICompletionsHeadend`** – surfaces agents as OpenAI Chat Completions models (`/v1/models`, `/v1/chat/completions`) with optional SSE streaming.
 - **`AnthropicCompletionsHeadend`** – provides Anthropic Messages compatibility (`/v1/models`, `/v1/messages`) and emits Anthropic-style SSE events.
+- **`SlackHeadend`** – wraps the existing Slack bot logic behind the headend manager. Socket Mode traffic shares the same concurrency limiter, and slash commands mount on the first REST headend (fallback listener on `api.port` when no REST headend is configured).
 
-Each headend is repeatable; the CLI can spin up multiple instances (e.g., multiple MCP ports plus REST). Concurrency guards are per-headend (`--api-concurrency`, `--openai-tool-concurrency`, etc.) and default to four in-flight sessions per headend instance.
+Each headend is repeatable; the CLI can spin up multiple instances (e.g., multiple MCP ports plus REST). Concurrency guards are per-headend (`--api-concurrency`, `--openai-tool-concurrency`, etc.) and default to ten in-flight sessions per headend instance.
 
 Edge cases and compatibility
 
 - Legacy servers returning `parameters` instead of `inputSchema` are supported.
 - Zero‑argument tools are supported (empty input schema object).
 - Tool timeouts return a failed result; never retried.
-- Non‑text content from tools is preserved in principle; we currently surface non‑text as a tagged placeholder in the tool result text. If desired later, we can attach resource links or structured content.
-- Streaming failure mid‑response discards partial assistant text from the conversation history but continues fallback cleanly.
+- Client disconnects before a queued request acquires a slot are detected; the limiter removes them from the FIFO queue so abandoned work is never executed.
+- Non-text content from tools is preserved in principle; we currently surface non-text as a tagged placeholder in the tool result text. If desired later, we can attach resource links or structured content.
+- Streaming failure mid-response discards partial assistant text from the conversation history but continues fallback cleanly.
 
 Implementation checklist (end‑to‑end)
 

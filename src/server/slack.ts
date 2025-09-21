@@ -16,6 +16,8 @@ interface SlackHeadendOptions {
   systemPrompt: string;
   verbose?: boolean;
   openerTone?: 'random' | 'cheerful' | 'formal' | 'busy';
+  acquireRunSlot?: () => Promise<() => void>;
+  registerRunSlot?: (session: SessionManager, runId: string, release: () => void) => void;
   resolveRoute?: (args: { kind: 'mentions'|'channel-posts'|'dms'; channelId: string; channelName?: string }) => Promise<{ sessions: SessionManager; systemPrompt: string; promptTemplates?: { mention?: string; dm?: string; channelPost?: string }; contextPolicy?: { channelPost?: 'selfOnly'|'previousOnly'|'selfAndPrevious' } } | undefined>;
 }
 
@@ -445,6 +447,8 @@ async function fetchContext(client: SlackClient, event: any, limit: number, char
 
 export function initSlackHeadend(options: SlackHeadendOptions): void {
   const { sessionManager, app, historyLimit = 100, historyCharsCap = 100000, updateIntervalMs = 2000, enableMentions = true, enableDMs = true, systemPrompt, verbose = false } = options;
+  const acquireRunSlot = options.acquireRunSlot;
+  const registerRunSlot = options.registerRunSlot;
 const vlog = (msg: string): void => { if (verbose) { try { process.stderr.write(`[SRV] ← [0.0] server slack: ${msg}\n`); } catch (e) { try { process.stderr.write(`[warn] failed to write vlog: ${e instanceof Error ? e.message : String(e)}\n`); } catch {} } } };
 const elog = (msg: string): void => { try { process.stderr.write(`[SRV] ← [0.0] server slack: ${msg}\n`); } catch (e) { try { process.stderr.write(`[warn] failed to write elog: ${e instanceof Error ? e.message : String(e)}\n`); } catch {} } };
 
@@ -795,7 +799,24 @@ const elog = (msg: string): void => { try { process.stderr.write(`[SRV] ← [0.0
     const agentPath = resolved ? 'custom' : 'default';
     const initialTitle = undefined;
     // Pass empty history array since context is now in userPrompt
-    const runId = activeSessions.startRun({ source: 'slack', teamId: context?.teamId, channelId: channel, threadTsOrSessionId: threadTs }, activeSystem, userPrompt, [], { initialTitle });
+    let slotRelease: (() => void) | undefined;
+    if (acquireRunSlot !== undefined) {
+      slotRelease = await acquireRunSlot();
+    }
+    let runId: string;
+    try {
+      runId = activeSessions.startRun({ source: 'slack', teamId: context?.teamId, channelId: channel, threadTsOrSessionId: threadTs }, activeSystem, userPrompt, [], { initialTitle });
+    } catch (err) {
+      slotRelease?.();
+      throw err;
+    }
+    if (slotRelease !== undefined) {
+      if (registerRunSlot !== undefined) {
+        registerRunSlot(activeSessions, runId, slotRelease);
+      } else {
+        slotRelease();
+      }
+    }
 
     vlog(`[SLACK→AGENT] runId=${runId} kind=${kind} channel="${chName ?? 'unknown'}"/${channel} user="${whoLabel}"/${who ?? 'unknown'} ` +
          `thread=${threadTs === event.ts ? 'root' : 'reply'} text="${text.substring(0, 50)}${text.length > 50 ? '...' : ''}" ` +
@@ -1031,11 +1052,14 @@ const elog = (msg: string): void => { try { process.stderr.write(`[SRV] ← [0.0
         .replace(/{text}/g, text)
         .replace(/{message\.url}/g, (permalink ?? ''));
       const userPrompt = renderTemplate(resolved?.promptTemplates?.channelPost ?? DEFAULT_CHANNEL_POST_TEMPLATE);
-      // target thread if member, otherwise DM fallback
-      const member = await isBotMember(client, channelId);
+      const baseThreadTs = typeof msg.thread_ts === 'string' && msg.thread_ts.length > 0
+        ? msg.thread_ts
+        : (typeof msg.ts === 'string' ? msg.ts : undefined);
+      const isImChannel = channelId.startsWith('D');
+      const member = isImChannel ? true : await isBotMember(client, channelId);
       let targetChannel = channelId;
-      let targetThreadTs: string | undefined = (msg.thread_ts ?? msg.ts) as string | undefined;
-      if (!member) {
+      let targetThreadTs: string | undefined = baseThreadTs;
+      if (!member && !isImChannel) {
         const dm = await client.conversations.open({ users: userId });
         const dmChannel = dm?.channel?.id as string | undefined;
         if (!dmChannel) return;
@@ -1043,10 +1067,31 @@ const elog = (msg: string): void => { try { process.stderr.write(`[SRV] ← [0.0
         targetThreadTs = undefined;
       }
       const opener = pickOpener(fname, options.openerTone ?? 'random');
-      const initial = await client.chat.postMessage({ channel: targetChannel, thread_ts: targetThreadTs, text: opener });
+      const initialPayload: { channel: string; text: string; thread_ts?: string } = { channel: targetChannel, text: opener };
+      if (targetThreadTs !== undefined && targetChannel === channelId) {
+        initialPayload.thread_ts = targetThreadTs;
+      }
+      const initial = await client.chat.postMessage(initialPayload);
       const liveTs = String(initial.ts ?? targetThreadTs ?? msg.ts);
       const history: ConversationMessage[] = [];
-      const runId = activeSessions.startRun({ source: 'slack', teamId: body?.team?.id, channelId: targetChannel, threadTsOrSessionId: liveTs }, activeSystem, userPrompt, history, { initialTitle: undefined });
+          let slotRelease: (() => void) | undefined;
+          if (acquireRunSlot !== undefined) {
+            slotRelease = await acquireRunSlot();
+          }
+          let runId: string;
+          try {
+            runId = activeSessions.startRun({ source: 'slack', teamId: body?.team?.id, channelId: targetChannel, threadTsOrSessionId: liveTs }, activeSystem, userPrompt, history, { initialTitle: undefined });
+          } catch (err) {
+            slotRelease?.();
+            throw err;
+          }
+          if (slotRelease !== undefined) {
+            if (registerRunSlot !== undefined) {
+              registerRunSlot(activeSessions, runId, slotRelease);
+            } else {
+              slotRelease();
+            }
+          }
       runIdToSession.set(runId, activeSessions);
       const cancelActions = { type: 'actions', elements: [
         { type: 'button', text: { type: 'plain_text', text: 'Stop' }, action_id: 'stop_run', value: runId },

@@ -105,7 +105,7 @@ export class AnthropicCompletionsHeadend implements Headend {
     this.id = `anthropic-completions:${String(options.port)}`;
     const limit = typeof options.concurrency === 'number' && Number.isFinite(options.concurrency) && options.concurrency > 0
       ? Math.floor(options.concurrency)
-      : 4;
+      : 10;
     this.limiter = new ConcurrencyLimiter(limit);
     this.closed = this.closeDeferred.promise;
   }
@@ -229,7 +229,6 @@ export class AnthropicCompletionsHeadend implements Headend {
       });
     }
 
-    const release = await this.limiter.acquire();
     const abortController = new AbortController();
     const stopRef = { stopping: false };
     const onAbort = () => {
@@ -244,6 +243,20 @@ export class AnthropicCompletionsHeadend implements Headend {
       req.removeListener('aborted', onAbort);
       res.removeListener('close', onAbort);
     };
+
+    let release: (() => void) | undefined;
+    try {
+      release = await this.limiter.acquire({ signal: abortController.signal });
+    } catch (err: unknown) {
+      cleanup();
+      if (abortController.signal.aborted) {
+        return;
+      }
+      const message = err instanceof Error ? err.message : String(err);
+      this.log(`concurrency acquire failed for model=${agent.id}: ${message}`, 'ERR');
+      writeJson(res, 503, { error: 'concurrency_unavailable', message: 'Concurrency limit reached' });
+      return;
+    }
 
     const requestId = randomUUID();
     const streamed = body.stream === true;

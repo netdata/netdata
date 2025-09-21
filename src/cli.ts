@@ -26,6 +26,7 @@ import { McpHeadend } from './headends/mcp-headend.js';
 import { OpenAICompletionsHeadend } from './headends/openai-completions-headend.js';
 import { OpenAIToolHeadend } from './headends/openai-tool-headend.js';
 import { RestHeadend } from './headends/rest-headend.js';
+import { SlackHeadend } from './headends/slack-headend.js';
 import { resolveIncludes } from './include-resolver.js';
 import { formatLog } from './log-formatter.js';
 import { makeTTYLogCallbacks } from './log-sink-tty.js';
@@ -342,6 +343,8 @@ const openaiCompletionsConcurrencyOption = new Option('--openai-completions-conc
 const anthropicCompletionsConcurrencyOption = new Option('--anthropic-completions-concurrency <n>', 'Maximum concurrent Anthropic chat sessions')
   .argParser(parsePositive);
 
+const slackHeadendOption = new Option('--slack', 'Start Slack Socket Mode headend');
+
 program.addOption(agentOption);
 program.addOption(apiHeadendOption);
 program.addOption(mcpHeadendOption);
@@ -352,6 +355,7 @@ program.addOption(apiConcurrencyOption);
 program.addOption(openaiToolConcurrencyOption);
 program.addOption(openaiCompletionsConcurrencyOption);
 program.addOption(anthropicCompletionsConcurrencyOption);
+program.addOption(slackHeadendOption);
 
 interface HeadendModeConfig {
   agentPaths: string[];
@@ -360,6 +364,7 @@ interface HeadendModeConfig {
   openaiToolPorts: number[];
   openaiCompletionsPorts: number[];
   anthropicCompletionsPorts: number[];
+  enableSlack: boolean;
   options: Record<string, unknown>;
 }
 
@@ -387,8 +392,9 @@ async function runHeadendMode(config: HeadendModeConfig): Promise<void> {
     && config.openaiToolPorts.length === 0
     && config.openaiCompletionsPorts.length === 0
     && config.anthropicCompletionsPorts.length === 0
+    && !config.enableSlack
   ) {
-    exitWith(4, 'no headends specified; add --api/--mcp/--openai-tool/--openai-completions/--anthropic-completions', 'EXIT-HEADEND-NO-HEADENDS');
+    exitWith(4, 'no headends specified; add --api/--mcp/--openai-tool/--openai-completions/--anthropic-completions/--slack', 'EXIT-HEADEND-NO-HEADENDS');
   }
 
   const configPathValue = typeof config.options.config === 'string' && config.options.config.length > 0
@@ -467,9 +473,24 @@ async function runHeadendMode(config: HeadendModeConfig): Promise<void> {
   const openaiCompletionsConcurrency = readConcurrency('openaiCompletionsConcurrency');
   const anthropicCompletionsConcurrency = readConcurrency('anthropicCompletionsConcurrency');
 
-  const headends = [] as Headend[];
+  const headends: Headend[] = [];
+  const restHeadends: RestHeadend[] = [];
+
+  let slackHeadend: SlackHeadend | undefined;
+  if (config.enableSlack) {
+    slackHeadend = new SlackHeadend({
+      agentPaths: uniqueAgents,
+      loadOptions,
+      verbose,
+      traceLLM: traceLLMFlag,
+      traceMCP: traceMCPFlag,
+    });
+  }
+
   config.apiPorts.forEach((port) => {
-    headends.push(new RestHeadend(registry, { port, concurrency: apiConcurrency }));
+    const rest = new RestHeadend(registry, { port, concurrency: apiConcurrency });
+    headends.push(rest);
+    restHeadends.push(rest);
   });
   mcpSpecs.forEach((spec) => {
     headends.push(new McpHeadend({ registry, transport: spec }));
@@ -483,6 +504,15 @@ async function runHeadendMode(config: HeadendModeConfig): Promise<void> {
   config.anthropicCompletionsPorts.forEach((port) => {
     headends.push(new AnthropicCompletionsHeadend(registry, { port, concurrency: anthropicCompletionsConcurrency }));
   });
+
+  if (slackHeadend !== undefined) {
+    const route = slackHeadend.getSlashCommandRoute();
+    if (route !== undefined && restHeadends.length > 0) {
+      restHeadends[0].registerRoute(route);
+      slackHeadend.markSlashCommandRouteRegistered();
+    }
+    headends.push(slackHeadend);
+  }
   const ttyLog = makeTTYLogCallbacks({
     color: true,
     verbose: config.options.verbose === true,
@@ -619,6 +649,7 @@ program
           openaiToolPorts,
           openaiCompletionsPorts,
           anthropicCompletionsPorts,
+          enableSlack: options.slack === true,
           options,
         });
         return;

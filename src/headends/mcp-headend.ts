@@ -15,6 +15,7 @@ import type { AuthInfo } from '@modelcontextprotocol/sdk/server/auth/types.js';
 
 import { resolveToolName } from '../schema-adapters.js';
 
+import { ConcurrencyLimiter } from './concurrency.js';
 import { McpWebSocketServerTransport } from './mcp-ws-transport.js';
 
 interface Deferred<T> {
@@ -45,6 +46,7 @@ interface McpHeadendOptions {
   registry: AgentRegistry;
   instructions?: string;
   transport: McpTransportSpec;
+  concurrency?: number;
 }
 
 export class McpHeadend implements Headend {
@@ -60,13 +62,14 @@ export class McpHeadend implements Headend {
   private context?: HeadendContext;
   private stdioTransport?: StdioServerTransport;
   private httpServer?: http.Server;
-  private readonly httpContexts = new Map<string, { transport: StreamableHTTPServerTransport; server: McpServer }>();
+  private readonly httpContexts = new Map<string, { transport: StreamableHTTPServerTransport; server: McpServer; release?: () => void }>();
   private sseServer?: http.Server;
-  private readonly sseContexts = new Map<string, { transport: SSEServerTransport; server: McpServer }>();
+  private readonly sseContexts = new Map<string, { transport: SSEServerTransport; server: McpServer; release?: () => void }>();
   private wsServer?: WebSocketServer;
-  private readonly wsContexts = new Map<string, { transport: McpWebSocketServerTransport; server: McpServer }>();
+  private readonly wsContexts = new Map<string, { transport: McpWebSocketServerTransport; server: McpServer; release?: () => void }>();
   private stopping = false;
   private closedSignaled = false;
+  private readonly limiter?: ConcurrencyLimiter;
 
   public constructor(options: McpHeadendOptions) {
     this.registry = options.registry;
@@ -74,6 +77,12 @@ export class McpHeadend implements Headend {
     this.transportSpec = options.transport;
     this.id = this.computeId(options.transport);
     this.closed = this.closeDeferred.promise;
+    if (options.transport.type !== 'stdio') {
+      const limit = typeof options.concurrency === 'number' && Number.isFinite(options.concurrency) && options.concurrency > 0
+        ? Math.floor(options.concurrency)
+        : 10;
+      this.limiter = new ConcurrencyLimiter(limit);
+    }
   }
 
   public describe(): HeadendDescription {
@@ -319,6 +328,7 @@ export class McpHeadend implements Headend {
     this.httpContexts.clear();
     // eslint-disable-next-line functional/no-loop-statements
     for (const ctx of contexts) {
+      try { ctx.release?.(); } catch (err) { this.logCloseFailure('transport', err); }
       try { await ctx.server.close(); } catch (err) { this.logCloseFailure('server', err); }
       try { await ctx.transport.close(); } catch (err) { this.logCloseFailure('transport', err); }
     }
@@ -352,6 +362,7 @@ export class McpHeadend implements Headend {
     this.sseContexts.clear();
     // eslint-disable-next-line functional/no-loop-statements
     for (const ctx of contexts) {
+      try { ctx.release?.(); } catch (err) { this.logCloseFailure('transport', err); }
       try { await ctx.transport.close(); } catch (err) { this.logCloseFailure('transport', err); }
       try { await ctx.server.close(); } catch (err) { this.logCloseFailure('server', err); }
     }
@@ -371,24 +382,42 @@ export class McpHeadend implements Headend {
       this.signalClosed({ reason: 'error', error: err instanceof Error ? err : new Error(message) });
     });
     server.on('connection', (socket) => {
-      const serverInstance = this.createServerInstance();
-      const transport = new McpWebSocketServerTransport(socket);
-      const sessionId = transport.sessionId;
-      this.wsContexts.set(sessionId, { transport, server: serverInstance });
-      transport.onerror = (err) => {
-        this.log(`ws transport error: ${err instanceof Error ? err.message : String(err)}`, 'ERR');
-      };
-      transport.onclose = () => {
-        this.wsContexts.delete(sessionId);
-        void serverInstance.close();
-      };
       void (async () => {
+        const limiter = this.limiter;
+        let release: (() => void) | undefined;
+        if (limiter !== undefined) {
+          try {
+            release = await limiter.acquire();
+          } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            this.log(`ws concurrency failure: ${message}`, 'ERR');
+            try { socket.close(); } catch { /* ignore */ }
+            return;
+          }
+        }
+        const serverInstance = this.createServerInstance();
+        const transport = new McpWebSocketServerTransport(socket);
+        const sessionId = transport.sessionId;
+        this.wsContexts.set(sessionId, { transport, server: serverInstance, release });
+        transport.onerror = (err) => {
+          this.log(`ws transport error: ${err instanceof Error ? err.message : String(err)}`, 'ERR');
+        };
+        transport.onclose = () => {
+          const ctx = this.wsContexts.get(sessionId);
+          const releaseFn = ctx?.release;
+          if (typeof releaseFn === 'function') {
+            try { releaseFn(); } catch { /* ignore */ }
+          }
+          this.wsContexts.delete(sessionId);
+          void serverInstance.close();
+        };
         try {
           await transport.start();
           await serverInstance.connect(transport);
         } catch (err) {
           this.log(`ws connection failed: ${err instanceof Error ? err.message : String(err)}`, 'ERR');
           this.wsContexts.delete(sessionId);
+          if (release !== undefined) release();
           await transport.close();
           await serverInstance.close();
         }
@@ -401,6 +430,7 @@ export class McpHeadend implements Headend {
     this.wsContexts.clear();
     // eslint-disable-next-line functional/no-loop-statements
     for (const ctx of contexts) {
+      try { ctx.release?.(); } catch (err) { this.logCloseFailure('transport', err); }
       try { await ctx.transport.close(); } catch (err) { this.logCloseFailure('transport', err); }
       try { await ctx.server.close(); } catch (err) { this.logCloseFailure('server', err); }
     }
@@ -446,11 +476,37 @@ export class McpHeadend implements Headend {
     }
 
     const sessionHeader = this.extractSessionId(req.headers['mcp-session-id']);
+    const limiter = this.limiter;
+    const isExistingSession = typeof sessionHeader === 'string' && sessionHeader.length > 0;
+    let release: (() => void) | undefined;
+    let releaseAttached = false;
+    let closeListener: (() => void) | undefined;
+    const abortController = new AbortController();
+    if (!isExistingSession && limiter !== undefined) {
+      closeListener = () => {
+        if (!abortController.signal.aborted) abortController.abort();
+      };
+      req.on('close', closeListener);
+      try {
+        release = await limiter.acquire({ signal: abortController.signal });
+      } catch (err) {
+        req.removeListener('close', closeListener);
+        if (abortController.signal.aborted) return;
+        const message = err instanceof Error ? err.message : String(err);
+        this.log(`streamable http concurrency failure: ${message}`, 'ERR');
+        this.writeJsonError(res, 503, -32001, 'concurrency_unavailable');
+        return;
+      }
+    }
+
     let parsedBody: unknown;
     try {
       const rawBody = await this.readRequestBody(req);
       parsedBody = rawBody.length > 0 ? JSON.parse(rawBody) : undefined;
     } catch (err) {
+      if (closeListener !== undefined) req.removeListener('close', closeListener);
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      if (!releaseAttached && release !== undefined) release();
       const message = err instanceof Error ? err.message : String(err);
       this.log(`failed to parse MCP request body: ${message}`, 'ERR', true);
       this.writeJsonError(res, 400, -32700, 'Invalid JSON');
@@ -458,13 +514,17 @@ export class McpHeadend implements Headend {
     }
 
     try {
-      if (typeof sessionHeader === 'string' && sessionHeader.length > 0) {
+      if (isExistingSession) {
         const ctx = this.httpContexts.get(sessionHeader);
         if (ctx === undefined) {
           this.writeJsonError(res, 404, -32000, 'Unknown MCP session');
+          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+          if (!releaseAttached && release !== undefined) release();
+          if (closeListener !== undefined) req.removeListener('close', closeListener);
           return;
         }
         await ctx.transport.handleRequest(req as http.IncomingMessage & { auth?: AuthInfo }, res, parsedBody);
+        if (closeListener !== undefined) req.removeListener('close', closeListener);
         return;
       }
 
@@ -473,11 +533,16 @@ export class McpHeadend implements Headend {
           sessionIdGenerator: () => randomUUID(),
           enableJsonResponse: true,
           onsessioninitialized: (sessionId) => {
-            this.httpContexts.set(sessionId, { transport, server: serverInstance });
+            this.httpContexts.set(sessionId, { transport, server: serverInstance, release });
+            releaseAttached = true;
         },
         onsessionclosed: (sessionId) => {
           const ctx = this.httpContexts.get(sessionId);
           if (ctx !== undefined) {
+            const releaseFn = ctx.release;
+            if (typeof releaseFn === 'function') {
+              releaseFn();
+            }
             this.httpContexts.delete(sessionId);
             void ctx.server.close();
           }
@@ -487,6 +552,11 @@ export class McpHeadend implements Headend {
       transport.onclose = () => {
         const sessionId = transport.sessionId;
         if (typeof sessionId === 'string') {
+          const ctx = this.httpContexts.get(sessionId);
+          const releaseFn = ctx?.release;
+          if (typeof releaseFn === 'function') {
+            try { releaseFn(); } catch { /* ignore */ }
+          }
           this.httpContexts.delete(sessionId);
         }
         void serverInstance.close();
@@ -497,7 +567,10 @@ export class McpHeadend implements Headend {
       const message = err instanceof Error ? err.message : String(err);
       this.log(`streamable http request failed: ${message}`, 'ERR', true);
       this.writeJsonError(res, 500, -32603, message);
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      if (!releaseAttached && release !== undefined) release();
     }
+    if (closeListener !== undefined) req.removeListener('close', closeListener);
   }
 
   private async handleSseRequest(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
@@ -512,14 +585,32 @@ export class McpHeadend implements Headend {
     }
     const path = parsedUrl.pathname;
     if (req.method === 'GET' && path === '/mcp/sse') {
+      const limiter = this.limiter;
+      let release: (() => void) | undefined;
+      if (limiter !== undefined) {
+        try {
+          release = await limiter.acquire();
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          this.log(`sse concurrency failure: ${message}`, 'ERR');
+          res.statusCode = 503;
+          res.end('Too many concurrent sessions');
+          return;
+        }
+      }
       const serverInstance = this.createServerInstance();
       const transport = new SSEServerTransport('/mcp/sse/message', res);
       const sessionId = transport.sessionId;
-      this.sseContexts.set(sessionId, { transport, server: serverInstance });
+      this.sseContexts.set(sessionId, { transport, server: serverInstance, release });
       transport.onerror = (err) => {
         this.log(`sse transport error: ${err instanceof Error ? err.message : String(err)}`, 'ERR');
       };
       transport.onclose = () => {
+        const ctx = this.sseContexts.get(sessionId);
+        const releaseFn = ctx?.release;
+        if (typeof releaseFn === 'function') {
+          try { releaseFn(); } catch { /* ignore */ }
+        }
         this.sseContexts.delete(sessionId);
         void serverInstance.close();
       };
@@ -528,6 +619,7 @@ export class McpHeadend implements Headend {
         await serverInstance.connect(transport);
       } catch (err) {
         this.sseContexts.delete(sessionId);
+        if (release !== undefined) release();
         this.log(`sse connection failed: ${err instanceof Error ? err.message : String(err)}`, 'ERR');
         try { await transport.close(); } catch { /* ignore */ }
         await serverInstance.close();

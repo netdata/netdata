@@ -65,6 +65,12 @@ interface AgentErrorResponse {
   error: unknown;
 }
 
+export interface RestExtraRoute {
+  method: 'GET' | 'POST' | 'PUT' | 'DELETE';
+  path: string;
+  handler: (args: { req: http.IncomingMessage; res: http.ServerResponse; url: URL; requestId: string }) => Promise<void>;
+}
+
 export class RestHeadend implements Headend {
   public readonly id: string;
   public readonly kind = 'api';
@@ -78,6 +84,7 @@ export class RestHeadend implements Headend {
   private server?: http.Server;
   private context?: HeadendContext;
   private readonly limiter: ConcurrencyLimiter;
+  private readonly extraRoutes: { method: RestExtraRoute['method']; path: string; handler: RestExtraRoute['handler']; originalPath: string }[] = [];
 
   public constructor(registry: AgentRegistry, opts: RestHeadendOptions) {
     this.registry = registry;
@@ -86,12 +93,21 @@ export class RestHeadend implements Headend {
     this.closed = this.closeDeferred.promise;
     const limit = typeof opts.concurrency === 'number' && Number.isFinite(opts.concurrency) && opts.concurrency > 0
       ? Math.floor(opts.concurrency)
-      : 4;
+      : 10;
     this.limiter = new ConcurrencyLimiter(limit);
   }
 
   public describe(): HeadendDescription {
     return { id: this.id, kind: this.kind, label: `REST API ${String(this.options.port)}` };
+  }
+
+  public registerRoute(route: RestExtraRoute): void {
+    if (this.server !== undefined) {
+      throw new Error('Cannot register REST route after server start');
+    }
+    const method = route.method.toUpperCase() as RestExtraRoute['method'];
+    const path = this.normalizePath(route.path);
+    this.extraRoutes.push({ method, path, handler: route.handler, originalPath: route.path });
   }
 
   public async start(context: HeadendContext): Promise<void> {
@@ -154,12 +170,21 @@ export class RestHeadend implements Headend {
     try {
       const urlRaw = req.url ?? '/';
       const parsedUrl = new URL(urlRaw, `http://localhost:${String(this.options.port)}`);
-      const pathname = parsedUrl.pathname.replace(/\/+/g, '/');
-      const segments = pathname.split('/').filter((segment) => segment.length > 0);
-      if (req.method !== 'GET') {
+      const method = (req.method ?? 'GET').toUpperCase();
+      const normalizedPath = this.normalizePath(parsedUrl.pathname);
+
+      const route = this.matchExtraRoute(method, normalizedPath);
+      if (route !== undefined) {
+        await this.handleExtraRoute(route, req, res, parsedUrl, requestId);
+        return;
+      }
+
+      if (method !== 'GET') {
         writeJson(res, 405, { success: false, output: '', finalReport: undefined, error: 'method_not_allowed' });
         return;
       }
+
+      const segments = normalizedPath.split('/').filter((segment) => segment.length > 0);
       if (segments.length === 1 && segments[0] === 'health') {
         const payload: HealthResponse = { status: 'ok' };
         writeJson(res, 200, payload);
@@ -196,7 +221,6 @@ export class RestHeadend implements Headend {
       return;
     }
 
-    const release = await this.limiter.acquire();
     const abortController = new AbortController();
     const stopRef = { stopping: false };
     const onAbort = () => {
@@ -212,6 +236,20 @@ export class RestHeadend implements Headend {
       req.removeListener('aborted', onAbort);
       res.removeListener('close', onAbort);
     };
+
+    let release: (() => void) | undefined;
+    try {
+      release = await this.limiter.acquire({ signal: abortController.signal });
+    } catch (err: unknown) {
+      cleanup();
+      if (abortController.signal.aborted) {
+        return;
+      }
+      const message = err instanceof Error ? err.message : String(err);
+      this.log(`concurrency acquire failed for ${requestId}: ${message}`, 'ERR');
+      writeJson(res, 503, { success: false, output: '', finalReport: undefined, error: 'concurrency_unavailable' });
+      return;
+    }
 
     let output = '';
     const callbacks: AIAgentCallbacks = {
@@ -266,6 +304,66 @@ export class RestHeadend implements Headend {
       release();
       cleanup();
     }
+  }
+
+  private async handleExtraRoute(
+    route: { method: RestExtraRoute['method']; path: string; handler: RestExtraRoute['handler']; originalPath: string },
+    req: http.IncomingMessage,
+    res: http.ServerResponse,
+    url: URL,
+    requestId: string
+  ): Promise<void> {
+    const abortController = new AbortController();
+    const stopRef = { stopping: false };
+    const onAbort = () => {
+      if (abortController.signal.aborted) return;
+      stopRef.stopping = true;
+      abortController.abort();
+      this.log(`extra route ${route.method} ${route.originalPath} aborted request=${requestId}`, 'WRN');
+    };
+    req.on('aborted', onAbort);
+    res.on('close', onAbort);
+    const cleanup = () => {
+      req.removeListener('aborted', onAbort);
+      res.removeListener('close', onAbort);
+    };
+
+    let release: (() => void) | undefined;
+    try {
+      release = await this.limiter.acquire({ signal: abortController.signal });
+    } catch (err: unknown) {
+      cleanup();
+      if (abortController.signal.aborted) return;
+      const message = err instanceof Error ? err.message : String(err);
+      this.log(`extra route concurrency failure ${route.method} ${route.originalPath}: ${message}`, 'ERR');
+      writeJson(res, 503, { success: false, output: '', finalReport: undefined, error: 'concurrency_unavailable' });
+      return;
+    }
+
+    try {
+      await route.handler({ req, res, url, requestId });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.log(`extra route handler failed ${route.method} ${route.originalPath}: ${message}`, 'ERR');
+      if (!res.writableEnded && !res.writableFinished) {
+        writeJson(res, 500, { success: false, output: '', finalReport: undefined, error: 'internal_error' });
+      }
+    } finally {
+      release();
+      cleanup();
+    }
+  }
+
+  private matchExtraRoute(method: string | undefined, path: string): { method: RestExtraRoute['method']; path: string; handler: RestExtraRoute['handler']; originalPath: string } | undefined {
+    if (method === undefined) return undefined;
+    const upper = method.toUpperCase() as RestExtraRoute['method'];
+    return this.extraRoutes.find((route) => route.method === upper && route.path === path);
+  }
+
+  private normalizePath(pathname: string): string {
+    const cleaned = pathname.replace(/\\+/g, '/');
+    if (cleaned === '' || cleaned === '/') return '/';
+    return cleaned.endsWith('/') ? cleaned.slice(0, -1) : cleaned;
   }
 
   private log(

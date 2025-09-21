@@ -6,6 +6,7 @@ export type HeadendKind =
   | 'openai-completions'
   | 'anthropic-completions'
   | 'api'
+  | 'slack'
   | 'custom';
 
 export interface HeadendDescription {
