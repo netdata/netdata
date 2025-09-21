@@ -34,11 +34,10 @@ func init() {
 func New() *Collector {
 	return &Collector{
 		Config: Config{
-			CreateVnode:                true,
-			EnableProfiles:             true,
-			EnableProfilesTableMetrics: true,
-			VnodeDeviceDownThreshold:   3,
-			Community:                  "public",
+			CreateVnode:              true,
+			EnableProfiles:           true,
+			VnodeDeviceDownThreshold: 3,
+			Community:                "public",
 			Options: Options{
 				Port:           161,
 				Retries:        1,

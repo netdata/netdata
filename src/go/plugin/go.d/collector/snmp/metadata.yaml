@@ -204,11 +204,6 @@ modules:
               description: Enable collection of metrics using SNMP profiles.
               default_value: "true"
               required: false
-            - name: enable_profiles_table_metrics
-              group: Profiles
-              description: Enable collection of SNMP table metrics from profiles. Enabling this may **increase collection time and memory usage** for devices with many network interfaces.
-              default_value: "true"
-              required: false
             - name: disable_legacy_collection
               group: Profiles
               description: Disable the legacy SNMP collection method, forcing the collector to use only SNMP profiles (YAML-based configuration). When enabled, the collector will ignore any non-profile based collection logic.
