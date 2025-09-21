@@ -367,7 +367,7 @@ jobs:
         if: needs.file-check.outputs.run == 'true'
         uses: actions/setup-go@v6
         with:
-          go-version: "^1.24"
+          go-version: "^1.25"
       - name: Set Up Dependencies
         id: deps
         if: needs.file-check.outputs.run == 'true'
