@@ -22,8 +22,8 @@ modules:
       data_collection:
         metrics_description: |
           Demonstrates the IBM.D framework capabilities with test metrics and dynamic instances.
-Collects sample metrics to showcase framework features including precision handling,
-instance management, and chart lifecycle.
+          Collects sample metrics to showcase framework features including precision handling,
+          instance management, and chart lifecycle.
 
         method_description: |
           The collector connects to Example Framework Demo and collects metrics via its monitoring interface.
