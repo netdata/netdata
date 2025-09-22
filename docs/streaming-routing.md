@@ -23,17 +23,17 @@ flowchart LR
     C -->|No data| D
     D --> F("**Connect**<br/>Streaming active")
     E --> F
-
-    %% Style definitions matching the reference
-    classDef alert fill:#ffeb3b,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
-    classDef neutral fill:#f9f9f9,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
-    classDef complete fill:#4caf50,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
-    classDef database fill:#2196F3,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
-
-    %% Apply styles
+%% Style definitions matching the reference
+    classDef alert fill: #ffeb3b, stroke: #000000, stroke-width: 3px, color: #000000, font-size: 18px
+    classDef neutral fill: #f9f9f9, stroke: #000000, stroke-width: 3px, color: #000000, font-size: 18px
+    classDef complete fill: #4caf50, stroke: #000000, stroke-width: 3px, color: #000000, font-size: 18px
+    classDef database fill: #2196F3, stroke: #000000, stroke-width: 3px, color: #000000, font-size: 18px
+%% Apply styles
     class A alert
-    class B,C neutral
-    class D,E database
+    class B neutral
+    class C neutral
+    class D database
+    class E database
     class F complete
 ```
 
@@ -41,10 +41,8 @@ flowchart LR
 
 1. Child sends HTTP requests to all parents in parallel
 2. Each parent responds with:
-
-- Last timestamp of this child's data (if any)
-- Random seed for load balancing
-
+    - Last timestamp of this child's data (if any)
+    - Random seed for load balancing
 3. Child calculates time delta for each parent
 4. Selection based on data recency (not data amount)
 
@@ -108,17 +106,18 @@ flowchart LR
     E --> F("**OK?**<br/>Connection test")
     F -->|No| B
     F -->|Yes| G("**Stream**<br/>Active monitoring")
-
-    %% Style definitions matching the reference
-    classDef alert fill:#ffeb3b,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
-    classDef neutral fill:#f9f9f9,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
-    classDef complete fill:#4caf50,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
-    classDef database fill:#2196F3,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
-
-    %% Apply styles
+%% Style definitions matching the reference
+    classDef alert fill: #ffeb3b, stroke: #000000, stroke-width: 3px, color: #000000, font-size: 18px
+    classDef neutral fill: #f9f9f9, stroke: #000000, stroke-width: 3px, color: #000000, font-size: 18px
+    classDef complete fill: #4caf50, stroke: #000000, stroke-width: 3px, color: #000000, font-size: 18px
+    classDef database fill: #2196F3, stroke: #000000, stroke-width: 3px, color: #000000, font-size: 18px
+%% Apply styles
     class A alert
-    class B,C,E neutral
-    class D,F database
+    class B neutral
+    class C neutral
+    class E neutral
+    class D database
+    class F database
     class G complete
 ```
 
@@ -227,7 +226,7 @@ If a child connects to an unexpected parent, check the data retention on all par
 
 :::caution Maintenance Planning
 
-When taking a parent offline for maintenance, its children will failover to other parents and won't automatically return. Plan capacity accordingly.
+When taking a parent offline for maintenance, its children will fail over to other parents and won't automatically return. Plan capacity accordingly.
 
 :::
 

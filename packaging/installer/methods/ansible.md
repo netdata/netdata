@@ -26,23 +26,23 @@ flowchart TD
     B -->|Deploys| C("**Netdata Agent**<br/>Monitoring daemon")
     C -->|Collects Metrics| D("**Monitored Services**<br/>Applications & infrastructure")
     C -->|Sends Data| E("**Netdata Cloud**<br/>Unified dashboard")
-    
+
     subgraph infrastructure["Target Infrastructure"]
         direction TB
         C
         D
     end
 
-    %% Style definitions matching the reference
-    classDef alert fill:#ffeb3b,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
-    classDef neutral fill:#f9f9f9,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
-    classDef complete fill:#4caf50,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
-    classDef database fill:#2196F3,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
-
-    %% Apply styles
+%% Style definitions matching the reference
+    classDef alert fill: #ffeb3b, stroke: #000000, stroke-width: 3px, color: #000000, font-size: 18px
+    classDef neutral fill: #f9f9f9, stroke: #000000, stroke-width: 3px, color: #000000, font-size: 18px
+    classDef complete fill: #4caf50, stroke: #000000, stroke-width: 3px, color: #000000, font-size: 18px
+    classDef database fill: #2196F3, stroke: #000000, stroke-width: 3px, color: #000000, font-size: 18px
+%% Apply styles
     class A alert
     class B database
-    class C,D complete
+    class C complete
+    class D complete
     class E neutral
     class infrastructure database
 ```

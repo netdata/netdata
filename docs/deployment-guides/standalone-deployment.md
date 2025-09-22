@@ -36,15 +36,17 @@ flowchart TB
 
     NC <--> Agents
 
-    %% Style definitions
-    classDef alert fill:#ffeb3b,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
-    classDef neutral fill:#f9f9f9,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
-    classDef complete fill:#4caf50,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
-    classDef database fill:#2196F3,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+%% Style definitions
+    classDef alert    fill:#ffeb3b, stroke:#000000, stroke-width:3px, color:#000000, font-size:18px
+    classDef neutral  fill:#f9f9f9, stroke:#000000, stroke-width:3px, color:#000000, font-size:18px
+    classDef complete fill:#4caf50, stroke:#000000, stroke-width:3px, color:#000000, font-size:18px
+    classDef database fill:#2196F3, stroke:#000000, stroke-width:3px, color:#000000, font-size:18px
 
-    %% Apply styles
-    class Users,Agents alert
-    class NC,Notifications neutral
+%% Apply styles
+    class Users alert
+    class Agents alert
+    class NC neutral
+    class Notifications neutral
     class Data complete
     class infrastructure database
 ```
@@ -102,7 +104,6 @@ flowchart TB
         N1("**Alerts**<br/>Local notifications")
         N2("**Alerts**<br/>Local notifications")
         N3("**Alerts**<br/>Local notifications")
-        
         A1 --> D1
         A2 --> D2
         A3 --> D3
@@ -111,16 +112,21 @@ flowchart TB
         A3 --> N3
     end
 
-    %% Style definitions matching the reference
-    classDef alert fill:#ffeb3b,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
-    classDef neutral fill:#f9f9f9,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
-    classDef complete fill:#4caf50,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
-    classDef database fill:#2196F3,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
-
-    %% Apply styles
-    class A1,A2,A3 alert
-    class D1,D2,D3 neutral
-    class N1,N2,N3 complete
+%% Style definitions matching the reference
+    classDef alert fill: #ffeb3b, stroke: #000000, stroke-width: 3px, color: #000000, font-size: 18px
+    classDef neutral fill: #f9f9f9, stroke: #000000, stroke-width: 3px, color: #000000, font-size: 18px
+    classDef complete fill: #4caf50, stroke: #000000, stroke-width: 3px, color: #000000, font-size: 18px
+    classDef database fill: #2196F3, stroke: #000000, stroke-width: 3px, color: #000000, font-size: 18px
+%% Apply styles
+    class A1 alert
+    class A2 alert
+    class A3 alert
+    class D1 neutral
+    class D2 neutral
+    class D3 neutral
+    class N1 complete
+    class N2 complete
+    class N3 complete
     class infrastructure database
 ```
 

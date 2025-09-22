@@ -31,7 +31,7 @@ The simplest approach is to use our one-line [kickstart installer](/packaging/in
    ```bash
    wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh --claim-token <YOUR_TOKEN> --claim-url https://app.netdata.cloud
    ```
-  
+
 :::note
 
 Replace `<YOUR_TOKEN>` with your actual claim token.
