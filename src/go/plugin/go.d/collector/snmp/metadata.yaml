@@ -235,17 +235,6 @@ modules:
               description: Additional key-value pairs to associate with the Virtual Node.
               default_value: ""
               required: false
-
-            - name: network_interface_filter.by_name
-              group: Filters
-              description: "Filter interfaces by their names using [simple patterns](/src/libnetdata/simple_pattern/README.md#simple-patterns)."
-              default_value: ""
-              required: false
-            - name: network_interface_filter.by_type
-              group: Filters
-              description: "Filter interfaces by their types using [simple patterns](/src/libnetdata/simple_pattern/README.md#simple-patterns)."
-              default_value: ""
-              required: false
         examples:
           folding:
             title: Config

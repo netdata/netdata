@@ -12,9 +12,6 @@ vnode:
   labels:
     ok: "ok"
 community: "ok"
-network_interface_filter:
-  by_name: "ok"
-  by_type: "ok"
 user:
   name: "ok"
   level: "ok"

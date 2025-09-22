@@ -59,10 +59,6 @@ func (c *Collector) collect() (map[string]int64, error) {
 		}
 
 		c.sysInfo = si
-
-		if !c.DisableLegacyCollection {
-			c.addSysUptimeChart()
-		}
 	}
 
 	mx := make(map[string]int64)
@@ -71,20 +67,9 @@ func (c *Collector) collect() (map[string]int64, error) {
 		c.Infof("failed to collect profiles: %v", err)
 	}
 
-	if !c.DisableLegacyCollection {
-		if err := c.collectSysUptime(mx); err != nil {
+	if !c.DisableLegacyCollection && len(c.customOids) > 0 {
+		if err := c.collectOIDs(mx); err != nil {
 			return nil, err
-		}
-
-		if c.snmpBulkWalkOk && c.collectIfMib {
-			if err := c.collectNetworkInterfaces(mx); err != nil {
-				return nil, err
-			}
-		}
-		if len(c.customOids) > 0 {
-			if err := c.collectOIDs(mx); err != nil {
-				return nil, err
-			}
 		}
 	}
 

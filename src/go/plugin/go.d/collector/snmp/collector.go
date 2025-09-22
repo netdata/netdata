@@ -9,7 +9,6 @@ import (
 
 	"github.com/gosnmp/gosnmp"
 
-	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/vnodes"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
@@ -59,8 +58,6 @@ func New() *Collector {
 		newSnmpClient: gosnmp.NewHandler,
 
 		snmpBulkWalkOk: true,
-		netInterfaces:  make(map[string]*netInterface),
-		collectIfMib:   true,
 		enableProfiles: true,
 	}
 }
@@ -86,13 +83,9 @@ type Collector struct {
 	snmpBulkWalkOk    bool
 
 	// legacy data collection parameters
-	netIfaceFilterByName matcher.Matcher
-	netIfaceFilterByType matcher.Matcher
-	netInterfaces        map[string]*netInterface
-	customOids           []string
+	customOids []string
 
 	// only for tests
-	collectIfMib   bool
 	enableProfiles bool
 }
 
@@ -108,13 +101,6 @@ func (c *Collector) Init(context.Context) error {
 	if _, err := c.initSNMPClient(); err != nil {
 		return fmt.Errorf("failed to initialize SNMP client: %v", err)
 	}
-
-	byName, byType, err := c.initNetIfaceFilters()
-	if err != nil {
-		return fmt.Errorf("failed to initialize network interface filters: %v", err)
-	}
-	c.netIfaceFilterByName = byName
-	c.netIfaceFilterByType = byType
 
 	charts, err := newUserInputCharts(c.ChartsInput)
 	if err != nil {

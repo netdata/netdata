@@ -18,10 +18,11 @@ type (
 
 		Options Options `yaml:"options,omitempty" json:"options"`
 
-		ChartsInput             []ChartConfig          `yaml:"charts,omitempty" json:"charts"`
-		NetworkInterfaceFilter  NetworkInterfaceFilter `yaml:"network_interface_filter,omitempty" json:"network_interface_filter"`
-		DisableLegacyCollection bool                   `yaml:"disable_legacy_collection,omitempty" json:"disable_legacy_collection"`
-		ManualProfiles          []string               `yaml:"manual_profiles,omitempty" json:"manual_profiles"`
+		ManualProfiles []string `yaml:"manual_profiles,omitempty" json:"manual_profiles"`
+
+		// legacy
+		ChartsInput             []ChartConfig `yaml:"charts,omitempty" json:"charts"`
+		DisableLegacyCollection bool          `yaml:"disable_legacy_collection,omitempty" json:"disable_legacy_collection"`
 	}
 	NetworkInterfaceFilter struct {
 		ByName string `yaml:"by_name,omitempty" json:"by_name"`
