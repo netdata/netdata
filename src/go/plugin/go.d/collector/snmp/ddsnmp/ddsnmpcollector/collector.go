@@ -53,8 +53,6 @@ type (
 		scalarCollector         *scalarCollector
 		tableCollector          *tableCollector
 		vmetricsCollector       *vmetricsCollector
-
-		DoTableMetrics bool
 	}
 	profileState struct {
 		profile        *ddsnmp.Profile
@@ -160,13 +158,11 @@ func (c *Collector) collectProfile(ps *profileState) (*ddsnmp.ProfileMetrics, er
 	}
 	metrics = append(metrics, scalarMetrics...)
 
-	if c.DoTableMetrics {
-		tableMetrics, err := c.tableCollector.Collect(ps.profile)
-		if err != nil {
-			return nil, err
-		}
-		metrics = append(metrics, tableMetrics...)
+	tableMetrics, err := c.tableCollector.Collect(ps.profile)
+	if err != nil {
+		return nil, err
 	}
+	metrics = append(metrics, tableMetrics...)
 
 	pm := &ddsnmp.ProfileMetrics{
 		Source:         ps.profile.SourceFile,

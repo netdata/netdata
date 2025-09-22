@@ -12,10 +12,6 @@
     }
   },
   "community": "ok",
-  "network_interface_filter": {
-    "by_name": "ok",
-    "by_type": "ok"
-  },
   "user": {
     "name": "ok",
     "level": "ok",
@@ -54,8 +50,6 @@
       ]
     }
   ],
-  "enable_profiles": true,
-  "enable_profiles_table_metrics": true,
   "disable_legacy_collection": true,
   "manual_profiles": [
     "ok"

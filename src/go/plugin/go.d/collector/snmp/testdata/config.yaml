@@ -2,8 +2,6 @@ update_every: 123
 hostname: "ok"
 create_vnode: yes
 vnode_device_down_threshold: 123
-enable_profiles: yes
-enable_profiles_table_metrics: yes
 disable_legacy_collection: yes
 manual_profiles:
   - "ok"
@@ -14,9 +12,6 @@ vnode:
   labels:
     ok: "ok"
 community: "ok"
-network_interface_filter:
-  by_name: "ok"
-  by_type: "ok"
 user:
   name: "ok"
   level: "ok"

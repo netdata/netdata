@@ -4613,7 +4613,6 @@ func TestCollector_Collect_TableCaching(t *testing.T) {
 			tc.setupMock(mockHandler)
 
 			collector := New(mockHandler, tc.profiles, logger.New(), "")
-			collector.DoTableMetrics = true
 
 			// Configure cache based on test requirements
 			if tc.enableCache {
