@@ -84,9 +84,17 @@ export function formatSlackStatus(summary: SnapshotSummary, masterAgentId?: stri
   const fmtK = (n: number): string => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n));
   const depthOf = (cp?: string): number => cp ? (cp.split('→').length - 1) : 0;
   // Sort lines by depth, then by agentId for stability
-  const sorted = [...summary.lines].sort((a, b) => depthOf(a.callPath) - depthOf(b.callPath) || a.agentId.localeCompare(b.agentId));
-  const master = masterAgentId ? sorted.find((l) => l.agentId === masterAgentId) : sorted[0];
-  const others = sorted.filter((l) => l !== master);
+  const sorted = [...summary.lines]
+    .sort((a, b) => depthOf(a.callPath) - depthOf(b.callPath) || (a.agentId ?? '').localeCompare(b.agentId ?? ''));
+  const seen = new Set<string>();
+  const unique = sorted.filter((line) => {
+    const key = line.callPath ?? line.agentId ?? '';
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  const master = masterAgentId ? unique.find((l) => l.agentId === masterAgentId) : unique[0];
+  const others = unique.filter((l) => l !== master);
   const parts: string[] = [];
 
   const fmtLine = (l: AgentStatusLine): string => {
@@ -110,7 +118,7 @@ export function formatSlackStatus(summary: SnapshotSummary, masterAgentId?: stri
   }
   others.forEach((l) => { const s = fmtLine(l); if (s.length > 0) parts.push(s); });
 
-  const tokenLine = `tokens →:${fmtK(summary.totals.tokensIn)} ←:${fmtK(summary.totals.tokensOut)} c→:${fmtK(summary.totals.tokensCacheRead)} c←:${fmtK(summary.totals.tokensCacheWrite)} | cost: $${(summary.totals.costUsd ?? 0).toFixed(2)} | tools ${summary.totals.toolsRun} | agents ${sorted.length}`;
+  const tokenLine = `tokens →:${fmtK(summary.totals.tokensIn)} ←:${fmtK(summary.totals.tokensOut)} c→:${fmtK(summary.totals.tokensCacheRead)} c←:${fmtK(summary.totals.tokensCacheWrite)} | cost: $${(summary.totals.costUsd ?? 0).toFixed(2)} | tools ${summary.totals.toolsRun} | agents ${unique.length}`;
   parts.push('', tokenLine);
 
   return parts.join('\n');
@@ -158,9 +166,16 @@ export function buildStatusBlocks(summary: SnapshotSummary, rootAgentId?: string
     const ss = n % 60;
     return `${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
   };
-  // Oldest first ⇒ larger elapsedSec first
-  const ordered = running.sort((a, b) => (b.elapsedSec ?? 0) - (a.elapsedSec ?? 0));
-  const entries = ordered
+  // Newest first ⇒ smaller elapsedSec first (dedup keeps the most recent entry)
+  const ordered = running.sort((a, b) => (a.elapsedSec ?? 0) - (b.elapsedSec ?? 0));
+  const seen = new Set<string>();
+  const deduped = ordered.filter((line) => {
+    const key = line.callPath ?? line.agentId ?? '';
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  const entries = deduped
     .flatMap((l) => {
       if (typeof rootAgentId === 'string' && l.agentId === rootAgentId) return []; // drop master
       const cpRaw = typeof l.callPath === 'string' && l.callPath.length > 0 ? l.callPath : l.agentId;
