@@ -5,9 +5,11 @@ package websphere_pmi
 import (
 	"context"
 	"encoding/xml"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -164,7 +166,7 @@ func TestWebSpherePMI_JVMMetricsExtraction(t *testing.T) {
 			require.NoError(t, err)
 
 			// Create test server
-			ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			ts := newTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("Content-Type", "text/xml")
 				w.Write(xmlData)
 			}))
@@ -342,7 +344,7 @@ func TestWebSpherePMI_NoDataLoss(t *testing.T) {
 			require.NoError(t, err)
 
 			// Create test server
-			ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			ts := newTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("Content-Type", "text/xml")
 				w.Write(xmlData)
 			}))
@@ -396,6 +398,32 @@ func TestWebSpherePMI_NoDataLoss(t *testing.T) {
 			}
 		})
 	}
+}
+
+func newTestServer(t *testing.T, handler http.Handler) *httptest.Server {
+	t.Helper()
+
+	var (
+		srv    *httptest.Server
+		caught any
+	)
+
+	func() {
+		defer func() {
+			caught = recover()
+		}()
+		srv = httptest.NewServer(handler)
+	}()
+
+	if caught != nil {
+		msg := fmt.Sprint(caught)
+		if strings.Contains(msg, "failed to listen on a port") || strings.Contains(msg, "operation not permitted") {
+			t.Skipf("skipping WebSphere PMI test: %s", msg)
+		}
+		panic(caught)
+	}
+
+	return srv
 }
 
 // TestWebSpherePMI_BackwardCompatibility verifies that the backward compatibility
