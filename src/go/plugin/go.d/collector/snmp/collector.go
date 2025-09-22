@@ -36,6 +36,7 @@ func New() *Collector {
 			CreateVnode:              true,
 			VnodeDeviceDownThreshold: 3,
 			Community:                "public",
+			DisableLegacyCollection:  true,
 			Options: Options{
 				Port:           161,
 				Retries:        1,

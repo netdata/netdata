@@ -42,7 +42,7 @@ func (c *Collector) collect() (map[string]int64, error) {
 			return nil, err
 		}
 
-		if c.DisableLegacyCollection || c.enableProfiles {
+		if c.enableProfiles {
 			c.snmpProfiles = c.setupProfiles(si.SysObjectID)
 		}
 

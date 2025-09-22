@@ -207,7 +207,7 @@ modules:
             - name: disable_legacy_collection
               group: Profiles
               description: Disable the legacy SNMP collection method, forcing the collector to use only SNMP profiles (YAML-based configuration). When enabled, the collector will ignore any non-profile based collection logic.
-              default_value: "false"
+              default_value: "true"
               required: false
 
             - name: create_vnode
