@@ -76,7 +76,11 @@ We tested a single installation Netdata Parent and Prometheus, at **4.6 million 
 | **Parent** | Workload distributor & aggregator | 10 cores, 40 GiB RAM per 1M metrics/sec | Same + ML training if enabled          | Linear scaling           |
 | **Cloud**  | Control plane & federation        | Minimal                                 | Minimal                                | Unlimited Parents        |
 
-**Offloading:** Agents can offload ML, alerting, dashboards, and retention to Parents - typically cutting agent CPU ≈50%, RAM ≈25%, and eliminating disk I/O entirely.
+:::note
+
+Agents can offload ML, alerting, dashboards, and retention to Parents - typically cutting agent CPU ≈50%, RAM ≈25%, and eliminating disk I/O entirely.
+
+:::
 
 ### The Edge Advantage
 
@@ -148,7 +152,11 @@ The architecture adapts to your needs - train where you have resources, use ever
 |    ~250 nodes    |   ~1M/sec   | 10 cores, 40 GiB RAM |
 |    ~500 nodes    |   ~2M/sec   | 20 cores, 80 GiB RAM |
 
-**Key principle:** Scale horizontally with more Parents, not vertically with bigger Parents. Beyond 500 nodes per Parent, resource usage grows non-linearly.
+:::tip
+
+Scale horizontally with more Parents, not vertically with bigger Parents. Beyond 500 nodes per Parent, resource usage grows non-linearly.
+
+:::
 
 ### Parent Placement Strategy
 
@@ -242,49 +250,95 @@ This isn't just optimization. It's a fundamentally different architecture that r
 
 ## FAQ
 
-**Q: How many nodes can a single Netdata Parent handle?**<br/>
-A: We recommend running Parents with up to 500 Agents (1.5M metrics/s). We have customers running larger Parents, but resources increase and performance decreases non-linearly.
+<details>
+<summary><strong>How many nodes can a single Netdata Parent handle?</strong></summary><br/>
 
-**Q: What happens if a Parent goes down?**<br/>
-A: If the Parent was clustered, agents will connect to the other Parent and replicate to it any metrics collected during the transition. If there is no other Parent to connect to, Agents keep collecting and storing data locally, which will be replicated to the Parent when it becomes available. Note that the replication of past metrics uses only tier-0 (high-res data), so Agents must have enough retention in tier-0 to avoid gaps in the charts.
+We recommend running Parents with up to 500 Agents (1.5M metrics/s). We have customers running larger Parents, but resources increase and performance decreases non-linearly.
 
-**Q: Do I always need Parents?**<br/>
-A: No. Agents alone may be enough. Parents are usually required when you have ephemeral nodes.
+</details>
 
-**Q: How much overhead does Netdata introduce on my systems?**<br/>
-A: Less than 5% CPU and ~200 MiB RAM per agent in standalone mode. Offloaded agents (streaming to a Parent) drop to &lt;2% CPU and ~150 MiB RAM with zero disk I/O. Netdata is designed to be "polite citizen" to production workloads, so it spreads its workload across time and avoids all kinds of sudden and intense spikes.
+<details>
+<summary><strong>What happens if a Parent goes down?</strong></summary><br/>
 
-**Q: How efficient is Netdata’s storage?**<br/>
-A: Tier 0 (per-second) is ~0.6 bytes/sample - the industry’s most efficient. Tiers 1 & 2 keep per-minute and per-hour aggregates, letting you retain months or years of history cheaply.
+If the Parent was clustered, agents will connect to the other Parent and replicate to it any metrics collected during the transition. If there is no other Parent to connect to, Agents keep collecting and storing data locally, which will be replicated to the Parent when it becomes available. Note that the replication of past metrics uses only tier-0 (high-res data), so Agents must have enough retention in tier-0 to avoid gaps in the charts.
 
-**Q: How do I deploy Parents in multi-region or multi-cloud setups?**<br/>
-A: Place Parents close to the agents they serve (same DC/region/AZ). Deploy multiple Parents per region for HA. Use Netdata Cloud to unify dashboards and queries across Parents.
+</details>
 
-**Q: What’s the difference between monitoring and automation alerts?**<br/>
-A: Since Netdata evaluates alerts at the edge, it allows you to specify scripts to be executed when an alert triggers. This enables automation, e.g. "restart service if API endpoint is not responding".
+<details>
+<summary><strong>Do I always need Parents?</strong></summary><br/>
 
-**Q: Is Netdata really energy-efficient?**<br/>
-A: Yes. A peer-reviewed 2023 study (ICSOC, University of Amsterdam) found Netdata to be the most energy-efficient tool among the ones tested, with the lowest CPU and RAM overhead even at 1-second collection.
+No. Agents alone may be enough. Parents are usually required when you have ephemeral nodes.
 
-**Q: Is 100,000+ nodes single installation real?**<br/>
-A: Yes. Even Netdata Cloud SaaS itself (our commercial service) is such a single installation that serves way more than 100k reachable nodes.
+</details>
 
-**Q: Do you promote per-second collection and unlimited metrics because your revenue depends on volume?**<br/>
-A: No. Our commercial offerings are priced per node, with volume discounts (smaller price as the number of nodes increases). Our revenue is not related to the number of metrics or the volume of observability data collected or viewed. We designed Netdata for maximum performance at scale and volume for your benefit. Not ours.
+<details>
+<summary><strong>How much overhead does Netdata introduce on my systems?</strong></summary><br/>
 
-**Q: If I have multiple Parents, how Netdata Cloud provides unified dashboards?**<br/>
-A: Think of Netdata Cloud as the headend of a distributed database. Each Netdata Parent and Agent dynamically becomes part of that database. So, Netdata Cloud queries them all in parallel, to provide the unified view required.
+Less than 5% CPU and ~200 MiB RAM per agent in standalone mode. Offloaded agents (streaming to a Parent) drop to <2% CPU and ~150 MiB RAM with zero disk I/O. Netdata is designed to be "polite citizen" to production workloads, so it spreads its workload across time and avoids all kinds of sudden and intense spikes.
 
-**Q: Is querying 100 remote systems in parallel slower than querying a bigger one locally?**<br/>
-A: There is some extra Network latency involved, but this is usually small (a few ms), because the data transferred are tiny (your web browser will receive 500-1000 points max, even if the query is 10 days of per-second data). However, the aggregate horse power and parallelism of 100 totally independent systems is orders of magnitude more, compared to any single local system. The queries are actually quite faster.
+</details>
+
+<details>
+<summary><strong>How efficient is Netdata's storage?</strong></summary><br/>
+
+Tier 0 (per-second) is ~0.6 bytes/sample - the industry's most efficient. Tiers 1 & 2 keep per-minute and per-hour aggregates, letting you retain months or years of history cheaply.
+
+</details>
+
+<details>
+<summary><strong>How do I deploy Parents in multi-region or multi-cloud setups?</strong></summary><br/>
+
+Place Parents close to the agents they serve (same DC/region/AZ). Deploy multiple Parents per region for HA. Use Netdata Cloud to unify dashboards and queries across Parents.
+
+</details>
+
+<details>
+<summary><strong>What's the difference between monitoring and automation alerts?</strong></summary><br/>
+
+Since Netdata evaluates alerts at the edge, it allows you to specify scripts to be executed when an alert triggers. This enables automation, e.g. "restart service if API endpoint is not responding".
+
+</details>
+
+<details>
+<summary><strong>Is Netdata really energy-efficient?</strong></summary><br/>
+
+Yes. A peer-reviewed 2023 study (ICSOC, University of Amsterdam) found Netdata to be the most energy-efficient tool among the ones tested, with the lowest CPU and RAM overhead even at 1-second collection.
+
+</details>
+
+<details>
+<summary><strong>Is 100,000+ nodes single installation real?</strong></summary><br/>
+
+Yes. Even Netdata Cloud SaaS itself (our commercial service) is such a single installation that serves way more than 100k reachable nodes.
+
+</details>
+
+<details>
+<summary><strong>Do you promote per-second collection and unlimited metrics because your revenue depends on volume?</strong></summary><br/>
+
+No. Our commercial offerings are priced per node, with volume discounts (smaller price as the number of nodes increases). Our revenue is not related to the number of metrics or the volume of observability data collected or viewed. We designed Netdata for maximum performance at scale and volume for your benefit. Not ours.
+
+</details>
+
+<details>
+<summary><strong>If I have multiple Parents, how does Netdata Cloud provide unified dashboards?</strong></summary><br/>
+
+Think of Netdata Cloud as the headend of a distributed database. Each Netdata Parent and Agent dynamically becomes part of that database. So, Netdata Cloud queries them all in parallel, to provide the unified view required.
+
+</details>
+
+<details>
+<summary><strong>Is querying 100 remote systems in parallel slower than querying a bigger one locally?</strong></summary><br/>
+
+There is some extra network latency involved, but this is usually small (a few ms), because the data transferred are tiny (your web browser will receive 500-1000 points max, even if the query is 10 days of per-second data). However, the aggregate horse power and parallelism of 100 totally independent systems is orders of magnitude more, compared to any single local system. The queries are actually quite faster.
+
+</details>
 
 ## Next Steps
 
-- **[Deploy your first Agent](./deployment/agents.md)** - Start monitoring in 60 seconds
-- **[Configure Parents](./deployment/parents.md)** - Scale to hundreds of nodes
-- **[Design for Enterprise](./deployment/enterprise.md)** - Architect for thousands
-- **[Try Netdata Cloud](https://netdata.cloud)** - Unified visibility across everything
-
----
+- **[Deploy your first Agent](/docs/deployment-guides/standalone-deployment.md)** - Start monitoring in 60 seconds
+- **[Configure Parents](/docs/deployment-guides/deployment-with-centralization-points.md)** - Scale to hundreds of nodes
+- **[Design for Enterprise](/docs/netdata-enterprise-evaluation-corrected.md)** - Architect for thousands
+- **[Try Netdata Cloud](/docs/netdata-cloud/README.md)** - Unified visibility across everything
 
 *Based on real production deployments, independent research (University of Amsterdam, ICSOC 2023), and comparative testing (2025). All metrics and resource usage figures represent typical production scenarios.*
