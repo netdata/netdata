@@ -142,9 +142,8 @@ func TestCollector_Charts(t *testing.T) {
 			prepareSNMP: func(t *testing.T, m *snmpmock.MockHandler) *Collector {
 				collr := New()
 				collr.Config = prepareV2Config()
-				if collr.EnableProfiles {
-					setMockClientSysObjectidExpect(m)
-				}
+				collr.enableProfiles = false
+
 				setMockClientSysinfoAndUptimeExpect(m)
 				setMockClientIfMibExpect(m)
 
@@ -244,10 +243,8 @@ func TestCollector_Collect(t *testing.T) {
 			prepareSNMP: func(m *snmpmock.MockHandler) *Collector {
 				collr := New()
 				collr.Config = prepareV2Config()
+				collr.enableProfiles = false
 
-				if collr.EnableProfiles {
-					setMockClientSysObjectidExpect(m)
-				}
 				setMockClientIfMibExpect(m)
 
 				return collr
@@ -349,10 +346,7 @@ func TestCollector_Collect(t *testing.T) {
 				collr := New()
 				collr.Config = prepareConfigWithUserCharts(prepareV2Config(), 0, 3)
 				collr.collectIfMib = false
-
-				if collr.EnableProfiles {
-					setMockClientSysObjectidExpect(m)
-				}
+				collr.enableProfiles = false
 
 				m.EXPECT().Get(gomock.Any()).Return(&gosnmp.SnmpPacket{
 					Variables: []gosnmp.SnmpPDU{
@@ -387,10 +381,7 @@ func TestCollector_Collect(t *testing.T) {
 				collr := New()
 				collr.Config = prepareConfigWithUserCharts(prepareV2Config(), 0, 2)
 				collr.collectIfMib = false
-
-				if collr.EnableProfiles {
-					setMockClientSysObjectidExpect(m)
-				}
+				collr.enableProfiles = false
 
 				m.EXPECT().Get(gomock.Any()).Return(&gosnmp.SnmpPacket{
 					Variables: []gosnmp.SnmpPDU{
@@ -418,10 +409,7 @@ func TestCollector_Collect(t *testing.T) {
 				collr := New()
 				collr.Config = prepareConfigWithUserCharts(prepareV2Config(), 0, 2)
 				collr.collectIfMib = false
-
-				if collr.EnableProfiles {
-					setMockClientSysObjectidExpect(m)
-				}
+				collr.enableProfiles = false
 
 				m.EXPECT().Get(gomock.Any()).Return(&gosnmp.SnmpPacket{
 					Variables: []gosnmp.SnmpPDU{
@@ -459,10 +447,6 @@ func TestCollector_Collect(t *testing.T) {
 			_ = collr.Check(context.Background())
 
 			mx := collr.Collect(context.Background())
-
-			if collr.EnableProfiles {
-				mx["TestMetric"] = 1
-			}
 
 			assert.Equal(t, test.wantCollected, mx)
 		})

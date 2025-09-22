@@ -350,12 +350,6 @@
           ]
         }
       },
-      "enable_profiles": {
-        "title": "Enable SNMP Profile Collection",
-        "description": "Enable collection of metrics using SNMP profiles.",
-        "type": "boolean",
-        "default": true
-      },
       "disable_legacy_collection": {
         "title": "Disable Legacy SNMP Collection",
         "description": "Disable the legacy SNMP collection method, forcing the collector to use only SNMP profiles (YAML-based configuration). When enabled, the collector will ignore any non-profile based collection logic.",
@@ -385,9 +379,6 @@
   "uiSchema": {
     "uiOptions": {
       "fullPage": true
-    },
-    "enable_profiles": {
-      "ui:help": "Profiles provide pre-configured monitoring for specific device models and MIBs, including network interfaces, system information, and device-specific metrics."
     },
     "manual_profiles": {
       "ui:listFlavour": "list",
@@ -505,9 +496,8 @@
         {
           "title": "Profiles",
           "fields": [
-            "enable_profiles",
-            "disable_legacy_collection",
-            "manual_profiles"
+            "manual_profiles",
+            "disable_legacy_collection"
           ]
         }
       ]

@@ -54,7 +54,6 @@
       ]
     }
   ],
-  "enable_profiles": true,
   "disable_legacy_collection": true,
   "manual_profiles": [
     "ok"

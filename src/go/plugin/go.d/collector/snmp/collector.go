@@ -35,7 +35,6 @@ func New() *Collector {
 	return &Collector{
 		Config: Config{
 			CreateVnode:              true,
-			EnableProfiles:           true,
 			VnodeDeviceDownThreshold: 3,
 			Community:                "public",
 			Options: Options{
@@ -62,6 +61,7 @@ func New() *Collector {
 		snmpBulkWalkOk: true,
 		netInterfaces:  make(map[string]*netInterface),
 		collectIfMib:   true,
+		enableProfiles: true,
 	}
 }
 
@@ -88,9 +88,12 @@ type Collector struct {
 	// legacy data collection parameters
 	netIfaceFilterByName matcher.Matcher
 	netIfaceFilterByType matcher.Matcher
-	collectIfMib         bool // only for tests
 	netInterfaces        map[string]*netInterface
 	customOids           []string
+
+	// only for tests
+	collectIfMib   bool
+	enableProfiles bool
 }
 
 func (c *Collector) Configuration() any {

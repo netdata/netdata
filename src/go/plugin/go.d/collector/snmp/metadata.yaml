@@ -199,10 +199,10 @@ modules:
               default_value: 60
               required: false
 
-            - name: enable_profiles
+            - name: manual_profiles
               group: Profiles
-              description: Enable collection of metrics using SNMP profiles.
-              default_value: "true"
+              description: Profiles to apply if automatic detection cannot be used.
+              default_value: "[]"
               required: false
             - name: disable_legacy_collection
               group: Profiles
