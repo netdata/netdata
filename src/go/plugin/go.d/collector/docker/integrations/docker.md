@@ -53,7 +53,6 @@ The default configuration for this integration does not impose any limits on dat
 Enabling `collect_container_size` may result in high CPU usage depending on the version of Docker Engine.
 
 
-
 ## Metrics
 
 Metrics grouped by *scope*.

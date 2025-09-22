@@ -24,7 +24,6 @@ Send notifications to Prowl using Netdata's Agent alert notification feature, wh
 - Warning messages will be sent with the 'High' priority, critical messages will be sent with the 'Emergency' priority, and all other messages will be sent with the normal priority. Opening the notification's associated URL will take you to the Netdata dashboard of the system that issued the alert, directly to the chart that it triggered on.
 
 
-
 ## Setup
 
 

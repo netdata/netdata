@@ -34,7 +34,6 @@ You can send notifications through Amazon SNS using Netdata's Agent alert notifi
   - It is less resource intensive and more cost-efficient than SNS.
 
 
-
 ## Setup
 
 

@@ -59,7 +59,6 @@ Calls to the following endpoints are disabled by default due to IPFS bugs:
 **Disabled by default** due to potential high CPU usage. Consider enabling only if necessary.
 
 
-
 ## Metrics
 
 Metrics grouped by *scope*.

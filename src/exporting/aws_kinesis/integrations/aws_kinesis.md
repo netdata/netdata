@@ -16,7 +16,6 @@ endmeta-->
 Export metrics to AWS Kinesis Data Streams
 
 
-
 <img src="https://img.shields.io/badge/maintained%20by-Netdata-%2300ab44" />
 
 ## Setup
