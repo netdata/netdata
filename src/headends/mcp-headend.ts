@@ -8,13 +8,13 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { WebSocketServer } from 'ws';
 import { z } from 'zod';
 
-import type { AgentRegistry } from '../agent-registry.js';
+import type { AgentMetadata, AgentRegistry } from '../agent-registry.js';
 import type { AIAgentCallbacks, LogEntry } from '../types.js';
 import type { Headend, HeadendClosedEvent, HeadendContext, HeadendDescription } from './types.js';
 import type { AuthInfo } from '@modelcontextprotocol/sdk/server/auth/types.js';
 
 import { describeFormat } from '../formats.js';
-import { resolveToolName } from '../schema-adapters.js';
+import { resolveToolName, type AgentSchemaSummary } from '../schema-adapters.js';
 
 import { ConcurrencyLimiter } from './concurrency.js';
 import { McpWebSocketServerTransport } from './mcp-ws-transport.js';
@@ -36,6 +36,7 @@ const createDeferred = <T>(): Deferred<T> => {
 };
 
 const STREAMABLE_HTTP = 'streamable-http' as const;
+const MCP_SESSION_HEADER = 'mcp-session-id' as const;
 
 const cloneJson = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
 
@@ -163,6 +164,7 @@ interface McpHeadendOptions {
   instructions?: string;
   transport: McpTransportSpec;
   concurrency?: number;
+  verboseLogging?: boolean;
 }
 
 export class McpHeadend implements Headend {
@@ -186,6 +188,7 @@ export class McpHeadend implements Headend {
   private stopping = false;
   private closedSignaled = false;
   private readonly limiter?: ConcurrencyLimiter;
+  private readonly verboseLogging: boolean;
 
   public constructor(options: McpHeadendOptions) {
     this.registry = options.registry;
@@ -193,6 +196,7 @@ export class McpHeadend implements Headend {
     this.transportSpec = options.transport;
     this.id = this.computeId(options.transport);
     this.closed = this.closeDeferred.promise;
+    this.verboseLogging = options.verboseLogging === true;
     if (options.transport.type !== 'stdio') {
       const limit = typeof options.concurrency === 'number' && Number.isFinite(options.concurrency) && options.concurrency > 0
         ? Math.floor(options.concurrency)
@@ -296,20 +300,73 @@ export class McpHeadend implements Headend {
     }
   }
 
+  private describeRemote(req: http.IncomingMessage): string {
+    const address = req.socket.remoteAddress ?? 'unknown';
+    const port = req.socket.remotePort;
+    return port !== undefined ? `${address}:${String(port)}` : address;
+  }
+
+  private extractRpcMethods(payload: unknown): string[] {
+    const gather = (message: unknown): string | undefined => {
+      if (message === null || typeof message !== 'object') return undefined;
+      const method = (message as { method?: unknown }).method;
+      return typeof method === 'string' ? method : undefined;
+    };
+    if (Array.isArray(payload)) {
+      return Array.from(new Set(payload.map(gather).filter((m): m is string => m !== undefined)));
+    }
+    const single = gather(payload);
+    return single !== undefined ? [single] : [];
+  }
+
+  private async ensureSession(sessionId?: string): Promise<{ sessionId: string; context: { transport: StreamableHTTPServerTransport; server: McpServer } }> {
+    if (sessionId !== undefined) {
+      const existing = this.httpContexts.get(sessionId);
+      if (existing !== undefined) return { sessionId, context: existing };
+    }
+
+    const serverInstance = this.createServerInstance();
+    let resolvedSessionId = sessionId ?? randomUUID();
+    let context: { transport: StreamableHTTPServerTransport; server: McpServer } | undefined;
+    const transport = new StreamableHTTPServerTransport({
+      sessionIdGenerator: () => resolvedSessionId,
+      enableJsonResponse: true,
+      onsessioninitialized: (sid) => {
+        resolvedSessionId = sid;
+        if (context !== undefined) this.httpContexts.set(sid, context);
+      },
+      onsessionclosed: (sid) => {
+        this.httpContexts.delete(sid);
+        void this.closeServer(serverInstance);
+      }
+    });
+    context = { transport, server: serverInstance };
+
+    await serverInstance.connect(transport);
+    const internal = transport as unknown as { sessionId?: string; _initialized?: boolean };
+    internal.sessionId = resolvedSessionId;
+    internal._initialized = true;
+    this.httpContexts.set(resolvedSessionId, context);
+    return { sessionId: resolvedSessionId, context };
+  }
+
+  private async closeServer(server: McpServer): Promise<void> {
+    try {
+      await server.close();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logVerbose(`server close failure: ${message}`, 'response', 'WRN');
+    }
+  }
+
   private registerTools(server: McpServer): void {
     const metadataList = this.registry.list();
     const formatValues = ['markdown', 'markdown+mermaid', 'slack-block-kit', 'tty', 'pipe', 'json', 'sub-agent'] as const;
     const jsonSchemaRequired = 'payload.schema is required when format is "json"';
+    const usedNames = new Set<string>();
 
     metadataList.forEach((meta) => {
-      const normalized = resolveToolName({
-        id: meta.id,
-        toolName: meta.toolName,
-        description: meta.description,
-        usage: meta.usage,
-        input: meta.input,
-        outputSchema: meta.outputSchema,
-      });
+      const normalized = this.reserveToolName(meta, usedNames);
       const description = meta.description ?? meta.usage ?? `Agent ${meta.id}`;
       const promptDescription = meta.usage ?? 'User prompt for the agent';
       const formatDetails = formatValues
@@ -364,6 +421,7 @@ export class McpHeadend implements Headend {
       })();
 
       server.tool(normalized, description, paramsShape, async (rawArgs, extra) => {
+        const requestId = randomUUID();
         const parsed = paramsSchema.safeParse(rawArgs);
         if (!parsed.success) {
           const message = parsed.error.issues.map((issue) => issue.message).join('; ');
@@ -421,22 +479,42 @@ export class McpHeadend implements Headend {
             stopRef,
           });
           const result = await session.run();
+          let text = output;
+          const finalReport = result.finalReport;
+          if (finalReport?.content !== undefined && typeof finalReport.content === 'string' && finalReport.content.trim().length > 0) {
+            text = text.length > 0 ? `${text}\n\n${finalReport.content}` : finalReport.content;
+          }
+          if (finalReport?.content_json !== undefined) {
+            try {
+              const jsonText = JSON.stringify(finalReport.content_json, null, 2);
+              if (jsonText.length > 0) {
+                text = text.length > 0 ? `${text}\n\n${jsonText}` : jsonText;
+              }
+            } catch (jsonErr) {
+              const jsonMessage: string = jsonErr instanceof Error ? jsonErr.message : String(jsonErr);
+              const logMessage = ['response', requestId, 'tool', normalized, `json_stringify_failed:${jsonMessage}`].join(' ');
+              this.logVerbose(logMessage, 'response', 'WRN');
+            }
+          }
           if (result.success) {
-            const finalReport = result.finalReport;
-            const structuredContent = finalReport?.content_json;
-            const contentBlock = output.length > 0 ? [{ type: 'text' as const, text: output }] : [];
+            const logMessage = ['response', requestId, 'tool', normalized, 'status=ok'].join(' ');
+            this.logVerbose(logMessage, 'response');
             return {
-              content: contentBlock,
-              ...(structuredContent !== undefined ? { structuredContent } : {}),
+              content: text.length > 0 ? [{ type: 'text' as const, text }] : [],
             };
           }
-          const message = result.error ?? 'Agent execution failed';
+          const message: string = result.error ?? 'Agent execution failed';
+          const logMessage = ['response', requestId, 'tool', normalized, `status=error`, `message:${message}`].join(' ');
+          this.logVerbose(logMessage, 'response', 'ERR');
+          const errorText: string = text.length > 0 ? text : message;
           return {
             isError: true,
-            content: [{ type: 'text' as const, text: message }],
+            content: [{ type: 'text' as const, text: errorText }],
           };
         } catch (err) {
-          const message = err instanceof Error ? err.message : String(err);
+          const message: string = err instanceof Error ? err.message : String(err);
+          const logMessage = ['response', requestId, 'tool', normalized, `status=error`, `message:${message}`].join(' ');
+          this.logVerbose(logMessage, 'response', 'ERR');
           return {
             isError: true,
             content: [{ type: 'text' as const, text: message }],
@@ -446,14 +524,14 @@ export class McpHeadend implements Headend {
     });
   }
 
-  private log(message: string, severity: LogEntry['severity'] = 'VRB', fatal = false): void {
+  private log(message: string, severity: LogEntry['severity'] = 'VRB', fatal = false, direction: LogEntry['direction'] = 'response'): void {
     if (this.context === undefined) return;
     this.context.log({
       timestamp: Date.now(),
       severity,
       turn: 0,
       subturn: 0,
-      direction: 'response',
+      direction,
       type: 'tool',
       remoteIdentifier: 'headend:mcp',
       fatal,
@@ -465,6 +543,67 @@ export class McpHeadend implements Headend {
   private logEntry(entry: LogEntry): void {
     if (this.context === undefined) return;
     this.context.log(entry);
+  }
+
+  private logVerbose(message: string, direction: LogEntry['direction'] = 'response', severity: LogEntry['severity'] = 'VRB'): void {
+    if (!this.verboseLogging) return;
+    this.log(message, severity, false, direction);
+  }
+
+  private logVerboseError(message: string): void {
+    this.logVerbose(message, 'response', 'ERR');
+  }
+
+  private logHttpRequestVerbose(requestId: string, remote: string, ...parts: string[]): void {
+    if (!this.verboseLogging) return;
+    this.logVerbose(['http request', requestId, ...parts, `remote=${remote}`].join(' '), 'request');
+  }
+
+  private logHttpResponseVerbose(requestId: string, remote: string, severity: LogEntry['severity'], ...parts: string[]): void {
+    this.logVerbose(['http response', requestId, ...parts, `remote=${remote}`].join(' '), 'response', severity);
+  }
+
+  private reserveToolName(meta: AgentMetadata, used: Set<string>): string {
+    const base = this.buildToolNameBase(meta);
+    return this.pickToolNameVariant(meta, base, 0, used);
+  }
+
+  private pickToolNameVariant(meta: AgentMetadata, base: string, attempt: number, used: Set<string>): string {
+    const candidateBase = attempt === 0 ? base : `${base}-${String(attempt + 1)}`;
+    const summary = {
+      id: meta.id,
+      toolName: candidateBase,
+      description: meta.description,
+      usage: meta.usage,
+      input: meta.input,
+      outputSchema: meta.outputSchema,
+    } satisfies AgentSchemaSummary;
+    const resolved = resolveToolName(summary);
+    if (used.has(resolved)) {
+      return this.pickToolNameVariant(meta, base, attempt + 1, used);
+    }
+    used.add(resolved);
+    return resolved;
+  }
+
+  private buildToolNameBase(meta: AgentMetadata): string {
+    const normalizeCandidate = (value: string | undefined): string | undefined => {
+      if (value === undefined) return undefined;
+      const trimmed = value.trim();
+      if (trimmed.length === 0) return undefined;
+      const parts = trimmed.split(/[\\/]/);
+      const tail = parts[parts.length - 1] ?? trimmed;
+      const withoutSuffix = tail.replace(/\.ai$/i, '').trim();
+      return withoutSuffix.length > 0 ? withoutSuffix : undefined;
+    };
+
+    const candidates = [
+      normalizeCandidate(typeof meta.toolName === 'string' ? meta.toolName : undefined),
+      normalizeCandidate(typeof meta.promptPath === 'string' ? meta.promptPath : undefined),
+      normalizeCandidate(meta.id),
+    ].filter((value): value is string => value !== undefined);
+
+    return candidates[0] ?? 'agent';
   }
 
   private signalClosed(event: HeadendClosedEvent): void {
@@ -644,25 +783,32 @@ export class McpHeadend implements Headend {
   }
 
   private async handleHttpRequest(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
+    const requestId = randomUUID();
+    const method = req.method ?? 'GET';
+    const url = req.url ?? '';
+    const remote = this.describeRemote(req);
+    this.logHttpRequestVerbose(requestId, remote, method, url);
+
     if (req.url !== '/mcp') {
+      this.logHttpResponseVerbose(requestId, remote, 'ERR', 'status=404', `path=${url}`);
       this.writeJsonError(res, 404, -32601, 'Not Found');
       return;
     }
-    if (req.method !== 'POST') {
+
+    if (method !== 'POST') {
+      this.logHttpResponseVerbose(requestId, remote, 'ERR', 'status=405', `method=${method}`);
       res.statusCode = 405;
       res.setHeader('Allow', 'POST');
       res.end('Method Not Allowed');
       return;
     }
 
-    const sessionHeader = this.extractSessionId(req.headers['mcp-session-id']);
+    let sessionId = this.extractSessionId(req.headers[MCP_SESSION_HEADER]);
     const limiter = this.limiter;
-    const isExistingSession = typeof sessionHeader === 'string' && sessionHeader.length > 0;
     let release: (() => void) | undefined;
-    let releaseAttached = false;
     let closeListener: (() => void) | undefined;
     const abortController = new AbortController();
-    if (!isExistingSession && limiter !== undefined) {
+    if (limiter !== undefined) {
       closeListener = () => {
         if (!abortController.signal.aborted) abortController.abort();
       };
@@ -674,83 +820,80 @@ export class McpHeadend implements Headend {
         if (abortController.signal.aborted) return;
         const message = err instanceof Error ? err.message : String(err);
         this.log(`streamable http concurrency failure: ${message}`, 'ERR');
+        this.logHttpResponseVerbose(requestId, remote, 'ERR', 'status=503', 'concurrency_unavailable');
         this.writeJsonError(res, 503, -32001, 'concurrency_unavailable');
         return;
       }
     }
 
     let parsedBody: unknown;
+    let methods: string[] = [];
     try {
       const rawBody = await this.readRequestBody(req);
       parsedBody = rawBody.length > 0 ? JSON.parse(rawBody) : undefined;
+      methods = this.extractRpcMethods(parsedBody);
+      if (methods.length > 0) {
+        this.logHttpRequestVerbose(requestId, remote, `methods=${methods.join(',')}`);
+      }
     } catch (err) {
       if (closeListener !== undefined) req.removeListener('close', closeListener);
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-      if (!releaseAttached && release !== undefined) release();
+      if (release !== undefined) release();
       const message = err instanceof Error ? err.message : String(err);
       this.log(`failed to parse MCP request body: ${message}`, 'ERR', true);
+      this.logHttpResponseVerbose(requestId, remote, 'ERR', 'status=400', 'invalid_json');
       this.writeJsonError(res, 400, -32700, 'Invalid JSON');
       return;
     }
 
+    const isInitializationRequest = methods.includes('initialize');
+    let context: { transport: StreamableHTTPServerTransport; server: McpServer } | undefined = sessionId !== undefined ? this.httpContexts.get(sessionId) : undefined;
+
+    if (!isInitializationRequest) {
+      const ensured = await this.ensureSession(sessionId);
+      sessionId = ensured.sessionId;
+      context = ensured.context;
+      (req.headers as NodeJS.Dict<string>)[MCP_SESSION_HEADER] = sessionId;
+      res.setHeader(MCP_SESSION_HEADER, sessionId);
+      this.logVerbose(['http session', requestId, `using=${sessionId}`, `remote=${remote}`].join(' '), 'request');
+    }
+
     try {
-      if (isExistingSession) {
-        const ctx = this.httpContexts.get(sessionHeader);
-        if (ctx === undefined) {
-          this.writeJsonError(res, 404, -32000, 'Unknown MCP session');
-          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-          if (!releaseAttached && release !== undefined) release();
-          if (closeListener !== undefined) req.removeListener('close', closeListener);
-          return;
-        }
-        await ctx.transport.handleRequest(req as http.IncomingMessage & { auth?: AuthInfo }, res, parsedBody);
-        if (closeListener !== undefined) req.removeListener('close', closeListener);
+      if (context !== undefined) {
+        await context.transport.handleRequest(req as http.IncomingMessage & { auth?: AuthInfo }, res, parsedBody);
         return;
       }
 
       const serverInstance = this.createServerInstance();
-        const transport = new StreamableHTTPServerTransport({
-          sessionIdGenerator: () => randomUUID(),
-          enableJsonResponse: true,
-          onsessioninitialized: (sessionId) => {
-            this.httpContexts.set(sessionId, { transport, server: serverInstance, release });
-            releaseAttached = true;
+      const transport = new StreamableHTTPServerTransport({
+        sessionIdGenerator: () => randomUUID(),
+        enableJsonResponse: true,
+        onsessioninitialized: (sid) => {
+          this.httpContexts.set(sid, { transport, server: serverInstance });
         },
-        onsessionclosed: (sessionId) => {
-          const ctx = this.httpContexts.get(sessionId);
-          if (ctx !== undefined) {
-            const releaseFn = ctx.release;
-            if (typeof releaseFn === 'function') {
-              releaseFn();
-            }
-            this.httpContexts.delete(sessionId);
-            void ctx.server.close();
-          }
-        },
+        onsessionclosed: (sid) => {
+          this.httpContexts.delete(sid);
+          void this.closeServer(serverInstance);
+        }
       });
       transport.onerror = (err) => { this.log(`transport error: ${err instanceof Error ? err.message : String(err)}`, 'ERR', true); };
       transport.onclose = () => {
-        const sessionId = transport.sessionId;
-        if (typeof sessionId === 'string') {
-          const ctx = this.httpContexts.get(sessionId);
-          const releaseFn = ctx?.release;
-          if (typeof releaseFn === 'function') {
-            try { releaseFn(); } catch { /* ignore */ }
-          }
-          this.httpContexts.delete(sessionId);
+        const sid = transport.sessionId;
+        if (typeof sid === 'string') {
+          this.httpContexts.delete(sid);
         }
-        void serverInstance.close();
+        void this.closeServer(serverInstance);
       };
       await serverInstance.connect(transport);
       await transport.handleRequest(req as http.IncomingMessage & { auth?: AuthInfo }, res, parsedBody);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       this.log(`streamable http request failed: ${message}`, 'ERR', true);
+        this.logHttpResponseVerbose(requestId, remote, 'ERR', 'status=500', `message:${message}`);
       this.writeJsonError(res, 500, -32603, message);
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-      if (!releaseAttached && release !== undefined) release();
+    } finally {
+      if (closeListener !== undefined) req.removeListener('close', closeListener);
+      if (release !== undefined) release();
     }
-    if (closeListener !== undefined) req.removeListener('close', closeListener);
   }
 
   private async handleSseRequest(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
