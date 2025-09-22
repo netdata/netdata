@@ -12,17 +12,17 @@ Test:
       type: line
       priority: 1000
       dimensions:
-        - { name: value, algo: absolute }
-    
+        - {name: value, algo: absolute}
+
     - name: TestIncremental
-      context: example.test_incremental  
+      context: example.test_incremental
       family: test
       title: "Test Incremental Counter"
       units: count/s
       type: line
       priority: 1001
       dimensions:
-        - { name: counter, algo: incremental }
+        - {name: counter, algo: incremental}
 
 Item:
   labels:
@@ -36,8 +36,8 @@ Item:
       type: stacked
       priority: 2000
       dimensions:
-        - { name: percentage, algo: absolute }
-    
+        - {name: percentage, algo: absolute}
+
     - name: ItemCounter
       context: example.item_counter
       family: items
@@ -46,4 +46,4 @@ Item:
       type: line
       priority: 2001
       dimensions:
-        - { name: counter, algo: incremental }
+        - {name: counter, algo: incremental}

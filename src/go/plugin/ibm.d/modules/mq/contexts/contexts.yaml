@@ -1,835 +1,834 @@
-
 # MQ Module Metric Definitions
 # This file defines all metrics collected by the MQ module using PCF protocol
 
 QueueManager:
   labels: []
   contexts:
-      - name: Status
-        context: mq.qmgr.status
-        title: Queue Manager Status
-        units: status
-        family: queue_manager
-        type: line
-        priority: 1000
-        dimensions:
-          - { name: status, algo: absolute }
-      - name: ConnectionCount
-        context: mq.qmgr.connection_count
-        title: Queue Manager Connections
-        units: connections
-        family: queue_manager
-        type: line
-        priority: 1001
-        dimensions:
-          - { name: connections, algo: absolute }
-      - name: Uptime
-        context: mq.qmgr.uptime
-        title: Queue Manager Uptime
-        units: seconds
-        family: queue_manager
-        type: line
-        priority: 1002
-        dimensions:
-          - { name: uptime, algo: absolute }
-      - name: QueuesOverview
-        context: mq.queues.overview
-        title: Queues Monitoring Status
-        units: queues
-        family: overview
-        type: stacked
-        priority: 1100
-        dimensions:
-          - { name: monitored, algo: absolute }
-          - { name: excluded, algo: absolute }
-          - { name: invisible, algo: absolute }
-          - { name: failed, algo: absolute }
-      - name: ChannelsOverview
-        context: mq.channels.overview
-        title: Channels Monitoring Status
-        units: channels
-        family: overview
-        type: stacked
-        priority: 1101
-        dimensions:
-          - { name: monitored, algo: absolute }
-          - { name: excluded, algo: absolute }
-          - { name: invisible, algo: absolute }
-          - { name: failed, algo: absolute }
-      - name: TopicsOverview
-        context: mq.topics.overview
-        title: Topics Monitoring Status
-        units: topics
-        family: overview
-        type: stacked
-        priority: 1102
-        dimensions:
-          - { name: monitored, algo: absolute }
-          - { name: excluded, algo: absolute }
-          - { name: invisible, algo: absolute }
-          - { name: failed, algo: absolute }
-      - name: ListenersOverview
-        context: mq.listeners.overview
-        title: Listeners Monitoring Status
-        units: listeners
-        family: overview
-        type: stacked
-        priority: 1103
-        dimensions:
-          - { name: monitored, algo: absolute }
-          - { name: excluded, algo: absolute }
-          - { name: invisible, algo: absolute }
-          - { name: failed, algo: absolute }
+    - name: Status
+      context: mq.qmgr.status
+      title: Queue Manager Status
+      units: status
+      family: queue_manager
+      type: line
+      priority: 1000
+      dimensions:
+          - {name: status, algo: absolute}
+    - name: ConnectionCount
+      context: mq.qmgr.connection_count
+      title: Queue Manager Connections
+      units: connections
+      family: queue_manager
+      type: line
+      priority: 1001
+      dimensions:
+          - {name: connections, algo: absolute}
+    - name: Uptime
+      context: mq.qmgr.uptime
+      title: Queue Manager Uptime
+      units: seconds
+      family: queue_manager
+      type: line
+      priority: 1002
+      dimensions:
+          - {name: uptime, algo: absolute}
+    - name: QueuesOverview
+      context: mq.queues.overview
+      title: Queues Monitoring Status
+      units: queues
+      family: overview
+      type: stacked
+      priority: 1100
+      dimensions:
+          - {name: monitored, algo: absolute}
+          - {name: excluded, algo: absolute}
+          - {name: invisible, algo: absolute}
+          - {name: failed, algo: absolute}
+    - name: ChannelsOverview
+      context: mq.channels.overview
+      title: Channels Monitoring Status
+      units: channels
+      family: overview
+      type: stacked
+      priority: 1101
+      dimensions:
+          - {name: monitored, algo: absolute}
+          - {name: excluded, algo: absolute}
+          - {name: invisible, algo: absolute}
+          - {name: failed, algo: absolute}
+    - name: TopicsOverview
+      context: mq.topics.overview
+      title: Topics Monitoring Status
+      units: topics
+      family: overview
+      type: stacked
+      priority: 1102
+      dimensions:
+          - {name: monitored, algo: absolute}
+          - {name: excluded, algo: absolute}
+          - {name: invisible, algo: absolute}
+          - {name: failed, algo: absolute}
+    - name: ListenersOverview
+      context: mq.listeners.overview
+      title: Listeners Monitoring Status
+      units: listeners
+      family: overview
+      type: stacked
+      priority: 1103
+      dimensions:
+          - {name: monitored, algo: absolute}
+          - {name: excluded, algo: absolute}
+          - {name: invisible, algo: absolute}
+          - {name: failed, algo: absolute}
 
 # Add Queue Manager Resource metrics from $SYS topics
 QueueManagerResources:
   labels: []
   contexts:
-      - name: CPUUsage
-        context: mq.qmgr.cpu_usage
-        title: Queue Manager CPU Usage
-        units: percentage
-        family: resources
-        type: stacked
-        priority: 1050
-        dimensions:
-          - { name: user, algo: absolute, div: 100 }    # Convert from 0.01% to %
-          - { name: system, algo: absolute, div: 100 }  # Convert from 0.01% to %
-      - name: MemoryUsage
-        context: mq.qmgr.memory_usage
-        title: Queue Manager Memory Usage
-        units: bytes
-        family: resources
-        type: line
-        priority: 1051
-        dimensions:
-          - { name: total, algo: absolute }
-      - name: RAMUsage
-        context: mq.qmgr.ram_usage
-        title: Queue Manager RAM Usage
-        units: bytes
-        family: resources
-        type: line
-        priority: 1052
-        dimensions:
-          - { name: total, algo: absolute }
-      - name: LogUtilization
-        context: mq.qmgr.log_utilization
-        title: Queue Manager Log Utilization
-        units: percentage
-        family: resources
-        type: line
-        priority: 1053
-        dimensions:
-          - { name: used, algo: absolute, div: 100 }    # Convert from 0.01% to %
-      - name: LogFileSize
-        context: mq.qmgr.log_file_size
-        title: Queue Manager Log File Size
-        units: bytes
-        family: resources
-        type: line
-        priority: 1054
-        dimensions:
-          - { name: size, algo: absolute }
-      - name: LogWriteRate
-        context: mq.qmgr.log_write_rate
-        title: Queue Manager Log Write Rate
-        units: bytes/s
-        family: resources
-        type: line
-        priority: 1055
-        dimensions:
-          - { name: rate, algo: absolute }
+    - name: CPUUsage
+      context: mq.qmgr.cpu_usage
+      title: Queue Manager CPU Usage
+      units: percentage
+      family: resources
+      type: stacked
+      priority: 1050
+      dimensions:
+          - {name: user, algo: absolute, div: 100}    # Convert from 0.01% to %
+          - {name: system, algo: absolute, div: 100}  # Convert from 0.01% to %
+    - name: MemoryUsage
+      context: mq.qmgr.memory_usage
+      title: Queue Manager Memory Usage
+      units: bytes
+      family: resources
+      type: line
+      priority: 1051
+      dimensions:
+          - {name: total, algo: absolute}
+    - name: RAMUsage
+      context: mq.qmgr.ram_usage
+      title: Queue Manager RAM Usage
+      units: bytes
+      family: resources
+      type: line
+      priority: 1052
+      dimensions:
+          - {name: total, algo: absolute}
+    - name: LogUtilization
+      context: mq.qmgr.log_utilization
+      title: Queue Manager Log Utilization
+      units: percentage
+      family: resources
+      type: line
+      priority: 1053
+      dimensions:
+          - {name: used, algo: absolute, div: 100}    # Convert from 0.01% to %
+    - name: LogFileSize
+      context: mq.qmgr.log_file_size
+      title: Queue Manager Log File Size
+      units: bytes
+      family: resources
+      type: line
+      priority: 1054
+      dimensions:
+          - {name: size, algo: absolute}
+    - name: LogWriteRate
+      context: mq.qmgr.log_write_rate
+      title: Queue Manager Log Write Rate
+      units: bytes/s
+      family: resources
+      type: line
+      priority: 1055
+      dimensions:
+          - {name: rate, algo: absolute}
 
 Queue:
   labels:
     - queue
     - type
   contexts:
-      - name: Depth
-        context: mq.queue.depth
-        title: Queue Depth
-        units: messages
-        family: queues/activity
-        type: line
-        priority: 2000
-        dimensions:
-          - { name: current, algo: absolute }
-          - { name: max, algo: absolute }
-      - name: DepthPercentage
-        context: mq.queue.depth_percentage
-        title: Queue Depth Percentage
-        units: percentage
-        family: queues/activity
-        type: line
-        priority: 2001
-        dimensions:
-          - { name: percentage, algo: absolute, precision: 1000, div: 1000 }
-      - name: Messages
-        context: mq.queue.messages
-        title: Queue Messages
-        units: messages/s
-        family: queues/activity
-        type: line
-        priority: 2002
-        dimensions:
-          - { name: enqueued, algo: incremental }
-          - { name: dequeued, algo: incremental }
-      - name: Connections
-        context: mq.queue.connections
-        title: Queue Connections
-        units: connections
-        family: queues/activity
-        type: line
-        priority: 2003
-        dimensions:
-          - { name: input, algo: absolute }
-          - { name: output, algo: absolute }
-      - name: HighDepth
-        context: mq.queue.high_depth
-        title: Queue Peak Depth
-        units: messages
-        family: queues/activity
-        type: line
-        priority: 2004
-        dimensions:
-          - { name: high_depth, algo: absolute }
-      - name: UncommittedMessages
-        context: mq.queue.uncommitted_msgs
-        title: Queue Uncommitted Messages
-        units: messages
-        family: queues/activity
-        type: line
-        priority: 2005
-        dimensions:
-          - { name: uncommitted, algo: absolute }
-      - name: FileSize
-        context: mq.queue.file_size
-        title: Queue File Size
-        units: bytes
-        family: queues/activity
-        type: line
-        priority: 2006
-        dimensions:
-          - { name: current, algo: absolute }
-          - { name: max, algo: absolute }
-      - name: LastActivity
-        context: mq.queue.last_activity
-        title: Time Since Last Queue Activity
-        units: seconds
-        family: queues/activity
-        type: line
-        priority: 2007
-        dimensions:
-          - { name: since_last_get, algo: absolute }
-          - { name: since_last_put, algo: absolute }
-      - name: OldestMessageAge
-        context: mq.queue.oldest_msg_age
-        title: Queue Oldest Message Age
-        units: seconds
-        family: queues/performance
-        type: line
-        priority: 2100
-        dimensions:
-          - { name: oldest_msg_age, algo: absolute }
-      - name: QueueTimeIndicators
-        context: mq.queue.time_indicators
-        title: Queue Time Indicators
-        units: microseconds
-        family: queues/performance
-        type: line
-        priority: 2101
-        dimensions:
-          - { name: short_period, algo: absolute }
-          - { name: long_period, algo: absolute }
-      - name: ServiceInterval
-        context: mq.queue.service_interval
-        title: Queue Service Interval
-        units: milliseconds
-        family: queues/performance
-        type: line
-        priority: 2102
-        dimensions:
-          - { name: service_interval, algo: absolute }
-      - name: InhibitStatus
-        context: mq.queue.inhibit_status
-        title: Queue Inhibit Status
-        units: status
-        family: queues/configuration
-        type: line
-        priority: 2200
-        dimensions:
-          - { name: inhibit_get, algo: absolute }
-          - { name: inhibit_put, algo: absolute }
-      - name: Priority
-        context: mq.queue.priority
-        title: Queue Priority Configuration
-        units: priority
-        family: queues/configuration
-        type: line
-        priority: 2201
-        dimensions:
-          - { name: def_priority, algo: absolute }
-      - name: MessagePersistence
-        context: mq.queue.message_persistence
-        title: Queue Default Message Persistence
-        units: boolean
-        family: queues/configuration
-        type: line
-        priority: 2202
-        dimensions:
-          - { name: persistent, algo: absolute }
-          - { name: non_persistent, algo: absolute }
-      - name: RetentionInterval
-        context: mq.queue.retention_interval
-        title: Queue Retention Interval
-        units: hours
-        family: queues/configuration
-        type: line
-        priority: 2203
-        dimensions:
-          - { name: retention_interval, algo: absolute }
-      - name: Triggers
-        context: mq.queue.triggers
-        title: Queue Trigger Configuration
-        units: messages
-        family: queues/limits
-        type: line
-        priority: 2300
-        dimensions:
-          - { name: trigger_depth, algo: absolute }
-          - { name: trigger_type, algo: absolute }
-      - name: BackoutThreshold
-        context: mq.queue.backout_threshold
-        title: Queue Error Handling
-        units: retries
-        family: queues/limits
-        type: line
-        priority: 2301
-        dimensions:
-          - { name: backout_threshold, algo: absolute }
-      - name: MaxMessageLength
-        context: mq.queue.max_msg_length
-        title: Queue Max Message Length
-        units: bytes
-        family: queues/limits
-        type: line
-        priority: 2302
-        dimensions:
-          - { name: max_msg_length, algo: absolute }
-      - name: QueueScope
-        context: mq.queue.scope
-        title: Queue Scope
-        units: boolean
-        family: queues/behavior
-        type: line
-        priority: 2400
-        dimensions:
-          - { name: queue_manager, algo: absolute }
-          - { name: cell, algo: absolute }
-      - name: QueueUsage
-        context: mq.queue.usage
-        title: Queue Usage Type
-        units: boolean
-        family: queues/behavior
-        type: line
-        priority: 2401
-        dimensions:
-          - { name: normal, algo: absolute }
-          - { name: transmission, algo: absolute }
-      - name: MessageDeliverySequence
-        context: mq.queue.msg_delivery_sequence
-        title: Message Delivery Sequence
-        units: boolean
-        family: queues/behavior
-        type: line
-        priority: 2402
-        dimensions:
-          - { name: priority, algo: absolute }
-          - { name: fifo, algo: absolute }
-      - name: HardenGetBackout
-        context: mq.queue.harden_get_backout
-        title: Harden Get Backout
-        units: boolean
-        family: queues/behavior
-        type: line
-        priority: 2403
-        dimensions:
-          - { name: enabled, algo: absolute }
-          - { name: disabled, algo: absolute }
+    - name: Depth
+      context: mq.queue.depth
+      title: Queue Depth
+      units: messages
+      family: queues/activity
+      type: line
+      priority: 2000
+      dimensions:
+          - {name: current, algo: absolute}
+          - {name: max, algo: absolute}
+    - name: DepthPercentage
+      context: mq.queue.depth_percentage
+      title: Queue Depth Percentage
+      units: percentage
+      family: queues/activity
+      type: line
+      priority: 2001
+      dimensions:
+          - {name: percentage, algo: absolute, precision: 1000, div: 1000}
+    - name: Messages
+      context: mq.queue.messages
+      title: Queue Messages
+      units: messages/s
+      family: queues/activity
+      type: line
+      priority: 2002
+      dimensions:
+          - {name: enqueued, algo: incremental}
+          - {name: dequeued, algo: incremental}
+    - name: Connections
+      context: mq.queue.connections
+      title: Queue Connections
+      units: connections
+      family: queues/activity
+      type: line
+      priority: 2003
+      dimensions:
+          - {name: input, algo: absolute}
+          - {name: output, algo: absolute}
+    - name: HighDepth
+      context: mq.queue.high_depth
+      title: Queue Peak Depth
+      units: messages
+      family: queues/activity
+      type: line
+      priority: 2004
+      dimensions:
+          - {name: high_depth, algo: absolute}
+    - name: UncommittedMessages
+      context: mq.queue.uncommitted_msgs
+      title: Queue Uncommitted Messages
+      units: messages
+      family: queues/activity
+      type: line
+      priority: 2005
+      dimensions:
+          - {name: uncommitted, algo: absolute}
+    - name: FileSize
+      context: mq.queue.file_size
+      title: Queue File Size
+      units: bytes
+      family: queues/activity
+      type: line
+      priority: 2006
+      dimensions:
+          - {name: current, algo: absolute}
+          - {name: max, algo: absolute}
+    - name: LastActivity
+      context: mq.queue.last_activity
+      title: Time Since Last Queue Activity
+      units: seconds
+      family: queues/activity
+      type: line
+      priority: 2007
+      dimensions:
+          - {name: since_last_get, algo: absolute}
+          - {name: since_last_put, algo: absolute}
+    - name: OldestMessageAge
+      context: mq.queue.oldest_msg_age
+      title: Queue Oldest Message Age
+      units: seconds
+      family: queues/performance
+      type: line
+      priority: 2100
+      dimensions:
+          - {name: oldest_msg_age, algo: absolute}
+    - name: QueueTimeIndicators
+      context: mq.queue.time_indicators
+      title: Queue Time Indicators
+      units: microseconds
+      family: queues/performance
+      type: line
+      priority: 2101
+      dimensions:
+          - {name: short_period, algo: absolute}
+          - {name: long_period, algo: absolute}
+    - name: ServiceInterval
+      context: mq.queue.service_interval
+      title: Queue Service Interval
+      units: milliseconds
+      family: queues/performance
+      type: line
+      priority: 2102
+      dimensions:
+          - {name: service_interval, algo: absolute}
+    - name: InhibitStatus
+      context: mq.queue.inhibit_status
+      title: Queue Inhibit Status
+      units: status
+      family: queues/configuration
+      type: line
+      priority: 2200
+      dimensions:
+          - {name: inhibit_get, algo: absolute}
+          - {name: inhibit_put, algo: absolute}
+    - name: Priority
+      context: mq.queue.priority
+      title: Queue Priority Configuration
+      units: priority
+      family: queues/configuration
+      type: line
+      priority: 2201
+      dimensions:
+          - {name: def_priority, algo: absolute}
+    - name: MessagePersistence
+      context: mq.queue.message_persistence
+      title: Queue Default Message Persistence
+      units: boolean
+      family: queues/configuration
+      type: line
+      priority: 2202
+      dimensions:
+          - {name: persistent, algo: absolute}
+          - {name: non_persistent, algo: absolute}
+    - name: RetentionInterval
+      context: mq.queue.retention_interval
+      title: Queue Retention Interval
+      units: hours
+      family: queues/configuration
+      type: line
+      priority: 2203
+      dimensions:
+          - {name: retention_interval, algo: absolute}
+    - name: Triggers
+      context: mq.queue.triggers
+      title: Queue Trigger Configuration
+      units: messages
+      family: queues/limits
+      type: line
+      priority: 2300
+      dimensions:
+          - {name: trigger_depth, algo: absolute}
+          - {name: trigger_type, algo: absolute}
+    - name: BackoutThreshold
+      context: mq.queue.backout_threshold
+      title: Queue Error Handling
+      units: retries
+      family: queues/limits
+      type: line
+      priority: 2301
+      dimensions:
+          - {name: backout_threshold, algo: absolute}
+    - name: MaxMessageLength
+      context: mq.queue.max_msg_length
+      title: Queue Max Message Length
+      units: bytes
+      family: queues/limits
+      type: line
+      priority: 2302
+      dimensions:
+          - {name: max_msg_length, algo: absolute}
+    - name: QueueScope
+      context: mq.queue.scope
+      title: Queue Scope
+      units: boolean
+      family: queues/behavior
+      type: line
+      priority: 2400
+      dimensions:
+          - {name: queue_manager, algo: absolute}
+          - {name: cell, algo: absolute}
+    - name: QueueUsage
+      context: mq.queue.usage
+      title: Queue Usage Type
+      units: boolean
+      family: queues/behavior
+      type: line
+      priority: 2401
+      dimensions:
+          - {name: normal, algo: absolute}
+          - {name: transmission, algo: absolute}
+    - name: MessageDeliverySequence
+      context: mq.queue.msg_delivery_sequence
+      title: Message Delivery Sequence
+      units: boolean
+      family: queues/behavior
+      type: line
+      priority: 2402
+      dimensions:
+          - {name: priority, algo: absolute}
+          - {name: fifo, algo: absolute}
+    - name: HardenGetBackout
+      context: mq.queue.harden_get_backout
+      title: Harden Get Backout
+      units: boolean
+      family: queues/behavior
+      type: line
+      priority: 2403
+      dimensions:
+          - {name: enabled, algo: absolute}
+          - {name: disabled, algo: absolute}
 
 Channel:
   labels:
     - channel
     - type
   contexts:
-      - name: Status
-        context: mq.channel.status
-        title: Channel Status
-        units: status
-        family: channels
-        type: stacked
-        priority: 3000
-        dimensions:
-          - { name: inactive, algo: absolute }
-          - { name: binding, algo: absolute }
-          - { name: starting, algo: absolute }
-          - { name: running, algo: absolute }
-          - { name: stopping, algo: absolute }
-          - { name: retrying, algo: absolute }
-          - { name: stopped, algo: absolute }
-          - { name: requesting, algo: absolute }
-          - { name: paused, algo: absolute }
-          - { name: disconnected, algo: absolute }
-          - { name: initializing, algo: absolute }
-          - { name: switching, algo: absolute }
-      - name: Messages
-        context: mq.channel.messages
-        title: Channel Message Rate
-        units: messages/s
-        family: channels
-        type: line
-        priority: 3001
-        dimensions:
-          - { name: messages, algo: incremental }
-      - name: Bytes
-        context: mq.channel.bytes
-        title: Channel Data Transfer Rate
-        units: bytes/s
-        family: channels
-        type: line
-        priority: 3002
-        dimensions:
-          - { name: bytes, algo: incremental }
-      - name: Batches
-        context: mq.channel.batches
-        title: Channel Batch Rate
-        units: batches/s
-        family: channels
-        type: line
-        priority: 3003
-        dimensions:
-          - { name: batches, algo: incremental }
-      - name: BatchSize
-        context: mq.channel.batch_size
-        title: Channel Batch Size
-        units: messages
-        family: channels
-        type: line
-        priority: 3004
-        dimensions:
-          - { name: batch_size, algo: absolute }
-      - name: BatchInterval
-        context: mq.channel.batch_interval
-        title: Channel Batch Interval
-        units: milliseconds
-        family: channels
-        type: line
-        priority: 3005
-        dimensions:
-          - { name: batch_interval, algo: absolute }
-      - name: Intervals
-        context: mq.channel.intervals
-        title: Channel Intervals
-        units: seconds
-        family: channels
-        type: line
-        priority: 3006
-        dimensions:
-          - { name: disc_interval, algo: absolute }
-          - { name: hb_interval, algo: absolute }
-          - { name: keep_alive_interval, algo: absolute }
-      - name: ShortRetryCount
-        context: mq.channel.short_retry_count
-        title: Channel Short Retry Count
-        units: retries
-        family: channels
-        type: line
-        priority: 3007
-        dimensions:
-          - { name: short_retry, algo: absolute }
-      - name: LongRetryInterval
-        context: mq.channel.long_retry_interval
-        title: Channel Long Retry Interval
-        units: seconds
-        family: channels
-        type: line
-        priority: 3008
-        dimensions:
-          - { name: long_retry, algo: absolute }
-      - name: MaxMessageLength
-        context: mq.channel.max_msg_length
-        title: Channel Max Message Length
-        units: bytes
-        family: channels
-        type: line
-        priority: 3009
-        dimensions:
-          - { name: max_msg_length, algo: absolute }
-      - name: SharingConversations
-        context: mq.channel.sharing_conversations
-        title: Channel Sharing Conversations
-        units: conversations
-        family: channels
-        type: line
-        priority: 3010
-        dimensions:
-          - { name: sharing_conversations, algo: absolute }
-      - name: NetworkPriority
-        context: mq.channel.network_priority
-        title: Channel Network Priority
-        units: priority
-        family: channels
-        type: line
-        priority: 3011
-        dimensions:
-          - { name: network_priority, algo: absolute }
-      - name: BufferCounts
-        context: mq.channel.buffer_counts
-        title: Channel Buffer Counts
-        units: buffers
-        family: channels
-        type: line
-        priority: 3012
-        dimensions:
-          - { name: sent, algo: absolute }
-          - { name: received, algo: absolute }
-      - name: CurrentMessages
-        context: mq.channel.current_messages
-        title: Channel Current Messages
-        units: messages
-        family: channels
-        type: line
-        priority: 3013
-        dimensions:
-          - { name: current, algo: absolute }
-      - name: XmitQueueTime
-        context: mq.channel.xmitq_time
-        title: Channel Transmission Queue Time
-        units: milliseconds
-        family: channels
-        type: line
-        priority: 3014
-        dimensions:
-          - { name: xmitq_time, algo: absolute }
-      - name: MCAStatus
-        context: mq.channel.mca_status
-        title: Channel MCA Status
-        units: status
-        family: channels
-        type: line
-        priority: 3015
-        dimensions:
-          - { name: mca_status, algo: absolute }
-      - name: InDoubtStatus
-        context: mq.channel.indoubt_status
-        title: Channel In-Doubt Status
-        units: status
-        family: channels
-        type: line
-        priority: 3016
-        dimensions:
-          - { name: indoubt_status, algo: absolute }
-      - name: SSLKeyResets
-        context: mq.channel.ssl_key_resets
-        title: Channel SSL Key Resets
-        units: resets
-        family: channels
-        type: line
-        priority: 3017
-        dimensions:
-          - { name: ssl_key_resets, algo: absolute }
-      - name: NPMSpeed
-        context: mq.channel.npm_speed
-        title: Channel Non-Persistent Message Speed
-        units: speed
-        family: channels
-        type: line
-        priority: 3018
-        dimensions:
-          - { name: npm_speed, algo: absolute }
-      - name: CurrentSharingConversations
-        context: mq.channel.current_sharing_convs
-        title: Channel Current Sharing Conversations
-        units: conversations
-        family: channels
-        type: line
-        priority: 3019
-        dimensions:
-          - { name: current_sharing, algo: absolute }
+    - name: Status
+      context: mq.channel.status
+      title: Channel Status
+      units: status
+      family: channels
+      type: stacked
+      priority: 3000
+      dimensions:
+          - {name: inactive, algo: absolute}
+          - {name: binding, algo: absolute}
+          - {name: starting, algo: absolute}
+          - {name: running, algo: absolute}
+          - {name: stopping, algo: absolute}
+          - {name: retrying, algo: absolute}
+          - {name: stopped, algo: absolute}
+          - {name: requesting, algo: absolute}
+          - {name: paused, algo: absolute}
+          - {name: disconnected, algo: absolute}
+          - {name: initializing, algo: absolute}
+          - {name: switching, algo: absolute}
+    - name: Messages
+      context: mq.channel.messages
+      title: Channel Message Rate
+      units: messages/s
+      family: channels
+      type: line
+      priority: 3001
+      dimensions:
+          - {name: messages, algo: incremental}
+    - name: Bytes
+      context: mq.channel.bytes
+      title: Channel Data Transfer Rate
+      units: bytes/s
+      family: channels
+      type: line
+      priority: 3002
+      dimensions:
+          - {name: bytes, algo: incremental}
+    - name: Batches
+      context: mq.channel.batches
+      title: Channel Batch Rate
+      units: batches/s
+      family: channels
+      type: line
+      priority: 3003
+      dimensions:
+          - {name: batches, algo: incremental}
+    - name: BatchSize
+      context: mq.channel.batch_size
+      title: Channel Batch Size
+      units: messages
+      family: channels
+      type: line
+      priority: 3004
+      dimensions:
+          - {name: batch_size, algo: absolute}
+    - name: BatchInterval
+      context: mq.channel.batch_interval
+      title: Channel Batch Interval
+      units: milliseconds
+      family: channels
+      type: line
+      priority: 3005
+      dimensions:
+          - {name: batch_interval, algo: absolute}
+    - name: Intervals
+      context: mq.channel.intervals
+      title: Channel Intervals
+      units: seconds
+      family: channels
+      type: line
+      priority: 3006
+      dimensions:
+          - {name: disc_interval, algo: absolute}
+          - {name: hb_interval, algo: absolute}
+          - {name: keep_alive_interval, algo: absolute}
+    - name: ShortRetryCount
+      context: mq.channel.short_retry_count
+      title: Channel Short Retry Count
+      units: retries
+      family: channels
+      type: line
+      priority: 3007
+      dimensions:
+          - {name: short_retry, algo: absolute}
+    - name: LongRetryInterval
+      context: mq.channel.long_retry_interval
+      title: Channel Long Retry Interval
+      units: seconds
+      family: channels
+      type: line
+      priority: 3008
+      dimensions:
+          - {name: long_retry, algo: absolute}
+    - name: MaxMessageLength
+      context: mq.channel.max_msg_length
+      title: Channel Max Message Length
+      units: bytes
+      family: channels
+      type: line
+      priority: 3009
+      dimensions:
+          - {name: max_msg_length, algo: absolute}
+    - name: SharingConversations
+      context: mq.channel.sharing_conversations
+      title: Channel Sharing Conversations
+      units: conversations
+      family: channels
+      type: line
+      priority: 3010
+      dimensions:
+          - {name: sharing_conversations, algo: absolute}
+    - name: NetworkPriority
+      context: mq.channel.network_priority
+      title: Channel Network Priority
+      units: priority
+      family: channels
+      type: line
+      priority: 3011
+      dimensions:
+          - {name: network_priority, algo: absolute}
+    - name: BufferCounts
+      context: mq.channel.buffer_counts
+      title: Channel Buffer Counts
+      units: buffers
+      family: channels
+      type: line
+      priority: 3012
+      dimensions:
+          - {name: sent, algo: absolute}
+          - {name: received, algo: absolute}
+    - name: CurrentMessages
+      context: mq.channel.current_messages
+      title: Channel Current Messages
+      units: messages
+      family: channels
+      type: line
+      priority: 3013
+      dimensions:
+          - {name: current, algo: absolute}
+    - name: XmitQueueTime
+      context: mq.channel.xmitq_time
+      title: Channel Transmission Queue Time
+      units: milliseconds
+      family: channels
+      type: line
+      priority: 3014
+      dimensions:
+          - {name: xmitq_time, algo: absolute}
+    - name: MCAStatus
+      context: mq.channel.mca_status
+      title: Channel MCA Status
+      units: status
+      family: channels
+      type: line
+      priority: 3015
+      dimensions:
+          - {name: mca_status, algo: absolute}
+    - name: InDoubtStatus
+      context: mq.channel.indoubt_status
+      title: Channel In-Doubt Status
+      units: status
+      family: channels
+      type: line
+      priority: 3016
+      dimensions:
+          - {name: indoubt_status, algo: absolute}
+    - name: SSLKeyResets
+      context: mq.channel.ssl_key_resets
+      title: Channel SSL Key Resets
+      units: resets
+      family: channels
+      type: line
+      priority: 3017
+      dimensions:
+          - {name: ssl_key_resets, algo: absolute}
+    - name: NPMSpeed
+      context: mq.channel.npm_speed
+      title: Channel Non-Persistent Message Speed
+      units: speed
+      family: channels
+      type: line
+      priority: 3018
+      dimensions:
+          - {name: npm_speed, algo: absolute}
+    - name: CurrentSharingConversations
+      context: mq.channel.current_sharing_convs
+      title: Channel Current Sharing Conversations
+      units: conversations
+      family: channels
+      type: line
+      priority: 3019
+      dimensions:
+          - {name: current_sharing, algo: absolute}
 
 Topic:
   labels:
     - topic
   contexts:
-      - name: Publishers
-        context: mq.topic.publishers
-        title: Topic Publishers
-        units: publishers
-        family: topics
-        type: line
-        priority: 4000
-        dimensions:
-          - { name: publishers, algo: absolute }
-      - name: Subscribers
-        context: mq.topic.subscribers
-        title: Topic Subscribers
-        units: subscribers
-        family: topics
-        type: line
-        priority: 4001
-        dimensions:
-          - { name: subscribers, algo: absolute }
-      - name: Messages
-        context: mq.topic.messages
-        title: Topic Message Rate
-        units: messages/s
-        family: topics
-        type: line
-        priority: 4002
-        dimensions:
-          - { name: messages, algo: incremental }
-      - name: TimeSinceLastMessage
-        context: mq.topic.time_since_last_message
-        title: Time Since Last Message
-        units: seconds
-        family: topics
-        type: line
-        priority: 4003
-        dimensions:
-          - { name: time_since_last_msg, algo: absolute }
+    - name: Publishers
+      context: mq.topic.publishers
+      title: Topic Publishers
+      units: publishers
+      family: topics
+      type: line
+      priority: 4000
+      dimensions:
+          - {name: publishers, algo: absolute}
+    - name: Subscribers
+      context: mq.topic.subscribers
+      title: Topic Subscribers
+      units: subscribers
+      family: topics
+      type: line
+      priority: 4001
+      dimensions:
+          - {name: subscribers, algo: absolute}
+    - name: Messages
+      context: mq.topic.messages
+      title: Topic Message Rate
+      units: messages/s
+      family: topics
+      type: line
+      priority: 4002
+      dimensions:
+          - {name: messages, algo: incremental}
+    - name: TimeSinceLastMessage
+      context: mq.topic.time_since_last_message
+      title: Time Since Last Message
+      units: seconds
+      family: topics
+      type: line
+      priority: 4003
+      dimensions:
+          - {name: time_since_last_msg, algo: absolute}
 
 Listener:
   labels: [listener, port, ip_address]
   contexts:
-      - name: Status
-        context: mq.listener.status
-        title: Listener Status
-        units: status
-        family: listeners
-        type: line
-        priority: 5000
-        dimensions:
-          - { name: stopped, algo: absolute }
-          - { name: starting, algo: absolute }
-          - { name: running, algo: absolute }
-          - { name: stopping, algo: absolute }
-          - { name: retrying, algo: absolute }
-      - name: Backlog
-        context: mq.listener.backlog
-        title: Listener Connection Backlog
-        units: connections
-        family: listeners
-        type: line
-        priority: 5001
-        dimensions:
-          - { name: backlog, algo: absolute }
-      - name: Uptime
-        context: mq.listener.uptime
-        title: Listener Uptime
-        units: seconds
-        family: listeners
-        type: line
-        priority: 5002
-        dimensions:
-          - { name: uptime, algo: absolute }
+    - name: Status
+      context: mq.listener.status
+      title: Listener Status
+      units: status
+      family: listeners
+      type: line
+      priority: 5000
+      dimensions:
+          - {name: stopped, algo: absolute}
+          - {name: starting, algo: absolute}
+          - {name: running, algo: absolute}
+          - {name: stopping, algo: absolute}
+          - {name: retrying, algo: absolute}
+    - name: Backlog
+      context: mq.listener.backlog
+      title: Listener Connection Backlog
+      units: connections
+      family: listeners
+      type: line
+      priority: 5001
+      dimensions:
+          - {name: backlog, algo: absolute}
+    - name: Uptime
+      context: mq.listener.uptime
+      title: Listener Uptime
+      units: seconds
+      family: listeners
+      type: line
+      priority: 5002
+      dimensions:
+          - {name: uptime, algo: absolute}
 
 QueueStatistics:
   labels: [queue, type]
   contexts:
-      - name: DepthMinMax
-        context: mq.queue_stats.depth_min_max
-        title: Queue Depth Min/Max (Statistics)
-        units: messages
-        family: queues/statistics
-        type: line
-        priority: 6000
-        dimensions:
-          - { name: min_depth, algo: absolute }
-          - { name: max_depth, algo: absolute }
-      - name: AvgQueueTime
-        context: mq.queue_stats.avg_queue_time
-        title: Queue Average Time (Statistics)
-        units: microseconds
-        family: queues/statistics
-        type: line
-        priority: 6001
-        dimensions:
-          - { name: non_persistent, algo: absolute }
-          - { name: persistent, algo: absolute }
-      - name: QueueTimeIndicators
-        context: mq.queue_stats.time_indicators
-        title: Queue Time Indicators (Statistics)
-        units: microseconds
-        family: queues/statistics
-        type: line
-        priority: 6002
-        dimensions:
-          - { name: short_period, algo: absolute }
-          - { name: long_period, algo: absolute }
-      - name: Operations
-        context: mq.queue_stats.operations
-        title: Queue Operations (Statistics)
-        units: operations/s
-        family: queues/statistics
-        type: line
-        priority: 6003
-        dimensions:
-          - { name: puts_non_persistent, algo: incremental }
-          - { name: puts_persistent, algo: incremental }
-          - { name: gets_non_persistent, algo: incremental }
-          - { name: gets_persistent, algo: incremental }
-          - { name: put1s, algo: incremental }
-          - { name: browses, algo: incremental }
-      - name: Bytes
-        context: mq.queue_stats.bytes
-        title: Queue Bytes (Statistics)
-        units: bytes/s
-        family: queues/statistics
-        type: line
-        priority: 6004
-        dimensions:
-          - { name: put_bytes_non_persistent, algo: incremental }
-          - { name: put_bytes_persistent, algo: incremental }
-          - { name: get_bytes_non_persistent, algo: incremental }
-          - { name: get_bytes_persistent, algo: incremental }
-          - { name: browse_bytes, algo: incremental }
-      - name: Failures
-        context: mq.queue_stats.failures
-        title: Queue Operation Failures (Statistics)
-        units: failures/s
-        family: queues/statistics
-        type: line
-        priority: 6005
-        dimensions:
-          - { name: puts_failed, algo: incremental }
-          - { name: put1s_failed, algo: incremental }
-          - { name: gets_failed, algo: incremental }
-          - { name: browses_failed, algo: incremental }
-      - name: MessageLifecycle
-        context: mq.queue_stats.message_lifecycle
-        title: Queue Message Lifecycle (Statistics)
-        units: messages/s
-        family: queues/statistics
-        type: line
-        priority: 6006
-        dimensions:
-          - { name: expired, algo: incremental }
-          - { name: purged, algo: incremental }
-          - { name: not_queued, algo: incremental }
+    - name: DepthMinMax
+      context: mq.queue_stats.depth_min_max
+      title: Queue Depth Min/Max (Statistics)
+      units: messages
+      family: queues/statistics
+      type: line
+      priority: 6000
+      dimensions:
+          - {name: min_depth, algo: absolute}
+          - {name: max_depth, algo: absolute}
+    - name: AvgQueueTime
+      context: mq.queue_stats.avg_queue_time
+      title: Queue Average Time (Statistics)
+      units: microseconds
+      family: queues/statistics
+      type: line
+      priority: 6001
+      dimensions:
+          - {name: non_persistent, algo: absolute}
+          - {name: persistent, algo: absolute}
+    - name: QueueTimeIndicators
+      context: mq.queue_stats.time_indicators
+      title: Queue Time Indicators (Statistics)
+      units: microseconds
+      family: queues/statistics
+      type: line
+      priority: 6002
+      dimensions:
+          - {name: short_period, algo: absolute}
+          - {name: long_period, algo: absolute}
+    - name: Operations
+      context: mq.queue_stats.operations
+      title: Queue Operations (Statistics)
+      units: operations/s
+      family: queues/statistics
+      type: line
+      priority: 6003
+      dimensions:
+          - {name: puts_non_persistent, algo: incremental}
+          - {name: puts_persistent, algo: incremental}
+          - {name: gets_non_persistent, algo: incremental}
+          - {name: gets_persistent, algo: incremental}
+          - {name: put1s, algo: incremental}
+          - {name: browses, algo: incremental}
+    - name: Bytes
+      context: mq.queue_stats.bytes
+      title: Queue Bytes (Statistics)
+      units: bytes/s
+      family: queues/statistics
+      type: line
+      priority: 6004
+      dimensions:
+          - {name: put_bytes_non_persistent, algo: incremental}
+          - {name: put_bytes_persistent, algo: incremental}
+          - {name: get_bytes_non_persistent, algo: incremental}
+          - {name: get_bytes_persistent, algo: incremental}
+          - {name: browse_bytes, algo: incremental}
+    - name: Failures
+      context: mq.queue_stats.failures
+      title: Queue Operation Failures (Statistics)
+      units: failures/s
+      family: queues/statistics
+      type: line
+      priority: 6005
+      dimensions:
+          - {name: puts_failed, algo: incremental}
+          - {name: put1s_failed, algo: incremental}
+          - {name: gets_failed, algo: incremental}
+          - {name: browses_failed, algo: incremental}
+    - name: MessageLifecycle
+      context: mq.queue_stats.message_lifecycle
+      title: Queue Message Lifecycle (Statistics)
+      units: messages/s
+      family: queues/statistics
+      type: line
+      priority: 6006
+      dimensions:
+          - {name: expired, algo: incremental}
+          - {name: purged, algo: incremental}
+          - {name: not_queued, algo: incremental}
 
 ChannelStatistics:
   labels: [channel, type]
   contexts:
-      - name: Messages
-        context: mq.channel_stats.messages
-        title: Channel Messages (Statistics)
-        units: messages/s
-        family: channels/statistics
-        type: line
-        priority: 7000
-        dimensions:
-          - { name: messages, algo: incremental }
-      - name: Bytes
-        context: mq.channel_stats.bytes
-        title: Channel Bytes (Statistics)
-        units: bytes/s
-        family: channels/statistics
-        type: line
-        priority: 7001
-        dimensions:
-          - { name: bytes, algo: incremental }
-      - name: Batches
-        context: mq.channel_stats.batches
-        title: Channel Batches (Statistics)
-        units: batches/s
-        family: channels/statistics
-        type: line
-        priority: 7002
-        dimensions:
-          - { name: full_batches, algo: incremental }
-          - { name: incomplete_batches, algo: incremental }
-      - name: BatchSize
-        context: mq.channel_stats.batch_size
-        title: Channel Average Batch Size (Statistics)
-        units: messages
-        family: channels/statistics
-        type: line
-        priority: 7003
-        dimensions:
-          - { name: avg_batch_size, algo: absolute }
-      - name: PutRetries
-        context: mq.channel_stats.put_retries
-        title: Channel Put Retries (Statistics)
-        units: retries/s
-        family: channels/statistics
-        type: line
-        priority: 7004
-        dimensions:
-          - { name: put_retries, algo: incremental }
+    - name: Messages
+      context: mq.channel_stats.messages
+      title: Channel Messages (Statistics)
+      units: messages/s
+      family: channels/statistics
+      type: line
+      priority: 7000
+      dimensions:
+          - {name: messages, algo: incremental}
+    - name: Bytes
+      context: mq.channel_stats.bytes
+      title: Channel Bytes (Statistics)
+      units: bytes/s
+      family: channels/statistics
+      type: line
+      priority: 7001
+      dimensions:
+          - {name: bytes, algo: incremental}
+    - name: Batches
+      context: mq.channel_stats.batches
+      title: Channel Batches (Statistics)
+      units: batches/s
+      family: channels/statistics
+      type: line
+      priority: 7002
+      dimensions:
+          - {name: full_batches, algo: incremental}
+          - {name: incomplete_batches, algo: incremental}
+    - name: BatchSize
+      context: mq.channel_stats.batch_size
+      title: Channel Average Batch Size (Statistics)
+      units: messages
+      family: channels/statistics
+      type: line
+      priority: 7003
+      dimensions:
+          - {name: avg_batch_size, algo: absolute}
+    - name: PutRetries
+      context: mq.channel_stats.put_retries
+      title: Channel Put Retries (Statistics)
+      units: retries/s
+      family: channels/statistics
+      type: line
+      priority: 7004
+      dimensions:
+          - {name: put_retries, algo: incremental}
 
 MQIStatistics:
   labels: [queue_manager]  # MQI stats are at queue manager level
   contexts:
-      - name: Opens
-        context: mq.mqi_stats.opens
-        title: MQOPEN Operations (Statistics)
-        units: operations/s
-        family: queues/mqi_operations
-        type: line
-        priority: 8000
-        dimensions:
-          - { name: opens_total, algo: incremental }
-          - { name: opens_failed, algo: incremental }
-      - name: Closes
-        context: mq.mqi_stats.closes
-        title: MQCLOSE Operations (Statistics)
-        units: operations/s
-        family: queues/mqi_operations
-        type: line
-        priority: 8001
-        dimensions:
-          - { name: closes_total, algo: incremental }
-          - { name: closes_failed, algo: incremental }
-      - name: Inqs
-        context: mq.mqi_stats.inqs
-        title: MQINQ Operations (Statistics)
-        units: operations/s
-        family: queues/mqi_operations
-        type: line
-        priority: 8002
-        dimensions:
-          - { name: inqs_total, algo: incremental }
-          - { name: inqs_failed, algo: incremental }
-      - name: Sets
-        context: mq.mqi_stats.sets
-        title: MQSET Operations (Statistics)
-        units: operations/s
-        family: queues/mqi_operations
-        type: line
-        priority: 8003
-        dimensions:
-          - { name: sets_total, algo: incremental }
-          - { name: sets_failed, algo: incremental }
+    - name: Opens
+      context: mq.mqi_stats.opens
+      title: MQOPEN Operations (Statistics)
+      units: operations/s
+      family: queues/mqi_operations
+      type: line
+      priority: 8000
+      dimensions:
+          - {name: opens_total, algo: incremental}
+          - {name: opens_failed, algo: incremental}
+    - name: Closes
+      context: mq.mqi_stats.closes
+      title: MQCLOSE Operations (Statistics)
+      units: operations/s
+      family: queues/mqi_operations
+      type: line
+      priority: 8001
+      dimensions:
+          - {name: closes_total, algo: incremental}
+          - {name: closes_failed, algo: incremental}
+    - name: Inqs
+      context: mq.mqi_stats.inqs
+      title: MQINQ Operations (Statistics)
+      units: operations/s
+      family: queues/mqi_operations
+      type: line
+      priority: 8002
+      dimensions:
+          - {name: inqs_total, algo: incremental}
+          - {name: inqs_failed, algo: incremental}
+    - name: Sets
+      context: mq.mqi_stats.sets
+      title: MQSET Operations (Statistics)
+      units: operations/s
+      family: queues/mqi_operations
+      type: line
+      priority: 8003
+      dimensions:
+          - {name: sets_total, algo: incremental}
+          - {name: sets_failed, algo: incremental}
 
 Subscription:
   labels: [subscription, topic]
   contexts:
-      - name: MessageCount
-        context: mq.subscription.messages
-        title: IBM MQ Subscription Messages
-        units: messages
-        family: subscriptions
-        type: line
-        priority: 9000
-        dimensions:
-          - { name: pending, algo: absolute }
-      - name: LastMessageAge
-        context: mq.subscription.last_message_age
-        title: IBM MQ Subscription Last Message Age
-        units: seconds
-        family: subscriptions
-        type: line
-        priority: 9001
-        dimensions:
-          - { name: age, algo: absolute }
+    - name: MessageCount
+      context: mq.subscription.messages
+      title: IBM MQ Subscription Messages
+      units: messages
+      family: subscriptions
+      type: line
+      priority: 9000
+      dimensions:
+          - {name: pending, algo: absolute}
+    - name: LastMessageAge
+      context: mq.subscription.last_message_age
+      title: IBM MQ Subscription Last Message Age
+      units: seconds
+      family: subscriptions
+      type: line
+      priority: 9001
+      dimensions:
+          - {name: age, algo: absolute}

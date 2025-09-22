@@ -106,12 +106,12 @@ modules:
           - title: IBM DB2 Client Libraries
             description: |
               Netdata automatically downloads and installs IBM Data Server Driver Package v12.1.0 to `/usr/lib/netdata/ibm-clidriver/` (or `/opt/netdata/ibm-clidriver/`).
-              
+
               **Important Restrictions:**
               - **License Key Required**: For connections to IBM i servers, you must install a Db2 Connect license key in the driver's license directory according to IBM driver distribution policy
-              - **XA Connections**: Not supported against IBM i servers  
+              - **XA Connections**: Not supported against IBM i servers
               - **CLIENT Authentication**: Not supported by the IBM Data Server Driver
-              
+
               For complete restrictions and limitations, see [IBM Data Server Driver Restrictions](https://www.ibm.com/docs/en/db2/12.1.0?topic=drivers-data-server-driver-restrictions).
 
           - title: Configure Database Connection

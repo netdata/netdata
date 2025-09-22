@@ -57,15 +57,15 @@ modules:
           - Memory pool usage and high water marks
           - Table I/O statistics (scans, reads, DML activity)
         method_description: |
-          The collector uses unixODBC with IBM DB2 ODBC drivers to connect to the database and queries 
+          The collector uses unixODBC with IBM DB2 ODBC drivers to connect to the database and queries
           system catalog tables in SYSIBMADM schema to gather performance metrics.
-          
+
           **Key Benefits of ODBC Approach:**
           - No IBM DB2 client library licensing required
-          - Works with both DB2 and AS/400 systems  
+          - Works with both DB2 and AS/400 systems
           - Simplified deployment and configuration
           - Consistent behavior across all IBM database types
-          
+
           For DB2 9.7+ LUW editions, the collector also uses MON_GET_* table functions for:
           - Memory pool monitoring (MON_GET_MEMORY_POOL)
           - Table I/O statistics (MON_GET_TABLE)
@@ -113,7 +113,7 @@ modules:
           - title: ODBC Driver Setup
             description: |
               This collector uses unixODBC exclusively for database connectivity, eliminating IBM DB2 client library licensing requirements.
-              
+
               **Required Components:**
               1. **unixODBC driver manager**: `sudo apt-get install unixodbc` or `sudo yum install unixODBC`
               2. **IBM DB2 ODBC drivers**: Available from:
@@ -121,7 +121,7 @@ modules:
                  - IBM i Access Client Solutions (for AS/400 connectivity)
                  - Distribution packages (e.g., `ibm-db2-odbc`)
               3. **Driver registration**: Verify with `odbcinst -q -d`
-              
+
               **Benefits:**
               - ✅ **No IBM DB2 client library licensing required**
               - ✅ **Works with both DB2 and AS/400 systems**
@@ -137,7 +137,7 @@ modules:
               GRANT SELECT ON SYSIBMADM.TBSP_UTILIZATION TO username;
               GRANT SELECT ON SYSIBMADM.LOG_UTILIZATION TO username;
               GRANT SELECT ON SYSIBMADM.ENV_INST_INFO TO username;
-              
+
               -- For MON_GET_* functions (DB2 9.7+ LUW):
               GRANT EXECUTE ON FUNCTION SYSPROC.MON_GET_MEMORY_POOL TO username;
               GRANT EXECUTE ON FUNCTION SYSPROC.MON_GET_TABLE TO username;
