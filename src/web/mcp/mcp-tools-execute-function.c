@@ -2596,9 +2596,9 @@ static bool check_requirements_and_violations(MCP_FUNCTION_DATA *data,
     return false;
 }
 
-MCP_RETURN_CODE mcp_tool_execute_function_execute(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id)
+MCP_RETURN_CODE mcp_tool_execute_function_execute(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id __maybe_unused)
 {
-    if (!mcpc || id == 0 || !params)
+    if (!mcpc || !params)
         return MCP_RC_ERROR;
 
     // Create and initialize function data structure

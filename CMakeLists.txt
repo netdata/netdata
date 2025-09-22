@@ -1839,8 +1839,6 @@ set(WEB_PLUGIN_FILES
         src/web/mcp/mcp-tools-configured-alerts.h
         src/web/mcp/mcp-params.c
         src/web/mcp/mcp-params.h
-        src/web/mcp/mcp-request-id.c
-        src/web/mcp/mcp-request-id.h
         src/web/mcp/mcp-ping.c
         src/web/mcp/mcp-ping.h
         src/web/mcp/mcp-logging.c
