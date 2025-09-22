@@ -1,17 +1,20 @@
 import { randomUUID } from 'node:crypto';
 import http from 'node:http';
+import { createRequire } from 'node:module';
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { WebSocketServer } from 'ws';
-import { z } from 'zod';
 
 import type { AgentMetadata, AgentRegistry } from '../agent-registry.js';
 import type { AIAgentCallbacks, LogEntry } from '../types.js';
 import type { Headend, HeadendClosedEvent, HeadendContext, HeadendDescription } from './types.js';
 import type { AuthInfo } from '@modelcontextprotocol/sdk/server/auth/types.js';
+
+/* eslint-disable-next-line @typescript-eslint/consistent-type-imports -- Need runtime type mapping for SDK's bundled Zod */
+type ZodExports = typeof import('zod');
 
 import { describeFormat } from '../formats.js';
 import { resolveToolName, type AgentSchemaSummary } from '../schema-adapters.js';
@@ -36,9 +39,11 @@ const createDeferred = <T>(): Deferred<T> => {
 };
 
 const STREAMABLE_HTTP = 'streamable-http' as const;
+const require = createRequire(import.meta.url);
+const sdkPackagePath = require.resolve('@modelcontextprotocol/sdk/package.json');
+const sdkRequire = createRequire(sdkPackagePath);
+const { z: sdkZ } = sdkRequire('zod') as ZodExports;
 const MCP_SESSION_HEADER = 'mcp-session-id' as const;
-
-const cloneJson = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
 
 const isPlainObject = (value: unknown): value is Record<string, unknown> => (
   value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -55,102 +60,6 @@ const isSimplePromptSchema = (schema: Record<string, unknown>): boolean => {
   if (!isPlainObject(prompt)) return false;
   if (prompt.type !== undefined && prompt.type !== 'string') return false;
   return true;
-};
-
-const buildEnumSchema = (values: unknown[]): z.ZodType => {
-  if (values.length === 0) return z.never();
-  if (values.every((val) => typeof val === 'string')) {
-    const tuple = values as [string, ...string[]];
-    return z.enum(tuple);
-  }
-  const literals = values.map((val) => z.literal(val as never));
-  if (literals.length === 1) return literals[0];
-  const [first, second, ...rest] = literals as unknown as [z.ZodType, z.ZodType, ...z.ZodType[]];
-  return z.union([first, second, ...rest]);
-};
-
-const jsonSchemaToZod = (schema: Record<string, unknown>): z.ZodType => {
-  if (Array.isArray(schema.enum) && schema.enum.length > 0) {
-    return buildEnumSchema(schema.enum);
-  }
-  if (schema.const !== undefined) {
-    return z.literal(schema.const as never);
-  }
-  const rawType = schema.type;
-  if (Array.isArray(rawType) && rawType.length > 0) {
-    const members = rawType.map((t) => {
-      if (typeof t !== 'string') return z.unknown();
-      return jsonSchemaToZod({ ...schema, type: t });
-    });
-    if (members.length === 1) return members[0];
-    return z.union(members as [z.ZodType, z.ZodType, ...z.ZodType[]]);
-  }
-  const type = typeof rawType === 'string' ? rawType : undefined;
-  switch (type) {
-    case 'object': {
-      const properties = isPlainObject(schema.properties) ? schema.properties : {};
-      const required = new Set(Array.isArray(schema.required) ? schema.required.filter((v): v is string => typeof v === 'string') : []);
-      const shape: Record<string, z.ZodType> = {};
-      Object.entries(properties).forEach(([key, value]) => {
-        if (!isPlainObject(value)) return;
-        let child = jsonSchemaToZod(value);
-        if (typeof value.description === 'string' && value.description.length > 0) {
-          child = child.describe(value.description);
-        }
-        if (!required.has(key)) {
-          child = child.optional();
-        }
-        shape[key] = child;
-      });
-      let obj = z.object(shape);
-      if (schema.additionalProperties === false) {
-        obj = obj.strict();
-      } else if (schema.additionalProperties === true || schema.additionalProperties === undefined) {
-        obj = obj.loose();
-      } else if (isPlainObject(schema.additionalProperties)) {
-        const additional = jsonSchemaToZod(schema.additionalProperties);
-        obj = obj.catchall(additional);
-      } else {
-        obj = obj.loose();
-      }
-      return obj;
-    }
-    case 'array': {
-      const items = schema.items;
-      if (Array.isArray(items) && items.length > 0) {
-        const tuple = items.map((item) => (isPlainObject(item) ? jsonSchemaToZod(item) : z.unknown()));
-        return z.tuple(tuple as [z.ZodType, ...z.ZodType[]]);
-      }
-      if (isPlainObject(items)) {
-        return z.array(jsonSchemaToZod(items));
-      }
-      return z.array(z.unknown());
-    }
-    case 'string': {
-      let str = z.string();
-      if (typeof schema.minLength === 'number') str = str.min(schema.minLength);
-      if (typeof schema.maxLength === 'number') str = str.max(schema.maxLength);
-      return str;
-    }
-    case 'number': {
-      let num = z.number();
-      if (typeof schema.minimum === 'number') num = num.min(schema.minimum);
-      if (typeof schema.maximum === 'number') num = num.max(schema.maximum);
-      return num;
-    }
-    case 'integer': {
-      let intSchema = z.number().int();
-      if (typeof schema.minimum === 'number') intSchema = intSchema.min(schema.minimum);
-      if (typeof schema.maximum === 'number') intSchema = intSchema.max(schema.maximum);
-      return intSchema;
-    }
-    case 'boolean':
-      return z.boolean();
-    case 'null':
-      return z.null();
-    default:
-      return z.unknown();
-  }
 };
 
 export type McpTransportSpec =
@@ -185,6 +94,7 @@ export class McpHeadend implements Headend {
   private readonly sseContexts = new Map<string, { transport: SSEServerTransport; server: McpServer; release?: () => void }>();
   private wsServer?: WebSocketServer;
   private readonly wsContexts = new Map<string, { transport: McpWebSocketServerTransport; server: McpServer; release?: () => void }>();
+  private readonly closingServers = new WeakSet<McpServer>();
   private stopping = false;
   private closedSignaled = false;
   private readonly limiter?: ConcurrencyLimiter;
@@ -249,7 +159,7 @@ export class McpHeadend implements Headend {
     switch (this.transportSpec.type) {
       case 'stdio': {
         if (this.server !== undefined) {
-          try { await this.server.close(); } catch (err) { this.logCloseFailure('server', err); }
+          await this.closeServer(this.server);
         }
         if (this.stdioTransport !== undefined) {
           try { await this.stdioTransport.close(); } catch (err) { this.logCloseFailure('transport', err); }
@@ -351,11 +261,14 @@ export class McpHeadend implements Headend {
   }
 
   private async closeServer(server: McpServer): Promise<void> {
+    if (this.closingServers.has(server)) return;
+    this.closingServers.add(server);
     try {
       await server.close();
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      this.logVerbose(`server close failure: ${message}`, 'response', 'WRN');
+      this.logCloseFailure('server', error);
+    } finally {
+      this.closingServers.delete(server);
     }
   }
 
@@ -372,43 +285,34 @@ export class McpHeadend implements Headend {
       const formatDetails = formatValues
         .map((id) => `${id}: ${describeFormat(id)}`)
         .join('\n');
-      const formatField = z.enum(formatValues).describe(`Output format to request from the agent. Choose one of:\n${formatDetails}`);
+      const formatField = sdkZ.enum(formatValues).describe(`Output format to request from the agent. Choose one of:\n${formatDetails}`);
 
       const isPromptOnly = meta.input.format === 'text' || isSimplePromptSchema(meta.input.schema);
 
       const { paramsShape, paramsSchema } = (() => {
-        const responseSchemaField = z
-          .record(z.string(), z.unknown())
+        const responseSchemaField = sdkZ
+          .record(sdkZ.string(), sdkZ.unknown())
           .describe('Optional JSON schema describing the expected JSON response format')
           .optional();
 
         if (!isPromptOnly) {
-          const schemaClone = cloneJson(meta.input.schema);
-          if (isPlainObject(schemaClone.properties)) {
-            delete schemaClone.properties.format;
-            if (Array.isArray(schemaClone.required)) {
-              schemaClone.required = schemaClone.required.filter((item) => item !== 'format');
-            }
-            const promptProp = schemaClone.properties.prompt;
-            if (isPlainObject(promptProp)) {
-              promptProp.description = promptDescription;
-            }
-          }
-          const payloadZod = jsonSchemaToZod(schemaClone).describe(`${promptDescription}. Provide the JSON payload matching the agent's input schema.`);
+          const payloadField = sdkZ
+            .record(sdkZ.string(), sdkZ.unknown())
+            .describe(`${promptDescription}. Provide the JSON payload matching the agent's input schema.`);
           const shape = {
             format: formatField,
-            payload: payloadZod,
+            payload: payloadField,
             schema: responseSchemaField,
           } as const;
-          return { paramsShape: shape, paramsSchema: z.object(shape) };
+          return { paramsShape: shape, paramsSchema: sdkZ.object(shape) };
         }
 
-        const promptField = z
+        const promptField = sdkZ
           .string()
           .min(1, 'prompt is required')
           .describe(promptDescription);
-        const extrasField = z
-          .record(z.string(), z.unknown())
+        const extrasField = sdkZ
+          .record(sdkZ.string(), sdkZ.unknown())
           .describe('Optional extra parameters forwarded unchanged to the agent')
           .optional();
         const shape = {
@@ -417,7 +321,7 @@ export class McpHeadend implements Headend {
           payload: extrasField,
           schema: responseSchemaField,
         } as const;
-        return { paramsShape: shape, paramsSchema: z.object(shape) };
+        return { paramsShape: shape, paramsSchema: sdkZ.object(shape) };
       })();
 
       server.tool(normalized, description, paramsShape, async (rawArgs, extra) => {
@@ -648,7 +552,7 @@ export class McpHeadend implements Headend {
     // eslint-disable-next-line functional/no-loop-statements
     for (const ctx of contexts) {
       try { ctx.release?.(); } catch (err) { this.logCloseFailure('transport', err); }
-      try { await ctx.server.close(); } catch (err) { this.logCloseFailure('server', err); }
+      await this.closeServer(ctx.server);
       try { await ctx.transport.close(); } catch (err) { this.logCloseFailure('transport', err); }
     }
     if (this.httpServer !== undefined) {
@@ -683,7 +587,7 @@ export class McpHeadend implements Headend {
     for (const ctx of contexts) {
       try { ctx.release?.(); } catch (err) { this.logCloseFailure('transport', err); }
       try { await ctx.transport.close(); } catch (err) { this.logCloseFailure('transport', err); }
-      try { await ctx.server.close(); } catch (err) { this.logCloseFailure('server', err); }
+      await this.closeServer(ctx.server);
     }
     if (this.sseServer !== undefined) {
       await new Promise<void>((resolve) => { this.sseServer?.close(() => { resolve(); }); });
@@ -728,7 +632,7 @@ export class McpHeadend implements Headend {
             try { releaseFn(); } catch { /* ignore */ }
           }
           this.wsContexts.delete(sessionId);
-          void serverInstance.close();
+          void this.closeServer(serverInstance);
         };
         try {
           await transport.start();
@@ -738,7 +642,7 @@ export class McpHeadend implements Headend {
           this.wsContexts.delete(sessionId);
           if (release !== undefined) release();
           await transport.close();
-          await serverInstance.close();
+          await this.closeServer(serverInstance);
         }
       })();
     });
@@ -751,7 +655,7 @@ export class McpHeadend implements Headend {
     for (const ctx of contexts) {
       try { ctx.release?.(); } catch (err) { this.logCloseFailure('transport', err); }
       try { await ctx.transport.close(); } catch (err) { this.logCloseFailure('transport', err); }
-      try { await ctx.server.close(); } catch (err) { this.logCloseFailure('server', err); }
+      await this.closeServer(ctx.server);
     }
     if (this.wsServer !== undefined) {
       await new Promise<void>((resolve) => {
@@ -935,7 +839,7 @@ export class McpHeadend implements Headend {
           try { releaseFn(); } catch { /* ignore */ }
         }
         this.sseContexts.delete(sessionId);
-        void serverInstance.close();
+        void this.closeServer(serverInstance);
       };
       try {
         await transport.start();
@@ -945,7 +849,7 @@ export class McpHeadend implements Headend {
         if (release !== undefined) release();
         this.log(`sse connection failed: ${err instanceof Error ? err.message : String(err)}`, 'ERR');
         try { await transport.close(); } catch { /* ignore */ }
-        await serverInstance.close();
+        await this.closeServer(serverInstance);
         if (!res.writableEnded && !res.writableFinished) {
           res.statusCode = 500;
           res.end('Failed to start SSE session');
