@@ -274,7 +274,7 @@ No. Agents alone may be enough. Parents are usually required when you have ephem
 <details>
 <summary><strong>How much overhead does Netdata introduce on my systems?</strong></summary><br/>
 
-Less than 5% CPU and ~200 MiB RAM per agent in standalone mode. Offloaded agents (streaming to a Parent) drop to <2% CPU and ~150 MiB RAM with zero disk I/O. Netdata is designed to be "polite citizen" to production workloads, so it spreads its workload across time and avoids all kinds of sudden and intense spikes.
+Less than 5% CPU and ~200 MiB RAM per agent in standalone mode. Offloaded agents (streaming to a Parent) drop to less than 2% CPU and ~150 MiB RAM with zero disk I/O. Netdata is designed to be "polite citizen" to production workloads, so it spreads its workload across time and avoids all kinds of sudden and intense spikes.
 
 </details>
 
