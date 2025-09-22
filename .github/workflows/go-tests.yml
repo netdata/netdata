@@ -127,7 +127,11 @@ jobs:
           set -euo pipefail
           # The race detector requires CGO; explicitly enable it to avoid go emitting
           # non-JSON diagnostics that crash gotestfmt when CGO is disabled upstream.
-          CGO_ENABLED=1 go test -json ./... -race -count=1 2>&1 | gotestfmt -hide all
+          # Some toolchain output still lacks package metadata, so normalize the stream
+          # before passing it to gotestfmt.
+          CGO_ENABLED=1 go test -json ./... -race -count=1 2>&1 \
+            | .github/scripts/normalize-go-test-json.py \
+            | gotestfmt -hide all
         working-directory: ${{ matrix.module }}
 
   build-tests:
