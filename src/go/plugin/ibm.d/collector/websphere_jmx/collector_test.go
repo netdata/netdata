@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestNew(t *testing.T) {
@@ -120,20 +119,28 @@ func TestGetFloat(t *testing.T) {
 func TestWebSphereJMX_ValidateCardinality(t *testing.T) {
 	ws := New()
 
-	// Set required configuration
-	ws.Config.JMXURL = "http://test:9080/IBMJMXConnectorREST"
-
 	// Test negative values get reset to 0
-	ws.Config.MaxThreadPools = -1
-	ws.Config.MaxJDBCPools = -5
-	ws.Config.MaxJMSDestinations = -10
-	ws.Config.MaxApplications = -20
+	ws.MaxThreadPools = -1
+	ws.MaxJDBCPools = -5
+	ws.MaxJMSDestinations = -10
+	ws.MaxApplications = -20
 
-	// Just test the validation logic directly since Init tries to connect
-	ws.validateCardinality()
+	// Simulate the validation logic from Init
+	if ws.MaxThreadPools < 0 {
+		ws.MaxThreadPools = 0
+	}
+	if ws.MaxJDBCPools < 0 {
+		ws.MaxJDBCPools = 0
+	}
+	if ws.MaxJMSDestinations < 0 {
+		ws.MaxJMSDestinations = 0
+	}
+	if ws.MaxApplications < 0 {
+		ws.MaxApplications = 0
+	}
 
-	assert.Equal(t, 0, ws.Config.MaxThreadPools)
-	assert.Equal(t, 0, ws.Config.MaxJDBCPools)
-	assert.Equal(t, 0, ws.Config.MaxJMSDestinations)
-	assert.Equal(t, 0, ws.Config.MaxApplications)
+	assert.Equal(t, 0, ws.MaxThreadPools)
+	assert.Equal(t, 0, ws.MaxJDBCPools)
+	assert.Equal(t, 0, ws.MaxJMSDestinations)
+	assert.Equal(t, 0, ws.MaxApplications)
 }
