@@ -68,7 +68,7 @@ static const size_t MCP_WEBSOCKET_RESPONSE_MAX_BYTES = 16 * 1024 * 1024;
 
 static void buffer_append_json_id(BUFFER *out, struct json_object *id_obj) {
     if (!id_obj) {
-        buffer_fast_strcat(out, "null", 4);
+        buffer_strcat(out, "null");
         return;
     }
 
@@ -100,22 +100,22 @@ static void mcp_websocket_send_payload(struct websocket_server_client *wsc, BUFF
 
 static BUFFER *mcp_websocket_build_error_payload(struct json_object *id_obj, int code, const char *message, const struct mcp_response_chunk *chunks, size_t chunk_count) {
     BUFFER *out = buffer_create(512, NULL);
-    buffer_fast_strcat(out, "{\"jsonrpc\":\"2.0\",\"id\":", 25);
+    buffer_strcat(out, "{\"jsonrpc\":\"2.0\",\"id\":");
     buffer_append_json_id(out, id_obj);
-    buffer_fast_strcat(out, ",\"error\":{\"code\":", 19);
+    buffer_strcat(out, ",\"error\":{\"code\":");
     buffer_sprintf(out, "%d", code);
-    buffer_fast_strcat(out, ",\"message\":", 13);
+    buffer_strcat(out, ",\"message\":");
     buffer_append_json_string_value(out, message ? message : "");
 
     if (chunk_count >= 1 && chunks && chunks[0].buffer && buffer_strlen(chunks[0].buffer)) {
-        buffer_fast_strcat(out, ",\"data\":", 9);
+        buffer_strcat(out, ",\"data\":");
         if (chunks[0].type == MCP_RESPONSE_CHUNK_JSON)
             buffer_fast_strcat(out, buffer_tostring(chunks[0].buffer), buffer_strlen(chunks[0].buffer));
         else
             buffer_append_json_string_value(out, buffer_tostring(chunks[0].buffer));
     }
 
-    buffer_fast_strcat(out, "}}", 2);
+    buffer_strcat(out, "}}");
     return out;
 }
 
@@ -124,14 +124,14 @@ static BUFFER *mcp_websocket_build_success_payload(struct json_object *id_obj, c
     size_t chunk_len = chunk_text ? buffer_strlen(chunk->buffer) : 0;
 
     BUFFER *out = buffer_create(64 + chunk_len, NULL);
-    buffer_fast_strcat(out, "{\"jsonrpc\":\"2.0\",\"id\":", 25);
+    buffer_strcat(out, "{\"jsonrpc\":\"2.0\",\"id\":");
     buffer_append_json_id(out, id_obj);
-    buffer_fast_strcat(out, ",\"result\":", 11);
+    buffer_strcat(out, ",\"result\":");
     if (chunk_text && chunk_len)
         buffer_fast_strcat(out, chunk_text, chunk_len);
     else
-        buffer_fast_strcat(out, "{}", 2);
-    buffer_fast_strcat(out, "}", 1);
+        buffer_strcat(out, "{}");
+    buffer_strcat(out, "}");
     return out;
 }
 
