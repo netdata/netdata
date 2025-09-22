@@ -215,7 +215,7 @@ https://github.com/netdata/netdata/edit/master/docs/security-and-privacy-design/
 ,,,,
 https://github.com/netdata/netdata/edit/master/docs/developer-and-contributor-corner/README.md,Developer and Contributor Corner,Published,Developer and Contributor Corner,
 https://github.com/netdata/netdata/edit/master/docs/category-overview-pages/netdata-apis.md,REST API,Unpublished,Developer and Contributor Corner/REST API,
-https://github.com/netdata/netdata/edit/master/src/web/api/README.md,REST API,Published,Developer and Contributor Corner/REST API,
+https://github.com/netdata/netdata/edit/master/src/web/api/README.md,Netdata API's,Published,Developer and Contributor Corner/REST API,
 https://github.com/netdata/netdata/edit/master/src/web/api/queries/README.md,Queries,Published,Developer and Contributor Corner/REST API/Queries,
 https://github.com/netdata/netdata/edit/master/src/web/api/queries/average/README.md,Average or Mean,Published,Developer and Contributor Corner/REST API/Queries,
 https://github.com/netdata/netdata/edit/master/src/web/api/queries/countif/README.md,CountIf,Published,Developer and Contributor Corner/REST API/Queries,
