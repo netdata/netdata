@@ -17,7 +17,9 @@ const (
 	prioJVMHeapUsage
 	prioJVMNonHeap
 	prioJVMGC
+	prioJVMGCTime // Added for GC time chart
 	prioJVMThreads
+	prioJVMThreadsPeak // Added for peak threads chart
 	prioJVMClasses
 	prioJVMProcessCPU
 	prioJVMUptime
@@ -40,19 +42,27 @@ const (
 	prioJCAPoolWaitingThreads
 
 	prioJMSMessages
+	prioJMSMessageBacklog // Added for message backlog chart
 	prioJMSConsumers
 
 	prioAppRequests
+	prioAppRequestsPerServlet // Added for per-servlet requests
 	prioAppResponseTime
 	prioAppSessions
+	prioAppSessionsActive // Added for active sessions
 	prioAppTransactions
+	prioAppTransactionRate // Added for transaction rate
 
 	prioClusterState
 	prioClusterMembers
+	prioClusterMemberStatus // Added for member status
 	prioHAManager
+	prioHAManagerBackup // Added for HA backup
 	prioDynamicCluster
 	prioReplication
+	prioReplicationRate // Added for replication rate
 	prioConnectionHealth
+	prioConnectionHealthDetail // Added for connection health details
 
 	// APM priorities
 	prioServletRequests
@@ -63,6 +73,7 @@ const (
 	prioEJBPool
 	prioJDBCTimeBreakdown
 	prioJDBCStmtCache
+	prioJDBCStmtCacheDiscards // Added for statement cache discards
 	prioJDBCConnectionReuse
 )
 
@@ -125,7 +136,7 @@ var baseCharts = module.Charts{
 		Units:    "milliseconds",
 		Fam:      "jvm",
 		Ctx:      "websphere_jmx.jvm_gc_time",
-		Priority: prioJVMGC + 1,
+		Priority: prioJVMGCTime,
 		Dims: module.Dims{
 			{ID: "jvm_gc_time", Name: "time"},
 		},
@@ -151,7 +162,7 @@ var baseCharts = module.Charts{
 		Units:    "threads",
 		Fam:      "jvm",
 		Ctx:      "websphere_jmx.jvm_thread_states",
-		Priority: prioJVMThreads + 1,
+		Priority: prioJVMThreadsPeak,
 		Dims: module.Dims{
 			{ID: "jvm_thread_peak", Name: "peak"},
 			{ID: "jvm_thread_started", Name: "started"},
@@ -217,7 +228,7 @@ var baseCharts = module.Charts{
 		Units:    "seconds",
 		Fam:      "resilience",
 		Ctx:      "websphere_jmx.connection_staleness",
-		Priority: prioConnectionHealth + 1,
+		Priority: prioConnectionHealthDetail,
 		Dims: module.Dims{
 			{ID: "seconds_since_last_success", Name: "age"},
 		},
@@ -418,7 +429,7 @@ var jmsDestinationChartsTmpl = module.Charts{
 		Units:    "messages",
 		Fam:      "jms",
 		Ctx:      "websphere_jmx.jms_messages_total",
-		Priority: prioJMSMessages + 1,
+		Priority: prioJMSMessageBacklog,
 		Dims: module.Dims{
 			{ID: "jms_%s_messages_total", Name: "total"},
 		},
@@ -455,7 +466,7 @@ var applicationChartsTmpl = module.Charts{
 		Units:    "errors",
 		Fam:      "applications",
 		Ctx:      "websphere_jmx.app_errors",
-		Priority: prioAppRequests + 1,
+		Priority: prioAppRequestsPerServlet,
 		Dims: module.Dims{
 			{ID: "app_%s_errors", Name: "errors"},
 		},
@@ -495,7 +506,7 @@ var sessionChartsTmpl = module.Charts{
 		Units:    "sessions",
 		Fam:      "applications",
 		Ctx:      "websphere_jmx.app_sessions_invalidated",
-		Priority: prioAppSessions + 1,
+		Priority: prioAppSessionsActive,
 		Dims: module.Dims{
 			{ID: "app_%s_sessions_invalidated", Name: "invalidated"},
 		},
@@ -521,7 +532,7 @@ var transactionChartsTmpl = module.Charts{
 		Units:    "transactions",
 		Fam:      "applications",
 		Ctx:      "websphere_jmx.app_transactions_total",
-		Priority: prioAppTransactions + 1,
+		Priority: prioAppTransactionRate,
 		Type:     module.Stacked,
 		Dims: module.Dims{
 			{ID: "app_%s_transactions_committed", Name: "committed"},
@@ -562,7 +573,7 @@ var clusterCharts = module.Charts{
 		Units:    "status",
 		Fam:      "cluster",
 		Ctx:      "websphere_jmx.cluster_workload",
-		Priority: prioClusterMembers + 1,
+		Priority: prioClusterMemberStatus,
 		Dims: module.Dims{
 			{ID: "cluster_wlm_enabled", Name: "wlm_enabled"},
 			{ID: "cluster_session_affinity", Name: "session_affinity"},
@@ -587,7 +598,7 @@ var clusterCharts = module.Charts{
 		Units:    "bulletins",
 		Fam:      "cluster",
 		Ctx:      "websphere_jmx.ha_bulletins",
-		Priority: prioHAManager + 1,
+		Priority: prioHAManagerBackup,
 		Dims: module.Dims{
 			{ID: "ha_bulletins_sent", Name: "sent"},
 		},
@@ -625,7 +636,7 @@ var clusterCharts = module.Charts{
 		Units:    "operations",
 		Fam:      "cluster",
 		Ctx:      "websphere_jmx.replication_health",
-		Priority: prioReplication + 1,
+		Priority: prioReplicationRate,
 		Dims: module.Dims{
 			{ID: "replication_sync_failures", Name: "sync_failures"},
 			{ID: "replication_async_queue_depth", Name: "async_queue_depth"},
@@ -747,7 +758,7 @@ var jdbcAdvancedChartsTmpl = module.Charts{
 		Units:    "statements",
 		Fam:      "jdbc pools",
 		Ctx:      "websphere_jmx.jdbc_stmt_cache_size",
-		Priority: prioJDBCStmtCache + 1,
+		Priority: prioJDBCStmtCacheDiscards,
 		Dims: module.Dims{
 			{ID: "jdbc_%s_stmt_cache_size", Name: "size"},
 		},

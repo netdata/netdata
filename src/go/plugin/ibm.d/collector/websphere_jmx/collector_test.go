@@ -120,13 +120,17 @@ func TestGetFloat(t *testing.T) {
 func TestWebSphereJMX_ValidateCardinality(t *testing.T) {
 	ws := New()
 
+	// Set required configuration
+	ws.Config.JMXURL = "http://test:9080/IBMJMXConnectorREST"
+
 	// Test negative values get reset to 0
 	ws.Config.MaxThreadPools = -1
 	ws.Config.MaxJDBCPools = -5
 	ws.Config.MaxJMSDestinations = -10
 	ws.Config.MaxApplications = -20
 
-	require.NoError(t, ws.Init(context.Background()))
+	// Just test the validation logic directly since Init tries to connect
+	ws.validateCardinality()
 
 	assert.Equal(t, 0, ws.Config.MaxThreadPools)
 	assert.Equal(t, 0, ws.Config.MaxJDBCPools)
