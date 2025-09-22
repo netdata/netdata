@@ -61,7 +61,7 @@ const (
 	ListenerStatusStopped  ListenerStatus = 0
 	ListenerStatusStarting ListenerStatus = 1
 	ListenerStatusRunning  ListenerStatus = 2
-	ListenerStatusStopping  ListenerStatus = 3
+	ListenerStatusStopping ListenerStatus = 3
 	ListenerStatusRetrying ListenerStatus = 4
 )
 
@@ -201,22 +201,22 @@ func QueueTypeString(t int32) string {
 // Stub type definitions
 type ConnectionConfig struct {
 	QueueManager string
-	Host        string
-	Port        int
-	Channel     string
-	User        string
-	Password    string
+	Host         string
+	Port         int
+	Channel      string
+	User         string
+	Password     string
 }
 
 type QueueManagerInfo struct {
-	Name        string
-	Status      int32
-	Connections int32
-	StartDate   string
-	StartTime   string
-	Platform    string
+	Name         string
+	Status       int32
+	Connections  int32
+	StartDate    string
+	StartTime    string
+	Platform     string
 	CommandLevel int32
-	IsBroker    bool
+	IsBroker     bool
 }
 
 type QueueInfo struct {
@@ -226,67 +226,67 @@ type QueueInfo struct {
 }
 
 type QueueMetrics struct {
-	Name                    string
-	Type                    AttributeValue
-	CurrentDepth           int64
-	MaxDepth               int64
-	DepthPercentage        float64
-	OpenInputCount         AttributeValue
-	OpenOutputCount        AttributeValue
-	EnqueueCount           int64
-	DequeueCount           int64
-	HighDepth              int64
-	TimeSinceReset         int64
-	OldestMsgAge           AttributeValue
-	UncommittedMsgs        AttributeValue
-	LastGetDate            AttributeValue
-	LastGetTime            AttributeValue
-	LastPutDate            AttributeValue
-	LastPutTime            AttributeValue
-	HasStatusMetrics       bool
-	HasResetStats          bool
-	CurrentFileSize        AttributeValue
-	CurrentMaxFileSize     AttributeValue
-	QTimeShort             AttributeValue
-	QTimeLong              AttributeValue
-	InhibitGet             AttributeValue
-	InhibitPut             AttributeValue
-	BackoutThreshold       AttributeValue
-	TriggerDepth           AttributeValue
-	TriggerType            AttributeValue
-	MaxMsgLength           AttributeValue
-	DefPriority            AttributeValue
-	ServiceInterval        AttributeValue
-	RetentionInterval      AttributeValue
-	Scope                  AttributeValue
-	Usage                  AttributeValue
-	MsgDeliverySequence    AttributeValue
-	HardenGetBackout       AttributeValue
-	DefPersistence         AttributeValue
+	Name                string
+	Type                AttributeValue
+	CurrentDepth        int64
+	MaxDepth            int64
+	DepthPercentage     float64
+	OpenInputCount      AttributeValue
+	OpenOutputCount     AttributeValue
+	EnqueueCount        int64
+	DequeueCount        int64
+	HighDepth           int64
+	TimeSinceReset      int64
+	OldestMsgAge        AttributeValue
+	UncommittedMsgs     AttributeValue
+	LastGetDate         AttributeValue
+	LastGetTime         AttributeValue
+	LastPutDate         AttributeValue
+	LastPutTime         AttributeValue
+	HasStatusMetrics    bool
+	HasResetStats       bool
+	CurrentFileSize     AttributeValue
+	CurrentMaxFileSize  AttributeValue
+	QTimeShort          AttributeValue
+	QTimeLong           AttributeValue
+	InhibitGet          AttributeValue
+	InhibitPut          AttributeValue
+	BackoutThreshold    AttributeValue
+	TriggerDepth        AttributeValue
+	TriggerType         AttributeValue
+	MaxMsgLength        AttributeValue
+	DefPriority         AttributeValue
+	ServiceInterval     AttributeValue
+	RetentionInterval   AttributeValue
+	Scope               AttributeValue
+	Usage               AttributeValue
+	MsgDeliverySequence AttributeValue
+	HardenGetBackout    AttributeValue
+	DefPersistence      AttributeValue
 }
 
 type ChannelInfo struct {
-	Name string
-	Type string
+	Name           string
+	Type           string
 	ConnectionName string
 }
 
 type ChannelMetrics struct {
-	Name            string
-	Type            ChannelType
-	Status          ChannelStatus
+	Name   string
+	Type   ChannelType
+	Status ChannelStatus
 
 	// Message metrics (only for message channels)
-	Messages        *int64
-	Bytes          *int64
-	Batches        *int64
+	Messages *int64
+	Bytes    *int64
+	Batches  *int64
 
 	// Current connections (only for SVRCONN)
-	Connections     *int64
+	Connections *int64
 
 	// Buffer metrics (only for sender/receiver channels)
-	BuffersUsed     *int64
-	BuffersMax      *int64
+	BuffersUsed *int64
+	BuffersMax  *int64
 
 	// Configuration metrics (populated when collectConfig is true)
 	BatchSize            AttributeValue
@@ -314,8 +314,8 @@ type ChannelMetrics struct {
 }
 
 type ListenerInfo struct {
-	Name     string
-	Port     int32
+	Name      string
+	Port      int32
 	IPAddress string
 }
 
@@ -447,11 +447,11 @@ type MQIStatistics struct {
 	Cbs       AttributeValue
 	CbsFailed AttributeValue
 
-	Commits   AttributeValue
-	Backs     AttributeValue
-	SubsReqs  AttributeValue
-	SubsPubs  AttributeValue
-	Browses   AttributeValue
+	Commits  AttributeValue
+	Backs    AttributeValue
+	SubsReqs AttributeValue
+	SubsPubs AttributeValue
+	Browses  AttributeValue
 }
 
 type StatisticsType int
