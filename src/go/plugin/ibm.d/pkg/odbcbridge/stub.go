@@ -1,5 +1,4 @@
 //go:build !cgo
-// +build !cgo
 
 // SPDX-License-Identifier: GPL-3.0-or-later
 

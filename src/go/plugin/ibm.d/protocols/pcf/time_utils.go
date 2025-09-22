@@ -1,8 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//go:build cgo
-// +build cgo
-
 //go:build linux && cgo
 
 package pcf

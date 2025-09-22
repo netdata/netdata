@@ -85,20 +85,20 @@ type QueueManagerInfo struct {
 }
 
 type QueueInfo struct {
-	Name                    string
-	Type                    string
-	CurrentDepth            int64
-	MaxDepth                int64
-	OpenInputCount          int64
-	OpenOutputCount         int64
-	InhibitGet              bool
-	InhibitPut              bool
-	OldestMessageAge        int64
-	LastGetDate             time.Time
-	LastPutDate             time.Time
-	MonitoringLevel         int32
-	UncommittedMessages     int64
-	QueueTime               *QueueTime
+	Name                string
+	Type                string
+	CurrentDepth        int64
+	MaxDepth            int64
+	OpenInputCount      int64
+	OpenOutputCount     int64
+	InhibitGet          bool
+	InhibitPut          bool
+	OldestMessageAge    int64
+	LastGetDate         time.Time
+	LastPutDate         time.Time
+	MonitoringLevel     int32
+	UncommittedMessages int64
+	QueueTime           *QueueTime
 }
 
 type QueueTime struct {
@@ -107,14 +107,14 @@ type QueueTime struct {
 }
 
 type ChannelInfo struct {
-	Name           string
-	Type           string
-	Status         int32
-	ConnectionName string
-	Messages       int64
-	BytesSent      int64
-	BytesReceived  int64
-	BuffersSent    int64
+	Name            string
+	Type            string
+	Status          int32
+	ConnectionName  string
+	Messages        int64
+	BytesSent       int64
+	BytesReceived   int64
+	BuffersSent     int64
 	BuffersReceived int64
 }
 
@@ -137,10 +137,10 @@ type SubscriptionInfo struct {
 }
 
 type ResourceUsage struct {
-	CPUUsed                int64
-	MemoryUsed             int64
-	QueueManagerFileSystemUsed  int64
-	QueueManagerFileSystemFree  int64
+	CPUUsed                    int64
+	MemoryUsed                 int64
+	QueueManagerFileSystemUsed int64
+	QueueManagerFileSystemFree int64
 }
 
 type QueueResetStats struct {

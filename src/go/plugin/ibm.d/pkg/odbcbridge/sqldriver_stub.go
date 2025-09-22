@@ -1,5 +1,4 @@
 //go:build !cgo
-// +build !cgo
 
 // Package odbcbridge provides an optimized ODBC connection interface using CGO.
 package odbcbridge
