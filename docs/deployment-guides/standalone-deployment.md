@@ -36,15 +36,17 @@ flowchart TB
 
     NC <--> Agents
 
-    %% Style definitions
-    classDef alert fill:#ffeb3b,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
-    classDef neutral fill:#f9f9f9,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
-    classDef complete fill:#4caf50,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
-    classDef database fill:#2196F3,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+%% Style definitions
+    classDef alert    fill:#ffeb3b, stroke:#000000, stroke-width:3px, color:#000000, font-size:18px
+    classDef neutral  fill:#f9f9f9, stroke:#000000, stroke-width:3px, color:#000000, font-size:18px
+    classDef complete fill:#4caf50, stroke:#000000, stroke-width:3px, color:#000000, font-size:18px
+    classDef database fill:#2196F3, stroke:#000000, stroke-width:3px, color:#000000, font-size:18px
 
-    %% Apply styles
-    class Users,Agents alert
-    class NC,Notifications neutral
+%% Apply styles
+    class Users alert
+    class Agents alert
+    class NC neutral
+    class Notifications neutral
     class Data complete
     class infrastructure database
 ```
@@ -93,15 +95,15 @@ You can also run Agents independently, though you'll miss out on unified dashboa
 flowchart TB
     subgraph infrastructure["Your Infrastructure"]
         direction TB
-        A1["Agent 1"]
-        A2["Agent 2"]
-        A3["Agent 3"]
-        D1["Dashboard 1<br/>:19999"]
-        D2["Dashboard 2<br/>:19999"]
-        D3["Dashboard 3<br/>:19999"]
-        N1["Alerts"]
-        N2["Alerts"]
-        N3["Alerts"]
+        A1("**Agent 1**<br/>Independent monitoring")
+        A2("**Agent 2**<br/>Independent monitoring")
+        A3("**Agent 3**<br/>Independent monitoring")
+        D1("**Dashboard 1**<br/>:19999")
+        D2("**Dashboard 2**<br/>:19999")
+        D3("**Dashboard 3**<br/>:19999")
+        N1("**Alerts**<br/>Local notifications")
+        N2("**Alerts**<br/>Local notifications")
+        N3("**Alerts**<br/>Local notifications")
         A1 --> D1
         A2 --> D2
         A3 --> D3
@@ -110,20 +112,22 @@ flowchart TB
         A3 --> N3
     end
 
-    classDef agents fill: #e8f5e8, stroke: #27ae60, stroke-width: 2px, color: #2c3e50, rx: 10, ry: 10
-    classDef dashboards fill: #fff2e8, stroke: #f39c12, stroke-width: 2px, color: #2c3e50, rx: 10, ry: 10
-    classDef alerts fill: #ffe8e8, stroke: #e74c3c, stroke-width: 2px, color: #2c3e50, rx: 10, ry: 10
-    classDef subgraphStyle fill: #f8f9fa, stroke: #6c757d, stroke-width: 2px, color: #2c3e50, rx: 15, ry: 15
-    class A1 agents
-    class A2 agents
-    class A3 agents
-    class D1 dashboards
-    class D2 dashboards
-    class D3 dashboards
-    class N1 alerts
-    class N2 alerts
-    class N3 alerts
-    class infrastructure subgraphStyle
+%% Style definitions matching the reference
+    classDef alert fill: #ffeb3b, stroke: #000000, stroke-width: 3px, color: #000000, font-size: 18px
+    classDef neutral fill: #f9f9f9, stroke: #000000, stroke-width: 3px, color: #000000, font-size: 18px
+    classDef complete fill: #4caf50, stroke: #000000, stroke-width: 3px, color: #000000, font-size: 18px
+    classDef database fill: #2196F3, stroke: #000000, stroke-width: 3px, color: #000000, font-size: 18px
+%% Apply styles
+    class A1 alert
+    class A2 alert
+    class A3 alert
+    class D1 neutral
+    class D2 neutral
+    class D3 neutral
+    class N1 complete
+    class N2 complete
+    class N3 complete
+    class infrastructure database
 ```
 
 </details>

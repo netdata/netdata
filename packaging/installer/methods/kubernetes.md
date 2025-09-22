@@ -3,7 +3,7 @@ import TabItem from '@theme/TabItem';
 
 # Install Netdata on Kubernetes
 
-This document details how to install Netdata on an existing Kubernetes (k8s) cluster, and connect it to Netdata Cloud. 
+This document details how to install Netdata on an existing Kubernetes (k8s) cluster, and connect it to Netdata Cloud.
 
 Read our [Kubernetes visualizations](/docs/dashboards-and-charts/kubernetes-tab.md) documentation, to see what you will get.
 
@@ -14,9 +14,7 @@ The [Netdata Helm chart](https://github.com/netdata/helmchart/blob/master/charts
 To deploy Kubernetes monitoring with Netdata, you'll need:
 
 - A working cluster running Kubernetes v1.9 or newer.
-- The [kubectl](https://kubernetes.io/docs/reference/kubectl/overview/) command line tool, within [one minor version
-    difference](https://kubernetes.io/docs/tasks/tools/install-kubectl/#before-you-begin) of your cluster, on an
-    administrative system.
+- The [kubectl](https://kubernetes.io/docs/reference/kubectl/overview/) command line tool, within [one minor version difference](https://kubernetes.io/docs/tasks/tools/install-kubectl/#before-you-begin) of your cluster, on an administrative system.
 - The [Helm package manager](https://helm.sh/) v3.0.0 or newer on the same administrative system.
 - A Netdata Cloud account with a Space to connect the cluster to.
 
@@ -44,11 +42,13 @@ The installation process securely connects your Kubernetes cluster to stream met
     helm install netdata netdata/netdata 
     ```
 
-    > **Note**
-    >
-    > If you plan to connect the node to Netdata Cloud, you can find the command with the right parameters by clicking the "Add Nodes" button in your Space's Nodes tab.
+   :::note
 
-    For more installation options, please read our [Netdata Helm chart for Kubernetes](https://github.com/netdata/helmchart/blob/master/charts/netdata/README.md) reference.
+   If you plan to connect the node to Netdata Cloud, you can find the command with the right parameters by clicking the "Add Nodes" button in your Space's Nodes tab.
+
+   :::
+
+   For more installation options, please read our [Netdata Helm chart for Kubernetes](https://github.com/netdata/helmchart/blob/master/charts/netdata/README.md) reference.
 
 #### Expected Result
 
@@ -93,16 +93,20 @@ On an existing installation, in order to connect it to Netdata Cloud you will ne
               enabled = no
     ```
 
-    > **Note**
-    >
-    > Make sure to replace `YOUR_CLAIM_TOKEN` with the claim token of your space,
-    > and `YOUR_ROOM_ID` with the ID of the Room you are willing to connect to.
+   :::note
 
-    These settings connect your `parent`/`child` nodes to Netdata Cloud and store more metrics in the nodes' time-series databases.
+   Make sure to replace `YOUR_CLAIM_TOKEN` with the claim token of your space,
+   and `YOUR_ROOM_ID` with the ID of the Room you are willing to connect to.
 
-    > **Info**
-    >
-    > These override settings, along with the Helm chart's defaults, will retain an hour's worth of metrics (`retention = 3600`, or `3600 seconds`) on each child node. Based on your metrics retention needs, and the resources available on your cluster, you may want to increase the `history` setting.
+   :::
+
+   These settings connect your `parent`/`child` nodes to Netdata Cloud and store more metrics in the nodes' time-series databases.
+
+   :::info
+
+   These override settings, along with the Helm chart's defaults, will retain an hour's worth of metrics (`retention = 3600`, or `3600 seconds`) on each child node. Based on your metrics retention needs, and the resources available on your cluster, you may want to increase the `history` setting.
+
+   :::
 
 3. To apply these new settings, run:
 
@@ -117,10 +121,7 @@ The cluster terminates the old pods and creates new ones with the proper persist
 </TabItem>
 </Tabs>
 
-![Netdata's Kubernetes monitoring
-visualizations](https://user-images.githubusercontent.com/1153921/107801491-5dcb0f00-6d1d-11eb-9ab1-876c39f556e2.png)
-
-If you don't need to configure your Netdata deployment, [skip down](#whats-next) to see how Kubernetes monitoring works in Netdata, in addition to more guides and resources.
+![Netdata's Kubernetes monitoring visualizations](https://user-images.githubusercontent.com/1153921/107801491-5dcb0f00-6d1d-11eb-9ab1-876c39f556e2.png)
 
 ## Configure your Netdata monitoring deployment
 
