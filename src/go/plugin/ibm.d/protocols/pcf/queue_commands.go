@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-//go:build cgo
-// +build cgo
+//go:build cgo && ibm_mq
+// +build cgo,ibm_mq
 
 package pcf
 
