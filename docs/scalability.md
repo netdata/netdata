@@ -13,11 +13,13 @@ This works. Until it doesn't.
 When scale breaks the model, teams face two options - and both are wrong:
 
 ### Option 1: Reduce the Workload
+
 Lower granularity. Drop cardinality. Filter. Sample.
 
 **This is a trap and a paradox.** If you knew which data you'd need during a crisis, you could predict the crisis and prevent it. By definition, an unpredictable event is the one that will be invisible in your downsampled dataset. You're betting your incident response on being able to predict the unpredictable.
 
 ### Option 2: Scale the Database
+
 Build giant, expensive clusters. Add more cores. More RAM. More everything.
 
 **This is a money pit.** In many organizations today, observability costs more than the services being monitored. We routinely encounter companies where 40-50% of infrastructure budget goes to monitoring pipelines, plus teams of specialists to keep them alive.
@@ -27,6 +29,7 @@ Build giant, expensive clusters. Add more cores. More RAM. More everything.
 **Instead of centralizing data, distribute the code.** This is the heart of Netdata's philosophy and design.
 
 Every Netdata Agent is a full observability engine:
+
 - Collects metrics at the edge
 - Stores data locally in multi-tier storage
 - Runs ML-based anomaly detection in real-time
@@ -46,6 +49,7 @@ Once you pass ~500 nodes, you’re naturally in the multi-million metrics/s rang
 ## Proof: The Numbers Don't Lie
 
 ### Independent Validation: University of Amsterdam Study (2023)
+
 **Study:** "An Empirical Evaluation of the Energy and Performance Overhead of Monitoring Tools on Docker-Based Systems"<br/>
 **Conference:** ICSOC 2023 (International Conference on Service-Oriented Computing)<br/>
 **DOI:** 10.1007/978-3-031-48421-6_13
@@ -53,10 +57,11 @@ Once you pass ~500 nodes, you’re naturally in the multi-million metrics/s rang
 **Finding:** **Netdata is the most energy-efficient monitoring solution**, with the lowest CPU and memory overhead - even while collecting data every second and running anomaly detection at the edge.
 
 ### Head-to-Head: Netdata vs Prometheus (2025)
+
 We tested a single installation Netdata Parent and Prometheus, at **4.6 million metrics per second** - the scale you hit with just 1,000 nodes. This is how the systems compare for ingestion:
 
 | Metric                          | Netdata           | Prometheus       | Impact                                       |
-| ------------------------------- | ----------------- | ---------------- | -------------------------------------------- |
+|---------------------------------|-------------------|------------------|----------------------------------------------|
 | **CPU Usage**                   | ~9.4 cores        | ~14.8 cores      | 36% less CPU                                 |
 | **Memory Usage**                | ~47 GiB           | ~383 GiB         | 88% less RAM                                 |
 | **Disk I/O**                    | ~4.7 MiB/s writes | ~147 MiB/s total | 97% less I/O                                 |
@@ -71,7 +76,7 @@ We tested a single installation Netdata Parent and Prometheus, at **4.6 million 
 ### Core Components
 
 | Component  | Role                              | Resources (Standalone)                  | Resources (Offloaded)                  | Scale Factor             |
-| ---------- | --------------------------------- | --------------------------------------- | -------------------------------------- | ------------------------ |
+|------------|-----------------------------------|-----------------------------------------|----------------------------------------|--------------------------|
 | **Agent**  | Edge collector                    | &lt;5% CPU, &lt;200 MiB RAM, disk I/O   | &lt;2% CPU, &lt;150 MiB RAM, zero disk | 3,000-20,000 metrics/sec |
 | **Parent** | Workload distributor & aggregator | 10 cores, 40 GiB RAM per 1M metrics/sec | Same + ML training if enabled          | Linear scaling           |
 | **Cloud**  | Control plane & federation        | Minimal                                 | Minimal                                | Unlimited Parents        |
@@ -85,6 +90,7 @@ Agents can offload ML, alerting, dashboards, and retention to Parents - typicall
 ### The Edge Advantage
 
 Each Agent is autonomous:
+
 - **Collects** 3,000-20,000 metrics per second per node
 - **Stores** data in tiered storage (raw + aggregated)
 - **Detects** anomalies using unsupervised ML
@@ -93,6 +99,7 @@ Each Agent is autonomous:
 - **Streams** to Parents for aggregation
 
 This means:
+
 - No data loss if Parent is down (Agents buffer locally)
 - No performance degradation as you scale (work stays distributed)
 - No architectural changes from 1 to 100,000 nodes
@@ -104,6 +111,7 @@ This means:
 Parents aren't just centralization points - they're intelligent workload distributors that can reduce the resource footprint on production systems.
 
 With Parents, Agents can offload:
+
 - **ML Training** - Parents train models, Agents just collect (50% CPU reduction)
 - **Health Checks** - Parents run all alerts, Agents focus on collection
 - **Persistent Storage** - Agents run in RAM-only mode with zero disk I/O
@@ -116,12 +124,14 @@ A fully offloaded Agent uses &lt;2% CPU, &lt;150 MiB RAM, and zero disk I/O - a 
 Netdata's ML models flow with the metrics stream, giving you complete flexibility:
 
 **Option 1: ML at the Edge (default)**
+
 - Agents train their own models locally
 - Models stream to Parents along with metrics
 - Parents receive pre-computed ML results
 - Best for: Systems with available CPU, need for immediate local anomaly detection
 
 **Option 2: ML at Parents**
+
 - Agents disable ML training (50% CPU savings)
 - First Parent trains models for all Agents
 - Models shared with other Parents in cluster
@@ -132,6 +142,7 @@ The architecture adapts to your needs - train where you have resources, use ever
 ### When You Need Parents
 
 **We recommend Parents by default:**
+
 - Future-proof your architecture (same setup works at 10 or 100,000 nodes)
 - Reduce production system load even at small scale
 - Provide unified dashboards and centralized alerting
@@ -139,6 +150,7 @@ The architecture adapts to your needs - train where you have resources, use ever
 - Cost less than the resources they save on production systems
 
 **Parents are essential when you have:**
+
 - **Ephemeral systems** - Kubernetes pods, auto-scaling VMs that disappear
 - **Resource constraints** - Systems where every CPU cycle matters
 - **On-premises requirements** - Multi-node view without Cloud connectivity
@@ -147,7 +159,7 @@ The architecture adapts to your needs - train where you have resources, use ever
 ### Parent Sizing Guidelines
 
 | Nodes per Parent | Metrics/sec | Resources            |
-| :--------------: | :---------: | :------------------- |
+|:----------------:|:-----------:|:---------------------|
 |    ~100 nodes    |  ~0.5M/sec  | 5 cores, 20 GiB RAM  |
 |    ~250 nodes    |   ~1M/sec   | 10 cores, 40 GiB RAM |
 |    ~500 nodes    |   ~2M/sec   | 20 cores, 80 GiB RAM |
@@ -183,12 +195,14 @@ Parents work together intelligently to eliminate duplicate work:
 Netdata separates automation from monitoring, letting you optimize both:
 
 **Agents: Local Automation**
+
 - Keep only alerts that trigger local scripts
 - Example: "If CPU > 90%, scale this service"
 - Immediate response, no network dependency
 - Minimal overhead when selective
 
 **Parents: Human Monitoring**
+
 - Run comprehensive health checks for all Agents
 - Send notifications to teams via Cloud or integrations
 - Correlate issues across multiple systems
@@ -201,7 +215,7 @@ This dual approach means production systems only run automation-critical alerts 
 ### Three-Tier Storage System
 
 | Tier       | Resolution | Compression                | Retention       | Use Case          |
-| ---------- | ---------- | -------------------------- | --------------- | ----------------- |
+|------------|------------|----------------------------|-----------------|-------------------|
 | **Tier 0** | Per-second | Minimal (0.6 bytes/sample) | Days to Weeks   | Troubleshooting   |
 | **Tier 1** | Per-minute | High                       | Weeks to Months | Trending          |
 | **Tier 2** | Per-hour   | Maximum                    | Months to Years | Capacity planning |
@@ -217,18 +231,21 @@ All tiers update in parallel - no post-processing or compaction jobs needed.
 ## Why This Architecture Wins
 
 ### For Operations Teams
+
 - **No blind spots** during incidents - all data available
 - **No architectural rewrites** as you scale
 - **No sampling lottery** - the metric you need is always there
 - **No specialized skills** required - it just works
 
 ### For Finance
+
 - **Predictable costs** - linear scaling, no surprises
 - **Lower TCO** - fewer resources for same visibility
 - **Energy efficient** - independently validated lowest overhead
 - **Reduced team size** - less complexity to manage
 
 ### For Developers
+
 - **Per-second granularity** - see what actually happened
 - **Real-time anomaly detection** - catch issues immediately
 - **Local dashboards** - debug without central bottlenecks
