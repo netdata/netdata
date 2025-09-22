@@ -9,7 +9,6 @@
 #include "mcp-logging.h"
 #include "mcp-completion.h"
 #include "mcp-tools-execute-function-registry.h"
-#include "adapters/mcp-websocket.h"
 #include "mcp-api-key.h"
 
 // Define the enum to string mapping for protocol versions
@@ -62,146 +61,206 @@ MCP_CLIENT *mcp_create_client(MCP_TRANSPORT transport, void *transport_ctx) {
     mcpc->transport = transport;
     mcpc->protocol_version = MCP_PROTOCOL_VERSION_UNKNOWN; // Will be set during initialization
     mcpc->ready = false; // Client is not ready until initialized notification is received
-    
+
     // Set capabilities based on transport type
     switch (transport) {
         case MCP_TRANSPORT_WEBSOCKET:
             mcpc->websocket = (struct websocket_server_client *)transport_ctx;
             mcpc->capabilities = MCP_CAPABILITY_ASYNC_COMMUNICATION |
-                               MCP_CAPABILITY_SUBSCRIPTIONS | 
+                               MCP_CAPABILITY_SUBSCRIPTIONS |
                                MCP_CAPABILITY_NOTIFICATIONS;
             break;
-            
+
         case MCP_TRANSPORT_HTTP:
             mcpc->http = (struct web_client *)transport_ctx;
             mcpc->capabilities = MCP_CAPABILITY_NONE; // HTTP has no special capabilities
             break;
-            
+
         default:
             mcpc->generic = transport_ctx;
             mcpc->capabilities = MCP_CAPABILITY_NONE;
             break;
     }
-    
+
     // Default client info (will be updated later from actual client)
     mcpc->client_name = string_strdupz("unknown");
     mcpc->client_version = string_strdupz("0.0.0");
-    
+
     // Set default logging level to info
     mcpc->logging_level = MCP_LOGGING_LEVEL_INFO;
-    
-    // Initialize response buffers
-    mcpc->result = buffer_create(4096, NULL);
+
+    // Persistent buffers
     mcpc->error = buffer_create(1024, NULL);
-    
-    // Initialize utility buffers
-    mcpc->uri = buffer_create(1024, NULL);
-    
-    // Initialize request IDs tracking
-    mcpc->request_id_counter = 0;
-    mcpc->request_ids = NULL;
-    
+    mcpc->result = NULL;
+
+    mcpc->last_return_code = MCP_RC_OK;
+    mcpc->last_response_error = false;
+
     return mcpc;
 }
 
 // Free a response context
 void mcp_free_client(MCP_CLIENT *mcpc) {
-    if (mcpc) {
-        string_freez(mcpc->client_name);
-        string_freez(mcpc->client_version);
-        
-        // Free response buffers
-        buffer_free(mcpc->result);
+    if (!mcpc)
+        return;
+
+    string_freez(mcpc->client_name);
+    string_freez(mcpc->client_version);
+
+    if (mcpc->error)
         buffer_free(mcpc->error);
-        
-        // Free utility buffers
-        buffer_free(mcpc->uri);
-        
-        // Free request IDs
-        mcp_request_id_cleanup_all(mcpc);
-        
-        freez(mcpc);
+
+    mcp_client_release_response(mcpc);
+
+    freez(mcpc);
+}
+
+void mcp_client_clear_error(MCP_CLIENT *mcpc) {
+    if (mcpc && mcpc->error)
+        buffer_reset(mcpc->error);
+}
+
+static void mcp_client_free_chunks(MCP_CLIENT *mcpc) {
+    if (!mcpc || !mcpc->response_chunks)
+        return;
+
+    for (size_t i = 0; i < mcpc->response_chunks_used; i++) {
+        if (mcpc->response_chunks[i].buffer)
+            buffer_free(mcpc->response_chunks[i].buffer);
     }
+
+    freez(mcpc->response_chunks);
+    mcpc->response_chunks = NULL;
+    mcpc->response_chunks_used = 0;
+    mcpc->response_chunks_size = 0;
+    mcpc->result = NULL;
 }
 
-// Map internal MCP_RETURN_CODE to JSON-RPC error code
-static int mcp_map_return_code_to_jsonrpc_error(MCP_RETURN_CODE rc) {
-    switch (rc) {
-        case MCP_RC_OK:
-            return 0; // Not an error
-        case MCP_RC_INVALID_PARAMS:
-            return -32602; // JSON-RPC Invalid params
-        case MCP_RC_NOT_FOUND:
-            return -32601; // JSON-RPC Method not found
-        case MCP_RC_INTERNAL_ERROR:
-            return -32603; // JSON-RPC Internal error
-        case MCP_RC_NOT_IMPLEMENTED:
-            return -32601; // Use method not found for not implemented
-        case MCP_RC_BAD_REQUEST:
-            return -32600; // JSON-RPC Invalid request
-        case MCP_RC_ERROR:
-        default:
-            return -32000; // JSON-RPC Server error
+void mcp_client_prepare_response(MCP_CLIENT *mcpc) {
+    if (!mcpc)
+        return;
+
+    mcp_client_free_chunks(mcpc);
+    mcpc->last_return_code = MCP_RC_OK;
+    mcpc->last_response_error = false;
+}
+
+void mcp_client_release_response(MCP_CLIENT *mcpc) {
+    mcp_client_free_chunks(mcpc);
+}
+
+static struct mcp_response_chunk *mcp_response_append_chunk(MCP_CLIENT *mcpc, enum mcp_response_chunk_type type) {
+    if (!mcpc)
+        return NULL;
+
+    const size_t MAX_RESPONSE_BYTES = 16 * 1024 * 1024; // 16 MiB per request safeguard
+    if (mcp_client_response_size(mcpc) >= MAX_RESPONSE_BYTES) {
+        netdata_log_error("MCP: response size limit reached");
+        return NULL;
     }
+
+    if (mcpc->response_chunks_used == mcpc->response_chunks_size) {
+        size_t new_size = mcpc->response_chunks_size ? mcpc->response_chunks_size * 2 : 4;
+        struct mcp_response_chunk *tmp = reallocz(mcpc->response_chunks, new_size * sizeof(*tmp));
+        if (unlikely(!tmp))
+            return NULL;
+        mcpc->response_chunks = tmp;
+        mcpc->response_chunks_size = new_size;
+    }
+
+    struct mcp_response_chunk *chunk = &mcpc->response_chunks[mcpc->response_chunks_used++];
+    chunk->buffer = NULL;
+    chunk->type = type;
+    return chunk;
 }
 
-void mcp_init_success_result(MCP_CLIENT *mcpc, MCP_REQUEST_ID id) {
-    buffer_flush(mcpc->result);
-    buffer_json_initialize(mcpc->result, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
-    buffer_json_member_add_string(mcpc->result, "jsonrpc", "2.0");
+BUFFER *mcp_response_add_json_chunk(MCP_CLIENT *mcpc, size_t initial_capacity) {
+    struct mcp_response_chunk *chunk = mcp_response_append_chunk(mcpc, MCP_RESPONSE_CHUNK_JSON);
+    if (!chunk)
+        return NULL;
 
-    // Add the ID using our request ID system
-    mcp_request_id_to_buffer(mcpc, mcpc->result, "id", id);
-    buffer_json_member_add_object(mcpc->result, "result");
-
-    buffer_flush(mcpc->error);
+    size_t capacity = initial_capacity ? initial_capacity : 4096;
+    chunk->buffer = buffer_create(capacity, NULL);
+    mcpc->result = chunk->buffer;
+    buffer_json_initialize(chunk->buffer, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
+    return chunk->buffer;
 }
 
-MCP_RETURN_CODE mcp_error_result(MCP_CLIENT *mcpc, MCP_REQUEST_ID id, MCP_RETURN_CODE rc) {
-    if (!mcpc) return rc;
-    
-    buffer_flush(mcpc->result);
-    buffer_json_initialize(mcpc->result, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
-    buffer_json_member_add_string(mcpc->result, "jsonrpc", "2.0");
-    
-    // Add the ID using our request ID system
-    mcp_request_id_to_buffer(mcpc, mcpc->result, "id", id);
+BUFFER *mcp_response_add_text_chunk(MCP_CLIENT *mcpc, size_t initial_capacity) {
+    struct mcp_response_chunk *chunk = mcp_response_append_chunk(mcpc, MCP_RESPONSE_CHUNK_TEXT);
+    if (!chunk)
+        return NULL;
 
-    buffer_json_member_add_object(mcpc->result, "error");
-    buffer_json_member_add_int64(mcpc->result, "code", mcp_map_return_code_to_jsonrpc_error(rc));
-    
-    const char *error_message = buffer_strlen(mcpc->error) 
-                              ? buffer_tostring(mcpc->error) 
+    size_t capacity = initial_capacity ? initial_capacity : 1024;
+    chunk->buffer = buffer_create(capacity, NULL);
+    chunk->buffer->content_type = CT_TEXT_PLAIN;
+    buffer_no_cacheable(chunk->buffer);
+    mcpc->result = chunk->buffer;
+    return chunk->buffer;
+}
+
+size_t mcp_client_response_chunk_count(const MCP_CLIENT *mcpc) {
+    return mcpc ? mcpc->response_chunks_used : 0;
+}
+
+const struct mcp_response_chunk *mcp_client_response_chunks(const MCP_CLIENT *mcpc) {
+    return mcpc ? mcpc->response_chunks : NULL;
+}
+
+size_t mcp_client_response_size(const MCP_CLIENT *mcpc) {
+    if (!mcpc || !mcpc->response_chunks)
+        return 0;
+
+    size_t total = 0;
+    for (size_t i = 0; i < mcpc->response_chunks_used; i++) {
+        if (mcpc->response_chunks[i].buffer)
+            total += buffer_strlen(mcpc->response_chunks[i].buffer);
+    }
+    return total;
+}
+
+const char *mcp_client_error_message(MCP_CLIENT *mcpc) {
+    if (!mcpc || !mcpc->error)
+        return NULL;
+    return buffer_strlen(mcpc->error) ? buffer_tostring(mcpc->error) : NULL;
+}
+
+void mcp_init_success_result(MCP_CLIENT *mcpc, MCP_REQUEST_ID id __maybe_unused) {
+    if (!mcpc)
+        return;
+
+    BUFFER *chunk = mcp_response_add_json_chunk(mcpc, 4096);
+    if (!chunk)
+        return;
+
+    mcpc->last_return_code = MCP_RC_OK;
+    mcpc->last_response_error = false;
+    mcp_client_clear_error(mcpc);
+}
+
+MCP_RETURN_CODE mcp_error_result(MCP_CLIENT *mcpc, MCP_REQUEST_ID id __maybe_unused, MCP_RETURN_CODE rc) {
+    if (!mcpc)
+        return rc;
+
+    mcpc->last_return_code = rc;
+    mcpc->last_response_error = true;
+
+    BUFFER *chunk = mcp_response_add_json_chunk(mcpc, 512);
+    if (!chunk)
+        return rc;
+
+    const char *error_message = buffer_strlen(mcpc->error)
+                              ? buffer_tostring(mcpc->error)
                               : MCP_RETURN_CODE_2str(rc);
-    
-    if(error_message && *error_message)
-        buffer_json_member_add_string(mcpc->result, "message", error_message);
-    
-    buffer_json_object_close(mcpc->result); // Close error
-    
-    buffer_json_finalize(mcpc->result);
+
+    buffer_json_member_add_string(chunk, "status", "error");
+    buffer_json_member_add_string(chunk, "code", MCP_RETURN_CODE_2str(rc));
+    buffer_json_member_add_int64(chunk, "codeNumeric", rc);
+    if (error_message)
+        buffer_json_member_add_string(chunk, "message", error_message);
+    buffer_json_finalize(chunk);
+
     return rc;
-}
-
-// No longer needed - we're using mcp_request_id_del directly in mcp_single_request
-
-// Send the content of a buffer using the appropriate transport
-int mcp_send_response_buffer(MCP_CLIENT *mcpc) {
-    if (!mcpc || !mcpc->result || !buffer_strlen(mcpc->result))
-        return -1;
-    
-    switch (mcpc->transport) {
-        case MCP_TRANSPORT_WEBSOCKET:
-            return mcp_websocket_send_buffer(mcpc->websocket, mcpc->result);
-            
-        case MCP_TRANSPORT_HTTP:
-            netdata_log_error("MCP: HTTP adapter not implemented yet");
-            return -1;
-
-        default:
-            netdata_log_error("MCP: Unknown transport type %u", mcpc->transport);
-            return -1;
-    }
 }
 
 // Parse and extract client info from initialize request params
@@ -224,242 +283,88 @@ static void mcp_extract_client_info(MCP_CLIENT *mcpc, struct json_object *params
     }
 }
 
-// Handle a JSON-RPC method call - the result is always filled with a jsonrpc response
-static MCP_RETURN_CODE mcp_single_request(MCP_CLIENT *mcpc, struct json_object *request) {
-    if (!mcpc || !request) {
-        return MCP_RC_ERROR;
-    }
+MCP_RETURN_CODE mcp_dispatch_method(MCP_CLIENT *mcpc, const char *method, struct json_object *params, MCP_REQUEST_ID id __maybe_unused) {
+    if (!mcpc)
+        return MCP_RC_INTERNAL_ERROR;
 
-    // Flush buffers before processing the request
-    buffer_reset(mcpc->result);
-    buffer_reset(mcpc->error);
-    
-    // Extract JSON-RPC fields
-    struct json_object *method_obj = NULL;
-    struct json_object *params_obj = NULL;
-    struct json_object *jsonrpc_obj = NULL;
-    
-    // Validate jsonrpc version
-    if (!json_object_object_get_ex(request, "jsonrpc", &jsonrpc_obj) ||
-        strcmp(json_object_get_string(jsonrpc_obj), "2.0") != 0) {
-        buffer_strcat(mcpc->error, "Invalid or missing jsonrpc version");
-        mcp_error_result(mcpc, 0, MCP_RC_INVALID_PARAMS);
-        return MCP_RC_INVALID_PARAMS;
-    }
-    
-    // Extract method
-    if (!json_object_object_get_ex(request, "method", &method_obj)) {
-        buffer_strcat(mcpc->error, "Missing method field");
-        mcp_error_result(mcpc, 0, MCP_RC_INVALID_PARAMS);
-        return MCP_RC_INVALID_PARAMS;
-    }
-    
-    const char *method = json_object_get_string(method_obj);
-    
-    // Extract params (optional)
-    bool params_created = false;
-    if (json_object_object_get_ex(request, "params", &params_obj)) {
-        if (json_object_get_type(params_obj) != json_type_object) {
-            buffer_strcat(mcpc->error, "params must be an object");
-            mcp_error_result(mcpc, 0, MCP_RC_INVALID_PARAMS);
-            return MCP_RC_INVALID_PARAMS;
-        }
-    } else {
-        // Create an empty params object if none provided
-        params_obj = json_object_new_object();
-        params_created = true;
-    }
-    
-    // Extract and register the request ID
-    MCP_REQUEST_ID id = mcp_request_id_add(mcpc, request);
-    bool has_id = (id != 0);
-
-    // If we have a request ID, log it
-    if (has_id) {
-        netdata_log_debug(D_WEB_CLIENT, "MCP: Handling method call: %s (request_id: %zu)", method, id);
-    } else {
-        netdata_log_debug(D_WEB_CLIENT, "MCP: Handling notification: %s (no id)", method);
-    }
-    
-    // Handle method calls based on namespace
-    MCP_RETURN_CODE rc;
-
-    // Check for notifications/initialized method which marks client as ready
-    if(!method || !*method) {
+    if (!method || !*method) {
         buffer_strcat(mcpc->error, "Empty method name");
-        rc = MCP_RC_INVALID_PARAMS;
+        mcp_error_result(mcpc, 0, MCP_RC_INVALID_PARAMS);
+        return MCP_RC_INVALID_PARAMS;
     }
-    else if (strcmp(method, "notifications/initialized") == 0) {
+
+    if (!params || json_object_get_type(params) != json_type_object) {
+        buffer_strcat(mcpc->error, "Parameters must be an object");
+        mcp_error_result(mcpc, 0, MCP_RC_INVALID_PARAMS);
+        return MCP_RC_INVALID_PARAMS;
+    }
+
+    MCP_RETURN_CODE rc = MCP_RC_OK;
+
+    if (strcmp(method, "notifications/initialized") == 0) {
         mcpc->ready = true;
-        netdata_log_debug(D_WEB_CLIENT, "MCP client %s v%s is now ready", 
-                         string2str(mcpc->client_name), string2str(mcpc->client_version));
-        rc = MCP_RC_OK;
+        netdata_log_debug(D_WEB_CLIENT, "MCP client %s v%s is now ready",
+                          string2str(mcpc->client_name), string2str(mcpc->client_version));
+        mcp_client_prepare_response(mcpc);
+        mcp_init_success_result(mcpc, 0);
+        buffer_json_finalize(mcpc->result);
+        return MCP_RC_OK;
     }
-    else if (strncmp(method, "tools/", 6) == 0) {
-        // Tools namespace
-        rc = mcp_tools_route(mcpc, method + 6, params_obj, id);
-        // Mark client as ready if not already
-        if (!mcpc->ready) {
+
+    if (!mcpc->ready && strcmp(method, "initialize") != 0) {
+        netdata_log_debug(D_WEB_CLIENT, "MCP method %s called before initialize", method);
+    }
+
+    mcp_client_prepare_response(mcpc);
+    mcp_client_clear_error(mcpc);
+
+    if (strncmp(method, "tools/", 6) == 0) {
+        rc = mcp_tools_route(mcpc, method + 6, params, 0);
+        if (!mcpc->ready)
             mcpc->ready = true;
-        }
     }
     else if (strncmp(method, "resources/", 10) == 0) {
-        // Resources namespace
-        rc = mcp_resources_route(mcpc, method + 10, params_obj, id);
-        // Mark client as ready if not already
-        if (!mcpc->ready) {
+        rc = mcp_resources_route(mcpc, method + 10, params, 0);
+        if (!mcpc->ready)
             mcpc->ready = true;
-        }
     }
     else if (strncmp(method, "prompts/", 8) == 0) {
-        // Prompts namespace
-        rc = mcp_prompts_route(mcpc, method + 8, params_obj, id);
-        // Mark client as ready if not already
-        if (!mcpc->ready) {
+        rc = mcp_prompts_route(mcpc, method + 8, params, 0);
+        if (!mcpc->ready)
             mcpc->ready = true;
-        }
     }
     else if (strncmp(method, "logging/", 8) == 0) {
-        // Logging namespace - don't alter ready state
-        rc = mcp_logging_route(mcpc, method + 8, params_obj, id);
+        rc = mcp_logging_route(mcpc, method + 8, params, 0);
     }
     else if (strncmp(method, "completion/", 11) == 0) {
-        // Completion namespace
-        rc = mcp_completion_route(mcpc, method + 11, params_obj, id);
-        // Mark client as ready if not already
-        if (!mcpc->ready) {
+        rc = mcp_completion_route(mcpc, method + 11, params, 0);
+        if (!mcpc->ready)
             mcpc->ready = true;
-        }
     }
     else if (strcmp(method, "initialize") == 0) {
-        // Extract client info from initialize request
-        mcp_extract_client_info(mcpc, params_obj);
-        netdata_log_debug(D_WEB_CLIENT, "MCP initialize request from client %s v%s", 
+        mcp_extract_client_info(mcpc, params);
+        netdata_log_debug(D_WEB_CLIENT, "MCP initialize request from client %s v%s",
                           string2str(mcpc->client_name), string2str(mcpc->client_version));
-        
-        // Handle initialize method
-        rc = mcp_method_initialize(mcpc, params_obj, id);
+        rc = mcp_method_initialize(mcpc, params, 0);
     }
     else if (strcmp(method, "ping") == 0) {
-        // Handle ping method - simple connection health check
-        // Don't alter ready state for ping requests
-        rc = mcp_method_ping(mcpc, params_obj, id);
+        rc = mcp_method_ping(mcpc, params, 0);
     }
     else {
         buffer_sprintf(mcpc->error, "Method '%s' not found", method);
         rc = MCP_RC_NOT_FOUND;
-        // Method not found shouldn't alter ready state
     }
 
-    // If this is a notification (no ID), don't generate a response
-    if (!has_id) {
-        // Clean up the params object if we created it
-        if (params_created) {
-            json_object_put(params_obj);
-        }
-        return rc;
-    }
+    if (rc != MCP_RC_OK)
+        mcp_error_result(mcpc, 0, rc);
 
-    // For requests with IDs, ensure we have a valid response
-    if (rc != MCP_RC_OK && !buffer_strlen(mcpc->result)) {
-        mcp_error_result(mcpc, id, rc);
-    }
-
-    if (!buffer_strlen(mcpc->result)) {
+    // Ensure at least one chunk exists on success
+    if (rc == MCP_RC_OK && mcp_client_response_chunk_count(mcpc) == 0) {
         buffer_strcat(mcpc->error, "method generated empty result");
-        mcp_error_result(mcpc, id, MCP_RC_INTERNAL_ERROR);
-    }
-
-    // Clean up the request ID
-    mcp_request_id_del(mcpc, id);
-
-    // Clean up the params object if we created it
-    if (params_created) {
-        json_object_put(params_obj);
+        rc = mcp_error_result(mcpc, 0, MCP_RC_INTERNAL_ERROR);
     }
 
     return rc;
-}
-
-// Main MCP entry point - handle a JSON-RPC request (can be single or batch)
-MCP_RETURN_CODE mcp_handle_request(MCP_CLIENT *mcpc, struct json_object *request) {
-    if (!mcpc || !request)
-        return MCP_RC_INTERNAL_ERROR;
-    
-    // Clear previous response buffers
-    buffer_flush(mcpc->result);
-    buffer_flush(mcpc->error);
-    
-    // Check if this is a batch request (JSON array)
-    if (json_object_get_type(request) == json_type_array) {
-        int array_len = (int)json_object_array_length(request);
-        
-        // Empty batch should return nothing according to JSON-RPC 2.0 spec
-        if (array_len == 0) {
-            return MCP_RC_OK;
-        }
-        
-        // Create a temporary buffer for building the batch response
-        BUFFER *batch_buffer = buffer_create(4096, NULL);
-        buffer_flush(batch_buffer);
-        
-        // Start the JSON array for batch response
-        buffer_strcat(batch_buffer, "[");
-        
-        // Track if we've added any responses (for comma handling)
-        size_t responses_added = 0;
-        
-        // Process each request in the batch
-        for (int i = 0; i < array_len; i++) {
-            struct json_object *req_item = json_object_array_get_idx(request, i);
-            
-            // Process the individual request
-            buffer_flush(mcpc->result);
-            buffer_flush(mcpc->error);
-            
-            // Call the single request handler
-            mcp_single_request(mcpc, req_item);
-            
-            // For notifications (no id), don't add to response
-            if (buffer_strlen(mcpc->result) == 0) {
-                continue;
-            }
-            
-            // Add comma if this isn't the first response
-            if (responses_added) {
-                buffer_strcat(batch_buffer, ", ");
-            }
-            
-            // Add the response to the batch
-            buffer_strcat(batch_buffer, buffer_tostring(mcpc->result));
-            responses_added++;
-        }
-        
-        // If no responses were added (all notifications), don't send anything per JSON-RPC spec
-        if (!responses_added) {
-            buffer_free(batch_buffer);
-            return MCP_RC_OK;
-        }
-        
-        // Close the JSON array
-        buffer_strcat(batch_buffer, "]");
-        
-        // Copy batch response to client's result buffer
-        buffer_flush(mcpc->result);
-        buffer_strcat(mcpc->result, buffer_tostring(batch_buffer));
-        buffer_free(batch_buffer);
-        
-        // Send the batch response
-        mcp_send_response_buffer(mcpc);
-        
-        return MCP_RC_OK;
-    } 
-    else {
-        // Handle single request
-        MCP_RETURN_CODE rc = mcp_single_request(mcpc, request);
-        mcp_send_response_buffer(mcpc);
-        return rc;
-    }
 }
 
 // Initialize the MCP subsystem

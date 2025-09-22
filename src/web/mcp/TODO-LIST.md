@@ -13,6 +13,26 @@ This document outlines the complete plan for implementing the Model Context Prot
 4. **Multi-buffer responses** - Support ordered responses using libnetdata double-linked lists
 5. **Clean job-based execution** - Each request becomes a structured job
 
+## Phase 1 – Transport Decoupling (Current Focus)
+
+### Goals
+- Keep request parsing inside each adapter while handing a parsed `json_object *` to the core.
+- Transform `MCP_CLIENT` into a session container with a per-request array of `BUFFER *` chunks instead of a single result buffer and JSON-RPC metadata.
+- Provide helper APIs (e.g. `mcp_response_reset`, `mcp_response_add_json`, `mcp_response_add_text`, `mcp_response_finalize`) so namespace handlers build transport-neutral responses without touching envelopes.
+- Ensure adapters own correlation data: WebSocket keeps JSON-RPC ids, future transports can pick their own tokens.
+- Preserve existing namespace function signatures by passing the same `MCP_CLIENT *`, params object, and `MCP_REQUEST_ID` while changing only the response building helpers they call.
+
+### Deliverables
+- Response buffer management implementation with request-level limits and ownership handled by `MCP_CLIENT`.
+- Updated namespace implementations (initialize, ping, tools, resources, prompts, logging, completion, etc.) to use the new helper APIs.
+- WebSocket adapter refactor that wraps/unwraps JSON-RPC entirely in adapter code, including batching and notifications.
+- Documentation updates describing the new lifecycle and expectations for adapters.
+
+### Open Questions / Checks
+- Confirm memory caps for accumulated response buffers and expose configuration knobs if required.
+- Validate streaming semantics: adapters must never split a single `BUFFER`, but may send multiple buffers sequentially.
+- Identify any shared utilities (UUID helpers, auth context) that should remain in core versus adapter.
+
 ## 1. Core MCP Architecture Refactoring
 
 ### A. Job-Based Request Processing
@@ -383,21 +403,22 @@ src/web/mcp/
 
 ## 7. Implementation Phases
 
-### Phase 1: Core Infrastructure (Priority: High)
-1. **MCP_REQ_JOB and response buffer structures**
-2. **Registry system with authorization**
-3. **Core execution function**
-4. **Basic HTTP adapter**
+### Phase 1: Transport Decoupling (Priority: High)
+1. Implement response buffer helpers on `MCP_CLIENT` (`mcp_response_reset/add/finalize`) with per-request limits.
+2. Migrate all namespace handlers (initialize, ping, tools, resources, prompts, logging, completion, etc.) to the helper API.
+3. Refactor WebSocket adapter to own JSON-RPC parsing, batching, and id correlation; keep adapters blocked while the core runs.
+4. Remove JSON-RPC-specific data (Judy request-id map, envelope builders) from the core and document the new lifecycle.
+5. Update docs/tests to reflect the transport-neutral contract.
 
-### Phase 2: Transport Separation (Priority: High)  
-1. **Extract JSON-RPC from WebSocket adapter**
-2. **Update all existing tools to use job interface**
-3. **Implement multi-buffer response system**
-4. **Complete HTTP adapter with full feature parity**
+### Phase 2: Additional Transports (Priority: High)
+1. Implement streamable HTTP adapter using the new buffer array (one `MCP_CLIENT` per HTTP connection).
+2. Implement SSE adapter reusing the same response chunks without splitting buffers.
+3. Share adapter scaffolding (factory helpers, auth wiring) and add coverage for reconnection scenarios.
+4. Evaluate whether a shared parser wrapper is needed or adapters should keep bespoke parsing.
 
 ### Phase 3: Advanced Features (Priority: Medium)
-1. **Specialized logs tools**
-2. **Enhanced error handling and status reporting**
+1. Specialized logs tools workflow.
+2. Enhanced error handling, status reporting, and potential job queue abstractions once multiple transports are stable.
 3. **Performance optimizations**
 4. **Comprehensive testing**
 

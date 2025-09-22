@@ -28,8 +28,8 @@
 #include "mcp-completion.h"
 
 // Implementation of completion/complete (transport-agnostic)
-static MCP_RETURN_CODE mcp_completion_method_complete(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id) {
-    if (!mcpc || id == 0) return MCP_RC_ERROR;
+static MCP_RETURN_CODE mcp_completion_method_complete(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id __maybe_unused) {
+    if (!mcpc) return MCP_RC_ERROR;
     
     // Extract argument and ref parameters
     struct json_object *argument_obj = NULL;
@@ -91,13 +91,9 @@ static MCP_RETURN_CODE mcp_completion_method_complete(MCP_CLIENT *mcpc, struct j
 // Completion namespace method dispatcher (transport-agnostic)
 MCP_RETURN_CODE mcp_completion_route(MCP_CLIENT *mcpc, const char *method, struct json_object *params, MCP_REQUEST_ID id) {
     if (!mcpc || !method) return MCP_RC_INTERNAL_ERROR;
-    
+
     netdata_log_debug(D_MCP, "MCP completion method: %s", method);
-    
-    // Flush previous buffers
-    buffer_flush(mcpc->result);
-    buffer_flush(mcpc->error);
-    
+
     MCP_RETURN_CODE rc;
     
     if (strcmp(method, "complete") == 0) {
