@@ -127,9 +127,11 @@ volumes:
 </TabItem>
 </Tabs>
 
-> :bookmark_tabs: Note
->
-> If you plan to connect the node to Netdata Cloud, you can find the command with the right parameters by clicking the "Add Nodes" button in your Space's "Nodes" view.
+:::note
+
+If you plan to connect the node to Netdata Cloud, you can find the command with the right parameters by clicking the "Add Nodes" button in your Space's "Nodes" view.
+
+:::
 
 ### With NVIDIA GPUs monitoring
 
@@ -326,7 +328,11 @@ to Caddyfile.
 
 ### With Docker socket proxy
 
-> **Note:** Using Netdata with a Docker socket proxy may cause some features to not work as expected. It hasn't been fully tested by the Netdata team.
+:::note
+
+ Using Netdata with a Docker socket proxy may cause some features to not work as expected. It hasn't been fully tested by the Netdata team.
+
+:::
 
 For better security, deploy a **Docker socket proxy** with a tool like [HAProxy](/docs/netdata-agent/configuration/running-the-netdata-agent-behind-a-reverse-proxy/Running-behind-haproxy.md) or [CetusGuard](https://github.com/hectorm/cetusguard). This ensures the socket is **read-only** and restricted to the `/containers` endpoint.  
 
@@ -376,11 +382,19 @@ volumes:
   netdatacache:
 ```
 
-**Note:** Replace `2375` with the port of your proxy.
+:::note
+
+Replace `2375` with the port of your proxy.
+
+:::
 
 #### CetusGuard
 
-> Note: This deployment method is supported by the community
+:::note
+
+This deployment method is supported by the community
+
+:::
 
 ```yaml
 version: '3'
@@ -429,8 +443,11 @@ volumes:
   netdatacache:
 ```
 
-You can run the socket proxy in its own Docker Compose file and leave it on a private network that you can add to
-other services that require access.
+:::tip
+
+You can run the socket proxy in its own Docker Compose file and leave it on a private network that you can add to other services that require access.
+
+:::
 
 ### Rootless mode
 
@@ -481,9 +498,11 @@ docker run -d --name=netdata \
 
 </Tabs>
 
-> :bookmark_tabs: Note
->
-> If you plan to connect the node to Netdata Cloud, you can find the command with the right parameters by clicking the "Add Nodes" button in your Space's "Nodes" view.
+:::note
+
+If you plan to connect the node to Netdata Cloud, you can find the command with the right parameters by clicking the "Add Nodes" button in your Space's "Nodes" view.
+
+:::
 
 ## Docker tags
 
@@ -574,4 +593,8 @@ The default `/api/v1/info` check is usually sufficient. However, if the web serv
 
 At Netdata, we provide multiple ways of testing your Docker images using your own repositories.
 
+:::tip
+
 You may either use the command line tools available or take advantage of our GitHub Actions infrastructure.
+
+:::

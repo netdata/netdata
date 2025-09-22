@@ -8,8 +8,17 @@ You can install Netdata in one of the three following ways:
 
 Each of these installation option requires [Homebrew](https://brew.sh/) for handling dependencies.
 
-> The Netdata Homebrew package is community-created and -maintained.
-> Community-maintained packages _may_ receive support from Netdata, but are only a best-effort affair. Learn more about [Netdata's platform support policy](/docs/netdata-agent/versions-and-platforms.md).
+:::info
+
+The Netdata Homebrew package is community-created and -maintained.
+
+:::
+
+:::note
+
+Community-maintained packages _may_ receive support from Netdata, but are only a best-effort affair. Learn more about [Netdata's platform support policy](/docs/netdata-agent/versions-and-platforms.md).
+
+:::
 
 ## Install Netdata with our automatic one-line installation script
 
@@ -102,10 +111,14 @@ We don't recommend installing Netdata from source on macOS, as it can be difficu
    sudo ./netdata-installer.sh --install-prefix /usr/local
    ```
 
-> Your Netdata configuration directory will be at `/usr/local/netdata/`.
-> Your stock configuration directory will be at `/usr/local/lib/netdata/conf.d/`.
-> The installer will also install a startup plist to start Netdata when your macOS system boots.
+:::info
+
+- Your Netdata configuration directory will be at `/usr/local/netdata/`.
+- Your stock configuration directory will be at `/usr/local/lib/netdata/conf.d/`.
+- The installer will also install a startup plist to start Netdata when your macOS system boots.
+
+:::
 
 Netdata works on macOS, albeit with some limitations.
-The number of charts displaying system metrics is limited, but you can use any of Netdata's [external plugins](/src/plugins.d/README.md) to monitor any services you might have installed on your macOS system.
-You could also use a macOS system as the parent node in a [streaming configuration](/src/streaming/README.md).
+- The number of charts displaying system metrics is limited, but you can use any of Netdata's [external plugins](/src/plugins.d/README.md) to monitor any services you might have installed on your macOS system.
+- You could also use a macOS system as the parent node in a [streaming configuration](/src/streaming/README.md).

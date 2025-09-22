@@ -10,34 +10,42 @@ With Ansible, you can deploy Netdata repeatedly without disrupting your infrastr
 
 :::
 
----
-
 ## Prerequisites
 
 - Netdata Cloud account. [Sign in and create one](https://app.netdata.cloud) if you don't have one already.
 - An administration system with [Ansible](https://www.ansible.com/) installed.
 - One or more nodes that your administration system can access via [SSH public keys](https://git-scm.com/book/en/v2/Git-on-the-Server-Generating-Your-SSH-Public-Key) (preferably password-less).
 
----
-
 ## Deployment Architecture
 
 Below is a visual representation of the deployment architecture, illustrating the relationship between the host system, Docker, the Netdata container, and key mounts/privileges.
 
 ```mermaid
-graph TD
-    A[Host System] -->|SSH| B[Ansible]
-    B -->|Deploys| C[Netdata Agent]
-    C -->|Collects Metrics| D[Monitored Services]
-    C -->|Sends Data| E[Netdata Cloud]
-    subgraph " "
+flowchart TD
+    A("**Host System**<br/>Administration server") -->|SSH| B("**Ansible**<br/>Configuration management")
+    B -->|Deploys| C("**Netdata Agent**<br/>Monitoring daemon")
+    C -->|Collects Metrics| D("**Monitored Services**<br/>Applications & infrastructure")
+    C -->|Sends Data| E("**Netdata Cloud**<br/>Unified dashboard")
+    
+    subgraph infrastructure["Target Infrastructure"]
         direction TB
+        C
         D
-        E
     end
-```
 
----
+    %% Style definitions matching the reference
+    classDef alert fill:#ffeb3b,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+    classDef neutral fill:#f9f9f9,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+    classDef complete fill:#4caf50,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+    classDef database fill:#2196F3,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+
+    %% Apply styles
+    class A alert
+    class B database
+    class C,D complete
+    class E neutral
+    class infrastructure database
+```
 
 ## Download and Configure the Playbook
 
@@ -56,8 +64,6 @@ Next, navigate into the Ansible directory.
 ```bash
 cd ansible-quickstart
 ```
-
----
 
 ### Edit the `hosts` File
 
@@ -87,8 +93,6 @@ If you use an SSH key other than `~/.ssh/id_rsa` for logging into your nodes, sp
 203.0.113.1  hostname=ansible-02  ansible_ssh_private_key_file=~/.ssh/LightsailDefaultKey-us-east-1.pem
 ```
 
----
-
 ### Edit the `vars/main.yml` File
 
 To connect your node(s) to your Space in Netdata Cloud and see all their metrics in real-time, set the `claim_token` and `claim_rooms` variables.
@@ -108,9 +112,11 @@ Since this node connects to Netdata Cloud, we'll view its dashboards there inste
 
 You can read more about this decision, or other ways to lock down the local dashboard, in our [node security documentation](https://learn.netdata.cloud/docs/netdata-agent/security/overview).
 
-> Curious about why Netdata's dashboard is open by default? Read our [blog post](https://www.netdata.cloud/blog/netdata-agent-dashboard/) on that zero-configuration design decision.
+:::tip
 
----
+Curious about why Netdata's dashboard is open by default? Read our [blog post](https://www.netdata.cloud/blog/netdata-agent-dashboard/) on that zero-configuration design decision.
+
+:::
 
 ## Run the Playbook
 

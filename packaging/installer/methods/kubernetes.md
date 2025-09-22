@@ -44,9 +44,11 @@ The installation process securely connects your Kubernetes cluster to stream met
     helm install netdata netdata/netdata 
     ```
 
-    > **Note**
-    >
-    > If you plan to connect the node to Netdata Cloud, you can find the command with the right parameters by clicking the "Add Nodes" button in your Space's Nodes tab.
+    :::note
+  
+    If you plan to connect the node to Netdata Cloud, you can find the command with the right parameters by clicking the "Add Nodes" button in your Space's Nodes tab.
+
+    :::
 
     For more installation options, please read our [Netdata Helm chart for Kubernetes](https://github.com/netdata/helmchart/blob/master/charts/netdata/README.md) reference.
 
@@ -93,16 +95,20 @@ On an existing installation, in order to connect it to Netdata Cloud you will ne
               enabled = no
     ```
 
-    > **Note**
-    >
-    > Make sure to replace `YOUR_CLAIM_TOKEN` with the claim token of your space,
-    > and `YOUR_ROOM_ID` with the ID of the Room you are willing to connect to.
+    :::note
+    
+    Make sure to replace `YOUR_CLAIM_TOKEN` with the claim token of your space,
+    and `YOUR_ROOM_ID` with the ID of the Room you are willing to connect to.
+
+    :::
 
     These settings connect your `parent`/`child` nodes to Netdata Cloud and store more metrics in the nodes' time-series databases.
 
-    > **Info**
-    >
-    > These override settings, along with the Helm chart's defaults, will retain an hour's worth of metrics (`retention = 3600`, or `3600 seconds`) on each child node. Based on your metrics retention needs, and the resources available on your cluster, you may want to increase the `history` setting.
+    :::info
+
+    These override settings, along with the Helm chart's defaults, will retain an hour's worth of metrics (`retention = 3600`, or `3600 seconds`) on each child node. Based on your metrics retention needs, and the resources available on your cluster, you may want to increase the `history` setting.
+
+    :::
 
 3. To apply these new settings, run:
 

@@ -1,10 +1,10 @@
 # Install Netdata on FreeBSD
 
-> 💡 This guide is community-maintained and might not always reflect the latest details (like package versions).  
-> Double-check before proceeding!  
-> Want to help? [Submit a PR!](https://github.com/netdata/netdata/edit/master/packaging/installer/methods/freebsd.md)
+:::info
 
----
+This guide is community-maintained and might not always reflect the latest details (like package versions). Double-check before proceeding! Want to help? [Submit a PR!](https://github.com/netdata/netdata/edit/master/packaging/installer/methods/freebsd.md)
+
+:::
 
 ## 1. Install dependencies
 
@@ -16,11 +16,10 @@ pkg install bash e2fsprogs-libuuid git curl autoconf automake pkgconf pidof libl
 
 Approve any prompts that appear.
 
----
-
 ## 2. Choose an Installation Method
 
-### Option A: Kickstart Installer (Recommended)
+<details>
+<summary><strong>Option A: Kickstart Installer (Recommended)</strong></summary>
 
 The simplest approach is to use our one-line [kickstart installer](/packaging/installer/methods/kickstart.md).
 
@@ -32,7 +31,12 @@ The simplest approach is to use our one-line [kickstart installer](/packaging/in
    ```bash
    wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh --claim-token <YOUR_TOKEN> --claim-url https://app.netdata.cloud
    ```
-  > Replace `<YOUR_TOKEN>` with your actual claim token.
+  
+:::note
+
+Replace `<YOUR_TOKEN>` with your actual claim token.
+
+:::
 
 - After installation, access your Netdata dashboard at:
 
@@ -42,7 +46,7 @@ The simplest approach is to use our one-line [kickstart installer](/packaging/in
 
   (`NODE` = your FreeBSD machine's hostname or IP)
 
----
+</details>
 
 ### Option B: FreeBSD Ports Installation
 
@@ -50,9 +54,8 @@ Netdata is also available through the FreeBSD Ports collection:
 
 https://www.freshports.org/net-mgmt/netdata/
 
----
-
-### Option C: Manual Installation (For Advanced Users)
+<details>
+<summary><strong>Option C: Manual Installation (For Advanced Users)</strong></summary>
 
 - Download the latest Netdata release:
 
@@ -91,7 +94,7 @@ https://www.freshports.org/net-mgmt/netdata/
    service netdata start
    ```
 
----
+</details>
 
 ## 3. Updating Netdata Installation
 
@@ -103,8 +106,6 @@ For manual updates:
 cd /opt/netdata/usr/libexec/netdata/
 ./netdata-updater.sh
 ```
-
----
 
 ## Optional Kickstart Parameters
 
@@ -120,8 +121,6 @@ cd /opt/netdata/usr/libexec/netdata/
 | `--install-prefix /opt`                              | Change installation directory.                                                                             |
 | `--prepare-offline-install-source ./netdata-offline` | Prepare offline installation source. See [Offline Install Guide](/packaging/installer/methods/offline.md). |
 
----
-
 ## Environment Variables (Advanced Users)
 
 | Variable              | Purpose                                                            |
@@ -129,8 +128,6 @@ cd /opt/netdata/usr/libexec/netdata/
 | `TMPDIR`              | Directory for temporary files.                                     |
 | `ROOTCMD`             | Command used for privilege escalation (default: `sudo` or `doas`). |
 | `DISABLE_TELEMETRY=1` | Disables anonymous telemetry data.                                 |
-
----
 
 ## Telemetry Notice
 
