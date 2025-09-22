@@ -125,7 +125,9 @@ jobs:
         if: needs.file-check.outputs.run == 'true'
         run: |
           set -euo pipefail
-          go test -json ./... -race -count=1 2>&1 | gotestfmt -hide all
+          # The race detector requires CGO; explicitly enable it to avoid go emitting
+          # non-JSON diagnostics that crash gotestfmt when CGO is disabled upstream.
+          CGO_ENABLED=1 go test -json ./... -race -count=1 2>&1 | gotestfmt -hide all
         working-directory: ${{ matrix.module }}
 
   build-tests:
