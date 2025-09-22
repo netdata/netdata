@@ -98,6 +98,11 @@ jobs:
         if: needs.file-check.outputs.run == 'true'
         run: go mod download
         working-directory: ${{ matrix.module }}
+      - name: Install CGO system dependencies
+        if: needs.file-check.outputs.run == 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y unixodbc-dev
       - name: Compile
         if: needs.file-check.outputs.run == 'true'
         run: |
