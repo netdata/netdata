@@ -39,11 +39,11 @@ func (c *Collector) collectProfileScalarMetrics(mx map[string]int64, pms []*ddsn
 			}
 
 			if len(m.MultiValue) == 0 {
-				id := fmt.Sprintf("snmp_device_prof_%s", m.Name)
+				id := fmt.Sprintf("snmp_device_%s", m.Name)
 				mx[id] = m.Value
 			} else {
 				for k, v := range m.MultiValue {
-					id := fmt.Sprintf("snmp_device_prof_%s_%s", m.Name, k)
+					id := fmt.Sprintf("snmp_device_%s_%s", m.Name, k)
 					mx[id] = v
 				}
 			}
@@ -73,11 +73,11 @@ func (c *Collector) collectProfileTableMetrics(mx map[string]int64, pms []*ddsnm
 			}
 
 			if len(m.MultiValue) == 0 {
-				id := fmt.Sprintf("snmp_device_prof_%s", key)
+				id := fmt.Sprintf("snmp_device_%s", key)
 				mx[id] += m.Value
 			} else {
 				for k, v := range m.MultiValue {
-					id := fmt.Sprintf("snmp_device_prof_%s_%s", key, k)
+					id := fmt.Sprintf("snmp_device_%s_%s", key, k)
 					mx[id] = v
 				}
 			}
