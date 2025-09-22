@@ -16,22 +16,28 @@ This document outlines the complete plan for implementing the Model Context Prot
 ## Phase 1 – Transport Decoupling (Current Focus)
 
 ### Goals
-- Keep request parsing inside each adapter while handing a parsed `json_object *` to the core.
-- Transform `MCP_CLIENT` into a session container with a per-request array of `BUFFER *` chunks instead of a single result buffer and JSON-RPC metadata.
-- Provide helper APIs (e.g. `mcp_response_reset`, `mcp_response_add_json`, `mcp_response_add_text`, `mcp_response_finalize`) so namespace handlers build transport-neutral responses without touching envelopes.
-- Ensure adapters own correlation data: WebSocket keeps JSON-RPC ids, future transports can pick their own tokens.
-- Preserve existing namespace function signatures by passing the same `MCP_CLIENT *`, params object, and `MCP_REQUEST_ID` while changing only the response building helpers they call.
+- Keep request parsing inside each adapter while handing a parsed `json_object *` to the core. [done]
+- Transform `MCP_CLIENT` into a session container with a per-request array of `BUFFER *` chunks instead of a single result buffer and JSON-RPC metadata. [done]
+- Provide helper APIs (e.g. `mcp_response_reset`, `mcp_response_add_json`, `mcp_response_add_text`, `mcp_response_finalize`) so namespace handlers build transport-neutral responses without touching envelopes. [done]
+- Ensure adapters own correlation data: WebSocket keeps JSON-RPC ids, future transports can pick their own tokens. [done]
+- Preserve existing namespace function signatures by passing the same `MCP_CLIENT *`, params object, and `MCP_REQUEST_ID` while changing only the response building helpers they call. [done]
 
 ### Deliverables
-- Response buffer management implementation with request-level limits and ownership handled by `MCP_CLIENT`.
-- Updated namespace implementations (initialize, ping, tools, resources, prompts, logging, completion, etc.) to use the new helper APIs.
-- WebSocket adapter refactor that wraps/unwraps JSON-RPC entirely in adapter code, including batching and notifications.
-- Documentation updates describing the new lifecycle and expectations for adapters.
+- Response buffer management implementation with request-level limits and ownership handled by `MCP_CLIENT`. [done]
+- Updated namespace implementations (initialize, ping, tools, resources, prompts, logging, completion, etc.) to use the new helper APIs. [done]
+- WebSocket adapter refactor that wraps/unwraps JSON-RPC entirely in adapter code, including batching and notifications. [done]
+- Documentation updates describing the new lifecycle and expectations for adapters. [done]
 
 ### Open Questions / Checks
-- Confirm memory caps for accumulated response buffers and expose configuration knobs if required.
-- Validate streaming semantics: adapters must never split a single `BUFFER`, but may send multiple buffers sequentially.
-- Identify any shared utilities (UUID helpers, auth context) that should remain in core versus adapter.
+- Confirm memory caps for accumulated response buffers and expose configuration knobs if required. [done]
+- Validate streaming semantics: adapters must never split a single `BUFFER`, but may send multiple buffers sequentially. [done]
+- Identify any shared utilities (UUID helpers, auth context) that should remain in core versus adapter. [done]
+
+Status:
+- [x] Response buffer helpers implemented in mcp.c (prepare, add_json/text, finalize via buffer_json_finalize in handlers)
+- [x] Namespaces updated to use helpers (initialize, ping, tools, resources, prompts, logging, completion)
+- [x] WebSocket adapter wraps JSON-RPC (batching, notifications) and converts MCP response chunks to JSON-RPC payloads
+- [x] Error handling unified via mcp_error_result and mcpc->error buffer
 
 ## 1. Core MCP Architecture Refactoring
 
