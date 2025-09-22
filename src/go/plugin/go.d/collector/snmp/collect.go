@@ -3,7 +3,6 @@
 package snmp
 
 import (
-	"errors"
 	"fmt"
 	"log/slog"
 	"maps"
@@ -21,8 +20,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
 )
-
-const oidSysUptime = "1.3.6.1.2.1.1.3.0"
 
 func (c *Collector) collect() (map[string]int64, error) {
 	if c.snmpClient == nil {
@@ -74,24 +71,6 @@ func (c *Collector) collect() (map[string]int64, error) {
 	}
 
 	return mx, nil
-}
-
-func (c *Collector) collectSysUptime(mx map[string]int64) error {
-	resp, err := c.snmpClient.Get([]string{oidSysUptime})
-	if err != nil {
-		return err
-	}
-	if len(resp.Variables) == 0 {
-		return errors.New("no system uptime")
-	}
-	v, err := pduToInt(resp.Variables[0])
-	if err != nil {
-		return err
-	}
-
-	mx["uptime"] = v / 100 // the time is in hundredths of a second
-
-	return nil
 }
 
 func (c *Collector) setupVnode(si *snmputils.SysInfo, deviceMeta map[string]ddsnmp.MetaTag) *vnodes.VirtualNode {
