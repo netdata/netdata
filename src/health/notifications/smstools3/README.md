@@ -17,10 +17,10 @@ Send notifications to `smstools3` using Netdata's Agent alert notification featu
 The SMS Server Tools 3 is a SMS Gateway software which can send and receive short messages through GSM modems and mobile phones.
 
 
-
 <img src="https://img.shields.io/badge/maintained%20by-Netdata-%2300ab44" />
 
 ## Setup
+
 
 ### Prerequisites
 
@@ -37,26 +37,16 @@ The SMS Server Tools 3 is a SMS Gateway software which can send and receive shor
 
 ### Configuration
 
-#### File
-
-The configuration file name for this integration is `health_alarm_notify.conf`.
-
-
-You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
-Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
-
-```bash
-cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
-sudo ./edit-config health_alarm_notify.conf
-```
 #### Options
 
 The following options can be defined for this notification
 
 <details open><summary>Config Options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | sendsms | Set the path for `sendsms`, otherwise Netdata will search for it in your system `$PATH:` | YES | yes |
 | SEND_SMS | Set `SEND_SMS` to `YES`. |  | yes |
 | DEFAULT_RECIPIENT_SMS | Set DEFAULT_RECIPIENT_SMS to the phone number you want the alert notifications to be sent to. You can define multiple phone numbers like this: PHONE1 PHONE2. |  | yes |
@@ -84,11 +74,27 @@ role_recipients_sms[sitemgr]="PHONE6"
 ```
 
 
+
 </details>
 
-#### Examples
 
-##### Basic Configuration
+
+#### via File
+
+The configuration file name for this integration is `health_alarm_notify.conf`.
+
+
+You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
+Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
+
+```bash
+cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
+sudo ./edit-config health_alarm_notify.conf
+```
+
+##### Examples
+
+###### Basic Configuration
 
 
 

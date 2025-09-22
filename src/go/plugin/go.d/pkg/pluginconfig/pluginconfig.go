@@ -15,6 +15,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/netdata/netdata/go/plugins/pkg/buildinfo"
 	"github.com/netdata/netdata/go/plugins/pkg/executable"
 	"github.com/netdata/netdata/go/plugins/pkg/multipath"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/cli"
@@ -51,6 +52,10 @@ type directories struct {
 	// Misc
 	collectorsWatch []string
 	varLibDir       string
+}
+
+func IsStock(path string) bool {
+	return strings.HasPrefix(path, StockConfigDir())
 }
 
 // MustInit parses env, applies CLI overrides, discovers directories, and stores them.
@@ -126,12 +131,20 @@ func (d *directories) initUserRoots(opts *cli.Option, env envData, execDir strin
 	}
 
 	// 2) NETDATA_USER_CONFIG_DIR
-	if env.userDir != "" {
-		roots = append(roots, safePathClean(env.userDir))
+	if buildinfo.UserConfigDir != "" {
+		roots = append(roots, safePathClean(buildinfo.UserConfigDir))
+	} else if dir := safePathClean(env.userDir); dir != "" {
+		roots = append(roots, dir)
 	}
 
 	if len(roots) != 0 {
 		d.userConfigDirs = multipath.New(roots...)
+		return
+	}
+
+	relDir := safePathClean(filepath.Join(execDir, "..", "..", "..", "..", "etc", "netdata"))
+	if isDirExists(relDir) {
+		d.userConfigDirs = multipath.New(relDir)
 		return
 	}
 
@@ -146,13 +159,23 @@ func (d *directories) initUserRoots(opts *cli.Option, env envData, execDir strin
 		}
 	}
 
-	d.userConfigDirs = multipath.New(filepath.Join(execDir, "..", "..", "..", "..", "etc", "netdata"))
+	d.userConfigDirs = multipath.New(relDir)
 }
 
 // Build step 2: initialize single "stock" root: env, common locations, build-relative fallback.
 func (d *directories) initStockRoot(env envData, execDir string) {
+	if buildinfo.StockConfigDir != "" {
+		d.stockConfigDir = safePathClean(buildinfo.StockConfigDir)
+		return
+	}
 	if stock := safePathClean(env.stockDir); stock != "" {
 		d.stockConfigDir = stock
+		return
+	}
+
+	relDir := safePathClean(filepath.Join(execDir, "..", "..", "..", "..", "usr", "lib", "netdata", "conf.d"))
+	if isDirExists(relDir) {
+		d.stockConfigDir = relDir
 		return
 	}
 
@@ -166,7 +189,7 @@ func (d *directories) initStockRoot(env envData, execDir string) {
 		}
 	}
 
-	d.stockConfigDir = filepath.Join(execDir, "..", "..", "..", "..", "usr", "lib", "netdata", "conf.d")
+	d.stockConfigDir = relDir
 }
 
 // Build step 3: derive collectors dirs from roots.

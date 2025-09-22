@@ -23,7 +23,7 @@ sysobjectids:
       model: FortiGate VM
     1.3.6.1.4.1.12356.101.1.30:
       category: Firewall
-      model: FortiGate VM64
+      model: FortiGate-VM64
     1.3.6.1.4.1.12356.101.1.31:
       category: Firewall
       model: FortiGate VM64 VMX
@@ -32,34 +32,37 @@ sysobjectids:
       model: FortiGate VM64 SVM
     1.3.6.1.4.1.12356.101.1.40:
       category: Firewall
-      model: FortiGate VM64 XEN
+      model: FortiGate-VM64-XEN
     1.3.6.1.4.1.12356.101.1.41:
       category: Firewall
       model: FortiGate VM64 XEN
     1.3.6.1.4.1.12356.101.1.45:
       category: Firewall
-      model: FortiGate VM64 AWS
+      model: FortiGate-VM64-AWS
     1.3.6.1.4.1.12356.101.1.46:
       category: Firewall
-      model: FortiGate VM64 AWS
+      model: FortiGate-VM64-FGC-AWS
     1.3.6.1.4.1.12356.101.1.47:
       category: Firewall
-      model: FortiGate VM64 OPC
+      model: FortiGate-VM64-OPC
     1.3.6.1.4.1.12356.101.1.60:
       category: Firewall
-      model: FortiGate VM64 KVM
+      model: FortiGate-VM64-KVM
     1.3.6.1.4.1.12356.101.1.61:
       category: Firewall
-      model: FortiGate VM64 NPU
+      model: FortiGate-VM64-FGC-KVM
     1.3.6.1.4.1.12356.101.1.65:
       category: Firewall
-      model: FortiGate VM64 GCP
+      model: FortiGate-VM64-GCP
+    1.3.6.1.4.1.12356.101.1.66:
+      category: Firewall
+      model: FortiGate-ARM64-KVM
     1.3.6.1.4.1.12356.101.1.67:
       category: Proxy Server
       model: FortiProxy VM
     1.3.6.1.4.1.12356.101.1.70:
       category: Firewall
-      model: FortiGate VM64 HW
+      model: FortiGate-VM64-HV
     1.3.6.1.4.1.12356.101.1.210:
       category: Firewall
       model: FortiWiFi 20C
@@ -125,10 +128,70 @@ sysobjectids:
       model: FortiWiFi 40C
     1.3.6.1.4.1.12356.101.1.441:
       category: Firewall
-      model: FortiGate 40F
+      model: FortiGate-40F
+    1.3.6.1.4.1.12356.101.1.442:
+      category: Firewall
+      model: FortiGate-41F
     1.3.6.1.4.1.12356.101.1.443:
       category: Firewall
-      model: FortiGate 40FI
+      model: FortiGate-40F-I
+    1.3.6.1.4.1.12356.101.1.444:
+      category: Firewall
+      model: FortiGate-41F-I
+    1.3.6.1.4.1.12356.101.1.445:
+      category: Firewall
+      model: FortiWiFi-40F
+    1.3.6.1.4.1.12356.101.1.446:
+      category: Firewall
+      model: FortiWiFi-41F
+    1.3.6.1.4.1.12356.101.1.447:
+      category: Firewall
+      model: FortiWiFi-40F-I
+    1.3.6.1.4.1.12356.101.1.448:
+      category: Firewall
+      model: FortiWiFi-41F-I
+    1.3.6.1.4.1.12356.101.1.450:
+      category: Firewall
+      model: FortiGate-50G
+    1.3.6.1.4.1.12356.101.1.451:
+      category: Firewall
+      model: FortiGate-50G5
+    1.3.6.1.4.1.12356.101.1.452:
+      category: Firewall
+      model: FortiGate-50GD
+    1.3.6.1.4.1.12356.101.1.453:
+      category: Firewall
+      model: FortiGate-51G5
+    1.3.6.1.4.1.12356.101.1.454:
+      category: Firewall
+      model: FortiWiFi-50G5
+    1.3.6.1.4.1.12356.101.1.455:
+      category: Firewall
+      model: FortiWiFi-50G
+    1.3.6.1.4.1.12356.101.1.456:
+      category: Firewall
+      model: FortiWiFi-51G
+    1.3.6.1.4.1.12356.101.1.457:
+      category: Firewall
+      model: FortiWiFi-50GD
+    1.3.6.1.4.1.12356.101.1.458:
+      category: Firewall
+      model: FortiWiFi-51G5
+    1.3.6.1.4.1.12356.101.1.459:
+      category: Firewall
+      model: FortiGate-51G
+    1.3.6.1.4.1.12356.101.1.460:
+      category: Firewall
+      model: FortiGate-50GP
+    1.3.6.1.4.1.12356.101.1.461:
+      category: Firewall
+      model: FortiGate-51GP
+    1.3.6.1.4.1.12356.101.1.462:
+      category: Firewall
+      model: FortiWiFi-50GS
+    1.3.6.1.4.1.12356.101.1.463:
+      category: Firewall
+      model: FortiGate-50GS
     1.3.6.1.4.1.12356.101.1.500:
       category: Firewall
       model: FortiGate FGT50A
@@ -257,55 +320,61 @@ sysobjectids:
       model: FortiGate Rugged 90D
     1.3.6.1.4.1.12356.101.1.639:
       category: Firewall
-      model: FortiWiFi 60E
+      model: FortiWiFi-60E
     1.3.6.1.4.1.12356.101.1.640:
       category: Firewall
-      model: FortiGate 61E
+      model: FortiGate-61E
     1.3.6.1.4.1.12356.101.1.641:
       category: Firewall
-      model: FortiGate 60E
+      model: FortiGate-60E
     1.3.6.1.4.1.12356.101.1.642:
       category: Firewall
-      model: FortiWiFi 60DC
+      model: FortiGate-60E-POE
     1.3.6.1.4.1.12356.101.1.643:
       category: Firewall
-      model: FortiGate Rugged 60D
+      model: FortiGateRugged-60F
     1.3.6.1.4.1.12356.101.1.644:
       category: Firewall
-      model: FortiGate 80F Bypass
+      model: FortiGate-60F
     1.3.6.1.4.1.12356.101.1.645:
       category: Firewall
-      model: FortiGate 61F
+      model: FortiGate-61F
     1.3.6.1.4.1.12356.101.1.646:
       category: Firewall
-      model: FortiGate 60EI
+      model: FortiWiFi-60F
     1.3.6.1.4.1.12356.101.1.647:
       category: Firewall
-      model: FortiGate 60EC
+      model: FortiWiFi-61F
+    1.3.6.1.4.1.12356.101.1.648:
+      category: Firewall
+      model: FortiGateRugged-60F-I
     1.3.6.1.4.1.12356.101.1.649:
       category: Firewall
-      model: FortiWifi 61E
+      model: FortiWiFi-61E
     1.3.6.1.4.1.12356.101.1.661:
       category: Firewall
-      model: FortiGate 60EJ
+      model: FortiGate-60E-J
     1.3.6.1.4.1.12356.101.1.662:
       category: Firewall
-      model: FortiWiFi 60EJ
+      model: FortiWiFi-60E-J
     1.3.6.1.4.1.12356.101.1.663:
       category: Firewall
-      model: FortiGate 60EV
+      model: FortiGate-60E-V
     1.3.6.1.4.1.12356.101.1.664:
       category: Firewall
-      model: FortiWiFi 60EV
-    1.3.6.1.4.1.12356.101.1.700:
-      category: Firewall
-      model: FortiGate 70D
+      model: FortiWiFi-60E-V
     1.3.6.1.4.1.12356.101.1.701:
       category: Firewall
-      model: FortiGate 70DPOE
+      model: FortiGate-70F
     1.3.6.1.4.1.12356.101.1.702:
       category: Firewall
-      model: FortiGate 71F
+      model: FortiGate-71F
+    1.3.6.1.4.1.12356.101.1.704:
+      category: Firewall
+      model: FortiGateRugged-70FB
+    1.3.6.1.4.1.12356.101.1.705:
+      category: Firewall
+      model: FortiGateRugged-70FM
     1.3.6.1.4.1.12356.101.1.800:
       category: Firewall
       model: FortiGate 80C
@@ -324,48 +393,81 @@ sysobjectids:
     1.3.6.1.4.1.12356.101.1.811:
       category: Firewall
       model: FortiWiFi 81CM
+    1.3.6.1.4.1.12356.101.1.826:
+      category: Firewall
+      model: FortiWiFi-80FS
+    1.3.6.1.4.1.12356.101.1.827:
+      category: Firewall
+      model: FortiWiFi-81FS
     1.3.6.1.4.1.12356.101.1.841:
       category: Firewall
-      model: FortiGate 80E-POE
+      model: FortiGate-80E-POE
     1.3.6.1.4.1.12356.101.1.842:
       category: Firewall
-      model: FortiGate 80E
+      model: FortiGate-80E
     1.3.6.1.4.1.12356.101.1.843:
       category: Firewall
-      model: FortiGate 81E
+      model: FortiGate-81E
     1.3.6.1.4.1.12356.101.1.844:
       category: Firewall
-      model: FortiGate 81POE
+      model: FortiGate-81E-POE
     1.3.6.1.4.1.12356.101.1.845:
       category: Firewall
-      model: FortiGate 80F
+      model: FortiGate-80F
     1.3.6.1.4.1.12356.101.1.846:
       category: Firewall
-      model: FortiGate 80F
+      model: FortiGate-81F
     1.3.6.1.4.1.12356.101.1.847:
       category: Firewall
-      model: Fortigate 80F-Bypass
+      model: FortiGate-80F-BP
+    1.3.6.1.4.1.12356.101.1.848:
+      category: Firewall
+      model: FortiWiFi-80F
+    1.3.6.1.4.1.12356.101.1.849:
+      category: Firewall
+      model: FortiWiFi-81F
     1.3.6.1.4.1.12356.101.1.850:
       category: Firewall
-      model: FortiGate 80F-POE
+      model: FortiGate-80F-POE
     1.3.6.1.4.1.12356.101.1.851:
       category: Firewall
-      model: FortiGate 81F-POE
+      model: FortiGate-81F-POE
+    1.3.6.1.4.1.12356.101.1.852:
+      category: Firewall
+      model: FortiWiFi-81FD
+    1.3.6.1.4.1.12356.101.1.853:
+      category: Firewall
+      model: FortiWiFi-81FP
+    1.3.6.1.4.1.12356.101.1.854:
+      category: Firewall
+      model: FortiGate-80F-DSL
     1.3.6.1.4.1.12356.101.1.900:
       category: Firewall
-      model: FortiGate 900D
+      model: FortiGate-900D
     1.3.6.1.4.1.12356.101.1.940:
       category: Firewall
-      model: FortiGate 90E
+      model: FortiGate-90E
     1.3.6.1.4.1.12356.101.1.941:
       category: Firewall
-      model: FortiGate 91E
+      model: FortiGate-91E
+    1.3.6.1.4.1.12356.101.1.942:
+      category: Firewall
+      model: FortiGate-90G
+    1.3.6.1.4.1.12356.101.1.943:
+      category: Firewall
+      model: FortiGate-91G
+    1.3.6.1.4.1.12356.101.1.944:
+      category: Firewall
+      model: FortiWiFi-90G
+    1.3.6.1.4.1.12356.101.1.945:
+      category: Firewall
+      model: FortiWiFi-91G
     1.3.6.1.4.1.12356.101.1.1000:
       category: Firewall
-      model: FortiGate 100
+      model: FortiGate-100F
     1.3.6.1.4.1.12356.101.1.1001:
       category: Firewall
-      model: FortiGate 100F
+      model: FortiGate-101F
     1.3.6.1.4.1.12356.101.1.1002:
       category: Firewall
       model: FortiGate 110C
@@ -377,25 +479,25 @@ sysobjectids:
       model: FortiGate-100D
     1.3.6.1.4.1.12356.101.1.1005:
       category: Firewall
-      model: FortiGate Rugged 100C
+      model: FortiGate-140E
     1.3.6.1.4.1.12356.101.1.1006:
       category: Firewall
-      model: FortiGate 140E-POE
-    1.3.6.1.4.1.12356.101.1.1010:
-      category: Firewall
-      model: FortiGate 101F
+      model: FortiGate-140E-POE
     1.3.6.1.4.1.12356.101.1.1041:
       category: Firewall
-      model: FortiGate 100E
+      model: FortiGate-100E
     1.3.6.1.4.1.12356.101.1.1042:
       category: Firewall
-      model: FortiGate 100EF
+      model: FortiGate-100EF
     1.3.6.1.4.1.12356.101.1.1043:
       category: Firewall
-      model: FortiGate 101E
+      model: FortiGate-101E
+    1.3.6.1.4.1.12356.101.1.1201:
+      category: Firewall
+      model: FortiGate-120G
     1.3.6.1.4.1.12356.101.1.1202:
       category: Firewall
-      model: FortiGate 121G
+      model: FortiGate-121G
     1.3.6.1.4.1.12356.101.1.1401:
       category: Firewall
       model: FortiGate 140D
@@ -434,19 +536,22 @@ sysobjectids:
       model: FortiGate 240DP
     1.3.6.1.4.1.12356.101.1.2009:
       category: Firewall
-      model: FortiGate 200E
+      model: FortiGate-200E
     1.3.6.1.4.1.12356.101.1.2010:
       category: Firewall
-      model: FortiGate 201E
+      model: FortiGate-201E
     1.3.6.1.4.1.12356.101.1.2011:
       category: Firewall
-      model: FortiGate 200F
+      model: FortiGate-200F
     1.3.6.1.4.1.12356.101.1.2012:
       category: Firewall
-      model: FortiGate 201F
+      model: FortiGate-201F
     1.3.6.1.4.1.12356.101.1.2013:
       category: Firewall
-      model: FortiGate 280D-POE
+      model: FortiGate-200G
+    1.3.6.1.4.1.12356.101.1.2014:
+      category: Firewall
+      model: FortiGate-201G
     1.3.6.1.4.1.12356.101.1.3000:
       category: Firewall
       model: FortiGate 300
@@ -467,13 +572,13 @@ sysobjectids:
       model: FortiGate 300C
     1.3.6.1.4.1.12356.101.1.3006:
       category: Firewall
-      model: FortiGate 300D
+      model: FortiGate-3HD
     1.3.6.1.4.1.12356.101.1.3007:
       category: Firewall
-      model: FortiGate 300E
+      model: FortiGate-300E
     1.3.6.1.4.1.12356.101.1.3008:
       category: Firewall
-      model: FortiGate 301E
+      model: FortiGate-301E
     1.3.6.1.4.1.12356.101.1.4000:
       category: Firewall
       model: FortiGate 400
@@ -482,19 +587,22 @@ sysobjectids:
       model: FortiGate 400A
     1.3.6.1.4.1.12356.101.1.4004:
       category: Firewall
-      model: FortiGate 400D
+      model: FortiGate-400D
     1.3.6.1.4.1.12356.101.1.4007:
       category: Firewall
-      model: FortiGate 400E
+      model: FortiGate-400E
     1.3.6.1.4.1.12356.101.1.4008:
       category: Firewall
-      model: FortiGate 401E
+      model: FortiGate-401E
+    1.3.6.1.4.1.12356.101.1.4009:
+      category: Firewall
+      model: FortiGate-400E-BP
     1.3.6.1.4.1.12356.101.1.4010:
       category: Firewall
-      model: FortiGate 400F
+      model: FortiGate-400F
     1.3.6.1.4.1.12356.101.1.4011:
       category: Firewall
-      model: FortiGate 401F
+      model: FortiGate-401F
     1.3.6.1.4.1.12356.101.1.5000:
       category: Firewall
       model: FortiGate 500
@@ -503,31 +611,31 @@ sysobjectids:
       model: FortiGate 500A
     1.3.6.1.4.1.12356.101.1.5004:
       category: Firewall
-      model: FortiGate 500D
+      model: FortiGate-500D
     1.3.6.1.4.1.12356.101.1.5005:
       category: Firewall
-      model: FortiGate 500E
+      model: FortiGate-500E
     1.3.6.1.4.1.12356.101.1.5006:
       category: Firewall
-      model: FortiGate 501E
+      model: FortiGate-501E
     1.3.6.1.4.1.12356.101.1.6003:
       category: Firewall
       model: FortiGate 600C
     1.3.6.1.4.1.12356.101.1.6004:
       category: Firewall
-      model: FortiGate 600D
+      model: FortiGate-600D
     1.3.6.1.4.1.12356.101.1.6005:
       category: Firewall
-      model: FortiGate 600E
+      model: FortiGate-600E
     1.3.6.1.4.1.12356.101.1.6006:
       category: Firewall
-      model: FortiGate 601E
+      model: FortiGate-601E
     1.3.6.1.4.1.12356.101.1.6007:
       category: Firewall
-      model: FortiGate 600F
+      model: FortiGate-600F
     1.3.6.1.4.1.12356.101.1.6008:
       category: Firewall
-      model: FortiGate 601E
+      model: FortiGate-601F
     1.3.6.1.4.1.12356.101.1.6200:
       category: Firewall
       model: FortiGate 620B
@@ -548,7 +656,13 @@ sysobjectids:
       model: FortiGate 800C
     1.3.6.1.4.1.12356.101.1.8004:
       category: Firewall
-      model: FortiGate 800D
+      model: FortiGate-800D
+    1.3.6.1.4.1.12356.101.1.9001:
+      category: Firewall
+      model: FortiGate-900G
+    1.3.6.1.4.1.12356.101.1.9002:
+      category: Firewall
+      model: FortiGate-901G
     1.3.6.1.4.1.12356.101.1.10000:
       category: Firewall
       model: FortiGate 1000
@@ -566,19 +680,19 @@ sysobjectids:
       model: FortiGate 1000C
     1.3.6.1.4.1.12356.101.1.10005:
       category: Firewall
-      model: FortiGate 1000D
+      model: FortiGate-1000D
     1.3.6.1.4.1.12356.101.1.10006:
       category: Firewall
-      model: FortiGate 1000E
+      model: FortiGate-1100E
     1.3.6.1.4.1.12356.101.1.10007:
       category: Firewall
-      model: FortiGate 1101E
+      model: FortiGate-1101E
     1.3.6.1.4.1.12356.101.1.10008:
       category: Firewall
-      model: FortiGate 1000F
+      model: FortiGate-1000F
     1.3.6.1.4.1.12356.101.1.10009:
       category: Firewall
-      model: FortiGate 1001F
+      model: FortiGate-1001F
     1.3.6.1.4.1.12356.101.1.10030:
       category: Proxy Server
       model: FortiProxy VM
@@ -587,7 +701,7 @@ sysobjectids:
       model: FortiProxy 400E
     1.3.6.1.4.1.12356.101.1.12000:
       category: Firewall
-      model: FortiGate 1200D
+      model: FortiGate-1200D
     1.3.6.1.4.1.12356.101.1.12400:
       category: Firewall
       model: FortiGate 1240B
@@ -599,22 +713,25 @@ sysobjectids:
       model: FortiProxy 4000G
     1.3.6.1.4.1.12356.101.1.15000:
       category: Firewall
-      model: FortiGate 1500D
+      model: FortiGate-1500D
     1.3.6.1.4.1.12356.101.1.15001:
       category: Firewall
-      model: FortiGate 1500DT
+      model: FortiGate-1500DT
     1.3.6.1.4.1.12356.101.1.15002:
       category: Firewall
-      model: FortiGate 1801F
+      model: FortiGate-1801F
     1.3.6.1.4.1.12356.101.1.15003:
       category: Firewall
-      model: FortiGate 1800F
+      model: FortiGate-1800F
+    1.3.6.1.4.1.12356.101.1.15004:
+      category: Firewall
+      model: FortiWiFi-1801F
     1.3.6.1.4.1.12356.101.1.18000:
       category: Firewall
-      model: FortiGate 2201E/2200E
+      model: FortiGate-2200E
     1.3.6.1.4.1.12356.101.1.18001:
       category: Firewall
-      model: FortiGate 2201E
+      model: FortiGate-2201E
     1.3.6.1.4.1.12356.101.1.18002:
       category: Firewall
       model: FortiGate 1801F
@@ -623,31 +740,37 @@ sysobjectids:
       model: FortiGate 1800F
     1.3.6.1.4.1.12356.101.1.20000:
       category: Firewall
-      model: FortiGate 2000
+      model: FortiGate-2000E
     1.3.6.1.4.1.12356.101.1.25000:
       category: Firewall
-      model: FortiGate 2500E
+      model: FortiGate-2500E
     1.3.6.1.4.1.12356.101.1.26000:
       category: Firewall
-      model: FortiGate 2600F
+      model: FortiGate-2600F
     1.3.6.1.4.1.12356.101.1.26001:
       category: Firewall
-      model: FortiGate 2600F
+      model: FortiGate-2601F
+    1.3.6.1.4.1.12356.101.1.26002:
+      category: Firewall
+      model: FortiWiFi-2600F
     1.3.6.1.4.1.12356.101.1.30000:
       category: Firewall
-      model: FortiGate 3000
+      model: FortiGate-3000D
     1.3.6.1.4.1.12356.101.1.30001:
       category: Firewall
-      model: FortiGate 3301E
+      model: FortiGate-3300E
     1.3.6.1.4.1.12356.101.1.30002:
       category: Firewall
-      model: Fortigate 3300
+      model: FortiGate-3301E
     1.3.6.1.4.1.12356.101.1.30003:
       category: Firewall
-      model: Fortigate 3000F
+      model: FortiGate-3000F
     1.3.6.1.4.1.12356.101.1.30004:
       category: Firewall
-      model: Fortigate 3001F
+      model: FortiGate-3001F
+    1.3.6.1.4.1.12356.101.1.30005:
+      category: Firewall
+      model: FortiWiFi-3001F
     1.3.6.1.4.1.12356.101.1.30160:
       category: Firewall
       model: FortiGate 3016B
@@ -659,34 +782,40 @@ sysobjectids:
       model: FortiGate 3140B
     1.3.6.1.4.1.12356.101.1.31000:
       category: Firewall
-      model: FortiGate 3100D
+      model: FortiGate-3100D
     1.3.6.1.4.1.12356.101.1.32000:
       category: Firewall
-      model: FortiGate 3200D
+      model: FortiGate-3200D
     1.3.6.1.4.1.12356.101.1.32010:
       category: Firewall
-      model: FortiGate 3200F
+      model: FortiGate-3200F
+    1.3.6.1.4.1.12356.101.1.32011:
+      category: Firewall
+      model: FortiGate-3201F
     1.3.6.1.4.1.12356.101.1.32401:
       category: Firewall
       model: FortiGate 3240C
     1.3.6.1.4.1.12356.101.1.34001:
       category: Firewall
-      model: FortiGate 3400E
+      model: FortiGate-3400E
     1.3.6.1.4.1.12356.101.1.34011:
       category: Firewall
-      model: FortiGate 3401E
+      model: FortiGate-3401E
     1.3.6.1.4.1.12356.101.1.35001:
       category: Firewall
-      model: FortiGate 3500F
+      model: FortiGate-3500F
     1.3.6.1.4.1.12356.101.1.35011:
       category: Firewall
-      model: FortiGate 3501F
+      model: FortiGate-3501F
+    1.3.6.1.4.1.12356.101.1.35012:
+      category: Firewall
+      model: FortiWiFi-3501F
     1.3.6.1.4.1.12356.101.1.36000:
       category: Firewall
       model: FortiGate 3600
     1.3.6.1.4.1.12356.101.1.36001:
       category: Firewall
-      model: Fortigate 3600E
+      model: FortiGate-3600E
     1.3.6.1.4.1.12356.101.1.36003:
       category: Firewall
       model: FortiGate 3600A
@@ -695,28 +824,40 @@ sysobjectids:
       model: FortiGate 3600C
     1.3.6.1.4.1.12356.101.1.36011:
       category: Firewall
-      model: FortiGate 3601E
+      model: FortiGate-3601E
     1.3.6.1.4.1.12356.101.1.37000:
       category: Firewall
-      model: FortiGate 3700DFortiGate 81F
+      model: FortiGate-3700D
     1.3.6.1.4.1.12356.101.1.37001:
       category: Firewall
-      model: FortiGate 3700DX
+      model: FortiGate-3700F
+    1.3.6.1.4.1.12356.101.1.37011:
+      category: Firewall
+      model: FortiGate-3701F
     1.3.6.1.4.1.12356.101.1.38001:
       category: Firewall
-      model: FortiGate 3800D
+      model: FortiGate-3800D
     1.3.6.1.4.1.12356.101.1.38002:
       category: Firewall
-      model: FortiGate 4200F
+      model: FortiGate-4200F
+    1.3.6.1.4.1.12356.101.1.38006:
+      category: Firewall
+      model: FortiWiFi-4200F
     1.3.6.1.4.1.12356.101.1.38100:
       category: Firewall
       model: FortiGate 3810A
     1.3.6.1.4.1.12356.101.1.38101:
       category: Firewall
-      model: FortiGate 3810D
+      model: FortiGate-3810D
     1.3.6.1.4.1.12356.101.1.38150:
       category: Firewall
-      model: FortiGate 3815D
+      model: FortiGate-3815D
+    1.3.6.1.4.1.12356.101.1.39001:
+      category: Firewall
+      model: FortiGate-4400F
+    1.3.6.1.4.1.12356.101.1.39007:
+      category: Firewall
+      model: FortiWiFi-4400F
     1.3.6.1.4.1.12356.101.1.39500:
       category: Firewall
       model: FortiGate 3950B
@@ -725,19 +866,34 @@ sysobjectids:
       model: FortiGate 3951B
     1.3.6.1.4.1.12356.101.1.39601:
       category: Firewall
-      model: FortiGate 3960E
+      model: FortiGate-3960E
     1.3.6.1.4.1.12356.101.1.39801:
       category: Firewall
-      model: FortiGate 3980E
+      model: FortiGate-3980E
+    1.3.6.1.4.1.12356.101.1.39804:
+      category: Firewall
+      model: FortiWiFi-3980E
     1.3.6.1.4.1.12356.101.1.40000:
       category: Firewall
       model: FortiGate 4000
     1.3.6.1.4.1.12356.101.1.42002:
       category: Firewall
-      model: FortiGate 4201F
+      model: FortiGate-4201F
     1.3.6.1.4.1.12356.101.1.44001:
       category: Firewall
-      model: FortiGate 4401F
+      model: FortiGate-4401F
+    1.3.6.1.4.1.12356.101.1.44002:
+      category: Firewall
+      model: FortiWiFi-4401F
+    1.3.6.1.4.1.12356.101.1.48000:
+      category: Firewall
+      model: FortiGate-4800F
+    1.3.6.1.4.1.12356.101.1.48001:
+      category: Firewall
+      model: FortiGate-4801F
+    1.3.6.1.4.1.12356.101.1.48003:
+      category: Firewall
+      model: FortiWiFi-4801F
     1.3.6.1.4.1.12356.101.1.50000:
       category: Firewall
       model: FortiGate 5000
@@ -761,13 +917,13 @@ sysobjectids:
       model: FortiGate 5001C
     1.3.6.1.4.1.12356.101.1.50015:
       category: Firewall
-      model: FortiGate 5001D
+      model: FortiGate-5001D
     1.3.6.1.4.1.12356.101.1.50016:
       category: Firewall
-      model: FortiGate 5001E
+      model: FortiGate-5001E
     1.3.6.1.4.1.12356.101.1.50017:
       category: Firewall
-      model: FortiGate 5001E1
+      model: FortiGate-5001E1
     1.3.6.1.4.1.12356.101.1.50021:
       category: Firewall
       model: FortiGate 5002A
@@ -788,34 +944,97 @@ sysobjectids:
       model: FortiGate 5101C
     1.3.6.1.4.1.12356.101.1.60001:
       category: Firewall
-      model: FortiGate 6000F
+      model: FortiGate-6000F
     1.3.6.1.4.1.12356.101.1.70001:
       category: Firewall
-      model: Fortinet fgt7060E
+      model: FortiGate-7000E
     1.3.6.1.4.1.12356.101.1.71201:
       category: Firewall
-      model: FortiGate 7081F
+      model: FortiGate-7000F
+    1.3.6.1.4.1.12356.101.1.80000:
+      category: Firewall
+      model: FortiGate-VM-EV
+    1.3.6.1.4.1.12356.101.1.80001:
+      category: Firewall
+      model: FortiGate-VM-EV
+    1.3.6.1.4.1.12356.101.1.80002:
+      category: Firewall
+      model: FortiGate-VM-XX
+    1.3.6.1.4.1.12356.101.1.80003:
+      category: Firewall
+      model: FortiGate-VMX
+    1.3.6.1.4.1.12356.101.1.80004:
+      category: Firewall
+      model: FortiGate-VM00
+    1.3.6.1.4.1.12356.101.1.80005:
+      category: Firewall
+      model: FortiGate-VM01
     1.3.6.1.4.1.12356.101.1.80006:
       category: Firewall
-      model: FortiGate VM64
+      model: FortiGate-VM02
+    1.3.6.1.4.1.12356.101.1.80007:
+      category: Firewall
+      model: FortiGate-VM04
+    1.3.6.1.4.1.12356.101.1.80008:
+      category: Firewall
+      model: FortiGate-VM08
+    1.3.6.1.4.1.12356.101.1.80009:
+      category: Firewall
+      model: FortiGate-VM16
+    1.3.6.1.4.1.12356.101.1.80010:
+      category: Firewall
+      model: FortiGate-VM32
     1.3.6.1.4.1.12356.101.1.80011:
       category: Firewall
-      model: FortiGate VM-01V
+      model: FortiGate-VM1V
     1.3.6.1.4.1.12356.101.1.80012:
       category: Firewall
-      model: FortiGate VM64
+      model: FortiGate-VM2V
     1.3.6.1.4.1.12356.101.1.80013:
       category: Firewall
-      model: FortiGate VM64
+      model: FortiGate-VM4V
     1.3.6.1.4.1.12356.101.1.80014:
       category: Firewall
-      model: FortiGate VM-08V
+      model: FortiGate-VM8V
+    1.3.6.1.4.1.12356.101.1.80015:
+      category: Firewall
+      model: FortiGate-V16V
+    1.3.6.1.4.1.12356.101.1.80016:
+      category: Firewall
+      model: FortiGate-V32V
+    1.3.6.1.4.1.12356.101.1.80019:
+      category: Firewall
+      model: FortiGate-V-ULV
+    1.3.6.1.4.1.12356.101.1.80020:
+      category: Firewall
+      model: FortiGate-VM-UL
     1.3.6.1.4.1.12356.101.1.80021:
       category: Firewall
-      model: FortiGate VM-08S
+      model: FortiGate-VM-SL
+    1.3.6.1.4.1.12356.101.1.80022:
+      category: Firewall
+      model: FortiGate-VM-SB
+    1.3.6.1.4.1.12356.101.1.80023:
+      category: Firewall
+      model: FortiGate-VM-EL
+    1.3.6.1.4.1.12356.101.1.80024:
+      category: Firewall
+      model: FortiGate-VM-ML
+    1.3.6.1.4.1.12356.101.1.80025:
+      category: Firewall
+      model: FortiGate-VM-BB
+    1.3.6.1.4.1.12356.101.1.80030:
+      category: Firewall
+      model: FortiGate-VM-PG
     1.3.6.1.4.1.12356.101.1.90000:
       category: Firewall
       model: FortiGate VM64
+    1.3.6.1.4.1.12356.101.1.90007:
+      category: Firewall
+      model: FortiGate-ARM64-AWS
+    1.3.6.1.4.1.12356.101.1.90008:
+      category: Firewall
+      model: FortiGate-ARM64-XEN
     1.3.6.1.4.1.12356.101.1.90010:
       category: Firewall
       model: FortiGate Azure VM
@@ -824,16 +1043,37 @@ sysobjectids:
       model: FortiGate VM64 GCP
     1.3.6.1.4.1.12356.101.1.90019:
       category: Firewall
-      model: FortiGate VM64 ALI
+      model: FortiGate-VM64-ALI
     1.3.6.1.4.1.12356.101.1.90020:
       category: Firewall
       model: FortiGate VM64 ALI
+    1.3.6.1.4.1.12356.101.1.90021:
+      category: Firewall
+      model: FortiGate-VM64-RAXONDEMAND
+    1.3.6.1.4.1.12356.101.1.90022:
+      category: Firewall
+      model: FortiGate-VM64-IBM
+    1.3.6.1.4.1.12356.101.1.90025:
+      category: Firewall
+      model: FortiGate-ARM64-OCI
+    1.3.6.1.4.1.12356.101.1.90026:
+      category: Firewall
+      model: FortiGate-ARM64-GCP
+    1.3.6.1.4.1.12356.101.1.90027:
+      category: Firewall
+      model: FortiGate-ARM64-AZURE
     1.3.6.1.4.1.12356.101.1.90060:
       category: Firewall
       model: FortiGate VM64 KVM
+    1.3.6.1.4.1.12356.101.1.90070:
+      category: Firewall
+      model: FortiWiFi-VM64
+    1.3.6.1.4.1.12356.101.1.90071:
+      category: Firewall
+      model: FortiWiFi-VM64-KVM
     1.3.6.1.4.1.12356.101.1.90081:
       category: Firewall
-      model: FortiGate VM64
+      model: FortiGate-VM64-AZURE
     1.3.6.1.4.1.12356.102.1.1000:
       category: Other
       model: FortiAnalyzer 100
@@ -878,16 +1118,19 @@ sysobjectids:
       model: FortiManager
     1.3.6.1.4.1.12356.103.1.1000:
       category: Management
-      model: FortiManager 100
+      model: FortiManager-100
+    1.3.6.1.4.1.12356.103.1.1001:
+      category: Management
+      model: FortiManager-VM
     1.3.6.1.4.1.12356.103.1.1003:
       category: Management
-      model: FortiManager 100C
+      model: FortiManager-100C
     1.3.6.1.4.1.12356.103.1.2004:
       category: Management
-      model: FortiManager 200D
+      model: FortiManager-200D
     1.3.6.1.4.1.12356.103.1.2005:
       category: Management
-      model: FortiManager 200E
+      model: FortiManager-200E
     1.3.6.1.4.1.12356.103.1.2006:
       category: Management
       model: FortiManager 200F
@@ -896,37 +1139,37 @@ sysobjectids:
       model: FortiManager 200G
     1.3.6.1.4.1.12356.103.1.3004:
       category: Management
-      model: FortiManager 300D
+      model: FortiManager-300D
     1.3.6.1.4.1.12356.103.1.3005:
       category: Management
-      model: FortiManager 300E
+      model: FortiManager-300E
     1.3.6.1.4.1.12356.103.1.3006:
       category: Management
       model: FortiManager 300F
     1.3.6.1.4.1.12356.103.1.4000:
       category: Management
-      model: FortiManager 400
+      model: FortiManager-400
     1.3.6.1.4.1.12356.103.1.4001:
       category: Management
-      model: FortiManager 400A
+      model: FortiManager-400A
     1.3.6.1.4.1.12356.103.1.4002:
       category: Management
-      model: FortiManager 400B
+      model: FortiManager-400B
     1.3.6.1.4.1.12356.103.1.4003:
       category: Management
-      model: FortiManager 400C
+      model: FortiManager-400C
     1.3.6.1.4.1.12356.103.1.4005:
       category: Management
-      model: FortiManager 400E
+      model: FortiManager-400E
     1.3.6.1.4.1.12356.103.1.4007:
       category: Management
       model: FortiManager 400G
     1.3.6.1.4.1.12356.103.1.10003:
       category: Management
-      model: FortiManager 1000C
+      model: FortiManager-1000C
     1.3.6.1.4.1.12356.103.1.10004:
-      category: Firewall
-      model: FortiGate 1000D
+      category: Management
+      model: FortiManager-1000D
     1.3.6.1.4.1.12356.103.1.10006:
       category: Management
       model: FortiManager 1000F
@@ -935,22 +1178,22 @@ sysobjectids:
       model: FortiManager 1000G
     1.3.6.1.4.1.12356.103.1.20000:
       category: Management
-      model: FortiManager 2000XL
+      model: FortiManager-2000XL
     1.3.6.1.4.1.12356.103.1.20005:
       category: Management
-      model: FortiManager 2000E
+      model: FortiManager-2000E
     1.3.6.1.4.1.12356.103.1.30000:
       category: Management
-      model: FortiManager 3000
+      model: FortiManager-3000
     1.3.6.1.4.1.12356.103.1.30002:
       category: Management
-      model: FortiManager 3000B
+      model: FortiManager-3000B
     1.3.6.1.4.1.12356.103.1.30003:
       category: Management
-      model: FortiManager 3000C
+      model: FortiManager-3000C
     1.3.6.1.4.1.12356.103.1.30006:
       category: Management
-      model: FortiManager 3000F
+      model: FortiManager-3000F
     1.3.6.1.4.1.12356.103.1.30007:
       category: Management
       model: FortiManager 3000G
@@ -963,45 +1206,48 @@ sysobjectids:
     1.3.6.1.4.1.12356.103.1.37007:
       category: Management
       model: FortiManager 3700G
+    1.3.6.1.4.1.12356.103.1.39005:
+      category: Management
+      model: FortiManager-3900E
     1.3.6.1.4.1.12356.103.1.40004:
       category: Management
-      model: FortiManager 4000D
+      model: FortiManager-4000D
     1.3.6.1.4.1.12356.103.1.40005:
       category: Management
-      model: FortiManager 4000E
+      model: FortiManager-4000E
     1.3.6.1.4.1.12356.103.1.50011:
       category: Management
-      model: FortiManager 5001A
+      model: FortiManager-5001A
     1.3.6.1.4.1.12356.103.3.20:
-      category: Other
-      model: FortiAnalyzer VM
+      category: Management
+      model: FortiAnalyzer-VM
     1.3.6.1.4.1.12356.103.3.64:
       category: Other
       model: FortiAnalyzer VM
     1.3.6.1.4.1.12356.103.3.1000:
-      category: Other
-      model: FortiAnalyzer 100
+      category: Management
+      model: FortiAnalyzer-100
     1.3.6.1.4.1.12356.103.3.1001:
-      category: Other
-      model: FortiAnalyzer 100A
+      category: Management
+      model: FortiAnalyzer-100A
     1.3.6.1.4.1.12356.103.3.1002:
-      category: Other
-      model: FortiAnalyzer 100B
+      category: Management
+      model: FortiAnalyzer-100B
     1.3.6.1.4.1.12356.103.3.1003:
-      category: Other
-      model: FortiAnalyzer 100C
+      category: Management
+      model: FortiAnalyzer-100C
     1.3.6.1.4.1.12356.103.3.2004:
-      category: Other
-      model: FortiAnalyzer 200D
+      category: Management
+      model: FortiAnalyzer-200D
     1.3.6.1.4.1.12356.103.3.2005:
-      category: Other
-      model: FortiAnalyzer 200E
+      category: Management
+      model: FortiAnalyzer-200E
     1.3.6.1.4.1.12356.103.3.2006:
       category: Other
       model: FortiAnalyzer 200F
     1.3.6.1.4.1.12356.103.3.3004:
-      category: Other
-      model: FortiAnalyzer 300D
+      category: Management
+      model: FortiAnalyzer-300D
     1.3.6.1.4.1.12356.103.3.3006:
       category: Other
       model: FortiAnalyzer 300F
@@ -1009,23 +1255,23 @@ sysobjectids:
       category: Other
       model: FortiAnalyzer 300G
     1.3.6.1.4.1.12356.103.3.4000:
-      category: Other
-      model: FortiAnalyzer 400
+      category: Management
+      model: FortiAnalyzer-400
     1.3.6.1.4.1.12356.103.3.4002:
-      category: Other
-      model: FortiAnalyzer 400B
+      category: Management
+      model: FortiAnalyzer-400B
     1.3.6.1.4.1.12356.103.3.4003:
-      category: Other
-      model: FortiAnalyzer 400C
+      category: Management
+      model: FortiAnalyzer-400C
     1.3.6.1.4.1.12356.103.3.4005:
-      category: Other
-      model: FortiAnalyzer 400E
+      category: Management
+      model: FortiAnalyzer-400E
     1.3.6.1.4.1.12356.103.3.8000:
-      category: Other
-      model: FortiAnalyzer 800
+      category: Management
+      model: FortiAnalyzer-800
     1.3.6.1.4.1.12356.103.3.8002:
-      category: Other
-      model: FortiAnalyzer 800B
+      category: Management
+      model: FortiAnalyzer-800B
     1.3.6.1.4.1.12356.103.3.8006:
       category: Other
       model: FortiAnalyzer 800F
@@ -1033,17 +1279,17 @@ sysobjectids:
       category: Other
       model: FortiAnalyzer 800G
     1.3.6.1.4.1.12356.103.3.10002:
-      category: Other
-      model: FortiAnalyzer 1000B
+      category: Management
+      model: FortiAnalyzer-1000B
     1.3.6.1.4.1.12356.103.3.10003:
-      category: Other
-      model: FortiAnalyzer 1000C
+      category: Management
+      model: FortiAnalyzer-1000C
     1.3.6.1.4.1.12356.103.3.10004:
-      category: Other
-      model: FortiAnalyzer 1000D
+      category: Management
+      model: FortiAnalyzer-1000D
     1.3.6.1.4.1.12356.103.3.10005:
-      category: Other
-      model: FortiAnalyzer 1000E
+      category: Management
+      model: FortiAnalyzer-1000E
     1.3.6.1.4.1.12356.103.3.10006:
       category: Other
       model: FortiAnalyzer 1000F
@@ -1051,56 +1297,56 @@ sysobjectids:
       category: Other
       model: FortiAnalyzer 1000G
     1.3.6.1.4.1.12356.103.3.20000:
-      category: Other
-      model: FortiAnalyzer 2000
+      category: Management
+      model: FortiAnalyzer-2000
     1.3.6.1.4.1.12356.103.3.20001:
-      category: Other
-      model: FortiAnalyzer 2000A
+      category: Management
+      model: FortiAnalyzer-2000A
     1.3.6.1.4.1.12356.103.3.20002:
-      category: Other
-      model: FortiAnalyzer 2000B
+      category: Management
+      model: FortiAnalyzer-2000B
     1.3.6.1.4.1.12356.103.3.20005:
-      category: Other
-      model: FortiAnalyzer 2000E
+      category: Management
+      model: FortiAnalyzer-2000E
     1.3.6.1.4.1.12356.103.3.30004:
-      category: Other
-      model: FortiAnalyzer 3000D
+      category: Management
+      model: FortiAnalyzer-3000D
     1.3.6.1.4.1.12356.103.3.30005:
-      category: Other
-      model: FortiAnalyzer 3000E
+      category: Management
+      model: FortiAnalyzer-3000E
     1.3.6.1.4.1.12356.103.3.30006:
-      category: Other
-      model: FortiAnalyzer 3000F
+      category: Management
+      model: FortiAnalyzer-3000F
     1.3.6.1.4.1.12356.103.3.30007:
       category: Other
       model: FortiAnalyzer 3000G
     1.3.6.1.4.1.12356.103.3.35005:
-      category: Firewall
-      model: FortiGate 3500E
+      category: Management
+      model: FortiAnalyzer-3500E
     1.3.6.1.4.1.12356.103.3.35006:
-      category: Other
-      model: FortiAnalyzer 3500F
+      category: Management
+      model: FortiAnalyzer-3500F
     1.3.6.1.4.1.12356.103.3.35007:
       category: Other
       model: FortiAnalyzer 3500G
     1.3.6.1.4.1.12356.103.3.37006:
-      category: Other
-      model: FortiAnalyzer 3700F
+      category: Management
+      model: FortiAnalyzer-3700F
     1.3.6.1.4.1.12356.103.3.37007:
       category: Other
       model: FortiAnalyzer 3700G
     1.3.6.1.4.1.12356.103.3.39005:
-      category: Other
-      model: FortiAnalyzer 3900E
+      category: Management
+      model: FortiAnalyzer-3900E
     1.3.6.1.4.1.12356.103.3.40000:
-      category: Other
-      model: FortiAnalyzer 4000
+      category: Management
+      model: FortiAnalyzer-4000
     1.3.6.1.4.1.12356.103.3.40001:
-      category: Other
-      model: FortiAnalyzer 4000A
+      category: Management
+      model: FortiAnalyzer-4000A
     1.3.6.1.4.1.12356.103.3.40002:
-      category: Other
-      model: FortiAnalyzer 4000B
+      category: Management
+      model: FortiAnalyzer-4000B
     1.3.6.1.4.1.12356.103.3.45006:
       category: Other
       model: FortiAnalyzer BigData 4500F
@@ -1161,171 +1407,647 @@ sysobjectids:
     1.3.6.1.4.1.12356.106.1.51030:
       category: Switch
       model: FORTISWITCH5003A-CONTROLLER
+    1.3.6.1.4.1.12356.106.5.1081:
+      category: Switch
+      model: FortiSwitch-108D-POE
+    1.3.6.1.4.1.12356.106.5.1082:
+      category: Switch
+      model: FortiSwitch-108E
+    1.3.6.1.4.1.12356.106.5.1083:
+      category: Switch
+      model: FortiSwitch-108E-POE
+    1.3.6.1.4.1.12356.106.5.1084:
+      category: Switch
+      model: FortiSwitch-108E-FPOE
+    1.3.6.1.4.1.12356.106.5.1085:
+      category: Switch
+      model: FortiSwitch-108D-VM
+    1.3.6.1.4.1.12356.106.5.1086:
+      category: Switch
+      model: FortiSwitch-108F
+    1.3.6.1.4.1.12356.106.5.1087:
+      category: Switch
+      model: FortiSwitch-108F-POE
+    1.3.6.1.4.1.12356.106.5.1088:
+      category: Switch
+      model: FortiSwitch-108F-FPOE
+    1.3.6.1.4.1.12356.106.5.1121:
+      category: Switch
+      model: FortiSwitchRugged-112D-POE
+    1.3.6.1.4.1.12356.106.5.1241:
+      category: Switch
+      model: FortiSwitch-124D
+    1.3.6.1.4.1.12356.106.5.1242:
+      category: Switch
+      model: FortiSwitch-124D-POE
+    1.3.6.1.4.1.12356.106.5.1243:
+      category: Switch
+      model: FortiSwitchRugged-124D
+    1.3.6.1.4.1.12356.106.5.1244:
+      category: Switch
+      model: FortiSwitch-124E
+    1.3.6.1.4.1.12356.106.5.1245:
+      category: Switch
+      model: FortiSwitch-124E-POE
+    1.3.6.1.4.1.12356.106.5.1246:
+      category: Switch
+      model: FortiSwitch-124E-FPOE
+    1.3.6.1.4.1.12356.106.5.1247:
+      category: Switch
+      model: FortiSwitch-148E
+    1.3.6.1.4.1.12356.106.5.1248:
+      category: Switch
+      model: FortiSwitch-148E-POE
+    1.3.6.1.4.1.12356.106.5.1249:
+      category: Switch
+      model: FortiSwitch-124F-FPOE
+    1.3.6.1.4.1.12356.106.5.1484:
+      category: Switch
+      model: FortiSwitch-148F
+    1.3.6.1.4.1.12356.106.5.1485:
+      category: Switch
+      model: FortiSwitch-148F-POE
+    1.3.6.1.4.1.12356.106.5.1486:
+      category: Switch
+      model: FortiSwitch-148F-FPOE
+    1.3.6.1.4.1.12356.106.5.2241:
+      category: Switch
+      model: FortiSwitch-224D-POE
+    1.3.6.1.4.1.12356.106.5.2242:
+      category: Switch
+      model: FortiSwitch-224D-FPOE
+    1.3.6.1.4.1.12356.106.5.2243:
+      category: Switch
+      model: FortiSwitch-224E
+    1.3.6.1.4.1.12356.106.5.2244:
+      category: Switch
+      model: FortiSwitch-224E-POE
+    1.3.6.1.4.1.12356.106.5.2481:
+      category: Switch
+      model: FortiSwitch-248D-POE
+    1.3.6.1.4.1.12356.106.5.2482:
+      category: Switch
+      model: FortiSwitch-248D-FPOE
+    1.3.6.1.4.1.12356.106.5.2483:
+      category: Switch
+      model: FortiSwitch-248D
+    1.3.6.1.4.1.12356.106.5.2484:
+      category: Switch
+      model: FortiSwitch-248E-FPOE
+    1.3.6.1.4.1.12356.106.5.2485:
+      category: Switch
+      model: FortiSwitch-248E-POE
+    1.3.6.1.4.1.12356.106.5.4241:
+      category: Switch
+      model: FortiSwitch-424D
+    1.3.6.1.4.1.12356.106.5.4242:
+      category: Switch
+      model: FortiSwitch-424D-POE
+    1.3.6.1.4.1.12356.106.5.4243:
+      category: Switch
+      model: FortiSwitch-424D-FPOE
+    1.3.6.1.4.1.12356.106.5.4482:
+      category: Switch
+      model: FortiSwitch-448D
+    1.3.6.1.4.1.12356.106.5.4483:
+      category: Switch
+      model: FortiSwitch-448D-FPOE
+    1.3.6.1.4.1.12356.106.5.4484:
+      category: Switch
+      model: FortiSwitch-448D-POE
+    1.3.6.1.4.1.12356.106.5.4485:
+      category: Switch
+      model: FortiSwitch-448E
+    1.3.6.1.4.1.12356.106.5.4486:
+      category: Switch
+      model: FortiSwitch-448E-POE
+    1.3.6.1.4.1.12356.106.5.4487:
+      category: Switch
+      model: FortiSwitch-448E-FPOE
+    1.3.6.1.4.1.12356.106.5.5241:
+      category: Switch
+      model: FortiSwitch-524D-FPOE
+    1.3.6.1.4.1.12356.106.5.5242:
+      category: Switch
+      model: FortiSwitch-524D
+    1.3.6.1.4.1.12356.106.5.5481:
+      category: Switch
+      model: FortiSwitch-548D-FPOE
+    1.3.6.1.4.1.12356.106.5.5482:
+      category: Switch
+      model: FortiSwitch-548D
+    1.3.6.1.4.1.12356.106.5.10241:
+      category: Switch
+      model: FortiSwitch-1024D
+    1.3.6.1.4.1.12356.106.5.10242:
+      category: Switch
+      model: FortiSwitch-1024E
+    1.3.6.1.4.1.12356.106.5.10243:
+      category: Switch
+      model: FortiSwitch-T1024E
+    1.3.6.1.4.1.12356.106.5.10481:
+      category: Switch
+      model: FortiSwitch-1048D
+    1.3.6.1.4.1.12356.106.5.10482:
+      category: Switch
+      model: FortiSwitch-1048E
+    1.3.6.1.4.1.12356.106.5.12410:
+      category: Switch
+      model: FortiSwitch-124F
+    1.3.6.1.4.1.12356.106.5.12411:
+      category: Switch
+      model: FortiSwitch-124F-POE
+    1.3.6.1.4.1.12356.106.5.30321:
+      category: Switch
+      model: FortiSwitch-3032D
+    1.3.6.1.4.1.12356.106.5.30322:
+      category: Switch
+      model: FortiSwitch-3032E
+    1.3.6.1.4.1.12356.106.5.42401:
+      category: Switch
+      model: FortiSwitch-424E
+    1.3.6.1.4.1.12356.106.5.42402:
+      category: Switch
+      model: FortiSwitch-424E-POE
+    1.3.6.1.4.1.12356.106.5.42403:
+      category: Switch
+      model: FortiSwitch-424E-FPOE
+    1.3.6.1.4.1.12356.106.5.42404:
+      category: Switch
+      model: FortiSwitch-424E-Fiber
+    1.3.6.1.4.1.12356.106.5.42405:
+      category: Switch
+      model: FortiSwitch-M426E-FPOE
     1.3.6.1.4.1.12356.107.1.1004:
       category: Firewall
-      model: FortiWeb 100D
+      model: FortiWeb-100D
     1.3.6.1.4.1.12356.107.1.4002:
       category: Firewall
-      model: FortiWeb 400B
+      model: FortiWeb-400B
     1.3.6.1.4.1.12356.107.1.4003:
       category: Firewall
-      model: FortiWeb 400C
+      model: FortiWeb-400C
     1.3.6.1.4.1.12356.107.1.4004:
       category: Firewall
-      model: FortiWeb 400D
+      model: FortiWeb-400D
     1.3.6.1.4.1.12356.107.1.4005:
       category: Firewall
       model: FortiWeb 400E
     1.3.6.1.4.1.12356.107.1.6004:
       category: Firewall
-      model: FortiWeb 600D
+      model: FortiWeb-600D
     1.3.6.1.4.1.12356.107.1.10002:
       category: Firewall
-      model: FortiWeb 1000B
+      model: FortiWeb-1000B
     1.3.6.1.4.1.12356.107.1.10003:
       category: Firewall
-      model: FortiWeb 1000C
+      model: FortiWeb-1000C
     1.3.6.1.4.1.12356.107.1.10004:
       category: Firewall
-      model: FortiWeb 1000D
+      model: FortiWeb-1000D
     1.3.6.1.4.1.12356.107.1.10005:
       category: Firewall
-      model: FortiWeb 2000E
+      model: FortiWeb-2000E
     1.3.6.1.4.1.12356.107.1.10006:
       category: Firewall
-      model: FortiWeb 1000E
+      model: FortiWeb-1000E
     1.3.6.1.4.1.12356.107.1.30003:
       category: Firewall
-      model: FortiWeb 3000C
+      model: FortiWeb-3000C
     1.3.6.1.4.1.12356.107.1.30004:
       category: Firewall
-      model: FortiWeb 3000C FSX
+      model: FortiWeb-3000C-FSX
     1.3.6.1.4.1.12356.107.1.30005:
       category: Firewall
-      model: FortiWeb 3000D
+      model: FortiWeb-3000D
     1.3.6.1.4.1.12356.107.1.30006:
       category: Firewall
-      model: FortiWeb 3000D-FSX
+      model: FortiWeb-3000D-FSX
     1.3.6.1.4.1.12356.107.1.30007:
       category: Firewall
-      model: FortiWeb 3000E
+      model: FortiWeb-3000E
     1.3.6.1.4.1.12356.107.1.30008:
       category: Firewall
-      model: FortiWeb 3010E
+      model: FortiWeb-3010E
     1.3.6.1.4.1.12356.107.1.30009:
       category: Firewall
       model: FortiWeb 3000F
     1.3.6.1.4.1.12356.107.1.40003:
       category: Firewall
-      model: FortiWeb 4000C
+      model: FortiWeb-4000C
     1.3.6.1.4.1.12356.107.1.40004:
       category: Firewall
-      model: FortiWeb 4000D
+      model: FortiWeb-4000D
     1.3.6.1.4.1.12356.107.1.40005:
       category: Firewall
-      model: FortiWeb 4000E
+      model: FortiWeb-4000E
     1.3.6.1.4.1.12356.107.1.50001:
       category: Firewall
-      model: FortiWeb VM
+      model: FortiWeb-VM
     1.3.6.1.4.1.12356.107.1.50002:
       category: Firewall
-      model: FortiWeb XenOpenSource
+      model: FortiWeb-XEN-Open
     1.3.6.1.4.1.12356.107.1.50003:
       category: Firewall
-      model: FortiWeb XenServer
+      model: FortiWeb-XEN-Server
     1.3.6.1.4.1.12356.107.1.50004:
       category: Firewall
-      model: FortiWeb XenAWS
+      model: FortiWeb-XEN-AWS
     1.3.6.1.4.1.12356.107.1.50005:
       category: Firewall
-      model: FortiWeb HyperV
+      model: FortiWeb-HyperV
     1.3.6.1.4.1.12356.107.1.50006:
       category: Firewall
-      model: FortiWeb KVM
+      model: FortiWeb-KVM
     1.3.6.1.4.1.12356.107.1.50007:
       category: Firewall
-      model: FortiWeb Azure
+      model: FortiWeb-Azure
     1.3.6.1.4.1.12356.107.1.50008:
       category: Firewall
-      model: FortiWeb VM PAYG
+      model: FortiWeb-VM-PAYG
     1.3.6.1.4.1.12356.107.1.50009:
       category: Firewall
-      model: FortiWeb KVM PAYG
+      model: FortiWeb-KVM-PAYG
+    1.3.6.1.4.1.12356.107.1.50010:
+      category: Firewall
+      model: FortiWeb-GCP
+    1.3.6.1.4.1.12356.107.1.50011:
+      category: Firewall
+      model: FortiWeb-VBox
+    1.3.6.1.4.1.12356.107.1.50012:
+      category: Firewall
+      model: FortiWeb-Docker
     1.3.6.1.4.1.12356.111:
       category: Firewall
-      model: FortiDDoS 900B
+    1.3.6.1.4.1.12356.112.100.1:
+      category: Load Balancer
+      model: FortiADC-Unknown
     1.3.6.1.4.1.12356.112.100.10:
-      category: Firewall
-      model: FortiADC DEV
+      category: Load Balancer
+      model: FortiADC-DEV
     1.3.6.1.4.1.12356.112.100.20:
-      category: Firewall
-      model: FortiADC KVM
+      category: Load Balancer
+      model: FortiADC-KVM
     1.3.6.1.4.1.12356.112.100.30:
-      category: Firewall
-      model: FortiADC VM
+      category: Load Balancer
+      model: FortiADC-VM
+    1.3.6.1.4.1.12356.112.100.63:
+      category: Load Balancer
+      model: FortiADC-60F
     1.3.6.1.4.1.12356.112.100.101:
-      category: Firewall
-      model: FortiADC 100D
+      category: Load Balancer
+      model: FortiADC-100D
     1.3.6.1.4.1.12356.112.100.103:
-      category: Firewall
-      model: FortiADC 100F
+      category: Load Balancer
+      model: FortiADC-100F
     1.3.6.1.4.1.12356.112.100.201:
-      category: Firewall
-      model: FortiADC 200D
+      category: Load Balancer
+      model: FortiADC-200D
+    1.3.6.1.4.1.12356.112.100.203:
+      category: Load Balancer
+      model: FortiADC-200F
     1.3.6.1.4.1.12356.112.100.301:
-      category: Firewall
-      model: FortiADC 300D
+      category: Load Balancer
+      model: FortiADC-300D
     1.3.6.1.4.1.12356.112.100.302:
-      category: Firewall
-      model: FortiADC 300E
+      category: Load Balancer
+      model: FortiADC-300E
+    1.3.6.1.4.1.12356.112.100.303:
+      category: Load Balancer
+      model: FortiADC-300F
     1.3.6.1.4.1.12356.112.100.401:
-      category: Firewall
-      model: FortiADC 400D
+      category: Load Balancer
+      model: FortiADC-400D
+    1.3.6.1.4.1.12356.112.100.403:
+      category: Load Balancer
+      model: FortiADC-400F
     1.3.6.1.4.1.12356.112.100.701:
-      category: Firewall
-      model: FortiADC 700D
+      category: Load Balancer
+      model: FortiADC-700D
     1.3.6.1.4.1.12356.112.100.1001:
-      category: Firewall
-      model: FortiADC 1000D
+      category: Load Balancer
+      model: FortiADC-1000D
     1.3.6.1.4.1.12356.112.100.1003:
-      category: Firewall
-      model: FortiADC 1000F
+      category: Load Balancer
+      model: FortiADC-1000F
+    1.3.6.1.4.1.12356.112.100.1203:
+      category: Load Balancer
+      model: FortiADC-1200F
     1.3.6.1.4.1.12356.112.100.1501:
-      category: Firewall
-      model: FortiADC 1500D
+      category: Load Balancer
+      model: FortiADC-1500D
     1.3.6.1.4.1.12356.112.100.2001:
-      category: Firewall
-      model: FortiADC 2000D
+      category: Load Balancer
+      model: FortiADC-2000D
     1.3.6.1.4.1.12356.112.100.2003:
-      category: Firewall
-      model: FortiADC 2000F
+      category: Load Balancer
+      model: FortiADC-2000F
+    1.3.6.1.4.1.12356.112.100.2203:
+      category: Load Balancer
+      model: FortiADC-2200F
     1.3.6.1.4.1.12356.112.100.4001:
-      category: Firewall
-      model: FortiADC 4000D
+      category: Load Balancer
+      model: FortiADC-4000D
+    1.3.6.1.4.1.12356.112.100.4003:
+      category: Load Balancer
+      model: FortiADC-4000F
+    1.3.6.1.4.1.12356.112.100.4203:
+      category: Load Balancer
+      model: FortiADC-4200F
+    1.3.6.1.4.1.12356.112.100.5003:
+      category: Load Balancer
+      model: FortiADC-5000F
     1.3.6.1.4.1.12356.113.100.101:
-      category: Firewall
-      model: FortiAuthenticator
+      category: Access Server
+      model: FortiAuthenticator-VM
+    1.3.6.1.4.1.12356.113.100.102:
+      category: Access Server
+      model: FortiAuthenticator-VM-HV
+    1.3.6.1.4.1.12356.113.100.103:
+      category: Access Server
+      model: FortiAuthenticator-VM-XEN
+    1.3.6.1.4.1.12356.113.100.104:
+      category: Access Server
+      model: FortiAuthenticator-VM-KVM
+    1.3.6.1.4.1.12356.113.100.105:
+      category: Access Server
+      model: FortiAuthenticator-Docker
+    1.3.6.1.4.1.12356.113.100.204:
+      category: Access Server
+      model: FortiAuthenticator-200D
+    1.3.6.1.4.1.12356.113.100.205:
+      category: Access Server
+      model: FortiAuthenticator-200E
+    1.3.6.1.4.1.12356.113.100.303:
+      category: Access Server
+      model: FortiAuthenticator-400C
+    1.3.6.1.4.1.12356.113.100.305:
+      category: Access Server
+      model: FortiAuthenticator-400E
+    1.3.6.1.4.1.12356.113.100.403:
+      category: Access Server
+      model: FortiAuthenticator-1000C
+    1.3.6.1.4.1.12356.113.100.404:
+      category: Access Server
+      model: FortiAuthenticator-1000D
+    1.3.6.1.4.1.12356.113.100.505:
+      category: Access Server
+      model: FortiAuthenticator-2000E
+    1.3.6.1.4.1.12356.113.100.604:
+      category: Access Server
+      model: FortiAuthenticator-3000D
+    1.3.6.1.4.1.12356.113.100.605:
+      category: Access Server
+      model: FortiAuthenticator-3000E
+    1.3.6.1.4.1.12356.113.100.706:
+      category: Access Server
+      model: FortiAuthenticator-300F
+    1.3.6.1.4.1.12356.113.100.806:
+      category: Access Server
+      model: FortiAuthenticator-800F
+    1.3.6.1.4.1.12356.118.1.10004:
+      category: Security
+      model: FortiSandbox-1000D
     1.3.6.1.4.1.12356.118.1.20000:
-      category: Other
+      category: Security
       model: FortiSandbox-VM
+    1.3.6.1.4.1.12356.118.1.30004:
+      category: Security
+      model: FortiSandbox-3000D
+    1.3.6.1.4.1.12356.118.1.30005:
+      category: Security
+      model: FortiSandbox-3500D
     1.3.6.1.4.1.12356.118.1.30006:
-      category: Other
-      model: FortiSandbox 3000E
+      category: Security
+      model: FortiSandbox-3000E
     1.3.6.1.4.1.12356.118.1.30007:
-      category: Other
-      model: FortiSandbox
+      category: Security
+      model: FortiSandbox-2000E
+    1.3.6.1.4.1.12356.118.1.30008:
+      category: Security
+      model: FortiSandbox-1000F
+    1.3.6.1.4.1.12356.118.1.30009:
+      category: Security
+      model: FortiSandbox-500F
+    1.3.6.1.4.1.12356.120.10.22111:
+      category: Access Point
+      model: FortiAP-221E
+    1.3.6.1.4.1.12356.120.10.22121:
+      category: Access Point
+      model: FortiAP-U221EV
+    1.3.6.1.4.1.12356.120.10.22131:
+      category: Access Point
+      model: FortiAP-S221E
+    1.3.6.1.4.1.12356.120.10.22211:
+      category: Access Point
+      model: FortiAP-222E
+    1.3.6.1.4.1.12356.120.10.22311:
+      category: Access Point
+      model: FortiAP-223E
+    1.3.6.1.4.1.12356.120.10.22321:
+      category: Access Point
+      model: FortiAP-U223EV
+    1.3.6.1.4.1.12356.120.10.22331:
+      category: Access Point
+      model: FortiAP-S223E
+    1.3.6.1.4.1.12356.120.10.22411:
+      category: Access Point
+      model: FortiAP-224E
+    1.3.6.1.4.1.12356.120.10.23111:
+      category: Access Point
+      model: FortiAP-231E
     1.3.6.1.4.1.12356.120.10.23112:
       category: Access Point
-      model: FortiAP 231F
+      model: FortiAP-231F
+    1.3.6.1.4.1.12356.120.10.23113:
+      category: Access Point
+      model: FortiAP-231G
+    1.3.6.1.4.1.12356.120.10.23122:
+      category: Access Point
+      model: FortiAP-U231F
+    1.3.6.1.4.1.12356.120.10.23313:
+      category: Access Point
+      model: FortiAP-233G
     1.3.6.1.4.1.12356.120.10.23412:
       category: Access Point
-      model: FortiAP 234F
+      model: FortiAP-234F
+    1.3.6.1.4.1.12356.120.10.23413:
+      category: Access Point
+      model: FortiAP-234G
+    1.3.6.1.4.1.12356.120.10.23422:
+      category: Access Point
+      model: FortiAP-U234F
+    1.3.6.1.4.1.12356.120.10.23912:
+      category: Access Point
+      model: FortiAP-23JF
+    1.3.6.1.4.1.12356.120.10.24114:
+      category: Access Point
+      model: FortiAP-241K
+    1.3.6.1.4.1.12356.120.10.24314:
+      category: Access Point
+      model: FortiAP-243K
+    1.3.6.1.4.1.12356.120.10.24921:
+      category: Access Point
+      model: FortiAP-U24JEV
+    1.3.6.1.4.1.12356.120.10.24941:
+      category: Access Point
+      model: FortiAP-C24JE
+    1.3.6.1.4.1.12356.120.10.32111:
+      category: Access Point
+      model: FortiAP-321E
+    1.3.6.1.4.1.12356.120.10.32121:
+      category: Access Point
+      model: FortiAP-U321EV
+    1.3.6.1.4.1.12356.120.10.32321:
+      category: Access Point
+      model: FortiAP-U323EV
+    1.3.6.1.4.1.12356.120.10.42111:
+      category: Access Point
+      model: FortiAP-421E
+    1.3.6.1.4.1.12356.120.10.42121:
+      category: Access Point
+      model: FortiAP-U421EV
+    1.3.6.1.4.1.12356.120.10.42131:
+      category: Access Point
+      model: FortiAP-S421E
+    1.3.6.1.4.1.12356.120.10.42221:
+      category: Access Point
+      model: FortiAP-U422EV
+    1.3.6.1.4.1.12356.120.10.42231:
+      category: Access Point
+      model: FortiAP-S422E
+    1.3.6.1.4.1.12356.120.10.42311:
+      category: Access Point
+      model: FortiAP-423E
+    1.3.6.1.4.1.12356.120.10.42321:
+      category: Access Point
+      model: FortiAP-U423EV
+    1.3.6.1.4.1.12356.120.10.42331:
+      category: Access Point
+      model: FortiAP-S423E
     1.3.6.1.4.1.12356.120.10.43112:
       category: Access Point
-      model: FortiAP 431F
+      model: FortiAP-431F
+    1.3.6.1.4.1.12356.120.10.43113:
+      category: Access Point
+      model: FortiAP-431G
+    1.3.6.1.4.1.12356.120.10.43122:
+      category: Access Point
+      model: FortiAP-U431F
     1.3.6.1.4.1.12356.120.10.43212:
       category: Access Point
-      model: FortiAP 432F
+      model: FortiAP-432F
+    1.3.6.1.4.1.12356.120.10.43213:
+      category: Access Point
+      model: FortiAP-432G
+    1.3.6.1.4.1.12356.120.10.43222:
+      category: Access Point
+      model: FortiAP-U432F
+    1.3.6.1.4.1.12356.120.10.43312:
+      category: Access Point
+      model: FortiAP-433F
+    1.3.6.1.4.1.12356.120.10.43313:
+      category: Access Point
+      model: FortiAP-433G
+    1.3.6.1.4.1.12356.120.10.43322:
+      category: Access Point
+      model: FortiAP-U433F
+    1.3.6.1.4.1.12356.120.10.44114:
+      category: Access Point
+      model: FortiAP-441K
+    1.3.6.1.4.1.12356.120.10.44314:
+      category: Access Point
+      model: FortiAP-443K
+    1.3.6.1.4.1.12356.120.10.83112:
+      category: Access Point
+      model: FortiAP-831F
+    1.3.6.1.4.1.12356.120.10.231121:
+      category: Access Point
+      model: FortiAP-231F-L
+    1.3.6.1.4.1.12356.120.10.431121:
+      category: Access Point
+      model: FortiAP-431F-L
+    1.3.6.1.4.1.12356.120.10.432122:
+      category: Access Point
+      model: FortiAP-432F-R
+    1.3.6.1.4.1.12356.120.10.433121:
+      category: Access Point
+      model: FortiAP-433F-L
+    1.3.6.1.4.1.12356.121.200.1:
+      category: Extender
+      model: FortiExtender-Unknown
+    1.3.6.1.4.1.12356.121.200.10:
+      category: Extender
+      model: FortiExtender-VM
+    1.3.6.1.4.1.12356.121.200.21:
+      category: Extender
+      model: FortiExtender-20D
+    1.3.6.1.4.1.12356.121.200.41:
+      category: Extender
+      model: FortiExtender-40D
+    1.3.6.1.4.1.12356.121.200.42:
+      category: Extender
+      model: FortiExtender-40D-A
+    1.3.6.1.4.1.12356.121.200.200:
+      category: Extender
+      model: FortiExtender-200F
+    1.3.6.1.4.1.12356.121.200.201:
+      category: Extender
+      model: FortiExtender-201E
+    1.3.6.1.4.1.12356.121.200.202:
+      category: Extender
+      model: FortiExtender-202E
+    1.3.6.1.4.1.12356.121.200.211:
+      category: Extender
+      model: FortiExtender-211E
+    1.3.6.1.4.1.12356.121.200.212:
+      category: Extender
+      model: FortiExtender-212E
+    1.3.6.1.4.1.12356.121.200.301:
+      category: Extender
+      model: FortiExtender-30G-WiFi
+    1.3.6.1.4.1.12356.121.200.311:
+      category: Extender
+      model: FortiExtender-311F
+    1.3.6.1.4.1.12356.121.200.312:
+      category: Extender
+      model: FortiExtender-312F
+    1.3.6.1.4.1.12356.121.200.511:
+      category: Extender
+      model: FortiExtender-511F
+    1.3.6.1.4.1.12356.121.200.1011:
+      category: Extender
+      model: FortiExtender-F11A
+    1.3.6.1.4.1.12356.121.200.1012:
+      category: Extender
+      model: FortiExtender-F11E
+    1.3.6.1.4.1.12356.121.200.1511:
+      category: Extender
+      model: FortiExtender-FER511G
+    1.3.6.1.4.1.12356.121.200.2011:
+      category: Extender
+      model: FortiExtender-F21A
+    1.3.6.1.4.1.12356.121.200.2012:
+      category: Extender
+      model: FortiExtender-F21E
+    1.3.6.1.4.1.12356.121.200.2021:
+      category: Extender
+      model: FortiExtender-F22A
+    1.3.6.1.4.1.12356.121.200.2022:
+      category: Extender
+      model: FortiExtender-F22E
+    1.3.6.1.4.1.12356.121.200.2111:
+      category: Extender
+      model: FortiExtender-FEV211FA
+    1.3.6.1.4.1.12356.121.200.2112:
+      category: Extender
+      model: FortiExtender-FEV211F
+    1.3.6.1.4.1.12356.121.200.2121:
+      category: Extender
+      model: FortiExtender-FEV212FA
+    1.3.6.1.4.1.12356.121.200.2122:
+      category: Extender
+      model: FortiExtender-FEV212F
     1.3.6.1.4.1.12356.201:
       category: Firewall
       model: FortiGate 200A

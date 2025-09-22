@@ -10,8 +10,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/gosnmp/gosnmp"
-
-	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 )
 
 func (c *Collector) validateConfig() error {
@@ -67,28 +65,6 @@ func (c *Collector) initSNMPClient() (gosnmp.Handler, error) {
 	c.Info(snmpClientConnInfo(client))
 
 	return client, nil
-}
-
-func (c *Collector) initNetIfaceFilters() (matcher.Matcher, matcher.Matcher, error) {
-	byName, byType := matcher.FALSE(), matcher.FALSE()
-
-	if v := c.NetworkInterfaceFilter.ByName; v != "" {
-		m, err := matcher.NewSimplePatternsMatcher(v)
-		if err != nil {
-			return nil, nil, err
-		}
-		byName = m
-	}
-
-	if v := c.NetworkInterfaceFilter.ByType; v != "" {
-		m, err := matcher.NewSimplePatternsMatcher(v)
-		if err != nil {
-			return nil, nil, err
-		}
-		byType = m
-	}
-
-	return byName, byType, nil
 }
 
 func (c *Collector) initOIDs() (oids []string) {

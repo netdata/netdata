@@ -27,7 +27,7 @@ fi
 
 # Add required dependencies
 echo "Adding dependencies..."
-go get nhooyr.io/websocket
+go get github.com/coder/websocket
 go mod tidy
 
 # Build the binary

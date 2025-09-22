@@ -81,34 +81,41 @@ modules:
             enabled: true
           list:
             - name: update_every
-              description: Data collection frequency.
+              description: Data collection interval (seconds).
               default_value: 5
               required: false
+              group: Collection
             - name: autodetection_retry
-              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              description: Autodetection retry interval (seconds). Set 0 to disable.
               default_value: 0
               required: false
+              group: Collection
+
             - name: uri
-              description: MongoDB connection string. See [URI syntax](https://www.mongodb.com/docs/manual/reference/connection-string/).
+              description: "MongoDB connection string. See [URI syntax](https://www.mongodb.com/docs/manual/reference/connection-string/)."
               default_value: mongodb://localhost:27017
               required: true
+              group: Target
             - name: timeout
-              description: Query timeout in seconds.
+              description: Query timeout (seconds).
               default_value: 1
               required: false
+              group: Target
+
             - name: databases
-              description: Databases selector. Determines which database metrics will be collected.
+              description: Database selector. Defines which databases to collect metrics from.
               default_value: ""
               required: false
+              group: Filters
               details: |
                 Metrics of databases matching the selector will be collected.
 
-                - Logic: (pattern1 OR pattern2) AND !(pattern3 or pattern4)
+                - Logic: (pattern1 OR pattern2) AND !(pattern3 OR pattern4)
                 - Pattern syntax: [matcher](https://github.com/netdata/netdata/tree/master/src/go/pkg/matcher#supported-format).
                 - Syntax:
 
                   ```yaml
-                  per_user_stats:
+                  databases:
                     includes:
                       - pattern1
                       - pattern2
@@ -116,6 +123,12 @@ modules:
                       - pattern3
                       - pattern4
                   ```
+
+            - name: vnode
+              description: Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).
+              default_value: ""
+              required: false
+              group: Virtual Node
         examples:
           folding:
             title: Config

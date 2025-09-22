@@ -47,7 +47,6 @@ The default configuration for this integration does not impose any limits on dat
 
 This thread will add overhead every time that an internal kernel function monitored by this thread is called. The estimated additional period of time is between 90-200ms per call on kernels that do not have BTF technology.
 
-
 ## Metrics
 
 Metrics grouped by *scope*.
@@ -78,6 +77,7 @@ There are no alerts configured by default for this integration.
 
 ## Setup
 
+
 ### Prerequisites
 
 #### Compile kernel
@@ -105,7 +105,29 @@ This thread needs to attach a tracepoint to monitor when a process schedule an e
 
 ### Configuration
 
-#### File
+#### Options
+
+All options are defined inside section `[global]`.
+
+
+<details open><summary>Config options</summary>
+
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
+| update every | Data collection frequency. | 5 | no |
+| ebpf load mode | Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`). | entry | no |
+| ebpf type format | Define the file type to load an eBPF program. Three options are available: `legacy` (Attach only `kprobe`), `co-re` (Plugin tries to use `trampoline` when available), and `auto` (plugin check OS configuration before to load). | auto | no |
+| ebpf co-re tracing | Select the attach method used by plugin when `co-re` is defined in previous option. Two options are available: `trampoline` (Option with lowest overhead), and `probe` (the same of legacy code). | trampoline | no |
+| lifetime | Set default lifetime for thread when enabled by cloud. | 300 | no |
+
+
+</details>
+
+
+
+#### via File
 
 The configuration file name for this integration is `ebpf.d/mount.conf`.
 
@@ -126,24 +148,8 @@ Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/n
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
 sudo ./edit-config ebpf.d/mount.conf
 ```
-#### Options
 
-All options are defined inside section `[global]`.
-
-
-<details open><summary>Config options</summary>
-
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
-| update every | Data collection frequency. | 5 | no |
-| ebpf load mode | Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`). | entry | no |
-| ebpf type format | Define the file type to load an eBPF program. Three options are available: `legacy` (Attach only `kprobe`), `co-re` (Plugin tries to use `trampoline` when available), and `auto` (plugin check OS configuration before to load). | auto | no |
-| ebpf co-re tracing | Select the attach method used by plugin when `co-re` is defined in previous option. Two options are available: `trampoline` (Option with lowest overhead), and `probe` (the same of legacy code). | trampoline | no |
-| lifetime | Set default lifetime for thread when enabled by cloud. | 300 | no |
-
-</details>
-
-#### Examples
+##### Examples
 There are no configuration examples.
 
 

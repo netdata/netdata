@@ -68,7 +68,6 @@ The default configuration for this integration does not impose any limits on dat
 The collector disables cpu frequency and idle state monitoring when there are more than 128 CPU cores available.
 
 
-
 ## Metrics
 
 Metrics grouped by *scope*.
@@ -98,13 +97,13 @@ Metrics:
 
 ### Per cpu core
 
-
+Per-core CPU metrics. Disabled by default, can be enabled in the [configuration options](#configuration).
 
 Labels:
 
 | Label      | Description     |
 |:-----------|:----------------|
-| cpu | TBD |
+| cpu | Identifier of the CPU core (e.g., core0, core1, core2). |
 
 Metrics:
 
@@ -129,13 +128,32 @@ The following alerts are available:
 
 ## Setup
 
+
 ### Prerequisites
 
 No action required.
 
 ### Configuration
 
-#### File
+#### Options
+
+
+
+<details open><summary>Config options</summary>
+
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
+| per cpu core utilization | Collects CPU usage metrics for each individual core, in addition to the system-wide averages. | no | no |
+| cpu idle states | Collects CPU idle state residency metrics for each individual core, showing how much time each core spends in different idle states (C-states). | no | no |
+
+
+</details>
+
+
+
+#### via File
 
 The configuration file name for this integration is `netdata.conf`.
 Configuration for this specific integration is located in the `plugin:proc:/proc/stat` section within that file.
@@ -157,13 +175,8 @@ Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/n
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
 sudo ./edit-config netdata.conf
 ```
-#### Options
 
-
-
-There are no configuration options.
-
-#### Examples
+##### Examples
 There are no configuration examples.
 
 

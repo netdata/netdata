@@ -131,7 +131,7 @@ int cgroup_function_cgroup_top(BUFFER *wb, const char *function __maybe_unused, 
 
     RRDDIM *rd = NULL;
 
-    uv_mutex_lock(&cgroup_root_mutex);
+    netdata_mutex_lock(&cgroup_root_mutex);
 
     for(struct cgroup *cg = cgroup_root; cg ; cg = cg->next) {
         if(unlikely(!cg->enabled || cg->pending_renames || !cg->function_ready || is_cgroup_systemd_service(cg)))
@@ -185,7 +185,7 @@ int cgroup_function_cgroup_top(BUFFER *wb, const char *function __maybe_unused, 
         buffer_json_array_close(wb);
     }
 
-    uv_mutex_unlock(&cgroup_root_mutex);
+    netdata_mutex_unlock(&cgroup_root_mutex);
 
     buffer_json_array_close(wb); // data
     buffer_json_member_add_object(wb, "columns");
@@ -371,7 +371,7 @@ int cgroup_function_systemd_top(BUFFER *wb, const char *function __maybe_unused,
 
     RRDDIM *rd = NULL;
 
-    uv_mutex_lock(&cgroup_root_mutex);
+    netdata_mutex_lock(&cgroup_root_mutex);
 
     for(struct cgroup *cg = cgroup_root; cg ; cg = cg->next) {
         if(unlikely(!cg->enabled || cg->pending_renames || !cg->function_ready || !is_cgroup_systemd_service(cg)))
@@ -405,7 +405,7 @@ int cgroup_function_systemd_top(BUFFER *wb, const char *function __maybe_unused,
         buffer_json_array_close(wb);
     }
 
-    uv_mutex_unlock(&cgroup_root_mutex);
+    netdata_mutex_unlock(&cgroup_root_mutex);
 
     buffer_json_array_close(wb); // data
     buffer_json_member_add_object(wb, "columns");

@@ -41,7 +41,9 @@ func loadProfiles() {
 		for _, dir := range profilesPaths {
 			profiles, err := loadProfilesFromDir(dir, profilesPaths)
 			if err != nil {
-				log.Errorf("failed to load dd snmp profiles from '%s': %v", dir, err)
+				if pluginconfig.IsStock(dir) || !errors.Is(err, os.ErrNotExist) {
+					log.Errorf("failed to load dd snmp profiles from '%s': %v", dir, err)
+				}
 				continue
 			}
 

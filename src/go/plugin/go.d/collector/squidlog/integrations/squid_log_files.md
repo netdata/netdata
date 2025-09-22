@@ -46,7 +46,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-
 ## Metrics
 
 Metrics grouped by *scope*.
@@ -93,32 +92,27 @@ There are no alerts configured by default for this integration.
 
 ## Setup
 
+
+You can configure the **squidlog** collector in two ways:
+
+| Method                | Best for                                                                                 | How to                                                                                                                                 |
+|-----------------------|------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------|
+| [**UI**](#via-ui)     | Fast setup without editing files                                                         | Go to **Nodes → Configure this node → Collectors → Jobs**, search for **squidlog**, then click **+** to add a job. |
+| [**File**](#via-file) | If you prefer configuring via file, or need to automate deployments (e.g., with Ansible) | Edit `go.d/squidlog.conf` and add a job.                                                                        |
+
+:::important
+
+UI configuration requires paid Netdata Cloud plan.
+
+:::
+
+
 ### Prerequisites
 
 No action required.
 
 ### Configuration
 
-#### File
-
-The configuration file name for this integration is `go.d/squidlog.conf`.
-
-The file format is YAML. Generally, the structure is:
-
-```yaml
-update_every: 1
-autodetection_retry: 0
-jobs:
-  - name: some_name1
-  - name: some_name1
-```
-You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
-Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
-
-```bash
-cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
-sudo ./edit-config go.d/squidlog.conf
-```
 #### Options
 
 Squid [log format codes](https://www.squid-cache.org/Doc/config/logformat/).
@@ -149,81 +143,66 @@ In addition, to make `Squid` [native log format](https://wiki.squid-cache.org/Fe
 
 <details open><summary>Config options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
-| update_every | Data collection frequency. | 1 | no |
-| autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
-| path | Path to the Squid access log file. | /var/log/squid/access.log | yes |
-| exclude_path | Path to exclude. | *.gz | no |
-| parser | Log parser configuration. |  | no |
-| parser.log_type | Log parser type. | auto | no |
-| parser.csv_config | CSV log parser config. |  | no |
-| parser.csv_config.delimiter | CSV field delimiter. | space | no |
-| parser.csv_config.format | CSV log format. | - $resp_time $client_address $result_code $resp_size $req_method - - $hierarchy $mime_type | yes |
-| parser.ltsv_config | LTSV log parser config. |  | no |
-| parser.ltsv_config.field_delimiter | LTSV field delimiter. | \t | no |
-| parser.ltsv_config.value_delimiter | LTSV value delimiter. | : | no |
-| parser.ltsv_config.mapping | LTSV fields mapping to **known fields**. |  | yes |
-| parser.regexp_config | RegExp log parser config. |  | no |
-| parser.regexp_config.pattern | RegExp pattern with named groups. |  | yes |
-
-##### parser.log_type
-
-Weblog supports 3 different log parsers:
-
-| Parser type | Description                               |
-|-------------|-------------------------------------------|
-| csv         | A comma-separated values                  |
-| ltsv        | [LTSV](http://ltsv.org/)                  |
-| regexp      | Regular expression with named groups      |
-
-Syntax:
-
-```yaml
-parser:
-  log_type: csv
-```
 
 
-##### parser.csv_config.format
-
-
-
-##### parser.ltsv_config.mapping
-
-The mapping is a dictionary where the key is a field, as in logs, and the value is the corresponding **known field**.
-
-> **Note**: don't use `$` and `%` prefixes for mapped field names.
-
-```yaml
-parser:
-  log_type: ltsv
-  ltsv_config:
-    mapping:
-      label1: field1
-      label2: field2
-```
-
-
-##### parser.regexp_config.pattern
-
-Use pattern with subexpressions names. These names should be **known fields**.
-
-> **Note**: don't use `$` and `%` prefixes for mapped field names.
-
-Syntax:
-
-```yaml
-parser:
-  log_type: regexp
-  regexp_config:
-    pattern: PATTERN
-```
+| Group | Option | Description | Default | Required |
+|:------|:-----|:------------|:--------|:---------:|
+| **Collection** | update_every | Data collection frequency (seconds). | 1 | no |
+|  | autodetection_retry | Autodetection retry interval (seconds). Set 0 to disable. | 0 | no |
+| **Target** | path | Path to the Squid access log file. | /var/log/squid/access.log | yes |
+|  | exclude_path | File path patterns to exclude. | *.gz | no |
+| **Parser** | parser | Log parser configuration block. |  | no |
+|  | parser.log_type | Log parser type (`csv`, `ltsv`, `regexp`, or `auto`). | auto | no |
+|  | parser.csv_config | CSV log parser configuration block. |  | no |
+|  | parser.csv_config.delimiter | CSV field delimiter. | space | no |
+|  | parser.csv_config.format | CSV log format string. | - $resp_time $client_address $result_code $resp_size $req_method - - $hierarchy $mime_type | yes |
+|  | parser.ltsv_config | LTSV log parser configuration block. |  | no |
+|  | parser.ltsv_config.field_delimiter | LTSV field delimiter. | \t | no |
+|  | parser.ltsv_config.value_delimiter | LTSV value delimiter. | : | no |
+|  | parser.ltsv_config.mapping | LTSV fields mapping to known fields. |  | yes |
+|  | parser.regexp_config | RegExp log parser configuration block. |  | no |
+|  | parser.regexp_config.pattern | RegExp pattern with named groups mapped to known fields. |  | yes |
 
 
 </details>
 
-#### Examples
+
+#### via UI
+
+Configure the **squidlog** collector from the Netdata web interface:
+
+1. Go to **Nodes**.
+2. Select the node **where you want the squidlog data-collection job to run** and click the :gear: (**Configure this node**). That node will run the data collection.
+3. The **Collectors → Jobs** view opens by default.
+4. In the Search box, type _squidlog_ (or scroll the list) to locate the **squidlog** collector.
+5. Click the **+** next to the **squidlog** collector to add a new job.
+6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
+    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
+
+
+#### via File
+
+The configuration file name for this integration is `go.d/squidlog.conf`.
+
+The file format is YAML. Generally, the structure is:
+
+```yaml
+update_every: 1
+autodetection_retry: 0
+jobs:
+  - name: some_name1
+  - name: some_name2
+```
+You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
+Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
+
+```bash
+cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
+sudo ./edit-config go.d/squidlog.conf
+```
+
+##### Examples
 There are no configuration examples.
 
 

@@ -49,7 +49,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-
 ## Metrics
 
 Metrics grouped by *scope*.
@@ -89,13 +88,27 @@ The following alerts are available:
 
 ## Setup
 
+
 ### Prerequisites
 
 No action required.
 
 ### Configuration
 
-#### File
+#### Options
+
+
+
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
+| update every | Data collection frequency. | 1 | no |
+
+
+
+
+#### via File
 
 The configuration file name for this integration is `netdata.conf`.
 Configuration for this specific integration is located in the `[plugin:windows:GetPowerSupply]` section within that file.
@@ -117,15 +130,8 @@ Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/n
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
 sudo ./edit-config netdata.conf
 ```
-#### Options
 
-
-
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
-| update every | Data collection frequency. | 1 | no |
-
-#### Examples
+##### Examples
 There are no configuration examples.
 
 

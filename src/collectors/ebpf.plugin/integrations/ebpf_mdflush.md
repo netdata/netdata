@@ -47,7 +47,6 @@ The default configuration for this integration does not impose any limits on dat
 
 This thread will add overhead every time that `md_flush_request` is called. The estimated additional period of time is between 90-200ms per call on kernels that do not have BTF technology.
 
-
 ## Metrics
 
 Metrics grouped by *scope*.
@@ -77,6 +76,7 @@ There are no alerts configured by default for this integration.
 
 ## Setup
 
+
 ### Prerequisites
 
 #### Compile kernel
@@ -99,7 +99,27 @@ Now follow steps:
 
 ### Configuration
 
-#### File
+#### Options
+
+All options are defined inside section `[global]`.
+
+
+<details open><summary>Config options</summary>
+
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
+| update every | Data collection frequency. | 5 | no |
+| ebpf load mode | Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`). | entry | no |
+| lifetime | Set default lifetime for thread when enabled by cloud. | 300 | no |
+
+
+</details>
+
+
+
+#### via File
 
 The configuration file name for this integration is `ebpf.d/mdflush.conf`.
 
@@ -120,22 +140,8 @@ Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/n
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
 sudo ./edit-config ebpf.d/mdflush.conf
 ```
-#### Options
 
-All options are defined inside section `[global]`.
-
-
-<details open><summary>Config options</summary>
-
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
-| update every | Data collection frequency. | 5 | no |
-| ebpf load mode | Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`). | entry | no |
-| lifetime | Set default lifetime for thread when enabled by cloud. | 300 | no |
-
-</details>
-
-#### Examples
+##### Examples
 There are no configuration examples.
 
 

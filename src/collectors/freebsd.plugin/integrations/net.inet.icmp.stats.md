@@ -44,7 +44,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-
 ## Metrics
 
 Metrics grouped by *scope*.
@@ -76,13 +75,33 @@ There are no alerts configured by default for this integration.
 
 ## Setup
 
+
 ### Prerequisites
 
 No action required.
 
 ### Configuration
 
-#### File
+#### Options
+
+
+
+<details open><summary>Config options</summary>
+
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
+| IPv4 ICMP packets | Enable or disable IPv4 ICMP packets metric. | yes | no |
+| IPv4 ICMP error | Enable or disable IPv4 ICMP error metric. | yes | no |
+| IPv4 ICMP messages | Enable or disable IPv4 ICMP messages metric. | yes | no |
+
+
+</details>
+
+
+
+#### via File
 
 The configuration file name for this integration is `netdata.conf`.
 Configuration for this specific integration is located in the `[plugin:freebsd:net.inet.icmp.stats]` section within that file.
@@ -104,21 +123,8 @@ Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/n
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
 sudo ./edit-config netdata.conf
 ```
-#### Options
 
-
-
-<details open><summary>Config options</summary>
-
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
-| IPv4 ICMP packets | Enable or disable IPv4 ICMP packets metric. | yes | no |
-| IPv4 ICMP error | Enable or disable IPv4 ICMP error metric. | yes | no |
-| IPv4 ICMP messages | Enable or disable IPv4 ICMP messages metric. | yes | no |
-
-</details>
-
-#### Examples
+##### Examples
 There are no configuration examples.
 
 

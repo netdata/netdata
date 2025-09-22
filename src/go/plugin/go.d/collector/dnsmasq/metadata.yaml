@@ -51,25 +51,37 @@ modules:
             enabled: true
           list:
             - name: update_every
-              description: Data collection frequency.
+              description: Data collection interval (seconds).
               default_value: 1
               required: false
+              group: Collection
             - name: autodetection_retry
-              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              description: Autodetection retry interval (seconds). Set 0 to disable.
               default_value: 0
               required: false
+              group: Collection
+
             - name: address
-              description: Server address in `ip:port` format.
+              description: Dnsmasq server address (`IP:PORT`).
               default_value: 127.0.0.1:53
               required: true
+              group: Target
             - name: protocol
-              description: 'DNS query transport protocol. Supported protocols: udp, tcp, tcp-tls.'
+              description: "DNS query transport protocol. Options: `udp`, `tcp`, `tcp-tls`."
               default_value: udp
               required: false
+              group: Target
             - name: timeout
-              description: DNS query timeout (dial, write and read) in seconds.
+              description: DNS query timeout for dial, write, and read (seconds).
               default_value: 1
               required: false
+              group: Target
+
+            - name: vnode
+              description: Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).
+              default_value: ""
+              required: false
+              group: Virtual Node
         examples:
           folding:
             title: Config

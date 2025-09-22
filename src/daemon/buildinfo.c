@@ -1291,7 +1291,9 @@ __attribute__((constructor)) void initialize_build_info(void) {
 #ifdef HAVE_LIBMNL
     build_info_set_status(BIB_LIB_LIBMNL, true);
 #endif
+#ifdef HAVE_LIBBACKTRACE
     build_info_set_value(BIB_LIB_STACKTRACE, stacktrace_backend());
+#endif
 
 #ifdef ENABLE_PLUGIN_APPS
     build_info_set_status(BIB_PLUGIN_APPS, true);

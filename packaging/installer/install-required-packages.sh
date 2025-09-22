@@ -858,7 +858,7 @@ declare -A pkg_libuuid_dev=(
   ['ol']="libuuid-devel"
   ['suse']="libuuid-devel"
   ['macos']="ossp-uuid"
-  ['freebsd']="e2fsprogs-libuuid"
+  ['freebsd']="libuuid"
   ['default']=""
 )
 

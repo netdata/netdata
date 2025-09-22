@@ -53,26 +53,40 @@ modules:
               description: Data collection frequency.
               default_value: 60
               required: false
+              group: Collection
             - name: autodetection_retry
               description: Recheck interval in seconds. Zero means no recheck will be scheduled.
               default_value: 0
               required: false
+              group: Collection
+
             - name: source
               description: Domain address.
               default_value: ""
               required: true
-            - name: days_until_expiration_warning
-              description: Number of days before the alarm status is warning.
-              default_value: 30
-              required: false
-            - name: days_until_expiration_critical
-              description: Number of days before the alarm status is critical.
-              default_value: 15
-              required: false
+              group: Target
             - name: timeout
               description: The query timeout in seconds.
               default_value: 5
               required: false
+              group: Target
+
+            - name: days_until_expiration_warning
+              description: Number of days before the alarm status is warning.
+              default_value: 30
+              required: false
+              group: Customization
+            - name: days_until_expiration_critical
+              description: Number of days before the alarm status is critical.
+              default_value: 15
+              required: false
+              group: Customization
+
+            - name: vnode
+              description: Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).
+              default_value: ""
+              required: false
+              group: Virtual Node
         examples:
           folding:
             title: Config

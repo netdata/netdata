@@ -74,37 +74,53 @@ modules:
             enabled: true
           list:
             - name: update_every
-              description: Data collection frequency.
+              description: Data collection interval (seconds).
               default_value: 5
               required: false
+              group: Collection
             - name: autodetection_retry
-              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              description: Autodetection retry interval (seconds). Set 0 to disable.
               default_value: 0
               required: false
+              group: Collection
+
             - name: hosts
-              description: Network hosts.
-              default_value: ""
+              description: List of hosts to ping.
+              default_value: "[]"
               required: true
+              group: Target
+
             - name: network
-              description: "Allows configuration of DNS resolution. Supported options: ip (select IPv4 or IPv6), ip4 (select IPv4), ip6 (select IPv6)."
-              default_value: "ip"
+              description: "DNS resolution mode. Options: `ip` (IPv4 or IPv6), `ip4` (IPv4 only), `ip6` (IPv6 only)."
+              default_value: ip
               required: false
+              group: Ping Settings
             - name: interface
-              description: "The network device name (e.g., `eth0`, `wlan0`) used as the source for ICMP echo requests."
+              description: "Network interface to use for ICMP echo requests (e.g., `eth0`, `wlan0`)."
               default_value: ""
               required: false
+              group: Ping Settings
             - name: privileged
-              description: Ping packets type. "yes" means raw ICMP ping, "no" - "unprivileged" UDP ping.
-              default_value: true
+              description: "Ping packet type. `yes` = raw ICMP ping, `no` = unprivileged UDP ping."
+              default_value: yes
               required: true
+              group: Ping Settings
             - name: packets
-              description: Number of ping packets to send.
+              description: Number of ping packets to send per iteration.
               default_value: 5
               required: false
+              group: Ping Settings
             - name: interval
-              description: Timeout between sending ping packets.
+              description: Interval between sending ping packets.
               default_value: 100ms
               required: false
+              group: Ping Settings
+
+            - name: vnode
+              description: Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).
+              default_value: ""
+              required: false
+              group: Virtual Node
         examples:
           folding:
             title: Config

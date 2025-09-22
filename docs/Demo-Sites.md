@@ -1,7 +1,7 @@
 
 # Live demos
 
-See the live Netdata Cloud demo with Rooms (listed below) for specific use cases at `https://app.netdata.cloud/spaces/netdata-demo`
+See the live Netdata Cloud demo with Rooms (listed below) for specific use cases at [`https://app.netdata.cloud/spaces/netdata-demo`](https://app.netdata.cloud/spaces/netdata-demo)
 
 | Location            | Netdata Demo URL                                                                                                                                | 60 mins reqs                                                                                                                                                                                                                                                 | VM donated by                                      |
 |:--------------------|:------------------------------------------------------------------------------------------------------------------------------------------------|:-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|:---------------------------------------------------|

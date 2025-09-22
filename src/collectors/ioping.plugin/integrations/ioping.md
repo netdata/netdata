@@ -44,7 +44,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-
 ## Metrics
 
 Metrics grouped by *scope*.
@@ -79,6 +78,7 @@ The following alerts are available:
 
 ## Setup
 
+
 ### Prerequisites
 
 #### Install ioping
@@ -89,7 +89,27 @@ You can install the command by passing the argument `install` to the plugin (`/u
 
 ### Configuration
 
-#### File
+#### Options
+
+
+
+<details open><summary>Config options</summary>
+
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
+| update_every | Data collection frequency. | 1s | no |
+| destination | The directory/file/device to ioping. |  | yes |
+| request_size | The request size in bytes to ioping the destination (symbolic modifiers are supported) | 4k | no |
+| ioping_opts | Options passed to `ioping` commands. | -T 1000000 | no |
+
+
+</details>
+
+
+
+#### via File
 
 The configuration file name for this integration is `ioping.conf`.
 
@@ -106,24 +126,10 @@ Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/n
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
 sudo ./edit-config ioping.conf
 ```
-#### Options
 
+##### Examples
 
-
-<details open><summary>Config options</summary>
-
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
-| update_every | Data collection frequency. | 1s | no |
-| destination | The directory/file/device to ioping. |  | yes |
-| request_size | The request size in bytes to ioping the destination (symbolic modifiers are supported) | 4k | no |
-| ioping_opts | Options passed to `ioping` commands. | -T 1000000 | no |
-
-</details>
-
-#### Examples
-
-##### Basic Configuration
+###### Basic Configuration
 
 This example has the minimum configuration necessary to have the plugin running.
 

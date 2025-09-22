@@ -6,8 +6,8 @@
 #include "../libnetdata.h"
 
 struct completion {
-    uv_mutex_t mutex;
-    uv_cond_t cond;
+    netdata_mutex_t mutex;
+    netdata_cond_t cond;
     volatile unsigned completed;
     volatile unsigned completed_jobs;
 };

@@ -397,7 +397,7 @@ struct rrdengine_instance {
     TIER_CONFIG_PROTOTYPE config;
 
     struct {
-        uv_rwlock_t rwlock;                         // the JudyL of datafiles is protected by this lock
+        netdata_rwlock_t rwlock;                         // the JudyL of datafiles is protected by this lock
         bool disk_time;                             // true: delete for disk quota, false: delete for retention
         bool pending_rotate;                        // Change from event loop
         bool pending_index;                         // Change from event loop

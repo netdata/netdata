@@ -17,10 +17,10 @@ PagerDuty is an enterprise incident resolution service that integrates with ITOp
 You can send notifications to PagerDuty using Netdata's Agent alert notification feature, which supports dozens of endpoints, user roles, and more.
 
 
-
 <img src="https://img.shields.io/badge/maintained%20by-Netdata-%2300ab44" />
 
 ## Setup
+
 
 ### Prerequisites
 
@@ -35,26 +35,16 @@ You can send notifications to PagerDuty using Netdata's Agent alert notification
 
 ### Configuration
 
-#### File
-
-The configuration file name for this integration is `health_alarm_notify.conf`.
-
-
-You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
-Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
-
-```bash
-cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
-sudo ./edit-config health_alarm_notify.conf
-```
 #### Options
 
 The following options can be defined for this notification
 
 <details open><summary>Config Options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | SEND_PD | Set `SEND_PD` to YES | YES | yes |
 | DEFAULT_RECIPIENT_PD | Set `DEFAULT_RECIPIENT_PD` to the PagerDuty service key you want the alert notifications to be sent to. You can define multiple service keys like this: `pd_service_key_1` `pd_service_key_2`. |  | yes |
 
@@ -73,11 +63,27 @@ role_recipients_pd[sitemgr]="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxf"
 ```
 
 
+
 </details>
 
-#### Examples
 
-##### Basic Configuration
+
+#### via File
+
+The configuration file name for this integration is `health_alarm_notify.conf`.
+
+
+You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
+Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
+
+```bash
+cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
+sudo ./edit-config health_alarm_notify.conf
+```
+
+##### Examples
+
+###### Basic Configuration
 
 
 

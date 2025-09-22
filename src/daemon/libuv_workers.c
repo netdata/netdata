@@ -167,19 +167,19 @@ void init_cmd_pool(CmdPool *pool, int size) {
     pool->tail = 0;
     pool->count = 0;
 
-    fatal_assert(0 == uv_mutex_init(&pool->lock));
-    fatal_assert(0 == uv_cond_init(&pool->not_full));
+    fatal_assert(0 == netdata_mutex_init(&pool->lock));
+    fatal_assert(0 == netdata_cond_init(&pool->not_full));
 }
 
 bool push_cmd(CmdPool *pool, const cmd_data_t *cmd, bool wait_on_full)
 {
-    uv_mutex_lock(&pool->lock);
+    netdata_mutex_lock(&pool->lock);
 
     while (pool->count == pool->size) {
         if (wait_on_full)
-            uv_cond_wait(&pool->not_full, &pool->lock);
+            netdata_cond_wait(&pool->not_full, &pool->lock);
         else {
-            uv_mutex_unlock(&pool->lock); // No space, return
+            netdata_mutex_unlock(&pool->lock); // No space, return
             return false;
         }
     }
@@ -188,22 +188,22 @@ bool push_cmd(CmdPool *pool, const cmd_data_t *cmd, bool wait_on_full)
     pool->tail = (pool->tail + 1) % pool->size;
     pool->count++;
 
-    uv_mutex_unlock(&pool->lock);
+    netdata_mutex_unlock(&pool->lock);
     return true;
 }
 
 bool pop_cmd(CmdPool *pool, cmd_data_t *out_cmd) {
-    uv_mutex_lock(&pool->lock);
+    netdata_mutex_lock(&pool->lock);
     if (pool->count == 0) {
-        uv_mutex_unlock(&pool->lock); // No commands to pop
+        netdata_mutex_unlock(&pool->lock); // No commands to pop
         return false;
     }
     *out_cmd = pool->buffer[pool->head];
     pool->head = (pool->head + 1) % pool->size;
     pool->count--;
 
-    uv_cond_signal(&pool->not_full);
-    uv_mutex_unlock(&pool->lock);
+    netdata_cond_signal(&pool->not_full);
+    netdata_mutex_unlock(&pool->lock);
     return true;
 }
 
@@ -212,8 +212,8 @@ void release_cmd_pool(CmdPool *pool) {
         free(pool->buffer);
         pool->buffer = NULL;
     }
-    uv_mutex_destroy(&pool->lock);
-    uv_cond_destroy(&pool->not_full);
+    netdata_mutex_destroy(&pool->lock);
+    netdata_cond_destroy(&pool->not_full);
 }
 
 /// Test

@@ -21,42 +21,25 @@ This same process works between Parents too. When Parents sync with each other, 
 When multiple Netdata Parents are available, the replication happens in sequence, like in the following diagram:
 
 ```mermaid
-%%{init: {
-  "theme": "base",
-  "themeVariables": {
-    "actorBkg": "#ffeb3b",
-    "actorBorder": "#000000",
-    "actorTextColor": "#000000",
-    "actorLineColor": "#000000",
-    "signalColor": "#000000",
-    "signalTextColor": "#000000",
-    "labelBoxBkgColor": "#f9f9f9",
-    "labelBoxBorderColor": "#000000",
-    "labelTextColor": "#000000",
-    "loopTextColor": "#000000",
-    "activationBkgColor": "#4caf50",
-    "activationBorderColor": "#000000",
-    "fontFamily": "Arial, sans-serif",
-    "fontSize": "16px"
-  }
-}}%%
-sequenceDiagram
-    participant C as Child
-    participant P1 as Parent 1
-    participant P2 as Parent 2
+flowchart TD
+    C("Child")
+    P1("Parent 1")
+    P2("Parent 2")
     
-    C->>P1: Connect
-    P1->>C: OK
-    P1->>P2: Connect
-    P2->>P1: OK
-    C->>P1: Metric M1 with retention up to Now
-    P1->>C: M1 stopped at -60sec, replicate up to Now
-    C->>P1: replicate M1 samples -60sec to Now
-    C->>P1: streaming M1
-    P1->>P2: Metric M1 with retention up to Now
-    P2->>P1: M1 stopped at -63sec, replicate up to Now
-    P1->>P2: replicate M1 samples -63sec to Now
-    P1->>P2: streaming M1
+    C --> P1
+    P1 --> P2
+    P1 --> C
+    P2 --> P1
+
+    %% Style definitions
+    classDef alert fill:#ffeb3b,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+    classDef neutral fill:#f9f9f9,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+    classDef complete fill:#4caf50,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+    classDef database fill:#2196F3,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+
+    %% Apply styles
+    class C alert
+    class P1,P2 complete
 ```
 
 ### Replication Process

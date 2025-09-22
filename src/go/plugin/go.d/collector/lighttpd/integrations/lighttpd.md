@@ -52,7 +52,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-
 ## Metrics
 
 Metrics grouped by *scope*.
@@ -86,6 +85,21 @@ There are no alerts configured by default for this integration.
 
 ## Setup
 
+
+You can configure the **lighttpd** collector in two ways:
+
+| Method                | Best for                                                                                 | How to                                                                                                                                 |
+|-----------------------|------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------|
+| [**UI**](#via-ui)     | Fast setup without editing files                                                         | Go to **Nodes → Configure this node → Collectors → Jobs**, search for **lighttpd**, then click **+** to add a job. |
+| [**File**](#via-file) | If you prefer configuring via file, or need to automate deployments (e.g., with Ansible) | Edit `go.d/lighttpd.conf` and add a job.                                                                        |
+
+:::important
+
+UI configuration requires paid Netdata Cloud plan.
+
+:::
+
+
 ### Prerequisites
 
 #### Enable Lighttpd status support
@@ -96,7 +110,57 @@ To enable status support, see the [official documentation](https://redmine.light
 
 ### Configuration
 
-#### File
+#### Options
+
+The following options can be defined globally: update_every, autodetection_retry.
+
+
+<details open><summary>Config options</summary>
+
+
+
+| Group | Option | Description | Default | Required |
+|:------|:-----|:------------|:--------|:---------:|
+| **Collection** | update_every | Data collection interval (seconds). | 1 | no |
+|  | autodetection_retry | Autodetection retry interval (seconds). Set 0 to disable. | 0 | no |
+| **Target** | url | Target endpoint URL. | http://127.0.0.1/server-status?auto | yes |
+|  | timeout | HTTP request timeout (seconds). | 2 | no |
+| **HTTP Auth** | username | Username for Basic HTTP authentication. |  | no |
+|  | password | Password for Basic HTTP authentication. |  | no |
+|  | bearer_token_file | Path to a file containing a bearer token (used for `Authorization: Bearer`). |  | no |
+| **TLS** | tls_skip_verify | Skip TLS certificate and hostname verification (insecure). | no | no |
+|  | tls_ca | Path to CA bundle used to validate the server certificate. |  | no |
+|  | tls_cert | Path to client TLS certificate (for mTLS). |  | no |
+|  | tls_key | Path to client TLS private key (for mTLS). |  | no |
+| **Proxy** | proxy_url | HTTP proxy URL. |  | no |
+|  | proxy_username | Username for proxy Basic HTTP authentication. |  | no |
+|  | proxy_password | Password for proxy Basic HTTP authentication. |  | no |
+| **Request** | method | HTTP method to use. | GET | no |
+|  | body | Request body (e.g., for POST/PUT). |  | no |
+|  | headers | Additional HTTP headers (one per line as key: value). |  | no |
+|  | not_follow_redirects | Do not follow HTTP redirects. | no | no |
+|  | force_http2 | Force HTTP/2 (including h2c over TCP). | no | no |
+| **Virtual Node** | vnode | Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). |  | no |
+
+
+</details>
+
+
+#### via UI
+
+Configure the **lighttpd** collector from the Netdata web interface:
+
+1. Go to **Nodes**.
+2. Select the node **where you want the lighttpd data-collection job to run** and click the :gear: (**Configure this node**). That node will run the data collection.
+3. The **Collectors → Jobs** view opens by default.
+4. In the Search box, type _lighttpd_ (or scroll the list) to locate the **lighttpd** collector.
+5. Click the **+** next to the **lighttpd** collector to add a new job.
+6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
+    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
+
+
+#### via File
 
 The configuration file name for this integration is `go.d/lighttpd.conf`.
 
@@ -107,7 +171,7 @@ update_every: 1
 autodetection_retry: 0
 jobs:
   - name: some_name1
-  - name: some_name1
+  - name: some_name2
 ```
 You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
 Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
@@ -116,38 +180,10 @@ Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/n
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
 sudo ./edit-config go.d/lighttpd.conf
 ```
-#### Options
 
-The following options can be defined globally: update_every, autodetection_retry.
+##### Examples
 
-
-<details open><summary>Config options</summary>
-
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
-| update_every | Data collection frequency. | 1 | no |
-| autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
-| url | Server URL. | http://127.0.0.1/server-status?auto | yes |
-| timeout | HTTP request timeout. | 1 | no |
-| username | Username for basic HTTP authentication. |  | no |
-| password | Password for basic HTTP authentication. |  | no |
-| proxy_url | Proxy URL. |  | no |
-| proxy_username | Username for proxy basic HTTP authentication. |  | no |
-| proxy_password | Password for proxy basic HTTP authentication. |  | no |
-| method | HTTP request method. | GET | no |
-| body | HTTP request body. |  | no |
-| headers | HTTP request headers. |  | no |
-| not_follow_redirects | Redirect handling policy. Controls whether the client follows redirects. | no | no |
-| tls_skip_verify | Server certificate chain and hostname validation policy. Controls whether the client performs this check. | no | no |
-| tls_ca | Certification authority that the client uses when verifying the server's certificates. |  | no |
-| tls_cert | Client TLS certificate. |  | no |
-| tls_key | Client TLS key. |  | no |
-
-</details>
-
-#### Examples
-
-##### Basic
+###### Basic
 
 A basic example configuration.
 
@@ -157,7 +193,7 @@ jobs:
     url: http://127.0.0.1/server-status?auto
 
 ```
-##### HTTP authentication
+###### HTTP authentication
 
 Basic HTTP authentication.
 
@@ -173,7 +209,7 @@ jobs:
 ```
 </details>
 
-##### HTTPS with self-signed certificate
+###### HTTPS with self-signed certificate
 
 Lighttpd with enabled HTTPS and self-signed certificate.
 
@@ -188,7 +224,7 @@ jobs:
 ```
 </details>
 
-##### Multi-instance
+###### Multi-instance
 
 > **Note**: When you define multiple jobs, their names must be unique.
 

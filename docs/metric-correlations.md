@@ -47,26 +47,26 @@ When you notice an anomaly in your system, use Metric Correlations with the **An
 
 ```mermaid
 flowchart LR
-    A("**STEP 1**<br/><br/>**Detection**<br/><br/>Spot a spike in the<br/>node anomaly <br/>rate chart<br/><br/>")
-    B("**STEP 2**<br/><br/>**Selection**<br/><br/>Highlight specific<br/>time period<br/><br/><br/>")
-    C("**STEP 3**<br/><br/>**Configuration**<br/><br/>Select **Anomaly Rate<br/>as data type** and<br/>**Volume as method**<br/><br/>")
-    D("**STEP 4**<br/><br/>**Execute**<br/><br/>Click on<br/> **Find Correlations**<br/>to start analysis<br/><br/>")
-    E("**STEP 5**<br/><br/>**Analysis**<br/><br/>Review metrics<br/>with<br/>highest anomaly rates<br/><br/>")
-    F("**STEP 6**<br/><br/>**Resolution**<br/><br/>Examine metrics<br/> to determine<br/>root cause<br/><br/>")
+    A("Detection<br/>Spot anomaly spike<br/>in node rate chart")
+    B("Selection<br/>Highlight specific<br/>time period")
+    C("Configuration<br/>Select Anomaly Rate<br/>as data type")
+    D("Execute<br/>Click Find<br/>Correlations")
+    E("Analysis<br/>Review metrics with<br/>highest anomaly rates")
+    F("Resolution<br/>Examine metrics to<br/>determine root cause")
     
     A --> B --> C --> D --> E --> F
     
     %% Style definitions
-    classDef neutral fill:#f9f9f9,stroke:#000000,stroke-width:4px,color:#000000,font-size:22px
-    classDef process fill:#ffeb3b,stroke:#000000,stroke-width:4px,color:#000000,font-size:22px
-    classDef complete fill:#4caf50,stroke:#000000,stroke-width:4px,color:#000000,font-size:22px
-    classDef anomaly fill:#f44336,stroke:#000000,stroke-width:4px,color:#000000,font-size:22px
-    
+    classDef alert fill:#ffeb3b,stroke:#000000,stroke-width:3px,color:#000000,font-size:14px
+    classDef neutral fill:#f9f9f9,stroke:#000000,stroke-width:3px,color:#000000,font-size:14px
+    classDef complete fill:#4caf50,stroke:#000000,stroke-width:3px,color:#000000,font-size:14px
+    classDef database fill:#2196F3,stroke:#000000,stroke-width:3px,color:#000000,font-size:14px
+
     %% Apply styles
-    class A,B neutral
-    class C,D process
+    class A,B alert
+    class C,D neutral
     class E complete
-    class F anomaly
+    class F database
 ```
 
 :::tip

@@ -44,7 +44,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-
 ## Metrics
 
 Metrics grouped by *scope*.
@@ -92,6 +91,7 @@ There are no alerts configured by default for this integration.
 
 ## Setup
 
+
 ### Prerequisites
 
 #### Install charts.d plugin
@@ -106,7 +106,32 @@ The collector requires the `opensipsctl` to be installed.
 
 ### Configuration
 
-#### File
+#### Options
+
+The config file is sourced by the charts.d plugin. It's a standard bash file.
+
+The following collapsed table contains all the options that can be configured for the opensips collector.
+
+
+<details open><summary>Config options</summary>
+
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
+| opensips_opts | Specify parameters to the `opensipsctl` command. If the default value fails to get global status, set here whatever options are needed to connect to the opensips server. | fifo get_statistics all | no |
+| opensips_cmd | If `opensipsctl` is not in $PATH, specify it's full path here. |  | no |
+| opensips_timeout | How long to wait for `opensipsctl` to respond. | 2 | no |
+| opensips_update_every | The data collection frequency. If unset, will inherit the netdata update frequency. | 5 | no |
+| opensips_priority | The charts priority on the dashboard. | 80000 | no |
+| opensips_retries | The number of retries to do in case of failure before disabling the collector. | 10 | no |
+
+
+</details>
+
+
+
+#### via File
 
 The configuration file name for this integration is `charts.d/opensips.conf`.
 
@@ -123,29 +148,10 @@ Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/n
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
 sudo ./edit-config charts.d/opensips.conf
 ```
-#### Options
 
-The config file is sourced by the charts.d plugin. It's a standard bash file.
+##### Examples
 
-The following collapsed table contains all the options that can be configured for the opensips collector.
-
-
-<details open><summary>Config options</summary>
-
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
-| opensips_opts | Specify parameters to the `opensipsctl` command. If the default value fails to get global status, set here whatever options are needed to connect to the opensips server. | fifo get_statistics all | no |
-| opensips_cmd | If `opensipsctl` is not in $PATH, specify it's full path here. |  | no |
-| opensips_timeout | How long to wait for `opensipsctl` to respond. | 2 | no |
-| opensips_update_every | The data collection frequency. If unset, will inherit the netdata update frequency. | 5 | no |
-| opensips_priority | The charts priority on the dashboard. | 80000 | no |
-| opensips_retries | The number of retries to do in case of failure before disabling the collector. | 10 | no |
-
-</details>
-
-#### Examples
-
-##### Custom `opensipsctl` command
+###### Custom `opensipsctl` command
 
 Set a custom path to the `opensipsctl` command
 

@@ -16,10 +16,10 @@ endmeta-->
 Send notifications to Discord using Netdata's Agent alert notification feature, which supports dozens of endpoints, user roles, and more.
 
 
-
 <img src="https://img.shields.io/badge/maintained%20by-Netdata-%2300ab44" />
 
 ## Setup
+
 
 ### Prerequisites
 
@@ -33,26 +33,16 @@ Send notifications to Discord using Netdata's Agent alert notification feature, 
 
 ### Configuration
 
-#### File
-
-The configuration file name for this integration is `health_alarm_notify.conf`.
-
-
-You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
-Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
-
-```bash
-cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
-sudo ./edit-config health_alarm_notify.conf
-```
 #### Options
 
 The following options can be defined for this notification
 
 <details open><summary>Config Options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | SEND_DISCORD | Set `SEND_DISCORD` to YES | YES | yes |
 | DISCORD_WEBHOOK_URL | set `DISCORD_WEBHOOK_URL` to your webhook URL. |  | yes |
 | DEFAULT_RECIPIENT_DISCORD | Set `DEFAULT_RECIPIENT_DISCORD` to the channel you want the alert notifications to be sent to. You can define multiple channels like this: `alerts` `systems`. |  | yes |
@@ -73,11 +63,27 @@ role_recipients_discord[sitemgr]="sites"
 The values you provide should already exist as Discord channels in your server.
 
 
+
 </details>
 
-#### Examples
 
-##### Basic Configuration
+
+#### via File
+
+The configuration file name for this integration is `health_alarm_notify.conf`.
+
+
+You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
+Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
+
+```bash
+cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
+sudo ./edit-config health_alarm_notify.conf
+```
+
+##### Examples
+
+###### Basic Configuration
 
 
 

@@ -16,10 +16,10 @@ endmeta-->
 Send notifications to a Slack workspace using Netdata's Agent alert notification feature, which supports dozens of endpoints, user roles, and more.
 
 
-
 <img src="https://img.shields.io/badge/maintained%20by-Netdata-%2300ab44" />
 
 ## Setup
+
 
 ### Prerequisites
 
@@ -33,7 +33,26 @@ Send notifications to a Slack workspace using Netdata's Agent alert notification
 
 ### Configuration
 
-#### File
+#### Options
+
+The following options can be defined for this notification
+
+<details open><summary>Config Options</summary>
+
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
+| SEND_SLACK | Set `SEND_SLACK` to YES | YES | yes |
+| SLACK_WEBHOOK_URL | set `SLACK_WEBHOOK_URL` to your Slack app's webhook URL. |  | yes |
+| DEFAULT_RECIPIENT_SLACK | Set `DEFAULT_RECIPIENT_SLACK` to the Slack channel your Slack app is set to send messages to. The syntax for channels is `#channel` or `channel`. |  | yes |
+
+
+</details>
+
+
+
+#### via File
 
 The configuration file name for this integration is `health_alarm_notify.conf`.
 
@@ -45,23 +64,10 @@ Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/n
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
 sudo ./edit-config health_alarm_notify.conf
 ```
-#### Options
 
-The following options can be defined for this notification
+##### Examples
 
-<details open><summary>Config Options</summary>
-
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
-| SEND_SLACK | Set `SEND_SLACK` to YES | YES | yes |
-| SLACK_WEBHOOK_URL | set `SLACK_WEBHOOK_URL` to your Slack app's webhook URL. |  | yes |
-| DEFAULT_RECIPIENT_SLACK | Set `DEFAULT_RECIPIENT_SLACK` to the Slack channel your Slack app is set to send messages to. The syntax for channels is `#channel` or `channel`. |  | yes |
-
-</details>
-
-#### Examples
-
-##### Basic Configuration
+###### Basic Configuration
 
 
 

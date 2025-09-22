@@ -365,9 +365,9 @@ jobs:
       - name: Set Up Go
         id: golang
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
-          go-version: "^1.24"
+          go-version: "^1.25"
       - name: Set Up Dependencies
         id: deps
         if: needs.file-check.outputs.run == 'true'
@@ -807,7 +807,7 @@ jobs:
         with:
           token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
       - name: Init python environment for publish release metadata
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         id: init-python
         with:
           python-version: "3.12"
@@ -1077,12 +1077,12 @@ jobs:
       max-parallel: 8
       matrix:
         include:
-          - name: macos-13
-            runner: macos-13
           - name: macos-14-M1
             runner: macos-14
           - name: macos-15-M1
             runner: macos-15
+          - name: macos-26-M1
+            runner: macos-26
     steps:
       - name: Skip Check
         id: skip

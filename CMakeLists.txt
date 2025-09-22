@@ -219,7 +219,7 @@ mark_as_advanced(ENABLE_SENTRY)
 option(BUILD_FOR_PACKAGING "Include component files for native packages" False)
 mark_as_advanced(BUILD_FOR_PACKAGING)
 
-cmake_dependent_option(ENABLE_LIBBACKTRACE "Use libbacktrace for stack traces in log output" True "OS_LINUX OR OS_WINDOWS OR OS_FREEBSD" False)
+cmake_dependent_option(ENABLE_LIBBACKTRACE "Use libbacktrace for stack traces in log output" True "OS_LINUX OR OS_WINDOWS" False)
 mark_as_advanced(ENABLE_LIBBACKTRACE)
 cmake_dependent_option(ENABLE_LIBUNWIND "Use libunwind for stack traces in log output" False "NOT ENABLE_LIBBACKTRACE" False)
 mark_as_advanced(ENABLE_LIBUNWIND)
@@ -1016,17 +1016,6 @@ set(LIBNETDATA_FILES
         src/libnetdata/os/setproctitle.h
         src/libnetdata/paths/paths.c
         src/libnetdata/paths/paths.h
-        src/libnetdata/stacktrace/stacktrace.h
-        src/libnetdata/stacktrace/stacktrace-common.h
-        src/libnetdata/stacktrace/stacktrace-common.c
-        src/libnetdata/stacktrace/stacktrace-array.h
-        src/libnetdata/stacktrace/stacktrace-array.c
-        src/libnetdata/stacktrace/stacktrace-libbacktrace.c
-        src/libnetdata/stacktrace/stacktrace-libunwind.c
-        src/libnetdata/stacktrace/stacktrace-backtrace.c
-        src/libnetdata/stacktrace/stacktrace-none.c
-        src/libnetdata/stacktrace/stacktrace-log.c
-        src/libnetdata/stacktrace/stacktrace-unittest.c
         src/libnetdata/json/json-c-parser-inline.c
         src/libnetdata/parsers/duration.h
         src/libnetdata/parsers/timeframe.c
@@ -1145,6 +1134,33 @@ set(LIBNETDATA_FILES
         src/libnetdata/signals/signal-code.c
         src/libnetdata/signals/signal-code.h
 )
+
+if(OS_WINDOWS)
+    set(LIBNETDATA_WIN_FILES
+            src/libnetdata/os/windows-api/windows_api.c
+            src/libnetdata/os/windows-api/windows_api.h
+    )
+
+    list(APPEND LIBNETDATA_FILES ${LIBNETDATA_WIN_FILES})
+endif()
+
+if(NOT OS_FREEBSD)
+    set(LIBNETDATA_STACKTRACE_FILES
+        src/libnetdata/stacktrace/stacktrace.h
+        src/libnetdata/stacktrace/stacktrace-common.h
+        src/libnetdata/stacktrace/stacktrace-common.c
+        src/libnetdata/stacktrace/stacktrace-array.h
+        src/libnetdata/stacktrace/stacktrace-array.c
+        src/libnetdata/stacktrace/stacktrace-libbacktrace.c
+        src/libnetdata/stacktrace/stacktrace-libunwind.c
+        src/libnetdata/stacktrace/stacktrace-backtrace.c
+        src/libnetdata/stacktrace/stacktrace-none.c
+        src/libnetdata/stacktrace/stacktrace-log.c
+        src/libnetdata/stacktrace/stacktrace-unittest.c
+    )
+
+    list(APPEND LIBNETDATA_FILES ${LIBNETDATA_STACKTRACE_FILES})
+endif()
 
 list(APPEND LIBNETDATA_FILES ${INICFG_FILES})
 list(APPEND LIBNETDATA_FILES ${CONFIG_FILES})
@@ -2217,7 +2233,7 @@ target_link_libraries(libnetdata PUBLIC
         "$<$<BOOL:${ENABLE_MIMALLOC}>:mimalloc-static>"
         "$<$<NOT:$<BOOL:${HAVE_BUILTIN_ATOMICS}>>:atomic>"
         "$<$<OR:$<BOOL:${OS_LINUX}>,$<BOOL:${OS_FREEBSD}>>:pthread;rt>"
-        "$<$<BOOL:${OS_WINDOWS}>:kernel32;advapi32;winmm;rpcrt4;wevtapi;ole32;oleaut32;wbemuuid;sensorsapi>"
+        "$<$<BOOL:${OS_WINDOWS}>:kernel32;advapi32;winmm;rpcrt4;wevtapi;ole32;oleaut32;wbemuuid;sensorsapi;iphlpapi>"
         "$<$<BOOL:${LINK_LIBM}>:m>"
         "${SYSTEMD_LDFLAGS}")
 

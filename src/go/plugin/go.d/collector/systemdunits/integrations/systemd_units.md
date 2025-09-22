@@ -45,7 +45,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-
 ## Metrics
 
 Metrics grouped by *scope*.
@@ -121,32 +120,27 @@ The following alerts are available:
 
 ## Setup
 
+
+You can configure the **systemdunits** collector in two ways:
+
+| Method                | Best for                                                                                 | How to                                                                                                                                 |
+|-----------------------|------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------|
+| [**UI**](#via-ui)     | Fast setup without editing files                                                         | Go to **Nodes → Configure this node → Collectors → Jobs**, search for **systemdunits**, then click **+** to add a job. |
+| [**File**](#via-file) | If you prefer configuring via file, or need to automate deployments (e.g., with Ansible) | Edit `go.d/systemdunits.conf` and add a job.                                                                        |
+
+:::important
+
+UI configuration requires paid Netdata Cloud plan.
+
+:::
+
+
 ### Prerequisites
 
 No action required.
 
 ### Configuration
 
-#### File
-
-The configuration file name for this integration is `go.d/systemdunits.conf`.
-
-The file format is YAML. Generally, the structure is:
-
-```yaml
-update_every: 1
-autodetection_retry: 0
-jobs:
-  - name: some_name1
-  - name: some_name1
-```
-You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
-Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
-
-```bash
-cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
-sudo ./edit-config go.d/systemdunits.conf
-```
 #### Options
 
 The following options can be defined globally: update_every, autodetection_retry.
@@ -154,16 +148,18 @@ The following options can be defined globally: update_every, autodetection_retry
 
 <details open><summary>Config options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
-| update_every | Data collection frequency. | 1 | no |
-| autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
-| timeout | System bus requests timeout. | 1 | no |
-| include | Systemd units selector. | *.service | no |
-| skip_transient | If set, skip data collection for systemd transient units. | false | no |
-| collect_unit_files | If set to true, collect the state of installed unit files. Enabling this may increase system overhead. | false | no |
-| collect_unit_files_every | Interval for querying systemd about unit files and their enablement state, measured in seconds. Data is cached for this interval to reduce system overhead. | 300 | no |
-| include_unit_files | Systemd unit files selector. | *.service | no |
+
+
+| Group | Option | Description | Default | Required |
+|:------|:-----|:------------|:--------|:---------:|
+| **Collection** | update_every | Data collection frequency. | 1 | no |
+|  | autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
+|  | timeout | System bus requests timeout. | 1 | no |
+| **Units** | include | Systemd units selector. | *.service | no |
+|  | skip_transient | If set, skip data collection for systemd transient units. | false | no |
+| **Unit Files** | collect_unit_files | If set to true, collect the state of installed unit files. Enabling this may increase system overhead. | false | no |
+|  | collect_unit_files_every | Interval for querying systemd about unit files and their enablement state, measured in seconds. Data is cached for this interval to reduce system overhead. | 300 | no |
+|  | include_unit_files | Systemd unit files selector. | *.service | no |
 
 ##### include
 
@@ -195,11 +191,48 @@ includes:
 ```
 
 
+
 </details>
 
-#### Examples
 
-##### Service units
+#### via UI
+
+Configure the **systemdunits** collector from the Netdata web interface:
+
+1. Go to **Nodes**.
+2. Select the node **where you want the systemdunits data-collection job to run** and click the :gear: (**Configure this node**). That node will run the data collection.
+3. The **Collectors → Jobs** view opens by default.
+4. In the Search box, type _systemdunits_ (or scroll the list) to locate the **systemdunits** collector.
+5. Click the **+** next to the **systemdunits** collector to add a new job.
+6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
+    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
+
+
+#### via File
+
+The configuration file name for this integration is `go.d/systemdunits.conf`.
+
+The file format is YAML. Generally, the structure is:
+
+```yaml
+update_every: 1
+autodetection_retry: 0
+jobs:
+  - name: some_name1
+  - name: some_name2
+```
+You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
+Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
+
+```bash
+cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
+sudo ./edit-config go.d/systemdunits.conf
+```
+
+##### Examples
+
+###### Service units
 
 Collect state of all service type units.
 
@@ -214,7 +247,7 @@ jobs:
 ```
 </details>
 
-##### One specific unit
+###### One specific unit
 
 Collect state of one specific unit.
 
@@ -229,7 +262,7 @@ jobs:
 ```
 </details>
 
-##### All unit types
+###### All unit types
 
 Collect state of all units.
 
@@ -244,7 +277,7 @@ jobs:
 ```
 </details>
 
-##### Multi-instance
+###### Multi-instance
 
 > **Note**: When you define multiple jobs, their names must be unique.
 

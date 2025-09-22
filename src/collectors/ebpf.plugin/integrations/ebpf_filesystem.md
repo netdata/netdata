@@ -47,7 +47,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-
 ## Metrics
 
 Metrics grouped by *scope*.
@@ -103,6 +102,7 @@ There are no alerts configured by default for this integration.
 
 ## Setup
 
+
 ### Prerequisites
 
 #### Compile kernel
@@ -125,7 +125,32 @@ Now follow steps:
 
 ### Configuration
 
-#### File
+#### Options
+
+This configuration file have two different sections. The `[global]` overwrites default options, while `[filesystem]` allow user to select the filesystems to monitor.
+
+
+<details open><summary>Config options</summary>
+
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
+| update every | Data collection frequency. | 5 | no |
+| ebpf load mode | Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`). | entry | no |
+| lifetime | Set default lifetime for thread when enabled by cloud. | 300 | no |
+| btrfsdist | Enable or disable latency monitoring for functions associated with btrfs filesystem. | yes | no |
+| ext4dist | Enable or disable latency monitoring for functions associated with ext4 filesystem. | yes | no |
+| nfsdist | Enable or disable latency monitoring for functions associated with nfs filesystem. | yes | no |
+| xfsdist | Enable or disable latency monitoring for functions associated with xfs filesystem. | yes | no |
+| zfsdist | Enable or disable latency monitoring for functions associated with zfs filesystem. | yes | no |
+
+
+</details>
+
+
+
+#### via File
 
 The configuration file name for this integration is `ebpf.d/filesystem.conf`.
 
@@ -146,27 +171,8 @@ Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/n
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
 sudo ./edit-config ebpf.d/filesystem.conf
 ```
-#### Options
 
-This configuration file have two different sections. The `[global]` overwrites default options, while `[filesystem]` allow user to select the filesystems to monitor.
-
-
-<details open><summary>Config options</summary>
-
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
-| update every | Data collection frequency. | 5 | no |
-| ebpf load mode | Define whether plugin will monitor the call (`entry`) for the functions or it will also monitor the return (`return`). | entry | no |
-| lifetime | Set default lifetime for thread when enabled by cloud. | 300 | no |
-| btrfsdist | Enable or disable latency monitoring for functions associated with btrfs filesystem. | yes | no |
-| ext4dist | Enable or disable latency monitoring for functions associated with ext4 filesystem. | yes | no |
-| nfsdist | Enable or disable latency monitoring for functions associated with nfs filesystem. | yes | no |
-| xfsdist | Enable or disable latency monitoring for functions associated with xfs filesystem. | yes | no |
-| zfsdist | Enable or disable latency monitoring for functions associated with zfs filesystem. | yes | no |
-
-</details>
-
-#### Examples
+##### Examples
 There are no configuration examples.
 
 

@@ -293,7 +293,7 @@ void journalfile_v2_data_unmount_cleanup(time_t now_s) {
         if(!ctx) continue;
 
         struct rrdengine_datafile *datafile;
-        if(uv_rwlock_tryrdlock(&ctx->datafiles.rwlock) != 0)
+        if(netdata_rwlock_tryrdlock(&ctx->datafiles.rwlock) != 0)
             continue;
 
         bool first_then_next = true;
@@ -328,7 +328,7 @@ void journalfile_v2_data_unmount_cleanup(time_t now_s) {
             if (unmount)
                 journalfile_v2_mounted_data_unmount(journalfile, false, false);
         }
-        uv_rwlock_rdunlock(&ctx->datafiles.rwlock);
+        netdata_rwlock_rdunlock(&ctx->datafiles.rwlock);
     }
 }
 

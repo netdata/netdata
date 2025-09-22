@@ -9,7 +9,6 @@ import (
 
 	"github.com/gosnmp/gosnmp"
 
-	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/vnodes"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
@@ -34,11 +33,10 @@ func init() {
 func New() *Collector {
 	return &Collector{
 		Config: Config{
-			CreateVnode:                true,
-			EnableProfiles:             true,
-			EnableProfilesTableMetrics: true,
-			VnodeDeviceDownThreshold:   3,
-			Community:                  "public",
+			CreateVnode:              true,
+			VnodeDeviceDownThreshold: 3,
+			Community:                "public",
+			DisableLegacyCollection:  true,
 			Options: Options{
 				Port:           161,
 				Retries:        1,
@@ -54,18 +52,14 @@ func New() *Collector {
 			},
 		},
 
-		charts: &module.Charts{},
-
-		seenMetrics: make(map[string]bool),
+		charts:            &module.Charts{},
+		seenScalarMetrics: make(map[string]bool),
+		seenTableMetrics:  make(map[string]bool),
 
 		newSnmpClient: gosnmp.NewHandler,
 
 		snmpBulkWalkOk: true,
-		netInterfaces:  make(map[string]*netInterface),
-		collectIfMib:   true,
-
-		seenScalarMetrics: make(map[string]bool),
-		seenTableMetrics:  make(map[string]bool),
+		enableProfiles: true,
 	}
 }
 
@@ -75,29 +69,25 @@ type Collector struct {
 
 	vnode *vnodes.VirtualNode
 
-	charts      *module.Charts
-	seenMetrics map[string]bool
+	charts            *module.Charts
+	seenScalarMetrics map[string]bool
+	seenTableMetrics  map[string]bool
 
 	newSnmpClient func() gosnmp.Handler
 	snmpClient    gosnmp.Handler
 	ddSnmpColl    *ddsnmpcollector.Collector
 
-	netIfaceFilterByName matcher.Matcher
-	netIfaceFilterByType matcher.Matcher
-
-	snmpBulkWalkOk bool
-	collectIfMib   bool // only for tests
-
-	netInterfaces map[string]*netInterface
-
-	sysInfo *snmputils.SysInfo
-
-	customOids []string
-
+	sysInfo      *snmputils.SysInfo
 	snmpProfiles []*ddsnmp.Profile
 
-	seenScalarMetrics map[string]bool
-	seenTableMetrics  map[string]bool
+	adjMaxRepetitions uint32
+	snmpBulkWalkOk    bool
+
+	// legacy data collection parameters
+	customOids []string
+
+	// only for tests
+	enableProfiles bool
 }
 
 func (c *Collector) Configuration() any {
@@ -105,28 +95,13 @@ func (c *Collector) Configuration() any {
 }
 
 func (c *Collector) Init(context.Context) error {
-	err := c.validateConfig()
-	if err != nil {
+	if err := c.validateConfig(); err != nil {
 		return fmt.Errorf("config validation failed: %v", err)
 	}
 
-	snmpClient, err := c.initSNMPClient()
-	if err != nil {
+	if _, err := c.initSNMPClient(); err != nil {
 		return fmt.Errorf("failed to initialize SNMP client: %v", err)
 	}
-
-	err = snmpClient.Connect()
-	if err != nil {
-		return fmt.Errorf("SNMP client connection failed: %v", err)
-	}
-	c.snmpClient = snmpClient
-
-	byName, byType, err := c.initNetIfaceFilters()
-	if err != nil {
-		return fmt.Errorf("failed to initialize network interface filters: %v", err)
-	}
-	c.netIfaceFilterByName = byName
-	c.netIfaceFilterByType = byType
 
 	charts, err := newUserInputCharts(c.ChartsInput)
 	if err != nil {
@@ -140,17 +115,17 @@ func (c *Collector) Init(context.Context) error {
 }
 
 func (c *Collector) Check(context.Context) error {
+	if c.snmpClient == nil {
+		snmpClient, err := c.initAndConnectSNMPClient()
+		if err != nil {
+			return fmt.Errorf("failed to init and connect SNMP client: %v", err)
+		}
+		c.snmpClient = snmpClient
+	}
+
 	if _, err := snmputils.GetSysInfo(c.snmpClient); err != nil {
 		return err
 	}
-	ok, err := c.adjustMaxRepetitions()
-	if err != nil {
-		return err
-	}
-	if !ok {
-		c.Warningf("SNMP bulk walk disabled: table metrics collection unavailable (device may not support GETBULK or max-repetitions adjustment failed)")
-	}
-	c.snmpBulkWalkOk = ok
 
 	return nil
 }
@@ -159,7 +134,7 @@ func (c *Collector) Charts() *module.Charts {
 	return c.charts
 }
 
-func (c *Collector) Collect(context.Context) map[string]int64 {
+func (c *Collector) Collect(ctx context.Context) map[string]int64 {
 	mx, err := c.collect()
 	if err != nil {
 		c.Error(err)

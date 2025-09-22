@@ -45,7 +45,7 @@ func Open(path string, excludePath string, log *logger.Logger) (*Reader, error) 
 		return nil, fmt.Errorf("bad path syntax: %q", path)
 	}
 	if _, err = filepath.Match(excludePath, "/"); err != nil {
-		return nil, fmt.Errorf("bad exclude_path syntax: %q", path)
+		return nil, fmt.Errorf("bad exclude_path syntax: %q", excludePath)
 	}
 	r := &Reader{
 		path:        path,
@@ -61,6 +61,9 @@ func Open(path string, excludePath string, log *logger.Logger) (*Reader, error) 
 
 // CurrentFilename get current opened file name
 func (r *Reader) CurrentFilename() string {
+	if r.file == nil {
+		return ""
+	}
 	return r.file.Name()
 }
 
@@ -77,9 +80,11 @@ func (r *Reader) open() error {
 	}
 	stat, err := file.Stat()
 	if err != nil {
+		_ = file.Close()
 		return err
 	}
 	if _, err = file.Seek(stat.Size(), io.SeekStart); err != nil {
+		_ = file.Close()
 		return err
 	}
 	r.file = file
@@ -129,6 +134,7 @@ func (r *Reader) Close() (err error) {
 	r.log.Debug("close log file: ", r.file.Name())
 	err = r.file.Close()
 	r.file = nil
+	r.continuousEOF = 0
 	r.eofCounter = 0
 	return
 }

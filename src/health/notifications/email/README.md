@@ -16,10 +16,10 @@ endmeta-->
 Send notifications via Email using Netdata's Agent alert notification feature, which supports dozens of endpoints, user roles, and more.
 
 
-
 <img src="https://img.shields.io/badge/maintained%20by-Netdata-%2300ab44" />
 
 ## Setup
+
 
 ### Prerequisites
 
@@ -43,26 +43,16 @@ Send notifications via Email using Netdata's Agent alert notification feature, w
 
 ### Configuration
 
-#### File
-
-The configuration file name for this integration is `health_alarm_notify.conf`.
-
-
-You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
-Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
-
-```bash
-cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
-sudo ./edit-config health_alarm_notify.conf
-```
 #### Options
 
 The following options can be defined for this notification
 
 <details open><summary>Config Options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | EMAIL_SENDER | You can change `EMAIL_SENDER` to the email address sending the notifications. | netdata | no |
 | SEND_EMAIL | Set `SEND_EMAIL` to YES | YES | yes |
 | DEFAULT_RECIPIENT_EMAIL | Set `DEFAULT_RECIPIENT_EMAIL` to the email address you want the email to be sent by default. You can define multiple email addresses like this: `alarms@example.com` `systems@example.com`. | root | yes |
@@ -81,11 +71,27 @@ role_recipients_email[sitemgr]="sites@example.com"
 ```
 
 
+
 </details>
 
-#### Examples
 
-##### Basic Configuration
+
+#### via File
+
+The configuration file name for this integration is `health_alarm_notify.conf`.
+
+
+You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
+Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
+
+```bash
+cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
+sudo ./edit-config health_alarm_notify.conf
+```
+
+##### Examples
+
+###### Basic Configuration
 
 
 

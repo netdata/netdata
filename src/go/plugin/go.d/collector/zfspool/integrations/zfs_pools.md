@@ -48,7 +48,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-
 ## Metrics
 
 Metrics grouped by *scope*.
@@ -110,13 +109,61 @@ The following alerts are available:
 
 ## Setup
 
+
+You can configure the **zfspool** collector in two ways:
+
+| Method                | Best for                                                                                 | How to                                                                                                                                 |
+|-----------------------|------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------|
+| [**UI**](#via-ui)     | Fast setup without editing files                                                         | Go to **Nodes → Configure this node → Collectors → Jobs**, search for **zfspool**, then click **+** to add a job. |
+| [**File**](#via-file) | If you prefer configuring via file, or need to automate deployments (e.g., with Ansible) | Edit `go.d/zfspool.conf` and add a job.                                                                        |
+
+:::important
+
+UI configuration requires paid Netdata Cloud plan.
+
+:::
+
+
 ### Prerequisites
 
 No action required.
 
 ### Configuration
 
-#### File
+#### Options
+
+The following options can be defined globally: update_every.
+
+
+<details open><summary>Config options</summary>
+
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
+| update_every | Data collection frequency. | 10 | no |
+| binary_path | Path to the `zpool` binary. If an absolute path is provided, the collector will use it directly; otherwise, it will search for the binary in directories specified in the PATH environment variable. | /usr/bin/zpool | yes |
+| timeout | Timeout for executing the binary, specified in seconds. | 2 | no |
+
+
+</details>
+
+
+#### via UI
+
+Configure the **zfspool** collector from the Netdata web interface:
+
+1. Go to **Nodes**.
+2. Select the node **where you want the zfspool data-collection job to run** and click the :gear: (**Configure this node**). That node will run the data collection.
+3. The **Collectors → Jobs** view opens by default.
+4. In the Search box, type _zfspool_ (or scroll the list) to locate the **zfspool** collector.
+5. Click the **+** next to the **zfspool** collector to add a new job.
+6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
+    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
+
+
+#### via File
 
 The configuration file name for this integration is `go.d/zfspool.conf`.
 
@@ -127,7 +174,7 @@ update_every: 1
 autodetection_retry: 0
 jobs:
   - name: some_name1
-  - name: some_name1
+  - name: some_name2
 ```
 You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
 Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
@@ -136,24 +183,10 @@ Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/n
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
 sudo ./edit-config go.d/zfspool.conf
 ```
-#### Options
 
-The following options can be defined globally: update_every.
+##### Examples
 
-
-<details open><summary>Config options</summary>
-
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
-| update_every | Data collection frequency. | 10 | no |
-| binary_path | Path to the `zpool` binary. If an absolute path is provided, the collector will use it directly; otherwise, it will search for the binary in directories specified in the PATH environment variable. | /usr/bin/zpool | yes |
-| timeout | Timeout for executing the binary, specified in seconds. | 2 | no |
-
-</details>
-
-#### Examples
-
-##### Custom binary path
+###### Custom binary path
 
 The executable is not in the directories specified in the PATH environment variable.
 

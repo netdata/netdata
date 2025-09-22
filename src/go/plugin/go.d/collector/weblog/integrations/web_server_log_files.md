@@ -46,7 +46,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-
 ## Metrics
 
 Metrics grouped by *scope*.
@@ -151,32 +150,27 @@ The following alerts are available:
 
 ## Setup
 
+
+You can configure the **web_log** collector in two ways:
+
+| Method                | Best for                                                                                 | How to                                                                                                                                 |
+|-----------------------|------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------|
+| [**UI**](#via-ui)     | Fast setup without editing files                                                         | Go to **Nodes → Configure this node → Collectors → Jobs**, search for **web_log**, then click **+** to add a job. |
+| [**File**](#via-file) | If you prefer configuring via file, or need to automate deployments (e.g., with Ansible) | Edit `go.d/web_log.conf` and add a job.                                                                        |
+
+:::important
+
+UI configuration requires paid Netdata Cloud plan.
+
+:::
+
+
 ### Prerequisites
 
 No action required.
 
 ### Configuration
 
-#### File
-
-The configuration file name for this integration is `go.d/web_log.conf`.
-
-The file format is YAML. Generally, the structure is:
-
-```yaml
-update_every: 1
-autodetection_retry: 0
-jobs:
-  - name: some_name1
-  - name: some_name1
-```
-You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
-Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
-
-```bash
-cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
-sudo ./edit-config go.d/web_log.conf
-```
 #### Options
 
 Weblog is aware of how to parse and interpret the following fields (**known fields**):
@@ -216,27 +210,29 @@ Notes:
 
 <details open><summary>Config options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
-| update_every | Data collection frequency. | 1 | no |
-| autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
-| path | Path to the web server log file. |  | yes |
-| exclude_path | Path to exclude. | *.gz | no |
-| url_patterns | List of URL patterns. | [] | no |
-| url_patterns.name | Used as a dimension name. |  | yes |
-| url_patterns.pattern | Used to match against full original request URI. Pattern syntax in [matcher](https://github.com/netdata/netdata/tree/master/src/go/pkg/matcher#supported-format). |  | yes |
-| log_type | Log parser type. | auto | no |
-| csv_config | CSV log parser config. |  | no |
-| csv_config.delimiter | CSV field delimiter. | , | no |
-| csv_config.format | CSV log format. |  | no |
-| ltsv_config | LTSV log parser config. |  | no |
-| ltsv_config.field_delimiter | LTSV field delimiter. | \t | no |
-| ltsv_config.value_delimiter | LTSV value delimiter. | : | no |
-| ltsv_config.mapping | LTSV fields mapping to **known fields**. |  | yes |
-| json_config | JSON log parser config. |  | no |
-| json_config.mapping | JSON fields mapping to **known fields**. |  | yes |
-| regexp_config | RegExp log parser config. |  | no |
-| regexp_config.pattern | RegExp pattern with named groups. |  | yes |
+
+
+| Group | Option | Description | Default | Required |
+|:------|:-----|:------------|:--------|:---------:|
+| **Collection** | update_every | Data collection frequency. | 1 | no |
+|  | autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
+| **Target** | path | Path to the web server log file. |  | yes |
+|  | exclude_path | Path to exclude. | *.gz | no |
+| **Customization** | url_patterns | List of URL patterns. | [] | no |
+|  | url_patterns.name | Used as a dimension name. |  | yes |
+|  | url_patterns.pattern | Used to match against full original request URI. Pattern syntax in [matcher](https://github.com/netdata/netdata/tree/master/src/go/pkg/matcher#supported-format). |  | yes |
+| **Parser** | log_type | Log parser type. | auto | no |
+|  | csv_config | CSV log parser config. |  | no |
+|  | csv_config.delimiter | CSV field delimiter. | , | no |
+|  | csv_config.format | CSV log format. |  | no |
+|  | ltsv_config | LTSV log parser config. |  | no |
+|  | ltsv_config.field_delimiter | LTSV field delimiter. | \t | no |
+|  | ltsv_config.value_delimiter | LTSV value delimiter. | : | no |
+|  | ltsv_config.mapping | LTSV fields mapping to **known fields**. |  | yes |
+|  | json_config | JSON log parser config. |  | no |
+|  | json_config.mapping | JSON fields mapping to **known fields**. |  | yes |
+|  | regexp_config | RegExp log parser config. |  | no |
+|  | regexp_config.pattern | RegExp pattern with named groups. |  | yes |
 
 ##### url_patterns
 
@@ -293,10 +289,6 @@ If `log_type` parameter set to `auto` (which is default), weblog will try to aut
   If you're using the default Apache/NGINX log format, auto-detect will work for you. If it doesn't work you need to set the format manually.
 
 
-##### csv_config.format
-
-
-
 ##### ltsv_config.mapping
 
 The mapping is a dictionary where the key is a field, as in logs, and the value is the corresponding **known field**.
@@ -342,9 +334,46 @@ regexp_config:
 ```
 
 
+
 </details>
 
-#### Examples
+
+#### via UI
+
+Configure the **web_log** collector from the Netdata web interface:
+
+1. Go to **Nodes**.
+2. Select the node **where you want the web_log data-collection job to run** and click the :gear: (**Configure this node**). That node will run the data collection.
+3. The **Collectors → Jobs** view opens by default.
+4. In the Search box, type _web_log_ (or scroll the list) to locate the **web_log** collector.
+5. Click the **+** next to the **web_log** collector to add a new job.
+6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
+    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
+
+
+#### via File
+
+The configuration file name for this integration is `go.d/web_log.conf`.
+
+The file format is YAML. Generally, the structure is:
+
+```yaml
+update_every: 1
+autodetection_retry: 0
+jobs:
+  - name: some_name1
+  - name: some_name2
+```
+You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
+Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
+
+```bash
+cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
+sudo ./edit-config go.d/web_log.conf
+```
+
+##### Examples
 There are no configuration examples.
 
 

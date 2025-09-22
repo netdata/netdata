@@ -61,7 +61,7 @@ Logs will be written to `./logs/`.
 
 - Node.js (v14 or higher)
 - A running Netdata instance with MCP server enabled
-- API keys for at least one LLM provider (OpenAI, Anthropic, or Google)
+- API keys for at least one LLM provider (OpenAI, Anthropic, or Google) OR a local Ollama installation
 
 ### 1. Setting up the LLM Proxy Server
 
@@ -101,6 +101,12 @@ Edit the configuration file to add your API keys:
          "apiKey": "YOUR-GOOGLE-AI-KEY",
          "models": [
            // Models are automatically populated from built-in definitions
+         ]
+       },
+       "ollama": {
+         "endpoint": "http://localhost:11434",
+         "models": [
+           // Models are automatically discovered from your Ollama installation
          ]
        }
      }
@@ -180,7 +186,11 @@ Edit the configuration file to add your API keys:
 ## Features
 
 - **Secure API Key Management**: API keys are stored only in the proxy server, never in the browser
-- **Multiple LLM Support**: Use OpenAI, Anthropic, or Google AI models
+- **Multiple LLM Support**: Use OpenAI, Anthropic, Google AI, or Ollama models
+- **Ollama Support**: Full support for local Ollama models with automatic discovery
+- **Multiple Provider Instances**: Configure multiple instances of the same provider with different settings
+- **Model-Specific Endpoints**: Support for different API endpoints per model (e.g., o1 models use /v1/responses)
+- **Tool Control Per Model**: Enable/disable MCP tools on a per-model basis
 - **Model Selection**: Choose specific models for each chat with automatic pricing info
 - **MCP Integration**: Full access to Netdata metrics and functions
 - **Chat History**: All conversations are saved locally
@@ -188,7 +198,7 @@ Edit the configuration file to add your API keys:
 - **Context Window Tracking**: Monitor token usage in real-time
 - **Cost Accounting**: Automatic tracking of all LLM usage with detailed cost breakdown
 - **Compressed Response Support**: Handles gzip, deflate, and brotli compressed responses
-- **Model Discovery**: Automatic model fetching from OpenAI and Google APIs
+- **Model Discovery**: Automatic model fetching from OpenAI, Google, and Ollama APIs
 - **Built-in Model Database**: Comprehensive pricing and context window information
 - **Strict Model Validation**: Enforces provider-specific pricing requirements to prevent silent failures
 
@@ -356,11 +366,97 @@ For some providers, the proxy can fetch available models directly:
 - **OpenAI**: Fetches from `/v1/models` endpoint
 - **Google**: Fetches from `/v1/models` endpoint  
 - **Anthropic**: No models endpoint available
+- **Ollama**: Fetches from `/api/tags` endpoint (discovers all locally installed models)
 
 To check which models are actually available with your API key:
 ```bash
 node llm-proxy.js --update-config --sync --check-availability
 ```
+
+For Ollama, the proxy automatically discovers all models installed locally and makes them available through the web interface. Model names with multiple colons (e.g., "llama3.3:latest", "hermes3:70b") are fully supported.
+
+### Advanced Provider Configuration
+
+#### Multiple Provider Instances
+
+You can configure multiple instances of the same provider type with different settings:
+
+```json
+{
+  "providers": {
+    "openai-gpt4": {
+      "apiKey": "sk-YOUR-API-KEY",
+      "type": "openai",
+      "baseUrl": "https://api.openai.com",
+      "models": [
+        {
+          "id": "gpt-4o",
+          "contextWindow": 128000,
+          "pricing": { "input": 2.50, "output": 10.00, "cacheRead": 0.625 }
+        }
+      ]
+    },
+    "openai-o1": {
+      "apiKey": "sk-YOUR-API-KEY",
+      "type": "openai",
+      "baseUrl": "https://api.openai.com",
+      "models": [
+        {
+          "id": "o1-mini",
+          "contextWindow": 128000,
+          "endpoint": "responses",
+          "supportsTools": false,
+          "pricing": { "input": 3.00, "output": 12.00, "cacheRead": 0.75 }
+        }
+      ]
+    },
+    "ollama-local": {
+      "type": "ollama",
+      "endpoint": "http://localhost:11434",
+      "models": []
+    },
+    "ollama-remote": {
+      "type": "ollama",
+      "endpoint": "http://remote-server:11434",
+      "models": []
+    }
+  }
+}
+```
+
+This allows you to:
+- Separate models by use case (e.g., GPT-4 for complex tasks, o1 for reasoning)
+- Use different API keys or endpoints for the same provider
+- Connect to multiple Ollama instances (local and remote)
+
+#### Model-Specific Configuration
+
+Each model can have custom settings:
+
+```json
+{
+  "id": "o1-mini",
+  "contextWindow": 128000,
+  "endpoint": "responses",      // Use /v1/responses instead of /v1/chat/completions
+  "supportsTools": false,       // Disable tool/function calling for this model
+  "pricing": {
+    "input": 3.00,
+    "output": 12.00,
+    "cacheRead": 0.75
+  }
+}
+```
+
+**Model Configuration Options:**
+- `endpoint`: Specify which API endpoint to use ("responses" for o1/o3 models)
+- `supportsTools`: Enable/disable native tool calling (MCP tools)
+  - `true`: Model supports function/tool calling (default for most models)
+  - `false`: Disable tools for models that don't support them (e.g., o1 series)
+
+**Note**: The web client automatically handles these configurations:
+- Routes requests to the correct endpoint based on model configuration
+- Filters out tools when sending requests to models with `supportsTools: false`
+- Preserves full tool functionality for models that support it
 
 ### Pricing Information
 
@@ -507,6 +603,12 @@ Status codes:
 - Run `node llm-proxy.js --sync --update-config` to sync models (development)
 - Restart the proxy after configuration changes
 - Test the connection in the LLM provider settings
+
+### Ollama model names display incorrectly
+- **Fixed in latest version**: Models with multiple colons (e.g., "llama3.3:latest") now display correctly
+- The web client automatically migrates existing chat data with incomplete model names
+- Model names are now consistently stored with provider prefix (e.g., "ollama:llama3.3:latest")
+- Token usage breakdown and accounting nodes properly display full model names
 
 ### Zero costs in accounting logs
 - **This should no longer occur with strict validation** - invalid models are now rejected at startup

@@ -15,10 +15,10 @@ endmeta-->
 
 Integrate your organization's Authorization Servers with Netdata to better manage your team's access controls to Netdata Cloud.
 
-
 <img src="https://img.shields.io/badge/maintained%20by-Netdata-%2300ab44" />
 
 ## Setup
+
 
 ### Prerequisites
 - Authorization Server with OIDC protocol supported

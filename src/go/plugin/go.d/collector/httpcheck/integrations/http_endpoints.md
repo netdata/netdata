@@ -57,7 +57,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-
 ## Metrics
 
 Metrics grouped by *scope*.
@@ -104,13 +103,85 @@ The following alerts are available:
 
 ## Setup
 
+
+You can configure the **httpcheck** collector in two ways:
+
+| Method                | Best for                                                                                 | How to                                                                                                                                 |
+|-----------------------|------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------|
+| [**UI**](#via-ui)     | Fast setup without editing files                                                         | Go to **Nodes → Configure this node → Collectors → Jobs**, search for **httpcheck**, then click **+** to add a job. |
+| [**File**](#via-file) | If you prefer configuring via file, or need to automate deployments (e.g., with Ansible) | Edit `go.d/httpcheck.conf` and add a job.                                                                        |
+
+:::important
+
+UI configuration requires paid Netdata Cloud plan.
+
+:::
+
+
 ### Prerequisites
 
 No action required.
 
 ### Configuration
 
-#### File
+#### Options
+
+The following options can be defined globally: update_every, autodetection_retry.
+
+
+<details open><summary>Config options</summary>
+
+
+
+| Group | Option | Description | Default | Required |
+|:------|:-----|:------------|:--------|:---------:|
+| **Collection** | update_every | Data collection interval (seconds). | 5 | no |
+|  | autodetection_retry | Autodetection retry interval (seconds). Set 0 to disable. | 0 | no |
+| **Target** | url | Target endpoint URL. |  | yes |
+|  | timeout | HTTP request timeout (seconds). | 1 | no |
+| **Validation** | status_accepted | HTTP accepted response statuses. Anything else results in 'bad status' in the status chart. | [200] | no |
+|  | response_match | If the status code is accepted, match the response body against this regular expression. |  | no |
+|  | header_match | A set of rules to check for specific key-value pairs in response headers. | [] | no |
+|  | header_match.exclude | When yes, the rule asserts the key-value pair must be absent. | no | no |
+|  | header_match.key | Exact HTTP header name to check. |  | yes |
+|  | header_match.value | The [pattern](https://github.com/netdata/netdata/tree/master/src/go/pkg/matcher#supported-format) to match against the header's value. |  | no |
+| **HTTP Auth** | username | Username for Basic HTTP authentication. |  | no |
+|  | password | Password for Basic HTTP authentication. |  | no |
+|  | bearer_token_file | Path to a file containing a bearer token (used for `Authorization: Bearer`). |  | no |
+| **TLS** | tls_skip_verify | Skip TLS certificate and hostname verification (insecure). | no | no |
+|  | tls_ca | Path to CA bundle used to validate the server certificate. |  | no |
+|  | tls_cert | Path to client TLS certificate (for mTLS). |  | no |
+|  | tls_key | Path to client TLS private key (for mTLS). |  | no |
+| **Proxy** | proxy_url | HTTP proxy URL. |  | no |
+|  | proxy_username | Username for proxy Basic HTTP authentication. |  | no |
+|  | proxy_password | Password for proxy Basic HTTP authentication. |  | no |
+| **Request** | method | HTTP method to use. | GET | no |
+|  | body | Request body (e.g., for POST/PUT). |  | no |
+|  | headers | Additional HTTP headers (one per line as key: value). |  | no |
+|  | cookie_file | Path to cookie file. See [cookie file format](https://everything.curl.dev/http/cookies/fileformat). |  | no |
+|  | not_follow_redirects | Do not follow HTTP redirects. | no | no |
+|  | force_http2 | Force HTTP/2 (including h2c over TCP). | no | no |
+| **Virtual Node** | vnode | Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). |  | no |
+
+
+</details>
+
+
+#### via UI
+
+Configure the **httpcheck** collector from the Netdata web interface:
+
+1. Go to **Nodes**.
+2. Select the node **where you want the httpcheck data-collection job to run** and click the :gear: (**Configure this node**). That node will run the data collection.
+3. The **Collectors → Jobs** view opens by default.
+4. In the Search box, type _httpcheck_ (or scroll the list) to locate the **httpcheck** collector.
+5. Click the **+** next to the **httpcheck** collector to add a new job.
+6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
+    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
+
+
+#### via File
 
 The configuration file name for this integration is `go.d/httpcheck.conf`.
 
@@ -121,7 +192,7 @@ update_every: 1
 autodetection_retry: 0
 jobs:
   - name: some_name1
-  - name: some_name1
+  - name: some_name2
 ```
 You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
 Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
@@ -130,45 +201,10 @@ Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/n
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
 sudo ./edit-config go.d/httpcheck.conf
 ```
-#### Options
 
-The following options can be defined globally: update_every, autodetection_retry.
+##### Examples
 
-
-<details open><summary>Config options</summary>
-
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
-| update_every | Data collection frequency. | 5 | no |
-| autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
-| url | Server URL. |  | yes |
-| status_accepted | HTTP accepted response statuses. Anything else will result in 'bad status' in the status chart. | [200] | no |
-| response_match | If the status code is accepted, the content of the response will be matched against this regular expression. |  | no |
-| header_match | This option defines a set of rules that check for specific key-value pairs in the HTTP headers of the response. | [] | no |
-| header_match.exclude | This option determines whether the rule should check for the presence of the specified key-value pair or the absence of it. | no | no |
-| header_match.key | The exact name of the HTTP header to check for. |  | yes |
-| header_match.value | The [pattern](https://github.com/netdata/netdata/tree/master/src/go/pkg/matcher#supported-format) to match against the value of the specified header. |  | no |
-| cookie_file | Path to cookie file. See [cookie file format](https://everything.curl.dev/http/cookies/fileformat). |  | no |
-| timeout | HTTP request timeout. | 1 | no |
-| username | Username for basic HTTP authentication. |  | no |
-| password | Password for basic HTTP authentication. |  | no |
-| proxy_url | Proxy URL. |  | no |
-| proxy_username | Username for proxy basic HTTP authentication. |  | no |
-| proxy_password | Password for proxy basic HTTP authentication. |  | no |
-| method | HTTP request method. | GET | no |
-| body | HTTP request body. |  | no |
-| headers | HTTP request headers. |  | no |
-| not_follow_redirects | Redirect handling policy. Controls whether the client follows redirects. | no | no |
-| tls_skip_verify | Server certificate chain and hostname validation policy. Controls whether the client performs this check. | no | no |
-| tls_ca | Certification authority that the client uses when verifying the server's certificates. |  | no |
-| tls_cert | Client TLS certificate. |  | no |
-| tls_key | Client TLS key. |  | no |
-
-</details>
-
-#### Examples
-
-##### Basic
+###### Basic
 
 A basic example configuration.
 
@@ -182,7 +218,7 @@ jobs:
 ```
 </details>
 
-##### With HTTP request headers
+###### With HTTP request headers
 
 Configuration with HTTP request headers that will be sent by the client.
 
@@ -200,7 +236,7 @@ jobs:
 ```
 </details>
 
-##### With `status_accepted`
+###### With `status_accepted`
 
 A basic example configuration with non-default status_accepted.
 
@@ -217,7 +253,7 @@ jobs:
 ```
 </details>
 
-##### With `header_match`
+###### With `header_match`
 
 Example configurations with `header_match`. See the value [pattern](https://github.com/netdata/netdata/tree/master/src/go/pkg/matcher#supported-format) syntax.
 
@@ -264,7 +300,7 @@ jobs:
 ```
 </details>
 
-##### HTTP authentication
+###### HTTP authentication
 
 Basic HTTP authentication.
 
@@ -280,7 +316,7 @@ jobs:
 ```
 </details>
 
-##### HTTPS with self-signed certificate
+###### HTTPS with self-signed certificate
 
 Do not validate server certificate chain and hostname.
 
@@ -296,7 +332,7 @@ jobs:
 ```
 </details>
 
-##### Multi-instance
+###### Multi-instance
 
 > **Note**: When you define multiple jobs, their names must be unique.
 

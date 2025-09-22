@@ -66,7 +66,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-
 ## Metrics
 
 Metrics grouped by *scope*.
@@ -114,22 +113,26 @@ The following alerts are available:
 
 ## Setup
 
+
 ### Prerequisites
 
 No action required.
 
 ### Configuration
 
-#### File
-
-There is no configuration file.
 #### Options
 
 
 
 There are no configuration options.
 
-#### Examples
+
+
+#### via File
+
+There is no configuration file.
+
+##### Examples
 There are no configuration examples.
 
 

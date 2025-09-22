@@ -1,15 +1,5 @@
 # Configure Health Alerts
 
-## Table of Contents
-
-- [Quick Start Guide](#quick-start-guide) <!-- SECTION_TYPE: tutorial -->
-- [Common Tasks](#common-tasks) <!-- SECTION_TYPE: workflow -->
-- [How-To Guides](#how-to-guides) <!-- SECTION_TYPE: procedures -->
-- [Alert Configuration Reference](#alert-configuration-reference) <!-- SECTION_TYPE: reference -->
-- [Expressions and Variables](#expressions-and-variables) <!-- SECTION_TYPE: concepts -->
-- [Alert Examples](#alert-examples) <!-- SECTION_TYPE: examples -->
-- [Troubleshooting](#troubleshooting) <!-- SECTION_TYPE: problem_solving -->
-
 ## Quick Start Guide
 
 :::tip
@@ -892,7 +882,7 @@ How to write calculations and use variables in your alert definitions. Essential
 |------------|----------------------------------------|---------------------------|
 | Arithmetic | `+`, `-`, `*`, `/`                     | Numeric values            |
 | Comparison | `<`, `==`, `<=`, `<>`, `!=`, `>`, `>=` | `1` (true) or `0` (false) |
-| Logical    | `&&`, `                                |                           |`, `!`, `AND`, `OR`, `NOT` | `1` (true) or `0` (false) |
+| Logical    | `&&`, `||`, `!`, `AND`, `OR`, `NOT`    | `1` (true) or `0` (false) |
 
 **Special Functions:**
 
@@ -1370,152 +1360,72 @@ Follow the flowcharts below to systematically diagnose and resolve alert issues.
 
 ```mermaid
 flowchart TD
-    A("Alert Not Working") --> B{"Alert appears<br/>in dashboard?"}
+    A("Alert Not Working") --> B("Check Configuration")
+    A --> C("Check Data Source")
+    A --> D("Check Thresholds")
     
-    B -->|No| C("Configuration Issue")
-    B -->|Yes| D{"Alert triggering<br/>at all?"}
+    B --> B1("Syntax errors<br/>Reload config<br/>Review logs")
+    C --> C1("Chart exists<br/>Data collection<br/>Variable names")
+    D --> D1("Adjust values<br/>Review logic<br/>Test expressions")
     
-    C --> C1("Check syntax errors<br/>Reload configuration<br/>Review debug logs")
-    
-    D -->|No| E{"Chart exists<br/>and has data?"}
-    D -->|Yes| F("Threshold Issue")
-    
-    E -->|No| E1("Verify chart name<br/>Check data collection<br/>Review collector status")
-    E -->|Yes| G{"Variables<br/>resolving?"}
-    
-    G -->|No| G1("Check variable names<br/>Verify dimensions<br/>Use alarm_variables API")
-    G -->|Yes| H{"Expression<br/>logic correct?"}
-    
-    H -->|No| H1("Review operators<br/>Check units<br/>Test with simple thresholds")
-    H -->|Yes| I("Check timing<br/>and frequency")
-    
-    F --> F1("Adjust warn/crit values<br/>Review hysteresis<br/>Check status conditions")
-    
-    style A fill:#f44336,stroke:#d32f2f,stroke-width:3px,color:#fff
-    style C fill:#ffeb3b,stroke:#fbc02d,stroke-width:2px,color:#000
-    style F fill:#ffeb3b,stroke:#fbc02d,stroke-width:2px,color:#000
-    style B fill:#f9f9f9,stroke:#e0e0e0,stroke-width:2px,color:#000
-    style D fill:#f9f9f9,stroke:#e0e0e0,stroke-width:2px,color:#000
-    style E fill:#f9f9f9,stroke:#e0e0e0,stroke-width:2px,color:#000
-    style G fill:#f9f9f9,stroke:#e0e0e0,stroke-width:2px,color:#000
-    style H fill:#f9f9f9,stroke:#e0e0e0,stroke-width:2px,color:#000
-    style E1 fill:#4caf50,stroke:#388e3c,stroke-width:2px,color:#fff
-    style G1 fill:#4caf50,stroke:#388e3c,stroke-width:2px,color:#fff
-    style H1 fill:#4caf50,stroke:#388e3c,stroke-width:2px,color:#fff
-    style F1 fill:#4caf50,stroke:#388e3c,stroke-width:2px,color:#fff
-    style C1 fill:#4caf50,stroke:#388e3c,stroke-width:2px,color:#fff
-    style I fill:#4caf50,stroke:#388e3c,stroke-width:2px,color:#fff
-    
-    linkStyle 0 stroke:#2196F3,stroke-width:3px
-    linkStyle 1 stroke:#f44336,stroke-width:3px
-    linkStyle 2 stroke:#2196F3,stroke-width:3px
-    linkStyle 4 stroke:#f44336,stroke-width:3px
-    linkStyle 5 stroke:#2196F3,stroke-width:3px
-    linkStyle 7 stroke:#f44336,stroke-width:3px
-    linkStyle 8 stroke:#2196F3,stroke-width:3px
-    linkStyle 10 stroke:#f44336,stroke-width:3px
-    linkStyle 11 stroke:#2196F3,stroke-width:3px
+    %% Style definitions
+    classDef alert fill:#ffeb3b,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+    classDef neutral fill:#f9f9f9,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+    classDef complete fill:#4caf50,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+    classDef database fill:#2196F3,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+
+    %% Apply styles
+    class A alert
+    class B,C,D database
+    class B1,C1,D1 complete
 ```
 
 #### Decision Tree: Alert Always Triggering
 
 ```mermaid
 flowchart TD
-    A("Alert Always Triggering") --> B{"Check current<br/>metric value"}
+    A("Alert Always Triggering") --> B("Check Values")
+    A --> C("Check Logic")
+    A --> D("Check Variables")
     
-    B --> C{"Value actually<br/>above threshold?"}
+    B --> B1("Current metrics<br/>Threshold comparison<br/>Units verification")
+    C --> C1("Operator direction<br/>Expression syntax<br/>Status conditions")
+    D --> D1("Variable names<br/>Dimension availability<br/>API verification")
     
-    C -->|Yes| D("Legitimate Alert")
-    C -->|No| E{"Expression<br/>logic error?"}
-    
-    D --> D1("Adjust thresholds<br/>Review alert necessity<br/>Change frequency")
-    
-    E -->|Yes| F{"Wrong operator<br/>direction?"}
-    E -->|No| G{"Units<br/>mismatch?"}
-    
-    F -->|Yes| F1("Change operators<br/>Fix direction<br/>Review logic")
-    F -->|No| H{"Variable name<br/>incorrect?"}
-    
-    G -->|Yes| G1("Check units<br/>Verify calculations<br/>Review methods")
-    G -->|No| I{"Status condition<br/>issue?"}
-    
-    H -->|Yes| H1("Verify variables<br/>Check dimensions<br/>Use API")
-    H -->|No| J("Review expression<br/>Check syntax")
-    
-    I -->|Yes| I1("Check status usage<br/>Review logic<br/>Simplify conditions")
-    I -->|No| J
-    
-    style A fill:#f44336,stroke:#d32f2f,stroke-width:3px,color:#fff
-    style D fill:#ffeb3b,stroke:#fbc02d,stroke-width:2px,color:#000
-    style B fill:#f9f9f9,stroke:#e0e0e0,stroke-width:2px,color:#000
-    style C fill:#f9f9f9,stroke:#e0e0e0,stroke-width:2px,color:#000
-    style E fill:#f9f9f9,stroke:#e0e0e0,stroke-width:2px,color:#000
-    style F fill:#f9f9f9,stroke:#e0e0e0,stroke-width:2px,color:#000
-    style G fill:#f9f9f9,stroke:#e0e0e0,stroke-width:2px,color:#000
-    style H fill:#f9f9f9,stroke:#e0e0e0,stroke-width:2px,color:#000
-    style I fill:#f9f9f9,stroke:#e0e0e0,stroke-width:2px,color:#000
-    style F1 fill:#4caf50,stroke:#388e3c,stroke-width:2px,color:#fff
-    style G1 fill:#4caf50,stroke:#388e3c,stroke-width:2px,color:#fff
-    style H1 fill:#4caf50,stroke:#388e3c,stroke-width:2px,color:#fff
-    style I1 fill:#4caf50,stroke:#388e3c,stroke-width:2px,color:#fff
-    style D1 fill:#4caf50,stroke:#388e3c,stroke-width:2px,color:#fff
-    style J fill:#4caf50,stroke:#388e3c,stroke-width:2px,color:#fff
-    
-    linkStyle 2 stroke:#2196F3,stroke-width:3px
-    linkStyle 3 stroke:#f44336,stroke-width:3px
-    linkStyle 5 stroke:#2196F3,stroke-width:3px
-    linkStyle 6 stroke:#f44336,stroke-width:3px
-    linkStyle 7 stroke:#2196F3,stroke-width:3px
-    linkStyle 8 stroke:#f44336,stroke-width:3px
-    linkStyle 10 stroke:#2196F3,stroke-width:3px
-    linkStyle 11 stroke:#f44336,stroke-width:3px
-    linkStyle 13 stroke:#2196F3,stroke-width:3px
-    linkStyle 14 stroke:#f44336,stroke-width:3px
+    %% Style definitions
+    classDef alert fill:#ffeb3b,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+    classDef neutral fill:#f9f9f9,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+    classDef complete fill:#4caf50,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+    classDef database fill:#2196F3,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+
+    %% Apply styles
+    class A alert
+    class B,C,D database
+    class B1,C1,D1 complete
 ```
 
 #### Decision Tree: Alert Flapping
 
 ```mermaid
 flowchart TD
-    A("Alert Flapping<br/>Too Many Notifications") --> B{"Values oscillating<br/>around threshold?"}
+    A("Alert Flapping") --> B("Add Hysteresis")
+    A --> C("Smooth Data")
+    A --> D("Adjust Timing")
     
-    B -->|Yes| C("Implement Hysteresis")
-    B -->|No| D{"Data source<br/>noisy/unstable?"}
+    B --> B1("Conditional thresholds<br/>Different up/down values<br/>Status-based logic")
+    C --> C1("Increase lookup time<br/>Use averages<br/>Reduce noise")
+    D --> D1("Increase intervals<br/>Add delays<br/>Reduce frequency")
     
-    C --> C1("Use conditional operator<br/>Set different thresholds<br/>Add hysteresis logic")
-    
-    D -->|Yes| E("Smooth Data")
-    D -->|No| F{"Check frequency<br/>too high?"}
-    
-    E --> E1("Increase lookup time<br/>Use averages<br/>Reduce noise")
-    
-    F -->|Yes| F1("Increase interval<br/>Match frequency<br/>Reduce checks")
-    F -->|No| G{"Delay settings<br/>needed?"}
-    
-    G -->|Yes| G1("Add delay line<br/>Set up/down delays<br/>Use multipliers")
-    G -->|No| H("Review notification<br/>settings")
-    
-    style A fill:#f44336,stroke:#d32f2f,stroke-width:3px,color:#fff
-    style C fill:#ffeb3b,stroke:#fbc02d,stroke-width:2px,color:#000
-    style E fill:#ffeb3b,stroke:#fbc02d,stroke-width:2px,color:#000
-    style B fill:#f9f9f9,stroke:#e0e0e0,stroke-width:2px,color:#000
-    style D fill:#f9f9f9,stroke:#e0e0e0,stroke-width:2px,color:#000
-    style F fill:#f9f9f9,stroke:#e0e0e0,stroke-width:2px,color:#000
-    style G fill:#f9f9f9,stroke:#e0e0e0,stroke-width:2px,color:#000
-    style C1 fill:#4caf50,stroke:#388e3c,stroke-width:2px,color:#fff
-    style E1 fill:#4caf50,stroke:#388e3c,stroke-width:2px,color:#fff
-    style F1 fill:#4caf50,stroke:#388e3c,stroke-width:2px,color:#fff
-    style G1 fill:#4caf50,stroke:#388e3c,stroke-width:2px,color:#fff
-    style H fill:#4caf50,stroke:#388e3c,stroke-width:2px,color:#fff
-    
-    linkStyle 1 stroke:#2196F3,stroke-width:3px
-    linkStyle 2 stroke:#f44336,stroke-width:3px
-    linkStyle 4 stroke:#2196F3,stroke-width:3px
-    linkStyle 5 stroke:#f44336,stroke-width:3px
-    linkStyle 7 stroke:#2196F3,stroke-width:3px
-    linkStyle 8 stroke:#f44336,stroke-width:3px
-    linkStyle 9 stroke:#2196F3,stroke-width:3px
-    linkStyle 10 stroke:#f44336,stroke-width:3px
+    %% Style definitions
+    classDef alert fill:#ffeb3b,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+    classDef neutral fill:#f9f9f9,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+    classDef complete fill:#4caf50,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+    classDef database fill:#2196F3,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+
+    %% Apply styles
+    class A alert
+    class B,C,D database
+    class B1,C1,D1 complete
 ```
 
 ### Common Issues and Solutions

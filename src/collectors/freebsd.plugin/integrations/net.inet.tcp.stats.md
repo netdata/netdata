@@ -44,7 +44,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-
 ## Metrics
 
 Metrics grouped by *scope*.
@@ -89,13 +88,38 @@ The following alerts are available:
 
 ## Setup
 
+
 ### Prerequisites
 
 No action required.
 
 ### Configuration
 
-#### File
+#### Options
+
+
+
+<details open><summary>Config options</summary>
+
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
+| ipv4 TCP packets | Enable or disable ipv4 TCP packets metric. | yes | no |
+| ipv4 TCP errors | Enable or disable pv4 TCP errors metric. | yes | no |
+| ipv4 TCP handshake issues | Enable or disable ipv4 TCP handshake issue metric. | yes | no |
+| TCP connection aborts | Enable or disable TCP connection aborts metric. | auto | no |
+| TCP out-of-order queue | Enable or disable TCP out-of-order queue metric. | auto | no |
+| TCP SYN cookies | Enable or disable TCP SYN cookies metric. | auto | no |
+| TCP listen issues | Enable or disable TCP listen issues metric. | auto | no |
+| ECN packets | Enable or disable ECN packets metric. | auto | no |
+
+
+</details>
+
+
+
+#### via File
 
 The configuration file name for this integration is `netdata.conf`.
 Configuration for this specific integration is located in the `[plugin:freebsd:net.inet.tcp.stats]` section within that file.
@@ -117,26 +141,8 @@ Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/n
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
 sudo ./edit-config netdata.conf
 ```
-#### Options
 
-
-
-<details open><summary>Config options</summary>
-
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
-| ipv4 TCP packets | Enable or disable ipv4 TCP packets metric. | yes | no |
-| ipv4 TCP errors | Enable or disable pv4 TCP errors metric. | yes | no |
-| ipv4 TCP handshake issues | Enable or disable ipv4 TCP handshake issue metric. | yes | no |
-| TCP connection aborts | Enable or disable TCP connection aborts metric. | auto | no |
-| TCP out-of-order queue | Enable or disable TCP out-of-order queue metric. | auto | no |
-| TCP SYN cookies | Enable or disable TCP SYN cookies metric. | auto | no |
-| TCP listen issues | Enable or disable TCP listen issues metric. | auto | no |
-| ECN packets | Enable or disable ECN packets metric. | auto | no |
-
-</details>
-
-#### Examples
+##### Examples
 There are no configuration examples.
 
 

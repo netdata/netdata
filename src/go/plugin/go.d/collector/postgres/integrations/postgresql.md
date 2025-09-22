@@ -53,7 +53,6 @@ These limits can be changed in the configuration file.
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-
 ## Metrics
 
 Metrics grouped by *scope*.
@@ -252,6 +251,21 @@ The following alerts are available:
 
 ## Setup
 
+
+You can configure the **postgres** collector in two ways:
+
+| Method                | Best for                                                                                 | How to                                                                                                                                 |
+|-----------------------|------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------|
+| [**UI**](#via-ui)     | Fast setup without editing files                                                         | Go to **Nodes → Configure this node → Collectors → Jobs**, search for **postgres**, then click **+** to add a job. |
+| [**File**](#via-file) | If you prefer configuring via file, or need to automate deployments (e.g., with Ansible) | Edit `go.d/postgres.conf` and add a job.                                                                        |
+
+:::important
+
+UI configuration requires paid Netdata Cloud plan.
+
+:::
+
+
 ### Prerequisites
 
 #### Create netdata user
@@ -274,7 +288,45 @@ system.
 
 ### Configuration
 
-#### File
+#### Options
+
+The following options can be defined globally: update_every, autodetection_retry.
+
+
+<details open><summary>Config options</summary>
+
+
+
+| Group | Option | Description | Default | Required |
+|:------|:-----|:------------|:--------|:---------:|
+| **Collection** | update_every | Data collection interval (seconds). | 1 | no |
+|  | autodetection_retry | Autodetection retry interval (seconds). Set 0 to disable. | 0 | no |
+| **Target** | dsn | Postgres connection string (DSN). See [DSN syntax](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING). | postgres://postgres:postgres@127.0.0.1:5432/postgres | yes |
+|  | timeout | Query timeout (seconds). | 2 | no |
+| **Filters** | collect_databases_matching | Database selector. Controls which databases are included. Uses [simple patterns](https://github.com/netdata/netdata/tree/master/src/go/pkg/matcher#simple-patterns-matcher). |  | no |
+| **Limits** | max_db_tables | Maximum number of tables per database to collect metrics for (0 = no limit). | 50 | no |
+|  | max_db_indexes | Maximum number of indexes per database to collect metrics for (0 = no limit). | 250 | no |
+| **Virtual Node** | vnode | Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). |  | no |
+
+
+</details>
+
+
+#### via UI
+
+Configure the **postgres** collector from the Netdata web interface:
+
+1. Go to **Nodes**.
+2. Select the node **where you want the postgres data-collection job to run** and click the :gear: (**Configure this node**). That node will run the data collection.
+3. The **Collectors → Jobs** view opens by default.
+4. In the Search box, type _postgres_ (or scroll the list) to locate the **postgres** collector.
+5. Click the **+** next to the **postgres** collector to add a new job.
+6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
+    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
+
+
+#### via File
 
 The configuration file name for this integration is `go.d/postgres.conf`.
 
@@ -285,7 +337,7 @@ update_every: 1
 autodetection_retry: 0
 jobs:
   - name: some_name1
-  - name: some_name1
+  - name: some_name2
 ```
 You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
 Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
@@ -294,28 +346,10 @@ Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/n
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
 sudo ./edit-config go.d/postgres.conf
 ```
-#### Options
 
-The following options can be defined globally: update_every, autodetection_retry.
+##### Examples
 
-
-<details open><summary>Config options</summary>
-
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
-| update_every | Data collection frequency. | 5 | no |
-| autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
-| dsn | Postgres server DSN (Data Source Name). See [DSN syntax](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING). | postgres://postgres:postgres@127.0.0.1:5432/postgres | yes |
-| timeout | Query timeout in seconds. | 2 | no |
-| collect_databases_matching | Databases selector. Determines which database metrics will be collected. Syntax is [simple patterns](https://github.com/netdata/netdata/tree/master/src/go/pkg/matcher#simple-patterns-matcher). |  | no |
-| max_db_tables | Maximum number of tables in the database. Table metrics will not be collected for databases that have more tables than max_db_tables. 0 means no limit. | 50 | no |
-| max_db_indexes | Maximum number of indexes in the database. Index metrics will not be collected for databases that have more indexes than max_db_indexes. 0 means no limit. | 250 | no |
-
-</details>
-
-#### Examples
-
-##### TCP socket
+###### TCP socket
 
 An example configuration.
 
@@ -325,7 +359,7 @@ jobs:
     dsn: 'postgresql://netdata@127.0.0.1:5432/postgres'
 
 ```
-##### Unix socket
+###### Unix socket
 
 An example configuration.
 
@@ -339,7 +373,7 @@ jobs:
 ```
 </details>
 
-##### Unix socket (custom port)
+###### Unix socket (custom port)
 
 Connect to PostgreSQL using a Unix socket with a non-default port (5433).
 
@@ -353,7 +387,7 @@ jobs:
 ```
 </details>
 
-##### Multi-instance
+###### Multi-instance
 
 > **Note**: When you define multiple jobs, their names must be unique.
 

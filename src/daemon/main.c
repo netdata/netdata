@@ -408,7 +408,9 @@ int netdata_main(int argc, char **argv) {
                             if (duration_unittest()) return 1;
                             if (unittest_waiting_queue()) return 1;
                             if (uuidmap_unittest()) return 1;
+#ifdef HAVE_LIBBACKTRACE
                             if (stacktrace_unittest()) return 1;
+#endif
                             if (test_cmd_pool_fifo()) return 1;
 #ifdef OS_WINDOWS
                             if (perflibnamestest_main()) return 1;
@@ -468,10 +470,12 @@ int netdata_main(int argc, char **argv) {
                             unittest_running = true;
                             return uuid_unittest();
                         }
+#ifdef HAVE_LIBBACKTRACE
                         else if(strcmp(optarg, "stacktracetest") == 0) {
                             unittest_running = true;
                             return stacktrace_unittest();
                         }
+#endif
 #ifdef OS_WINDOWS
                         else if(strcmp(optarg, "perflibdump") == 0) {
                             return windows_perflib_dump(optind + 1 > argc ? NULL : argv[optind]);

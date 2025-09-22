@@ -48,7 +48,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-
 ## Metrics
 
 Metrics grouped by *scope*.
@@ -95,32 +94,27 @@ There are no alerts configured by default for this integration.
 
 ## Setup
 
+
+You can configure the **isc_dhcpd** collector in two ways:
+
+| Method                | Best for                                                                                 | How to                                                                                                                                 |
+|-----------------------|------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------|
+| [**UI**](#via-ui)     | Fast setup without editing files                                                         | Go to **Nodes → Configure this node → Collectors → Jobs**, search for **isc_dhcpd**, then click **+** to add a job. |
+| [**File**](#via-file) | If you prefer configuring via file, or need to automate deployments (e.g., with Ansible) | Edit `go.d/isc_dhcpd.conf` and add a job.                                                                        |
+
+:::important
+
+UI configuration requires paid Netdata Cloud plan.
+
+:::
+
+
 ### Prerequisites
 
 No action required.
 
 ### Configuration
 
-#### File
-
-The configuration file name for this integration is `go.d/isc_dhcpd.conf`.
-
-The file format is YAML. Generally, the structure is:
-
-```yaml
-update_every: 1
-autodetection_retry: 0
-jobs:
-  - name: some_name1
-  - name: some_name1
-```
-You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
-Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
-
-```bash
-cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
-sudo ./edit-config go.d/isc_dhcpd.conf
-```
 #### Options
 
 The following options can be defined globally: update_every, autodetection_retry.
@@ -128,12 +122,14 @@ The following options can be defined globally: update_every, autodetection_retry
 
 <details open><summary>Config options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
-| update_every | Data collection frequency. | 1 | no |
-| autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
-| leases_path | Path to DHCP client lease database. | /var/lib/dhcp/dhcpd.leases | no |
-| pools | List of IP pools to monitor. |  | yes |
+
+
+| Group | Option | Description | Default | Required |
+|:------|:-----|:------------|:--------|:---------:|
+| **Collection** | update_every | Data collection interval (seconds). | 1 | no |
+|  | autodetection_retry | Autodetection retry interval (seconds). Set 0 to disable. | 0 | no |
+| **Target** | leases_path | Path to DHCP client lease database. | /var/lib/dhcp/dhcpd.leases | no |
+|  | pools | DHCP IP pools to monitor. |  | yes |
 
 ##### pools
 
@@ -151,11 +147,48 @@ pools:
 ```
 
 
+
 </details>
 
-#### Examples
 
-##### Basic
+#### via UI
+
+Configure the **isc_dhcpd** collector from the Netdata web interface:
+
+1. Go to **Nodes**.
+2. Select the node **where you want the isc_dhcpd data-collection job to run** and click the :gear: (**Configure this node**). That node will run the data collection.
+3. The **Collectors → Jobs** view opens by default.
+4. In the Search box, type _isc_dhcpd_ (or scroll the list) to locate the **isc_dhcpd** collector.
+5. Click the **+** next to the **isc_dhcpd** collector to add a new job.
+6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
+    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
+
+
+#### via File
+
+The configuration file name for this integration is `go.d/isc_dhcpd.conf`.
+
+The file format is YAML. Generally, the structure is:
+
+```yaml
+update_every: 1
+autodetection_retry: 0
+jobs:
+  - name: some_name1
+  - name: some_name2
+```
+You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
+Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
+
+```bash
+cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
+sudo ./edit-config go.d/isc_dhcpd.conf
+```
+
+##### Examples
+
+###### Basic
 
 A basic example configuration.
 

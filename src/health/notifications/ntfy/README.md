@@ -17,10 +17,10 @@ endmeta-->
 You can send alerts to an ntfy server using Netdata's Agent alert notification feature, which supports dozens of endpoints, user roles, and more.
 
 
-
 <img src="https://img.shields.io/badge/maintained%20by-Netdata-%2300ab44" />
 
 ## Setup
+
 
 ### Prerequisites
 
@@ -34,26 +34,16 @@ You can send alerts to an ntfy server using Netdata's Agent alert notification f
 
 ### Configuration
 
-#### File
-
-The configuration file name for this integration is `health_alarm_notify.conf`.
-
-
-You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
-Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
-
-```bash
-cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
-sudo ./edit-config health_alarm_notify.conf
-```
 #### Options
 
 The following options can be defined for this notification
 
 <details open><summary>Config Options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | SEND_NTFY | Set `SEND_NTFY` to YES | YES | yes |
 | DEFAULT_RECIPIENT_NTFY | URL formed by the server-topic combination you want the alert notifications to be sent to. Unless hosting your own server, the server should always be set to https://ntfy.sh. |  | yes |
 | NTFY_USERNAME | The username for netdata to use to authenticate with an ntfy server. |  | no |
@@ -95,11 +85,27 @@ This can be used in place of `NTFY_USERNAME` and `NTFY_PASSWORD` to authenticate
 Ensure that the token user has proper read/write access to the provided topic in `DEFAULT_RECIPIENT_NTFY`
 
 
+
 </details>
 
-#### Examples
 
-##### Basic Configuration
+
+#### via File
+
+The configuration file name for this integration is `health_alarm_notify.conf`.
+
+
+You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
+Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
+
+```bash
+cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
+sudo ./edit-config health_alarm_notify.conf
+```
+
+##### Examples
+
+###### Basic Configuration
 
 
 

@@ -10,6 +10,23 @@
 There is no configuration needed for this integration.
 [% else %]
 
+[% if entry.meta.plugin_name == 'go.d.plugin' %]
+
+You can configure the **[[ entry.meta.module_name ]]** collector in two ways:
+
+| Method                | Best for                                                                                 | How to                                                                                                                                 |
+|-----------------------|------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------|
+| [**UI**](#via-ui)     | Fast setup without editing files                                                         | Go to **Nodes → Configure this node → Collectors → Jobs**, search for **[[ entry.meta.module_name ]]**, then click **+** to add a job. |
+| [**File**](#via-file) | If you prefer configuring via file, or need to automate deployments (e.g., with Ansible) | Edit `[[ entry.setup.configuration.file.name ]]` and add a job.                                                                        |
+
+:::important
+
+UI configuration requires paid Netdata Cloud plan.
+
+:::
+
+[% endif %]
+
 [% if entry.setup.description %]
 [[ entry.setup.description ]]
 [% else %]
@@ -30,7 +47,67 @@ No action required.
 [% endif %]
 ### Configuration
 
-#### File
+#### Options
+
+[[ entry.setup.configuration.options.description ]]
+
+[% if entry.setup.configuration.options.list %]
+[% if entry.setup.configuration.options.folding.enabled and not clean %]
+{% details open=true summary="[[ entry.setup.configuration.options.folding.title or 'Config options' ]]" %}
+[% endif %]
+
+[% set has_groups = entry.setup.configuration.options.list | selectattr("group","defined") | list | length > 0 %]
+
+[% if has_groups %]
+| Group | Option | Description | Default | Required |
+|:------|:-----|:------------|:--------|:---------:|
+[% set ns = namespace(last_group=None) %]
+[% for item in entry.setup.configuration.options.list %]
+| [[ ("**" ~ item.group ~ "**") if (item.group is defined and item.group != ns.last_group) else "" ]] | [[ strfy(item.name) ]] | [[ strfy(item.description) ]] | [[ strfy(item.default_value) ]] | [[ strfy(item.required) ]] |
+[% set ns.last_group = item.group if item.group is defined else ns.last_group %]
+[% endfor %]
+[% else %]
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
+[% for item in entry.setup.configuration.options.list %]
+| [[ strfy(item.name) ]] | [[ strfy(item.description) ]] | [[ strfy(item.default_value) ]] | [[ strfy(item.required) ]] |
+[% endfor %]
+[% endif %]
+
+[% for item in entry.setup.configuration.options.list %]
+[% if 'detailed_description' in item %]
+##### [[ item.name ]]
+
+[[ item.detailed_description ]]
+
+[% endif %]
+[% endfor %]
+
+[% if entry.setup.configuration.options.folding.enabled and not clean %]
+{% /details %}
+[% endif %]
+[% elif not entry.setup.configuration.options.description %]
+There are no configuration options.
+
+[% endif %]
+
+[% if entry.meta.plugin_name == 'go.d.plugin' %]
+#### via UI
+
+Configure the **[[ entry.meta.module_name ]]** collector from the Netdata web interface:
+
+1. Go to **Nodes**.
+2. Select the node **where you want the [[ entry.meta.module_name ]] data-collection job to run** and click the :gear: (**Configure this node**). That node will run the data collection.
+3. The **Collectors → Jobs** view opens by default.
+4. In the Search box, type _[[ entry.meta.module_name ]]_ (or scroll the list) to locate the **[[ entry.meta.module_name ]]** collector.
+5. Click the **+** next to the **[[ entry.meta.module_name ]]** collector to add a new job.
+6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
+    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
+
+[% endif %]
+
+#### via File
 
 [% if entry.setup.configuration.file.name %]
 The configuration file name for this integration is `[[ entry.setup.configuration.file.name ]]`.
@@ -64,40 +141,12 @@ sudo ./edit-config [[ entry.setup.configuration.file.name ]]
 [% else %]
 There is no configuration file.
 [% endif %]
-#### Options
 
-[[ entry.setup.configuration.options.description ]]
-
-[% if entry.setup.configuration.options.list %]
-[% if entry.setup.configuration.options.folding.enabled and not clean %]
-{% details open=true summary="[[ entry.setup.configuration.options.folding.title ]]" %}
-[% endif %]
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
-[% for item in entry.setup.configuration.options.list %]
-| [[ strfy(item.name) ]] | [[ strfy(item.description) ]] | [[ strfy(item.default_value) ]] | [[ strfy(item.required) ]] |
-[% endfor %]
-
-[% for item in entry.setup.configuration.options.list %]
-[% if 'detailed_description' in item %]
-##### [[ item.name ]]
-
-[[ item.detailed_description ]]
-
-[% endif %]
-[% endfor %]
-[% if entry.setup.configuration.options.folding.enabled and not clean %]
-{% /details %}
-[% endif %]
-[% elif not entry.setup.configuration.options.description %]
-There are no configuration options.
-
-[% endif %]
-#### Examples
+##### Examples
 [% if entry.setup.configuration.examples.list %]
 
 [% for example in entry.setup.configuration.examples.list %]
-##### [[ example.name ]]
+###### [[ example.name ]]
 
 [[ example.description ]]
 

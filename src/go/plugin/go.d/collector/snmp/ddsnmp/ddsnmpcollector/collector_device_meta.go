@@ -58,7 +58,7 @@ func (dc *deviceMetadataCollector) Collect(prof *ddsnmp.Profile) (map[string]dds
 		}
 	}
 
-	if err := dc.processMetadataFields(cfg.Fields, meta, slices.Contains(prof.Definition.Extends, dc.sysobjectid)); err != nil {
+	if err := dc.processMetadataFields(cfg.Fields, meta, slices.Contains(prof.Definition.SysObjectIDs, dc.sysobjectid)); err != nil {
 		return ternary(len(meta) > 0, meta, nil), fmt.Errorf("failed to process metadata resource '%s': %w", resName, err)
 	}
 

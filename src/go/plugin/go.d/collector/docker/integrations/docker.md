@@ -53,7 +53,6 @@ The default configuration for this integration does not impose any limits on dat
 Enabling `collect_container_size` may result in high CPU usage depending on the version of Docker Engine.
 
 
-
 ## Metrics
 
 Metrics grouped by *scope*.
@@ -110,13 +109,65 @@ The following alerts are available:
 
 ## Setup
 
+
+You can configure the **docker** collector in two ways:
+
+| Method                | Best for                                                                                 | How to                                                                                                                                 |
+|-----------------------|------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------|
+| [**UI**](#via-ui)     | Fast setup without editing files                                                         | Go to **Nodes → Configure this node → Collectors → Jobs**, search for **docker**, then click **+** to add a job. |
+| [**File**](#via-file) | If you prefer configuring via file, or need to automate deployments (e.g., with Ansible) | Edit `go.d/docker.conf` and add a job.                                                                        |
+
+:::important
+
+UI configuration requires paid Netdata Cloud plan.
+
+:::
+
+
 ### Prerequisites
 
 No action required.
 
 ### Configuration
 
-#### File
+#### Options
+
+The following options can be defined globally: update_every, autodetection_retry.
+
+
+<details open><summary>Config options</summary>
+
+
+
+| Group | Option | Description | Default | Required |
+|:------|:-----|:------------|:--------|:---------:|
+| **Collection** | update_every | Data collection interval (seconds). | 1 | no |
+|  | autodetection_retry | Autodetection retry interval (seconds). Set 0 to disable. | 0 | no |
+| **Target** | address | Docker daemon address. For TCP sockets: `tcp://IP:PORT`. | unix:///var/run/docker.sock | yes |
+|  | timeout | Request timeout (seconds). | 2 | no |
+| **Filters** | container_selector | Container selector. Defines which containers to monitor. Uses [simple patterns](https://github.com/netdata/netdata/tree/master/src/libnetdata/simple_pattern#readme). | * | no |
+| **Metrics Selection** | collect_container_size | Collect container writable layer size metrics. | no | no |
+| **Virtual Node** | vnode | Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). |  | no |
+
+
+</details>
+
+
+#### via UI
+
+Configure the **docker** collector from the Netdata web interface:
+
+1. Go to **Nodes**.
+2. Select the node **where you want the docker data-collection job to run** and click the :gear: (**Configure this node**). That node will run the data collection.
+3. The **Collectors → Jobs** view opens by default.
+4. In the Search box, type _docker_ (or scroll the list) to locate the **docker** collector.
+5. Click the **+** next to the **docker** collector to add a new job.
+6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
+    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
+
+
+#### via File
 
 The configuration file name for this integration is `go.d/docker.conf`.
 
@@ -127,7 +178,7 @@ update_every: 1
 autodetection_retry: 0
 jobs:
   - name: some_name1
-  - name: some_name1
+  - name: some_name2
 ```
 You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
 Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
@@ -136,27 +187,10 @@ Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/n
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
 sudo ./edit-config go.d/docker.conf
 ```
-#### Options
 
-The following options can be defined globally: update_every, autodetection_retry.
+##### Examples
 
-
-<details open><summary>Config options</summary>
-
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
-| update_every | Data collection frequency. | 1 | no |
-| autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
-| address | Docker daemon's listening address. When using a TCP socket, the format is: tcp://[ip]:[port] | unix:///var/run/docker.sock | yes |
-| timeout | Request timeout in seconds. | 2 | no |
-| container_selector | [Pattern](https://github.com/netdata/netdata/tree/master/src/libnetdata/simple_pattern#readme) to specify which containers to monitor. | * | no |
-| collect_container_size | Whether to collect container writable layer size. | no | no |
-
-</details>
-
-#### Examples
-
-##### Basic
+###### Basic
 
 An example configuration.
 
@@ -166,7 +200,7 @@ jobs:
     address: 'unix:///var/run/docker.sock'
 
 ```
-##### Multi-instance
+###### Multi-instance
 
 > **Note**: When you define multiple jobs, their names must be unique.
 

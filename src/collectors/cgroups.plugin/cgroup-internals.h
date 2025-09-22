@@ -262,8 +262,8 @@ struct cgroup {
 
 struct discovery_thread {
     ND_THREAD *thread;
-    uv_mutex_t mutex;
-    uv_cond_t cond_var;
+    netdata_mutex_t mutex;
+    netdata_cond_t cond_var;
     int exited;
 };
 
@@ -272,7 +272,7 @@ extern struct discovery_thread discovery_thread;
 extern const char *cgroups_rename_script;
 extern char cgroup_chart_id_prefix[];
 extern char services_chart_id_prefix[];
-extern uv_mutex_t cgroup_root_mutex;
+extern netdata_mutex_t cgroup_root_mutex;
 
 void cgroup_discovery_worker(void *ptr);
 

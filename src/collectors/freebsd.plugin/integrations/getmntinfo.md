@@ -44,7 +44,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-
 ## Metrics
 
 Metrics grouped by *scope*.
@@ -81,13 +80,35 @@ The following alerts are available:
 
 ## Setup
 
+
 ### Prerequisites
 
 No action required.
 
 ### Configuration
 
-#### File
+#### Options
+
+
+
+<details open><summary>Config options</summary>
+
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
+| enable new mount points detected at runtime | Cheeck new mount points during runtime. | auto | no |
+| space usage for all disks | Enable or disable space usage for all disks metric. | auto | no |
+| inodes usage for all disks | Enable or disable inodes usage for all disks metric. | auto | no |
+| exclude space metrics on paths | Do not show metrics for listed paths. | /proc/* | no |
+| exclude space metrics on filesystems | Do not monitor listed filesystems. | autofs procfs subfs devfs none | no |
+
+
+</details>
+
+
+
+#### via File
 
 The configuration file name for this integration is `netdata.conf`.
 Configuration for this specific integration is located in the `[plugin:freebsd:getmntinfo]` section within that file.
@@ -109,23 +130,8 @@ Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/n
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
 sudo ./edit-config netdata.conf
 ```
-#### Options
 
-
-
-<details open><summary>Config options</summary>
-
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
-| enable new mount points detected at runtime | Cheeck new mount points during runtime. | auto | no |
-| space usage for all disks | Enable or disable space usage for all disks metric. | auto | no |
-| inodes usage for all disks | Enable or disable inodes usage for all disks metric. | auto | no |
-| exclude space metrics on paths | Do not show metrics for listed paths. | /proc/* | no |
-| exclude space metrics on filesystems | Do not monitor listed filesystems. | autofs procfs subfs devfs none | no |
-
-</details>
-
-#### Examples
+##### Examples
 There are no configuration examples.
 
 

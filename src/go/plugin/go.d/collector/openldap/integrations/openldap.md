@@ -48,7 +48,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-
 ## Metrics
 
 Metrics grouped by *scope*.
@@ -85,6 +84,21 @@ There are no alerts configured by default for this integration.
 
 ## Setup
 
+
+You can configure the **openldap** collector in two ways:
+
+| Method                | Best for                                                                                 | How to                                                                                                                                 |
+|-----------------------|------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------|
+| [**UI**](#via-ui)     | Fast setup without editing files                                                         | Go to **Nodes → Configure this node → Collectors → Jobs**, search for **openldap**, then click **+** to add a job. |
+| [**File**](#via-file) | If you prefer configuring via file, or need to automate deployments (e.g., with Ansible) | Edit `go.d/openldap.conf` and add a job.                                                                        |
+
+:::important
+
+UI configuration requires paid Netdata Cloud plan.
+
+:::
+
+
 ### Prerequisites
 
 #### Enable the openLDAP Monitor Backend.
@@ -95,7 +109,48 @@ Follow instructions from https://www.openldap.org/doc/admin24/monitoringslapd.ht
 
 ### Configuration
 
-#### File
+#### Options
+
+The following options can be defined globally: update_every.
+
+
+<details open><summary>Config options</summary>
+
+
+
+| Group | Option | Description | Default | Required |
+|:------|:-----|:------------|:--------|:---------:|
+| **Collection** | update_every | Data collection interval (seconds). | 1 | no |
+|  | autodetection_retry | Autodetection retry interval (seconds). Set 0 to disable. | 0 | no |
+| **Target** | url | LDAP server URL. | ldap://127.0.0.1:389 | yes |
+|  | timeout | Connection and communication timeout (seconds). | 2 | no |
+| **Auth** | username | Distinguished Name (DN) of the user authorized to query the monitor database. |  | yes |
+|  | password | Password for the DN user. |  | yes |
+| **TLS** | tls_skip_verify | Skip TLS certificate and hostname verification (insecure). | no | no |
+|  | tls_ca | Path to CA bundle used to validate the server certificate. |  | no |
+|  | tls_cert | Path to client TLS certificate (for mTLS). |  | no |
+|  | tls_key | Path to client TLS private key (for mTLS). |  | no |
+| **Virtual Node** | vnode | Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). |  | no |
+
+
+</details>
+
+
+#### via UI
+
+Configure the **openldap** collector from the Netdata web interface:
+
+1. Go to **Nodes**.
+2. Select the node **where you want the openldap data-collection job to run** and click the :gear: (**Configure this node**). That node will run the data collection.
+3. The **Collectors → Jobs** view opens by default.
+4. In the Search box, type _openldap_ (or scroll the list) to locate the **openldap** collector.
+5. Click the **+** next to the **openldap** collector to add a new job.
+6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
+    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
+
+
+#### via File
 
 The configuration file name for this integration is `go.d/openldap.conf`.
 
@@ -106,7 +161,7 @@ update_every: 1
 autodetection_retry: 0
 jobs:
   - name: some_name1
-  - name: some_name1
+  - name: some_name2
 ```
 You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
 Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
@@ -115,30 +170,10 @@ Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/n
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
 sudo ./edit-config go.d/openldap.conf
 ```
-#### Options
 
-The following options can be defined globally: update_every.
+##### Examples
 
-
-<details open><summary>Config options</summary>
-
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
-| update_every | Data collection frequency. | 1 | no |
-| timeout | Timeout for establishing a connection and communication (reading and writing) in seconds. | 2 | no |
-| url | LDAP server URL. | ldap://127.0.0.1:389 | yes |
-| username | The distinguished name (DN) of the user authorized to view the monitor database. |  | yes |
-| password | The password associated with the user identified by the DN. |  | yes |
-| tls_skip_verify | Server certificate chain and hostname validation policy. Controls whether the client performs this check. | no | no |
-| tls_ca | Certification authority that the client uses when verifying the server's certificates. |  | no |
-| tls_cert | Client TLS certificate. |  | no |
-| tls_key | Client TLS key. |  | no |
-
-</details>
-
-#### Examples
-
-##### Basic
+###### Basic
 
 A basic example configuration.
 
@@ -150,7 +185,7 @@ jobs:
     password: secret
 
 ```
-##### Multi-instance
+###### Multi-instance
 
 > **Note**: When you define multiple jobs, their names must be unique.
 

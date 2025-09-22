@@ -11,25 +11,22 @@ To use this feature, you'll need an active Netdata subscription. [View subscript
 ## Creating Alerts: Quick Guide
 
 ```mermaid
-%%{init: {'theme': 'default', 'themeVariables': { 
-  'primaryColor': '#2b2b2b',
-  'primaryTextColor': '#fff', 
-  'primaryBorderColor': '#7C0000',
-  'lineColor': '#F8B229',
-  'secondaryColor': '#006100',
-  'tertiaryColor': '#333',
-  'fontFamily': 'arial',
-  'fontSize': '16px'
-}}}%%
 flowchart LR
-    A[Navigate to Metrics] -->|Find Chart| B[Click Alert Icon]
-    B -->|Select Add Alert| C[Set Thresholds]
-    C -->|Configure Options| D[Submit to Nodes]
+    A("Navigate to Metrics") -->|"Find Chart"| B("Click Alert Icon")
+    B -->|"Select Add Alert"| C("Set Thresholds")
+    C -->|"Configure Options"| D("Submit to Nodes")
         
-    style A fill:#f9f9f9,stroke:#444,color:#000,stroke-width:1px,rx:10,ry:10
-    style B fill:#ffeb3b,stroke:#555,color:#000,stroke-width:1px,rx:10,ry:10
-    style C fill:#f44336,stroke:#333,color:#000,stroke-width:1px,rx:10,ry:10
-    style D fill:#4caf50,stroke:#333,color:#000,stroke-width:1px,rx:10,ry:10
+    %% Style definitions
+    classDef alert fill:#ffeb3b,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+    classDef neutral fill:#f9f9f9,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+    classDef complete fill:#4caf50,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+    classDef database fill:#2196F3,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+
+    %% Apply styles
+    class A neutral
+    class B alert
+    class C database
+    class D complete
 ```
 
 ## Alert Detection Types

@@ -55,7 +55,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-
 ## Metrics
 
 Metrics grouped by *scope*.
@@ -101,6 +100,21 @@ There are no alerts configured by default for this integration.
 
 ## Setup
 
+
+You can configure the **smartctl** collector in two ways:
+
+| Method                | Best for                                                                                 | How to                                                                                                                                 |
+|-----------------------|------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------|
+| [**UI**](#via-ui)     | Fast setup without editing files                                                         | Go to **Nodes → Configure this node → Collectors → Jobs**, search for **smartctl**, then click **+** to add a job. |
+| [**File**](#via-file) | If you prefer configuring via file, or need to automate deployments (e.g., with Ansible) | Edit `go.d/smartctl.conf` and add a job.                                                                        |
+
+:::important
+
+UI configuration requires paid Netdata Cloud plan.
+
+:::
+
+
 ### Prerequisites
 
 #### Install smartmontools (v7.0+)
@@ -145,7 +159,57 @@ Install `smartmontools` version 7.0 or later using your distribution's package m
 
 ### Configuration
 
-#### File
+#### Options
+
+The following options can be defined globally: update_every.
+
+
+<details open><summary>Config options</summary>
+
+
+
+| Group | Option | Description | Default | Required |
+|:------|:-----|:------------|:--------|:---------:|
+| **Collection** | update_every | Netdata chart update interval (seconds). Collector may use cached data if this is less than **poll_devices_every**. | 10 | no |
+|  | timeout | `smartctl` binary execution timeout (seconds). | 5 | no |
+|  | scan_every | Device discovery interval using `smartctl --scan` (seconds). Set 0 to scan only once at startup. | 900 | no |
+|  | poll_devices_every | Device polling interval (seconds). Data is cached for this interval. | 300 | no |
+| **Target** | device_selector | Pattern to match the 'info name' of devices as reported by `smartctl --scan --json`. | * | no |
+|  | extra_devices | Manually specify devices not auto-detected by `smartctl --scan`. Each entry must include both a name and a type. | [] | no |
+| **Performance** | concurrent_scans | Number of devices to scan concurrently. Set 0 for sequential scanning (default). Helps performance when monitoring many devices. | 0 | no |
+|  | no_check_power_mode | Skip data collection when device is in low-power mode (avoids unnecessary spin-up). | standby | no |
+
+##### no_check_power_mode
+
+Valid arguments:
+
+| Mode    | Description                                                                                                                                                                            |
+|---------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| never   | Check the device always.                                                                                                                                                               |
+| sleep   | Skip check if device is in SLEEP mode.                                                                                                                                                 |
+| standby | Skip check if device is in SLEEP or STANDBY mode (prevents spin-up).                                                                                                                   |
+| idle    | Skip check if device is in SLEEP, STANDBY, or IDLE mode (not recommended since disks may still be spinning).                                                                           |
+
+
+
+</details>
+
+
+#### via UI
+
+Configure the **smartctl** collector from the Netdata web interface:
+
+1. Go to **Nodes**.
+2. Select the node **where you want the smartctl data-collection job to run** and click the :gear: (**Configure this node**). That node will run the data collection.
+3. The **Collectors → Jobs** view opens by default.
+4. In the Search box, type _smartctl_ (or scroll the list) to locate the **smartctl** collector.
+5. Click the **+** next to the **smartctl** collector to add a new job.
+6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
+    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
+
+
+#### via File
 
 The configuration file name for this integration is `go.d/smartctl.conf`.
 
@@ -156,7 +220,7 @@ update_every: 1
 autodetection_retry: 0
 jobs:
   - name: some_name1
-  - name: some_name1
+  - name: some_name2
 ```
 You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
 Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
@@ -165,41 +229,10 @@ Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/n
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
 sudo ./edit-config go.d/smartctl.conf
 ```
-#### Options
 
-The following options can be defined globally: update_every.
+##### Examples
 
-
-<details open><summary>Config options</summary>
-
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
-| update_every | interval for updating Netdata charts, measured in seconds. Collector might use cached data if less than **Devices poll interval**. | 10 | no |
-| timeout | smartctl binary execution timeout. | 5 | no |
-| scan_every | interval for discovering new devices using `smartctl --scan`, measured in seconds. Set to 0 to scan devices only once on startup. | 900 | no |
-| poll_devices_every | interval for gathering data for every device, measured in seconds. Data is cached for this interval. | 300 | no |
-| device_selector | Specifies a pattern to match the 'info name' of devices as reported by `smartctl --scan --json`. | * | no |
-| concurrent_scans | Number of devices to scan concurrently. Set to 0 for sequential scanning (default behavior). Improves performance when monitoring many devices. | 0 | no |
-| extra_devices | Allows manual specification of devices not automatically detected by `smartctl --scan`. Each device entry must include both a name and a type. See "Configuration Examples" for details. | [] | no |
-| no_check_power_mode | Skip data collection when the device is in a low-power mode. Prevents unnecessary disk spin-up. | standby | no |
-
-##### no_check_power_mode
-
-The valid arguments to this option are:
-
-| Mode    | Description                                                                                                                                                                            |
-|---------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| never   | Check the device always.                                                                                                                                                               |
-| sleep   | Check the device unless it is in SLEEP mode.                                                                                                                                           |
-| standby | Check the device unless it is in SLEEP or STANDBY mode. In these modes most disks are not spinning, so if you want to prevent a disk from spinning up, this is probably what you want. |
-| idle    | Check the device unless it is in SLEEP, STANDBY or IDLE mode. In the IDLE state, most disks are still spinning, so this is probably not what you want.                                 |
-
-
-</details>
-
-#### Examples
-
-##### Custom devices poll interval
+###### Custom devices poll interval
 
 Allows you to override the default devices poll interval (data collection).
 
@@ -213,7 +246,7 @@ jobs:
 ```
 </details>
 
-##### Concurrent scanning for multiple devices
+###### Concurrent scanning for multiple devices
 
 This example demonstrates enabling concurrent scanning to improve performance when monitoring many devices.
 
@@ -228,7 +261,7 @@ jobs:
 ```
 </details>
 
-##### Extra devices
+###### Extra devices
 
 This example demonstrates using `extra_devices` to manually add a storage device (`/dev/sdc`) not automatically detected by `smartctl --scan`.
 

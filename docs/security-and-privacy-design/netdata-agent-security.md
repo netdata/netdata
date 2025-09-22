@@ -27,8 +27,6 @@ When plugins collect data from databases or logs, only **processed metrics** are
 
 Raw data remains local and is never transmitted.
 
----
-
 ## User Data Protection
 
 Netdata Agent safeguards your data at every stage.
@@ -53,8 +51,6 @@ Netdata's decentralized design keeps all data local.
 
 :::
 
----
-
 ## Communication and Data Encryption
 
 Netdata secures all internal and external communications:
@@ -72,15 +68,25 @@ Public and private keys are exchanged securely during Cloud provisioning.
 
 ```mermaid
 flowchart TD
-    A[Netdata Plugin] -->|Collects raw data| B[In-memory Processing]
-    B -->|Processes into metrics| C[Netdata Daemon]
-    C -->|Stores metrics locally| D[Netdata Database]
-    C -->|Optionally streams metrics| E[Another Netdata Agent]
-    C -->|Optionally sends metadata| F[Netdata Cloud]
-    F --> G[Dashboards <br/>&<br/> Notifications]
-```
+    A("Netdata Plugin") -->|"Collects raw data"| B("In-memory Processing")
+    B -->|"Processes into metrics"| C("Netdata Daemon")
+    C -->|"Stores metrics locally"| D("Netdata Database")
+    C -->|"Optionally streams metrics"| E("Another Netdata Agent")
+    C -->|"Optionally sends metadata"| F("Netdata Cloud")
+    F --> G("Dashboards<br/>& Notifications")
 
----
+    %% Style definitions
+    classDef alert fill:#ffeb3b,stroke:#000000,stroke-width:3px,color:#000000,font-size:14px
+    classDef neutral fill:#f9f9f9,stroke:#000000,stroke-width:3px,color:#000000,font-size:14px
+    classDef complete fill:#4caf50,stroke:#000000,stroke-width:3px,color:#000000,font-size:14px
+    classDef database fill:#2196F3,stroke:#000000,stroke-width:3px,color:#000000,font-size:14px
+
+    %% Apply styles
+    class A alert
+    class B,C neutral
+    class D,E complete
+    class F,G database
+```
 
 ## Authentication
 
@@ -98,8 +104,6 @@ For additional access control, place Netdata Agents behind an authenticating web
 
 :::
 
----
-
 ## Security Vulnerability Response
 
 Netdata follows a structured vulnerability response process:
@@ -116,8 +120,6 @@ Learn more in [Netdata's GitHub Security Policy](https://github.com/netdata/netd
 
 :::
 
----
-
 ## Protection Against Common Security Threats
 
 Netdata Agent is resilient against major security threats:
@@ -133,8 +135,6 @@ Additional protections include:
 - Running as an unprivileged user by default
 - Isolating escalated privileges to specific collectors
 - Proactive CPU and memory management
-
----
 
 ## User-Customizable Security Settings
 

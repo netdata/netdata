@@ -47,7 +47,6 @@ The default configuration for this integration does not impose any limits on dat
 
 Linux kernel module for IPMI can create big overhead.
 
-
 ## Metrics
 
 Metrics grouped by *scope*.
@@ -108,6 +107,7 @@ The following alerts are available:
 
 ## Setup
 
+
 ### Prerequisites
 
 #### Install freeipmi.plugin
@@ -128,28 +128,6 @@ to initialize IPMI settings so that the Netdata plugin works correctly. It shoul
 
 ### Configuration
 
-#### File
-
-The configuration file name for this integration is `netdata.conf`.
-Configuration for this specific integration is located in the `[plugin:freeipmi]` section within that file.
-
-The file format is a modified INI syntax. The general structure is:
-
-```ini
-[section1]
-    option1 = some value
-    option2 = some other value
-
-[section2]
-    option3 = some third value
-```
-You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
-Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
-
-```bash
-cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
-sudo ./edit-config netdata.conf
-```
 #### Options
 
 The configuration is set using command line options:
@@ -169,8 +147,10 @@ To display a help message listing the available command line options:
 
 <details open><summary>Command options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | SECONDS | Data collection frequency. |  | no |
 | debug | Enable verbose output. | disabled | no |
 | no-sel | Disable System Event Log (SEL) collection. | disabled | no |
@@ -196,11 +176,37 @@ To display a help message listing the available command line options:
 | -v | Print version and exit. |  | no |
 | --help | Print usage message and exit. |  | no |
 
+
 </details>
 
-#### Examples
 
-##### Decrease data collection frequency
+
+#### via File
+
+The configuration file name for this integration is `netdata.conf`.
+Configuration for this specific integration is located in the `[plugin:freeipmi]` section within that file.
+
+The file format is a modified INI syntax. The general structure is:
+
+```ini
+[section1]
+    option1 = some value
+    option2 = some other value
+
+[section2]
+    option3 = some third value
+```
+You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
+Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
+
+```bash
+cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
+sudo ./edit-config netdata.conf
+```
+
+##### Examples
+
+###### Decrease data collection frequency
 
 Basic example decreasing data collection frequency. The minimum `update every` is 5 (enforced internally by the plugin). IPMI is slow and CPU hungry. So, once every 5 seconds is pretty acceptable.
 
@@ -209,7 +215,7 @@ Basic example decreasing data collection frequency. The minimum `update every` i
   update every = 10
 
 ```
-##### Disable SEL collection
+###### Disable SEL collection
 
 Append to `command options =` the options you need.
 
@@ -222,7 +228,7 @@ Append to `command options =` the options you need.
 ```
 </details>
 
-##### Ignore specific sensors
+###### Ignore specific sensors
 
 Specific sensor IDs can be excluded from freeipmi tools by editing `/etc/freeipmi/freeipmi.conf` and setting the IDs to be ignored at `ipmi-sensors-exclude-record-ids`.
 

@@ -8,20 +8,20 @@ Chat with your infrastructure using natural language through two distinct integr
 
 ```mermaid
 flowchart TB
-    LLM("🤖 LLM Provider<br/>OpenAI, Anthropic, etc.")
+    LLM("LLM Provider<br/>OpenAI, Anthropic, etc.")
     
     subgraph infra["Your Infrastructure"]
         direction TB
         subgraph userLayer[" "]
             direction LR
-            User("👤 User") 
-            Client("💻 AI Client<br/>Claude Desktop, Cursor, etc.")
+            User("User") 
+            Client("AI Client<br/>Claude Desktop, Cursor, etc.")
             
             User -->|"(1) Ask question"| Client
             Client -->|"(8) Display response"| User
         end
         
-        Agent("📊 Netdata Agent or Parent<br/>with MCP Server")
+        Agent("Netdata Agent or Parent<br/>with MCP Server")
         
         Client -->|"(4) Execute tools"| Agent
         Agent -->|"(5) Return data"| Client
@@ -32,17 +32,18 @@ flowchart TB
     Client -->|"(6) Send results"| LLM
     LLM -->|"(7) Final answer"| Client
     
-    classDef user fill:#e1f5fe,stroke:#01579b,stroke-width:2px
-    classDef client fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
-    classDef llm fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
-    classDef agent fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
-    classDef invisible fill:transparent,stroke:transparent
-    
-    class User user
-    class Client client
-    class LLM llm
-    class Agent agent
-    class userLayer invisible
+    %% Style definitions
+    classDef alert fill:#ffeb3b,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+    classDef neutral fill:#f9f9f9,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+    classDef complete fill:#4caf50,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+    classDef database fill:#2196F3,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+
+    %% Apply styles
+    class User alert
+    class Client neutral
+    class LLM complete
+    class Agent complete
+    class infra,userLayer database
 ```
 
 **How it works:**
@@ -64,21 +65,21 @@ flowchart TB
 
 ```mermaid
 flowchart TB
-    LLM("🤖 LLM Provider<br/>OpenAI, Anthropic, etc.")
-    CloudMCP("☁️ Netdata Cloud<br/>with MCP Server")
+    LLM("LLM Provider<br/>OpenAI, Anthropic, etc.")
+    CloudMCP("Netdata Cloud<br/>with MCP Server")
     
     subgraph infra["Your Infrastructure"]
         direction TB
         subgraph userLayer[" "]
             direction LR
-            User("👤 User")
-            Client("💻 AI Client")
+            User("User")
+            Client("AI Client")
             
             User -->|"(1) Ask question"| Client
             Client -->|"(6) Display response"| User
         end
         
-        Agents("📊 Netdata Agents<br/>and Parents")
+        Agents("Netdata Agents<br/>and Parents")
     end
     
     Client -->|"(2) Send query"| LLM
@@ -88,19 +89,18 @@ flowchart TB
     
     Agents -.-> CloudMCP
     
-    classDef user fill:#e1f5fe,stroke:#01579b,stroke-width:2px
-    classDef client fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
-    classDef llm fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px
-    classDef cloud fill:#e3f2fd,stroke:#0d47a1,stroke-width:2px
-    classDef agent fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
-    classDef invisible fill:transparent,stroke:transparent
-    
-    class User user
-    class Client client
-    class LLM llm
-    class CloudMCP cloud
-    class Agents agent
-    class userLayer invisible
+    %% Style definitions
+    classDef alert fill:#ffeb3b,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+    classDef neutral fill:#f9f9f9,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+    classDef complete fill:#4caf50,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+    classDef database fill:#2196F3,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+
+    %% Apply styles
+    class User alert
+    class Client neutral
+    class LLM complete
+    class CloudMCP,Agents complete
+    class infra,userLayer database
 ```
 
 **How it works:**

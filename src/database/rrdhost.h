@@ -8,6 +8,8 @@
 #define HOST_LABEL_IS_EPHEMERAL "_is_ephemeral"
 #define NETDATA_VIRTUAL_HOST "Netdata Virtual Host 1.0"
 
+#define IS_VIRTUAL_HOST_OS(host) (strcmp(string2str(host->os), NETDATA_VIRTUAL_HOST) == 0)
+
 struct stream_thread;
 struct rrdset;
 
@@ -138,6 +140,8 @@ struct rrdhost {
     STRING *abbrev_timezone;                        // the abbriviated timezone of the host
     STRING *program_name;                           // the program name that collects metrics for this host
     STRING *program_version;                        // the program version that collects metrics for this host
+
+    uint32_t node_stale_after_seconds;              // vnode stale timeout
 
     OBJECT_STATE state_id;                          // every time data collection (stream receiver) (dis)connects,
                            // this gets incremented - it is used to detect stale functions,

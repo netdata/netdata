@@ -50,7 +50,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-
 ## Metrics
 
 Metrics grouped by *scope*.
@@ -168,33 +167,13 @@ The following alerts are available:
 
 ## Setup
 
+
 ### Prerequisites
 
 No action required.
 
 ### Configuration
 
-#### File
-
-The configuration file name for this integration is `netdata.conf`.
-
-The file format is a modified INI syntax. The general structure is:
-
-```ini
-[section1]
-    option1 = some value
-    option2 = some other value
-
-[section2]
-    option3 = some third value
-```
-You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
-Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
-
-```bash
-cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
-sudo ./edit-config netdata.conf
-```
 #### Options
 
 There are three sections in the file which you can configure:
@@ -206,8 +185,10 @@ There are three sections in the file which you can configure:
 
 <details open><summary>Config options</summary>
 
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
+
+
+| Option | Description | Default | Required |
+|:-----|:------------|:--------|:---------:|
 | enable load average | Enable or disable monitoring of load average metrics (load1, load5, load15). | yes | no |
 | system swap | Enable or disable monitoring of system swap metrics (free, used). | yes | no |
 | bandwidth | Enable or disable monitoring of network bandwidth metrics (received, sent). | yes | no |
@@ -247,11 +228,36 @@ There are three sections in the file which you can configure:
 | memory page faults | Enable or disable monitoring of memory page faults metrics (memory, cow, I/O page, compress, decompress, zero fill, reactivate, purge). | yes | no |
 | disk i/o | Enable or disable monitoring of disk I/O metrics (In, Out). | yes | no |
 
+
 </details>
 
-#### Examples
 
-##### Disable swap monitoring.
+
+#### via File
+
+The configuration file name for this integration is `netdata.conf`.
+
+The file format is a modified INI syntax. The general structure is:
+
+```ini
+[section1]
+    option1 = some value
+    option2 = some other value
+
+[section2]
+    option3 = some third value
+```
+You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
+Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
+
+```bash
+cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
+sudo ./edit-config netdata.conf
+```
+
+##### Examples
+
+###### Disable swap monitoring.
 
 A basic example that discards swap monitoring
 
@@ -266,7 +272,7 @@ A basic example that discards swap monitoring
 ```
 </details>
 
-##### Disable complete Machine SMI section.
+###### Disable complete Machine SMI section.
 
 A basic example that discards swap monitoring
 

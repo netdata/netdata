@@ -59,7 +59,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-
 ## Metrics
 
 Metrics grouped by *scope*.
@@ -202,6 +201,21 @@ The following alerts are available:
 
 ## Setup
 
+
+You can configure the **mysql** collector in two ways:
+
+| Method                | Best for                                                                                 | How to                                                                                                                                 |
+|-----------------------|------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------|
+| [**UI**](#via-ui)     | Fast setup without editing files                                                         | Go to **Nodes → Configure this node → Collectors → Jobs**, search for **mysql**, then click **+** to add a job. |
+| [**File**](#via-file) | If you prefer configuring via file, or need to automate deployments (e.g., with Ansible) | Edit `go.d/mysql.conf` and add a job.                                                                        |
+
+:::important
+
+UI configuration requires paid Netdata Cloud plan.
+
+:::
+
+
 ### Prerequisites
 
 #### Create netdata user
@@ -239,7 +253,43 @@ It will only be able to gather statistics without being able to alter or affect 
 
 ### Configuration
 
-#### File
+#### Options
+
+The following options can be defined globally: update_every, autodetection_retry.
+
+
+<details open><summary>Config options</summary>
+
+
+
+| Group | Option | Description | Default | Required |
+|:------|:-----|:------------|:--------|:---------:|
+| **Collection** | update_every | Data collection interval (seconds). | 5 | no |
+|  | autodetection_retry | Autodetection retry interval (seconds). Set 0 to disable. | 0 | no |
+| **Target** | dsn | MySQL server DSN (Data Source Name). See [DSN syntax](https://github.com/go-sql-driver/mysql#dsn-data-source-name). | root@tcp(localhost:3306)/ | yes |
+|  | my.cnf | Path to a `my.cnf` file to read connection settings from the `[client]` section. |  | no |
+|  | timeout | Query timeout (seconds). | 1 | no |
+| **Virtual Node** | vnode | Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). |  | no |
+
+
+</details>
+
+
+#### via UI
+
+Configure the **mysql** collector from the Netdata web interface:
+
+1. Go to **Nodes**.
+2. Select the node **where you want the mysql data-collection job to run** and click the :gear: (**Configure this node**). That node will run the data collection.
+3. The **Collectors → Jobs** view opens by default.
+4. In the Search box, type _mysql_ (or scroll the list) to locate the **mysql** collector.
+5. Click the **+** next to the **mysql** collector to add a new job.
+6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
+    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
+
+
+#### via File
 
 The configuration file name for this integration is `go.d/mysql.conf`.
 
@@ -250,7 +300,7 @@ update_every: 1
 autodetection_retry: 0
 jobs:
   - name: some_name1
-  - name: some_name1
+  - name: some_name2
 ```
 You can edit the configuration file using the [`edit-config`](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
 Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
@@ -259,26 +309,10 @@ Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/n
 cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
 sudo ./edit-config go.d/mysql.conf
 ```
-#### Options
 
-The following options can be defined globally: update_every, autodetection_retry.
+##### Examples
 
-
-<details open><summary>Config options</summary>
-
-| Name | Description | Default | Required |
-|:----|:-----------|:-------|:--------:|
-| update_every | Data collection frequency. | 5 | no |
-| autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
-| dsn | MySQL server DSN (Data Source Name). See [DSN syntax](https://github.com/go-sql-driver/mysql#dsn-data-source-name). | root@tcp(localhost:3306)/ | yes |
-| my.cnf | Specifies the my.cnf file to read the connection settings from the [client] section. |  | no |
-| timeout | Query timeout in seconds. | 1 | no |
-
-</details>
-
-#### Examples
-
-##### TCP socket
+###### TCP socket
 
 An example configuration.
 
@@ -292,7 +326,7 @@ jobs:
 ```
 </details>
 
-##### Unix socket
+###### Unix socket
 
 An example configuration.
 
@@ -306,7 +340,7 @@ jobs:
 ```
 </details>
 
-##### Connection with password
+###### Connection with password
 
 An example configuration.
 
@@ -320,7 +354,7 @@ jobs:
 ```
 </details>
 
-##### my.cnf
+###### my.cnf
 
 An example configuration.
 
@@ -334,7 +368,7 @@ jobs:
 ```
 </details>
 
-##### Multi-instance
+###### Multi-instance
 
 > **Note**: When you define multiple jobs, their names must be unique.
 
