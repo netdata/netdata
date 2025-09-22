@@ -39,7 +39,6 @@ You can start exploring Windows event logs on the "Logs" tab of the Netdata UI.
 - Supports coloring log entries based on severity.
 - In PLAY mode it "tails" all the Events, showing new log entries immediately after they are received.
 
-
 ## Setup
 
 ## Prerequisites

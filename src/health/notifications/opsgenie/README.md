@@ -17,7 +17,6 @@ Opsgenie is an alerting and incident response tool. It is designed to group and 
 You can send notifications to Opsgenie using Netdata's Agent alert notification feature, which supports dozens of endpoints, user roles, and more.
 
 
-
 <img src="https://img.shields.io/badge/maintained%20by-Netdata-%2300ab44" />
 
 ## Setup

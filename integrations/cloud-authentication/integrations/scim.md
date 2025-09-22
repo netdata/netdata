@@ -15,7 +15,6 @@ endmeta-->
 
 The System for Cross-domain Identity Management (SCIM) specification is designed to simplify the management of user identities in cloud-based applications and services.
 
-
 <img src="https://img.shields.io/badge/maintained%20by-Netdata-%2300ab44" />
 
 ## Setup

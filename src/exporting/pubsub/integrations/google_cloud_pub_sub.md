@@ -16,7 +16,6 @@ endmeta-->
 Export metrics to Google Cloud Pub/Sub Service
 
 
-
 <img src="https://img.shields.io/badge/maintained%20by-Netdata-%2300ab44" />
 
 ## Setup

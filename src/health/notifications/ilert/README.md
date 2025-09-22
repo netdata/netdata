@@ -17,7 +17,6 @@ ilert is an alerting and incident management tool. It helps teams reduce respons
 Sending notification to ilert via Netdata's Agent alert notification feature includes links, images and resolving of corresponding alerts.
 
 
-
 <img src="https://img.shields.io/badge/maintained%20by-Netdata-%2300ab44" />
 
 ## Setup

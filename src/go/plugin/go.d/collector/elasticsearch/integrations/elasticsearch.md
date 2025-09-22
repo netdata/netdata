@@ -61,7 +61,6 @@ By default, this collector monitors only the node it is connected to. To monitor
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-
 ## Metrics
 
 Metrics grouped by *scope*.

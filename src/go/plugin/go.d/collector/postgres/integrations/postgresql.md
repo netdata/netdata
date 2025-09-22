@@ -53,7 +53,6 @@ These limits can be changed in the configuration file.
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-
 ## Metrics
 
 Metrics grouped by *scope*.
