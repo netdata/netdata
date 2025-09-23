@@ -403,13 +403,13 @@ src/web/mcp/
 
 ## 7. Implementation Phases
 
-### Phase 3: Advanced Features (Priority: Medium)
+### Phase 1: Advanced Features (Priority: Medium)
 1. Specialized logs tools workflow.
 2. Enhanced error handling, status reporting, and potential job queue abstractions once multiple transports are stable.
 3. **Performance optimizations**
 4. **Comprehensive testing**
 
-### Phase 4: Future Enhancements (Priority: Low)
+### Phase 2: Future Enhancements (Priority: Low)
 1. **Streaming support for long-running operations**
 2. **Additional MCP namespaces (resources, prompts)**
 3. **Advanced caching strategies**
