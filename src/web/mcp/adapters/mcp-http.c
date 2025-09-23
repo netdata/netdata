@@ -5,6 +5,7 @@
 #include "web/server/web_client.h"
 #include "web/mcp/mcp-jsonrpc.h"
 #include "web/mcp/mcp.h"
+#include "web/mcp/adapters/mcp-sse.h"
 #include "mcp-http-common.h"
 
 #ifdef NETDATA_MCP_DEV_PREVIEW_API_KEY
@@ -18,6 +19,9 @@
 #include <stdbool.h>
 #include <json-c/json.h>
 #include <string.h>
+#include <strings.h>
+
+#define IS_PARAM_SEPARATOR(c) ((c) == '&' || (c) == '\0')
 
 static const char *mcp_http_body(struct web_client *w, size_t *len) {
     if (!w || !w->payload)
@@ -30,6 +34,37 @@ static const char *mcp_http_body(struct web_client *w, size_t *len) {
     if (len)
         *len = buffer_strlen(w->payload);
     return body;
+}
+
+static bool mcp_http_accepts_sse(struct web_client *w) {
+    if (!w)
+        return false;
+
+    if (web_client_flag_check(w, WEB_CLIENT_FLAG_ACCEPT_SSE))
+        return true;
+
+    if (!w->url_query_string_decoded)
+        return false;
+
+    const char *qs = buffer_tostring(w->url_query_string_decoded);
+    if (!qs || !*qs)
+        return false;
+
+    if (*qs == '?')
+        qs++;
+
+    if (!*qs)
+        return false;
+
+    const char *param = strstr(qs, "transport=");
+    if (!param)
+        return false;
+
+    param += strlen("transport=");
+    if (strncasecmp(param, "sse", 3) == 0 && IS_PARAM_SEPARATOR(param[3]))
+        return true;
+
+    return false;
 }
 
 #ifdef NETDATA_MCP_DEV_PREVIEW_API_KEY
@@ -101,59 +136,72 @@ int mcp_http_handle_request(struct rrdhost *host __maybe_unused, struct web_clie
     }
     mcpc->user_auth = &w->user_auth;
 
-    BUFFER *response_payload = NULL;
-    bool has_response = false;
+    bool wants_sse = mcp_http_accepts_sse(w);
 
-    if (json_object_is_type(root, json_type_array)) {
-        size_t len = json_object_array_length(root);
-        BUFFER **responses = NULL;
-        size_t responses_used = 0;
-        size_t responses_size = 0;
+    int result_code = HTTP_RESP_INTERNAL_SERVER_ERROR;
 
-        for (size_t i = 0; i < len; i++) {
-            struct json_object *req_item = json_object_array_get_idx(root, i);
-            BUFFER *resp_item = mcp_jsonrpc_process_single_request(mcpc, req_item, NULL);
-            if (!resp_item)
-                continue;
+    if (wants_sse) {
+        mcpc->transport = MCP_TRANSPORT_SSE;
+        mcpc->capabilities = MCP_CAPABILITY_ASYNC_COMMUNICATION |
+                             MCP_CAPABILITY_SUBSCRIPTIONS |
+                             MCP_CAPABILITY_NOTIFICATIONS;
+        result_code = mcp_sse_serialize_response(w, mcpc, root);
+    } else {
+        BUFFER *response_payload = NULL;
+        bool has_response = false;
 
-            if (responses_used == responses_size) {
-                size_t new_size = responses_size ? responses_size * 2 : 4;
-                BUFFER **tmp = reallocz(responses, new_size * sizeof(*tmp));
-                if (!tmp) {
-                    buffer_free(resp_item);
+        if (json_object_is_type(root, json_type_array)) {
+            size_t len = json_object_array_length(root);
+            BUFFER **responses = NULL;
+            size_t responses_used = 0;
+            size_t responses_size = 0;
+
+            for (size_t i = 0; i < len; i++) {
+                struct json_object *req_item = json_object_array_get_idx(root, i);
+                BUFFER *resp_item = mcp_jsonrpc_process_single_request(mcpc, req_item, NULL);
+                if (!resp_item)
                     continue;
-                }
-                responses = tmp;
-                responses_size = new_size;
-            }
-            responses[responses_used++] = resp_item;
-        }
 
-        if (responses_used) {
-            response_payload = mcp_jsonrpc_build_batch_response(responses, responses_used);
+                if (responses_used == responses_size) {
+                    size_t new_size = responses_size ? responses_size * 2 : 4;
+                    BUFFER **tmp = reallocz(responses, new_size * sizeof(*tmp));
+                    if (!tmp) {
+                        buffer_free(resp_item);
+                        continue;
+                    }
+                    responses = tmp;
+                    responses_size = new_size;
+                }
+                responses[responses_used++] = resp_item;
+            }
+
+            if (responses_used) {
+                response_payload = mcp_jsonrpc_build_batch_response(responses, responses_used);
+                has_response = response_payload && buffer_strlen(response_payload);
+            }
+
+            for (size_t i = 0; i < responses_used; i++)
+                buffer_free(responses[i]);
+            freez(responses);
+        } else {
+            response_payload = mcp_jsonrpc_process_single_request(mcpc, root, NULL);
             has_response = response_payload && buffer_strlen(response_payload);
         }
 
-        for (size_t i = 0; i < responses_used; i++)
-            buffer_free(responses[i]);
-        freez(responses);
-    } else {
-        response_payload = mcp_jsonrpc_process_single_request(mcpc, root, NULL);
-        has_response = response_payload && buffer_strlen(response_payload);
+        if (response_payload)
+            mcp_http_write_json_payload(w, response_payload);
+        else
+            buffer_flush(w->response.data);
+
+        w->response.code = has_response ? HTTP_RESP_OK : HTTP_RESP_ACCEPTED;
+
+        if (response_payload)
+            buffer_free(response_payload);
+
+        result_code = w->response.code;
     }
 
     json_object_put(root);
-
-    if (response_payload)
-        mcp_http_write_json_payload(w, response_payload);
-    else
-        buffer_flush(w->response.data);
-
-    w->response.code = has_response ? HTTP_RESP_OK : HTTP_RESP_ACCEPTED;
-
-    if (response_payload)
-        buffer_free(response_payload);
-
     mcp_free_client(mcpc);
-    return w->response.code;
+    return result_code;
 }

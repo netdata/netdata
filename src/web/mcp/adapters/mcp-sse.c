@@ -77,6 +77,64 @@ static void mcp_sse_append_buffer_event(BUFFER *out, const char *event, BUFFER *
     buffer_strcat(out, "\n\n");
 }
 
+int mcp_sse_serialize_response(struct web_client *w, MCP_CLIENT *mcpc, struct json_object *root) {
+    if (!w || !mcpc || !root)
+        return HTTP_RESP_INTERNAL_SERVER_ERROR;
+
+    BUFFER **responses = NULL;
+    size_t responses_used = 0;
+    size_t responses_size = 0;
+
+    if (json_object_is_type(root, json_type_array)) {
+        size_t len = json_object_array_length(root);
+        for (size_t i = 0; i < len; i++) {
+            struct json_object *req_item = json_object_array_get_idx(root, i);
+            BUFFER *resp_item = mcp_jsonrpc_process_single_request(mcpc, req_item, NULL);
+            if (!resp_item)
+                continue;
+
+            if (responses_used == responses_size) {
+                size_t new_size = responses_size ? responses_size * 2 : 4;
+                BUFFER **tmp = reallocz(responses, new_size * sizeof(*tmp));
+                if (!tmp) {
+                    buffer_free(resp_item);
+                    continue;
+                }
+                responses = tmp;
+                responses_size = new_size;
+            }
+            responses[responses_used++] = resp_item;
+        }
+    } else {
+        BUFFER *resp = mcp_jsonrpc_process_single_request(mcpc, root, NULL);
+        if (resp) {
+            responses = reallocz(responses, sizeof(*responses));
+            if (responses)
+                responses[responses_used++] = resp;
+            else
+                buffer_free(resp);
+        }
+    }
+
+    buffer_flush(w->response.data);
+    w->response.data->content_type = CT_TEXT_EVENT_STREAM;
+    mcp_sse_disable_compression(w);
+    mcp_sse_add_common_headers(w);
+
+    for (size_t i = 0; i < responses_used; i++) {
+        if (!responses[i])
+            continue;
+        mcp_sse_append_buffer_event(w->response.data, "message", responses[i]);
+        buffer_free(responses[i]);
+    }
+    freez(responses);
+
+    mcp_sse_append_event(w->response.data, "complete", "{}");
+
+    w->response.code = HTTP_RESP_OK;
+    return w->response.code;
+}
+
 int mcp_sse_handle_request(struct rrdhost *host __maybe_unused, struct web_client *w) {
     if (!w)
         return HTTP_RESP_INTERNAL_SERVER_ERROR;
@@ -143,60 +201,9 @@ int mcp_sse_handle_request(struct rrdhost *host __maybe_unused, struct web_clien
     }
     mcpc->user_auth = &w->user_auth;
 
-    BUFFER **responses = NULL;
-    size_t responses_used = 0;
-    size_t responses_size = 0;
-
-    if (json_object_is_type(root, json_type_array)) {
-        size_t len = json_object_array_length(root);
-        for (size_t i = 0; i < len; i++) {
-            struct json_object *req_item = json_object_array_get_idx(root, i);
-            BUFFER *resp_item = mcp_jsonrpc_process_single_request(mcpc, req_item, NULL);
-            if (!resp_item)
-                continue;
-
-            if (responses_used == responses_size) {
-                size_t new_size = responses_size ? responses_size * 2 : 4;
-                BUFFER **tmp = reallocz(responses, new_size * sizeof(*tmp));
-                if (!tmp) {
-                    buffer_free(resp_item);
-                    continue;
-                }
-                responses = tmp;
-                responses_size = new_size;
-            }
-            responses[responses_used++] = resp_item;
-        }
-    } else {
-        BUFFER *resp = mcp_jsonrpc_process_single_request(mcpc, root, NULL);
-        if (resp) {
-            responses = reallocz(responses, sizeof(*responses));
-            if (responses)
-                responses[responses_used++] = resp;
-            else
-                buffer_free(resp);
-        }
-    }
+    int rc = mcp_sse_serialize_response(w, mcpc, root);
 
     json_object_put(root);
-
-    buffer_flush(w->response.data);
-    w->response.data->content_type = CT_TEXT_EVENT_STREAM;
-    mcp_sse_disable_compression(w);
-    mcp_sse_add_common_headers(w);
-
-    for (size_t i = 0; i < responses_used; i++) {
-        if (!responses[i])
-            continue;
-        mcp_sse_append_buffer_event(w->response.data, "message", responses[i]);
-        buffer_free(responses[i]);
-    }
-    freez(responses);
-
-    mcp_sse_append_event(w->response.data, "complete", "{}");
-
     mcp_free_client(mcpc);
-
-    w->response.code = HTTP_RESP_OK;
-    return w->response.code;
+    return rc;
 }
