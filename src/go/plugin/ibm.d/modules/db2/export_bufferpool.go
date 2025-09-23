@@ -6,8 +6,8 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/modules/db2/contexts"
 )
 
-func (c *Collector) exportBufferpoolMetrics() {
-	for name, metrics := range c.mx.bufferpools {
+func (c *Collector) exportBufferpoolMetrics(mx metricsData) {
+	for name, metrics := range mx.bufferpools {
 		meta := c.bufferpools[name]
 		pageSizeLabel := "unknown"
 		if meta != nil && meta.pageSize > 0 {

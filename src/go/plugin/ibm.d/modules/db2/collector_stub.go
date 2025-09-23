@@ -11,8 +11,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 )
 
-// Stub implementation for when CGO is disabled
-
 type Collector struct {
 	module.Base
 }
