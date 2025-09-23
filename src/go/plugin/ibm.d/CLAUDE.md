@@ -20,6 +20,8 @@ This document describes the IBM.D framework - a new framework built on top of go
 4. **Let framework manage charts** - Never manual chart operations
 5. **Float handling** - Pre-multiply by 1000, use `precision: 1, div: 1000` in YAML
 6. **Safe defaults** - mul/div/precision all default to 1 (no transformation)
+7. **CGO awareness** - Runtime collectors live behind `//go:build cgo`; provide matching `!cgo` stubs (`module_stub.go`) that register an erroring module so tooling (go vet, lint, IDEs) can operate with CGO disabled.
+8. **Normalize connection strings** - Pass external DSNs through helpers like `dbdriver.EnsureDriver` to guarantee mandatory driver hints are present before handing them to protocol clients.
 
 ### Testing
 ```bash
@@ -129,7 +131,8 @@ module/
 ├── init.go               # Init, Check, Cleanup lifecycle methods
 ├── collect_*.go          # Collection logic by metric type
 ├── config.go             # Configuration structure
-├── module.go             # Module registration
+├── module.go             # Module registration (requires CGO)
+├── module_stub.go        # !CGO stub registering an erroring module
 ├── config_schema.json    # Web UI configuration schema
 ├── contexts/
 │   ├── contexts.yaml     # Metric definitions (source of truth)
