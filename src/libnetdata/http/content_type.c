@@ -12,6 +12,7 @@ static struct {
     // primary - preferred during id-to-string conversions
     { .format = "application/json",             CT_APPLICATION_JSON, true },
     { .format = "text/plain",                   CT_TEXT_PLAIN, true },
+    { .format = "text/event-stream",            CT_TEXT_EVENT_STREAM, true },
     { .format = "text/html",                    CT_TEXT_HTML, true },
     { .format = "text/css",                     CT_TEXT_CSS, true },
     { .format = "text/yaml",                    CT_TEXT_YAML, true },

@@ -1814,6 +1814,13 @@ set(WEB_PLUGIN_FILES
         src/web/api/v3/api_v3_stream_path.c
         src/web/mcp/adapters/mcp-websocket.c
         src/web/mcp/adapters/mcp-websocket.h
+        src/web/mcp/adapters/mcp-http.c
+        src/web/mcp/adapters/mcp-http.h
+        src/web/mcp/adapters/mcp-http-common.h
+        src/web/mcp/adapters/mcp-sse.c
+        src/web/mcp/adapters/mcp-sse.h
+        src/web/mcp/mcp-jsonrpc.c
+        src/web/mcp/mcp-jsonrpc.h
         src/web/mcp/mcp-initialize.c
         src/web/mcp/mcp-initialize.h
         src/web/mcp/mcp-prompts.c

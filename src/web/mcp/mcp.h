@@ -129,6 +129,7 @@ typedef enum {
     MCP_TRANSPORT_UNKNOWN = 0,
     MCP_TRANSPORT_WEBSOCKET,
     MCP_TRANSPORT_HTTP,
+    MCP_TRANSPORT_SSE,
     // Add more as needed
 } MCP_TRANSPORT;
 

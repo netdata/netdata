@@ -76,6 +76,13 @@ MCP_CLIENT *mcp_create_client(MCP_TRANSPORT transport, void *transport_ctx) {
             mcpc->capabilities = MCP_CAPABILITY_NONE; // HTTP has no special capabilities
             break;
 
+        case MCP_TRANSPORT_SSE:
+            mcpc->http = (struct web_client *)transport_ctx;
+            mcpc->capabilities = MCP_CAPABILITY_ASYNC_COMMUNICATION |
+                               MCP_CAPABILITY_SUBSCRIPTIONS |
+                               MCP_CAPABILITY_NOTIFICATIONS;
+            break;
+
         default:
             mcpc->generic = transport_ctx;
             mcpc->capabilities = MCP_CAPABILITY_NONE;
