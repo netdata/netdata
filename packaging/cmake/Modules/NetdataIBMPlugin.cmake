@@ -97,7 +97,11 @@ macro(add_ibm_plugin_target)
             LD_LIBRARY_PATH=${IBM_MQ_DIR}/lib64:$LD_LIBRARY_PATH
             MQ_INSTALLATION_PATH=${MQ_INSTALLATION_PATH}
             GOPROXY=https://proxy.golang.org,direct 
-            "${GO_EXECUTABLE}" build -buildvcs=false -ldflags "${GO_LDFLAGS} -extldflags '${IBM_RPATH_FLAGS}'" -o "${CMAKE_BINARY_DIR}/ibm.d.plugin" "./cmd/ibmdplugin"
+            "${GO_EXECUTABLE}" build 
+                -buildvcs=false 
+                -tags "ibm_mq" 
+                -ldflags "${GO_LDFLAGS} -extldflags '${IBM_RPATH_FLAGS}'" 
+                -o "${CMAKE_BINARY_DIR}/ibm.d.plugin" "./cmd/ibmdplugin"
         DEPENDS ${IBM_PLUGIN_DEPS}
         COMMENT "Building ibm.d.plugin (with CGO)"
         WORKING_DIRECTORY "${RESOLVED_SOURCE_DIR}/src/go"

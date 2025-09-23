@@ -10,7 +10,6 @@ type Config struct {
 	framework.Config `yaml:",inline" json:",inline"`
 
 	Vnode         string           `yaml:"vnode,omitempty" json:"vnode"`
-	UpdateEvery   int              `yaml:"update_every,omitempty" json:"update_every"`
 	DSN           string           `yaml:"dsn" json:"dsn"`
 	Timeout       confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
 	MaxDbConns    int              `yaml:"max_db_conns,omitempty" json:"max_db_conns"`

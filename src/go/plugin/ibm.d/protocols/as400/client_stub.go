@@ -23,7 +23,7 @@ func (c *Client) DoQuery(context.Context, string, func(string, string, bool)) er
 func (c *Client) DoQueryRow(context.Context, string, func(string, string)) error {
 	return errors.New("as400 protocol requires cgo")
 }
-func (c *Client) QueryRows(context.Context, string) (*sql.Rows, error) {
-	return nil, errors.New("as400 protocol requires cgo")
+func (c *Client) QueryRows(context.Context, string) (*sql.Rows, context.CancelFunc, error) {
+	return nil, nil, errors.New("as400 protocol requires cgo")
 }
 func (c *Client) DB() *sql.DB { return nil }

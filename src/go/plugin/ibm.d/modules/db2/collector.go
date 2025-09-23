@@ -26,7 +26,7 @@ type serverInfo struct {
 type Collector struct {
 	framework.Collector
 
-	Config
+	Config `yaml:",inline" json:",inline"`
 
 	client *db2proto.Client
 	db     *sql.DB

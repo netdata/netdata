@@ -22,14 +22,14 @@ import (
 	"golang.org/x/net/http/httpproxy"
 
 	// Register IBM ecosystem collectors
-	_ "github.com/netdata/netdata/go/plugins/plugin/ibm.d/collector/as400" // Requires CGO
-	_ "github.com/netdata/netdata/go/plugins/plugin/ibm.d/collector/db2"   // Requires CGO
+	_ "github.com/netdata/netdata/go/plugins/plugin/ibm.d/modules/as400" // Requires CGO
+	_ "github.com/netdata/netdata/go/plugins/plugin/ibm.d/modules/db2"   // Requires CGO
 	// Note: Legacy mq_pcf collector was removed - using framework-based MQ module instead
 	// _ "github.com/netdata/netdata/go/plugins/plugin/ibm.d/collector/websphere_jmx" // Requires CGO
 	_ "github.com/netdata/netdata/go/plugins/plugin/ibm.d/collector/websphere_mp"  // Pure Go
 	_ "github.com/netdata/netdata/go/plugins/plugin/ibm.d/collector/websphere_pmi" // Pure Go
 
-	// New framework example
+	// New framework example modules
 	_ "github.com/netdata/netdata/go/plugins/plugin/ibm.d/modules/example" // Framework demo
 	_ "github.com/netdata/netdata/go/plugins/plugin/ibm.d/modules/mq"      // MQ monitoring with PCF protocol
 )

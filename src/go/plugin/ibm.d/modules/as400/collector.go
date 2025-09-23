@@ -23,7 +23,7 @@ import (
 type Collector struct {
 	framework.Collector
 
-	Config
+	Config `yaml:",inline" json:",inline"`
 
 	client *as400proto.Client
 
@@ -487,12 +487,12 @@ func (c *Collector) Cleanup(ctx context.Context) {
 	c.Collector.Cleanup(ctx)
 }
 
-func (c *Collector) buildDSNIfNeeded() error {
+func (c *Collector) buildDSNIfNeeded(ctx context.Context) error {
 	if strings.TrimSpace(c.DSN) != "" {
 		return nil
 	}
 
-	if c.Hostname == "" || c.Username == "" || c.Password == "" {
+	if strings.TrimSpace(c.Hostname) == "" || strings.TrimSpace(c.Username) == "" || c.Password == "" {
 		return fmt.Errorf("dsn required but not set, and insufficient connection parameters provided")
 	}
 

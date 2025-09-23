@@ -30,8 +30,8 @@ func (c *Client) DoQueryRow(context.Context, string, func(string, string)) error
 	return errors.New("db2 protocol requires CGO")
 }
 
-func (c *Client) QueryRows(context.Context, string) (*sql.Rows, error) {
-	return nil, errors.New("db2 protocol requires CGO")
+func (c *Client) QueryRows(context.Context, string) (*sql.Rows, context.CancelFunc, error) {
+	return nil, nil, errors.New("db2 protocol requires CGO")
 }
 
 func (c *Client) DB() *sql.DB { return nil }

@@ -90,10 +90,11 @@ func (c *Client) Close() error {
 
 // DoQuery executes a query and streams rows to the handler.
 func (c *Client) DoQuery(ctx context.Context, query string, fn func(column, value string, lineEnd bool)) error {
-	rows, err := c.QueryRows(ctx, query)
+	rows, cancel, err := c.QueryRows(ctx, query)
 	if err != nil {
 		return err
 	}
+	defer cancel()
 	defer rows.Close()
 
 	return c.readRows(rows, fn)
@@ -101,10 +102,11 @@ func (c *Client) DoQuery(ctx context.Context, query string, fn func(column, valu
 
 // DoQueryRow executes a query expected to return a single row.
 func (c *Client) DoQueryRow(ctx context.Context, query string, fn func(column, value string)) error {
-	rows, err := c.QueryRows(ctx, query)
+	rows, cancel, err := c.QueryRows(ctx, query)
 	if err != nil {
 		return err
 	}
+	defer cancel()
 	defer rows.Close()
 
 	columns, err := rows.Columns()
@@ -131,19 +133,19 @@ func (c *Client) DoQueryRow(ctx context.Context, query string, fn func(column, v
 }
 
 // QueryRows runs the query and returns the raw rows.
-func (c *Client) QueryRows(ctx context.Context, query string) (*sql.Rows, error) {
+func (c *Client) QueryRows(ctx context.Context, query string) (*sql.Rows, context.CancelFunc, error) {
 	if err := c.Connect(ctx); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	queryCtx, cancel := context.WithTimeout(ctx, c.effectiveTimeout())
 	rows, err := c.db.QueryContext(queryCtx, query)
-	cancel()
 	if err != nil {
-		return nil, fmt.Errorf("as400 protocol: query failed: %w", err)
+		cancel()
+		return nil, nil, fmt.Errorf("as400 protocol: query failed: %w", err)
 	}
 
-	return rows, nil
+	return rows, cancel, nil
 }
 
 func (c *Client) readRows(rows *sql.Rows, fn func(column, value string, lineEnd bool)) error {

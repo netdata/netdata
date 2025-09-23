@@ -12,16 +12,19 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
+	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/framework"
 	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/modules/as400/contexts"
 	as400proto "github.com/netdata/netdata/go/plugins/plugin/ibm.d/protocols/as400"
 )
 
 func defaultConfig() Config {
 	return Config{
+		Config: framework.Config{
+			UpdateEvery: 10,
+		},
 		Vnode:         "",
 		DSN:           "",
 		Timeout:       confopt.Duration(2 * time.Second),
-		UpdateEvery:   10,
 		MaxDbConns:    1,
 		MaxDbLifeTime: confopt.Duration(10 * time.Minute),
 
@@ -71,7 +74,9 @@ func (c *Collector) Init(ctx context.Context) error {
 	c.SetImpl(c)
 
 	// Prepare DSN from individual parameters if necessary
-	if err := c.buildDSNIfNeeded(); err != nil {
+	c.Debugf("initial config: DSN=%q hostname=%q username=%q password_set=%t port=%d driver=%q",
+		c.DSN, c.Hostname, c.Username, c.Password != "", c.Port, c.ODBCDriver)
+	if err := c.buildDSNIfNeeded(ctx); err != nil {
 		return err
 	}
 	if err := c.verifyConfig(); err != nil {

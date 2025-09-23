@@ -12,16 +12,19 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
+	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/framework"
 	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/modules/db2/contexts"
 	db2proto "github.com/netdata/netdata/go/plugins/plugin/ibm.d/protocols/db2"
 )
 
 func defaultConfig() Config {
 	return Config{
+		Config: framework.Config{
+			UpdateEvery: 5,
+		},
 		Vnode:         "",
 		DSN:           "",
 		Timeout:       confopt.Duration(2 * time.Second),
-		UpdateEvery:   5,
 		MaxDbConns:    1,
 		MaxDbLifeTime: confopt.Duration(10 * time.Minute),
 

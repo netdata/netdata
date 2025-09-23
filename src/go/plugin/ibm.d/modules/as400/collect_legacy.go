@@ -557,19 +557,20 @@ func (a *Collector) collectJobInfo(ctx context.Context) error {
 }
 
 func (a *Collector) doQuery(ctx context.Context, query string, assign func(column, value string, lineEnd bool)) error {
-	rows, err := a.client.QueryRows(ctx, query)
-	if err != nil {
-		// Log expected SQL feature errors at DEBUG level to reduce noise
-		if isSQLFeatureError(err) {
-			a.Debugf("query failed with expected feature error: %s, error: %v", query, err)
-		} else if isSQLTemporaryError(err) {
-			a.Debugf("query failed with temporary database error: %s, error: %v", query, err)
-		} else {
-			a.Errorf("failed to execute query: %s, error: %v", query, err)
-		}
-		return err
-	}
-	defer rows.Close()
+    rows, cancel, err := a.client.QueryRows(ctx, query)
+    if err != nil {
+        // Log expected SQL feature errors at DEBUG level to reduce noise
+        if isSQLFeatureError(err) {
+            a.Debugf("query failed with expected feature error: %s, error: %v", query, err)
+        } else if isSQLTemporaryError(err) {
+            a.Debugf("query failed with temporary database error: %s, error: %v", query, err)
+        } else {
+            a.Errorf("failed to execute query: %s, error: %v", query, err)
+        }
+        return err
+    }
+    defer cancel()
+    defer rows.Close()
 
 	return a.readRows(rows, assign)
 }
@@ -605,18 +606,19 @@ func (a *Collector) readRows(rows *sql.Rows, assign func(column, value string, l
 
 // doQueryRow executes a query that returns a single row
 func (a *Collector) doQueryRow(ctx context.Context, query string, assign func(column, value string)) error {
-	rows, err := a.client.QueryRows(ctx, query)
-	if err != nil {
-		if isSQLFeatureError(err) {
-			a.Debugf("query failed with expected feature error: %s, error: %v", query, err)
-		} else if isSQLTemporaryError(err) {
-			a.Debugf("query failed with temporary database error: %s, error: %v", query, err)
-		} else {
-			a.Errorf("failed to execute query: %s, error: %v", query, err)
-		}
-		return err
-	}
-	defer rows.Close()
+    rows, cancel, err := a.client.QueryRows(ctx, query)
+    if err != nil {
+        if isSQLFeatureError(err) {
+            a.Debugf("query failed with expected feature error: %s, error: %v", query, err)
+        } else if isSQLTemporaryError(err) {
+            a.Debugf("query failed with temporary database error: %s, error: %v", query, err)
+        } else {
+            a.Errorf("failed to execute query: %s, error: %v", query, err)
+        }
+        return err
+    }
+    defer cancel()
+    defer rows.Close()
 
 	columns, err := rows.Columns()
 	if err != nil {
@@ -1242,10 +1244,11 @@ func (a *Collector) collectNetworkInterfaces(ctx context.Context) error {
 	}
 
 	// Collect interface data
-	rows, err := a.client.QueryRows(ctx, queryNetworkInterfaces)
+	rows, cancel, err := a.client.QueryRows(ctx, queryNetworkInterfaces)
 	if err != nil {
 		return fmt.Errorf("failed to query network interfaces: %w", err)
 	}
+	defer cancel()
 	defer rows.Close()
 
 	for rows.Next() {

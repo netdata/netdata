@@ -11,9 +11,19 @@ if(ENABLE_PLUGIN_IBM_D)
     
     set(IBM_D_PLUGIN_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../..)
     set(IBM_D_PLUGIN_BINARY ibm.d.plugin)
-    set(IBM_D_PLUGIN_FILES 
-        ${CMAKE_CURRENT_SOURCE_DIR}/collector/as400/collector.go
-        ${CMAKE_CURRENT_SOURCE_DIR}/collector/db2/collector.go)
+
+    # Track relevant Go sources so the target rebuilds when modules change
+    file(GLOB_RECURSE IBM_D_PLUGIN_FILES
+        ${IBM_D_PLUGIN_SOURCE_DIR}/cmd/ibmdplugin/*.go
+        ${CMAKE_CURRENT_SOURCE_DIR}/framework/*.go
+        ${CMAKE_CURRENT_SOURCE_DIR}/modules/as400/*.go
+        ${CMAKE_CURRENT_SOURCE_DIR}/modules/db2/*.go
+        ${CMAKE_CURRENT_SOURCE_DIR}/modules/mq/*.go
+        ${CMAKE_CURRENT_SOURCE_DIR}/protocols/*.go
+        ${CMAKE_CURRENT_SOURCE_DIR}/protocols/*/*.go
+        ${CMAKE_CURRENT_SOURCE_DIR}/pkg/*.go
+        ${CMAKE_CURRENT_SOURCE_DIR}/pkg/*/*.go
+        ${CMAKE_CURRENT_SOURCE_DIR}/collector/websphere_*/*.go)
     
     # Build with CGO enabled
     add_custom_command(
@@ -26,6 +36,7 @@ if(ENABLE_PLUGIN_IBM_D)
             ${GO_EXECUTABLE} build
             -buildvcs=false
             -ldflags "${GO_LDFLAGS}"
+            -tags "ibm_mq"
             -o ${CMAKE_BINARY_DIR}/${IBM_D_PLUGIN_BINARY}
             ./cmd/ibmdplugin
         DEPENDS ${IBM_D_PLUGIN_FILES}
