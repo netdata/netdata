@@ -2,8 +2,10 @@ extends:
   - _system-base.yaml
   - _std-ups-mib.yaml
 
-sysobjectid:
-  - 1.3.6.1.2.1.33
+selector:
+  - sysobjectid:
+      include:
+        - 1.3.6.1.2.1.33
 
 metadata:
   device:

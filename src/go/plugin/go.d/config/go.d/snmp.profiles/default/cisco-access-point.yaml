@@ -9,11 +9,13 @@ metadata:
       vendor:
         value: Cisco
 
-sysobjectid:
-  - 1.3.6.1.4.1.9.1.525 # Cisco AIR AP 1210
-  - 1.3.6.1.4.1.9.1.618 # Cisco AIR AP 1130
-  - 1.3.6.1.4.1.9.1.1660 # AIR-SAP1602E-C-K9
-  - 1.3.6.1.4.1.9.1.2371 # Cisco Aironet 1830
+selector:
+  - sysobjectid:
+      include:
+        - 1.3.6.1.4.1.9.1.525 # Cisco AIR AP 1210
+        - 1.3.6.1.4.1.9.1.618 # Cisco AIR AP 1130
+        - 1.3.6.1.4.1.9.1.1660 # AIR-SAP1602E-C-K9
+        - 1.3.6.1.4.1.9.1.2371 # Cisco Aironet 1830
 
 metrics:
   - MIB: CISCO-DOT11-ASSOCIATION-MIB

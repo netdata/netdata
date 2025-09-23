@@ -3,10 +3,8 @@
 package ddsnmp
 
 import (
-	"errors"
 	"fmt"
 	"path/filepath"
-	"regexp"
 	"slices"
 	"sort"
 	"strings"
@@ -14,23 +12,9 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 )
 
-var oidOnly = regexp.MustCompile(`^[0-9]+(\.[0-9]+)*$`)
-
-func OidMatches(sysObjId, id string) bool {
-	if oidOnly.MatchString(id) {
-		return sysObjId == id
-	}
-	re, err := regexp.Compile(id)
-	if err != nil {
-		log.Warningf("invalid regex %q: %v", id, err)
-		return false
-	}
-	return re.MatchString(sysObjId)
-}
-
 // FindProfiles returns profiles matching the given sysObjectID.
 // Profiles are sorted by match specificity: most specific first.
-func FindProfiles(sysObjID string, manualProfiles []string) []*Profile {
+func FindProfiles(sysObjID, sysDescr string, manualProfiles []string) []*Profile {
 	loadProfiles()
 
 	finalize := func(profiles []*Profile) []*Profile {
@@ -65,14 +49,10 @@ func FindProfiles(sysObjID string, manualProfiles []string) []*Profile {
 	var selected []*Profile
 
 	for _, prof := range ddProfiles {
-		// Use first matching OID (profile author's responsibility to order them)
-		for _, id := range prof.Definition.SysObjectIDs {
-			if OidMatches(sysObjID, id) {
-				cloned := prof.clone()
-				selected = append(selected, cloned)
-				matchedOIDs[cloned] = id
-				break
-			}
+		if ok, matchedOid := prof.Definition.Selector.Matches(sysObjID, sysDescr); ok {
+			cloned := prof.clone()
+			selected = append(selected, cloned)
+			matchedOIDs[cloned] = matchedOid
 		}
 	}
 
@@ -248,27 +228,7 @@ func (p *Profile) mergeMetadata(base *Profile) {
 }
 
 func (p *Profile) validate() error {
-	ddprofiledefinition.NormalizeMetrics(p.Definition.Metrics)
-
-	var errs []error
-
-	for _, err := range ddprofiledefinition.ValidateEnrichMetadata(p.Definition.Metadata) {
-		errs = append(errs, errors.New(err))
-	}
-	for _, err := range ddprofiledefinition.ValidateEnrichSysobjectIDMetadata(p.Definition.SysobjectIDMetadata) {
-		errs = append(errs, errors.New(err))
-	}
-	for _, err := range ddprofiledefinition.ValidateEnrichMetrics(p.Definition.Metrics) {
-		errs = append(errs, errors.New(err))
-	}
-	for _, err := range ddprofiledefinition.ValidateEnrichMetricTags(p.Definition.MetricTags) {
-		errs = append(errs, errors.New(err))
-	}
-	if len(errs) > 0 {
-		return errors.Join(errs...)
-	}
-
-	return nil
+	return ddprofiledefinition.ValidateEnrichProfile(p.Definition)
 }
 
 func (p *Profile) removeConstantMetrics() {
@@ -305,8 +265,8 @@ func sortProfilesBySpecificity(profiles []*Profile, matchedOIDs map[*Profile]str
 		}
 
 		// 2. Same length: exact OIDs before patterns
-		aIsExact := oidOnly.MatchString(aOID)
-		bIsExact := oidOnly.MatchString(bOID)
+		aIsExact := ddprofiledefinition.IsPlainOid(aOID)
+		bIsExact := ddprofiledefinition.IsPlainOid(bOID)
 		if aIsExact != bIsExact {
 			if aIsExact {
 				return -1

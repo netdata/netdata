@@ -1,8 +1,10 @@
 extends:
   - _system-base.yaml
 
-sysobjectid:
-  - 1.3.6.1.4.1.3711.24  # Sinetica Eagle-i
+selector:
+  - sysobjectid:
+      include:
+        - 1.3.6.1.4.1.3711.24  # Sinetica Eagle-i
 
 metadata:
   device:

@@ -8,7 +8,10 @@ extends:
   - _std-udp-mib.yaml
   - _std-ip-mib.yaml
 
-sysobjectid: 1.3.6.1.4.1.232.*
+selector:
+  - sysobjectid:
+      include:
+        - 1.3.6.1.4.1.232.*
 
 metadata:
   device:

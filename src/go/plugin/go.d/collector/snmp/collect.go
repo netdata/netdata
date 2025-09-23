@@ -3,7 +3,6 @@
 package snmp
 
 import (
-	"errors"
 	"fmt"
 	"log/slog"
 	"maps"
@@ -43,7 +42,7 @@ func (c *Collector) collect() (map[string]int64, error) {
 		}
 
 		if c.enableProfiles {
-			c.snmpProfiles = c.setupProfiles(si.SysObjectID)
+			c.snmpProfiles = c.setupProfiles(si)
 		}
 
 		if c.ddSnmpColl == nil {
@@ -74,24 +73,6 @@ func (c *Collector) collect() (map[string]int64, error) {
 	}
 
 	return mx, nil
-}
-
-func (c *Collector) collectSysUptime(mx map[string]int64) error {
-	resp, err := c.snmpClient.Get([]string{oidSysUptime})
-	if err != nil {
-		return err
-	}
-	if len(resp.Variables) == 0 {
-		return errors.New("no system uptime")
-	}
-	v, err := pduToInt(resp.Variables[0])
-	if err != nil {
-		return err
-	}
-
-	mx["uptime"] = v / 100 // the time is in hundredths of a second
-
-	return nil
 }
 
 func (c *Collector) setupVnode(si *snmputils.SysInfo, deviceMeta map[string]ddsnmp.MetaTag) *vnodes.VirtualNode {
@@ -151,8 +132,8 @@ func (c *Collector) setupVnode(si *snmputils.SysInfo, deviceMeta map[string]ddsn
 	}
 }
 
-func (c *Collector) setupProfiles(sysObjectID string) []*ddsnmp.Profile {
-	snmpProfiles := ddsnmp.FindProfiles(sysObjectID, c.ManualProfiles)
+func (c *Collector) setupProfiles(si *snmputils.SysInfo) []*ddsnmp.Profile {
+	snmpProfiles := ddsnmp.FindProfiles(si.SysObjectID, si.Descr, c.ManualProfiles)
 	var profInfo []string
 
 	for _, prof := range snmpProfiles {
@@ -164,7 +145,8 @@ func (c *Collector) setupProfiles(sysObjectID string) []*ddsnmp.Profile {
 		}
 	}
 
-	c.Infof("device matched %d profile(s): %s (sysObjectID: '%s')", len(snmpProfiles), strings.Join(profInfo, ", "), sysObjectID)
+	c.Infof("device matched %d profile(s): %s (sysObjectID: '%s')",
+		len(snmpProfiles), strings.Join(profInfo, ", "), si.SysObjectID)
 
 	return snmpProfiles
 }

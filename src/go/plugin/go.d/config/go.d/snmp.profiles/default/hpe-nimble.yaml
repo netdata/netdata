@@ -2,8 +2,10 @@ extends:
   - _hp.yaml
   - _std-if-mib.yaml
 
-sysobjectid:
-  - 1.3.6.1.4.1.37447.3.1
+selector:
+  - sysobjectid:
+      include:
+        - 1.3.6.1.4.1.37447.3.1
 
 metadata:
   device:

@@ -4,8 +4,10 @@ extends:
   - _std-host-resources-mib-feat-base.yaml
   - _std-ucd-mib.yaml
 
-sysobjectid:
-  - 1.3.6.1.4.1.13315.2.*
+selector:
+  - sysobjectid:
+      include:
+        - 1.3.6.1.4.1.13315.2.*
 
 metric_tags:
   - tag: bcn_sys_id_product

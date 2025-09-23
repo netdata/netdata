@@ -1,8 +1,10 @@
 extends:
   - _huawei.yaml
 
-sysobjectid:
-  - 1.3.6.1.4.1.2011.2.*
+selector:
+  - sysobjectid:
+      include:
+        - 1.3.6.1.4.1.2011.2.*
 
 metric_tags:
   - OID: 1.3.6.1.4.1.2011.5.25.31.6.5.0
