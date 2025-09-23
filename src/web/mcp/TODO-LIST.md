@@ -403,19 +403,6 @@ src/web/mcp/
 
 ## 7. Implementation Phases
 
-### Phase 1: Transport Decoupling (Priority: High)
-1. Implement response buffer helpers on `MCP_CLIENT` (`mcp_response_reset/add/finalize`) with per-request limits.
-2. Migrate all namespace handlers (initialize, ping, tools, resources, prompts, logging, completion, etc.) to the helper API.
-3. Refactor WebSocket adapter to own JSON-RPC parsing, batching, and id correlation; keep adapters blocked while the core runs.
-4. Remove JSON-RPC-specific data (Judy request-id map, envelope builders) from the core and document the new lifecycle.
-5. Update docs/tests to reflect the transport-neutral contract.
-
-### Phase 2: HTTP + SSE Adapters (Priority: High)
-1. **HTTP `/mcp` streamable responses** – add an HTTP adapter that runs on the same path the WebSocket handshake already uses. Ordinary `GET`/`POST` requests should be routed to MCP, gather all response chunks, and return them as chunked JSON when multiple buffers are present.
-2. **HTTP `/sse` endpoint** – provide a Server-Sent Events surface that serializes MCP response chunks as `data:` frames, emits a terminal `event: complete`, and then closes the connection (no long-lived loops).
-3. **Shared transport plumbing** – extend `mcp_create_client()` for the HTTP/SSE transports, share authorization helpers, and document the minimal header changes (chunked transfer flag, SSE headers, compression disabled).
-4. **API key parity & validation** – mirror the WebSocket handshake logic: accept `api_key` in the query string (and/or header), call `mcp_api_key_verify()`, upgrade the HTTP client to `HTTP_ACCESS_ALL` on success, and fall back to the standard ACL gates otherwise. Add curl-based regression tests for both endpoints, confirm that WebSocket upgrades continue to work on `/mcp`, and document usage in MCP README.
-
 ### Phase 3: Advanced Features (Priority: Medium)
 1. Specialized logs tools workflow.
 2. Enhanced error handling, status reporting, and potential job queue abstractions once multiple transports are stable.
