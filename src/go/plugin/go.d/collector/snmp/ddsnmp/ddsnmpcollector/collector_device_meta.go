@@ -46,16 +46,13 @@ func (dc *deviceMetadataCollector) Collect(prof *ddsnmp.Profile) (map[string]dds
 
 	if dc.sysobjectid != "" {
 		for i, entry := range prof.Definition.SysobjectIDMetadata {
-			if !ddprofiledefinition.SelectorOidMatches(dc.sysobjectid, entry.SysobjectID) {
-				continue
+			if ddprofiledefinition.SelectorOidMatches(dc.sysobjectid, entry.SysobjectID) {
+				err := dc.processMetadataFields(entry.Metadata, meta, dc.sysobjectid == entry.SysobjectID)
+				if err != nil {
+					dc.log.Warningf("sysobjectid_metadata[%d]: failed to process metadata fields for sysobjectid '%s': %v",
+						i, entry.SysobjectID, err)
+				}
 			}
-			if err := dc.processMetadataFields(entry.Metadata, meta, dc.sysobjectid == entry.SysobjectID); err != nil {
-				dc.log.Warningf("sysobjectid_metadata[%d]: failed to process metadata fields for sysobjectid '%s': %v",
-					i, entry.SysobjectID, err)
-				continue
-			}
-			dc.log.Debugf("sysobjectid_metadata[%d]: matched sysobjectid '%s' with device OID '%s', applying metadata overrides",
-				i, entry.SysobjectID, dc.sysobjectid)
 		}
 	}
 
