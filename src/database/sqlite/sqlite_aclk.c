@@ -1006,6 +1006,7 @@ void aclk_synchronization_init(void)
         node_data.normal,
         node_data.vnodes);
 
+    bool barrier_init = true;
     uv_barrier_init(&ctx_barrier, node_data.vnodes + 1);
 
     // Trigger host context load for hosts that have been created
@@ -1013,6 +1014,8 @@ void aclk_synchronization_init(void)
         nd_log_daemon(NDLP_WARNING, "Failed to queue command to load contexts for archived hosts");
         // Reset context load flag so that contexts will be loaded on demand
         reset_host_context_load_flag();
+        uv_barrier_destroy(&ctx_barrier);
+        barrier_init = false;
     }
 
     rc = sqlite3_exec_monitored(db_meta, SQL_FETCH_ALL_INSTANCES, aclk_config_parameters, NULL, &err_msg);
@@ -1027,9 +1030,11 @@ void aclk_synchronization_init(void)
     if (!(node_data.normal + node_data.vnodes))
         aclk_queue_node_info(localhost, true);
 
-    rc = uv_barrier_wait(&ctx_barrier);
-    if (0 == rc)
-        uv_barrier_destroy(&ctx_barrier);
+    if (barrier_init) {
+        rc = uv_barrier_wait(&ctx_barrier);
+        if (0 == rc)
+            uv_barrier_destroy(&ctx_barrier);
+    }
 
     RRDHOST *host = NULL;
     int pending;

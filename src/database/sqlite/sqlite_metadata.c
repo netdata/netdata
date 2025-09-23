@@ -1851,7 +1851,7 @@ void reset_host_context_load_flag()
     RRDHOST *host;
     dfe_start_reentrant(rrdhost_root_index, host)
     {
-        rrdhost_flag_set(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD);
+        rrdhost_flag_clear(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD);
     }
     dfe_done(host);
 }
