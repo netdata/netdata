@@ -2,7 +2,7 @@
 
 //go:build !cgo
 
-package db2
+package as400
 
 import (
 	"context"
@@ -11,7 +11,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 )
 
-// Stub implementation for when CGO is disabled
+var configSchema string
 
 type Collector struct {
 	module.Base
@@ -21,14 +21,16 @@ func New() *Collector {
 	return &Collector{}
 }
 
-func (c *Collector) Configuration() any { return nil }
+func (c *Collector) Configuration() any {
+	return nil
+}
 
 func (c *Collector) Init(context.Context) error {
-	return errors.New("db2 collector requires CGO support")
+	return errors.New("as400 collector requires CGO support")
 }
 
 func (c *Collector) Check(context.Context) error {
-	return errors.New("db2 collector requires CGO support")
+	return errors.New("as400 collector requires CGO support")
 }
 
 func (c *Collector) Charts() *module.Charts { return nil }
@@ -36,3 +38,11 @@ func (c *Collector) Charts() *module.Charts { return nil }
 func (c *Collector) Collect(context.Context) map[string]int64 { return nil }
 
 func (c *Collector) Cleanup(context.Context) {}
+
+func init() {
+	module.Register("as400", module.Creator{
+		JobConfigSchema: configSchema,
+		Create:          func() module.Module { return New() },
+		Config:          func() any { return nil },
+	})
+}
