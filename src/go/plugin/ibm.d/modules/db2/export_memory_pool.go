@@ -1,3 +1,5 @@
+//go:build cgo
+
 package db2
 
 import "github.com/netdata/netdata/go/plugins/plugin/ibm.d/modules/db2/contexts"

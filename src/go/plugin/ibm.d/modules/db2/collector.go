@@ -150,7 +150,7 @@ func (c *Collector) CollectOnce() error {
 
 	c.exportSystemMetrics()
 	c.exportDatabaseMetrics()
-	c.exportBufferpoolMetrics()
+	c.exportBufferpoolMetrics(*c.mx)
 	c.exportTablespaceMetrics()
 	c.exportConnectionMetrics()
 	c.exportTableMetrics()
