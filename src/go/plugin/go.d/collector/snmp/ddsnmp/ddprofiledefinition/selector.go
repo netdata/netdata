@@ -10,8 +10,8 @@ type (
 	SelectorSpec []SelectorRule
 
 	SelectorRule struct {
-		SysObjectID SelectorIncludeExclude `yaml:"sysObjectID,omitempty" json:"sysobjectid,omitempty"`
-		SysDescr    SelectorIncludeExclude `yaml:"sysDescr,omitempty"    json:"sysdescr,omitempty"`
+		SysObjectID SelectorIncludeExclude `yaml:"sysobjectid,omitempty" json:"sysobjectid,omitempty"`
+		SysDescr    SelectorIncludeExclude `yaml:"sysdescr,omitempty"    json:"sysdescr,omitempty"`
 	}
 
 	SelectorIncludeExclude struct {
@@ -88,9 +88,10 @@ func (r SelectorRule) Matches(deviceSysObjectID, deviceSysDescr string) (bool, s
 				}
 			}
 		}
-		if longestMatch == "" {
-			return false, ""
-		}
+	}
+
+	if longestMatch == "" {
+		return false, ""
 	}
 
 	// Includes: sysDescr
