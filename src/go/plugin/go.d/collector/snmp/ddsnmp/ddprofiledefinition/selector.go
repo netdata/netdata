@@ -64,6 +64,10 @@ func (s SelectorSpec) Matches(deviceSysObjectID, deviceSysDescr string) (bool, s
 }
 
 func (r SelectorRule) Matches(deviceSysObjectID, deviceSysDescr string) (bool, string) {
+	if len(r.SysObjectID.Include) == 0 && len(r.SysDescr.Include) == 0 {
+		return false, ""
+	}
+
 	// Excludes first
 	if slices.ContainsFunc(r.SysObjectID.Exclude, func(s string) bool {
 		return SelectorOidMatches(deviceSysObjectID, s)
@@ -88,10 +92,9 @@ func (r SelectorRule) Matches(deviceSysObjectID, deviceSysDescr string) (bool, s
 				}
 			}
 		}
-	}
-
-	if longestMatch == "" {
-		return false, ""
+		if longestMatch == "" {
+			return false, ""
+		}
 	}
 
 	// Includes: sysDescr
