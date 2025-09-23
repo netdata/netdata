@@ -259,12 +259,27 @@ func sortProfilesBySpecificity(profiles []*Profile, matchedOIDs map[*Profile]str
 		aOID := matchedOIDs[a]
 		bOID := matchedOIDs[b]
 
-		// 1. Longer OIDs first (more specific)
+		// 0) Profiles with an OID match (non-empty) come before descr-only matches (empty)
+		aHasOID := aOID != ""
+		bHasOID := bOID != ""
+		if aHasOID != bHasOID {
+			if aHasOID {
+				return -1
+			}
+			return 1
+		}
+
+		// If both are descr-only (both empty), keep stable order.
+		if !aHasOID && !bHasOID {
+			return 0
+		}
+
+		// 1) Longer OIDs first (more specific)
 		if diff := len(bOID) - len(aOID); diff != 0 {
 			return diff
 		}
 
-		// 2. Same length: exact OIDs before patterns
+		// 2) Same length: exact OIDs before patterns
 		aIsExact := ddprofiledefinition.IsPlainOid(aOID)
 		bIsExact := ddprofiledefinition.IsPlainOid(bOID)
 		if aIsExact != bIsExact {
@@ -274,7 +289,7 @@ func sortProfilesBySpecificity(profiles []*Profile, matchedOIDs map[*Profile]str
 			return 1
 		}
 
-		// 3. Same type: lexicographic order for stability
+		// 3) Same type: lexicographic order for stability
 		return strings.Compare(aOID, bOID)
 	})
 }

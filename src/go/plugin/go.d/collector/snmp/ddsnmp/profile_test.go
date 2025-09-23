@@ -937,6 +937,54 @@ func TestSortProfilesBySpecificity(t *testing.T) {
 				"generic.yaml",
 			},
 		},
+		"mix: longer > shorter; OID > descr-only": {
+			profiles:    []string{"a.yaml", "b.yaml", "c.yaml", "d.yaml"},
+			matchedOIDs: []string{"1.3.6.1", "1.3.*", "", "1.3.6.1.4"},
+			// d: longest "1.3.6.1.4"  > a: "1.3.6.1" > b: "1.3.*" > c: descr-only
+			expected: []string{"d.yaml", "a.yaml", "b.yaml", "c.yaml"},
+		},
+		"oid match outranks descr-only": {
+			profiles:    []string{"descr-only.yaml", "exact.yaml"},
+			matchedOIDs: []string{"", "1.2.3"},
+			expected:    []string{"exact.yaml", "descr-only.yaml"},
+		},
+		"same length: exact before pattern": {
+			profiles:    []string{"exact.yaml", "pattern.yaml"},
+			matchedOIDs: []string{"1.3.4", "1.3.*"}, // both len == 5
+			expected:    []string{"exact.yaml", "pattern.yaml"},
+		},
+		"longer pattern beats shorter exact (by design)": {
+			profiles:    []string{"exact-short.yaml", "pattern-long.yaml"},
+			matchedOIDs: []string{"1.3.4", "1.3.4.5.*"}, // len(pattern) > len(exact)
+			expected:    []string{"pattern-long.yaml", "exact-short.yaml"},
+		},
+		"lexicographic tiebreaker (same type & same length, both exact)": {
+			profiles:    []string{"a.yaml", "b.yaml"},
+			matchedOIDs: []string{"1.10", "1.20"},     // same len, both exact
+			expected:    []string{"a.yaml", "b.yaml"}, // "1.10" < "1.20"
+		},
+		"stability when both descr-only (both empty)": {
+			profiles:    []string{"x.yaml", "y.yaml", "z.yaml"},
+			matchedOIDs: []string{"", "", ""},
+			// comparator returns 0 → SortStable preserves original order
+			expected: []string{"x.yaml", "y.yaml", "z.yaml"},
+		},
+		"patterns by length (no exacts)": {
+			profiles:    []string{"p1.yaml", "p2.yaml", "p3.yaml"},
+			matchedOIDs: []string{"1.*", "1.2.*", "1.2.3.*"},
+			expected:    []string{"p3.yaml", "p2.yaml", "p1.yaml"},
+		},
+		"tie: same length patterns → lexicographic": {
+			profiles:    []string{"pA.yaml", "pB.yaml"},
+			matchedOIDs: []string{"1.9.*", "1.10.*"},    // same length strings
+			expected:    []string{"pB.yaml", "pA.yaml"}, // "1.10.*" < "1.9.*" lexicographically
+		},
+		"mixed: two OID matches + one descr-only; ensure empty last": {
+			profiles:    []string{"o1.yaml", "desc.yaml", "o2.yaml"},
+			matchedOIDs: []string{"1.2.*", "", "1.2.3"},
+			// longer first among OID matches, then empty
+			expected: []string{"o2.yaml", "o1.yaml", "desc.yaml"},
+		},
 	}
 
 	for name, tc := range tests {
