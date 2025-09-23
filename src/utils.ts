@@ -16,12 +16,30 @@ function bytesPreview(s: string, maxBytes: number): string {
 
 function ensureTrailingNewline(s: string): string { return s.endsWith('\n') ? s : (s + '\n'); }
 
+const TOOL_NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_\-]*(?:__[A-Za-z0-9_\-]+)*/;
+const TOOL_NAME_INVALID_CHARS = /[^A-Za-z0-9_\-]+/g;
+const TOOL_NAME_FALLBACK = 'tool_call';
+export const TOOL_NAME_MAX_LENGTH = 200;
+
 export const sanitizeToolName = (raw: string): string => {
   const withoutPrefix = raw.replace(/<\|[^|]+\|>/g, '').trim();
-  const pattern = /^[A-Za-z0-9][A-Za-z0-9_\-]*(?:__[A-Za-z0-9_\-]+)*/;
-  const match = pattern.exec(withoutPrefix);
-  return match !== null ? match[0] : withoutPrefix;
+  if (withoutPrefix.length === 0) return TOOL_NAME_FALLBACK;
+  const match = TOOL_NAME_PATTERN.exec(withoutPrefix);
+  if (match !== null) return match[0];
+  const replaced = withoutPrefix.replace(TOOL_NAME_INVALID_CHARS, '_');
+  const stripped = replaced.replace(/^[^A-Za-z0-9]+/, '');
+  return stripped.length > 0 ? stripped : TOOL_NAME_FALLBACK;
 };
+
+export function clampToolName(name: string, maxLength = TOOL_NAME_MAX_LENGTH): { name: string; truncated: boolean } {
+  if (maxLength <= 0) {
+    return { name: '', truncated: name.length > 0 };
+  }
+  if (name.length <= maxLength) {
+    return { name, truncated: false };
+  }
+  return { name: name.slice(0, maxLength), truncated: true };
+}
 
 
 

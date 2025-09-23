@@ -4,6 +4,8 @@ import { generateText, streamText } from 'ai';
 import type { ConversationMessage, MCPTool, TokenUsage, TurnRequest, TurnResult, TurnStatus } from '../types.js';
 import type { LanguageModel, ModelMessage, StreamTextResult, ToolSet } from 'ai';
 
+import { clampToolName, sanitizeToolName, TOOL_NAME_MAX_LENGTH, warn } from '../utils.js';
+
 interface LLMProviderInterface {
   name: string;
   executeTurn: (request: TurnRequest) => Promise<TurnResult>;
@@ -594,7 +596,7 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
       const lastAssistantMessage = lastAssistantMessageArr.length > 0 ? lastAssistantMessageArr[lastAssistantMessageArr.length - 1] : undefined;
 
       // Detect final report request strictly by tool name, after normalization
-      const normalizeName = (name: string) => name.replace(/^<\|[^|]+\|>/, '').trim();
+      const normalizeName = (name: string) => sanitizeToolName(name);
       const finalReportRequested = lastAssistantMessage?.toolCalls?.some(tc => normalizeName(tc.name) === 'agent__final_report') === true;
 
       // Only count tool calls that target currently available tools
@@ -796,7 +798,7 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
       
       // Only count tool calls that target currently available tools
       const validToolNames = tools !== undefined ? Object.keys(tools) : [];
-      const normalizeName = (name: string) => name.replace(/^<\|[^|]+\|>/, '').trim();
+      const normalizeName = (name: string) => sanitizeToolName(name);
       const hasNewToolCalls = lastAssistantMessage?.toolCalls !== undefined &&
         lastAssistantMessage.toolCalls.filter(tc => validToolNames.includes(normalizeName(tc.name))).length > 0;
       const finalReportRequested = lastAssistantMessage?.toolCalls?.some(tc => normalizeName(tc.name) === 'agent__final_report') === true;
@@ -1135,7 +1137,18 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
     let toolCallId: string | undefined;
     
 
-    const normalizeToolName = (name: string): string => name.replace(/^<\|[^|]+\|>/, '').trim();
+    const toSafeToolName = (value: unknown): string => {
+      const rawName = typeof value === 'string' ? value : '';
+      const sanitized = sanitizeToolName(rawName);
+      const { name, truncated } = clampToolName(sanitized);
+      if (truncated) {
+        const previewLength = Math.min(sanitized.length, 64);
+        const preview = sanitized.slice(0, previewLength);
+        const suffix = sanitized.length > previewLength ? '…' : '';
+        warn(`Truncated tool name '${preview}${suffix}' (length ${String(sanitized.length)}) to ${String(TOOL_NAME_MAX_LENGTH)} characters before storing in history.`);
+      }
+      return name;
+    };
     if (Array.isArray(m.content)) {
       const textParts: string[] = [];
       const toolCalls: { id: string; name: string; parameters: Record<string, unknown> }[] = [];
@@ -1155,7 +1168,7 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
           // AI SDK embeds tool calls in content
           toolCalls.push({
             id: part.toolCallId,
-            name: normalizeToolName(typeof part.toolName === "string" ? part.toolName : ""),
+            name: toSafeToolName(part.toolName),
             parameters: (part.input ?? {}) as Record<string, unknown>
           });
         } else if (part.type === this.TOOL_RESULT_TYPE && part.toolCallId !== undefined) {
@@ -1177,11 +1190,14 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
     }
     
     // Prefer tool calls from content array (AI SDK format) over legacy toolCalls field
-    const finalToolCalls = toolCallsFromContent ?? (Array.isArray(m.toolCalls) ? m.toolCalls.map(tc => ({
-      id: tc.id ?? tc.toolCallId ?? '',
-      name: tc.name ?? tc.function?.name ?? '',
-      parameters: (tc.arguments ?? tc.function?.arguments ?? {}) as Record<string, unknown>
-    })) : undefined);
+    const finalToolCalls = toolCallsFromContent ?? (Array.isArray(m.toolCalls) ? m.toolCalls.map(tc => {
+      const rawName = tc.name ?? tc.function?.name ?? '';
+      return {
+        id: tc.id ?? tc.toolCallId ?? '',
+        name: toSafeToolName(rawName),
+        parameters: (tc.arguments ?? tc.function?.arguments ?? {}) as Record<string, unknown>
+      };
+    }) : undefined);
     
     return {
       role: (m.role ?? 'assistant') as ConversationMessage['role'],
