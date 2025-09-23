@@ -192,6 +192,9 @@ static void web_client_reset_allocations(struct web_client *w, bool free_all) {
 
     web_client_reset_permissions(w);
     web_client_flag_clear(w, WEB_CLIENT_ENCODING_GZIP|WEB_CLIENT_ENCODING_DEFLATE);
+    web_client_flag_clear(w, WEB_CLIENT_FLAG_ACCEPT_JSON |
+                             WEB_CLIENT_FLAG_ACCEPT_SSE |
+                             WEB_CLIENT_FLAG_ACCEPT_TEXT);
     web_client_reset_path_flags(w);
 }
 
