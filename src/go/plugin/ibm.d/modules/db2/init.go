@@ -14,6 +14,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/framework"
 	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/modules/db2/contexts"
+	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/pkg/dbdriver"
 	db2proto "github.com/netdata/netdata/go/plugins/plugin/ibm.d/protocols/db2"
 )
 
@@ -73,6 +74,12 @@ func (c *Collector) Init(ctx context.Context) error {
 
 	if err := c.verifyConfig(); err != nil {
 		return err
+	}
+
+	originalDSN := c.DSN
+	c.DSN = dbdriver.EnsureDriver(c.DSN, "IBM DB2 ODBC DRIVER")
+	if c.DSN != originalDSN {
+		c.Debugf("DSN missing driver keyword; prepended default driver mapping")
 	}
 
 	clientCfg := db2proto.Config{

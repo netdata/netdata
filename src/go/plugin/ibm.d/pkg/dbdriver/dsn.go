@@ -2,7 +2,10 @@
 
 package dbdriver
 
-import "strings"
+import (
+	"fmt"
+	"strings"
+)
 
 // SanitizeDSN masks sensitive information in DSN for logging
 func SanitizeDSN(dsn string) string {
@@ -83,4 +86,29 @@ func containsODBCKeywords(dsn string) bool {
 	}
 
 	return false
+}
+
+// EnsureDriver prepends the provided default driver if the DSN string does not specify one.
+func EnsureDriver(dsn, defaultDriver string) string {
+	trimmed := strings.TrimSpace(dsn)
+	if trimmed == "" {
+		return dsn
+	}
+
+	upper := strings.ToUpper(trimmed)
+	if strings.Contains(upper, "DRIVER=") {
+		return dsn
+	}
+
+	if defaultDriver == "" {
+		defaultDriver = "IBM DB2 ODBC DRIVER"
+	}
+
+	// Avoid duplicate separators when original DSN already begins with ';'
+	trimmed = strings.TrimLeft(trimmed, ";")
+	if trimmed != "" {
+		return fmt.Sprintf("Driver={%s};%s", defaultDriver, trimmed)
+	}
+
+	return fmt.Sprintf("Driver={%s};", defaultDriver)
 }
