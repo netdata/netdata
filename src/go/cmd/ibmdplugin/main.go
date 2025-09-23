@@ -26,8 +26,8 @@ import (
 	_ "github.com/netdata/netdata/go/plugins/plugin/ibm.d/modules/db2"   // Requires CGO
 	// Note: Legacy mq_pcf collector was removed - using framework-based MQ module instead
 	// _ "github.com/netdata/netdata/go/plugins/plugin/ibm.d/collector/websphere_jmx" // Requires CGO
-	_ "github.com/netdata/netdata/go/plugins/plugin/ibm.d/collector/websphere_mp"  // Pure Go
-	_ "github.com/netdata/netdata/go/plugins/plugin/ibm.d/collector/websphere_pmi" // Pure Go
+	_ "github.com/netdata/netdata/go/plugins/plugin/ibm.d/collector/websphere_mp" // Pure Go
+	_ "github.com/netdata/netdata/go/plugins/plugin/ibm.d/modules/websphere/pmi"  // Requires CGO
 
 	// New framework example modules
 	_ "github.com/netdata/netdata/go/plugins/plugin/ibm.d/modules/example" // Framework demo

@@ -1,0 +1,167 @@
+# IBM WebSphere MicroProfile collector
+
+## Overview
+
+Collects JVM, vendor, and REST endpoint metrics from WebSphere Liberty / Open Liberty
+servers via the MicroProfile Metrics (Prometheus/OpenMetrics) endpoint.
+
+
+This collector is part of the [Netdata](https://github.com/netdata/netdata) monitoring solution.
+
+## Collected metrics
+
+Metrics grouped by scope.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
+### Per IBM WebSphere MicroProfile instance
+
+
+These metrics refer to the entire monitored IBM WebSphere MicroProfile instance.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:-------|:-----------|:-----|
+| websphere_mp.cpu_usage | process, utilization | percentage |
+| websphere_mp.cpu_time | total | seconds |
+
+These metrics refer to the entire monitored IBM WebSphere MicroProfile instance.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:-------|:-----------|:-----|
+| websphere_mp.jvm_memory_heap_usage | used, free | bytes |
+| websphere_mp.jvm_memory_heap_committed | committed | bytes |
+| websphere_mp.jvm_memory_heap_max | limit | bytes |
+| websphere_mp.jvm_heap_utilization | utilization | percentage |
+| websphere_mp.jvm_gc_collections | rate | collections/s |
+| websphere_mp.jvm_gc_time | total, per_cycle | milliseconds |
+| websphere_mp.jvm_threads_current | daemon, other | threads |
+| websphere_mp.jvm_threads_peak | peak | threads |
+
+These metrics refer to the entire monitored IBM WebSphere MicroProfile instance.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:-------|:-----------|:-----|
+| websphere_mp.threadpool_usage | active, idle | threads |
+| websphere_mp.threadpool_size | size | threads |
+
+
+
+### Per restendpoint
+
+These metrics refer to individual restendpoint instances.
+
+Labels:
+
+| Label | Description |
+|:------|:------------|
+| method | Method identifier |
+| endpoint | Endpoint identifier |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:-------|:-----------|:-----|
+| websphere_mp.rest_requests | requests | requests/s |
+| websphere_mp.rest_response_time | average | milliseconds |
+
+
+## Configuration
+
+### File
+
+The configuration file name for this integration is `ibm.d/websphere_mp.conf`.
+
+You can edit the configuration file using the `edit-config` script from the
+Netdata [config directory](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/configuration.md#the-netdata-config-directory).
+
+```bash
+cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
+sudo ./edit-config ibm.d/websphere_mp.conf
+```
+
+### Options
+
+The following options can be defined globally or per job.
+
+| Name | Description | Default | Required | Min | Max |
+|:-----|:------------|:--------|:---------|:----|:----|
+| Vnode | Vnode | `` | no | - | - |
+| CellName | Identity labels | `` | no | - | - |
+| NodeName | Node name | `` | no | - | - |
+| ServerName | Server name | `` | no | - | - |
+| URL | Connection URL or URI | `https://localhost:9443` | no | - | - |
+| MetricsEndpoint | Metrics endpoint | `/metrics` | no | - | - |
+| CollectJVMMetrics | Enable collection of j v m metrics metrics | `true` | no | - | - |
+| CollectRESTMetrics | Enable collection of r e s t metrics metrics | `true` | no | - | - |
+| MaxRESTEndpoints | Maximum number of r e s t endpoints to monitor | `50` | no | - | - |
+| CollectRESTMatching | Enable collection of r e s t matching metrics | `` | no | - | - |
+
+### Examples
+
+#### Basic configuration
+
+IBM WebSphere MicroProfile monitoring with default settings.
+
+<details>
+<summary>Config</summary>
+
+```yaml
+jobs:
+  - name: local
+    endpoint: dummy://localhost
+```
+
+</details>
+
+## Troubleshooting
+
+### Debug Mode
+
+To troubleshoot issues with the `websphere_mp` collector, run the `ibm.d.plugin` with the debug option enabled.
+The output should give you clues as to why the collector isn't working.
+
+- Navigate to the `plugins.d` directory, usually at `/usr/libexec/netdata/plugins.d/`
+- Switch to the `netdata` user
+- Run the `ibm.d.plugin` to debug the collector:
+
+```bash
+sudo -u netdata ./ibm.d.plugin -d -m websphere_mp
+```
+
+## Getting Logs
+
+If you're encountering problems with the `websphere_mp` collector, follow these steps to retrieve logs and identify potential issues:
+
+- **Run the command** specific to your system (systemd, non-systemd, or Docker container).
+- **Examine the output** for any warnings or error messages that might indicate issues. These messages will typically provide clues about the root cause of the problem.
+
+### For systemd systems (most Linux distributions)
+
+```bash
+sudo journalctl -u netdata --reverse | grep websphere_mp
+```
+
+### For non-systemd systems
+
+```bash
+sudo grep websphere_mp /var/log/netdata/error.log
+sudo grep websphere_mp /var/log/netdata/collector.log
+```
+
+### For Docker containers
+
+```bash
+sudo docker logs netdata 2>&1 | grep websphere_mp
+```

@@ -1,0 +1,105 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "properties": {
+      "cell_name": {
+        "default": "",
+        "title": "Cell name",
+        "type": "string"
+      },
+      "cluster_name": {
+        "default": "",
+        "title": "Cluster name",
+        "type": "string"
+      },
+      "collect_apps_matching": {
+        "default": "",
+        "title": "Enable collection of apps matching metrics",
+        "type": "string"
+      },
+      "collect_ejbs_matching": {
+        "default": "",
+        "title": "Enable collection of e j bs matching metrics",
+        "type": "string"
+      },
+      "collect_jms_matching": {
+        "default": "",
+        "title": "Enable collection of j m s matching metrics",
+        "type": "string"
+      },
+      "collect_pools_matching": {
+        "default": "",
+        "title": "Enable collection of pools matching metrics",
+        "type": "string"
+      },
+      "collect_servlets_matching": {
+        "default": "",
+        "title": "Enable collection of servlets matching metrics",
+        "type": "string"
+      },
+      "max_applications": {
+        "default": 100,
+        "title": "Maximum number of applications to monitor",
+        "type": "integer"
+      },
+      "max_ejbs": {
+        "default": 50,
+        "title": "Maximum number of e j bs to monitor",
+        "type": "integer"
+      },
+      "max_jca_pools": {
+        "default": 50,
+        "title": "Maximum number of j c a pools to monitor",
+        "type": "integer"
+      },
+      "max_jdbc_pools": {
+        "default": 50,
+        "title": "Maximum number of j d b c pools to monitor",
+        "type": "integer"
+      },
+      "max_jms_destinations": {
+        "default": 50,
+        "title": "Maximum number of j m s destinations to monitor",
+        "type": "integer"
+      },
+      "max_servlets": {
+        "default": 50,
+        "title": "Maximum number of servlets to monitor",
+        "type": "integer"
+      },
+      "max_threadpools": {
+        "default": 50,
+        "title": "Maximum number of thread pools to monitor",
+        "type": "integer"
+      },
+      "node_name": {
+        "default": "",
+        "title": "Node name",
+        "type": "string"
+      },
+      "pmi_refresh_rate": {
+        "default": 60,
+        "title": "P m i refresh rate",
+        "type": "integer"
+      },
+      "pmi_stats_type": {
+        "default": "extended",
+        "title": "P m i stats type",
+        "type": "string"
+      },
+      "server_type": {
+        "default": "",
+        "title": "Server type",
+        "type": "string"
+      },
+      "vnode": {
+        "default": "",
+        "title": "Vnode",
+        "type": "string"
+      }
+    },
+    "required": null,
+    "title": "websphere_pmi collector configuration",
+    "type": "object"
+  }
+}

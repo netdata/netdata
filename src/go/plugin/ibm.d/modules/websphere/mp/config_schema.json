@@ -1,0 +1,60 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "properties": {
+      "cell_name": {
+        "default": "",
+        "title": "Identity labels",
+        "type": "string"
+      },
+      "collect_jvm_metrics": {
+        "default": true,
+        "title": "Enable collection of j v m metrics metrics",
+        "type": "boolean"
+      },
+      "collect_rest_matching": {
+        "default": "",
+        "title": "Enable collection of r e s t matching metrics",
+        "type": "string"
+      },
+      "collect_rest_metrics": {
+        "default": true,
+        "title": "Enable collection of r e s t metrics metrics",
+        "type": "boolean"
+      },
+      "max_rest_endpoints": {
+        "default": 50,
+        "title": "Maximum number of r e s t endpoints to monitor",
+        "type": "integer"
+      },
+      "metrics_endpoint": {
+        "default": "/metrics",
+        "title": "Metrics endpoint",
+        "type": "string"
+      },
+      "node_name": {
+        "default": "",
+        "title": "Node name",
+        "type": "string"
+      },
+      "server_name": {
+        "default": "",
+        "title": "Server name",
+        "type": "string"
+      },
+      "url": {
+        "default": "https://localhost:9443",
+        "title": "Connection URL or URI",
+        "type": "string"
+      },
+      "vnode": {
+        "default": "",
+        "title": "Vnode",
+        "type": "string"
+      }
+    },
+    "required": null,
+    "title": "websphere_mp collector configuration",
+    "type": "object"
+  }
+}
