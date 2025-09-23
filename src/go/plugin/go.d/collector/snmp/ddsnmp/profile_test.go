@@ -162,7 +162,7 @@ func Test_FindProfiles(t *testing.T) {
 
 	for name, test := range test {
 		t.Run(name, func(t *testing.T) {
-			profiles := FindProfiles(test.sysObjOId, test.manualProfiles)
+			profiles := FindProfiles(test.sysObjOId, "", test.manualProfiles)
 
 			var names []string
 			for _, p := range profiles {
@@ -175,7 +175,7 @@ func Test_FindProfiles(t *testing.T) {
 }
 
 func Test_Profile_merge(t *testing.T) {
-	profiles := FindProfiles("1.3.6.1.4.1.9.1.1216", nil) // cisco-nexus
+	profiles := FindProfiles("1.3.6.1.4.1.9.1.1216", "", nil) // cisco-nexus
 
 	i := slices.IndexFunc(profiles, func(p *Profile) bool {
 		return strings.HasSuffix(p.SourceFile, "cisco-nexus.yaml")

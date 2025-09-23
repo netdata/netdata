@@ -43,7 +43,7 @@ func (c *Collector) collect() (map[string]int64, error) {
 		}
 
 		if c.enableProfiles {
-			c.snmpProfiles = c.setupProfiles(si.SysObjectID)
+			c.snmpProfiles = c.setupProfiles(si)
 		}
 
 		if c.ddSnmpColl == nil {
@@ -151,8 +151,8 @@ func (c *Collector) setupVnode(si *snmputils.SysInfo, deviceMeta map[string]ddsn
 	}
 }
 
-func (c *Collector) setupProfiles(sysObjectID string) []*ddsnmp.Profile {
-	snmpProfiles := ddsnmp.FindProfiles(sysObjectID, c.ManualProfiles)
+func (c *Collector) setupProfiles(si *snmputils.SysInfo) []*ddsnmp.Profile {
+	snmpProfiles := ddsnmp.FindProfiles(si.SysObjectID, si.Descr, c.ManualProfiles)
 	var profInfo []string
 
 	for _, prof := range snmpProfiles {
@@ -164,7 +164,8 @@ func (c *Collector) setupProfiles(sysObjectID string) []*ddsnmp.Profile {
 		}
 	}
 
-	c.Infof("device matched %d profile(s): %s (sysObjectID: '%s')", len(snmpProfiles), strings.Join(profInfo, ", "), sysObjectID)
+	c.Infof("device matched %d profile(s): %s (sysObjectID: '%s')",
+		len(snmpProfiles), strings.Join(profInfo, ", "), si.SysObjectID)
 
 	return snmpProfiles
 }

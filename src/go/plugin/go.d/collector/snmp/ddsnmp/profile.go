@@ -14,7 +14,7 @@ import (
 
 // FindProfiles returns profiles matching the given sysObjectID.
 // Profiles are sorted by match specificity: most specific first.
-func FindProfiles(sysObjID string, manualProfiles []string) []*Profile {
+func FindProfiles(sysObjID, sysDescr string, manualProfiles []string) []*Profile {
 	loadProfiles()
 
 	finalize := func(profiles []*Profile) []*Profile {
@@ -49,7 +49,7 @@ func FindProfiles(sysObjID string, manualProfiles []string) []*Profile {
 	var selected []*Profile
 
 	for _, prof := range ddProfiles {
-		if ok, matchedOid := prof.Definition.Selector.Matches(sysObjID, ""); ok {
+		if ok, matchedOid := prof.Definition.Selector.Matches(sysObjID, sysDescr); ok {
 			cloned := prof.clone()
 			selected = append(selected, cloned)
 			matchedOIDs[cloned] = matchedOid
