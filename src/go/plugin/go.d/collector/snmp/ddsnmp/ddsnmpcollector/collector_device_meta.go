@@ -46,19 +46,20 @@ func (dc *deviceMetadataCollector) Collect(prof *ddsnmp.Profile) (map[string]dds
 
 	if dc.sysobjectid != "" {
 		for i, entry := range prof.Definition.SysobjectIDMetadata {
-			if ddsnmp.OidMatches(dc.sysobjectid, entry.SysobjectID) {
-				if err := dc.processMetadataFields(entry.Metadata, meta, dc.sysobjectid == entry.SysobjectID); err != nil {
-					dc.log.Warningf("sysobjectid_metadata[%d]: failed to process metadata fields for sysobjectid '%s': %v",
-						i, entry.SysobjectID, err)
-					continue
-				}
-				dc.log.Debugf("sysobjectid_metadata[%d]: matched sysobjectid '%s' with device OID '%s', applying metadata overrides",
-					i, entry.SysobjectID, dc.sysobjectid)
+			if !ddprofiledefinition.SelectorOidMatches(dc.sysobjectid, entry.SysobjectID) {
+				continue
 			}
+			if err := dc.processMetadataFields(entry.Metadata, meta, dc.sysobjectid == entry.SysobjectID); err != nil {
+				dc.log.Warningf("sysobjectid_metadata[%d]: failed to process metadata fields for sysobjectid '%s': %v",
+					i, entry.SysobjectID, err)
+				continue
+			}
+			dc.log.Debugf("sysobjectid_metadata[%d]: matched sysobjectid '%s' with device OID '%s', applying metadata overrides",
+				i, entry.SysobjectID, dc.sysobjectid)
 		}
 	}
 
-	if err := dc.processMetadataFields(cfg.Fields, meta, slices.Contains(prof.Definition.SysObjectIDs, dc.sysobjectid)); err != nil {
+	if err := dc.processMetadataFields(cfg.Fields, meta, prof.Definition.Selector.HasExactOidMatch(dc.sysobjectid)); err != nil {
 		return ternary(len(meta) > 0, meta, nil), fmt.Errorf("failed to process metadata resource '%s': %w", resName, err)
 	}
 

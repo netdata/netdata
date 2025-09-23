@@ -20,9 +20,14 @@ type DeviceMeta struct {
 // 2/ Datadog backend: the profiles are in json format, they are used to store profiles created via UI.
 // The serialisation of json profiles are defined by the json annotation.
 type ProfileDefinition struct {
-	Name                string                           `yaml:"name,omitempty" json:"name,omitempty"`
-	Description         string                           `yaml:"description,omitempty" json:"description,omitempty"`
-	SysObjectIDs        StringArray                      `yaml:"sysobjectid,omitempty" json:"sysobjectid,omitempty"`
+	Name        string `yaml:"name,omitempty" json:"name,omitempty"`
+	Description string `yaml:"description,omitempty" json:"description,omitempty"`
+
+	// Keep legacy field for backward compatibility
+	SysObjectIDs StringArray `yaml:"sysobjectid,omitempty" json:"sysobjectid,omitempty"`
+	// New, preferred matching
+	Selector SelectorSpec `yaml:"selector,omitempty" json:"selector,omitempty"`
+
 	Extends             []string                         `yaml:"extends,omitempty" json:"extends,omitempty"`
 	Metadata            MetadataConfig                   `yaml:"metadata,omitempty" json:"metadata,omitempty"`
 	SysobjectIDMetadata []SysobjectIDMetadataEntryConfig `yaml:"sysobjectid_metadata,omitempty"`
@@ -69,6 +74,7 @@ func (p *ProfileDefinition) Clone() *ProfileDefinition {
 		Name:                p.Name,
 		Description:         p.Description,
 		SysObjectIDs:        slices.Clone(p.SysObjectIDs),
+		Selector:            p.Selector.Clone(),
 		Extends:             slices.Clone(p.Extends),
 		Metadata:            CloneMap(p.Metadata),
 		SysobjectIDMetadata: CloneSlice(p.SysobjectIDMetadata),
