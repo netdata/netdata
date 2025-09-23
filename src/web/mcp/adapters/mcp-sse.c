@@ -17,17 +17,6 @@
 
 #include <json-c/json.h>
 
-static void mcp_sse_disable_compression(struct web_client *w) {
-    if (!w)
-        return;
-
-    web_client_flag_clear(w, WEB_CLIENT_ENCODING_GZIP);
-    web_client_flag_clear(w, WEB_CLIENT_ENCODING_DEFLATE);
-    web_client_flag_clear(w, WEB_CLIENT_CHUNKED_TRANSFER);
-    w->response.zoutput = false;
-    w->response.zinitialized = false;
-}
-
 static void mcp_sse_add_common_headers(struct web_client *w) {
     if (!w)
         return;
@@ -118,7 +107,7 @@ int mcp_sse_serialize_response(struct web_client *w, MCP_CLIENT *mcpc, struct js
 
     buffer_flush(w->response.data);
     w->response.data->content_type = CT_TEXT_EVENT_STREAM;
-    mcp_sse_disable_compression(w);
+    mcp_http_disable_compression(w);
     mcp_sse_add_common_headers(w);
 
     for (size_t i = 0; i < responses_used; i++) {
@@ -161,7 +150,7 @@ int mcp_sse_handle_request(struct rrdhost *host __maybe_unused, struct web_clien
     if (!body || !body_len) {
         buffer_flush(w->response.data);
         w->response.data->content_type = CT_TEXT_EVENT_STREAM;
-        mcp_sse_disable_compression(w);
+        mcp_http_disable_compression(w);
         mcp_sse_add_common_headers(w);
         mcp_sse_append_event(w->response.data, "error", "Empty request body");
         w->response.code = HTTP_RESP_BAD_REQUEST;
@@ -174,7 +163,7 @@ int mcp_sse_handle_request(struct rrdhost *host __maybe_unused, struct web_clien
         BUFFER *payload = mcp_jsonrpc_build_error_payload(NULL, -32700, json_tokener_error_desc(jerr), NULL, 0);
         buffer_flush(w->response.data);
         w->response.data->content_type = CT_TEXT_EVENT_STREAM;
-        mcp_sse_disable_compression(w);
+        mcp_http_disable_compression(w);
         mcp_sse_add_common_headers(w);
         if (payload) {
             mcp_sse_append_buffer_event(w->response.data, "error", payload);
@@ -193,7 +182,7 @@ int mcp_sse_handle_request(struct rrdhost *host __maybe_unused, struct web_clien
         json_object_put(root);
         buffer_flush(w->response.data);
         w->response.data->content_type = CT_TEXT_EVENT_STREAM;
-        mcp_sse_disable_compression(w);
+        mcp_http_disable_compression(w);
         mcp_sse_add_common_headers(w);
         mcp_sse_append_event(w->response.data, "error", "Failed to allocate MCP client");
         w->response.code = HTTP_RESP_INTERNAL_SERVER_ERROR;

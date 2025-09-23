@@ -188,10 +188,14 @@ int mcp_http_handle_request(struct rrdhost *host __maybe_unused, struct web_clie
             has_response = response_payload && buffer_strlen(response_payload);
         }
 
-        if (response_payload)
+        if (response_payload) {
             mcp_http_write_json_payload(w, response_payload);
-        else
+        } else {
             buffer_flush(w->response.data);
+            mcp_http_disable_compression(w);
+            w->response.data->content_type = CT_APPLICATION_JSON;
+            buffer_flush(w->response.header);
+        }
 
         w->response.code = has_response ? HTTP_RESP_OK : HTTP_RESP_ACCEPTED;
 
