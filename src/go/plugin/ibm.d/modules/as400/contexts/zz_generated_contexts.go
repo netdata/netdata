@@ -175,11 +175,11 @@ var ActiveJob = struct {
 	CPU: ActiveJobCPUContext{
 		Context: framework.Context[ActiveJobLabels]{
 			Name:        "as400.activejob_cpu",
-			Family:      "activejobs",
+			Family:      "workloads/active_jobs",
 			Title:       "Active Job CPU Usage",
 			Units:       "percentage",
 			Type:        module.Line,
-			Priority:    2400,
+			Priority:    506,
 			UpdateEvery: 1,
 			Dimensions: []framework.Dimension{
 				{
@@ -201,11 +201,11 @@ var ActiveJob = struct {
 	Resources: ActiveJobResourcesContext{
 		Context: framework.Context[ActiveJobLabels]{
 			Name:        "as400.activejob_resources",
-			Family:      "activejobs",
+			Family:      "workloads/active_jobs",
 			Title:       "Active Job Resources",
 			Units:       "MiB",
 			Type:        module.Stacked,
-			Priority:    2401,
+			Priority:    507,
 			UpdateEvery: 1,
 			Dimensions: []framework.Dimension{
 				{
@@ -227,11 +227,11 @@ var ActiveJob = struct {
 	Time: ActiveJobTimeContext{
 		Context: framework.Context[ActiveJobLabels]{
 			Name:        "as400.activejob_time",
-			Family:      "activejobs",
+			Family:      "workloads/active_jobs",
 			Title:       "Active Job Elapsed Time",
 			Units:       "seconds",
 			Type:        module.Line,
-			Priority:    2402,
+			Priority:    508,
 			UpdateEvery: 1,
 			Dimensions: []framework.Dimension{
 				{
@@ -260,11 +260,11 @@ var ActiveJob = struct {
 	Activity: ActiveJobActivityContext{
 		Context: framework.Context[ActiveJobLabels]{
 			Name:        "as400.activejob_activity",
-			Family:      "activejobs",
+			Family:      "workloads/active_jobs",
 			Title:       "Active Job Activity",
 			Units:       "operations/s",
 			Type:        module.Area,
-			Priority:    2403,
+			Priority:    509,
 			UpdateEvery: 1,
 			Dimensions: []framework.Dimension{
 				{
@@ -293,11 +293,11 @@ var ActiveJob = struct {
 	Threads: ActiveJobThreadsContext{
 		Context: framework.Context[ActiveJobLabels]{
 			Name:        "as400.activejob_threads",
-			Family:      "activejobs",
+			Family:      "workloads/active_jobs",
 			Title:       "Active Job Thread Count",
 			Units:       "threads",
 			Type:        module.Line,
-			Priority:    2404,
+			Priority:    510,
 			UpdateEvery: 1,
 			Dimensions: []framework.Dimension{
 				{
@@ -508,11 +508,11 @@ var Disk = struct {
 	Busy: DiskBusyContext{
 		Context: framework.Context[DiskLabels]{
 			Name:        "as400.disk_busy",
-			Family:      "disk",
+			Family:      "storage/disk/devices",
 			Title:       "Disk Busy Percentage",
 			Units:       "percentage",
 			Type:        module.Line,
-			Priority:    2000,
+			Priority:    307,
 			UpdateEvery: 1,
 			Dimensions: []framework.Dimension{
 				{
@@ -535,11 +535,11 @@ var Disk = struct {
 	IORequests: DiskIORequestsContext{
 		Context: framework.Context[DiskLabels]{
 			Name:        "as400.disk_io_requests",
-			Family:      "disk",
+			Family:      "storage/disk/devices",
 			Title:       "Disk I/O Requests",
 			Units:       "requests/s",
 			Type:        module.Area,
-			Priority:    2001,
+			Priority:    308,
 			UpdateEvery: 1,
 			Dimensions: []framework.Dimension{
 				{
@@ -569,11 +569,11 @@ var Disk = struct {
 	SpaceUsage: DiskSpaceUsageContext{
 		Context: framework.Context[DiskLabels]{
 			Name:        "as400.disk_space_usage",
-			Family:      "disk",
+			Family:      "storage/disk/devices",
 			Title:       "Disk Space Usage",
 			Units:       "percentage",
 			Type:        module.Line,
-			Priority:    2002,
+			Priority:    309,
 			UpdateEvery: 1,
 			Dimensions: []framework.Dimension{
 				{
@@ -596,11 +596,11 @@ var Disk = struct {
 	Capacity: DiskCapacityContext{
 		Context: framework.Context[DiskLabels]{
 			Name:        "as400.disk_capacity",
-			Family:      "disk",
+			Family:      "storage/disk/devices",
 			Title:       "Disk Capacity",
 			Units:       "gigabytes",
 			Type:        module.Stacked,
-			Priority:    2003,
+			Priority:    310,
 			UpdateEvery: 1,
 			Dimensions: []framework.Dimension{
 				{
@@ -630,11 +630,11 @@ var Disk = struct {
 	Blocks: DiskBlocksContext{
 		Context: framework.Context[DiskLabels]{
 			Name:        "as400.disk_blocks",
-			Family:      "disk",
+			Family:      "storage/disk/devices",
 			Title:       "Disk Block Operations",
 			Units:       "blocks/s",
 			Type:        module.Area,
-			Priority:    2004,
+			Priority:    311,
 			UpdateEvery: 1,
 			Dimensions: []framework.Dimension{
 				{
@@ -664,11 +664,11 @@ var Disk = struct {
 	SSDHealth: DiskSSDHealthContext{
 		Context: framework.Context[DiskLabels]{
 			Name:        "as400.disk_ssd_health",
-			Family:      "disk",
+			Family:      "storage/disk/devices",
 			Title:       "Disk SSD Health",
 			Units:       "percentage",
 			Type:        module.Line,
-			Priority:    2005,
+			Priority:    312,
 			UpdateEvery: 1,
 			Dimensions: []framework.Dimension{
 				{
@@ -691,11 +691,11 @@ var Disk = struct {
 	SSDPowerOn: DiskSSDPowerOnContext{
 		Context: framework.Context[DiskLabels]{
 			Name:        "as400.disk_ssd_age",
-			Family:      "disk",
+			Family:      "storage/disk/devices",
 			Title:       "Disk SSD Power On Days",
 			Units:       "days",
 			Type:        module.Line,
-			Priority:    2006,
+			Priority:    313,
 			UpdateEvery: 1,
 			Dimensions: []framework.Dimension{
 				{
@@ -761,11 +761,11 @@ var JobQueue = struct {
 	Length: JobQueueLengthContext{
 		Context: framework.Context[JobQueueLabels]{
 			Name:        "as400.jobqueue_length",
-			Family:      "jobqueue",
+			Family:      "workloads/job_queues",
 			Title:       "Job Queue Length",
 			Units:       "jobs",
 			Type:        module.Line,
-			Priority:    2200,
+			Priority:    505,
 			UpdateEvery: 1,
 			Dimensions: []framework.Dimension{
 				{
@@ -855,11 +855,11 @@ var NetworkInterface = struct {
 	Status: NetworkInterfaceStatusContext{
 		Context: framework.Context[NetworkInterfaceLabels]{
 			Name:        "as400.network_interface_status",
-			Family:      "network_interfaces",
+			Family:      "network/interfaces",
 			Title:       "Network Interface Status",
 			Units:       "status",
 			Type:        module.Line,
-			Priority:    2500,
+			Priority:    403,
 			UpdateEvery: 1,
 			Dimensions: []framework.Dimension{
 				{
@@ -883,11 +883,11 @@ var NetworkInterface = struct {
 	MTU: NetworkInterfaceMTUContext{
 		Context: framework.Context[NetworkInterfaceLabels]{
 			Name:        "as400.network_interface_mtu",
-			Family:      "network_interfaces",
+			Family:      "network/interfaces",
 			Title:       "Network Interface MTU",
 			Units:       "bytes",
 			Type:        module.Line,
-			Priority:    2501,
+			Priority:    404,
 			UpdateEvery: 1,
 			Dimensions: []framework.Dimension{
 				{
@@ -956,11 +956,11 @@ var Subsystem = struct {
 	Jobs: SubsystemJobsContext{
 		Context: framework.Context[SubsystemLabels]{
 			Name:        "as400.subsystem_jobs",
-			Family:      "subsystem",
+			Family:      "workloads/subsystems",
 			Title:       "Subsystem Jobs",
 			Units:       "jobs",
 			Type:        module.Line,
-			Priority:    2100,
+			Priority:    504,
 			UpdateEvery: 1,
 			Dimensions: []framework.Dimension{
 				{
@@ -1556,11 +1556,11 @@ var System = struct {
 	CPUUtilization: SystemCPUUtilizationContext{
 		Context: framework.Context[EmptyLabels]{
 			Name:        "as400.cpu_utilization",
-			Family:      "cpu",
+			Family:      "compute/cpu",
 			Title:       "CPU Utilization",
 			Units:       "percentage",
 			Type:        module.Line,
-			Priority:    1000,
+			Priority:    101,
 			UpdateEvery: 1,
 			Dimensions: []framework.Dimension{
 				{
@@ -1577,11 +1577,11 @@ var System = struct {
 	CPUDetails: SystemCPUDetailsContext{
 		Context: framework.Context[EmptyLabels]{
 			Name:        "as400.cpu_configuration",
-			Family:      "cpu",
+			Family:      "compute/cpu",
 			Title:       "CPU Configuration",
 			Units:       "cpus",
 			Type:        module.Line,
-			Priority:    1010,
+			Priority:    102,
 			UpdateEvery: 1,
 			Dimensions: []framework.Dimension{
 				{
@@ -1598,11 +1598,11 @@ var System = struct {
 	CPUCapacity: SystemCPUCapacityContext{
 		Context: framework.Context[EmptyLabels]{
 			Name:        "as400.cpu_capacity",
-			Family:      "cpu",
+			Family:      "compute/cpu",
 			Title:       "Current CPU Capacity",
 			Units:       "percentage",
 			Type:        module.Line,
-			Priority:    1020,
+			Priority:    103,
 			UpdateEvery: 1,
 			Dimensions: []framework.Dimension{
 				{
@@ -1619,11 +1619,11 @@ var System = struct {
 	TotalJobs: SystemTotalJobsContext{
 		Context: framework.Context[EmptyLabels]{
 			Name:        "as400.total_jobs",
-			Family:      "jobs",
+			Family:      "workloads/jobs",
 			Title:       "Total Jobs in System",
 			Units:       "jobs",
 			Type:        module.Line,
-			Priority:    1100,
+			Priority:    501,
 			UpdateEvery: 1,
 			Dimensions: []framework.Dimension{
 				{
@@ -1640,11 +1640,11 @@ var System = struct {
 	ActiveJobsByType: SystemActiveJobsByTypeContext{
 		Context: framework.Context[EmptyLabels]{
 			Name:        "as400.active_jobs_by_type",
-			Family:      "jobs",
+			Family:      "workloads/jobs",
 			Title:       "Active Jobs by Type",
 			Units:       "jobs",
 			Type:        module.Stacked,
-			Priority:    1110,
+			Priority:    502,
 			UpdateEvery: 1,
 			Dimensions: []framework.Dimension{
 				{
@@ -1675,11 +1675,11 @@ var System = struct {
 	JobQueueLength: SystemJobQueueLengthContext{
 		Context: framework.Context[EmptyLabels]{
 			Name:        "as400.job_queue_length",
-			Family:      "jobs",
+			Family:      "workloads/jobs",
 			Title:       "Job Queue Length",
 			Units:       "jobs",
 			Type:        module.Line,
-			Priority:    1120,
+			Priority:    503,
 			UpdateEvery: 1,
 			Dimensions: []framework.Dimension{
 				{
@@ -1696,11 +1696,11 @@ var System = struct {
 	MainStorageSize: SystemMainStorageSizeContext{
 		Context: framework.Context[EmptyLabels]{
 			Name:        "as400.main_storage_size",
-			Family:      "memory",
+			Family:      "memory/overview",
 			Title:       "Main Storage Size",
 			Units:       "KiB",
 			Type:        module.Line,
-			Priority:    1200,
+			Priority:    201,
 			UpdateEvery: 1,
 			Dimensions: []framework.Dimension{
 				{
@@ -1717,11 +1717,11 @@ var System = struct {
 	TemporaryStorage: SystemTemporaryStorageContext{
 		Context: framework.Context[EmptyLabels]{
 			Name:        "as400.temporary_storage",
-			Family:      "memory",
+			Family:      "storage/temp/overview",
 			Title:       "Temporary Storage",
 			Units:       "MiB",
 			Type:        module.Line,
-			Priority:    1210,
+			Priority:    304,
 			UpdateEvery: 1,
 			Dimensions: []framework.Dimension{
 				{
@@ -1745,11 +1745,11 @@ var System = struct {
 	MemoryPoolUsage: SystemMemoryPoolUsageContext{
 		Context: framework.Context[EmptyLabels]{
 			Name:        "as400.memory_pool_usage",
-			Family:      "memory",
+			Family:      "memory/pools",
 			Title:       "Memory Pool Usage",
 			Units:       "bytes",
 			Type:        module.Stacked,
-			Priority:    1220,
+			Priority:    203,
 			UpdateEvery: 1,
 			Dimensions: []framework.Dimension{
 				{
@@ -1787,11 +1787,11 @@ var System = struct {
 	MemoryPoolDefined: SystemMemoryPoolDefinedContext{
 		Context: framework.Context[EmptyLabels]{
 			Name:        "as400.memory_pool_defined",
-			Family:      "memory",
+			Family:      "memory/pools",
 			Title:       "Memory Pool Defined Size",
 			Units:       "bytes",
 			Type:        module.Stacked,
-			Priority:    1230,
+			Priority:    204,
 			UpdateEvery: 1,
 			Dimensions: []framework.Dimension{
 				{
@@ -1815,11 +1815,11 @@ var System = struct {
 	MemoryPoolReserved: SystemMemoryPoolReservedContext{
 		Context: framework.Context[EmptyLabels]{
 			Name:        "as400.memory_pool_reserved",
-			Family:      "memory",
+			Family:      "memory/pools",
 			Title:       "Memory Pool Reserved Size",
 			Units:       "bytes",
 			Type:        module.Stacked,
-			Priority:    1240,
+			Priority:    205,
 			UpdateEvery: 1,
 			Dimensions: []framework.Dimension{
 				{
@@ -1843,11 +1843,11 @@ var System = struct {
 	MemoryPoolThreads: SystemMemoryPoolThreadsContext{
 		Context: framework.Context[EmptyLabels]{
 			Name:        "as400.memory_pool_threads",
-			Family:      "memory",
+			Family:      "memory/pools",
 			Title:       "Memory Pool Threads",
 			Units:       "threads",
 			Type:        module.Line,
-			Priority:    1250,
+			Priority:    206,
 			UpdateEvery: 1,
 			Dimensions: []framework.Dimension{
 				{
@@ -1871,11 +1871,11 @@ var System = struct {
 	MemoryPoolMaxThreads: SystemMemoryPoolMaxThreadsContext{
 		Context: framework.Context[EmptyLabels]{
 			Name:        "as400.memory_pool_max_threads",
-			Family:      "memory",
+			Family:      "memory/pools",
 			Title:       "Memory Pool Maximum Threads",
 			Units:       "threads",
 			Type:        module.Line,
-			Priority:    1260,
+			Priority:    207,
 			UpdateEvery: 1,
 			Dimensions: []framework.Dimension{
 				{
@@ -1899,11 +1899,11 @@ var System = struct {
 	DiskBusyAverage: SystemDiskBusyAverageContext{
 		Context: framework.Context[EmptyLabels]{
 			Name:        "as400.disk_busy_average",
-			Family:      "disk_aggregate",
+			Family:      "storage/disk/summary",
 			Title:       "Average Disk Busy Percentage",
 			Units:       "percentage",
 			Type:        module.Line,
-			Priority:    1300,
+			Priority:    306,
 			UpdateEvery: 1,
 			Dimensions: []framework.Dimension{
 				{
@@ -1920,11 +1920,11 @@ var System = struct {
 	SystemASPUsage: SystemSystemASPUsageContext{
 		Context: framework.Context[EmptyLabels]{
 			Name:        "as400.system_asp_usage",
-			Family:      "storage",
+			Family:      "storage/asp",
 			Title:       "System ASP Usage",
 			Units:       "percentage",
 			Type:        module.Line,
-			Priority:    1310,
+			Priority:    301,
 			UpdateEvery: 1,
 			Dimensions: []framework.Dimension{
 				{
@@ -1941,11 +1941,11 @@ var System = struct {
 	SystemASPStorage: SystemSystemASPStorageContext{
 		Context: framework.Context[EmptyLabels]{
 			Name:        "as400.system_asp_storage",
-			Family:      "storage",
+			Family:      "storage/asp",
 			Title:       "System ASP Storage",
 			Units:       "MiB",
 			Type:        module.Line,
-			Priority:    1320,
+			Priority:    302,
 			UpdateEvery: 1,
 			Dimensions: []framework.Dimension{
 				{
@@ -1962,11 +1962,11 @@ var System = struct {
 	TotalAuxiliaryStorage: SystemTotalAuxiliaryStorageContext{
 		Context: framework.Context[EmptyLabels]{
 			Name:        "as400.total_auxiliary_storage",
-			Family:      "storage",
+			Family:      "storage/asp",
 			Title:       "Total Auxiliary Storage",
 			Units:       "MiB",
 			Type:        module.Line,
-			Priority:    1330,
+			Priority:    303,
 			UpdateEvery: 1,
 			Dimensions: []framework.Dimension{
 				{
@@ -1983,11 +1983,11 @@ var System = struct {
 	SystemThreads: SystemSystemThreadsContext{
 		Context: framework.Context[EmptyLabels]{
 			Name:        "as400.system_threads",
-			Family:      "threads",
+			Family:      "compute/threads",
 			Title:       "System Threads",
 			Units:       "threads",
 			Type:        module.Line,
-			Priority:    1400,
+			Priority:    104,
 			UpdateEvery: 1,
 			Dimensions: []framework.Dimension{
 				{
@@ -2011,11 +2011,11 @@ var System = struct {
 	NetworkConnections: SystemNetworkConnectionsContext{
 		Context: framework.Context[EmptyLabels]{
 			Name:        "as400.network_connections",
-			Family:      "network",
+			Family:      "network/summary",
 			Title:       "Network Connections",
 			Units:       "connections",
 			Type:        module.Line,
-			Priority:    1500,
+			Priority:    401,
 			UpdateEvery: 1,
 			Dimensions: []framework.Dimension{
 				{
@@ -2039,11 +2039,11 @@ var System = struct {
 	NetworkConnectionStates: SystemNetworkConnectionStatesContext{
 		Context: framework.Context[EmptyLabels]{
 			Name:        "as400.network_connection_states",
-			Family:      "network",
+			Family:      "network/summary",
 			Title:       "Network Connection States",
 			Units:       "connections",
 			Type:        module.Line,
-			Priority:    1510,
+			Priority:    402,
 			UpdateEvery: 1,
 			Dimensions: []framework.Dimension{
 				{
@@ -2067,11 +2067,11 @@ var System = struct {
 	TempStorageTotal: SystemTempStorageTotalContext{
 		Context: framework.Context[EmptyLabels]{
 			Name:        "as400.temp_storage_total",
-			Family:      "temp_storage_total",
+			Family:      "storage/temp/overview",
 			Title:       "Temporary Storage Total",
 			Units:       "bytes",
 			Type:        module.Line,
-			Priority:    1600,
+			Priority:    304,
 			UpdateEvery: 1,
 			Dimensions: []framework.Dimension{
 				{
@@ -2095,11 +2095,11 @@ var System = struct {
 	SystemActivityCPURate: SystemSystemActivityCPURateContext{
 		Context: framework.Context[EmptyLabels]{
 			Name:        "as400.system_activity_cpu_rate",
-			Family:      "system_activity",
+			Family:      "compute/activity",
 			Title:       "System CPU Rate",
 			Units:       "percentage",
 			Type:        module.Line,
-			Priority:    1700,
+			Priority:    105,
 			UpdateEvery: 1,
 			Dimensions: []framework.Dimension{
 				{
@@ -2116,11 +2116,11 @@ var System = struct {
 	SystemActivityCPUUtilization: SystemSystemActivityCPUUtilizationContext{
 		Context: framework.Context[EmptyLabels]{
 			Name:        "as400.system_activity_cpu_utilization",
-			Family:      "system_activity",
+			Family:      "compute/activity",
 			Title:       "System CPU Utilization",
 			Units:       "percentage",
 			Type:        module.Line,
-			Priority:    1710,
+			Priority:    106,
 			UpdateEvery: 1,
 			Dimensions: []framework.Dimension{
 				{
@@ -2194,11 +2194,11 @@ var TempStorageBucket = struct {
 	Usage: TempStorageBucketUsageContext{
 		Context: framework.Context[TempStorageBucketLabels]{
 			Name:        "as400.temp_storage_bucket",
-			Family:      "temp_storage_buckets",
+			Family:      "storage/temp/buckets",
 			Title:       "Temporary Storage Bucket Usage",
 			Units:       "bytes",
 			Type:        module.Line,
-			Priority:    2300,
+			Priority:    305,
 			UpdateEvery: 1,
 			Dimensions: []framework.Dimension{
 				{
