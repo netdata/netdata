@@ -11,13 +11,13 @@ import (
 	"strconv"
 )
 
-func (d *DB2) collectTableInstances(ctx context.Context) error {
-	if d.MaxTables <= 0 {
+func (c *Collector) collectTableInstances(ctx context.Context) error {
+	if c.MaxTables <= 0 {
 		return nil
 	}
 
 	var currentTable, currentSchema, key string
-	err := d.doQuery(ctx, queryTableInstances, func(column, value string, lineEnd bool) {
+	err := c.doQuery(ctx, queryTableInstances, func(column, value string, lineEnd bool) {
 		switch column {
 		case "TABSCHEMA":
 			currentSchema = value
@@ -25,54 +25,53 @@ func (d *DB2) collectTableInstances(ctx context.Context) error {
 			currentTable = value
 			key = fmt.Sprintf("%s.%s", currentSchema, currentTable)
 
-			if d.tableSelector != nil && !d.tableSelector.MatchString(key) {
+			if c.tableSelector != nil && !c.tableSelector.MatchString(key) {
 				key = ""
 				return
 			}
 
-			if _, exists := d.tables[key]; !exists {
-				d.tables[key] = &tableMetrics{name: key}
-				d.addTableCharts(d.tables[key])
+			if _, exists := c.tables[key]; !exists {
+				c.tables[key] = &tableMetrics{name: key}
 			}
-			d.mx.tables[key] = tableInstanceMetrics{}
+			c.mx.tables[key] = tableInstanceMetrics{}
 		case "DATA_OBJECT_P_SIZE":
 			if key != "" {
 				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-					metrics := d.mx.tables[key]
+					metrics := c.mx.tables[key]
 					metrics.DataSize = v
-					d.mx.tables[key] = metrics
+					c.mx.tables[key] = metrics
 				}
 			}
 		case "INDEX_OBJECT_P_SIZE":
 			if key != "" {
 				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-					metrics := d.mx.tables[key]
+					metrics := c.mx.tables[key]
 					metrics.IndexSize = v
-					d.mx.tables[key] = metrics
+					c.mx.tables[key] = metrics
 				}
 			}
 		case "LONG_OBJECT_P_SIZE":
 			if key != "" {
 				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-					metrics := d.mx.tables[key]
+					metrics := c.mx.tables[key]
 					metrics.LongObjSize = v
-					d.mx.tables[key] = metrics
+					c.mx.tables[key] = metrics
 				}
 			}
 		case "ROWS_READ":
 			if key != "" {
 				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-					metrics := d.mx.tables[key]
+					metrics := c.mx.tables[key]
 					metrics.RowsRead = v
-					d.mx.tables[key] = metrics
+					c.mx.tables[key] = metrics
 				}
 			}
 		case "ROWS_WRITTEN":
 			if key != "" {
 				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-					metrics := d.mx.tables[key]
+					metrics := c.mx.tables[key]
 					metrics.RowsWritten = v
-					d.mx.tables[key] = metrics
+					c.mx.tables[key] = metrics
 				}
 			}
 		}

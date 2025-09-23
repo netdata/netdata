@@ -13,34 +13,32 @@ import (
 )
 
 // collectMemoryPoolInstances collects memory pool metrics
-func (d *DB2) collectMemoryPoolInstances(ctx context.Context) error {
+func (c *Collector) collectMemoryPoolInstances(ctx context.Context) error {
 	// Initialize maps if needed
-	if d.mx.memoryPools == nil {
-		d.mx.memoryPools = make(map[string]memoryPoolInstanceMetrics)
+	if c.mx.memoryPools == nil {
+		c.mx.memoryPools = make(map[string]memoryPoolInstanceMetrics)
 	}
 
 	// Mark all pools as not updated
-	for _, pool := range d.memoryPools {
+	for _, pool := range c.memoryPools {
 		pool.updated = false
 	}
 
 	var currentPoolType string
 	var currentMetrics memoryPoolInstanceMetrics
 
-	err := d.doQuery(ctx, queryMonGetMemoryPool, func(column, value string, lineEnd bool) {
+	err := c.doQuery(ctx, queryMonGetMemoryPool, func(column, value string, lineEnd bool) {
 		switch column {
 		case "MEMORY_POOL_TYPE":
 			currentPoolType = cleanName(value)
 
 			// Create pool metadata if new
-			if _, exists := d.memoryPools[currentPoolType]; !exists {
-				d.memoryPools[currentPoolType] = &memoryPoolMetrics{
+			if _, exists := c.memoryPools[currentPoolType]; !exists {
+				c.memoryPools[currentPoolType] = &memoryPoolMetrics{
 					poolType: value,
 				}
-				// Add charts for new pool
-				d.addMemoryPoolCharts(d.memoryPools[currentPoolType])
 			}
-			d.memoryPools[currentPoolType].updated = true
+			c.memoryPools[currentPoolType].updated = true
 
 		case "MEMORY_POOL_USED":
 			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
@@ -55,7 +53,7 @@ func (d *DB2) collectMemoryPoolInstances(ctx context.Context) error {
 
 		// At end of row, save metrics
 		if lineEnd && currentPoolType != "" {
-			d.mx.memoryPools[currentPoolType] = currentMetrics
+			c.mx.memoryPools[currentPoolType] = currentMetrics
 			currentPoolType = ""
 			currentMetrics = memoryPoolInstanceMetrics{}
 		}
@@ -66,11 +64,10 @@ func (d *DB2) collectMemoryPoolInstances(ctx context.Context) error {
 	}
 
 	// Remove stale pools
-	for poolType, pool := range d.memoryPools {
+	for poolType, pool := range c.memoryPools {
 		if !pool.updated {
-			delete(d.memoryPools, poolType)
-			d.removeMemoryPoolCharts(poolType)
-			delete(d.mx.memoryPools, poolType)
+			delete(c.memoryPools, poolType)
+			delete(c.mx.memoryPools, poolType)
 		}
 	}
 
@@ -78,11 +75,11 @@ func (d *DB2) collectMemoryPoolInstances(ctx context.Context) error {
 }
 
 // collectConnectionWaits collects enhanced wait metrics for connections
-func (d *DB2) collectConnectionWaits(ctx context.Context) error {
+func (c *Collector) collectConnectionWaits(ctx context.Context) error {
 	// This enhances existing connection metrics with wait time details
 	// We add wait metrics to the existing connection instance metrics
 
-	if !d.CollectWaitMetrics || d.MaxConnections <= 0 {
+	if !c.CollectWaitMetrics || c.MaxConnections <= 0 {
 		return nil
 	}
 
@@ -129,7 +126,7 @@ func (d *DB2) collectConnectionWaits(ctx context.Context) error {
 		TotalRollbackTime int64
 	}
 
-	err := d.doQuery(ctx, query, func(column, value string, lineEnd bool) {
+	err := c.doQuery(ctx, query, func(column, value string, lineEnd bool) {
 		switch column {
 		case "APPLICATION_ID":
 			currentAppID = strings.TrimSpace(value)
@@ -213,7 +210,7 @@ func (d *DB2) collectConnectionWaits(ctx context.Context) error {
 		// At end of row, add wait metrics to existing connection metrics
 		if lineEnd && currentAppID != "" {
 			// Only update if we already track this connection
-			if metrics, exists := d.mx.connections[currentAppID]; exists {
+			if metrics, exists := c.mx.connections[currentAppID]; exists {
 				// Add wait time metrics to existing connection metrics
 				metrics.TotalWaitTime = waitMetrics.TotalWaitTime
 				metrics.LockWaitTime = waitMetrics.LockWaitTime
@@ -231,7 +228,7 @@ func (d *DB2) collectConnectionWaits(ctx context.Context) error {
 				metrics.TotalCommitTime = waitMetrics.TotalCommitTime
 				metrics.TotalRollbackTime = waitMetrics.TotalRollbackTime
 
-				d.mx.connections[currentAppID] = metrics
+				c.mx.connections[currentAppID] = metrics
 			}
 
 			// Reset for next row
@@ -264,20 +261,20 @@ func (d *DB2) collectConnectionWaits(ctx context.Context) error {
 }
 
 // collectTableIOInstances collects table I/O statistics
-func (d *DB2) collectTableIOInstances(ctx context.Context) error {
-	if d.MaxTables <= 0 {
+func (c *Collector) collectTableIOInstances(ctx context.Context) error {
+	if c.MaxTables <= 0 {
 		return nil
 	}
 
 	// Initialize maps if needed
-	if d.mx.tableIOs == nil {
-		d.mx.tableIOs = make(map[string]tableIOInstanceMetrics)
+	if c.mx.tableIOs == nil {
+		c.mx.tableIOs = make(map[string]tableIOInstanceMetrics)
 	}
 
-	d.Debugf("collectTableIOInstances: starting collection, MaxTables=%d", d.MaxTables)
+	c.Debugf("collectTableIOInstances: starting collection, MaxTables=%d", c.MaxTables)
 
 	// Mark all tables as not updated for I/O metrics
-	for _, table := range d.tables {
+	for _, table := range c.tables {
 		table.ioUpdated = false
 	}
 
@@ -287,7 +284,7 @@ func (d *DB2) collectTableIOInstances(ctx context.Context) error {
 	var currentMetrics tableIOInstanceMetrics
 	collected := 0
 
-	err := d.doQuery(ctx, query, func(column, value string, lineEnd bool) {
+	err := c.doQuery(ctx, query, func(column, value string, lineEnd bool) {
 		switch column {
 		case "TABSCHEMA":
 			if value != "" {
@@ -299,14 +296,12 @@ func (d *DB2) collectTableIOInstances(ctx context.Context) error {
 			cleanName := cleanName(currentTableName)
 
 			// Create table metadata if new
-			if _, exists := d.tables[cleanName]; !exists {
-				d.tables[cleanName] = &tableMetrics{
+			if _, exists := c.tables[cleanName]; !exists {
+				c.tables[cleanName] = &tableMetrics{
 					name: currentTableName,
 				}
-				// Add charts for new table
-				d.addTableIOCharts(d.tables[cleanName])
 			}
-			d.tables[cleanName].ioUpdated = true
+			c.tables[cleanName].ioUpdated = true
 			collected++
 
 		case "TABLE_SCANS":
@@ -343,7 +338,7 @@ func (d *DB2) collectTableIOInstances(ctx context.Context) error {
 		// At end of row, save metrics
 		if lineEnd && currentTableName != "" {
 			cleanName := cleanName(currentTableName)
-			d.mx.tableIOs[cleanName] = currentMetrics
+			c.mx.tableIOs[cleanName] = currentMetrics
 			currentTableName = ""
 			currentMetrics = tableIOInstanceMetrics{}
 		}
@@ -354,19 +349,17 @@ func (d *DB2) collectTableIOInstances(ctx context.Context) error {
 	}
 
 	// Remove stale table I/O metrics
-	for name, table := range d.tables {
-		if table.ioUpdated == false && d.mx.tableIOs[name].RowsRead > 0 {
-			// Only remove if it was being tracked for I/O
-			d.removeTableIOCharts(name)
-			delete(d.mx.tableIOs, name)
+	for name, table := range c.tables {
+		if !table.ioUpdated {
+			delete(c.mx.tableIOs, name)
 		}
 	}
 
-	if collected == d.MaxTables {
-		d.Debugf("reached max_tables limit (%d) for I/O metrics, some tables may not be collected", d.MaxTables)
+	if collected == c.MaxTables {
+		c.Debugf("reached max_tables limit (%d) for I/O metrics, some tables may not be collected", c.MaxTables)
 	}
 
-	d.Debugf("collectTableIOInstances: completed, collected=%d tables, tableIOs map size=%d", collected, len(d.mx.tableIOs))
+	c.Debugf("collectTableIOInstances: completed, collected=%d tables, tableIOs map size=%d", collected, len(c.mx.tableIOs))
 
 	return nil
 }

@@ -1,0 +1,119 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "properties": {
+      "backup_history_days": {
+        "default": 30,
+        "title": "Backup history days",
+        "type": "integer"
+      },
+      "collect_bufferpools_matching": {
+        "default": "",
+        "title": "Enable collection of bufferpools matching metrics",
+        "type": "string"
+      },
+      "collect_connections_matching": {
+        "default": "",
+        "title": "Enable collection of connections matching metrics",
+        "type": "string"
+      },
+      "collect_databases_matching": {
+        "default": "",
+        "title": "Enable collection of databases matching metrics",
+        "type": "string"
+      },
+      "collect_indexes_matching": {
+        "default": "",
+        "title": "Enable collection of indexes matching metrics",
+        "type": "string"
+      },
+      "collect_memory_metrics": {
+        "default": true,
+        "title": "Enable collection of memory metrics metrics",
+        "type": "boolean"
+      },
+      "collect_table_io_metrics": {
+        "default": true,
+        "title": "Enable collection of table i o metrics metrics",
+        "type": "boolean"
+      },
+      "collect_tables_matching": {
+        "default": "",
+        "title": "Enable collection of tables matching metrics",
+        "type": "string"
+      },
+      "collect_tablespaces_matching": {
+        "default": "",
+        "title": "Enable collection of tablespaces matching metrics",
+        "type": "string"
+      },
+      "collect_wait_metrics": {
+        "default": true,
+        "title": "Enable collection of wait metrics metrics",
+        "type": "boolean"
+      },
+      "dsn": {
+        "default": "",
+        "title": "Data Source Name (DSN) for connection",
+        "type": "string"
+      },
+      "max_bufferpools": {
+        "default": 20,
+        "title": "Maximum number of bufferpools to monitor",
+        "type": "integer"
+      },
+      "max_connections": {
+        "default": 200,
+        "title": "Maximum number of connections to monitor",
+        "type": "integer"
+      },
+      "max_databases": {
+        "default": 10,
+        "title": "Maximum number of databases to monitor",
+        "type": "integer"
+      },
+      "max_db_conns": {
+        "default": 1,
+        "title": "Maximum number of db conns to monitor",
+        "type": "integer"
+      },
+      "max_db_life_time": {
+        "title": "Maximum number of db life time to monitor",
+        "type": "integer"
+      },
+      "max_indexes": {
+        "default": 100,
+        "title": "Maximum number of indexes to monitor",
+        "type": "integer"
+      },
+      "max_tables": {
+        "default": 50,
+        "title": "Maximum number of tables to monitor",
+        "type": "integer"
+      },
+      "max_tablespaces": {
+        "default": 100,
+        "title": "Maximum number of tablespaces to monitor",
+        "type": "integer"
+      },
+      "timeout": {
+        "title": "Connection timeout duration in seconds",
+        "type": "integer"
+      },
+      "update_every": {
+        "default": 5,
+        "minimum": 1,
+        "title": "Data collection frequency in seconds",
+        "type": "integer"
+      },
+      "vnode": {
+        "default": "",
+        "title": "Vnode",
+        "type": "string"
+      }
+    },
+    "required": null,
+    "title": "db2 collector configuration",
+    "type": "object"
+  }
+}

@@ -179,18 +179,18 @@ type memoryPoolMetrics struct {
 	updated  bool
 }
 
-func (d *DB2) getTableMetrics(name string) *tableMetrics {
-	if _, ok := d.tables[name]; !ok {
-		d.tables[name] = &tableMetrics{name: name}
+func (c *Collector) getTableMetrics(name string) *tableMetrics {
+	if _, ok := c.tables[name]; !ok {
+		c.tables[name] = &tableMetrics{name: name}
 	}
-	return d.tables[name]
+	return c.tables[name]
 }
 
-func (d *DB2) getIndexMetrics(name string) *indexMetrics {
-	if _, ok := d.indexes[name]; !ok {
-		d.indexes[name] = &indexMetrics{name: name}
+func (c *Collector) getIndexMetrics(name string) *indexMetrics {
+	if _, ok := c.indexes[name]; !ok {
+		c.indexes[name] = &indexMetrics{name: name}
 	}
-	return d.indexes[name]
+	return c.indexes[name]
 }
 
 type databaseInstanceMetrics struct {

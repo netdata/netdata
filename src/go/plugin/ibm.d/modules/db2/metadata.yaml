@@ -1,0 +1,698 @@
+# Generated metadata.yaml for db2 module
+plugin_name: ibm.d.plugin
+modules:
+  - meta:
+      plugin_name: ibm.d.plugin
+      module_name: db2
+      monitored_instance:
+        name: IBM DB2
+        link: https://www.ibm.com/products/db2
+        categories:
+          - data-collection.database-servers
+        icon_filename: "ibm.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - db2
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          Monitors IBM DB2 databases using system catalog views and MON_GET_* table
+functions to expose connections, locking, buffer pool efficiency, tablespace
+capacity, and workload performance metrics.
+
+        method_description: |
+          The collector connects to IBM DB2 and collects metrics via its monitoring interface.
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+    setup:
+      prerequisites:
+        list:
+          - title: Enable monitoring interface
+            description: |
+              Ensure the IBM DB2 monitoring interface is accessible.
+      configuration:
+        file:
+          name: ibm.d/db2.conf
+        options:
+          description: |
+            Configuration options for the db2 collector.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+            - name: endpoint
+              description: Connection endpoint.
+              default_value: "dummy://localhost"
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: Config
+          list:
+            - name: Basic
+              description: Basic configuration example.
+              config: |
+                jobs:
+                  - name: local
+                    endpoint: dummy://localhost
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: bufferpool
+          description: These metrics refer to bufferpool instances.
+          labels:
+            - name: bufferpool
+              description: Bufferpool identifier
+            - name: page_size
+              description: Page_size identifier
+          metrics:
+            - name: db2.bufferpool_instance_hit_ratio
+              description: Buffer Pool Hit Ratio
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: overall
+            - name: db2.bufferpool_instance_detailed_hit_ratio
+              description: Buffer Pool Detailed Hit Ratios
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: data
+                - name: index
+                - name: xda
+                - name: column
+            - name: db2.bufferpool_instance_reads
+              description: Buffer Pool Reads
+              unit: reads/s
+              chart_type: stacked
+              dimensions:
+                - name: logical
+                - name: physical
+            - name: db2.bufferpool_instance_data_reads
+              description: Buffer Pool Data Page Reads
+              unit: reads/s
+              chart_type: stacked
+              dimensions:
+                - name: logical
+                - name: physical
+            - name: db2.bufferpool_instance_index_reads
+              description: Buffer Pool Index Page Reads
+              unit: reads/s
+              chart_type: stacked
+              dimensions:
+                - name: logical
+                - name: physical
+            - name: db2.bufferpool_instance_pages
+              description: Buffer Pool Pages
+              unit: pages
+              chart_type: stacked
+              dimensions:
+                - name: used
+                - name: total
+            - name: db2.bufferpool_instance_writes
+              description: Buffer Pool Writes
+              unit: writes/s
+              chart_type: line
+              dimensions:
+                - name: writes
+        - name: connection
+          description: These metrics refer to connection instances.
+          labels:
+            - name: application_id
+              description: Application_id identifier
+            - name: application_name
+              description: Application_name identifier
+            - name: client_hostname
+              description: Client_hostname identifier
+            - name: client_ip
+              description: Client_ip identifier
+            - name: client_user
+              description: Client_user identifier
+            - name: state
+              description: State identifier
+          metrics:
+            - name: db2.connection_state
+              description: Connection State
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: state
+            - name: db2.connection_activity
+              description: Connection Row Activity
+              unit: rows/s
+              chart_type: area
+              dimensions:
+                - name: read
+                - name: written
+            - name: db2.connection_wait_time
+              description: Connection Wait Time
+              unit: milliseconds
+              chart_type: stacked
+              dimensions:
+                - name: lock
+                - name: log_disk
+                - name: log_buffer
+                - name: pool_read
+                - name: pool_write
+                - name: direct_read
+                - name: direct_write
+                - name: fcm_recv
+                - name: fcm_send
+            - name: db2.connection_processing_time
+              description: Connection Processing Time
+              unit: milliseconds
+              chart_type: stacked
+              dimensions:
+                - name: routine
+                - name: compile
+                - name: section
+                - name: commit
+                - name: rollback
+        - name: database
+          description: These metrics refer to database instances.
+          labels:
+            - name: database
+              description: Database identifier
+            - name: status
+              description: Status identifier
+          metrics:
+            - name: db2.database_instance_status
+              description: Database Status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: status
+            - name: db2.database_applications
+              description: Database Applications
+              unit: applications
+              chart_type: line
+              dimensions:
+                - name: applications
+        - name: index
+          description: These metrics refer to index instances.
+          labels:
+            - name: index
+              description: Index identifier
+          metrics:
+            - name: db2.index_usage
+              description: Index Usage
+              unit: scans/s
+              chart_type: area
+              dimensions:
+                - name: index
+                - name: full
+        - name: memorypool
+          description: These metrics refer to memorypool instances.
+          labels:
+            - name: pool_type
+              description: Pool_type identifier
+          metrics:
+            - name: db2.memory_pool_usage
+              description: Memory Pool Usage
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: used
+            - name: db2.memory_pool_hwm
+              description: Memory Pool High Water Mark
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: hwm
+        - name: memoryset
+          description: These metrics refer to memoryset instances.
+          labels:
+            - name: host
+              description: Host identifier
+            - name: database
+              description: Database identifier
+            - name: set_type
+              description: Set_type identifier
+            - name: member
+              description: Member identifier
+          metrics:
+            - name: db2.memory_set_usage
+              description: Memory Set Usage
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: used
+            - name: db2.memory_set_committed
+              description: Memory Set Committed
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: committed
+            - name: db2.memory_set_high_water_mark
+              description: Memory Set High Water Mark
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: hwm
+            - name: db2.memory_set_additional_committed
+              description: Memory Set Additional Committed
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: additional
+            - name: db2.memory_set_percent_used_hwm
+              description: Memory Set Percent Used vs HWM
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: used_hwm
+        - name: prefetcher
+          description: These metrics refer to prefetcher instances.
+          labels:
+            - name: bufferpool
+              description: Bufferpool identifier
+          metrics:
+            - name: db2.prefetcher_prefetch_ratio
+              description: Prefetcher Prefetch Ratio
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: ratio
+            - name: db2.prefetcher_cleaner_ratio
+              description: Prefetcher Cleaner Ratio
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: ratio
+            - name: db2.prefetcher_physical_reads
+              description: Prefetcher Physical Reads
+              unit: reads/s
+              chart_type: line
+              dimensions:
+                - name: reads
+            - name: db2.prefetcher_async_reads
+              description: Prefetcher Asynchronous Reads
+              unit: reads/s
+              chart_type: line
+              dimensions:
+                - name: reads
+            - name: db2.prefetcher_wait_time
+              description: Prefetcher Wait Time
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: wait_time
+            - name: db2.prefetcher_unread_pages
+              description: Prefetcher Unread Pages
+              unit: pages/s
+              chart_type: line
+              dimensions:
+                - name: unread
+        - name: global
+          description: These metrics refer to the entire monitored instance.
+          labels: []
+          metrics:
+            - name: db2.service_health
+              description: Service Health Status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: connection
+                - name: database
+            - name: db2.connections
+              description: Database Connections
+              unit: connections
+              chart_type: line
+              dimensions:
+                - name: total
+                - name: active
+                - name: executing
+                - name: idle
+                - name: max_allowed
+            - name: db2.locking
+              description: Database Locking
+              unit: events/s
+              chart_type: line
+              dimensions:
+                - name: waits
+                - name: timeouts
+                - name: escalations
+            - name: db2.deadlocks
+              description: Database Deadlocks
+              unit: deadlocks/s
+              chart_type: line
+              dimensions:
+                - name: deadlocks
+            - name: db2.lock_details
+              description: Lock Details
+              unit: locks
+              chart_type: line
+              dimensions:
+                - name: active
+                - name: waiting_agents
+                - name: memory_pages
+            - name: db2.lock_wait_time
+              description: Average Lock Wait Time
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: wait_time
+            - name: db2.sorting
+              description: Database Sorting
+              unit: sorts/s
+              chart_type: stacked
+              dimensions:
+                - name: sorts
+                - name: overflows
+            - name: db2.row_activity
+              description: Row Activity
+              unit: rows/s
+              chart_type: area
+              dimensions:
+                - name: read
+                - name: returned
+                - name: modified
+            - name: db2.bufferpool_hit_ratio
+              description: Buffer Pool Hit Ratio
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: hits
+                - name: misses
+            - name: db2.bufferpool_data_hit_ratio
+              description: Buffer Pool Data Page Hit Ratio
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: hits
+                - name: misses
+            - name: db2.bufferpool_index_hit_ratio
+              description: Buffer Pool Index Page Hit Ratio
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: hits
+                - name: misses
+            - name: db2.bufferpool_xda_hit_ratio
+              description: Buffer Pool XDA Page Hit Ratio
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: hits
+                - name: misses
+            - name: db2.bufferpool_column_hit_ratio
+              description: Buffer Pool Column Page Hit Ratio
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: hits
+                - name: misses
+            - name: db2.bufferpool_reads
+              description: Buffer Pool Reads
+              unit: reads/s
+              chart_type: stacked
+              dimensions:
+                - name: logical
+                - name: physical
+            - name: db2.bufferpool_data_reads
+              description: Buffer Pool Data Page Reads
+              unit: reads/s
+              chart_type: stacked
+              dimensions:
+                - name: logical
+                - name: physical
+            - name: db2.bufferpool_index_reads
+              description: Buffer Pool Index Page Reads
+              unit: reads/s
+              chart_type: stacked
+              dimensions:
+                - name: logical
+                - name: physical
+            - name: db2.bufferpool_xda_reads
+              description: Buffer Pool XDA Page Reads
+              unit: reads/s
+              chart_type: stacked
+              dimensions:
+                - name: logical
+                - name: physical
+            - name: db2.bufferpool_column_reads
+              description: Buffer Pool Column Page Reads
+              unit: reads/s
+              chart_type: stacked
+              dimensions:
+                - name: logical
+                - name: physical
+            - name: db2.bufferpool_writes
+              description: Buffer Pool Writes
+              unit: writes/s
+              chart_type: line
+              dimensions:
+                - name: writes
+            - name: db2.log_space
+              description: Log Space Usage
+              unit: bytes
+              chart_type: stacked
+              dimensions:
+                - name: used
+                - name: available
+            - name: db2.log_utilization
+              description: Log Space Utilization
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: utilization
+            - name: db2.log_io
+              description: Log I/O Operations
+              unit: operations/s
+              chart_type: area
+              dimensions:
+                - name: reads
+                - name: writes
+            - name: db2.log_operations
+              description: Log Operations
+              unit: operations/s
+              chart_type: line
+              dimensions:
+                - name: commits
+                - name: rollbacks
+                - name: reads
+                - name: writes
+            - name: db2.log_timing
+              description: Log Operation Times
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: avg_commit
+                - name: avg_read
+                - name: avg_write
+            - name: db2.log_buffer_events
+              description: Log Buffer Full Events
+              unit: events/s
+              chart_type: line
+              dimensions:
+                - name: buffer_full
+            - name: db2.long_running_queries
+              description: Long Running Queries
+              unit: queries
+              chart_type: stacked
+              dimensions:
+                - name: total
+                - name: warning
+                - name: critical
+            - name: db2.backup_status
+              description: Last Backup Status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: status
+            - name: db2.backup_age
+              description: Time Since Last Backup
+              unit: hours
+              chart_type: line
+              dimensions:
+                - name: full
+                - name: incremental
+            - name: db2.federation_connections
+              description: Federated Connections
+              unit: connections
+              chart_type: line
+              dimensions:
+                - name: active
+                - name: idle
+            - name: db2.federation_operations
+              description: Federated Operations
+              unit: operations/s
+              chart_type: line
+              dimensions:
+                - name: rows_read
+                - name: selects
+                - name: waits
+            - name: db2.database_status
+              description: Current Database Status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: active
+                - name: inactive
+            - name: db2.database_count
+              description: Database Count
+              unit: databases
+              chart_type: line
+              dimensions:
+                - name: active
+                - name: inactive
+            - name: db2.cpu_usage
+              description: CPU Usage (100% = 1 CPU core)
+              unit: percentage
+              chart_type: stacked
+              dimensions:
+                - name: user
+                - name: system
+                - name: idle
+                - name: iowait
+            - name: db2.active_connections
+              description: Active Connections
+              unit: connections
+              chart_type: line
+              dimensions:
+                - name: active
+                - name: total
+            - name: db2.memory_usage
+              description: Memory Usage
+              unit: MiB
+              chart_type: stacked
+              dimensions:
+                - name: database
+                - name: instance
+                - name: bufferpool
+                - name: shared_sort
+            - name: db2.sql_statements
+              description: SQL Statements
+              unit: statements/s
+              chart_type: stacked
+              dimensions:
+                - name: selects
+                - name: modifications
+            - name: db2.transaction_activity
+              description: Transaction Activity
+              unit: transactions/s
+              chart_type: stacked
+              dimensions:
+                - name: committed
+                - name: aborted
+            - name: db2.time_spent
+              description: Average Operation Times
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: direct_read
+                - name: direct_write
+                - name: pool_read
+                - name: pool_write
+        - name: table
+          description: These metrics refer to table instances.
+          labels:
+            - name: table
+              description: Table identifier
+          metrics:
+            - name: db2.table_size
+              description: Table Size
+              unit: bytes
+              chart_type: stacked
+              dimensions:
+                - name: data
+                - name: index
+                - name: long_obj
+            - name: db2.table_activity
+              description: Table Activity
+              unit: rows/s
+              chart_type: area
+              dimensions:
+                - name: read
+                - name: written
+        - name: tableio
+          description: These metrics refer to tableio instances.
+          labels:
+            - name: table
+              description: Table identifier
+          metrics:
+            - name: db2.table_io_scans
+              description: Table Scans
+              unit: scans/s
+              chart_type: line
+              dimensions:
+                - name: scans
+            - name: db2.table_io_rows
+              description: Table Row Operations
+              unit: rows/s
+              chart_type: line
+              dimensions:
+                - name: read
+            - name: db2.table_io_activity
+              description: Table DML Activity
+              unit: operations/s
+              chart_type: stacked
+              dimensions:
+                - name: inserts
+                - name: updates
+                - name: deletes
+            - name: db2.table_io_overflow
+              description: Table Overflow Accesses
+              unit: accesses/s
+              chart_type: line
+              dimensions:
+                - name: overflow
+        - name: tablespace
+          description: These metrics refer to tablespace instances.
+          labels:
+            - name: tablespace
+              description: Tablespace identifier
+            - name: type
+              description: Type identifier
+            - name: content_type
+              description: Content_type identifier
+            - name: state
+              description: State identifier
+          metrics:
+            - name: db2.tablespace_usage
+              description: Tablespace Usage
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: used
+            - name: db2.tablespace_size
+              description: Tablespace Size
+              unit: bytes
+              chart_type: stacked
+              dimensions:
+                - name: used
+                - name: free
+            - name: db2.tablespace_usable_size
+              description: Tablespace Usable Size
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: total
+                - name: usable
+            - name: db2.tablespace_state
+              description: Tablespace State
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: state

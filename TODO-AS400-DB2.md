@@ -78,9 +78,9 @@ We will ship the migration in two phases so we can validate each module before t
 5. Remove legacy AS400 code once confidence is high. ✅ Legacy collector removed.
 
 **Phase 2 – DB2**
-6. Extend shared analysis for any DB2-specific pieces still pending.
-7. DB2 context YAML + generated code.
-8. DB2 protocol + collector implementation.
+6. Extend shared analysis for any DB2-specific pieces still pending. ✅ Done.
+7. DB2 context YAML + generated code. ✅ Done.
+8. DB2 protocol + collector implementation. ✅ Collector migrated to framework with protocol client.
 9. DB2 validation with the four local instances.
 10. Remove legacy DB2 code.
 
