@@ -2085,7 +2085,8 @@
             updateHistoryFlowIndicator();
 
             try {
-                await dispatchRequest(request, { awaitResponse: false });
+                const shouldAwaitResponse = currentTransport !== 'websocket';
+                await dispatchRequest(request, { awaitResponse: shouldAwaitResponse });
             } catch (err) {
                 log('Request failed: ' + err.message);
             }
@@ -2302,10 +2303,13 @@
 
                     buffer += decoder.decode(value, { stream: true });
 
+                    let normalized = buffer.replace(/\r\n/g, '\n');
+                    let lastProcessedIndex = 0;
                     let separatorIndex;
-                    while ((separatorIndex = buffer.indexOf('\n\n')) !== -1) {
-                        const rawEvent = buffer.slice(0, separatorIndex);
-                        buffer = buffer.slice(separatorIndex + 2);
+
+                    while ((separatorIndex = normalized.indexOf('\n\n', lastProcessedIndex)) !== -1) {
+                        const rawEvent = normalized.slice(lastProcessedIndex, separatorIndex);
+                        lastProcessedIndex = separatorIndex + 2;
 
                         const parsed = parseSseEvent(rawEvent);
                         if (!parsed) {
@@ -2326,12 +2330,15 @@
                             });
 
                             if (event && event.toLowerCase() === 'complete') {
+                                buffer = normalized.slice(lastProcessedIndex);
                                 return;
                             }
                         } catch (error) {
                             log('Failed to parse SSE data: ' + error.message + ' (' + data + ')');
                         }
                     }
+
+                    buffer = normalized.slice(lastProcessedIndex);
                 }
             } finally {
                 activeSseController = null;
@@ -2350,20 +2357,22 @@
             const lines = rawEvent.split('\n');
             const result = { event: 'message', data: '' };
 
-            for (const line of lines) {
-                if (line.startsWith('event:')) {
-                    result.event = line.slice(6).trim();
-                } else if (line.startsWith('data:')) {
-                    let value = line.slice(5);
-                    if (value.startsWith(' ')) {
-                        value = value.slice(1);
-                    }
-                    result.data += result.data ? '\n' + value : value;
+        for (const line of lines) {
+            if (line.startsWith('event:')) {
+                result.event = line.slice(6).trim();
+            } else if (line.startsWith('data:')) {
+                let value = line.slice(5);
+                if (value.startsWith(' ')) {
+                    value = value.slice(1);
                 }
+                value = value.replace(/\r/g, '');
+                result.data += result.data ? '\n' + value : value;
             }
-
-            return result.data ? result : null;
         }
+
+        result.data = result.data.trim();
+        return result.data ? result : null;
+    }
 
         function handleIncomingTransportPayload(payload, meta = {}) {
             if (payload === null || payload === undefined) {
