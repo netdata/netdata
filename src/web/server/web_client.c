@@ -2,6 +2,8 @@
 
 #include "web_client.h"
 #include "web/websocket/websocket.h"
+#include "web/mcp/adapters/mcp-http.h"
+#include "web/mcp/adapters/mcp-sse.h"
 
 // this is an async I/O implementation of the web server request parser
 // it is used by all netdata web servers
@@ -1115,7 +1117,9 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
             hash_v0 = 0,
             hash_v1 = 0,
             hash_v2 = 0,
-            hash_v3 = 0;
+            hash_v3 = 0,
+            hash_mcp = 0,
+            hash_sse = 0;
 
 #ifdef NETDATA_INTERNAL_CHECKS
     static uint32_t hash_exit = 0, hash_debug = 0, hash_mirror = 0;
@@ -1130,6 +1134,8 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
         hash_v1 = simple_hash("v1");
         hash_v2 = simple_hash("v2");
         hash_v3 = simple_hash("v3");
+        hash_mcp = simple_hash("mcp");
+        hash_sse = simple_hash("sse");
 #ifdef NETDATA_INTERNAL_CHECKS
         hash_exit = simple_hash("exit");
         hash_debug = simple_hash("debug");
@@ -1149,6 +1155,16 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
         if(likely(hash == hash_api && strcmp(tok, "api") == 0)) {                           // current API
             netdata_log_debug(D_WEB_CLIENT_ACCESS, "%llu: API request ...", w->id);
             return check_host_and_call(host, w, decoded_url_path, web_client_api_request);
+        }
+        else if(likely(hash == hash_mcp && strcmp(tok, "mcp") == 0)) {
+            if(unlikely(!http_can_access_dashboard(w)))
+                return web_client_permission_denied_acl(w);
+            return mcp_http_handle_request(host, w);
+        }
+        else if(likely(hash == hash_sse && strcmp(tok, "sse") == 0)) {
+            if(unlikely(!http_can_access_dashboard(w)))
+                return web_client_permission_denied_acl(w);
+            return mcp_sse_handle_request(host, w);
         }
         else if(unlikely((hash == hash_host && strcmp(tok, "host") == 0) || (hash == hash_node && strcmp(tok, "node") == 0))) { // host switching
             netdata_log_debug(D_WEB_CLIENT_ACCESS, "%llu: host switch request ...", w->id);
