@@ -1,10 +1,10 @@
 # Netdata MCP Web Client
 
-A web-based client for testing and interacting with Netdata's Model Context Protocol (MCP) server via WebSocket.
+A web-based client for testing and interacting with Netdata's Model Context Protocol (MCP) server over WebSocket, streamable HTTP, or Server-Sent Events (SSE).
 
 ## Features
 
-- **WebSocket Connection**: Connect to any MCP server via WebSocket
+- **Multi-transport support**: Connect to MCP over WebSocket, HTTP chunked responses, or SSE
 - **Schema Validation**: Validates tool schemas against MCP specification
 - **Custom UI Generator**: Lightweight form generator for tool parameters
 - **JSON Pretty Printing**: Advanced formatting with syntax highlighting
@@ -20,11 +20,12 @@ A web-based client for testing and interacting with Netdata's Model Context Prot
 ## Usage
 
 1. Open `index.html` in a web browser
-2. Enter your MCP WebSocket URL (default: `ws://localhost:19999/mcp`)
-3. Click "Connect"
+2. Enter your MCP endpoint URL (defaults to `ws://localhost:19999/mcp`)
+   - WebSocket URLs (`ws://` / `wss://`) connect automatically over WebSocket
+   - HTTP/HTTPS URLs show a selector to choose between **Streamable HTTP** and **SSE**
+3. Click "Connect" or "Connect and Handshake" to run the full capability discovery flow
 4. Use the interface to:
-   - Initialize the connection
-   - List available tools
+   - Initialize the connection and fetch tool, prompt, and resource lists automatically
    - Call tools with parameters
    - View formatted responses
 
