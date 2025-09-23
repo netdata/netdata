@@ -10,17 +10,19 @@ metadata:
       vendor:
         value: "Cisco"
 
-sysobjectid:
-  - 1.3.6.1.4.1.9.1.957 # Cisco WAVE 674
-  - 1.3.6.1.4.1.9.1.985 # Cisco WAVE 574
-  - 1.3.6.1.4.1.9.1.986 # Cisco WAVE 474
-  - 1.3.6.1.4.1.9.1.987 # Cisco WAVE 274
-  - 1.3.6.1.4.1.9.1.1349 # Cisco WAVE 8541
-  - 1.3.6.1.4.1.9.1.1350 # Cisco WAVE 7571
-  - 1.3.6.1.4.1.9.1.1351 # Cisco WAVE 7541
-  - 1.3.6.1.4.1.9.1.1352 # Cisco WAVE 694
-  - 1.3.6.1.4.1.9.1.1353 # Cisco WAVE 594
-  - 1.3.6.1.4.1.9.1.1354 # Cisco WAVE 294
+selector:
+  - sysobjectid:
+      include:
+        - 1.3.6.1.4.1.9.1.957 # Cisco WAVE 674
+        - 1.3.6.1.4.1.9.1.985 # Cisco WAVE 574
+        - 1.3.6.1.4.1.9.1.986 # Cisco WAVE 474
+        - 1.3.6.1.4.1.9.1.987 # Cisco WAVE 274
+        - 1.3.6.1.4.1.9.1.1349 # Cisco WAVE 8541
+        - 1.3.6.1.4.1.9.1.1350 # Cisco WAVE 7571
+        - 1.3.6.1.4.1.9.1.1351 # Cisco WAVE 7541
+        - 1.3.6.1.4.1.9.1.1352 # Cisco WAVE 694
+        - 1.3.6.1.4.1.9.1.1353 # Cisco WAVE 594
+        - 1.3.6.1.4.1.9.1.1354 # Cisco WAVE 294
 
 metrics:
   - MIB: CISCO-CONTENT-ENGINE-MIB

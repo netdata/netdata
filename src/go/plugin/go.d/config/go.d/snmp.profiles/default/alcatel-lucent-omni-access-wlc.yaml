@@ -1,8 +1,10 @@
 extends:
   - alcatel-lucent.yaml
 
-sysobjectid:
-  - 1.3.6.1.4.1.6486.800.1.1.2.2.2.*
+selector:
+  - sysobjectid:
+      include:
+        - 1.3.6.1.4.1.6486.800.1.1.2.2.2.* # Alcatel-Lucent OmniAccess WLC and Switches
 
 metadata:
   device:

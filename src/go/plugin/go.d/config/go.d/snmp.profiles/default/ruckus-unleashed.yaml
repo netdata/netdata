@@ -1,13 +1,15 @@
 extends:
   - ruckus.yaml
 
-sysobjectid:
-  - 1.3.6.1.4.1.25053.3.1.5.*  # Ruckus ZoneDirector
-  - 1.3.6.1.4.1.25053.3.1.5.1  # Ruckus ZD1000
-  - 1.3.6.1.4.1.25053.3.1.5.2  # Ruckus ZD1100
-  - 1.3.6.1.4.1.25053.3.1.5.3  # Ruckus ZD3000
-  - 1.3.6.1.4.1.25053.3.1.5.8  # Ruckus ZD5000
-  - 1.3.6.1.4.1.25053.3.1.5.15  # Ruckus ZD1200
+selector:
+  - sysobjectid:
+      include:
+        - 1.3.6.1.4.1.25053.3.1.5.*  # Ruckus ZoneDirector
+        - 1.3.6.1.4.1.25053.3.1.5.1  # Ruckus ZD1000
+        - 1.3.6.1.4.1.25053.3.1.5.2  # Ruckus ZD1100
+        - 1.3.6.1.4.1.25053.3.1.5.3  # Ruckus ZD3000
+        - 1.3.6.1.4.1.25053.3.1.5.8  # Ruckus ZD5000
+        - 1.3.6.1.4.1.25053.3.1.5.15  # Ruckus ZD1200
 
 metadata:
   device:

@@ -5,10 +5,12 @@ extends:
   - _std-ucd-mib.yaml
   - _opengear.yaml
 
-sysobjectid:
-  - 1.3.6.1.4.1.25049.1.*     # Open Gear Console Managers
-  - 1.3.6.1.4.1.25049.1.10    # CM41xx series Console Managers
-  - 1.3.6.1.4.1.25049.1.11    # CM71xx series Console Managers
+selector:
+  - sysobjectid:
+      include:
+        - 1.3.6.1.4.1.25049.1.*     # Open Gear Console Managers
+        - 1.3.6.1.4.1.25049.1.10    # CM41xx series Console Managers
+        - 1.3.6.1.4.1.25049.1.11    # CM71xx series Console Managers
 
 # OG-STATUSv2-MIB
 # https://mibbrowser.online/mibdb_search.php?mib=OG-STATUSv2-MIB

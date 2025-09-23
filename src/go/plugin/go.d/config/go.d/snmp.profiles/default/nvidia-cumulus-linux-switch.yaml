@@ -3,8 +3,10 @@ extends:
   - _std-ucd-mib.yaml
   - nvidia.yaml
 
-sysobjectid:
-  - 1.3.6.1.4.1.40310
+selector:
+  - sysobjectid:
+      include:
+        - 1.3.6.1.4.1.40310
 
 metadata:
   device:

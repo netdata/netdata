@@ -2,8 +2,10 @@ extends:
   - _dell.yaml
   - _std-if-mib.yaml
 
-sysobjectid:
-  - 1.3.6.1.4.1.8741.1  # SonicWALL TZ 400
+selector:
+  - sysobjectid:
+      include:
+        - 1.3.6.1.4.1.8741.1  # SonicWALL TZ 400
 
 metadata:
   device:

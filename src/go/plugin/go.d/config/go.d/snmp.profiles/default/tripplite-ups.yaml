@@ -2,8 +2,10 @@ extends:
   - _std-ups-mib.yaml
   - tripplite.yaml
 
-sysobjectid:
-  - 1.3.6.1.4.1.850.1.1.3.1 #  tlpHardware.tlpDeviceTypes.tlpUps
+selector:
+  - sysobjectid:
+      include:
+        - 1.3.6.1.4.1.850.1.1.3.1 #  tlpHardware.tlpDeviceTypes.tlpUps
 
 metadata:
   device:

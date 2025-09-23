@@ -1,8 +1,10 @@
 extends:
   - alcatel-lucent.yaml
 
-sysobjectid:
-  - 1.3.6.1.4.1.6486.800.1.1.2.1.*
+selector:
+  - sysobjectid:
+      include:
+        - 1.3.6.1.4.1.6486.800.1.1.2.1.*
 
 # metadata:
 #   device:
@@ -44,7 +46,7 @@ sysobjectid:
 
 #       - OID: 1.3.6.1.4.1.6486.800.1.1.1.1.1.1.1.1
 #         name: alcatel.ind.chasEntPhysAdminStatus
-        
+
 #         mapping:
 #           1: unknown
 #           2: power_off
@@ -97,7 +99,7 @@ sysobjectid:
 #           OID: 1.3.6.1.2.1.47.1.1.1.1.13
 #           name: alcatel.ind.entPhysicalModelName
 #         tag: ent_physical_model_name
-      
+
 #       - symbol:
 #           OID: 1.3.6.1.4.1.6486.800.1.1.1.1.1.1.1.2
 #           name: alcatel.ind.chasEntPhysOperStatus
