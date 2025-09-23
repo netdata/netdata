@@ -12,7 +12,7 @@ import (
 )
 
 // countActiveJobs returns the number of active jobs for cardinality check
-func (a *AS400) countActiveJobs(ctx context.Context) (int, error) {
+func (a *Collector) countActiveJobs(ctx context.Context) (int, error) {
 	var count int
 	err := a.doQueryRow(ctx, queryCountActiveJobs, func(column, value string) {
 		if column == "COUNT" {
@@ -25,7 +25,7 @@ func (a *AS400) countActiveJobs(ctx context.Context) (int, error) {
 }
 
 // collectActiveJobs collects metrics for top CPU-consuming active jobs
-func (a *AS400) collectActiveJobs(ctx context.Context) error {
+func (a *Collector) collectActiveJobs(ctx context.Context) error {
 	// Check if feature is enabled
 	if a.CollectActiveJobs == nil || !*a.CollectActiveJobs {
 		return nil
@@ -41,48 +41,41 @@ func (a *AS400) collectActiveJobs(ctx context.Context) error {
 		// We'll collect only top N by CPU usage
 	}
 
-	// Mark all jobs as not updated
-	for _, job := range a.activeJobs {
-		job.updated = false
-	}
-
 	// Query for top active jobs by CPU usage
 	query := fmt.Sprintf(queryTopActiveJobs, a.MaxActiveJobs)
 
-	var currentJobName string
+	var (
+		currentJobName string
+		currentJob     *activeJobMetrics
+	)
 	err := a.doQuery(ctx, query, func(column, value string, lineEnd bool) {
 		switch column {
 		case "JOB_NAME":
 			currentJobName = value
-
-			job := a.getActiveJobMetrics(currentJobName)
-			job.updated = true
-
-			// Add charts on first encounter
-			if !job.hasCharts {
-				job.hasCharts = true
-				a.addActiveJobCharts(job)
+			currentJob = a.getActiveJobMetrics(currentJobName)
+			if currentJob != nil {
+				currentJob.jobName = value
 			}
 
 		case "JOB_STATUS":
-			if currentJobName != "" && a.activeJobs[currentJobName] != nil {
-				a.activeJobs[currentJobName].jobStatus = value
+			if currentJob != nil {
+				currentJob.jobStatus = value
 			}
 
 		case "SUBSYSTEM":
-			if currentJobName != "" && a.activeJobs[currentJobName] != nil {
-				a.activeJobs[currentJobName].subsystem = value
+			if currentJob != nil {
+				currentJob.subsystem = value
 			}
 
 		case "JOB_TYPE":
-			if currentJobName != "" && a.activeJobs[currentJobName] != nil {
-				a.activeJobs[currentJobName].jobType = value
+			if currentJob != nil {
+				currentJob.jobType = value
 			}
 
 		case "ELAPSED_CPU_TIME":
-			if currentJobName != "" && a.activeJobs[currentJobName] != nil {
+			if currentJob != nil {
 				if v, err := strconv.ParseFloat(value, 64); err == nil {
-					a.activeJobs[currentJobName].elapsedCPUTime = int64(v)
+					currentJob.elapsedCPUTime = int64(v)
 					if m, ok := a.mx.activeJobs[currentJobName]; ok {
 						m.ElapsedCPUTime = int64(v)
 						a.mx.activeJobs[currentJobName] = m
@@ -95,9 +88,9 @@ func (a *AS400) collectActiveJobs(ctx context.Context) error {
 			}
 
 		case "ELAPSED_TIME":
-			if currentJobName != "" && a.activeJobs[currentJobName] != nil {
+			if currentJob != nil {
 				if v, err := strconv.ParseFloat(value, 64); err == nil {
-					a.activeJobs[currentJobName].elapsedTime = int64(v)
+					currentJob.elapsedTime = int64(v)
 					if m, ok := a.mx.activeJobs[currentJobName]; ok {
 						m.ElapsedTime = int64(v)
 						a.mx.activeJobs[currentJobName] = m
@@ -106,11 +99,11 @@ func (a *AS400) collectActiveJobs(ctx context.Context) error {
 			}
 
 		case "TEMPORARY_STORAGE":
-			if currentJobName != "" && a.activeJobs[currentJobName] != nil {
+			if currentJob != nil {
 				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
 					// Convert KB to MB
 					vMB := v / 1024
-					a.activeJobs[currentJobName].temporaryStorage = vMB
+					currentJob.temporaryStorage = vMB
 					if m, ok := a.mx.activeJobs[currentJobName]; ok {
 						m.TemporaryStorage = vMB
 						a.mx.activeJobs[currentJobName] = m
@@ -119,9 +112,9 @@ func (a *AS400) collectActiveJobs(ctx context.Context) error {
 			}
 
 		case "CPU_PERCENTAGE":
-			if currentJobName != "" && a.activeJobs[currentJobName] != nil {
+			if currentJob != nil {
 				if v, err := strconv.ParseFloat(value, 64); err == nil {
-					a.activeJobs[currentJobName].cpuPercentage = int64(v * precision)
+					currentJob.cpuPercentage = int64(v * precision)
 					if m, ok := a.mx.activeJobs[currentJobName]; ok {
 						m.CPUPercentage = int64(v * precision)
 						a.mx.activeJobs[currentJobName] = m
@@ -130,9 +123,9 @@ func (a *AS400) collectActiveJobs(ctx context.Context) error {
 			}
 
 		case "ELAPSED_INTERACTIVE_TRANSACTIONS":
-			if currentJobName != "" && a.activeJobs[currentJobName] != nil {
+			if currentJob != nil {
 				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-					a.activeJobs[currentJobName].interactiveTransactions = v
+					currentJob.interactiveTransactions = v
 					if m, ok := a.mx.activeJobs[currentJobName]; ok {
 						m.ElapsedInteractiveTransactions = v
 						a.mx.activeJobs[currentJobName] = m
@@ -141,9 +134,9 @@ func (a *AS400) collectActiveJobs(ctx context.Context) error {
 			}
 
 		case "ELAPSED_TOTAL_DISK_IO_COUNT":
-			if currentJobName != "" && a.activeJobs[currentJobName] != nil {
+			if currentJob != nil {
 				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-					a.activeJobs[currentJobName].diskIO = v
+					currentJob.diskIO = v
 					if m, ok := a.mx.activeJobs[currentJobName]; ok {
 						m.ElapsedDiskIO = v
 						a.mx.activeJobs[currentJobName] = m
@@ -152,9 +145,9 @@ func (a *AS400) collectActiveJobs(ctx context.Context) error {
 			}
 
 		case "THREAD_COUNT":
-			if currentJobName != "" && a.activeJobs[currentJobName] != nil {
+			if currentJob != nil {
 				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-					a.activeJobs[currentJobName].threadCount = v
+					currentJob.threadCount = v
 					if m, ok := a.mx.activeJobs[currentJobName]; ok {
 						m.ThreadCount = v
 						a.mx.activeJobs[currentJobName] = m
@@ -163,9 +156,9 @@ func (a *AS400) collectActiveJobs(ctx context.Context) error {
 			}
 
 		case "RUN_PRIORITY":
-			if currentJobName != "" && a.activeJobs[currentJobName] != nil {
+			if currentJob != nil {
 				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-					a.activeJobs[currentJobName].runPriority = v
+					currentJob.runPriority = v
 				}
 			}
 		}
@@ -173,16 +166,6 @@ func (a *AS400) collectActiveJobs(ctx context.Context) error {
 
 	if err != nil {
 		return err
-	}
-
-	// Remove stale jobs
-	for jobName, job := range a.activeJobs {
-		if !job.updated {
-			delete(a.activeJobs, jobName)
-			delete(a.mx.activeJobs, jobName)
-			a.removeActiveJobCharts(jobName)
-			a.Debugf("Removed stale active job: %s", jobName)
-		}
 	}
 
 	return nil

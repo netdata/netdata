@@ -21,9 +21,6 @@ type diskMetrics struct {
 	hardwareStatus   string // Hardware status from SYSDISKSTAT
 	diskModel        string // Disk model from SYSDISKSTAT
 	serialNumber     string // Serial number from SYSDISKSTAT
-
-	updated   bool
-	hasCharts bool
 }
 
 // subsystemMetrics holds metrics for an individual subsystem
@@ -37,9 +34,6 @@ type subsystemMetrics struct {
 	poolID      int64
 	maxJobs     int64
 	currentJobs int64
-
-	updated   bool
-	hasCharts bool
 }
 
 // jobQueueMetrics holds metrics for an individual job queue
@@ -52,9 +46,6 @@ type jobQueueMetrics struct {
 	jobsScheduled int64
 	maxJobs       int64
 	priority      int64
-
-	updated   bool
-	hasCharts bool
 }
 
 // messageQueueMetrics holds metrics for an individual message queue
@@ -63,9 +54,6 @@ type messageQueueMetrics struct {
 	library      string
 	messageCount int64
 	oldestHours  int64
-
-	updated   bool
-	hasCharts bool
 }
 
 // tempStorageMetrics holds metrics for a named temporary storage bucket
@@ -73,9 +61,6 @@ type tempStorageMetrics struct {
 	name        string
 	currentSize int64
 	peakSize    int64
-
-	updated   bool
-	hasCharts bool
 }
 
 // activeJobMetrics holds metrics for an individual active job
@@ -92,9 +77,6 @@ type activeJobMetrics struct {
 	interactiveTransactions int64
 	diskIO                  int64
 	threadCount             int64
-
-	updated   bool
-	hasCharts bool
 }
 
 type networkInterfaceMetrics struct {
@@ -106,13 +88,10 @@ type networkInterfaceMetrics struct {
 	networkAddress  string // NETWORK_ADDRESS
 	subnetMask      string // INTERFACE_SUBNET_MASK
 	mtu             int64  // MAXIMUM_TRANSMISSION_UNIT
-
-	updated   bool
-	hasCharts bool
 }
 
 // Per-instance metric methods
-func (a *AS400) getDiskMetrics(unit string) *diskMetrics {
+func (a *Collector) getDiskMetrics(unit string) *diskMetrics {
 	if _, ok := a.disks[unit]; !ok {
 		a.disks[unit] = &diskMetrics{
 			unit:             unit,
@@ -127,42 +106,42 @@ func (a *AS400) getDiskMetrics(unit string) *diskMetrics {
 	return a.disks[unit]
 }
 
-func (a *AS400) getSubsystemMetrics(name string) *subsystemMetrics {
+func (a *Collector) getSubsystemMetrics(name string) *subsystemMetrics {
 	if _, ok := a.subsystems[name]; !ok {
 		a.subsystems[name] = &subsystemMetrics{name: name}
 	}
 	return a.subsystems[name]
 }
 
-func (a *AS400) getJobQueueMetrics(key string) *jobQueueMetrics {
+func (a *Collector) getJobQueueMetrics(key string) *jobQueueMetrics {
 	if _, ok := a.jobQueues[key]; !ok {
 		a.jobQueues[key] = &jobQueueMetrics{}
 	}
 	return a.jobQueues[key]
 }
 
-func (a *AS400) getMessageQueueMetrics(key string) *messageQueueMetrics {
+func (a *Collector) getMessageQueueMetrics(key string) *messageQueueMetrics {
 	if _, ok := a.messageQueues[key]; !ok {
 		a.messageQueues[key] = &messageQueueMetrics{}
 	}
 	return a.messageQueues[key]
 }
 
-func (a *AS400) getTempStorageMetrics(name string) *tempStorageMetrics {
+func (a *Collector) getTempStorageMetrics(name string) *tempStorageMetrics {
 	if _, ok := a.tempStorageNamed[name]; !ok {
 		a.tempStorageNamed[name] = &tempStorageMetrics{name: name}
 	}
 	return a.tempStorageNamed[name]
 }
 
-func (a *AS400) getActiveJobMetrics(jobName string) *activeJobMetrics {
+func (a *Collector) getActiveJobMetrics(jobName string) *activeJobMetrics {
 	if _, ok := a.activeJobs[jobName]; !ok {
 		a.activeJobs[jobName] = &activeJobMetrics{jobName: jobName}
 	}
 	return a.activeJobs[jobName]
 }
 
-func (a *AS400) getNetworkInterfaceMetrics(name string) *networkInterfaceMetrics {
+func (a *Collector) getNetworkInterfaceMetrics(name string) *networkInterfaceMetrics {
 	if _, ok := a.networkInterfaces[name]; !ok {
 		a.networkInterfaces[name] = &networkInterfaceMetrics{name: name}
 	}

@@ -1,0 +1,117 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "properties": {
+      "collect_disks_matching": {
+        "default": "",
+        "title": "Pattern to filter disk (wildcards supported)",
+        "type": "string"
+      },
+      "collect_job_queues_matching": {
+        "default": "",
+        "title": "Pattern to filter job queue (wildcards supported)",
+        "type": "string"
+      },
+      "collect_subsystems_matching": {
+        "default": "",
+        "title": "Pattern to filter subsystem (wildcards supported)",
+        "type": "string"
+      },
+      "connection_type": {
+        "default": "odbc",
+        "title": "Connection type",
+        "type": "string"
+      },
+      "database": {
+        "default": "*SYSBAS",
+        "title": "Database",
+        "type": "string"
+      },
+      "dsn": {
+        "default": "",
+        "title": "Data Source Name (DSN) for connection",
+        "type": "string"
+      },
+      "hostname": {
+        "default": "",
+        "title": "Server hostname or IP address",
+        "type": "string"
+      },
+      "max_active_jobs": {
+        "default": 100,
+        "title": "Maximum number of active jobs to monitor",
+        "type": "integer"
+      },
+      "max_db_conns": {
+        "default": 1,
+        "title": "Maximum number of db conns to monitor",
+        "type": "integer"
+      },
+      "max_db_life_time": {
+        "title": "Maximum number of db life time to monitor",
+        "type": "integer"
+      },
+      "max_disks": {
+        "default": 100,
+        "title": "Maximum number of disks to monitor",
+        "type": "integer"
+      },
+      "max_job_queues": {
+        "default": 100,
+        "title": "Maximum number of job queues to monitor",
+        "type": "integer"
+      },
+      "max_subsystems": {
+        "default": 100,
+        "title": "Maximum number of subsystems to monitor",
+        "type": "integer"
+      },
+      "odbc_driver": {
+        "default": "IBM i Access ODBC Driver",
+        "title": "O d b c driver",
+        "type": "string"
+      },
+      "password": {
+        "default": "",
+        "format": "password",
+        "title": "Password for authentication",
+        "type": "string"
+      },
+      "port": {
+        "default": 8471,
+        "maximum": 65535,
+        "minimum": 1,
+        "title": "Server port number",
+        "type": "integer"
+      },
+      "timeout": {
+        "title": "Connection timeout duration in seconds",
+        "type": "integer"
+      },
+      "update_every": {
+        "default": 10,
+        "minimum": 1,
+        "title": "Data collection frequency in seconds",
+        "type": "integer"
+      },
+      "use_ssl": {
+        "default": false,
+        "title": "Enable SSL/TLS encrypted connection",
+        "type": "boolean"
+      },
+      "username": {
+        "default": "",
+        "title": "Username for authentication",
+        "type": "string"
+      },
+      "vnode": {
+        "default": "",
+        "title": "Vnode",
+        "type": "string"
+      }
+    },
+    "required": null,
+    "title": "as400 collector configuration",
+    "type": "object"
+  }
+}

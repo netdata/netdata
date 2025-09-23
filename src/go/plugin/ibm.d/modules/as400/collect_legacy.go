@@ -10,6 +10,7 @@ import (
 	"database/sql"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/stm"
@@ -89,20 +90,15 @@ func isSystemMetric(key string) bool {
 	return systemMetrics[key]
 }
 
-func (a *AS400) collect(ctx context.Context) (map[string]int64, error) {
+func (a *Collector) collect(ctx context.Context) (map[string]int64, error) {
 	startTime := time.Now()
 	defer func() {
 		duration := time.Since(startTime)
 		a.Debugf("collection iteration completed in %v", duration)
 	}()
 
-	if a.db == nil {
-		db, err := a.initDatabase(ctx)
-		if err != nil {
-			return nil, err
-		}
-		a.db = db
-	}
+	// Ensure per-instance caches start fresh for this iteration
+	a.resetInstanceCaches()
 
 	// Reset metrics - initialize all instance maps
 	a.mx = &metricsData{
@@ -115,22 +111,6 @@ func (a *AS400) collect(ctx context.Context) (map[string]int64, error) {
 
 	// Create final metrics map - only populate with successfully collected metrics
 	mx := make(map[string]int64)
-
-	// Test connection with a ping before proceeding
-	if err := a.ping(ctx); err != nil {
-		// Try to reconnect once
-		a.Cleanup(ctx)
-		db, err := a.initDatabase(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to reconnect to database: %v", err)
-		}
-		a.db = db
-
-		// Retry ping
-		if err := a.ping(ctx); err != nil {
-			return nil, fmt.Errorf("database connection failed after reconnect: %v", err)
-		}
-	}
 
 	// Collect system-wide metrics - only add to mx if collection succeeds
 	if err := a.collectSystemStatus(ctx); err == nil {
@@ -324,9 +304,6 @@ func (a *AS400) collect(ctx context.Context) (map[string]int64, error) {
 		}
 	}
 
-	// Cleanup stale instances
-	a.cleanupStaleInstances()
-
 	// Add per-instance metrics
 	// Disks
 	for unit, metrics := range a.mx.disks {
@@ -406,7 +383,7 @@ func (a *AS400) collect(ctx context.Context) (map[string]int64, error) {
 	return mx, nil
 }
 
-func (a *AS400) collectSystemStatus(ctx context.Context) error {
+func (a *Collector) collectSystemStatus(ctx context.Context) error {
 	// Use comprehensive query to get all system status metrics at once
 	err := a.doQuery(ctx, querySystemStatus, func(column, value string, lineEnd bool) {
 		// Skip empty values
@@ -494,7 +471,7 @@ func (a *AS400) collectSystemStatus(ctx context.Context) error {
 	return nil
 }
 
-func (a *AS400) collectMemoryPools(ctx context.Context) error {
+func (a *Collector) collectMemoryPools(ctx context.Context) error {
 	var currentPoolName string
 	return a.doQuery(ctx, queryMemoryPools, func(column, value string, lineEnd bool) {
 		switch column {
@@ -553,7 +530,7 @@ func (a *AS400) collectMemoryPools(ctx context.Context) error {
 	})
 }
 
-func (a *AS400) collectDiskStatus(ctx context.Context) error {
+func (a *Collector) collectDiskStatus(ctx context.Context) error {
 	// Try modern query first
 	err := a.doQuery(ctx, queryDiskStatus, func(column, value string, lineEnd bool) {
 		if column == "AVG_DISK_BUSY" {
@@ -566,7 +543,7 @@ func (a *AS400) collectDiskStatus(ctx context.Context) error {
 	return err
 }
 
-func (a *AS400) collectJobInfo(ctx context.Context) error {
+func (a *Collector) collectJobInfo(ctx context.Context) error {
 	// Try modern query first
 	err := a.doQuery(ctx, queryJobInfo, func(column, value string, lineEnd bool) {
 		if column == "JOB_QUEUE_LENGTH" {
@@ -579,11 +556,8 @@ func (a *AS400) collectJobInfo(ctx context.Context) error {
 	return err
 }
 
-func (a *AS400) doQuery(ctx context.Context, query string, assign func(column, value string, lineEnd bool)) error {
-	queryCtx, cancel := context.WithTimeout(ctx, time.Duration(a.Timeout))
-	defer cancel()
-
-	rows, err := a.db.QueryContext(queryCtx, query)
+func (a *Collector) doQuery(ctx context.Context, query string, assign func(column, value string, lineEnd bool)) error {
+	rows, err := a.client.QueryRows(ctx, query)
 	if err != nil {
 		// Log expected SQL feature errors at DEBUG level to reduce noise
 		if isSQLFeatureError(err) {
@@ -600,7 +574,7 @@ func (a *AS400) doQuery(ctx context.Context, query string, assign func(column, v
 	return a.readRows(rows, assign)
 }
 
-func (a *AS400) readRows(rows *sql.Rows, assign func(column, value string, lineEnd bool)) error {
+func (a *Collector) readRows(rows *sql.Rows, assign func(column, value string, lineEnd bool)) error {
 	columns, err := rows.Columns()
 	if err != nil {
 		return err
@@ -630,11 +604,8 @@ func (a *AS400) readRows(rows *sql.Rows, assign func(column, value string, lineE
 }
 
 // doQueryRow executes a query that returns a single row
-func (a *AS400) doQueryRow(ctx context.Context, query string, assign func(column, value string)) error {
-	queryCtx, cancel := context.WithTimeout(ctx, time.Duration(a.Timeout))
-	defer cancel()
-
-	rows, err := a.db.QueryContext(queryCtx, query)
+func (a *Collector) doQueryRow(ctx context.Context, query string, assign func(column, value string)) error {
+	rows, err := a.client.QueryRows(ctx, query)
 	if err != nil {
 		if isSQLFeatureError(err) {
 			a.Debugf("query failed with expected feature error: %s, error: %v", query, err)
@@ -677,7 +648,7 @@ func (a *AS400) doQueryRow(ctx context.Context, query string, assign func(column
 
 // Per-instance collection methods
 
-func (a *AS400) collectDiskInstances(ctx context.Context) error {
+func (a *Collector) collectDiskInstances(ctx context.Context) error {
 	// First check cardinality if we haven't yet
 	if len(a.disks) == 0 && a.MaxDisks > 0 {
 		count, err := a.countDisks(ctx)
@@ -702,14 +673,7 @@ func (a *AS400) collectDiskInstances(ctx context.Context) error {
 				return
 			}
 
-			disk := a.getDiskMetrics(currentUnit)
-			disk.updated = true
-
-			// Add charts on first encounter
-			if !disk.hasCharts {
-				disk.hasCharts = true
-				a.addDiskCharts(disk)
-			}
+			_ = a.getDiskMetrics(currentUnit)
 
 		case "UNIT_TYPE":
 			if currentUnit != "" && a.disks[currentUnit] != nil {
@@ -724,8 +688,6 @@ func (a *AS400) collectDiskInstances(ctx context.Context) error {
 				default:
 					a.disks[currentUnit].typeField = value // Keep unknown values as-is
 				}
-				// Update labels on existing charts for this disk
-				a.updateDiskChartLabels(currentUnit)
 			}
 		case "UNIT_MODEL":
 			if currentUnit != "" && a.disks[currentUnit] != nil {
@@ -846,11 +808,6 @@ func (a *AS400) collectDiskInstances(ctx context.Context) error {
 							SSDLifeRemaining: v,
 						}
 					}
-					// Add SSD health chart if not already present
-					ssdHealthChartID := fmt.Sprintf("disk_%s_ssd_health", cleanName(disk.unit))
-					if a.Charts().Get(ssdHealthChartID) == nil {
-						a.addSSDHealthChart(disk)
-					}
 				}
 			}
 		case "SSD_POWER_ON_DAYS":
@@ -865,11 +822,6 @@ func (a *AS400) collectDiskInstances(ctx context.Context) error {
 						a.mx.disks[currentUnit] = diskInstanceMetrics{
 							SSDPowerOnDays: v,
 						}
-					}
-					// Add SSD age chart if not already present
-					ssdAgeChartID := fmt.Sprintf("disk_%s_ssd_age", cleanName(disk.unit))
-					if a.Charts().Get(ssdAgeChartID) == nil {
-						a.addSSDPowerOnChart(disk)
 					}
 				}
 			}
@@ -933,7 +885,7 @@ func (a *AS400) collectDiskInstances(ctx context.Context) error {
 	})
 }
 
-func (a *AS400) countDisks(ctx context.Context) (int, error) {
+func (a *Collector) countDisks(ctx context.Context) (int, error) {
 	var count int
 	err := a.doQuery(ctx, queryCountDisks, func(column, value string, lineEnd bool) {
 		if column == "COUNT" {
@@ -946,7 +898,7 @@ func (a *AS400) countDisks(ctx context.Context) (int, error) {
 }
 
 // Network connections collection
-func (a *AS400) collectNetworkConnections(ctx context.Context) error {
+func (a *Collector) collectNetworkConnections(ctx context.Context) error {
 	return a.doQuery(ctx, queryNetworkConnections, func(column, value string, lineEnd bool) {
 		switch column {
 		case "REMOTE_CONNECTIONS":
@@ -970,7 +922,7 @@ func (a *AS400) collectNetworkConnections(ctx context.Context) error {
 }
 
 // Temporary storage collection
-func (a *AS400) collectTempStorage(ctx context.Context) error {
+func (a *Collector) collectTempStorage(ctx context.Context) error {
 	// Collect total temp storage
 	err := a.doQuery(ctx, queryTempStorageTotal, func(column, value string, lineEnd bool) {
 		switch column {
@@ -994,9 +946,7 @@ func (a *AS400) collectTempStorage(ctx context.Context) error {
 		switch column {
 		case "NAME":
 			currentBucket = value
-			bucket := a.getTempStorageMetrics(currentBucket)
-			bucket.updated = true
-			// Note: Charts will be created when we have actual data
+			_ = a.getTempStorageMetrics(currentBucket)
 
 		case "CURRENT_SIZE":
 			if currentBucket != "" && a.tempStorageNamed[currentBucket] != nil {
@@ -1009,13 +959,6 @@ func (a *AS400) collectTempStorage(ctx context.Context) error {
 							CurrentSize: v,
 						}
 					}
-
-					// Create charts only when we have actual data
-					bucket := a.tempStorageNamed[currentBucket]
-					if !bucket.hasCharts && v > 0 {
-						bucket.hasCharts = true
-						a.addTempStorageCharts(bucket)
-					}
 				}
 			}
 		case "PEAK_SIZE":
@@ -1025,13 +968,6 @@ func (a *AS400) collectTempStorage(ctx context.Context) error {
 						m.PeakSize = v
 						a.mx.tempStorageNamed[currentBucket] = m
 					}
-
-					// Create charts only when we have actual data
-					bucket := a.tempStorageNamed[currentBucket]
-					if !bucket.hasCharts && v > 0 {
-						bucket.hasCharts = true
-						a.addTempStorageCharts(bucket)
-					}
 				}
 			}
 		}
@@ -1039,20 +975,22 @@ func (a *AS400) collectTempStorage(ctx context.Context) error {
 }
 
 // Subsystems collection
-func (a *AS400) collectSubsystems(ctx context.Context) error {
+func (a *Collector) collectSubsystems(ctx context.Context) error {
 	var currentSubsystem string
 	return a.doQuery(ctx, querySubsystems, func(column, value string, lineEnd bool) {
 		switch column {
 		case "SUBSYSTEM_NAME":
 			currentSubsystem = value
 			subsystem := a.getSubsystemMetrics(currentSubsystem)
-			subsystem.updated = true
-
-			// Add charts on first encounter
-			if !subsystem.hasCharts {
-				subsystem.hasCharts = true
-				a.addSubsystemCharts(subsystem)
+			parts := strings.SplitN(value, "/", 2)
+			if len(parts) == 2 {
+				subsystem.library = parts[0]
+				subsystem.name = parts[1]
+			} else {
+				subsystem.name = value
+				subsystem.library = ""
 			}
+			subsystem.status = "ACTIVE"
 
 		case "CURRENT_ACTIVE_JOBS":
 			if currentSubsystem != "" && a.subsystems[currentSubsystem] != nil {
@@ -1082,20 +1020,22 @@ func (a *AS400) collectSubsystems(ctx context.Context) error {
 }
 
 // Job queues collection
-func (a *AS400) collectJobQueues(ctx context.Context) error {
+func (a *Collector) collectJobQueues(ctx context.Context) error {
 	var currentQueue string
 	return a.doQuery(ctx, queryJobQueues, func(column, value string, lineEnd bool) {
 		switch column {
 		case "QUEUE_NAME":
 			currentQueue = value
 			queue := a.getJobQueueMetrics(currentQueue)
-			queue.updated = true
-
-			// Add charts on first encounter
-			if !queue.hasCharts {
-				queue.hasCharts = true
-				a.addJobQueueCharts(queue, currentQueue)
+			parts := strings.SplitN(value, "/", 2)
+			if len(parts) == 2 {
+				queue.library = parts[0]
+				queue.name = parts[1]
+			} else {
+				queue.name = value
+				queue.library = ""
 			}
+			queue.status = "RELEASED"
 
 		case "NUMBER_OF_JOBS":
 			if currentQueue != "" && a.jobQueues[currentQueue] != nil {
@@ -1116,7 +1056,7 @@ func (a *AS400) collectJobQueues(ctx context.Context) error {
 }
 
 // Enhanced disk collection with all metrics
-func (a *AS400) collectDiskInstancesEnhanced(ctx context.Context) error {
+func (a *Collector) collectDiskInstancesEnhanced(ctx context.Context) error {
 	// First check cardinality if we haven't yet
 	if len(a.disks) == 0 && a.MaxDisks > 0 {
 		count, err := a.countDisks(ctx)
@@ -1140,14 +1080,7 @@ func (a *AS400) collectDiskInstancesEnhanced(ctx context.Context) error {
 				return
 			}
 
-			disk := a.getDiskMetrics(currentUnit)
-			disk.updated = true
-
-			// Add charts on first encounter
-			if !disk.hasCharts {
-				disk.hasCharts = true
-				a.addDiskCharts(disk)
-			}
+			_ = a.getDiskMetrics(currentUnit)
 
 		case "UNIT_TYPE":
 			if currentUnit != "" && a.disks[currentUnit] != nil {
@@ -1162,8 +1095,6 @@ func (a *AS400) collectDiskInstancesEnhanced(ctx context.Context) error {
 				default:
 					a.disks[currentUnit].typeField = value // Keep unknown values as-is
 				}
-				// Update labels on existing charts for this disk
-				a.updateDiskChartLabels(currentUnit)
 			}
 		case "PERCENT_USED":
 			if currentUnit != "" && a.disks[currentUnit] != nil {
@@ -1250,11 +1181,6 @@ func (a *AS400) collectDiskInstancesEnhanced(ctx context.Context) error {
 						m.SSDLifeRemaining = v
 						a.mx.disks[currentUnit] = m
 					}
-					// Add SSD health chart if not already present
-					ssdHealthChartID := fmt.Sprintf("disk_%s_ssd_health", cleanName(disk.unit))
-					if a.Charts().Get(ssdHealthChartID) == nil {
-						a.addSSDHealthChart(disk)
-					}
 				}
 			}
 		case "SSD_POWER_ON_DAYS":
@@ -1265,11 +1191,6 @@ func (a *AS400) collectDiskInstancesEnhanced(ctx context.Context) error {
 					if m, ok := a.mx.disks[currentUnit]; ok {
 						m.SSDPowerOnDays = v
 						a.mx.disks[currentUnit] = m
-					}
-					// Add SSD age chart if not already present
-					ssdAgeChartID := fmt.Sprintf("disk_%s_ssd_age", cleanName(disk.unit))
-					if a.Charts().Get(ssdAgeChartID) == nil {
-						a.addSSDPowerOnChart(disk)
 					}
 				}
 			}
@@ -1301,7 +1222,7 @@ func (a *AS400) collectDiskInstancesEnhanced(ctx context.Context) error {
 	})
 }
 
-func (a *AS400) collectNetworkInterfaces(ctx context.Context) error {
+func (a *Collector) collectNetworkInterfaces(ctx context.Context) error {
 	// First check cardinality
 	var count int64
 	err := a.doQueryRow(ctx, queryCountNetworkInterfaces, func(column, value string) {
@@ -1320,13 +1241,8 @@ func (a *AS400) collectNetworkInterfaces(ctx context.Context) error {
 		return nil
 	}
 
-	// Mark all interfaces as not updated
-	for _, intf := range a.networkInterfaces {
-		intf.updated = false
-	}
-
 	// Collect interface data
-	rows, err := a.db.QueryContext(ctx, queryNetworkInterfaces)
+	rows, err := a.client.QueryRows(ctx, queryNetworkInterfaces)
 	if err != nil {
 		return fmt.Errorf("failed to query network interfaces: %w", err)
 	}
@@ -1352,13 +1268,6 @@ func (a *AS400) collectNetworkInterfaces(ctx context.Context) error {
 		intf.networkAddress = networkAddr
 		intf.subnetMask = "" // Not available in all IBM i versions
 		intf.mtu = mtu
-		intf.updated = true
-
-		// Create charts if needed
-		if !intf.hasCharts {
-			intf.hasCharts = true
-			a.addNetworkInterfaceCharts(intf)
-		}
 
 		// Set metrics in the map
 		cleanKey := cleanName(lineDesc)
@@ -1388,22 +1297,10 @@ func (a *AS400) collectNetworkInterfaces(ctx context.Context) error {
 		return fmt.Errorf("error iterating network interface rows: %w", err)
 	}
 
-	// Remove stale interfaces
-	for name, intf := range a.networkInterfaces {
-		if !intf.updated {
-			a.removeNetworkInterfaceCharts(intf)
-			delete(a.networkInterfaces, name)
-			cleanKey := cleanName(name)
-			if a.mx.networkInterfaces != nil {
-				delete(a.mx.networkInterfaces, cleanKey)
-			}
-		}
-	}
-
 	return nil
 }
 
-func (a *AS400) collectSystemActivity(ctx context.Context) error {
+func (a *Collector) collectSystemActivity(ctx context.Context) error {
 	// Query SYSTEM_STATUS_INFO view for CPU utilization metrics
 	// This is more reliable than SYSTEM_ACTIVITY_INFO() table function
 	query := `SELECT 

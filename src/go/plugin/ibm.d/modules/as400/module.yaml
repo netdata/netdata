@@ -1,0 +1,15 @@
+name: as400
+display_name: IBM i (AS/400)
+description: |
+  Monitors IBM i (AS/400) systems using SQL services and CL commands to
+  expose CPU, memory, storage, job, and subsystem activity.
+icon: ibm-i.svg
+categories:
+  - data-collection.infrastructure
+link: https://www.ibm.com/products/power-systems
+keywords:
+  - ibm i
+  - as400
+  - system i
+  - os400
+  - power systems

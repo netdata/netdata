@@ -1,0 +1,415 @@
+# Generated metadata.yaml for as400 module
+plugin_name: ibm.d.plugin
+modules:
+  - meta:
+      plugin_name: ibm.d.plugin
+      module_name: as400
+      monitored_instance:
+        name: IBM i (AS/400)
+        link: https://www.ibm.com/products/power-systems
+        categories:
+          - data-collection.infrastructure
+        icon_filename: "ibm-i.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - as400
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          Monitors IBM i (AS/400) systems using SQL services and CL commands to
+expose CPU, memory, storage, job, and subsystem activity.
+
+        method_description: |
+          The collector connects to IBM i (AS/400) and collects metrics via its monitoring interface.
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+    setup:
+      prerequisites:
+        list:
+          - title: Enable monitoring interface
+            description: |
+              Ensure the IBM i (AS/400) monitoring interface is accessible.
+      configuration:
+        file:
+          name: ibm.d/as400.conf
+        options:
+          description: |
+            Configuration options for the as400 collector.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+            - name: endpoint
+              description: Connection endpoint.
+              default_value: "dummy://localhost"
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: Config
+          list:
+            - name: Basic
+              description: Basic configuration example.
+              config: |
+                jobs:
+                  - name: local
+                    endpoint: dummy://localhost
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: activejob
+          description: These metrics refer to activejob instances.
+          labels:
+            - name: job_name
+              description: Job_name identifier
+            - name: job_status
+              description: Job_status identifier
+            - name: subsystem
+              description: Subsystem identifier
+            - name: job_type
+              description: Job_type identifier
+          metrics:
+            - name: as400.activejob_cpu
+              description: Active Job CPU Usage
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: cpu
+            - name: as400.activejob_resources
+              description: Active Job Resources
+              unit: MiB
+              chart_type: stacked
+              dimensions:
+                - name: temp_storage
+            - name: as400.activejob_time
+              description: Active Job Elapsed Time
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: cpu_time
+                - name: total_time
+            - name: as400.activejob_activity
+              description: Active Job Activity
+              unit: operations/s
+              chart_type: area
+              dimensions:
+                - name: disk_io
+                - name: interactive_transactions
+            - name: as400.activejob_threads
+              description: Active Job Thread Count
+              unit: threads
+              chart_type: line
+              dimensions:
+                - name: threads
+        - name: disk
+          description: These metrics refer to disk instances.
+          labels:
+            - name: disk_unit
+              description: Disk_unit identifier
+            - name: disk_type
+              description: Disk_type identifier
+            - name: disk_model
+              description: Disk_model identifier
+            - name: hardware_status
+              description: Hardware_status identifier
+            - name: disk_serial_number
+              description: Disk_serial_number identifier
+          metrics:
+            - name: as400.disk_busy
+              description: Disk Busy Percentage
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: busy
+            - name: as400.disk_io_requests
+              description: Disk I/O Requests
+              unit: requests/s
+              chart_type: area
+              dimensions:
+                - name: read
+                - name: write
+            - name: as400.disk_space_usage
+              description: Disk Space Usage
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: used
+            - name: as400.disk_capacity
+              description: Disk Capacity
+              unit: gigabytes
+              chart_type: stacked
+              dimensions:
+                - name: available
+                - name: used
+            - name: as400.disk_blocks
+              description: Disk Block Operations
+              unit: blocks/s
+              chart_type: area
+              dimensions:
+                - name: read
+                - name: write
+            - name: as400.disk_ssd_health
+              description: Disk SSD Health
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: life_remaining
+            - name: as400.disk_ssd_age
+              description: Disk SSD Power On Days
+              unit: days
+              chart_type: line
+              dimensions:
+                - name: power_on_days
+        - name: jobqueue
+          description: These metrics refer to jobqueue instances.
+          labels:
+            - name: job_queue
+              description: Job_queue identifier
+            - name: library
+              description: Library identifier
+            - name: status
+              description: Status identifier
+          metrics:
+            - name: as400.jobqueue_length
+              description: Job Queue Length
+              unit: jobs
+              chart_type: line
+              dimensions:
+                - name: jobs
+        - name: networkinterface
+          description: These metrics refer to networkinterface instances.
+          labels:
+            - name: interface
+              description: Interface identifier
+            - name: interface_type
+              description: Interface_type identifier
+            - name: connection_type
+              description: Connection_type identifier
+            - name: internet_address
+              description: Internet_address identifier
+            - name: network_address
+              description: Network_address identifier
+            - name: subnet_mask
+              description: Subnet_mask identifier
+          metrics:
+            - name: as400.network_interface_status
+              description: Network Interface Status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: active
+            - name: as400.network_interface_mtu
+              description: Network Interface MTU
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: mtu
+        - name: subsystem
+          description: These metrics refer to subsystem instances.
+          labels:
+            - name: subsystem
+              description: Subsystem identifier
+            - name: library
+              description: Library identifier
+            - name: status
+              description: Status identifier
+          metrics:
+            - name: as400.subsystem_jobs
+              description: Subsystem Jobs
+              unit: jobs
+              chart_type: line
+              dimensions:
+                - name: active
+                - name: maximum
+        - name: global
+          description: These metrics refer to the entire monitored instance.
+          labels: []
+          metrics:
+            - name: as400.cpu_utilization
+              description: CPU Utilization
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: utilization
+            - name: as400.cpu_configuration
+              description: CPU Configuration
+              unit: cpus
+              chart_type: line
+              dimensions:
+                - name: configured
+            - name: as400.cpu_capacity
+              description: Current CPU Capacity
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: capacity
+            - name: as400.total_jobs
+              description: Total Jobs in System
+              unit: jobs
+              chart_type: line
+              dimensions:
+                - name: total
+            - name: as400.active_jobs_by_type
+              description: Active Jobs by Type
+              unit: jobs
+              chart_type: stacked
+              dimensions:
+                - name: batch
+                - name: interactive
+                - name: active
+            - name: as400.job_queue_length
+              description: Job Queue Length
+              unit: jobs
+              chart_type: line
+              dimensions:
+                - name: waiting
+            - name: as400.main_storage_size
+              description: Main Storage Size
+              unit: KiB
+              chart_type: line
+              dimensions:
+                - name: total
+            - name: as400.temporary_storage
+              description: Temporary Storage
+              unit: MiB
+              chart_type: line
+              dimensions:
+                - name: current
+                - name: maximum
+            - name: as400.memory_pool_usage
+              description: Memory Pool Usage
+              unit: bytes
+              chart_type: stacked
+              dimensions:
+                - name: machine
+                - name: base
+                - name: interactive
+                - name: spool
+            - name: as400.memory_pool_defined
+              description: Memory Pool Defined Size
+              unit: bytes
+              chart_type: stacked
+              dimensions:
+                - name: machine
+                - name: base
+            - name: as400.memory_pool_reserved
+              description: Memory Pool Reserved Size
+              unit: bytes
+              chart_type: stacked
+              dimensions:
+                - name: machine
+                - name: base
+            - name: as400.memory_pool_threads
+              description: Memory Pool Threads
+              unit: threads
+              chart_type: line
+              dimensions:
+                - name: machine
+                - name: base
+            - name: as400.memory_pool_max_threads
+              description: Memory Pool Maximum Threads
+              unit: threads
+              chart_type: line
+              dimensions:
+                - name: machine
+                - name: base
+            - name: as400.disk_busy_average
+              description: Average Disk Busy Percentage
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: busy
+            - name: as400.system_asp_usage
+              description: System ASP Usage
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: used
+            - name: as400.system_asp_storage
+              description: System ASP Storage
+              unit: MiB
+              chart_type: line
+              dimensions:
+                - name: total
+            - name: as400.total_auxiliary_storage
+              description: Total Auxiliary Storage
+              unit: MiB
+              chart_type: line
+              dimensions:
+                - name: total
+            - name: as400.system_threads
+              description: System Threads
+              unit: threads
+              chart_type: line
+              dimensions:
+                - name: active
+                - name: per_processor
+            - name: as400.network_connections
+              description: Network Connections
+              unit: connections
+              chart_type: line
+              dimensions:
+                - name: remote
+                - name: total
+            - name: as400.network_connection_states
+              description: Network Connection States
+              unit: connections
+              chart_type: line
+              dimensions:
+                - name: listen
+                - name: close_wait
+            - name: as400.temp_storage_total
+              description: Temporary Storage Total
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: current
+                - name: peak
+            - name: as400.system_activity_cpu_rate
+              description: System CPU Rate
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: average
+            - name: as400.system_activity_cpu_utilization
+              description: System CPU Utilization
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: average
+                - name: minimum
+                - name: maximum
+        - name: tempstoragebucket
+          description: These metrics refer to tempstoragebucket instances.
+          labels:
+            - name: bucket
+              description: Bucket identifier
+          metrics:
+            - name: as400.temp_storage_bucket
+              description: Temporary Storage Bucket Usage
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: current
+                - name: peak
