@@ -232,16 +232,21 @@ static bool metric_release(MRG *mrg, METRIC *metric) {
 
     if (refcount_release(&metric->refcount) == 0) {
         // we are the last user
-        bool already_deleted = __atomic_load_n(&metric->deleted, __ATOMIC_ACQUIRE);
-        if (already_deleted || !acquired_metric_has_retention(mrg, metric)) {
-            if (!already_deleted) {
-                 acquired_for_deletion_metric_delete(mrg, metric);
+        if (!acquired_metric_has_retention(mrg, metric)) {
+            // This metric is eligible for deletion.
+            // Atomically check and set the 'deleted' flag.
+            // If __atomic_test_and_set returns 'true', it means the flag was already set.
+            if (!__atomic_test_and_set(&metric->deleted, __ATOMIC_ACQ_REL)) {
+                // We won the race. The flag was 'false' and we set it to 'true'.
+                // We are now responsible for deletion.
+                acquired_for_deletion_metric_delete(mrg, metric);
+                uuidmap_free(metric->uuid);
+                aral_freez(mrg->index[partition].aral, metric);
+                __atomic_sub_fetch(&mrg->index[partition].stats.entries_acquired, 1, __ATOMIC_RELAXED);
+                __atomic_sub_fetch(&mrg->index[partition].stats.current_references, 1, __ATOMIC_RELAXED);
+                return true;
             }
-            uuidmap_free(metric->uuid);
-            aral_freez(mrg->index[partition].aral, metric);
-            __atomic_sub_fetch(&mrg->index[partition].stats.entries_acquired, 1, __ATOMIC_RELAXED);
-            __atomic_sub_fetch(&mrg->index[partition].stats.current_references, 1, __ATOMIC_RELAXED);
-            return true;
+            // Another thread is already deleting it. nothing to do
         }
     }
 
