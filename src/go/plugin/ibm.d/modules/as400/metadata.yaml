@@ -22,7 +22,7 @@ modules:
       data_collection:
         metrics_description: |
           Monitors IBM i (AS/400) systems using SQL services and CL commands to
-expose CPU, memory, storage, job, and subsystem activity.
+          expose CPU, memory, storage, job, and subsystem activity.
 
         method_description: |
           The collector connects to IBM i (AS/400) and collects metrics via its monitoring interface.

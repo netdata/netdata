@@ -160,6 +160,7 @@ The following options can be defined globally or per job.
 
 | Name | Description | Default | Required | Min | Max |
 |:-----|:------------|:--------|:---------|:----|:----|
+| update_every | Data collection frequency | `1` | no | 1 | - |
 | Vnode | Vnode | `` | no | - | - |
 | JMXURL | Connection settings | `` | no | - | - |
 | JMXUsername | Username for authentication | `` | no | - | - |

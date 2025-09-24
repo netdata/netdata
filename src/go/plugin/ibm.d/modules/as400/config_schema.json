@@ -89,9 +89,9 @@
         "type": "integer"
       },
       "update_every": {
-        "default": 10,
+        "default": 1,
         "minimum": 1,
-        "title": "Data collection frequency in seconds",
+        "title": "Data collection frequency",
         "type": "integer"
       },
       "use_ssl": {

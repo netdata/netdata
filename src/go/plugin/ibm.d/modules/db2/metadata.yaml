@@ -22,8 +22,8 @@ modules:
       data_collection:
         metrics_description: |
           Monitors IBM DB2 databases using system catalog views and MON_GET_* table
-functions to expose connections, locking, buffer pool efficiency, tablespace
-capacity, and workload performance metrics.
+          functions to expose connections, locking, buffer pool efficiency, tablespace
+          capacity, and workload performance metrics.
 
         method_description: |
           The collector connects to IBM DB2 and collects metrics via its monitoring interface.

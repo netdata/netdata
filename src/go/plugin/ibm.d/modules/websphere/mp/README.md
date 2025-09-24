@@ -97,6 +97,7 @@ The following options can be defined globally or per job.
 
 | Name | Description | Default | Required | Min | Max |
 |:-----|:------------|:--------|:---------|:----|:----|
+| update_every | Data collection frequency | `1` | no | 1 | - |
 | Vnode | Vnode | `` | no | - | - |
 | CellName | Identity labels | `` | no | - | - |
 | NodeName | Node name | `` | no | - | - |

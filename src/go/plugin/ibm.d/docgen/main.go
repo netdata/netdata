@@ -210,6 +210,27 @@ func (g *DocGenerator) parseConfig() ([]ConfigField, error) {
 		return nil, fmt.Errorf("no configuration fields found in config.go")
 	}
 
+	// Ensure standard fields are present even if they come from embedded structs
+	ensureField := func(name string, desc string, defaultVal interface{}, fieldType string, min *int, max *int) {
+		for _, f := range fields {
+			if f.JSONName == name {
+				return
+			}
+		}
+		fields = append([]ConfigField{ConfigField{
+			Name:        name,
+			JSONName:    name,
+			Type:        fieldType,
+			Required:    false,
+			Default:     defaultVal,
+			Description: desc,
+			Minimum:     min,
+			Maximum:     max,
+		}}, fields...)
+	}
+
+	ensureField("update_every", "Data collection frequency", 1, "integer", intPtr(1), nil)
+
 	return fields, nil
 }
 
@@ -268,10 +289,27 @@ func intPtr(i int) *int {
 	return &i
 }
 
+func indent(spaces int, text string) string {
+	if text == "" {
+		return ""
+	}
+	prefix := strings.Repeat(" ", spaces)
+	lines := strings.Split(text, "\n")
+	for i, line := range lines {
+		if line == "" {
+			lines[i] = ""
+		} else {
+			lines[i] = prefix + line
+		}
+	}
+	return strings.Join(lines, "\n")
+}
+
 func (g *DocGenerator) generateMetadata(contexts *Config, moduleInfo *ModuleInfo) error {
 	tmpl := template.Must(template.New("metadata").Funcs(template.FuncMap{
-		"lower": strings.ToLower,
-		"title": strings.Title,
+		"lower":  strings.ToLower,
+		"title":  strings.Title,
+		"indent": indent,
 	}).Parse(metadataTemplate))
 
 	// Prepare template data
@@ -409,9 +447,9 @@ modules:
     overview:
       data_collection:
         metrics_description: |
-          {{.ModuleInfo.Description}}
+{{ indent 10 .ModuleInfo.Description }}
         method_description: |
-          The collector connects to {{.ModuleInfo.DisplayName}} and collects metrics via its monitoring interface.
+{{ indent 10 (printf "The collector connects to %s and collects metrics via its monitoring interface." .ModuleInfo.DisplayName) }}
       supported_platforms:
         include: []
         exclude: []

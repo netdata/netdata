@@ -101,9 +101,9 @@
         "type": "integer"
       },
       "update_every": {
-        "default": 5,
+        "default": 1,
         "minimum": 1,
-        "title": "Data collection frequency in seconds",
+        "title": "Data collection frequency",
         "type": "integer"
       },
       "vnode": {

@@ -22,7 +22,7 @@ modules:
       data_collection:
         metrics_description: |
           Collects JVM, vendor, and REST endpoint metrics from WebSphere Liberty / Open Liberty
-servers via the MicroProfile Metrics (Prometheus/OpenMetrics) endpoint.
+          servers via the MicroProfile Metrics (Prometheus/OpenMetrics) endpoint.
 
         method_description: |
           The collector connects to IBM WebSphere MicroProfile and collects metrics via its monitoring interface.

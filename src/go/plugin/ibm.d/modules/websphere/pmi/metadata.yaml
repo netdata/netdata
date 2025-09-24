@@ -22,7 +22,7 @@ modules:
       data_collection:
         metrics_description: |
           Collects WebSphere Application Server performance metrics via the PerfServlet (PMI) interface,
-covering JVM, thread pools, JDBC/JMS resources, applications, and clustering information.
+          covering JVM, thread pools, JDBC/JMS resources, applications, and clustering information.
 
         method_description: |
           The collector connects to IBM WebSphere PMI and collects metrics via its monitoring interface.

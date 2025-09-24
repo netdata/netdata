@@ -195,8 +195,8 @@ The following options can be defined globally or per job.
 
 | Name | Description | Default | Required | Min | Max |
 |:-----|:------------|:--------|:---------|:----|:----|
+| update_every | Data collection frequency | `1` | no | 1 | - |
 | Vnode | Vnode | `` | no | - | - |
-| UpdateEvery | Data collection frequency in seconds | `10` | no | 1 | - |
 | DSN | Data Source Name (DSN) for connection | `` | no | - | - |
 | Timeout | Connection timeout duration in seconds | `<no value>` | no | - | - |
 | MaxDbConns | Maximum number of db conns to monitor | `1` | no | - | - |

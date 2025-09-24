@@ -42,6 +42,12 @@
         "title": "Server name",
         "type": "string"
       },
+      "update_every": {
+        "default": 1,
+        "minimum": 1,
+        "title": "Data collection frequency",
+        "type": "integer"
+      },
       "vnode": {
         "default": "",
         "title": "Vnode",
