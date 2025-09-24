@@ -1037,6 +1037,173 @@ var JobQueue = struct {
 	},
 }
 
+// --- MessageQueue ---
+
+// MessageQueueMessagesValues defines the type-safe values for MessageQueue.Messages context
+type MessageQueueMessagesValues struct {
+	Total         int64
+	Informational int64
+	Inquiry       int64
+	Diagnostic    int64
+	Escape        int64
+	Notify        int64
+	Sender_copy   int64
+}
+
+// MessageQueueMessagesContext provides type-safe operations for MessageQueue.Messages context
+type MessageQueueMessagesContext struct {
+	framework.Context[MessageQueueLabels]
+}
+
+// Set provides type-safe dimension setting for MessageQueue.Messages context
+func (c MessageQueueMessagesContext) Set(state *framework.CollectorState, labels MessageQueueLabels, values MessageQueueMessagesValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"total":         values.Total,
+		"informational": values.Informational,
+		"inquiry":       values.Inquiry,
+		"diagnostic":    values.Diagnostic,
+		"escape":        values.Escape,
+		"notify":        values.Notify,
+		"sender_copy":   values.Sender_copy,
+	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c MessageQueueMessagesContext) SetUpdateEvery(state *framework.CollectorState, labels MessageQueueLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
+// MessageQueueSeverityValues defines the type-safe values for MessageQueue.Severity context
+type MessageQueueSeverityValues struct {
+	Max int64
+}
+
+// MessageQueueSeverityContext provides type-safe operations for MessageQueue.Severity context
+type MessageQueueSeverityContext struct {
+	framework.Context[MessageQueueLabels]
+}
+
+// Set provides type-safe dimension setting for MessageQueue.Severity context
+func (c MessageQueueSeverityContext) Set(state *framework.CollectorState, labels MessageQueueLabels, values MessageQueueSeverityValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"max": values.Max,
+	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c MessageQueueSeverityContext) SetUpdateEvery(state *framework.CollectorState, labels MessageQueueLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
+// MessageQueueLabels defines the required labels for MessageQueue contexts
+type MessageQueueLabels struct {
+	Library string
+	Queue   string
+}
+
+// InstanceID generates a unique instance ID using the hardcoded label order from YAML
+func (l MessageQueueLabels) InstanceID(contextName string) string {
+	// Label order from YAML: library, queue
+	return contextName + "." + cleanLabelValue(l.Library) + "_" + cleanLabelValue(l.Queue)
+}
+
+// MessageQueue contains all metric contexts for MessageQueue
+var MessageQueue = struct {
+	Messages MessageQueueMessagesContext
+	Severity MessageQueueSeverityContext
+}{
+	Messages: MessageQueueMessagesContext{
+		Context: framework.Context[MessageQueueLabels]{
+			Name:        "as400.message_queue_messages",
+			Family:      "messaging/message_queues",
+			Title:       "Message Queue Messages",
+			Units:       "messages",
+			Type:        module.Stacked,
+			Priority:    700,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "total",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "informational",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "inquiry",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "diagnostic",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "escape",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "notify",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "sender_copy",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+			},
+			LabelKeys: []string{
+				"library",
+				"queue",
+			},
+		},
+	},
+	Severity: MessageQueueSeverityContext{
+		Context: framework.Context[MessageQueueLabels]{
+			Name:        "as400.message_queue_severity",
+			Family:      "messaging/message_queues",
+			Title:       "Message Queue Severity",
+			Units:       "severity",
+			Type:        module.Line,
+			Priority:    701,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "max",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+			},
+			LabelKeys: []string{
+				"library",
+				"queue",
+			},
+		},
+	},
+}
+
 // --- NetworkInterface ---
 
 // NetworkInterfaceStatusValues defines the type-safe values for NetworkInterface.Status context
@@ -1157,6 +1324,170 @@ var NetworkInterface = struct {
 				"internet_address",
 				"network_address",
 				"subnet_mask",
+			},
+		},
+	},
+}
+
+// --- OutputQueue ---
+
+// OutputQueueFilesValues defines the type-safe values for OutputQueue.Files context
+type OutputQueueFilesValues struct {
+	Files int64
+}
+
+// OutputQueueFilesContext provides type-safe operations for OutputQueue.Files context
+type OutputQueueFilesContext struct {
+	framework.Context[OutputQueueLabels]
+}
+
+// Set provides type-safe dimension setting for OutputQueue.Files context
+func (c OutputQueueFilesContext) Set(state *framework.CollectorState, labels OutputQueueLabels, values OutputQueueFilesValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"files": values.Files,
+	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c OutputQueueFilesContext) SetUpdateEvery(state *framework.CollectorState, labels OutputQueueLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
+// OutputQueueWritersValues defines the type-safe values for OutputQueue.Writers context
+type OutputQueueWritersValues struct {
+	Writers int64
+}
+
+// OutputQueueWritersContext provides type-safe operations for OutputQueue.Writers context
+type OutputQueueWritersContext struct {
+	framework.Context[OutputQueueLabels]
+}
+
+// Set provides type-safe dimension setting for OutputQueue.Writers context
+func (c OutputQueueWritersContext) Set(state *framework.CollectorState, labels OutputQueueLabels, values OutputQueueWritersValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"writers": values.Writers,
+	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c OutputQueueWritersContext) SetUpdateEvery(state *framework.CollectorState, labels OutputQueueLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
+// OutputQueueStatusValues defines the type-safe values for OutputQueue.Status context
+type OutputQueueStatusValues struct {
+	Released int64
+}
+
+// OutputQueueStatusContext provides type-safe operations for OutputQueue.Status context
+type OutputQueueStatusContext struct {
+	framework.Context[OutputQueueLabels]
+}
+
+// Set provides type-safe dimension setting for OutputQueue.Status context
+func (c OutputQueueStatusContext) Set(state *framework.CollectorState, labels OutputQueueLabels, values OutputQueueStatusValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"released": values.Released,
+	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c OutputQueueStatusContext) SetUpdateEvery(state *framework.CollectorState, labels OutputQueueLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
+// OutputQueueLabels defines the required labels for OutputQueue contexts
+type OutputQueueLabels struct {
+	Library string
+	Queue   string
+	Status  string
+}
+
+// InstanceID generates a unique instance ID using the hardcoded label order from YAML
+func (l OutputQueueLabels) InstanceID(contextName string) string {
+	// Label order from YAML: library, queue, status
+	return contextName + "." + cleanLabelValue(l.Library) + "_" + cleanLabelValue(l.Queue) + "_" + cleanLabelValue(l.Status)
+}
+
+// OutputQueue contains all metric contexts for OutputQueue
+var OutputQueue = struct {
+	Files   OutputQueueFilesContext
+	Writers OutputQueueWritersContext
+	Status  OutputQueueStatusContext
+}{
+	Files: OutputQueueFilesContext{
+		Context: framework.Context[OutputQueueLabels]{
+			Name:        "as400.output_queue_files",
+			Family:      "messaging/output_queues",
+			Title:       "Output Queue Files",
+			Units:       "files",
+			Type:        module.Line,
+			Priority:    702,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "files",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+			},
+			LabelKeys: []string{
+				"library",
+				"queue",
+				"status",
+			},
+		},
+	},
+	Writers: OutputQueueWritersContext{
+		Context: framework.Context[OutputQueueLabels]{
+			Name:        "as400.output_queue_writers",
+			Family:      "messaging/output_queues",
+			Title:       "Output Queue Writers",
+			Units:       "writers",
+			Type:        module.Line,
+			Priority:    703,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "writers",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+			},
+			LabelKeys: []string{
+				"library",
+				"queue",
+				"status",
+			},
+		},
+	},
+	Status: OutputQueueStatusContext{
+		Context: framework.Context[OutputQueueLabels]{
+			Name:        "as400.output_queue_status",
+			Family:      "messaging/output_queues",
+			Title:       "Output Queue Status",
+			Units:       "state",
+			Type:        module.Line,
+			Priority:    704,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "released",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+			},
+			LabelKeys: []string{
+				"library",
+				"queue",
+				"status",
 			},
 		},
 	},
@@ -2559,8 +2890,13 @@ func GetAllContexts() []interface{} {
 		&HTTPServer.Requests.Context,
 		&HTTPServer.Bytes.Context,
 		&JobQueue.Length.Context,
+		&MessageQueue.Messages.Context,
+		&MessageQueue.Severity.Context,
 		&NetworkInterface.Status.Context,
 		&NetworkInterface.MTU.Context,
+		&OutputQueue.Files.Context,
+		&OutputQueue.Writers.Context,
+		&OutputQueue.Status.Context,
 		&PlanCache.Summary.Context,
 		&Subsystem.Jobs.Context,
 		&System.CPUUtilization.Context,

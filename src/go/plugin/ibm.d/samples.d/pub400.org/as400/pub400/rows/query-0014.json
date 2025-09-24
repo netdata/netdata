@@ -6,19 +6,14 @@
   ],
   "rows": [
     {
-      "CURRENT_ACTIVE_JOBS": "139",
+      "CURRENT_ACTIVE_JOBS": "144",
       "MAXIMUM_ACTIVE_JOBS": "NULL",
       "SUBSYSTEM_NAME": "QSYS/QUSRWRK"
     },
     {
-      "CURRENT_ACTIVE_JOBS": "98",
+      "CURRENT_ACTIVE_JOBS": "96",
       "MAXIMUM_ACTIVE_JOBS": "NULL",
       "SUBSYSTEM_NAME": "QSYS/QSYSWRK"
-    },
-    {
-      "CURRENT_ACTIVE_JOBS": "23",
-      "MAXIMUM_ACTIVE_JOBS": "NULL",
-      "SUBSYSTEM_NAME": "QSYS/QSERVER"
     },
     {
       "CURRENT_ACTIVE_JOBS": "23",
@@ -26,17 +21,22 @@
       "SUBSYSTEM_NAME": "QSYS/QSPL"
     },
     {
+      "CURRENT_ACTIVE_JOBS": "22",
+      "MAXIMUM_ACTIVE_JOBS": "NULL",
+      "SUBSYSTEM_NAME": "QSYS/QSERVER"
+    },
+    {
       "CURRENT_ACTIVE_JOBS": "14",
       "MAXIMUM_ACTIVE_JOBS": "NULL",
       "SUBSYSTEM_NAME": "QHTTPSVR/QHTTPSVR"
     },
     {
-      "CURRENT_ACTIVE_JOBS": "11",
+      "CURRENT_ACTIVE_JOBS": "9",
       "MAXIMUM_ACTIVE_JOBS": "NULL",
       "SUBSYSTEM_NAME": "QSYS/QINTER"
     },
     {
-      "CURRENT_ACTIVE_JOBS": "9",
+      "CURRENT_ACTIVE_JOBS": "8",
       "MAXIMUM_ACTIVE_JOBS": "NULL",
       "SUBSYSTEM_NAME": "QSYS/QINTER2"
     },

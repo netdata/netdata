@@ -50,10 +50,14 @@ type jobQueueMetrics struct {
 
 // messageQueueMetrics holds metrics for an individual message queue
 type messageQueueMetrics struct {
-	name         string
-	library      string
-	messageCount int64
-	oldestHours  int64
+	name    string
+	library string
+}
+
+type outputQueueMetrics struct {
+	name    string
+	library string
+	status  string
 }
 
 // tempStorageMetrics holds metrics for a named temporary storage bucket
@@ -134,6 +138,13 @@ func (a *Collector) getMessageQueueMetrics(key string) *messageQueueMetrics {
 		a.messageQueues[key] = &messageQueueMetrics{}
 	}
 	return a.messageQueues[key]
+}
+
+func (a *Collector) getOutputQueueMetrics(key string) *outputQueueMetrics {
+	if _, ok := a.outputQueues[key]; !ok {
+		a.outputQueues[key] = &outputQueueMetrics{}
+	}
+	return a.outputQueues[key]
 }
 
 func (a *Collector) getTempStorageMetrics(name string) *tempStorageMetrics {

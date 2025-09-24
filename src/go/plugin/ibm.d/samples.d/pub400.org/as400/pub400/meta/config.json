@@ -1,5 +1,5 @@
 {
-  "generated_at": "2025-09-24T23:58:01.7348776+03:00",
+  "generated_at": "2025-09-25T02:41:47.367297677+03:00",
   "config": {
     "obsoletion_iterations": 0,
     "update_every": 10,
@@ -23,11 +23,14 @@
     "collect_job_queue_metrics": true,
     "collect_active_jobs": false,
     "collect_http_server_metrics": null,
-    "collect_system_value_metrics": null,
+    "collect_message_queue_metrics": true,
+    "collect_output_queue_metrics": true,
     "collect_plan_cache_metrics": null,
     "max_disks": 200,
     "max_subsystems": 200,
     "max_job_queues": 200,
+    "max_message_queues": 200,
+    "max_output_queues": 200,
     "max_active_jobs": 200,
     "collect_disks_matching": "",
     "collect_subsystems_matching": "",

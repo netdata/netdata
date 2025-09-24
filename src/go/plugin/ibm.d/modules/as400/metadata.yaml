@@ -242,6 +242,32 @@ modules:
               chart_type: line
               dimensions:
                 - name: jobs
+        - name: messagequeue
+          description: These metrics refer to messagequeue instances.
+          labels:
+            - name: library
+              description: Library identifier
+            - name: queue
+              description: Queue identifier
+          metrics:
+            - name: as400.message_queue_messages
+              description: Message Queue Messages
+              unit: messages
+              chart_type: stacked
+              dimensions:
+                - name: total
+                - name: informational
+                - name: inquiry
+                - name: diagnostic
+                - name: escape
+                - name: notify
+                - name: sender_copy
+            - name: as400.message_queue_severity
+              description: Message Queue Severity
+              unit: severity
+              chart_type: line
+              dimensions:
+                - name: max
         - name: networkinterface
           description: These metrics refer to networkinterface instances.
           labels:
@@ -270,6 +296,34 @@ modules:
               chart_type: line
               dimensions:
                 - name: mtu
+        - name: outputqueue
+          description: These metrics refer to outputqueue instances.
+          labels:
+            - name: library
+              description: Library identifier
+            - name: queue
+              description: Queue identifier
+            - name: status
+              description: Status identifier
+          metrics:
+            - name: as400.output_queue_files
+              description: Output Queue Files
+              unit: files
+              chart_type: line
+              dimensions:
+                - name: files
+            - name: as400.output_queue_writers
+              description: Output Queue Writers
+              unit: writers
+              chart_type: line
+              dimensions:
+                - name: writers
+            - name: as400.output_queue_status
+              description: Output Queue Status
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: released
         - name: plancache
           description: These metrics refer to plancache instances.
           labels:

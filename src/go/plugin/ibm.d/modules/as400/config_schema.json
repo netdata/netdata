@@ -32,6 +32,16 @@
         "title": "JobQueueSelector filters job queues by name using glob-style patterns.",
         "type": "string"
       },
+      "collect_message_queue_metrics": {
+        "default": "\u003cauto\u003e",
+        "title": "CollectMessageQueueMetrics toggles collection of IBM i message queue metrics.",
+        "type": "boolean"
+      },
+      "collect_output_queue_metrics": {
+        "default": "\u003cauto\u003e",
+        "title": "CollectOutputQueueMetrics toggles collection of IBM i output queue metrics.",
+        "type": "boolean"
+      },
       "collect_plan_cache_metrics": {
         "default": "\u003cauto\u003e",
         "title": "CollectPlanCacheMetrics toggles collection of plan cache analysis metrics.",
@@ -89,6 +99,16 @@
       "max_job_queues": {
         "default": 100,
         "title": "MaxJobQueues caps how many job queues may be charted.",
+        "type": "integer"
+      },
+      "max_message_queues": {
+        "default": 100,
+        "title": "MaxMessageQueues caps how many message queues may be charted.",
+        "type": "integer"
+      },
+      "max_output_queues": {
+        "default": 100,
+        "title": "MaxOutputQueues caps how many output queues may be charted.",
         "type": "integer"
       },
       "max_subsystems": {

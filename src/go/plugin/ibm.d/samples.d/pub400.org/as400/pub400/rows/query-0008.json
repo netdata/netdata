@@ -9,8 +9,8 @@
     {
       "CLOSEWAIT_CONNECTIONS": "0",
       "LISTEN_CONNECTIONS": "71",
-      "REMOTE_CONNECTIONS": "124",
-      "TOTAL_CONNECTIONS": "24"
+      "REMOTE_CONNECTIONS": "103",
+      "TOTAL_CONNECTIONS": "6"
     }
   ]
 }

@@ -558,6 +558,79 @@ HTTPServer:
           algo: incremental
         - name: sent
           algo: incremental
+MessageQueue:
+  labels:
+    - library
+    - queue
+  contexts:
+    - name: Messages
+      context: as400.message_queue_messages
+      title: Message Queue Messages
+      family: messaging/message_queues
+      units: messages
+      type: stacked
+      priority: 700
+      dimensions:
+        - name: total
+          algo: absolute
+        - name: informational
+          algo: absolute
+        - name: inquiry
+          algo: absolute
+        - name: diagnostic
+          algo: absolute
+        - name: escape
+          algo: absolute
+        - name: notify
+          algo: absolute
+        - name: sender_copy
+          algo: absolute
+    - name: Severity
+      context: as400.message_queue_severity
+      title: Message Queue Severity
+      family: messaging/message_queues
+      units: severity
+      type: line
+      priority: 701
+      dimensions:
+        - name: max
+          algo: absolute
+OutputQueue:
+  labels:
+    - library
+    - queue
+    - status
+  contexts:
+    - name: Files
+      context: as400.output_queue_files
+      title: Output Queue Files
+      family: messaging/output_queues
+      units: files
+      type: line
+      priority: 702
+      dimensions:
+        - name: files
+          algo: absolute
+    - name: Writers
+      context: as400.output_queue_writers
+      title: Output Queue Writers
+      family: messaging/output_queues
+      units: writers
+      type: line
+      priority: 703
+      dimensions:
+        - name: writers
+          algo: absolute
+    - name: Status
+      context: as400.output_queue_status
+      title: Output Queue Status
+      family: messaging/output_queues
+      units: state
+      type: line
+      priority: 704
+      dimensions:
+        - name: released
+          algo: absolute
 PlanCache:
   labels:
     - metric

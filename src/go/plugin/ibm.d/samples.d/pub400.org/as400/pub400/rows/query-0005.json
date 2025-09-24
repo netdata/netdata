@@ -14,19 +14,19 @@
       "DEFINED_SIZE": "8192",
       "MAXIMUM_ACTIVE_THREADS": "255",
       "POOL_NAME": "*MACHINE  ",
-      "RESERVED_SIZE": "2550.58"
+      "RESERVED_SIZE": "2550.57"
     },
     {
       "CURRENT_SIZE": "48440",
-      "CURRENT_THREADS": "206",
+      "CURRENT_THREADS": "45",
       "DEFINED_SIZE": "NULL",
       "MAXIMUM_ACTIVE_THREADS": "168",
       "POOL_NAME": "*BASE     ",
-      "RESERVED_SIZE": "7.4"
+      "RESERVED_SIZE": "8.13"
     },
     {
       "CURRENT_SIZE": "8192",
-      "CURRENT_THREADS": "24",
+      "CURRENT_THREADS": "23",
       "DEFINED_SIZE": "8192",
       "MAXIMUM_ACTIVE_THREADS": "244",
       "POOL_NAME": "*INTERACT ",

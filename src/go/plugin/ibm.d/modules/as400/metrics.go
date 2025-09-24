@@ -68,6 +68,8 @@ type metricsData struct {
 	disks             map[string]diskInstanceMetrics
 	subsystems        map[string]subsystemInstanceMetrics
 	jobQueues         map[string]jobQueueInstanceMetrics
+	messageQueues     map[string]messageQueueInstanceMetrics
+	outputQueues      map[string]outputQueueInstanceMetrics
 	tempStorageNamed  map[string]tempStorageInstanceMetrics
 	activeJobs        map[string]activeJobInstanceMetrics
 	networkInterfaces map[string]networkInterfaceInstanceMetrics
@@ -103,6 +105,23 @@ type subsystemInstanceMetrics struct {
 type jobQueueInstanceMetrics struct {
 	NumberOfJobs int64 `stm:"number_of_jobs"` // NUMBER_OF_JOBS
 	// Note: HELD_JOB_COUNT removed - column doesn't exist in JOB_QUEUE_INFO table
+}
+
+type messageQueueInstanceMetrics struct {
+	Total         int64 `stm:"total"`
+	Informational int64 `stm:"informational"`
+	Inquiry       int64 `stm:"inquiry"`
+	Diagnostic    int64 `stm:"diagnostic"`
+	Escape        int64 `stm:"escape"`
+	Notify        int64 `stm:"notify"`
+	SenderCopy    int64 `stm:"sender_copy"`
+	MaxSeverity   int64 `stm:"max_severity"`
+}
+
+type outputQueueInstanceMetrics struct {
+	Files    int64 `stm:"files"`
+	Writers  int64 `stm:"writers"`
+	Released int64 `stm:"released"`
 }
 
 type tempStorageInstanceMetrics struct {

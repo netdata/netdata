@@ -96,6 +96,28 @@ func planCacheMetricKey(heading string) string {
 	return result
 }
 
+func normalizeValue(value string) string {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" || strings.EqualFold(trimmed, "NULL") {
+		return ""
+	}
+	return trimmed
+}
+
+func parseInt64OrZero(value string) int64 {
+	if v, err := strconv.ParseInt(strings.TrimSpace(value), 10, 64); err == nil {
+		return v
+	}
+	return 0
+}
+
+func boolToInt(cond bool) int64 {
+	if cond {
+		return 1
+	}
+	return 0
+}
+
 func (a *Collector) collect(ctx context.Context) error {
 	startTime := time.Now()
 	defer func() {
@@ -289,6 +311,140 @@ func (a *Collector) collectJobInfo(ctx context.Context) error {
 	})
 
 	return err
+}
+
+func (a *Collector) collectMessageQueues(ctx context.Context) error {
+	if a.CollectMessageQueueMetrics != nil && !*a.CollectMessageQueueMetrics {
+		return nil
+	}
+
+	allowed, count, err := a.messageQueuesCardinality.Allow(ctx, a.countMessageQueues)
+	if err != nil {
+		return fmt.Errorf("failed to count message queues: %w", err)
+	}
+	if !allowed {
+		limit := a.MaxMessageQueues
+		if limit <= 0 {
+			limit = messageQueueLimit
+		}
+		a.logOnce("message_queue_cardinality", "message queue count (%d) exceeds limit (%d), skipping collection", count, limit)
+		return nil
+	}
+
+	limit := a.MaxMessageQueues
+	if limit <= 0 {
+		limit = messageQueueLimit
+	}
+	query := fmt.Sprintf(queryMessageQueueAggregates, limit)
+
+	var (
+		library string
+		queue   string
+		metrics messageQueueInstanceMetrics
+	)
+
+	return a.doQuery(ctx, query, func(column, value string, lineEnd bool) {
+		switch column {
+		case "MESSAGE_QUEUE_LIBRARY":
+			library = normalizeValue(value)
+		case "MESSAGE_QUEUE_NAME":
+			queue = normalizeValue(value)
+		case "MESSAGE_COUNT":
+			metrics.Total = parseInt64OrZero(value)
+		case "INFORMATIONAL_MESSAGES":
+			metrics.Informational = parseInt64OrZero(value)
+		case "INQUIRY_MESSAGES":
+			metrics.Inquiry = parseInt64OrZero(value)
+		case "DIAGNOSTIC_MESSAGES":
+			metrics.Diagnostic = parseInt64OrZero(value)
+		case "ESCAPE_MESSAGES":
+			metrics.Escape = parseInt64OrZero(value)
+		case "NOTIFY_MESSAGES":
+			metrics.Notify = parseInt64OrZero(value)
+		case "SENDER_COPY_MESSAGES":
+			metrics.SenderCopy = parseInt64OrZero(value)
+		case "MAX_SEVERITY":
+			metrics.MaxSeverity = parseInt64OrZero(value)
+		}
+
+		if lineEnd {
+			if queue != "" {
+				key := library + "/" + queue
+				meta := a.getMessageQueueMetrics(key)
+				meta.library = library
+				meta.name = queue
+				a.messageQueues[key] = meta
+				a.mx.messageQueues[key] = metrics
+			}
+			library = ""
+			queue = ""
+			metrics = messageQueueInstanceMetrics{}
+		}
+	})
+}
+
+func (a *Collector) collectOutputQueues(ctx context.Context) error {
+	if a.CollectOutputQueueMetrics != nil && !*a.CollectOutputQueueMetrics {
+		return nil
+	}
+
+	allowed, count, err := a.outputQueuesCardinality.Allow(ctx, a.countOutputQueues)
+	if err != nil {
+		return fmt.Errorf("failed to count output queues: %w", err)
+	}
+	if !allowed {
+		limit := a.MaxOutputQueues
+		if limit <= 0 {
+			limit = outputQueueLimit
+		}
+		a.logOnce("output_queue_cardinality", "output queue count (%d) exceeds limit (%d), skipping collection", count, limit)
+		return nil
+	}
+
+	limit := a.MaxOutputQueues
+	if limit <= 0 {
+		limit = outputQueueLimit
+	}
+	query := fmt.Sprintf(queryOutputQueueInfo, limit)
+
+	var (
+		library string
+		queue   string
+		status  string
+		metrics outputQueueInstanceMetrics
+	)
+
+	return a.doQuery(ctx, query, func(column, value string, lineEnd bool) {
+		switch column {
+		case "OUTPUT_QUEUE_LIBRARY_NAME":
+			library = normalizeValue(value)
+		case "OUTPUT_QUEUE_NAME":
+			queue = normalizeValue(value)
+		case "OUTPUT_QUEUE_STATUS":
+			status = normalizeValue(value)
+		case "NUMBER_OF_FILES":
+			metrics.Files = parseInt64OrZero(value)
+		case "NUMBER_OF_WRITERS":
+			metrics.Writers = parseInt64OrZero(value)
+		}
+
+		if lineEnd {
+			if queue != "" {
+				key := library + "/" + queue
+				meta := a.getOutputQueueMetrics(key)
+				meta.library = library
+				meta.name = queue
+				meta.status = status
+				a.outputQueues[key] = meta
+				metrics.Released = boolToInt(strings.EqualFold(status, "RELEASED"))
+				a.mx.outputQueues[key] = metrics
+			}
+			library = ""
+			queue = ""
+			status = ""
+			metrics = outputQueueInstanceMetrics{}
+		}
+	})
 }
 
 func (a *Collector) doQuery(ctx context.Context, query string, assign func(column, value string, lineEnd bool)) error {
@@ -644,6 +800,30 @@ func (a *Collector) collectNetworkConnections(ctx context.Context) error {
 func (a *Collector) countNetworkInterfaces(ctx context.Context) (int, error) {
 	var count int
 	err := a.doQueryRow(ctx, queryCountNetworkInterfaces, func(column, value string) {
+		if column == "COUNT" {
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				count = int(v)
+			}
+		}
+	})
+	return count, err
+}
+
+func (a *Collector) countMessageQueues(ctx context.Context) (int, error) {
+	var count int
+	err := a.doQueryRow(ctx, queryCountMessageQueues, func(column, value string) {
+		if column == "COUNT" {
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				count = int(v)
+			}
+		}
+	})
+	return count, err
+}
+
+func (a *Collector) countOutputQueues(ctx context.Context) (int, error) {
+	var count int
+	err := a.doQueryRow(ctx, queryCountOutputQueues, func(column, value string) {
 		if column == "COUNT" {
 			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
 				count = int(v)

@@ -38,10 +38,12 @@ func defaultConfig() Config {
 		UseSSL:          false,
 		ResetStatistics: false,
 
-		MaxDisks:      100,
-		MaxSubsystems: 100,
-		MaxJobQueues:  100,
-		MaxActiveJobs: 100,
+		MaxDisks:         100,
+		MaxSubsystems:    100,
+		MaxJobQueues:     100,
+		MaxMessageQueues: 100,
+		MaxOutputQueues:  100,
+		MaxActiveJobs:    100,
 
 		DiskSelector:      "",
 		SubsystemSelector: "",

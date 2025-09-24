@@ -271,8 +271,29 @@ func (c *Collector) setConfigurationDefaults() {
 		c.CollectActiveJobs = boolPtr(false)
 	}
 
-	c.Infof("Configuration after defaults: DiskMetrics=%v, SubsystemMetrics=%v, JobQueueMetrics=%v, ActiveJobs=%v",
-		boolValue(c.CollectDiskMetrics), boolValue(c.CollectSubsystemMetrics), boolValue(c.CollectJobQueueMetrics), boolValue(c.CollectActiveJobs))
+	if c.CollectMessageQueueMetrics == nil {
+		c.CollectMessageQueueMetrics = boolPtr(true)
+	}
+
+	if c.CollectOutputQueueMetrics == nil {
+		c.CollectOutputQueueMetrics = boolPtr(true)
+	}
+
+	if c.MaxMessageQueues <= 0 {
+		c.MaxMessageQueues = messageQueueLimit
+	}
+
+	if c.MaxOutputQueues <= 0 {
+		c.MaxOutputQueues = outputQueueLimit
+	}
+
+	c.Infof("Configuration after defaults: DiskMetrics=%v, SubsystemMetrics=%v, JobQueueMetrics=%v, MessageQueues=%v, OutputQueues=%v, ActiveJobs=%v",
+		boolValue(c.CollectDiskMetrics),
+		boolValue(c.CollectSubsystemMetrics),
+		boolValue(c.CollectJobQueueMetrics),
+		boolValue(c.CollectMessageQueueMetrics),
+		boolValue(c.CollectOutputQueueMetrics),
+		boolValue(c.CollectActiveJobs))
 }
 
 func boolValue(v *bool) bool {

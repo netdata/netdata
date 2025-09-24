@@ -146,6 +146,24 @@ Metrics:
 |:-------|:-----------|:-----|
 | as400.jobqueue_length | jobs | jobs |
 
+### Per messagequeue
+
+These metrics refer to individual messagequeue instances.
+
+Labels:
+
+| Label | Description |
+|:------|:------------|
+| library | Library identifier |
+| queue | Queue identifier |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:-------|:-----------|:-----|
+| as400.message_queue_messages | total, informational, inquiry, diagnostic, escape, notify, sender_copy | messages |
+| as400.message_queue_severity | max | severity |
+
 ### Per networkinterface
 
 These metrics refer to individual networkinterface instances.
@@ -167,6 +185,26 @@ Metrics:
 |:-------|:-----------|:-----|
 | as400.network_interface_status | active | status |
 | as400.network_interface_mtu | mtu | bytes |
+
+### Per outputqueue
+
+These metrics refer to individual outputqueue instances.
+
+Labels:
+
+| Label | Description |
+|:------|:------------|
+| library | Library identifier |
+| queue | Queue identifier |
+| status | Status identifier |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:-------|:-----------|:-----|
+| as400.output_queue_files | files | files |
+| as400.output_queue_writers | writers | writers |
+| as400.output_queue_status | released | state |
 
 ### Per plancache
 
@@ -259,10 +297,14 @@ The following options can be defined globally or per job.
 | CollectJobQueueMetrics | CollectJobQueueMetrics toggles collection of job queue backlog metrics. | `<auto>` | no | - | - |
 | CollectActiveJobs | CollectActiveJobs toggles collection of detailed per-job metrics. | `<auto>` | no | - | - |
 | CollectHTTPServerMetrics | CollectHTTPServerMetrics toggles collection of IBM HTTP Server statistics. | `<auto>` | no | - | - |
+| CollectMessageQueueMetrics | CollectMessageQueueMetrics toggles collection of IBM i message queue metrics. | `<auto>` | no | - | - |
+| CollectOutputQueueMetrics | CollectOutputQueueMetrics toggles collection of IBM i output queue metrics. | `<auto>` | no | - | - |
 | CollectPlanCacheMetrics | CollectPlanCacheMetrics toggles collection of plan cache analysis metrics. | `<auto>` | no | - | - |
 | MaxDisks | MaxDisks caps how many disk units may be charted. | `100` | no | - | - |
 | MaxSubsystems | MaxSubsystems caps how many subsystems may be charted. | `100` | no | - | - |
 | MaxJobQueues | MaxJobQueues caps how many job queues may be charted. | `100` | no | - | - |
+| MaxMessageQueues | MaxMessageQueues caps how many message queues may be charted. | `100` | no | - | - |
+| MaxOutputQueues | MaxOutputQueues caps how many output queues may be charted. | `100` | no | - | - |
 | MaxActiveJobs | MaxActiveJobs caps how many active jobs may be charted. | `100` | no | - | - |
 | DiskSelector | DiskSelector filters disk units by name using glob-style patterns. | `` | no | - | - |
 | SubsystemSelector | SubsystemSelector filters subsystems by name using glob-style patterns. | `` | no | - | - |

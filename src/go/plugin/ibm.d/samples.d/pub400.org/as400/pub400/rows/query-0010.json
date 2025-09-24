@@ -6,7 +6,7 @@
   ],
   "rows": [
     {
-      "CURRENT_SIZE": "7.779971072e+09",
+      "CURRENT_SIZE": "7.803392e+09",
       "NAME": "MACHINE",
       "PEAK_SIZE": "8.093978624e+09"
     },
@@ -26,7 +26,7 @@
       "PEAK_SIZE": "978944"
     },
     {
-      "CURRENT_SIZE": "3.29990144e+08",
+      "CURRENT_SIZE": "3.35060992e+08",
       "NAME": "NOTRACK___SYSTEM",
       "PEAK_SIZE": "3.53083392e+08"
     },
@@ -41,29 +41,29 @@
       "PEAK_SIZE": "7.663616e+06"
     },
     {
-      "CURRENT_SIZE": "1.660157952e+09",
+      "CURRENT_SIZE": "1.674641408e+09",
       "NAME": "DATABASE__SEGMENT_CACHE",
-      "PEAK_SIZE": "1.921224704e+09"
+      "PEAK_SIZE": "2.086793216e+09"
     },
     {
-      "CURRENT_SIZE": "2.40734208e+08",
+      "CURRENT_SIZE": "2.44834304e+08",
       "NAME": "DATABASE__SQE_HEAP",
-      "PEAK_SIZE": "2.40734208e+08"
+      "PEAK_SIZE": "2.44834304e+08"
     },
     {
-      "CURRENT_SIZE": "1.613824e+06",
+      "CURRENT_SIZE": "1.61792e+06",
       "NAME": "DATABASE__DS_SQE_LOB",
       "PEAK_SIZE": "5.595136e+06"
     },
     {
-      "CURRENT_SIZE": "53248",
+      "CURRENT_SIZE": "57344",
       "NAME": "DATABASE__DS_SQQQ_LOB",
       "PEAK_SIZE": "2.953216e+06"
     },
     {
       "CURRENT_SIZE": "3.4045952e+07",
       "NAME": "DATABASE__DSI_SQE_MTI",
-      "PEAK_SIZE": "3.4045952e+07"
+      "PEAK_SIZE": "3.4193408e+07"
     },
     {
       "CURRENT_SIZE": "2.097152e+06",
@@ -71,14 +71,14 @@
       "PEAK_SIZE": "8.388608e+06"
     },
     {
-      "CURRENT_SIZE": "2.24260096e+08",
+      "CURRENT_SIZE": "2.24227328e+08",
       "NAME": "OS",
       "PEAK_SIZE": "2.29527552e+08"
     },
     {
-      "CURRENT_SIZE": "5.19806976e+08",
+      "CURRENT_SIZE": "5.28474112e+08",
       "NAME": "CMD",
-      "PEAK_SIZE": "5.20290304e+08"
+      "PEAK_SIZE": "5.28596992e+08"
     },
     {
       "CURRENT_SIZE": "7.8311424e+07",
@@ -88,10 +88,10 @@
     {
       "CURRENT_SIZE": "864256",
       "NAME": "IPC",
-      "PEAK_SIZE": "937984"
+      "PEAK_SIZE": "974848"
     },
     {
-      "CURRENT_SIZE": "1.25198336e+08",
+      "CURRENT_SIZE": "1.2572672e+08",
       "NAME": "WM",
       "PEAK_SIZE": "1.26611456e+08"
     },
@@ -101,9 +101,9 @@
       "PEAK_SIZE": "147456"
     },
     {
-      "CURRENT_SIZE": "5.5517184e+07",
+      "CURRENT_SIZE": "5.5709696e+07",
       "NAME": "MSG",
-      "PEAK_SIZE": "5.5529472e+07"
+      "PEAK_SIZE": "5.5709696e+07"
     }
   ]
 }

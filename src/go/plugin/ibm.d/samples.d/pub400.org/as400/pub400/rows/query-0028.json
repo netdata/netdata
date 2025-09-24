@@ -1,12 +1,10 @@
 {
   "columns": [
-    "CURRENT_SIZE",
-    "PEAK_SIZE"
+    "AVG_DISK_BUSY"
   ],
   "rows": [
     {
-      "CURRENT_SIZE": "7.508967424e+09",
-      "PEAK_SIZE": "1.0005303296e+10"
+      "AVG_DISK_BUSY": "0.175"
     }
   ]
 }

@@ -66,6 +66,12 @@ type Config struct {
 	// CollectHTTPServerMetrics toggles collection of IBM HTTP Server statistics.
 	CollectHTTPServerMetrics *bool `yaml:"collect_http_server_metrics,omitempty" json:"collect_http_server_metrics"`
 
+	// CollectMessageQueueMetrics toggles collection of IBM i message queue metrics.
+	CollectMessageQueueMetrics *bool `yaml:"collect_message_queue_metrics,omitempty" json:"collect_message_queue_metrics"`
+
+	// CollectOutputQueueMetrics toggles collection of IBM i output queue metrics.
+	CollectOutputQueueMetrics *bool `yaml:"collect_output_queue_metrics,omitempty" json:"collect_output_queue_metrics"`
+
 	// CollectPlanCacheMetrics toggles collection of plan cache analysis metrics.
 	CollectPlanCacheMetrics *bool `yaml:"collect_plan_cache_metrics,omitempty" json:"collect_plan_cache_metrics"`
 
@@ -77,6 +83,12 @@ type Config struct {
 
 	// MaxJobQueues caps how many job queues may be charted.
 	MaxJobQueues int `yaml:"max_job_queues,omitempty" json:"max_job_queues"`
+
+	// MaxMessageQueues caps how many message queues may be charted.
+	MaxMessageQueues int `yaml:"max_message_queues,omitempty" json:"max_message_queues"`
+
+	// MaxOutputQueues caps how many output queues may be charted.
+	MaxOutputQueues int `yaml:"max_output_queues,omitempty" json:"max_output_queues"`
 
 	// MaxActiveJobs caps how many active jobs may be charted.
 	MaxActiveJobs int `yaml:"max_active_jobs,omitempty" json:"max_active_jobs"`

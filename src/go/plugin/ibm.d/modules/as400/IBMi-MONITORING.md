@@ -188,8 +188,8 @@ This document provides a comprehensive comparison of IBM i monitoring solutions 
 | Network Connections | ✅ | ❌ | 🔧 | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
 | Network Interfaces | ✅ | ❌ | 🔧 | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
 | HTTP Servers | ✅ | ❌ | 🔧 | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| Message Queues | ❌ | ✅ | 🔧 | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Output Queues | ❌ | ❌ | 🔧 | ❌ | ✅ | ❌ | ❌ | ❌ | ✅ |
+| Message Queues | ✅ | ✅ | 🔧 | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Output Queues | ✅ | ❌ | 🔧 | ❌ | ✅ | ❌ | ❌ | ❌ | ✅ |
 | Message Checkpoints | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ |
 
 ### Special Features
@@ -255,6 +255,7 @@ This document provides a comprehensive comparison of IBM i monitoring solutions 
 - SSD health and age monitoring
 - Comprehensive temporary storage tracking with buckets
 - Plan cache monitoring
+- Message and output queue metrics with cardinality safeguards
 - Built-in cardinality limits to prevent metric explosion
 - Statistics reset control
 

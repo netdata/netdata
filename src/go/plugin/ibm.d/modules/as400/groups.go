@@ -128,6 +128,62 @@ func (g *jobQueueGroup) Collect(ctx context.Context) error {
 	return nil
 }
 
+type messageQueueGroup struct {
+	c *Collector
+}
+
+func (g *messageQueueGroup) Name() string { return "message_queues" }
+func (g *messageQueueGroup) Enabled() bool {
+	return g.c.CollectMessageQueueMetrics == nil || *g.c.CollectMessageQueueMetrics
+}
+
+func (g *messageQueueGroup) Collect(ctx context.Context) error {
+	if !g.Enabled() {
+		return nil
+	}
+	if err := g.c.collectMessageQueues(ctx); err != nil {
+		if isSQLFeatureError(err) {
+			g.c.Warningf("message queue metrics not available on this IBM i version: %v", err)
+			g.c.CollectMessageQueueMetrics = boolPtr(false)
+			return nil
+		}
+		if isSQLTemporaryError(err) {
+			g.c.Debugf("message queue collection failed with temporary error, will show gaps: %v", err)
+			return nil
+		}
+		g.c.Errorf("failed to collect message queues: %v", err)
+	}
+	return nil
+}
+
+type outputQueueGroup struct {
+	c *Collector
+}
+
+func (g *outputQueueGroup) Name() string { return "output_queues" }
+func (g *outputQueueGroup) Enabled() bool {
+	return g.c.CollectOutputQueueMetrics == nil || *g.c.CollectOutputQueueMetrics
+}
+
+func (g *outputQueueGroup) Collect(ctx context.Context) error {
+	if !g.Enabled() {
+		return nil
+	}
+	if err := g.c.collectOutputQueues(ctx); err != nil {
+		if isSQLFeatureError(err) {
+			g.c.Warningf("output queue metrics not available on this IBM i version: %v", err)
+			g.c.CollectOutputQueueMetrics = boolPtr(false)
+			return nil
+		}
+		if isSQLTemporaryError(err) {
+			g.c.Debugf("output queue collection failed with temporary error, will show gaps: %v", err)
+			return nil
+		}
+		g.c.Errorf("failed to collect output queues: %v", err)
+	}
+	return nil
+}
+
 type diskGroup struct {
 	c *Collector
 }

@@ -36,6 +36,7 @@ type Collector struct {
 	subsystems        map[string]*subsystemMetrics
 	jobQueues         map[string]*jobQueueMetrics
 	messageQueues     map[string]*messageQueueMetrics
+	outputQueues      map[string]*outputQueueMetrics
 	tempStorageNamed  map[string]*tempStorageMetrics
 	activeJobs        map[string]*activeJobMetrics
 	networkInterfaces map[string]*networkInterfaceMetrics
@@ -65,6 +66,8 @@ type Collector struct {
 	activeJobsCardinality        cardinalityGuard
 	networkInterfacesCardinality cardinalityGuard
 	httpServersCardinality       cardinalityGuard
+	messageQueuesCardinality     cardinalityGuard
+	outputQueuesCardinality      cardinalityGuard
 
 	dump   *dumpContext
 	groups []collectionGroup
@@ -86,6 +89,7 @@ func (c *Collector) resetInstanceCaches() {
 	c.subsystems = make(map[string]*subsystemMetrics)
 	c.jobQueues = make(map[string]*jobQueueMetrics)
 	c.messageQueues = make(map[string]*messageQueueMetrics)
+	c.outputQueues = make(map[string]*outputQueueMetrics)
 	c.tempStorageNamed = make(map[string]*tempStorageMetrics)
 	c.activeJobs = make(map[string]*activeJobMetrics)
 	c.networkInterfaces = make(map[string]*networkInterfaceMetrics)
@@ -94,6 +98,8 @@ func (c *Collector) resetInstanceCaches() {
 	c.mx.disks = make(map[string]diskInstanceMetrics)
 	c.mx.subsystems = make(map[string]subsystemInstanceMetrics)
 	c.mx.jobQueues = make(map[string]jobQueueInstanceMetrics)
+	c.mx.messageQueues = make(map[string]messageQueueInstanceMetrics)
+	c.mx.outputQueues = make(map[string]outputQueueInstanceMetrics)
 	c.mx.tempStorageNamed = make(map[string]tempStorageInstanceMetrics)
 	c.mx.activeJobs = make(map[string]activeJobInstanceMetrics)
 	c.mx.networkInterfaces = make(map[string]networkInterfaceInstanceMetrics)
@@ -110,6 +116,8 @@ func (c *Collector) prepareIterationState() {
 	c.activeJobsCardinality.Configure(c.MaxActiveJobs)
 	c.networkInterfacesCardinality.Configure(networkInterfaceLimit)
 	c.httpServersCardinality.Configure(httpServerLimit)
+	c.messageQueuesCardinality.Configure(c.MaxMessageQueues)
+	c.outputQueuesCardinality.Configure(c.MaxOutputQueues)
 }
 
 func (c *Collector) initGroups() {
@@ -121,6 +129,8 @@ func (c *Collector) initGroups() {
 		&diskGroup{c},
 		&subsystemGroup{c},
 		&jobQueueGroup{c},
+		&messageQueueGroup{c},
+		&outputQueueGroup{c},
 		&activeJobGroup{c},
 		&networkInterfaceGroup{c},
 		&systemActivityGroup{c},
@@ -159,6 +169,8 @@ func (c *Collector) CollectOnce() error {
 	c.exportDiskMetrics()
 	c.exportSubsystemMetrics()
 	c.exportJobQueueMetrics()
+	c.exportMessageQueueMetrics()
+	c.exportOutputQueueMetrics()
 	c.exportTempStorageMetrics()
 	c.exportActiveJobMetrics()
 	c.exportNetworkInterfaceMetrics()
@@ -203,6 +215,20 @@ func (c *Collector) snapshotMetrics() map[string]int64 {
 		clean := cleanName(name)
 		for k, v := range stm.ToMap(values) {
 			metrics[fmt.Sprintf("jobqueue_%s_%s", clean, k)] = v
+		}
+	}
+
+	for key, values := range c.mx.messageQueues {
+		clean := cleanName(key)
+		for k, v := range stm.ToMap(values) {
+			metrics[fmt.Sprintf("message_queue_%s_%s", clean, k)] = v
+		}
+	}
+
+	for key, values := range c.mx.outputQueues {
+		clean := cleanName(key)
+		for k, v := range stm.ToMap(values) {
+			metrics[fmt.Sprintf("output_queue_%s_%s", clean, k)] = v
 		}
 	}
 
@@ -529,6 +555,66 @@ func (c *Collector) exportTempStorageMetrics() {
 		contexts.TempStorageBucket.Usage.Set(c.State, labels, contexts.TempStorageBucketUsageValues{
 			Current: values.CurrentSize,
 			Peak:    values.PeakSize,
+		})
+	}
+}
+
+func (c *Collector) exportMessageQueueMetrics() {
+	for key, values := range c.mx.messageQueues {
+		meta := c.messageQueues[key]
+		library := ""
+		queue := key
+		if meta != nil {
+			library = meta.library
+			if meta.name != "" {
+				queue = meta.name
+			}
+		}
+		labels := contexts.MessageQueueLabels{
+			Library: library,
+			Queue:   queue,
+		}
+		contexts.MessageQueue.Messages.Set(c.State, labels, contexts.MessageQueueMessagesValues{
+			Total:         values.Total,
+			Informational: values.Informational,
+			Inquiry:       values.Inquiry,
+			Diagnostic:    values.Diagnostic,
+			Escape:        values.Escape,
+			Notify:        values.Notify,
+			Sender_copy:   values.SenderCopy,
+		})
+		contexts.MessageQueue.Severity.Set(c.State, labels, contexts.MessageQueueSeverityValues{
+			Max: values.MaxSeverity,
+		})
+	}
+}
+
+func (c *Collector) exportOutputQueueMetrics() {
+	for key, values := range c.mx.outputQueues {
+		meta := c.outputQueues[key]
+		library := ""
+		queue := key
+		status := ""
+		if meta != nil {
+			library = meta.library
+			status = meta.status
+			if meta.name != "" {
+				queue = meta.name
+			}
+		}
+		labels := contexts.OutputQueueLabels{
+			Library: library,
+			Queue:   queue,
+			Status:  status,
+		}
+		contexts.OutputQueue.Files.Set(c.State, labels, contexts.OutputQueueFilesValues{
+			Files: values.Files,
+		})
+		contexts.OutputQueue.Writers.Set(c.State, labels, contexts.OutputQueueWritersValues{
+			Writers: values.Writers,
+		})
+		contexts.OutputQueue.Status.Set(c.State, labels, contexts.OutputQueueStatusValues{
+			Released: values.Released,
 		})
 	}
 }
