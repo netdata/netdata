@@ -14,7 +14,7 @@ This document provides a comprehensive comparison of IBM i monitoring solutions 
 - Real-time, high-resolution metrics
 - Statistics reset control
 - Cardinality management
-- Extensive network, disk health, and system value monitoring
+- Extensive network, disk health, and HTTP server monitoring
 
 ### 2. Datadog IBM i Integration
 **Repository**: https://github.com/DataDog/integrations-core/tree/master/ibm_i
@@ -133,9 +133,10 @@ This document provides a comprehensive comparison of IBM i monitoring solutions 
 | CPU Rate/Activity | ✅ | ❌ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
 | Min/Max CPU | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
 | Per-Job CPU | ✅ | ✅ | 🔧 | ❌ | ✅ | ✅ | ✅ | ❌ | ⚠️¹ |
-| Top CPU Jobs | ❌ | ❌ | 🔧 | ❌ | ✅ | ❌ | ❌ | ❌ | ⚠️¹ |
+| Top CPU Jobs | ✅² | ❌ | 🔧 | ❌ | ✅ | ❌ | ❌ | ❌ | ⚠️¹ |
 
 ¹ *Depends on agent emulator implementation*
+² *Enable `collect_active_jobs` to capture top CPU jobs*
 
 ### Memory & Storage Metrics
 
@@ -197,7 +198,7 @@ This document provides a comprehensive comparison of IBM i monitoring solutions 
 |---------|---------|---------|------------|--------|-------------|------------|-----------|---------|--------|
 | HA Monitoring | ❌ | ❌ | ❌ | ❌ | ✅¹ | ❌ | ❌ | ❌ | ❌ |
 | PTF Monitoring | ❌ | ❌ | 🔧 | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ |
-| System Values | ✅ | ❌ | 🔧 | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| System Values | ❌ | ❌ | 🔧 | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
 | Plan Cache | ✅ | ❌ | 🔧 | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
 | Custom SQL | ❌ | ⚠️ | ✅ | ⚠️ | ❌ | ✅ | ❌ | ⚠️² | ❌ |
 | Problem Detection | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ |
@@ -253,7 +254,7 @@ This document provides a comprehensive comparison of IBM i monitoring solutions 
 - Network interface and HTTP server monitoring (exclusive)
 - SSD health and age monitoring
 - Comprehensive temporary storage tracking with buckets
-- System values and plan cache monitoring
+- Plan cache monitoring
 - Built-in cardinality limits to prevent metric explosion
 - Statistics reset control
 
