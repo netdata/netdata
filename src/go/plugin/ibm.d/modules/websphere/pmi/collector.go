@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"math"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -120,6 +121,108 @@ type aggregator struct {
 	jmsStores     map[string]*jmsStoreSectionMetrics
 	portletApps   map[string]*portletAppMetrics
 	portlets      map[string]*portletMetrics
+
+	coverage *statCoverage
+}
+
+type statCoverage struct {
+	all     map[string]struct{}
+	handled map[string]struct{}
+}
+
+func newStatCoverage() *statCoverage {
+	return &statCoverage{
+		all:     make(map[string]struct{}),
+		handled: make(map[string]struct{}),
+	}
+}
+
+func (c *statCoverage) Reset() {
+	if c == nil {
+		return
+	}
+	c.all = make(map[string]struct{})
+	c.handled = make(map[string]struct{})
+}
+
+func (c *statCoverage) Seed(snapshot *pmiproto.Snapshot) {
+	if c == nil || snapshot == nil {
+		return
+	}
+	for i := range snapshot.Nodes {
+		node := &snapshot.Nodes[i]
+		for j := range node.Servers {
+			server := &node.Servers[j]
+			for k := range server.Stats {
+				c.walk(&server.Stats[k])
+			}
+		}
+	}
+	for i := range snapshot.Stats {
+		c.walk(&snapshot.Stats[i])
+	}
+}
+
+func (c *statCoverage) walk(stat *pmiproto.Stat) {
+	if stat == nil {
+		return
+	}
+	path := statPath(stat)
+	c.all[path] = struct{}{}
+	for i := range stat.SubStats {
+		c.walk(&stat.SubStats[i])
+	}
+}
+
+func (c *statCoverage) Handle(stat *pmiproto.Stat) {
+	if c == nil || stat == nil {
+		return
+	}
+	path := statPath(stat)
+	c.handled[path] = struct{}{}
+}
+
+func (c *statCoverage) Missing() []string {
+	if c == nil {
+		return nil
+	}
+	missing := make([]string, 0)
+	for path := range c.all {
+		if _, ok := c.handled[path]; !ok {
+			missing = append(missing, path)
+		}
+	}
+	sort.Strings(missing)
+	return missing
+}
+
+func statPath(stat *pmiproto.Stat) string {
+	if stat == nil {
+		return ""
+	}
+	path := strings.TrimSpace(stat.Path)
+	if path == "" {
+		path = strings.TrimSpace(stat.Name)
+	}
+	return path
+}
+
+func (a *aggregator) markNestedStats(stats ...*pmiproto.Stat) {
+	for _, stat := range stats {
+		if stat == nil {
+			continue
+		}
+		a.coverage.Handle(stat)
+		for i := range stat.SubStats {
+			a.markNestedStats(&stat.SubStats[i])
+		}
+	}
+}
+
+func (a *aggregator) markNestedStatsSlice(stats []pmiproto.Stat) {
+	for i := range stats {
+		a.markNestedStats(&stats[i])
+	}
 }
 
 type jvmSystemMetrics struct {
@@ -554,10 +657,18 @@ func newAggregator(cfg Config) *aggregator {
 		jmsStores:     make(map[string]*jmsStoreSectionMetrics),
 		portletApps:   make(map[string]*portletAppMetrics),
 		portlets:      make(map[string]*portletMetrics),
+		coverage:      newStatCoverage(),
 	}
 }
 
 func (a *aggregator) processSnapshot(snapshot *pmiproto.Snapshot, selectors selectorBundle) {
+	if a.coverage == nil {
+		a.coverage = newStatCoverage()
+	} else {
+		a.coverage.Reset()
+	}
+	a.coverage.Seed(snapshot)
+
 	for _, node := range snapshot.Nodes {
 		for _, server := range node.Servers {
 			a.processStats(node.Name, server.Name, server.Stats, selectors)
@@ -596,7 +707,7 @@ func (a *aggregator) processStats(node, server string, stats []pmiproto.Stat, se
 			handled = true
 		case "Thread Pools":
 			for j := range stat.SubStats {
-				a.processThreadPool(stat.SubStats[j])
+				a.processThreadPool(&stat.SubStats[j])
 			}
 			handled = true
 		case "Transaction Manager":
@@ -604,10 +715,12 @@ func (a *aggregator) processStats(node, server string, stats []pmiproto.Stat, se
 			handled = true
 		case "JDBC Connection Pools":
 			if !a.collectJDBCMetricsEnabled() {
+				a.coverage.Handle(stat)
 				continue
 			}
 			for j := range stat.SubStats {
 				provider := &stat.SubStats[j]
+				a.coverage.Handle(provider)
 				for k := range provider.SubStats {
 					a.processJDBCPool(node, server, provider.Name, &provider.SubStats[k], selectors)
 				}
@@ -615,10 +728,12 @@ func (a *aggregator) processStats(node, server string, stats []pmiproto.Stat, se
 			handled = true
 		case "JCA Connection Pools":
 			if !a.collectJCAMetricsEnabled() {
+				a.coverage.Handle(stat)
 				continue
 			}
 			for j := range stat.SubStats {
 				provider := &stat.SubStats[j]
+				a.coverage.Handle(provider)
 				for k := range provider.SubStats {
 					a.processJCAPool(node, server, provider.Name, &provider.SubStats[k], selectors)
 				}
@@ -626,6 +741,7 @@ func (a *aggregator) processStats(node, server string, stats []pmiproto.Stat, se
 			handled = true
 		case "Web Applications":
 			if !a.collectWebAppMetricsEnabled() {
+				a.coverage.Handle(stat)
 				continue
 			}
 			for j := range stat.SubStats {
@@ -648,6 +764,7 @@ func (a *aggregator) processStats(node, server string, stats []pmiproto.Stat, se
 			handled = true
 		case "URLs":
 			if !a.collectServletMetricsEnabled() {
+				a.coverage.Handle(stat)
 				continue
 			}
 			for j := range stat.SubStats {
@@ -656,6 +773,7 @@ func (a *aggregator) processStats(node, server string, stats []pmiproto.Stat, se
 			handled = true
 		case "Servlet Session Manager":
 			if !a.collectSessionMetricsEnabled() {
+				a.coverage.Handle(stat)
 				continue
 			}
 			for j := range stat.SubStats {
@@ -664,6 +782,7 @@ func (a *aggregator) processStats(node, server string, stats []pmiproto.Stat, se
 			handled = true
 		case "Dynamic Caching":
 			if !a.collectDynamicCacheMetricsEnabled() {
+				a.coverage.Handle(stat)
 				continue
 			}
 			for j := range stat.SubStats {
@@ -714,19 +833,30 @@ func (a *aggregator) processStats(node, server string, stats []pmiproto.Stat, se
 			handled = true
 		case "SIB Service":
 			if !a.collectJMSMetricsEnabled() {
+				a.coverage.Handle(stat)
 				continue
 			}
 			a.processSIBService(node, server, stat, selectors)
 			handled = true
 		}
 
-		if !handled && len(stat.SubStats) > 0 {
+		if handled {
+			a.coverage.Handle(stat)
+			continue
+		}
+		if len(stat.SubStats) > 0 {
 			a.processStats(node, server, stat.SubStats, selectors)
+			a.coverage.Handle(stat)
 		}
 	}
 }
 
 func (a *aggregator) processJVMRuntime(stat *pmiproto.Stat) {
+	if stat == nil {
+		return
+	}
+	a.coverage.Handle(stat)
+
 	for _, cs := range stat.CountStatistics {
 		switch strings.ToLower(cs.Name) {
 		case "freememory":
@@ -771,6 +901,11 @@ func (a *aggregator) processJVMRuntime(stat *pmiproto.Stat) {
 }
 
 func (a *aggregator) processJVMMemory(stat *pmiproto.Stat) {
+	if stat == nil {
+		return
+	}
+	a.coverage.Handle(stat)
+
 	for _, rs := range stat.RangeStatistics {
 		switch strings.ToLower(rs.Name) {
 		case "heapbytesused":
@@ -790,6 +925,11 @@ func (a *aggregator) processJVMMemory(stat *pmiproto.Stat) {
 }
 
 func (a *aggregator) processJVMThreads(stat *pmiproto.Stat) {
+	if stat == nil {
+		return
+	}
+	a.coverage.Handle(stat)
+
 	var total, daemon int64
 	for _, rs := range stat.RangeStatistics {
 		switch strings.ToLower(rs.Name) {
@@ -818,6 +958,11 @@ func (a *aggregator) processJVMThreads(stat *pmiproto.Stat) {
 }
 
 func (a *aggregator) processJVMGC(stat *pmiproto.Stat) {
+	if stat == nil {
+		return
+	}
+	a.coverage.Handle(stat)
+
 	for _, cs := range stat.CountStatistics {
 		switch strings.ToLower(cs.Name) {
 		case "collectioncount":
@@ -832,7 +977,12 @@ func (a *aggregator) processJVMGC(stat *pmiproto.Stat) {
 	}
 }
 
-func (a *aggregator) processThreadPool(stat pmiproto.Stat) {
+func (a *aggregator) processThreadPool(stat *pmiproto.Stat) {
+	if stat == nil {
+		return
+	}
+	a.coverage.Handle(stat)
+
 	metrics := a.threadPools[stat.Name]
 	for _, rs := range stat.RangeStatistics {
 		switch strings.ToLower(rs.Name) {
@@ -850,6 +1000,11 @@ func (a *aggregator) processThreadPool(stat pmiproto.Stat) {
 }
 
 func (a *aggregator) processTransactionManager(node, server string, stat *pmiproto.Stat) {
+	if stat == nil {
+		return
+	}
+	a.coverage.Handle(stat)
+
 	key := common.InstanceKey(node, server, "transaction_manager")
 	metrics := a.transactions[key]
 	if metrics == nil {
@@ -919,6 +1074,7 @@ func (a *aggregator) processJDBCPool(node, server, provider string, stat *pmipro
 	if stat == nil {
 		return
 	}
+	a.coverage.Handle(stat)
 	poolName := stat.Name
 	if poolName == "" {
 		poolName = provider
@@ -1005,6 +1161,7 @@ func (a *aggregator) processJCAPool(node, server, provider string, stat *pmiprot
 	if stat == nil {
 		return
 	}
+	a.coverage.Handle(stat)
 	poolName := stat.Name
 	if poolName == "" {
 		poolName = provider
@@ -1076,6 +1233,7 @@ func (a *aggregator) processWebApplication(node, server string, stat *pmiproto.S
 	if stat == nil {
 		return
 	}
+	a.coverage.Handle(stat)
 	name := stat.Name
 	if name == "" {
 		name = "unknown"
@@ -1110,12 +1268,15 @@ func (a *aggregator) processWebApplication(node, server string, stat *pmiproto.S
 	if len(stat.SubStats) > 0 {
 		a.processStats(node, server, stat.SubStats, selectors)
 	}
+
+	a.markNestedStatsSlice(stat.SubStats)
 }
 
 func (a *aggregator) processPortletApplication(node, server string, stat *pmiproto.Stat) {
 	if stat == nil {
 		return
 	}
+	a.coverage.Handle(stat)
 	key := common.InstanceKey(node, server, "portlet_application")
 	metrics := a.portletApps[key]
 	if metrics == nil {
@@ -1139,6 +1300,7 @@ func (a *aggregator) processPortlet(node, server string, stat *pmiproto.Stat) {
 	if stat == nil {
 		return
 	}
+	a.coverage.Handle(stat)
 	name := stat.Name
 	if name == "" {
 		name = "unknown"
@@ -1198,6 +1360,7 @@ func (a *aggregator) processSessionManager(node, server string, stat *pmiproto.S
 	if stat == nil {
 		return
 	}
+	a.coverage.Handle(stat)
 	appName := stat.Name
 	if appName == "" {
 		appName = "unknown"
@@ -1257,6 +1420,7 @@ func (a *aggregator) processDynamicCache(node, server string, stat *pmiproto.Sta
 	if stat == nil {
 		return
 	}
+	a.coverage.Handle(stat)
 	cacheName := stat.Name
 	if cacheName == "" {
 		cacheName = "default"
@@ -1281,12 +1445,21 @@ func (a *aggregator) processDynamicCache(node, server string, stat *pmiproto.Sta
 			metrics.entries = value
 		}
 	}
+
+	for i := range stat.SubStats {
+		sub := &stat.SubStats[i]
+		a.coverage.Handle(sub)
+		for j := range sub.SubStats {
+			a.coverage.Handle(&sub.SubStats[j])
+		}
+	}
 }
 
 func (a *aggregator) processSystemData(stat *pmiproto.Stat) {
 	if stat == nil {
 		return
 	}
+	a.coverage.Handle(stat)
 
 	for _, cs := range stat.CountStatistics {
 		value, ok := parseCount(cs.Count)
@@ -1317,6 +1490,7 @@ func (a *aggregator) processURLMetric(node, server string, stat *pmiproto.Stat, 
 	if stat == nil {
 		return
 	}
+	a.coverage.Handle(stat)
 	urlName := stat.Name
 	if urlName == "" {
 		urlName = "unknown"
@@ -1362,6 +1536,7 @@ func (a *aggregator) processSecurityAuthentication(node, server string, stat *pm
 	if stat == nil {
 		return
 	}
+	a.coverage.Handle(stat)
 	key := common.InstanceKey(node, server, "security_auth")
 	metrics := a.securityAuth[key]
 	if metrics == nil {
@@ -1401,6 +1576,7 @@ func (a *aggregator) processSecurityAuthorization(node, server string, stat *pmi
 	if stat == nil {
 		return
 	}
+	a.coverage.Handle(stat)
 	key := common.InstanceKey(node, server, "security_authz")
 	metrics := a.securityAuthz[key]
 	if metrics == nil {
@@ -1431,6 +1607,7 @@ func (a *aggregator) processORB(node, server string, stat *pmiproto.Stat) {
 	if stat == nil {
 		return
 	}
+	a.coverage.Handle(stat)
 	key := common.InstanceKey(node, server, "orb")
 	metrics := a.orb[key]
 	if metrics == nil {
@@ -1460,13 +1637,19 @@ func (a *aggregator) processORB(node, server string, stat *pmiproto.Stat) {
 		}
 	}
 
-	for _, sub := range stat.SubStats {
+	for i := range stat.SubStats {
+		sub := &stat.SubStats[i]
+		a.coverage.Handle(sub)
 		if strings.EqualFold(sub.Name, "Interceptors") {
-			for i := range sub.CountStatistics {
-				setq := sub.CountStatistics[i]
-				if strings.EqualFold(setq.Name, "requestcount") {
-					if value, ok := parseCount(setq.Count); ok {
-						metrics.requestCount = value
+			for j := range sub.SubStats {
+				interceptor := &sub.SubStats[j]
+				a.coverage.Handle(interceptor)
+				for k := range interceptor.CountStatistics {
+					cs := interceptor.CountStatistics[k]
+					if strings.EqualFold(cs.Name, "requestcount") {
+						if value, ok := parseCount(cs.Count); ok {
+							metrics.requestCount = value
+						}
 					}
 				}
 			}
@@ -1478,6 +1661,7 @@ func (a *aggregator) processHAManager(node, server string, stat *pmiproto.Stat) 
 	if stat == nil {
 		return
 	}
+	a.coverage.Handle(stat)
 	key := common.InstanceKey(node, server, "ha_manager")
 	metrics := a.haManager[key]
 	if metrics == nil {
@@ -1525,13 +1709,21 @@ func (a *aggregator) processHAManager(node, server string, stat *pmiproto.Stat) 
 			metrics.bBoardRebuildMs = ms
 		}
 	}
+
+	for i := range stat.SubStats {
+		a.coverage.Handle(&stat.SubStats[i])
+	}
 }
 
 func (a *aggregator) processAlarmManager(node, server string, stat *pmiproto.Stat) {
 	if stat == nil {
 		return
 	}
-	for _, manager := range stat.SubStats {
+	a.coverage.Handle(stat)
+	for i := range stat.SubStats {
+		manager := &stat.SubStats[i]
+		a.coverage.Handle(manager)
+
 		name := manager.Name
 		if name == "" {
 			name = "default"
@@ -1563,7 +1755,11 @@ func (a *aggregator) processSchedulers(node, server string, stat *pmiproto.Stat)
 	if stat == nil {
 		return
 	}
-	for _, scheduler := range stat.SubStats {
+	a.coverage.Handle(stat)
+	for i := range stat.SubStats {
+		scheduler := &stat.SubStats[i]
+		a.coverage.Handle(scheduler)
+
 		name := scheduler.Name
 		if name == "" {
 			name = "default"
@@ -1595,43 +1791,73 @@ func (a *aggregator) processSIBService(node, server string, stat *pmiproto.Stat,
 	if stat == nil {
 		return
 	}
-	for _, sub := range stat.SubStats {
+	a.coverage.Handle(stat)
+	for i := range stat.SubStats {
+		sub := &stat.SubStats[i]
+		a.coverage.Handle(sub)
 		if !strings.EqualFold(sub.Name, "SIB Messaging Engines") {
 			continue
 		}
-		for _, engine := range sub.SubStats {
+		for j := range sub.SubStats {
+			engine := &sub.SubStats[j]
+			a.coverage.Handle(engine)
 			engineName := engine.Name
 			if engineName == "" {
 				engineName = "engine"
 			}
-			a.processSIBMessagingEngine(node, server, engineName, &engine, selectors)
+			a.processSIBMessagingEngine(node, server, engineName, engine, selectors)
+		}
+	}
+
+	for i := range stat.SubStats {
+		s := &stat.SubStats[i]
+		for j := range s.SubStats {
+			child := &s.SubStats[j]
+			a.coverage.Handle(child)
+			for k := range child.SubStats {
+				a.coverage.Handle(&child.SubStats[k])
+			}
 		}
 	}
 }
 
 func (a *aggregator) processSIBMessagingEngine(node, server, engine string, stat *pmiproto.Stat, selectors selectorBundle) {
-	for _, sub := range stat.SubStats {
+	if stat == nil {
+		return
+	}
+	a.coverage.Handle(stat)
+	for i := range stat.SubStats {
+		sub := &stat.SubStats[i]
+		a.coverage.Handle(sub)
 		switch sub.Name {
 		case "Destinations":
-			for _, destGroup := range sub.SubStats {
+			for j := range sub.SubStats {
+				destGroup := &sub.SubStats[j]
+				a.coverage.Handle(destGroup)
 				switch destGroup.Name {
 				case "Queues":
-					for _, queue := range destGroup.SubStats {
-						a.processSIBQueue(node, server, engine, &queue, selectors)
+					for k := range destGroup.SubStats {
+						queue := &destGroup.SubStats[k]
+						a.coverage.Handle(queue)
+						a.processSIBQueue(node, server, engine, queue, selectors)
 					}
 				case "Topicspaces":
-					for _, topic := range destGroup.SubStats {
-						a.processSIBTopicSpace(node, server, engine, &topic, selectors)
+					for k := range destGroup.SubStats {
+						topic := &destGroup.SubStats[k]
+						a.coverage.Handle(topic)
+						a.processSIBTopicSpace(node, server, engine, topic, selectors)
 					}
 				}
 			}
 		case "MessageStoreStats.group":
-			for _, section := range sub.SubStats {
+			for j := range sub.SubStats {
+				section := &sub.SubStats[j]
+				a.coverage.Handle(section)
 				sectionName := section.Name
 				if sectionName == "" {
 					continue
 				}
-				a.processSIBMessageStoreSection(node, server, engine, sectionName, &section)
+				a.processSIBMessageStoreSection(node, server, engine, sectionName, section)
 			}
 		}
 	}
@@ -1641,6 +1867,7 @@ func (a *aggregator) processSIBQueue(node, server, engine string, stat *pmiproto
 	if stat == nil {
 		return
 	}
+	a.coverage.Handle(stat)
 	queueName := stat.Name
 	if queueName == "" {
 		queueName = "queue"
@@ -1731,6 +1958,7 @@ func (a *aggregator) processSIBTopicSpace(node, server, engine string, stat *pmi
 	if stat == nil {
 		return
 	}
+	a.coverage.Handle(stat)
 	topicName := stat.Name
 	if topicName == "" {
 		topicName = "topicspace"
@@ -1782,12 +2010,15 @@ func (a *aggregator) processSIBTopicSpace(node, server, engine string, stat *pmi
 			metrics.localSubscriberAttaches = value
 		}
 	}
+
+	a.markNestedStatsSlice(stat.SubStats)
 }
 
 func (a *aggregator) processSIBMessageStoreSection(node, server, engine, section string, stat *pmiproto.Stat) {
 	if stat == nil {
 		return
 	}
+	a.coverage.Handle(stat)
 	lowerSection := strings.ToLower(section)
 	sectionLabel := section
 	if strings.HasPrefix(lowerSection, "messagestorestats.") {
@@ -1888,7 +2119,11 @@ func (a *aggregator) processObjectPool(node, server string, stat *pmiproto.Stat)
 	if stat == nil {
 		return
 	}
-	for _, pool := range stat.SubStats {
+	a.coverage.Handle(stat)
+	for i := range stat.SubStats {
+		pool := &stat.SubStats[i]
+		a.coverage.Handle(pool)
+
 		name := pool.Name
 		if name == "" {
 			name = "default"
@@ -1949,121 +2184,152 @@ func (a *aggregator) processEnterpriseBeans(node, server string, stat *pmiproto.
 	if stat == nil {
 		return
 	}
+	a.coverage.Handle(stat)
 	if a.cfg.CollectEJBMetrics != nil && !*a.cfg.CollectEJBMetrics {
 		return
 	}
 
-	for _, bean := range stat.SubStats {
-		beanName := bean.Name
-		if beanName == "" {
-			beanName = "unknown"
-		}
-		if selectors.ejb != nil && !selectors.ejb.MatchString(beanName) {
+	for i := range stat.SubStats {
+		category := &stat.SubStats[i]
+		a.coverage.Handle(category)
+
+		if len(category.SubStats) == 0 {
+			a.processEnterpriseBeanInstance(node, server, category.Name, category, selectors)
 			continue
 		}
 
-		key := common.InstanceKey(node, server, beanName)
-		metrics := a.enterpriseEJB[key]
-		if metrics == nil {
-			if a.cfg.MaxEJBs > 0 && len(a.enterpriseEJB) >= a.cfg.MaxEJBs {
-				continue
-			}
-			metrics = &enterpriseBeanMetrics{node: node, server: server, name: beanName}
-			a.enterpriseEJB[key] = metrics
-		}
-
-		for _, cs := range bean.CountStatistics {
-			value, ok := parseCount(cs.Count)
-			if !ok {
-				continue
-			}
-			switch strings.ToLower(cs.Name) {
-			case "createcount":
-				metrics.createCount = value
-			case "removecount":
-				metrics.removeCount = value
-			case "activatecount":
-				metrics.activateCount = value
-			case "passivatecount":
-				metrics.passivateCount = value
-			case "instantiatecount":
-				metrics.instantiateCount = value
-			case "storecount":
-				metrics.storeCount = value
-			case "loadcount":
-				metrics.loadCount = value
-			case "messagecount":
-				metrics.messageCount = value
-			case "messagebackoutcount":
-				metrics.messageBackoutCnt = value
-			}
-		}
-
-		for _, rs := range bean.RangeStatistics {
-			value, ok := parseFloat(rs.Current)
-			if !ok {
-				continue
-			}
-			rounded := int64(math.Round(value))
-			switch strings.ToLower(rs.Name) {
-			case "readycount":
-				metrics.readyCount = rounded
-			case "livecount":
-				metrics.liveCount = rounded
-			case "pooledcount":
-				metrics.pooledCount = rounded
-			case "activemethodcount":
-				metrics.activeMethodCount = rounded
-			case "passivecount":
-				metrics.passiveCount = rounded
-			case "serversessionpoolusage":
-				metrics.serverSessionPoolUsage = rounded
-			case "methodreadycount":
-				metrics.methodReadyCount = rounded
-			case "asyncqsize":
-				metrics.asyncQueueSize = rounded
-			}
-		}
-
-		for _, ts := range bean.TimeStatistics {
-			value, ok := parseFloat(ts.TotalTime)
-			if !ok {
-				continue
-			}
-			ms := convertUnits(int64(math.Round(value)), ts.Unit, unitMilliseconds)
-			switch strings.ToLower(ts.Name) {
-			case "activationtime":
-				metrics.activationTimeMs = ms
-			case "passivationtime":
-				metrics.passivationTimeMs = ms
-			case "createtime":
-				metrics.createTimeMs = ms
-			case "removetime":
-				metrics.removeTimeMs = ms
-			case "loadtime":
-				metrics.loadTimeMs = ms
-			case "storetime":
-				metrics.storeTimeMs = ms
-			case "methodresponsetime":
-				metrics.methodResponseTimeMs = ms
-			case "waittime":
-				metrics.waitTimeMs = ms
-			case "asyncwaittime":
-				metrics.asyncWaitTimeMs = ms
-			case "readlocktime":
-				metrics.readLockTimeMs = ms
-			case "writelocktime":
-				metrics.writeLockTimeMs = ms
-			}
+		for j := range category.SubStats {
+			bean := &category.SubStats[j]
+			a.processEnterpriseBeanInstance(node, server, bean.Name, bean, selectors)
+			a.markNestedStatsSlice(bean.SubStats)
 		}
 	}
+}
+
+func (a *aggregator) processEnterpriseBeanInstance(node, server, rawName string, bean *pmiproto.Stat, selectors selectorBundle) {
+	if bean == nil {
+		return
+	}
+	a.coverage.Handle(bean)
+
+	name := rawName
+	if name == "" {
+		name = bean.Name
+	}
+	if name == "" {
+		name = "unknown"
+	}
+
+	if selectors.ejb != nil && !selectors.ejb.MatchString(name) {
+		return
+	}
+
+	key := common.InstanceKey(node, server, name)
+	metrics := a.enterpriseEJB[key]
+	if metrics == nil {
+		if a.cfg.MaxEJBs > 0 && len(a.enterpriseEJB) >= a.cfg.MaxEJBs {
+			return
+		}
+		metrics = &enterpriseBeanMetrics{node: node, server: server, name: name}
+		a.enterpriseEJB[key] = metrics
+	}
+
+	for _, cs := range bean.CountStatistics {
+		value, ok := parseCount(cs.Count)
+		if !ok {
+			continue
+		}
+		switch strings.ToLower(cs.Name) {
+		case "createcount":
+			metrics.createCount = value
+		case "removecount":
+			metrics.removeCount = value
+		case "activatecount":
+			metrics.activateCount = value
+		case "passivatecount":
+			metrics.passivateCount = value
+		case "instantiatecount":
+			metrics.instantiateCount = value
+		case "storecount":
+			metrics.storeCount = value
+		case "loadcount":
+			metrics.loadCount = value
+		case "messagecount":
+			metrics.messageCount = value
+		case "messagebackoutcount":
+			metrics.messageBackoutCnt = value
+		}
+	}
+
+	for _, rs := range bean.RangeStatistics {
+		value, ok := parseFloat(rs.Current)
+		if !ok {
+			continue
+		}
+		rounded := int64(math.Round(value))
+		switch strings.ToLower(rs.Name) {
+		case "readycount":
+			metrics.readyCount = rounded
+		case "livecount":
+			metrics.liveCount = rounded
+		case "pooledcount":
+			metrics.pooledCount = rounded
+		case "activemethodcount":
+			metrics.activeMethodCount = rounded
+		case "passivecount":
+			metrics.passiveCount = rounded
+		case "serversessionpoolusage":
+			metrics.serverSessionPoolUsage = rounded
+		case "methodreadycount":
+			metrics.methodReadyCount = rounded
+		case "asyncqsize":
+			metrics.asyncQueueSize = rounded
+		}
+	}
+
+	for _, ts := range bean.TimeStatistics {
+		value, ok := parseFloat(ts.TotalTime)
+		if !ok {
+			continue
+		}
+		ms := convertUnits(int64(math.Round(value)), ts.Unit, unitMilliseconds)
+		switch strings.ToLower(ts.Name) {
+		case "activationtime":
+			metrics.activationTimeMs = ms
+		case "passivationtime":
+			metrics.passivationTimeMs = ms
+		case "createtime":
+			metrics.createTimeMs = ms
+		case "removetime":
+			metrics.removeTimeMs = ms
+		case "loadtime":
+			metrics.loadTimeMs = ms
+		case "storetime":
+			metrics.storeTimeMs = ms
+		case "methodresponsetime":
+			metrics.methodResponseTimeMs = ms
+		case "waittime":
+			metrics.waitTimeMs = ms
+		case "asyncwaittime":
+			metrics.asyncWaitTimeMs = ms
+		case "readlocktime":
+			metrics.readLockTimeMs = ms
+		case "writelocktime":
+			metrics.writeLockTimeMs = ms
+		}
+	}
+
+	a.markNestedStatsSlice(bean.SubStats)
 }
 
 func (a *aggregator) processWebServices(node, server string, stat *pmiproto.Stat) {
 	if stat == nil {
 		return
 	}
-	for _, svc := range stat.SubStats {
+	a.coverage.Handle(stat)
+	for i := range stat.SubStats {
+		svc := &stat.SubStats[i]
+		a.coverage.Handle(svc)
 		name := svc.Name
 		if name == "" {
 			name = "default"
@@ -2084,6 +2350,10 @@ func (a *aggregator) processWebServices(node, server string, stat *pmiproto.Stat
 				metrics.loaded = value
 			}
 		}
+
+		for j := range svc.SubStats {
+			a.coverage.Handle(&svc.SubStats[j])
+		}
 	}
 }
 
@@ -2091,7 +2361,10 @@ func (a *aggregator) processWebServicesGateway(node, server string, stat *pmipro
 	if stat == nil {
 		return
 	}
-	for _, gateway := range stat.SubStats {
+	a.coverage.Handle(stat)
+	for i := range stat.SubStats {
+		gateway := &stat.SubStats[i]
+		a.coverage.Handle(gateway)
 		name := gateway.Name
 		if name == "" {
 			name = "gateway"
@@ -2118,6 +2391,10 @@ func (a *aggregator) processWebServicesGateway(node, server string, stat *pmipro
 				metrics.asyncResponses = value
 			}
 		}
+
+		for j := range gateway.SubStats {
+			a.coverage.Handle(&gateway.SubStats[j])
+		}
 	}
 }
 
@@ -2125,7 +2402,10 @@ func (a *aggregator) processPMIWebServiceModule(node, server string, stat *pmipr
 	if stat == nil {
 		return
 	}
-	for _, module := range stat.SubStats {
+	a.coverage.Handle(stat)
+	for i := range stat.SubStats {
+		module := &stat.SubStats[i]
+		a.coverage.Handle(module)
 		name := module.Name
 		if name == "" {
 			name = "module"
@@ -2146,6 +2426,10 @@ func (a *aggregator) processPMIWebServiceModule(node, server string, stat *pmipr
 				metrics.loaded = value
 			}
 		}
+
+		for j := range module.SubStats {
+			a.coverage.Handle(&module.SubStats[j])
+		}
 	}
 }
 
@@ -2153,6 +2437,7 @@ func (a *aggregator) processExtensionRegistry(node, server string, stat *pmiprot
 	if stat == nil {
 		return
 	}
+	a.coverage.Handle(stat)
 	metrics := a.extensionReg
 	metrics.node = node
 	metrics.server = server
@@ -2802,6 +3087,13 @@ func convertUnits(value int64, unit string, target string) int64 {
 	default:
 		return value
 	}
+}
+
+func (a *aggregator) coverageMissing() []string {
+	if a.coverage == nil {
+		return nil
+	}
+	return a.coverage.Missing()
 }
 
 func convertToBytes(value int64, unit string) int64 {
