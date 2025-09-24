@@ -1,6 +1,6 @@
-# AI and Machine Learning
+# Netdata AI
 
-Netdata provides powerful AI-driven capabilities to transform how you monitor and troubleshoot your infrastructure, with more innovations coming soon.
+Netdata AI brings synthesis, investigation, and automation to your observability data—turning per‑second telemetry into explanations, recommendations, and faster incident resolution.
 
 ## What's Available Today
 
@@ -29,9 +29,9 @@ Ask questions about your infrastructure like you're talking to a colleague. Get 
 
 **Access**: Available now for all Netdata Agent deployments (Standalone and Parents)
 
-[Explore AI Chat →](./chat-with-netdata-mcp)
+[Explore AI Chat →](/docs/ml-ai/ai-chat-netdata/ai-chat-netdata.md)
 
-### 2. AI DevOps Copilot
+### 2. MCP Clients
 
 **Available Now** - Transform observability into action with CLI AI assistants
 
@@ -55,9 +55,9 @@ Combine the power of AI with system automation. CLI-based AI assistants like Cla
 
 </details>
 
-**Access**: Available now with MCP-supported CLI AI tools
+**Access**: Available now with MCP‑supported AI clients
 
-[Explore AI DevOps Copilot →](./ai-devops-copilot/ai-devops-copilot)
+[Explore MCP Clients →](/docs/ml-ai/ai-devops-copilot/ai-devops-copilot.md)
 
 ### 3. AI Insights
 
@@ -85,11 +85,10 @@ Transform past data into actionable insights with AI-generated reports. Perfect 
 
 **Access**:
 
-- Business subscriptions: Unlimited reports
-- Free trial users: Full access during trial
-- Community users: 10 free reports ([request early access](https://discord.gg/mPZ6WZKKG2))
+- Eligible Spaces receive 10 free AI runs/month; additional usage via AI Credits
+- Available for Business and Free Trial plans
 
-[Explore AI Reports →](./ai-insights)
+[Explore AI Reports →](/docs/ml-ai/ai-insights.md)
 
 
 ### 4. Anomaly Advisor
@@ -117,7 +116,7 @@ Stop guessing what went wrong. The Anomaly Advisor instantly shows you how probl
 
 **Find it**: Anomalies tab in any Netdata dashboard
 
-[Learn more about Anomaly Advisor →](./anomaly-advisor)
+[Learn more about Anomaly Advisor →](/docs/ml-ai/anomaly-advisor.md)
 
 ### 5. Machine Learning Anomaly Detection
 
@@ -147,7 +146,7 @@ The foundation of Netdata's AI capabilities. Machine learning models run locally
 
 **Access**: Free for everyone - enabled by default
 
-[Explore Machine Learning →](./machine-learning-anomaly-detection)
+[Explore Machine Learning →](/docs/ml-ai/ml-anomaly-detection/ml-anomaly-detection.md)
 
 ### 6. AI-Powered Alert Troubleshooting
 

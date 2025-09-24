@@ -65,13 +65,9 @@ Reports typically generate in 1-2 minutes. Once complete:
 
 ### Access and Availability
 
-This feature is available in preview mode for:
-
-- All Business and Homelab plan users
-- New users get 10 AI troubleshooting sessions per month during their Business plan trial
+- Generally available in Netdata Cloud (Business and Free Trial)
+- Eligible Spaces receive 10 free AI runs per month; additional usage via AI Credits
 
 :::note
-
-Community users can request access by contacting product@netdata.cloud
-
+Track AI credit usage from `Settings → Usage & Billing → AI Credits`.
 :::

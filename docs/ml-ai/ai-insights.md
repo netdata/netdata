@@ -42,6 +42,8 @@ Perfect for Monday morning reviews, post-incident analysis, or executive updates
 
 **Use cases**: Weekend incident recovery, executive briefings, team handoffs, regular health checks
 
+[Learn more →](/docs/netdata-ai/insights/infrastructure-summary.mdx)
+
 ### Capacity Planning
 
 **Stop guessing future needs - get data-driven projections**
@@ -55,6 +57,8 @@ Make informed decisions about infrastructure investments with reports that inclu
 - Projections for 3 months to 2 years ahead
 
 **Use cases**: Quarterly planning, budget justification, infrastructure roadmaps, vendor negotiations
+
+[Learn more →](/docs/netdata-ai/insights/capacity-planning.mdx)
 
 ### Performance Optimization
 
@@ -70,6 +74,8 @@ Identify inefficiencies and optimization opportunities with:
 
 **Use cases**: Performance audits, system tuning, SRE optimization projects, efficiency improvements
 
+[Learn more →](/docs/netdata-ai/insights/performance-optimization.mdx)
+
 ### Anomaly Analysis
 
 **Post-incident forensics made simple**
@@ -83,6 +89,8 @@ Understand unusual patterns and prevent future issues with:
 - Recommendations to prevent recurrence
 
 **Use cases**: Post-mortems, proactive issue detection, system behavior analysis, troubleshooting
+
+[Learn more →](/docs/netdata-ai/insights/anomaly-analysis.mdx)
 
 ## Customize Reports to Your Needs
 
@@ -148,6 +156,12 @@ Within 2-3 minutes, you receive:
 From the Inrento fintech case study:
 > "AI Insights provided **significant time savings** in identifying and resolving issues. It **drastically reduced the time spent** identifying problems and implementing solutions, leading to **enhanced productivity and performance** with **minimized downtime**."
 Teams report that incident analysis that previously took hours of manual investigation now completes in minutes with AI Insights.
+
+## Automate with Schedules
+
+Set up recurring runs for Insights and custom investigations to receive weekly health summaries, monthly optimization reviews, and SLO conformance reports automatically.
+
+[Learn more →](/docs/netdata-ai/insights/scheduled-reports.mdx)
 
 ## Perfect For
 
