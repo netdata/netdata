@@ -1,7 +1,7 @@
 import type { ConversationMessage, AIAgentResult } from '../types.js';
 import { warn } from '../utils.js';
 import { SessionManager } from './session-manager.js';
-import { buildSnapshotFromOpTree, formatSlackStatus, buildStatusBlocks } from './status-aggregator.js';
+import { buildSnapshotFromOpTree, formatSlackStatus, buildStatusBlocks, formatFooterLines } from './status-aggregator.js';
 
 type SlackClient = any;
 
@@ -534,13 +534,39 @@ const elog = (msg: string): void => { try { process.stderr.write(`[SRV] ← [0.0
     return finalText;
   };
 
+  const parseSlackJson = (text: string): { blocks?: unknown[] }[] | undefined => {
+    const trimmed = text.trim();
+    if (!trimmed.startsWith('[') && !trimmed.startsWith('{')) return undefined;
+    try {
+      const parsed = JSON.parse(trimmed) as unknown;
+      if (Array.isArray(parsed)) {
+        return parsed.filter((v): v is { blocks?: unknown[] } => v !== null && typeof v === 'object' && !Array.isArray(v));
+      }
+      if (parsed !== null && typeof parsed === 'object') {
+        const obj = parsed as { blocks?: unknown[] };
+        return [obj];
+      }
+    } catch {
+      return undefined;
+    }
+    return undefined;
+  };
+
   const finalizeAndPost = async (sm: SessionManager, client: any, channel: string, ts: string, runId: string, meta: { error?: string; chName?: string; userName?: string }): Promise<void> => {
     const key = `${channel}:${ts}`;
     closed.add(key);
     const pending = updating.get(key); if (pending) { clearTimeout(pending); updating.delete(key); }
     const result = sm.getResult(runId);
-    const slackMessages = extractSlackMessages(result);
+    let slackMessages = extractSlackMessages(result);
     let finalText = extractFinalText(sm, runId);
+
+    if ((!slackMessages || slackMessages.length === 0) && typeof finalText === 'string' && finalText.trim().length > 0) {
+      const parsed = parseSlackJson(finalText);
+      if (parsed && parsed.length > 0) {
+        slackMessages = parsed;
+        finalText = '';
+      }
+    }
     // Fix: Check for both falsy AND empty array cases
     const hasSlackMessages = slackMessages && slackMessages.length > 0;
     if (!finalText && !hasSlackMessages) {
@@ -627,13 +653,9 @@ const elog = (msg: string): void => { try { process.stderr.write(`[SRV] ← [0.0
         try {
           // Use only opTree for structure and totals
           const opTree = sm.getOpTree(runId) as any | undefined;
-          const snap = opTree ? buildSnapshotFromOpTree(opTree as any, Date.now()) : { lines: [], totals: { tokensIn: 0, tokensOut: 0, tokensCacheRead: 0, tokensCacheWrite: 0, toolsRun: 0 } } as any;
-          const startedAt = (opTree && typeof opTree.startedAt === 'number') ? opTree.startedAt : Date.now();
-          const elapsedSec = Math.max(0, Math.round((Date.now() - startedAt) / 1000));
-          const mm = Math.floor(elapsedSec / 60);
-          const ss = elapsedSec % 60;
-          const elapsedClock = `${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
-          const fmtK = (n: number): string => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n));
+          const snap = opTree
+            ? buildSnapshotFromOpTree(opTree as any, Date.now())
+            : { lines: [], totals: { tokensIn: 0, tokensOut: 0, tokensCacheRead: 0, tokensCacheWrite: 0, toolsRun: 0 }, sessionCount: 0 } as any;
           const countFromOpTree = (node: any | undefined): { tools: number; sessions: number } => {
             if (!node || typeof node !== 'object') return { tools: 0, sessions: 0 };
             let tools = 0; let sessions = 1; // count this session
@@ -652,8 +674,8 @@ const elog = (msg: string): void => { try { process.stderr.write(`[SRV] ← [0.0
             return { tools, sessions };
           };
           const agCounts = countFromOpTree(opTree as any);
-          const footer = `${elapsedClock} tokens →:${fmtK(snap.totals.tokensIn)} ←:${fmtK(snap.totals.tokensOut)} c→:${fmtK(snap.totals.tokensCacheRead)} c←:${fmtK(snap.totals.tokensCacheWrite)} | cost: $${(snap.totals.costUsd ?? 0).toFixed(2)} | tools ${agCounts.tools} | agents ${agCounts.sessions}`;
-          await client.chat.postMessage({ channel, thread_ts: ts, text: footer, blocks: [ { type: 'context', elements: [ { type: 'mrkdwn', text: footer } ] } ] });
+          const footer = formatFooterLines(snap, { agentsCount: agCounts.sessions, toolsCount: agCounts.tools });
+          await client.chat.postMessage({ channel, thread_ts: ts, text: footer.text, blocks: [ { type: 'context', elements: [ { type: 'mrkdwn', text: footer.text } ] } ] });
         } catch (e3) { elog(`stats footer post failed: ${(e3 as Error).message}`); }
       } else {
         // No splitting/truncation. Post as-is; if Slack rejects, error handler below will present a minimal fallback.
@@ -662,13 +684,9 @@ const elog = (msg: string): void => { try { process.stderr.write(`[SRV] ← [0.0
         // Post tiny stats footer as a separate small message (context)
         try {
           const opTree = sessionManager.getOpTree(runId) as any | undefined;
-          const snap = opTree ? buildSnapshotFromOpTree(opTree as any, Date.now()) : { lines: [], totals: { tokensIn: 0, tokensOut: 0, tokensCacheRead: 0, tokensCacheWrite: 0, toolsRun: 0 } } as any;
-          const startedAt = (opTree && typeof opTree.startedAt === 'number') ? opTree.startedAt : Date.now();
-          const elapsedSec = Math.max(0, Math.round((Date.now() - startedAt) / 1000));
-          const mm = Math.floor(elapsedSec / 60);
-          const ss = elapsedSec % 60;
-          const elapsedClock = `${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
-          const fmtK = (n: number): string => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n));
+          const snap = opTree
+            ? buildSnapshotFromOpTree(opTree as any, Date.now())
+            : { lines: [], totals: { tokensIn: 0, tokensOut: 0, tokensCacheRead: 0, tokensCacheWrite: 0, toolsRun: 0 }, sessionCount: 0 } as any;
           const countFromOpTree = (node: any | undefined): { tools: number; sessions: number } => {
             if (!node || typeof node !== 'object') return { tools: 0, sessions: 0 };
             let tools = 0; let sessions = 1;
@@ -687,8 +705,8 @@ const elog = (msg: string): void => { try { process.stderr.write(`[SRV] ← [0.0
             return { tools, sessions };
           };
           const agCounts = countFromOpTree(opTree as any);
-          const footer = `${elapsedClock} tokens →:${fmtK(snap.totals.tokensIn)} ←:${fmtK(snap.totals.tokensOut)} c→:${fmtK(snap.totals.tokensCacheRead)} c←:${fmtK(snap.totals.tokensCacheWrite)} | cost: $${(snap.totals.costUsd ?? 0).toFixed(2)} | tools ${agCounts.tools} | agents ${agCounts.sessions}`;
-          await client.chat.postMessage({ channel, thread_ts: ts, text: footer, blocks: [ { type: 'context', elements: [ { type: 'mrkdwn', text: footer } ] } ] });
+          const footer = formatFooterLines(snap, { agentsCount: agCounts.sessions, toolsCount: agCounts.tools });
+          await client.chat.postMessage({ channel, thread_ts: ts, text: footer.text, blocks: [ { type: 'context', elements: [ { type: 'mrkdwn', text: footer.text } ] } ] });
         } catch (e3) { elog(`stats footer post failed: ${(e3 as Error).message}`); }
       }
     } catch (e) {
@@ -854,7 +872,7 @@ const elog = (msg: string): void => { try { process.stderr.write(`[SRV] ← [0.0
             return buildSnapshotFromOpTree(maybeTree as any, now);
           }
         } catch (e) { warn(`slack progress update failed: ${e instanceof Error ? e.message : String(e)}`); }
-        return { lines: [], totals: { tokensIn: 0, tokensOut: 0, tokensCacheRead: 0, tokensCacheWrite: 0, toolsRun: 0 } } as any;
+        return { lines: [], totals: { tokensIn: 0, tokensOut: 0, tokensCacheRead: 0, tokensCacheWrite: 0, toolsRun: 0 }, sessionCount: 0 } as any;
       })();
       const text = formatSlackStatus(snap);
       const blocks = buildStatusBlocks(snap, (maybeTree as any)?.agentId, (maybeTree as any)?.startedAt);

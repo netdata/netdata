@@ -27,6 +27,42 @@ interface SnapshotSummary {
   // Optional overall timing when available (from opTree)
   runStartedAt?: number;
   runElapsedSec?: number;
+  originTxnId?: string;
+  sessionCount: number;
+}
+
+const formatThousands = (n: number): string => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n));
+
+const formatClock = (elapsedSec: number): string => {
+  const mm = Math.floor(elapsedSec / 60);
+  const ss = elapsedSec % 60;
+  return `${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
+};
+
+interface FooterFormat {
+  lines: [string, string];
+  text: string;
+}
+
+interface FooterOptions {
+  elapsedSec?: number;
+  originTxnId?: string;
+  agentsCount?: number;
+  toolsCount?: number;
+}
+
+export function formatFooterLines(summary: SnapshotSummary, options?: FooterOptions): FooterFormat {
+  const elapsedSec = options?.elapsedSec ?? summary.runElapsedSec ?? 0;
+  const clock = formatClock(Math.max(0, elapsedSec));
+  const costVal = summary.totals.costUsd ?? 0;
+  const costStr = `$${costVal.toFixed(2)}`;
+  const origin = options?.originTxnId ?? summary.originTxnId ?? 'unknown-txn';
+  const agentsCount = typeof options?.agentsCount === 'number' ? options.agentsCount : summary.sessionCount;
+  const toolsCount = typeof options?.toolsCount === 'number' ? options.toolsCount : summary.totals.toolsRun;
+  const line1 = `*${clock}* | cost: *${costStr}* | ${origin}`;
+  const line2 = `agents ${agentsCount} | tools ${toolsCount} | tokens →${formatThousands(summary.totals.tokensIn)} ←${formatThousands(summary.totals.tokensOut)} c→${formatThousands(summary.totals.tokensCacheRead)} c←${formatThousands(summary.totals.tokensCacheWrite)}`;
+  const lines: [string, string] = [line1, line2];
+  return { lines, text: lines.join('\n') };
 }
 
 // Build SnapshotSummary from the hierarchical operation tree (Option C)
@@ -35,8 +71,10 @@ export function buildSnapshotFromOpTree(root: SessionNode, nowTs: number): Snaps
   const tokens = { in: 0, out: 0, read: 0, write: 0 };
   let toolsRun = 0;
   let costUsd = 0;
+  let sessionCount = 0;
 
   const visit = (node: SessionNode): void => {
+    sessionCount += 1;
     const agentId = node.agentId ?? 'agent';
     const callPath = node.callPath;
     const started = node.startedAt;
@@ -76,12 +114,13 @@ export function buildSnapshotFromOpTree(root: SessionNode, nowTs: number): Snaps
     lines,
     totals: { tokensIn: tokens.in, tokensOut: tokens.out, tokensCacheRead: tokens.read, tokensCacheWrite: tokens.write, toolsRun, costUsd: costUsd > 0 ? Number(costUsd.toFixed(4)) : undefined },
     runStartedAt: root.startedAt,
-    runElapsedSec: Math.max(0, Math.round((nowTs - root.startedAt) / 1000))
+    runElapsedSec: Math.max(0, Math.round((nowTs - root.startedAt) / 1000)),
+    originTxnId: root.traceId ?? root.id,
+    sessionCount
   };
 }
 
 export function formatSlackStatus(summary: SnapshotSummary, masterAgentId?: string): string {
-  const fmtK = (n: number): string => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n));
   const depthOf = (cp?: string): number => cp ? (cp.split('→').length - 1) : 0;
   // Sort lines by depth, then by agentId for stability
   const sorted = [...summary.lines]
@@ -118,15 +157,14 @@ export function formatSlackStatus(summary: SnapshotSummary, masterAgentId?: stri
   }
   others.forEach((l) => { const s = fmtLine(l); if (s.length > 0) parts.push(s); });
 
-  const tokenLine = `tokens →:${fmtK(summary.totals.tokensIn)} ←:${fmtK(summary.totals.tokensOut)} c→:${fmtK(summary.totals.tokensCacheRead)} c←:${fmtK(summary.totals.tokensCacheWrite)} | cost: $${(summary.totals.costUsd ?? 0).toFixed(2)} | tools ${summary.totals.toolsRun} | agents ${unique.length}`;
-  parts.push('', tokenLine);
+  const footer = formatFooterLines(summary);
+  parts.push('', footer.lines[0], footer.lines[1]);
 
   return parts.join('\n');
 }
 
 // Build a richer Block Kit version for Slack with emojis and progress bars
 export function buildStatusBlocks(summary: SnapshotSummary, rootAgentId?: string, runStartedAt?: number): any[] {
-  const fmtK = (n: number): string => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n));
   const blocks: any[] = [];
 
   // Compute overall elapsed: prefer provided start, else max elapsed among lines
@@ -140,9 +178,6 @@ export function buildStatusBlocks(summary: SnapshotSummary, rootAgentId?: string
   })();
 
   // Title: For master agent, prefer latestStatus over title (since title is just "Working...")
-  const mm = Math.floor(elapsed / 60);
-  const ss = elapsed % 60;
-  const elapsedClock = `${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
   const master = typeof rootAgentId === 'string' ? summary.lines.find((l) => l.agentId === rootAgentId) : undefined;
   // For master agent: use latestStatus if available, otherwise title, otherwise "Working..."
   const headerTitle = (() => {
@@ -228,8 +263,7 @@ export function buildStatusBlocks(summary: SnapshotSummary, rootAgentId?: string
 
 
   // Footer stats (smallest font)
-  const agentsCount = summary.lines.length;
-  const footer = `${elapsedClock} tokens →:${fmtK(summary.totals.tokensIn)} ←:${fmtK(summary.totals.tokensOut)} c→:${fmtK(summary.totals.tokensCacheRead)} c←:${fmtK(summary.totals.tokensCacheWrite)} | cost: $${(summary.totals.costUsd ?? 0).toFixed(2)} | tools ${summary.totals.toolsRun} | agents ${agentsCount}`;
-  blocks.push({ type: 'context', elements: [ { type: 'mrkdwn', text: footer } ] });
+  const footer = formatFooterLines(summary, { elapsedSec: elapsed });
+  blocks.push({ type: 'context', elements: [ { type: 'mrkdwn', text: footer.text } ] });
   return blocks;
 }

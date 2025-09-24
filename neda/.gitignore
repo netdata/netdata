@@ -13,6 +13,10 @@ gsc-service-account.json
 *.pem
 *.key
 
+# accounting, sessions and logs
+.ai-agent/
+logs/
+
 # Cache and runtime files
 *.log
 *.pid

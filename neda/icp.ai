@@ -7,7 +7,6 @@ usage: |
   company name or contact email to reseach information for
 models:
   - anthropic/claude-sonnet-4-20250514
-  - google/gemini-2.5-pro
   - openai/gpt-5
 #  - openrouter/openai/gpt-oss-120b
 #  - openai/gpt-5

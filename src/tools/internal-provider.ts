@@ -343,7 +343,7 @@ export class InternalToolProvider extends ToolProvider {
       const content = typeof args.report_content === 'string' ? args.report_content : (typeof args.content === 'string' ? args.content : undefined);
       const contentJson = (args.content_json !== null && typeof args.content_json === 'object' && !Array.isArray(args.content_json)) ? (args.content_json as Record<string, unknown>) : undefined;
       const metadata = (args.metadata !== null && typeof args.metadata === 'object' && !Array.isArray(args.metadata)) ? (args.metadata as Record<string, unknown>) : undefined;
-      const originalMessages = Array.isArray(args.messages) ? args.messages : undefined;
+      const rawMessages = Object.prototype.hasOwnProperty.call(args, 'messages') ? args.messages : undefined;
 
       if (this.formatId === SLACK_BLOCK_KIT_FORMAT) {
         const asString = (value: unknown): string | undefined => {
@@ -355,6 +355,19 @@ export class InternalToolProvider extends ToolProvider {
           try { return JSON.parse(value) as unknown; } catch { return value; }
         };
         const isObj = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);
+        const originalMessages = (() => {
+          if (Array.isArray(rawMessages)) return rawMessages as unknown[];
+          if (typeof rawMessages === 'string') {
+            const trimmed = rawMessages.trim();
+            if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
+              const parsed = safeParseJson(trimmed);
+              if (Array.isArray(parsed) || isObj(parsed)) return parsed;
+            }
+            return rawMessages;
+          }
+          if (rawMessages !== null && typeof rawMessages === 'object') return rawMessages;
+          return undefined;
+        })();
         const expandMessages = (candidate: unknown): Record<string, unknown>[] => {
           if (candidate === undefined || candidate === null) return [];
           const str = asString(candidate);
