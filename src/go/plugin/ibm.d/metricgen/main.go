@@ -2,8 +2,10 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
+	"go/format"
 	"log"
 	"os"
 	"path/filepath"
@@ -244,14 +246,7 @@ func generateOutput(config Config, source, output, pkg string) error {
 		return fmt.Errorf("failed to parse template: %v", err)
 	}
 
-	// Create output file
-	outFile, err := os.Create(output)
-	if err != nil {
-		return fmt.Errorf("failed to create output file: %v", err)
-	}
-	defer outFile.Close()
-
-	// Execute template
+	// Execute template into a buffer so we can run gofmt before writing
 	data := struct {
 		Source  string
 		Package string
@@ -262,8 +257,18 @@ func generateOutput(config Config, source, output, pkg string) error {
 		Classes: config.Classes,
 	}
 
-	if err := tmpl.Execute(outFile, data); err != nil {
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, data); err != nil {
 		return fmt.Errorf("failed to execute template: %v", err)
+	}
+
+	formatted, err := format.Source(buf.Bytes())
+	if err != nil {
+		return fmt.Errorf("failed to format generated code: %v", err)
+	}
+
+	if err := os.WriteFile(output, formatted, 0o644); err != nil {
+		return fmt.Errorf("failed to write output file: %v", err)
 	}
 
 	return nil

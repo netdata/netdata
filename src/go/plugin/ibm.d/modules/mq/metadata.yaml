@@ -23,6 +23,7 @@ modules:
         metrics_description: |
           Monitors IBM MQ queue managers, queues, channels, and topics
           using the PCF (Programmable Command Format) protocol.
+
         method_description: |
           The collector connects to IBM MQ and collects metrics via its monitoring interface.
       supported_platforms:

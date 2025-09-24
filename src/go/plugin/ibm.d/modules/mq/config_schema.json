@@ -155,6 +155,12 @@
         "title": "Pattern to filter topics (wildcards supported)",
         "type": "string"
       },
+      "update_every": {
+        "default": 1,
+        "minimum": 1,
+        "title": "Data collection frequency",
+        "type": "integer"
+      },
       "user": {
         "default": "",
         "title": "Username for IBM MQ authentication",

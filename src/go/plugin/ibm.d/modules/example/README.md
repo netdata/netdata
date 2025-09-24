@@ -69,6 +69,7 @@ The following options can be defined globally or per job.
 
 | Name | Description | Default | Required | Min | Max |
 |:-----|:------------|:--------|:---------|:----|:----|
+| update_every | Data collection frequency | `1` | no | 1 | - |
 | Endpoint | Connection endpoint (for demonstration) | `dummy://localhost` | no | - | - |
 | ConnectTimeout | Connection timeout in seconds | `5` | no | 1 | 300 |
 | CollectItems | Whether to collect item metrics | `true` | no | - | - |
