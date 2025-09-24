@@ -27,13 +27,15 @@ func defaultConfig() Config {
 		CellName:            "",
 		NodeName:            "",
 		ServerName:          "",
-		URL:                 "https://localhost:9443",
 		MetricsEndpoint:     "/metrics",
 		CollectJVMMetrics:   true,
 		CollectRESTMetrics:  true,
 		MaxRESTEndpoints:    50,
 		CollectRESTMatching: "",
 		HTTPConfig: web.HTTPConfig{
+			RequestConfig: web.RequestConfig{
+				URL: "https://localhost:9443",
+			},
 			ClientConfig: web.ClientConfig{
 				Timeout: confopt.Duration(defaultTimeout),
 			},
@@ -42,11 +44,26 @@ func defaultConfig() Config {
 }
 
 func (c *Collector) Init(ctx context.Context) error {
-	c.SetImpl(c)
+	// Propagate job-level overrides into the embedded framework collector before init
+	if c.Config.ObsoletionIterations != 0 {
+		c.Collector.Config.ObsoletionIterations = c.Config.ObsoletionIterations
+	}
+	if c.Config.UpdateEvery != 0 {
+		c.Collector.Config.UpdateEvery = c.Config.UpdateEvery
+	}
+	if c.Config.CollectionGroups != nil {
+		c.Collector.Config.CollectionGroups = c.Config.CollectionGroups
+	}
+
 	c.RegisterContexts(contexts.GetAllContexts()...)
 
+	if err := c.Collector.Init(ctx); err != nil {
+		return err
+	}
+	c.SetImpl(c)
+
 	cfg := c.Config
-	baseURL := strings.TrimSpace(cfg.URL)
+	baseURL := strings.TrimSpace(cfg.HTTPConfig.RequestConfig.URL)
 	if baseURL == "" {
 		return fmt.Errorf("url is required")
 	}
@@ -60,7 +77,15 @@ func (c *Collector) Init(ctx context.Context) error {
 		if strings.HasPrefix(endpoint, "http://") || strings.HasPrefix(endpoint, "https://") {
 			metricsURL = endpoint
 		} else {
-			metricsURL = strings.TrimRight(baseURL, "/") + "/" + strings.TrimLeft(endpoint, "/")
+			baseNormalized := strings.TrimRight(baseURL, "/")
+			endpointNormalized := strings.TrimLeft(endpoint, "/")
+			if endpointNormalized == "" {
+				metricsURL = baseNormalized
+			} else if strings.HasSuffix(baseNormalized, "/"+endpointNormalized) {
+				metricsURL = baseNormalized
+			} else {
+				metricsURL = baseNormalized + "/" + endpointNormalized
+			}
 		}
 	}
 	c.Config.HTTPConfig.RequestConfig.URL = metricsURL

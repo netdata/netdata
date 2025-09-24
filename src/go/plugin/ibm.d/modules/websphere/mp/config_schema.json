@@ -42,11 +42,6 @@
         "title": "Server name",
         "type": "string"
       },
-      "url": {
-        "default": "https://localhost:9443",
-        "title": "Connection URL or URI",
-        "type": "string"
-      },
       "vnode": {
         "default": "",
         "title": "Vnode",

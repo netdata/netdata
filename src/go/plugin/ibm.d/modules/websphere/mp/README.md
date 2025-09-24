@@ -101,7 +101,6 @@ The following options can be defined globally or per job.
 | CellName | Identity labels | `` | no | - | - |
 | NodeName | Node name | `` | no | - | - |
 | ServerName | Server name | `` | no | - | - |
-| URL | Connection URL or URI | `https://localhost:9443` | no | - | - |
 | MetricsEndpoint | Metrics endpoint | `/metrics` | no | - | - |
 | CollectJVMMetrics | Enable collection of j v m metrics metrics | `true` | no | - | - |
 | CollectRESTMetrics | Enable collection of r e s t metrics metrics | `true` | no | - | - |

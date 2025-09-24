@@ -98,6 +98,7 @@ func (c *Collector) CollectOnce() error {
 
 	c.exportCoreMetrics(agg)
 	c.exportRESTMetrics(restData)
+	c.Debugf("exported core metrics (keys=%d) rest endpoints=%d", len(agg), len(restData))
 
 	labels := c.identity.Labels()
 	if c.mpMetricsVersion != "" && c.mpMetricsVersion != "unknown" {
@@ -235,93 +236,56 @@ func (c *Collector) collectRESTMetric(rest map[restKey]*restMetrics, method, end
 func (c *Collector) exportCoreMetrics(agg map[string]int64) {
 	labels := contexts.EmptyLabels{}
 
-	if used, ok := agg["heap_used"]; ok {
-		if committed, okc := agg["heap_committed"]; okc {
-			free := committed - used
-			if free < 0 {
-				free = 0
-			}
-			contexts.JVM.HeapUsage.Set(c.State, labels, contexts.JVMHeapUsageValues{
-				Used: used,
-				Free: free,
-			})
-		}
+	used := agg["heap_used"]
+	committed := agg["heap_committed"]
+	free := committed - used
+	if free < 0 {
+		free = 0
 	}
+	contexts.JVM.HeapUsage.Set(c.State, labels, contexts.JVMHeapUsageValues{
+		Used: used,
+		Free: free,
+	})
+	contexts.JVM.HeapCommitted.Set(c.State, labels, contexts.JVMHeapCommittedValues{Committed: committed})
+	contexts.JVM.HeapMax.Set(c.State, labels, contexts.JVMHeapMaxValues{Limit: agg["heap_max"]})
+	contexts.JVM.HeapUtilization.Set(c.State, labels, contexts.JVMHeapUtilizationValues{Utilization: agg["heap_util"]})
 
-	if committed, ok := agg["heap_committed"]; ok {
-		contexts.JVM.HeapCommitted.Set(c.State, labels, contexts.JVMHeapCommittedValues{Committed: committed})
-	}
+	contexts.JVM.GCCollections.Set(c.State, labels, contexts.JVMGCCollectionsValues{Rate: agg["gc_total"]})
+	perCycle := agg["gc_time_cycle_ms"]
+	contexts.JVM.GCTime.Set(c.State, labels, contexts.JVMGCTimeValues{
+		Total:     agg["gc_time_ms"],
+		Per_cycle: perCycle,
+	})
 
-	if max, ok := agg["heap_max"]; ok {
-		contexts.JVM.HeapMax.Set(c.State, labels, contexts.JVMHeapMaxValues{Limit: max})
+	totalThreads := agg["thread_total"]
+	daemon := agg["thread_daemon"]
+	other := totalThreads - daemon
+	if other < 0 {
+		other = 0
 	}
+	contexts.JVM.ThreadsCurrent.Set(c.State, labels, contexts.JVMThreadsCurrentValues{
+		Daemon: daemon,
+		Other:  other,
+	})
+	contexts.JVM.ThreadsPeak.Set(c.State, labels, contexts.JVMThreadsPeakValues{Peak: agg["thread_peak"]})
 
-	if util, ok := agg["heap_util"]; ok {
-		contexts.JVM.HeapUtilization.Set(c.State, labels, contexts.JVMHeapUtilizationValues{Utilization: util})
-	}
+	contexts.CPU.Usage.Set(c.State, contexts.EmptyLabels{}, contexts.CPUUsageValues{
+		Process:     agg["cpu_process"],
+		Utilization: agg["cpu_util"],
+	})
+	contexts.CPU.Time.Set(c.State, contexts.EmptyLabels{}, contexts.CPUTimeValues{Total: agg["cpu_time_ms"]})
 
-	if rate, ok := agg["gc_total"]; ok {
-		contexts.JVM.GCCollections.Set(c.State, labels, contexts.JVMGCCollectionsValues{Rate: rate})
+	active := agg["threadpool_active"]
+	size := agg["threadpool_size"]
+	idle := size - active
+	if idle < 0 {
+		idle = 0
 	}
-
-	if total, ok := agg["gc_time_ms"]; ok {
-		perCycle := int64(0)
-		if cycle, okc := agg["gc_time_cycle_ms"]; okc {
-			perCycle = cycle
-		}
-		contexts.JVM.GCTime.Set(c.State, labels, contexts.JVMGCTimeValues{
-			Total:     total,
-			Per_cycle: perCycle,
-		})
-	}
-
-	if total, ok := agg["thread_total"]; ok {
-		daemon := agg["thread_daemon"]
-		other := total - daemon
-		if other < 0 {
-			other = 0
-		}
-		contexts.JVM.ThreadsCurrent.Set(c.State, labels, contexts.JVMThreadsCurrentValues{
-			Daemon: daemon,
-			Other:  other,
-		})
-	}
-
-	if peak, ok := agg["thread_peak"]; ok {
-		contexts.JVM.ThreadsPeak.Set(c.State, labels, contexts.JVMThreadsPeakValues{Peak: peak})
-	}
-
-	if proc, ok := agg["cpu_process"]; ok {
-		contexts.CPU.Usage.Set(c.State, contexts.EmptyLabels{}, contexts.CPUUsageValues{
-			Process:     proc,
-			Utilization: agg["cpu_util"],
-		})
-	}
-
-	if timeVal, ok := agg["cpu_time_ms"]; ok {
-		contexts.CPU.Time.Set(c.State, contexts.EmptyLabels{}, contexts.CPUTimeValues{Total: timeVal})
-	}
-
-	active, hasActive := agg["threadpool_active"]
-	size, hasSize := agg["threadpool_size"]
-	if hasActive || hasSize {
-		idle := int64(0)
-		if hasActive && hasSize {
-			idle = size - active
-			if idle < 0 {
-				idle = 0
-			}
-		} else if hasSize {
-			idle = size
-		}
-		contexts.Vendor.ThreadPoolUsage.Set(c.State, labels, contexts.VendorThreadPoolUsageValues{
-			Active: active,
-			Idle:   idle,
-		})
-		if hasSize {
-			contexts.Vendor.ThreadPoolSize.Set(c.State, labels, contexts.VendorThreadPoolSizeValues{Size: size})
-		}
-	}
+	contexts.Vendor.ThreadPoolUsage.Set(c.State, labels, contexts.VendorThreadPoolUsageValues{
+		Active: active,
+		Idle:   idle,
+	})
+	contexts.Vendor.ThreadPoolSize.Set(c.State, labels, contexts.VendorThreadPoolSizeValues{Size: size})
 }
 
 func (c *Collector) exportRESTMetrics(rest map[restKey]*restMetrics) {
