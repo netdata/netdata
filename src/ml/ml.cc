@@ -56,8 +56,23 @@ ml_dimension_calculated_numbers(ml_worker_t *worker, ml_dimension_t *dim)
     training_response.first_entry_on_response = rrddim_first_entry_s_of_tier(dim->rd, 0);
     training_response.last_entry_on_response = rrddim_last_entry_s_of_tier(dim->rd, 0);
 
-    size_t min_n = Cfg.min_training_window / dim->rd->rrdset->update_every;
-    size_t max_n = Cfg.training_window / dim->rd->rrdset->update_every;
+    unsigned chart_update_every = dim->rd->rrdset->update_every;
+    size_t smoothing_window = (chart_update_every > nd_profile.update_every) ? 1 : Cfg.max_samples_to_smooth;
+    size_t min_required_samples = Cfg.diff_n + smoothing_window + Cfg.lag_n;
+
+    auto round_up_div = [](time_t window, unsigned step) -> size_t {
+        if (window <= 0 || step == 0)
+            return 0;
+        return static_cast<size_t>((window + step - 1) / step);
+    };
+
+    size_t min_n = round_up_div(Cfg.min_training_window, chart_update_every);
+    size_t max_n = round_up_div(Cfg.training_window, chart_update_every);
+
+    if (min_n < min_required_samples)
+        min_n = min_required_samples;
+    if (max_n < min_required_samples)
+        max_n = min_required_samples;
 
     // Figure out what our time window should be.
     training_response.query_before_t = training_response.last_entry_on_response;
@@ -124,6 +139,9 @@ ml_dimension_calculated_numbers(ml_worker_t *worker, ml_dimension_t *dim)
     // Overwrite NaN values.
     if (idx != 0)
         memmove(worker->training_cns, &worker->training_cns[idx], sizeof(calculated_number_t) * training_response.total_values);
+
+    if (training_response.total_values < min_required_samples)
+        return { ML_WORKER_RESULT_NOT_ENOUGH_COLLECTED_VALUES, training_response };
 
     return { ML_WORKER_RESULT_OK, training_response };
 }
