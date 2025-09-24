@@ -141,16 +141,16 @@ void ml_host_get_info(RRDHOST *rh, BUFFER *wb)
 
     buffer_json_member_add_boolean(wb, "enabled", Cfg.enable_anomaly_detection);
 
-    buffer_json_member_add_uint64(wb, "training-window", Cfg.training_window);
-    buffer_json_member_add_uint64(wb, "min-training-window", Cfg.min_training_window);
-    buffer_json_member_add_uint64(wb, "max-training-vectors", Cfg.max_training_vectors);
-    buffer_json_member_add_uint64(wb, "max-samples-to-smooth", Cfg.max_samples_to_smooth);
+    buffer_json_member_add_uint64(wb, "min-train-samples", Cfg.min_train_samples);
+    buffer_json_member_add_uint64(wb, "max-train-samples", Cfg.max_train_samples);
     buffer_json_member_add_uint64(wb, "train-every", Cfg.train_every);
 
     buffer_json_member_add_uint64(wb, "diff-n", Cfg.diff_n);
+    buffer_json_member_add_uint64(wb, "smooth-n", Cfg.smooth_n);
     buffer_json_member_add_uint64(wb, "lag-n", Cfg.lag_n);
 
-    buffer_json_member_add_uint64(wb, "max-kmeans-iters", Cfg.max_kmeans_iters);
+    buffer_json_member_add_double(wb, "random-sampling-ratio", Cfg.random_sampling_ratio);
+    buffer_json_member_add_uint64(wb, "max-kmeans-iters", Cfg.random_sampling_ratio);
 
     buffer_json_member_add_double(wb, "dimension-anomaly-score-threshold", Cfg.dimension_anomaly_score_threshold);
 
@@ -369,8 +369,8 @@ void ml_init()
     std::random_device RD;
     std::mt19937 Gen(RD());
 
-    Cfg.random_nums.reserve(Cfg.max_training_vectors);
-    for (size_t Idx = 0; Idx != Cfg.max_training_vectors; Idx++)
+    Cfg.random_nums.reserve(Cfg.max_train_samples);
+    for (size_t Idx = 0; Idx != Cfg.max_train_samples; Idx++)
         Cfg.random_nums.push_back(Gen());
 
     // init training thread-specific data
@@ -378,10 +378,7 @@ void ml_init()
     for (size_t idx = 0; idx != Cfg.num_worker_threads; idx++) {
         ml_worker_t *worker = &Cfg.workers[idx];
 
-        // Calculate max elements needed based on the highest frequency metrics
-        // For 1-second metrics: training_window samples
-        // We allocate for worst case (1-second update frequency)
-        size_t max_elements_needed_for_training = (size_t) Cfg.training_window * (size_t) (Cfg.lag_n + 1);
+        size_t max_elements_needed_for_training = (size_t) Cfg.max_train_samples * (size_t) (Cfg.lag_n + 1);
         worker->training_cns = new calculated_number_t[max_elements_needed_for_training]();
         worker->scratch_training_cns = new calculated_number_t[max_elements_needed_for_training]();
 

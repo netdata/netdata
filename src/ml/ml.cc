@@ -56,13 +56,13 @@ ml_dimension_calculated_numbers(ml_worker_t *worker, ml_dimension_t *dim)
     training_response.first_entry_on_response = rrddim_first_entry_s_of_tier(dim->rd, 0);
     training_response.last_entry_on_response = rrddim_last_entry_s_of_tier(dim->rd, 0);
 
-    size_t min_n = Cfg.min_training_window / dim->rd->rrdset->update_every;
-    size_t max_n = Cfg.training_window / dim->rd->rrdset->update_every;
+    size_t min_n = Cfg.min_train_samples;
+    size_t max_n = Cfg.max_train_samples;
 
     // Figure out what our time window should be.
     training_response.query_before_t = training_response.last_entry_on_response;
     training_response.query_after_t = std::max(
-        training_response.query_before_t - Cfg.training_window,  // Fixed time window
+        training_response.query_before_t - static_cast<time_t>((max_n - 1) * dim->rd->rrdset->update_every),
         training_response.first_entry_on_response
     );
 
@@ -379,7 +379,7 @@ int ml_dimension_load_models(RRDDIM *rd, sqlite3_stmt **active_stmt) {
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    rc = sqlite3_bind_int64(res, ++param, now_realtime_sec() - (Cfg.num_models_to_use * Cfg.train_every));
+    rc = sqlite3_bind_int64(res, ++param, now_realtime_sec() - (Cfg.num_models_to_use * Cfg.max_train_samples));
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
@@ -674,29 +674,13 @@ ml_dimension_train_model(ml_worker_t *worker, ml_dimension_t *dim)
         memcpy(worker->scratch_training_cns, worker->training_cns,
                training_response.total_values * sizeof(calculated_number_t));
 
-        size_t smoothing_window = (dim->rd->rrdset->update_every > nd_profile.update_every) ? 1 : Cfg.max_samples_to_smooth;
-
         ml_features_t features = {
-            Cfg.diff_n, smoothing_window, Cfg.lag_n,
+            Cfg.diff_n, Cfg.smooth_n, Cfg.lag_n,
             worker->scratch_training_cns, training_response.total_values,
             worker->training_cns, training_response.total_values,
             worker->training_samples
         };
-        
-        // Calculate dynamic sampling ratio based on expected output size
-        // After diff and smooth, we'll have approximately this many vectors
-        size_t expected_vectors = training_response.total_values;
-        if (Cfg.diff_n > 0) expected_vectors--;
-        if (smoothing_window > 1) expected_vectors = expected_vectors - smoothing_window + 1;
-        expected_vectors = expected_vectors - Cfg.lag_n;
-        
-        double sampling_ratio = 1.0;
-        if (expected_vectors > Cfg.max_training_vectors) {
-            sampling_ratio = (double)Cfg.max_training_vectors / expected_vectors;
-        }
-
-        // Apply sampling during lag feature extraction
-        ml_features_preprocess(&features, sampling_ratio);
+        ml_features_preprocess(&features);
 
         ml_kmeans_init(&dim->kmeans);
         ml_kmeans_train(&dim->kmeans, &features,  Cfg.max_kmeans_iters, training_response.query_after_t, training_response.query_before_t);
@@ -722,7 +706,7 @@ ml_dimension_predict(ml_dimension_t *dim, calculated_number_t value, bool exists
     }
 
     // Save the value and return if we don't have enough values for a sample
-    unsigned n = Cfg.diff_n + Cfg.max_samples_to_smooth + Cfg.lag_n;
+    unsigned n = Cfg.diff_n + Cfg.smooth_n + Cfg.lag_n;
     if (dim->cns.size() < n) {
         dim->cns.push_back(value);
         return false;
@@ -747,11 +731,11 @@ ml_dimension_predict(ml_dimension_t *dim, calculated_number_t value, bool exists
     memcpy(dst_cns, dim->cns.data(), n * sizeof(calculated_number_t));
 
     ml_features_t features = {
-        Cfg.diff_n, Cfg.max_samples_to_smooth, Cfg.lag_n,
+        Cfg.diff_n, Cfg.smooth_n, Cfg.lag_n,
         dst_cns, n, src_cns, n,
         dim->feature
     };
-    ml_features_preprocess(&features, 1.0);
+    ml_features_preprocess(&features);
 
     /*
      * Lock to predict

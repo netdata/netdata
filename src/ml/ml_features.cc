@@ -41,10 +41,13 @@ static void ml_features_smooth(ml_features_t *features)
         features->src[(features->src_n - 1) - idx] = 0.0;
 }
 
-static void ml_features_lag(ml_features_t *features, double sampling_ratio)
+static void ml_features_lag(ml_features_t *features)
 {
     size_t n = features->src_n - features->diff_n - features->smooth_n + 1 - features->lag_n;
     features->preprocessed_features.resize(n);
+
+    unsigned target_num_samples = Cfg.max_train_samples * Cfg.random_sampling_ratio;
+    double sampling_ratio = std::min(static_cast<double>(target_num_samples) / n, 1.0);
 
     uint32_t max_mt = std::numeric_limits<uint32_t>::max();
     uint32_t cutoff = static_cast<double>(max_mt) * sampling_ratio;
@@ -55,7 +58,7 @@ static void ml_features_lag(ml_features_t *features, double sampling_ratio)
         DSample &DS = features->preprocessed_features[sample_idx++];
         DS.set_size(features->lag_n);
 
-        if (Cfg.random_nums[idx % Cfg.random_nums.size()] > cutoff) {
+        if (Cfg.random_nums[idx] > cutoff) {
             sample_idx--;
             continue;
         }
@@ -67,9 +70,9 @@ static void ml_features_lag(ml_features_t *features, double sampling_ratio)
     features->preprocessed_features.resize(sample_idx);
 }
 
-void ml_features_preprocess(ml_features_t *features, double sampling_ratio)
+void ml_features_preprocess(ml_features_t *features)
 {
     ml_features_diff(features);
     ml_features_smooth(features);
-    ml_features_lag(features, sampling_ratio);
+    ml_features_lag(features);
 }
