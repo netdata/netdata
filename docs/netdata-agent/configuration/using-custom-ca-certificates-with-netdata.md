@@ -116,6 +116,6 @@ Windows. Instead, certificates must be installed into the bundled MSYS2 environm
 using the following instructions:
 
 1. Ensure the certificate file to be installed is in PEM or DER format.
-2. Copy the certificate file to `C:\Program FIles\Netdata\etc\pki\ca-trust\source\anchors`. You may need to create
+2. Copy the certificate file to `C:\Program Files\Netdata\etc\pki\ca-trust\source\anchors`. You may need to create
    this directory.
 3. In an administrative command prompt, run `C:\Program Files\Netdata\usr\bin\update-ca-trust.exe`
