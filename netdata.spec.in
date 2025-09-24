@@ -889,6 +889,7 @@ fi
 Summary: The IBM ecosystem metrics collection plugin for the Netdata Agent
 Group: Applications/System
 Requires: %{name} = %{version}
+Requires: unixODBC
 Conflicts: %{name} < %{version}
 
 %description plugin-ibm
