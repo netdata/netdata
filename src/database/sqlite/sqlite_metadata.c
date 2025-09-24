@@ -1741,6 +1741,7 @@ __thread sqlite3 *db_meta_thread = NULL;
 __thread sqlite3 *db_context_thread = NULL;
 __thread bool main_context_thread = false;
 
+extern uv_sem_t ctx_sem;
 static void restore_host_context(void *arg)
 {
     struct host_context_load_thread *hclt = arg;
@@ -1786,6 +1787,10 @@ static void restore_host_context(void *arg)
     pulse_host_status(host, 0, 0); // this will detect the receiver status
 
     aclk_queue_node_info(host, false);
+
+    if (IS_VIRTUAL_HOST_OS(host)) {
+        uv_sem_post(&ctx_sem);
+    }
 
     // Check and clear the thread local variables
     if (!main_context_thread) {
@@ -1847,7 +1852,7 @@ void reset_host_context_load_flag()
     RRDHOST *host;
     dfe_start_reentrant(rrdhost_root_index, host)
     {
-        rrdhost_flag_set(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD);
+        rrdhost_flag_clear(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD);
     }
     dfe_done(host);
 }
@@ -1876,36 +1881,44 @@ static void ctx_hosts_load(uv_work_t *req)
     size_t host_count = 0;
     size_t sync_exec = 0;
     size_t async_exec = 0;
-    dfe_start_reentrant(rrdhost_root_index, host) {
-        if (!rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD))
-            continue;
 
-        if (unlikely(SHUTDOWN_REQUESTED(config)))
-            break;
+    for (int pass=0 ; pass < 2 ; pass++) {
+        dfe_start_reentrant(rrdhost_root_index, host) {
+            // pass 0 will do vnodes (skip the rest)
+            // pass 1 will do the rest (skip vnodes)
+            if (pass == IS_VIRTUAL_HOST_OS(host))
+                continue;
 
-        nd_log_daemon(NDLP_DEBUG, "Loading context for host %s", rrdhost_hostname(host));
+            if (!rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD))
+                continue;
 
-        int rc = 0;
-        bool thread_found = cleanup_finished_threads(hclt, max_threads, false, &thread_index);
-        if (thread_found) {
-            __atomic_store_n(&hclt[thread_index].busy, true, __ATOMIC_RELAXED);
-            hclt[thread_index].host = host;
-            hclt[thread_index].thread = nd_thread_create("CTXLOAD", NETDATA_THREAD_OPTION_DEFAULT, restore_host_context, &hclt[thread_index]);
-            rc = (hclt[thread_index].thread == NULL);
-            async_exec += (rc == 0);
-            // if it failed, mark the thread slot as free
-            if (rc)
-                __atomic_store_n(&hclt[thread_index].busy, false, __ATOMIC_RELAXED);
+            if (unlikely(SHUTDOWN_REQUESTED(config)))
+                break;
+
+            nd_log_daemon(NDLP_DEBUG, "Loading context for host %s", rrdhost_hostname(host));
+
+            int rc = 0;
+            bool thread_found = cleanup_finished_threads(hclt, max_threads, false, &thread_index);
+            if (thread_found) {
+                __atomic_store_n(&hclt[thread_index].busy, true, __ATOMIC_RELAXED);
+                hclt[thread_index].host = host;
+                hclt[thread_index].thread = nd_thread_create("CTXLOAD", NETDATA_THREAD_OPTION_DEFAULT, restore_host_context, &hclt[thread_index]);
+                rc = (hclt[thread_index].thread == NULL);
+                async_exec += (rc == 0);
+                // if it failed, mark the thread slot as free
+                if (rc)
+                    __atomic_store_n(&hclt[thread_index].busy, false, __ATOMIC_RELAXED);
+            }
+            // if single thread, thread creation failure or failure tofind slot
+            if (rc || !thread_found) {
+                sync_exec++;
+                struct host_context_load_thread hclt_sync = {.host = host};
+                restore_host_context(&hclt_sync);
+            }
+            host_count++;
         }
-        // if single thread, thread creation failure or failure tofind slot
-        if (rc || !thread_found) {
-            sync_exec++;
-            struct host_context_load_thread hclt_sync = {.host = host};
-            restore_host_context(&hclt_sync);
-        }
-        host_count++;
+        dfe_done(host);
     }
-    dfe_done(host);
 
     bool should_clean_threads = cleanup_finished_threads(hclt, max_threads, true, NULL);
 

@@ -4,8 +4,10 @@ extends:
   - _hp.yaml
   - _hp-base.yaml
 
-sysobjectid:
-  - 1.3.6.1.4.1.11.5.7.1.2
+selector:
+  - sysobjectid:
+      include:
+        - 1.3.6.1.4.1.11.5.7.1.2
 
 # https://mibbrowser.online/mibdb_search.php?mib=CPQRACK-MIB
 # https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/hp/CPQRACK-MIB

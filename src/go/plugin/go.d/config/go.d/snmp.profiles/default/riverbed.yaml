@@ -9,5 +9,7 @@ metadata:
       vendor:
         value: "Riverbed"
 
-sysobjectid:
-  - 1.3.6.1.4.1.17163.1.*
+selector:
+  - sysobjectid:
+      include:
+        - 1.3.6.1.4.1.17163.1.*

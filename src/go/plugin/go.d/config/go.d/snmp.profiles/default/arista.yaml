@@ -25,4 +25,7 @@ extends:
 
 # The OID `1.3.6.1.4.1.30065.1`/`aristaProducts` is the root object identifier from
 # which sysObjectID values are assigned. Values are defined in ARISTA-PRODUCTS-MIB.
-sysobjectid: 1.3.6.1.4.1.30065.1.*
+selector:
+  - sysobjectid:
+      include:
+        - 1.3.6.1.4.1.30065.1.*

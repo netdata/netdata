@@ -15,7 +15,10 @@ extends:
   - _std-ip-mib.yaml
   - _f5-big-ip-cpu-memory.yaml
 
-sysobjectid: 1.3.6.1.4.1.3375.2.1.3.4.*
+selector:
+  - sysobjectid:
+      include:
+        - 1.3.6.1.4.1.3375.2.1.3.4.*
 
 metadata:
   device:

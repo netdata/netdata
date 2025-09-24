@@ -7,18 +7,20 @@ extends:
   - _std-tcp-mib.yaml
   - _std-udp-mib.yaml
 
-sysobjectid:
-  - 1.3.6.1.4.1.12124.*
+selector:
+  - sysobjectid:
+      include:
+        - 1.3.6.1.4.1.12124.*
 
-  # Looks like EMC Isilon devices might use the wrong sysObjectID `1.3.6.1.4.1.12325.1.1.2.1.1` (FreeBSD-FOKUS)
-  # Few related discussions:
-  # - https://thwack.solarwinds.com/product-forums/network-performance-monitor-npm/f/forum/66098/emc-isilon-showing-up-as-non-emc-device-after-upgrade/39511
-  # - https://support.servicenow.com/kb?id=kb_article_view&sysparm_article=KB0761173
-  # - https://github.com/librenms/librenms/issues/6412
-  # Long term solution:
-  # Similar to librenms a possible solution is to have other ways to match devices like sysDescr text matching. See example:
-  # https://github.com/librenms/librenms/pull/6416/files#diff-ec0470a0c495f1349b349f62b0dfdf14b928a5acb94f0de5f6c5a6e523f7817cR12-R16
-  - 1.3.6.1.4.1.12325.1.1.2.1.1
+        # Looks like EMC Isilon devices might use the wrong sysObjectID `1.3.6.1.4.1.12325.1.1.2.1.1` (FreeBSD-FOKUS)
+        # Few related discussions:
+        # - https://thwack.solarwinds.com/product-forums/network-performance-monitor-npm/f/forum/66098/emc-isilon-showing-up-as-non-emc-device-after-upgrade/39511
+        # - https://support.servicenow.com/kb?id=kb_article_view&sysparm_article=KB0761173
+        # - https://github.com/librenms/librenms/issues/6412
+        # Long term solution:
+        # Similar to librenms a possible solution is to have other ways to match devices like sysDescr text matching. See example:
+        # https://github.com/librenms/librenms/pull/6416/files#diff-ec0470a0c495f1349b349f62b0dfdf14b928a5acb94f0de5f6c5a6e523f7817cR12-R16
+        - 1.3.6.1.4.1.12325.1.1.2.1.1
 
 metadata:
   device:

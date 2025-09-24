@@ -1,7 +1,10 @@
 extends:
   - a10.yaml
 
-sysobjectid: 1.3.6.1.4.1.22610.1.3.* # A10 Thunder
+selector:
+  - sysobjectid:
+      include:
+        - 1.3.6.1.4.1.22610.1.3.* # A10 Thunder
 
 metadata:
   device:

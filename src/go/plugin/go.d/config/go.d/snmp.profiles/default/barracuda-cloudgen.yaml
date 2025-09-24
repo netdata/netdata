@@ -7,8 +7,10 @@ metadata:
       type:
         value: "Firewall"
 
-sysobjectid:
-  - 1.3.6.1.4.1.10704.1.*
+selector:
+  - sysobjectid:
+      include:
+        - 1.3.6.1.4.1.10704.1.*
 
 # TODO, could find MIB descriptions here, so I wrote the descriptions from the context of the metric name.
 metrics:

@@ -6,6 +6,14 @@
 
 **Merged pull requests:**
 
+- fix\(docs\): update mermaid diagrams leftovers plus syntax issues [\#21034](https://github.com/netdata/netdata/pull/21034) ([kanelatechnical](https://github.com/kanelatechnical))
+- docs: fix mdx parsing scalability.md [\#21032](https://github.com/netdata/netdata/pull/21032) ([ilyam8](https://github.com/ilyam8))
+- Revert "chore\(docs\): rename REST API sidebar to Netdata APIs" [\#21031](https://github.com/netdata/netdata/pull/21031) ([ilyam8](https://github.com/ilyam8))
+- Update scalability.md [\#21030](https://github.com/netdata/netdata/pull/21030) ([kanelatechnical](https://github.com/kanelatechnical))
+- chore\(docs\): rename REST API sidebar to Netdata APIs [\#21029](https://github.com/netdata/netdata/pull/21029) ([kanelatechnical](https://github.com/kanelatechnical))
+- Regenerate integrations docs [\#21028](https://github.com/netdata/netdata/pull/21028) ([netdatabot](https://github.com/netdatabot))
+- Update README.md [\#21027](https://github.com/netdata/netdata/pull/21027) ([kanelatechnical](https://github.com/kanelatechnical))
+- chore\(go.d/snmp\): remove/disable legacy components [\#21026](https://github.com/netdata/netdata/pull/21026) ([ilyam8](https://github.com/ilyam8))
 - build\(deps\): update go toolchain to v1.25.1 [\#21025](https://github.com/netdata/netdata/pull/21025) ([ilyam8](https://github.com/ilyam8))
 - build\(deps\): bump openssl and curl version in static build [\#21024](https://github.com/netdata/netdata/pull/21024) ([ilyam8](https://github.com/ilyam8))
 - improve\(go.d/snmp\): add `manual_profiles` option [\#21023](https://github.com/netdata/netdata/pull/21023) ([ilyam8](https://github.com/ilyam8))
@@ -255,6 +263,7 @@
 - Add Oracle Linux 10 to CI and package builds. [\#20684](https://github.com/netdata/netdata/pull/20684) ([Ferroin](https://github.com/Ferroin))
 - Split collection \(Windows.plugin\) [\#20677](https://github.com/netdata/netdata/pull/20677) ([thiagoftsm](https://github.com/thiagoftsm))
 - Add Getting Started Netdata guide [\#20642](https://github.com/netdata/netdata/pull/20642) ([kanelatechnical](https://github.com/kanelatechnical))
+- ml: implement fixed time-based training windows [\#20638](https://github.com/netdata/netdata/pull/20638) ([ktsaou](https://github.com/ktsaou))
 
 ## [v2.6.3](https://github.com/netdata/netdata/tree/v2.6.3) (2025-08-22)
 
@@ -439,15 +448,6 @@
 - SNMP: second pass of aruba profiles [\#20499](https://github.com/netdata/netdata/pull/20499) ([Ancairon](https://github.com/Ancairon))
 - SNMP: Arista profiles [\#20498](https://github.com/netdata/netdata/pull/20498) ([Ancairon](https://github.com/Ancairon))
 - chore\(go.d/ddsnmp\): fix table metrics again [\#20497](https://github.com/netdata/netdata/pull/20497) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations docs [\#20496](https://github.com/netdata/netdata/pull/20496) ([netdatabot](https://github.com/netdatabot))
-- fix: mark import groups as not supported SCIM feature [\#20495](https://github.com/netdata/netdata/pull/20495) ([juacker](https://github.com/juacker))
-- chore\(go.d/ddsnmp\): fix table metrics collection [\#20492](https://github.com/netdata/netdata/pull/20492) ([ilyam8](https://github.com/ilyam8))
-- SNMP: APC profiles [\#20491](https://github.com/netdata/netdata/pull/20491) ([Ancairon](https://github.com/Ancairon))
-- fix fluentd schema permit\_plugin [\#20490](https://github.com/netdata/netdata/pull/20490) ([ilyam8](https://github.com/ilyam8))
-- fix\(go.d\): add missing props to config schemas [\#20489](https://github.com/netdata/netdata/pull/20489) ([ilyam8](https://github.com/ilyam8))
-- anue [\#20488](https://github.com/netdata/netdata/pull/20488) ([Ancairon](https://github.com/Ancairon))
-- SNMP: Alcatel profiles [\#20487](https://github.com/netdata/netdata/pull/20487) ([Ancairon](https://github.com/Ancairon))
-- ASP.NET \(windows.plugin\) [\#20485](https://github.com/netdata/netdata/pull/20485) ([thiagoftsm](https://github.com/thiagoftsm))
 
 ## [v2.5.4](https://github.com/netdata/netdata/tree/v2.5.4) (2025-06-24)
 

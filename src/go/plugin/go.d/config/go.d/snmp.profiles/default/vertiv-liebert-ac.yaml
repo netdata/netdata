@@ -1,8 +1,10 @@
 extends:
   - _vertiv.yaml
 
-sysobjectid:
-  - 1.3.6.1.4.1.476.1.42 # liebertGlobalProducts
+selector:
+  - sysobjectid:
+      include:
+        - 1.3.6.1.4.1.476.1.42 # liebertGlobalProducts
 
 metric_tags:
   - tag: lgp_agent_ident_model

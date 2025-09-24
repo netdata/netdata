@@ -2,14 +2,23 @@
 
 You can install Netdata in one of the three following ways:
 
-- **[Install Netdata with the our automatic one-line installation script (recommended)](#install-netdata-with-our-automatic-one-line-installation-script)**,
+- **[Install Netdata with the automatic one-line installation script (recommended)](#install-netdata-with-our-automatic-one-line-installation-script)**,
 - [Install Netdata via Homebrew](#install-netdata-via-homebrew)
 - [Install Netdata from source](#install-netdata-from-source)
 
 Each of these installation option requires [Homebrew](https://brew.sh/) for handling dependencies.
 
-> The Netdata Homebrew package is community-created and -maintained.
-> Community-maintained packages _may_ receive support from Netdata, but are only a best-effort affair. Learn more about [Netdata's platform support policy](/docs/netdata-agent/versions-and-platforms.md).
+:::info
+
+The Netdata Homebrew package is community-created and -maintained.
+
+:::
+
+:::note
+
+Community-maintained packages _may_ receive support from Netdata, but are only a best-effort affair. Learn more about [Netdata's platform support policy](/docs/netdata-agent/versions-and-platforms.md).
+
+:::
 
 ## Install Netdata with our automatic one-line installation script
 
@@ -33,7 +42,7 @@ Cloud](https://app.netdata.cloud/sign-in?cloudRoute=/spaces), then clicking on *
   after the install.
 - `--claim-rooms`: Specify a comma-separated list of tokens for each Room this node should appear in.
 - `--claim-proxy`: Specify a proxy to use when connecting to the Cloud in the form of `http://[user:pass@]host:ip` for an HTTP(S) proxy.
-  See [connecting through a proxy](/src/claim/README.md#automatically-via-a-provisioning-system-or-the-command-line) for details.
+  See [connecting through a proxy](/src/claim/README.md#proxy-configuration) for details.
 - `--claim-url`: Specify a URL to use when connecting to the Cloud. Defaults to `https://app.netdata.cloud`.
 
 For example:
@@ -44,7 +53,7 @@ curl https://get.netdata.cloud/kickstart.sh > /tmp/netdata-kickstart.sh && sh /t
 
 The Netdata Agent is installed under `/usr/local/netdata` on your machine. Your machine will also show up as a node in your Netdata Cloud.
 
-If you experience issues while connecting your node, follow the steps in our [Troubleshoot](/src/claim/README.md#troubleshoot) documentation.
+If you experience issues while connecting your node, follow the steps in our [Troubleshoot](/src/claim/README.md#troubleshooting) documentation.
 
 ## Install Netdata via Homebrew
 
@@ -102,10 +111,15 @@ We don't recommend installing Netdata from source on macOS, as it can be difficu
    sudo ./netdata-installer.sh --install-prefix /usr/local
    ```
 
-> Your Netdata configuration directory will be at `/usr/local/netdata/`.
-> Your stock configuration directory will be at `/usr/local/lib/netdata/conf.d/`.
-> The installer will also install a startup plist to start Netdata when your macOS system boots.
+:::info
+
+- Your Netdata configuration directory will be at `/usr/local/netdata/`.
+- Your stock configuration directory will be at `/usr/local/lib/netdata/conf.d/`.
+- The installer will also install a startup plist to start Netdata when your macOS system boots.
+
+:::
 
 Netdata works on macOS, albeit with some limitations.
-The number of charts displaying system metrics is limited, but you can use any of Netdata's [external plugins](/src/plugins.d/README.md) to monitor any services you might have installed on your macOS system.
-You could also use a macOS system as the parent node in a [streaming configuration](/src/streaming/README.md).
+
+- The number of charts displaying system metrics is limited, but you can use any of Netdata's [external plugins](/src/plugins.d/README.md) to monitor any services you might have installed on your macOS system.
+- You could also use a macOS system as the parent node in a [streaming configuration](/src/streaming/README.md).

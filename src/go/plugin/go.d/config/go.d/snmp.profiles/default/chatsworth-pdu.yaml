@@ -9,7 +9,10 @@ metadata:
       type:
         value: PDU
 
-sysobjectid: 1.3.6.1.4.1.30932.*
+selector:
+  - sysobjectid:
+      include:
+        - 1.3.6.1.4.1.30932.*
 
 # [legacy] Global tags
 metric_tags:

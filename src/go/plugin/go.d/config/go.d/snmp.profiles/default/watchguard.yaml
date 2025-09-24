@@ -3,8 +3,10 @@ extends:
   - _std-if-mib.yaml
   - _std-host-resources-mib-feat-base.yaml
 
-sysobjectid:
-  - 1.3.6.1.4.1.3097.1.5.*
+selector:
+  - sysobjectid:
+      include:
+        - 1.3.6.1.4.1.3097.1.5.*
 
 metadata:
   device:

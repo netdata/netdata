@@ -5,4 +5,7 @@ extends:
   - _std-tcp-mib.yaml
   - _std-udp-mib.yaml
 
-sysobjectid: 1.3.6.1.4.1.318.*
+selector:
+  - sysobjectid:
+      include:
+        - 1.3.6.1.4.1.318.*
