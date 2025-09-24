@@ -1,21 +1,14 @@
 # IBM i (AS/400) protocol helpers
 
-This package implements the low-level ODBC client used by the AS/400 collector.
-It exposes helpers for running SQL queries and classified error handling.
+This package implements the low-level ODBC helper used by the AS/400 collector.
 
 ## Files
 
 - `client.go` — production client (requires CGO/ODBC).
 - `client_stub.go` — build stub for non-CGO platforms.
-- `sqltool/` — internal-only tooling; includes `ibmi-sql`, a helper you can build locally (see its README) to execute ad-hoc SQL using the same connection stack as the collector. The helper is compiled only with the `internaltools` build tag and is not shipped with Netdata.
 
-## Internal helper
+## Usage
 
-To build the optional SQL tool:
-
-```bash
-cd src/go
-go build -tags internaltools -o plugin/ibm.d/protocols/as400/sqltool/ibmi-sql ./plugin/ibm.d/protocols/as400/sqltool
-```
-
-See `sqltool/README.md` for usage instructions.
+The collector imports this package to issue SQL statements and handle error
+classification. No standalone tooling ships from this directory; the code is
+intended for internal use by the AS/400 module.
