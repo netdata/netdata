@@ -4,9 +4,9 @@
 package contexts
 
 import (
-	"strings"
-	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/framework"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/framework"
+	"strings"
 )
 
 // cleanLabelValue cleans a label value for use in instance/dimension IDs
@@ -34,13 +34,11 @@ func (EmptyLabels) InstanceID(contextName string) string {
 	return contextName
 }
 
-
 // --- CPU ---
-
 
 // CPUUsageValues defines the type-safe values for CPU.Usage context
 type CPUUsageValues struct {
-	Process int64
+	Process     int64
 	Utilization int64
 }
 
@@ -52,7 +50,7 @@ type CPUUsageContext struct {
 // Set provides type-safe dimension setting for CPU.Usage context
 func (c CPUUsageContext) Set(state *framework.CollectorState, labels EmptyLabels, values CPUUsageValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, nil, map[string]int64{
-		"process": values.Process,
+		"process":     values.Process,
 		"utilization": values.Utilization,
 	})
 }
@@ -84,70 +82,63 @@ func (c CPUTimeContext) SetUpdateEvery(state *framework.CollectorState, labels E
 	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, nil, updateEvery)
 }
 
-
-
-
 // CPU contains all metric contexts for CPU
 var CPU = struct {
 	Usage CPUUsageContext
-	Time CPUTimeContext
+	Time  CPUTimeContext
 }{
 	Usage: CPUUsageContext{
 		Context: framework.Context[EmptyLabels]{
-		Name:       "websphere_mp.cpu_usage",
-		Family:     "compute/cpu",
-		Title:      "JVM CPU Usage",
-		Units:      "percentage",
-		Type:       module.Line,
-		Priority:   101,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "process",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1000,
-				Precision: 1,
+			Name:        "websphere_mp.cpu_usage",
+			Family:      "compute/cpu",
+			Title:       "JVM CPU Usage",
+			Units:       "percentage",
+			Type:        module.Line,
+			Priority:    101,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "process",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1000,
+					Precision: 1,
+				},
+				{
+					Name:      "utilization",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1000,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "utilization",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1000,
-				Precision: 1,
-			},
-		},
-		LabelKeys: []string{
-		},
+			LabelKeys: []string{},
 		},
 	},
 	Time: CPUTimeContext{
 		Context: framework.Context[EmptyLabels]{
-		Name:       "websphere_mp.cpu_time",
-		Family:     "compute/cpu",
-		Title:      "JVM CPU Time",
-		Units:      "seconds",
-		Type:       module.Line,
-		Priority:   102,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "total",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1000,
-				Precision: 1,
+			Name:        "websphere_mp.cpu_time",
+			Family:      "compute/cpu",
+			Title:       "JVM CPU Time",
+			Units:       "seconds",
+			Type:        module.Line,
+			Priority:    102,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "total",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1000,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-		},
+			LabelKeys: []string{},
 		},
 	},
 }
 
-
 // --- JVM ---
-
 
 // JVMHeapUsageValues defines the type-safe values for JVM.HeapUsage context
 type JVMHeapUsageValues struct {
@@ -263,7 +254,7 @@ func (c JVMGCCollectionsContext) SetUpdateEvery(state *framework.CollectorState,
 
 // JVMGCTimeValues defines the type-safe values for JVM.GCTime context
 type JVMGCTimeValues struct {
-	Total int64
+	Total     int64
 	Per_cycle int64
 }
 
@@ -275,7 +266,7 @@ type JVMGCTimeContext struct {
 // Set provides type-safe dimension setting for JVM.GCTime context
 func (c JVMGCTimeContext) Set(state *framework.CollectorState, labels EmptyLabels, values JVMGCTimeValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, nil, map[string]int64{
-		"total": values.Total,
+		"total":     values.Total,
 		"per_cycle": values.Per_cycle,
 	})
 }
@@ -288,7 +279,7 @@ func (c JVMGCTimeContext) SetUpdateEvery(state *framework.CollectorState, labels
 // JVMThreadsCurrentValues defines the type-safe values for JVM.ThreadsCurrent context
 type JVMThreadsCurrentValues struct {
 	Daemon int64
-	Other int64
+	Other  int64
 }
 
 // JVMThreadsCurrentContext provides type-safe operations for JVM.ThreadsCurrent context
@@ -300,7 +291,7 @@ type JVMThreadsCurrentContext struct {
 func (c JVMThreadsCurrentContext) Set(state *framework.CollectorState, labels EmptyLabels, values JVMThreadsCurrentValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, nil, map[string]int64{
 		"daemon": values.Daemon,
-		"other": values.Other,
+		"other":  values.Other,
 	})
 }
 
@@ -331,222 +322,209 @@ func (c JVMThreadsPeakContext) SetUpdateEvery(state *framework.CollectorState, l
 	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, nil, updateEvery)
 }
 
-
-
-
 // JVM contains all metric contexts for JVM
 var JVM = struct {
-	HeapUsage JVMHeapUsageContext
-	HeapCommitted JVMHeapCommittedContext
-	HeapMax JVMHeapMaxContext
+	HeapUsage       JVMHeapUsageContext
+	HeapCommitted   JVMHeapCommittedContext
+	HeapMax         JVMHeapMaxContext
 	HeapUtilization JVMHeapUtilizationContext
-	GCCollections JVMGCCollectionsContext
-	GCTime JVMGCTimeContext
-	ThreadsCurrent JVMThreadsCurrentContext
-	ThreadsPeak JVMThreadsPeakContext
+	GCCollections   JVMGCCollectionsContext
+	GCTime          JVMGCTimeContext
+	ThreadsCurrent  JVMThreadsCurrentContext
+	ThreadsPeak     JVMThreadsPeakContext
 }{
 	HeapUsage: JVMHeapUsageContext{
 		Context: framework.Context[EmptyLabels]{
-		Name:       "websphere_mp.jvm_memory_heap_usage",
-		Family:     "memory/heap",
-		Title:      "JVM Heap Memory Usage",
-		Units:      "bytes",
-		Type:       module.Stacked,
-		Priority:   201,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "used",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_mp.jvm_memory_heap_usage",
+			Family:      "memory/heap",
+			Title:       "JVM Heap Memory Usage",
+			Units:       "bytes",
+			Type:        module.Stacked,
+			Priority:    201,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "used",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "free",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "free",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-		},
-		LabelKeys: []string{
-		},
+			LabelKeys: []string{},
 		},
 	},
 	HeapCommitted: JVMHeapCommittedContext{
 		Context: framework.Context[EmptyLabels]{
-		Name:       "websphere_mp.jvm_memory_heap_committed",
-		Family:     "memory/heap",
-		Title:      "JVM Heap Memory Committed",
-		Units:      "bytes",
-		Type:       module.Line,
-		Priority:   202,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "committed",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_mp.jvm_memory_heap_committed",
+			Family:      "memory/heap",
+			Title:       "JVM Heap Memory Committed",
+			Units:       "bytes",
+			Type:        module.Line,
+			Priority:    202,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "committed",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-		},
+			LabelKeys: []string{},
 		},
 	},
 	HeapMax: JVMHeapMaxContext{
 		Context: framework.Context[EmptyLabels]{
-		Name:       "websphere_mp.jvm_memory_heap_max",
-		Family:     "memory/heap",
-		Title:      "JVM Heap Memory Maximum",
-		Units:      "bytes",
-		Type:       module.Line,
-		Priority:   203,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "limit",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_mp.jvm_memory_heap_max",
+			Family:      "memory/heap",
+			Title:       "JVM Heap Memory Maximum",
+			Units:       "bytes",
+			Type:        module.Line,
+			Priority:    203,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "limit",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-		},
+			LabelKeys: []string{},
 		},
 	},
 	HeapUtilization: JVMHeapUtilizationContext{
 		Context: framework.Context[EmptyLabels]{
-		Name:       "websphere_mp.jvm_heap_utilization",
-		Family:     "memory/heap",
-		Title:      "JVM Heap Utilization",
-		Units:      "percentage",
-		Type:       module.Line,
-		Priority:   204,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "utilization",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1000,
-				Precision: 1,
+			Name:        "websphere_mp.jvm_heap_utilization",
+			Family:      "memory/heap",
+			Title:       "JVM Heap Utilization",
+			Units:       "percentage",
+			Type:        module.Line,
+			Priority:    204,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "utilization",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1000,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-		},
+			LabelKeys: []string{},
 		},
 	},
 	GCCollections: JVMGCCollectionsContext{
 		Context: framework.Context[EmptyLabels]{
-		Name:       "websphere_mp.jvm_gc_collections",
-		Family:     "compute/gc",
-		Title:      "JVM Garbage Collection Rate",
-		Units:      "collections/s",
-		Type:       module.Line,
-		Priority:   205,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "rate",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_mp.jvm_gc_collections",
+			Family:      "compute/gc",
+			Title:       "JVM Garbage Collection Rate",
+			Units:       "collections/s",
+			Type:        module.Line,
+			Priority:    205,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "rate",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-		},
+			LabelKeys: []string{},
 		},
 	},
 	GCTime: JVMGCTimeContext{
 		Context: framework.Context[EmptyLabels]{
-		Name:       "websphere_mp.jvm_gc_time",
-		Family:     "compute/gc",
-		Title:      "JVM GC Time",
-		Units:      "milliseconds",
-		Type:       module.Line,
-		Priority:   206,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "total",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_mp.jvm_gc_time",
+			Family:      "compute/gc",
+			Title:       "JVM GC Time",
+			Units:       "milliseconds",
+			Type:        module.Line,
+			Priority:    206,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "total",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "per_cycle",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "per_cycle",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-		},
-		LabelKeys: []string{
-		},
+			LabelKeys: []string{},
 		},
 	},
 	ThreadsCurrent: JVMThreadsCurrentContext{
 		Context: framework.Context[EmptyLabels]{
-		Name:       "websphere_mp.jvm_threads_current",
-		Family:     "compute/threads",
-		Title:      "JVM Current Threads",
-		Units:      "threads",
-		Type:       module.Stacked,
-		Priority:   301,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "daemon",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_mp.jvm_threads_current",
+			Family:      "compute/threads",
+			Title:       "JVM Current Threads",
+			Units:       "threads",
+			Type:        module.Stacked,
+			Priority:    301,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "daemon",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "other",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "other",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-		},
-		LabelKeys: []string{
-		},
+			LabelKeys: []string{},
 		},
 	},
 	ThreadsPeak: JVMThreadsPeakContext{
 		Context: framework.Context[EmptyLabels]{
-		Name:       "websphere_mp.jvm_threads_peak",
-		Family:     "compute/threads",
-		Title:      "JVM Peak Threads",
-		Units:      "threads",
-		Type:       module.Line,
-		Priority:   302,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "peak",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_mp.jvm_threads_peak",
+			Family:      "compute/threads",
+			Title:       "JVM Peak Threads",
+			Units:       "threads",
+			Type:        module.Line,
+			Priority:    302,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "peak",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-		},
+			LabelKeys: []string{},
 		},
 	},
 }
 
-
 // --- RESTEndpoint ---
-
 
 // RESTEndpointRequestsValues defines the type-safe values for RESTEndpoint.Requests context
 type RESTEndpointRequestsValues struct {
@@ -592,11 +570,9 @@ func (c RESTEndpointResponseTimeContext) SetUpdateEvery(state *framework.Collect
 	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
 }
 
-
-
 // RESTEndpointLabels defines the required labels for RESTEndpoint contexts
 type RESTEndpointLabels struct {
-	Method string
+	Method   string
 	Endpoint string
 }
 
@@ -606,70 +582,67 @@ func (l RESTEndpointLabels) InstanceID(contextName string) string {
 	return contextName + "." + cleanLabelValue(l.Method) + "_" + cleanLabelValue(l.Endpoint)
 }
 
-
 // RESTEndpoint contains all metric contexts for RESTEndpoint
 var RESTEndpoint = struct {
-	Requests RESTEndpointRequestsContext
+	Requests     RESTEndpointRequestsContext
 	ResponseTime RESTEndpointResponseTimeContext
 }{
 	Requests: RESTEndpointRequestsContext{
 		Context: framework.Context[RESTEndpointLabels]{
-		Name:       "websphere_mp.rest_requests",
-		Family:     "workloads/rest",
-		Title:      "REST Request Rate",
-		Units:      "requests/s",
-		Type:       module.Line,
-		Priority:   501,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "requests",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_mp.rest_requests",
+			Family:      "workloads/rest",
+			Title:       "REST Request Rate",
+			Units:       "requests/s",
+			Type:        module.Line,
+			Priority:    501,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "requests",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-			"method",
-			"endpoint",
-		},
+			LabelKeys: []string{
+				"method",
+				"endpoint",
+			},
 		},
 	},
 	ResponseTime: RESTEndpointResponseTimeContext{
 		Context: framework.Context[RESTEndpointLabels]{
-		Name:       "websphere_mp.rest_response_time",
-		Family:     "workloads/rest",
-		Title:      "REST Response Time",
-		Units:      "milliseconds",
-		Type:       module.Line,
-		Priority:   502,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "average",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_mp.rest_response_time",
+			Family:      "workloads/rest",
+			Title:       "REST Response Time",
+			Units:       "milliseconds",
+			Type:        module.Line,
+			Priority:    502,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "average",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-			"method",
-			"endpoint",
-		},
+			LabelKeys: []string{
+				"method",
+				"endpoint",
+			},
 		},
 	},
 }
 
-
 // --- Vendor ---
-
 
 // VendorThreadPoolUsageValues defines the type-safe values for Vendor.ThreadPoolUsage context
 type VendorThreadPoolUsageValues struct {
 	Active int64
-	Idle int64
+	Idle   int64
 }
 
 // VendorThreadPoolUsageContext provides type-safe operations for Vendor.ThreadPoolUsage context
@@ -681,7 +654,7 @@ type VendorThreadPoolUsageContext struct {
 func (c VendorThreadPoolUsageContext) Set(state *framework.CollectorState, labels EmptyLabels, values VendorThreadPoolUsageValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, nil, map[string]int64{
 		"active": values.Active,
-		"idle": values.Idle,
+		"idle":   values.Idle,
 	})
 }
 
@@ -712,68 +685,61 @@ func (c VendorThreadPoolSizeContext) SetUpdateEvery(state *framework.CollectorSt
 	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, nil, updateEvery)
 }
 
-
-
-
 // Vendor contains all metric contexts for Vendor
 var Vendor = struct {
 	ThreadPoolUsage VendorThreadPoolUsageContext
-	ThreadPoolSize VendorThreadPoolSizeContext
+	ThreadPoolSize  VendorThreadPoolSizeContext
 }{
 	ThreadPoolUsage: VendorThreadPoolUsageContext{
 		Context: framework.Context[EmptyLabels]{
-		Name:       "websphere_mp.threadpool_usage",
-		Family:     "workloads/threadpools",
-		Title:      "Thread Pool Usage",
-		Units:      "threads",
-		Type:       module.Stacked,
-		Priority:   401,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "active",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_mp.threadpool_usage",
+			Family:      "workloads/threadpools",
+			Title:       "Thread Pool Usage",
+			Units:       "threads",
+			Type:        module.Stacked,
+			Priority:    401,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "active",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "idle",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "idle",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-		},
-		LabelKeys: []string{
-		},
+			LabelKeys: []string{},
 		},
 	},
 	ThreadPoolSize: VendorThreadPoolSizeContext{
 		Context: framework.Context[EmptyLabels]{
-		Name:       "websphere_mp.threadpool_size",
-		Family:     "workloads/threadpools",
-		Title:      "Thread Pool Size",
-		Units:      "threads",
-		Type:       module.Line,
-		Priority:   402,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "size",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_mp.threadpool_size",
+			Family:      "workloads/threadpools",
+			Title:       "Thread Pool Size",
+			Units:       "threads",
+			Type:        module.Line,
+			Priority:    402,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "size",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-		},
+			LabelKeys: []string{},
 		},
 	},
 }
-
-
 
 // GetAllContexts returns all contexts for framework registration
 func GetAllContexts() []interface{} {

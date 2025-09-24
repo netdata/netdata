@@ -4,9 +4,9 @@
 package contexts
 
 import (
-	"strings"
-	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/framework"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/framework"
+	"strings"
 )
 
 // cleanLabelValue cleans a label value for use in instance/dimension IDs
@@ -34,9 +34,7 @@ func (EmptyLabels) InstanceID(contextName string) string {
 	return contextName
 }
 
-
 // --- Applications ---
-
 
 // ApplicationsRequestsValues defines the type-safe values for Applications.Requests context
 type ApplicationsRequestsValues struct {
@@ -128,7 +126,7 @@ func (c ApplicationsSessionsLiveContext) SetUpdateEvery(state *framework.Collect
 
 // ApplicationsSessionEventsValues defines the type-safe values for Applications.SessionEvents context
 type ApplicationsSessionEventsValues struct {
-	Creates int64
+	Creates     int64
 	Invalidates int64
 }
 
@@ -140,7 +138,7 @@ type ApplicationsSessionEventsContext struct {
 // Set provides type-safe dimension setting for Applications.SessionEvents context
 func (c ApplicationsSessionEventsContext) Set(state *framework.CollectorState, labels ApplicationsLabels, values ApplicationsSessionEventsValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
-		"creates": values.Creates,
+		"creates":     values.Creates,
 		"invalidates": values.Invalidates,
 	})
 }
@@ -152,7 +150,7 @@ func (c ApplicationsSessionEventsContext) SetUpdateEvery(state *framework.Collec
 
 // ApplicationsTransactionsValues defines the type-safe values for Applications.Transactions context
 type ApplicationsTransactionsValues struct {
-	Committed int64
+	Committed  int64
 	Rolledback int64
 }
 
@@ -164,7 +162,7 @@ type ApplicationsTransactionsContext struct {
 // Set provides type-safe dimension setting for Applications.Transactions context
 func (c ApplicationsTransactionsContext) Set(state *framework.CollectorState, labels ApplicationsLabels, values ApplicationsTransactionsValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
-		"committed": values.Committed,
+		"committed":  values.Committed,
 		"rolledback": values.Rolledback,
 	})
 }
@@ -174,12 +172,10 @@ func (c ApplicationsTransactionsContext) SetUpdateEvery(state *framework.Collect
 	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
 }
 
-
-
 // ApplicationsLabels defines the required labels for Applications contexts
 type ApplicationsLabels struct {
 	Application string
-	Module string
+	Module      string
 }
 
 // InstanceID generates a unique instance ID using the hardcoded label order from YAML
@@ -188,179 +184,176 @@ func (l ApplicationsLabels) InstanceID(contextName string) string {
 	return contextName + "." + cleanLabelValue(l.Application) + "_" + cleanLabelValue(l.Module)
 }
 
-
 // Applications contains all metric contexts for Applications
 var Applications = struct {
-	Requests ApplicationsRequestsContext
-	ResponseTime ApplicationsResponseTimeContext
+	Requests       ApplicationsRequestsContext
+	ResponseTime   ApplicationsResponseTimeContext
 	SessionsActive ApplicationsSessionsActiveContext
-	SessionsLive ApplicationsSessionsLiveContext
-	SessionEvents ApplicationsSessionEventsContext
-	Transactions ApplicationsTransactionsContext
+	SessionsLive   ApplicationsSessionsLiveContext
+	SessionEvents  ApplicationsSessionEventsContext
+	Transactions   ApplicationsTransactionsContext
 }{
 	Requests: ApplicationsRequestsContext{
 		Context: framework.Context[ApplicationsLabels]{
-		Name:       "websphere_jmx.app_requests",
-		Family:     "workloads/applications",
-		Title:      "Application Requests",
-		Units:      "requests",
-		Type:       module.Line,
-		Priority:   801,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "requests",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_jmx.app_requests",
+			Family:      "workloads/applications",
+			Title:       "Application Requests",
+			Units:       "requests",
+			Type:        module.Line,
+			Priority:    801,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "requests",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-			"application",
-			"module",
-		},
+			LabelKeys: []string{
+				"application",
+				"module",
+			},
 		},
 	},
 	ResponseTime: ApplicationsResponseTimeContext{
 		Context: framework.Context[ApplicationsLabels]{
-		Name:       "websphere_jmx.app_response_time",
-		Family:     "workloads/applications",
-		Title:      "Application Response Time",
-		Units:      "milliseconds",
-		Type:       module.Line,
-		Priority:   802,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "response_time",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_jmx.app_response_time",
+			Family:      "workloads/applications",
+			Title:       "Application Response Time",
+			Units:       "milliseconds",
+			Type:        module.Line,
+			Priority:    802,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "response_time",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-			"application",
-			"module",
-		},
+			LabelKeys: []string{
+				"application",
+				"module",
+			},
 		},
 	},
 	SessionsActive: ApplicationsSessionsActiveContext{
 		Context: framework.Context[ApplicationsLabels]{
-		Name:       "websphere_jmx.app_sessions_active",
-		Family:     "workloads/applications",
-		Title:      "Active Sessions",
-		Units:      "sessions",
-		Type:       module.Line,
-		Priority:   803,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "active",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_jmx.app_sessions_active",
+			Family:      "workloads/applications",
+			Title:       "Active Sessions",
+			Units:       "sessions",
+			Type:        module.Line,
+			Priority:    803,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "active",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-			"application",
-			"module",
-		},
+			LabelKeys: []string{
+				"application",
+				"module",
+			},
 		},
 	},
 	SessionsLive: ApplicationsSessionsLiveContext{
 		Context: framework.Context[ApplicationsLabels]{
-		Name:       "websphere_jmx.app_sessions_live",
-		Family:     "workloads/applications",
-		Title:      "Live Sessions",
-		Units:      "sessions",
-		Type:       module.Line,
-		Priority:   804,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "live",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_jmx.app_sessions_live",
+			Family:      "workloads/applications",
+			Title:       "Live Sessions",
+			Units:       "sessions",
+			Type:        module.Line,
+			Priority:    804,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "live",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-			"application",
-			"module",
-		},
+			LabelKeys: []string{
+				"application",
+				"module",
+			},
 		},
 	},
 	SessionEvents: ApplicationsSessionEventsContext{
 		Context: framework.Context[ApplicationsLabels]{
-		Name:       "websphere_jmx.app_session_events",
-		Family:     "workloads/applications",
-		Title:      "Session Events",
-		Units:      "sessions",
-		Type:       module.Stacked,
-		Priority:   805,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "creates",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_jmx.app_session_events",
+			Family:      "workloads/applications",
+			Title:       "Session Events",
+			Units:       "sessions",
+			Type:        module.Stacked,
+			Priority:    805,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "creates",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "invalidates",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "invalidates",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			LabelKeys: []string{
+				"application",
+				"module",
 			},
-		},
-		LabelKeys: []string{
-			"application",
-			"module",
-		},
 		},
 	},
 	Transactions: ApplicationsTransactionsContext{
 		Context: framework.Context[ApplicationsLabels]{
-		Name:       "websphere_jmx.app_transactions",
-		Family:     "workloads/applications",
-		Title:      "Application Transactions",
-		Units:      "transactions",
-		Type:       module.Line,
-		Priority:   806,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "committed",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_jmx.app_transactions",
+			Family:      "workloads/applications",
+			Title:       "Application Transactions",
+			Units:       "transactions",
+			Type:        module.Line,
+			Priority:    806,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "committed",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "rolledback",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "rolledback",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			LabelKeys: []string{
+				"application",
+				"module",
 			},
-		},
-		LabelKeys: []string{
-			"application",
-			"module",
-		},
 		},
 	},
 }
 
-
 // --- JCA ---
-
 
 // JCAPoolSizeValues defines the type-safe values for JCA.PoolSize context
 type JCAPoolSizeValues struct {
@@ -387,7 +380,7 @@ func (c JCAPoolSizeContext) SetUpdateEvery(state *framework.CollectorState, labe
 // JCAPoolUsageValues defines the type-safe values for JCA.PoolUsage context
 type JCAPoolUsageValues struct {
 	Active int64
-	Free int64
+	Free   int64
 }
 
 // JCAPoolUsageContext provides type-safe operations for JCA.PoolUsage context
@@ -399,7 +392,7 @@ type JCAPoolUsageContext struct {
 func (c JCAPoolUsageContext) Set(state *framework.CollectorState, labels JCALabels, values JCAPoolUsageValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
 		"active": values.Active,
-		"free": values.Free,
+		"free":   values.Free,
 	})
 }
 
@@ -454,7 +447,7 @@ func (c JCAUseTimeContext) SetUpdateEvery(state *framework.CollectorState, label
 
 // JCAConnectionsTotalsValues defines the type-safe values for JCA.ConnectionsTotals context
 type JCAConnectionsTotalsValues struct {
-	Created int64
+	Created   int64
 	Destroyed int64
 }
 
@@ -466,7 +459,7 @@ type JCAConnectionsTotalsContext struct {
 // Set provides type-safe dimension setting for JCA.ConnectionsTotals context
 func (c JCAConnectionsTotalsContext) Set(state *framework.CollectorState, labels JCALabels, values JCAConnectionsTotalsValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
-		"created": values.Created,
+		"created":   values.Created,
 		"destroyed": values.Destroyed,
 	})
 }
@@ -498,8 +491,6 @@ func (c JCAWaitingThreadsContext) SetUpdateEvery(state *framework.CollectorState
 	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
 }
 
-
-
 // JCALabels defines the required labels for JCA contexts
 type JCALabels struct {
 	Pool string
@@ -511,173 +502,170 @@ func (l JCALabels) InstanceID(contextName string) string {
 	return contextName + "." + cleanLabelValue(l.Pool)
 }
 
-
 // JCA contains all metric contexts for JCA
 var JCA = struct {
-	PoolSize JCAPoolSizeContext
-	PoolUsage JCAPoolUsageContext
-	WaitTime JCAWaitTimeContext
-	UseTime JCAUseTimeContext
+	PoolSize          JCAPoolSizeContext
+	PoolUsage         JCAPoolUsageContext
+	WaitTime          JCAWaitTimeContext
+	UseTime           JCAUseTimeContext
 	ConnectionsTotals JCAConnectionsTotalsContext
-	WaitingThreads JCAWaitingThreadsContext
+	WaitingThreads    JCAWaitingThreadsContext
 }{
 	PoolSize: JCAPoolSizeContext{
 		Context: framework.Context[JCALabels]{
-		Name:       "websphere_jmx.jca_pool_size",
-		Family:     "workloads/jca",
-		Title:      "JCA Pool Size",
-		Units:      "connections",
-		Type:       module.Line,
-		Priority:   651,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "size",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_jmx.jca_pool_size",
+			Family:      "workloads/jca",
+			Title:       "JCA Pool Size",
+			Units:       "connections",
+			Type:        module.Line,
+			Priority:    651,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "size",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-			"pool",
-		},
+			LabelKeys: []string{
+				"pool",
+			},
 		},
 	},
 	PoolUsage: JCAPoolUsageContext{
 		Context: framework.Context[JCALabels]{
-		Name:       "websphere_jmx.jca_pool_usage",
-		Family:     "workloads/jca",
-		Title:      "JCA Pool Usage",
-		Units:      "connections",
-		Type:       module.Stacked,
-		Priority:   652,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "active",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_jmx.jca_pool_usage",
+			Family:      "workloads/jca",
+			Title:       "JCA Pool Usage",
+			Units:       "connections",
+			Type:        module.Stacked,
+			Priority:    652,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "active",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "free",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "free",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			LabelKeys: []string{
+				"pool",
 			},
-		},
-		LabelKeys: []string{
-			"pool",
-		},
 		},
 	},
 	WaitTime: JCAWaitTimeContext{
 		Context: framework.Context[JCALabels]{
-		Name:       "websphere_jmx.jca_pool_wait_time",
-		Family:     "workloads/jca",
-		Title:      "JCA Average Wait Time",
-		Units:      "milliseconds",
-		Type:       module.Line,
-		Priority:   653,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "wait",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_jmx.jca_pool_wait_time",
+			Family:      "workloads/jca",
+			Title:       "JCA Average Wait Time",
+			Units:       "milliseconds",
+			Type:        module.Line,
+			Priority:    653,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "wait",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-			"pool",
-		},
+			LabelKeys: []string{
+				"pool",
+			},
 		},
 	},
 	UseTime: JCAUseTimeContext{
 		Context: framework.Context[JCALabels]{
-		Name:       "websphere_jmx.jca_pool_use_time",
-		Family:     "workloads/jca",
-		Title:      "JCA Average Use Time",
-		Units:      "milliseconds",
-		Type:       module.Line,
-		Priority:   654,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "use",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_jmx.jca_pool_use_time",
+			Family:      "workloads/jca",
+			Title:       "JCA Average Use Time",
+			Units:       "milliseconds",
+			Type:        module.Line,
+			Priority:    654,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "use",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-			"pool",
-		},
+			LabelKeys: []string{
+				"pool",
+			},
 		},
 	},
 	ConnectionsTotals: JCAConnectionsTotalsContext{
 		Context: framework.Context[JCALabels]{
-		Name:       "websphere_jmx.jca_pool_connections",
-		Family:     "workloads/jca",
-		Title:      "JCA Connections Totals",
-		Units:      "connections",
-		Type:       module.Line,
-		Priority:   655,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "created",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_jmx.jca_pool_connections",
+			Family:      "workloads/jca",
+			Title:       "JCA Connections Totals",
+			Units:       "connections",
+			Type:        module.Line,
+			Priority:    655,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "created",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "destroyed",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "destroyed",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			LabelKeys: []string{
+				"pool",
 			},
-		},
-		LabelKeys: []string{
-			"pool",
-		},
 		},
 	},
 	WaitingThreads: JCAWaitingThreadsContext{
 		Context: framework.Context[JCALabels]{
-		Name:       "websphere_jmx.jca_pool_waiting_threads",
-		Family:     "workloads/jca",
-		Title:      "JCA Waiting Threads",
-		Units:      "threads",
-		Type:       module.Line,
-		Priority:   656,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "waiting",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_jmx.jca_pool_waiting_threads",
+			Family:      "workloads/jca",
+			Title:       "JCA Waiting Threads",
+			Units:       "threads",
+			Type:        module.Line,
+			Priority:    656,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "waiting",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-			"pool",
-		},
+			LabelKeys: []string{
+				"pool",
+			},
 		},
 	},
 }
 
-
 // --- JDBC ---
-
 
 // JDBCPoolSizeValues defines the type-safe values for JDBC.PoolSize context
 type JDBCPoolSizeValues struct {
@@ -704,7 +692,7 @@ func (c JDBCPoolSizeContext) SetUpdateEvery(state *framework.CollectorState, lab
 // JDBCPoolUsageValues defines the type-safe values for JDBC.PoolUsage context
 type JDBCPoolUsageValues struct {
 	Active int64
-	Free int64
+	Free   int64
 }
 
 // JDBCPoolUsageContext provides type-safe operations for JDBC.PoolUsage context
@@ -716,7 +704,7 @@ type JDBCPoolUsageContext struct {
 func (c JDBCPoolUsageContext) Set(state *framework.CollectorState, labels JDBCLabels, values JDBCPoolUsageValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
 		"active": values.Active,
-		"free": values.Free,
+		"free":   values.Free,
 	})
 }
 
@@ -771,7 +759,7 @@ func (c JDBCUseTimeContext) SetUpdateEvery(state *framework.CollectorState, labe
 
 // JDBCConnectionsTotalsValues defines the type-safe values for JDBC.ConnectionsTotals context
 type JDBCConnectionsTotalsValues struct {
-	Created int64
+	Created   int64
 	Destroyed int64
 }
 
@@ -783,7 +771,7 @@ type JDBCConnectionsTotalsContext struct {
 // Set provides type-safe dimension setting for JDBC.ConnectionsTotals context
 func (c JDBCConnectionsTotalsContext) Set(state *framework.CollectorState, labels JDBCLabels, values JDBCConnectionsTotalsValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
-		"created": values.Created,
+		"created":   values.Created,
 		"destroyed": values.Destroyed,
 	})
 }
@@ -815,8 +803,6 @@ func (c JDBCWaitingThreadsContext) SetUpdateEvery(state *framework.CollectorStat
 	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
 }
 
-
-
 // JDBCLabels defines the required labels for JDBC contexts
 type JDBCLabels struct {
 	Pool string
@@ -828,173 +814,170 @@ func (l JDBCLabels) InstanceID(contextName string) string {
 	return contextName + "." + cleanLabelValue(l.Pool)
 }
 
-
 // JDBC contains all metric contexts for JDBC
 var JDBC = struct {
-	PoolSize JDBCPoolSizeContext
-	PoolUsage JDBCPoolUsageContext
-	WaitTime JDBCWaitTimeContext
-	UseTime JDBCUseTimeContext
+	PoolSize          JDBCPoolSizeContext
+	PoolUsage         JDBCPoolUsageContext
+	WaitTime          JDBCWaitTimeContext
+	UseTime           JDBCUseTimeContext
 	ConnectionsTotals JDBCConnectionsTotalsContext
-	WaitingThreads JDBCWaitingThreadsContext
+	WaitingThreads    JDBCWaitingThreadsContext
 }{
 	PoolSize: JDBCPoolSizeContext{
 		Context: framework.Context[JDBCLabels]{
-		Name:       "websphere_jmx.jdbc_pool_size",
-		Family:     "workloads/jdbc",
-		Title:      "JDBC Pool Size",
-		Units:      "connections",
-		Type:       module.Line,
-		Priority:   601,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "size",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_jmx.jdbc_pool_size",
+			Family:      "workloads/jdbc",
+			Title:       "JDBC Pool Size",
+			Units:       "connections",
+			Type:        module.Line,
+			Priority:    601,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "size",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-			"pool",
-		},
+			LabelKeys: []string{
+				"pool",
+			},
 		},
 	},
 	PoolUsage: JDBCPoolUsageContext{
 		Context: framework.Context[JDBCLabels]{
-		Name:       "websphere_jmx.jdbc_pool_usage",
-		Family:     "workloads/jdbc",
-		Title:      "JDBC Pool Usage",
-		Units:      "connections",
-		Type:       module.Stacked,
-		Priority:   602,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "active",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_jmx.jdbc_pool_usage",
+			Family:      "workloads/jdbc",
+			Title:       "JDBC Pool Usage",
+			Units:       "connections",
+			Type:        module.Stacked,
+			Priority:    602,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "active",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "free",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "free",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			LabelKeys: []string{
+				"pool",
 			},
-		},
-		LabelKeys: []string{
-			"pool",
-		},
 		},
 	},
 	WaitTime: JDBCWaitTimeContext{
 		Context: framework.Context[JDBCLabels]{
-		Name:       "websphere_jmx.jdbc_pool_wait_time",
-		Family:     "workloads/jdbc",
-		Title:      "JDBC Average Wait Time",
-		Units:      "milliseconds",
-		Type:       module.Line,
-		Priority:   603,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "wait",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_jmx.jdbc_pool_wait_time",
+			Family:      "workloads/jdbc",
+			Title:       "JDBC Average Wait Time",
+			Units:       "milliseconds",
+			Type:        module.Line,
+			Priority:    603,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "wait",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-			"pool",
-		},
+			LabelKeys: []string{
+				"pool",
+			},
 		},
 	},
 	UseTime: JDBCUseTimeContext{
 		Context: framework.Context[JDBCLabels]{
-		Name:       "websphere_jmx.jdbc_pool_use_time",
-		Family:     "workloads/jdbc",
-		Title:      "JDBC Average Use Time",
-		Units:      "milliseconds",
-		Type:       module.Line,
-		Priority:   604,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "use",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_jmx.jdbc_pool_use_time",
+			Family:      "workloads/jdbc",
+			Title:       "JDBC Average Use Time",
+			Units:       "milliseconds",
+			Type:        module.Line,
+			Priority:    604,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "use",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-			"pool",
-		},
+			LabelKeys: []string{
+				"pool",
+			},
 		},
 	},
 	ConnectionsTotals: JDBCConnectionsTotalsContext{
 		Context: framework.Context[JDBCLabels]{
-		Name:       "websphere_jmx.jdbc_pool_connections",
-		Family:     "workloads/jdbc",
-		Title:      "JDBC Connections Totals",
-		Units:      "connections",
-		Type:       module.Line,
-		Priority:   605,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "created",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_jmx.jdbc_pool_connections",
+			Family:      "workloads/jdbc",
+			Title:       "JDBC Connections Totals",
+			Units:       "connections",
+			Type:        module.Line,
+			Priority:    605,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "created",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "destroyed",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "destroyed",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			LabelKeys: []string{
+				"pool",
 			},
-		},
-		LabelKeys: []string{
-			"pool",
-		},
 		},
 	},
 	WaitingThreads: JDBCWaitingThreadsContext{
 		Context: framework.Context[JDBCLabels]{
-		Name:       "websphere_jmx.jdbc_pool_waiting_threads",
-		Family:     "workloads/jdbc",
-		Title:      "JDBC Waiting Threads",
-		Units:      "threads",
-		Type:       module.Line,
-		Priority:   606,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "waiting",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_jmx.jdbc_pool_waiting_threads",
+			Family:      "workloads/jdbc",
+			Title:       "JDBC Waiting Threads",
+			Units:       "threads",
+			Type:        module.Line,
+			Priority:    606,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "waiting",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-			"pool",
-		},
+			LabelKeys: []string{
+				"pool",
+			},
 		},
 	},
 }
 
-
 // --- JMS ---
-
 
 // JMSMessagesCurrentValues defines the type-safe values for JMS.MessagesCurrent context
 type JMSMessagesCurrentValues struct {
@@ -1084,11 +1067,9 @@ func (c JMSConsumersContext) SetUpdateEvery(state *framework.CollectorState, lab
 	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
 }
 
-
-
 // JMSLabels defines the required labels for JMS contexts
 type JMSLabels struct {
-	Destination string
+	Destination      string
 	Destination_type string
 }
 
@@ -1098,121 +1079,118 @@ func (l JMSLabels) InstanceID(contextName string) string {
 	return contextName + "." + cleanLabelValue(l.Destination) + "_" + cleanLabelValue(l.Destination_type)
 }
 
-
 // JMS contains all metric contexts for JMS
 var JMS = struct {
 	MessagesCurrent JMSMessagesCurrentContext
 	MessagesPending JMSMessagesPendingContext
-	MessagesTotal JMSMessagesTotalContext
-	Consumers JMSConsumersContext
+	MessagesTotal   JMSMessagesTotalContext
+	Consumers       JMSConsumersContext
 }{
 	MessagesCurrent: JMSMessagesCurrentContext{
 		Context: framework.Context[JMSLabels]{
-		Name:       "websphere_jmx.jms_messages_current",
-		Family:     "workloads/jms",
-		Title:      "JMS Messages Current Depth",
-		Units:      "messages",
-		Type:       module.Line,
-		Priority:   701,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "current",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_jmx.jms_messages_current",
+			Family:      "workloads/jms",
+			Title:       "JMS Messages Current Depth",
+			Units:       "messages",
+			Type:        module.Line,
+			Priority:    701,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "current",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-			"destination",
-			"destination_type",
-		},
+			LabelKeys: []string{
+				"destination",
+				"destination_type",
+			},
 		},
 	},
 	MessagesPending: JMSMessagesPendingContext{
 		Context: framework.Context[JMSLabels]{
-		Name:       "websphere_jmx.jms_messages_pending",
-		Family:     "workloads/jms",
-		Title:      "JMS Messages Pending",
-		Units:      "messages",
-		Type:       module.Line,
-		Priority:   702,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "pending",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_jmx.jms_messages_pending",
+			Family:      "workloads/jms",
+			Title:       "JMS Messages Pending",
+			Units:       "messages",
+			Type:        module.Line,
+			Priority:    702,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "pending",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-			"destination",
-			"destination_type",
-		},
+			LabelKeys: []string{
+				"destination",
+				"destination_type",
+			},
 		},
 	},
 	MessagesTotal: JMSMessagesTotalContext{
 		Context: framework.Context[JMSLabels]{
-		Name:       "websphere_jmx.jms_messages_total",
-		Family:     "workloads/jms",
-		Title:      "JMS Messages Added Total",
-		Units:      "messages",
-		Type:       module.Line,
-		Priority:   703,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "total",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_jmx.jms_messages_total",
+			Family:      "workloads/jms",
+			Title:       "JMS Messages Added Total",
+			Units:       "messages",
+			Type:        module.Line,
+			Priority:    703,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "total",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-			"destination",
-			"destination_type",
-		},
+			LabelKeys: []string{
+				"destination",
+				"destination_type",
+			},
 		},
 	},
 	Consumers: JMSConsumersContext{
 		Context: framework.Context[JMSLabels]{
-		Name:       "websphere_jmx.jms_consumers",
-		Family:     "workloads/jms",
-		Title:      "JMS Consumers",
-		Units:      "consumers",
-		Type:       module.Line,
-		Priority:   704,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "consumers",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_jmx.jms_consumers",
+			Family:      "workloads/jms",
+			Title:       "JMS Consumers",
+			Units:       "consumers",
+			Type:        module.Line,
+			Priority:    704,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "consumers",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-			"destination",
-			"destination_type",
-		},
+			LabelKeys: []string{
+				"destination",
+				"destination_type",
+			},
 		},
 	},
 }
 
-
 // --- JVM ---
-
 
 // JVMHeapMemoryValues defines the type-safe values for JVM.HeapMemory context
 type JVMHeapMemoryValues struct {
-	Used int64
+	Used      int64
 	Committed int64
-	Max int64
+	Max       int64
 }
 
 // JVMHeapMemoryContext provides type-safe operations for JVM.HeapMemory context
@@ -1223,9 +1201,9 @@ type JVMHeapMemoryContext struct {
 // Set provides type-safe dimension setting for JVM.HeapMemory context
 func (c JVMHeapMemoryContext) Set(state *framework.CollectorState, labels EmptyLabels, values JVMHeapMemoryValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, nil, map[string]int64{
-		"used": values.Used,
+		"used":      values.Used,
 		"committed": values.Committed,
-		"max": values.Max,
+		"max":       values.Max,
 	})
 }
 
@@ -1258,7 +1236,7 @@ func (c JVMHeapUsageContext) SetUpdateEvery(state *framework.CollectorState, lab
 
 // JVMNonHeapMemoryValues defines the type-safe values for JVM.NonHeapMemory context
 type JVMNonHeapMemoryValues struct {
-	Used int64
+	Used      int64
 	Committed int64
 }
 
@@ -1270,7 +1248,7 @@ type JVMNonHeapMemoryContext struct {
 // Set provides type-safe dimension setting for JVM.NonHeapMemory context
 func (c JVMNonHeapMemoryContext) Set(state *framework.CollectorState, labels EmptyLabels, values JVMNonHeapMemoryValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, nil, map[string]int64{
-		"used": values.Used,
+		"used":      values.Used,
 		"committed": values.Committed,
 	})
 }
@@ -1326,7 +1304,7 @@ func (c JVMGCTimeContext) SetUpdateEvery(state *framework.CollectorState, labels
 
 // JVMThreadsValues defines the type-safe values for JVM.Threads context
 type JVMThreadsValues struct {
-	Total int64
+	Total  int64
 	Daemon int64
 }
 
@@ -1338,7 +1316,7 @@ type JVMThreadsContext struct {
 // Set provides type-safe dimension setting for JVM.Threads context
 func (c JVMThreadsContext) Set(state *framework.CollectorState, labels EmptyLabels, values JVMThreadsValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, nil, map[string]int64{
-		"total": values.Total,
+		"total":  values.Total,
 		"daemon": values.Daemon,
 	})
 }
@@ -1350,7 +1328,7 @@ func (c JVMThreadsContext) SetUpdateEvery(state *framework.CollectorState, label
 
 // JVMThreadStatesValues defines the type-safe values for JVM.ThreadStates context
 type JVMThreadStatesValues struct {
-	Peak int64
+	Peak    int64
 	Started int64
 }
 
@@ -1362,7 +1340,7 @@ type JVMThreadStatesContext struct {
 // Set provides type-safe dimension setting for JVM.ThreadStates context
 func (c JVMThreadStatesContext) Set(state *framework.CollectorState, labels EmptyLabels, values JVMThreadStatesValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, nil, map[string]int64{
-		"peak": values.Peak,
+		"peak":    values.Peak,
 		"started": values.Started,
 	})
 }
@@ -1374,7 +1352,7 @@ func (c JVMThreadStatesContext) SetUpdateEvery(state *framework.CollectorState, 
 
 // JVMClassesValues defines the type-safe values for JVM.Classes context
 type JVMClassesValues struct {
-	Loaded int64
+	Loaded   int64
 	Unloaded int64
 }
 
@@ -1386,7 +1364,7 @@ type JVMClassesContext struct {
 // Set provides type-safe dimension setting for JVM.Classes context
 func (c JVMClassesContext) Set(state *framework.CollectorState, labels EmptyLabels, values JVMClassesValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, nil, map[string]int64{
-		"loaded": values.Loaded,
+		"loaded":   values.Loaded,
 		"unloaded": values.Unloaded,
 	})
 }
@@ -1440,294 +1418,279 @@ func (c JVMUptimeContext) SetUpdateEvery(state *framework.CollectorState, labels
 	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, nil, updateEvery)
 }
 
-
-
-
 // JVM contains all metric contexts for JVM
 var JVM = struct {
-	HeapMemory JVMHeapMemoryContext
-	HeapUsage JVMHeapUsageContext
+	HeapMemory    JVMHeapMemoryContext
+	HeapUsage     JVMHeapUsageContext
 	NonHeapMemory JVMNonHeapMemoryContext
-	GCCycles JVMGCCyclesContext
-	GCTime JVMGCTimeContext
-	Threads JVMThreadsContext
-	ThreadStates JVMThreadStatesContext
-	Classes JVMClassesContext
-	ProcessCPU JVMProcessCPUContext
-	Uptime JVMUptimeContext
+	GCCycles      JVMGCCyclesContext
+	GCTime        JVMGCTimeContext
+	Threads       JVMThreadsContext
+	ThreadStates  JVMThreadStatesContext
+	Classes       JVMClassesContext
+	ProcessCPU    JVMProcessCPUContext
+	Uptime        JVMUptimeContext
 }{
 	HeapMemory: JVMHeapMemoryContext{
 		Context: framework.Context[EmptyLabels]{
-		Name:       "websphere_jmx.jvm_heap_memory",
-		Family:     "memory/heap",
-		Title:      "JVM Heap Memory",
-		Units:      "bytes",
-		Type:       module.Stacked,
-		Priority:   201,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "used",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_jmx.jvm_heap_memory",
+			Family:      "memory/heap",
+			Title:       "JVM Heap Memory",
+			Units:       "bytes",
+			Type:        module.Stacked,
+			Priority:    201,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "used",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "committed",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "max",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "committed",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "max",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-		},
-		LabelKeys: []string{
-		},
+			LabelKeys: []string{},
 		},
 	},
 	HeapUsage: JVMHeapUsageContext{
 		Context: framework.Context[EmptyLabels]{
-		Name:       "websphere_jmx.jvm_heap_usage",
-		Family:     "memory/heap",
-		Title:      "JVM Heap Usage",
-		Units:      "percentage",
-		Type:       module.Line,
-		Priority:   202,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "usage",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1000,
-				Precision: 1,
+			Name:        "websphere_jmx.jvm_heap_usage",
+			Family:      "memory/heap",
+			Title:       "JVM Heap Usage",
+			Units:       "percentage",
+			Type:        module.Line,
+			Priority:    202,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "usage",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1000,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-		},
+			LabelKeys: []string{},
 		},
 	},
 	NonHeapMemory: JVMNonHeapMemoryContext{
 		Context: framework.Context[EmptyLabels]{
-		Name:       "websphere_jmx.jvm_nonheap_memory",
-		Family:     "memory/nonheap",
-		Title:      "JVM Non-Heap Memory",
-		Units:      "bytes",
-		Type:       module.Stacked,
-		Priority:   203,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "used",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_jmx.jvm_nonheap_memory",
+			Family:      "memory/nonheap",
+			Title:       "JVM Non-Heap Memory",
+			Units:       "bytes",
+			Type:        module.Stacked,
+			Priority:    203,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "used",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "committed",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "committed",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-		},
-		LabelKeys: []string{
-		},
+			LabelKeys: []string{},
 		},
 	},
 	GCCycles: JVMGCCyclesContext{
 		Context: framework.Context[EmptyLabels]{
-		Name:       "websphere_jmx.jvm_gc_count",
-		Family:     "compute/gc",
-		Title:      "JVM Garbage Collection Count",
-		Units:      "collections",
-		Type:       module.Line,
-		Priority:   301,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "collections",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_jmx.jvm_gc_count",
+			Family:      "compute/gc",
+			Title:       "JVM Garbage Collection Count",
+			Units:       "collections",
+			Type:        module.Line,
+			Priority:    301,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "collections",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-		},
+			LabelKeys: []string{},
 		},
 	},
 	GCTime: JVMGCTimeContext{
 		Context: framework.Context[EmptyLabels]{
-		Name:       "websphere_jmx.jvm_gc_time",
-		Family:     "compute/gc",
-		Title:      "JVM Garbage Collection Time",
-		Units:      "milliseconds",
-		Type:       module.Line,
-		Priority:   302,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "time",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_jmx.jvm_gc_time",
+			Family:      "compute/gc",
+			Title:       "JVM Garbage Collection Time",
+			Units:       "milliseconds",
+			Type:        module.Line,
+			Priority:    302,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "time",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-		},
+			LabelKeys: []string{},
 		},
 	},
 	Threads: JVMThreadsContext{
 		Context: framework.Context[EmptyLabels]{
-		Name:       "websphere_jmx.jvm_threads",
-		Family:     "compute/threads",
-		Title:      "JVM Threads",
-		Units:      "threads",
-		Type:       module.Stacked,
-		Priority:   303,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "total",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_jmx.jvm_threads",
+			Family:      "compute/threads",
+			Title:       "JVM Threads",
+			Units:       "threads",
+			Type:        module.Stacked,
+			Priority:    303,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "total",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "daemon",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "daemon",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-		},
-		LabelKeys: []string{
-		},
+			LabelKeys: []string{},
 		},
 	},
 	ThreadStates: JVMThreadStatesContext{
 		Context: framework.Context[EmptyLabels]{
-		Name:       "websphere_jmx.jvm_thread_states",
-		Family:     "compute/threads",
-		Title:      "JVM Thread States",
-		Units:      "threads",
-		Type:       module.Line,
-		Priority:   304,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "peak",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_jmx.jvm_thread_states",
+			Family:      "compute/threads",
+			Title:       "JVM Thread States",
+			Units:       "threads",
+			Type:        module.Line,
+			Priority:    304,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "peak",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "started",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "started",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-		},
-		LabelKeys: []string{
-		},
+			LabelKeys: []string{},
 		},
 	},
 	Classes: JVMClassesContext{
 		Context: framework.Context[EmptyLabels]{
-		Name:       "websphere_jmx.jvm_classes",
-		Family:     "compute/classes",
-		Title:      "JVM Classes",
-		Units:      "classes",
-		Type:       module.Line,
-		Priority:   305,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "loaded",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_jmx.jvm_classes",
+			Family:      "compute/classes",
+			Title:       "JVM Classes",
+			Units:       "classes",
+			Type:        module.Line,
+			Priority:    305,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "loaded",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "unloaded",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "unloaded",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-		},
-		LabelKeys: []string{
-		},
+			LabelKeys: []string{},
 		},
 	},
 	ProcessCPU: JVMProcessCPUContext{
 		Context: framework.Context[EmptyLabels]{
-		Name:       "websphere_jmx.jvm_process_cpu_usage",
-		Family:     "compute/cpu",
-		Title:      "JVM Process CPU Usage",
-		Units:      "percentage",
-		Type:       module.Line,
-		Priority:   103,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "cpu",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1000,
-				Precision: 1,
+			Name:        "websphere_jmx.jvm_process_cpu_usage",
+			Family:      "compute/cpu",
+			Title:       "JVM Process CPU Usage",
+			Units:       "percentage",
+			Type:        module.Line,
+			Priority:    103,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "cpu",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1000,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-		},
+			LabelKeys: []string{},
 		},
 	},
 	Uptime: JVMUptimeContext{
 		Context: framework.Context[EmptyLabels]{
-		Name:       "websphere_jmx.jvm_uptime",
-		Family:     "compute/runtime",
-		Title:      "JVM Uptime",
-		Units:      "seconds",
-		Type:       module.Line,
-		Priority:   110,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "uptime",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_jmx.jvm_uptime",
+			Family:      "compute/runtime",
+			Title:       "JVM Uptime",
+			Units:       "seconds",
+			Type:        module.Line,
+			Priority:    110,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "uptime",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-		},
+			LabelKeys: []string{},
 		},
 	},
 }
 
-
 // --- ThreadPools ---
-
 
 // ThreadPoolsSizeValues defines the type-safe values for ThreadPools.Size context
 type ThreadPoolsSizeValues struct {
 	Size int64
-	Max int64
+	Max  int64
 }
 
 // ThreadPoolsSizeContext provides type-safe operations for ThreadPools.Size context
@@ -1739,7 +1702,7 @@ type ThreadPoolsSizeContext struct {
 func (c ThreadPoolsSizeContext) Set(state *framework.CollectorState, labels ThreadPoolsLabels, values ThreadPoolsSizeValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
 		"size": values.Size,
-		"max": values.Max,
+		"max":  values.Max,
 	})
 }
 
@@ -1770,8 +1733,6 @@ func (c ThreadPoolsActiveContext) SetUpdateEvery(state *framework.CollectorState
 	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
 }
 
-
-
 // ThreadPoolsLabels defines the required labels for ThreadPools contexts
 type ThreadPoolsLabels struct {
 	Pool string
@@ -1783,68 +1744,65 @@ func (l ThreadPoolsLabels) InstanceID(contextName string) string {
 	return contextName + "." + cleanLabelValue(l.Pool)
 }
 
-
 // ThreadPools contains all metric contexts for ThreadPools
 var ThreadPools = struct {
-	Size ThreadPoolsSizeContext
+	Size   ThreadPoolsSizeContext
 	Active ThreadPoolsActiveContext
 }{
 	Size: ThreadPoolsSizeContext{
 		Context: framework.Context[ThreadPoolsLabels]{
-		Name:       "websphere_jmx.threadpool_size",
-		Family:     "workloads/threadpools",
-		Title:      "Thread Pool Size",
-		Units:      "threads",
-		Type:       module.Line,
-		Priority:   401,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "size",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_jmx.threadpool_size",
+			Family:      "workloads/threadpools",
+			Title:       "Thread Pool Size",
+			Units:       "threads",
+			Type:        module.Line,
+			Priority:    401,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "size",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "max",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "max",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			LabelKeys: []string{
+				"pool",
 			},
-		},
-		LabelKeys: []string{
-			"pool",
-		},
 		},
 	},
 	Active: ThreadPoolsActiveContext{
 		Context: framework.Context[ThreadPoolsLabels]{
-		Name:       "websphere_jmx.threadpool_active",
-		Family:     "workloads/threadpools",
-		Title:      "Thread Pool Active Threads",
-		Units:      "threads",
-		Type:       module.Line,
-		Priority:   402,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "active",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_jmx.threadpool_active",
+			Family:      "workloads/threadpools",
+			Title:       "Thread Pool Active Threads",
+			Units:       "threads",
+			Type:        module.Line,
+			Priority:    402,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "active",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-			"pool",
-		},
+			LabelKeys: []string{
+				"pool",
+			},
 		},
 	},
 }
-
-
 
 // GetAllContexts returns all contexts for framework registration
 func GetAllContexts() []interface{} {

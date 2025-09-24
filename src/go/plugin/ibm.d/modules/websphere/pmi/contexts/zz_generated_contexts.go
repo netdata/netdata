@@ -4,9 +4,9 @@
 package contexts
 
 import (
-	"strings"
-	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/framework"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/framework"
+	"strings"
 )
 
 // cleanLabelValue cleans a label value for use in instance/dimension IDs
@@ -34,15 +34,13 @@ func (EmptyLabels) InstanceID(contextName string) string {
 	return contextName
 }
 
-
 // --- AlarmManager ---
-
 
 // AlarmManagerEventsValues defines the type-safe values for AlarmManager.Events context
 type AlarmManagerEventsValues struct {
-	Created int64
+	Created   int64
 	Cancelled int64
-	Fired int64
+	Fired     int64
 }
 
 // AlarmManagerEventsContext provides type-safe operations for AlarmManager.Events context
@@ -53,9 +51,9 @@ type AlarmManagerEventsContext struct {
 // Set provides type-safe dimension setting for AlarmManager.Events context
 func (c AlarmManagerEventsContext) Set(state *framework.CollectorState, labels AlarmManagerLabels, values AlarmManagerEventsValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
-		"created": values.Created,
+		"created":   values.Created,
 		"cancelled": values.Cancelled,
-		"fired": values.Fired,
+		"fired":     values.Fired,
 	})
 }
 
@@ -64,12 +62,10 @@ func (c AlarmManagerEventsContext) SetUpdateEvery(state *framework.CollectorStat
 	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
 }
 
-
-
 // AlarmManagerLabels defines the required labels for AlarmManager contexts
 type AlarmManagerLabels struct {
-	Node string
-	Server string
+	Node    string
+	Server  string
 	Manager string
 }
 
@@ -79,55 +75,52 @@ func (l AlarmManagerLabels) InstanceID(contextName string) string {
 	return contextName + "." + cleanLabelValue(l.Node) + "_" + cleanLabelValue(l.Server) + "_" + cleanLabelValue(l.Manager)
 }
 
-
 // AlarmManager contains all metric contexts for AlarmManager
 var AlarmManager = struct {
 	Events AlarmManagerEventsContext
 }{
 	Events: AlarmManagerEventsContext{
 		Context: framework.Context[AlarmManagerLabels]{
-		Name:       "websphere_pmi.alarm_manager_events",
-		Family:     "workloads/alarms",
-		Title:      "Alarm Manager Events",
-		Units:      "events/s",
-		Type:       module.Line,
-		Priority:   610,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "created",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_pmi.alarm_manager_events",
+			Family:      "workloads/alarms",
+			Title:       "Alarm Manager Events",
+			Units:       "events/s",
+			Type:        module.Line,
+			Priority:    610,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "created",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "cancelled",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "fired",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "cancelled",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			LabelKeys: []string{
+				"node",
+				"server",
+				"manager",
 			},
-			{
-				Name:      "fired",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-		},
-		LabelKeys: []string{
-			"node",
-			"server",
-			"manager",
-		},
 		},
 	},
 }
 
-
 // --- DynamicCache ---
-
 
 // DynamicCacheInMemoryValues defines the type-safe values for DynamicCache.InMemory context
 type DynamicCacheInMemoryValues struct {
@@ -173,13 +166,11 @@ func (c DynamicCacheCapacityContext) SetUpdateEvery(state *framework.CollectorSt
 	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
 }
 
-
-
 // DynamicCacheLabels defines the required labels for DynamicCache contexts
 type DynamicCacheLabels struct {
-	Node string
+	Node   string
 	Server string
-	Cache string
+	Cache  string
 }
 
 // InstanceID generates a unique instance ID using the hardcoded label order from YAML
@@ -188,7 +179,6 @@ func (l DynamicCacheLabels) InstanceID(contextName string) string {
 	return contextName + "." + cleanLabelValue(l.Node) + "_" + cleanLabelValue(l.Server) + "_" + cleanLabelValue(l.Cache)
 }
 
-
 // DynamicCache contains all metric contexts for DynamicCache
 var DynamicCache = struct {
 	InMemory DynamicCacheInMemoryContext
@@ -196,69 +186,67 @@ var DynamicCache = struct {
 }{
 	InMemory: DynamicCacheInMemoryContext{
 		Context: framework.Context[DynamicCacheLabels]{
-		Name:       "websphere_pmi.dynamic_cache_in_memory",
-		Family:     "workloads/cache",
-		Title:      "Dynamic Cache Entries",
-		Units:      "entries",
-		Type:       module.Line,
-		Priority:   540,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "entries",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_pmi.dynamic_cache_in_memory",
+			Family:      "workloads/cache",
+			Title:       "Dynamic Cache Entries",
+			Units:       "entries",
+			Type:        module.Line,
+			Priority:    540,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "entries",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-			"node",
-			"server",
-			"cache",
-		},
+			LabelKeys: []string{
+				"node",
+				"server",
+				"cache",
+			},
 		},
 	},
 	Capacity: DynamicCacheCapacityContext{
 		Context: framework.Context[DynamicCacheLabels]{
-		Name:       "websphere_pmi.dynamic_cache_capacity",
-		Family:     "workloads/cache",
-		Title:      "Dynamic Cache Capacity",
-		Units:      "entries",
-		Type:       module.Line,
-		Priority:   541,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "max_entries",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_pmi.dynamic_cache_capacity",
+			Family:      "workloads/cache",
+			Title:       "Dynamic Cache Capacity",
+			Units:       "entries",
+			Type:        module.Line,
+			Priority:    541,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "max_entries",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-			"node",
-			"server",
-			"cache",
-		},
+			LabelKeys: []string{
+				"node",
+				"server",
+				"cache",
+			},
 		},
 	},
 }
 
-
 // --- EnterpriseBeans ---
-
 
 // EnterpriseBeansOperationsValues defines the type-safe values for EnterpriseBeans.Operations context
 type EnterpriseBeansOperationsValues struct {
-	Create int64
-	Remove int64
-	Activate int64
-	Passivate int64
+	Create      int64
+	Remove      int64
+	Activate    int64
+	Passivate   int64
 	Instantiate int64
-	Store int64
-	Load int64
+	Store       int64
+	Load        int64
 }
 
 // EnterpriseBeansOperationsContext provides type-safe operations for EnterpriseBeans.Operations context
@@ -269,13 +257,13 @@ type EnterpriseBeansOperationsContext struct {
 // Set provides type-safe dimension setting for EnterpriseBeans.Operations context
 func (c EnterpriseBeansOperationsContext) Set(state *framework.CollectorState, labels EnterpriseBeansLabels, values EnterpriseBeansOperationsValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
-		"create": values.Create,
-		"remove": values.Remove,
-		"activate": values.Activate,
-		"passivate": values.Passivate,
+		"create":      values.Create,
+		"remove":      values.Remove,
+		"activate":    values.Activate,
+		"passivate":   values.Passivate,
 		"instantiate": values.Instantiate,
-		"store": values.Store,
-		"load": values.Load,
+		"store":       values.Store,
+		"load":        values.Load,
 	})
 }
 
@@ -287,7 +275,7 @@ func (c EnterpriseBeansOperationsContext) SetUpdateEvery(state *framework.Collec
 // EnterpriseBeansMessagesValues defines the type-safe values for EnterpriseBeans.Messages context
 type EnterpriseBeansMessagesValues struct {
 	Received int64
-	Backout int64
+	Backout  int64
 }
 
 // EnterpriseBeansMessagesContext provides type-safe operations for EnterpriseBeans.Messages context
@@ -299,7 +287,7 @@ type EnterpriseBeansMessagesContext struct {
 func (c EnterpriseBeansMessagesContext) Set(state *framework.CollectorState, labels EnterpriseBeansLabels, values EnterpriseBeansMessagesValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
 		"received": values.Received,
-		"backout": values.Backout,
+		"backout":  values.Backout,
 	})
 }
 
@@ -310,14 +298,14 @@ func (c EnterpriseBeansMessagesContext) SetUpdateEvery(state *framework.Collecto
 
 // EnterpriseBeansPoolValues defines the type-safe values for EnterpriseBeans.Pool context
 type EnterpriseBeansPoolValues struct {
-	Ready int64
-	Live int64
-	Pooled int64
-	Active_method int64
-	Passive int64
+	Ready               int64
+	Live                int64
+	Pooled              int64
+	Active_method       int64
+	Passive             int64
 	Server_session_pool int64
-	Method_ready int64
-	Async_queue int64
+	Method_ready        int64
+	Async_queue         int64
 }
 
 // EnterpriseBeansPoolContext provides type-safe operations for EnterpriseBeans.Pool context
@@ -328,14 +316,14 @@ type EnterpriseBeansPoolContext struct {
 // Set provides type-safe dimension setting for EnterpriseBeans.Pool context
 func (c EnterpriseBeansPoolContext) Set(state *framework.CollectorState, labels EnterpriseBeansLabels, values EnterpriseBeansPoolValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
-		"ready": values.Ready,
-		"live": values.Live,
-		"pooled": values.Pooled,
-		"active_method": values.Active_method,
-		"passive": values.Passive,
+		"ready":               values.Ready,
+		"live":                values.Live,
+		"pooled":              values.Pooled,
+		"active_method":       values.Active_method,
+		"passive":             values.Passive,
 		"server_session_pool": values.Server_session_pool,
-		"method_ready": values.Method_ready,
-		"async_queue": values.Async_queue,
+		"method_ready":        values.Method_ready,
+		"async_queue":         values.Async_queue,
 	})
 }
 
@@ -346,17 +334,17 @@ func (c EnterpriseBeansPoolContext) SetUpdateEvery(state *framework.CollectorSta
 
 // EnterpriseBeansTimeValues defines the type-safe values for EnterpriseBeans.Time context
 type EnterpriseBeansTimeValues struct {
-	Activation int64
-	Passivation int64
-	Create int64
-	Remove int64
-	Load int64
-	Store int64
+	Activation      int64
+	Passivation     int64
+	Create          int64
+	Remove          int64
+	Load            int64
+	Store           int64
 	Method_response int64
-	Wait int64
-	Async_wait int64
-	Read_lock int64
-	Write_lock int64
+	Wait            int64
+	Async_wait      int64
+	Read_lock       int64
+	Write_lock      int64
 }
 
 // EnterpriseBeansTimeContext provides type-safe operations for EnterpriseBeans.Time context
@@ -367,17 +355,17 @@ type EnterpriseBeansTimeContext struct {
 // Set provides type-safe dimension setting for EnterpriseBeans.Time context
 func (c EnterpriseBeansTimeContext) Set(state *framework.CollectorState, labels EnterpriseBeansLabels, values EnterpriseBeansTimeValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
-		"activation": values.Activation,
-		"passivation": values.Passivation,
-		"create": values.Create,
-		"remove": values.Remove,
-		"load": values.Load,
-		"store": values.Store,
+		"activation":      values.Activation,
+		"passivation":     values.Passivation,
+		"create":          values.Create,
+		"remove":          values.Remove,
+		"load":            values.Load,
+		"store":           values.Store,
 		"method_response": values.Method_response,
-		"wait": values.Wait,
-		"async_wait": values.Async_wait,
-		"read_lock": values.Read_lock,
-		"write_lock": values.Write_lock,
+		"wait":            values.Wait,
+		"async_wait":      values.Async_wait,
+		"read_lock":       values.Read_lock,
+		"write_lock":      values.Write_lock,
 	})
 }
 
@@ -386,13 +374,11 @@ func (c EnterpriseBeansTimeContext) SetUpdateEvery(state *framework.CollectorSta
 	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
 }
 
-
-
 // EnterpriseBeansLabels defines the required labels for EnterpriseBeans contexts
 type EnterpriseBeansLabels struct {
-	Node string
+	Node   string
 	Server string
-	Bean string
+	Bean   string
 }
 
 // InstanceID generates a unique instance ID using the hardcoded label order from YAML
@@ -401,292 +387,289 @@ func (l EnterpriseBeansLabels) InstanceID(contextName string) string {
 	return contextName + "." + cleanLabelValue(l.Node) + "_" + cleanLabelValue(l.Server) + "_" + cleanLabelValue(l.Bean)
 }
 
-
 // EnterpriseBeans contains all metric contexts for EnterpriseBeans
 var EnterpriseBeans = struct {
 	Operations EnterpriseBeansOperationsContext
-	Messages EnterpriseBeansMessagesContext
-	Pool EnterpriseBeansPoolContext
-	Time EnterpriseBeansTimeContext
+	Messages   EnterpriseBeansMessagesContext
+	Pool       EnterpriseBeansPoolContext
+	Time       EnterpriseBeansTimeContext
 }{
 	Operations: EnterpriseBeansOperationsContext{
 		Context: framework.Context[EnterpriseBeansLabels]{
-		Name:       "websphere_pmi.ejb_operations",
-		Family:     "workloads/ejb",
-		Title:      "EJB Operations",
-		Units:      "operations/s",
-		Type:       module.Line,
-		Priority:   640,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "create",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_pmi.ejb_operations",
+			Family:      "workloads/ejb",
+			Title:       "EJB Operations",
+			Units:       "operations/s",
+			Type:        module.Line,
+			Priority:    640,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "create",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "remove",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "activate",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "passivate",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "instantiate",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "store",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "load",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "remove",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			LabelKeys: []string{
+				"node",
+				"server",
+				"bean",
 			},
-			{
-				Name:      "activate",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "passivate",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "instantiate",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "store",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "load",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-		},
-		LabelKeys: []string{
-			"node",
-			"server",
-			"bean",
-		},
 		},
 	},
 	Messages: EnterpriseBeansMessagesContext{
 		Context: framework.Context[EnterpriseBeansLabels]{
-		Name:       "websphere_pmi.ejb_messages",
-		Family:     "workloads/ejb",
-		Title:      "EJB Message Activity",
-		Units:      "messages/s",
-		Type:       module.Line,
-		Priority:   641,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "received",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_pmi.ejb_messages",
+			Family:      "workloads/ejb",
+			Title:       "EJB Message Activity",
+			Units:       "messages/s",
+			Type:        module.Line,
+			Priority:    641,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "received",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "backout",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "backout",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			LabelKeys: []string{
+				"node",
+				"server",
+				"bean",
 			},
-		},
-		LabelKeys: []string{
-			"node",
-			"server",
-			"bean",
-		},
 		},
 	},
 	Pool: EnterpriseBeansPoolContext{
 		Context: framework.Context[EnterpriseBeansLabels]{
-		Name:       "websphere_pmi.ejb_pool",
-		Family:     "workloads/ejb",
-		Title:      "EJB Pool Usage",
-		Units:      "beans",
-		Type:       module.Line,
-		Priority:   642,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "ready",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_pmi.ejb_pool",
+			Family:      "workloads/ejb",
+			Title:       "EJB Pool Usage",
+			Units:       "beans",
+			Type:        module.Line,
+			Priority:    642,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "ready",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "live",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "pooled",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "active_method",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "passive",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "server_session_pool",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "method_ready",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "async_queue",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "live",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			LabelKeys: []string{
+				"node",
+				"server",
+				"bean",
 			},
-			{
-				Name:      "pooled",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "active_method",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "passive",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "server_session_pool",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "method_ready",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "async_queue",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-		},
-		LabelKeys: []string{
-			"node",
-			"server",
-			"bean",
-		},
 		},
 	},
 	Time: EnterpriseBeansTimeContext{
 		Context: framework.Context[EnterpriseBeansLabels]{
-		Name:       "websphere_pmi.ejb_time",
-		Family:     "workloads/ejb",
-		Title:      "EJB Operation Time",
-		Units:      "milliseconds",
-		Type:       module.Line,
-		Priority:   643,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "activation",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_pmi.ejb_time",
+			Family:      "workloads/ejb",
+			Title:       "EJB Operation Time",
+			Units:       "milliseconds",
+			Type:        module.Line,
+			Priority:    643,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "activation",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "passivation",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "create",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "remove",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "load",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "store",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "method_response",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "wait",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "async_wait",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "read_lock",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "write_lock",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "passivation",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			LabelKeys: []string{
+				"node",
+				"server",
+				"bean",
 			},
-			{
-				Name:      "create",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "remove",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "load",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "store",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "method_response",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "wait",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "async_wait",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "read_lock",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "write_lock",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-		},
-		LabelKeys: []string{
-			"node",
-			"server",
-			"bean",
-		},
 		},
 	},
 }
 
-
 // --- ExtensionRegistry ---
-
 
 // ExtensionRegistryRequestsValues defines the type-safe values for ExtensionRegistry.Requests context
 type ExtensionRegistryRequestsValues struct {
-	Requests int64
-	Hits int64
+	Requests      int64
+	Hits          int64
 	Displacements int64
 }
 
@@ -698,8 +681,8 @@ type ExtensionRegistryRequestsContext struct {
 // Set provides type-safe dimension setting for ExtensionRegistry.Requests context
 func (c ExtensionRegistryRequestsContext) Set(state *framework.CollectorState, labels ExtensionRegistryLabels, values ExtensionRegistryRequestsValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
-		"requests": values.Requests,
-		"hits": values.Hits,
+		"requests":      values.Requests,
+		"hits":          values.Hits,
 		"displacements": values.Displacements,
 	})
 }
@@ -731,11 +714,9 @@ func (c ExtensionRegistryHitRateContext) SetUpdateEvery(state *framework.Collect
 	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
 }
 
-
-
 // ExtensionRegistryLabels defines the required labels for ExtensionRegistry contexts
 type ExtensionRegistryLabels struct {
-	Node string
+	Node   string
 	Server string
 }
 
@@ -745,79 +726,76 @@ func (l ExtensionRegistryLabels) InstanceID(contextName string) string {
 	return contextName + "." + cleanLabelValue(l.Node) + "_" + cleanLabelValue(l.Server)
 }
 
-
 // ExtensionRegistry contains all metric contexts for ExtensionRegistry
 var ExtensionRegistry = struct {
 	Requests ExtensionRegistryRequestsContext
-	HitRate ExtensionRegistryHitRateContext
+	HitRate  ExtensionRegistryHitRateContext
 }{
 	Requests: ExtensionRegistryRequestsContext{
 		Context: framework.Context[ExtensionRegistryLabels]{
-		Name:       "websphere_pmi.extension_registry_requests",
-		Family:     "platform/extensions",
-		Title:      "Extension Registry Requests",
-		Units:      "events/s",
-		Type:       module.Line,
-		Priority:   660,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "requests",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_pmi.extension_registry_requests",
+			Family:      "platform/extensions",
+			Title:       "Extension Registry Requests",
+			Units:       "events/s",
+			Type:        module.Line,
+			Priority:    660,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "requests",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "hits",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "displacements",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "hits",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			LabelKeys: []string{
+				"node",
+				"server",
 			},
-			{
-				Name:      "displacements",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-		},
-		LabelKeys: []string{
-			"node",
-			"server",
-		},
 		},
 	},
 	HitRate: ExtensionRegistryHitRateContext{
 		Context: framework.Context[ExtensionRegistryLabels]{
-		Name:       "websphere_pmi.extension_registry_hit_rate",
-		Family:     "platform/extensions",
-		Title:      "Extension Registry Hit Rate",
-		Units:      "percentage",
-		Type:       module.Line,
-		Priority:   661,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "hit_rate",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1000,
-				Precision: 1,
+			Name:        "websphere_pmi.extension_registry_hit_rate",
+			Family:      "platform/extensions",
+			Title:       "Extension Registry Hit Rate",
+			Units:       "percentage",
+			Type:        module.Line,
+			Priority:    661,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "hit_rate",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1000,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-			"node",
-			"server",
-		},
+			LabelKeys: []string{
+				"node",
+				"server",
+			},
 		},
 	},
 }
 
-
 // --- HAManager ---
-
 
 // HAManagerGroupsValues defines the type-safe values for HAManager.Groups context
 type HAManagerGroupsValues struct {
@@ -843,9 +821,9 @@ func (c HAManagerGroupsContext) SetUpdateEvery(state *framework.CollectorState, 
 
 // HAManagerBulletinBoardValues defines the type-safe values for HAManager.BulletinBoard context
 type HAManagerBulletinBoardValues struct {
-	Subjects int64
-	Subscriptions int64
-	Local_subjects int64
+	Subjects            int64
+	Subscriptions       int64
+	Local_subjects      int64
 	Local_subscriptions int64
 }
 
@@ -857,9 +835,9 @@ type HAManagerBulletinBoardContext struct {
 // Set provides type-safe dimension setting for HAManager.BulletinBoard context
 func (c HAManagerBulletinBoardContext) Set(state *framework.CollectorState, labels HAManagerLabels, values HAManagerBulletinBoardValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
-		"subjects": values.Subjects,
-		"subscriptions": values.Subscriptions,
-		"local_subjects": values.Local_subjects,
+		"subjects":            values.Subjects,
+		"subscriptions":       values.Subscriptions,
+		"local_subjects":      values.Local_subjects,
 		"local_subscriptions": values.Local_subscriptions,
 	})
 }
@@ -871,7 +849,7 @@ func (c HAManagerBulletinBoardContext) SetUpdateEvery(state *framework.Collector
 
 // HAManagerRebuildTimeValues defines the type-safe values for HAManager.RebuildTime context
 type HAManagerRebuildTimeValues struct {
-	Group_state int64
+	Group_state    int64
 	Bulletin_board int64
 }
 
@@ -883,7 +861,7 @@ type HAManagerRebuildTimeContext struct {
 // Set provides type-safe dimension setting for HAManager.RebuildTime context
 func (c HAManagerRebuildTimeContext) Set(state *framework.CollectorState, labels HAManagerLabels, values HAManagerRebuildTimeValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
-		"group_state": values.Group_state,
+		"group_state":    values.Group_state,
 		"bulletin_board": values.Bulletin_board,
 	})
 }
@@ -893,11 +871,9 @@ func (c HAManagerRebuildTimeContext) SetUpdateEvery(state *framework.CollectorSt
 	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
 }
 
-
-
 // HAManagerLabels defines the required labels for HAManager contexts
 type HAManagerLabels struct {
-	Node string
+	Node   string
 	Server string
 }
 
@@ -907,126 +883,123 @@ func (l HAManagerLabels) InstanceID(contextName string) string {
 	return contextName + "." + cleanLabelValue(l.Node) + "_" + cleanLabelValue(l.Server)
 }
 
-
 // HAManager contains all metric contexts for HAManager
 var HAManager = struct {
-	Groups HAManagerGroupsContext
+	Groups        HAManagerGroupsContext
 	BulletinBoard HAManagerBulletinBoardContext
-	RebuildTime HAManagerRebuildTimeContext
+	RebuildTime   HAManagerRebuildTimeContext
 }{
 	Groups: HAManagerGroupsContext{
 		Context: framework.Context[HAManagerLabels]{
-		Name:       "websphere_pmi.ha_manager_groups",
-		Family:     "reliability/ha",
-		Title:      "HA Manager Groups",
-		Units:      "groups",
-		Type:       module.Line,
-		Priority:   600,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "local",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_pmi.ha_manager_groups",
+			Family:      "reliability/ha",
+			Title:       "HA Manager Groups",
+			Units:       "groups",
+			Type:        module.Line,
+			Priority:    600,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "local",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-			"node",
-			"server",
-		},
+			LabelKeys: []string{
+				"node",
+				"server",
+			},
 		},
 	},
 	BulletinBoard: HAManagerBulletinBoardContext{
 		Context: framework.Context[HAManagerLabels]{
-		Name:       "websphere_pmi.ha_manager_bulletin_board",
-		Family:     "reliability/ha",
-		Title:      "HA Manager Bulletin Board",
-		Units:      "items",
-		Type:       module.Line,
-		Priority:   601,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "subjects",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_pmi.ha_manager_bulletin_board",
+			Family:      "reliability/ha",
+			Title:       "HA Manager Bulletin Board",
+			Units:       "items",
+			Type:        module.Line,
+			Priority:    601,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "subjects",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "subscriptions",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "local_subjects",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "local_subscriptions",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "subscriptions",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			LabelKeys: []string{
+				"node",
+				"server",
 			},
-			{
-				Name:      "local_subjects",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "local_subscriptions",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-		},
-		LabelKeys: []string{
-			"node",
-			"server",
-		},
 		},
 	},
 	RebuildTime: HAManagerRebuildTimeContext{
 		Context: framework.Context[HAManagerLabels]{
-		Name:       "websphere_pmi.ha_manager_rebuild_time",
-		Family:     "reliability/ha",
-		Title:      "HA Manager Rebuild Time",
-		Units:      "milliseconds",
-		Type:       module.Line,
-		Priority:   602,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "group_state",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_pmi.ha_manager_rebuild_time",
+			Family:      "reliability/ha",
+			Title:       "HA Manager Rebuild Time",
+			Units:       "milliseconds",
+			Type:        module.Line,
+			Priority:    602,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "group_state",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "bulletin_board",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "bulletin_board",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			LabelKeys: []string{
+				"node",
+				"server",
 			},
-		},
-		LabelKeys: []string{
-			"node",
-			"server",
-		},
 		},
 	},
 }
 
-
 // --- JCAPool ---
-
 
 // JCAPoolOperationsValues defines the type-safe values for JCAPool.Operations context
 type JCAPoolOperationsValues struct {
-	Create int64
-	Close int64
+	Create   int64
+	Close    int64
 	Allocate int64
-	Freed int64
-	Faults int64
+	Freed    int64
+	Faults   int64
 }
 
 // JCAPoolOperationsContext provides type-safe operations for JCAPool.Operations context
@@ -1037,11 +1010,11 @@ type JCAPoolOperationsContext struct {
 // Set provides type-safe dimension setting for JCAPool.Operations context
 func (c JCAPoolOperationsContext) Set(state *framework.CollectorState, labels JCAPoolLabels, values JCAPoolOperationsValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
-		"create": values.Create,
-		"close": values.Close,
+		"create":   values.Create,
+		"close":    values.Close,
 		"allocate": values.Allocate,
-		"freed": values.Freed,
-		"faults": values.Faults,
+		"freed":    values.Freed,
+		"faults":   values.Faults,
 	})
 }
 
@@ -1053,7 +1026,7 @@ func (c JCAPoolOperationsContext) SetUpdateEvery(state *framework.CollectorState
 // JCAPoolManagedValues defines the type-safe values for JCAPool.Managed context
 type JCAPoolManagedValues struct {
 	Managed_connections int64
-	Connection_handles int64
+	Connection_handles  int64
 }
 
 // JCAPoolManagedContext provides type-safe operations for JCAPool.Managed context
@@ -1065,7 +1038,7 @@ type JCAPoolManagedContext struct {
 func (c JCAPoolManagedContext) Set(state *framework.CollectorState, labels JCAPoolLabels, values JCAPoolManagedValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
 		"managed_connections": values.Managed_connections,
-		"connection_handles": values.Connection_handles,
+		"connection_handles":  values.Connection_handles,
 	})
 }
 
@@ -1076,7 +1049,7 @@ func (c JCAPoolManagedContext) SetUpdateEvery(state *framework.CollectorState, l
 
 // JCAPoolUtilizationValues defines the type-safe values for JCAPool.Utilization context
 type JCAPoolUtilizationValues struct {
-	Percent_used int64
+	Percent_used  int64
 	Percent_maxed int64
 }
 
@@ -1088,7 +1061,7 @@ type JCAPoolUtilizationContext struct {
 // Set provides type-safe dimension setting for JCAPool.Utilization context
 func (c JCAPoolUtilizationContext) Set(state *framework.CollectorState, labels JCAPoolLabels, values JCAPoolUtilizationValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
-		"percent_used": values.Percent_used,
+		"percent_used":  values.Percent_used,
 		"percent_maxed": values.Percent_maxed,
 	})
 }
@@ -1120,14 +1093,12 @@ func (c JCAPoolWaitingContext) SetUpdateEvery(state *framework.CollectorState, l
 	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
 }
 
-
-
 // JCAPoolLabels defines the required labels for JCAPool contexts
 type JCAPoolLabels struct {
-	Node string
-	Server string
+	Node     string
+	Server   string
 	Provider string
-	Pool string
+	Pool     string
 }
 
 // InstanceID generates a unique instance ID using the hardcoded label order from YAML
@@ -1136,169 +1107,166 @@ func (l JCAPoolLabels) InstanceID(contextName string) string {
 	return contextName + "." + cleanLabelValue(l.Node) + "_" + cleanLabelValue(l.Server) + "_" + cleanLabelValue(l.Provider) + "_" + cleanLabelValue(l.Pool)
 }
 
-
 // JCAPool contains all metric contexts for JCAPool
 var JCAPool = struct {
-	Operations JCAPoolOperationsContext
-	Managed JCAPoolManagedContext
+	Operations  JCAPoolOperationsContext
+	Managed     JCAPoolManagedContext
 	Utilization JCAPoolUtilizationContext
-	Waiting JCAPoolWaitingContext
+	Waiting     JCAPoolWaitingContext
 }{
 	Operations: JCAPoolOperationsContext{
 		Context: framework.Context[JCAPoolLabels]{
-		Name:       "websphere_pmi.jca_pool_operations",
-		Family:     "connectivity/jca",
-		Title:      "JCA Pool Operations",
-		Units:      "operations/s",
-		Type:       module.Line,
-		Priority:   580,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "create",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_pmi.jca_pool_operations",
+			Family:      "connectivity/jca",
+			Title:       "JCA Pool Operations",
+			Units:       "operations/s",
+			Type:        module.Line,
+			Priority:    580,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "create",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "close",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "allocate",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "freed",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "faults",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "close",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			LabelKeys: []string{
+				"node",
+				"server",
+				"provider",
+				"pool",
 			},
-			{
-				Name:      "allocate",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "freed",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "faults",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-		},
-		LabelKeys: []string{
-			"node",
-			"server",
-			"provider",
-			"pool",
-		},
 		},
 	},
 	Managed: JCAPoolManagedContext{
 		Context: framework.Context[JCAPoolLabels]{
-		Name:       "websphere_pmi.jca_pool_managed",
-		Family:     "connectivity/jca",
-		Title:      "JCA Pool Managed Resources",
-		Units:      "resources",
-		Type:       module.Line,
-		Priority:   581,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "managed_connections",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_pmi.jca_pool_managed",
+			Family:      "connectivity/jca",
+			Title:       "JCA Pool Managed Resources",
+			Units:       "resources",
+			Type:        module.Line,
+			Priority:    581,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "managed_connections",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "connection_handles",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "connection_handles",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			LabelKeys: []string{
+				"node",
+				"server",
+				"provider",
+				"pool",
 			},
-		},
-		LabelKeys: []string{
-			"node",
-			"server",
-			"provider",
-			"pool",
-		},
 		},
 	},
 	Utilization: JCAPoolUtilizationContext{
 		Context: framework.Context[JCAPoolLabels]{
-		Name:       "websphere_pmi.jca_pool_utilization",
-		Family:     "connectivity/jca",
-		Title:      "JCA Pool Utilization",
-		Units:      "percentage",
-		Type:       module.Line,
-		Priority:   582,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "percent_used",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1000,
-				Precision: 1,
+			Name:        "websphere_pmi.jca_pool_utilization",
+			Family:      "connectivity/jca",
+			Title:       "JCA Pool Utilization",
+			Units:       "percentage",
+			Type:        module.Line,
+			Priority:    582,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "percent_used",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1000,
+					Precision: 1,
+				},
+				{
+					Name:      "percent_maxed",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1000,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "percent_maxed",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1000,
-				Precision: 1,
+			LabelKeys: []string{
+				"node",
+				"server",
+				"provider",
+				"pool",
 			},
-		},
-		LabelKeys: []string{
-			"node",
-			"server",
-			"provider",
-			"pool",
-		},
 		},
 	},
 	Waiting: JCAPoolWaitingContext{
 		Context: framework.Context[JCAPoolLabels]{
-		Name:       "websphere_pmi.jca_pool_waiting",
-		Family:     "connectivity/jca",
-		Title:      "JCA Pool Waiting Threads",
-		Units:      "threads",
-		Type:       module.Line,
-		Priority:   583,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "waiting_threads",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_pmi.jca_pool_waiting",
+			Family:      "connectivity/jca",
+			Title:       "JCA Pool Waiting Threads",
+			Units:       "threads",
+			Type:        module.Line,
+			Priority:    583,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "waiting_threads",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-			"node",
-			"server",
-			"provider",
-			"pool",
-		},
+			LabelKeys: []string{
+				"node",
+				"server",
+				"provider",
+				"pool",
+			},
 		},
 	},
 }
 
-
 // --- JDBCPool ---
-
 
 // JDBCPoolUsageValues defines the type-safe values for JDBCPool.Usage context
 type JDBCPoolUsageValues struct {
-	Percent_used int64
+	Percent_used  int64
 	Percent_maxed int64
 }
 
@@ -1310,7 +1278,7 @@ type JDBCPoolUsageContext struct {
 // Set provides type-safe dimension setting for JDBCPool.Usage context
 func (c JDBCPoolUsageContext) Set(state *framework.CollectorState, labels JDBCPoolLabels, values JDBCPoolUsageValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
-		"percent_used": values.Percent_used,
+		"percent_used":  values.Percent_used,
 		"percent_maxed": values.Percent_maxed,
 	})
 }
@@ -1368,11 +1336,11 @@ func (c JDBCPoolConnectionsContext) SetUpdateEvery(state *framework.CollectorSta
 
 // JDBCPoolOperationsValues defines the type-safe values for JDBCPool.Operations context
 type JDBCPoolOperationsValues struct {
-	Created int64
-	Closed int64
-	Allocated int64
-	Returned int64
-	Faults int64
+	Created                 int64
+	Closed                  int64
+	Allocated               int64
+	Returned                int64
+	Faults                  int64
 	Prep_stmt_cache_discard int64
 }
 
@@ -1384,11 +1352,11 @@ type JDBCPoolOperationsContext struct {
 // Set provides type-safe dimension setting for JDBCPool.Operations context
 func (c JDBCPoolOperationsContext) Set(state *framework.CollectorState, labels JDBCPoolLabels, values JDBCPoolOperationsValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
-		"created": values.Created,
-		"closed": values.Closed,
-		"allocated": values.Allocated,
-		"returned": values.Returned,
-		"faults": values.Faults,
+		"created":                 values.Created,
+		"closed":                  values.Closed,
+		"allocated":               values.Allocated,
+		"returned":                values.Returned,
+		"faults":                  values.Faults,
 		"prep_stmt_cache_discard": values.Prep_stmt_cache_discard,
 	})
 }
@@ -1400,7 +1368,7 @@ func (c JDBCPoolOperationsContext) SetUpdateEvery(state *framework.CollectorStat
 
 // JDBCPoolTimeValues defines the type-safe values for JDBCPool.Time context
 type JDBCPoolTimeValues struct {
-	Use int64
+	Use  int64
 	Wait int64
 	Jdbc int64
 }
@@ -1413,7 +1381,7 @@ type JDBCPoolTimeContext struct {
 // Set provides type-safe dimension setting for JDBCPool.Time context
 func (c JDBCPoolTimeContext) Set(state *framework.CollectorState, labels JDBCPoolLabels, values JDBCPoolTimeValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
-		"use": values.Use,
+		"use":  values.Use,
 		"wait": values.Wait,
 		"jdbc": values.Jdbc,
 	})
@@ -1424,13 +1392,11 @@ func (c JDBCPoolTimeContext) SetUpdateEvery(state *framework.CollectorState, lab
 	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
 }
 
-
-
 // JDBCPoolLabels defines the required labels for JDBCPool contexts
 type JDBCPoolLabels struct {
-	Node string
+	Node   string
 	Server string
-	Pool string
+	Pool   string
 }
 
 // InstanceID generates a unique instance ID using the hardcoded label order from YAML
@@ -1439,217 +1405,214 @@ func (l JDBCPoolLabels) InstanceID(contextName string) string {
 	return contextName + "." + cleanLabelValue(l.Node) + "_" + cleanLabelValue(l.Server) + "_" + cleanLabelValue(l.Pool)
 }
 
-
 // JDBCPool contains all metric contexts for JDBCPool
 var JDBCPool = struct {
-	Usage JDBCPoolUsageContext
-	Waiting JDBCPoolWaitingContext
+	Usage       JDBCPoolUsageContext
+	Waiting     JDBCPoolWaitingContext
 	Connections JDBCPoolConnectionsContext
-	Operations JDBCPoolOperationsContext
-	Time JDBCPoolTimeContext
+	Operations  JDBCPoolOperationsContext
+	Time        JDBCPoolTimeContext
 }{
 	Usage: JDBCPoolUsageContext{
 		Context: framework.Context[JDBCPoolLabels]{
-		Name:       "websphere_pmi.jdbc_pool_usage",
-		Family:     "workloads/jdbc/usage",
-		Title:      "JDBC Pool Utilization",
-		Units:      "percentage",
-		Type:       module.Line,
-		Priority:   501,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "percent_used",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1000,
-				Precision: 1,
+			Name:        "websphere_pmi.jdbc_pool_usage",
+			Family:      "workloads/jdbc/usage",
+			Title:       "JDBC Pool Utilization",
+			Units:       "percentage",
+			Type:        module.Line,
+			Priority:    501,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "percent_used",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1000,
+					Precision: 1,
+				},
+				{
+					Name:      "percent_maxed",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1000,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "percent_maxed",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1000,
-				Precision: 1,
+			LabelKeys: []string{
+				"node",
+				"server",
+				"pool",
 			},
-		},
-		LabelKeys: []string{
-			"node",
-			"server",
-			"pool",
-		},
 		},
 	},
 	Waiting: JDBCPoolWaitingContext{
 		Context: framework.Context[JDBCPoolLabels]{
-		Name:       "websphere_pmi.jdbc_pool_waiting",
-		Family:     "workloads/jdbc/wait",
-		Title:      "JDBC Pool Waiting Threads",
-		Units:      "threads",
-		Type:       module.Line,
-		Priority:   502,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "waiting_threads",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_pmi.jdbc_pool_waiting",
+			Family:      "workloads/jdbc/wait",
+			Title:       "JDBC Pool Waiting Threads",
+			Units:       "threads",
+			Type:        module.Line,
+			Priority:    502,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "waiting_threads",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-			"node",
-			"server",
-			"pool",
-		},
+			LabelKeys: []string{
+				"node",
+				"server",
+				"pool",
+			},
 		},
 	},
 	Connections: JDBCPoolConnectionsContext{
 		Context: framework.Context[JDBCPoolLabels]{
-		Name:       "websphere_pmi.jdbc_pool_connections",
-		Family:     "workloads/jdbc/connections",
-		Title:      "JDBC Pool Connections",
-		Units:      "connections",
-		Type:       module.Line,
-		Priority:   503,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "managed",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_pmi.jdbc_pool_connections",
+			Family:      "workloads/jdbc/connections",
+			Title:       "JDBC Pool Connections",
+			Units:       "connections",
+			Type:        module.Line,
+			Priority:    503,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "managed",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "handles",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "handles",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			LabelKeys: []string{
+				"node",
+				"server",
+				"pool",
 			},
-		},
-		LabelKeys: []string{
-			"node",
-			"server",
-			"pool",
-		},
 		},
 	},
 	Operations: JDBCPoolOperationsContext{
 		Context: framework.Context[JDBCPoolLabels]{
-		Name:       "websphere_pmi.jdbc_pool_operations",
-		Family:     "workloads/jdbc/operations",
-		Title:      "JDBC Pool Operations",
-		Units:      "operations/s",
-		Type:       module.Line,
-		Priority:   504,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "created",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_pmi.jdbc_pool_operations",
+			Family:      "workloads/jdbc/operations",
+			Title:       "JDBC Pool Operations",
+			Units:       "operations/s",
+			Type:        module.Line,
+			Priority:    504,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "created",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "closed",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "allocated",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "returned",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "faults",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "prep_stmt_cache_discard",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "closed",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			LabelKeys: []string{
+				"node",
+				"server",
+				"pool",
 			},
-			{
-				Name:      "allocated",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "returned",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "faults",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "prep_stmt_cache_discard",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-		},
-		LabelKeys: []string{
-			"node",
-			"server",
-			"pool",
-		},
 		},
 	},
 	Time: JDBCPoolTimeContext{
 		Context: framework.Context[JDBCPoolLabels]{
-		Name:       "websphere_pmi.jdbc_pool_time",
-		Family:     "workloads/jdbc/time",
-		Title:      "JDBC Pool Time",
-		Units:      "milliseconds",
-		Type:       module.Line,
-		Priority:   505,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "use",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_pmi.jdbc_pool_time",
+			Family:      "workloads/jdbc/time",
+			Title:       "JDBC Pool Time",
+			Units:       "milliseconds",
+			Type:        module.Line,
+			Priority:    505,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "use",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "wait",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "jdbc",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "wait",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			LabelKeys: []string{
+				"node",
+				"server",
+				"pool",
 			},
-			{
-				Name:      "jdbc",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-		},
-		LabelKeys: []string{
-			"node",
-			"server",
-			"pool",
-		},
 		},
 	},
 }
 
-
 // --- JMSQueue ---
-
 
 // JMSQueueMessagesProducedValues defines the type-safe values for JMSQueue.MessagesProduced context
 type JMSQueueMessagesProducedValues struct {
-	Total int64
-	Best_effort int64
-	Express int64
+	Total                  int64
+	Best_effort            int64
+	Express                int64
 	Reliable_nonpersistent int64
-	Reliable_persistent int64
-	Assured_persistent int64
+	Reliable_persistent    int64
+	Assured_persistent     int64
 }
 
 // JMSQueueMessagesProducedContext provides type-safe operations for JMSQueue.MessagesProduced context
@@ -1660,12 +1623,12 @@ type JMSQueueMessagesProducedContext struct {
 // Set provides type-safe dimension setting for JMSQueue.MessagesProduced context
 func (c JMSQueueMessagesProducedContext) Set(state *framework.CollectorState, labels JMSQueueLabels, values JMSQueueMessagesProducedValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
-		"total": values.Total,
-		"best_effort": values.Best_effort,
-		"express": values.Express,
+		"total":                  values.Total,
+		"best_effort":            values.Best_effort,
+		"express":                values.Express,
 		"reliable_nonpersistent": values.Reliable_nonpersistent,
-		"reliable_persistent": values.Reliable_persistent,
-		"assured_persistent": values.Assured_persistent,
+		"reliable_persistent":    values.Reliable_persistent,
+		"assured_persistent":     values.Assured_persistent,
 	})
 }
 
@@ -1676,13 +1639,13 @@ func (c JMSQueueMessagesProducedContext) SetUpdateEvery(state *framework.Collect
 
 // JMSQueueMessagesConsumedValues defines the type-safe values for JMSQueue.MessagesConsumed context
 type JMSQueueMessagesConsumedValues struct {
-	Total int64
-	Best_effort int64
-	Express int64
+	Total                  int64
+	Best_effort            int64
+	Express                int64
 	Reliable_nonpersistent int64
-	Reliable_persistent int64
-	Assured_persistent int64
-	Expired int64
+	Reliable_persistent    int64
+	Assured_persistent     int64
+	Expired                int64
 }
 
 // JMSQueueMessagesConsumedContext provides type-safe operations for JMSQueue.MessagesConsumed context
@@ -1693,13 +1656,13 @@ type JMSQueueMessagesConsumedContext struct {
 // Set provides type-safe dimension setting for JMSQueue.MessagesConsumed context
 func (c JMSQueueMessagesConsumedContext) Set(state *framework.CollectorState, labels JMSQueueLabels, values JMSQueueMessagesConsumedValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
-		"total": values.Total,
-		"best_effort": values.Best_effort,
-		"express": values.Express,
+		"total":                  values.Total,
+		"best_effort":            values.Best_effort,
+		"express":                values.Express,
 		"reliable_nonpersistent": values.Reliable_nonpersistent,
-		"reliable_persistent": values.Reliable_persistent,
-		"assured_persistent": values.Assured_persistent,
-		"expired": values.Expired,
+		"reliable_persistent":    values.Reliable_persistent,
+		"assured_persistent":     values.Assured_persistent,
+		"expired":                values.Expired,
 	})
 }
 
@@ -1710,9 +1673,9 @@ func (c JMSQueueMessagesConsumedContext) SetUpdateEvery(state *framework.Collect
 
 // JMSQueueClientsValues defines the type-safe values for JMSQueue.Clients context
 type JMSQueueClientsValues struct {
-	Local_producers int64
+	Local_producers         int64
 	Local_producer_attaches int64
-	Local_consumers int64
+	Local_consumers         int64
 	Local_consumer_attaches int64
 }
 
@@ -1724,9 +1687,9 @@ type JMSQueueClientsContext struct {
 // Set provides type-safe dimension setting for JMSQueue.Clients context
 func (c JMSQueueClientsContext) Set(state *framework.CollectorState, labels JMSQueueLabels, values JMSQueueClientsValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
-		"local_producers": values.Local_producers,
+		"local_producers":         values.Local_producers,
 		"local_producer_attaches": values.Local_producer_attaches,
-		"local_consumers": values.Local_consumers,
+		"local_consumers":         values.Local_consumers,
 		"local_consumer_attaches": values.Local_consumer_attaches,
 	})
 }
@@ -1738,9 +1701,9 @@ func (c JMSQueueClientsContext) SetUpdateEvery(state *framework.CollectorState, 
 
 // JMSQueueStorageValues defines the type-safe values for JMSQueue.Storage context
 type JMSQueueStorageValues struct {
-	Available int64
+	Available   int64
 	Unavailable int64
-	Oldest_age int64
+	Oldest_age  int64
 }
 
 // JMSQueueStorageContext provides type-safe operations for JMSQueue.Storage context
@@ -1751,9 +1714,9 @@ type JMSQueueStorageContext struct {
 // Set provides type-safe dimension setting for JMSQueue.Storage context
 func (c JMSQueueStorageContext) Set(state *framework.CollectorState, labels JMSQueueLabels, values JMSQueueStorageValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
-		"available": values.Available,
+		"available":   values.Available,
 		"unavailable": values.Unavailable,
-		"oldest_age": values.Oldest_age,
+		"oldest_age":  values.Oldest_age,
 	})
 }
 
@@ -1765,7 +1728,7 @@ func (c JMSQueueStorageContext) SetUpdateEvery(state *framework.CollectorState, 
 // JMSQueueWaitTimeValues defines the type-safe values for JMSQueue.WaitTime context
 type JMSQueueWaitTimeValues struct {
 	Aggregate int64
-	Local int64
+	Local     int64
 }
 
 // JMSQueueWaitTimeContext provides type-safe operations for JMSQueue.WaitTime context
@@ -1777,7 +1740,7 @@ type JMSQueueWaitTimeContext struct {
 func (c JMSQueueWaitTimeContext) Set(state *framework.CollectorState, labels JMSQueueLabels, values JMSQueueWaitTimeValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
 		"aggregate": values.Aggregate,
-		"local": values.Local,
+		"local":     values.Local,
 	})
 }
 
@@ -1786,13 +1749,11 @@ func (c JMSQueueWaitTimeContext) SetUpdateEvery(state *framework.CollectorState,
 	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
 }
 
-
-
 // JMSQueueLabels defines the required labels for JMSQueue contexts
 type JMSQueueLabels struct {
-	Node string
-	Server string
-	Engine string
+	Node        string
+	Server      string
+	Engine      string
 	Destination string
 }
 
@@ -1802,280 +1763,277 @@ func (l JMSQueueLabels) InstanceID(contextName string) string {
 	return contextName + "." + cleanLabelValue(l.Node) + "_" + cleanLabelValue(l.Server) + "_" + cleanLabelValue(l.Engine) + "_" + cleanLabelValue(l.Destination)
 }
 
-
 // JMSQueue contains all metric contexts for JMSQueue
 var JMSQueue = struct {
 	MessagesProduced JMSQueueMessagesProducedContext
 	MessagesConsumed JMSQueueMessagesConsumedContext
-	Clients JMSQueueClientsContext
-	Storage JMSQueueStorageContext
-	WaitTime JMSQueueWaitTimeContext
+	Clients          JMSQueueClientsContext
+	Storage          JMSQueueStorageContext
+	WaitTime         JMSQueueWaitTimeContext
 }{
 	MessagesProduced: JMSQueueMessagesProducedContext{
 		Context: framework.Context[JMSQueueLabels]{
-		Name:       "websphere_pmi.jms_queue_messages_produced",
-		Family:     "messaging/jms/queues",
-		Title:      "JMS Queue Messages Produced",
-		Units:      "messages/s",
-		Type:       module.Line,
-		Priority:   700,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "total",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_pmi.jms_queue_messages_produced",
+			Family:      "messaging/jms/queues",
+			Title:       "JMS Queue Messages Produced",
+			Units:       "messages/s",
+			Type:        module.Line,
+			Priority:    700,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "total",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "best_effort",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "express",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "reliable_nonpersistent",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "reliable_persistent",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "assured_persistent",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "best_effort",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			LabelKeys: []string{
+				"node",
+				"server",
+				"engine",
+				"destination",
 			},
-			{
-				Name:      "express",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "reliable_nonpersistent",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "reliable_persistent",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "assured_persistent",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-		},
-		LabelKeys: []string{
-			"node",
-			"server",
-			"engine",
-			"destination",
-		},
 		},
 	},
 	MessagesConsumed: JMSQueueMessagesConsumedContext{
 		Context: framework.Context[JMSQueueLabels]{
-		Name:       "websphere_pmi.jms_queue_messages_consumed",
-		Family:     "messaging/jms/queues",
-		Title:      "JMS Queue Messages Consumed",
-		Units:      "messages/s",
-		Type:       module.Line,
-		Priority:   701,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "total",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_pmi.jms_queue_messages_consumed",
+			Family:      "messaging/jms/queues",
+			Title:       "JMS Queue Messages Consumed",
+			Units:       "messages/s",
+			Type:        module.Line,
+			Priority:    701,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "total",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "best_effort",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "express",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "reliable_nonpersistent",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "reliable_persistent",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "assured_persistent",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "expired",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "best_effort",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			LabelKeys: []string{
+				"node",
+				"server",
+				"engine",
+				"destination",
 			},
-			{
-				Name:      "express",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "reliable_nonpersistent",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "reliable_persistent",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "assured_persistent",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "expired",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-		},
-		LabelKeys: []string{
-			"node",
-			"server",
-			"engine",
-			"destination",
-		},
 		},
 	},
 	Clients: JMSQueueClientsContext{
 		Context: framework.Context[JMSQueueLabels]{
-		Name:       "websphere_pmi.jms_queue_clients",
-		Family:     "messaging/jms/queues",
-		Title:      "JMS Queue Clients",
-		Units:      "clients",
-		Type:       module.Line,
-		Priority:   702,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "local_producers",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_pmi.jms_queue_clients",
+			Family:      "messaging/jms/queues",
+			Title:       "JMS Queue Clients",
+			Units:       "clients",
+			Type:        module.Line,
+			Priority:    702,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "local_producers",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "local_producer_attaches",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "local_consumers",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "local_consumer_attaches",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "local_producer_attaches",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			LabelKeys: []string{
+				"node",
+				"server",
+				"engine",
+				"destination",
 			},
-			{
-				Name:      "local_consumers",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "local_consumer_attaches",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-		},
-		LabelKeys: []string{
-			"node",
-			"server",
-			"engine",
-			"destination",
-		},
 		},
 	},
 	Storage: JMSQueueStorageContext{
 		Context: framework.Context[JMSQueueLabels]{
-		Name:       "websphere_pmi.jms_queue_storage",
-		Family:     "messaging/jms/queues",
-		Title:      "JMS Queue Storage",
-		Units:      "messages",
-		Type:       module.Line,
-		Priority:   703,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "available",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_pmi.jms_queue_storage",
+			Family:      "messaging/jms/queues",
+			Title:       "JMS Queue Storage",
+			Units:       "messages",
+			Type:        module.Line,
+			Priority:    703,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "available",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "unavailable",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "oldest_age",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "unavailable",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			LabelKeys: []string{
+				"node",
+				"server",
+				"engine",
+				"destination",
 			},
-			{
-				Name:      "oldest_age",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-		},
-		LabelKeys: []string{
-			"node",
-			"server",
-			"engine",
-			"destination",
-		},
 		},
 	},
 	WaitTime: JMSQueueWaitTimeContext{
 		Context: framework.Context[JMSQueueLabels]{
-		Name:       "websphere_pmi.jms_queue_wait_time",
-		Family:     "messaging/jms/queues",
-		Title:      "JMS Queue Wait Time",
-		Units:      "milliseconds",
-		Type:       module.Line,
-		Priority:   704,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "aggregate",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_pmi.jms_queue_wait_time",
+			Family:      "messaging/jms/queues",
+			Title:       "JMS Queue Wait Time",
+			Units:       "milliseconds",
+			Type:        module.Line,
+			Priority:    704,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "aggregate",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "local",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "local",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			LabelKeys: []string{
+				"node",
+				"server",
+				"engine",
+				"destination",
 			},
-		},
-		LabelKeys: []string{
-			"node",
-			"server",
-			"engine",
-			"destination",
-		},
 		},
 	},
 }
 
-
 // --- JMSStore ---
-
 
 // JMSStoreCacheValues defines the type-safe values for JMSStore.Cache context
 type JMSStoreCacheValues struct {
-	Add_stored int64
-	Add_not_stored int64
-	Stored_current int64
-	Stored_bytes int64
+	Add_stored         int64
+	Add_not_stored     int64
+	Stored_current     int64
+	Stored_bytes       int64
 	Not_stored_current int64
-	Not_stored_bytes int64
-	Discard_count int64
-	Discard_bytes int64
+	Not_stored_bytes   int64
+	Discard_count      int64
+	Discard_bytes      int64
 }
 
 // JMSStoreCacheContext provides type-safe operations for JMSStore.Cache context
@@ -2086,14 +2044,14 @@ type JMSStoreCacheContext struct {
 // Set provides type-safe dimension setting for JMSStore.Cache context
 func (c JMSStoreCacheContext) Set(state *framework.CollectorState, labels JMSStoreLabels, values JMSStoreCacheValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
-		"add_stored": values.Add_stored,
-		"add_not_stored": values.Add_not_stored,
-		"stored_current": values.Stored_current,
-		"stored_bytes": values.Stored_bytes,
+		"add_stored":         values.Add_stored,
+		"add_not_stored":     values.Add_not_stored,
+		"stored_current":     values.Stored_current,
+		"stored_bytes":       values.Stored_bytes,
 		"not_stored_current": values.Not_stored_current,
-		"not_stored_bytes": values.Not_stored_bytes,
-		"discard_count": values.Discard_count,
-		"discard_bytes": values.Discard_bytes,
+		"not_stored_bytes":   values.Not_stored_bytes,
+		"discard_count":      values.Discard_count,
+		"discard_bytes":      values.Discard_bytes,
 	})
 }
 
@@ -2107,11 +2065,11 @@ type JMSStoreDatastoreValues struct {
 	Insert_batches int64
 	Update_batches int64
 	Delete_batches int64
-	Insert_count int64
-	Update_count int64
-	Delete_count int64
-	Open_count int64
-	Abort_count int64
+	Insert_count   int64
+	Update_count   int64
+	Delete_count   int64
+	Open_count     int64
+	Abort_count    int64
 	Transaction_ms int64
 }
 
@@ -2126,11 +2084,11 @@ func (c JMSStoreDatastoreContext) Set(state *framework.CollectorState, labels JM
 		"insert_batches": values.Insert_batches,
 		"update_batches": values.Update_batches,
 		"delete_batches": values.Delete_batches,
-		"insert_count": values.Insert_count,
-		"update_count": values.Update_count,
-		"delete_count": values.Delete_count,
-		"open_count": values.Open_count,
-		"abort_count": values.Abort_count,
+		"insert_count":   values.Insert_count,
+		"update_count":   values.Update_count,
+		"delete_count":   values.Delete_count,
+		"open_count":     values.Open_count,
+		"abort_count":    values.Abort_count,
 		"transaction_ms": values.Transaction_ms,
 	})
 }
@@ -2142,13 +2100,13 @@ func (c JMSStoreDatastoreContext) SetUpdateEvery(state *framework.CollectorState
 
 // JMSStoreTransactionsValues defines the type-safe values for JMSStore.Transactions context
 type JMSStoreTransactionsValues struct {
-	Global_start int64
-	Global_commit int64
-	Global_abort int64
+	Global_start   int64
+	Global_commit  int64
+	Global_abort   int64
 	Global_indoubt int64
-	Local_start int64
-	Local_commit int64
-	Local_abort int64
+	Local_start    int64
+	Local_commit   int64
+	Local_abort    int64
 }
 
 // JMSStoreTransactionsContext provides type-safe operations for JMSStore.Transactions context
@@ -2159,13 +2117,13 @@ type JMSStoreTransactionsContext struct {
 // Set provides type-safe dimension setting for JMSStore.Transactions context
 func (c JMSStoreTransactionsContext) Set(state *framework.CollectorState, labels JMSStoreLabels, values JMSStoreTransactionsValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
-		"global_start": values.Global_start,
-		"global_commit": values.Global_commit,
-		"global_abort": values.Global_abort,
+		"global_start":   values.Global_start,
+		"global_commit":  values.Global_commit,
+		"global_abort":   values.Global_abort,
 		"global_indoubt": values.Global_indoubt,
-		"local_start": values.Local_start,
-		"local_commit": values.Local_commit,
-		"local_abort": values.Local_abort,
+		"local_start":    values.Local_start,
+		"local_commit":   values.Local_commit,
+		"local_abort":    values.Local_abort,
 	})
 }
 
@@ -2196,13 +2154,11 @@ func (c JMSStoreExpiryContext) SetUpdateEvery(state *framework.CollectorState, l
 	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
 }
 
-
-
 // JMSStoreLabels defines the required labels for JMSStore contexts
 type JMSStoreLabels struct {
-	Node string
-	Server string
-	Engine string
+	Node    string
+	Server  string
+	Engine  string
 	Section string
 }
 
@@ -2212,276 +2168,273 @@ func (l JMSStoreLabels) InstanceID(contextName string) string {
 	return contextName + "." + cleanLabelValue(l.Node) + "_" + cleanLabelValue(l.Server) + "_" + cleanLabelValue(l.Engine) + "_" + cleanLabelValue(l.Section)
 }
 
-
 // JMSStore contains all metric contexts for JMSStore
 var JMSStore = struct {
-	Cache JMSStoreCacheContext
-	Datastore JMSStoreDatastoreContext
+	Cache        JMSStoreCacheContext
+	Datastore    JMSStoreDatastoreContext
 	Transactions JMSStoreTransactionsContext
-	Expiry JMSStoreExpiryContext
+	Expiry       JMSStoreExpiryContext
 }{
 	Cache: JMSStoreCacheContext{
 		Context: framework.Context[JMSStoreLabels]{
-		Name:       "websphere_pmi.jms_store_cache",
-		Family:     "messaging/jms/store",
-		Title:      "JMS Store Cache",
-		Units:      "events",
-		Type:       module.Line,
-		Priority:   740,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "add_stored",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_pmi.jms_store_cache",
+			Family:      "messaging/jms/store",
+			Title:       "JMS Store Cache",
+			Units:       "events",
+			Type:        module.Line,
+			Priority:    740,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "add_stored",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "add_not_stored",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "stored_current",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "stored_bytes",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "not_stored_current",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "not_stored_bytes",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "discard_count",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "discard_bytes",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "add_not_stored",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			LabelKeys: []string{
+				"node",
+				"server",
+				"engine",
+				"section",
 			},
-			{
-				Name:      "stored_current",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "stored_bytes",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "not_stored_current",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "not_stored_bytes",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "discard_count",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "discard_bytes",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-		},
-		LabelKeys: []string{
-			"node",
-			"server",
-			"engine",
-			"section",
-		},
 		},
 	},
 	Datastore: JMSStoreDatastoreContext{
 		Context: framework.Context[JMSStoreLabels]{
-		Name:       "websphere_pmi.jms_store_datastore",
-		Family:     "messaging/jms/store",
-		Title:      "JMS Store Datastore Operations",
-		Units:      "events/s",
-		Type:       module.Line,
-		Priority:   741,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "insert_batches",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_pmi.jms_store_datastore",
+			Family:      "messaging/jms/store",
+			Title:       "JMS Store Datastore Operations",
+			Units:       "events/s",
+			Type:        module.Line,
+			Priority:    741,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "insert_batches",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "update_batches",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "delete_batches",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "insert_count",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "update_count",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "delete_count",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "open_count",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "abort_count",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "transaction_ms",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "update_batches",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			LabelKeys: []string{
+				"node",
+				"server",
+				"engine",
+				"section",
 			},
-			{
-				Name:      "delete_batches",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "insert_count",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "update_count",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "delete_count",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "open_count",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "abort_count",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "transaction_ms",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-		},
-		LabelKeys: []string{
-			"node",
-			"server",
-			"engine",
-			"section",
-		},
 		},
 	},
 	Transactions: JMSStoreTransactionsContext{
 		Context: framework.Context[JMSStoreLabels]{
-		Name:       "websphere_pmi.jms_store_transactions",
-		Family:     "messaging/jms/store",
-		Title:      "JMS Store Transactions",
-		Units:      "transactions/s",
-		Type:       module.Line,
-		Priority:   742,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "global_start",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_pmi.jms_store_transactions",
+			Family:      "messaging/jms/store",
+			Title:       "JMS Store Transactions",
+			Units:       "transactions/s",
+			Type:        module.Line,
+			Priority:    742,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "global_start",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "global_commit",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "global_abort",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "global_indoubt",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "local_start",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "local_commit",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "local_abort",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "global_commit",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			LabelKeys: []string{
+				"node",
+				"server",
+				"engine",
+				"section",
 			},
-			{
-				Name:      "global_abort",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "global_indoubt",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "local_start",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "local_commit",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "local_abort",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-		},
-		LabelKeys: []string{
-			"node",
-			"server",
-			"engine",
-			"section",
-		},
 		},
 	},
 	Expiry: JMSStoreExpiryContext{
 		Context: framework.Context[JMSStoreLabels]{
-		Name:       "websphere_pmi.jms_store_expiry",
-		Family:     "messaging/jms/store",
-		Title:      "JMS Store Expiry Index",
-		Units:      "items",
-		Type:       module.Line,
-		Priority:   743,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "index_items",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_pmi.jms_store_expiry",
+			Family:      "messaging/jms/store",
+			Title:       "JMS Store Expiry Index",
+			Units:       "items",
+			Type:        module.Line,
+			Priority:    743,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "index_items",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-			"node",
-			"server",
-			"engine",
-			"section",
-		},
+			LabelKeys: []string{
+				"node",
+				"server",
+				"engine",
+				"section",
+			},
 		},
 	},
 }
 
-
 // --- JMSTopic ---
-
 
 // JMSTopicPublicationsValues defines the type-safe values for JMSTopic.Publications context
 type JMSTopicPublicationsValues struct {
-	Assured int64
+	Assured     int64
 	Best_effort int64
-	Express int64
+	Express     int64
 }
 
 // JMSTopicPublicationsContext provides type-safe operations for JMSTopic.Publications context
@@ -2492,9 +2445,9 @@ type JMSTopicPublicationsContext struct {
 // Set provides type-safe dimension setting for JMSTopic.Publications context
 func (c JMSTopicPublicationsContext) Set(state *framework.CollectorState, labels JMSTopicLabels, values JMSTopicPublicationsValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
-		"assured": values.Assured,
+		"assured":     values.Assured,
 		"best_effort": values.Best_effort,
-		"express": values.Express,
+		"express":     values.Express,
 	})
 }
 
@@ -2505,9 +2458,9 @@ func (c JMSTopicPublicationsContext) SetUpdateEvery(state *framework.CollectorSt
 
 // JMSTopicSubscriptionHitsValues defines the type-safe values for JMSTopic.SubscriptionHits context
 type JMSTopicSubscriptionHitsValues struct {
-	Assured int64
+	Assured     int64
 	Best_effort int64
-	Express int64
+	Express     int64
 }
 
 // JMSTopicSubscriptionHitsContext provides type-safe operations for JMSTopic.SubscriptionHits context
@@ -2518,9 +2471,9 @@ type JMSTopicSubscriptionHitsContext struct {
 // Set provides type-safe dimension setting for JMSTopic.SubscriptionHits context
 func (c JMSTopicSubscriptionHitsContext) Set(state *framework.CollectorState, labels JMSTopicLabels, values JMSTopicSubscriptionHitsValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
-		"assured": values.Assured,
+		"assured":     values.Assured,
 		"best_effort": values.Best_effort,
-		"express": values.Express,
+		"express":     values.Express,
 	})
 }
 
@@ -2554,8 +2507,8 @@ func (c JMSTopicSubscriptionsContext) SetUpdateEvery(state *framework.CollectorS
 // JMSTopicEventsValues defines the type-safe values for JMSTopic.Events context
 type JMSTopicEventsValues struct {
 	Incomplete_publications int64
-	Publisher_attaches int64
-	Subscriber_attaches int64
+	Publisher_attaches      int64
+	Subscriber_attaches     int64
 }
 
 // JMSTopicEventsContext provides type-safe operations for JMSTopic.Events context
@@ -2567,8 +2520,8 @@ type JMSTopicEventsContext struct {
 func (c JMSTopicEventsContext) Set(state *framework.CollectorState, labels JMSTopicLabels, values JMSTopicEventsValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
 		"incomplete_publications": values.Incomplete_publications,
-		"publisher_attaches": values.Publisher_attaches,
-		"subscriber_attaches": values.Subscriber_attaches,
+		"publisher_attaches":      values.Publisher_attaches,
+		"subscriber_attaches":     values.Subscriber_attaches,
 	})
 }
 
@@ -2599,13 +2552,11 @@ func (c JMSTopicAgeContext) SetUpdateEvery(state *framework.CollectorState, labe
 	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
 }
 
-
-
 // JMSTopicLabels defines the required labels for JMSTopic contexts
 type JMSTopicLabels struct {
-	Node string
-	Server string
-	Engine string
+	Node        string
+	Server      string
+	Engine      string
 	Destination string
 }
 
@@ -2615,192 +2566,189 @@ func (l JMSTopicLabels) InstanceID(contextName string) string {
 	return contextName + "." + cleanLabelValue(l.Node) + "_" + cleanLabelValue(l.Server) + "_" + cleanLabelValue(l.Engine) + "_" + cleanLabelValue(l.Destination)
 }
 
-
 // JMSTopic contains all metric contexts for JMSTopic
 var JMSTopic = struct {
-	Publications JMSTopicPublicationsContext
+	Publications     JMSTopicPublicationsContext
 	SubscriptionHits JMSTopicSubscriptionHitsContext
-	Subscriptions JMSTopicSubscriptionsContext
-	Events JMSTopicEventsContext
-	Age JMSTopicAgeContext
+	Subscriptions    JMSTopicSubscriptionsContext
+	Events           JMSTopicEventsContext
+	Age              JMSTopicAgeContext
 }{
 	Publications: JMSTopicPublicationsContext{
 		Context: framework.Context[JMSTopicLabels]{
-		Name:       "websphere_pmi.jms_topic_publications",
-		Family:     "messaging/jms/topics",
-		Title:      "JMS Topic Publications",
-		Units:      "messages/s",
-		Type:       module.Line,
-		Priority:   720,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "assured",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_pmi.jms_topic_publications",
+			Family:      "messaging/jms/topics",
+			Title:       "JMS Topic Publications",
+			Units:       "messages/s",
+			Type:        module.Line,
+			Priority:    720,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "assured",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "best_effort",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "express",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "best_effort",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			LabelKeys: []string{
+				"node",
+				"server",
+				"engine",
+				"destination",
 			},
-			{
-				Name:      "express",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-		},
-		LabelKeys: []string{
-			"node",
-			"server",
-			"engine",
-			"destination",
-		},
 		},
 	},
 	SubscriptionHits: JMSTopicSubscriptionHitsContext{
 		Context: framework.Context[JMSTopicLabels]{
-		Name:       "websphere_pmi.jms_topic_subscription_hits",
-		Family:     "messaging/jms/topics",
-		Title:      "JMS Topic Subscription Hits",
-		Units:      "events/s",
-		Type:       module.Line,
-		Priority:   721,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "assured",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_pmi.jms_topic_subscription_hits",
+			Family:      "messaging/jms/topics",
+			Title:       "JMS Topic Subscription Hits",
+			Units:       "events/s",
+			Type:        module.Line,
+			Priority:    721,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "assured",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "best_effort",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "express",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "best_effort",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			LabelKeys: []string{
+				"node",
+				"server",
+				"engine",
+				"destination",
 			},
-			{
-				Name:      "express",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-		},
-		LabelKeys: []string{
-			"node",
-			"server",
-			"engine",
-			"destination",
-		},
 		},
 	},
 	Subscriptions: JMSTopicSubscriptionsContext{
 		Context: framework.Context[JMSTopicLabels]{
-		Name:       "websphere_pmi.jms_topic_subscriptions",
-		Family:     "messaging/jms/topics",
-		Title:      "JMS Topic Subscriptions",
-		Units:      "subscriptions",
-		Type:       module.Line,
-		Priority:   722,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "durable_local",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_pmi.jms_topic_subscriptions",
+			Family:      "messaging/jms/topics",
+			Title:       "JMS Topic Subscriptions",
+			Units:       "subscriptions",
+			Type:        module.Line,
+			Priority:    722,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "durable_local",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-			"node",
-			"server",
-			"engine",
-			"destination",
-		},
+			LabelKeys: []string{
+				"node",
+				"server",
+				"engine",
+				"destination",
+			},
 		},
 	},
 	Events: JMSTopicEventsContext{
 		Context: framework.Context[JMSTopicLabels]{
-		Name:       "websphere_pmi.jms_topic_events",
-		Family:     "messaging/jms/topics",
-		Title:      "JMS Topic Events",
-		Units:      "events/s",
-		Type:       module.Line,
-		Priority:   723,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "incomplete_publications",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_pmi.jms_topic_events",
+			Family:      "messaging/jms/topics",
+			Title:       "JMS Topic Events",
+			Units:       "events/s",
+			Type:        module.Line,
+			Priority:    723,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "incomplete_publications",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "publisher_attaches",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "subscriber_attaches",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "publisher_attaches",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			LabelKeys: []string{
+				"node",
+				"server",
+				"engine",
+				"destination",
 			},
-			{
-				Name:      "subscriber_attaches",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-		},
-		LabelKeys: []string{
-			"node",
-			"server",
-			"engine",
-			"destination",
-		},
 		},
 	},
 	Age: JMSTopicAgeContext{
 		Context: framework.Context[JMSTopicLabels]{
-		Name:       "websphere_pmi.jms_topic_age",
-		Family:     "messaging/jms/topics",
-		Title:      "JMS Topic Oldest Publication Age",
-		Units:      "milliseconds",
-		Type:       module.Line,
-		Priority:   724,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "local_oldest",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_pmi.jms_topic_age",
+			Family:      "messaging/jms/topics",
+			Title:       "JMS Topic Oldest Publication Age",
+			Units:       "milliseconds",
+			Type:        module.Line,
+			Priority:    724,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "local_oldest",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-			"node",
-			"server",
-			"engine",
-			"destination",
-		},
+			LabelKeys: []string{
+				"node",
+				"server",
+				"engine",
+				"destination",
+			},
 		},
 	},
 }
 
-
 // --- JVM ---
-
 
 // JVMHeapUsageValues defines the type-safe values for JVM.HeapUsage context
 type JVMHeapUsageValues struct {
@@ -2961,7 +2909,7 @@ func (c JVMGCTimeContext) SetUpdateEvery(state *framework.CollectorState, labels
 // JVMThreadsValues defines the type-safe values for JVM.Threads context
 type JVMThreadsValues struct {
 	Daemon int64
-	Other int64
+	Other  int64
 }
 
 // JVMThreadsContext provides type-safe operations for JVM.Threads context
@@ -2973,7 +2921,7 @@ type JVMThreadsContext struct {
 func (c JVMThreadsContext) Set(state *framework.CollectorState, labels EmptyLabels, values JVMThreadsValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, nil, map[string]int64{
 		"daemon": values.Daemon,
-		"other": values.Other,
+		"other":  values.Other,
 	})
 }
 
@@ -3004,238 +2952,224 @@ func (c JVMThreadPeakContext) SetUpdateEvery(state *framework.CollectorState, la
 	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, nil, updateEvery)
 }
 
-
-
-
 // JVM contains all metric contexts for JVM
 var JVM = struct {
-	HeapUsage JVMHeapUsageContext
+	HeapUsage     JVMHeapUsageContext
 	HeapCommitted JVMHeapCommittedContext
-	HeapMax JVMHeapMaxContext
-	Uptime JVMUptimeContext
-	CPU JVMCPUContext
+	HeapMax       JVMHeapMaxContext
+	Uptime        JVMUptimeContext
+	CPU           JVMCPUContext
 	GCCollections JVMGCCollectionsContext
-	GCTime JVMGCTimeContext
-	Threads JVMThreadsContext
-	ThreadPeak JVMThreadPeakContext
+	GCTime        JVMGCTimeContext
+	Threads       JVMThreadsContext
+	ThreadPeak    JVMThreadPeakContext
 }{
 	HeapUsage: JVMHeapUsageContext{
 		Context: framework.Context[EmptyLabels]{
-		Name:       "websphere_pmi.jvm_heap_usage",
-		Family:     "memory/heap",
-		Title:      "JVM Heap Memory Usage",
-		Units:      "bytes",
-		Type:       module.Stacked,
-		Priority:   201,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "used",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_pmi.jvm_heap_usage",
+			Family:      "memory/heap",
+			Title:       "JVM Heap Memory Usage",
+			Units:       "bytes",
+			Type:        module.Stacked,
+			Priority:    201,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "used",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "free",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "free",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-		},
-		LabelKeys: []string{
-		},
+			LabelKeys: []string{},
 		},
 	},
 	HeapCommitted: JVMHeapCommittedContext{
 		Context: framework.Context[EmptyLabels]{
-		Name:       "websphere_pmi.jvm_heap_committed",
-		Family:     "memory/heap",
-		Title:      "JVM Heap Committed",
-		Units:      "bytes",
-		Type:       module.Line,
-		Priority:   202,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "committed",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_pmi.jvm_heap_committed",
+			Family:      "memory/heap",
+			Title:       "JVM Heap Committed",
+			Units:       "bytes",
+			Type:        module.Line,
+			Priority:    202,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "committed",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-		},
+			LabelKeys: []string{},
 		},
 	},
 	HeapMax: JVMHeapMaxContext{
 		Context: framework.Context[EmptyLabels]{
-		Name:       "websphere_pmi.jvm_heap_max",
-		Family:     "memory/heap",
-		Title:      "JVM Heap Maximum",
-		Units:      "bytes",
-		Type:       module.Line,
-		Priority:   203,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "limit",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_pmi.jvm_heap_max",
+			Family:      "memory/heap",
+			Title:       "JVM Heap Maximum",
+			Units:       "bytes",
+			Type:        module.Line,
+			Priority:    203,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "limit",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-		},
+			LabelKeys: []string{},
 		},
 	},
 	Uptime: JVMUptimeContext{
 		Context: framework.Context[EmptyLabels]{
-		Name:       "websphere_pmi.jvm_uptime",
-		Family:     "compute/runtime",
-		Title:      "JVM Uptime",
-		Units:      "seconds",
-		Type:       module.Line,
-		Priority:   210,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "uptime",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_pmi.jvm_uptime",
+			Family:      "compute/runtime",
+			Title:       "JVM Uptime",
+			Units:       "seconds",
+			Type:        module.Line,
+			Priority:    210,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "uptime",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-		},
+			LabelKeys: []string{},
 		},
 	},
 	CPU: JVMCPUContext{
 		Context: framework.Context[EmptyLabels]{
-		Name:       "websphere_pmi.jvm_cpu",
-		Family:     "compute/cpu",
-		Title:      "JVM CPU Usage",
-		Units:      "percentage",
-		Type:       module.Line,
-		Priority:   211,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "usage",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1000,
-				Precision: 1,
+			Name:        "websphere_pmi.jvm_cpu",
+			Family:      "compute/cpu",
+			Title:       "JVM CPU Usage",
+			Units:       "percentage",
+			Type:        module.Line,
+			Priority:    211,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "usage",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1000,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-		},
+			LabelKeys: []string{},
 		},
 	},
 	GCCollections: JVMGCCollectionsContext{
 		Context: framework.Context[EmptyLabels]{
-		Name:       "websphere_pmi.jvm_gc_collections",
-		Family:     "compute/gc",
-		Title:      "JVM GC Collections",
-		Units:      "collections/s",
-		Type:       module.Line,
-		Priority:   220,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "collections",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_pmi.jvm_gc_collections",
+			Family:      "compute/gc",
+			Title:       "JVM GC Collections",
+			Units:       "collections/s",
+			Type:        module.Line,
+			Priority:    220,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "collections",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-		},
+			LabelKeys: []string{},
 		},
 	},
 	GCTime: JVMGCTimeContext{
 		Context: framework.Context[EmptyLabels]{
-		Name:       "websphere_pmi.jvm_gc_time",
-		Family:     "compute/gc",
-		Title:      "JVM GC Time",
-		Units:      "milliseconds",
-		Type:       module.Line,
-		Priority:   221,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "total",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_pmi.jvm_gc_time",
+			Family:      "compute/gc",
+			Title:       "JVM GC Time",
+			Units:       "milliseconds",
+			Type:        module.Line,
+			Priority:    221,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "total",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-		},
+			LabelKeys: []string{},
 		},
 	},
 	Threads: JVMThreadsContext{
 		Context: framework.Context[EmptyLabels]{
-		Name:       "websphere_pmi.jvm_threads",
-		Family:     "compute/threads",
-		Title:      "JVM Threads",
-		Units:      "threads",
-		Type:       module.Stacked,
-		Priority:   230,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "daemon",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_pmi.jvm_threads",
+			Family:      "compute/threads",
+			Title:       "JVM Threads",
+			Units:       "threads",
+			Type:        module.Stacked,
+			Priority:    230,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "daemon",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "other",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "other",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-		},
-		LabelKeys: []string{
-		},
+			LabelKeys: []string{},
 		},
 	},
 	ThreadPeak: JVMThreadPeakContext{
 		Context: framework.Context[EmptyLabels]{
-		Name:       "websphere_pmi.jvm_threads_peak",
-		Family:     "compute/threads",
-		Title:      "JVM Peak Threads",
-		Units:      "threads",
-		Type:       module.Line,
-		Priority:   231,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "peak",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_pmi.jvm_threads_peak",
+			Family:      "compute/threads",
+			Title:       "JVM Peak Threads",
+			Units:       "threads",
+			Type:        module.Line,
+			Priority:    231,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "peak",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-		},
+			LabelKeys: []string{},
 		},
 	},
 }
 
-
 // --- ORB ---
-
 
 // ORBConcurrentValues defines the type-safe values for ORB.Concurrent context
 type ORBConcurrentValues struct {
@@ -3281,11 +3215,9 @@ func (c ORBRequestsContext) SetUpdateEvery(state *framework.CollectorState, labe
 	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
 }
 
-
-
 // ORBLabels defines the required labels for ORB contexts
 type ORBLabels struct {
-	Node string
+	Node   string
 	Server string
 }
 
@@ -3295,65 +3227,62 @@ func (l ORBLabels) InstanceID(contextName string) string {
 	return contextName + "." + cleanLabelValue(l.Node) + "_" + cleanLabelValue(l.Server)
 }
 
-
 // ORB contains all metric contexts for ORB
 var ORB = struct {
 	Concurrent ORBConcurrentContext
-	Requests ORBRequestsContext
+	Requests   ORBRequestsContext
 }{
 	Concurrent: ORBConcurrentContext{
 		Context: framework.Context[ORBLabels]{
-		Name:       "websphere_pmi.orb_concurrent",
-		Family:     "workloads/orb",
-		Title:      "ORB Concurrent Requests",
-		Units:      "requests",
-		Type:       module.Line,
-		Priority:   570,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "concurrent_requests",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_pmi.orb_concurrent",
+			Family:      "workloads/orb",
+			Title:       "ORB Concurrent Requests",
+			Units:       "requests",
+			Type:        module.Line,
+			Priority:    570,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "concurrent_requests",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-			"node",
-			"server",
-		},
+			LabelKeys: []string{
+				"node",
+				"server",
+			},
 		},
 	},
 	Requests: ORBRequestsContext{
 		Context: framework.Context[ORBLabels]{
-		Name:       "websphere_pmi.orb_requests",
-		Family:     "workloads/orb",
-		Title:      "ORB Requests",
-		Units:      "requests/s",
-		Type:       module.Line,
-		Priority:   571,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "requests",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_pmi.orb_requests",
+			Family:      "workloads/orb",
+			Title:       "ORB Requests",
+			Units:       "requests/s",
+			Type:        module.Line,
+			Priority:    571,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "requests",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-			"node",
-			"server",
-		},
+			LabelKeys: []string{
+				"node",
+				"server",
+			},
 		},
 	},
 }
 
-
 // --- ObjectPool ---
-
 
 // ObjectPoolOperationsValues defines the type-safe values for ObjectPool.Operations context
 type ObjectPoolOperationsValues struct {
@@ -3380,8 +3309,8 @@ func (c ObjectPoolOperationsContext) SetUpdateEvery(state *framework.CollectorSt
 // ObjectPoolSizeValues defines the type-safe values for ObjectPool.Size context
 type ObjectPoolSizeValues struct {
 	Allocated int64
-	Returned int64
-	Idle int64
+	Returned  int64
+	Idle      int64
 }
 
 // ObjectPoolSizeContext provides type-safe operations for ObjectPool.Size context
@@ -3393,8 +3322,8 @@ type ObjectPoolSizeContext struct {
 func (c ObjectPoolSizeContext) Set(state *framework.CollectorState, labels ObjectPoolLabels, values ObjectPoolSizeValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
 		"allocated": values.Allocated,
-		"returned": values.Returned,
-		"idle": values.Idle,
+		"returned":  values.Returned,
+		"idle":      values.Idle,
 	})
 }
 
@@ -3403,13 +3332,11 @@ func (c ObjectPoolSizeContext) SetUpdateEvery(state *framework.CollectorState, l
 	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
 }
 
-
-
 // ObjectPoolLabels defines the required labels for ObjectPool contexts
 type ObjectPoolLabels struct {
-	Node string
+	Node   string
 	Server string
-	Pool string
+	Pool   string
 }
 
 // InstanceID generates a unique instance ID using the hardcoded label order from YAML
@@ -3418,81 +3345,78 @@ func (l ObjectPoolLabels) InstanceID(contextName string) string {
 	return contextName + "." + cleanLabelValue(l.Node) + "_" + cleanLabelValue(l.Server) + "_" + cleanLabelValue(l.Pool)
 }
 
-
 // ObjectPool contains all metric contexts for ObjectPool
 var ObjectPool = struct {
 	Operations ObjectPoolOperationsContext
-	Size ObjectPoolSizeContext
+	Size       ObjectPoolSizeContext
 }{
 	Operations: ObjectPoolOperationsContext{
 		Context: framework.Context[ObjectPoolLabels]{
-		Name:       "websphere_pmi.object_pool_operations",
-		Family:     "workloads/object_pool",
-		Title:      "Object Pool Operations",
-		Units:      "operations/s",
-		Type:       module.Line,
-		Priority:   630,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "created",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_pmi.object_pool_operations",
+			Family:      "workloads/object_pool",
+			Title:       "Object Pool Operations",
+			Units:       "operations/s",
+			Type:        module.Line,
+			Priority:    630,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "created",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-			"node",
-			"server",
-			"pool",
-		},
+			LabelKeys: []string{
+				"node",
+				"server",
+				"pool",
+			},
 		},
 	},
 	Size: ObjectPoolSizeContext{
 		Context: framework.Context[ObjectPoolLabels]{
-		Name:       "websphere_pmi.object_pool_size",
-		Family:     "workloads/object_pool",
-		Title:      "Object Pool Size",
-		Units:      "objects",
-		Type:       module.Line,
-		Priority:   631,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "allocated",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_pmi.object_pool_size",
+			Family:      "workloads/object_pool",
+			Title:       "Object Pool Size",
+			Units:       "objects",
+			Type:        module.Line,
+			Priority:    631,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "allocated",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "returned",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "idle",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "returned",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			LabelKeys: []string{
+				"node",
+				"server",
+				"pool",
 			},
-			{
-				Name:      "idle",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-		},
-		LabelKeys: []string{
-			"node",
-			"server",
-			"pool",
-		},
 		},
 	},
 }
 
-
 // --- PMIWebServiceModule ---
-
 
 // PMIWebServiceModuleServicesValues defines the type-safe values for PMIWebServiceModule.Services context
 type PMIWebServiceModuleServicesValues struct {
@@ -3516,11 +3440,9 @@ func (c PMIWebServiceModuleServicesContext) SetUpdateEvery(state *framework.Coll
 	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
 }
 
-
-
 // PMIWebServiceModuleLabels defines the required labels for PMIWebServiceModule contexts
 type PMIWebServiceModuleLabels struct {
-	Node string
+	Node   string
 	Server string
 	Module string
 }
@@ -3531,41 +3453,38 @@ func (l PMIWebServiceModuleLabels) InstanceID(contextName string) string {
 	return contextName + "." + cleanLabelValue(l.Node) + "_" + cleanLabelValue(l.Server) + "_" + cleanLabelValue(l.Module)
 }
 
-
 // PMIWebServiceModule contains all metric contexts for PMIWebServiceModule
 var PMIWebServiceModule = struct {
 	Services PMIWebServiceModuleServicesContext
 }{
 	Services: PMIWebServiceModuleServicesContext{
 		Context: framework.Context[PMIWebServiceModuleLabels]{
-		Name:       "websphere_pmi.pmi_web_service_module_services",
-		Family:     "integration/web_services",
-		Title:      "PMI Web Service Module Services",
-		Units:      "services",
-		Type:       module.Line,
-		Priority:   652,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "loaded",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_pmi.pmi_web_service_module_services",
+			Family:      "integration/web_services",
+			Title:       "PMI Web Service Module Services",
+			Units:       "services",
+			Type:        module.Line,
+			Priority:    652,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "loaded",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-			"node",
-			"server",
-			"module",
-		},
+			LabelKeys: []string{
+				"node",
+				"server",
+				"module",
+			},
 		},
 	},
 }
 
-
 // --- Portlet ---
-
 
 // PortletRequestsValues defines the type-safe values for Portlet.Requests context
 type PortletRequestsValues struct {
@@ -3635,9 +3554,9 @@ func (c PortletErrorsContext) SetUpdateEvery(state *framework.CollectorState, la
 
 // PortletResponseTimeValues defines the type-safe values for Portlet.ResponseTime context
 type PortletResponseTimeValues struct {
-	Render int64
-	Action int64
-	Process_event int64
+	Render         int64
+	Action         int64
+	Process_event  int64
 	Serve_resource int64
 }
 
@@ -3649,9 +3568,9 @@ type PortletResponseTimeContext struct {
 // Set provides type-safe dimension setting for Portlet.ResponseTime context
 func (c PortletResponseTimeContext) Set(state *framework.CollectorState, labels PortletLabels, values PortletResponseTimeValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
-		"render": values.Render,
-		"action": values.Action,
-		"process_event": values.Process_event,
+		"render":         values.Render,
+		"action":         values.Action,
+		"process_event":  values.Process_event,
 		"serve_resource": values.Serve_resource,
 	})
 }
@@ -3661,12 +3580,10 @@ func (c PortletResponseTimeContext) SetUpdateEvery(state *framework.CollectorSta
 	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
 }
 
-
-
 // PortletLabels defines the required labels for Portlet contexts
 type PortletLabels struct {
-	Node string
-	Server string
+	Node    string
+	Server  string
 	Portlet string
 }
 
@@ -3676,140 +3593,137 @@ func (l PortletLabels) InstanceID(contextName string) string {
 	return contextName + "." + cleanLabelValue(l.Node) + "_" + cleanLabelValue(l.Server) + "_" + cleanLabelValue(l.Portlet)
 }
 
-
 // Portlet contains all metric contexts for Portlet
 var Portlet = struct {
-	Requests PortletRequestsContext
-	Concurrent PortletConcurrentContext
-	Errors PortletErrorsContext
+	Requests     PortletRequestsContext
+	Concurrent   PortletConcurrentContext
+	Errors       PortletErrorsContext
 	ResponseTime PortletResponseTimeContext
 }{
 	Requests: PortletRequestsContext{
 		Context: framework.Context[PortletLabels]{
-		Name:       "websphere_pmi.portlet_requests",
-		Family:     "platform/portlets",
-		Title:      "Portlet Requests",
-		Units:      "requests/s",
-		Type:       module.Line,
-		Priority:   801,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "requests",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_pmi.portlet_requests",
+			Family:      "platform/portlets",
+			Title:       "Portlet Requests",
+			Units:       "requests/s",
+			Type:        module.Line,
+			Priority:    801,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "requests",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-			"node",
-			"server",
-			"portlet",
-		},
+			LabelKeys: []string{
+				"node",
+				"server",
+				"portlet",
+			},
 		},
 	},
 	Concurrent: PortletConcurrentContext{
 		Context: framework.Context[PortletLabels]{
-		Name:       "websphere_pmi.portlet_concurrent",
-		Family:     "platform/portlets",
-		Title:      "Portlet Concurrent Requests",
-		Units:      "requests",
-		Type:       module.Line,
-		Priority:   802,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "concurrent",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_pmi.portlet_concurrent",
+			Family:      "platform/portlets",
+			Title:       "Portlet Concurrent Requests",
+			Units:       "requests",
+			Type:        module.Line,
+			Priority:    802,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "concurrent",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-			"node",
-			"server",
-			"portlet",
-		},
+			LabelKeys: []string{
+				"node",
+				"server",
+				"portlet",
+			},
 		},
 	},
 	Errors: PortletErrorsContext{
 		Context: framework.Context[PortletLabels]{
-		Name:       "websphere_pmi.portlet_errors",
-		Family:     "platform/portlets",
-		Title:      "Portlet Errors",
-		Units:      "errors/s",
-		Type:       module.Line,
-		Priority:   803,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "errors",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_pmi.portlet_errors",
+			Family:      "platform/portlets",
+			Title:       "Portlet Errors",
+			Units:       "errors/s",
+			Type:        module.Line,
+			Priority:    803,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "errors",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-			"node",
-			"server",
-			"portlet",
-		},
+			LabelKeys: []string{
+				"node",
+				"server",
+				"portlet",
+			},
 		},
 	},
 	ResponseTime: PortletResponseTimeContext{
 		Context: framework.Context[PortletLabels]{
-		Name:       "websphere_pmi.portlet_response_time",
-		Family:     "platform/portlets",
-		Title:      "Portlet Response Time",
-		Units:      "milliseconds",
-		Type:       module.Line,
-		Priority:   804,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "render",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_pmi.portlet_response_time",
+			Family:      "platform/portlets",
+			Title:       "Portlet Response Time",
+			Units:       "milliseconds",
+			Type:        module.Line,
+			Priority:    804,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "render",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "action",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "process_event",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "serve_resource",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "action",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			LabelKeys: []string{
+				"node",
+				"server",
+				"portlet",
 			},
-			{
-				Name:      "process_event",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "serve_resource",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-		},
-		LabelKeys: []string{
-			"node",
-			"server",
-			"portlet",
-		},
 		},
 	},
 }
 
-
 // --- PortletApplication ---
-
 
 // PortletApplicationLoadedValues defines the type-safe values for PortletApplication.Loaded context
 type PortletApplicationLoadedValues struct {
@@ -3833,11 +3747,9 @@ func (c PortletApplicationLoadedContext) SetUpdateEvery(state *framework.Collect
 	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
 }
 
-
-
 // PortletApplicationLabels defines the required labels for PortletApplication contexts
 type PortletApplicationLabels struct {
-	Node string
+	Node   string
 	Server string
 }
 
@@ -3847,46 +3759,43 @@ func (l PortletApplicationLabels) InstanceID(contextName string) string {
 	return contextName + "." + cleanLabelValue(l.Node) + "_" + cleanLabelValue(l.Server)
 }
 
-
 // PortletApplication contains all metric contexts for PortletApplication
 var PortletApplication = struct {
 	Loaded PortletApplicationLoadedContext
 }{
 	Loaded: PortletApplicationLoadedContext{
 		Context: framework.Context[PortletApplicationLabels]{
-		Name:       "websphere_pmi.portlet_application_loaded",
-		Family:     "platform/portlets",
-		Title:      "Loaded Portlets",
-		Units:      "portlets",
-		Type:       module.Line,
-		Priority:   800,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "loaded",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_pmi.portlet_application_loaded",
+			Family:      "platform/portlets",
+			Title:       "Loaded Portlets",
+			Units:       "portlets",
+			Type:        module.Line,
+			Priority:    800,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "loaded",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-			"node",
-			"server",
-		},
+			LabelKeys: []string{
+				"node",
+				"server",
+			},
 		},
 	},
 }
 
-
 // --- Schedulers ---
-
 
 // SchedulersActivityValues defines the type-safe values for Schedulers.Activity context
 type SchedulersActivityValues struct {
 	Finished int64
 	Failures int64
-	Polls int64
+	Polls    int64
 }
 
 // SchedulersActivityContext provides type-safe operations for Schedulers.Activity context
@@ -3899,7 +3808,7 @@ func (c SchedulersActivityContext) Set(state *framework.CollectorState, labels S
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
 		"finished": values.Finished,
 		"failures": values.Failures,
-		"polls": values.Polls,
+		"polls":    values.Polls,
 	})
 }
 
@@ -3908,12 +3817,10 @@ func (c SchedulersActivityContext) SetUpdateEvery(state *framework.CollectorStat
 	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
 }
 
-
-
 // SchedulersLabels defines the required labels for Schedulers contexts
 type SchedulersLabels struct {
-	Node string
-	Server string
+	Node      string
+	Server    string
 	Scheduler string
 }
 
@@ -3923,67 +3830,64 @@ func (l SchedulersLabels) InstanceID(contextName string) string {
 	return contextName + "." + cleanLabelValue(l.Node) + "_" + cleanLabelValue(l.Server) + "_" + cleanLabelValue(l.Scheduler)
 }
 
-
 // Schedulers contains all metric contexts for Schedulers
 var Schedulers = struct {
 	Activity SchedulersActivityContext
 }{
 	Activity: SchedulersActivityContext{
 		Context: framework.Context[SchedulersLabels]{
-		Name:       "websphere_pmi.scheduler_activity",
-		Family:     "workloads/schedulers",
-		Title:      "Scheduler Activity",
-		Units:      "events/s",
-		Type:       module.Line,
-		Priority:   620,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "finished",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_pmi.scheduler_activity",
+			Family:      "workloads/schedulers",
+			Title:       "Scheduler Activity",
+			Units:       "events/s",
+			Type:        module.Line,
+			Priority:    620,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "finished",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "failures",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "polls",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "failures",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			LabelKeys: []string{
+				"node",
+				"server",
+				"scheduler",
 			},
-			{
-				Name:      "polls",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-		},
-		LabelKeys: []string{
-			"node",
-			"server",
-			"scheduler",
-		},
 		},
 	},
 }
 
-
 // --- SecurityAuth ---
-
 
 // SecurityAuthCountsValues defines the type-safe values for SecurityAuth.Counts context
 type SecurityAuthCountsValues struct {
-	Web int64
-	Tai int64
-	Identity int64
-	Basic int64
-	Token int64
+	Web           int64
+	Tai           int64
+	Identity      int64
+	Basic         int64
+	Token         int64
 	Jaas_identity int64
-	Jaas_basic int64
-	Jaas_token int64
-	Rmi int64
+	Jaas_basic    int64
+	Jaas_token    int64
+	Rmi           int64
 }
 
 // SecurityAuthCountsContext provides type-safe operations for SecurityAuth.Counts context
@@ -3994,15 +3898,15 @@ type SecurityAuthCountsContext struct {
 // Set provides type-safe dimension setting for SecurityAuth.Counts context
 func (c SecurityAuthCountsContext) Set(state *framework.CollectorState, labels SecurityAuthLabels, values SecurityAuthCountsValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
-		"web": values.Web,
-		"tai": values.Tai,
-		"identity": values.Identity,
-		"basic": values.Basic,
-		"token": values.Token,
+		"web":           values.Web,
+		"tai":           values.Tai,
+		"identity":      values.Identity,
+		"basic":         values.Basic,
+		"token":         values.Token,
 		"jaas_identity": values.Jaas_identity,
-		"jaas_basic": values.Jaas_basic,
-		"jaas_token": values.Jaas_token,
-		"rmi": values.Rmi,
+		"jaas_basic":    values.Jaas_basic,
+		"jaas_token":    values.Jaas_token,
+		"rmi":           values.Rmi,
 	})
 }
 
@@ -4011,11 +3915,9 @@ func (c SecurityAuthCountsContext) SetUpdateEvery(state *framework.CollectorStat
 	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
 }
 
-
-
 // SecurityAuthLabels defines the required labels for SecurityAuth contexts
 type SecurityAuthLabels struct {
-	Node string
+	Node   string
 	Server string
 }
 
@@ -4025,101 +3927,98 @@ func (l SecurityAuthLabels) InstanceID(contextName string) string {
 	return contextName + "." + cleanLabelValue(l.Node) + "_" + cleanLabelValue(l.Server)
 }
 
-
 // SecurityAuth contains all metric contexts for SecurityAuth
 var SecurityAuth = struct {
 	Counts SecurityAuthCountsContext
 }{
 	Counts: SecurityAuthCountsContext{
 		Context: framework.Context[SecurityAuthLabels]{
-		Name:       "websphere_pmi.security_auth_counts",
-		Family:     "security/authentication",
-		Title:      "Security Authentication Counts",
-		Units:      "events/s",
-		Type:       module.Line,
-		Priority:   560,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "web",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_pmi.security_auth_counts",
+			Family:      "security/authentication",
+			Title:       "Security Authentication Counts",
+			Units:       "events/s",
+			Type:        module.Line,
+			Priority:    560,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "web",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "tai",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "identity",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "basic",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "token",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "jaas_identity",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "jaas_basic",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "jaas_token",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "rmi",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "tai",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			LabelKeys: []string{
+				"node",
+				"server",
 			},
-			{
-				Name:      "identity",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "basic",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "token",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "jaas_identity",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "jaas_basic",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "jaas_token",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "rmi",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-		},
-		LabelKeys: []string{
-			"node",
-			"server",
-		},
 		},
 	},
 }
 
-
 // --- SecurityAuthz ---
-
 
 // SecurityAuthzTimeValues defines the type-safe values for SecurityAuthz.Time context
 type SecurityAuthzTimeValues struct {
-	Web int64
-	Ejb int64
+	Web   int64
+	Ejb   int64
 	Admin int64
 	Cwwja int64
 }
@@ -4132,8 +4031,8 @@ type SecurityAuthzTimeContext struct {
 // Set provides type-safe dimension setting for SecurityAuthz.Time context
 func (c SecurityAuthzTimeContext) Set(state *framework.CollectorState, labels SecurityAuthzLabels, values SecurityAuthzTimeValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
-		"web": values.Web,
-		"ejb": values.Ejb,
+		"web":   values.Web,
+		"ejb":   values.Ejb,
 		"admin": values.Admin,
 		"cwwja": values.Cwwja,
 	})
@@ -4144,11 +4043,9 @@ func (c SecurityAuthzTimeContext) SetUpdateEvery(state *framework.CollectorState
 	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
 }
 
-
-
 // SecurityAuthzLabels defines the required labels for SecurityAuthz contexts
 type SecurityAuthzLabels struct {
-	Node string
+	Node   string
 	Server string
 }
 
@@ -4158,66 +4055,63 @@ func (l SecurityAuthzLabels) InstanceID(contextName string) string {
 	return contextName + "." + cleanLabelValue(l.Node) + "_" + cleanLabelValue(l.Server)
 }
 
-
 // SecurityAuthz contains all metric contexts for SecurityAuthz
 var SecurityAuthz = struct {
 	Time SecurityAuthzTimeContext
 }{
 	Time: SecurityAuthzTimeContext{
 		Context: framework.Context[SecurityAuthzLabels]{
-		Name:       "websphere_pmi.security_authz_time",
-		Family:     "security/authorization",
-		Title:      "Security Authorization Time",
-		Units:      "milliseconds",
-		Type:       module.Line,
-		Priority:   561,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "web",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_pmi.security_authz_time",
+			Family:      "security/authorization",
+			Title:       "Security Authorization Time",
+			Units:       "milliseconds",
+			Type:        module.Line,
+			Priority:    561,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "web",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "ejb",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "admin",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "cwwja",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "ejb",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			LabelKeys: []string{
+				"node",
+				"server",
 			},
-			{
-				Name:      "admin",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "cwwja",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-		},
-		LabelKeys: []string{
-			"node",
-			"server",
-		},
 		},
 	},
 }
 
-
 // --- SessionManager ---
-
 
 // SessionManagerActiveValues defines the type-safe values for SessionManager.Active context
 type SessionManagerActiveValues struct {
 	Active int64
-	Live int64
+	Live   int64
 }
 
 // SessionManagerActiveContext provides type-safe operations for SessionManager.Active context
@@ -4229,7 +4123,7 @@ type SessionManagerActiveContext struct {
 func (c SessionManagerActiveContext) Set(state *framework.CollectorState, labels SessionManagerLabels, values SessionManagerActiveValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
 		"active": values.Active,
-		"live": values.Live,
+		"live":   values.Live,
 	})
 }
 
@@ -4240,13 +4134,13 @@ func (c SessionManagerActiveContext) SetUpdateEvery(state *framework.CollectorSt
 
 // SessionManagerEventsValues defines the type-safe values for SessionManager.Events context
 type SessionManagerEventsValues struct {
-	Created int64
-	Invalidated int64
+	Created               int64
+	Invalidated           int64
 	Timeout_invalidations int64
-	Affinity_breaks int64
-	Cache_discards int64
-	No_room int64
-	Activate_non_exist int64
+	Affinity_breaks       int64
+	Cache_discards        int64
+	No_room               int64
+	Activate_non_exist    int64
 }
 
 // SessionManagerEventsContext provides type-safe operations for SessionManager.Events context
@@ -4257,13 +4151,13 @@ type SessionManagerEventsContext struct {
 // Set provides type-safe dimension setting for SessionManager.Events context
 func (c SessionManagerEventsContext) Set(state *framework.CollectorState, labels SessionManagerLabels, values SessionManagerEventsValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
-		"created": values.Created,
-		"invalidated": values.Invalidated,
+		"created":               values.Created,
+		"invalidated":           values.Invalidated,
 		"timeout_invalidations": values.Timeout_invalidations,
-		"affinity_breaks": values.Affinity_breaks,
-		"cache_discards": values.Cache_discards,
-		"no_room": values.No_room,
-		"activate_non_exist": values.Activate_non_exist,
+		"affinity_breaks":       values.Affinity_breaks,
+		"cache_discards":        values.Cache_discards,
+		"no_room":               values.No_room,
+		"activate_non_exist":    values.Activate_non_exist,
 	})
 }
 
@@ -4272,13 +4166,11 @@ func (c SessionManagerEventsContext) SetUpdateEvery(state *framework.CollectorSt
 	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
 }
 
-
-
 // SessionManagerLabels defines the required labels for SessionManager contexts
 type SessionManagerLabels struct {
-	Node string
+	Node   string
 	Server string
-	App string
+	App    string
 }
 
 // InstanceID generates a unique instance ID using the hardcoded label order from YAML
@@ -4287,7 +4179,6 @@ func (l SessionManagerLabels) InstanceID(contextName string) string {
 	return contextName + "." + cleanLabelValue(l.Node) + "_" + cleanLabelValue(l.Server) + "_" + cleanLabelValue(l.App)
 }
 
-
 // SessionManager contains all metric contexts for SessionManager
 var SessionManager = struct {
 	Active SessionManagerActiveContext
@@ -4295,108 +4186,106 @@ var SessionManager = struct {
 }{
 	Active: SessionManagerActiveContext{
 		Context: framework.Context[SessionManagerLabels]{
-		Name:       "websphere_pmi.session_manager_active",
-		Family:     "workloads/sessions",
-		Title:      "Session Manager Active Sessions",
-		Units:      "sessions",
-		Type:       module.Line,
-		Priority:   530,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "active",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_pmi.session_manager_active",
+			Family:      "workloads/sessions",
+			Title:       "Session Manager Active Sessions",
+			Units:       "sessions",
+			Type:        module.Line,
+			Priority:    530,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "active",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "live",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "live",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			LabelKeys: []string{
+				"node",
+				"server",
+				"app",
 			},
-		},
-		LabelKeys: []string{
-			"node",
-			"server",
-			"app",
-		},
 		},
 	},
 	Events: SessionManagerEventsContext{
 		Context: framework.Context[SessionManagerLabels]{
-		Name:       "websphere_pmi.session_manager_events",
-		Family:     "workloads/sessions",
-		Title:      "Session Manager Events",
-		Units:      "events/s",
-		Type:       module.Line,
-		Priority:   531,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "created",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_pmi.session_manager_events",
+			Family:      "workloads/sessions",
+			Title:       "Session Manager Events",
+			Units:       "events/s",
+			Type:        module.Line,
+			Priority:    531,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "created",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "invalidated",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "timeout_invalidations",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "affinity_breaks",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "cache_discards",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "no_room",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "activate_non_exist",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "invalidated",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			LabelKeys: []string{
+				"node",
+				"server",
+				"app",
 			},
-			{
-				Name:      "timeout_invalidations",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "affinity_breaks",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "cache_discards",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "no_room",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "activate_non_exist",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-		},
-		LabelKeys: []string{
-			"node",
-			"server",
-			"app",
-		},
 		},
 	},
 }
 
-
 // --- System ---
-
 
 // SystemCPUValues defines the type-safe values for System.CPU context
 type SystemCPUValues struct {
@@ -4420,45 +4309,39 @@ func (c SystemCPUContext) SetUpdateEvery(state *framework.CollectorState, labels
 	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, nil, updateEvery)
 }
 
-
-
-
 // System contains all metric contexts for System
 var System = struct {
 	CPU SystemCPUContext
 }{
 	CPU: SystemCPUContext{
 		Context: framework.Context[EmptyLabels]{
-		Name:       "websphere_pmi.cpu_utilization",
-		Family:     "compute/cpu",
-		Title:      "CPU Utilization",
-		Units:      "percentage",
-		Type:       module.Line,
-		Priority:   101,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "utilization",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1000,
-				Precision: 1,
+			Name:        "websphere_pmi.cpu_utilization",
+			Family:      "compute/cpu",
+			Title:       "CPU Utilization",
+			Units:       "percentage",
+			Type:        module.Line,
+			Priority:    101,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "utilization",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1000,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-		},
+			LabelKeys: []string{},
 		},
 	},
 }
 
-
 // --- SystemData ---
-
 
 // SystemDataUsageValues defines the type-safe values for SystemData.Usage context
 type SystemDataUsageValues struct {
 	Cpu_since_last int64
-	Free_memory int64
+	Free_memory    int64
 }
 
 // SystemDataUsageContext provides type-safe operations for SystemData.Usage context
@@ -4470,7 +4353,7 @@ type SystemDataUsageContext struct {
 func (c SystemDataUsageContext) Set(state *framework.CollectorState, labels EmptyLabels, values SystemDataUsageValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, nil, map[string]int64{
 		"cpu_since_last": values.Cpu_since_last,
-		"free_memory": values.Free_memory,
+		"free_memory":    values.Free_memory,
 	})
 }
 
@@ -4479,52 +4362,46 @@ func (c SystemDataUsageContext) SetUpdateEvery(state *framework.CollectorState, 
 	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, nil, updateEvery)
 }
 
-
-
-
 // SystemData contains all metric contexts for SystemData
 var SystemData = struct {
 	Usage SystemDataUsageContext
 }{
 	Usage: SystemDataUsageContext{
 		Context: framework.Context[EmptyLabels]{
-		Name:       "websphere_pmi.system_data_usage",
-		Family:     "system/overview",
-		Title:      "System Data Snapshot",
-		Units:      "value",
-		Type:       module.Line,
-		Priority:   100,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "cpu_since_last",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_pmi.system_data_usage",
+			Family:      "system/overview",
+			Title:       "System Data Snapshot",
+			Units:       "value",
+			Type:        module.Line,
+			Priority:    100,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "cpu_since_last",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "free_memory",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "free_memory",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-		},
-		LabelKeys: []string{
-		},
+			LabelKeys: []string{},
 		},
 	},
 }
 
-
 // --- ThreadPool ---
-
 
 // ThreadPoolUsageValues defines the type-safe values for ThreadPool.Usage context
 type ThreadPoolUsageValues struct {
 	Active int64
-	Size int64
+	Size   int64
 }
 
 // ThreadPoolUsageContext provides type-safe operations for ThreadPool.Usage context
@@ -4536,7 +4413,7 @@ type ThreadPoolUsageContext struct {
 func (c ThreadPoolUsageContext) Set(state *framework.CollectorState, labels ThreadPoolLabels, values ThreadPoolUsageValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
 		"active": values.Active,
-		"size": values.Size,
+		"size":   values.Size,
 	})
 }
 
@@ -4544,8 +4421,6 @@ func (c ThreadPoolUsageContext) Set(state *framework.CollectorState, labels Thre
 func (c ThreadPoolUsageContext) SetUpdateEvery(state *framework.CollectorState, labels ThreadPoolLabels, updateEvery int) {
 	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
 }
-
-
 
 // ThreadPoolLabels defines the required labels for ThreadPool contexts
 type ThreadPoolLabels struct {
@@ -4558,59 +4433,56 @@ func (l ThreadPoolLabels) InstanceID(contextName string) string {
 	return contextName + "." + cleanLabelValue(l.Name)
 }
 
-
 // ThreadPool contains all metric contexts for ThreadPool
 var ThreadPool = struct {
 	Usage ThreadPoolUsageContext
 }{
 	Usage: ThreadPoolUsageContext{
 		Context: framework.Context[ThreadPoolLabels]{
-		Name:       "websphere_pmi.threadpool_usage",
-		Family:     "workloads/threadpools",
-		Title:      "Thread Pool Usage",
-		Units:      "threads",
-		Type:       module.Stacked,
-		Priority:   301,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "active",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_pmi.threadpool_usage",
+			Family:      "workloads/threadpools",
+			Title:       "Thread Pool Usage",
+			Units:       "threads",
+			Type:        module.Stacked,
+			Priority:    301,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "active",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "size",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "size",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			LabelKeys: []string{
+				"name",
 			},
-		},
-		LabelKeys: []string{
-			"name",
-		},
 		},
 	},
 }
 
-
 // --- TransactionManager ---
-
 
 // TransactionManagerCountsValues defines the type-safe values for TransactionManager.Counts context
 type TransactionManagerCountsValues struct {
-	Global_begun int64
-	Global_committed int64
+	Global_begun       int64
+	Global_committed   int64
 	Global_rolled_back int64
-	Global_timeout int64
-	Global_involved int64
-	Optimizations int64
-	Local_begun int64
-	Local_committed int64
-	Local_rolled_back int64
-	Local_timeout int64
+	Global_timeout     int64
+	Global_involved    int64
+	Optimizations      int64
+	Local_begun        int64
+	Local_committed    int64
+	Local_rolled_back  int64
+	Local_timeout      int64
 }
 
 // TransactionManagerCountsContext provides type-safe operations for TransactionManager.Counts context
@@ -4621,16 +4493,16 @@ type TransactionManagerCountsContext struct {
 // Set provides type-safe dimension setting for TransactionManager.Counts context
 func (c TransactionManagerCountsContext) Set(state *framework.CollectorState, labels TransactionManagerLabels, values TransactionManagerCountsValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
-		"global_begun": values.Global_begun,
-		"global_committed": values.Global_committed,
+		"global_begun":       values.Global_begun,
+		"global_committed":   values.Global_committed,
 		"global_rolled_back": values.Global_rolled_back,
-		"global_timeout": values.Global_timeout,
-		"global_involved": values.Global_involved,
-		"optimizations": values.Optimizations,
-		"local_begun": values.Local_begun,
-		"local_committed": values.Local_committed,
-		"local_rolled_back": values.Local_rolled_back,
-		"local_timeout": values.Local_timeout,
+		"global_timeout":     values.Global_timeout,
+		"global_involved":    values.Global_involved,
+		"optimizations":      values.Optimizations,
+		"local_begun":        values.Local_begun,
+		"local_committed":    values.Local_committed,
+		"local_rolled_back":  values.Local_rolled_back,
+		"local_timeout":      values.Local_timeout,
 	})
 }
 
@@ -4642,7 +4514,7 @@ func (c TransactionManagerCountsContext) SetUpdateEvery(state *framework.Collect
 // TransactionManagerActiveValues defines the type-safe values for TransactionManager.Active context
 type TransactionManagerActiveValues struct {
 	Global int64
-	Local int64
+	Local  int64
 }
 
 // TransactionManagerActiveContext provides type-safe operations for TransactionManager.Active context
@@ -4654,7 +4526,7 @@ type TransactionManagerActiveContext struct {
 func (c TransactionManagerActiveContext) Set(state *framework.CollectorState, labels TransactionManagerLabels, values TransactionManagerActiveValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
 		"global": values.Global,
-		"local": values.Local,
+		"local":  values.Local,
 	})
 }
 
@@ -4665,13 +4537,13 @@ func (c TransactionManagerActiveContext) SetUpdateEvery(state *framework.Collect
 
 // TransactionManagerTimeValues defines the type-safe values for TransactionManager.Time context
 type TransactionManagerTimeValues struct {
-	Global_total int64
-	Global_prepare int64
-	Global_commit int64
+	Global_total             int64
+	Global_prepare           int64
+	Global_commit            int64
 	Global_before_completion int64
-	Local_total int64
-	Local_commit int64
-	Local_before_completion int64
+	Local_total              int64
+	Local_commit             int64
+	Local_before_completion  int64
 }
 
 // TransactionManagerTimeContext provides type-safe operations for TransactionManager.Time context
@@ -4682,13 +4554,13 @@ type TransactionManagerTimeContext struct {
 // Set provides type-safe dimension setting for TransactionManager.Time context
 func (c TransactionManagerTimeContext) Set(state *framework.CollectorState, labels TransactionManagerLabels, values TransactionManagerTimeValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
-		"global_total": values.Global_total,
-		"global_prepare": values.Global_prepare,
-		"global_commit": values.Global_commit,
+		"global_total":             values.Global_total,
+		"global_prepare":           values.Global_prepare,
+		"global_commit":            values.Global_commit,
 		"global_before_completion": values.Global_before_completion,
-		"local_total": values.Local_total,
-		"local_commit": values.Local_commit,
-		"local_before_completion": values.Local_before_completion,
+		"local_total":              values.Local_total,
+		"local_commit":             values.Local_commit,
+		"local_before_completion":  values.Local_before_completion,
 	})
 }
 
@@ -4697,11 +4569,9 @@ func (c TransactionManagerTimeContext) SetUpdateEvery(state *framework.Collector
 	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
 }
 
-
-
 // TransactionManagerLabels defines the required labels for TransactionManager contexts
 type TransactionManagerLabels struct {
-	Node string
+	Node   string
 	Server string
 }
 
@@ -4711,202 +4581,199 @@ func (l TransactionManagerLabels) InstanceID(contextName string) string {
 	return contextName + "." + cleanLabelValue(l.Node) + "_" + cleanLabelValue(l.Server)
 }
 
-
 // TransactionManager contains all metric contexts for TransactionManager
 var TransactionManager = struct {
 	Counts TransactionManagerCountsContext
 	Active TransactionManagerActiveContext
-	Time TransactionManagerTimeContext
+	Time   TransactionManagerTimeContext
 }{
 	Counts: TransactionManagerCountsContext{
 		Context: framework.Context[TransactionManagerLabels]{
-		Name:       "websphere_pmi.transaction_counts",
-		Family:     "workloads/transactions",
-		Title:      "Transaction Counts",
-		Units:      "transactions/s",
-		Type:       module.Line,
-		Priority:   401,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "global_begun",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_pmi.transaction_counts",
+			Family:      "workloads/transactions",
+			Title:       "Transaction Counts",
+			Units:       "transactions/s",
+			Type:        module.Line,
+			Priority:    401,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "global_begun",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "global_committed",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "global_rolled_back",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "global_timeout",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "global_involved",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "optimizations",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "local_begun",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "local_committed",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "local_rolled_back",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "local_timeout",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "global_committed",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			LabelKeys: []string{
+				"node",
+				"server",
 			},
-			{
-				Name:      "global_rolled_back",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "global_timeout",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "global_involved",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "optimizations",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "local_begun",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "local_committed",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "local_rolled_back",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "local_timeout",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-		},
-		LabelKeys: []string{
-			"node",
-			"server",
-		},
 		},
 	},
 	Active: TransactionManagerActiveContext{
 		Context: framework.Context[TransactionManagerLabels]{
-		Name:       "websphere_pmi.transaction_active",
-		Family:     "workloads/transactions",
-		Title:      "Active Transactions",
-		Units:      "transactions",
-		Type:       module.Line,
-		Priority:   402,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "global",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_pmi.transaction_active",
+			Family:      "workloads/transactions",
+			Title:       "Active Transactions",
+			Units:       "transactions",
+			Type:        module.Line,
+			Priority:    402,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "global",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "local",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "local",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			LabelKeys: []string{
+				"node",
+				"server",
 			},
-		},
-		LabelKeys: []string{
-			"node",
-			"server",
-		},
 		},
 	},
 	Time: TransactionManagerTimeContext{
 		Context: framework.Context[TransactionManagerLabels]{
-		Name:       "websphere_pmi.transaction_time",
-		Family:     "workloads/transactions",
-		Title:      "Transaction Durations",
-		Units:      "milliseconds",
-		Type:       module.Line,
-		Priority:   403,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "global_total",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_pmi.transaction_time",
+			Family:      "workloads/transactions",
+			Title:       "Transaction Durations",
+			Units:       "milliseconds",
+			Type:        module.Line,
+			Priority:    403,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "global_total",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "global_prepare",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "global_commit",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "global_before_completion",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "local_total",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "local_commit",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "local_before_completion",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "global_prepare",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			LabelKeys: []string{
+				"node",
+				"server",
 			},
-			{
-				Name:      "global_commit",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "global_before_completion",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "local_total",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "local_commit",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "local_before_completion",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-		},
-		LabelKeys: []string{
-			"node",
-			"server",
-		},
 		},
 	},
 }
 
-
 // --- URL ---
-
 
 // URLRequestsValues defines the type-safe values for URL.Requests context
 type URLRequestsValues struct {
@@ -4933,7 +4800,7 @@ func (c URLRequestsContext) SetUpdateEvery(state *framework.CollectorState, labe
 // URLTimeValues defines the type-safe values for URL.Time context
 type URLTimeValues struct {
 	Service int64
-	Async int64
+	Async   int64
 }
 
 // URLTimeContext provides type-safe operations for URL.Time context
@@ -4945,7 +4812,7 @@ type URLTimeContext struct {
 func (c URLTimeContext) Set(state *framework.CollectorState, labels URLLabels, values URLTimeValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
 		"service": values.Service,
-		"async": values.Async,
+		"async":   values.Async,
 	})
 }
 
@@ -4954,13 +4821,11 @@ func (c URLTimeContext) SetUpdateEvery(state *framework.CollectorState, labels U
 	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
 }
 
-
-
 // URLLabels defines the required labels for URL contexts
 type URLLabels struct {
-	Node string
+	Node   string
 	Server string
-	Url string
+	Url    string
 }
 
 // InstanceID generates a unique instance ID using the hardcoded label order from YAML
@@ -4969,79 +4834,76 @@ func (l URLLabels) InstanceID(contextName string) string {
 	return contextName + "." + cleanLabelValue(l.Node) + "_" + cleanLabelValue(l.Server) + "_" + cleanLabelValue(l.Url)
 }
 
-
 // URL contains all metric contexts for URL
 var URL = struct {
 	Requests URLRequestsContext
-	Time URLTimeContext
+	Time     URLTimeContext
 }{
 	Requests: URLRequestsContext{
 		Context: framework.Context[URLLabels]{
-		Name:       "websphere_pmi.url_requests",
-		Family:     "workloads/urls",
-		Title:      "URL Requests",
-		Units:      "requests/s",
-		Type:       module.Line,
-		Priority:   550,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "requests",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_pmi.url_requests",
+			Family:      "workloads/urls",
+			Title:       "URL Requests",
+			Units:       "requests/s",
+			Type:        module.Line,
+			Priority:    550,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "requests",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-			"node",
-			"server",
-			"url",
-		},
+			LabelKeys: []string{
+				"node",
+				"server",
+				"url",
+			},
 		},
 	},
 	Time: URLTimeContext{
 		Context: framework.Context[URLLabels]{
-		Name:       "websphere_pmi.url_time",
-		Family:     "workloads/urls",
-		Title:      "URL Service Time",
-		Units:      "milliseconds",
-		Type:       module.Line,
-		Priority:   551,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "service",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_pmi.url_time",
+			Family:      "workloads/urls",
+			Title:       "URL Service Time",
+			Units:       "milliseconds",
+			Type:        module.Line,
+			Priority:    551,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "service",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "async",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "async",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			LabelKeys: []string{
+				"node",
+				"server",
+				"url",
 			},
-		},
-		LabelKeys: []string{
-			"node",
-			"server",
-			"url",
-		},
 		},
 	},
 }
 
-
 // --- WebApp ---
-
 
 // WebAppLoadValues defines the type-safe values for WebApp.Load context
 type WebAppLoadValues struct {
 	Loaded_servlets int64
-	Reloads int64
+	Reloads         int64
 }
 
 // WebAppLoadContext provides type-safe operations for WebApp.Load context
@@ -5053,7 +4915,7 @@ type WebAppLoadContext struct {
 func (c WebAppLoadContext) Set(state *framework.CollectorState, labels WebAppLabels, values WebAppLoadValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
 		"loaded_servlets": values.Loaded_servlets,
-		"reloads": values.Reloads,
+		"reloads":         values.Reloads,
 	})
 }
 
@@ -5062,13 +4924,11 @@ func (c WebAppLoadContext) SetUpdateEvery(state *framework.CollectorState, label
 	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
 }
 
-
-
 // WebAppLabels defines the required labels for WebApp contexts
 type WebAppLabels struct {
-	Node string
+	Node   string
 	Server string
-	App string
+	App    string
 }
 
 // InstanceID generates a unique instance ID using the hardcoded label order from YAML
@@ -5077,48 +4937,45 @@ func (l WebAppLabels) InstanceID(contextName string) string {
 	return contextName + "." + cleanLabelValue(l.Node) + "_" + cleanLabelValue(l.Server) + "_" + cleanLabelValue(l.App)
 }
 
-
 // WebApp contains all metric contexts for WebApp
 var WebApp = struct {
 	Load WebAppLoadContext
 }{
 	Load: WebAppLoadContext{
 		Context: framework.Context[WebAppLabels]{
-		Name:       "websphere_pmi.webapp_load",
-		Family:     "workloads/webapps",
-		Title:      "Web Application Load",
-		Units:      "events",
-		Type:       module.Line,
-		Priority:   520,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "loaded_servlets",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_pmi.webapp_load",
+			Family:      "workloads/webapps",
+			Title:       "Web Application Load",
+			Units:       "events",
+			Type:        module.Line,
+			Priority:    520,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "loaded_servlets",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "reloads",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "reloads",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			LabelKeys: []string{
+				"node",
+				"server",
+				"app",
 			},
-		},
-		LabelKeys: []string{
-			"node",
-			"server",
-			"app",
-		},
 		},
 	},
 }
 
-
 // --- WebServices ---
-
 
 // WebServicesLoadedValues defines the type-safe values for WebServices.Loaded context
 type WebServicesLoadedValues struct {
@@ -5142,12 +4999,10 @@ func (c WebServicesLoadedContext) SetUpdateEvery(state *framework.CollectorState
 	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
 }
 
-
-
 // WebServicesLabels defines the required labels for WebServices contexts
 type WebServicesLabels struct {
-	Node string
-	Server string
+	Node    string
+	Server  string
 	Service string
 }
 
@@ -5157,47 +5012,44 @@ func (l WebServicesLabels) InstanceID(contextName string) string {
 	return contextName + "." + cleanLabelValue(l.Node) + "_" + cleanLabelValue(l.Server) + "_" + cleanLabelValue(l.Service)
 }
 
-
 // WebServices contains all metric contexts for WebServices
 var WebServices = struct {
 	Loaded WebServicesLoadedContext
 }{
 	Loaded: WebServicesLoadedContext{
 		Context: framework.Context[WebServicesLabels]{
-		Name:       "websphere_pmi.web_services_loaded",
-		Family:     "integration/web_services",
-		Title:      "Web Services Loaded",
-		Units:      "services",
-		Type:       module.Line,
-		Priority:   650,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "loaded",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_pmi.web_services_loaded",
+			Family:      "integration/web_services",
+			Title:       "Web Services Loaded",
+			Units:       "services",
+			Type:        module.Line,
+			Priority:    650,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "loaded",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-			"node",
-			"server",
-			"service",
-		},
+			LabelKeys: []string{
+				"node",
+				"server",
+				"service",
+			},
 		},
 	},
 }
 
-
 // --- WebServicesGateway ---
-
 
 // WebServicesGatewayRequestsValues defines the type-safe values for WebServicesGateway.Requests context
 type WebServicesGatewayRequestsValues struct {
-	Synchronous int64
-	Synchronous_responses int64
-	Asynchronous int64
+	Synchronous            int64
+	Synchronous_responses  int64
+	Asynchronous           int64
 	Asynchronous_responses int64
 }
 
@@ -5209,9 +5061,9 @@ type WebServicesGatewayRequestsContext struct {
 // Set provides type-safe dimension setting for WebServicesGateway.Requests context
 func (c WebServicesGatewayRequestsContext) Set(state *framework.CollectorState, labels WebServicesGatewayLabels, values WebServicesGatewayRequestsValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
-		"synchronous": values.Synchronous,
-		"synchronous_responses": values.Synchronous_responses,
-		"asynchronous": values.Asynchronous,
+		"synchronous":            values.Synchronous,
+		"synchronous_responses":  values.Synchronous_responses,
+		"asynchronous":           values.Asynchronous,
 		"asynchronous_responses": values.Asynchronous_responses,
 	})
 }
@@ -5221,12 +5073,10 @@ func (c WebServicesGatewayRequestsContext) SetUpdateEvery(state *framework.Colle
 	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
 }
 
-
-
 // WebServicesGatewayLabels defines the required labels for WebServicesGateway contexts
 type WebServicesGatewayLabels struct {
-	Node string
-	Server string
+	Node    string
+	Server  string
 	Gateway string
 }
 
@@ -5236,60 +5086,57 @@ func (l WebServicesGatewayLabels) InstanceID(contextName string) string {
 	return contextName + "." + cleanLabelValue(l.Node) + "_" + cleanLabelValue(l.Server) + "_" + cleanLabelValue(l.Gateway)
 }
 
-
 // WebServicesGateway contains all metric contexts for WebServicesGateway
 var WebServicesGateway = struct {
 	Requests WebServicesGatewayRequestsContext
 }{
 	Requests: WebServicesGatewayRequestsContext{
 		Context: framework.Context[WebServicesGatewayLabels]{
-		Name:       "websphere_pmi.web_services_gateway_requests",
-		Family:     "integration/web_services_gateway",
-		Title:      "Web Services Gateway Requests",
-		Units:      "requests/s",
-		Type:       module.Line,
-		Priority:   651,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "synchronous",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "websphere_pmi.web_services_gateway_requests",
+			Family:      "integration/web_services_gateway",
+			Title:       "Web Services Gateway Requests",
+			Units:       "requests/s",
+			Type:        module.Line,
+			Priority:    651,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "synchronous",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "synchronous_responses",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "asynchronous",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "asynchronous_responses",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "synchronous_responses",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			LabelKeys: []string{
+				"node",
+				"server",
+				"gateway",
 			},
-			{
-				Name:      "asynchronous",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "asynchronous_responses",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-		},
-		LabelKeys: []string{
-			"node",
-			"server",
-			"gateway",
-		},
 		},
 	},
 }
-
-
 
 // GetAllContexts returns all contexts for framework registration
 func GetAllContexts() []interface{} {

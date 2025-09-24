@@ -4,9 +4,9 @@
 package contexts
 
 import (
-	"strings"
-	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/framework"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/framework"
+	"strings"
 )
 
 // cleanLabelValue cleans a label value for use in instance/dimension IDs
@@ -34,9 +34,7 @@ func (EmptyLabels) InstanceID(contextName string) string {
 	return contextName
 }
 
-
 // --- Bufferpool ---
-
 
 // BufferpoolHitRatioValues defines the type-safe values for Bufferpool.HitRatio context
 type BufferpoolHitRatioValues struct {
@@ -62,9 +60,9 @@ func (c BufferpoolHitRatioContext) SetUpdateEvery(state *framework.CollectorStat
 
 // BufferpoolDetailedHitRatioValues defines the type-safe values for Bufferpool.DetailedHitRatio context
 type BufferpoolDetailedHitRatioValues struct {
-	Data int64
-	Index int64
-	Xda int64
+	Data   int64
+	Index  int64
+	Xda    int64
 	Column int64
 }
 
@@ -76,9 +74,9 @@ type BufferpoolDetailedHitRatioContext struct {
 // Set provides type-safe dimension setting for Bufferpool.DetailedHitRatio context
 func (c BufferpoolDetailedHitRatioContext) Set(state *framework.CollectorState, labels BufferpoolLabels, values BufferpoolDetailedHitRatioValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
-		"data": values.Data,
-		"index": values.Index,
-		"xda": values.Xda,
+		"data":   values.Data,
+		"index":  values.Index,
+		"xda":    values.Xda,
 		"column": values.Column,
 	})
 }
@@ -90,7 +88,7 @@ func (c BufferpoolDetailedHitRatioContext) SetUpdateEvery(state *framework.Colle
 
 // BufferpoolReadsValues defines the type-safe values for Bufferpool.Reads context
 type BufferpoolReadsValues struct {
-	Logical int64
+	Logical  int64
 	Physical int64
 }
 
@@ -102,7 +100,7 @@ type BufferpoolReadsContext struct {
 // Set provides type-safe dimension setting for Bufferpool.Reads context
 func (c BufferpoolReadsContext) Set(state *framework.CollectorState, labels BufferpoolLabels, values BufferpoolReadsValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
-		"logical": values.Logical,
+		"logical":  values.Logical,
 		"physical": values.Physical,
 	})
 }
@@ -114,7 +112,7 @@ func (c BufferpoolReadsContext) SetUpdateEvery(state *framework.CollectorState, 
 
 // BufferpoolDataReadsValues defines the type-safe values for Bufferpool.DataReads context
 type BufferpoolDataReadsValues struct {
-	Logical int64
+	Logical  int64
 	Physical int64
 }
 
@@ -126,7 +124,7 @@ type BufferpoolDataReadsContext struct {
 // Set provides type-safe dimension setting for Bufferpool.DataReads context
 func (c BufferpoolDataReadsContext) Set(state *framework.CollectorState, labels BufferpoolLabels, values BufferpoolDataReadsValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
-		"logical": values.Logical,
+		"logical":  values.Logical,
 		"physical": values.Physical,
 	})
 }
@@ -138,7 +136,7 @@ func (c BufferpoolDataReadsContext) SetUpdateEvery(state *framework.CollectorSta
 
 // BufferpoolIndexReadsValues defines the type-safe values for Bufferpool.IndexReads context
 type BufferpoolIndexReadsValues struct {
-	Logical int64
+	Logical  int64
 	Physical int64
 }
 
@@ -150,7 +148,7 @@ type BufferpoolIndexReadsContext struct {
 // Set provides type-safe dimension setting for Bufferpool.IndexReads context
 func (c BufferpoolIndexReadsContext) Set(state *framework.CollectorState, labels BufferpoolLabels, values BufferpoolIndexReadsValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
-		"logical": values.Logical,
+		"logical":  values.Logical,
 		"physical": values.Physical,
 	})
 }
@@ -162,7 +160,7 @@ func (c BufferpoolIndexReadsContext) SetUpdateEvery(state *framework.CollectorSt
 
 // BufferpoolPagesValues defines the type-safe values for Bufferpool.Pages context
 type BufferpoolPagesValues struct {
-	Used int64
+	Used  int64
 	Total int64
 }
 
@@ -174,7 +172,7 @@ type BufferpoolPagesContext struct {
 // Set provides type-safe dimension setting for Bufferpool.Pages context
 func (c BufferpoolPagesContext) Set(state *framework.CollectorState, labels BufferpoolLabels, values BufferpoolPagesValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
-		"used": values.Used,
+		"used":  values.Used,
 		"total": values.Total,
 	})
 }
@@ -206,12 +204,10 @@ func (c BufferpoolWritesContext) SetUpdateEvery(state *framework.CollectorState,
 	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
 }
 
-
-
 // BufferpoolLabels defines the required labels for Bufferpool contexts
 type BufferpoolLabels struct {
 	Bufferpool string
-	Page_size string
+	Page_size  string
 }
 
 // InstanceID generates a unique instance ID using the hardcoded label order from YAML
@@ -220,239 +216,236 @@ func (l BufferpoolLabels) InstanceID(contextName string) string {
 	return contextName + "." + cleanLabelValue(l.Bufferpool) + "_" + cleanLabelValue(l.Page_size)
 }
 
-
 // Bufferpool contains all metric contexts for Bufferpool
 var Bufferpool = struct {
-	HitRatio BufferpoolHitRatioContext
+	HitRatio         BufferpoolHitRatioContext
 	DetailedHitRatio BufferpoolDetailedHitRatioContext
-	Reads BufferpoolReadsContext
-	DataReads BufferpoolDataReadsContext
-	IndexReads BufferpoolIndexReadsContext
-	Pages BufferpoolPagesContext
-	Writes BufferpoolWritesContext
+	Reads            BufferpoolReadsContext
+	DataReads        BufferpoolDataReadsContext
+	IndexReads       BufferpoolIndexReadsContext
+	Pages            BufferpoolPagesContext
+	Writes           BufferpoolWritesContext
 }{
 	HitRatio: BufferpoolHitRatioContext{
 		Context: framework.Context[BufferpoolLabels]{
-		Name:       "db2.bufferpool_instance_hit_ratio",
-		Family:     "bufferpools/instances",
-		Title:      "Buffer Pool Hit Ratio",
-		Units:      "percentage",
-		Type:       module.Line,
-		Priority:   1110,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "overall",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1000,
-				Precision: 1000,
+			Name:        "db2.bufferpool_instance_hit_ratio",
+			Family:      "bufferpools/instances",
+			Title:       "Buffer Pool Hit Ratio",
+			Units:       "percentage",
+			Type:        module.Line,
+			Priority:    1110,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "overall",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1000,
+					Precision: 1000,
+				},
 			},
-		},
-		LabelKeys: []string{
-			"bufferpool",
-			"page_size",
-		},
+			LabelKeys: []string{
+				"bufferpool",
+				"page_size",
+			},
 		},
 	},
 	DetailedHitRatio: BufferpoolDetailedHitRatioContext{
 		Context: framework.Context[BufferpoolLabels]{
-		Name:       "db2.bufferpool_instance_detailed_hit_ratio",
-		Family:     "bufferpools/instances",
-		Title:      "Buffer Pool Detailed Hit Ratios",
-		Units:      "percentage",
-		Type:       module.Line,
-		Priority:   1111,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "data",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1000,
-				Precision: 1000,
+			Name:        "db2.bufferpool_instance_detailed_hit_ratio",
+			Family:      "bufferpools/instances",
+			Title:       "Buffer Pool Detailed Hit Ratios",
+			Units:       "percentage",
+			Type:        module.Line,
+			Priority:    1111,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "data",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1000,
+					Precision: 1000,
+				},
+				{
+					Name:      "index",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1000,
+					Precision: 1000,
+				},
+				{
+					Name:      "xda",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1000,
+					Precision: 1000,
+				},
+				{
+					Name:      "column",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1000,
+					Precision: 1000,
+				},
 			},
-			{
-				Name:      "index",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1000,
-				Precision: 1000,
+			LabelKeys: []string{
+				"bufferpool",
+				"page_size",
 			},
-			{
-				Name:      "xda",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1000,
-				Precision: 1000,
-			},
-			{
-				Name:      "column",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1000,
-				Precision: 1000,
-			},
-		},
-		LabelKeys: []string{
-			"bufferpool",
-			"page_size",
-		},
 		},
 	},
 	Reads: BufferpoolReadsContext{
 		Context: framework.Context[BufferpoolLabels]{
-		Name:       "db2.bufferpool_instance_reads",
-		Family:     "bufferpools/instances",
-		Title:      "Buffer Pool Reads",
-		Units:      "reads/s",
-		Type:       module.Stacked,
-		Priority:   1112,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "logical",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "db2.bufferpool_instance_reads",
+			Family:      "bufferpools/instances",
+			Title:       "Buffer Pool Reads",
+			Units:       "reads/s",
+			Type:        module.Stacked,
+			Priority:    1112,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "logical",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "physical",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "physical",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			LabelKeys: []string{
+				"bufferpool",
+				"page_size",
 			},
-		},
-		LabelKeys: []string{
-			"bufferpool",
-			"page_size",
-		},
 		},
 	},
 	DataReads: BufferpoolDataReadsContext{
 		Context: framework.Context[BufferpoolLabels]{
-		Name:       "db2.bufferpool_instance_data_reads",
-		Family:     "bufferpools/instances",
-		Title:      "Buffer Pool Data Page Reads",
-		Units:      "reads/s",
-		Type:       module.Stacked,
-		Priority:   1113,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "logical",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "db2.bufferpool_instance_data_reads",
+			Family:      "bufferpools/instances",
+			Title:       "Buffer Pool Data Page Reads",
+			Units:       "reads/s",
+			Type:        module.Stacked,
+			Priority:    1113,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "logical",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "physical",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "physical",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			LabelKeys: []string{
+				"bufferpool",
+				"page_size",
 			},
-		},
-		LabelKeys: []string{
-			"bufferpool",
-			"page_size",
-		},
 		},
 	},
 	IndexReads: BufferpoolIndexReadsContext{
 		Context: framework.Context[BufferpoolLabels]{
-		Name:       "db2.bufferpool_instance_index_reads",
-		Family:     "bufferpools/instances",
-		Title:      "Buffer Pool Index Page Reads",
-		Units:      "reads/s",
-		Type:       module.Stacked,
-		Priority:   1114,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "logical",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "db2.bufferpool_instance_index_reads",
+			Family:      "bufferpools/instances",
+			Title:       "Buffer Pool Index Page Reads",
+			Units:       "reads/s",
+			Type:        module.Stacked,
+			Priority:    1114,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "logical",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "physical",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "physical",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			LabelKeys: []string{
+				"bufferpool",
+				"page_size",
 			},
-		},
-		LabelKeys: []string{
-			"bufferpool",
-			"page_size",
-		},
 		},
 	},
 	Pages: BufferpoolPagesContext{
 		Context: framework.Context[BufferpoolLabels]{
-		Name:       "db2.bufferpool_instance_pages",
-		Family:     "bufferpools/instances",
-		Title:      "Buffer Pool Pages",
-		Units:      "pages",
-		Type:       module.Stacked,
-		Priority:   1115,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "used",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "db2.bufferpool_instance_pages",
+			Family:      "bufferpools/instances",
+			Title:       "Buffer Pool Pages",
+			Units:       "pages",
+			Type:        module.Stacked,
+			Priority:    1115,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "used",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "total",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "total",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			LabelKeys: []string{
+				"bufferpool",
+				"page_size",
 			},
-		},
-		LabelKeys: []string{
-			"bufferpool",
-			"page_size",
-		},
 		},
 	},
 	Writes: BufferpoolWritesContext{
 		Context: framework.Context[BufferpoolLabels]{
-		Name:       "db2.bufferpool_instance_writes",
-		Family:     "bufferpools/instances",
-		Title:      "Buffer Pool Writes",
-		Units:      "writes/s",
-		Type:       module.Line,
-		Priority:   1116,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "writes",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "db2.bufferpool_instance_writes",
+			Family:      "bufferpools/instances",
+			Title:       "Buffer Pool Writes",
+			Units:       "writes/s",
+			Type:        module.Line,
+			Priority:    1116,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "writes",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-			"bufferpool",
-			"page_size",
-		},
+			LabelKeys: []string{
+				"bufferpool",
+				"page_size",
+			},
 		},
 	},
 }
 
-
 // --- Connection ---
-
 
 // ConnectionStateValues defines the type-safe values for Connection.State context
 type ConnectionStateValues struct {
@@ -478,7 +471,7 @@ func (c ConnectionStateContext) SetUpdateEvery(state *framework.CollectorState, 
 
 // ConnectionActivityValues defines the type-safe values for Connection.Activity context
 type ConnectionActivityValues struct {
-	Read int64
+	Read    int64
 	Written int64
 }
 
@@ -490,7 +483,7 @@ type ConnectionActivityContext struct {
 // Set provides type-safe dimension setting for Connection.Activity context
 func (c ConnectionActivityContext) Set(state *framework.CollectorState, labels ConnectionLabels, values ConnectionActivityValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
-		"read": values.Read,
+		"read":    values.Read,
 		"written": values.Written,
 	})
 }
@@ -502,15 +495,15 @@ func (c ConnectionActivityContext) SetUpdateEvery(state *framework.CollectorStat
 
 // ConnectionWaitTimeValues defines the type-safe values for Connection.WaitTime context
 type ConnectionWaitTimeValues struct {
-	Lock int64
-	Log_disk int64
-	Log_buffer int64
-	Pool_read int64
-	Pool_write int64
-	Direct_read int64
+	Lock         int64
+	Log_disk     int64
+	Log_buffer   int64
+	Pool_read    int64
+	Pool_write   int64
+	Direct_read  int64
 	Direct_write int64
-	Fcm_recv int64
-	Fcm_send int64
+	Fcm_recv     int64
+	Fcm_send     int64
 }
 
 // ConnectionWaitTimeContext provides type-safe operations for Connection.WaitTime context
@@ -521,15 +514,15 @@ type ConnectionWaitTimeContext struct {
 // Set provides type-safe dimension setting for Connection.WaitTime context
 func (c ConnectionWaitTimeContext) Set(state *framework.CollectorState, labels ConnectionLabels, values ConnectionWaitTimeValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
-		"lock": values.Lock,
-		"log_disk": values.Log_disk,
-		"log_buffer": values.Log_buffer,
-		"pool_read": values.Pool_read,
-		"pool_write": values.Pool_write,
-		"direct_read": values.Direct_read,
+		"lock":         values.Lock,
+		"log_disk":     values.Log_disk,
+		"log_buffer":   values.Log_buffer,
+		"pool_read":    values.Pool_read,
+		"pool_write":   values.Pool_write,
+		"direct_read":  values.Direct_read,
 		"direct_write": values.Direct_write,
-		"fcm_recv": values.Fcm_recv,
-		"fcm_send": values.Fcm_send,
+		"fcm_recv":     values.Fcm_recv,
+		"fcm_send":     values.Fcm_send,
 	})
 }
 
@@ -540,10 +533,10 @@ func (c ConnectionWaitTimeContext) SetUpdateEvery(state *framework.CollectorStat
 
 // ConnectionProcessingTimeValues defines the type-safe values for Connection.ProcessingTime context
 type ConnectionProcessingTimeValues struct {
-	Routine int64
-	Compile int64
-	Section int64
-	Commit int64
+	Routine  int64
+	Compile  int64
+	Section  int64
+	Commit   int64
 	Rollback int64
 }
 
@@ -555,10 +548,10 @@ type ConnectionProcessingTimeContext struct {
 // Set provides type-safe dimension setting for Connection.ProcessingTime context
 func (c ConnectionProcessingTimeContext) Set(state *framework.CollectorState, labels ConnectionLabels, values ConnectionProcessingTimeValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
-		"routine": values.Routine,
-		"compile": values.Compile,
-		"section": values.Section,
-		"commit": values.Commit,
+		"routine":  values.Routine,
+		"compile":  values.Compile,
+		"section":  values.Section,
+		"commit":   values.Commit,
 		"rollback": values.Rollback,
 	})
 }
@@ -568,16 +561,14 @@ func (c ConnectionProcessingTimeContext) SetUpdateEvery(state *framework.Collect
 	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
 }
 
-
-
 // ConnectionLabels defines the required labels for Connection contexts
 type ConnectionLabels struct {
-	Application_id string
+	Application_id   string
 	Application_name string
-	Client_hostname string
-	Client_ip string
-	Client_user string
-	State string
+	Client_hostname  string
+	Client_ip        string
+	Client_user      string
+	State            string
 }
 
 // InstanceID generates a unique instance ID using the hardcoded label order from YAML
@@ -586,222 +577,219 @@ func (l ConnectionLabels) InstanceID(contextName string) string {
 	return contextName + "." + cleanLabelValue(l.Application_id) + "_" + cleanLabelValue(l.Application_name) + "_" + cleanLabelValue(l.Client_hostname) + "_" + cleanLabelValue(l.Client_ip) + "_" + cleanLabelValue(l.Client_user) + "_" + cleanLabelValue(l.State)
 }
 
-
 // Connection contains all metric contexts for Connection
 var Connection = struct {
-	State ConnectionStateContext
-	Activity ConnectionActivityContext
-	WaitTime ConnectionWaitTimeContext
+	State          ConnectionStateContext
+	Activity       ConnectionActivityContext
+	WaitTime       ConnectionWaitTimeContext
 	ProcessingTime ConnectionProcessingTimeContext
 }{
 	State: ConnectionStateContext{
 		Context: framework.Context[ConnectionLabels]{
-		Name:       "db2.connection_state",
-		Family:     "connections/instances",
-		Title:      "Connection State",
-		Units:      "state",
-		Type:       module.Line,
-		Priority:   1130,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "state",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "db2.connection_state",
+			Family:      "connections/instances",
+			Title:       "Connection State",
+			Units:       "state",
+			Type:        module.Line,
+			Priority:    1130,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "state",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-			"application_id",
-			"application_name",
-			"client_hostname",
-			"client_ip",
-			"client_user",
-			"state",
-		},
+			LabelKeys: []string{
+				"application_id",
+				"application_name",
+				"client_hostname",
+				"client_ip",
+				"client_user",
+				"state",
+			},
 		},
 	},
 	Activity: ConnectionActivityContext{
 		Context: framework.Context[ConnectionLabels]{
-		Name:       "db2.connection_activity",
-		Family:     "connections/instances",
-		Title:      "Connection Row Activity",
-		Units:      "rows/s",
-		Type:       module.Area,
-		Priority:   1131,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "read",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "db2.connection_activity",
+			Family:      "connections/instances",
+			Title:       "Connection Row Activity",
+			Units:       "rows/s",
+			Type:        module.Area,
+			Priority:    1131,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "read",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "written",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "written",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			LabelKeys: []string{
+				"application_id",
+				"application_name",
+				"client_hostname",
+				"client_ip",
+				"client_user",
+				"state",
 			},
-		},
-		LabelKeys: []string{
-			"application_id",
-			"application_name",
-			"client_hostname",
-			"client_ip",
-			"client_user",
-			"state",
-		},
 		},
 	},
 	WaitTime: ConnectionWaitTimeContext{
 		Context: framework.Context[ConnectionLabels]{
-		Name:       "db2.connection_wait_time",
-		Family:     "connections/instances",
-		Title:      "Connection Wait Time",
-		Units:      "milliseconds",
-		Type:       module.Stacked,
-		Priority:   1132,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "lock",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "db2.connection_wait_time",
+			Family:      "connections/instances",
+			Title:       "Connection Wait Time",
+			Units:       "milliseconds",
+			Type:        module.Stacked,
+			Priority:    1132,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "lock",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "log_disk",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "log_buffer",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "pool_read",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "pool_write",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "direct_read",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "direct_write",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "fcm_recv",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "fcm_send",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "log_disk",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			LabelKeys: []string{
+				"application_id",
+				"application_name",
+				"client_hostname",
+				"client_ip",
+				"client_user",
+				"state",
 			},
-			{
-				Name:      "log_buffer",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "pool_read",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "pool_write",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "direct_read",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "direct_write",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "fcm_recv",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "fcm_send",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-		},
-		LabelKeys: []string{
-			"application_id",
-			"application_name",
-			"client_hostname",
-			"client_ip",
-			"client_user",
-			"state",
-		},
 		},
 	},
 	ProcessingTime: ConnectionProcessingTimeContext{
 		Context: framework.Context[ConnectionLabels]{
-		Name:       "db2.connection_processing_time",
-		Family:     "connections/instances",
-		Title:      "Connection Processing Time",
-		Units:      "milliseconds",
-		Type:       module.Stacked,
-		Priority:   1133,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "routine",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "db2.connection_processing_time",
+			Family:      "connections/instances",
+			Title:       "Connection Processing Time",
+			Units:       "milliseconds",
+			Type:        module.Stacked,
+			Priority:    1133,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "routine",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "compile",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "section",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "commit",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "rollback",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "compile",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			LabelKeys: []string{
+				"application_id",
+				"application_name",
+				"client_hostname",
+				"client_ip",
+				"client_user",
+				"state",
 			},
-			{
-				Name:      "section",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "commit",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "rollback",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-		},
-		LabelKeys: []string{
-			"application_id",
-			"application_name",
-			"client_hostname",
-			"client_ip",
-			"client_user",
-			"state",
-		},
 		},
 	},
 }
 
-
 // --- Database ---
-
 
 // DatabaseStatusValues defines the type-safe values for Database.Status context
 type DatabaseStatusValues struct {
@@ -847,12 +835,10 @@ func (c DatabaseApplicationsContext) SetUpdateEvery(state *framework.CollectorSt
 	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
 }
 
-
-
 // DatabaseLabels defines the required labels for Database contexts
 type DatabaseLabels struct {
 	Database string
-	Status string
+	Status   string
 }
 
 // InstanceID generates a unique instance ID using the hardcoded label order from YAML
@@ -861,70 +847,67 @@ func (l DatabaseLabels) InstanceID(contextName string) string {
 	return contextName + "." + cleanLabelValue(l.Database) + "_" + cleanLabelValue(l.Status)
 }
 
-
 // Database contains all metric contexts for Database
 var Database = struct {
-	Status DatabaseStatusContext
+	Status       DatabaseStatusContext
 	Applications DatabaseApplicationsContext
 }{
 	Status: DatabaseStatusContext{
 		Context: framework.Context[DatabaseLabels]{
-		Name:       "db2.database_instance_status",
-		Family:     "databases",
-		Title:      "Database Status",
-		Units:      "status",
-		Type:       module.Line,
-		Priority:   1100,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "status",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "db2.database_instance_status",
+			Family:      "databases",
+			Title:       "Database Status",
+			Units:       "status",
+			Type:        module.Line,
+			Priority:    1100,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "status",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-			"database",
-			"status",
-		},
+			LabelKeys: []string{
+				"database",
+				"status",
+			},
 		},
 	},
 	Applications: DatabaseApplicationsContext{
 		Context: framework.Context[DatabaseLabels]{
-		Name:       "db2.database_applications",
-		Family:     "databases",
-		Title:      "Database Applications",
-		Units:      "applications",
-		Type:       module.Line,
-		Priority:   1101,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "applications",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "db2.database_applications",
+			Family:      "databases",
+			Title:       "Database Applications",
+			Units:       "applications",
+			Type:        module.Line,
+			Priority:    1101,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "applications",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-			"database",
-			"status",
-		},
+			LabelKeys: []string{
+				"database",
+				"status",
+			},
 		},
 	},
 }
 
-
 // --- Index ---
-
 
 // IndexUsageValues defines the type-safe values for Index.Usage context
 type IndexUsageValues struct {
 	Index int64
-	Full int64
+	Full  int64
 }
 
 // IndexUsageContext provides type-safe operations for Index.Usage context
@@ -936,7 +919,7 @@ type IndexUsageContext struct {
 func (c IndexUsageContext) Set(state *framework.CollectorState, labels IndexLabels, values IndexUsageValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
 		"index": values.Index,
-		"full": values.Full,
+		"full":  values.Full,
 	})
 }
 
@@ -944,8 +927,6 @@ func (c IndexUsageContext) Set(state *framework.CollectorState, labels IndexLabe
 func (c IndexUsageContext) SetUpdateEvery(state *framework.CollectorState, labels IndexLabels, updateEvery int) {
 	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
 }
-
-
 
 // IndexLabels defines the required labels for Index contexts
 type IndexLabels struct {
@@ -958,46 +939,43 @@ func (l IndexLabels) InstanceID(contextName string) string {
 	return contextName + "." + cleanLabelValue(l.Index)
 }
 
-
 // Index contains all metric contexts for Index
 var Index = struct {
 	Usage IndexUsageContext
 }{
 	Usage: IndexUsageContext{
 		Context: framework.Context[IndexLabels]{
-		Name:       "db2.index_usage",
-		Family:     "indexes",
-		Title:      "Index Usage",
-		Units:      "scans/s",
-		Type:       module.Area,
-		Priority:   1150,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "index",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "db2.index_usage",
+			Family:      "indexes",
+			Title:       "Index Usage",
+			Units:       "scans/s",
+			Type:        module.Area,
+			Priority:    1150,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "index",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "full",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "full",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			LabelKeys: []string{
+				"index",
 			},
-		},
-		LabelKeys: []string{
-			"index",
-		},
 		},
 	},
 }
 
-
 // --- MemoryPool ---
-
 
 // MemoryPoolUsageValues defines the type-safe values for MemoryPool.Usage context
 type MemoryPoolUsageValues struct {
@@ -1043,8 +1021,6 @@ func (c MemoryPoolHighWaterMarkContext) SetUpdateEvery(state *framework.Collecto
 	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
 }
 
-
-
 // MemoryPoolLabels defines the required labels for MemoryPool contexts
 type MemoryPoolLabels struct {
 	Pool_type string
@@ -1056,63 +1032,60 @@ func (l MemoryPoolLabels) InstanceID(contextName string) string {
 	return contextName + "." + cleanLabelValue(l.Pool_type)
 }
 
-
 // MemoryPool contains all metric contexts for MemoryPool
 var MemoryPool = struct {
-	Usage MemoryPoolUsageContext
+	Usage         MemoryPoolUsageContext
 	HighWaterMark MemoryPoolHighWaterMarkContext
 }{
 	Usage: MemoryPoolUsageContext{
 		Context: framework.Context[MemoryPoolLabels]{
-		Name:       "db2.memory_pool_usage",
-		Family:     "memory",
-		Title:      "Memory Pool Usage",
-		Units:      "bytes",
-		Type:       module.Line,
-		Priority:   1160,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "used",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "db2.memory_pool_usage",
+			Family:      "memory",
+			Title:       "Memory Pool Usage",
+			Units:       "bytes",
+			Type:        module.Line,
+			Priority:    1160,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "used",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-			"pool_type",
-		},
+			LabelKeys: []string{
+				"pool_type",
+			},
 		},
 	},
 	HighWaterMark: MemoryPoolHighWaterMarkContext{
 		Context: framework.Context[MemoryPoolLabels]{
-		Name:       "db2.memory_pool_hwm",
-		Family:     "memory",
-		Title:      "Memory Pool High Water Mark",
-		Units:      "bytes",
-		Type:       module.Line,
-		Priority:   1161,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "hwm",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "db2.memory_pool_hwm",
+			Family:      "memory",
+			Title:       "Memory Pool High Water Mark",
+			Units:       "bytes",
+			Type:        module.Line,
+			Priority:    1161,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "hwm",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-			"pool_type",
-		},
+			LabelKeys: []string{
+				"pool_type",
+			},
 		},
 	},
 }
 
-
 // --- MemorySet ---
-
 
 // MemorySetUsageValues defines the type-safe values for MemorySet.Usage context
 type MemorySetUsageValues struct {
@@ -1224,14 +1197,12 @@ func (c MemorySetPercentUsedHWMContext) SetUpdateEvery(state *framework.Collecto
 	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
 }
 
-
-
 // MemorySetLabels defines the required labels for MemorySet contexts
 type MemorySetLabels struct {
-	Host string
+	Host     string
 	Database string
 	Set_type string
-	Member string
+	Member   string
 }
 
 // InstanceID generates a unique instance ID using the hardcoded label order from YAML
@@ -1240,150 +1211,147 @@ func (l MemorySetLabels) InstanceID(contextName string) string {
 	return contextName + "." + cleanLabelValue(l.Host) + "_" + cleanLabelValue(l.Database) + "_" + cleanLabelValue(l.Set_type) + "_" + cleanLabelValue(l.Member)
 }
 
-
 // MemorySet contains all metric contexts for MemorySet
 var MemorySet = struct {
-	Usage MemorySetUsageContext
-	Committed MemorySetCommittedContext
-	HighWaterMark MemorySetHighWaterMarkContext
+	Usage               MemorySetUsageContext
+	Committed           MemorySetCommittedContext
+	HighWaterMark       MemorySetHighWaterMarkContext
 	AdditionalCommitted MemorySetAdditionalCommittedContext
-	PercentUsedHWM MemorySetPercentUsedHWMContext
+	PercentUsedHWM      MemorySetPercentUsedHWMContext
 }{
 	Usage: MemorySetUsageContext{
 		Context: framework.Context[MemorySetLabels]{
-		Name:       "db2.memory_set_usage",
-		Family:     "memory_sets",
-		Title:      "Memory Set Usage",
-		Units:      "bytes",
-		Type:       module.Line,
-		Priority:   1180,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "used",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "db2.memory_set_usage",
+			Family:      "memory_sets",
+			Title:       "Memory Set Usage",
+			Units:       "bytes",
+			Type:        module.Line,
+			Priority:    1180,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "used",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-			"host",
-			"database",
-			"set_type",
-			"member",
-		},
+			LabelKeys: []string{
+				"host",
+				"database",
+				"set_type",
+				"member",
+			},
 		},
 	},
 	Committed: MemorySetCommittedContext{
 		Context: framework.Context[MemorySetLabels]{
-		Name:       "db2.memory_set_committed",
-		Family:     "memory_sets",
-		Title:      "Memory Set Committed",
-		Units:      "bytes",
-		Type:       module.Line,
-		Priority:   1181,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "committed",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "db2.memory_set_committed",
+			Family:      "memory_sets",
+			Title:       "Memory Set Committed",
+			Units:       "bytes",
+			Type:        module.Line,
+			Priority:    1181,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "committed",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-			"host",
-			"database",
-			"set_type",
-			"member",
-		},
+			LabelKeys: []string{
+				"host",
+				"database",
+				"set_type",
+				"member",
+			},
 		},
 	},
 	HighWaterMark: MemorySetHighWaterMarkContext{
 		Context: framework.Context[MemorySetLabels]{
-		Name:       "db2.memory_set_high_water_mark",
-		Family:     "memory_sets",
-		Title:      "Memory Set High Water Mark",
-		Units:      "bytes",
-		Type:       module.Line,
-		Priority:   1182,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "hwm",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "db2.memory_set_high_water_mark",
+			Family:      "memory_sets",
+			Title:       "Memory Set High Water Mark",
+			Units:       "bytes",
+			Type:        module.Line,
+			Priority:    1182,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "hwm",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-			"host",
-			"database",
-			"set_type",
-			"member",
-		},
+			LabelKeys: []string{
+				"host",
+				"database",
+				"set_type",
+				"member",
+			},
 		},
 	},
 	AdditionalCommitted: MemorySetAdditionalCommittedContext{
 		Context: framework.Context[MemorySetLabels]{
-		Name:       "db2.memory_set_additional_committed",
-		Family:     "memory_sets",
-		Title:      "Memory Set Additional Committed",
-		Units:      "bytes",
-		Type:       module.Line,
-		Priority:   1183,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "additional",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "db2.memory_set_additional_committed",
+			Family:      "memory_sets",
+			Title:       "Memory Set Additional Committed",
+			Units:       "bytes",
+			Type:        module.Line,
+			Priority:    1183,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "additional",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-			"host",
-			"database",
-			"set_type",
-			"member",
-		},
+			LabelKeys: []string{
+				"host",
+				"database",
+				"set_type",
+				"member",
+			},
 		},
 	},
 	PercentUsedHWM: MemorySetPercentUsedHWMContext{
 		Context: framework.Context[MemorySetLabels]{
-		Name:       "db2.memory_set_percent_used_hwm",
-		Family:     "memory_sets",
-		Title:      "Memory Set Percent Used vs HWM",
-		Units:      "percentage",
-		Type:       module.Line,
-		Priority:   1184,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "used_hwm",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1000,
-				Precision: 1000,
+			Name:        "db2.memory_set_percent_used_hwm",
+			Family:      "memory_sets",
+			Title:       "Memory Set Percent Used vs HWM",
+			Units:       "percentage",
+			Type:        module.Line,
+			Priority:    1184,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "used_hwm",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1000,
+					Precision: 1000,
+				},
 			},
-		},
-		LabelKeys: []string{
-			"host",
-			"database",
-			"set_type",
-			"member",
-		},
+			LabelKeys: []string{
+				"host",
+				"database",
+				"set_type",
+				"member",
+			},
 		},
 	},
 }
 
-
 // --- Prefetcher ---
-
 
 // PrefetcherPrefetchRatioValues defines the type-safe values for Prefetcher.PrefetchRatio context
 type PrefetcherPrefetchRatioValues struct {
@@ -1517,8 +1485,6 @@ func (c PrefetcherUnreadPagesContext) SetUpdateEvery(state *framework.CollectorS
 	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
 }
 
-
-
 // PrefetcherLabels defines the required labels for Prefetcher contexts
 type PrefetcherLabels struct {
 	Bufferpool string
@@ -1530,164 +1496,161 @@ func (l PrefetcherLabels) InstanceID(contextName string) string {
 	return contextName + "." + cleanLabelValue(l.Bufferpool)
 }
 
-
 // Prefetcher contains all metric contexts for Prefetcher
 var Prefetcher = struct {
 	PrefetchRatio PrefetcherPrefetchRatioContext
-	CleanerRatio PrefetcherCleanerRatioContext
+	CleanerRatio  PrefetcherCleanerRatioContext
 	PhysicalReads PrefetcherPhysicalReadsContext
-	AsyncReads PrefetcherAsyncReadsContext
-	WaitTime PrefetcherWaitTimeContext
-	UnreadPages PrefetcherUnreadPagesContext
+	AsyncReads    PrefetcherAsyncReadsContext
+	WaitTime      PrefetcherWaitTimeContext
+	UnreadPages   PrefetcherUnreadPagesContext
 }{
 	PrefetchRatio: PrefetcherPrefetchRatioContext{
 		Context: framework.Context[PrefetcherLabels]{
-		Name:       "db2.prefetcher_prefetch_ratio",
-		Family:     "prefetchers",
-		Title:      "Prefetcher Prefetch Ratio",
-		Units:      "percentage",
-		Type:       module.Line,
-		Priority:   1190,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "ratio",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1000,
-				Precision: 1000,
+			Name:        "db2.prefetcher_prefetch_ratio",
+			Family:      "prefetchers",
+			Title:       "Prefetcher Prefetch Ratio",
+			Units:       "percentage",
+			Type:        module.Line,
+			Priority:    1190,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "ratio",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1000,
+					Precision: 1000,
+				},
 			},
-		},
-		LabelKeys: []string{
-			"bufferpool",
-		},
+			LabelKeys: []string{
+				"bufferpool",
+			},
 		},
 	},
 	CleanerRatio: PrefetcherCleanerRatioContext{
 		Context: framework.Context[PrefetcherLabels]{
-		Name:       "db2.prefetcher_cleaner_ratio",
-		Family:     "prefetchers",
-		Title:      "Prefetcher Cleaner Ratio",
-		Units:      "percentage",
-		Type:       module.Line,
-		Priority:   1191,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "ratio",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1000,
-				Precision: 1000,
+			Name:        "db2.prefetcher_cleaner_ratio",
+			Family:      "prefetchers",
+			Title:       "Prefetcher Cleaner Ratio",
+			Units:       "percentage",
+			Type:        module.Line,
+			Priority:    1191,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "ratio",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1000,
+					Precision: 1000,
+				},
 			},
-		},
-		LabelKeys: []string{
-			"bufferpool",
-		},
+			LabelKeys: []string{
+				"bufferpool",
+			},
 		},
 	},
 	PhysicalReads: PrefetcherPhysicalReadsContext{
 		Context: framework.Context[PrefetcherLabels]{
-		Name:       "db2.prefetcher_physical_reads",
-		Family:     "prefetchers",
-		Title:      "Prefetcher Physical Reads",
-		Units:      "reads/s",
-		Type:       module.Line,
-		Priority:   1192,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "reads",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "db2.prefetcher_physical_reads",
+			Family:      "prefetchers",
+			Title:       "Prefetcher Physical Reads",
+			Units:       "reads/s",
+			Type:        module.Line,
+			Priority:    1192,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "reads",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-			"bufferpool",
-		},
+			LabelKeys: []string{
+				"bufferpool",
+			},
 		},
 	},
 	AsyncReads: PrefetcherAsyncReadsContext{
 		Context: framework.Context[PrefetcherLabels]{
-		Name:       "db2.prefetcher_async_reads",
-		Family:     "prefetchers",
-		Title:      "Prefetcher Asynchronous Reads",
-		Units:      "reads/s",
-		Type:       module.Line,
-		Priority:   1193,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "reads",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "db2.prefetcher_async_reads",
+			Family:      "prefetchers",
+			Title:       "Prefetcher Asynchronous Reads",
+			Units:       "reads/s",
+			Type:        module.Line,
+			Priority:    1193,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "reads",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-			"bufferpool",
-		},
+			LabelKeys: []string{
+				"bufferpool",
+			},
 		},
 	},
 	WaitTime: PrefetcherWaitTimeContext{
 		Context: framework.Context[PrefetcherLabels]{
-		Name:       "db2.prefetcher_wait_time",
-		Family:     "prefetchers",
-		Title:      "Prefetcher Wait Time",
-		Units:      "milliseconds",
-		Type:       module.Line,
-		Priority:   1194,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "wait_time",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "db2.prefetcher_wait_time",
+			Family:      "prefetchers",
+			Title:       "Prefetcher Wait Time",
+			Units:       "milliseconds",
+			Type:        module.Line,
+			Priority:    1194,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "wait_time",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-			"bufferpool",
-		},
+			LabelKeys: []string{
+				"bufferpool",
+			},
 		},
 	},
 	UnreadPages: PrefetcherUnreadPagesContext{
 		Context: framework.Context[PrefetcherLabels]{
-		Name:       "db2.prefetcher_unread_pages",
-		Family:     "prefetchers",
-		Title:      "Prefetcher Unread Pages",
-		Units:      "pages/s",
-		Type:       module.Line,
-		Priority:   1195,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "unread",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "db2.prefetcher_unread_pages",
+			Family:      "prefetchers",
+			Title:       "Prefetcher Unread Pages",
+			Units:       "pages/s",
+			Type:        module.Line,
+			Priority:    1195,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "unread",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-			"bufferpool",
-		},
+			LabelKeys: []string{
+				"bufferpool",
+			},
 		},
 	},
 }
 
-
 // --- System ---
-
 
 // SystemServiceHealthValues defines the type-safe values for System.ServiceHealth context
 type SystemServiceHealthValues struct {
 	Connection int64
-	Database int64
+	Database   int64
 }
 
 // SystemServiceHealthContext provides type-safe operations for System.ServiceHealth context
@@ -1699,7 +1662,7 @@ type SystemServiceHealthContext struct {
 func (c SystemServiceHealthContext) Set(state *framework.CollectorState, labels EmptyLabels, values SystemServiceHealthValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, nil, map[string]int64{
 		"connection": values.Connection,
-		"database": values.Database,
+		"database":   values.Database,
 	})
 }
 
@@ -1710,10 +1673,10 @@ func (c SystemServiceHealthContext) SetUpdateEvery(state *framework.CollectorSta
 
 // SystemConnectionsValues defines the type-safe values for System.Connections context
 type SystemConnectionsValues struct {
-	Total int64
-	Active int64
-	Executing int64
-	Idle int64
+	Total       int64
+	Active      int64
+	Executing   int64
+	Idle        int64
 	Max_allowed int64
 }
 
@@ -1725,10 +1688,10 @@ type SystemConnectionsContext struct {
 // Set provides type-safe dimension setting for System.Connections context
 func (c SystemConnectionsContext) Set(state *framework.CollectorState, labels EmptyLabels, values SystemConnectionsValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, nil, map[string]int64{
-		"total": values.Total,
-		"active": values.Active,
-		"executing": values.Executing,
-		"idle": values.Idle,
+		"total":       values.Total,
+		"active":      values.Active,
+		"executing":   values.Executing,
+		"idle":        values.Idle,
 		"max_allowed": values.Max_allowed,
 	})
 }
@@ -1740,8 +1703,8 @@ func (c SystemConnectionsContext) SetUpdateEvery(state *framework.CollectorState
 
 // SystemLockingValues defines the type-safe values for System.Locking context
 type SystemLockingValues struct {
-	Waits int64
-	Timeouts int64
+	Waits       int64
+	Timeouts    int64
 	Escalations int64
 }
 
@@ -1753,8 +1716,8 @@ type SystemLockingContext struct {
 // Set provides type-safe dimension setting for System.Locking context
 func (c SystemLockingContext) Set(state *framework.CollectorState, labels EmptyLabels, values SystemLockingValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, nil, map[string]int64{
-		"waits": values.Waits,
-		"timeouts": values.Timeouts,
+		"waits":       values.Waits,
+		"timeouts":    values.Timeouts,
 		"escalations": values.Escalations,
 	})
 }
@@ -1788,9 +1751,9 @@ func (c SystemDeadlocksContext) SetUpdateEvery(state *framework.CollectorState, 
 
 // SystemLockDetailsValues defines the type-safe values for System.LockDetails context
 type SystemLockDetailsValues struct {
-	Active int64
+	Active         int64
 	Waiting_agents int64
-	Memory_pages int64
+	Memory_pages   int64
 }
 
 // SystemLockDetailsContext provides type-safe operations for System.LockDetails context
@@ -1801,9 +1764,9 @@ type SystemLockDetailsContext struct {
 // Set provides type-safe dimension setting for System.LockDetails context
 func (c SystemLockDetailsContext) Set(state *framework.CollectorState, labels EmptyLabels, values SystemLockDetailsValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, nil, map[string]int64{
-		"active": values.Active,
+		"active":         values.Active,
 		"waiting_agents": values.Waiting_agents,
-		"memory_pages": values.Memory_pages,
+		"memory_pages":   values.Memory_pages,
 	})
 }
 
@@ -1836,7 +1799,7 @@ func (c SystemLockWaitTimeContext) SetUpdateEvery(state *framework.CollectorStat
 
 // SystemSortingValues defines the type-safe values for System.Sorting context
 type SystemSortingValues struct {
-	Sorts int64
+	Sorts     int64
 	Overflows int64
 }
 
@@ -1848,7 +1811,7 @@ type SystemSortingContext struct {
 // Set provides type-safe dimension setting for System.Sorting context
 func (c SystemSortingContext) Set(state *framework.CollectorState, labels EmptyLabels, values SystemSortingValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, nil, map[string]int64{
-		"sorts": values.Sorts,
+		"sorts":     values.Sorts,
 		"overflows": values.Overflows,
 	})
 }
@@ -1860,7 +1823,7 @@ func (c SystemSortingContext) SetUpdateEvery(state *framework.CollectorState, la
 
 // SystemRowActivityValues defines the type-safe values for System.RowActivity context
 type SystemRowActivityValues struct {
-	Read int64
+	Read     int64
 	Returned int64
 	Modified int64
 }
@@ -1873,7 +1836,7 @@ type SystemRowActivityContext struct {
 // Set provides type-safe dimension setting for System.RowActivity context
 func (c SystemRowActivityContext) Set(state *framework.CollectorState, labels EmptyLabels, values SystemRowActivityValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, nil, map[string]int64{
-		"read": values.Read,
+		"read":     values.Read,
 		"returned": values.Returned,
 		"modified": values.Modified,
 	})
@@ -1886,7 +1849,7 @@ func (c SystemRowActivityContext) SetUpdateEvery(state *framework.CollectorState
 
 // SystemBufferpoolHitRatioValues defines the type-safe values for System.BufferpoolHitRatio context
 type SystemBufferpoolHitRatioValues struct {
-	Hits int64
+	Hits   int64
 	Misses int64
 }
 
@@ -1898,7 +1861,7 @@ type SystemBufferpoolHitRatioContext struct {
 // Set provides type-safe dimension setting for System.BufferpoolHitRatio context
 func (c SystemBufferpoolHitRatioContext) Set(state *framework.CollectorState, labels EmptyLabels, values SystemBufferpoolHitRatioValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, nil, map[string]int64{
-		"hits": values.Hits,
+		"hits":   values.Hits,
 		"misses": values.Misses,
 	})
 }
@@ -1910,7 +1873,7 @@ func (c SystemBufferpoolHitRatioContext) SetUpdateEvery(state *framework.Collect
 
 // SystemBufferpoolDataHitRatioValues defines the type-safe values for System.BufferpoolDataHitRatio context
 type SystemBufferpoolDataHitRatioValues struct {
-	Hits int64
+	Hits   int64
 	Misses int64
 }
 
@@ -1922,7 +1885,7 @@ type SystemBufferpoolDataHitRatioContext struct {
 // Set provides type-safe dimension setting for System.BufferpoolDataHitRatio context
 func (c SystemBufferpoolDataHitRatioContext) Set(state *framework.CollectorState, labels EmptyLabels, values SystemBufferpoolDataHitRatioValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, nil, map[string]int64{
-		"hits": values.Hits,
+		"hits":   values.Hits,
 		"misses": values.Misses,
 	})
 }
@@ -1934,7 +1897,7 @@ func (c SystemBufferpoolDataHitRatioContext) SetUpdateEvery(state *framework.Col
 
 // SystemBufferpoolIndexHitRatioValues defines the type-safe values for System.BufferpoolIndexHitRatio context
 type SystemBufferpoolIndexHitRatioValues struct {
-	Hits int64
+	Hits   int64
 	Misses int64
 }
 
@@ -1946,7 +1909,7 @@ type SystemBufferpoolIndexHitRatioContext struct {
 // Set provides type-safe dimension setting for System.BufferpoolIndexHitRatio context
 func (c SystemBufferpoolIndexHitRatioContext) Set(state *framework.CollectorState, labels EmptyLabels, values SystemBufferpoolIndexHitRatioValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, nil, map[string]int64{
-		"hits": values.Hits,
+		"hits":   values.Hits,
 		"misses": values.Misses,
 	})
 }
@@ -1958,7 +1921,7 @@ func (c SystemBufferpoolIndexHitRatioContext) SetUpdateEvery(state *framework.Co
 
 // SystemBufferpoolXDAHitRatioValues defines the type-safe values for System.BufferpoolXDAHitRatio context
 type SystemBufferpoolXDAHitRatioValues struct {
-	Hits int64
+	Hits   int64
 	Misses int64
 }
 
@@ -1970,7 +1933,7 @@ type SystemBufferpoolXDAHitRatioContext struct {
 // Set provides type-safe dimension setting for System.BufferpoolXDAHitRatio context
 func (c SystemBufferpoolXDAHitRatioContext) Set(state *framework.CollectorState, labels EmptyLabels, values SystemBufferpoolXDAHitRatioValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, nil, map[string]int64{
-		"hits": values.Hits,
+		"hits":   values.Hits,
 		"misses": values.Misses,
 	})
 }
@@ -1982,7 +1945,7 @@ func (c SystemBufferpoolXDAHitRatioContext) SetUpdateEvery(state *framework.Coll
 
 // SystemBufferpoolColumnHitRatioValues defines the type-safe values for System.BufferpoolColumnHitRatio context
 type SystemBufferpoolColumnHitRatioValues struct {
-	Hits int64
+	Hits   int64
 	Misses int64
 }
 
@@ -1994,7 +1957,7 @@ type SystemBufferpoolColumnHitRatioContext struct {
 // Set provides type-safe dimension setting for System.BufferpoolColumnHitRatio context
 func (c SystemBufferpoolColumnHitRatioContext) Set(state *framework.CollectorState, labels EmptyLabels, values SystemBufferpoolColumnHitRatioValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, nil, map[string]int64{
-		"hits": values.Hits,
+		"hits":   values.Hits,
 		"misses": values.Misses,
 	})
 }
@@ -2006,7 +1969,7 @@ func (c SystemBufferpoolColumnHitRatioContext) SetUpdateEvery(state *framework.C
 
 // SystemBufferpoolReadsValues defines the type-safe values for System.BufferpoolReads context
 type SystemBufferpoolReadsValues struct {
-	Logical int64
+	Logical  int64
 	Physical int64
 }
 
@@ -2018,7 +1981,7 @@ type SystemBufferpoolReadsContext struct {
 // Set provides type-safe dimension setting for System.BufferpoolReads context
 func (c SystemBufferpoolReadsContext) Set(state *framework.CollectorState, labels EmptyLabels, values SystemBufferpoolReadsValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, nil, map[string]int64{
-		"logical": values.Logical,
+		"logical":  values.Logical,
 		"physical": values.Physical,
 	})
 }
@@ -2030,7 +1993,7 @@ func (c SystemBufferpoolReadsContext) SetUpdateEvery(state *framework.CollectorS
 
 // SystemBufferpoolDataReadsValues defines the type-safe values for System.BufferpoolDataReads context
 type SystemBufferpoolDataReadsValues struct {
-	Logical int64
+	Logical  int64
 	Physical int64
 }
 
@@ -2042,7 +2005,7 @@ type SystemBufferpoolDataReadsContext struct {
 // Set provides type-safe dimension setting for System.BufferpoolDataReads context
 func (c SystemBufferpoolDataReadsContext) Set(state *framework.CollectorState, labels EmptyLabels, values SystemBufferpoolDataReadsValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, nil, map[string]int64{
-		"logical": values.Logical,
+		"logical":  values.Logical,
 		"physical": values.Physical,
 	})
 }
@@ -2054,7 +2017,7 @@ func (c SystemBufferpoolDataReadsContext) SetUpdateEvery(state *framework.Collec
 
 // SystemBufferpoolIndexReadsValues defines the type-safe values for System.BufferpoolIndexReads context
 type SystemBufferpoolIndexReadsValues struct {
-	Logical int64
+	Logical  int64
 	Physical int64
 }
 
@@ -2066,7 +2029,7 @@ type SystemBufferpoolIndexReadsContext struct {
 // Set provides type-safe dimension setting for System.BufferpoolIndexReads context
 func (c SystemBufferpoolIndexReadsContext) Set(state *framework.CollectorState, labels EmptyLabels, values SystemBufferpoolIndexReadsValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, nil, map[string]int64{
-		"logical": values.Logical,
+		"logical":  values.Logical,
 		"physical": values.Physical,
 	})
 }
@@ -2078,7 +2041,7 @@ func (c SystemBufferpoolIndexReadsContext) SetUpdateEvery(state *framework.Colle
 
 // SystemBufferpoolXDAReadsValues defines the type-safe values for System.BufferpoolXDAReads context
 type SystemBufferpoolXDAReadsValues struct {
-	Logical int64
+	Logical  int64
 	Physical int64
 }
 
@@ -2090,7 +2053,7 @@ type SystemBufferpoolXDAReadsContext struct {
 // Set provides type-safe dimension setting for System.BufferpoolXDAReads context
 func (c SystemBufferpoolXDAReadsContext) Set(state *framework.CollectorState, labels EmptyLabels, values SystemBufferpoolXDAReadsValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, nil, map[string]int64{
-		"logical": values.Logical,
+		"logical":  values.Logical,
 		"physical": values.Physical,
 	})
 }
@@ -2102,7 +2065,7 @@ func (c SystemBufferpoolXDAReadsContext) SetUpdateEvery(state *framework.Collect
 
 // SystemBufferpoolColumnReadsValues defines the type-safe values for System.BufferpoolColumnReads context
 type SystemBufferpoolColumnReadsValues struct {
-	Logical int64
+	Logical  int64
 	Physical int64
 }
 
@@ -2114,7 +2077,7 @@ type SystemBufferpoolColumnReadsContext struct {
 // Set provides type-safe dimension setting for System.BufferpoolColumnReads context
 func (c SystemBufferpoolColumnReadsContext) Set(state *framework.CollectorState, labels EmptyLabels, values SystemBufferpoolColumnReadsValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, nil, map[string]int64{
-		"logical": values.Logical,
+		"logical":  values.Logical,
 		"physical": values.Physical,
 	})
 }
@@ -2148,7 +2111,7 @@ func (c SystemBufferpoolWritesContext) SetUpdateEvery(state *framework.Collector
 
 // SystemLogSpaceValues defines the type-safe values for System.LogSpace context
 type SystemLogSpaceValues struct {
-	Used int64
+	Used      int64
 	Available int64
 }
 
@@ -2160,7 +2123,7 @@ type SystemLogSpaceContext struct {
 // Set provides type-safe dimension setting for System.LogSpace context
 func (c SystemLogSpaceContext) Set(state *framework.CollectorState, labels EmptyLabels, values SystemLogSpaceValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, nil, map[string]int64{
-		"used": values.Used,
+		"used":      values.Used,
 		"available": values.Available,
 	})
 }
@@ -2194,7 +2157,7 @@ func (c SystemLogUtilizationContext) SetUpdateEvery(state *framework.CollectorSt
 
 // SystemLogIOValues defines the type-safe values for System.LogIO context
 type SystemLogIOValues struct {
-	Reads int64
+	Reads  int64
 	Writes int64
 }
 
@@ -2206,7 +2169,7 @@ type SystemLogIOContext struct {
 // Set provides type-safe dimension setting for System.LogIO context
 func (c SystemLogIOContext) Set(state *framework.CollectorState, labels EmptyLabels, values SystemLogIOValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, nil, map[string]int64{
-		"reads": values.Reads,
+		"reads":  values.Reads,
 		"writes": values.Writes,
 	})
 }
@@ -2218,10 +2181,10 @@ func (c SystemLogIOContext) SetUpdateEvery(state *framework.CollectorState, labe
 
 // SystemLogOperationsValues defines the type-safe values for System.LogOperations context
 type SystemLogOperationsValues struct {
-	Commits int64
+	Commits   int64
 	Rollbacks int64
-	Reads int64
-	Writes int64
+	Reads     int64
+	Writes    int64
 }
 
 // SystemLogOperationsContext provides type-safe operations for System.LogOperations context
@@ -2232,10 +2195,10 @@ type SystemLogOperationsContext struct {
 // Set provides type-safe dimension setting for System.LogOperations context
 func (c SystemLogOperationsContext) Set(state *framework.CollectorState, labels EmptyLabels, values SystemLogOperationsValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, nil, map[string]int64{
-		"commits": values.Commits,
+		"commits":   values.Commits,
 		"rollbacks": values.Rollbacks,
-		"reads": values.Reads,
-		"writes": values.Writes,
+		"reads":     values.Reads,
+		"writes":    values.Writes,
 	})
 }
 
@@ -2247,8 +2210,8 @@ func (c SystemLogOperationsContext) SetUpdateEvery(state *framework.CollectorSta
 // SystemLogTimingValues defines the type-safe values for System.LogTiming context
 type SystemLogTimingValues struct {
 	Avg_commit int64
-	Avg_read int64
-	Avg_write int64
+	Avg_read   int64
+	Avg_write  int64
 }
 
 // SystemLogTimingContext provides type-safe operations for System.LogTiming context
@@ -2260,8 +2223,8 @@ type SystemLogTimingContext struct {
 func (c SystemLogTimingContext) Set(state *framework.CollectorState, labels EmptyLabels, values SystemLogTimingValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, nil, map[string]int64{
 		"avg_commit": values.Avg_commit,
-		"avg_read": values.Avg_read,
-		"avg_write": values.Avg_write,
+		"avg_read":   values.Avg_read,
+		"avg_write":  values.Avg_write,
 	})
 }
 
@@ -2294,8 +2257,8 @@ func (c SystemLogBufferEventsContext) SetUpdateEvery(state *framework.CollectorS
 
 // SystemLongRunningQueriesValues defines the type-safe values for System.LongRunningQueries context
 type SystemLongRunningQueriesValues struct {
-	Total int64
-	Warning int64
+	Total    int64
+	Warning  int64
 	Critical int64
 }
 
@@ -2307,8 +2270,8 @@ type SystemLongRunningQueriesContext struct {
 // Set provides type-safe dimension setting for System.LongRunningQueries context
 func (c SystemLongRunningQueriesContext) Set(state *framework.CollectorState, labels EmptyLabels, values SystemLongRunningQueriesValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, nil, map[string]int64{
-		"total": values.Total,
-		"warning": values.Warning,
+		"total":    values.Total,
+		"warning":  values.Warning,
 		"critical": values.Critical,
 	})
 }
@@ -2342,7 +2305,7 @@ func (c SystemBackupStatusContext) SetUpdateEvery(state *framework.CollectorStat
 
 // SystemBackupAgeValues defines the type-safe values for System.BackupAge context
 type SystemBackupAgeValues struct {
-	Full int64
+	Full        int64
 	Incremental int64
 }
 
@@ -2354,7 +2317,7 @@ type SystemBackupAgeContext struct {
 // Set provides type-safe dimension setting for System.BackupAge context
 func (c SystemBackupAgeContext) Set(state *framework.CollectorState, labels EmptyLabels, values SystemBackupAgeValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, nil, map[string]int64{
-		"full": values.Full,
+		"full":        values.Full,
 		"incremental": values.Incremental,
 	})
 }
@@ -2367,7 +2330,7 @@ func (c SystemBackupAgeContext) SetUpdateEvery(state *framework.CollectorState, 
 // SystemFederationConnectionsValues defines the type-safe values for System.FederationConnections context
 type SystemFederationConnectionsValues struct {
 	Active int64
-	Idle int64
+	Idle   int64
 }
 
 // SystemFederationConnectionsContext provides type-safe operations for System.FederationConnections context
@@ -2379,7 +2342,7 @@ type SystemFederationConnectionsContext struct {
 func (c SystemFederationConnectionsContext) Set(state *framework.CollectorState, labels EmptyLabels, values SystemFederationConnectionsValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, nil, map[string]int64{
 		"active": values.Active,
-		"idle": values.Idle,
+		"idle":   values.Idle,
 	})
 }
 
@@ -2391,8 +2354,8 @@ func (c SystemFederationConnectionsContext) SetUpdateEvery(state *framework.Coll
 // SystemFederationOperationsValues defines the type-safe values for System.FederationOperations context
 type SystemFederationOperationsValues struct {
 	Rows_read int64
-	Selects int64
-	Waits int64
+	Selects   int64
+	Waits     int64
 }
 
 // SystemFederationOperationsContext provides type-safe operations for System.FederationOperations context
@@ -2404,8 +2367,8 @@ type SystemFederationOperationsContext struct {
 func (c SystemFederationOperationsContext) Set(state *framework.CollectorState, labels EmptyLabels, values SystemFederationOperationsValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, nil, map[string]int64{
 		"rows_read": values.Rows_read,
-		"selects": values.Selects,
-		"waits": values.Waits,
+		"selects":   values.Selects,
+		"waits":     values.Waits,
 	})
 }
 
@@ -2416,7 +2379,7 @@ func (c SystemFederationOperationsContext) SetUpdateEvery(state *framework.Colle
 
 // SystemDatabaseStatusValues defines the type-safe values for System.DatabaseStatus context
 type SystemDatabaseStatusValues struct {
-	Active int64
+	Active   int64
 	Inactive int64
 }
 
@@ -2428,7 +2391,7 @@ type SystemDatabaseStatusContext struct {
 // Set provides type-safe dimension setting for System.DatabaseStatus context
 func (c SystemDatabaseStatusContext) Set(state *framework.CollectorState, labels EmptyLabels, values SystemDatabaseStatusValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, nil, map[string]int64{
-		"active": values.Active,
+		"active":   values.Active,
 		"inactive": values.Inactive,
 	})
 }
@@ -2440,7 +2403,7 @@ func (c SystemDatabaseStatusContext) SetUpdateEvery(state *framework.CollectorSt
 
 // SystemDatabaseCountValues defines the type-safe values for System.DatabaseCount context
 type SystemDatabaseCountValues struct {
-	Active int64
+	Active   int64
 	Inactive int64
 }
 
@@ -2452,7 +2415,7 @@ type SystemDatabaseCountContext struct {
 // Set provides type-safe dimension setting for System.DatabaseCount context
 func (c SystemDatabaseCountContext) Set(state *framework.CollectorState, labels EmptyLabels, values SystemDatabaseCountValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, nil, map[string]int64{
-		"active": values.Active,
+		"active":   values.Active,
 		"inactive": values.Inactive,
 	})
 }
@@ -2464,9 +2427,9 @@ func (c SystemDatabaseCountContext) SetUpdateEvery(state *framework.CollectorSta
 
 // SystemCPUUsageValues defines the type-safe values for System.CPUUsage context
 type SystemCPUUsageValues struct {
-	User int64
+	User   int64
 	System int64
-	Idle int64
+	Idle   int64
 	Iowait int64
 }
 
@@ -2478,9 +2441,9 @@ type SystemCPUUsageContext struct {
 // Set provides type-safe dimension setting for System.CPUUsage context
 func (c SystemCPUUsageContext) Set(state *framework.CollectorState, labels EmptyLabels, values SystemCPUUsageValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, nil, map[string]int64{
-		"user": values.User,
+		"user":   values.User,
 		"system": values.System,
-		"idle": values.Idle,
+		"idle":   values.Idle,
 		"iowait": values.Iowait,
 	})
 }
@@ -2493,7 +2456,7 @@ func (c SystemCPUUsageContext) SetUpdateEvery(state *framework.CollectorState, l
 // SystemActiveConnectionsValues defines the type-safe values for System.ActiveConnections context
 type SystemActiveConnectionsValues struct {
 	Active int64
-	Total int64
+	Total  int64
 }
 
 // SystemActiveConnectionsContext provides type-safe operations for System.ActiveConnections context
@@ -2505,7 +2468,7 @@ type SystemActiveConnectionsContext struct {
 func (c SystemActiveConnectionsContext) Set(state *framework.CollectorState, labels EmptyLabels, values SystemActiveConnectionsValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, nil, map[string]int64{
 		"active": values.Active,
-		"total": values.Total,
+		"total":  values.Total,
 	})
 }
 
@@ -2516,9 +2479,9 @@ func (c SystemActiveConnectionsContext) SetUpdateEvery(state *framework.Collecto
 
 // SystemMemoryUsageValues defines the type-safe values for System.MemoryUsage context
 type SystemMemoryUsageValues struct {
-	Database int64
-	Instance int64
-	Bufferpool int64
+	Database    int64
+	Instance    int64
+	Bufferpool  int64
 	Shared_sort int64
 }
 
@@ -2530,9 +2493,9 @@ type SystemMemoryUsageContext struct {
 // Set provides type-safe dimension setting for System.MemoryUsage context
 func (c SystemMemoryUsageContext) Set(state *framework.CollectorState, labels EmptyLabels, values SystemMemoryUsageValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, nil, map[string]int64{
-		"database": values.Database,
-		"instance": values.Instance,
-		"bufferpool": values.Bufferpool,
+		"database":    values.Database,
+		"instance":    values.Instance,
+		"bufferpool":  values.Bufferpool,
 		"shared_sort": values.Shared_sort,
 	})
 }
@@ -2544,7 +2507,7 @@ func (c SystemMemoryUsageContext) SetUpdateEvery(state *framework.CollectorState
 
 // SystemSQLStatementsValues defines the type-safe values for System.SQLStatements context
 type SystemSQLStatementsValues struct {
-	Selects int64
+	Selects       int64
 	Modifications int64
 }
 
@@ -2556,7 +2519,7 @@ type SystemSQLStatementsContext struct {
 // Set provides type-safe dimension setting for System.SQLStatements context
 func (c SystemSQLStatementsContext) Set(state *framework.CollectorState, labels EmptyLabels, values SystemSQLStatementsValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, nil, map[string]int64{
-		"selects": values.Selects,
+		"selects":       values.Selects,
 		"modifications": values.Modifications,
 	})
 }
@@ -2569,7 +2532,7 @@ func (c SystemSQLStatementsContext) SetUpdateEvery(state *framework.CollectorSta
 // SystemTransactionActivityValues defines the type-safe values for System.TransactionActivity context
 type SystemTransactionActivityValues struct {
 	Committed int64
-	Aborted int64
+	Aborted   int64
 }
 
 // SystemTransactionActivityContext provides type-safe operations for System.TransactionActivity context
@@ -2581,7 +2544,7 @@ type SystemTransactionActivityContext struct {
 func (c SystemTransactionActivityContext) Set(state *framework.CollectorState, labels EmptyLabels, values SystemTransactionActivityValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, nil, map[string]int64{
 		"committed": values.Committed,
-		"aborted": values.Aborted,
+		"aborted":   values.Aborted,
 	})
 }
 
@@ -2592,10 +2555,10 @@ func (c SystemTransactionActivityContext) SetUpdateEvery(state *framework.Collec
 
 // SystemTimeSpentValues defines the type-safe values for System.TimeSpent context
 type SystemTimeSpentValues struct {
-	Direct_read int64
+	Direct_read  int64
 	Direct_write int64
-	Pool_read int64
-	Pool_write int64
+	Pool_read    int64
+	Pool_write   int64
 }
 
 // SystemTimeSpentContext provides type-safe operations for System.TimeSpent context
@@ -2606,10 +2569,10 @@ type SystemTimeSpentContext struct {
 // Set provides type-safe dimension setting for System.TimeSpent context
 func (c SystemTimeSpentContext) Set(state *framework.CollectorState, labels EmptyLabels, values SystemTimeSpentValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, nil, map[string]int64{
-		"direct_read": values.Direct_read,
+		"direct_read":  values.Direct_read,
 		"direct_write": values.Direct_write,
-		"pool_read": values.Pool_read,
-		"pool_write": values.Pool_write,
+		"pool_read":    values.Pool_read,
+		"pool_write":   values.Pool_write,
 	})
 }
 
@@ -2618,1239 +2581,1196 @@ func (c SystemTimeSpentContext) SetUpdateEvery(state *framework.CollectorState, 
 	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, nil, updateEvery)
 }
 
-
-
-
 // System contains all metric contexts for System
 var System = struct {
-	ServiceHealth SystemServiceHealthContext
-	Connections SystemConnectionsContext
-	Locking SystemLockingContext
-	Deadlocks SystemDeadlocksContext
-	LockDetails SystemLockDetailsContext
-	LockWaitTime SystemLockWaitTimeContext
-	Sorting SystemSortingContext
-	RowActivity SystemRowActivityContext
-	BufferpoolHitRatio SystemBufferpoolHitRatioContext
-	BufferpoolDataHitRatio SystemBufferpoolDataHitRatioContext
-	BufferpoolIndexHitRatio SystemBufferpoolIndexHitRatioContext
-	BufferpoolXDAHitRatio SystemBufferpoolXDAHitRatioContext
+	ServiceHealth            SystemServiceHealthContext
+	Connections              SystemConnectionsContext
+	Locking                  SystemLockingContext
+	Deadlocks                SystemDeadlocksContext
+	LockDetails              SystemLockDetailsContext
+	LockWaitTime             SystemLockWaitTimeContext
+	Sorting                  SystemSortingContext
+	RowActivity              SystemRowActivityContext
+	BufferpoolHitRatio       SystemBufferpoolHitRatioContext
+	BufferpoolDataHitRatio   SystemBufferpoolDataHitRatioContext
+	BufferpoolIndexHitRatio  SystemBufferpoolIndexHitRatioContext
+	BufferpoolXDAHitRatio    SystemBufferpoolXDAHitRatioContext
 	BufferpoolColumnHitRatio SystemBufferpoolColumnHitRatioContext
-	BufferpoolReads SystemBufferpoolReadsContext
-	BufferpoolDataReads SystemBufferpoolDataReadsContext
-	BufferpoolIndexReads SystemBufferpoolIndexReadsContext
-	BufferpoolXDAReads SystemBufferpoolXDAReadsContext
-	BufferpoolColumnReads SystemBufferpoolColumnReadsContext
-	BufferpoolWrites SystemBufferpoolWritesContext
-	LogSpace SystemLogSpaceContext
-	LogUtilization SystemLogUtilizationContext
-	LogIO SystemLogIOContext
-	LogOperations SystemLogOperationsContext
-	LogTiming SystemLogTimingContext
-	LogBufferEvents SystemLogBufferEventsContext
-	LongRunningQueries SystemLongRunningQueriesContext
-	BackupStatus SystemBackupStatusContext
-	BackupAge SystemBackupAgeContext
-	FederationConnections SystemFederationConnectionsContext
-	FederationOperations SystemFederationOperationsContext
-	DatabaseStatus SystemDatabaseStatusContext
-	DatabaseCount SystemDatabaseCountContext
-	CPUUsage SystemCPUUsageContext
-	ActiveConnections SystemActiveConnectionsContext
-	MemoryUsage SystemMemoryUsageContext
-	SQLStatements SystemSQLStatementsContext
-	TransactionActivity SystemTransactionActivityContext
-	TimeSpent SystemTimeSpentContext
+	BufferpoolReads          SystemBufferpoolReadsContext
+	BufferpoolDataReads      SystemBufferpoolDataReadsContext
+	BufferpoolIndexReads     SystemBufferpoolIndexReadsContext
+	BufferpoolXDAReads       SystemBufferpoolXDAReadsContext
+	BufferpoolColumnReads    SystemBufferpoolColumnReadsContext
+	BufferpoolWrites         SystemBufferpoolWritesContext
+	LogSpace                 SystemLogSpaceContext
+	LogUtilization           SystemLogUtilizationContext
+	LogIO                    SystemLogIOContext
+	LogOperations            SystemLogOperationsContext
+	LogTiming                SystemLogTimingContext
+	LogBufferEvents          SystemLogBufferEventsContext
+	LongRunningQueries       SystemLongRunningQueriesContext
+	BackupStatus             SystemBackupStatusContext
+	BackupAge                SystemBackupAgeContext
+	FederationConnections    SystemFederationConnectionsContext
+	FederationOperations     SystemFederationOperationsContext
+	DatabaseStatus           SystemDatabaseStatusContext
+	DatabaseCount            SystemDatabaseCountContext
+	CPUUsage                 SystemCPUUsageContext
+	ActiveConnections        SystemActiveConnectionsContext
+	MemoryUsage              SystemMemoryUsageContext
+	SQLStatements            SystemSQLStatementsContext
+	TransactionActivity      SystemTransactionActivityContext
+	TimeSpent                SystemTimeSpentContext
 }{
 	ServiceHealth: SystemServiceHealthContext{
 		Context: framework.Context[EmptyLabels]{
-		Name:       "db2.service_health",
-		Family:     "overview",
-		Title:      "Service Health Status",
-		Units:      "status",
-		Type:       module.Line,
-		Priority:   990,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "connection",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "db2.service_health",
+			Family:      "overview",
+			Title:       "Service Health Status",
+			Units:       "status",
+			Type:        module.Line,
+			Priority:    990,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "connection",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "database",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "database",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-		},
-		LabelKeys: []string{
-		},
+			LabelKeys: []string{},
 		},
 	},
 	Connections: SystemConnectionsContext{
 		Context: framework.Context[EmptyLabels]{
-		Name:       "db2.connections",
-		Family:     "connections/overview",
-		Title:      "Database Connections",
-		Units:      "connections",
-		Type:       module.Line,
-		Priority:   1000,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "total",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "db2.connections",
+			Family:      "connections/overview",
+			Title:       "Database Connections",
+			Units:       "connections",
+			Type:        module.Line,
+			Priority:    1000,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "total",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "active",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "executing",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "idle",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "max_allowed",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "active",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "executing",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "idle",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "max_allowed",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-		},
-		LabelKeys: []string{
-		},
+			LabelKeys: []string{},
 		},
 	},
 	Locking: SystemLockingContext{
 		Context: framework.Context[EmptyLabels]{
-		Name:       "db2.locking",
-		Family:     "locking",
-		Title:      "Database Locking",
-		Units:      "events/s",
-		Type:       module.Line,
-		Priority:   1010,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "waits",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "db2.locking",
+			Family:      "locking",
+			Title:       "Database Locking",
+			Units:       "events/s",
+			Type:        module.Line,
+			Priority:    1010,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "waits",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "timeouts",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "escalations",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "timeouts",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "escalations",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-		},
-		LabelKeys: []string{
-		},
+			LabelKeys: []string{},
 		},
 	},
 	Deadlocks: SystemDeadlocksContext{
 		Context: framework.Context[EmptyLabels]{
-		Name:       "db2.deadlocks",
-		Family:     "locking",
-		Title:      "Database Deadlocks",
-		Units:      "deadlocks/s",
-		Type:       module.Line,
-		Priority:   1011,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "deadlocks",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "db2.deadlocks",
+			Family:      "locking",
+			Title:       "Database Deadlocks",
+			Units:       "deadlocks/s",
+			Type:        module.Line,
+			Priority:    1011,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "deadlocks",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-		},
+			LabelKeys: []string{},
 		},
 	},
 	LockDetails: SystemLockDetailsContext{
 		Context: framework.Context[EmptyLabels]{
-		Name:       "db2.lock_details",
-		Family:     "locking",
-		Title:      "Lock Details",
-		Units:      "locks",
-		Type:       module.Line,
-		Priority:   1012,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "active",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "db2.lock_details",
+			Family:      "locking",
+			Title:       "Lock Details",
+			Units:       "locks",
+			Type:        module.Line,
+			Priority:    1012,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "active",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "waiting_agents",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "memory_pages",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "waiting_agents",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "memory_pages",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-		},
-		LabelKeys: []string{
-		},
+			LabelKeys: []string{},
 		},
 	},
 	LockWaitTime: SystemLockWaitTimeContext{
 		Context: framework.Context[EmptyLabels]{
-		Name:       "db2.lock_wait_time",
-		Family:     "locking",
-		Title:      "Average Lock Wait Time",
-		Units:      "milliseconds",
-		Type:       module.Line,
-		Priority:   1013,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "wait_time",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1000,
-				Precision: 1000,
+			Name:        "db2.lock_wait_time",
+			Family:      "locking",
+			Title:       "Average Lock Wait Time",
+			Units:       "milliseconds",
+			Type:        module.Line,
+			Priority:    1013,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "wait_time",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1000,
+					Precision: 1000,
+				},
 			},
-		},
-		LabelKeys: []string{
-		},
+			LabelKeys: []string{},
 		},
 	},
 	Sorting: SystemSortingContext{
 		Context: framework.Context[EmptyLabels]{
-		Name:       "db2.sorting",
-		Family:     "activity/sorting",
-		Title:      "Database Sorting",
-		Units:      "sorts/s",
-		Type:       module.Stacked,
-		Priority:   1020,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "sorts",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "db2.sorting",
+			Family:      "activity/sorting",
+			Title:       "Database Sorting",
+			Units:       "sorts/s",
+			Type:        module.Stacked,
+			Priority:    1020,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "sorts",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "overflows",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "overflows",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-		},
-		LabelKeys: []string{
-		},
+			LabelKeys: []string{},
 		},
 	},
 	RowActivity: SystemRowActivityContext{
 		Context: framework.Context[EmptyLabels]{
-		Name:       "db2.row_activity",
-		Family:     "activity/rows",
-		Title:      "Row Activity",
-		Units:      "rows/s",
-		Type:       module.Area,
-		Priority:   1030,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "read",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "db2.row_activity",
+			Family:      "activity/rows",
+			Title:       "Row Activity",
+			Units:       "rows/s",
+			Type:        module.Area,
+			Priority:    1030,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "read",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "returned",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "modified",
+					Algorithm: module.Incremental,
+					Mul:       -1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "returned",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "modified",
-				Algorithm: module.Incremental,
-				Mul:       -1,
-				Div:       1,
-				Precision: 1,
-			},
-		},
-		LabelKeys: []string{
-		},
+			LabelKeys: []string{},
 		},
 	},
 	BufferpoolHitRatio: SystemBufferpoolHitRatioContext{
 		Context: framework.Context[EmptyLabels]{
-		Name:       "db2.bufferpool_hit_ratio",
-		Family:     "bufferpools/overview",
-		Title:      "Buffer Pool Hit Ratio",
-		Units:      "percentage",
-		Type:       module.Line,
-		Priority:   1040,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "hits",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1000,
-				Precision: 1000,
+			Name:        "db2.bufferpool_hit_ratio",
+			Family:      "bufferpools/overview",
+			Title:       "Buffer Pool Hit Ratio",
+			Units:       "percentage",
+			Type:        module.Line,
+			Priority:    1040,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "hits",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1000,
+					Precision: 1000,
+				},
+				{
+					Name:      "misses",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1000,
+					Precision: 1000,
+				},
 			},
-			{
-				Name:      "misses",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1000,
-				Precision: 1000,
-			},
-		},
-		LabelKeys: []string{
-		},
+			LabelKeys: []string{},
 		},
 	},
 	BufferpoolDataHitRatio: SystemBufferpoolDataHitRatioContext{
 		Context: framework.Context[EmptyLabels]{
-		Name:       "db2.bufferpool_data_hit_ratio",
-		Family:     "bufferpools/data",
-		Title:      "Buffer Pool Data Page Hit Ratio",
-		Units:      "percentage",
-		Type:       module.Line,
-		Priority:   1041,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "hits",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1000,
-				Precision: 1000,
+			Name:        "db2.bufferpool_data_hit_ratio",
+			Family:      "bufferpools/data",
+			Title:       "Buffer Pool Data Page Hit Ratio",
+			Units:       "percentage",
+			Type:        module.Line,
+			Priority:    1041,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "hits",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1000,
+					Precision: 1000,
+				},
+				{
+					Name:      "misses",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1000,
+					Precision: 1000,
+				},
 			},
-			{
-				Name:      "misses",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1000,
-				Precision: 1000,
-			},
-		},
-		LabelKeys: []string{
-		},
+			LabelKeys: []string{},
 		},
 	},
 	BufferpoolIndexHitRatio: SystemBufferpoolIndexHitRatioContext{
 		Context: framework.Context[EmptyLabels]{
-		Name:       "db2.bufferpool_index_hit_ratio",
-		Family:     "bufferpools/index",
-		Title:      "Buffer Pool Index Page Hit Ratio",
-		Units:      "percentage",
-		Type:       module.Line,
-		Priority:   1042,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "hits",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1000,
-				Precision: 1000,
+			Name:        "db2.bufferpool_index_hit_ratio",
+			Family:      "bufferpools/index",
+			Title:       "Buffer Pool Index Page Hit Ratio",
+			Units:       "percentage",
+			Type:        module.Line,
+			Priority:    1042,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "hits",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1000,
+					Precision: 1000,
+				},
+				{
+					Name:      "misses",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1000,
+					Precision: 1000,
+				},
 			},
-			{
-				Name:      "misses",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1000,
-				Precision: 1000,
-			},
-		},
-		LabelKeys: []string{
-		},
+			LabelKeys: []string{},
 		},
 	},
 	BufferpoolXDAHitRatio: SystemBufferpoolXDAHitRatioContext{
 		Context: framework.Context[EmptyLabels]{
-		Name:       "db2.bufferpool_xda_hit_ratio",
-		Family:     "bufferpools/xda",
-		Title:      "Buffer Pool XDA Page Hit Ratio",
-		Units:      "percentage",
-		Type:       module.Line,
-		Priority:   1043,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "hits",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1000,
-				Precision: 1000,
+			Name:        "db2.bufferpool_xda_hit_ratio",
+			Family:      "bufferpools/xda",
+			Title:       "Buffer Pool XDA Page Hit Ratio",
+			Units:       "percentage",
+			Type:        module.Line,
+			Priority:    1043,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "hits",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1000,
+					Precision: 1000,
+				},
+				{
+					Name:      "misses",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1000,
+					Precision: 1000,
+				},
 			},
-			{
-				Name:      "misses",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1000,
-				Precision: 1000,
-			},
-		},
-		LabelKeys: []string{
-		},
+			LabelKeys: []string{},
 		},
 	},
 	BufferpoolColumnHitRatio: SystemBufferpoolColumnHitRatioContext{
 		Context: framework.Context[EmptyLabels]{
-		Name:       "db2.bufferpool_column_hit_ratio",
-		Family:     "bufferpools/columns",
-		Title:      "Buffer Pool Column Page Hit Ratio",
-		Units:      "percentage",
-		Type:       module.Line,
-		Priority:   1044,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "hits",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1000,
-				Precision: 1000,
+			Name:        "db2.bufferpool_column_hit_ratio",
+			Family:      "bufferpools/columns",
+			Title:       "Buffer Pool Column Page Hit Ratio",
+			Units:       "percentage",
+			Type:        module.Line,
+			Priority:    1044,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "hits",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1000,
+					Precision: 1000,
+				},
+				{
+					Name:      "misses",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1000,
+					Precision: 1000,
+				},
 			},
-			{
-				Name:      "misses",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1000,
-				Precision: 1000,
-			},
-		},
-		LabelKeys: []string{
-		},
+			LabelKeys: []string{},
 		},
 	},
 	BufferpoolReads: SystemBufferpoolReadsContext{
 		Context: framework.Context[EmptyLabels]{
-		Name:       "db2.bufferpool_reads",
-		Family:     "bufferpools/overview",
-		Title:      "Buffer Pool Reads",
-		Units:      "reads/s",
-		Type:       module.Stacked,
-		Priority:   1045,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "logical",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "db2.bufferpool_reads",
+			Family:      "bufferpools/overview",
+			Title:       "Buffer Pool Reads",
+			Units:       "reads/s",
+			Type:        module.Stacked,
+			Priority:    1045,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "logical",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "physical",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "physical",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-		},
-		LabelKeys: []string{
-		},
+			LabelKeys: []string{},
 		},
 	},
 	BufferpoolDataReads: SystemBufferpoolDataReadsContext{
 		Context: framework.Context[EmptyLabels]{
-		Name:       "db2.bufferpool_data_reads",
-		Family:     "bufferpools/data",
-		Title:      "Buffer Pool Data Page Reads",
-		Units:      "reads/s",
-		Type:       module.Stacked,
-		Priority:   1043,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "logical",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "db2.bufferpool_data_reads",
+			Family:      "bufferpools/data",
+			Title:       "Buffer Pool Data Page Reads",
+			Units:       "reads/s",
+			Type:        module.Stacked,
+			Priority:    1043,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "logical",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "physical",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "physical",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-		},
-		LabelKeys: []string{
-		},
+			LabelKeys: []string{},
 		},
 	},
 	BufferpoolIndexReads: SystemBufferpoolIndexReadsContext{
 		Context: framework.Context[EmptyLabels]{
-		Name:       "db2.bufferpool_index_reads",
-		Family:     "bufferpools/index",
-		Title:      "Buffer Pool Index Page Reads",
-		Units:      "reads/s",
-		Type:       module.Stacked,
-		Priority:   1044,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "logical",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "db2.bufferpool_index_reads",
+			Family:      "bufferpools/index",
+			Title:       "Buffer Pool Index Page Reads",
+			Units:       "reads/s",
+			Type:        module.Stacked,
+			Priority:    1044,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "logical",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "physical",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "physical",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-		},
-		LabelKeys: []string{
-		},
+			LabelKeys: []string{},
 		},
 	},
 	BufferpoolXDAReads: SystemBufferpoolXDAReadsContext{
 		Context: framework.Context[EmptyLabels]{
-		Name:       "db2.bufferpool_xda_reads",
-		Family:     "bufferpools/xda",
-		Title:      "Buffer Pool XDA Page Reads",
-		Units:      "reads/s",
-		Type:       module.Stacked,
-		Priority:   1045,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "logical",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "db2.bufferpool_xda_reads",
+			Family:      "bufferpools/xda",
+			Title:       "Buffer Pool XDA Page Reads",
+			Units:       "reads/s",
+			Type:        module.Stacked,
+			Priority:    1045,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "logical",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "physical",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "physical",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-		},
-		LabelKeys: []string{
-		},
+			LabelKeys: []string{},
 		},
 	},
 	BufferpoolColumnReads: SystemBufferpoolColumnReadsContext{
 		Context: framework.Context[EmptyLabels]{
-		Name:       "db2.bufferpool_column_reads",
-		Family:     "bufferpools/columns",
-		Title:      "Buffer Pool Column Page Reads",
-		Units:      "reads/s",
-		Type:       module.Stacked,
-		Priority:   1046,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "logical",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "db2.bufferpool_column_reads",
+			Family:      "bufferpools/columns",
+			Title:       "Buffer Pool Column Page Reads",
+			Units:       "reads/s",
+			Type:        module.Stacked,
+			Priority:    1046,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "logical",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "physical",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "physical",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-		},
-		LabelKeys: []string{
-		},
+			LabelKeys: []string{},
 		},
 	},
 	BufferpoolWrites: SystemBufferpoolWritesContext{
 		Context: framework.Context[EmptyLabels]{
-		Name:       "db2.bufferpool_writes",
-		Family:     "bufferpools/overview",
-		Title:      "Buffer Pool Writes",
-		Units:      "writes/s",
-		Type:       module.Line,
-		Priority:   1047,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "writes",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "db2.bufferpool_writes",
+			Family:      "bufferpools/overview",
+			Title:       "Buffer Pool Writes",
+			Units:       "writes/s",
+			Type:        module.Line,
+			Priority:    1047,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "writes",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-		},
+			LabelKeys: []string{},
 		},
 	},
 	LogSpace: SystemLogSpaceContext{
 		Context: framework.Context[EmptyLabels]{
-		Name:       "db2.log_space",
-		Family:     "storage/space",
-		Title:      "Log Space Usage",
-		Units:      "bytes",
-		Type:       module.Stacked,
-		Priority:   1050,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "used",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "db2.log_space",
+			Family:      "storage/space",
+			Title:       "Log Space Usage",
+			Units:       "bytes",
+			Type:        module.Stacked,
+			Priority:    1050,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "used",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "available",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "available",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-		},
-		LabelKeys: []string{
-		},
+			LabelKeys: []string{},
 		},
 	},
 	LogUtilization: SystemLogUtilizationContext{
 		Context: framework.Context[EmptyLabels]{
-		Name:       "db2.log_utilization",
-		Family:     "storage/space",
-		Title:      "Log Space Utilization",
-		Units:      "percentage",
-		Type:       module.Line,
-		Priority:   1051,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "utilization",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1000,
-				Precision: 1000,
+			Name:        "db2.log_utilization",
+			Family:      "storage/space",
+			Title:       "Log Space Utilization",
+			Units:       "percentage",
+			Type:        module.Line,
+			Priority:    1051,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "utilization",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1000,
+					Precision: 1000,
+				},
 			},
-		},
-		LabelKeys: []string{
-		},
+			LabelKeys: []string{},
 		},
 	},
 	LogIO: SystemLogIOContext{
 		Context: framework.Context[EmptyLabels]{
-		Name:       "db2.log_io",
-		Family:     "storage/operations",
-		Title:      "Log I/O Operations",
-		Units:      "operations/s",
-		Type:       module.Area,
-		Priority:   1052,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "reads",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "db2.log_io",
+			Family:      "storage/operations",
+			Title:       "Log I/O Operations",
+			Units:       "operations/s",
+			Type:        module.Area,
+			Priority:    1052,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "reads",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "writes",
+					Algorithm: module.Incremental,
+					Mul:       -1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "writes",
-				Algorithm: module.Incremental,
-				Mul:       -1,
-				Div:       1,
-				Precision: 1,
-			},
-		},
-		LabelKeys: []string{
-		},
+			LabelKeys: []string{},
 		},
 	},
 	LogOperations: SystemLogOperationsContext{
 		Context: framework.Context[EmptyLabels]{
-		Name:       "db2.log_operations",
-		Family:     "storage/operations",
-		Title:      "Log Operations",
-		Units:      "operations/s",
-		Type:       module.Line,
-		Priority:   1053,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "commits",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "db2.log_operations",
+			Family:      "storage/operations",
+			Title:       "Log Operations",
+			Units:       "operations/s",
+			Type:        module.Line,
+			Priority:    1053,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "commits",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "rollbacks",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "reads",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "writes",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "rollbacks",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "reads",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "writes",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-		},
-		LabelKeys: []string{
-		},
+			LabelKeys: []string{},
 		},
 	},
 	LogTiming: SystemLogTimingContext{
 		Context: framework.Context[EmptyLabels]{
-		Name:       "db2.log_timing",
-		Family:     "storage/operations",
-		Title:      "Log Operation Times",
-		Units:      "milliseconds",
-		Type:       module.Line,
-		Priority:   1054,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "avg_commit",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1000,
-				Precision: 1000,
+			Name:        "db2.log_timing",
+			Family:      "storage/operations",
+			Title:       "Log Operation Times",
+			Units:       "milliseconds",
+			Type:        module.Line,
+			Priority:    1054,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "avg_commit",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1000,
+					Precision: 1000,
+				},
+				{
+					Name:      "avg_read",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1000,
+					Precision: 1000,
+				},
+				{
+					Name:      "avg_write",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1000,
+					Precision: 1000,
+				},
 			},
-			{
-				Name:      "avg_read",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1000,
-				Precision: 1000,
-			},
-			{
-				Name:      "avg_write",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1000,
-				Precision: 1000,
-			},
-		},
-		LabelKeys: []string{
-		},
+			LabelKeys: []string{},
 		},
 	},
 	LogBufferEvents: SystemLogBufferEventsContext{
 		Context: framework.Context[EmptyLabels]{
-		Name:       "db2.log_buffer_events",
-		Family:     "storage/operations",
-		Title:      "Log Buffer Full Events",
-		Units:      "events/s",
-		Type:       module.Line,
-		Priority:   1055,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "buffer_full",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "db2.log_buffer_events",
+			Family:      "storage/operations",
+			Title:       "Log Buffer Full Events",
+			Units:       "events/s",
+			Type:        module.Line,
+			Priority:    1055,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "buffer_full",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-		},
+			LabelKeys: []string{},
 		},
 	},
 	LongRunningQueries: SystemLongRunningQueriesContext{
 		Context: framework.Context[EmptyLabels]{
-		Name:       "db2.long_running_queries",
-		Family:     "activity/requests",
-		Title:      "Long Running Queries",
-		Units:      "queries",
-		Type:       module.Stacked,
-		Priority:   1060,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "total",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "db2.long_running_queries",
+			Family:      "activity/requests",
+			Title:       "Long Running Queries",
+			Units:       "queries",
+			Type:        module.Stacked,
+			Priority:    1060,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "total",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "warning",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "critical",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "warning",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "critical",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-		},
-		LabelKeys: []string{
-		},
+			LabelKeys: []string{},
 		},
 	},
 	BackupStatus: SystemBackupStatusContext{
 		Context: framework.Context[EmptyLabels]{
-		Name:       "db2.backup_status",
-		Family:     "storage/backup",
-		Title:      "Last Backup Status",
-		Units:      "status",
-		Type:       module.Line,
-		Priority:   1070,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "status",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "db2.backup_status",
+			Family:      "storage/backup",
+			Title:       "Last Backup Status",
+			Units:       "status",
+			Type:        module.Line,
+			Priority:    1070,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "status",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-		},
+			LabelKeys: []string{},
 		},
 	},
 	BackupAge: SystemBackupAgeContext{
 		Context: framework.Context[EmptyLabels]{
-		Name:       "db2.backup_age",
-		Family:     "storage/backup",
-		Title:      "Time Since Last Backup",
-		Units:      "hours",
-		Type:       module.Line,
-		Priority:   1071,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "full",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "db2.backup_age",
+			Family:      "storage/backup",
+			Title:       "Time Since Last Backup",
+			Units:       "hours",
+			Type:        module.Line,
+			Priority:    1071,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "full",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "incremental",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "incremental",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-		},
-		LabelKeys: []string{
-		},
+			LabelKeys: []string{},
 		},
 	},
 	FederationConnections: SystemFederationConnectionsContext{
 		Context: framework.Context[EmptyLabels]{
-		Name:       "db2.federation_connections",
-		Family:     "federation",
-		Title:      "Federated Connections",
-		Units:      "connections",
-		Type:       module.Line,
-		Priority:   1080,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "active",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "db2.federation_connections",
+			Family:      "federation",
+			Title:       "Federated Connections",
+			Units:       "connections",
+			Type:        module.Line,
+			Priority:    1080,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "active",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "idle",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "idle",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-		},
-		LabelKeys: []string{
-		},
+			LabelKeys: []string{},
 		},
 	},
 	FederationOperations: SystemFederationOperationsContext{
 		Context: framework.Context[EmptyLabels]{
-		Name:       "db2.federation_operations",
-		Family:     "federation",
-		Title:      "Federated Operations",
-		Units:      "operations/s",
-		Type:       module.Line,
-		Priority:   1081,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "rows_read",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "db2.federation_operations",
+			Family:      "federation",
+			Title:       "Federated Operations",
+			Units:       "operations/s",
+			Type:        module.Line,
+			Priority:    1081,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "rows_read",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "selects",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "waits",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "selects",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-			{
-				Name:      "waits",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-		},
-		LabelKeys: []string{
-		},
+			LabelKeys: []string{},
 		},
 	},
 	DatabaseStatus: SystemDatabaseStatusContext{
 		Context: framework.Context[EmptyLabels]{
-		Name:       "db2.database_status",
-		Family:     "overview",
-		Title:      "Current Database Status",
-		Units:      "status",
-		Type:       module.Line,
-		Priority:   900,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "active",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "db2.database_status",
+			Family:      "overview",
+			Title:       "Current Database Status",
+			Units:       "status",
+			Type:        module.Line,
+			Priority:    900,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "active",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "inactive",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "inactive",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-		},
-		LabelKeys: []string{
-		},
+			LabelKeys: []string{},
 		},
 	},
 	DatabaseCount: SystemDatabaseCountContext{
 		Context: framework.Context[EmptyLabels]{
-		Name:       "db2.database_count",
-		Family:     "overview",
-		Title:      "Database Count",
-		Units:      "databases",
-		Type:       module.Line,
-		Priority:   899,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "active",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "db2.database_count",
+			Family:      "overview",
+			Title:       "Database Count",
+			Units:       "databases",
+			Type:        module.Line,
+			Priority:    899,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "active",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "inactive",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "inactive",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-		},
-		LabelKeys: []string{
-		},
+			LabelKeys: []string{},
 		},
 	},
 	CPUUsage: SystemCPUUsageContext{
 		Context: framework.Context[EmptyLabels]{
-		Name:       "db2.cpu_usage",
-		Family:     "overview",
-		Title:      "CPU Usage (100% = 1 CPU core)",
-		Units:      "percentage",
-		Type:       module.Stacked,
-		Priority:   901,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "user",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1000,
-				Precision: 1000,
+			Name:        "db2.cpu_usage",
+			Family:      "overview",
+			Title:       "CPU Usage (100% = 1 CPU core)",
+			Units:       "percentage",
+			Type:        module.Stacked,
+			Priority:    901,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "user",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1000,
+					Precision: 1000,
+				},
+				{
+					Name:      "system",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1000,
+					Precision: 1000,
+				},
+				{
+					Name:      "idle",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1000,
+					Precision: 1000,
+				},
+				{
+					Name:      "iowait",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1000,
+					Precision: 1000,
+				},
 			},
-			{
-				Name:      "system",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1000,
-				Precision: 1000,
-			},
-			{
-				Name:      "idle",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1000,
-				Precision: 1000,
-			},
-			{
-				Name:      "iowait",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1000,
-				Precision: 1000,
-			},
-		},
-		LabelKeys: []string{
-		},
+			LabelKeys: []string{},
 		},
 	},
 	ActiveConnections: SystemActiveConnectionsContext{
 		Context: framework.Context[EmptyLabels]{
-		Name:       "db2.active_connections",
-		Family:     "connections/overview",
-		Title:      "Active Connections",
-		Units:      "connections",
-		Type:       module.Line,
-		Priority:   902,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "active",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "db2.active_connections",
+			Family:      "connections/overview",
+			Title:       "Active Connections",
+			Units:       "connections",
+			Type:        module.Line,
+			Priority:    902,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "active",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "total",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "total",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-		},
-		LabelKeys: []string{
-		},
+			LabelKeys: []string{},
 		},
 	},
 	MemoryUsage: SystemMemoryUsageContext{
 		Context: framework.Context[EmptyLabels]{
-		Name:       "db2.memory_usage",
-		Family:     "overview",
-		Title:      "Memory Usage",
-		Units:      "MiB",
-		Type:       module.Stacked,
-		Priority:   903,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "database",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1048576,
-				Precision: 1,
+			Name:        "db2.memory_usage",
+			Family:      "overview",
+			Title:       "Memory Usage",
+			Units:       "MiB",
+			Type:        module.Stacked,
+			Priority:    903,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "database",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1048576,
+					Precision: 1,
+				},
+				{
+					Name:      "instance",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1048576,
+					Precision: 1,
+				},
+				{
+					Name:      "bufferpool",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1048576,
+					Precision: 1,
+				},
+				{
+					Name:      "shared_sort",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1048576,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "instance",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1048576,
-				Precision: 1,
-			},
-			{
-				Name:      "bufferpool",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1048576,
-				Precision: 1,
-			},
-			{
-				Name:      "shared_sort",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1048576,
-				Precision: 1,
-			},
-		},
-		LabelKeys: []string{
-		},
+			LabelKeys: []string{},
 		},
 	},
 	SQLStatements: SystemSQLStatementsContext{
 		Context: framework.Context[EmptyLabels]{
-		Name:       "db2.sql_statements",
-		Family:     "activity/requests",
-		Title:      "SQL Statements",
-		Units:      "statements/s",
-		Type:       module.Stacked,
-		Priority:   904,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "selects",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "db2.sql_statements",
+			Family:      "activity/requests",
+			Title:       "SQL Statements",
+			Units:       "statements/s",
+			Type:        module.Stacked,
+			Priority:    904,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "selects",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "modifications",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "modifications",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-		},
-		LabelKeys: []string{
-		},
+			LabelKeys: []string{},
 		},
 	},
 	TransactionActivity: SystemTransactionActivityContext{
 		Context: framework.Context[EmptyLabels]{
-		Name:       "db2.transaction_activity",
-		Family:     "activity/transactions",
-		Title:      "Transaction Activity",
-		Units:      "transactions/s",
-		Type:       module.Stacked,
-		Priority:   905,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "committed",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "db2.transaction_activity",
+			Family:      "activity/transactions",
+			Title:       "Transaction Activity",
+			Units:       "transactions/s",
+			Type:        module.Stacked,
+			Priority:    905,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "committed",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "aborted",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "aborted",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-		},
-		LabelKeys: []string{
-		},
+			LabelKeys: []string{},
 		},
 	},
 	TimeSpent: SystemTimeSpentContext{
 		Context: framework.Context[EmptyLabels]{
-		Name:       "db2.time_spent",
-		Family:     "activity/time-spent",
-		Title:      "Average Operation Times",
-		Units:      "milliseconds",
-		Type:       module.Line,
-		Priority:   905,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "direct_read",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1000,
-				Precision: 1000,
+			Name:        "db2.time_spent",
+			Family:      "activity/time-spent",
+			Title:       "Average Operation Times",
+			Units:       "milliseconds",
+			Type:        module.Line,
+			Priority:    905,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "direct_read",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1000,
+					Precision: 1000,
+				},
+				{
+					Name:      "direct_write",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1000,
+					Precision: 1000,
+				},
+				{
+					Name:      "pool_read",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1000,
+					Precision: 1000,
+				},
+				{
+					Name:      "pool_write",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1000,
+					Precision: 1000,
+				},
 			},
-			{
-				Name:      "direct_write",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1000,
-				Precision: 1000,
-			},
-			{
-				Name:      "pool_read",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1000,
-				Precision: 1000,
-			},
-			{
-				Name:      "pool_write",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1000,
-				Precision: 1000,
-			},
-		},
-		LabelKeys: []string{
-		},
+			LabelKeys: []string{},
 		},
 	},
 }
 
-
 // --- Table ---
-
 
 // TableSizeValues defines the type-safe values for Table.Size context
 type TableSizeValues struct {
-	Data int64
-	Index int64
+	Data     int64
+	Index    int64
 	Long_obj int64
 }
 
@@ -3862,8 +3782,8 @@ type TableSizeContext struct {
 // Set provides type-safe dimension setting for Table.Size context
 func (c TableSizeContext) Set(state *framework.CollectorState, labels TableLabels, values TableSizeValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
-		"data": values.Data,
-		"index": values.Index,
+		"data":     values.Data,
+		"index":    values.Index,
 		"long_obj": values.Long_obj,
 	})
 }
@@ -3875,7 +3795,7 @@ func (c TableSizeContext) SetUpdateEvery(state *framework.CollectorState, labels
 
 // TableActivityValues defines the type-safe values for Table.Activity context
 type TableActivityValues struct {
-	Read int64
+	Read    int64
 	Written int64
 }
 
@@ -3887,7 +3807,7 @@ type TableActivityContext struct {
 // Set provides type-safe dimension setting for Table.Activity context
 func (c TableActivityContext) Set(state *framework.CollectorState, labels TableLabels, values TableActivityValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
-		"read": values.Read,
+		"read":    values.Read,
 		"written": values.Written,
 	})
 }
@@ -3896,8 +3816,6 @@ func (c TableActivityContext) Set(state *framework.CollectorState, labels TableL
 func (c TableActivityContext) SetUpdateEvery(state *framework.CollectorState, labels TableLabels, updateEvery int) {
 	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
 }
-
-
 
 // TableLabels defines the required labels for Table contexts
 type TableLabels struct {
@@ -3910,84 +3828,81 @@ func (l TableLabels) InstanceID(contextName string) string {
 	return contextName + "." + cleanLabelValue(l.Table)
 }
 
-
 // Table contains all metric contexts for Table
 var Table = struct {
-	Size TableSizeContext
+	Size     TableSizeContext
 	Activity TableActivityContext
 }{
 	Size: TableSizeContext{
 		Context: framework.Context[TableLabels]{
-		Name:       "db2.table_size",
-		Family:     "tables",
-		Title:      "Table Size",
-		Units:      "bytes",
-		Type:       module.Stacked,
-		Priority:   1140,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "data",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "db2.table_size",
+			Family:      "tables",
+			Title:       "Table Size",
+			Units:       "bytes",
+			Type:        module.Stacked,
+			Priority:    1140,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "data",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "index",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "long_obj",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "index",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			LabelKeys: []string{
+				"table",
 			},
-			{
-				Name:      "long_obj",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-		},
-		LabelKeys: []string{
-			"table",
-		},
 		},
 	},
 	Activity: TableActivityContext{
 		Context: framework.Context[TableLabels]{
-		Name:       "db2.table_activity",
-		Family:     "tables",
-		Title:      "Table Activity",
-		Units:      "rows/s",
-		Type:       module.Area,
-		Priority:   1141,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "read",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "db2.table_activity",
+			Family:      "tables",
+			Title:       "Table Activity",
+			Units:       "rows/s",
+			Type:        module.Area,
+			Priority:    1141,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "read",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "written",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "written",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			LabelKeys: []string{
+				"table",
 			},
-		},
-		LabelKeys: []string{
-			"table",
-		},
 		},
 	},
 }
 
-
 // --- TableIO ---
-
 
 // TableIOScansValues defines the type-safe values for TableIO.Scans context
 type TableIOScansValues struct {
@@ -4081,8 +3996,6 @@ func (c TableIOOverflowContext) SetUpdateEvery(state *framework.CollectorState, 
 	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
 }
 
-
-
 // TableIOLabels defines the required labels for TableIO contexts
 type TableIOLabels struct {
 	Table string
@@ -4094,125 +4007,122 @@ func (l TableIOLabels) InstanceID(contextName string) string {
 	return contextName + "." + cleanLabelValue(l.Table)
 }
 
-
 // TableIO contains all metric contexts for TableIO
 var TableIO = struct {
-	Scans TableIOScansContext
-	Rows TableIORowsContext
+	Scans    TableIOScansContext
+	Rows     TableIORowsContext
 	Activity TableIOActivityContext
 	Overflow TableIOOverflowContext
 }{
 	Scans: TableIOScansContext{
 		Context: framework.Context[TableIOLabels]{
-		Name:       "db2.table_io_scans",
-		Family:     "table_io",
-		Title:      "Table Scans",
-		Units:      "scans/s",
-		Type:       module.Line,
-		Priority:   1170,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "scans",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "db2.table_io_scans",
+			Family:      "table_io",
+			Title:       "Table Scans",
+			Units:       "scans/s",
+			Type:        module.Line,
+			Priority:    1170,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "scans",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-			"table",
-		},
+			LabelKeys: []string{
+				"table",
+			},
 		},
 	},
 	Rows: TableIORowsContext{
 		Context: framework.Context[TableIOLabels]{
-		Name:       "db2.table_io_rows",
-		Family:     "table_io",
-		Title:      "Table Row Operations",
-		Units:      "rows/s",
-		Type:       module.Line,
-		Priority:   1171,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "read",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "db2.table_io_rows",
+			Family:      "table_io",
+			Title:       "Table Row Operations",
+			Units:       "rows/s",
+			Type:        module.Line,
+			Priority:    1171,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "read",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-			"table",
-		},
+			LabelKeys: []string{
+				"table",
+			},
 		},
 	},
 	Activity: TableIOActivityContext{
 		Context: framework.Context[TableIOLabels]{
-		Name:       "db2.table_io_activity",
-		Family:     "table_io",
-		Title:      "Table DML Activity",
-		Units:      "operations/s",
-		Type:       module.Stacked,
-		Priority:   1172,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "inserts",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "db2.table_io_activity",
+			Family:      "table_io",
+			Title:       "Table DML Activity",
+			Units:       "operations/s",
+			Type:        module.Stacked,
+			Priority:    1172,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "inserts",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "updates",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "deletes",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "updates",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			LabelKeys: []string{
+				"table",
 			},
-			{
-				Name:      "deletes",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
-			},
-		},
-		LabelKeys: []string{
-			"table",
-		},
 		},
 	},
 	Overflow: TableIOOverflowContext{
 		Context: framework.Context[TableIOLabels]{
-		Name:       "db2.table_io_overflow",
-		Family:     "table_io",
-		Title:      "Table Overflow Accesses",
-		Units:      "accesses/s",
-		Type:       module.Line,
-		Priority:   1173,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "overflow",
-				Algorithm: module.Incremental,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "db2.table_io_overflow",
+			Family:      "table_io",
+			Title:       "Table Overflow Accesses",
+			Units:       "accesses/s",
+			Type:        module.Line,
+			Priority:    1173,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "overflow",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-			"table",
-		},
+			LabelKeys: []string{
+				"table",
+			},
 		},
 	},
 }
 
-
 // --- Tablespace ---
-
 
 // TablespaceUsageValues defines the type-safe values for Tablespace.Usage context
 type TablespaceUsageValues struct {
@@ -4262,7 +4172,7 @@ func (c TablespaceSizeContext) SetUpdateEvery(state *framework.CollectorState, l
 
 // TablespaceUsableSizeValues defines the type-safe values for Tablespace.UsableSize context
 type TablespaceUsableSizeValues struct {
-	Total int64
+	Total  int64
 	Usable int64
 }
 
@@ -4274,7 +4184,7 @@ type TablespaceUsableSizeContext struct {
 // Set provides type-safe dimension setting for Tablespace.UsableSize context
 func (c TablespaceUsableSizeContext) Set(state *framework.CollectorState, labels TablespaceLabels, values TablespaceUsableSizeValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
-		"total": values.Total,
+		"total":  values.Total,
 		"usable": values.Usable,
 	})
 }
@@ -4306,14 +4216,12 @@ func (c TablespaceStateContext) SetUpdateEvery(state *framework.CollectorState, 
 	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
 }
 
-
-
 // TablespaceLabels defines the required labels for Tablespace contexts
 type TablespaceLabels struct {
-	Tablespace string
-	Type string
+	Tablespace   string
+	Type         string
 	Content_type string
-	State string
+	State        string
 }
 
 // InstanceID generates a unique instance ID using the hardcoded label order from YAML
@@ -4322,135 +4230,132 @@ func (l TablespaceLabels) InstanceID(contextName string) string {
 	return contextName + "." + cleanLabelValue(l.Tablespace) + "_" + cleanLabelValue(l.Type) + "_" + cleanLabelValue(l.Content_type) + "_" + cleanLabelValue(l.State)
 }
 
-
 // Tablespace contains all metric contexts for Tablespace
 var Tablespace = struct {
-	Usage TablespaceUsageContext
-	Size TablespaceSizeContext
+	Usage      TablespaceUsageContext
+	Size       TablespaceSizeContext
 	UsableSize TablespaceUsableSizeContext
-	State TablespaceStateContext
+	State      TablespaceStateContext
 }{
 	Usage: TablespaceUsageContext{
 		Context: framework.Context[TablespaceLabels]{
-		Name:       "db2.tablespace_usage",
-		Family:     "tablespaces",
-		Title:      "Tablespace Usage",
-		Units:      "percentage",
-		Type:       module.Line,
-		Priority:   1120,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "used",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1000,
-				Precision: 1000,
+			Name:        "db2.tablespace_usage",
+			Family:      "tablespaces",
+			Title:       "Tablespace Usage",
+			Units:       "percentage",
+			Type:        module.Line,
+			Priority:    1120,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "used",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1000,
+					Precision: 1000,
+				},
 			},
-		},
-		LabelKeys: []string{
-			"tablespace",
-			"type",
-			"content_type",
-			"state",
-		},
+			LabelKeys: []string{
+				"tablespace",
+				"type",
+				"content_type",
+				"state",
+			},
 		},
 	},
 	Size: TablespaceSizeContext{
 		Context: framework.Context[TablespaceLabels]{
-		Name:       "db2.tablespace_size",
-		Family:     "tablespaces",
-		Title:      "Tablespace Size",
-		Units:      "bytes",
-		Type:       module.Stacked,
-		Priority:   1121,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "used",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "db2.tablespace_size",
+			Family:      "tablespaces",
+			Title:       "Tablespace Size",
+			Units:       "bytes",
+			Type:        module.Stacked,
+			Priority:    1121,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "used",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "free",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "free",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			LabelKeys: []string{
+				"tablespace",
+				"type",
+				"content_type",
+				"state",
 			},
-		},
-		LabelKeys: []string{
-			"tablespace",
-			"type",
-			"content_type",
-			"state",
-		},
 		},
 	},
 	UsableSize: TablespaceUsableSizeContext{
 		Context: framework.Context[TablespaceLabels]{
-		Name:       "db2.tablespace_usable_size",
-		Family:     "tablespaces",
-		Title:      "Tablespace Usable Size",
-		Units:      "bytes",
-		Type:       module.Line,
-		Priority:   1122,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "total",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "db2.tablespace_usable_size",
+			Family:      "tablespaces",
+			Title:       "Tablespace Usable Size",
+			Units:       "bytes",
+			Type:        module.Line,
+			Priority:    1122,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "total",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "usable",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-			{
-				Name:      "usable",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			LabelKeys: []string{
+				"tablespace",
+				"type",
+				"content_type",
+				"state",
 			},
-		},
-		LabelKeys: []string{
-			"tablespace",
-			"type",
-			"content_type",
-			"state",
-		},
 		},
 	},
 	State: TablespaceStateContext{
 		Context: framework.Context[TablespaceLabels]{
-		Name:       "db2.tablespace_state",
-		Family:     "tablespaces",
-		Title:      "Tablespace State",
-		Units:      "state",
-		Type:       module.Line,
-		Priority:   1123,
-		UpdateEvery: 1,
-		Dimensions: []framework.Dimension{
-			{
-				Name:      "state",
-				Algorithm: module.Absolute,
-				Mul:       1,
-				Div:       1,
-				Precision: 1,
+			Name:        "db2.tablespace_state",
+			Family:      "tablespaces",
+			Title:       "Tablespace State",
+			Units:       "state",
+			Type:        module.Line,
+			Priority:    1123,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "state",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
 			},
-		},
-		LabelKeys: []string{
-			"tablespace",
-			"type",
-			"content_type",
-			"state",
-		},
+			LabelKeys: []string{
+				"tablespace",
+				"type",
+				"content_type",
+				"state",
+			},
 		},
 	},
 }
-
-
 
 // GetAllContexts returns all contexts for framework registration
 func GetAllContexts() []interface{} {
