@@ -1741,7 +1741,7 @@ __thread sqlite3 *db_meta_thread = NULL;
 __thread sqlite3 *db_context_thread = NULL;
 __thread bool main_context_thread = false;
 
-extern uv_barrier_t ctx_barrier;
+extern uv_sem_t ctx_sem;
 static void restore_host_context(void *arg)
 {
     struct host_context_load_thread *hclt = arg;
@@ -1788,8 +1788,9 @@ static void restore_host_context(void *arg)
 
     aclk_queue_node_info(host, false);
 
-    if (IS_VIRTUAL_HOST_OS(host))
-        (void) uv_barrier_wait(&ctx_barrier);
+    if (IS_VIRTUAL_HOST_OS(host)) {
+        uv_sem_post(&ctx_sem);
+    }
 
     // Check and clear the thread local variables
     if (!main_context_thread) {

@@ -982,7 +982,7 @@ void create_aclk_config(RRDHOST *host, nd_uuid_t *host_uuid __maybe_unused, nd_u
     "WHERE h.host_id = ni.host_id AND ni.node_id IS NOT NULL"
 
 
-uv_barrier_t ctx_barrier;
+uv_sem_t ctx_sem;
 
 void aclk_synchronization_init(void)
 {
@@ -1006,16 +1006,16 @@ void aclk_synchronization_init(void)
         node_data.normal,
         node_data.vnodes);
 
-    bool barrier_init = true;
-    uv_barrier_init(&ctx_barrier, node_data.vnodes + 1);
+    bool sem_init = true;
+    uv_sem_init(&ctx_sem, 0);
 
     // Trigger host context load for hosts that have been created
     if (unlikely(!metadata_queue_load_host_context())) {
         nd_log_daemon(NDLP_WARNING, "Failed to queue command to load contexts for archived hosts");
         // Reset context load flag so that contexts will be loaded on demand
         reset_host_context_load_flag();
-        uv_barrier_destroy(&ctx_barrier);
-        barrier_init = false;
+        uv_sem_destroy(&ctx_sem);
+        sem_init = false;
     }
 
     rc = sqlite3_exec_monitored(db_meta, SQL_FETCH_ALL_INSTANCES, aclk_config_parameters, NULL, &err_msg);
@@ -1030,24 +1030,25 @@ void aclk_synchronization_init(void)
     if (!(node_data.normal + node_data.vnodes))
         aclk_queue_node_info(localhost, true);
 
-    if (barrier_init) {
-        rc = uv_barrier_wait(&ctx_barrier);
-        if (0 == rc)
-            uv_barrier_destroy(&ctx_barrier);
-    }
+    if (sem_init) {
+        int finished_vnodes = 0;
+        time_t deadline = now_realtime_sec() + 60;  // hard timeput to avoid infinite block
+        while (finished_vnodes < node_data.vnodes) {
+            if (uv_sem_trywait(&ctx_sem) == 0) {
+                finished_vnodes++;
+                continue;
+            }
 
-    RRDHOST *host = NULL;
-    int pending;
-    do {
-        pending = 0;
-        dfe_start_reentrant(rrdhost_root_index, host) {
-            if (IS_VIRTUAL_HOST_OS(host) && rrdhost_flag_check(host, RRDHOST_FLAG_PENDING_CONTEXT_LOAD))
-                pending++;
+            if (now_realtime_sec() >= deadline) {
+                nd_log_daemon(NDLP_WARNING, "Vnodes context load still in progress, continue with agent start");
+                break;
+            }
+            sleep_usec(100 * USEC_PER_MS);
         }
-        dfe_done(host);
-        nd_log_daemon(NDLP_INFO, "Pending host context load: %d", pending);
-    } while (pending);
-
+        if (finished_vnodes == node_data.vnodes) {
+            uv_sem_destroy(&ctx_sem);
+        }
+    }
     nd_log_daemon(NDLP_INFO, "ACLK sync initialization completed");
 }
 
