@@ -4,6 +4,18 @@
 
 IBM WebSphere Application Server comes in multiple editions, each with different monitoring capabilities. This guide helps understand which monitoring interfaces are available in each edition and provides recommendations for comprehensive market coverage.
 
+## Netdata Module Mapping
+
+Netdata ships three dedicated WebSphere collectors implemented in the ibm.d framework. Their source locations and backing protocols are:
+
+| Module | Source Path | Protocol Layer |
+| ------ | ----------- | -------------- |
+| `websphere_pmi` | `src/go/plugin/ibm.d/modules/websphere/pmi` | `protocols/websphere/pmi` (PerfServlet XML) |
+| `websphere_mp`  | `src/go/plugin/ibm.d/modules/websphere/mp`  | `protocols/openmetrics` (MicroProfile Metrics) |
+| `websphere_jmx` | `src/go/plugin/ibm.d/modules/websphere/jmx` | `protocols/jmxbridge` + `protocols/websphere/jmx` |
+
+Each module exposes generated contexts under its `contexts/` directory and is configured via `/etc/netdata/ibm.d/websphere_*.conf`.
+
 ## WebSphere Editions
 
 ### 1. WebSphere Traditional (Full Profile)

@@ -23,7 +23,8 @@ if(ENABLE_PLUGIN_IBM_D)
         ${CMAKE_CURRENT_SOURCE_DIR}/protocols/*/*.go
         ${CMAKE_CURRENT_SOURCE_DIR}/pkg/*.go
         ${CMAKE_CURRENT_SOURCE_DIR}/pkg/*/*.go
-        ${CMAKE_CURRENT_SOURCE_DIR}/collector/websphere_*/*.go)
+        ${CMAKE_CURRENT_SOURCE_DIR}/modules/websphere/*.go
+        ${CMAKE_CURRENT_SOURCE_DIR}/modules/websphere/*/*.go)
     
     # Build with CGO enabled
     add_custom_command(
