@@ -2,90 +2,110 @@
   "jsonSchema": {
     "$schema": "http://json-schema.org/draft-07/schema#",
     "properties": {
+      "collect_active_jobs": {
+        "default": "\u003cauto\u003e",
+        "title": "CollectActiveJobs toggles collection of detailed per-job metrics.",
+        "type": "boolean"
+      },
+      "collect_disk_metrics": {
+        "default": "\u003cauto\u003e",
+        "title": "CollectDiskMetrics toggles collection of disk unit statistics.",
+        "type": "boolean"
+      },
       "collect_disks_matching": {
         "default": "",
-        "title": "Pattern to filter disk (wildcards supported)",
+        "title": "DiskSelector filters disk units by name using glob-style patterns.",
         "type": "string"
+      },
+      "collect_job_queue_metrics": {
+        "default": "\u003cauto\u003e",
+        "title": "CollectJobQueueMetrics toggles collection of job queue backlog metrics.",
+        "type": "boolean"
       },
       "collect_job_queues_matching": {
         "default": "",
-        "title": "Pattern to filter job queue (wildcards supported)",
+        "title": "JobQueueSelector filters job queues by name using glob-style patterns.",
         "type": "string"
+      },
+      "collect_subsystem_metrics": {
+        "default": "\u003cauto\u003e",
+        "title": "CollectSubsystemMetrics toggles collection of subsystem activity metrics.",
+        "type": "boolean"
       },
       "collect_subsystems_matching": {
         "default": "",
-        "title": "Pattern to filter subsystem (wildcards supported)",
+        "title": "SubsystemSelector filters subsystems by name using glob-style patterns.",
         "type": "string"
       },
       "connection_type": {
         "default": "odbc",
-        "title": "Connection type",
+        "title": "ConnectionType selects how the collector connects (currently only \"odbc\").",
         "type": "string"
       },
       "database": {
         "default": "*SYSBAS",
-        "title": "Database",
+        "title": "Database selects the IBM i database (library) to use when building the DSN.",
         "type": "string"
       },
       "dsn": {
         "default": "",
-        "title": "Data Source Name (DSN) for connection",
+        "title": "DSN provides a full IBM i ODBC connection string if manual override is needed.",
         "type": "string"
       },
       "hostname": {
         "default": "",
-        "title": "Server hostname or IP address",
+        "title": "Hostname is the remote IBM i host to monitor.",
         "type": "string"
       },
       "max_active_jobs": {
         "default": 100,
-        "title": "Maximum number of active jobs to monitor",
+        "title": "MaxActiveJobs caps how many active jobs may be charted.",
         "type": "integer"
       },
       "max_db_conns": {
         "default": 1,
-        "title": "Maximum number of db conns to monitor",
+        "title": "MaxDbConns restricts the maximum number of open ODBC connections.",
         "type": "integer"
       },
       "max_db_life_time": {
-        "title": "Maximum number of db life time to monitor",
+        "title": "MaxDbLifeTime limits how long a pooled connection may live before being recycled.",
         "type": "integer"
       },
       "max_disks": {
         "default": 100,
-        "title": "Maximum number of disks to monitor",
+        "title": "MaxDisks caps how many disk units may be charted.",
         "type": "integer"
       },
       "max_job_queues": {
         "default": 100,
-        "title": "Maximum number of job queues to monitor",
+        "title": "MaxJobQueues caps how many job queues may be charted.",
         "type": "integer"
       },
       "max_subsystems": {
         "default": 100,
-        "title": "Maximum number of subsystems to monitor",
+        "title": "MaxSubsystems caps how many subsystems may be charted.",
         "type": "integer"
       },
       "odbc_driver": {
         "default": "IBM i Access ODBC Driver",
-        "title": "O d b c driver",
+        "title": "ODBCDriver specifies the driver name registered on the host.",
         "type": "string"
       },
       "password": {
         "default": "",
         "format": "password",
-        "title": "Password for authentication",
+        "title": "Password supplies the password used for authentication.",
         "type": "string"
       },
       "port": {
         "default": 8471,
         "maximum": 65535,
         "minimum": 1,
-        "title": "Server port number",
+        "title": "Port is the TCP port for the IBM i Access ODBC server.",
         "type": "integer"
       },
       "timeout": {
-        "title": "Connection timeout duration in seconds",
+        "title": "Timeout controls how long to wait for SQL statements and RPCs.",
         "type": "integer"
       },
       "update_every": {
@@ -96,17 +116,17 @@
       },
       "use_ssl": {
         "default": false,
-        "title": "Enable SSL/TLS encrypted connection",
+        "title": "UseSSL enables TLS for the ODBC connection when supported by the driver.",
         "type": "boolean"
       },
       "username": {
         "default": "",
-        "title": "Username for authentication",
+        "title": "Username supplies the credentials used for authentication.",
         "type": "string"
       },
       "vnode": {
         "default": "",
-        "title": "Vnode",
+        "title": "Vnode allows binding the collector to a virtual node.",
         "type": "string"
       }
     },

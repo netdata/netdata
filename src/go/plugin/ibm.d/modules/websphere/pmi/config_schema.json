@@ -4,92 +4,140 @@
     "properties": {
       "cell_name": {
         "default": "",
-        "title": "Cell name",
+        "title": "CellName appends the cell label to every timeseries.",
         "type": "string"
       },
       "cluster_name": {
         "default": "",
-        "title": "Cluster name",
+        "title": "ClusterName appends a cluster label to every timeseries.",
         "type": "string"
       },
       "collect_apps_matching": {
         "default": "",
-        "title": "Enable collection of apps matching metrics",
+        "title": "CollectAppsMatching filters applications by name using glob patterns.",
         "type": "string"
+      },
+      "collect_cluster_metrics": {
+        "title": "CollectClusterMetrics toggles cluster health metrics.",
+        "type": "boolean"
+      },
+      "collect_ejb_metrics": {
+        "title": "CollectEJBMetrics toggles Enterprise Java Bean metrics.",
+        "type": "boolean"
       },
       "collect_ejbs_matching": {
         "default": "",
-        "title": "Enable collection of e j bs matching metrics",
+        "title": "CollectEJBsMatching filters EJBs by name using glob patterns.",
         "type": "string"
+      },
+      "collect_jca_metrics": {
+        "title": "CollectJCAMetrics toggles JCA resource adapter metrics.",
+        "type": "boolean"
+      },
+      "collect_jdbc_advanced": {
+        "title": "CollectJDBCAdvanced toggles advanced JDBC timing metrics.",
+        "type": "boolean"
+      },
+      "collect_jdbc_metrics": {
+        "title": "CollectJDBCMetrics toggles JDBC pool metrics.",
+        "type": "boolean"
       },
       "collect_jms_matching": {
         "default": "",
-        "title": "Enable collection of j m s matching metrics",
+        "title": "CollectJMSMatching filters JMS destinations by name using glob patterns.",
         "type": "string"
+      },
+      "collect_jms_metrics": {
+        "title": "CollectJMSMetrics toggles JMS destination metrics.",
+        "type": "boolean"
+      },
+      "collect_jvm_metrics": {
+        "title": "CollectJVMMetrics toggles JVM runtime metrics.",
+        "type": "boolean"
       },
       "collect_pools_matching": {
         "default": "",
-        "title": "Enable collection of pools matching metrics",
+        "title": "CollectPoolsMatching filters pools (JDBC/JCA) by name using glob patterns.",
         "type": "string"
+      },
+      "collect_servlet_metrics": {
+        "title": "CollectServletMetrics toggles servlet response-time metrics.",
+        "type": "boolean"
       },
       "collect_servlets_matching": {
         "default": "",
-        "title": "Enable collection of servlets matching metrics",
+        "title": "CollectServletsMatching filters servlets by name using glob patterns.",
         "type": "string"
+      },
+      "collect_session_metrics": {
+        "title": "CollectSessionMetrics toggles HTTP session manager metrics.",
+        "type": "boolean"
+      },
+      "collect_threadpool_metrics": {
+        "title": "CollectThreadPoolMetrics toggles thread pool metrics.",
+        "type": "boolean"
+      },
+      "collect_transaction_metrics": {
+        "title": "CollectTransactionMetrics toggles transaction manager metrics.",
+        "type": "boolean"
+      },
+      "collect_webapp_metrics": {
+        "title": "CollectWebAppMetrics toggles Web application metrics.",
+        "type": "boolean"
       },
       "max_applications": {
         "default": 100,
-        "title": "Maximum number of applications to monitor",
+        "title": "MaxApplications caps the number of web applications charted.",
         "type": "integer"
       },
       "max_ejbs": {
         "default": 50,
-        "title": "Maximum number of e j bs to monitor",
+        "title": "MaxEJBs caps the number of EJBs charted.",
         "type": "integer"
       },
       "max_jca_pools": {
         "default": 50,
-        "title": "Maximum number of j c a pools to monitor",
+        "title": "MaxJCAPools caps the number of JCA pools charted.",
         "type": "integer"
       },
       "max_jdbc_pools": {
         "default": 50,
-        "title": "Maximum number of j d b c pools to monitor",
+        "title": "MaxJDBCPools caps the number of JDBC pools charted.",
         "type": "integer"
       },
       "max_jms_destinations": {
         "default": 50,
-        "title": "Maximum number of j m s destinations to monitor",
+        "title": "MaxJMSDestinations caps the number of JMS destinations charted.",
         "type": "integer"
       },
       "max_servlets": {
         "default": 50,
-        "title": "Maximum number of servlets to monitor",
+        "title": "MaxServlets caps the number of servlets charted.",
         "type": "integer"
       },
       "max_threadpools": {
         "default": 50,
-        "title": "Maximum number of thread pools to monitor",
+        "title": "MaxThreadPools caps the number of thread pools charted per server.",
         "type": "integer"
       },
       "node_name": {
         "default": "",
-        "title": "Node name",
+        "title": "NodeName appends the node label to every timeseries.",
         "type": "string"
       },
       "pmi_refresh_rate": {
         "default": 60,
-        "title": "P m i refresh rate",
+        "title": "PMIRefreshRate overrides the PMI servlet refresh interval in seconds.",
         "type": "integer"
       },
       "pmi_stats_type": {
         "default": "extended",
-        "title": "P m i stats type",
+        "title": "PMIStatsType selects which PMI statistics tier to request (basic, extended, all).",
         "type": "string"
       },
       "server_type": {
         "default": "",
-        "title": "Server type",
+        "title": "ServerType annotates metrics with the WebSphere server type (e.g. app_server, dmgr).",
         "type": "string"
       },
       "update_every": {
@@ -100,7 +148,7 @@
       },
       "vnode": {
         "default": "",
-        "title": "Vnode",
+        "title": "Vnode allows binding the collector to a virtual node.",
         "type": "string"
       }
     },

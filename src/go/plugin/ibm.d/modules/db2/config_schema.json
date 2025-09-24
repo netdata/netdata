@@ -4,100 +4,135 @@
     "properties": {
       "backup_history_days": {
         "default": 30,
-        "title": "Backup history days",
+        "title": "BackupHistoryDays controls how many days of backup history are retrieved.",
         "type": "integer"
+      },
+      "collect_bufferpool_metrics": {
+        "default": "\u003cauto\u003e",
+        "title": "CollectBufferpoolMetrics toggles buffer pool efficiency metrics.",
+        "type": "boolean"
       },
       "collect_bufferpools_matching": {
         "default": "",
-        "title": "Enable collection of bufferpools matching metrics",
+        "title": "CollectBufferpoolsMatching filters buffer pools by name using glob patterns.",
         "type": "string"
+      },
+      "collect_connection_metrics": {
+        "default": "\u003cauto\u003e",
+        "title": "CollectConnectionMetrics toggles per-connection activity metrics.",
+        "type": "boolean"
       },
       "collect_connections_matching": {
         "default": "",
-        "title": "Enable collection of connections matching metrics",
+        "title": "CollectConnectionsMatching filters monitored connections by application ID.",
         "type": "string"
+      },
+      "collect_database_metrics": {
+        "default": "\u003cauto\u003e",
+        "title": "CollectDatabaseMetrics toggles high-level database status metrics.",
+        "type": "boolean"
       },
       "collect_databases_matching": {
         "default": "",
-        "title": "Enable collection of databases matching metrics",
+        "title": "CollectDatabasesMatching filters databases by name using glob patterns.",
         "type": "string"
+      },
+      "collect_index_metrics": {
+        "default": "\u003cauto\u003e",
+        "title": "CollectIndexMetrics toggles index usage metrics.",
+        "type": "boolean"
       },
       "collect_indexes_matching": {
         "default": "",
-        "title": "Enable collection of indexes matching metrics",
+        "title": "CollectIndexesMatching filters indexes by schema/name.",
         "type": "string"
+      },
+      "collect_lock_metrics": {
+        "default": "\u003cauto\u003e",
+        "title": "CollectLockMetrics toggles lock contention metrics.",
+        "type": "boolean"
       },
       "collect_memory_metrics": {
         "default": true,
-        "title": "Enable collection of memory metrics metrics",
+        "title": "CollectMemoryMetrics enables memory pool statistics.",
         "type": "boolean"
       },
       "collect_table_io_metrics": {
         "default": true,
-        "title": "Enable collection of table i o metrics metrics",
+        "title": "CollectTableIOMetrics enables table I/O statistics when available.",
+        "type": "boolean"
+      },
+      "collect_table_metrics": {
+        "default": "\u003cauto\u003e",
+        "title": "CollectTableMetrics toggles table-level size and row metrics.",
         "type": "boolean"
       },
       "collect_tables_matching": {
         "default": "",
-        "title": "Enable collection of tables matching metrics",
+        "title": "CollectTablesMatching filters tables by schema/name.",
         "type": "string"
+      },
+      "collect_tablespace_metrics": {
+        "default": "\u003cauto\u003e",
+        "title": "CollectTablespaceMetrics toggles tablespace capacity metrics.",
+        "type": "boolean"
       },
       "collect_tablespaces_matching": {
         "default": "",
-        "title": "Enable collection of tablespaces matching metrics",
+        "title": "CollectTablespacesMatching filters tablespaces by name using glob patterns.",
         "type": "string"
       },
       "collect_wait_metrics": {
         "default": true,
-        "title": "Enable collection of wait metrics metrics",
+        "title": "CollectWaitMetrics enables wait time statistics (locks, logs, I/O).",
         "type": "boolean"
       },
       "dsn": {
         "default": "",
-        "title": "Data Source Name (DSN) for connection",
+        "title": "DSN provides a full DB2 connection string when manual control is required.",
         "type": "string"
       },
       "max_bufferpools": {
         "default": 20,
-        "title": "Maximum number of bufferpools to monitor",
+        "title": "MaxBufferpools caps the number of buffer pools charted.",
         "type": "integer"
       },
       "max_connections": {
         "default": 200,
-        "title": "Maximum number of connections to monitor",
+        "title": "MaxConnections caps the number of connection instances charted.",
         "type": "integer"
       },
       "max_databases": {
         "default": 10,
-        "title": "Maximum number of databases to monitor",
+        "title": "MaxDatabases caps the number of databases charted.",
         "type": "integer"
       },
       "max_db_conns": {
         "default": 1,
-        "title": "Maximum number of db conns to monitor",
+        "title": "MaxDbConns limits the connection pool size.",
         "type": "integer"
       },
       "max_db_life_time": {
-        "title": "Maximum number of db life time to monitor",
+        "title": "MaxDbLifeTime forces pooled connections to be recycled after the specified duration.",
         "type": "integer"
       },
       "max_indexes": {
         "default": 100,
-        "title": "Maximum number of indexes to monitor",
+        "title": "MaxIndexes caps the number of indexes charted.",
         "type": "integer"
       },
       "max_tables": {
         "default": 50,
-        "title": "Maximum number of tables to monitor",
+        "title": "MaxTables caps the number of tables charted.",
         "type": "integer"
       },
       "max_tablespaces": {
         "default": 100,
-        "title": "Maximum number of tablespaces to monitor",
+        "title": "MaxTablespaces caps the number of tablespaces charted.",
         "type": "integer"
       },
       "timeout": {
-        "title": "Connection timeout duration in seconds",
+        "title": "Timeout controls how long DB2 RPCs may run before cancellation.",
         "type": "integer"
       },
       "update_every": {
@@ -108,7 +143,7 @@
       },
       "vnode": {
         "default": "",
-        "title": "Vnode",
+        "title": "Vnode allows binding the collector to a virtual node.",
         "type": "string"
       }
     },

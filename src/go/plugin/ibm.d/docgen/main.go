@@ -66,6 +66,7 @@ type ConfigField struct {
 	Minimum     *int
 	Maximum     *int
 	Examples    []string
+	Pointer     bool
 }
 
 func main() {

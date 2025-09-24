@@ -89,6 +89,21 @@ The following generators keep modules aligned:
 | `metricgen` | `../metricgen` | Optional helper to scaffold metric exports |
 | `go generate` directives | module directories | Invoke docgen + context generation |
 
+### Source of Truth vs Generated Artifacts
+
+Author **only** the following files manually:
+
+- `contexts/contexts.yaml`
+- Go sources (`config.go`, `collector.go`, `collect_*.go`, `module.go`, `init.go`)
+- `module.yaml` and module-specific health alerts/extra docs
+
+Everything else is generated:
+
+- `contexts/zz_generated_contexts.go` (and other `contexts/zz_*` helpers)
+- `metadata.yaml`, `config_schema.json`, and `README.md`
+
+To update generated files, run `go generate` in the module directory. Any manual edits to the generated outputs will be overwritten the next time docgen runs, so keep tweaks in the source files above. If additional prose is needed, place it in `module.yaml` (description, prerequisites, troubleshooting) or create a separate developer-facing document; the generated README is intended for users and should remain fully automated.
+
 Typical `go:generate` directives for a module:
 
 ```go

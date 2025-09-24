@@ -55,6 +55,9 @@ func (g *DocGenerator) parseConfigFromGoFile() ([]ConfigField, error) {
 			fields[i].Default = defaultValue
 			// If field has a default, it's not required
 			fields[i].Required = false
+		} else if fields[i].Pointer {
+			fields[i].Default = "<auto>"
+			fields[i].Required = false
 		} else {
 			missingDefaults = append(missingDefaults, fields[i].Name)
 		}
@@ -115,6 +118,7 @@ func extractConfigField(fieldName string, field *ast.Field, comments []*ast.Comm
 	}
 
 	// Convert Go type to JSON Schema type
+	isPointer := strings.HasPrefix(fieldType, "*")
 	jsonType := convertToJSONType(fieldType)
 
 	// Extract documentation from comments
@@ -127,6 +131,7 @@ func extractConfigField(fieldName string, field *ast.Field, comments []*ast.Comm
 		Type:        jsonType,
 		Required:    !strings.Contains(yamlName, "omitempty"),
 		Description: description,
+		Pointer:     isPointer,
 	}
 
 	// Set defaults and constraints based on field name and type
@@ -144,6 +149,12 @@ func extractGoType(expr ast.Expr) string {
 		if ident, ok := t.X.(*ast.Ident); ok {
 			return ident.Name + "." + t.Sel.Name
 		}
+	case *ast.StarExpr:
+		inner := extractGoType(t.X)
+		if inner == "" {
+			return ""
+		}
+		return "*" + inner
 	}
 	return ""
 }
@@ -190,6 +201,7 @@ func convertToSnakeCase(s string) string {
 }
 
 func convertToJSONType(goType string) string {
+	baseType := strings.TrimPrefix(goType, "*")
 	switch goType {
 	case "string":
 		return "string"
@@ -200,6 +212,17 @@ func convertToJSONType(goType string) string {
 	case "bool":
 		return "boolean"
 	default:
+		// Handle pointer wrappers of basic types
+		switch baseType {
+		case "string":
+			return "string"
+		case "int", "int8", "int16", "int32", "int64", "uint", "uint8", "uint16", "uint32", "uint64":
+			return "integer"
+		case "float32", "float64":
+			return "number"
+		case "bool":
+			return "boolean"
+		}
 		// Handle complex types
 		if strings.Contains(goType, "Duration") {
 			return "integer"
@@ -494,6 +517,15 @@ func extractValue(expr ast.Expr) interface{} {
 		case "false":
 			return false
 		}
+	case *ast.CallExpr:
+		if len(v.Args) > 0 {
+			val := extractValue(v.Args[0])
+			if val != nil {
+				return val
+			}
+		}
+	case *ast.UnaryExpr:
+		return extractValue(v.X)
 	}
 	return nil
 }

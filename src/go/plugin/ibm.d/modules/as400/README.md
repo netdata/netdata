@@ -196,26 +196,30 @@ The following options can be defined globally or per job.
 | Name | Description | Default | Required | Min | Max |
 |:-----|:------------|:--------|:---------|:----|:----|
 | update_every | Data collection frequency | `1` | no | 1 | - |
-| Vnode | Vnode | `` | no | - | - |
-| DSN | Data Source Name (DSN) for connection | `` | no | - | - |
-| Timeout | Connection timeout duration in seconds | `<no value>` | no | - | - |
-| MaxDbConns | Maximum number of db conns to monitor | `1` | no | - | - |
-| MaxDbLifeTime | Maximum number of db life time to monitor | `<no value>` | no | - | - |
-| Hostname | Server hostname or IP address | `` | no | - | - |
-| Port | Server port number | `8471` | no | 1 | 65535 |
-| Username | Username for authentication | `` | no | - | - |
-| Password | Password for authentication | `` | no | - | - |
-| Database | Database | `*SYSBAS` | no | - | - |
-| ConnectionType | Connection type | `odbc` | no | - | - |
-| ODBCDriver | O d b c driver | `IBM i Access ODBC Driver` | no | - | - |
-| UseSSL | Enable SSL/TLS encrypted connection | `false` | no | - | - |
-| MaxDisks | Maximum number of disks to monitor | `100` | no | - | - |
-| MaxSubsystems | Maximum number of subsystems to monitor | `100` | no | - | - |
-| MaxJobQueues | Maximum number of job queues to monitor | `100` | no | - | - |
-| MaxActiveJobs | Maximum number of active jobs to monitor | `100` | no | - | - |
-| DiskSelector | Pattern to filter disk (wildcards supported) | `` | no | - | - |
-| SubsystemSelector | Pattern to filter subsystem (wildcards supported) | `` | no | - | - |
-| JobQueueSelector | Pattern to filter job queue (wildcards supported) | `` | no | - | - |
+| Vnode | Vnode allows binding the collector to a virtual node. | `` | no | - | - |
+| DSN | DSN provides a full IBM i ODBC connection string if manual override is needed. | `` | no | - | - |
+| Timeout | Timeout controls how long to wait for SQL statements and RPCs. | `<no value>` | no | - | - |
+| MaxDbConns | MaxDbConns restricts the maximum number of open ODBC connections. | `1` | no | - | - |
+| MaxDbLifeTime | MaxDbLifeTime limits how long a pooled connection may live before being recycled. | `<no value>` | no | - | - |
+| Hostname | Hostname is the remote IBM i host to monitor. | `` | no | - | - |
+| Port | Port is the TCP port for the IBM i Access ODBC server. | `8471` | no | 1 | 65535 |
+| Username | Username supplies the credentials used for authentication. | `` | no | - | - |
+| Password | Password supplies the password used for authentication. | `` | no | - | - |
+| Database | Database selects the IBM i database (library) to use when building the DSN. | `*SYSBAS` | no | - | - |
+| ConnectionType | ConnectionType selects how the collector connects (currently only "odbc"). | `odbc` | no | - | - |
+| ODBCDriver | ODBCDriver specifies the driver name registered on the host. | `IBM i Access ODBC Driver` | no | - | - |
+| UseSSL | UseSSL enables TLS for the ODBC connection when supported by the driver. | `false` | no | - | - |
+| CollectDiskMetrics | CollectDiskMetrics toggles collection of disk unit statistics. | `<auto>` | no | - | - |
+| CollectSubsystemMetrics | CollectSubsystemMetrics toggles collection of subsystem activity metrics. | `<auto>` | no | - | - |
+| CollectJobQueueMetrics | CollectJobQueueMetrics toggles collection of job queue backlog metrics. | `<auto>` | no | - | - |
+| CollectActiveJobs | CollectActiveJobs toggles collection of detailed per-job metrics. | `<auto>` | no | - | - |
+| MaxDisks | MaxDisks caps how many disk units may be charted. | `100` | no | - | - |
+| MaxSubsystems | MaxSubsystems caps how many subsystems may be charted. | `100` | no | - | - |
+| MaxJobQueues | MaxJobQueues caps how many job queues may be charted. | `100` | no | - | - |
+| MaxActiveJobs | MaxActiveJobs caps how many active jobs may be charted. | `100` | no | - | - |
+| DiskSelector | DiskSelector filters disk units by name using glob-style patterns. | `` | no | - | - |
+| SubsystemSelector | SubsystemSelector filters subsystems by name using glob-style patterns. | `` | no | - | - |
+| JobQueueSelector | JobQueueSelector filters job queues by name using glob-style patterns. | `` | no | - | - |
 
 ### Examples
 

@@ -289,27 +289,34 @@ The following options can be defined globally or per job.
 | Name | Description | Default | Required | Min | Max |
 |:-----|:------------|:--------|:---------|:----|:----|
 | update_every | Data collection frequency | `1` | no | 1 | - |
-| Vnode | Vnode | `` | no | - | - |
-| DSN | Data Source Name (DSN) for connection | `` | no | - | - |
-| Timeout | Connection timeout duration in seconds | `<no value>` | no | - | - |
-| MaxDbConns | Maximum number of db conns to monitor | `1` | no | - | - |
-| MaxDbLifeTime | Maximum number of db life time to monitor | `<no value>` | no | - | - |
-| MaxDatabases | Maximum number of databases to monitor | `10` | no | - | - |
-| MaxBufferpools | Maximum number of bufferpools to monitor | `20` | no | - | - |
-| MaxTablespaces | Maximum number of tablespaces to monitor | `100` | no | - | - |
-| MaxConnections | Maximum number of connections to monitor | `200` | no | - | - |
-| MaxTables | Maximum number of tables to monitor | `50` | no | - | - |
-| MaxIndexes | Maximum number of indexes to monitor | `100` | no | - | - |
-| BackupHistoryDays | Backup history days | `30` | no | - | - |
-| CollectMemoryMetrics | Enable collection of memory metrics metrics | `true` | no | - | - |
-| CollectWaitMetrics | Enable collection of wait metrics metrics | `true` | no | - | - |
-| CollectTableIOMetrics | Enable collection of table i o metrics metrics | `true` | no | - | - |
-| CollectDatabasesMatching | Enable collection of databases matching metrics | `` | no | - | - |
-| CollectBufferpoolsMatching | Enable collection of bufferpools matching metrics | `` | no | - | - |
-| CollectTablespacesMatching | Enable collection of tablespaces matching metrics | `` | no | - | - |
-| CollectConnectionsMatching | Enable collection of connections matching metrics | `` | no | - | - |
-| CollectTablesMatching | Enable collection of tables matching metrics | `` | no | - | - |
-| CollectIndexesMatching | Enable collection of indexes matching metrics | `` | no | - | - |
+| Vnode | Vnode allows binding the collector to a virtual node. | `` | no | - | - |
+| DSN | DSN provides a full DB2 connection string when manual control is required. | `` | no | - | - |
+| Timeout | Timeout controls how long DB2 RPCs may run before cancellation. | `<no value>` | no | - | - |
+| MaxDbConns | MaxDbConns limits the connection pool size. | `1` | no | - | - |
+| MaxDbLifeTime | MaxDbLifeTime forces pooled connections to be recycled after the specified duration. | `<no value>` | no | - | - |
+| CollectDatabaseMetrics | CollectDatabaseMetrics toggles high-level database status metrics. | `<auto>` | no | - | - |
+| CollectBufferpoolMetrics | CollectBufferpoolMetrics toggles buffer pool efficiency metrics. | `<auto>` | no | - | - |
+| CollectTablespaceMetrics | CollectTablespaceMetrics toggles tablespace capacity metrics. | `<auto>` | no | - | - |
+| CollectConnectionMetrics | CollectConnectionMetrics toggles per-connection activity metrics. | `<auto>` | no | - | - |
+| CollectLockMetrics | CollectLockMetrics toggles lock contention metrics. | `<auto>` | no | - | - |
+| CollectTableMetrics | CollectTableMetrics toggles table-level size and row metrics. | `<auto>` | no | - | - |
+| CollectIndexMetrics | CollectIndexMetrics toggles index usage metrics. | `<auto>` | no | - | - |
+| MaxDatabases | MaxDatabases caps the number of databases charted. | `10` | no | - | - |
+| MaxBufferpools | MaxBufferpools caps the number of buffer pools charted. | `20` | no | - | - |
+| MaxTablespaces | MaxTablespaces caps the number of tablespaces charted. | `100` | no | - | - |
+| MaxConnections | MaxConnections caps the number of connection instances charted. | `200` | no | - | - |
+| MaxTables | MaxTables caps the number of tables charted. | `50` | no | - | - |
+| MaxIndexes | MaxIndexes caps the number of indexes charted. | `100` | no | - | - |
+| BackupHistoryDays | BackupHistoryDays controls how many days of backup history are retrieved. | `30` | no | - | - |
+| CollectMemoryMetrics | CollectMemoryMetrics enables memory pool statistics. | `true` | no | - | - |
+| CollectWaitMetrics | CollectWaitMetrics enables wait time statistics (locks, logs, I/O). | `true` | no | - | - |
+| CollectTableIOMetrics | CollectTableIOMetrics enables table I/O statistics when available. | `true` | no | - | - |
+| CollectDatabasesMatching | CollectDatabasesMatching filters databases by name using glob patterns. | `` | no | - | - |
+| CollectBufferpoolsMatching | CollectBufferpoolsMatching filters buffer pools by name using glob patterns. | `` | no | - | - |
+| CollectTablespacesMatching | CollectTablespacesMatching filters tablespaces by name using glob patterns. | `` | no | - | - |
+| CollectConnectionsMatching | CollectConnectionsMatching filters monitored connections by application ID. | `` | no | - | - |
+| CollectTablesMatching | CollectTablesMatching filters tables by schema/name. | `` | no | - | - |
+| CollectIndexesMatching | CollectIndexesMatching filters indexes by schema/name. | `` | no | - | - |
 
 ### Examples
 

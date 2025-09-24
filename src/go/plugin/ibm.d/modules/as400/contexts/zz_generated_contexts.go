@@ -4,9 +4,9 @@
 package contexts
 
 import (
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
-	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/framework"
 	"strings"
+	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/framework"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 )
 
 // cleanLabelValue cleans a label value for use in instance/dimension IDs
@@ -34,7 +34,9 @@ func (EmptyLabels) InstanceID(contextName string) string {
 	return contextName
 }
 
+
 // --- ActiveJob ---
+
 
 // ActiveJobCPUValues defines the type-safe values for ActiveJob.CPU context
 type ActiveJobCPUValues struct {
@@ -82,7 +84,7 @@ func (c ActiveJobResourcesContext) SetUpdateEvery(state *framework.CollectorStat
 
 // ActiveJobTimeValues defines the type-safe values for ActiveJob.Time context
 type ActiveJobTimeValues struct {
-	Cpu_time   int64
+	Cpu_time int64
 	Total_time int64
 }
 
@@ -94,7 +96,7 @@ type ActiveJobTimeContext struct {
 // Set provides type-safe dimension setting for ActiveJob.Time context
 func (c ActiveJobTimeContext) Set(state *framework.CollectorState, labels ActiveJobLabels, values ActiveJobTimeValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
-		"cpu_time":   values.Cpu_time,
+		"cpu_time": values.Cpu_time,
 		"total_time": values.Total_time,
 	})
 }
@@ -106,7 +108,7 @@ func (c ActiveJobTimeContext) SetUpdateEvery(state *framework.CollectorState, la
 
 // ActiveJobActivityValues defines the type-safe values for ActiveJob.Activity context
 type ActiveJobActivityValues struct {
-	Disk_io                  int64
+	Disk_io int64
 	Interactive_transactions int64
 }
 
@@ -118,7 +120,7 @@ type ActiveJobActivityContext struct {
 // Set provides type-safe dimension setting for ActiveJob.Activity context
 func (c ActiveJobActivityContext) Set(state *framework.CollectorState, labels ActiveJobLabels, values ActiveJobActivityValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
-		"disk_io":                  values.Disk_io,
+		"disk_io": values.Disk_io,
 		"interactive_transactions": values.Interactive_transactions,
 	})
 }
@@ -150,12 +152,14 @@ func (c ActiveJobThreadsContext) SetUpdateEvery(state *framework.CollectorState,
 	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
 }
 
+
+
 // ActiveJobLabels defines the required labels for ActiveJob contexts
 type ActiveJobLabels struct {
-	Job_name   string
+	Job_name string
 	Job_status string
-	Subsystem  string
-	Job_type   string
+	Subsystem string
+	Job_type string
 }
 
 // InstanceID generates a unique instance ID using the hardcoded label order from YAML
@@ -164,161 +168,164 @@ func (l ActiveJobLabels) InstanceID(contextName string) string {
 	return contextName + "." + cleanLabelValue(l.Job_name) + "_" + cleanLabelValue(l.Job_status) + "_" + cleanLabelValue(l.Subsystem) + "_" + cleanLabelValue(l.Job_type)
 }
 
+
 // ActiveJob contains all metric contexts for ActiveJob
 var ActiveJob = struct {
-	CPU       ActiveJobCPUContext
+	CPU ActiveJobCPUContext
 	Resources ActiveJobResourcesContext
-	Time      ActiveJobTimeContext
-	Activity  ActiveJobActivityContext
-	Threads   ActiveJobThreadsContext
+	Time ActiveJobTimeContext
+	Activity ActiveJobActivityContext
+	Threads ActiveJobThreadsContext
 }{
 	CPU: ActiveJobCPUContext{
 		Context: framework.Context[ActiveJobLabels]{
-			Name:        "as400.activejob_cpu",
-			Family:      "workloads/active_jobs",
-			Title:       "Active Job CPU Usage",
-			Units:       "percentage",
-			Type:        module.Line,
-			Priority:    506,
-			UpdateEvery: 1,
-			Dimensions: []framework.Dimension{
-				{
-					Name:      "cpu",
-					Algorithm: module.Absolute,
-					Mul:       1,
-					Div:       1000,
-					Precision: 1,
-				},
+		Name:       "as400.activejob_cpu",
+		Family:     "workloads/active_jobs",
+		Title:      "Active Job CPU Usage",
+		Units:      "percentage",
+		Type:       module.Line,
+		Priority:   506,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "cpu",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1000,
+				Precision: 1,
 			},
-			LabelKeys: []string{
-				"job_name",
-				"job_status",
-				"subsystem",
-				"job_type",
-			},
+		},
+		LabelKeys: []string{
+			"job_name",
+			"job_status",
+			"subsystem",
+			"job_type",
+		},
 		},
 	},
 	Resources: ActiveJobResourcesContext{
 		Context: framework.Context[ActiveJobLabels]{
-			Name:        "as400.activejob_resources",
-			Family:      "workloads/active_jobs",
-			Title:       "Active Job Resources",
-			Units:       "MiB",
-			Type:        module.Stacked,
-			Priority:    507,
-			UpdateEvery: 1,
-			Dimensions: []framework.Dimension{
-				{
-					Name:      "temp_storage",
-					Algorithm: module.Absolute,
-					Mul:       1,
-					Div:       1,
-					Precision: 1,
-				},
+		Name:       "as400.activejob_resources",
+		Family:     "workloads/active_jobs",
+		Title:      "Active Job Resources",
+		Units:      "MiB",
+		Type:       module.Stacked,
+		Priority:   507,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "temp_storage",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
 			},
-			LabelKeys: []string{
-				"job_name",
-				"job_status",
-				"subsystem",
-				"job_type",
-			},
+		},
+		LabelKeys: []string{
+			"job_name",
+			"job_status",
+			"subsystem",
+			"job_type",
+		},
 		},
 	},
 	Time: ActiveJobTimeContext{
 		Context: framework.Context[ActiveJobLabels]{
-			Name:        "as400.activejob_time",
-			Family:      "workloads/active_jobs",
-			Title:       "Active Job Elapsed Time",
-			Units:       "seconds",
-			Type:        module.Line,
-			Priority:    508,
-			UpdateEvery: 1,
-			Dimensions: []framework.Dimension{
-				{
-					Name:      "cpu_time",
-					Algorithm: module.Absolute,
-					Mul:       1,
-					Div:       1,
-					Precision: 1,
-				},
-				{
-					Name:      "total_time",
-					Algorithm: module.Absolute,
-					Mul:       1,
-					Div:       1,
-					Precision: 1,
-				},
+		Name:       "as400.activejob_time",
+		Family:     "workloads/active_jobs",
+		Title:      "Active Job Elapsed Time",
+		Units:      "seconds",
+		Type:       module.Line,
+		Priority:   508,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "cpu_time",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
 			},
-			LabelKeys: []string{
-				"job_name",
-				"job_status",
-				"subsystem",
-				"job_type",
+			{
+				Name:      "total_time",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
 			},
+		},
+		LabelKeys: []string{
+			"job_name",
+			"job_status",
+			"subsystem",
+			"job_type",
+		},
 		},
 	},
 	Activity: ActiveJobActivityContext{
 		Context: framework.Context[ActiveJobLabels]{
-			Name:        "as400.activejob_activity",
-			Family:      "workloads/active_jobs",
-			Title:       "Active Job Activity",
-			Units:       "operations/s",
-			Type:        module.Area,
-			Priority:    509,
-			UpdateEvery: 1,
-			Dimensions: []framework.Dimension{
-				{
-					Name:      "disk_io",
-					Algorithm: module.Incremental,
-					Mul:       1,
-					Div:       1,
-					Precision: 1,
-				},
-				{
-					Name:      "interactive_transactions",
-					Algorithm: module.Incremental,
-					Mul:       -1,
-					Div:       1,
-					Precision: 1,
-				},
+		Name:       "as400.activejob_activity",
+		Family:     "workloads/active_jobs",
+		Title:      "Active Job Activity",
+		Units:      "operations/s",
+		Type:       module.Area,
+		Priority:   509,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "disk_io",
+				Algorithm: module.Incremental,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
 			},
-			LabelKeys: []string{
-				"job_name",
-				"job_status",
-				"subsystem",
-				"job_type",
+			{
+				Name:      "interactive_transactions",
+				Algorithm: module.Incremental,
+				Mul:       -1,
+				Div:       1,
+				Precision: 1,
 			},
+		},
+		LabelKeys: []string{
+			"job_name",
+			"job_status",
+			"subsystem",
+			"job_type",
+		},
 		},
 	},
 	Threads: ActiveJobThreadsContext{
 		Context: framework.Context[ActiveJobLabels]{
-			Name:        "as400.activejob_threads",
-			Family:      "workloads/active_jobs",
-			Title:       "Active Job Thread Count",
-			Units:       "threads",
-			Type:        module.Line,
-			Priority:    510,
-			UpdateEvery: 1,
-			Dimensions: []framework.Dimension{
-				{
-					Name:      "threads",
-					Algorithm: module.Absolute,
-					Mul:       1,
-					Div:       1,
-					Precision: 1,
-				},
+		Name:       "as400.activejob_threads",
+		Family:     "workloads/active_jobs",
+		Title:      "Active Job Thread Count",
+		Units:      "threads",
+		Type:       module.Line,
+		Priority:   510,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "threads",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
 			},
-			LabelKeys: []string{
-				"job_name",
-				"job_status",
-				"subsystem",
-				"job_type",
-			},
+		},
+		LabelKeys: []string{
+			"job_name",
+			"job_status",
+			"subsystem",
+			"job_type",
+		},
 		},
 	},
 }
 
+
 // --- Disk ---
+
 
 // DiskBusyValues defines the type-safe values for Disk.Busy context
 type DiskBusyValues struct {
@@ -344,7 +351,7 @@ func (c DiskBusyContext) SetUpdateEvery(state *framework.CollectorState, labels 
 
 // DiskIORequestsValues defines the type-safe values for Disk.IORequests context
 type DiskIORequestsValues struct {
-	Read  int64
+	Read int64
 	Write int64
 }
 
@@ -356,7 +363,7 @@ type DiskIORequestsContext struct {
 // Set provides type-safe dimension setting for Disk.IORequests context
 func (c DiskIORequestsContext) Set(state *framework.CollectorState, labels DiskLabels, values DiskIORequestsValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
-		"read":  values.Read,
+		"read": values.Read,
 		"write": values.Write,
 	})
 }
@@ -391,7 +398,7 @@ func (c DiskSpaceUsageContext) SetUpdateEvery(state *framework.CollectorState, l
 // DiskCapacityValues defines the type-safe values for Disk.Capacity context
 type DiskCapacityValues struct {
 	Available int64
-	Used      int64
+	Used int64
 }
 
 // DiskCapacityContext provides type-safe operations for Disk.Capacity context
@@ -403,7 +410,7 @@ type DiskCapacityContext struct {
 func (c DiskCapacityContext) Set(state *framework.CollectorState, labels DiskLabels, values DiskCapacityValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
 		"available": values.Available,
-		"used":      values.Used,
+		"used": values.Used,
 	})
 }
 
@@ -414,7 +421,7 @@ func (c DiskCapacityContext) SetUpdateEvery(state *framework.CollectorState, lab
 
 // DiskBlocksValues defines the type-safe values for Disk.Blocks context
 type DiskBlocksValues struct {
-	Read  int64
+	Read int64
 	Write int64
 }
 
@@ -426,7 +433,7 @@ type DiskBlocksContext struct {
 // Set provides type-safe dimension setting for Disk.Blocks context
 func (c DiskBlocksContext) Set(state *framework.CollectorState, labels DiskLabels, values DiskBlocksValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
-		"read":  values.Read,
+		"read": values.Read,
 		"write": values.Write,
 	})
 }
@@ -480,12 +487,14 @@ func (c DiskSSDPowerOnContext) SetUpdateEvery(state *framework.CollectorState, l
 	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
 }
 
+
+
 // DiskLabels defines the required labels for Disk contexts
 type DiskLabels struct {
-	Disk_unit          string
-	Disk_type          string
-	Disk_model         string
-	Hardware_status    string
+	Disk_unit string
+	Disk_type string
+	Disk_model string
+	Hardware_status string
 	Disk_serial_number string
 }
 
@@ -495,229 +504,232 @@ func (l DiskLabels) InstanceID(contextName string) string {
 	return contextName + "." + cleanLabelValue(l.Disk_unit) + "_" + cleanLabelValue(l.Disk_type) + "_" + cleanLabelValue(l.Disk_model) + "_" + cleanLabelValue(l.Hardware_status) + "_" + cleanLabelValue(l.Disk_serial_number)
 }
 
+
 // Disk contains all metric contexts for Disk
 var Disk = struct {
-	Busy       DiskBusyContext
+	Busy DiskBusyContext
 	IORequests DiskIORequestsContext
 	SpaceUsage DiskSpaceUsageContext
-	Capacity   DiskCapacityContext
-	Blocks     DiskBlocksContext
-	SSDHealth  DiskSSDHealthContext
+	Capacity DiskCapacityContext
+	Blocks DiskBlocksContext
+	SSDHealth DiskSSDHealthContext
 	SSDPowerOn DiskSSDPowerOnContext
 }{
 	Busy: DiskBusyContext{
 		Context: framework.Context[DiskLabels]{
-			Name:        "as400.disk_busy",
-			Family:      "storage/disk/devices",
-			Title:       "Disk Busy Percentage",
-			Units:       "percentage",
-			Type:        module.Line,
-			Priority:    307,
-			UpdateEvery: 1,
-			Dimensions: []framework.Dimension{
-				{
-					Name:      "busy",
-					Algorithm: module.Absolute,
-					Mul:       1,
-					Div:       1000,
-					Precision: 1,
-				},
+		Name:       "as400.disk_busy",
+		Family:     "storage/disk/devices",
+		Title:      "Disk Busy Percentage",
+		Units:      "percentage",
+		Type:       module.Line,
+		Priority:   307,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "busy",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1000,
+				Precision: 1,
 			},
-			LabelKeys: []string{
-				"disk_unit",
-				"disk_type",
-				"disk_model",
-				"hardware_status",
-				"disk_serial_number",
-			},
+		},
+		LabelKeys: []string{
+			"disk_unit",
+			"disk_type",
+			"disk_model",
+			"hardware_status",
+			"disk_serial_number",
+		},
 		},
 	},
 	IORequests: DiskIORequestsContext{
 		Context: framework.Context[DiskLabels]{
-			Name:        "as400.disk_io_requests",
-			Family:      "storage/disk/devices",
-			Title:       "Disk I/O Requests",
-			Units:       "requests/s",
-			Type:        module.Area,
-			Priority:    308,
-			UpdateEvery: 1,
-			Dimensions: []framework.Dimension{
-				{
-					Name:      "read",
-					Algorithm: module.Incremental,
-					Mul:       1,
-					Div:       1,
-					Precision: 1,
-				},
-				{
-					Name:      "write",
-					Algorithm: module.Incremental,
-					Mul:       -1,
-					Div:       1,
-					Precision: 1,
-				},
+		Name:       "as400.disk_io_requests",
+		Family:     "storage/disk/devices",
+		Title:      "Disk I/O Requests",
+		Units:      "requests/s",
+		Type:       module.Area,
+		Priority:   308,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "read",
+				Algorithm: module.Incremental,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
 			},
-			LabelKeys: []string{
-				"disk_unit",
-				"disk_type",
-				"disk_model",
-				"hardware_status",
-				"disk_serial_number",
+			{
+				Name:      "write",
+				Algorithm: module.Incremental,
+				Mul:       -1,
+				Div:       1,
+				Precision: 1,
 			},
+		},
+		LabelKeys: []string{
+			"disk_unit",
+			"disk_type",
+			"disk_model",
+			"hardware_status",
+			"disk_serial_number",
+		},
 		},
 	},
 	SpaceUsage: DiskSpaceUsageContext{
 		Context: framework.Context[DiskLabels]{
-			Name:        "as400.disk_space_usage",
-			Family:      "storage/disk/devices",
-			Title:       "Disk Space Usage",
-			Units:       "percentage",
-			Type:        module.Line,
-			Priority:    309,
-			UpdateEvery: 1,
-			Dimensions: []framework.Dimension{
-				{
-					Name:      "used",
-					Algorithm: module.Absolute,
-					Mul:       1,
-					Div:       1000,
-					Precision: 1,
-				},
+		Name:       "as400.disk_space_usage",
+		Family:     "storage/disk/devices",
+		Title:      "Disk Space Usage",
+		Units:      "percentage",
+		Type:       module.Line,
+		Priority:   309,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "used",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1000,
+				Precision: 1,
 			},
-			LabelKeys: []string{
-				"disk_unit",
-				"disk_type",
-				"disk_model",
-				"hardware_status",
-				"disk_serial_number",
-			},
+		},
+		LabelKeys: []string{
+			"disk_unit",
+			"disk_type",
+			"disk_model",
+			"hardware_status",
+			"disk_serial_number",
+		},
 		},
 	},
 	Capacity: DiskCapacityContext{
 		Context: framework.Context[DiskLabels]{
-			Name:        "as400.disk_capacity",
-			Family:      "storage/disk/devices",
-			Title:       "Disk Capacity",
-			Units:       "gigabytes",
-			Type:        module.Stacked,
-			Priority:    310,
-			UpdateEvery: 1,
-			Dimensions: []framework.Dimension{
-				{
-					Name:      "available",
-					Algorithm: module.Absolute,
-					Mul:       1,
-					Div:       1000,
-					Precision: 1,
-				},
-				{
-					Name:      "used",
-					Algorithm: module.Absolute,
-					Mul:       1,
-					Div:       1000,
-					Precision: 1,
-				},
+		Name:       "as400.disk_capacity",
+		Family:     "storage/disk/devices",
+		Title:      "Disk Capacity",
+		Units:      "gigabytes",
+		Type:       module.Stacked,
+		Priority:   310,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "available",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1000,
+				Precision: 1,
 			},
-			LabelKeys: []string{
-				"disk_unit",
-				"disk_type",
-				"disk_model",
-				"hardware_status",
-				"disk_serial_number",
+			{
+				Name:      "used",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1000,
+				Precision: 1,
 			},
+		},
+		LabelKeys: []string{
+			"disk_unit",
+			"disk_type",
+			"disk_model",
+			"hardware_status",
+			"disk_serial_number",
+		},
 		},
 	},
 	Blocks: DiskBlocksContext{
 		Context: framework.Context[DiskLabels]{
-			Name:        "as400.disk_blocks",
-			Family:      "storage/disk/devices",
-			Title:       "Disk Block Operations",
-			Units:       "blocks/s",
-			Type:        module.Area,
-			Priority:    311,
-			UpdateEvery: 1,
-			Dimensions: []framework.Dimension{
-				{
-					Name:      "read",
-					Algorithm: module.Incremental,
-					Mul:       1,
-					Div:       1,
-					Precision: 1,
-				},
-				{
-					Name:      "write",
-					Algorithm: module.Incremental,
-					Mul:       -1,
-					Div:       1,
-					Precision: 1,
-				},
+		Name:       "as400.disk_blocks",
+		Family:     "storage/disk/devices",
+		Title:      "Disk Block Operations",
+		Units:      "blocks/s",
+		Type:       module.Area,
+		Priority:   311,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "read",
+				Algorithm: module.Incremental,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
 			},
-			LabelKeys: []string{
-				"disk_unit",
-				"disk_type",
-				"disk_model",
-				"hardware_status",
-				"disk_serial_number",
+			{
+				Name:      "write",
+				Algorithm: module.Incremental,
+				Mul:       -1,
+				Div:       1,
+				Precision: 1,
 			},
+		},
+		LabelKeys: []string{
+			"disk_unit",
+			"disk_type",
+			"disk_model",
+			"hardware_status",
+			"disk_serial_number",
+		},
 		},
 	},
 	SSDHealth: DiskSSDHealthContext{
 		Context: framework.Context[DiskLabels]{
-			Name:        "as400.disk_ssd_health",
-			Family:      "storage/disk/devices",
-			Title:       "Disk SSD Health",
-			Units:       "percentage",
-			Type:        module.Line,
-			Priority:    312,
-			UpdateEvery: 1,
-			Dimensions: []framework.Dimension{
-				{
-					Name:      "life_remaining",
-					Algorithm: module.Absolute,
-					Mul:       1,
-					Div:       1,
-					Precision: 1,
-				},
+		Name:       "as400.disk_ssd_health",
+		Family:     "storage/disk/devices",
+		Title:      "Disk SSD Health",
+		Units:      "percentage",
+		Type:       module.Line,
+		Priority:   312,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "life_remaining",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
 			},
-			LabelKeys: []string{
-				"disk_unit",
-				"disk_type",
-				"disk_model",
-				"hardware_status",
-				"disk_serial_number",
-			},
+		},
+		LabelKeys: []string{
+			"disk_unit",
+			"disk_type",
+			"disk_model",
+			"hardware_status",
+			"disk_serial_number",
+		},
 		},
 	},
 	SSDPowerOn: DiskSSDPowerOnContext{
 		Context: framework.Context[DiskLabels]{
-			Name:        "as400.disk_ssd_age",
-			Family:      "storage/disk/devices",
-			Title:       "Disk SSD Power On Days",
-			Units:       "days",
-			Type:        module.Line,
-			Priority:    313,
-			UpdateEvery: 1,
-			Dimensions: []framework.Dimension{
-				{
-					Name:      "power_on_days",
-					Algorithm: module.Absolute,
-					Mul:       1,
-					Div:       1,
-					Precision: 1,
-				},
+		Name:       "as400.disk_ssd_age",
+		Family:     "storage/disk/devices",
+		Title:      "Disk SSD Power On Days",
+		Units:      "days",
+		Type:       module.Line,
+		Priority:   313,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "power_on_days",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
 			},
-			LabelKeys: []string{
-				"disk_unit",
-				"disk_type",
-				"disk_model",
-				"hardware_status",
-				"disk_serial_number",
-			},
+		},
+		LabelKeys: []string{
+			"disk_unit",
+			"disk_type",
+			"disk_model",
+			"hardware_status",
+			"disk_serial_number",
+		},
 		},
 	},
 }
 
+
 // --- JobQueue ---
+
 
 // JobQueueLengthValues defines the type-safe values for JobQueue.Length context
 type JobQueueLengthValues struct {
@@ -741,11 +753,13 @@ func (c JobQueueLengthContext) SetUpdateEvery(state *framework.CollectorState, l
 	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
 }
 
+
+
 // JobQueueLabels defines the required labels for JobQueue contexts
 type JobQueueLabels struct {
 	Job_queue string
-	Library   string
-	Status    string
+	Library string
+	Status string
 }
 
 // InstanceID generates a unique instance ID using the hardcoded label order from YAML
@@ -754,38 +768,41 @@ func (l JobQueueLabels) InstanceID(contextName string) string {
 	return contextName + "." + cleanLabelValue(l.Job_queue) + "_" + cleanLabelValue(l.Library) + "_" + cleanLabelValue(l.Status)
 }
 
+
 // JobQueue contains all metric contexts for JobQueue
 var JobQueue = struct {
 	Length JobQueueLengthContext
 }{
 	Length: JobQueueLengthContext{
 		Context: framework.Context[JobQueueLabels]{
-			Name:        "as400.jobqueue_length",
-			Family:      "workloads/job_queues",
-			Title:       "Job Queue Length",
-			Units:       "jobs",
-			Type:        module.Line,
-			Priority:    505,
-			UpdateEvery: 1,
-			Dimensions: []framework.Dimension{
-				{
-					Name:      "jobs",
-					Algorithm: module.Absolute,
-					Mul:       1,
-					Div:       1,
-					Precision: 1,
-				},
+		Name:       "as400.jobqueue_length",
+		Family:     "workloads/job_queues",
+		Title:      "Job Queue Length",
+		Units:      "jobs",
+		Type:       module.Line,
+		Priority:   505,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "jobs",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
 			},
-			LabelKeys: []string{
-				"job_queue",
-				"library",
-				"status",
-			},
+		},
+		LabelKeys: []string{
+			"job_queue",
+			"library",
+			"status",
+		},
 		},
 	},
 }
 
+
 // --- NetworkInterface ---
+
 
 // NetworkInterfaceStatusValues defines the type-safe values for NetworkInterface.Status context
 type NetworkInterfaceStatusValues struct {
@@ -831,14 +848,16 @@ func (c NetworkInterfaceMTUContext) SetUpdateEvery(state *framework.CollectorSta
 	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
 }
 
+
+
 // NetworkInterfaceLabels defines the required labels for NetworkInterface contexts
 type NetworkInterfaceLabels struct {
-	Interface        string
-	Interface_type   string
-	Connection_type  string
+	Interface string
+	Interface_type string
+	Connection_type string
 	Internet_address string
-	Network_address  string
-	Subnet_mask      string
+	Network_address string
+	Subnet_mask string
 }
 
 // InstanceID generates a unique instance ID using the hardcoded label order from YAML
@@ -847,74 +866,77 @@ func (l NetworkInterfaceLabels) InstanceID(contextName string) string {
 	return contextName + "." + cleanLabelValue(l.Interface) + "_" + cleanLabelValue(l.Interface_type) + "_" + cleanLabelValue(l.Connection_type) + "_" + cleanLabelValue(l.Internet_address) + "_" + cleanLabelValue(l.Network_address) + "_" + cleanLabelValue(l.Subnet_mask)
 }
 
+
 // NetworkInterface contains all metric contexts for NetworkInterface
 var NetworkInterface = struct {
 	Status NetworkInterfaceStatusContext
-	MTU    NetworkInterfaceMTUContext
+	MTU NetworkInterfaceMTUContext
 }{
 	Status: NetworkInterfaceStatusContext{
 		Context: framework.Context[NetworkInterfaceLabels]{
-			Name:        "as400.network_interface_status",
-			Family:      "network/interfaces",
-			Title:       "Network Interface Status",
-			Units:       "status",
-			Type:        module.Line,
-			Priority:    403,
-			UpdateEvery: 1,
-			Dimensions: []framework.Dimension{
-				{
-					Name:      "active",
-					Algorithm: module.Absolute,
-					Mul:       1,
-					Div:       1,
-					Precision: 1,
-				},
+		Name:       "as400.network_interface_status",
+		Family:     "network/interfaces",
+		Title:      "Network Interface Status",
+		Units:      "status",
+		Type:       module.Line,
+		Priority:   403,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "active",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
 			},
-			LabelKeys: []string{
-				"interface",
-				"interface_type",
-				"connection_type",
-				"internet_address",
-				"network_address",
-				"subnet_mask",
-			},
+		},
+		LabelKeys: []string{
+			"interface",
+			"interface_type",
+			"connection_type",
+			"internet_address",
+			"network_address",
+			"subnet_mask",
+		},
 		},
 	},
 	MTU: NetworkInterfaceMTUContext{
 		Context: framework.Context[NetworkInterfaceLabels]{
-			Name:        "as400.network_interface_mtu",
-			Family:      "network/interfaces",
-			Title:       "Network Interface MTU",
-			Units:       "bytes",
-			Type:        module.Line,
-			Priority:    404,
-			UpdateEvery: 1,
-			Dimensions: []framework.Dimension{
-				{
-					Name:      "mtu",
-					Algorithm: module.Absolute,
-					Mul:       1,
-					Div:       1,
-					Precision: 1,
-				},
+		Name:       "as400.network_interface_mtu",
+		Family:     "network/interfaces",
+		Title:      "Network Interface MTU",
+		Units:      "bytes",
+		Type:       module.Line,
+		Priority:   404,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "mtu",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
 			},
-			LabelKeys: []string{
-				"interface",
-				"interface_type",
-				"connection_type",
-				"internet_address",
-				"network_address",
-				"subnet_mask",
-			},
+		},
+		LabelKeys: []string{
+			"interface",
+			"interface_type",
+			"connection_type",
+			"internet_address",
+			"network_address",
+			"subnet_mask",
+		},
 		},
 	},
 }
 
+
 // --- Subsystem ---
+
 
 // SubsystemJobsValues defines the type-safe values for Subsystem.Jobs context
 type SubsystemJobsValues struct {
-	Active  int64
+	Active int64
 	Maximum int64
 }
 
@@ -926,7 +948,7 @@ type SubsystemJobsContext struct {
 // Set provides type-safe dimension setting for Subsystem.Jobs context
 func (c SubsystemJobsContext) Set(state *framework.CollectorState, labels SubsystemLabels, values SubsystemJobsValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
-		"active":  values.Active,
+		"active": values.Active,
 		"maximum": values.Maximum,
 	})
 }
@@ -936,11 +958,13 @@ func (c SubsystemJobsContext) SetUpdateEvery(state *framework.CollectorState, la
 	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
 }
 
+
+
 // SubsystemLabels defines the required labels for Subsystem contexts
 type SubsystemLabels struct {
 	Subsystem string
-	Library   string
-	Status    string
+	Library string
+	Status string
 }
 
 // InstanceID generates a unique instance ID using the hardcoded label order from YAML
@@ -949,45 +973,48 @@ func (l SubsystemLabels) InstanceID(contextName string) string {
 	return contextName + "." + cleanLabelValue(l.Subsystem) + "_" + cleanLabelValue(l.Library) + "_" + cleanLabelValue(l.Status)
 }
 
+
 // Subsystem contains all metric contexts for Subsystem
 var Subsystem = struct {
 	Jobs SubsystemJobsContext
 }{
 	Jobs: SubsystemJobsContext{
 		Context: framework.Context[SubsystemLabels]{
-			Name:        "as400.subsystem_jobs",
-			Family:      "workloads/subsystems",
-			Title:       "Subsystem Jobs",
-			Units:       "jobs",
-			Type:        module.Line,
-			Priority:    504,
-			UpdateEvery: 1,
-			Dimensions: []framework.Dimension{
-				{
-					Name:      "active",
-					Algorithm: module.Absolute,
-					Mul:       1,
-					Div:       1,
-					Precision: 1,
-				},
-				{
-					Name:      "maximum",
-					Algorithm: module.Absolute,
-					Mul:       1,
-					Div:       1,
-					Precision: 1,
-				},
+		Name:       "as400.subsystem_jobs",
+		Family:     "workloads/subsystems",
+		Title:      "Subsystem Jobs",
+		Units:      "jobs",
+		Type:       module.Line,
+		Priority:   504,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "active",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
 			},
-			LabelKeys: []string{
-				"subsystem",
-				"library",
-				"status",
+			{
+				Name:      "maximum",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
 			},
+		},
+		LabelKeys: []string{
+			"subsystem",
+			"library",
+			"status",
+		},
 		},
 	},
 }
 
+
 // --- System ---
+
 
 // SystemCPUUtilizationValues defines the type-safe values for System.CPUUtilization context
 type SystemCPUUtilizationValues struct {
@@ -1079,9 +1106,9 @@ func (c SystemTotalJobsContext) SetUpdateEvery(state *framework.CollectorState, 
 
 // SystemActiveJobsByTypeValues defines the type-safe values for System.ActiveJobsByType context
 type SystemActiveJobsByTypeValues struct {
-	Batch       int64
+	Batch int64
 	Interactive int64
-	Active      int64
+	Active int64
 }
 
 // SystemActiveJobsByTypeContext provides type-safe operations for System.ActiveJobsByType context
@@ -1092,9 +1119,9 @@ type SystemActiveJobsByTypeContext struct {
 // Set provides type-safe dimension setting for System.ActiveJobsByType context
 func (c SystemActiveJobsByTypeContext) Set(state *framework.CollectorState, labels EmptyLabels, values SystemActiveJobsByTypeValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, nil, map[string]int64{
-		"batch":       values.Batch,
+		"batch": values.Batch,
 		"interactive": values.Interactive,
-		"active":      values.Active,
+		"active": values.Active,
 	})
 }
 
@@ -1173,10 +1200,10 @@ func (c SystemTemporaryStorageContext) SetUpdateEvery(state *framework.Collector
 
 // SystemMemoryPoolUsageValues defines the type-safe values for System.MemoryPoolUsage context
 type SystemMemoryPoolUsageValues struct {
-	Machine     int64
-	Base        int64
+	Machine int64
+	Base int64
 	Interactive int64
-	Spool       int64
+	Spool int64
 }
 
 // SystemMemoryPoolUsageContext provides type-safe operations for System.MemoryPoolUsage context
@@ -1187,10 +1214,10 @@ type SystemMemoryPoolUsageContext struct {
 // Set provides type-safe dimension setting for System.MemoryPoolUsage context
 func (c SystemMemoryPoolUsageContext) Set(state *framework.CollectorState, labels EmptyLabels, values SystemMemoryPoolUsageValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, nil, map[string]int64{
-		"machine":     values.Machine,
-		"base":        values.Base,
+		"machine": values.Machine,
+		"base": values.Base,
 		"interactive": values.Interactive,
-		"spool":       values.Spool,
+		"spool": values.Spool,
 	})
 }
 
@@ -1202,7 +1229,7 @@ func (c SystemMemoryPoolUsageContext) SetUpdateEvery(state *framework.CollectorS
 // SystemMemoryPoolDefinedValues defines the type-safe values for System.MemoryPoolDefined context
 type SystemMemoryPoolDefinedValues struct {
 	Machine int64
-	Base    int64
+	Base int64
 }
 
 // SystemMemoryPoolDefinedContext provides type-safe operations for System.MemoryPoolDefined context
@@ -1214,7 +1241,7 @@ type SystemMemoryPoolDefinedContext struct {
 func (c SystemMemoryPoolDefinedContext) Set(state *framework.CollectorState, labels EmptyLabels, values SystemMemoryPoolDefinedValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, nil, map[string]int64{
 		"machine": values.Machine,
-		"base":    values.Base,
+		"base": values.Base,
 	})
 }
 
@@ -1226,7 +1253,7 @@ func (c SystemMemoryPoolDefinedContext) SetUpdateEvery(state *framework.Collecto
 // SystemMemoryPoolReservedValues defines the type-safe values for System.MemoryPoolReserved context
 type SystemMemoryPoolReservedValues struct {
 	Machine int64
-	Base    int64
+	Base int64
 }
 
 // SystemMemoryPoolReservedContext provides type-safe operations for System.MemoryPoolReserved context
@@ -1238,7 +1265,7 @@ type SystemMemoryPoolReservedContext struct {
 func (c SystemMemoryPoolReservedContext) Set(state *framework.CollectorState, labels EmptyLabels, values SystemMemoryPoolReservedValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, nil, map[string]int64{
 		"machine": values.Machine,
-		"base":    values.Base,
+		"base": values.Base,
 	})
 }
 
@@ -1250,7 +1277,7 @@ func (c SystemMemoryPoolReservedContext) SetUpdateEvery(state *framework.Collect
 // SystemMemoryPoolThreadsValues defines the type-safe values for System.MemoryPoolThreads context
 type SystemMemoryPoolThreadsValues struct {
 	Machine int64
-	Base    int64
+	Base int64
 }
 
 // SystemMemoryPoolThreadsContext provides type-safe operations for System.MemoryPoolThreads context
@@ -1262,7 +1289,7 @@ type SystemMemoryPoolThreadsContext struct {
 func (c SystemMemoryPoolThreadsContext) Set(state *framework.CollectorState, labels EmptyLabels, values SystemMemoryPoolThreadsValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, nil, map[string]int64{
 		"machine": values.Machine,
-		"base":    values.Base,
+		"base": values.Base,
 	})
 }
 
@@ -1274,7 +1301,7 @@ func (c SystemMemoryPoolThreadsContext) SetUpdateEvery(state *framework.Collecto
 // SystemMemoryPoolMaxThreadsValues defines the type-safe values for System.MemoryPoolMaxThreads context
 type SystemMemoryPoolMaxThreadsValues struct {
 	Machine int64
-	Base    int64
+	Base int64
 }
 
 // SystemMemoryPoolMaxThreadsContext provides type-safe operations for System.MemoryPoolMaxThreads context
@@ -1286,7 +1313,7 @@ type SystemMemoryPoolMaxThreadsContext struct {
 func (c SystemMemoryPoolMaxThreadsContext) Set(state *framework.CollectorState, labels EmptyLabels, values SystemMemoryPoolMaxThreadsValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, nil, map[string]int64{
 		"machine": values.Machine,
-		"base":    values.Base,
+		"base": values.Base,
 	})
 }
 
@@ -1385,7 +1412,7 @@ func (c SystemTotalAuxiliaryStorageContext) SetUpdateEvery(state *framework.Coll
 
 // SystemSystemThreadsValues defines the type-safe values for System.SystemThreads context
 type SystemSystemThreadsValues struct {
-	Active        int64
+	Active int64
 	Per_processor int64
 }
 
@@ -1397,7 +1424,7 @@ type SystemSystemThreadsContext struct {
 // Set provides type-safe dimension setting for System.SystemThreads context
 func (c SystemSystemThreadsContext) Set(state *framework.CollectorState, labels EmptyLabels, values SystemSystemThreadsValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, nil, map[string]int64{
-		"active":        values.Active,
+		"active": values.Active,
 		"per_processor": values.Per_processor,
 	})
 }
@@ -1410,7 +1437,7 @@ func (c SystemSystemThreadsContext) SetUpdateEvery(state *framework.CollectorSta
 // SystemNetworkConnectionsValues defines the type-safe values for System.NetworkConnections context
 type SystemNetworkConnectionsValues struct {
 	Remote int64
-	Total  int64
+	Total int64
 }
 
 // SystemNetworkConnectionsContext provides type-safe operations for System.NetworkConnections context
@@ -1422,7 +1449,7 @@ type SystemNetworkConnectionsContext struct {
 func (c SystemNetworkConnectionsContext) Set(state *framework.CollectorState, labels EmptyLabels, values SystemNetworkConnectionsValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, nil, map[string]int64{
 		"remote": values.Remote,
-		"total":  values.Total,
+		"total": values.Total,
 	})
 }
 
@@ -1433,7 +1460,7 @@ func (c SystemNetworkConnectionsContext) SetUpdateEvery(state *framework.Collect
 
 // SystemNetworkConnectionStatesValues defines the type-safe values for System.NetworkConnectionStates context
 type SystemNetworkConnectionStatesValues struct {
-	Listen     int64
+	Listen int64
 	Close_wait int64
 }
 
@@ -1445,7 +1472,7 @@ type SystemNetworkConnectionStatesContext struct {
 // Set provides type-safe dimension setting for System.NetworkConnectionStates context
 func (c SystemNetworkConnectionStatesContext) Set(state *framework.CollectorState, labels EmptyLabels, values SystemNetworkConnectionStatesValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, nil, map[string]int64{
-		"listen":     values.Listen,
+		"listen": values.Listen,
 		"close_wait": values.Close_wait,
 	})
 }
@@ -1458,7 +1485,7 @@ func (c SystemNetworkConnectionStatesContext) SetUpdateEvery(state *framework.Co
 // SystemTempStorageTotalValues defines the type-safe values for System.TempStorageTotal context
 type SystemTempStorageTotalValues struct {
 	Current int64
-	Peak    int64
+	Peak int64
 }
 
 // SystemTempStorageTotalContext provides type-safe operations for System.TempStorageTotal context
@@ -1470,7 +1497,7 @@ type SystemTempStorageTotalContext struct {
 func (c SystemTempStorageTotalContext) Set(state *framework.CollectorState, labels EmptyLabels, values SystemTempStorageTotalValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, nil, map[string]int64{
 		"current": values.Current,
-		"peak":    values.Peak,
+		"peak": values.Peak,
 	})
 }
 
@@ -1527,635 +1554,663 @@ func (c SystemSystemActivityCPUUtilizationContext) SetUpdateEvery(state *framewo
 	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, nil, updateEvery)
 }
 
+
+
+
 // System contains all metric contexts for System
 var System = struct {
-	CPUUtilization               SystemCPUUtilizationContext
-	CPUDetails                   SystemCPUDetailsContext
-	CPUCapacity                  SystemCPUCapacityContext
-	TotalJobs                    SystemTotalJobsContext
-	ActiveJobsByType             SystemActiveJobsByTypeContext
-	JobQueueLength               SystemJobQueueLengthContext
-	MainStorageSize              SystemMainStorageSizeContext
-	TemporaryStorage             SystemTemporaryStorageContext
-	MemoryPoolUsage              SystemMemoryPoolUsageContext
-	MemoryPoolDefined            SystemMemoryPoolDefinedContext
-	MemoryPoolReserved           SystemMemoryPoolReservedContext
-	MemoryPoolThreads            SystemMemoryPoolThreadsContext
-	MemoryPoolMaxThreads         SystemMemoryPoolMaxThreadsContext
-	DiskBusyAverage              SystemDiskBusyAverageContext
-	SystemASPUsage               SystemSystemASPUsageContext
-	SystemASPStorage             SystemSystemASPStorageContext
-	TotalAuxiliaryStorage        SystemTotalAuxiliaryStorageContext
-	SystemThreads                SystemSystemThreadsContext
-	NetworkConnections           SystemNetworkConnectionsContext
-	NetworkConnectionStates      SystemNetworkConnectionStatesContext
-	TempStorageTotal             SystemTempStorageTotalContext
-	SystemActivityCPURate        SystemSystemActivityCPURateContext
+	CPUUtilization SystemCPUUtilizationContext
+	CPUDetails SystemCPUDetailsContext
+	CPUCapacity SystemCPUCapacityContext
+	TotalJobs SystemTotalJobsContext
+	ActiveJobsByType SystemActiveJobsByTypeContext
+	JobQueueLength SystemJobQueueLengthContext
+	MainStorageSize SystemMainStorageSizeContext
+	TemporaryStorage SystemTemporaryStorageContext
+	MemoryPoolUsage SystemMemoryPoolUsageContext
+	MemoryPoolDefined SystemMemoryPoolDefinedContext
+	MemoryPoolReserved SystemMemoryPoolReservedContext
+	MemoryPoolThreads SystemMemoryPoolThreadsContext
+	MemoryPoolMaxThreads SystemMemoryPoolMaxThreadsContext
+	DiskBusyAverage SystemDiskBusyAverageContext
+	SystemASPUsage SystemSystemASPUsageContext
+	SystemASPStorage SystemSystemASPStorageContext
+	TotalAuxiliaryStorage SystemTotalAuxiliaryStorageContext
+	SystemThreads SystemSystemThreadsContext
+	NetworkConnections SystemNetworkConnectionsContext
+	NetworkConnectionStates SystemNetworkConnectionStatesContext
+	TempStorageTotal SystemTempStorageTotalContext
+	SystemActivityCPURate SystemSystemActivityCPURateContext
 	SystemActivityCPUUtilization SystemSystemActivityCPUUtilizationContext
 }{
 	CPUUtilization: SystemCPUUtilizationContext{
 		Context: framework.Context[EmptyLabels]{
-			Name:        "as400.cpu_utilization",
-			Family:      "compute/cpu",
-			Title:       "CPU Utilization",
-			Units:       "percentage",
-			Type:        module.Line,
-			Priority:    101,
-			UpdateEvery: 1,
-			Dimensions: []framework.Dimension{
-				{
-					Name:      "utilization",
-					Algorithm: module.Absolute,
-					Mul:       1,
-					Div:       1000,
-					Precision: 1,
-				},
+		Name:       "as400.cpu_utilization",
+		Family:     "compute/cpu",
+		Title:      "CPU Utilization",
+		Units:      "percentage",
+		Type:       module.Line,
+		Priority:   101,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "utilization",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1000,
+				Precision: 1,
 			},
-			LabelKeys: []string{},
+		},
+		LabelKeys: []string{
+		},
 		},
 	},
 	CPUDetails: SystemCPUDetailsContext{
 		Context: framework.Context[EmptyLabels]{
-			Name:        "as400.cpu_configuration",
-			Family:      "compute/cpu",
-			Title:       "CPU Configuration",
-			Units:       "cpus",
-			Type:        module.Line,
-			Priority:    102,
-			UpdateEvery: 1,
-			Dimensions: []framework.Dimension{
-				{
-					Name:      "configured",
-					Algorithm: module.Absolute,
-					Mul:       1,
-					Div:       1,
-					Precision: 1,
-				},
+		Name:       "as400.cpu_configuration",
+		Family:     "compute/cpu",
+		Title:      "CPU Configuration",
+		Units:      "cpus",
+		Type:       module.Line,
+		Priority:   102,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "configured",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
 			},
-			LabelKeys: []string{},
+		},
+		LabelKeys: []string{
+		},
 		},
 	},
 	CPUCapacity: SystemCPUCapacityContext{
 		Context: framework.Context[EmptyLabels]{
-			Name:        "as400.cpu_capacity",
-			Family:      "compute/cpu",
-			Title:       "Current CPU Capacity",
-			Units:       "percentage",
-			Type:        module.Line,
-			Priority:    103,
-			UpdateEvery: 1,
-			Dimensions: []framework.Dimension{
-				{
-					Name:      "capacity",
-					Algorithm: module.Absolute,
-					Mul:       1,
-					Div:       1000,
-					Precision: 1,
-				},
+		Name:       "as400.cpu_capacity",
+		Family:     "compute/cpu",
+		Title:      "Current CPU Capacity",
+		Units:      "percentage",
+		Type:       module.Line,
+		Priority:   103,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "capacity",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1000,
+				Precision: 1,
 			},
-			LabelKeys: []string{},
+		},
+		LabelKeys: []string{
+		},
 		},
 	},
 	TotalJobs: SystemTotalJobsContext{
 		Context: framework.Context[EmptyLabels]{
-			Name:        "as400.total_jobs",
-			Family:      "workloads/jobs",
-			Title:       "Total Jobs in System",
-			Units:       "jobs",
-			Type:        module.Line,
-			Priority:    501,
-			UpdateEvery: 1,
-			Dimensions: []framework.Dimension{
-				{
-					Name:      "total",
-					Algorithm: module.Absolute,
-					Mul:       1,
-					Div:       1,
-					Precision: 1,
-				},
+		Name:       "as400.total_jobs",
+		Family:     "workloads/jobs",
+		Title:      "Total Jobs in System",
+		Units:      "jobs",
+		Type:       module.Line,
+		Priority:   501,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "total",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
 			},
-			LabelKeys: []string{},
+		},
+		LabelKeys: []string{
+		},
 		},
 	},
 	ActiveJobsByType: SystemActiveJobsByTypeContext{
 		Context: framework.Context[EmptyLabels]{
-			Name:        "as400.active_jobs_by_type",
-			Family:      "workloads/jobs",
-			Title:       "Active Jobs by Type",
-			Units:       "jobs",
-			Type:        module.Stacked,
-			Priority:    502,
-			UpdateEvery: 1,
-			Dimensions: []framework.Dimension{
-				{
-					Name:      "batch",
-					Algorithm: module.Absolute,
-					Mul:       1,
-					Div:       1,
-					Precision: 1,
-				},
-				{
-					Name:      "interactive",
-					Algorithm: module.Absolute,
-					Mul:       1,
-					Div:       1,
-					Precision: 1,
-				},
-				{
-					Name:      "active",
-					Algorithm: module.Absolute,
-					Mul:       1,
-					Div:       1,
-					Precision: 1,
-				},
+		Name:       "as400.active_jobs_by_type",
+		Family:     "workloads/jobs",
+		Title:      "Active Jobs by Type",
+		Units:      "jobs",
+		Type:       module.Stacked,
+		Priority:   502,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "batch",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
 			},
-			LabelKeys: []string{},
+			{
+				Name:      "interactive",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+			{
+				Name:      "active",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+		},
+		LabelKeys: []string{
+		},
 		},
 	},
 	JobQueueLength: SystemJobQueueLengthContext{
 		Context: framework.Context[EmptyLabels]{
-			Name:        "as400.job_queue_length",
-			Family:      "workloads/jobs",
-			Title:       "Job Queue Length",
-			Units:       "jobs",
-			Type:        module.Line,
-			Priority:    503,
-			UpdateEvery: 1,
-			Dimensions: []framework.Dimension{
-				{
-					Name:      "waiting",
-					Algorithm: module.Absolute,
-					Mul:       1,
-					Div:       1,
-					Precision: 1,
-				},
+		Name:       "as400.job_queue_length",
+		Family:     "workloads/jobs",
+		Title:      "Job Queue Length",
+		Units:      "jobs",
+		Type:       module.Line,
+		Priority:   503,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "waiting",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
 			},
-			LabelKeys: []string{},
+		},
+		LabelKeys: []string{
+		},
 		},
 	},
 	MainStorageSize: SystemMainStorageSizeContext{
 		Context: framework.Context[EmptyLabels]{
-			Name:        "as400.main_storage_size",
-			Family:      "memory/overview",
-			Title:       "Main Storage Size",
-			Units:       "KiB",
-			Type:        module.Line,
-			Priority:    201,
-			UpdateEvery: 1,
-			Dimensions: []framework.Dimension{
-				{
-					Name:      "total",
-					Algorithm: module.Absolute,
-					Mul:       1,
-					Div:       1,
-					Precision: 1,
-				},
+		Name:       "as400.main_storage_size",
+		Family:     "memory/overview",
+		Title:      "Main Storage Size",
+		Units:      "KiB",
+		Type:       module.Line,
+		Priority:   201,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "total",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
 			},
-			LabelKeys: []string{},
+		},
+		LabelKeys: []string{
+		},
 		},
 	},
 	TemporaryStorage: SystemTemporaryStorageContext{
 		Context: framework.Context[EmptyLabels]{
-			Name:        "as400.temporary_storage",
-			Family:      "storage/temp/overview",
-			Title:       "Temporary Storage",
-			Units:       "MiB",
-			Type:        module.Line,
-			Priority:    304,
-			UpdateEvery: 1,
-			Dimensions: []framework.Dimension{
-				{
-					Name:      "current",
-					Algorithm: module.Absolute,
-					Mul:       1,
-					Div:       1,
-					Precision: 1,
-				},
-				{
-					Name:      "maximum",
-					Algorithm: module.Absolute,
-					Mul:       1,
-					Div:       1,
-					Precision: 1,
-				},
+		Name:       "as400.temporary_storage",
+		Family:     "storage/temp/overview",
+		Title:      "Temporary Storage",
+		Units:      "MiB",
+		Type:       module.Line,
+		Priority:   304,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "current",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
 			},
-			LabelKeys: []string{},
+			{
+				Name:      "maximum",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+		},
+		LabelKeys: []string{
+		},
 		},
 	},
 	MemoryPoolUsage: SystemMemoryPoolUsageContext{
 		Context: framework.Context[EmptyLabels]{
-			Name:        "as400.memory_pool_usage",
-			Family:      "memory/pools",
-			Title:       "Memory Pool Usage",
-			Units:       "bytes",
-			Type:        module.Stacked,
-			Priority:    203,
-			UpdateEvery: 1,
-			Dimensions: []framework.Dimension{
-				{
-					Name:      "machine",
-					Algorithm: module.Absolute,
-					Mul:       1,
-					Div:       1,
-					Precision: 1,
-				},
-				{
-					Name:      "base",
-					Algorithm: module.Absolute,
-					Mul:       1,
-					Div:       1,
-					Precision: 1,
-				},
-				{
-					Name:      "interactive",
-					Algorithm: module.Absolute,
-					Mul:       1,
-					Div:       1,
-					Precision: 1,
-				},
-				{
-					Name:      "spool",
-					Algorithm: module.Absolute,
-					Mul:       1,
-					Div:       1,
-					Precision: 1,
-				},
+		Name:       "as400.memory_pool_usage",
+		Family:     "memory/pools",
+		Title:      "Memory Pool Usage",
+		Units:      "bytes",
+		Type:       module.Stacked,
+		Priority:   203,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "machine",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
 			},
-			LabelKeys: []string{},
+			{
+				Name:      "base",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+			{
+				Name:      "interactive",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+			{
+				Name:      "spool",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+		},
+		LabelKeys: []string{
+		},
 		},
 	},
 	MemoryPoolDefined: SystemMemoryPoolDefinedContext{
 		Context: framework.Context[EmptyLabels]{
-			Name:        "as400.memory_pool_defined",
-			Family:      "memory/pools",
-			Title:       "Memory Pool Defined Size",
-			Units:       "bytes",
-			Type:        module.Stacked,
-			Priority:    204,
-			UpdateEvery: 1,
-			Dimensions: []framework.Dimension{
-				{
-					Name:      "machine",
-					Algorithm: module.Absolute,
-					Mul:       1,
-					Div:       1,
-					Precision: 1,
-				},
-				{
-					Name:      "base",
-					Algorithm: module.Absolute,
-					Mul:       1,
-					Div:       1,
-					Precision: 1,
-				},
+		Name:       "as400.memory_pool_defined",
+		Family:     "memory/pools",
+		Title:      "Memory Pool Defined Size",
+		Units:      "bytes",
+		Type:       module.Stacked,
+		Priority:   204,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "machine",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
 			},
-			LabelKeys: []string{},
+			{
+				Name:      "base",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+		},
+		LabelKeys: []string{
+		},
 		},
 	},
 	MemoryPoolReserved: SystemMemoryPoolReservedContext{
 		Context: framework.Context[EmptyLabels]{
-			Name:        "as400.memory_pool_reserved",
-			Family:      "memory/pools",
-			Title:       "Memory Pool Reserved Size",
-			Units:       "bytes",
-			Type:        module.Stacked,
-			Priority:    205,
-			UpdateEvery: 1,
-			Dimensions: []framework.Dimension{
-				{
-					Name:      "machine",
-					Algorithm: module.Absolute,
-					Mul:       1,
-					Div:       1,
-					Precision: 1,
-				},
-				{
-					Name:      "base",
-					Algorithm: module.Absolute,
-					Mul:       1,
-					Div:       1,
-					Precision: 1,
-				},
+		Name:       "as400.memory_pool_reserved",
+		Family:     "memory/pools",
+		Title:      "Memory Pool Reserved Size",
+		Units:      "bytes",
+		Type:       module.Stacked,
+		Priority:   205,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "machine",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
 			},
-			LabelKeys: []string{},
+			{
+				Name:      "base",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+		},
+		LabelKeys: []string{
+		},
 		},
 	},
 	MemoryPoolThreads: SystemMemoryPoolThreadsContext{
 		Context: framework.Context[EmptyLabels]{
-			Name:        "as400.memory_pool_threads",
-			Family:      "memory/pools",
-			Title:       "Memory Pool Threads",
-			Units:       "threads",
-			Type:        module.Line,
-			Priority:    206,
-			UpdateEvery: 1,
-			Dimensions: []framework.Dimension{
-				{
-					Name:      "machine",
-					Algorithm: module.Absolute,
-					Mul:       1,
-					Div:       1,
-					Precision: 1,
-				},
-				{
-					Name:      "base",
-					Algorithm: module.Absolute,
-					Mul:       1,
-					Div:       1,
-					Precision: 1,
-				},
+		Name:       "as400.memory_pool_threads",
+		Family:     "memory/pools",
+		Title:      "Memory Pool Threads",
+		Units:      "threads",
+		Type:       module.Line,
+		Priority:   206,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "machine",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
 			},
-			LabelKeys: []string{},
+			{
+				Name:      "base",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+		},
+		LabelKeys: []string{
+		},
 		},
 	},
 	MemoryPoolMaxThreads: SystemMemoryPoolMaxThreadsContext{
 		Context: framework.Context[EmptyLabels]{
-			Name:        "as400.memory_pool_max_threads",
-			Family:      "memory/pools",
-			Title:       "Memory Pool Maximum Threads",
-			Units:       "threads",
-			Type:        module.Line,
-			Priority:    207,
-			UpdateEvery: 1,
-			Dimensions: []framework.Dimension{
-				{
-					Name:      "machine",
-					Algorithm: module.Absolute,
-					Mul:       1,
-					Div:       1,
-					Precision: 1,
-				},
-				{
-					Name:      "base",
-					Algorithm: module.Absolute,
-					Mul:       1,
-					Div:       1,
-					Precision: 1,
-				},
+		Name:       "as400.memory_pool_max_threads",
+		Family:     "memory/pools",
+		Title:      "Memory Pool Maximum Threads",
+		Units:      "threads",
+		Type:       module.Line,
+		Priority:   207,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "machine",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
 			},
-			LabelKeys: []string{},
+			{
+				Name:      "base",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+		},
+		LabelKeys: []string{
+		},
 		},
 	},
 	DiskBusyAverage: SystemDiskBusyAverageContext{
 		Context: framework.Context[EmptyLabels]{
-			Name:        "as400.disk_busy_average",
-			Family:      "storage/disk/summary",
-			Title:       "Average Disk Busy Percentage",
-			Units:       "percentage",
-			Type:        module.Line,
-			Priority:    306,
-			UpdateEvery: 1,
-			Dimensions: []framework.Dimension{
-				{
-					Name:      "busy",
-					Algorithm: module.Absolute,
-					Mul:       1,
-					Div:       1000,
-					Precision: 1,
-				},
+		Name:       "as400.disk_busy_average",
+		Family:     "storage/disk/summary",
+		Title:      "Average Disk Busy Percentage",
+		Units:      "percentage",
+		Type:       module.Line,
+		Priority:   306,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "busy",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1000,
+				Precision: 1,
 			},
-			LabelKeys: []string{},
+		},
+		LabelKeys: []string{
+		},
 		},
 	},
 	SystemASPUsage: SystemSystemASPUsageContext{
 		Context: framework.Context[EmptyLabels]{
-			Name:        "as400.system_asp_usage",
-			Family:      "storage/asp",
-			Title:       "System ASP Usage",
-			Units:       "percentage",
-			Type:        module.Line,
-			Priority:    301,
-			UpdateEvery: 1,
-			Dimensions: []framework.Dimension{
-				{
-					Name:      "used",
-					Algorithm: module.Absolute,
-					Mul:       1,
-					Div:       1000,
-					Precision: 1,
-				},
+		Name:       "as400.system_asp_usage",
+		Family:     "storage/asp",
+		Title:      "System ASP Usage",
+		Units:      "percentage",
+		Type:       module.Line,
+		Priority:   301,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "used",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1000,
+				Precision: 1,
 			},
-			LabelKeys: []string{},
+		},
+		LabelKeys: []string{
+		},
 		},
 	},
 	SystemASPStorage: SystemSystemASPStorageContext{
 		Context: framework.Context[EmptyLabels]{
-			Name:        "as400.system_asp_storage",
-			Family:      "storage/asp",
-			Title:       "System ASP Storage",
-			Units:       "MiB",
-			Type:        module.Line,
-			Priority:    302,
-			UpdateEvery: 1,
-			Dimensions: []framework.Dimension{
-				{
-					Name:      "total",
-					Algorithm: module.Absolute,
-					Mul:       1,
-					Div:       1,
-					Precision: 1,
-				},
+		Name:       "as400.system_asp_storage",
+		Family:     "storage/asp",
+		Title:      "System ASP Storage",
+		Units:      "MiB",
+		Type:       module.Line,
+		Priority:   302,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "total",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
 			},
-			LabelKeys: []string{},
+		},
+		LabelKeys: []string{
+		},
 		},
 	},
 	TotalAuxiliaryStorage: SystemTotalAuxiliaryStorageContext{
 		Context: framework.Context[EmptyLabels]{
-			Name:        "as400.total_auxiliary_storage",
-			Family:      "storage/asp",
-			Title:       "Total Auxiliary Storage",
-			Units:       "MiB",
-			Type:        module.Line,
-			Priority:    303,
-			UpdateEvery: 1,
-			Dimensions: []framework.Dimension{
-				{
-					Name:      "total",
-					Algorithm: module.Absolute,
-					Mul:       1,
-					Div:       1,
-					Precision: 1,
-				},
+		Name:       "as400.total_auxiliary_storage",
+		Family:     "storage/asp",
+		Title:      "Total Auxiliary Storage",
+		Units:      "MiB",
+		Type:       module.Line,
+		Priority:   303,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "total",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
 			},
-			LabelKeys: []string{},
+		},
+		LabelKeys: []string{
+		},
 		},
 	},
 	SystemThreads: SystemSystemThreadsContext{
 		Context: framework.Context[EmptyLabels]{
-			Name:        "as400.system_threads",
-			Family:      "compute/threads",
-			Title:       "System Threads",
-			Units:       "threads",
-			Type:        module.Line,
-			Priority:    104,
-			UpdateEvery: 1,
-			Dimensions: []framework.Dimension{
-				{
-					Name:      "active",
-					Algorithm: module.Absolute,
-					Mul:       1,
-					Div:       1,
-					Precision: 1,
-				},
-				{
-					Name:      "per_processor",
-					Algorithm: module.Absolute,
-					Mul:       1,
-					Div:       1,
-					Precision: 1,
-				},
+		Name:       "as400.system_threads",
+		Family:     "compute/threads",
+		Title:      "System Threads",
+		Units:      "threads",
+		Type:       module.Line,
+		Priority:   104,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "active",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
 			},
-			LabelKeys: []string{},
+			{
+				Name:      "per_processor",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+		},
+		LabelKeys: []string{
+		},
 		},
 	},
 	NetworkConnections: SystemNetworkConnectionsContext{
 		Context: framework.Context[EmptyLabels]{
-			Name:        "as400.network_connections",
-			Family:      "network/summary",
-			Title:       "Network Connections",
-			Units:       "connections",
-			Type:        module.Line,
-			Priority:    401,
-			UpdateEvery: 1,
-			Dimensions: []framework.Dimension{
-				{
-					Name:      "remote",
-					Algorithm: module.Absolute,
-					Mul:       1,
-					Div:       1,
-					Precision: 1,
-				},
-				{
-					Name:      "total",
-					Algorithm: module.Absolute,
-					Mul:       1,
-					Div:       1,
-					Precision: 1,
-				},
+		Name:       "as400.network_connections",
+		Family:     "network/summary",
+		Title:      "Network Connections",
+		Units:      "connections",
+		Type:       module.Line,
+		Priority:   401,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "remote",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
 			},
-			LabelKeys: []string{},
+			{
+				Name:      "total",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+		},
+		LabelKeys: []string{
+		},
 		},
 	},
 	NetworkConnectionStates: SystemNetworkConnectionStatesContext{
 		Context: framework.Context[EmptyLabels]{
-			Name:        "as400.network_connection_states",
-			Family:      "network/summary",
-			Title:       "Network Connection States",
-			Units:       "connections",
-			Type:        module.Line,
-			Priority:    402,
-			UpdateEvery: 1,
-			Dimensions: []framework.Dimension{
-				{
-					Name:      "listen",
-					Algorithm: module.Absolute,
-					Mul:       1,
-					Div:       1,
-					Precision: 1,
-				},
-				{
-					Name:      "close_wait",
-					Algorithm: module.Absolute,
-					Mul:       1,
-					Div:       1,
-					Precision: 1,
-				},
+		Name:       "as400.network_connection_states",
+		Family:     "network/summary",
+		Title:      "Network Connection States",
+		Units:      "connections",
+		Type:       module.Line,
+		Priority:   402,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "listen",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
 			},
-			LabelKeys: []string{},
+			{
+				Name:      "close_wait",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+		},
+		LabelKeys: []string{
+		},
 		},
 	},
 	TempStorageTotal: SystemTempStorageTotalContext{
 		Context: framework.Context[EmptyLabels]{
-			Name:        "as400.temp_storage_total",
-			Family:      "storage/temp/overview",
-			Title:       "Temporary Storage Total",
-			Units:       "bytes",
-			Type:        module.Line,
-			Priority:    304,
-			UpdateEvery: 1,
-			Dimensions: []framework.Dimension{
-				{
-					Name:      "current",
-					Algorithm: module.Absolute,
-					Mul:       1,
-					Div:       1,
-					Precision: 1,
-				},
-				{
-					Name:      "peak",
-					Algorithm: module.Absolute,
-					Mul:       1,
-					Div:       1,
-					Precision: 1,
-				},
+		Name:       "as400.temp_storage_total",
+		Family:     "storage/temp/overview",
+		Title:      "Temporary Storage Total",
+		Units:      "bytes",
+		Type:       module.Line,
+		Priority:   304,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "current",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
 			},
-			LabelKeys: []string{},
+			{
+				Name:      "peak",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
+			},
+		},
+		LabelKeys: []string{
+		},
 		},
 	},
 	SystemActivityCPURate: SystemSystemActivityCPURateContext{
 		Context: framework.Context[EmptyLabels]{
-			Name:        "as400.system_activity_cpu_rate",
-			Family:      "compute/activity",
-			Title:       "System CPU Rate",
-			Units:       "percentage",
-			Type:        module.Line,
-			Priority:    105,
-			UpdateEvery: 1,
-			Dimensions: []framework.Dimension{
-				{
-					Name:      "average",
-					Algorithm: module.Absolute,
-					Mul:       1,
-					Div:       1000,
-					Precision: 1,
-				},
+		Name:       "as400.system_activity_cpu_rate",
+		Family:     "compute/activity",
+		Title:      "System CPU Rate",
+		Units:      "percentage",
+		Type:       module.Line,
+		Priority:   105,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "average",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1000,
+				Precision: 1,
 			},
-			LabelKeys: []string{},
+		},
+		LabelKeys: []string{
+		},
 		},
 	},
 	SystemActivityCPUUtilization: SystemSystemActivityCPUUtilizationContext{
 		Context: framework.Context[EmptyLabels]{
-			Name:        "as400.system_activity_cpu_utilization",
-			Family:      "compute/activity",
-			Title:       "System CPU Utilization",
-			Units:       "percentage",
-			Type:        module.Line,
-			Priority:    106,
-			UpdateEvery: 1,
-			Dimensions: []framework.Dimension{
-				{
-					Name:      "average",
-					Algorithm: module.Absolute,
-					Mul:       1,
-					Div:       1000,
-					Precision: 1,
-				},
-				{
-					Name:      "minimum",
-					Algorithm: module.Absolute,
-					Mul:       1,
-					Div:       1000,
-					Precision: 1,
-				},
-				{
-					Name:      "maximum",
-					Algorithm: module.Absolute,
-					Mul:       1,
-					Div:       1000,
-					Precision: 1,
-				},
+		Name:       "as400.system_activity_cpu_utilization",
+		Family:     "compute/activity",
+		Title:      "System CPU Utilization",
+		Units:      "percentage",
+		Type:       module.Line,
+		Priority:   106,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "average",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1000,
+				Precision: 1,
 			},
-			LabelKeys: []string{},
+			{
+				Name:      "minimum",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1000,
+				Precision: 1,
+			},
+			{
+				Name:      "maximum",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1000,
+				Precision: 1,
+			},
+		},
+		LabelKeys: []string{
+		},
 		},
 	},
 }
 
+
 // --- TempStorageBucket ---
+
 
 // TempStorageBucketUsageValues defines the type-safe values for TempStorageBucket.Usage context
 type TempStorageBucketUsageValues struct {
 	Current int64
-	Peak    int64
+	Peak int64
 }
 
 // TempStorageBucketUsageContext provides type-safe operations for TempStorageBucket.Usage context
@@ -2167,7 +2222,7 @@ type TempStorageBucketUsageContext struct {
 func (c TempStorageBucketUsageContext) Set(state *framework.CollectorState, labels TempStorageBucketLabels, values TempStorageBucketUsageValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
 		"current": values.Current,
-		"peak":    values.Peak,
+		"peak": values.Peak,
 	})
 }
 
@@ -2175,6 +2230,8 @@ func (c TempStorageBucketUsageContext) Set(state *framework.CollectorState, labe
 func (c TempStorageBucketUsageContext) SetUpdateEvery(state *framework.CollectorState, labels TempStorageBucketLabels, updateEvery int) {
 	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
 }
+
+
 
 // TempStorageBucketLabels defines the required labels for TempStorageBucket contexts
 type TempStorageBucketLabels struct {
@@ -2187,41 +2244,44 @@ func (l TempStorageBucketLabels) InstanceID(contextName string) string {
 	return contextName + "." + cleanLabelValue(l.Bucket)
 }
 
+
 // TempStorageBucket contains all metric contexts for TempStorageBucket
 var TempStorageBucket = struct {
 	Usage TempStorageBucketUsageContext
 }{
 	Usage: TempStorageBucketUsageContext{
 		Context: framework.Context[TempStorageBucketLabels]{
-			Name:        "as400.temp_storage_bucket",
-			Family:      "storage/temp/buckets",
-			Title:       "Temporary Storage Bucket Usage",
-			Units:       "bytes",
-			Type:        module.Line,
-			Priority:    305,
-			UpdateEvery: 1,
-			Dimensions: []framework.Dimension{
-				{
-					Name:      "current",
-					Algorithm: module.Absolute,
-					Mul:       1,
-					Div:       1,
-					Precision: 1,
-				},
-				{
-					Name:      "peak",
-					Algorithm: module.Absolute,
-					Mul:       1,
-					Div:       1,
-					Precision: 1,
-				},
+		Name:       "as400.temp_storage_bucket",
+		Family:     "storage/temp/buckets",
+		Title:      "Temporary Storage Bucket Usage",
+		Units:      "bytes",
+		Type:       module.Line,
+		Priority:   305,
+		UpdateEvery: 1,
+		Dimensions: []framework.Dimension{
+			{
+				Name:      "current",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
 			},
-			LabelKeys: []string{
-				"bucket",
+			{
+				Name:      "peak",
+				Algorithm: module.Absolute,
+				Mul:       1,
+				Div:       1,
+				Precision: 1,
 			},
+		},
+		LabelKeys: []string{
+			"bucket",
+		},
 		},
 	},
 }
+
+
 
 // GetAllContexts returns all contexts for framework registration
 func GetAllContexts() []interface{} {
