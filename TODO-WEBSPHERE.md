@@ -8,10 +8,10 @@
 
 ## Current State Snapshot
 - **PMI collector**: migrated to `modules/websphere/pmi` with framework contexts; legacy `collector/websphere_pmi` code has been removed.
-- **MicroProfile collector**: under `collector/websphere_mp`, wraps HTTP fetching of MicroProfile metrics, applies regex-based classification (JVM vs REST), and manually manages dynamic charts. Uses go.d Prometheus helpers indirectly but does not expose a reusable protocol.
-- **JMX collector**: under `collector/websphere_jmx`, tightly couples module lifecycle with the embedded Java helper process. Collector handles helper orchestration, command routing, delta calculations, and chart management.
-- All three collectors still rely on go.d patterns (manual charts, `module.Base`) rather than the new framework’s type-safe contexts.
-- Tests exist for PMI and MP parsing plus the JMX helper, but they assume the old structure.
+- **MicroProfile collector**: migrated to `modules/websphere/mp` on top of the reusable OpenMetrics protocol; the go.d implementation has been retired.
+- **JMX collector**: migrated to `modules/websphere/jmx` using the new JMX bridge; JVM, thread pool, JDBC/JCA, JMS, and application domains are exported through framework contexts while advanced domains (clusters, servlets, EJB) remain on the roadmap.
+- The legacy WebSphere collectors (`collector/websphere_*`) have all been removed in favour of the framework modules.
+- Tests now cover the PMI, MP, and JMX protocol adapters plus the new JMX collector flows.
 
 ## Target Architecture
 ```
@@ -72,41 +72,42 @@ protocols/
 
 ## Migration Phases & Tasks
 ### Phase 1 – Protocol Foundations & Shared Utilities
-- [ ] Stand up `protocols/websphere/pmi` with HTTP client setup, PMI XML parsing, caching primitives, and unit tests using existing sample payloads from `collect_test.go`.
-- [ ] Extract a reusable OpenMetrics client (`protocols/openmetrics`) leveraging the existing Prometheus parser; cover fetch + parse with fixtures from current MP tests.
-- [ ] Stand up `protocols/jmxbridge` to host the helper lifecycle + command plumbing, then add a WebSphere adapter that ports logic from `jmx.go`/`resilience.go`; include lifecycle tests using stub responses.
-- [ ] Create `modules/websphere/common` with shared config structs (cluster labels, cardinality defaults), label builders, and helpers for consistent context labeling across the three modules.
-- [ ] Provide CGO stubs and ensure go vet/build succeed when CGO is disabled.
+- [x] Stand up `protocols/websphere/pmi` with HTTP client setup, PMI XML parsing, caching primitives, and unit tests using existing sample payloads from `collect_test.go`.
+- [x] Extract a reusable OpenMetrics client (`protocols/openmetrics`) leveraging the existing Prometheus parser; cover fetch + parse with fixtures from current MP tests.
+- [x] Stand up `protocols/jmxbridge` to host the helper lifecycle + command plumbing, then add a WebSphere adapter that ports logic from `jmx.go`/`resilience.go`; include lifecycle tests using stub responses.
+- [x] Create `modules/websphere/common` with shared config structs (cluster labels, cardinality defaults), label builders, and helpers for consistent context labeling across the three modules.
+- [x] Provide CGO stubs and ensure go vet/build succeed when CGO is disabled.
 
 ### Phase 2 – WebSphere PMI Module Migration
-- [ ] Define `modules/websphere/pmi/contexts/contexts.yaml` covering existing metric families (JVM, thread pools, JDBC/JCA, JMS, web apps, APM, cluster, etc.) and regenerate code via `go generate`.
-- [ ] Port configuration schema/validation into `config.go` and `module.yaml`, preserving feature flags, selectors, and cardinality controls from the legacy collector.
-- [ ] Re-implement `CollectOnce` using the new PMI protocol: iterate typed datasets, apply selector filters, and populate contexts with type-safe setters.
-- [ ] Move delta/time-average logic onto protocol utilities or framework state helpers to keep collector loops minimal.
-- [ ] Recreate tests (unit + integration) using the new module structure; adapt existing fixtures to assert context output rather than raw chart IDs.
-- [ ] Update documentation (`README.md`, stock config) to reference the new module path.
+- [x] Define `modules/websphere/pmi/contexts/contexts.yaml` covering existing metric families (JVM, thread pools, JDBC/JCA, JMS, web apps, APM, cluster, etc.) and regenerate code via `go generate`.
+- [x] Port configuration schema/validation into `config.go` and `module.yaml`, preserving feature flags, selectors, and cardinality controls from the legacy collector.
+- [x] Re-implement `CollectOnce` using the new PMI protocol: iterate typed datasets, apply selector filters, and populate contexts with type-safe setters.
+- [x] Move delta/time-average logic onto protocol utilities or framework state helpers to keep collector loops minimal.
+- [x] Recreate tests (unit + integration) using the new module structure; adapt existing fixtures to assert context output rather than raw chart IDs.
+- [x] Update documentation (`README.md`, stock config) to reference the new module path.
 - [x] Delete the legacy `collector/websphere_pmi` package once parity tests pass.
 
 ### Phase 3 – WebSphere MicroProfile Module Migration
-- [ ] Author contexts for JVM, vendor/thread-pool, REST endpoint metrics, and fallback “other” metrics with sensible families/priorities mirroring current dashboards.
-- [ ] Implement the framework collector (`modules/websphere/mp`) that:
+- [x] Author contexts for JVM, vendor/thread-pool, REST endpoint metrics, and fallback “other” metrics with sensible families/priorities mirroring current dashboards.
+- [x] Implement the framework collector (`modules/websphere/mp`) that:
     * Uses the OpenMetrics protocol to fetch samples.
     * Classifies metrics via regex/prefix helpers (moved from legacy code) housed in `modules/websphere/common`.
     * Applies REST endpoint filtering/cardinality limits before exporting contexts.
-- [ ] Port configuration (URL rules, TLS options, selectors) and regenerate schema.
-- [ ] Add tests verifying metrics classification and context emission using sample metric payloads.
-- [ ] Remove legacy `collector/websphere_mp` after verification.
+- [x] Port configuration (URL rules, TLS options, selectors) and regenerate schema.
+- [x] Add tests verifying metrics classification and context emission using sample metric payloads.
+- [x] Remove legacy `collector/websphere_mp` after verification.
 
 ### Phase 4 – WebSphere JMX Module Migration
-- [ ] Build contexts for JVM, thread pools, JDBC/JCA, JMS, applications, clusters, and APM metrics with appropriate instance labels (server, cluster, servlet/EJB identifiers).
-- [ ] Implement the framework collector using the new bridge + adapter:
+- [x] Build framework contexts for JVM, thread pools, JDBC/JCA pools, JMS destinations, and web applications in `modules/websphere/jmx`.
+- [ ] Add contexts for advanced domains (clusters, servlets, EJBs, JDBC advanced stats) once representative data sets are available.
+- [x] Implement the framework collector using the new bridge + adapter for the covered domains.
     * Manage helper health metrics via protocol signals (connection state, circuit breaker).
     * Keep cardinality management and selectors (applications, pools, servlets, ejbs) but leverage framework state for instance lifecycle.
     * Translate protocol structs into context setters, handling precision scaling consistently.
-- [ ] Port configuration handling (JMX URL, auth, classpath, feature toggles) and regenerate schema/stock config.
-- [ ] Ensure helper jar embedding + extraction still works under the new layout (update build scripts if necessary).
-- [ ] Rework unit/integration tests to exercise protocol mocks and verify context output; include helper process restart scenarios.
-- [ ] Drop `collector/websphere_jmx` once migration is validated.
+- [x] Port configuration handling (JMX URL, auth, classpath, feature toggles) and regenerate schema/stock config.
+- [x] Ensure helper jar embedding + extraction still works under the new layout (update build scripts if necessary).
+- [x] Rework unit/integration tests to exercise protocol mocks and verify context output; include helper process restart scenarios.
+- [x] Drop `collector/websphere_jmx` once migration is validated.
 
 ### Phase 5 – Integration, QA, and Cleanup
 - [ ] Update CI workflows (fmt/vet/build/test) if new packages or go:generate steps require adjustments.

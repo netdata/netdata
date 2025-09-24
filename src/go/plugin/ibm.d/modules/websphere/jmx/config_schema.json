@@ -1,0 +1,217 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "properties": {
+      "cell_name": {
+        "default": "",
+        "title": "Cell name",
+        "type": "string"
+      },
+      "circuit_breaker_threshold": {
+        "default": 5,
+        "title": "Circuit breaker threshold",
+        "type": "integer"
+      },
+      "cluster_name": {
+        "default": "",
+        "title": "Identity labels",
+        "type": "string"
+      },
+      "collect_apps_matching": {
+        "default": "",
+        "title": "Enable collection of apps matching metrics",
+        "type": "string"
+      },
+      "collect_cluster_metrics": {
+        "default": true,
+        "title": "Enable collection of cluster metrics metrics",
+        "type": "boolean"
+      },
+      "collect_ejb_metrics": {
+        "default": true,
+        "title": "Enable collection of e j b metrics metrics",
+        "type": "boolean"
+      },
+      "collect_ejbs_matching": {
+        "default": "",
+        "title": "Enable collection of e j bs matching metrics",
+        "type": "string"
+      },
+      "collect_jca_metrics": {
+        "default": true,
+        "title": "Enable collection of j c a metrics metrics",
+        "type": "boolean"
+      },
+      "collect_jdbc_advanced": {
+        "default": false,
+        "title": "Enable collection of j d b c advanced metrics",
+        "type": "boolean"
+      },
+      "collect_jdbc_metrics": {
+        "default": true,
+        "title": "Enable collection of j d b c metrics metrics",
+        "type": "boolean"
+      },
+      "collect_jms_matching": {
+        "default": "",
+        "title": "Enable collection of j m s matching metrics",
+        "type": "string"
+      },
+      "collect_jms_metrics": {
+        "default": true,
+        "title": "Enable collection of j m s metrics metrics",
+        "type": "boolean"
+      },
+      "collect_jvm_metrics": {
+        "default": true,
+        "title": "Metric toggles",
+        "type": "boolean"
+      },
+      "collect_pools_matching": {
+        "default": "",
+        "title": "Filters",
+        "type": "string"
+      },
+      "collect_servlet_metrics": {
+        "default": true,
+        "title": "Enable collection of servlet metrics metrics",
+        "type": "boolean"
+      },
+      "collect_servlets_matching": {
+        "default": "",
+        "title": "Enable collection of servlets matching metrics",
+        "type": "string"
+      },
+      "collect_session_metrics": {
+        "default": true,
+        "title": "Enable collection of session metrics metrics",
+        "type": "boolean"
+      },
+      "collect_threadpool_metrics": {
+        "default": true,
+        "title": "Enable collection of thread pool metrics metrics",
+        "type": "boolean"
+      },
+      "collect_transaction_metrics": {
+        "default": true,
+        "title": "Enable collection of transaction metrics metrics",
+        "type": "boolean"
+      },
+      "collect_webapp_metrics": {
+        "default": true,
+        "title": "Enable collection of web app metrics metrics",
+        "type": "boolean"
+      },
+      "helper_restart_max": {
+        "default": 3,
+        "title": "Helper restart max",
+        "type": "integer"
+      },
+      "init_timeout": {
+        "title": "Connection timeout duration in seconds",
+        "type": "integer"
+      },
+      "java_exec_path": {
+        "default": "",
+        "title": "Java exec path",
+        "type": "string"
+      },
+      "jmx_classpath": {
+        "default": "",
+        "title": "J m x classpath",
+        "type": "string"
+      },
+      "jmx_password": {
+        "default": "",
+        "format": "password",
+        "title": "Password for authentication",
+        "type": "string"
+      },
+      "jmx_timeout": {
+        "title": "Connection timeout duration in seconds",
+        "type": "integer"
+      },
+      "jmx_url": {
+        "default": "",
+        "title": "Connection settings",
+        "type": "string"
+      },
+      "jmx_username": {
+        "default": "",
+        "title": "Username for authentication",
+        "type": "string"
+      },
+      "max_applications": {
+        "default": 100,
+        "title": "Maximum number of applications to monitor",
+        "type": "integer"
+      },
+      "max_ejbs": {
+        "default": 50,
+        "title": "Maximum number of e j bs to monitor",
+        "type": "integer"
+      },
+      "max_jca_pools": {
+        "default": 50,
+        "title": "Maximum number of j c a pools to monitor",
+        "type": "integer"
+      },
+      "max_jdbc_pools": {
+        "default": 50,
+        "title": "Maximum number of j d b c pools to monitor",
+        "type": "integer"
+      },
+      "max_jms_destinations": {
+        "default": 50,
+        "title": "Maximum number of j m s destinations to monitor",
+        "type": "integer"
+      },
+      "max_retries": {
+        "default": 3,
+        "title": "Resilience tuning",
+        "type": "integer"
+      },
+      "max_servlets": {
+        "default": 50,
+        "title": "Maximum number of servlets to monitor",
+        "type": "integer"
+      },
+      "max_threadpools": {
+        "default": 50,
+        "title": "Cardinality guards",
+        "type": "integer"
+      },
+      "node_name": {
+        "default": "",
+        "title": "Node name",
+        "type": "string"
+      },
+      "retry_backoff_multiplier": {
+        "title": "Retry backoff multiplier",
+        "type": "number"
+      },
+      "server_name": {
+        "default": "",
+        "title": "Server name",
+        "type": "string"
+      },
+      "server_type": {
+        "default": "",
+        "title": "Server type",
+        "type": "string"
+      },
+      "shutdown_delay": {
+        "title": "Shutdown delay",
+        "type": "integer"
+      },
+      "vnode": {
+        "default": "",
+        "title": "Vnode",
+        "type": "string"
+      }
+    },
+    "required": null,
+    "title": "websphere_jmx collector configuration",
+    "type": "object"
+  }
+}
