@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- chore\(go.d/ddsnmp\): Improve profile sorting by match specificity [\#21042](https://github.com/netdata/netdata/pull/21042) ([ilyam8](https://github.com/ilyam8))
+- Context loading priority to vnodes [\#21040](https://github.com/netdata/netdata/pull/21040) ([stelfrag](https://github.com/stelfrag))
+- improve\(go.d/ddsnmp\): switch profile matching to `selector` [\#21039](https://github.com/netdata/netdata/pull/21039) ([ilyam8](https://github.com/ilyam8))
 - fix\(docs\): update mermaid diagrams leftovers plus syntax issues [\#21034](https://github.com/netdata/netdata/pull/21034) ([kanelatechnical](https://github.com/kanelatechnical))
 - docs: fix mdx parsing scalability.md [\#21032](https://github.com/netdata/netdata/pull/21032) ([ilyam8](https://github.com/ilyam8))
 - Revert "chore\(docs\): rename REST API sidebar to Netdata APIs" [\#21031](https://github.com/netdata/netdata/pull/21031) ([ilyam8](https://github.com/ilyam8))
@@ -445,9 +448,6 @@
 - Use ARAL for labels [\#20502](https://github.com/netdata/netdata/pull/20502) ([stelfrag](https://github.com/stelfrag))
 - SNMP: audiocodes profile [\#20501](https://github.com/netdata/netdata/pull/20501) ([Ancairon](https://github.com/Ancairon))
 - chore\(go.d/ddsnmp\): better label values sanitization [\#20500](https://github.com/netdata/netdata/pull/20500) ([ilyam8](https://github.com/ilyam8))
-- SNMP: second pass of aruba profiles [\#20499](https://github.com/netdata/netdata/pull/20499) ([Ancairon](https://github.com/Ancairon))
-- SNMP: Arista profiles [\#20498](https://github.com/netdata/netdata/pull/20498) ([Ancairon](https://github.com/Ancairon))
-- chore\(go.d/ddsnmp\): fix table metrics again [\#20497](https://github.com/netdata/netdata/pull/20497) ([ilyam8](https://github.com/ilyam8))
 
 ## [v2.5.4](https://github.com/netdata/netdata/tree/v2.5.4) (2025-06-24)
 
