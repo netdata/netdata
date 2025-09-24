@@ -90,6 +90,15 @@ type networkInterfaceMetrics struct {
 	mtu             int64  // MAXIMUM_TRANSMISSION_UNIT
 }
 
+type httpServerMetrics struct {
+	serverName   string
+	httpFunction string
+}
+
+type planCacheMetrics struct {
+	heading string
+}
+
 // Per-instance metric methods
 func (a *Collector) getDiskMetrics(unit string) *diskMetrics {
 	if _, ok := a.disks[unit]; !ok {
@@ -146,4 +155,35 @@ func (a *Collector) getNetworkInterfaceMetrics(name string) *networkInterfaceMet
 		a.networkInterfaces[name] = &networkInterfaceMetrics{name: name}
 	}
 	return a.networkInterfaces[name]
+}
+
+func (a *Collector) getHTTPServerMetrics(serverName, function string) *httpServerMetrics {
+	key := httpServerKey(serverName, function)
+	if _, ok := a.httpServers[key]; !ok {
+		a.httpServers[key] = &httpServerMetrics{
+			serverName:   serverName,
+			httpFunction: function,
+		}
+	} else {
+		m := a.httpServers[key]
+		m.serverName = serverName
+		m.httpFunction = function
+	}
+	return a.httpServers[key]
+}
+
+func (a *Collector) getPlanCacheMetrics(key, heading string) *planCacheMetrics {
+	if key == "" {
+		return nil
+	}
+	if _, ok := a.planCache[key]; !ok {
+		a.planCache[key] = &planCacheMetrics{heading: heading}
+	} else if heading != "" {
+		a.planCache[key].heading = heading
+	}
+	return a.planCache[key]
+}
+
+func httpServerKey(serverName, function string) string {
+	return serverName + "|" + function
 }

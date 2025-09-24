@@ -8,6 +8,7 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
@@ -69,6 +70,7 @@ type Manager struct {
 	// Dump mode
 	DumpMode     bool
 	DumpAnalyzer interface{} // Will be *agent.DumpAnalyzer but avoid circular dependency
+	DumpDataDir  string
 
 	fileStatus *fileStatus
 
@@ -316,6 +318,20 @@ func (m *Manager) createCollectorJob(cfg confgroup.Config) (*module.Job, error) 
 		return nil, err
 	}
 
+	var jobDumpDir string
+	if m.DumpDataDir != "" {
+		jobDumpDir = filepath.Join(m.DumpDataDir, sanitizeName(cfg.Module()), sanitizeName(cfg.Name()))
+		if err := os.MkdirAll(jobDumpDir, 0o755); err != nil {
+			return nil, fmt.Errorf("creating dump directory: %w", err)
+		}
+		if analyzer, ok := m.DumpAnalyzer.(interface{ RegisterJob(string, string, string) }); ok {
+			analyzer.RegisterJob(cfg.Name(), cfg.Module(), jobDumpDir)
+		}
+		if dumpAware, ok := mod.(interface{ EnableDump(string) }); ok {
+			dumpAware.EnableDump(jobDumpDir)
+		}
+	}
+
 	jobCfg := module.JobConfig{
 		PluginName:      m.PluginName,
 		Name:            cfg.Name(),
@@ -339,6 +355,11 @@ func (m *Manager) createCollectorJob(cfg confgroup.Config) (*module.Job, error) 
 	job := module.NewJob(jobCfg)
 
 	return job, nil
+}
+
+func sanitizeName(name string) string {
+	replacer := strings.NewReplacer("/", "_", "\\", "_", " ", "_", ":", "_", "*", "_", "?", "_", "\"", "_", "<", "_", ">", "_", "|", "_")
+	return replacer.Replace(name)
 }
 
 func runRetryTask(ctx context.Context, out chan<- confgroup.Config, cfg confgroup.Config) {

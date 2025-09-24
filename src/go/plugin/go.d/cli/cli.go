@@ -21,6 +21,7 @@ type Option struct {
 	Version     bool     `short:"v" long:"version" description:"display the version and exit"`
 	DumpMode    string   `long:"dump" description:"run in dump mode for specified duration (e.g. 30s, 5m) and analyze metric structure"`
 	DumpSummary bool     `long:"dump-summary" description:"show consolidated summary across all jobs in dump mode"`
+	DumpDataDir string   `long:"dump-data" description:"write structured dump artifacts for the selected module to the given directory"`
 }
 
 // Parse returns parsed command-line flags in Option struct

@@ -42,6 +42,7 @@ type Config struct {
 	MinUpdateEvery            int
 	DumpMode                  time.Duration
 	DumpSummary               bool
+	DumpDataDir               string
 }
 
 // Agent represents orchestrator.
@@ -73,6 +74,9 @@ type Agent struct {
 	dumpSummary  bool
 	dumpAnalyzer *DumpAnalyzer
 	mgr          *jobmgr.Manager
+
+	dumpDataDir string
+	dumpOnce    sync.Once
 }
 
 // New creates a new Agent.
@@ -104,6 +108,15 @@ func New(cfg Config) *Agent {
 		if a.dumpSummary {
 			a.Infof("dump summary enabled: will show consolidated summary across all jobs")
 		}
+	}
+
+	if cfg.DumpDataDir != "" {
+		a.dumpDataDir = cfg.DumpDataDir
+		if a.dumpAnalyzer == nil {
+			a.dumpAnalyzer = NewDumpAnalyzer()
+		}
+		a.dumpAnalyzer.EnableDataCapture(cfg.DumpDataDir, a.signalDumpComplete)
+		a.Infof("dump data directory: %s", cfg.DumpDataDir)
 	}
 
 	return a
@@ -244,6 +257,7 @@ func (a *Agent) run(ctx context.Context) {
 		jobMgr.DumpMode = true
 		jobMgr.DumpAnalyzer = a.dumpAnalyzer
 	}
+	jobMgr.DumpDataDir = a.dumpDataDir
 
 	if reg := a.setupVnodeRegistry(); len(reg) > 0 {
 		jobMgr.Vnodes = reg
@@ -299,4 +313,14 @@ func (a *Agent) collectDumpAnalysis() {
 	} else {
 		a.dumpAnalyzer.PrintReport()
 	}
+}
+
+func (a *Agent) signalDumpComplete() {
+	a.dumpOnce.Do(func() {
+		a.Infof("dump data collection complete, shutting down")
+		select {
+		case a.quitCh <- struct{}{}:
+		default:
+		}
+	})
 }

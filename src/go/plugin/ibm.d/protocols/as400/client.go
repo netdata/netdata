@@ -10,10 +10,22 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	_ "github.com/netdata/netdata/go/plugins/plugin/ibm.d/pkg/dbdriver"
 )
+
+var (
+	// ErrFeatureUnavailable indicates that a requested SQL service is not available on this IBM i system.
+	ErrFeatureUnavailable = errors.New("as400 protocol: feature unavailable")
+	// ErrTemporaryFailure indicates a transient database error that may succeed on retry.
+	ErrTemporaryFailure = errors.New("as400 protocol: temporary failure")
+)
+
+// RowScanner receives a row's column names and values.
+// Implementations should treat the values slice as read-only for the duration of the callback.
+type RowScanner func(columns []string, values []string) error
 
 // Config represents the connection options required to talk to IBM i.
 type Config struct {
@@ -142,10 +154,81 @@ func (c *Client) QueryRows(ctx context.Context, query string) (*sql.Rows, contex
 	rows, err := c.db.QueryContext(queryCtx, query)
 	if err != nil {
 		cancel()
-		return nil, nil, fmt.Errorf("as400 protocol: query failed: %w", err)
+		return nil, nil, classifySQLError(err)
 	}
 
 	return rows, cancel, nil
+}
+
+// Query executes the query and streams rows to the provided scanner.
+func (c *Client) Query(ctx context.Context, query string, scan RowScanner) error {
+	rows, cancel, err := c.QueryRows(ctx, query)
+	if err != nil {
+		return err
+	}
+	defer cancel()
+	defer rows.Close()
+
+	columns, err := rows.Columns()
+	if err != nil {
+		return fmt.Errorf("as400 protocol: reading columns failed: %w", err)
+	}
+
+	raw := make([]sql.RawBytes, len(columns))
+	ptrs := make([]any, len(columns))
+	for i := range raw {
+		ptrs[i] = &raw[i]
+	}
+
+	values := make([]string, len(columns))
+
+	for rows.Next() {
+		if err := rows.Scan(ptrs...); err != nil {
+			return fmt.Errorf("as400 protocol: scanning row failed: %w", err)
+		}
+		for i := range raw {
+			if raw[i] == nil {
+				values[i] = "NULL"
+			} else {
+				values[i] = string(raw[i])
+			}
+		}
+		if err := scan(columns, values); err != nil {
+			return err
+		}
+	}
+
+	return rows.Err()
+}
+
+// QueryWithLimit executes the query and enforces a FETCH FIRST limit when limit > 0.
+func (c *Client) QueryWithLimit(ctx context.Context, query string, limit int, scan RowScanner) error {
+	return c.Query(ctx, applyFetchLimit(query, limit), scan)
+}
+
+// Exec runs a statement that does not return rows.
+func (c *Client) Exec(ctx context.Context, statement string) error {
+	if err := c.Connect(ctx); err != nil {
+		return err
+	}
+	execCtx, cancel := context.WithTimeout(ctx, c.effectiveTimeout())
+	defer cancel()
+	if _, err := c.db.ExecContext(execCtx, statement); err != nil {
+		return classifySQLError(err)
+	}
+	return nil
+}
+
+func applyFetchLimit(query string, limit int) string {
+	if limit <= 0 {
+		return query
+	}
+	trimmed := strings.TrimSpace(query)
+	upper := strings.ToUpper(trimmed)
+	if strings.Contains(upper, "FETCH FIRST") {
+		return trimmed
+	}
+	return fmt.Sprintf("%s FETCH FIRST %d ROWS ONLY", trimmed, limit)
 }
 
 func (c *Client) readRows(rows *sql.Rows, fn func(column, value string, lineEnd bool)) error {
@@ -182,4 +265,70 @@ func (c *Client) effectiveTimeout() time.Duration {
 // DB exposes the underlying handle for operations that still rely on *sql.DB.
 func (c *Client) DB() *sql.DB {
 	return c.db
+}
+
+var featureErrorTokens = []string{
+	"SQL0204",
+	"SQL0206",
+	"SQL0443",
+	"SQL0551",
+	"SQL7024",
+	"SQL0707",
+	"SQLCODE=-204",
+	"SQLCODE=-206",
+	"SQLCODE=-443",
+	"SQLCODE=-551",
+	"SQLCODE=-707",
+}
+
+var temporaryErrorTokens = []string{
+	"SQL0519",
+	"SQLCODE=-519",
+}
+
+// IsFeatureError reports whether err indicates an unavailable SQL service.
+func IsFeatureError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, ErrFeatureUnavailable) {
+		return true
+	}
+	msg := strings.ToUpper(err.Error())
+	for _, token := range featureErrorTokens {
+		if strings.Contains(msg, token) {
+			return true
+		}
+	}
+	return false
+}
+
+// IsTemporaryError reports whether err is a transient database error that may succeed on retry.
+func IsTemporaryError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, ErrTemporaryFailure) {
+		return true
+	}
+	msg := strings.ToUpper(err.Error())
+	for _, token := range temporaryErrorTokens {
+		if strings.Contains(msg, token) {
+			return true
+		}
+	}
+	return false
+}
+
+func classifySQLError(err error) error {
+	if err == nil {
+		return nil
+	}
+	if IsFeatureError(err) {
+		return fmt.Errorf("%w: %s", ErrFeatureUnavailable, err)
+	}
+	if IsTemporaryError(err) {
+		return fmt.Errorf("%w: %s", ErrTemporaryFailure, err)
+	}
+	return fmt.Errorf("as400 protocol: query failed: %w", err)
 }

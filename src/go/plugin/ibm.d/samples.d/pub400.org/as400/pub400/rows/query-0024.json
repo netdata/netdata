@@ -1,0 +1,44 @@
+{
+  "columns": [
+    "POOL_NAME",
+    "CURRENT_SIZE",
+    "DEFINED_SIZE",
+    "RESERVED_SIZE",
+    "CURRENT_THREADS",
+    "MAXIMUM_ACTIVE_THREADS"
+  ],
+  "rows": [
+    {
+      "CURRENT_SIZE": "8192",
+      "CURRENT_THREADS": "11",
+      "DEFINED_SIZE": "8192",
+      "MAXIMUM_ACTIVE_THREADS": "255",
+      "POOL_NAME": "*MACHINE  ",
+      "RESERVED_SIZE": "2550.64"
+    },
+    {
+      "CURRENT_SIZE": "48440",
+      "CURRENT_THREADS": "211",
+      "DEFINED_SIZE": "NULL",
+      "MAXIMUM_ACTIVE_THREADS": "168",
+      "POOL_NAME": "*BASE     ",
+      "RESERVED_SIZE": "7.41"
+    },
+    {
+      "CURRENT_SIZE": "8192",
+      "CURRENT_THREADS": "25",
+      "DEFINED_SIZE": "8192",
+      "MAXIMUM_ACTIVE_THREADS": "244",
+      "POOL_NAME": "*INTERACT ",
+      "RESERVED_SIZE": "0"
+    },
+    {
+      "CURRENT_SIZE": "128",
+      "CURRENT_THREADS": "23",
+      "DEFINED_SIZE": "128",
+      "MAXIMUM_ACTIVE_THREADS": "5",
+      "POOL_NAME": "*SPOOL    ",
+      "RESERVED_SIZE": "0"
+    }
+  ]
+}

@@ -230,7 +230,8 @@ func (g *DocGenerator) parseConfig() ([]ConfigField, error) {
 		}}, fields...)
 	}
 
-	ensureField("update_every", "Data collection frequency", 1, "integer", intPtr(1), nil)
+	ensureField("update_every", "Data collection frequency", 10, "integer", intPtr(1), nil)
+	ensureField("reset_statistics", "ResetStatistics enables SQL calls that reset IBM i system statistics on each run.", false, "boolean", nil, nil)
 
 	return fields, nil
 }
@@ -242,9 +243,17 @@ func (g *DocGenerator) getFallbackConfigFields() []ConfigField {
 			JSONName:    "update_every",
 			Type:        "integer",
 			Required:    false,
-			Default:     1,
+			Default:     10,
 			Description: "Data collection frequency",
 			Minimum:     intPtr(1),
+		},
+		{
+			Name:        "reset_statistics",
+			JSONName:    "reset_statistics",
+			Type:        "boolean",
+			Required:    false,
+			Default:     false,
+			Description: "ResetStatistics enables SQL calls that reset IBM i system statistics on each run.",
 		},
 		{
 			Name:        "endpoint",

@@ -28,14 +28,15 @@ func defaultConfig() Config {
 		MaxDbConns:    1,
 		MaxDbLifeTime: confopt.Duration(10 * time.Minute),
 
-		Hostname:       "",
-		Port:           8471,
-		Username:       "",
-		Password:       "",
-		Database:       "*SYSBAS",
-		ConnectionType: "odbc",
-		ODBCDriver:     "IBM i Access ODBC Driver",
-		UseSSL:         false,
+		Hostname:        "",
+		Port:            8471,
+		Username:        "",
+		Password:        "",
+		Database:        "*SYSBAS",
+		ConnectionType:  "odbc",
+		ODBCDriver:      "IBM i Access ODBC Driver",
+		UseSSL:          false,
+		ResetStatistics: false,
 
 		MaxDisks:      100,
 		MaxSubsystems: 100,
@@ -90,6 +91,10 @@ func (c *Collector) Init(ctx context.Context) error {
 		ConnMaxLife:  time.Duration(c.MaxDbLifeTime),
 	}
 	c.client = as400proto.NewClient(clientCfg)
+
+	if c.ResetStatistics {
+		c.Warningf("reset_statistics is enabled; IBM i statistics will be reset on each collection iteration")
+	}
 
 	// Compile selectors if provided
 	if c.DiskSelector != "" {
@@ -152,6 +157,5 @@ func (c *Collector) Check(ctx context.Context) error {
 		return err
 	}
 	// Perform lightweight query to ensure connectivity
-	_, err := c.collect(ctx)
-	return err
+	return c.collect(ctx)
 }

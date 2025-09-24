@@ -10,6 +10,8 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+
+	as400proto "github.com/netdata/netdata/go/plugins/plugin/ibm.d/protocols/as400"
 )
 
 func cleanName(name string) string {
@@ -37,30 +39,11 @@ func (c *Collector) isDisabled(key string) bool {
 }
 
 func isSQLFeatureError(err error) bool {
-	if err == nil {
-		return false
-	}
-	errStr := strings.ToUpper(err.Error())
-	return strings.Contains(errStr, "SQL0204") ||
-		strings.Contains(errStr, "SQL0206") ||
-		strings.Contains(errStr, "SQL0443") ||
-		strings.Contains(errStr, "SQL0551") ||
-		strings.Contains(errStr, "SQL7024") ||
-		strings.Contains(errStr, "SQL0707") ||
-		strings.Contains(errStr, "SQLCODE=-204") ||
-		strings.Contains(errStr, "SQLCODE=-206") ||
-		strings.Contains(errStr, "SQLCODE=-443") ||
-		strings.Contains(errStr, "SQLCODE=-551") ||
-		strings.Contains(errStr, "SQLCODE=-707")
+	return as400proto.IsFeatureError(err)
 }
 
 func isSQLTemporaryError(err error) bool {
-	if err == nil {
-		return false
-	}
-	errStr := strings.ToUpper(err.Error())
-	return strings.Contains(errStr, "SQL0519") ||
-		strings.Contains(errStr, "SQLCODE=-519")
+	return as400proto.IsTemporaryError(err)
 }
 
 func (c *Collector) collectSingleMetric(ctx context.Context, metricKey string, query string, handler func(value string)) error {
@@ -297,4 +280,18 @@ func boolValue(v *bool) bool {
 		return false
 	}
 	return *v
+}
+
+func (c *Collector) systemStatusQuery() string {
+	if c.ResetStatistics {
+		return querySystemStatusReset
+	}
+	return querySystemStatusNoReset
+}
+
+func (c *Collector) memoryPoolQuery() string {
+	if c.ResetStatistics {
+		return queryMemoryPoolsReset
+	}
+	return queryMemoryPoolsNoReset
 }

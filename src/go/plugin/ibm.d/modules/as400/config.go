@@ -48,6 +48,9 @@ type Config struct {
 	// UseSSL enables TLS for the ODBC connection when supported by the driver.
 	UseSSL bool `yaml:"use_ssl,omitempty" json:"use_ssl"`
 
+	// ResetStatistics toggles destructive SQL services that reset system statistics on each query.
+	ResetStatistics bool `yaml:"reset_statistics,omitempty" json:"reset_statistics"`
+
 	// CollectDiskMetrics toggles collection of disk unit statistics.
 	CollectDiskMetrics *bool `yaml:"collect_disk_metrics,omitempty" json:"collect_disk_metrics"`
 
@@ -59,6 +62,12 @@ type Config struct {
 
 	// CollectActiveJobs toggles collection of detailed per-job metrics.
 	CollectActiveJobs *bool `yaml:"collect_active_jobs,omitempty" json:"collect_active_jobs"`
+
+	// CollectHTTPServerMetrics toggles collection of IBM HTTP Server statistics.
+	CollectHTTPServerMetrics *bool `yaml:"collect_http_server_metrics,omitempty" json:"collect_http_server_metrics"`
+
+	// CollectPlanCacheMetrics toggles collection of plan cache analysis metrics.
+	CollectPlanCacheMetrics *bool `yaml:"collect_plan_cache_metrics,omitempty" json:"collect_plan_cache_metrics"`
 
 	// MaxDisks caps how many disk units may be charted.
 	MaxDisks int `yaml:"max_disks,omitempty" json:"max_disks"`

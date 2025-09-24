@@ -1,0 +1,16 @@
+{
+  "columns": [
+    "AVERAGE_CPU_RATE",
+    "AVERAGE_CPU_UTILIZATION",
+    "MINIMUM_CPU_UTILIZATION",
+    "MAXIMUM_CPU_UTILIZATION"
+  ],
+  "rows": [
+    {
+      "AVERAGE_CPU_RATE": "0",
+      "AVERAGE_CPU_UTILIZATION": "0",
+      "MAXIMUM_CPU_UTILIZATION": "0",
+      "MINIMUM_CPU_UTILIZATION": "0"
+    }
+  ]
+}

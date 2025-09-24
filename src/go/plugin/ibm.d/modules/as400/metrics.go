@@ -71,6 +71,8 @@ type metricsData struct {
 	tempStorageNamed  map[string]tempStorageInstanceMetrics
 	activeJobs        map[string]activeJobInstanceMetrics
 	networkInterfaces map[string]networkInterfaceInstanceMetrics
+	httpServers       map[string]httpServerInstanceMetrics
+	planCache         map[string]planCacheInstanceMetrics
 	systemActivity    systemActivityMetrics
 }
 
@@ -133,4 +135,20 @@ type systemActivityMetrics struct {
 	AverageCPUUtilization int64 `stm:"average_cpu_utilization"` // AVERAGE_CPU_UTILIZATION (percentage with precision)
 	MinimumCPUUtilization int64 `stm:"minimum_cpu_utilization"` // MINIMUM_CPU_UTILIZATION (percentage with precision)
 	MaximumCPUUtilization int64 `stm:"maximum_cpu_utilization"` // MAXIMUM_CPU_UTILIZATION (percentage with precision)
+}
+
+type httpServerInstanceMetrics struct {
+	NormalConnections     int64 `stm:"normal_connections"`
+	SSLConnections        int64 `stm:"ssl_connections"`
+	ActiveThreads         int64 `stm:"active_threads"`
+	IdleThreads           int64 `stm:"idle_threads"`
+	TotalRequests         int64 `stm:"total_requests"`
+	TotalResponses        int64 `stm:"total_responses"`
+	TotalRequestsRejected int64 `stm:"total_requests_rejected"`
+	BytesReceived         int64 `stm:"bytes_received"`
+	BytesSent             int64 `stm:"bytes_sent"`
+}
+
+type planCacheInstanceMetrics struct {
+	Value int64 `stm:"value"`
 }

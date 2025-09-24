@@ -24,6 +24,14 @@ modules:
           Monitors IBM i (AS/400) systems using SQL services and CL commands to
           expose CPU, memory, storage, job, and subsystem activity.
 
+          **Dependencies:**
+          - unixODBC 2.3+ with IBM i Access ODBC driver
+          - IBM i 7.2 or later with SQL services enabled
+
+          **Required Libraries:**
+          - libodbc.so (provided by unixODBC)
+          - IBM i Access Client Solutions
+
         method_description: |
           The collector connects to IBM i (AS/400) and collects metrics via its monitoring interface.
       supported_platforms:
@@ -181,6 +189,43 @@ modules:
               chart_type: line
               dimensions:
                 - name: power_on_days
+        - name: httpserver
+          description: These metrics refer to httpserver instances.
+          labels:
+            - name: server
+              description: Server identifier
+            - name: function
+              description: Function identifier
+          metrics:
+            - name: as400.http_server_connections
+              description: HTTP Server Connections
+              unit: connections
+              chart_type: line
+              dimensions:
+                - name: normal
+                - name: ssl
+            - name: as400.http_server_threads
+              description: HTTP Server Threads
+              unit: threads
+              chart_type: line
+              dimensions:
+                - name: active
+                - name: idle
+            - name: as400.http_server_requests
+              description: HTTP Server Requests
+              unit: requests/s
+              chart_type: area
+              dimensions:
+                - name: requests
+                - name: responses
+                - name: rejected
+            - name: as400.http_server_bytes
+              description: HTTP Server Throughput
+              unit: bytes/s
+              chart_type: area
+              dimensions:
+                - name: received
+                - name: sent
         - name: jobqueue
           description: These metrics refer to jobqueue instances.
           labels:
@@ -225,6 +270,18 @@ modules:
               chart_type: line
               dimensions:
                 - name: mtu
+        - name: plancache
+          description: These metrics refer to plancache instances.
+          labels:
+            - name: metric
+              description: Metric identifier
+          metrics:
+            - name: as400.plan_cache_summary
+              description: Plan Cache Summary
+              unit: value
+              chart_type: line
+              dimensions:
+                - name: value
         - name: subsystem
           description: These metrics refer to subsystem instances.
           labels:

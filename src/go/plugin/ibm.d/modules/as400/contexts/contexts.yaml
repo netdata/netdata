@@ -503,3 +503,73 @@ NetworkInterface:
       dimensions:
         - name: mtu
           algo: absolute
+HTTPServer:
+  labels:
+    - server
+    - function
+  contexts:
+    - name: Connections
+      context: as400.http_server_connections
+      title: HTTP Server Connections
+      family: network/http
+      units: connections
+      type: line
+      priority: 601
+      dimensions:
+        - name: normal
+          algo: absolute
+        - name: ssl
+          algo: absolute
+    - name: Threads
+      context: as400.http_server_threads
+      title: HTTP Server Threads
+      family: network/http
+      units: threads
+      type: line
+      priority: 602
+      dimensions:
+        - name: active
+          algo: absolute
+        - name: idle
+          algo: absolute
+    - name: Requests
+      context: as400.http_server_requests
+      title: HTTP Server Requests
+      family: network/http
+      units: requests/s
+      type: area
+      priority: 603
+      dimensions:
+        - name: requests
+          algo: incremental
+        - name: responses
+          algo: incremental
+        - name: rejected
+          algo: incremental
+    - name: Bytes
+      context: as400.http_server_bytes
+      title: HTTP Server Throughput
+      family: network/http
+      units: bytes/s
+      type: area
+      priority: 604
+      dimensions:
+        - name: received
+          algo: incremental
+        - name: sent
+          algo: incremental
+PlanCache:
+  labels:
+    - metric
+  contexts:
+    - name: Summary
+      context: as400.plan_cache_summary
+      title: Plan Cache Summary
+      family: database/cache
+      units: value
+      type: line
+      priority: 802
+      dimensions:
+        - name: value
+          algo: absolute
+          div: 1000

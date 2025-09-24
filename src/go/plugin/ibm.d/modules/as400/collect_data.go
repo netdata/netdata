@@ -7,13 +7,11 @@ package as400
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/stm"
 )
 
 const precision = 1000 // Precision multiplier for floating-point values
@@ -23,369 +21,106 @@ func boolPtr(v bool) *bool {
 	return &v
 }
 
-// isSystemMetric determines if a metric key represents a system-level metric
-// (as opposed to instance-specific metrics like per-disk, per-subsystem, etc.)
-func isSystemMetric(key string) bool {
-	systemMetrics := map[string]bool{
-		// CPU metrics
-		"cpu_percentage":       true,
-		"configured_cpus":      true,
-		"current_cpu_capacity": true,
-
-		// Memory metrics
-		"main_storage_size":              true,
-		"current_temporary_storage":      true,
-		"maximum_temporary_storage_used": true,
-
-		// Job metrics
-		"total_jobs_in_system":       true,
-		"active_jobs_in_system":      true,
-		"interactive_jobs_in_system": true,
-		"batch_jobs_running":         true,
-		"job_queue_length":           true,
-
-		// Storage metrics
-		"system_asp_used":         true,
-		"system_asp_storage":      true,
-		"total_auxiliary_storage": true,
-
-		// Thread metrics
-		"active_threads_in_system": true,
-		"threads_per_processor":    true,
-
-		// Memory pool metrics
-		"machine_pool_size":          true,
-		"base_pool_size":             true,
-		"interactive_pool_size":      true,
-		"spool_pool_size":            true,
-		"machine_pool_defined_size":  true,
-		"machine_pool_reserved_size": true,
-		"base_pool_defined_size":     true,
-		"base_pool_reserved_size":    true,
-		"machine_pool_threads":       true,
-		"machine_pool_max_threads":   true,
-		"base_pool_threads":          true,
-		"base_pool_max_threads":      true,
-
-		// Network metrics
-		"remote_connections":    true,
-		"total_connections":     true,
-		"listen_connections":    true,
-		"closewait_connections": true,
-
-		// Temporary storage metrics
-		"temp_storage_current_total": true,
-		"temp_storage_peak_total":    true,
-
-		// Disk aggregate metrics
-		"disk_busy_percentage": true,
-
-		// System activity metrics
-		"system_activity_average_cpu_rate":        true,
-		"system_activity_average_cpu_utilization": true,
-		"system_activity_minimum_cpu_utilization": true,
-		"system_activity_maximum_cpu_utilization": true,
+func parseNumericValue(value string, multiplier int64) (int64, bool) {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" || strings.EqualFold(trimmed, "NULL") || strings.EqualFold(trimmed, "N/A") {
+		return 0, false
 	}
-
-	return systemMetrics[key]
+	cleaned := strings.Map(func(r rune) rune {
+		switch {
+		case r >= '0' && r <= '9':
+			return r
+		case r == '-' || r == '.':
+			return r
+		default:
+			return -1
+		}
+	}, trimmed)
+	if cleaned == "" || cleaned == "-" || cleaned == "." {
+		return 0, false
+	}
+	if strings.Count(cleaned, ".") > 1 {
+		// Too many decimal separators, treat as invalid
+		return 0, false
+	}
+	if multiplier <= 0 {
+		multiplier = 1
+	}
+	if strings.Contains(cleaned, ".") {
+		f, err := strconv.ParseFloat(cleaned, 64)
+		if err != nil {
+			return 0, false
+		}
+		return int64(math.Round(f * float64(multiplier))), true
+	}
+	v, err := strconv.ParseInt(cleaned, 10, 64)
+	if err != nil {
+		return 0, false
+	}
+	if multiplier == 1 {
+		return v, true
+	}
+	return v * multiplier, true
 }
 
-func (a *Collector) collect(ctx context.Context) (map[string]int64, error) {
+func planCacheMetricKey(heading string) string {
+	trimmed := strings.TrimSpace(heading)
+	if trimmed == "" {
+		return ""
+	}
+	trimmed = strings.ToLower(trimmed)
+	var builder strings.Builder
+	lastUnderscore := false
+	for _, r := range trimmed {
+		switch {
+		case r >= 'a' && r <= 'z', r >= '0' && r <= '9':
+			builder.WriteRune(r)
+			lastUnderscore = false
+		case r == ' ' || r == '-' || r == '/' || r == '\\' || r == ':' || r == '%' || r == '(' || r == ')' || r == '.':
+			if !lastUnderscore {
+				builder.WriteRune('_')
+				lastUnderscore = true
+			}
+		default:
+			// skip other punctuation
+		}
+	}
+	result := builder.String()
+	result = strings.Trim(result, "_")
+	if result == "" {
+		result = cleanName(trimmed)
+	}
+	if result == "" {
+		return "plan_cache_metric"
+	}
+	return result
+}
+
+func (a *Collector) collect(ctx context.Context) error {
 	startTime := time.Now()
 	defer func() {
 		duration := time.Since(startTime)
 		a.Debugf("collection iteration completed in %v", duration)
 	}()
 
-	// Ensure per-instance caches start fresh for this iteration
-	a.resetInstanceCaches()
+	a.prepareIterationState()
+	a.initGroups()
 
-	// Reset metrics - initialize all instance maps
-	a.mx = &metricsData{
-		disks:            make(map[string]diskInstanceMetrics),
-		subsystems:       make(map[string]subsystemInstanceMetrics),
-		jobQueues:        make(map[string]jobQueueInstanceMetrics),
-		tempStorageNamed: make(map[string]tempStorageInstanceMetrics),
-		activeJobs:       make(map[string]activeJobInstanceMetrics),
-	}
-
-	// Create final metrics map - only populate with successfully collected metrics
-	mx := make(map[string]int64)
-
-	// Collect system-wide metrics - only add to mx if collection succeeds
-	if err := a.collectSystemStatus(ctx); err == nil {
-		// System status collection succeeded - add metrics to mx
-		systemMetrics := stm.ToMap(a.mx)
-		for k, v := range systemMetrics {
-			// Only add system-level metrics (not instance-specific ones)
-			if isSystemMetric(k) {
-				mx[k] = v
-			}
+	for _, grp := range a.groups {
+		if grp == nil || !grp.Enabled() {
+			continue
 		}
-	} else {
-		if isSQLTemporaryError(err) {
-			a.Debugf("system status collection failed with temporary error, will show gaps: %v", err)
-		} else {
-			a.Errorf("failed to collect system status: %v", err)
-		}
-		// Don't add any system status metrics to mx - this creates proper gaps
-	}
-
-	// Collect memory pools - only add to mx if collection succeeds
-	if err := a.collectMemoryPools(ctx); err == nil {
-		// Memory pools collection succeeded - add metrics to mx
-		memoryMetrics := stm.ToMap(a.mx)
-		for k, v := range memoryMetrics {
-			if isSystemMetric(k) {
-				mx[k] = v
-			}
-		}
-	} else {
-		if isSQLTemporaryError(err) {
-			a.Debugf("memory pools collection failed with temporary error, will show gaps: %v", err)
-		} else {
-			a.Errorf("failed to collect memory pools: %v", err)
-		}
-		// Don't add any memory pool metrics to mx - this creates proper gaps
-	}
-
-	// Collect aggregate disk status - only add to mx if collection succeeds
-	if err := a.collectDiskStatus(ctx); err == nil {
-		// Disk status metrics are part of system metrics
-		diskMetrics := stm.ToMap(a.mx)
-		for k, v := range diskMetrics {
-			if isSystemMetric(k) {
-				mx[k] = v
-			}
-		}
-	} else {
-		if isSQLFeatureError(err) {
-			a.Warningf("disk status monitoring not available on this IBM i version: %v", err)
-		} else if isSQLTemporaryError(err) {
-			a.Debugf("disk status collection failed with temporary error, will show gaps: %v", err)
-		} else {
-			a.Errorf("failed to collect disk status: %v", err)
-		}
-		// Don't add disk status metrics to mx - this creates proper gaps
-	}
-
-	// Collect aggregate job info - only add to mx if collection succeeds
-	if err := a.collectJobInfo(ctx); err == nil {
-		// Job info metrics are part of system metrics
-		jobMetrics := stm.ToMap(a.mx)
-		for k, v := range jobMetrics {
-			if isSystemMetric(k) {
-				mx[k] = v
-			}
-		}
-	} else {
-		if isSQLFeatureError(err) {
-			a.Warningf("job info monitoring not available on this IBM i version: %v", err)
-		} else if isSQLTemporaryError(err) {
-			a.Debugf("job info collection failed with temporary error, will show gaps: %v", err)
-		} else {
-			a.Errorf("failed to collect job info: %v", err)
-		}
-		// Don't add job info metrics to mx - this creates proper gaps
-	}
-
-	// Collect network connections - only add to mx if collection succeeds
-	if err := a.collectNetworkConnections(ctx); err == nil {
-		// Network metrics are part of system metrics
-		networkMetrics := stm.ToMap(a.mx)
-		for k, v := range networkMetrics {
-			if isSystemMetric(k) {
-				mx[k] = v
-			}
-		}
-	} else {
-		if isSQLFeatureError(err) {
-			a.Warningf("network connections monitoring not available on this IBM i version: %v", err)
-		} else if isSQLTemporaryError(err) {
-			a.Debugf("network connections collection failed with temporary error, will show gaps: %v", err)
-		} else {
-			a.Errorf("failed to collect network connections: %v", err)
-		}
-		// Don't add network metrics to mx - this creates proper gaps
-	}
-
-	// Collect temporary storage - only add to mx if collection succeeds
-	if err := a.collectTempStorage(ctx); err == nil {
-		// Temporary storage metrics are part of system metrics
-		tempMetrics := stm.ToMap(a.mx)
-		for k, v := range tempMetrics {
-			if isSystemMetric(k) {
-				mx[k] = v
-			}
-		}
-	} else {
-		if isSQLFeatureError(err) {
-			a.Warningf("temporary storage monitoring not available on this IBM i version: %v", err)
-		} else if isSQLTemporaryError(err) {
-			a.Debugf("temporary storage collection failed with temporary error, will show gaps: %v", err)
-		} else {
-			a.Errorf("failed to collect temporary storage: %v", err)
-		}
-		// Don't add temporary storage metrics to mx - this creates proper gaps
-	}
-
-	// Collect subsystems - optional
-	if a.CollectSubsystemMetrics != nil && *a.CollectSubsystemMetrics {
-		if err := a.collectSubsystems(ctx); err != nil {
-			if isSQLFeatureError(err) {
-				a.Warningf("subsystem monitoring not available on this IBM i version: %v", err)
-			} else {
-				a.Errorf("failed to collect subsystems: %v", err)
-			}
+		if err := grp.Collect(ctx); err != nil {
+			return fmt.Errorf("%s: %w", grp.Name(), err)
 		}
 	}
 
-	// Collect job queues - optional
-	if a.CollectJobQueueMetrics != nil && *a.CollectJobQueueMetrics {
-		if err := a.collectJobQueues(ctx); err != nil {
-			if isSQLFeatureError(err) {
-				a.Warningf("job queue monitoring not available on this IBM i version: %v", err)
-			} else {
-				a.Errorf("failed to collect job queues: %v", err)
-			}
-		}
-	}
-
-	// Collect per-instance metrics if enabled
-	if a.CollectDiskMetrics != nil && *a.CollectDiskMetrics {
-		if err := a.collectDiskInstancesEnhanced(ctx); err != nil {
-			if isSQLFeatureError(err) {
-				// Fall back to basic disk collection
-				a.Warningf("enhanced disk metrics not available, using basic collection: %v", err)
-				if err := a.collectDiskInstances(ctx); err != nil {
-					a.Errorf("failed to collect disk instances: %v", err)
-				}
-			} else {
-				a.Errorf("failed to collect enhanced disk instances: %v", err)
-			}
-		}
-	}
-
-	// Collect active jobs if enabled (requires IBM i 7.3+)
-	if a.CollectActiveJobs != nil && *a.CollectActiveJobs {
-		if err := a.collectActiveJobs(ctx); err != nil {
-			if isSQLFeatureError(err) {
-				a.Warningf("active job metrics not available on this IBM i version: %v", err)
-				// Disable it for future collections
-				a.CollectActiveJobs = boolPtr(false)
-			} else {
-				a.Errorf("failed to collect active jobs: %v", err)
-			}
-		}
-	}
-
-	// Collect network interfaces (requires IBM i 7.2 TR3+)
-	if err := a.collectNetworkInterfaces(ctx); err != nil {
-		if isSQLFeatureError(err) {
-			a.Warningf("network interface monitoring not available on this IBM i version: %v", err)
-		} else {
-			a.Errorf("failed to collect network interfaces: %v", err)
-		}
-	}
-
-	// Track if system activity collection succeeds
-	systemActivitySuccess := false
-
-	// Collect system activity metrics (requires IBM i 7.3+)
-	if err := a.collectSystemActivity(ctx); err == nil {
-		systemActivitySuccess = true
-	} else {
-		if isSQLFeatureError(err) {
-			a.Warningf("system activity monitoring not available on this IBM i version: %v", err)
-		} else if isSQLTemporaryError(err) {
-			a.Debugf("system activity collection failed with temporary error, will show gaps: %v", err)
-		} else {
-			a.Errorf("failed to collect system activity: %v", err)
-		}
-	}
-
-	// Add per-instance metrics
-	// Disks
-	for unit, metrics := range a.mx.disks {
-		cleanUnit := cleanName(unit)
-		metricsMap := stm.ToMap(metrics)
-
-		// Manually add SSD metrics only if they have values >= 0 (matches chart creation logic)
-		if metrics.SSDLifeRemaining >= 0 {
-			metricsMap["ssd_life_remaining"] = metrics.SSDLifeRemaining
-		}
-		if metrics.SSDPowerOnDays >= 0 {
-			metricsMap["ssd_power_on_days"] = metrics.SSDPowerOnDays
-		}
-
-		for k, v := range metricsMap {
-			mx[fmt.Sprintf("disk_%s_%s", cleanUnit, k)] = v
-		}
-		// Calculate used_gb from capacity - available
-		// Always calculate used_gb if we have capacity information
-		if metrics.CapacityGB > 0 {
-			usedGB := metrics.CapacityGB - metrics.AvailableGB
-			// Ensure used_gb is not negative
-			if usedGB < 0 {
-				usedGB = 0
-			}
-			mx[fmt.Sprintf("disk_%s_used_gb", cleanUnit)] = usedGB
-		}
-	}
-
-	// Subsystems
-	for name, metrics := range a.mx.subsystems {
-		cleanName := cleanName(name)
-		for k, v := range stm.ToMap(metrics) {
-			mx[fmt.Sprintf("subsystem_%s_%s", cleanName, k)] = v
-		}
-	}
-
-	// Job queues
-	for name, metrics := range a.mx.jobQueues {
-		cleanName := cleanName(name)
-		for k, v := range stm.ToMap(metrics) {
-			mx[fmt.Sprintf("jobqueue_%s_%s", cleanName, k)] = v
-		}
-	}
-
-	// Temp storage buckets
-	for name, metrics := range a.mx.tempStorageNamed {
-		cleanName := cleanName(name)
-		for k, v := range stm.ToMap(metrics) {
-			mx[fmt.Sprintf("tempstorage_%s_%s", cleanName, k)] = v
-		}
-	}
-
-	// Active jobs
-	for jobName, metrics := range a.mx.activeJobs {
-		cleanJobName := cleanName(jobName)
-		for k, v := range stm.ToMap(metrics) {
-			mx[fmt.Sprintf("activejob_%s_%s", cleanJobName, k)] = v
-		}
-	}
-
-	// Network interfaces
-	for interfaceName, metrics := range a.mx.networkInterfaces {
-		cleanInterfaceName := cleanName(interfaceName)
-		for k, v := range stm.ToMap(metrics) {
-			mx[fmt.Sprintf("netintf_%s_%s", cleanInterfaceName, k)] = v
-		}
-	}
-
-	// System activity metrics - only add if collection succeeded
-	if systemActivitySuccess {
-		for k, v := range stm.ToMap(a.mx.systemActivity) {
-			mx[fmt.Sprintf("system_activity_%s", k)] = v
-		}
-	}
-
-	return mx, nil
+	return nil
 }
 
 func (a *Collector) collectSystemStatus(ctx context.Context) error {
 	// Use comprehensive query to get all system status metrics at once
-	err := a.doQuery(ctx, querySystemStatus, func(column, value string, lineEnd bool) {
+	err := a.doQuery(ctx, a.systemStatusQuery(), func(column, value string, lineEnd bool) {
 		// Skip empty values
 		if value == "" {
 			return
@@ -473,7 +208,7 @@ func (a *Collector) collectSystemStatus(ctx context.Context) error {
 
 func (a *Collector) collectMemoryPools(ctx context.Context) error {
 	var currentPoolName string
-	return a.doQuery(ctx, queryMemoryPools, func(column, value string, lineEnd bool) {
+	return a.doQuery(ctx, a.memoryPoolQuery(), func(column, value string, lineEnd bool) {
 		switch column {
 		case "POOL_NAME":
 			currentPoolName = value
@@ -557,9 +292,29 @@ func (a *Collector) collectJobInfo(ctx context.Context) error {
 }
 
 func (a *Collector) doQuery(ctx context.Context, query string, assign func(column, value string, lineEnd bool)) error {
-	rows, cancel, err := a.client.QueryRows(ctx, query)
+	var (
+		capture      bool
+		columnsSaved []string
+		rowsSaved    [][]string
+	)
+	if a.dump != nil {
+		capture = true
+	}
+	err := a.client.Query(ctx, query, func(columns []string, values []string) error {
+		for i, col := range columns {
+			assign(col, values[i], i == len(columns)-1)
+		}
+		if capture {
+			if columnsSaved == nil {
+				columnsSaved = append(columnsSaved, columns...)
+			}
+			rowCopy := make([]string, len(values))
+			copy(rowCopy, values)
+			rowsSaved = append(rowsSaved, rowCopy)
+		}
+		return nil
+	})
 	if err != nil {
-		// Log expected SQL feature errors at DEBUG level to reduce noise
 		if isSQLFeatureError(err) {
 			a.Debugf("query failed with expected feature error: %s, error: %v", query, err)
 		} else if isSQLTemporaryError(err) {
@@ -569,44 +324,34 @@ func (a *Collector) doQuery(ctx context.Context, query string, assign func(colum
 		}
 		return err
 	}
-	defer cancel()
-	defer rows.Close()
-
-	return a.readRows(rows, assign)
-}
-
-func (a *Collector) readRows(rows *sql.Rows, assign func(column, value string, lineEnd bool)) error {
-	columns, err := rows.Columns()
-	if err != nil {
-		return err
+	if capture && columnsSaved != nil {
+		a.dump.recordQuery(query, columnsSaved, rowsSaved)
 	}
-
-	values := make([]sql.NullString, len(columns))
-	valuePtrs := make([]interface{}, len(columns))
-	for i := range values {
-		valuePtrs[i] = &values[i]
-	}
-
-	for rows.Next() {
-		if err := rows.Scan(valuePtrs...); err != nil {
-			return err
-		}
-
-		for i, col := range columns {
-			val := "NULL"
-			if values[i].Valid {
-				val = values[i].String
-			}
-			assign(col, val, i == len(columns)-1)
-		}
-	}
-
-	return rows.Err()
+	return nil
 }
 
 // doQueryRow executes a query that returns a single row
 func (a *Collector) doQueryRow(ctx context.Context, query string, assign func(column, value string)) error {
-	rows, cancel, err := a.client.QueryRows(ctx, query)
+	var (
+		capture      bool
+		columnsSaved []string
+		rowsSaved    [][]string
+	)
+	if a.dump != nil {
+		capture = true
+	}
+	err := a.client.QueryWithLimit(ctx, query, 1, func(columns []string, values []string) error {
+		for i, col := range columns {
+			assign(col, values[i])
+		}
+		if capture {
+			columnsSaved = append([]string{}, columns...)
+			rowCopy := make([]string, len(values))
+			copy(rowCopy, values)
+			rowsSaved = append(rowsSaved, rowCopy)
+		}
+		return nil
+	})
 	if err != nil {
 		if isSQLFeatureError(err) {
 			a.Debugf("query failed with expected feature error: %s, error: %v", query, err)
@@ -617,53 +362,26 @@ func (a *Collector) doQueryRow(ctx context.Context, query string, assign func(co
 		}
 		return err
 	}
-	defer cancel()
-	defer rows.Close()
-
-	columns, err := rows.Columns()
-	if err != nil {
-		return err
+	if capture && columnsSaved != nil {
+		a.dump.recordQuery(query, columnsSaved, rowsSaved)
 	}
-
-	values := make([]sql.NullString, len(columns))
-	valuePtrs := make([]interface{}, len(columns))
-	for i := range values {
-		valuePtrs[i] = &values[i]
-	}
-
-	if rows.Next() {
-		if err := rows.Scan(valuePtrs...); err != nil {
-			return err
-		}
-
-		for i, col := range columns {
-			val := "NULL"
-			if values[i].Valid {
-				val = values[i].String
-			}
-			assign(col, val)
-		}
-	}
-
-	return rows.Err()
+	return nil
 }
 
 // Per-instance collection methods
 
 func (a *Collector) collectDiskInstances(ctx context.Context) error {
-	// First check cardinality if we haven't yet
-	if len(a.disks) == 0 && a.MaxDisks > 0 {
-		count, err := a.countDisks(ctx)
-		if err != nil {
-			return err
-		}
-		if count > a.MaxDisks {
-			return fmt.Errorf("disk count (%d) exceeds limit (%d), skipping per-disk metrics", count, a.MaxDisks)
-		}
+	allowed, count, err := a.diskCardinality.Allow(ctx, a.countDisks)
+	if err != nil {
+		return err
+	}
+	if !allowed {
+		a.logOnce("disk_cardinality", "disk count (%d) exceeds limit (%d), skipping per-disk metrics", count, a.MaxDisks)
+		return nil
 	}
 
 	var currentUnit string
-	return a.doQuery(ctx, queryDiskInstancesEnhanced, func(column, value string, lineEnd bool) {
+	return a.doQuery(ctx, queryDiskInstances, func(column, value string, lineEnd bool) {
 
 		switch column {
 		case "UNIT_NUMBER":
@@ -923,6 +641,66 @@ func (a *Collector) collectNetworkConnections(ctx context.Context) error {
 	})
 }
 
+func (a *Collector) countNetworkInterfaces(ctx context.Context) (int, error) {
+	var count int
+	err := a.doQueryRow(ctx, queryCountNetworkInterfaces, func(column, value string) {
+		if column == "COUNT" {
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				count = int(v)
+			}
+		}
+	})
+	return count, err
+}
+
+func (a *Collector) countHTTPServers(ctx context.Context) (int, error) {
+	var count int64
+	err := a.doQueryRow(ctx, queryCountHTTPServers, func(column, value string) {
+		if column == "COUNT" {
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				count = v
+			}
+		}
+	})
+	return int(count), err
+}
+
+func withFetchLimit(query string, limit int) string {
+	if limit <= 0 {
+		return query
+	}
+	trimmed := strings.TrimSpace(query)
+	upper := strings.ToUpper(trimmed)
+	if strings.Contains(upper, "FETCH FIRST") {
+		return trimmed
+	}
+	return fmt.Sprintf("%s FETCH FIRST %d ROWS ONLY", trimmed, limit)
+}
+
+func (a *Collector) countSubsystems(ctx context.Context) (int, error) {
+	var count int64
+	err := a.doQueryRow(ctx, queryCountSubsystems, func(column, value string) {
+		if column == "COUNT" {
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				count = v
+			}
+		}
+	})
+	return int(count), err
+}
+
+func (a *Collector) countJobQueues(ctx context.Context) (int, error) {
+	var count int64
+	err := a.doQueryRow(ctx, queryCountJobQueues, func(column, value string) {
+		if column == "COUNT" {
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				count = v
+			}
+		}
+	})
+	return int(count), err
+}
+
 // Temporary storage collection
 func (a *Collector) collectTempStorage(ctx context.Context) error {
 	// Collect total temp storage
@@ -978,18 +756,37 @@ func (a *Collector) collectTempStorage(ctx context.Context) error {
 
 // Subsystems collection
 func (a *Collector) collectSubsystems(ctx context.Context) error {
+	query := querySubsystems
+	if a.MaxSubsystems > 0 {
+		if total, err := a.countSubsystems(ctx); err != nil {
+			a.logOnce("subsystem_count_failed", "failed to count subsystems before applying limit: %v", err)
+		} else if total > a.MaxSubsystems {
+			a.logOnce("subsystem_limit", "subsystem count (%d) exceeds limit (%d); truncating results", total, a.MaxSubsystems)
+		}
+		query = withFetchLimit(query, a.MaxSubsystems)
+	}
+
 	var currentSubsystem string
-	return a.doQuery(ctx, querySubsystems, func(column, value string, lineEnd bool) {
+	return a.doQuery(ctx, query, func(column, value string, lineEnd bool) {
 		switch column {
 		case "SUBSYSTEM_NAME":
-			currentSubsystem = value
+			name := strings.TrimSpace(value)
+			if name == "" {
+				currentSubsystem = ""
+				return
+			}
+			if a.subsystemSelector != nil && !a.subsystemSelector.MatchString(name) {
+				currentSubsystem = ""
+				return
+			}
+			currentSubsystem = name
 			subsystem := a.getSubsystemMetrics(currentSubsystem)
-			parts := strings.SplitN(value, "/", 2)
+			parts := strings.SplitN(name, "/", 2)
 			if len(parts) == 2 {
 				subsystem.library = parts[0]
 				subsystem.name = parts[1]
 			} else {
-				subsystem.name = value
+				subsystem.name = name
 				subsystem.library = ""
 			}
 			subsystem.status = "ACTIVE"
@@ -1018,23 +815,46 @@ func (a *Collector) collectSubsystems(ctx context.Context) error {
 			}
 			// Note: HELD_JOB_COUNT and STORAGE_USED_KB columns removed - they don't exist in SUBSYSTEM_INFO table
 		}
+
+		if lineEnd {
+			currentSubsystem = ""
+		}
 	})
 }
 
 // Job queues collection
 func (a *Collector) collectJobQueues(ctx context.Context) error {
+	query := queryJobQueues
+	if a.MaxJobQueues > 0 {
+		if total, err := a.countJobQueues(ctx); err != nil {
+			a.logOnce("job_queue_count_failed", "failed to count job queues before applying limit: %v", err)
+		} else if total > a.MaxJobQueues {
+			a.logOnce("job_queue_limit", "job queue count (%d) exceeds limit (%d); truncating results", total, a.MaxJobQueues)
+		}
+		query = withFetchLimit(query, a.MaxJobQueues)
+	}
+
 	var currentQueue string
-	return a.doQuery(ctx, queryJobQueues, func(column, value string, lineEnd bool) {
+	return a.doQuery(ctx, query, func(column, value string, lineEnd bool) {
 		switch column {
 		case "QUEUE_NAME":
-			currentQueue = value
+			name := strings.TrimSpace(value)
+			if name == "" {
+				currentQueue = ""
+				return
+			}
+			if a.jobQueueSelector != nil && !a.jobQueueSelector.MatchString(name) {
+				currentQueue = ""
+				return
+			}
+			currentQueue = name
 			queue := a.getJobQueueMetrics(currentQueue)
-			parts := strings.SplitN(value, "/", 2)
+			parts := strings.SplitN(name, "/", 2)
 			if len(parts) == 2 {
 				queue.library = parts[0]
 				queue.name = parts[1]
 			} else {
-				queue.name = value
+				queue.name = name
 				queue.library = ""
 			}
 			queue.status = "RELEASED"
@@ -1053,6 +873,10 @@ func (a *Collector) collectJobQueues(ctx context.Context) error {
 				}
 			}
 			// Note: HELD_JOB_COUNT column removed - it doesn't exist in JOB_QUEUE_INFO table
+		}
+
+		if lineEnd {
+			currentQueue = ""
 		}
 	})
 }
@@ -1225,82 +1049,272 @@ func (a *Collector) collectDiskInstancesEnhanced(ctx context.Context) error {
 }
 
 func (a *Collector) collectNetworkInterfaces(ctx context.Context) error {
-	// First check cardinality
-	var count int64
-	err := a.doQueryRow(ctx, queryCountNetworkInterfaces, func(column, value string) {
-		if column == "COUNT" {
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-				count = v
-			}
-		}
-	})
+	allowed, count, err := a.networkInterfacesCardinality.Allow(ctx, a.countNetworkInterfaces)
 	if err != nil {
 		return fmt.Errorf("failed to count network interfaces: %w", err)
 	}
-
-	if count > 50 { // Reasonable limit for network interfaces
-		a.Warningf("too many network interfaces (%d), skipping collection to avoid performance issues", count)
+	if !allowed {
+		a.logOnce("network_interfaces_cardinality", "too many network interfaces (%d), skipping collection to avoid performance issues", count)
 		return nil
 	}
 
-	// Collect interface data
-	rows, cancel, err := a.client.QueryRows(ctx, queryNetworkInterfaces)
+	var currentInterface string
+	return a.doQuery(ctx, queryNetworkInterfaces, func(column, value string, lineEnd bool) {
+		switch column {
+		case "LINE_DESCRIPTION":
+			iface := strings.TrimSpace(value)
+			if iface == "" {
+				currentInterface = ""
+				return
+			}
+			currentInterface = iface
+			intf := a.getNetworkInterfaceMetrics(currentInterface)
+			intf.name = iface
+
+		case "INTERFACE_LINE_TYPE":
+			if currentInterface == "" {
+				return
+			}
+			intf := a.getNetworkInterfaceMetrics(currentInterface)
+			intf.interfaceType = value
+			clean := cleanName(currentInterface)
+			entry := a.mx.networkInterfaces[clean]
+			entry.InterfaceType = value
+			a.mx.networkInterfaces[clean] = entry
+
+		case "INTERFACE_STATUS":
+			if currentInterface == "" {
+				return
+			}
+			intf := a.getNetworkInterfaceMetrics(currentInterface)
+			intf.interfaceStatus = value
+			clean := cleanName(currentInterface)
+			entry := a.mx.networkInterfaces[clean]
+			if strings.EqualFold(value, "ACTIVE") {
+				entry.InterfaceStatus = 1
+			} else {
+				entry.InterfaceStatus = 0
+			}
+			a.mx.networkInterfaces[clean] = entry
+
+		case "CONNECTION_TYPE":
+			if currentInterface == "" {
+				return
+			}
+			intf := a.getNetworkInterfaceMetrics(currentInterface)
+			intf.connectionType = value
+			clean := cleanName(currentInterface)
+			entry := a.mx.networkInterfaces[clean]
+			entry.ConnectionType = value
+			a.mx.networkInterfaces[clean] = entry
+
+		case "INTERNET_ADDRESS":
+			if currentInterface == "" {
+				return
+			}
+			intf := a.getNetworkInterfaceMetrics(currentInterface)
+			intf.internetAddress = value
+			clean := cleanName(currentInterface)
+			entry := a.mx.networkInterfaces[clean]
+			entry.InternetAddress = value
+			a.mx.networkInterfaces[clean] = entry
+
+		case "NETWORK_ADDRESS":
+			if currentInterface == "" {
+				return
+			}
+			intf := a.getNetworkInterfaceMetrics(currentInterface)
+			intf.networkAddress = value
+			clean := cleanName(currentInterface)
+			entry := a.mx.networkInterfaces[clean]
+			entry.NetworkAddress = value
+			a.mx.networkInterfaces[clean] = entry
+
+		case "MAXIMUM_TRANSMISSION_UNIT":
+			if currentInterface == "" {
+				return
+			}
+			intf := a.getNetworkInterfaceMetrics(currentInterface)
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				intf.mtu = v
+				clean := cleanName(currentInterface)
+				entry := a.mx.networkInterfaces[clean]
+				entry.MTU = v
+				a.mx.networkInterfaces[clean] = entry
+			}
+		}
+
+		if lineEnd {
+			currentInterface = ""
+		}
+	})
+}
+
+func (a *Collector) collectHTTPServerInfo(ctx context.Context) error {
+	if a.CollectHTTPServerMetrics != nil && !*a.CollectHTTPServerMetrics {
+		return nil
+	}
+
+	allowed, count, err := a.httpServersCardinality.Allow(ctx, a.countHTTPServers)
 	if err != nil {
-		return fmt.Errorf("failed to query network interfaces: %w", err)
+		return fmt.Errorf("failed to count HTTP server rows: %w", err)
 	}
-	defer cancel()
-	defer rows.Close()
-
-	for rows.Next() {
-		var lineDesc, interfaceType, interfaceStatus, connectionType string
-		var internetAddr, networkAddr string
-		var mtu int64
-
-		if err := rows.Scan(&lineDesc, &interfaceType, &interfaceStatus, &connectionType,
-			&internetAddr, &networkAddr, &mtu); err != nil {
-			a.Warningf("failed to scan network interface row: %v", err)
-			continue
-		}
-
-		// Get or create interface metrics
-		intf := a.getNetworkInterfaceMetrics(lineDesc)
-		intf.interfaceType = interfaceType
-		intf.interfaceStatus = interfaceStatus
-		intf.connectionType = connectionType
-		intf.internetAddress = internetAddr
-		intf.networkAddress = networkAddr
-		intf.subnetMask = "" // Not available in all IBM i versions
-		intf.mtu = mtu
-
-		// Set metrics in the map
-		cleanKey := cleanName(lineDesc)
-
-		// Interface status: 1 if ACTIVE, 0 otherwise
-		statusValue := int64(0)
-		if interfaceStatus == "ACTIVE" {
-			statusValue = 1
-		}
-
-		if a.mx.networkInterfaces == nil {
-			a.mx.networkInterfaces = make(map[string]networkInterfaceInstanceMetrics)
-		}
-
-		a.mx.networkInterfaces[cleanKey] = networkInterfaceInstanceMetrics{
-			InterfaceStatus: statusValue,
-			MTU:             mtu,
-			InterfaceType:   interfaceType,
-			ConnectionType:  connectionType,
-			InternetAddress: internetAddr,
-			NetworkAddress:  networkAddr,
-			SubnetMask:      "", // Not available in all IBM i versions
-		}
+	if !allowed {
+		a.logOnce("http_server_cardinality", "too many HTTP server entries (%d), skipping collection to avoid performance issues", count)
+		return nil
 	}
 
-	if err := rows.Err(); err != nil {
-		return fmt.Errorf("error iterating network interface rows: %w", err)
+	var (
+		serverName   string
+		functionName string
+		currentKey   string
+	)
+
+	return a.doQuery(ctx, queryHTTPServerInfo, func(column, value string, lineEnd bool) {
+		switch column {
+		case "SERVER_NAME":
+			serverName = strings.TrimSpace(value)
+		case "HTTP_FUNCTION":
+			functionName = strings.TrimSpace(value)
+			if serverName == "" {
+				serverName = "UNKNOWN"
+			}
+			if functionName == "" {
+				functionName = "UNKNOWN"
+			}
+			currentKey = httpServerKey(serverName, functionName)
+			if meta := a.getHTTPServerMetrics(serverName, functionName); meta != nil {
+				meta.serverName = serverName
+				meta.httpFunction = functionName
+			}
+		case "SERVER_NORMAL_CONNECTIONS":
+			if currentKey == "" {
+				return
+			}
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				entry := a.mx.httpServers[currentKey]
+				entry.NormalConnections = v
+				a.mx.httpServers[currentKey] = entry
+			}
+		case "SERVER_SSL_CONNECTIONS":
+			if currentKey == "" {
+				return
+			}
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				entry := a.mx.httpServers[currentKey]
+				entry.SSLConnections = v
+				a.mx.httpServers[currentKey] = entry
+			}
+		case "SERVER_ACTIVE_THREADS":
+			if currentKey == "" {
+				return
+			}
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				entry := a.mx.httpServers[currentKey]
+				entry.ActiveThreads = v
+				a.mx.httpServers[currentKey] = entry
+			}
+		case "SERVER_IDLE_THREADS":
+			if currentKey == "" {
+				return
+			}
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				entry := a.mx.httpServers[currentKey]
+				entry.IdleThreads = v
+				a.mx.httpServers[currentKey] = entry
+			}
+		case "SERVER_TOTAL_REQUESTS":
+			if currentKey == "" {
+				return
+			}
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				entry := a.mx.httpServers[currentKey]
+				entry.TotalRequests = v
+				a.mx.httpServers[currentKey] = entry
+			}
+		case "SERVER_TOTAL_RESPONSES":
+			if currentKey == "" {
+				return
+			}
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				entry := a.mx.httpServers[currentKey]
+				entry.TotalResponses = v
+				a.mx.httpServers[currentKey] = entry
+			}
+		case "SERVER_TOTAL_REQUESTS_REJECTED":
+			if currentKey == "" {
+				return
+			}
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				entry := a.mx.httpServers[currentKey]
+				entry.TotalRequestsRejected = v
+				a.mx.httpServers[currentKey] = entry
+			}
+		case "BYTES_RECEIVED":
+			if currentKey == "" {
+				return
+			}
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				entry := a.mx.httpServers[currentKey]
+				entry.BytesReceived = v
+				a.mx.httpServers[currentKey] = entry
+			}
+		case "BYTES_SENT":
+			if currentKey == "" {
+				return
+			}
+			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				entry := a.mx.httpServers[currentKey]
+				entry.BytesSent = v
+				a.mx.httpServers[currentKey] = entry
+			}
+		}
+
+		if lineEnd {
+			serverName = ""
+			functionName = ""
+			currentKey = ""
+		}
+	})
+}
+
+func (a *Collector) collectPlanCache(ctx context.Context) error {
+	if a.CollectPlanCacheMetrics != nil && !*a.CollectPlanCacheMetrics {
+		return nil
 	}
 
-	return nil
+	start := time.Now()
+	if err := a.client.Exec(ctx, callAnalyzePlanCache); err != nil {
+		return fmt.Errorf("failed to analyze plan cache: %w", err)
+	}
+	a.Debugf("plan cache analysis completed in %v", time.Since(start))
+
+	var currentHeading string
+	return a.doQuery(ctx, queryPlanCacheSummary, func(column, value string, lineEnd bool) {
+		switch column {
+		case "HEADING":
+			currentHeading = strings.TrimSpace(value)
+		case "VALUE":
+			if currentHeading == "" {
+				return
+			}
+			key := planCacheMetricKey(currentHeading)
+			if key == "" {
+				return
+			}
+			if parsed, ok := parseNumericValue(value, precision); ok {
+				if meta := a.getPlanCacheMetrics(key, currentHeading); meta != nil {
+					meta.heading = currentHeading
+				}
+				entry := a.mx.planCache[key]
+				entry.Value = parsed
+				a.mx.planCache[key] = entry
+			}
+		}
+		if lineEnd {
+			currentHeading = ""
+		}
+	})
 }
 
 func (a *Collector) collectSystemActivity(ctx context.Context) error {

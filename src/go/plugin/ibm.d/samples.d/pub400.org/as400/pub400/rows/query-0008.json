@@ -1,0 +1,16 @@
+{
+  "columns": [
+    "REMOTE_CONNECTIONS",
+    "TOTAL_CONNECTIONS",
+    "LISTEN_CONNECTIONS",
+    "CLOSEWAIT_CONNECTIONS"
+  ],
+  "rows": [
+    {
+      "CLOSEWAIT_CONNECTIONS": "0",
+      "LISTEN_CONNECTIONS": "71",
+      "REMOTE_CONNECTIONS": "124",
+      "TOTAL_CONNECTIONS": "24"
+    }
+  ]
+}

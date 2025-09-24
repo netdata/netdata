@@ -3,7 +3,10 @@
 package agent
 
 import (
+	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -14,9 +17,14 @@ import (
 
 // DumpAnalyzer collects and analyzes metric structure from dump mode
 type DumpAnalyzer struct {
-	mu        sync.RWMutex
-	jobs      map[string]*JobAnalysis // key: job name
-	startTime time.Time
+	mu         sync.RWMutex
+	jobs       map[string]*JobAnalysis // key: job name
+	startTime  time.Time
+	dataDir    string
+	jobDirs    map[string]string
+	jobDone    map[string]bool
+	onComplete func()
+	completed  bool
 }
 
 // JobAnalysis holds analysis for a single job
@@ -41,7 +49,39 @@ func NewDumpAnalyzer() *DumpAnalyzer {
 	return &DumpAnalyzer{
 		jobs:      make(map[string]*JobAnalysis),
 		startTime: time.Now(),
+		jobDirs:   make(map[string]string),
+		jobDone:   make(map[string]bool),
 	}
+}
+
+// EnableDataCapture configures the analyzer to persist dump artifacts.
+func (da *DumpAnalyzer) EnableDataCapture(dir string, onComplete func()) {
+	da.mu.Lock()
+	defer da.mu.Unlock()
+	da.dataDir = dir
+	da.onComplete = onComplete
+}
+
+// RegisterJob registers directory info for a job.
+func (da *DumpAnalyzer) RegisterJob(jobName, moduleName, dir string) {
+	da.mu.Lock()
+	defer da.mu.Unlock()
+	if dir == "" {
+		return
+	}
+	if da.jobDirs == nil {
+		da.jobDirs = make(map[string]string)
+	}
+	da.jobDirs[jobName] = dir
+	if da.jobDone == nil {
+		da.jobDone = make(map[string]bool)
+	}
+	da.jobDone[jobName] = false
+	// Ensure expected sub-directories exist
+	_ = os.MkdirAll(filepath.Join(dir, "queries"), 0o755)
+	_ = os.MkdirAll(filepath.Join(dir, "rows"), 0o755)
+	_ = os.MkdirAll(filepath.Join(dir, "metrics"), 0o755)
+	_ = os.MkdirAll(filepath.Join(dir, "meta"), 0o755)
 }
 
 // RecordJobStructure records the initial chart structure for a job
@@ -74,6 +114,7 @@ func (da *DumpAnalyzer) RecordJobStructure(jobName, moduleName string, charts *m
 	}
 
 	da.jobs[jobName] = job
+	da.writeJobMetadata(jobName, moduleName)
 }
 
 // UpdateJobStructure updates the chart structure for a job with current charts
@@ -162,6 +203,9 @@ func (da *DumpAnalyzer) RecordCollection(jobName string, mx map[string]int64) {
 			}
 		}
 	}
+
+	da.writeMetrics(jobName, job.CollectionCount, mx)
+	da.markJobCollected(jobName)
 }
 
 // PrintReport prints the analysis report
@@ -375,6 +419,118 @@ func (da *DumpAnalyzer) PrintSummary() {
 	if len(families) > 0 {
 		fmt.Println("└─────────────────────────────────────────────────────────────")
 	}
+}
+
+func (da *DumpAnalyzer) writeJobMetadata(jobName, moduleName string) {
+	if da.dataDir == "" {
+		return
+	}
+	dir, ok := da.jobDirs[jobName]
+	if !ok || dir == "" {
+		return
+	}
+	meta := struct {
+		Job      string            `json:"job"`
+		Module   string            `json:"module"`
+		Created  time.Time         `json:"created_at"`
+		Metadata map[string]string `json:"metadata"`
+	}{
+		Job:     jobName,
+		Module:  moduleName,
+		Created: time.Now(),
+		Metadata: map[string]string{
+			"module": moduleName,
+		},
+	}
+	path := filepath.Join(dir, "meta", "job.json")
+	_ = writeJSON(path, meta)
+}
+
+func (da *DumpAnalyzer) writeMetrics(jobName string, seq int, mx map[string]int64) {
+	if da.dataDir == "" {
+		return
+	}
+	dir, ok := da.jobDirs[jobName]
+	if !ok || dir == "" {
+		return
+	}
+	metricsDir := filepath.Join(dir, "metrics")
+	_ = os.MkdirAll(metricsDir, 0o755)
+	payload := struct {
+		CollectedAt time.Time        `json:"collected_at"`
+		Metrics     map[string]int64 `json:"metrics"`
+	}{
+		CollectedAt: time.Now(),
+		Metrics:     mx,
+	}
+	filename := fmt.Sprintf("metrics-%04d.json", seq)
+	path := filepath.Join(metricsDir, filename)
+	_ = writeJSON(path, payload)
+}
+
+func (da *DumpAnalyzer) markJobCollected(jobName string) {
+	if da.dataDir == "" {
+		return
+	}
+	if da.jobDone == nil {
+		return
+	}
+	da.jobDone[jobName] = true
+	for job, dir := range da.jobDirs {
+		if dir == "" {
+			continue
+		}
+		if !da.jobDone[job] {
+			return
+		}
+	}
+	if da.completed {
+		return
+	}
+	da.completed = true
+	da.writeManifest()
+	if da.onComplete != nil {
+		go da.onComplete()
+	}
+}
+
+func (da *DumpAnalyzer) writeManifest() {
+	if da.dataDir == "" {
+		return
+	}
+	type manifestJob struct {
+		Name        string `json:"name"`
+		Module      string `json:"module"`
+		Directory   string `json:"directory"`
+		Collections int    `json:"collections"`
+	}
+	var jobs []manifestJob
+	for name, job := range da.jobs {
+		dir := da.jobDirs[name]
+		jobs = append(jobs, manifestJob{
+			Name:        name,
+			Module:      job.Module,
+			Directory:   dir,
+			Collections: job.CollectionCount,
+		})
+	}
+	sort.Slice(jobs, func(i, j int) bool { return jobs[i].Name < jobs[j].Name })
+	manifest := struct {
+		GeneratedAt time.Time     `json:"generated_at"`
+		Jobs        []manifestJob `json:"jobs"`
+	}{
+		GeneratedAt: time.Now(),
+		Jobs:        jobs,
+	}
+	_ = writeJSON(filepath.Join(da.dataDir, "manifest.json"), manifest)
+}
+
+func writeJSON(path string, payload any) error {
+	data, err := json.MarshalIndent(payload, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, data, 0o644)
 }
 
 // contextInfo holds information about a context within a family

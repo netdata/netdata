@@ -31,15 +31,15 @@ func (a *Collector) collectActiveJobs(ctx context.Context) error {
 		return nil
 	}
 
-	// First check cardinality if we haven't yet
-	if len(a.activeJobs) == 0 && a.MaxActiveJobs > 0 {
-		count, err := a.countActiveJobs(ctx)
-		if err != nil {
-			return fmt.Errorf("failed to count active jobs: %v", err)
-		}
-		a.Debugf("Found %d active jobs in system", count)
-		// We'll collect only top N by CPU usage
+	allowed, count, err := a.activeJobsCardinality.Allow(ctx, a.countActiveJobs)
+	if err != nil {
+		return fmt.Errorf("failed to count active jobs: %v", err)
 	}
+	if !allowed {
+		a.logOnce("active_jobs_cardinality", "active jobs (%d) exceed configured limit (%d), skipping detailed collection", count, a.MaxActiveJobs)
+		return nil
+	}
+	a.Debugf("Found %d active jobs in system", count)
 
 	// Query for top active jobs by CPU usage
 	query := fmt.Sprintf(queryTopActiveJobs, a.MaxActiveJobs)
@@ -48,7 +48,7 @@ func (a *Collector) collectActiveJobs(ctx context.Context) error {
 		currentJobName string
 		currentJob     *activeJobMetrics
 	)
-	err := a.doQuery(ctx, query, func(column, value string, lineEnd bool) {
+	err = a.doQuery(ctx, query, func(column, value string, lineEnd bool) {
 		switch column {
 		case "JOB_NAME":
 			currentJobName = value

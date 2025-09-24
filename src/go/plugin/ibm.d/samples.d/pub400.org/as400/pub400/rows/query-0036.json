@@ -1,0 +1,22 @@
+{
+  "columns": [
+    "LINE_DESCRIPTION",
+    "INTERFACE_LINE_TYPE",
+    "INTERFACE_STATUS",
+    "CONNECTION_TYPE",
+    "INTERNET_ADDRESS",
+    "NETWORK_ADDRESS",
+    "MTU"
+  ],
+  "rows": [
+    {
+      "CONNECTION_TYPE": "IPV4",
+      "INTERFACE_LINE_TYPE": "VETH",
+      "INTERFACE_STATUS": "ACTIVE",
+      "INTERNET_ADDRESS": "185.113.5.134",
+      "LINE_DESCRIPTION": "LINETH2",
+      "MTU": "220",
+      "NETWORK_ADDRESS": "185.113.5.0"
+    }
+  ]
+}

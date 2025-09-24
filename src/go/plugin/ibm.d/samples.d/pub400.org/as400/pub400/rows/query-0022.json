@@ -1,0 +1,128 @@
+{
+  "columns": [
+    "SYSTEM_VALUE_NAME",
+    "CURRENT_NUMERIC_VALUE"
+  ],
+  "rows": [
+    {
+      "CURRENT_NUMERIC_VALUE": "24",
+      "SYSTEM_VALUE_NAME": "QJOBMSGQTL"
+    },
+    {
+      "CURRENT_NUMERIC_VALUE": "16",
+      "SYSTEM_VALUE_NAME": "QJOBMSGQSZ"
+    },
+    {
+      "CURRENT_NUMERIC_VALUE": "255",
+      "SYSTEM_VALUE_NAME": "QHSTLOGSIZ"
+    },
+    {
+      "CURRENT_NUMERIC_VALUE": "132",
+      "SYSTEM_VALUE_NAME": "QPWRDWNLMT"
+    },
+    {
+      "CURRENT_NUMERIC_VALUE": "255",
+      "SYSTEM_VALUE_NAME": "QMAXACTLVL"
+    },
+    {
+      "CURRENT_NUMERIC_VALUE": "168",
+      "SYSTEM_VALUE_NAME": "QBASACTLVL"
+    },
+    {
+      "CURRENT_NUMERIC_VALUE": "0",
+      "SYSTEM_VALUE_NAME": "QMCHPOOL"
+    },
+    {
+      "CURRENT_NUMERIC_VALUE": "102",
+      "SYSTEM_VALUE_NAME": "QBASPOOL"
+    },
+    {
+      "CURRENT_NUMERIC_VALUE": "232",
+      "SYSTEM_VALUE_NAME": "QTOTJOB"
+    },
+    {
+      "CURRENT_NUMERIC_VALUE": "10",
+      "SYSTEM_VALUE_NAME": "QADLTOTJ"
+    },
+    {
+      "CURRENT_NUMERIC_VALUE": "244",
+      "SYSTEM_VALUE_NAME": "QACTJOB"
+    },
+    {
+      "CURRENT_NUMERIC_VALUE": "30",
+      "SYSTEM_VALUE_NAME": "QADLACTJ"
+    },
+    {
+      "CURRENT_NUMERIC_VALUE": "188",
+      "SYSTEM_VALUE_NAME": "QJOBSPLA"
+    },
+    {
+      "CURRENT_NUMERIC_VALUE": "0",
+      "SYSTEM_VALUE_NAME": "QADLSPLA"
+    },
+    {
+      "CURRENT_NUMERIC_VALUE": "0",
+      "SYSTEM_VALUE_NAME": "QLEAPADJ"
+    },
+    {
+      "CURRENT_NUMERIC_VALUE": "255",
+      "SYSTEM_VALUE_NAME": "QAUTOVRT"
+    },
+    {
+      "CURRENT_NUMERIC_VALUE": "6",
+      "SYSTEM_VALUE_NAME": "QPWDMINLEN"
+    },
+    {
+      "CURRENT_NUMERIC_VALUE": "128",
+      "SYSTEM_VALUE_NAME": "QPWDMAXLEN"
+    },
+    {
+      "CURRENT_NUMERIC_VALUE": "0",
+      "SYSTEM_VALUE_NAME": "QPRBHLDITV"
+    },
+    {
+      "CURRENT_NUMERIC_VALUE": "17",
+      "SYSTEM_VALUE_NAME": "QCCSID"
+    },
+    {
+      "CURRENT_NUMERIC_VALUE": "16",
+      "SYSTEM_VALUE_NAME": "QJOBMSGQMX"
+    },
+    {
+      "CURRENT_NUMERIC_VALUE": "255",
+      "SYSTEM_VALUE_NAME": "QAUDFRCLVL"
+    },
+    {
+      "CURRENT_NUMERIC_VALUE": "64",
+      "SYSTEM_VALUE_NAME": "QSVRAUTITV"
+    },
+    {
+      "CURRENT_NUMERIC_VALUE": "80",
+      "SYSTEM_VALUE_NAME": "QSTGLOWLMT"
+    },
+    {
+      "CURRENT_NUMERIC_VALUE": "0",
+      "SYSTEM_VALUE_NAME": "QIGCFNTSIZ"
+    },
+    {
+      "CURRENT_NUMERIC_VALUE": "16",
+      "SYSTEM_VALUE_NAME": "QMAXJOB"
+    },
+    {
+      "CURRENT_NUMERIC_VALUE": "159",
+      "SYSTEM_VALUE_NAME": "QMAXSPLF"
+    },
+    {
+      "CURRENT_NUMERIC_VALUE": "3",
+      "SYSTEM_VALUE_NAME": "QPWDLVL"
+    },
+    {
+      "CURRENT_NUMERIC_VALUE": "120",
+      "SYSTEM_VALUE_NAME": "QENDJOBLMT"
+    },
+    {
+      "CURRENT_NUMERIC_VALUE": "7",
+      "SYSTEM_VALUE_NAME": "QPWDEXPWRN"
+    }
+  ]
+}

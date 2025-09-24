@@ -717,6 +717,258 @@ var Disk = struct {
 	},
 }
 
+// --- HTTPServer ---
+
+// HTTPServerConnectionsValues defines the type-safe values for HTTPServer.Connections context
+type HTTPServerConnectionsValues struct {
+	Normal int64
+	Ssl    int64
+}
+
+// HTTPServerConnectionsContext provides type-safe operations for HTTPServer.Connections context
+type HTTPServerConnectionsContext struct {
+	framework.Context[HTTPServerLabels]
+}
+
+// Set provides type-safe dimension setting for HTTPServer.Connections context
+func (c HTTPServerConnectionsContext) Set(state *framework.CollectorState, labels HTTPServerLabels, values HTTPServerConnectionsValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"normal": values.Normal,
+		"ssl":    values.Ssl,
+	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c HTTPServerConnectionsContext) SetUpdateEvery(state *framework.CollectorState, labels HTTPServerLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
+// HTTPServerThreadsValues defines the type-safe values for HTTPServer.Threads context
+type HTTPServerThreadsValues struct {
+	Active int64
+	Idle   int64
+}
+
+// HTTPServerThreadsContext provides type-safe operations for HTTPServer.Threads context
+type HTTPServerThreadsContext struct {
+	framework.Context[HTTPServerLabels]
+}
+
+// Set provides type-safe dimension setting for HTTPServer.Threads context
+func (c HTTPServerThreadsContext) Set(state *framework.CollectorState, labels HTTPServerLabels, values HTTPServerThreadsValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"active": values.Active,
+		"idle":   values.Idle,
+	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c HTTPServerThreadsContext) SetUpdateEvery(state *framework.CollectorState, labels HTTPServerLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
+// HTTPServerRequestsValues defines the type-safe values for HTTPServer.Requests context
+type HTTPServerRequestsValues struct {
+	Requests  int64
+	Responses int64
+	Rejected  int64
+}
+
+// HTTPServerRequestsContext provides type-safe operations for HTTPServer.Requests context
+type HTTPServerRequestsContext struct {
+	framework.Context[HTTPServerLabels]
+}
+
+// Set provides type-safe dimension setting for HTTPServer.Requests context
+func (c HTTPServerRequestsContext) Set(state *framework.CollectorState, labels HTTPServerLabels, values HTTPServerRequestsValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"requests":  values.Requests,
+		"responses": values.Responses,
+		"rejected":  values.Rejected,
+	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c HTTPServerRequestsContext) SetUpdateEvery(state *framework.CollectorState, labels HTTPServerLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
+// HTTPServerBytesValues defines the type-safe values for HTTPServer.Bytes context
+type HTTPServerBytesValues struct {
+	Received int64
+	Sent     int64
+}
+
+// HTTPServerBytesContext provides type-safe operations for HTTPServer.Bytes context
+type HTTPServerBytesContext struct {
+	framework.Context[HTTPServerLabels]
+}
+
+// Set provides type-safe dimension setting for HTTPServer.Bytes context
+func (c HTTPServerBytesContext) Set(state *framework.CollectorState, labels HTTPServerLabels, values HTTPServerBytesValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"received": values.Received,
+		"sent":     values.Sent,
+	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c HTTPServerBytesContext) SetUpdateEvery(state *framework.CollectorState, labels HTTPServerLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
+// HTTPServerLabels defines the required labels for HTTPServer contexts
+type HTTPServerLabels struct {
+	Server   string
+	Function string
+}
+
+// InstanceID generates a unique instance ID using the hardcoded label order from YAML
+func (l HTTPServerLabels) InstanceID(contextName string) string {
+	// Label order from YAML: server, function
+	return contextName + "." + cleanLabelValue(l.Server) + "_" + cleanLabelValue(l.Function)
+}
+
+// HTTPServer contains all metric contexts for HTTPServer
+var HTTPServer = struct {
+	Connections HTTPServerConnectionsContext
+	Threads     HTTPServerThreadsContext
+	Requests    HTTPServerRequestsContext
+	Bytes       HTTPServerBytesContext
+}{
+	Connections: HTTPServerConnectionsContext{
+		Context: framework.Context[HTTPServerLabels]{
+			Name:        "as400.http_server_connections",
+			Family:      "network/http",
+			Title:       "HTTP Server Connections",
+			Units:       "connections",
+			Type:        module.Line,
+			Priority:    601,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "normal",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "ssl",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+			},
+			LabelKeys: []string{
+				"server",
+				"function",
+			},
+		},
+	},
+	Threads: HTTPServerThreadsContext{
+		Context: framework.Context[HTTPServerLabels]{
+			Name:        "as400.http_server_threads",
+			Family:      "network/http",
+			Title:       "HTTP Server Threads",
+			Units:       "threads",
+			Type:        module.Line,
+			Priority:    602,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "active",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "idle",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+			},
+			LabelKeys: []string{
+				"server",
+				"function",
+			},
+		},
+	},
+	Requests: HTTPServerRequestsContext{
+		Context: framework.Context[HTTPServerLabels]{
+			Name:        "as400.http_server_requests",
+			Family:      "network/http",
+			Title:       "HTTP Server Requests",
+			Units:       "requests/s",
+			Type:        module.Area,
+			Priority:    603,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "requests",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "responses",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "rejected",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+			},
+			LabelKeys: []string{
+				"server",
+				"function",
+			},
+		},
+	},
+	Bytes: HTTPServerBytesContext{
+		Context: framework.Context[HTTPServerLabels]{
+			Name:        "as400.http_server_bytes",
+			Family:      "network/http",
+			Title:       "HTTP Server Throughput",
+			Units:       "bytes/s",
+			Type:        module.Area,
+			Priority:    604,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "received",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "sent",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+			},
+			LabelKeys: []string{
+				"server",
+				"function",
+			},
+		},
+	},
+}
+
 // --- JobQueue ---
 
 // JobQueueLengthValues defines the type-safe values for JobQueue.Length context
@@ -905,6 +1157,70 @@ var NetworkInterface = struct {
 				"internet_address",
 				"network_address",
 				"subnet_mask",
+			},
+		},
+	},
+}
+
+// --- PlanCache ---
+
+// PlanCacheSummaryValues defines the type-safe values for PlanCache.Summary context
+type PlanCacheSummaryValues struct {
+	Value int64
+}
+
+// PlanCacheSummaryContext provides type-safe operations for PlanCache.Summary context
+type PlanCacheSummaryContext struct {
+	framework.Context[PlanCacheLabels]
+}
+
+// Set provides type-safe dimension setting for PlanCache.Summary context
+func (c PlanCacheSummaryContext) Set(state *framework.CollectorState, labels PlanCacheLabels, values PlanCacheSummaryValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"value": values.Value,
+	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c PlanCacheSummaryContext) SetUpdateEvery(state *framework.CollectorState, labels PlanCacheLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
+// PlanCacheLabels defines the required labels for PlanCache contexts
+type PlanCacheLabels struct {
+	Metric string
+}
+
+// InstanceID generates a unique instance ID using the hardcoded label order from YAML
+func (l PlanCacheLabels) InstanceID(contextName string) string {
+	// Label order from YAML: metric
+	return contextName + "." + cleanLabelValue(l.Metric)
+}
+
+// PlanCache contains all metric contexts for PlanCache
+var PlanCache = struct {
+	Summary PlanCacheSummaryContext
+}{
+	Summary: PlanCacheSummaryContext{
+		Context: framework.Context[PlanCacheLabels]{
+			Name:        "as400.plan_cache_summary",
+			Family:      "database/cache",
+			Title:       "Plan Cache Summary",
+			Units:       "value",
+			Type:        module.Line,
+			Priority:    802,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "value",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1000,
+					Precision: 1,
+				},
+			},
+			LabelKeys: []string{
+				"metric",
 			},
 		},
 	},
@@ -2238,9 +2554,14 @@ func GetAllContexts() []interface{} {
 		&Disk.Blocks.Context,
 		&Disk.SSDHealth.Context,
 		&Disk.SSDPowerOn.Context,
+		&HTTPServer.Connections.Context,
+		&HTTPServer.Threads.Context,
+		&HTTPServer.Requests.Context,
+		&HTTPServer.Bytes.Context,
 		&JobQueue.Length.Context,
 		&NetworkInterface.Status.Context,
 		&NetworkInterface.MTU.Context,
+		&PlanCache.Summary.Context,
 		&Subsystem.Jobs.Context,
 		&System.CPUUtilization.Context,
 		&System.CPUDetails.Context,

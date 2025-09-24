@@ -6,13 +6,14 @@
 package as400
 
 const (
-	// VERIFIED: Comprehensive system status query - works on both IBM i 7.4 and pub400.com
-	// This is the primary source for all system-level metrics
-	querySystemStatus = `SELECT * FROM TABLE(QSYS2.SYSTEM_STATUS(RESET_STATISTICS=>'YES',DETAILED_INFO=>'ALL')) X`
+	// VERIFIED: Comprehensive system status queries - works on IBM i 7.4+
+	// The reset variant matches legacy behaviour but clears global statistics.
+	querySystemStatusReset   = `SELECT * FROM TABLE(QSYS2.SYSTEM_STATUS(RESET_STATISTICS=>'YES',DETAILED_INFO=>'ALL')) X`
+	querySystemStatusNoReset = `SELECT * FROM TABLE(QSYS2.SYSTEM_STATUS(RESET_STATISTICS=>'NO',DETAILED_INFO=>'ALL')) X`
 
 	// VERIFIED: Memory pool monitoring using MEMORY_POOL() function
-	// Works on both IBM i 7.4 and pub400.com - only use verified columns
-	queryMemoryPools = `
+	// The reset variant matches legacy behaviour; NO leaves system statistics intact.
+	queryMemoryPoolsReset = `
 		SELECT 
 			POOL_NAME,
 			CURRENT_SIZE,
@@ -21,6 +22,17 @@ const (
 			CURRENT_THREADS,
 			MAXIMUM_ACTIVE_THREADS
 		FROM TABLE(QSYS2.MEMORY_POOL(RESET_STATISTICS=>'YES')) X
+		WHERE POOL_NAME IN ('*MACHINE', '*BASE', '*INTERACT', '*SPOOL')
+	`
+	queryMemoryPoolsNoReset = `
+		SELECT 
+			POOL_NAME,
+			CURRENT_SIZE,
+			DEFINED_SIZE,
+			RESERVED_SIZE,
+			CURRENT_THREADS,
+			MAXIMUM_ACTIVE_THREADS
+		FROM TABLE(QSYS2.MEMORY_POOL(RESET_STATISTICS=>'NO')) X
 		WHERE POOL_NAME IN ('*MACHINE', '*BASE', '*INTERACT', '*SPOOL')
 	`
 
@@ -115,6 +127,33 @@ const (
 		WHERE LINE_DESCRIPTION != '*LOOPBACK'
 	`
 
+	// HTTP server monitoring
+	queryHTTPServerInfo = `
+		SELECT
+			SERVER_NAME,
+			HTTP_FUNCTION,
+			SERVER_NORMAL_CONNECTIONS,
+			SERVER_SSL_CONNECTIONS,
+			SERVER_ACTIVE_THREADS,
+			SERVER_IDLE_THREADS,
+			SERVER_TOTAL_REQUESTS,
+			SERVER_TOTAL_RESPONSES,
+			SERVER_TOTAL_REQUESTS_REJECTED,
+			REQUESTS,
+			RESPONSES,
+			NONCACHE_RESPONSES,
+			BYTES_RECEIVED,
+			BYTES_SENT,
+			NONCACHE_PROCESSING_TIME,
+			CACHE_PROCESSING_TIME
+		FROM QSYS2.HTTP_SERVER_INFO
+	`
+
+	queryCountHTTPServers = `
+		SELECT COUNT(*) as COUNT
+		FROM QSYS2.HTTP_SERVER_INFO
+	`
+
 	// VERIFIED: Temporary storage monitoring
 	// Works on both IBM i 7.4 and pub400.com
 	queryTempStorageTotal = `
@@ -147,6 +186,12 @@ const (
 		ORDER BY CURRENT_ACTIVE_JOBS DESC
 	`
 
+	queryCountSubsystems = `
+		SELECT COUNT(*) as COUNT
+		FROM QSYS2.SUBSYSTEM_INFO
+		WHERE STATUS = 'ACTIVE'
+	`
+
 	// VERIFIED: Job queue monitoring
 	// Works on both IBM i 7.4 and pub400.com
 	// Note: HELD_JOB_COUNT column doesn't exist, removed per AS400.md verification
@@ -157,6 +202,12 @@ const (
 		FROM QSYS2.JOB_QUEUE_INFO
 		WHERE JOB_QUEUE_STATUS = 'RELEASED'
 		ORDER BY NUMBER_OF_JOBS DESC
+	`
+
+	queryCountJobQueues = `
+		SELECT COUNT(*) as COUNT
+		FROM QSYS2.JOB_QUEUE_INFO
+		WHERE JOB_QUEUE_STATUS = 'RELEASED'
 	`
 
 	// Enhanced disk query with all metrics
@@ -228,4 +279,14 @@ const (
 	// - SYSFUNCS (ROUTINE_TYPE column doesn't exist)
 	// - All CPU utilization breakdown columns (don't exist)
 	// - All advanced disk columns (don't exist)
+
+	// Plan cache analysis
+	callAnalyzePlanCache  = `CALL QSYS2.ANALYZE_PLAN_CACHE('03', '', '', BX'', '%')`
+	queryPlanCacheSummary = `
+		SELECT 
+			HEADING,
+			VALUE
+		FROM QTEMP.QDBOP00003
+		WHERE VALUE IS NOT NULL
+	`
 )

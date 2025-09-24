@@ -5,6 +5,14 @@
 Monitors IBM i (AS/400) systems using SQL services and CL commands to
 expose CPU, memory, storage, job, and subsystem activity.
 
+**Dependencies:**
+- unixODBC 2.3+ with IBM i Access ODBC driver
+- IBM i 7.2 or later with SQL services enabled
+
+**Required Libraries:**
+- libodbc.so (provided by unixODBC)
+- IBM i Access Client Solutions
+
 
 This collector is part of the [Netdata](https://github.com/netdata/netdata) monitoring solution.
 
@@ -100,6 +108,26 @@ Metrics:
 | as400.disk_ssd_health | life_remaining | percentage |
 | as400.disk_ssd_age | power_on_days | days |
 
+### Per httpserver
+
+These metrics refer to individual httpserver instances.
+
+Labels:
+
+| Label | Description |
+|:------|:------------|
+| server | Server identifier |
+| function | Function identifier |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:-------|:-----------|:-----|
+| as400.http_server_connections | normal, ssl | connections |
+| as400.http_server_threads | active, idle | threads |
+| as400.http_server_requests | requests, responses, rejected | requests/s |
+| as400.http_server_bytes | received, sent | bytes/s |
+
 ### Per jobqueue
 
 These metrics refer to individual jobqueue instances.
@@ -139,6 +167,22 @@ Metrics:
 |:-------|:-----------|:-----|
 | as400.network_interface_status | active | status |
 | as400.network_interface_mtu | mtu | bytes |
+
+### Per plancache
+
+These metrics refer to individual plancache instances.
+
+Labels:
+
+| Label | Description |
+|:------|:------------|
+| metric | Metric identifier |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:-------|:-----------|:-----|
+| as400.plan_cache_summary | value | value |
 
 ### Per subsystem
 
@@ -195,7 +239,7 @@ The following options can be defined globally or per job.
 
 | Name | Description | Default | Required | Min | Max |
 |:-----|:------------|:--------|:---------|:----|:----|
-| update_every | Data collection frequency | `1` | no | 1 | - |
+| update_every | Data collection frequency | `10` | no | 1 | - |
 | Vnode | Vnode allows binding the collector to a virtual node. | `` | no | - | - |
 | DSN | DSN provides a full IBM i ODBC connection string if manual override is needed. | `` | no | - | - |
 | Timeout | Timeout controls how long to wait for SQL statements and RPCs. | `<no value>` | no | - | - |
@@ -209,10 +253,13 @@ The following options can be defined globally or per job.
 | ConnectionType | ConnectionType selects how the collector connects (currently only "odbc"). | `odbc` | no | - | - |
 | ODBCDriver | ODBCDriver specifies the driver name registered on the host. | `IBM i Access ODBC Driver` | no | - | - |
 | UseSSL | UseSSL enables TLS for the ODBC connection when supported by the driver. | `false` | no | - | - |
+| ResetStatistics | ResetStatistics toggles destructive SQL services that reset system statistics on each query. | `false` | no | - | - |
 | CollectDiskMetrics | CollectDiskMetrics toggles collection of disk unit statistics. | `<auto>` | no | - | - |
 | CollectSubsystemMetrics | CollectSubsystemMetrics toggles collection of subsystem activity metrics. | `<auto>` | no | - | - |
 | CollectJobQueueMetrics | CollectJobQueueMetrics toggles collection of job queue backlog metrics. | `<auto>` | no | - | - |
 | CollectActiveJobs | CollectActiveJobs toggles collection of detailed per-job metrics. | `<auto>` | no | - | - |
+| CollectHTTPServerMetrics | CollectHTTPServerMetrics toggles collection of IBM HTTP Server statistics. | `<auto>` | no | - | - |
+| CollectPlanCacheMetrics | CollectPlanCacheMetrics toggles collection of plan cache analysis metrics. | `<auto>` | no | - | - |
 | MaxDisks | MaxDisks caps how many disk units may be charted. | `100` | no | - | - |
 | MaxSubsystems | MaxSubsystems caps how many subsystems may be charted. | `100` | no | - | - |
 | MaxJobQueues | MaxJobQueues caps how many job queues may be charted. | `100` | no | - | - |

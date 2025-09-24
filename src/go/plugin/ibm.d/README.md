@@ -38,6 +38,7 @@ The build target downloads the driver if it is not already present; see the pack
 - The plugin reads `/etc/netdata/ibm.d.conf` for global settings and discovers per-collector jobs under `/etc/netdata/ibm.d/*.conf`.
 - Each module provides safe stock health alarms in `src/health/health.d/`.
 - Command-line dump mode works exactly like go.d: `script -c 'sudo /usr/libexec/netdata/plugins.d/ibm.d.plugin -d -m MODULE --dump=2s --dump-summary 2>&1' /dev/null`.
+- Structured fixture dumps are available via `--dump-data <dir>`; run `ibm.d.plugin --module MODULE --dump-data ./testdata/MODULE` to generate JSON/SQL artifacts that can feed automated tests. The flag implicitly enables dump mode and exits once every job has produced at least one collection.
 
 ## Contributing
 

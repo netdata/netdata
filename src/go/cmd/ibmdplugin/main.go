@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"os"
 	"os/user"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -52,8 +53,22 @@ func main() {
 		return
 	}
 
+	if opts.DumpDataDir != "" && opts.DumpMode == "" {
+		opts.DumpMode = "10m"
+	}
+
 	env := newEnvConfig()
 	cfg := newConfig(opts, env)
+
+	dumpDataDir := ""
+	if opts.DumpDataDir != "" {
+		var err error
+		dumpDataDir, err = prepareDumpDataDir(opts.DumpDataDir, cfg.varLibDir)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error preparing dump-data directory: %v\n", err)
+			os.Exit(1)
+		}
+	}
 
 	if env.logLevel != "" {
 		logger.Level.SetByName(env.logLevel)
@@ -85,6 +100,7 @@ func main() {
 		MinUpdateEvery:            opts.UpdateEvery,
 		DumpMode:                  dumpMode,
 		DumpSummary:               opts.DumpSummary,
+		DumpDataDir:               dumpDataDir,
 	})
 
 	a.Debugf("plugin: name=%s, version=%s", a.Name, buildinfo.Version)
@@ -108,4 +124,28 @@ func parseCLI() *cli.Option {
 	}
 
 	return opt
+}
+
+func prepareDumpDataDir(path string, varLibDir string) (string, error) {
+	if path == "" {
+		return "", nil
+	}
+	clean := strings.TrimSpace(path)
+	if !filepath.IsAbs(clean) && varLibDir != "" {
+		clean = filepath.Join(varLibDir, clean)
+	}
+	absolute, err := filepath.Abs(clean)
+	if err != nil {
+		return "", err
+	}
+	if absolute == "" || absolute == "/" {
+		return "", fmt.Errorf("refusing to use unsafe dump-data directory '%s'", absolute)
+	}
+	if err := os.RemoveAll(absolute); err != nil {
+		return "", err
+	}
+	if err := os.MkdirAll(absolute, 0o755); err != nil {
+		return "", err
+	}
+	return absolute, nil
 }

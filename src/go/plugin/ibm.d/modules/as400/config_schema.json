@@ -17,6 +17,11 @@
         "title": "DiskSelector filters disk units by name using glob-style patterns.",
         "type": "string"
       },
+      "collect_http_server_metrics": {
+        "default": "\u003cauto\u003e",
+        "title": "CollectHTTPServerMetrics toggles collection of IBM HTTP Server statistics.",
+        "type": "boolean"
+      },
       "collect_job_queue_metrics": {
         "default": "\u003cauto\u003e",
         "title": "CollectJobQueueMetrics toggles collection of job queue backlog metrics.",
@@ -26,6 +31,11 @@
         "default": "",
         "title": "JobQueueSelector filters job queues by name using glob-style patterns.",
         "type": "string"
+      },
+      "collect_plan_cache_metrics": {
+        "default": "\u003cauto\u003e",
+        "title": "CollectPlanCacheMetrics toggles collection of plan cache analysis metrics.",
+        "type": "boolean"
       },
       "collect_subsystem_metrics": {
         "default": "\u003cauto\u003e",
@@ -104,12 +114,17 @@
         "title": "Port is the TCP port for the IBM i Access ODBC server.",
         "type": "integer"
       },
+      "reset_statistics": {
+        "default": false,
+        "title": "ResetStatistics toggles destructive SQL services that reset system statistics on each query.",
+        "type": "boolean"
+      },
       "timeout": {
         "title": "Timeout controls how long to wait for SQL statements and RPCs.",
         "type": "integer"
       },
       "update_every": {
-        "default": 1,
+        "default": 10,
         "minimum": 1,
         "title": "Data collection frequency",
         "type": "integer"

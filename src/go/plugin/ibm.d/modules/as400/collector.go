@@ -13,6 +13,7 @@ import (
 	"sync"
 
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/stm"
 	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/framework"
 	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/modules/as400/contexts"
 	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/pkg/dbdriver"
@@ -38,6 +39,8 @@ type Collector struct {
 	tempStorageNamed  map[string]*tempStorageMetrics
 	activeJobs        map[string]*activeJobMetrics
 	networkInterfaces map[string]*networkInterfaceMetrics
+	httpServers       map[string]*httpServerMetrics
+	planCache         map[string]*planCacheMetrics
 
 	// Selectors
 	diskSelector      matcher.Matcher
@@ -57,6 +60,15 @@ type Collector struct {
 	// Feature flags and logging guards
 	disabled map[string]bool
 
+	// Cardinality guards to avoid repeated expensive counts
+	diskCardinality              cardinalityGuard
+	activeJobsCardinality        cardinalityGuard
+	networkInterfacesCardinality cardinalityGuard
+	httpServersCardinality       cardinalityGuard
+
+	dump   *dumpContext
+	groups []collectionGroup
+
 	once sync.Once
 }
 
@@ -65,6 +77,7 @@ func (c *Collector) initOnce() {
 		c.disabled = make(map[string]bool)
 		c.mx = &metricsData{}
 		c.resetInstanceCaches()
+		c.initGroups()
 	})
 }
 
@@ -76,12 +89,44 @@ func (c *Collector) resetInstanceCaches() {
 	c.tempStorageNamed = make(map[string]*tempStorageMetrics)
 	c.activeJobs = make(map[string]*activeJobMetrics)
 	c.networkInterfaces = make(map[string]*networkInterfaceMetrics)
+	c.httpServers = make(map[string]*httpServerMetrics)
+	c.planCache = make(map[string]*planCacheMetrics)
 	c.mx.disks = make(map[string]diskInstanceMetrics)
 	c.mx.subsystems = make(map[string]subsystemInstanceMetrics)
 	c.mx.jobQueues = make(map[string]jobQueueInstanceMetrics)
 	c.mx.tempStorageNamed = make(map[string]tempStorageInstanceMetrics)
 	c.mx.activeJobs = make(map[string]activeJobInstanceMetrics)
 	c.mx.networkInterfaces = make(map[string]networkInterfaceInstanceMetrics)
+	c.mx.httpServers = make(map[string]httpServerInstanceMetrics)
+	c.mx.planCache = make(map[string]planCacheInstanceMetrics)
+}
+
+func (c *Collector) prepareIterationState() {
+	c.mx = &metricsData{
+		systemActivity: systemActivityMetrics{},
+	}
+	c.resetInstanceCaches()
+	c.diskCardinality.Configure(c.MaxDisks)
+	c.activeJobsCardinality.Configure(c.MaxActiveJobs)
+	c.networkInterfacesCardinality.Configure(networkInterfaceLimit)
+	c.httpServersCardinality.Configure(httpServerLimit)
+}
+
+func (c *Collector) initGroups() {
+	if c.groups != nil {
+		return
+	}
+	c.groups = []collectionGroup{
+		&systemGroup{c},
+		&diskGroup{c},
+		&subsystemGroup{c},
+		&jobQueueGroup{c},
+		&activeJobGroup{c},
+		&networkInterfaceGroup{c},
+		&systemActivityGroup{c},
+		&httpServerGroup{c},
+		&planCacheGroup{c},
+	}
 }
 
 // CollectOnce implements framework.CollectorImpl.
@@ -102,21 +147,11 @@ func (c *Collector) CollectOnce() error {
 		}
 	}
 
-	// Reset state for the iteration
-	c.mx = &metricsData{
-		disks:             make(map[string]diskInstanceMetrics),
-		subsystems:        make(map[string]subsystemInstanceMetrics),
-		jobQueues:         make(map[string]jobQueueInstanceMetrics),
-		tempStorageNamed:  make(map[string]tempStorageInstanceMetrics),
-		activeJobs:        make(map[string]activeJobInstanceMetrics),
-		networkInterfaces: make(map[string]networkInterfaceInstanceMetrics),
-		systemActivity:    systemActivityMetrics{},
-	}
-	c.resetInstanceCaches()
-
-	metricsMap, err := c.collect(ctx)
-	if err != nil {
+	if err := c.collect(ctx); err != nil {
 		return err
+	}
+	if c.dump != nil {
+		c.dump.recordMetrics(c.snapshotMetrics())
 	}
 
 	// Populate contexts from metric struct maps
@@ -128,13 +163,135 @@ func (c *Collector) CollectOnce() error {
 	c.exportActiveJobMetrics()
 	c.exportNetworkInterfaceMetrics()
 	c.exportSystemActivityMetrics()
+	c.exportHTTPServerMetrics()
+	c.exportPlanCacheMetrics()
 	c.applyGlobalLabels()
 
-	// Some collectors expect legacy map for compatibility (e.g. tests);
-	// ensure we at least touch the metrics map so linter doesn't complain.
-	_ = metricsMap
-
 	return nil
+}
+
+func (c *Collector) snapshotMetrics() map[string]int64 {
+	metrics := make(map[string]int64)
+
+	for k, v := range stm.ToMap(c.mx) {
+		if isSystemMetric(k) {
+			metrics[k] = v
+		}
+	}
+
+	for unit, values := range c.mx.disks {
+		clean := cleanName(unit)
+		for k, v := range stm.ToMap(values) {
+			metrics[fmt.Sprintf("disk_%s_%s", clean, k)] = v
+		}
+		if values.SSDLifeRemaining >= 0 {
+			metrics[fmt.Sprintf("disk_%s_ssd_life_remaining", clean)] = values.SSDLifeRemaining
+		}
+		if values.SSDPowerOnDays >= 0 {
+			metrics[fmt.Sprintf("disk_%s_ssd_power_on_days", clean)] = values.SSDPowerOnDays
+		}
+	}
+
+	for name, values := range c.mx.subsystems {
+		clean := cleanName(name)
+		for k, v := range stm.ToMap(values) {
+			metrics[fmt.Sprintf("subsystem_%s_%s", clean, k)] = v
+		}
+	}
+
+	for name, values := range c.mx.jobQueues {
+		clean := cleanName(name)
+		for k, v := range stm.ToMap(values) {
+			metrics[fmt.Sprintf("jobqueue_%s_%s", clean, k)] = v
+		}
+	}
+
+	for bucket, values := range c.mx.tempStorageNamed {
+		clean := cleanName(bucket)
+		for k, v := range stm.ToMap(values) {
+			metrics[fmt.Sprintf("tempstorage_%s_%s", clean, k)] = v
+		}
+	}
+
+	for jobName, values := range c.mx.activeJobs {
+		clean := cleanName(jobName)
+		for k, v := range stm.ToMap(values) {
+			metrics[fmt.Sprintf("activejob_%s_%s", clean, k)] = v
+		}
+	}
+
+	for name, values := range c.mx.networkInterfaces {
+		clean := cleanName(name)
+		for k, v := range stm.ToMap(values) {
+			metrics[fmt.Sprintf("netintf_%s_%s", clean, k)] = v
+		}
+	}
+
+	for id, values := range c.mx.httpServers {
+		clean := cleanName(id)
+		for k, v := range stm.ToMap(values) {
+			metrics[fmt.Sprintf("httpserver_%s_%s", clean, k)] = v
+		}
+	}
+
+	for heading, values := range c.mx.planCache {
+		clean := cleanName(heading)
+		for k, v := range stm.ToMap(values) {
+			metrics[fmt.Sprintf("plan_cache_%s_%s", clean, k)] = v
+		}
+	}
+
+	for k, v := range stm.ToMap(c.mx.systemActivity) {
+		metrics[fmt.Sprintf("system_activity_%s", k)] = v
+	}
+
+	return metrics
+}
+
+func isSystemMetric(key string) bool {
+	systemMetrics := map[string]bool{
+		"cpu_percentage":                          true,
+		"configured_cpus":                         true,
+		"current_cpu_capacity":                    true,
+		"main_storage_size":                       true,
+		"current_temporary_storage":               true,
+		"maximum_temporary_storage_used":          true,
+		"total_jobs_in_system":                    true,
+		"active_jobs_in_system":                   true,
+		"interactive_jobs_in_system":              true,
+		"batch_jobs_running":                      true,
+		"job_queue_length":                        true,
+		"system_asp_used":                         true,
+		"system_asp_storage":                      true,
+		"total_auxiliary_storage":                 true,
+		"active_threads_in_system":                true,
+		"threads_per_processor":                   true,
+		"machine_pool_size":                       true,
+		"base_pool_size":                          true,
+		"interactive_pool_size":                   true,
+		"spool_pool_size":                         true,
+		"machine_pool_defined_size":               true,
+		"machine_pool_reserved_size":              true,
+		"base_pool_defined_size":                  true,
+		"base_pool_reserved_size":                 true,
+		"machine_pool_threads":                    true,
+		"machine_pool_max_threads":                true,
+		"base_pool_threads":                       true,
+		"base_pool_max_threads":                   true,
+		"remote_connections":                      true,
+		"total_connections":                       true,
+		"listen_connections":                      true,
+		"closewait_connections":                   true,
+		"temp_storage_current_total":              true,
+		"temp_storage_peak_total":                 true,
+		"disk_busy_percentage":                    true,
+		"system_activity_average_cpu_rate":        true,
+		"system_activity_average_cpu_utilization": true,
+		"system_activity_minimum_cpu_utilization": true,
+		"system_activity_maximum_cpu_utilization": true,
+	}
+
+	return systemMetrics[key]
 }
 
 func (c *Collector) exportSystemMetrics() {
@@ -456,6 +613,53 @@ func (c *Collector) exportNetworkInterfaceMetrics() {
 	}
 }
 
+func (c *Collector) exportHTTPServerMetrics() {
+	for key, values := range c.mx.httpServers {
+		meta := c.httpServers[key]
+		server := ""
+		function := ""
+		if meta != nil {
+			server = meta.serverName
+			function = meta.httpFunction
+		}
+		labels := contexts.HTTPServerLabels{
+			Server:   server,
+			Function: function,
+		}
+		contexts.HTTPServer.Connections.Set(c.State, labels, contexts.HTTPServerConnectionsValues{
+			Normal: values.NormalConnections,
+			Ssl:    values.SSLConnections,
+		})
+		contexts.HTTPServer.Threads.Set(c.State, labels, contexts.HTTPServerThreadsValues{
+			Active: values.ActiveThreads,
+			Idle:   values.IdleThreads,
+		})
+		contexts.HTTPServer.Requests.Set(c.State, labels, contexts.HTTPServerRequestsValues{
+			Requests:  values.TotalRequests,
+			Responses: values.TotalResponses,
+			Rejected:  values.TotalRequestsRejected,
+		})
+		contexts.HTTPServer.Bytes.Set(c.State, labels, contexts.HTTPServerBytesValues{
+			Received: values.BytesReceived,
+			Sent:     values.BytesSent,
+		})
+	}
+}
+
+func (c *Collector) exportPlanCacheMetrics() {
+	for key, values := range c.mx.planCache {
+		meta := c.planCache[key]
+		metricLabel := key
+		if meta != nil && meta.heading != "" {
+			metricLabel = meta.heading
+		}
+		labels := contexts.PlanCacheLabels{Metric: metricLabel}
+		contexts.PlanCache.Summary.Set(c.State, labels, contexts.PlanCacheSummaryValues{
+			Value: values.Value,
+		})
+	}
+}
+
 func (c *Collector) exportSystemActivityMetrics() {
 	if c.mx.systemActivity.AverageCPURate == 0 && c.mx.systemActivity.AverageCPUUtilization == 0 {
 		return
@@ -485,6 +689,17 @@ func (c *Collector) Cleanup(ctx context.Context) {
 		}
 	}
 	c.Collector.Cleanup(ctx)
+}
+
+// EnableDump allows the collector to emit structured dump artifacts when requested.
+func (c *Collector) EnableDump(dir string) {
+	ctx, err := newDumpContext(dir, &c.Config)
+	if err != nil {
+		c.Errorf("failed to initialise dump context: %v", err)
+		return
+	}
+	c.dump = ctx
+	c.Infof("dump data enabled, writing artifacts to %s", dir)
 }
 
 func (c *Collector) buildDSNIfNeeded(ctx context.Context) error {
