@@ -1074,3 +1074,70 @@ ExtensionRegistry:
         - name: hit_rate
           algo: absolute
           div: 1000
+PortletApplication:
+  labels:
+    - node
+    - server
+  contexts:
+    - name: Loaded
+      context: websphere_pmi.portlet_application_loaded
+      title: Loaded Portlets
+      family: platform/portlets
+      units: portlets
+      type: line
+      priority: 800
+      dimensions:
+        - name: loaded
+          algo: absolute
+Portlet:
+  labels:
+    - node
+    - server
+    - portlet
+  contexts:
+    - name: Requests
+      context: websphere_pmi.portlet_requests
+      title: Portlet Requests
+      family: platform/portlets
+      units: requests/s
+      type: line
+      priority: 801
+      dimensions:
+        - name: requests
+          algo: incremental
+    - name: Concurrent
+      context: websphere_pmi.portlet_concurrent
+      title: Portlet Concurrent Requests
+      family: platform/portlets
+      units: requests
+      type: line
+      priority: 802
+      dimensions:
+        - name: concurrent
+          algo: absolute
+    - name: Errors
+      context: websphere_pmi.portlet_errors
+      title: Portlet Errors
+      family: platform/portlets
+      units: errors/s
+      type: line
+      priority: 803
+      dimensions:
+        - name: errors
+          algo: incremental
+    - name: ResponseTime
+      context: websphere_pmi.portlet_response_time
+      title: Portlet Response Time
+      family: platform/portlets
+      units: milliseconds
+      type: line
+      priority: 804
+      dimensions:
+        - name: render
+          algo: absolute
+        - name: action
+          algo: absolute
+        - name: process_event
+          algo: absolute
+        - name: serve_resource
+          algo: absolute

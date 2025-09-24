@@ -319,6 +319,44 @@ Metrics:
 |:-------|:-----------|:-----|
 | websphere_pmi.pmi_web_service_module_services | loaded | services |
 
+### Per portlet
+
+These metrics refer to individual portlet instances.
+
+Labels:
+
+| Label | Description |
+|:------|:------------|
+| node | Node identifier |
+| server | Server identifier |
+| portlet | Portlet identifier |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:-------|:-----------|:-----|
+| websphere_pmi.portlet_requests | requests | requests/s |
+| websphere_pmi.portlet_concurrent | concurrent | requests |
+| websphere_pmi.portlet_errors | errors | errors/s |
+| websphere_pmi.portlet_response_time | render, action, process_event, serve_resource | milliseconds |
+
+### Per portletapplication
+
+These metrics refer to individual portletapplication instances.
+
+Labels:
+
+| Label | Description |
+|:------|:------------|
+| node | Node identifier |
+| server | Server identifier |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:-------|:-----------|:-----|
+| websphere_pmi.portlet_application_loaded | loaded | portlets |
+
 ### Per schedulers
 
 These metrics refer to individual schedulers instances.

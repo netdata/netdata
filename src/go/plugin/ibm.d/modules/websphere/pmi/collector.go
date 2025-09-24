@@ -58,6 +58,7 @@ func (c *Collector) CollectOnce() error {
 	agg.identity = c.identity
 
 	agg.processSnapshot(snapshot, c.applySelectors())
+	c.Debugf("PMI aggregator counts: threadPools=%d transactions=%d jdbcPools=%d jcaPools=%d jmsQueues=%d jmsTopics=%d webApps=%d sessions=%d dynamicCaches=%d urls=%d securityAuth=%d", len(agg.threadPools), len(agg.transactions), len(agg.jdbcPools), len(agg.jcaPools), len(agg.jmsQueues), len(agg.jmsTopics), len(agg.webApps), len(agg.sessions), len(agg.dynamicCaches), len(agg.urls), len(agg.securityAuth))
 	agg.exportMetrics(c.State)
 
 	if labels := c.identity.Labels(); len(labels) > 0 {
@@ -117,6 +118,8 @@ type aggregator struct {
 	jmsQueues     map[string]*jmsQueueMetrics
 	jmsTopics     map[string]*jmsTopicMetrics
 	jmsStores     map[string]*jmsStoreSectionMetrics
+	portletApps   map[string]*portletAppMetrics
+	portlets      map[string]*portletMetrics
 }
 
 type jvmSystemMetrics struct {
@@ -239,6 +242,26 @@ type urlMetrics struct {
 	requestCount    int64
 	serviceTimeMs   int64
 	asyncResponseMs int64
+}
+
+type portletAppMetrics struct {
+	node           string
+	server         string
+	loadedPortlets int64
+}
+
+type portletMetrics struct {
+	node   string
+	server string
+	name   string
+
+	requestCount    int64
+	concurrent      int64
+	errors          int64
+	renderTimeMs    int64
+	actionTimeMs    int64
+	processEventMs  int64
+	serveResourceMs int64
 }
 
 type securityAuthMetrics struct {
@@ -529,6 +552,8 @@ func newAggregator(cfg Config) *aggregator {
 		jmsQueues:     make(map[string]*jmsQueueMetrics),
 		jmsTopics:     make(map[string]*jmsTopicMetrics),
 		jmsStores:     make(map[string]*jmsStoreSectionMetrics),
+		portletApps:   make(map[string]*portletAppMetrics),
+		portlets:      make(map[string]*portletMetrics),
 	}
 }
 
@@ -546,27 +571,37 @@ func (a *aggregator) processSnapshot(snapshot *pmiproto.Snapshot, selectors sele
 func (a *aggregator) processStats(node, server string, stats []pmiproto.Stat, selectors selectorBundle) {
 	for i := range stats {
 		stat := &stats[i]
+		handled := false
 		switch stat.Name {
 		case "JVM Runtime":
 			a.processJVMRuntime(stat)
+			handled = true
 		case "JVM Runtime MBean":
 			a.processJVMRuntime(stat)
+			handled = true
 		case "JVM Thread":
 			a.processJVMThreads(stat)
+			handled = true
 		case "JVM Thread MBean":
 			a.processJVMThreads(stat)
+			handled = true
 		case "JVM Memory":
 			a.processJVMMemory(stat)
+			handled = true
 		case "JVM Memory MBean":
 			a.processJVMMemory(stat)
+			handled = true
 		case "JVM GC":
 			a.processJVMGC(stat)
+			handled = true
 		case "Thread Pools":
 			for j := range stat.SubStats {
 				a.processThreadPool(stat.SubStats[j])
 			}
+			handled = true
 		case "Transaction Manager":
 			a.processTransactionManager(node, server, stat)
+			handled = true
 		case "JDBC Connection Pools":
 			if !a.collectJDBCMetricsEnabled() {
 				continue
@@ -577,6 +612,7 @@ func (a *aggregator) processStats(node, server string, stats []pmiproto.Stat, se
 					a.processJDBCPool(node, server, provider.Name, &provider.SubStats[k], selectors)
 				}
 			}
+			handled = true
 		case "JCA Connection Pools":
 			if !a.collectJCAMetricsEnabled() {
 				continue
@@ -587,6 +623,7 @@ func (a *aggregator) processStats(node, server string, stats []pmiproto.Stat, se
 					a.processJCAPool(node, server, provider.Name, &provider.SubStats[k], selectors)
 				}
 			}
+			handled = true
 		case "Web Applications":
 			if !a.collectWebAppMetricsEnabled() {
 				continue
@@ -594,6 +631,21 @@ func (a *aggregator) processStats(node, server string, stats []pmiproto.Stat, se
 			for j := range stat.SubStats {
 				a.processWebApplication(node, server, &stat.SubStats[j], selectors)
 			}
+			handled = true
+		case "Portlet Application":
+			a.processPortletApplication(node, server, stat)
+			handled = true
+		case "Portlets":
+			for j := range stat.SubStats {
+				a.processPortlet(node, server, &stat.SubStats[j])
+			}
+			handled = true
+		case "WIM Group Management":
+			a.processPortlet(node, server, stat)
+			handled = true
+		case "WIM User Management":
+			a.processPortlet(node, server, stat)
+			handled = true
 		case "URLs":
 			if !a.collectServletMetricsEnabled() {
 				continue
@@ -601,6 +653,7 @@ func (a *aggregator) processStats(node, server string, stats []pmiproto.Stat, se
 			for j := range stat.SubStats {
 				a.processURLMetric(node, server, &stat.SubStats[j], selectors)
 			}
+			handled = true
 		case "Servlet Session Manager":
 			if !a.collectSessionMetricsEnabled() {
 				continue
@@ -608,6 +661,7 @@ func (a *aggregator) processStats(node, server string, stats []pmiproto.Stat, se
 			for j := range stat.SubStats {
 				a.processSessionManager(node, server, &stat.SubStats[j], selectors)
 			}
+			handled = true
 		case "Dynamic Caching":
 			if !a.collectDynamicCacheMetricsEnabled() {
 				continue
@@ -615,37 +669,59 @@ func (a *aggregator) processStats(node, server string, stats []pmiproto.Stat, se
 			for j := range stat.SubStats {
 				a.processDynamicCache(node, server, &stat.SubStats[j])
 			}
+			handled = true
 		case "System Data":
 			a.processSystemData(stat)
+			handled = true
 		case "Security Authentication":
 			a.processSecurityAuthentication(node, server, stat)
+			handled = true
 		case "ORB":
 			a.processORB(node, server, stat)
+			handled = true
+		case "Object Request Broker":
+			a.processORB(node, server, stat)
+			handled = true
 		case "Security Authorization":
 			a.processSecurityAuthorization(node, server, stat)
+			handled = true
 		case "HAManager":
 			a.processHAManager(node, server, stat)
+			handled = true
 		case "Alarm Manager":
 			a.processAlarmManager(node, server, stat)
+			handled = true
 		case "Schedulers":
 			a.processSchedulers(node, server, stat)
+			handled = true
 		case "Object Pool":
 			a.processObjectPool(node, server, stat)
+			handled = true
 		case "Enterprise Beans":
 			a.processEnterpriseBeans(node, server, stat, selectors)
+			handled = true
 		case "Web services":
 			a.processWebServices(node, server, stat)
+			handled = true
 		case "Web services Gateway":
 			a.processWebServicesGateway(node, server, stat)
+			handled = true
 		case "pmiWebServiceModule":
 			a.processPMIWebServiceModule(node, server, stat)
+			handled = true
 		case "ExtensionRegistryStats.name":
 			a.processExtensionRegistry(node, server, stat)
+			handled = true
 		case "SIB Service":
 			if !a.collectJMSMetricsEnabled() {
 				continue
 			}
 			a.processSIBService(node, server, stat, selectors)
+			handled = true
+		}
+
+		if !handled && len(stat.SubStats) > 0 {
+			a.processStats(node, server, stat.SubStats, selectors)
 		}
 	}
 }
@@ -770,9 +846,7 @@ func (a *aggregator) processThreadPool(stat pmiproto.Stat) {
 			}
 		}
 	}
-	if metrics.active != 0 || metrics.size != 0 {
-		a.threadPools[stat.Name] = metrics
-	}
+	a.threadPools[stat.Name] = metrics
 }
 
 func (a *aggregator) processTransactionManager(node, server string, stat *pmiproto.Stat) {
@@ -1030,6 +1104,92 @@ func (a *aggregator) processWebApplication(node, server string, stat *pmiproto.S
 			metrics.loadedServlets = value
 		case "reloadcount":
 			metrics.reloads = value
+		}
+	}
+
+	if len(stat.SubStats) > 0 {
+		a.processStats(node, server, stat.SubStats, selectors)
+	}
+}
+
+func (a *aggregator) processPortletApplication(node, server string, stat *pmiproto.Stat) {
+	if stat == nil {
+		return
+	}
+	key := common.InstanceKey(node, server, "portlet_application")
+	metrics := a.portletApps[key]
+	if metrics == nil {
+		metrics = &portletAppMetrics{node: node, server: server}
+		a.portletApps[key] = metrics
+	}
+
+	for _, cs := range stat.CountStatistics {
+		value, ok := parseCount(cs.Count)
+		if !ok {
+			continue
+		}
+		switch strings.ToLower(cs.Name) {
+		case "number of loaded portlets":
+			metrics.loadedPortlets = value
+		}
+	}
+}
+
+func (a *aggregator) processPortlet(node, server string, stat *pmiproto.Stat) {
+	if stat == nil {
+		return
+	}
+	name := stat.Name
+	if name == "" {
+		name = "unknown"
+	}
+
+	key := common.InstanceKey(node, server, name)
+	metrics := a.portlets[key]
+	if metrics == nil {
+		metrics = &portletMetrics{node: node, server: server, name: name}
+		a.portlets[key] = metrics
+	}
+
+	for _, cs := range stat.CountStatistics {
+		value, ok := parseCount(cs.Count)
+		if !ok {
+			continue
+		}
+		switch strings.ToLower(cs.Name) {
+		case "number of portlet requests":
+			metrics.requestCount = value
+		case "number of portlet errors":
+			metrics.errors = value
+		}
+	}
+
+	for _, rs := range stat.RangeStatistics {
+		val, ok := parseFloat(rs.Current)
+		if !ok {
+			continue
+		}
+		switch strings.ToLower(rs.Name) {
+		case "number of concurrent portlet requests":
+			metrics.concurrent = int64(math.Round(val))
+		}
+	}
+
+	for _, ts := range stat.TimeStatistics {
+		val, ok := parseFloat(ts.TotalTime)
+		if !ok {
+			continue
+		}
+		ms := convertUnits(int64(math.Round(val)), ts.Unit, unitMilliseconds)
+		switch strings.ToLower(ts.Name) {
+		case "response time of portlet render":
+			metrics.renderTimeMs = ms
+		case "response time of portlet action":
+			metrics.actionTimeMs = ms
+		case "response time of a portlet processevent request":
+			metrics.processEventMs = ms
+		case "response time of a portlet serveresource request":
+			metrics.serveResourceMs = ms
 		}
 	}
 }
@@ -2432,6 +2592,32 @@ func (a *aggregator) exportMetrics(state *framework.CollectorState) {
 				Index_items: store.expiryIndexItemCount,
 			})
 		}
+	}
+
+	for _, app := range a.portletApps {
+		labels := contexts.PortletApplicationLabels{Node: app.node, Server: app.server}
+		contexts.PortletApplication.Loaded.Set(state, labels, contexts.PortletApplicationLoadedValues{
+			Loaded: app.loadedPortlets,
+		})
+	}
+
+	for _, portlet := range a.portlets {
+		labels := contexts.PortletLabels{Node: portlet.node, Server: portlet.server, Portlet: portlet.name}
+		contexts.Portlet.Requests.Set(state, labels, contexts.PortletRequestsValues{
+			Requests: portlet.requestCount,
+		})
+		contexts.Portlet.Concurrent.Set(state, labels, contexts.PortletConcurrentValues{
+			Concurrent: portlet.concurrent,
+		})
+		contexts.Portlet.Errors.Set(state, labels, contexts.PortletErrorsValues{
+			Errors: portlet.errors,
+		})
+		contexts.Portlet.ResponseTime.Set(state, labels, contexts.PortletResponseTimeValues{
+			Render:         portlet.renderTimeMs,
+			Action:         portlet.actionTimeMs,
+			Process_event:  portlet.processEventMs,
+			Serve_resource: portlet.serveResourceMs,
+		})
 	}
 
 	for _, bean := range a.enterpriseEJB {

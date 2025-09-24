@@ -603,6 +603,57 @@ covering JVM, thread pools, JDBC/JMS resources, applications, and clustering inf
               chart_type: line
               dimensions:
                 - name: loaded
+        - name: portlet
+          description: These metrics refer to portlet instances.
+          labels:
+            - name: node
+              description: Node identifier
+            - name: server
+              description: Server identifier
+            - name: portlet
+              description: Portlet identifier
+          metrics:
+            - name: websphere_pmi.portlet_requests
+              description: Portlet Requests
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: requests
+            - name: websphere_pmi.portlet_concurrent
+              description: Portlet Concurrent Requests
+              unit: requests
+              chart_type: line
+              dimensions:
+                - name: concurrent
+            - name: websphere_pmi.portlet_errors
+              description: Portlet Errors
+              unit: errors/s
+              chart_type: line
+              dimensions:
+                - name: errors
+            - name: websphere_pmi.portlet_response_time
+              description: Portlet Response Time
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: render
+                - name: action
+                - name: process_event
+                - name: serve_resource
+        - name: portletapplication
+          description: These metrics refer to portletapplication instances.
+          labels:
+            - name: node
+              description: Node identifier
+            - name: server
+              description: Server identifier
+          metrics:
+            - name: websphere_pmi.portlet_application_loaded
+              description: Loaded Portlets
+              unit: portlets
+              chart_type: line
+              dimensions:
+                - name: loaded
         - name: schedulers
           description: These metrics refer to schedulers instances.
           labels:

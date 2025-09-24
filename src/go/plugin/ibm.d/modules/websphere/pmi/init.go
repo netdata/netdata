@@ -66,8 +66,23 @@ func defaultConfig() Config {
 }
 
 func (c *Collector) Init(ctx context.Context) error {
-	c.SetImpl(c)
+	// Propagate job-level overrides into the embedded framework collector before init
+	if c.Config.ObsoletionIterations != 0 {
+		c.Collector.Config.ObsoletionIterations = c.Config.ObsoletionIterations
+	}
+	if c.Config.UpdateEvery != 0 {
+		c.Collector.Config.UpdateEvery = c.Config.UpdateEvery
+	}
+	if c.Config.CollectionGroups != nil {
+		c.Collector.Config.CollectionGroups = c.Config.CollectionGroups
+	}
+
 	c.RegisterContexts(contexts.GetAllContexts()...)
+
+	if err := c.Collector.Init(ctx); err != nil {
+		return err
+	}
+	c.SetImpl(c)
 
 	cfg := c.Config
 	if cfg.URL == "" {
