@@ -1,3 +1,6 @@
+//go:build cgo
+// +build cgo
+
 package db2
 
 import (
