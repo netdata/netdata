@@ -37,6 +37,146 @@
             flex-wrap: wrap;
             gap: 8px;
         }
+        .server-selector {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+        }
+        .server-dropdown-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 10px;
+            border: 1px solid #99c6dd;
+            border-radius: 4px;
+            background-color: #fff;
+            color: #005f8a;
+            font-size: 0.95em;
+            cursor: pointer;
+            min-width: 220px;
+        }
+        .server-dropdown-btn:hover {
+            background-color: #f0f8ff;
+        }
+        .server-dropdown-btn .caret {
+            margin-left: auto;
+            font-size: 0.9em;
+        }
+        .server-dropdown-menu {
+            position: absolute;
+            top: calc(100% + 6px);
+            left: 0;
+            min-width: 280px;
+            background-color: white;
+            border: 1px solid #99c6dd;
+            border-radius: 6px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.12);
+            z-index: 200;
+            display: none;
+            max-height: 320px;
+            overflow-y: auto;
+        }
+        .server-dropdown-menu.open {
+            display: block;
+        }
+        .server-menu-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 10px;
+            border-bottom: 1px solid #ddeaf3;
+            background-color: #f5fbff;
+            font-size: 0.9em;
+            font-weight: bold;
+            color: #005f8a;
+        }
+        .server-menu-add {
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 4px 8px;
+            font-size: 0.85em;
+            cursor: pointer;
+        }
+        .server-menu-add:hover {
+            background-color: #218838;
+        }
+        .server-menu-list {
+            display: flex;
+            flex-direction: column;
+        }
+        .server-menu-empty {
+            padding: 12px 14px;
+            font-size: 0.85em;
+            color: #666;
+            text-align: center;
+        }
+        .server-menu-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 8px 10px;
+            cursor: pointer;
+            border-bottom: 1px solid #f0f4f7;
+        }
+        .server-menu-item:last-child {
+            border-bottom: none;
+        }
+        .server-menu-item:hover {
+            background-color: #f0f8ff;
+        }
+        .server-menu-item.active {
+            background-color: #d0e8f2;
+            font-weight: bold;
+        }
+        .server-menu-info {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            flex: 1;
+        }
+        .server-menu-url {
+            font-size: 0.9em;
+            color: #003f5f;
+            word-break: break-all;
+        }
+        .server-menu-meta {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.8em;
+            color: #666;
+        }
+        .server-menu-bearer {
+            color: #0f7b0f;
+            font-weight: bold;
+        }
+        .server-menu-actions {
+            display: flex;
+            gap: 6px;
+        }
+        .server-menu-btn {
+            border: 1px solid #99c6dd;
+            background-color: #f5fbff;
+            color: #005f8a;
+            border-radius: 4px;
+            font-size: 0.78em;
+            padding: 4px 6px;
+            cursor: pointer;
+        }
+        .server-menu-btn:hover {
+            background-color: #e0f0ff;
+        }
+        .server-menu-btn.delete {
+            border-color: #d9534f;
+            color: #d9534f;
+            background-color: #fff5f5;
+        }
+        .server-menu-btn.delete:hover {
+            background-color: #ffe5e5;
+        }
         .transport-select {
             display: none;
             align-items: center;
@@ -607,12 +747,68 @@
             margin-bottom: 10px;
             color: #666;
         }
+        #serverModal .modal-content {
+            max-width: 420px;
+        }
+        .server-modal-form {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .server-modal-form label {
+            font-size: 0.85em;
+            color: #005f8a;
+            margin-bottom: 4px;
+        }
+        .server-modal-form input,
+        .server-modal-form select {
+            padding: 6px 8px;
+            border: 1px solid #99c6dd;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+        .server-bearer-wrapper {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+        .toggle-visibility-btn {
+            border: 1px solid #99c6dd;
+            background-color: #f5fbff;
+            color: #005f8a;
+            border-radius: 4px;
+            font-size: 0.85em;
+            padding: 4px 8px;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+        .toggle-visibility-btn:hover {
+            background-color: #e0f0ff;
+        }
+        .form-hint {
+            font-size: 0.75em;
+            color: #666;
+        }
     </style>
 </head>
 <body>
     <div class="connection-panel">
-        <label for="serverUrl">Netdata MCP Test Client:</label>
-        <input type="text" id="serverUrl" value="ws://localhost:19999/mcp" style="width: 300px;">
+        <label for="serverDropdownButton">Netdata MCP Test Client:</label>
+        <div class="server-selector">
+            <button type="button" id="serverDropdownButton" class="server-dropdown-btn">
+                <span id="serverDropdownLabel">Servers</span>
+                <span class="caret">v</span>
+            </button>
+            <div id="serverDropdownMenu" class="server-dropdown-menu">
+                <div class="server-menu-header">
+                    <span>Saved Servers</span>
+                    <button type="button" id="addServerBtn" class="server-menu-add">Add</button>
+                </div>
+                <div id="serverListContainer" class="server-menu-list"></div>
+                <div id="serverEmptyState" class="server-menu-empty" style="display: none;">No servers saved yet.</div>
+            </div>
+        </div>
+        <input type="hidden" id="serverUrl" value="ws://localhost:19999/mcp">
         <span id="httpTransportSelectWrapper" class="transport-select">
             <label for="httpTransportSelect">Transport:</label>
             <select id="httpTransportSelect">
@@ -715,6 +911,44 @@
         </div>
     </div>
     
+    <!-- Manage Servers Modal -->
+    <div id="serverModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="serverModalTitle">Add Server</h2>
+                <span class="modal-close" id="serverModalClose">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form class="server-modal-form" onsubmit="return false;">
+                    <div>
+                        <label for="serverModalUrl">Server URL</label>
+                        <input type="text" id="serverModalUrl" placeholder="https://example.com/mcp" autocomplete="off">
+                    </div>
+                    <div>
+                        <label for="serverModalType">Transport Type</label>
+                        <select id="serverModalType">
+                            <option value="websocket">WebSocket</option>
+                            <option value="stream-http">Streamable HTTP</option>
+                            <option value="sse">Server-Sent Events</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="serverModalToken">Bearer Token</label>
+                        <div class="server-bearer-wrapper">
+                            <input type="password" id="serverModalToken" autocomplete="new-password" placeholder="Optional" spellcheck="false">
+                            <button type="button" id="toggleServerTokenVisibility" class="toggle-visibility-btn">Show</button>
+                        </div>
+                        <div class="form-hint">Leave blank if the server does not require authorization.</div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" id="serverModalCancel">Cancel</button>
+                <button type="button" id="serverModalSave" style="background-color: #28a745;">Save</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Import from LLM Modal -->
     <div id="importLLMModal" class="modal">
         <div class="modal-content">
@@ -768,13 +1002,21 @@
         let currentServerUrl = '';
         let isConnected = false;
         let activeSseController = null;
+        let serverEntries = [];
+        let selectedServerId = null;
+        let serverModalMode = 'add';
+        let serverModalEditingId = null;
+
+        const DEFAULT_WS_URL = 'ws://localhost:19999/mcp';
 
         // Local storage keys
         const STORAGE_KEYS = {
             TOOL_PARAMS: 'mcp_tool_params',
             REQUEST_HISTORY: 'mcp_request_history',
             SERVER_URL: 'mcp_server_url',
-            HTTP_TRANSPORT: 'mcp_http_transport'
+            HTTP_TRANSPORT: 'mcp_http_transport',
+            SERVER_ENTRIES: 'mcp_server_entries_v1',
+            SELECTED_SERVER_ID: 'mcp_selected_server_v1'
         };
         
         // Local Storage utility functions
@@ -794,6 +1036,61 @@
                 console.warn('Failed to load from localStorage:', e);
                 return defaultValue;
             }
+        }
+
+        function removeFromLocalStorage(key) {
+            try {
+                localStorage.removeItem(key);
+            } catch (e) {
+                console.warn('Failed to remove from localStorage:', e);
+            }
+        }
+
+        function generateServerId() {
+            return 'srv_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+        }
+
+        function loadServerEntries() {
+            const entries = loadFromLocalStorage(STORAGE_KEYS.SERVER_ENTRIES, []);
+            return Array.isArray(entries) ? entries : [];
+        }
+
+        function saveServerEntries(entries) {
+            serverEntries = Array.isArray(entries) ? entries : [];
+            saveToLocalStorage(STORAGE_KEYS.SERVER_ENTRIES, serverEntries);
+        }
+
+        function loadSelectedServerKey() {
+            return loadFromLocalStorage(STORAGE_KEYS.SELECTED_SERVER_ID, null);
+        }
+
+        function saveSelectedServerKey(id) {
+            if (id) {
+                saveToLocalStorage(STORAGE_KEYS.SELECTED_SERVER_ID, id);
+            } else {
+                removeFromLocalStorage(STORAGE_KEYS.SELECTED_SERVER_ID);
+            }
+        }
+
+        function getServerById(id) {
+            if (!id) {
+                return null;
+            }
+            return serverEntries.find(server => server.id === id) || null;
+        }
+
+        function getSelectedServer() {
+            return getServerById(selectedServerId);
+        }
+
+        const TRANSPORT_LABELS = {
+            websocket: 'WebSocket',
+            'stream-http': 'Streamable HTTP',
+            sse: 'Server-Sent Events'
+        };
+
+        function formatTransportLabel(type) {
+            return TRANSPORT_LABELS[type] || type;
         }
         
         // Save tool parameters
@@ -1153,6 +1450,12 @@
         const jsonEditor = document.getElementById('jsonEditor');
         const responseViewer = document.getElementById('responseViewer');
         const statusElement = document.getElementById('status');
+        const serverDropdownButton = document.getElementById('serverDropdownButton');
+        const serverDropdownLabel = document.getElementById('serverDropdownLabel');
+        const serverDropdownMenu = document.getElementById('serverDropdownMenu');
+        const serverListContainer = document.getElementById('serverListContainer');
+        const serverEmptyState = document.getElementById('serverEmptyState');
+        const addServerBtn = document.getElementById('addServerBtn');
         const serverUrlInput = document.getElementById('serverUrl');
         const httpTransportSelectWrapper = document.getElementById('httpTransportSelectWrapper');
         const httpTransportSelect = document.getElementById('httpTransportSelect');
@@ -1160,6 +1463,15 @@
         const methodsList = document.getElementById('methodsList');
         const noSchemaMessage = document.getElementById('noSchemaMessage');
         const schemaFormEditor = document.getElementById('schemaFormEditor');
+        const serverModal = document.getElementById('serverModal');
+        const serverModalTitle = document.getElementById('serverModalTitle');
+        const serverModalUrl = document.getElementById('serverModalUrl');
+        const serverModalType = document.getElementById('serverModalType');
+        const serverModalToken = document.getElementById('serverModalToken');
+        const toggleServerTokenVisibility = document.getElementById('toggleServerTokenVisibility');
+        const serverModalCancel = document.getElementById('serverModalCancel');
+        const serverModalSave = document.getElementById('serverModalSave');
+        const serverModalClose = document.getElementById('serverModalClose');
         
         // Event listeners
         connectBtn.addEventListener('click', () => { connect().catch(err => log('Connection error: ' + err.message)); });
@@ -1177,15 +1489,379 @@
         nextResponseBtn.addEventListener('click', navigateToNextResponse);
         clearParamsBtn.addEventListener('click', clearCurrentToolParams);
         clearHistoryBtn.addEventListener('click', clearRequestHistory);
-        serverUrlInput.addEventListener('input', handleServerUrlInputChange);
         httpTransportSelect.addEventListener('change', () => {
             httpTransportPreference = httpTransportSelect.value;
             saveHttpTransportPreference(httpTransportPreference);
         });
-        
+        serverDropdownButton.addEventListener('click', toggleServerDropdown);
+        addServerBtn.addEventListener('click', () => {
+            closeServerDropdown();
+            openServerModal();
+        });
+        serverListContainer.addEventListener('click', handleServerListInteraction);
+        document.addEventListener('click', (event) => {
+            if (!serverDropdownMenu.classList.contains('open')) {
+                return;
+            }
+            if (event.target.closest('.server-selector')) {
+                return;
+            }
+            closeServerDropdown();
+        });
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') {
+                if (serverDropdownMenu.classList.contains('open')) {
+                    closeServerDropdown();
+                }
+                if (serverModal.style.display === 'block') {
+                    closeServerModal();
+                }
+            }
+        });
+        serverModalCancel.addEventListener('click', closeServerModal);
+        serverModalClose.addEventListener('click', closeServerModal);
+        serverModalSave.addEventListener('click', handleServerModalSave);
+        toggleServerTokenVisibility.addEventListener('click', toggleBearerVisibility);
+        serverModal.addEventListener('click', (event) => {
+            if (event.target === serverModal) {
+                closeServerModal();
+            }
+        });
+
         // JSON editor change detection
         let jsonEditorChangeTimer = null;
-        
+
+        function toggleServerDropdown() {
+            if (serverDropdownMenu.classList.contains('open')) {
+                closeServerDropdown();
+                return;
+            }
+            renderServerDropdown();
+            const buttonWidth = serverDropdownButton.getBoundingClientRect().width;
+            serverDropdownMenu.style.minWidth = Math.max(280, Math.ceil(buttonWidth)) + 'px';
+            serverDropdownMenu.classList.add('open');
+        }
+
+        function closeServerDropdown() {
+            serverDropdownMenu.classList.remove('open');
+        }
+
+        function handleServerListInteraction(event) {
+            const action = event.target.dataset.action;
+            const serverId = event.target.dataset.serverId;
+
+            if (action === 'delete') {
+                event.stopPropagation();
+                deleteServer(serverId);
+                return;
+            }
+
+            if (action === 'edit') {
+                event.stopPropagation();
+                closeServerDropdown();
+                openServerModal({ mode: 'edit', serverId });
+                return;
+            }
+
+            const item = event.target.closest('.server-menu-item');
+            if (item) {
+                selectServer(item.dataset.serverId);
+                closeServerDropdown();
+            }
+        }
+
+        function renderServerDropdown() {
+            if (!serverListContainer) {
+                return;
+            }
+
+            serverListContainer.innerHTML = '';
+
+            if (!serverEntries.length) {
+                serverEmptyState.style.display = 'block';
+                return;
+            }
+
+            serverEmptyState.style.display = 'none';
+
+            serverEntries.forEach((server) => {
+                const item = document.createElement('div');
+                item.className = 'server-menu-item';
+                item.dataset.serverId = server.id;
+                if (server.id === selectedServerId) {
+                    item.classList.add('active');
+                }
+
+                const info = document.createElement('div');
+                info.className = 'server-menu-info';
+
+                const urlElem = document.createElement('div');
+                urlElem.className = 'server-menu-url';
+                urlElem.textContent = server.url;
+                info.appendChild(urlElem);
+
+                const meta = document.createElement('div');
+                meta.className = 'server-menu-meta';
+
+                const typeElem = document.createElement('span');
+                typeElem.className = 'server-menu-type';
+                typeElem.textContent = formatTransportLabel(server.type);
+                meta.appendChild(typeElem);
+
+                if (server.bearerToken) {
+                    const bearerElem = document.createElement('span');
+                    bearerElem.className = 'server-menu-bearer';
+                    bearerElem.title = 'Bearer token configured';
+                    bearerElem.textContent = '✓';
+                    meta.appendChild(bearerElem);
+                }
+
+                info.appendChild(meta);
+                item.appendChild(info);
+
+                const actions = document.createElement('div');
+                actions.className = 'server-menu-actions';
+
+                const editBtn = document.createElement('button');
+                editBtn.type = 'button';
+                editBtn.className = 'server-menu-btn edit';
+                editBtn.dataset.action = 'edit';
+                editBtn.dataset.serverId = server.id;
+                editBtn.textContent = 'Edit';
+                editBtn.title = 'Edit server';
+                actions.appendChild(editBtn);
+
+                const deleteBtn = document.createElement('button');
+                deleteBtn.type = 'button';
+                deleteBtn.className = 'server-menu-btn delete';
+                deleteBtn.dataset.action = 'delete';
+                deleteBtn.dataset.serverId = server.id;
+                deleteBtn.textContent = 'Delete';
+                deleteBtn.title = 'Delete server';
+                actions.appendChild(deleteBtn);
+
+                item.appendChild(actions);
+                serverListContainer.appendChild(item);
+            });
+        }
+
+        function persistSelectedServer(server) {
+            if (!server) {
+                selectedServerId = null;
+                saveSelectedServerKey(null);
+                return;
+            }
+
+            selectedServerId = server.id;
+            saveSelectedServerKey(server.id);
+            saveServerUrl(server.url);
+
+            if (server.type === 'stream-http' || server.type === 'sse') {
+                httpTransportPreference = server.type;
+                saveHttpTransportPreference(server.type);
+            }
+        }
+
+        function updateTransportControlsForServer(server) {
+            if (server && (server.type === 'stream-http' || server.type === 'sse')) {
+                httpTransportPreference = server.type;
+                httpTransportSelect.value = server.type;
+                httpTransportSelect.disabled = true;
+                httpTransportSelectWrapper.style.display = 'inline-flex';
+            } else {
+                httpTransportSelectWrapper.style.display = 'none';
+                httpTransportSelect.disabled = false;
+            }
+        }
+
+        function applyServerSelection(server) {
+            if (!server) {
+                serverDropdownLabel.textContent = 'Servers';
+                serverUrlInput.value = '';
+                currentServerUrl = '';
+                updateTransportControlsForServer(null);
+                return;
+            }
+
+            serverDropdownLabel.textContent = server.url;
+            serverUrlInput.value = server.url;
+            currentServerUrl = server.url;
+            updateTransportControlsForServer(server);
+        }
+
+        function selectServer(serverId) {
+            const server = getServerById(serverId);
+            if (!server) {
+                return;
+            }
+
+            persistSelectedServer(server);
+            applyServerSelection(server);
+            renderServerDropdown();
+        }
+
+        function deleteServer(serverId) {
+            const server = getServerById(serverId);
+            if (!server) {
+                return;
+            }
+
+            if (!confirm(`Delete server "${server.url}"?`)) {
+                return;
+            }
+
+            serverEntries = serverEntries.filter(entry => entry.id !== serverId);
+            saveServerEntries(serverEntries);
+
+            if (selectedServerId === serverId) {
+                if (serverEntries.length) {
+                    const fallback = serverEntries[0];
+                    persistSelectedServer(fallback);
+                    applyServerSelection(fallback);
+                } else {
+                    persistSelectedServer(null);
+                    applyServerSelection(null);
+                }
+            }
+
+            renderServerDropdown();
+        }
+
+        function resetServerModal() {
+            serverModalUrl.value = '';
+            serverModalType.value = 'stream-http';
+            serverModalToken.value = '';
+            serverModalToken.type = 'password';
+            toggleServerTokenVisibility.textContent = 'Show';
+        }
+
+        function openServerModal({ mode = 'add', serverId = null } = {}) {
+            serverModalMode = mode;
+            serverModalEditingId = serverId;
+
+            if (mode === 'edit') {
+                const server = getServerById(serverId);
+                if (!server) {
+                    return;
+                }
+                serverModalTitle.textContent = 'Edit Server';
+                serverModalUrl.value = server.url;
+                serverModalType.value = server.type;
+                serverModalToken.value = server.bearerToken || '';
+                serverModalToken.type = 'password';
+                toggleServerTokenVisibility.textContent = 'Show';
+            } else {
+                serverModalTitle.textContent = 'Add Server';
+                resetServerModal();
+                const activeServer = getSelectedServer();
+                if (activeServer) {
+                    serverModalType.value = activeServer.type;
+                }
+            }
+
+            serverModal.style.display = 'block';
+            setTimeout(() => {
+                serverModalUrl.focus();
+            }, 0);
+        }
+
+        function closeServerModal() {
+            serverModal.style.display = 'none';
+            resetServerModal();
+        }
+
+        function toggleBearerVisibility() {
+            if (serverModalToken.type === 'password') {
+                serverModalToken.type = 'text';
+                toggleServerTokenVisibility.textContent = 'Hide';
+            } else {
+                serverModalToken.type = 'password';
+                toggleServerTokenVisibility.textContent = 'Show';
+            }
+        }
+
+        function handleServerModalSave() {
+            const url = serverModalUrl.value.trim();
+            const type = serverModalType.value;
+            const bearerToken = serverModalToken.value.trim();
+
+            if (!url) {
+                alert('Please enter a server URL.');
+                return;
+            }
+
+            if (type === 'websocket' && !isWebSocketUrl(url)) {
+                alert('WebSocket URLs must start with ws:// or wss://');
+                return;
+            }
+
+            if ((type === 'stream-http' || type === 'sse') && !isHttpUrl(url)) {
+                alert('HTTP transports require URLs that start with http:// or https://');
+                return;
+            }
+
+            if (!['websocket', 'stream-http', 'sse'].includes(type)) {
+                alert('Unknown transport type.');
+                return;
+            }
+
+            const sanitizedToken = bearerToken || '';
+
+            if (serverModalMode === 'edit') {
+                const existing = getServerById(serverModalEditingId);
+                if (!existing) {
+                    alert('Unable to locate server to edit.');
+                    return;
+                }
+
+                const updated = {
+                    id: existing.id,
+                    url,
+                    type,
+                    bearerToken: sanitizedToken
+                };
+
+                serverEntries = [updated, ...serverEntries.filter(entry => entry.id !== existing.id)];
+                saveServerEntries(serverEntries);
+                persistSelectedServer(updated);
+                applyServerSelection(updated);
+                renderServerDropdown();
+                closeServerModal();
+                return;
+            }
+
+            const duplicate = serverEntries.find(entry => entry.url === url && entry.type === type);
+            if (duplicate) {
+                const updatedDuplicate = {
+                    id: duplicate.id,
+                    url,
+                    type,
+                    bearerToken: sanitizedToken
+                };
+                serverEntries = [updatedDuplicate, ...serverEntries.filter(entry => entry.id !== duplicate.id)];
+                saveServerEntries(serverEntries);
+                persistSelectedServer(updatedDuplicate);
+                applyServerSelection(updatedDuplicate);
+                renderServerDropdown();
+                closeServerModal();
+                return;
+            }
+
+            const newServer = {
+                id: generateServerId(),
+                url,
+                type,
+                bearerToken: sanitizedToken
+            };
+
+            serverEntries = [newServer, ...serverEntries];
+            saveServerEntries(serverEntries);
+            persistSelectedServer(newServer);
+            applyServerSelection(newServer);
+            renderServerDropdown();
+            closeServerModal();
+        }
+
         jsonEditor.addEventListener('input', () => {
             // Skip if this change was triggered by code (not user)
             if (isUpdatingFromCode) return;
@@ -1212,26 +1888,52 @@
         });
         
         // Initialize from storage
-        function initializeFromStorage() {
-            // Load server URL
-            const savedServerUrl = loadServerUrl();
-            if (savedServerUrl) {
-                serverUrlInput.value = savedServerUrl;
+        function initializeServerState() {
+            serverEntries = loadServerEntries();
+            selectedServerId = loadSelectedServerKey();
+
+            if (!serverEntries.length) {
+                const legacyUrl = loadServerUrl();
+                const fallbackUrl = typeof legacyUrl === 'string' && legacyUrl ? legacyUrl : DEFAULT_WS_URL;
+                const inferredType = isHttpUrl(fallbackUrl)
+                    ? (loadHttpTransportPreference() === 'sse' ? 'sse' : 'stream-http')
+                    : 'websocket';
+                const defaultServer = {
+                    id: generateServerId(),
+                    url: fallbackUrl,
+                    type: inferredType,
+                    bearerToken: ''
+                };
+                serverEntries = [defaultServer];
+                saveServerEntries(serverEntries);
+                selectedServerId = defaultServer.id;
+                saveSelectedServerKey(selectedServerId);
             }
 
-            httpTransportPreference = loadHttpTransportPreference();
-            httpTransportSelect.value = httpTransportPreference;
-            updateHttpTransportControls();
+            if (selectedServerId && !getServerById(selectedServerId)) {
+                selectedServerId = serverEntries[0]?.id || null;
+                saveSelectedServerKey(selectedServerId);
+            } else if (!selectedServerId && serverEntries.length) {
+                selectedServerId = serverEntries[0].id;
+                saveSelectedServerKey(selectedServerId);
+            }
+
+            renderServerDropdown();
+            const activeServer = getServerById(selectedServerId);
+            if (activeServer) {
+                persistSelectedServer(activeServer);
+            }
+            applyServerSelection(activeServer);
+        }
+
+        function initializeFromStorage() {
+            initializeServerState();
 
             // Load request history
             requestHistory = loadRequestHistory();
             
             // Update history flow indicator
             updateHistoryFlowIndicator();
-        }
-
-        function handleServerUrlInputChange() {
-            updateHttpTransportControls();
         }
 
         function isWebSocketUrl(url) {
@@ -1258,19 +1960,20 @@
             return 'websocket';
         }
 
-        function updateHttpTransportControls() {
-            const url = serverUrlInput.value.trim();
-            if (isHttpUrl(url)) {
-                httpTransportSelectWrapper.style.display = 'inline-flex';
-                if (!httpTransportPreference) {
-                    httpTransportPreference = loadHttpTransportPreference();
-                }
-                httpTransportSelect.value = httpTransportPreference;
-            } else {
-                httpTransportSelectWrapper.style.display = 'none';
+        function getAuthorizationHeader() {
+            const server = getSelectedServer();
+            if (!server) {
+                return null;
             }
+            if (!server.bearerToken) {
+                return null;
+            }
+            if (server.type !== 'stream-http' && server.type !== 'sse') {
+                return null;
+            }
+            return 'Bearer ' + server.bearerToken;
         }
-        
+
         // Update history flow indicator
         function updateHistoryFlowIndicator() {
             const historyCount = loadRequestHistory().length;
@@ -1739,9 +2442,10 @@
         
         // Connect and Handshake automation
         async function connectAndInitialize() {
-            const url = serverUrlInput.value.trim();
+            const server = getSelectedServer();
+            const url = server ? server.url.trim() : '';
             if (!url) {
-                alert('Please enter a server URL');
+                alert('Please add and select a server before connecting.');
                 return;
             }
 
@@ -1925,18 +2629,27 @@
 
         // Transport helpers
         async function connect() {
-            const url = serverUrlInput.value.trim();
+            const server = getSelectedServer();
+            const url = server ? server.url.trim() : '';
             if (!url) {
-                alert('Please enter a server URL');
+                alert('Please add and select a server before connecting.');
                 return;
             }
 
-            if (isHttpUrl(url)) {
+            if (server && (server.type === 'stream-http' || server.type === 'sse')) {
+                httpTransportPreference = server.type;
+                httpTransportSelect.value = server.type;
+                saveHttpTransportPreference(server.type);
+            } else if (isHttpUrl(url)) {
                 httpTransportPreference = httpTransportSelect.value || httpTransportPreference || 'stream-http';
                 saveHttpTransportPreference(httpTransportPreference);
             }
 
             currentTransport = determineTransportForUrl(url);
+            if (server && (server.type === 'stream-http' || server.type === 'sse')) {
+                currentTransport = server.type;
+            }
+
             currentServerUrl = url;
 
             // Clear cached data from previous connection
@@ -2185,12 +2898,18 @@
         async function sendOverHttp(request, payloadText, expectResponse = true) {
             let response;
             try {
+                const headers = {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                };
+                const authHeader = getAuthorizationHeader();
+                if (authHeader) {
+                    headers.Authorization = authHeader;
+                }
+
                 response = await fetch(currentServerUrl, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    },
+                    headers,
                     body: payloadText
                 });
             } catch (error) {
@@ -2252,12 +2971,18 @@
 
             let response;
             try {
+                const headers = {
+                    'Content-Type': 'application/json',
+                    'Accept': 'text/event-stream'
+                };
+                const authHeader = getAuthorizationHeader();
+                if (authHeader) {
+                    headers.Authorization = authHeader;
+                }
+
                 response = await fetch(enhanceUrlForSse(currentServerUrl), {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'text/event-stream'
-                    },
+                    headers,
                     body: payloadText,
                     signal: activeSseController.signal
                 });
