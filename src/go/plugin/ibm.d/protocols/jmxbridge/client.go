@@ -193,19 +193,24 @@ func (c *Client) Send(ctx context.Context, cmd Command) (*Response, error) {
 		return nil, fmt.Errorf("jmxbridge: failed to send command: %w", err)
 	}
 
+	scanner := c.scanner
+	if scanner == nil {
+		return nil, errors.New("jmxbridge: response scanner not initialised")
+	}
+
 	type result struct {
 		line string
 		err  error
 	}
 
 	resCh := make(chan result, 1)
-	go func() {
-		if c.scanner.Scan() {
-			resCh <- result{line: c.scanner.Text()}
+	go func(s *bufio.Scanner) {
+		if s.Scan() {
+			resCh <- result{line: s.Text()}
 		} else {
-			resCh <- result{err: c.scanner.Err()}
+			resCh <- result{err: s.Err()}
 		}
-	}()
+	}(scanner)
 
 	select {
 	case <-ctx.Done():
