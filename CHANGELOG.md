@@ -1,8 +1,8 @@
 # Changelog
 
-## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+## [v2.7.0](https://github.com/netdata/netdata/tree/v2.7.0) (2025-09-25)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v2.6.3...HEAD)
+[Full Changelog](https://github.com/netdata/netdata/compare/v2.6.3...v2.7.0)
 
 **Merged pull requests:**
 
@@ -140,6 +140,7 @@
 - Update documentation [\#20865](https://github.com/netdata/netdata/pull/20865) ([thiagoftsm](https://github.com/thiagoftsm))
 - Update documentation \(Windows.plugin\) [\#20864](https://github.com/netdata/netdata/pull/20864) ([thiagoftsm](https://github.com/thiagoftsm))
 - chore\(go.d/snmp\): more vendor-scoped meta yaml files [\#20863](https://github.com/netdata/netdata/pull/20863) ([ilyam8](https://github.com/ilyam8))
+- Properly integrate Rust code checks in CI. [\#20862](https://github.com/netdata/netdata/pull/20862) ([Ferroin](https://github.com/Ferroin))
 - improve\(go.d/snmp\): update snmp meta copilot [\#20861](https://github.com/netdata/netdata/pull/20861) ([ilyam8](https://github.com/ilyam8))
 - Handle virtual host disconnection [\#20860](https://github.com/netdata/netdata/pull/20860) ([stelfrag](https://github.com/stelfrag))
 - Add cargo lock file. [\#20855](https://github.com/netdata/netdata/pull/20855) ([vkalintiris](https://github.com/vkalintiris))
@@ -446,7 +447,6 @@
 - Regenerate integrations docs [\#20506](https://github.com/netdata/netdata/pull/20506) ([netdatabot](https://github.com/netdatabot))
 - improve\(go.d/snmp profiles\): simplify \_generic-if.yaml and add interface type tags [\#20505](https://github.com/netdata/netdata/pull/20505) ([ilyam8](https://github.com/ilyam8))
 - fix snmp prof mikrotik mem tagging [\#20504](https://github.com/netdata/netdata/pull/20504) ([ilyam8](https://github.com/ilyam8))
-- feat\(go.d/ddsnmp\): make SNMP profile collection configurable [\#20503](https://github.com/netdata/netdata/pull/20503) ([ilyam8](https://github.com/ilyam8))
 
 ## [v2.5.4](https://github.com/netdata/netdata/tree/v2.5.4) (2025-06-24)
 
