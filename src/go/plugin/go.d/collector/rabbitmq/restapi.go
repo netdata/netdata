@@ -36,11 +36,6 @@ func (a *apiWhoamiTags) UnmarshalJSON(data []byte) error {
 		return nil
 	}
 
-	if string(data) == "null" {
-		*a = nil
-		return nil
-	}
-
 	return fmt.Errorf("unexpected tags format: %s", string(data))
 }
 
