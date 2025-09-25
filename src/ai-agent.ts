@@ -257,7 +257,13 @@ export class AIAgentSession {
       parallelToolCalls: sessionConfig.parallelToolCalls,
       traceTools: sessionConfig.traceMCP === true,
     }, this.opTree, (tree: SessionNode) => { try { this.sessionConfig.callbacks?.onOpTree?.(tree); } catch (e) { warn(`onOpTree callback failed: ${e instanceof Error ? e.message : String(e)}`); } }, (entry, opts) => { this.log(entry, opts); }, sessionConfig.callbacks?.onAccounting);
-    orch.register(new MCPProvider('mcp', sessionConfig.config.mcpServers, { trace: sessionConfig.traceMCP, verbose: sessionConfig.verbose, requestTimeoutMs: sessionConfig.toolTimeout, onLog: (e) => { this.log(e); } }));
+    orch.register(new MCPProvider('mcp', sessionConfig.config.mcpServers, {
+      trace: sessionConfig.traceMCP,
+      verbose: sessionConfig.verbose,
+      requestTimeoutMs: sessionConfig.toolTimeout,
+      onLog: (e) => { this.log(e); },
+      initConcurrency: sessionConfig.mcpInitConcurrency
+    }));
     // Build selected REST tools by frontmatter selection
     if (this.sessionConfig.config.restTools !== undefined) {
       const selected: Record<string, RestToolConfig> = {};

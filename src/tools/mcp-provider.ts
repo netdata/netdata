@@ -5,6 +5,7 @@ import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 
 import type { ChildProcess } from 'node:child_process';
+import { performance } from 'node:perf_hooks';
 
 import type { MCPServerConfig, MCPTool, MCPServer, LogEntry } from '../types.js';
 import type { ToolExecuteOptions, ToolExecuteResult } from './types.js';
@@ -28,8 +29,9 @@ export class MCPProvider extends ToolProvider {
   private verbose = false;
   private requestTimeoutMs?: number;
   private onLog?: (entry: LogEntry) => void;
+  private initConcurrency?: number;
 
-  constructor(public readonly id: string, servers: Record<string, MCPServerConfig>, opts?: { trace?: boolean; verbose?: boolean; requestTimeoutMs?: number; onLog?: (entry: LogEntry) => void }) {
+  constructor(public readonly id: string, servers: Record<string, MCPServerConfig>, opts?: { trace?: boolean; verbose?: boolean; requestTimeoutMs?: number; onLog?: (entry: LogEntry) => void; initConcurrency?: number }) {
     super();
     this.serversConfig = servers;
     this.trace = opts?.trace === true;
@@ -39,6 +41,10 @@ export class MCPProvider extends ToolProvider {
       return typeof v === 'number' && Number.isFinite(v) && v > 0 ? Math.trunc(v) : undefined;
     })();
     this.onLog = opts?.onLog;
+    const limit = opts?.initConcurrency;
+    if (typeof limit === 'number' && Number.isFinite(limit) && limit > 0) {
+      this.initConcurrency = Math.trunc(limit);
+    }
   }
 
   override getInstructions(): string {
@@ -69,27 +75,79 @@ export class MCPProvider extends ToolProvider {
   
   private async doInitialize(): Promise<void> {
     const entries = Object.entries(this.serversConfig);
-    const failedServers: string[] = [];
-    // eslint-disable-next-line functional/no-loop-statements
-    for (const [name, config] of entries) {
-      try {
-        this.log('TRC', `initializing '${name}' (${config.type})`, `mcp:${name}`);
-        const server = await this.initializeServer(name, config);
-        this.servers.set(name, server);
-        this.log('TRC', `initialized '${name}' with ${String(server.tools.length)} tools`, `mcp:${name}`);
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        this.log('ERR', `failed to initialize '${name}': ${msg}`, `mcp:${name}`, true);
-        this.failedServers.add(name);
-        failedServers.push(`${name} (${msg})`);
+    if (entries.length === 0) {
+      this.initialized = true;
+      return;
+    }
+
+    const limit = this.initConcurrency ?? entries.length;
+    let active = 0;
+    const waiters: (() => void)[] = [];
+
+    const acquire = async (): Promise<void> => {
+      if (active < limit) {
+        active += 1;
+        return;
       }
+      await new Promise<void>((resolve) => { waiters.push(resolve); });
+      active += 1;
+    };
+
+    const release = (): void => {
+      active = Math.max(0, active - 1);
+      const next = waiters.shift();
+      if (next !== undefined) {
+        try { next(); } catch { /* noop */ }
+      }
+    };
+
+    interface InitResult { name: string; elapsedMs: number; status: 'success' | 'failure'; error?: string }
+    const results: InitResult[] = [];
+    const failedServers: string[] = [];
+
+    const warmupStart = performance.now();
+
+    try {
+      await Promise.all(entries.map(async ([name, config]) => {
+        await acquire();
+        const start = performance.now();
+        try {
+          this.log('TRC', `initializing '${name}' (${config.type})`, `mcp:${name}`);
+          const server = await this.initializeServer(name, config);
+          this.servers.set(name, server);
+          this.log('TRC', `initialized '${name}' with ${String(server.tools.length)} tools`, `mcp:${name}`);
+          const elapsedMs = Math.round(performance.now() - start);
+          results.push({ name, elapsedMs, status: 'success' });
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          const elapsedMs = Math.round(performance.now() - start);
+          this.log('ERR', `failed to initialize '${name}': ${msg}`, `mcp:${name}`, true);
+          this.failedServers.add(name);
+          failedServers.push(`${name} (${msg})`);
+          results.push({ name, elapsedMs, status: 'failure', error: msg });
+        } finally {
+          release();
+        }
+      }));
+    } finally {
+      this.initializationPromise = undefined;
     }
-    
-    // Fail fast if any servers failed to initialize
+
+    const totalElapsed = Math.round(performance.now() - warmupStart);
+    const sorted = results.sort((a, b) => b.elapsedMs - a.elapsedMs);
+    const summaryParts = sorted.length > 0
+      ? sorted.map((r) => {
+          const base = `${r.name}=${String(r.elapsedMs)}ms`;
+          return r.status === 'success' ? base : `${base} FAILED (${r.error ?? 'unknown error'})`;
+        })
+      : ['<no servers>'];
+    this.log('VRB', `MCP initialization latencies (total=${String(totalElapsed)}ms, desc): ${summaryParts.join(', ')}`, 'mcp:init');
+
     if (failedServers.length > 0) {
-      throw new Error(`Failed to initialize MCP servers: ${failedServers.join(', ')}`);
+      const warnMessage = `Some MCP servers failed to initialize and will be unavailable: ${failedServers.join(', ')}`;
+      this.log('WRN', warnMessage, 'mcp:init');
     }
-    
+
     this.initialized = true;
   }
 
