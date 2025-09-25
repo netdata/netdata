@@ -51,3 +51,4 @@ An SRE investigating cluster slowness sees synthesized findings about container 
 - Available on Business and Free Trial plans
 - Each report consumes 1 AI credit (10 free per month on eligible plans)
 - Results are saved in Insights and downloadable as PDFs
+

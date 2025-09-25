@@ -84,3 +84,4 @@ Automate recurring investigations (weekly health, monthly optimization, SLO conf
 - `Investigations` overview
 - `Scheduled Investigations`
 - `Alert Troubleshooting`
+

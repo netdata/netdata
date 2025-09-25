@@ -48,3 +48,4 @@ breaches, contributing factors, and remediation recommendations.
 
 - Available on Business and Free Trial plans
 - 10 free AI runs/month on eligible Spaces; additional usage via AI Credits
+

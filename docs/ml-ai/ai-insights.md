@@ -6,12 +6,12 @@ AI Insights generates on‑demand reports from your Netdata telemetry to explain
 
 ## Report types
 
-- [Infrastructure Summary](/docs/netdata-ai/insights/infrastructure-summary.mdx)
-- [Performance Optimization](/docs/netdata-ai/insights/performance-optimization.mdx)
-- [Capacity Planning](/docs/netdata-ai/insights/capacity-planning.mdx)
-- [Anomaly Analysis](/docs/netdata-ai/insights/anomaly-analysis.mdx)
+- [Infrastructure Summary](/docs/netdata-ai/insights/infrastructure-summary.md)
+- [Performance Optimization](/docs/netdata-ai/insights/performance-optimization.md)
+- [Capacity Planning](/docs/netdata-ai/insights/capacity-planning.md)
+- [Anomaly Analysis](/docs/netdata-ai/insights/anomaly-analysis.md)
 
-Schedule recurring runs: [Scheduled Reports](/docs/netdata-ai/insights/scheduled-reports.mdx)
+Schedule recurring runs: [Scheduled Reports](/docs/netdata-ai/insights/scheduled-reports.md)
 
 ## Generate a report
 

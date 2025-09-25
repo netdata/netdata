@@ -65,6 +65,6 @@ Context:
 
 ## Related documentation
 
-- [Custom Investigations](/docs/netdata-ai/investigations/custom-investigations.mdx)
-- [Scheduled Investigations](/docs/netdata-ai/investigations/scheduled-investigations.mdx)
+- [Custom Investigations](/docs/netdata-ai/investigations/custom-investigations.md)
+- [Scheduled Investigations](/docs/netdata-ai/investigations/scheduled-investigations.md)
 - [Alert Troubleshooting](/docs/troubleshooting/troubleshoot.md)

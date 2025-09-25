@@ -17,16 +17,16 @@ Netdata AI is a set of analysis and troubleshooting capabilities built into Netd
 
 Generates on‑demand, professional reports (see [AI Insights](/docs/ml-ai/ai-insights.md)):
 
-- [Infrastructure Summary](/docs/netdata-ai/insights/infrastructure-summary.mdx) – incident timelines, health, and prioritized actions
-- [Performance Optimization](/docs/netdata-ai/insights/performance-optimization.mdx) – bottlenecks, contention, and concrete tuning steps
-- [Capacity Planning](/docs/netdata-ai/insights/capacity-planning.mdx) – growth projections and exhaustion dates
-- [Anomaly Analysis](/docs/netdata-ai/insights/anomaly-analysis.mdx) – forensics on unusual behavior and likely causes
+- [Infrastructure Summary](/docs/netdata-ai/insights/infrastructure-summary.md) – incident timelines, health, and prioritized actions
+- [Performance Optimization](/docs/netdata-ai/insights/performance-optimization.md) – bottlenecks, contention, and concrete tuning steps
+- [Capacity Planning](/docs/netdata-ai/insights/capacity-planning.md) – growth projections and exhaustion dates
+- [Anomaly Analysis](/docs/netdata-ai/insights/anomaly-analysis.md) – forensics on unusual behavior and likely causes
 
-Each report includes an executive summary, evidence, and actionable recommendations. Reports are downloadable as PDFs and shareable with your team. You can also [schedule reports](/docs/netdata-ai/insights/scheduled-reports.mdx).
+Each report includes an executive summary, evidence, and actionable recommendations. Reports are downloadable as PDFs and shareable with your team. You can also [schedule reports](/docs/netdata-ai/insights/scheduled-reports.md).
 
 ### 2) Investigations
 
-Ask open‑ended questions (“what changed here?”, “why did X regress?”) and get a researched answer using your telemetry — see the [Investigations overview](/docs/netdata-ai/investigations/index.mdx). Launch from the “Troubleshoot with AI” button (captures current scope) or from Insights → New Investigation. Create [Custom Investigations](/docs/netdata-ai/investigations/custom-investigations.mdx) and set up [Scheduled Investigations](/docs/netdata-ai/investigations/scheduled-investigations.mdx).
+Ask open‑ended questions (“what changed here?”, “why did X regress?”) and get a researched answer using your telemetry — see the [Investigations overview](/docs/netdata-ai/investigations/index.md). Launch from the “Troubleshoot with AI” button (captures current scope) or from Insights → New Investigation. Create [Custom Investigations](/docs/netdata-ai/investigations/custom-investigations.md) and set up [Scheduled Investigations](/docs/netdata-ai/investigations/scheduled-investigations.md).
 
 ### 3) Troubleshooting
 
@@ -34,7 +34,7 @@ Ask open‑ended questions (“what changed here?”, “why did X regress?”) 
 - [Anomaly Advisor](/docs/ml-ai/anomaly-advisor.md) – interactive exploration of how anomalies propagate across systems
 - [Metric Correlations](/docs/metric-correlations.md) – focus on the most relevant charts for any time window
 
-See the [Troubleshooting overview](/docs/netdata-ai/troubleshooting/index.mdx). From any view, use the [Troubleshoot with AI button](/docs/netdata-ai/troubleshooting/troubleshoot-button.mdx).
+See the [Troubleshooting overview](/docs/netdata-ai/troubleshooting/index.md). From any view, use the [Troubleshoot with AI button](/docs/netdata-ai/troubleshooting/troubleshoot-button.md).
 
 ### 4) Anomaly Detection
 

@@ -53,3 +53,4 @@ At the scheduled time, Netdata AI runs the report and delivers it to your email 
 - Start with weekly summaries to establish a baseline
 - Schedule targeted reports for critical services or high‑cost areas
 - Use schedules to feed regular Slack/email updates and leadership briefs
+

@@ -24,3 +24,4 @@ From any dashboard or time window, surface the charts most related to your selec
 
 - Troubleshoot Button (how to trigger analysis from anywhere)
 - Investigations (ask open‑ended questions with rich context)
+

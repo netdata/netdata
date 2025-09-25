@@ -47,3 +47,4 @@ Point the report at a suspicious time window and let it reconstruct the change: 
 
 - Available on Business and Free Trial plans
 - Each report consumes 1 AI credit (10 free per month on eligible plans)
+

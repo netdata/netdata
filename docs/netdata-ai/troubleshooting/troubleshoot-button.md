@@ -38,3 +38,4 @@ Within ~2 minutes, you’ll receive a report with:
 ## Privacy
 
 Your infrastructure data is summarized to a compact context for analysis and is not used to train foundation models.
+
