@@ -58,6 +58,7 @@ https://github.com/netdata/netdata/edit/master/docs/netdata-agent/configuration/
 https://github.com/netdata/netdata/edit/master/docs/netdata-agent/configuration/running-the-netdata-agent-behind-a-reverse-proxy/Running-behind-h2o.md,H2O,Published,Netdata Agent/Configuration/Securing Agents/Running the Agent behind a reverse proxy,
 https://github.com/netdata/netdata/edit/master/docs/netdata-agent/configuration/optimize-the-netdata-agents-performance.md,Performance Optimization,Published,Netdata Agent/Configuration,"While the Netdata Agent is designed to monitor a system with only 1% CPU, you can optimize its performance for low-resource systems."
 https://github.com/netdata/netdata/edit/master/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts.md,"Organize systems, metrics, and alerts",Published,Netdata Agent/Configuration,
+https://github.com/netdata/netdata/edit/master/docs/netdata-agent/configuration/using-custom-ca-certificates-with-netdata.md,"Using custom CA certificates with Netdata",Published,Netdata Agent/Configuration,
 https://github.com/netdata/netdata/edit/master/src/daemon/README.md,Daemon,Published,Netdata Agent,
 https://github.com/netdata/netdata/edit/master/src/database/README.md,Database,Published,Netdata Agent,
 https://github.com/netdata/netdata/edit/master/src/libnetdata/log/README.md,Logging,Published,Netdata Agent,
