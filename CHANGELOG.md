@@ -6,7 +6,9 @@
 
 **Merged pull requests:**
 
+- Revert "ml: implement fixed time-based training windows \(\#20638\)" [\#21045](https://github.com/netdata/netdata/pull/21045) ([vkalintiris](https://github.com/vkalintiris))
 - chore\(go.d/ddsnmp\): Improve profile sorting by match specificity [\#21042](https://github.com/netdata/netdata/pull/21042) ([ilyam8](https://github.com/ilyam8))
+- Add documentation on using custom CA certificates to Learn [\#21041](https://github.com/netdata/netdata/pull/21041) ([ralphm](https://github.com/ralphm))
 - Context loading priority to vnodes [\#21040](https://github.com/netdata/netdata/pull/21040) ([stelfrag](https://github.com/stelfrag))
 - improve\(go.d/ddsnmp\): switch profile matching to `selector` [\#21039](https://github.com/netdata/netdata/pull/21039) ([ilyam8](https://github.com/ilyam8))
 - fix\(docs\): update mermaid diagrams leftovers plus syntax issues [\#21034](https://github.com/netdata/netdata/pull/21034) ([kanelatechnical](https://github.com/kanelatechnical))
@@ -445,9 +447,6 @@
 - improve\(go.d/snmp profiles\): simplify \_generic-if.yaml and add interface type tags [\#20505](https://github.com/netdata/netdata/pull/20505) ([ilyam8](https://github.com/ilyam8))
 - fix snmp prof mikrotik mem tagging [\#20504](https://github.com/netdata/netdata/pull/20504) ([ilyam8](https://github.com/ilyam8))
 - feat\(go.d/ddsnmp\): make SNMP profile collection configurable [\#20503](https://github.com/netdata/netdata/pull/20503) ([ilyam8](https://github.com/ilyam8))
-- Use ARAL for labels [\#20502](https://github.com/netdata/netdata/pull/20502) ([stelfrag](https://github.com/stelfrag))
-- SNMP: audiocodes profile [\#20501](https://github.com/netdata/netdata/pull/20501) ([Ancairon](https://github.com/Ancairon))
-- chore\(go.d/ddsnmp\): better label values sanitization [\#20500](https://github.com/netdata/netdata/pull/20500) ([ilyam8](https://github.com/ilyam8))
 
 ## [v2.5.4](https://github.com/netdata/netdata/tree/v2.5.4) (2025-06-24)
 
