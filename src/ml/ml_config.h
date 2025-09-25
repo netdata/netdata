@@ -8,10 +8,8 @@
 typedef struct {
     int enable_anomaly_detection;
 
-    time_t training_window;        // Training window in seconds
-    time_t min_training_window;    // Minimum training window in seconds
-    size_t max_training_vectors;   // Target number of vectors for training
-    size_t max_samples_to_smooth;  // Maximum smoothing window (adaptive)
+    unsigned max_train_samples;
+    unsigned min_train_samples;
     unsigned train_every;
 
     unsigned num_models_to_use;
@@ -20,7 +18,10 @@ typedef struct {
     unsigned db_engine_anomaly_rate_every;
 
     unsigned diff_n;
+    unsigned smooth_n;
     unsigned lag_n;
+
+    double random_sampling_ratio;
     unsigned max_kmeans_iters;
 
     double dimension_anomaly_score_threshold;

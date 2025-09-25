@@ -92,9 +92,14 @@ enum {
     IDX_IS_REGISTERED,
 };
 
+struct children {
+    int vnodes;
+    int normal;
+};
+
 static int create_host_callback(void *data, int argc, char **argv, char **column)
 {
-    int *number_of_chidren = data;
+    struct children *node_data = data;
     UNUSED(argc);
     UNUSED(column);
 
@@ -175,7 +180,10 @@ static int create_host_callback(void *data, int argc, char **argv, char **column
         pulse_host_status(host, 0, 0); // this will detect the receiver status
     }
 
-    (*number_of_chidren)++;
+    if (IS_VIRTUAL_HOST_OS(host))
+        node_data->vnodes++;
+    else
+        node_data->normal++;
 
 #ifdef NETDATA_INTERNAL_CHECKS
     char node_str[UUID_STR_LEN] = "<none>";
@@ -973,26 +981,41 @@ void create_aclk_config(RRDHOST *host, nd_uuid_t *host_uuid __maybe_unused, nd_u
     "SELECT ni.host_id, ni.node_id FROM host h, node_instance ni "                                                     \
     "WHERE h.host_id = ni.host_id AND ni.node_id IS NOT NULL"
 
+
+uv_sem_t ctx_sem;
+
 void aclk_synchronization_init(void)
 {
     char *err_msg = NULL;
     int rc;
 
     nd_log_daemon(NDLP_INFO, "Creating archived hosts");
-    int number_of_children = 0;
-    rc = sqlite3_exec_monitored(db_meta, SQL_FETCH_ALL_HOSTS, create_host_callback, &number_of_children, &err_msg);
+    struct children node_data = { 0, 0};
+
+    rc = sqlite3_exec_monitored(db_meta, SQL_FETCH_ALL_HOSTS, create_host_callback, &node_data, &err_msg);
 
     if (rc != SQLITE_OK) {
         nd_log_daemon(NDLP_ERR, "SQLite error when loading archived hosts, rc = %d (%s)", rc, err_msg);
         sqlite3_free(err_msg);
     }
 
-    nd_log_daemon(NDLP_INFO, "Created %d archived hosts", number_of_children);
+    nd_log_daemon(
+        NDLP_INFO,
+        "Created %d archived hosts (%d children and %d vnodes)",
+        node_data.normal + node_data.vnodes,
+        node_data.normal,
+        node_data.vnodes);
+
+    bool sem_init = true;
+    uv_sem_init(&ctx_sem, 0);
+
     // Trigger host context load for hosts that have been created
     if (unlikely(!metadata_queue_load_host_context())) {
         nd_log_daemon(NDLP_WARNING, "Failed to queue command to load contexts for archived hosts");
         // Reset context load flag so that contexts will be loaded on demand
         reset_host_context_load_flag();
+        uv_sem_destroy(&ctx_sem);
+        sem_init = false;
     }
 
     rc = sqlite3_exec_monitored(db_meta, SQL_FETCH_ALL_INSTANCES, aclk_config_parameters, NULL, &err_msg);
@@ -1004,9 +1027,28 @@ void aclk_synchronization_init(void)
 
     aclk_initialize_event_loop();
 
-    if (!number_of_children)
+    if (!(node_data.normal + node_data.vnodes))
         aclk_queue_node_info(localhost, true);
 
+    if (sem_init) {
+        int finished_vnodes = 0;
+        time_t deadline = now_realtime_sec() + 60;  // hard timeput to avoid infinite block
+        while (finished_vnodes < node_data.vnodes) {
+            if (uv_sem_trywait(&ctx_sem) == 0) {
+                finished_vnodes++;
+                continue;
+            }
+
+            if (now_realtime_sec() >= deadline) {
+                nd_log_daemon(NDLP_WARNING, "Vnodes context load still in progress, continue with agent start");
+                break;
+            }
+            sleep_usec(100 * USEC_PER_MS);
+        }
+        if (finished_vnodes == node_data.vnodes) {
+            uv_sem_destroy(&ctx_sem);
+        }
+    }
     nd_log_daemon(NDLP_INFO, "ACLK sync initialization completed");
 }
 
