@@ -264,10 +264,17 @@ export class ToolsOrchestrator {
         };
         exec = await provider.execute(effective, preparedArgs, { ...opts, timeoutMs: undefined, trace: this.opts.traceTools, onChildOpTree, parentOpPath });
       } else {
-        exec = await withTimeout(
-          provider.execute(effective, preparedArgs, { ...opts, timeoutMs: opts?.timeoutMs ?? this.opts.toolTimeout, trace: this.opts.traceTools }),
-          this.opts.toolTimeout
+        const providerTimeout = opts?.timeoutMs ?? this.opts.toolTimeout;
+        const execPromise = provider.execute(
+          effective,
+          preparedArgs,
+          { ...opts, timeoutMs: providerTimeout, trace: this.opts.traceTools }
         );
+        if (opts?.disableGlobalTimeout === true) {
+          exec = await execPromise;
+        } else {
+          exec = await withTimeout(execPromise, this.opts.toolTimeout);
+        }
       }
     } catch (e) {
       errorMessage = e instanceof Error ? e.message : String(e);

@@ -24,7 +24,19 @@
       "baseUrl": "https://api.anthropic.com/v1",
       "headers": {},
       "custom": {},
-      "mergeStrategy": "overlay"
+      "mergeStrategy": "overlay",
+      "models": {
+        "claude-opus-4-1-20250805": {
+          "overrides": {
+            "top_p": null
+          }
+        },
+        "claude-opus-4-20250514": {
+          "overrides": {
+            "top_p": null
+          }
+        }
+      }
     },
     "google": {
       "apiKey": "${GOOGLE_API_KEY}",
@@ -525,6 +537,14 @@
   },
   "pricing": {
     "anthropic": {
+      "claude-opus-4-1-20250805": {
+        "unit": "per_1m",
+        "currency": "USD",
+        "prompt": 15,
+        "completion": 75,
+        "cacheRead": 1.5,
+        "cacheWrite": 18.75
+      },
       "claude-opus-4-20250514": {
         "unit": "per_1m",
         "currency": "USD",

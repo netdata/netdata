@@ -6,6 +6,16 @@ import { z } from 'zod';
 
 import type { Configuration } from './types.js';
 
+const ProviderModelOverridesSchema = z.object({
+  temperature: z.number().min(0).max(2).nullable().optional(),
+  topP: z.number().min(0).max(1).nullable().optional(),
+  top_p: z.number().min(0).max(1).nullable().optional(),
+});
+
+const ProviderModelConfigSchema = z.object({
+  overrides: ProviderModelOverridesSchema.optional(),
+});
+
 const ProviderConfigSchema = z.object({
   apiKey: z.string().optional(),
   baseUrl: z.string().optional(),
@@ -14,6 +24,7 @@ const ProviderConfigSchema = z.object({
   mergeStrategy: z.enum(['overlay','override','deep']).optional(),
   type: z.enum(['openai','anthropic','google','openrouter','ollama']).optional(),
   openaiMode: z.enum(['responses','chat']).optional(),
+  models: z.record(z.string(), ProviderModelConfigSchema).optional(),
 });
 
 const MCPServerConfigSchema = z.object({

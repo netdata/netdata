@@ -136,6 +136,16 @@ export interface MCPServer {
 }
 
 // Provider configuration
+export interface ProviderModelOverrides {
+  temperature?: number | null;
+  topP?: number | null;
+  top_p?: number | null;
+}
+
+export interface ProviderModelConfig {
+  overrides?: ProviderModelOverrides;
+}
+
 export interface ProviderConfig {
   apiKey?: string;
   baseUrl?: string;
@@ -144,6 +154,7 @@ export interface ProviderConfig {
   mergeStrategy?: "overlay" | "override" | "deep";
   type?: 'openai' | 'anthropic' | 'google' | 'openrouter' | 'ollama';
   openaiMode?: 'responses' | 'chat';
+  models?: Record<string, ProviderModelConfig>;
 }
 
 export interface Configuration {

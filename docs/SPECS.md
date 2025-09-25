@@ -137,6 +137,39 @@ All string values in the configuration support environment variable expansion us
 }
 ```
 
+### Per-Model Parameter Overrides
+
+Some providers require bespoke sampling controls for specific models. Add a `models`
+block under the provider entry to override the `temperature` or `top_p`/`topP`
+values that will be sent to the LLM. Overrides take precedence over CLI options,
+frontmatter, and config defaults. Use `null` to omit a parameter entirely.
+
+```json
+{
+  "providers": {
+    "openrouter": {
+      "apiKey": "${OPENROUTER_KEY}",
+      "models": {
+        "meta-llama/llama-3": {
+          "overrides": {
+            "top_p": null
+          }
+        },
+        "openai/gpt-4o-mini": {
+          "overrides": {
+            "temperature": 0.2,
+            "topP": 1.0
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+In this example `meta-llama/llama-3` never receives a `top_p` value, while
+`openai/gpt-4o-mini` always uses the specified temperature and top-p values.
+
 ### Command Line vs Configuration Priority
 - **Flags override config**: Command line options override configuration file settings
 - **Defaults in config**: All timeout, limit, and model parameters can be set in the config file under `"defaults"`

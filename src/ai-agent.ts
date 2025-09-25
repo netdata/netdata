@@ -118,6 +118,38 @@ export class AIAgentSession {
   // Per-turn buffer of tool failures to synthesize messages when provider omits tool_error
   private pendingToolErrors: { id?: string; name: string; message: string; parameters?: Record<string, unknown> }[] = [];
 
+  private resolveModelOverrides(
+    provider: string,
+    model: string
+  ): { temperature?: number | null; topP?: number | null } {
+    const providers = this.sessionConfig.config.providers;
+    const providerConfig = Object.prototype.hasOwnProperty.call(providers, provider)
+      ? providers[provider]
+      : undefined;
+    if (providerConfig === undefined) return {};
+    const modelConfig = providerConfig.models?.[model];
+    const overrides = modelConfig?.overrides;
+    if (overrides === undefined) return {};
+    const result: { temperature?: number | null; topP?: number | null } = {};
+
+    const overrideTemperature = overrides.temperature;
+    if (overrideTemperature !== undefined) {
+      result.temperature = overrideTemperature ?? null;
+    }
+
+    const overrideTopPCamel = overrides.topP;
+    if (overrideTopPCamel !== undefined) {
+      result.topP = overrideTopPCamel ?? null;
+    } else {
+      const overrideTopPSnake = overrides.top_p;
+      if (overrideTopPSnake !== undefined) {
+        result.topP = overrideTopPSnake ?? null;
+      }
+    }
+
+    return result;
+  }
+
   // Find the last LLM op for a given turn to anchor agent-emitted logs (debug/FIN)
   private getLastLlmOpIdForTurn(turnIndex: number): string | undefined {
     try {
@@ -1642,11 +1674,16 @@ export class AIAgentSession {
 
         // Orchestrator-managed execution for MCP + REST
         if (this.toolsOrchestrator?.hasTool(effectiveToolName) === true) {
+          const isBatchTool = effectiveToolName === 'agent__batch';
           const managed = await this.toolsOrchestrator.executeWithManagement(
             effectiveToolName,
             parameters,
             { turn: currentTurn, subturn: subturnCounter },
-            { timeoutMs: this.sessionConfig.toolTimeout, bypassConcurrency: effectiveToolName === 'agent__batch' }
+            {
+              timeoutMs: this.sessionConfig.toolTimeout,
+              bypassConcurrency: isBatchTool,
+              disableGlobalTimeout: isBatchTool
+            }
           );
           // Ensure we always return a valid string
           return managed.result || '(no output)';
@@ -1689,15 +1726,26 @@ export class AIAgentSession {
         return `(tool failed: ${errorMsg})`;
       }
     };
-    
+    const modelOverrides = this.resolveModelOverrides(provider, model);
+    let effectiveTemperature = this.sessionConfig.temperature;
+    if (modelOverrides.temperature !== undefined) {
+      if (modelOverrides.temperature === null) effectiveTemperature = undefined;
+      else effectiveTemperature = modelOverrides.temperature;
+    }
+    let effectiveTopP = this.sessionConfig.topP;
+    if (modelOverrides.topP !== undefined) {
+      if (modelOverrides.topP === null) effectiveTopP = undefined;
+      else effectiveTopP = modelOverrides.topP;
+    }
+
     const request: TurnRequest = {
       messages: conversation,
       provider,
       model,
       tools: availableTools,
       toolExecutor,
-      temperature: this.sessionConfig.temperature,
-      topP: this.sessionConfig.topP,
+      temperature: effectiveTemperature,
+      topP: effectiveTopP,
       maxOutputTokens: this.sessionConfig.maxOutputTokens,
       repeatPenalty: this.sessionConfig.repeatPenalty,
       parallelToolCalls: this.sessionConfig.parallelToolCalls,
