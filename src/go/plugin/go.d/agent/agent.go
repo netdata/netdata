@@ -43,6 +43,7 @@ type Config struct {
 	DumpMode                  time.Duration
 	DumpSummary               bool
 	DumpDataDir               string
+	DynamicConfigPrefix       string
 }
 
 // Agent represents orchestrator.
@@ -77,10 +78,16 @@ type Agent struct {
 
 	dumpDataDir string
 	dumpOnce    sync.Once
+
+	DynamicConfigPrefix string
 }
 
 // New creates a new Agent.
 func New(cfg Config) *Agent {
+	if cfg.DynamicConfigPrefix == "" {
+		cfg.DynamicConfigPrefix = jobmgr.DefaultDyncfgCollectorPrefix
+	}
+
 	a := &Agent{
 		Logger: logger.New().With(
 			slog.String("component", "agent"),
@@ -100,6 +107,7 @@ func New(cfg Config) *Agent {
 		quitCh:                    make(chan struct{}, 1),
 		dumpMode:                  cfg.DumpMode,
 		dumpSummary:               cfg.DumpSummary,
+		DynamicConfigPrefix:       cfg.DynamicConfigPrefix,
 	}
 
 	if a.dumpMode > 0 {
@@ -241,6 +249,7 @@ func (a *Agent) run(ctx context.Context) {
 	fnMgr := functions.NewManager()
 
 	jobMgr := jobmgr.New()
+	jobMgr.SetDyncfgCollectorPrefix(a.DynamicConfigPrefix)
 	jobMgr.PluginName = a.Name
 	jobMgr.Out = a.Out
 	jobMgr.VarLibDir = a.VarLibDir

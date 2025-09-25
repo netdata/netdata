@@ -108,6 +108,7 @@
         "type": "integer"
       },
       "init_timeout": {
+        "default": 30000000000,
         "title": "Connection timeout duration in seconds",
         "type": "integer"
       },
@@ -128,6 +129,7 @@
         "type": "string"
       },
       "jmx_timeout": {
+        "default": 5000000000,
         "title": "Connection timeout duration in seconds",
         "type": "integer"
       },
@@ -187,6 +189,7 @@
         "type": "string"
       },
       "retry_backoff_multiplier": {
+        "default": 2,
         "title": "Retry backoff multiplier",
         "type": "number"
       },
@@ -201,11 +204,12 @@
         "type": "string"
       },
       "shutdown_delay": {
+        "default": 100000000,
         "title": "Shutdown delay",
         "type": "integer"
       },
       "update_every": {
-        "default": 1,
+        "default": 5,
         "minimum": 1,
         "title": "Data collection frequency",
         "type": "integer"
@@ -216,7 +220,6 @@
         "type": "string"
       }
     },
-    "required": null,
     "title": "websphere_jmx collector configuration",
     "type": "object"
   }

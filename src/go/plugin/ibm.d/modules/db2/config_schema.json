@@ -113,6 +113,7 @@
         "type": "integer"
       },
       "max_db_life_time": {
+        "default": 600000000000,
         "title": "MaxDbLifeTime forces pooled connections to be recycled after the specified duration.",
         "type": "integer"
       },
@@ -132,11 +133,12 @@
         "type": "integer"
       },
       "timeout": {
+        "default": 2000000000,
         "title": "Timeout controls how long DB2 RPCs may run before cancellation.",
         "type": "integer"
       },
       "update_every": {
-        "default": 1,
+        "default": 5,
         "minimum": 1,
         "title": "Data collection frequency",
         "type": "integer"
@@ -147,7 +149,6 @@
         "type": "string"
       }
     },
-    "required": null,
     "title": "db2 collector configuration",
     "type": "object"
   }

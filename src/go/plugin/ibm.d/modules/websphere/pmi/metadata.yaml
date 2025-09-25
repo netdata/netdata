@@ -9,7 +9,7 @@ modules:
         link: https://www.ibm.com/docs/en/was
         categories:
           - data-collection.application_servers
-        icon_filename: ""
+        icon_filename: "ibm.svg"
       related_resources:
         integrations:
           list: []

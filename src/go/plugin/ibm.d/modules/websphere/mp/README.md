@@ -99,14 +99,14 @@ The following options can be defined globally or per job.
 |:-----|:------------|:--------|:---------|:----|:----|
 | update_every | Data collection frequency | `1` | no | 1 | - |
 | Vnode | Vnode | `` | no | - | - |
-| CellName | Identity labels | `` | no | - | - |
-| NodeName | Node name | `` | no | - | - |
-| ServerName | Server name | `` | no | - | - |
-| MetricsEndpoint | Metrics endpoint | `/metrics` | no | - | - |
-| CollectJVMMetrics | Enable collection of j v m metrics metrics | `true` | no | - | - |
-| CollectRESTMetrics | Enable collection of r e s t metrics metrics | `true` | no | - | - |
-| MaxRESTEndpoints | Maximum number of r e s t endpoints to monitor | `50` | no | - | - |
-| CollectRESTMatching | Enable collection of r e s t matching metrics | `` | no | - | - |
+| CellName | CellName appends the Liberty cell label to every exported time-series. | `` | no | - | - |
+| NodeName | NodeName appends the Liberty node label to every exported time-series. | `` | no | - | - |
+| ServerName | ServerName appends the Liberty server label to every exported time-series. | `` | no | - | - |
+| MetricsEndpoint | MetricsEndpoint overrides the metrics path relative to the base URL (accepts absolute URLs as well). | `/metrics` | no | - | - |
+| CollectJVMMetrics | CollectJVMMetrics toggles JVM/base scope metrics scraped from the MicroProfile endpoint. | `true` | no | - | - |
+| CollectRESTMetrics | CollectRESTMetrics toggles per-endpoint REST/JAX-RS metrics (may introduce cardinality). | `true` | no | - | - |
+| MaxRESTEndpoints | MaxRESTEndpoints limits how many REST endpoints are exported when REST metrics are enabled (0 disables the limit). | `50` | no | - | - |
+| CollectRESTMatching | CollectRESTMatching filters REST endpoints using glob-style patterns (supports `*`, `?`, `!` prefixes). | `` | no | - | - |
 
 ### Examples
 

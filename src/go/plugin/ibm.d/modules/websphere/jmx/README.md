@@ -160,16 +160,16 @@ The following options can be defined globally or per job.
 
 | Name | Description | Default | Required | Min | Max |
 |:-----|:------------|:--------|:---------|:----|:----|
-| update_every | Data collection frequency | `1` | no | 1 | - |
+| update_every | Data collection frequency | `5` | no | 1 | - |
 | Vnode | Vnode | `` | no | - | - |
 | JMXURL | Connection settings | `` | no | - | - |
 | JMXUsername | Username for authentication | `` | no | - | - |
 | JMXPassword | Password for authentication | `` | no | - | - |
 | JMXClasspath | J m x classpath | `` | no | - | - |
 | JavaExecPath | Java exec path | `` | no | - | - |
-| JMXTimeout | Connection timeout duration in seconds | `<no value>` | no | - | - |
-| InitTimeout | Connection timeout duration in seconds | `<no value>` | no | - | - |
-| ShutdownDelay | Shutdown delay | `<no value>` | no | - | - |
+| JMXTimeout | Connection timeout duration in seconds | `5000000000` | no | - | - |
+| InitTimeout | Connection timeout duration in seconds | `30000000000` | no | - | - |
+| ShutdownDelay | Shutdown delay | `100000000` | no | - | - |
 | ClusterName | Identity labels | `` | no | - | - |
 | CellName | Cell name | `` | no | - | - |
 | NodeName | Node name | `` | no | - | - |
@@ -200,7 +200,7 @@ The following options can be defined globally or per job.
 | CollectServletsMatching | Enable collection of servlets matching metrics | `` | no | - | - |
 | CollectEJBsMatching | Enable collection of e j bs matching metrics | `` | no | - | - |
 | MaxRetries | Resilience tuning | `3` | no | - | - |
-| RetryBackoffMultiplier | Retry backoff multiplier | `<no value>` | no | - | - |
+| RetryBackoffMultiplier | Retry backoff multiplier | `2` | no | - | - |
 | CircuitBreakerThreshold | Circuit breaker threshold | `5` | no | - | - |
 | HelperRestartMax | Helper restart max | `3` | no | - | - |
 

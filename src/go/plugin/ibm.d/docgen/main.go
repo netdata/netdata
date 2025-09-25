@@ -104,6 +104,7 @@ type DocGenerator struct {
 	ConfigFile  string
 	OutputDir   string
 	ModuleInfo  string
+	consts      map[string]interface{}
 }
 
 func (g *DocGenerator) Generate() error {
@@ -200,7 +201,7 @@ func (g *DocGenerator) parseModuleInfo() (*ModuleInfo, error) {
 
 func (g *DocGenerator) parseConfig() ([]ConfigField, error) {
 	// Try to parse the actual Go file - this MUST succeed
-	fields, err := g.parseConfigFromGoFile()
+	fields, defaults, err := g.parseConfigFromGoFile()
 	if err != nil {
 		// FAIL HARD - no fallback for validation errors
 		return nil, fmt.Errorf("config validation failed: %w", err)
@@ -212,10 +213,17 @@ func (g *DocGenerator) parseConfig() ([]ConfigField, error) {
 	}
 
 	// Ensure standard fields are present even if they come from embedded structs
-	ensureField := func(name string, desc string, defaultVal interface{}, fieldType string, min *int, max *int) {
+	ensureField := func(name string, desc string, defaultKey string, fallback interface{}, fieldType string, min *int, max *int) {
 		for _, f := range fields {
 			if f.JSONName == name {
 				return
+			}
+		}
+
+		defaultVal := fallback
+		if defaultKey != "" && defaults != nil {
+			if val, ok := defaults[defaultKey]; ok {
+				defaultVal = val
 			}
 		}
 		fields = append([]ConfigField{ConfigField{
@@ -230,8 +238,7 @@ func (g *DocGenerator) parseConfig() ([]ConfigField, error) {
 		}}, fields...)
 	}
 
-	ensureField("update_every", "Data collection frequency", 10, "integer", intPtr(1), nil)
-	ensureField("reset_statistics", "ResetStatistics enables SQL calls that reset IBM i system statistics on each run.", false, "boolean", nil, nil)
+	ensureField("update_every", "Data collection frequency", "UpdateEvery", 10, "integer", intPtr(1), nil)
 
 	return fields, nil
 }
@@ -391,7 +398,9 @@ func (g *DocGenerator) generateConfigSchema(fields []ConfigField) error {
 	}
 
 	schema["jsonSchema"].(map[string]interface{})["properties"] = properties
-	schema["jsonSchema"].(map[string]interface{})["required"] = required
+	if len(required) > 0 {
+		schema["jsonSchema"].(map[string]interface{})["required"] = required
+	}
 
 	// Marshal to JSON with proper formatting
 	data, err := json.MarshalIndent(schema, "", "  ")

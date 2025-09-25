@@ -88,6 +88,7 @@
         "type": "integer"
       },
       "max_db_life_time": {
+        "default": 600000000000,
         "title": "MaxDbLifeTime limits how long a pooled connection may live before being recycled.",
         "type": "integer"
       },
@@ -140,6 +141,7 @@
         "type": "boolean"
       },
       "timeout": {
+        "default": 2000000000,
         "title": "Timeout controls how long to wait for SQL statements and RPCs.",
         "type": "integer"
       },
@@ -165,7 +167,6 @@
         "type": "string"
       }
     },
-    "required": null,
     "title": "as400 collector configuration",
     "type": "object"
   }

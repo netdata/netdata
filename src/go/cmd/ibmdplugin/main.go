@@ -101,6 +101,7 @@ func main() {
 		DumpMode:                  dumpMode,
 		DumpSummary:               opts.DumpSummary,
 		DumpDataDir:               dumpDataDir,
+		DynamicConfigPrefix:       "ibm.d:collector:",
 	})
 
 	a.Debugf("plugin: name=%s, version=%s", a.Name, buildinfo.Version)

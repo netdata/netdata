@@ -52,6 +52,8 @@ func New() *Manager {
 		dyncfgCh: make(chan functions.Function),
 	}
 
+	mgr.SetDyncfgCollectorPrefix(DefaultDyncfgCollectorPrefix)
+
 	return mgr
 }
 
@@ -88,6 +90,16 @@ type Manager struct {
 	dyncfgCh chan functions.Function
 
 	waitCfgOnOff string // block processing of discovered configs until "enable"/"disable" is received from Netdata
+
+	dyncfgCollectorPrefix string
+}
+
+func (m *Manager) SetDyncfgCollectorPrefix(prefix string) {
+	if strings.TrimSpace(prefix) == "" {
+		m.dyncfgCollectorPrefix = DefaultDyncfgCollectorPrefix
+		return
+	}
+	m.dyncfgCollectorPrefix = prefix
 }
 
 func (m *Manager) Run(ctx context.Context, in chan []*confgroup.Group) {
@@ -169,7 +181,7 @@ func (m *Manager) run() {
 				m.removeConfig(cfg)
 			case fn := <-m.dyncfgCh:
 				switch id := fn.Args[0]; true {
-				case strings.HasPrefix(id, dyncfgCollectorIDPrefix):
+				case strings.HasPrefix(id, m.dyncfgCollectorPrefixValue()):
 					m.dyncfgCollectorSeqExec(fn)
 				case strings.HasPrefix(id, dyncfgVnodeID):
 					m.dyncfgVnodeSeqExec(fn)
@@ -216,7 +228,7 @@ func (m *Manager) addConfig(cfg confgroup.Config) {
 	m.dyncfgCollectorJobCreate(ecfg.cfg, ecfg.status)
 
 	if isTerminal || m.PluginName == "nodyncfg" { // FIXME: quick fix of TestAgent_Run (agent_test.go)
-		m.dyncfgConfigEnable(functions.Function{Args: []string{dyncfgJobID(ecfg.cfg), "enable"}})
+		m.dyncfgConfigEnable(functions.Function{Args: []string{m.dyncfgJobID(ecfg.cfg), "enable"}})
 	} else {
 		m.waitCfgOnOff = ecfg.cfg.FullName()
 	}

@@ -31,13 +31,12 @@
         "type": "integer"
       },
       "update_every": {
-        "default": 1,
+        "default": 10,
         "minimum": 1,
         "title": "Data collection frequency",
         "type": "integer"
       }
     },
-    "required": null,
     "title": "example collector configuration",
     "type": "object"
   }

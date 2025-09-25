@@ -288,12 +288,12 @@ The following options can be defined globally or per job.
 
 | Name | Description | Default | Required | Min | Max |
 |:-----|:------------|:--------|:---------|:----|:----|
-| update_every | Data collection frequency | `1` | no | 1 | - |
+| update_every | Data collection frequency | `5` | no | 1 | - |
 | Vnode | Vnode allows binding the collector to a virtual node. | `` | no | - | - |
 | DSN | DSN provides a full DB2 connection string when manual control is required. | `` | no | - | - |
-| Timeout | Timeout controls how long DB2 RPCs may run before cancellation. | `<no value>` | no | - | - |
+| Timeout | Timeout controls how long DB2 RPCs may run before cancellation. | `2000000000` | no | - | - |
 | MaxDbConns | MaxDbConns limits the connection pool size. | `1` | no | - | - |
-| MaxDbLifeTime | MaxDbLifeTime forces pooled connections to be recycled after the specified duration. | `<no value>` | no | - | - |
+| MaxDbLifeTime | MaxDbLifeTime forces pooled connections to be recycled after the specified duration. | `600000000000` | no | - | - |
 | CollectDatabaseMetrics | CollectDatabaseMetrics toggles high-level database status metrics. | `<auto>` | no | - | - |
 | CollectBufferpoolMetrics | CollectBufferpoolMetrics toggles buffer pool efficiency metrics. | `<auto>` | no | - | - |
 | CollectTablespaceMetrics | CollectTablespaceMetrics toggles tablespace capacity metrics. | `<auto>` | no | - | - |

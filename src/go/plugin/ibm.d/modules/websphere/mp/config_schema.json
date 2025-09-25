@@ -4,42 +4,42 @@
     "properties": {
       "cell_name": {
         "default": "",
-        "title": "Identity labels",
+        "title": "CellName appends the Liberty cell label to every exported time-series.",
         "type": "string"
       },
       "collect_jvm_metrics": {
         "default": true,
-        "title": "Enable collection of j v m metrics metrics",
+        "title": "CollectJVMMetrics toggles JVM/base scope metrics scraped from the MicroProfile endpoint.",
         "type": "boolean"
       },
       "collect_rest_matching": {
         "default": "",
-        "title": "Enable collection of r e s t matching metrics",
+        "title": "CollectRESTMatching filters REST endpoints using glob-style patterns (supports `*`, `?`, `!` prefixes).",
         "type": "string"
       },
       "collect_rest_metrics": {
         "default": true,
-        "title": "Enable collection of r e s t metrics metrics",
+        "title": "CollectRESTMetrics toggles per-endpoint REST/JAX-RS metrics (may introduce cardinality).",
         "type": "boolean"
       },
       "max_rest_endpoints": {
         "default": 50,
-        "title": "Maximum number of r e s t endpoints to monitor",
+        "title": "MaxRESTEndpoints limits how many REST endpoints are exported when REST metrics are enabled (0 disables the limit).",
         "type": "integer"
       },
       "metrics_endpoint": {
         "default": "/metrics",
-        "title": "Metrics endpoint",
+        "title": "MetricsEndpoint overrides the metrics path relative to the base URL (accepts absolute URLs as well).",
         "type": "string"
       },
       "node_name": {
         "default": "",
-        "title": "Node name",
+        "title": "NodeName appends the Liberty node label to every exported time-series.",
         "type": "string"
       },
       "server_name": {
         "default": "",
-        "title": "Server name",
+        "title": "ServerName appends the Liberty server label to every exported time-series.",
         "type": "string"
       },
       "update_every": {
@@ -54,7 +54,6 @@
         "type": "string"
       }
     },
-    "required": null,
     "title": "websphere_mp collector configuration",
     "type": "object"
   }

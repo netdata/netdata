@@ -1,25 +1,32 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"go/ast"
+	"go/format"
 	"go/parser"
 	"go/token"
 	"log"
+	"math"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 	"unicode"
 )
 
 // parseConfigFromGoFile parses a Go config file to extract configuration fields
-func (g *DocGenerator) parseConfigFromGoFile() ([]ConfigField, error) {
+// and the defaults supplied by defaultConfig().
+func (g *DocGenerator) parseConfigFromGoFile() ([]ConfigField, map[string]interface{}, error) {
 	fset := token.NewFileSet()
 	node, err := parser.ParseFile(fset, g.ConfigFile, nil, parser.ParseComments)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse Go file: %w", err)
+		return nil, nil, fmt.Errorf("failed to parse Go file: %w", err)
 	}
+
+	g.consts = g.extractConstValues(node)
 
 	var fields []ConfigField
 	var configStruct *ast.StructType
@@ -45,7 +52,7 @@ func (g *DocGenerator) parseConfigFromGoFile() ([]ConfigField, error) {
 	// Try to parse defaults from init.go
 	defaults := g.parseDefaultsFromInitFile()
 	if defaults == nil {
-		return nil, fmt.Errorf("failed to parse defaultConfig() function from init.go - all configuration fields must have defaults defined")
+		return nil, nil, fmt.Errorf("failed to parse defaultConfig() function from init.go - all configuration fields must have defaults defined")
 	}
 
 	// Validate that ALL fields have defaults and apply them
@@ -65,10 +72,10 @@ func (g *DocGenerator) parseConfigFromGoFile() ([]ConfigField, error) {
 
 	// FAIL HARD if any field lacks a default
 	if len(missingDefaults) > 0 {
-		return nil, fmt.Errorf("defaultConfig() function must provide default values for ALL configuration fields. Missing defaults for: %v", missingDefaults)
+		return nil, nil, fmt.Errorf("defaultConfig() function must provide default values for ALL configuration fields. Missing defaults for: %v", missingDefaults)
 	}
 
-	return fields, nil
+	return fields, defaults, nil
 }
 
 func extractFieldsFromStruct(structType *ast.StructType, comments []*ast.CommentGroup) []ConfigField {
@@ -453,7 +460,7 @@ func (g *DocGenerator) parseDefaultsFromInitFile() map[string]interface{} {
 					case *ast.ReturnStmt:
 						if len(stmt.Results) > 0 {
 							if lit, ok := stmt.Results[0].(*ast.CompositeLit); ok {
-								extractDefaultsFromLiteral(lit, defaults)
+								g.extractDefaultsFromLiteral(lit, defaults)
 								foundReturn = true
 								return false
 							}
@@ -485,19 +492,43 @@ func (g *DocGenerator) parseDefaultsFromInitFile() map[string]interface{} {
 }
 
 // extractDefaultsFromLiteral extracts field values from a Config{} literal
-func extractDefaultsFromLiteral(lit *ast.CompositeLit, defaults map[string]interface{}) {
+func (g *DocGenerator) extractDefaultsFromLiteral(lit *ast.CompositeLit, defaults map[string]interface{}) {
 	for _, elt := range lit.Elts {
 		if kv, ok := elt.(*ast.KeyValueExpr); ok {
 			if ident, ok := kv.Key.(*ast.Ident); ok {
 				fieldName := ident.Name
-				defaults[fieldName] = extractValue(kv.Value)
+				switch val := kv.Value.(type) {
+				case *ast.CompositeLit:
+					nested := make(map[string]interface{})
+					g.extractDefaultsFromLiteral(val, nested)
+					// Flatten nested composite literals for embedded configs such as framework.Config.
+					if fieldName == "Config" {
+						for k, v := range nested {
+							if _, exists := defaults[k]; !exists {
+								defaults[k] = v
+							}
+						}
+					} else {
+						// Preserve nested context using fieldName prefix to avoid collisions.
+						for k, v := range nested {
+							compositeKey := fmt.Sprintf("%s.%s", fieldName, k)
+							if _, exists := defaults[compositeKey]; !exists {
+								defaults[compositeKey] = v
+							}
+						}
+					}
+				default:
+					if value := g.extractValue(kv.Value); value != nil {
+						defaults[fieldName] = value
+					}
+				}
 			}
 		}
 	}
 }
 
 // extractValue converts an AST expression to a Go value
-func extractValue(expr ast.Expr) interface{} {
+func (g *DocGenerator) extractValue(expr ast.Expr) interface{} {
 	switch v := expr.(type) {
 	case *ast.BasicLit:
 		switch v.Kind {
@@ -508,6 +539,10 @@ func extractValue(expr ast.Expr) interface{} {
 			if i, err := strconv.Atoi(v.Value); err == nil {
 				return i
 			}
+		case token.FLOAT:
+			if f, err := strconv.ParseFloat(v.Value, 64); err == nil {
+				return f
+			}
 		}
 	case *ast.Ident:
 		// Handle boolean values
@@ -517,15 +552,224 @@ func extractValue(expr ast.Expr) interface{} {
 		case "false":
 			return false
 		}
+		if g != nil {
+			if val, ok := g.consts[v.Name]; ok {
+				return val
+			}
+		}
+		return exprToString(v)
 	case *ast.CallExpr:
 		if len(v.Args) > 0 {
-			val := extractValue(v.Args[0])
+			val := g.extractValue(v.Args[0])
 			if val != nil {
 				return val
 			}
 		}
+		return exprToString(v)
+	case *ast.BinaryExpr:
+		left := g.extractValue(v.X)
+		right := g.extractValue(v.Y)
+		if result, ok := evalBinaryExpr(v.Op, left, right); ok {
+			return result
+		}
+		return exprToString(v)
+	case *ast.SelectorExpr:
+		if ident, ok := v.X.(*ast.Ident); ok && ident.Name == "time" {
+			if duration, ok := timeConstant(v.Sel.Name); ok {
+				return duration
+			}
+		}
+		return exprToString(v)
 	case *ast.UnaryExpr:
-		return extractValue(v.X)
+		return g.extractValue(v.X)
 	}
 	return nil
+}
+
+func exprToString(expr ast.Expr) string {
+	if expr == nil {
+		return ""
+	}
+	var buf bytes.Buffer
+	if err := format.Node(&buf, token.NewFileSet(), expr); err != nil {
+		return ""
+	}
+	return strings.TrimSpace(buf.String())
+}
+
+func (g *DocGenerator) extractConstValues(file *ast.File) map[string]interface{} {
+	consts := make(map[string]interface{})
+	if file == nil {
+		return consts
+	}
+
+	prev := g.consts
+	g.consts = consts
+
+	for _, decl := range file.Decls {
+		gen, ok := decl.(*ast.GenDecl)
+		if !ok || gen.Tok != token.CONST {
+			continue
+		}
+		for _, spec := range gen.Specs {
+			vs, ok := spec.(*ast.ValueSpec)
+			if !ok {
+				continue
+			}
+			for i, name := range vs.Names {
+				if name == nil || name.Name == "_" {
+					continue
+				}
+				var value interface{}
+				if len(vs.Values) > i {
+					value = g.extractValue(vs.Values[i])
+				} else if len(vs.Values) > 0 {
+					value = g.extractValue(vs.Values[0])
+				}
+				if value != nil {
+					consts[name.Name] = value
+				}
+			}
+		}
+	}
+
+	g.consts = prev
+	return consts
+}
+
+func evalBinaryExpr(op token.Token, left, right interface{}) (interface{}, bool) {
+	if li, lok := toInt64(left); lok {
+		if ri, rok := toInt64(right); rok {
+			switch op {
+			case token.MUL:
+				return li * ri, true
+			case token.QUO:
+				if ri == 0 {
+					return nil, false
+				}
+				return li / ri, true
+			case token.ADD:
+				return li + ri, true
+			case token.SUB:
+				return li - ri, true
+			case token.REM:
+				if ri == 0 {
+					return nil, false
+				}
+				return li % ri, true
+			}
+		}
+	}
+
+	lf, lok := toFloat64(left)
+	rf, rok := toFloat64(right)
+	if !lok || !rok {
+		return nil, false
+	}
+
+	var res float64
+	switch op {
+	case token.MUL:
+		res = lf * rf
+	case token.QUO:
+		if rf == 0 {
+			return nil, false
+		}
+		res = lf / rf
+	case token.ADD:
+		res = lf + rf
+	case token.SUB:
+		res = lf - rf
+	default:
+		return nil, false
+	}
+
+	if math.IsNaN(res) || math.IsInf(res, 0) {
+		return nil, false
+	}
+	if math.Mod(res, 1) == 0 {
+		return int64(res), true
+	}
+	return res, true
+}
+
+func toInt64(v interface{}) (int64, bool) {
+	switch val := v.(type) {
+	case int:
+		return int64(val), true
+	case int8:
+		return int64(val), true
+	case int16:
+		return int64(val), true
+	case int32:
+		return int64(val), true
+	case int64:
+		return val, true
+	case uint:
+		return int64(val), true
+	case uint8:
+		return int64(val), true
+	case uint16:
+		return int64(val), true
+	case uint32:
+		return int64(val), true
+	case uint64:
+		if val > math.MaxInt64 {
+			return 0, false
+		}
+		return int64(val), true
+	case float64:
+		if math.Mod(val, 1) == 0 {
+			return int64(val), true
+		}
+	}
+	return 0, false
+}
+
+func toFloat64(v interface{}) (float64, bool) {
+	switch val := v.(type) {
+	case int:
+		return float64(val), true
+	case int8:
+		return float64(val), true
+	case int16:
+		return float64(val), true
+	case int32:
+		return float64(val), true
+	case int64:
+		return float64(val), true
+	case uint:
+		return float64(val), true
+	case uint8:
+		return float64(val), true
+	case uint16:
+		return float64(val), true
+	case uint32:
+		return float64(val), true
+	case uint64:
+		return float64(val), true
+	case float32:
+		return float64(val), true
+	case float64:
+		return val, true
+	}
+	return 0, false
+}
+
+func timeConstant(name string) (int64, bool) {
+	switch name {
+	case "Nanosecond":
+		return int64(time.Nanosecond), true
+	case "Microsecond":
+		return int64(time.Microsecond), true
+	case "Millisecond":
+		return int64(time.Millisecond), true
+	case "Second":
+		return int64(time.Second), true
+	case "Minute":
+		return int64(time.Minute), true
+	case "Hour":
+		return int64(time.Hour), true
+	}
+	return 0, false
 }

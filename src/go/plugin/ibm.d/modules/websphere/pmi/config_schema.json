@@ -4,144 +4,156 @@
     "properties": {
       "cell_name": {
         "default": "",
-        "title": "CellName appends the cell label to every timeseries.",
+        "title": "CellName appends the WebSphere cell identifier label to every exported time-series.",
         "type": "string"
       },
       "cluster_name": {
         "default": "",
-        "title": "ClusterName appends a cluster label to every timeseries.",
+        "title": "ClusterName appends the WebSphere cluster identifier label to every exported time-series.",
         "type": "string"
       },
       "collect_apps_matching": {
         "default": "",
-        "title": "CollectAppsMatching filters applications by name using glob patterns.",
+        "title": "CollectAppsMatching filters Web applications by name using glob patterns (supports `*`, `?`, `!` prefixes).",
         "type": "string"
       },
       "collect_cluster_metrics": {
-        "title": "CollectClusterMetrics toggles cluster health metrics.",
+        "default": "nil",
+        "title": "CollectClusterMetrics toggles cluster-level health metrics; defaults to enabled when unset.",
         "type": "boolean"
       },
       "collect_ejb_metrics": {
-        "title": "CollectEJBMetrics toggles Enterprise Java Bean metrics.",
+        "default": "nil",
+        "title": "CollectEJBMetrics enables Enterprise Java Bean workload metrics; defaults to enabled when unset.",
         "type": "boolean"
       },
       "collect_ejbs_matching": {
         "default": "",
-        "title": "CollectEJBsMatching filters EJBs by name using glob patterns.",
+        "title": "CollectEJBsMatching filters Enterprise Java Beans by name using glob patterns (supports `*`, `?`, `!` prefixes).",
         "type": "string"
       },
       "collect_jca_metrics": {
-        "title": "CollectJCAMetrics toggles JCA resource adapter metrics.",
+        "default": "nil",
+        "title": "CollectJCAMetrics toggles JCA resource-adapter metrics; defaults to enabled when unset.",
         "type": "boolean"
       },
       "collect_jdbc_advanced": {
-        "title": "CollectJDBCAdvanced toggles advanced JDBC timing metrics.",
+        "default": "nil",
+        "title": "CollectJDBCAdvanced enables additional JDBC latency/timing statistics; defaults to disabled when unset.",
         "type": "boolean"
       },
       "collect_jdbc_metrics": {
-        "title": "CollectJDBCMetrics toggles JDBC pool metrics.",
+        "default": "nil",
+        "title": "CollectJDBCMetrics toggles JDBC connection-pool metrics; defaults to enabled when unset.",
         "type": "boolean"
       },
       "collect_jms_matching": {
         "default": "",
-        "title": "CollectJMSMatching filters JMS destinations by name using glob patterns.",
+        "title": "CollectJMSMatching filters JMS destinations by name using glob patterns (supports `*`, `?`, `!` prefixes).",
         "type": "string"
       },
       "collect_jms_metrics": {
-        "title": "CollectJMSMetrics toggles JMS destination metrics.",
+        "default": "nil",
+        "title": "CollectJMSMetrics toggles JMS destination metrics; defaults to enabled when unset.",
         "type": "boolean"
       },
       "collect_jvm_metrics": {
-        "title": "CollectJVMMetrics toggles JVM runtime metrics.",
+        "default": "nil",
+        "title": "CollectJVMMetrics toggles JVM runtime metrics; defaults to enabled when unset.",
         "type": "boolean"
       },
       "collect_pools_matching": {
         "default": "",
-        "title": "CollectPoolsMatching filters pools (JDBC/JCA) by name using glob patterns.",
+        "title": "CollectPoolsMatching filters JDBC and JCA pools by name using glob patterns (supports `*`, `?`, `!` prefixes).",
         "type": "string"
       },
       "collect_servlet_metrics": {
-        "title": "CollectServletMetrics toggles servlet response-time metrics.",
+        "default": "nil",
+        "title": "CollectServletMetrics enables servlet response-time metrics; defaults to enabled when unset (may add high-cardinality charts).",
         "type": "boolean"
       },
       "collect_servlets_matching": {
         "default": "",
-        "title": "CollectServletsMatching filters servlets by name using glob patterns.",
+        "title": "CollectServletsMatching filters servlet contexts by name using glob patterns (supports `*`, `?`, `!` prefixes).",
         "type": "string"
       },
       "collect_session_metrics": {
-        "title": "CollectSessionMetrics toggles HTTP session manager metrics.",
+        "default": "nil",
+        "title": "CollectSessionMetrics toggles HTTP session manager metrics; defaults to enabled when unset.",
         "type": "boolean"
       },
       "collect_threadpool_metrics": {
-        "title": "CollectThreadPoolMetrics toggles thread pool metrics.",
+        "default": "nil",
+        "title": "CollectThreadPoolMetrics toggles thread-pool metrics; defaults to enabled when unset.",
         "type": "boolean"
       },
       "collect_transaction_metrics": {
-        "title": "CollectTransactionMetrics toggles transaction manager metrics.",
+        "default": "nil",
+        "title": "CollectTransactionMetrics toggles transaction manager metrics; defaults to enabled when unset.",
         "type": "boolean"
       },
       "collect_webapp_metrics": {
-        "title": "CollectWebAppMetrics toggles Web application metrics.",
+        "default": "nil",
+        "title": "CollectWebAppMetrics toggles Web application metrics (includes servlet/session data); defaults to enabled when unset.",
         "type": "boolean"
       },
       "max_applications": {
         "default": 100,
-        "title": "MaxApplications caps the number of web applications charted.",
+        "title": "MaxApplications caps the number of web applications charted (0 disables the limit).",
         "type": "integer"
       },
       "max_ejbs": {
         "default": 50,
-        "title": "MaxEJBs caps the number of EJBs charted.",
+        "title": "MaxEJBs caps the number of Enterprise Java Beans charted (0 disables the limit).",
         "type": "integer"
       },
       "max_jca_pools": {
         "default": 50,
-        "title": "MaxJCAPools caps the number of JCA pools charted.",
+        "title": "MaxJCAPools caps the number of JCA resource adapters charted (0 disables the limit).",
         "type": "integer"
       },
       "max_jdbc_pools": {
         "default": 50,
-        "title": "MaxJDBCPools caps the number of JDBC pools charted.",
+        "title": "MaxJDBCPools caps the number of JDBC connection pools charted (0 disables the limit).",
         "type": "integer"
       },
       "max_jms_destinations": {
         "default": 50,
-        "title": "MaxJMSDestinations caps the number of JMS destinations charted.",
+        "title": "MaxJMSDestinations caps the number of JMS destinations charted (0 disables the limit).",
         "type": "integer"
       },
       "max_servlets": {
         "default": 50,
-        "title": "MaxServlets caps the number of servlets charted.",
+        "title": "MaxServlets caps the number of servlet contexts charted when servlet collection is enabled (0 disables the limit).",
         "type": "integer"
       },
       "max_threadpools": {
         "default": 50,
-        "title": "MaxThreadPools caps the number of thread pools charted per server.",
+        "title": "MaxThreadPools caps the number of thread pools charted per server (0 disables the limit).",
         "type": "integer"
       },
       "node_name": {
         "default": "",
-        "title": "NodeName appends the node label to every timeseries.",
+        "title": "NodeName appends the WebSphere node identifier label to every exported time-series.",
         "type": "string"
       },
       "pmi_refresh_rate": {
         "default": 60,
-        "title": "PMIRefreshRate overrides the PMI servlet refresh interval in seconds.",
+        "title": "PMIRefreshRate overrides the global PMI servlet refresh interval in seconds when a value \u003e0 is provided.",
         "type": "integer"
       },
       "pmi_stats_type": {
         "default": "extended",
-        "title": "PMIStatsType selects which PMI statistics tier to request (basic, extended, all).",
+        "title": "PMIStatsType selects which PMI statistics tier to request (`basic`, `extended`, `all`, or `custom`).",
         "type": "string"
       },
       "server_type": {
         "default": "",
-        "title": "ServerType annotates metrics with the WebSphere server type (e.g. app_server, dmgr).",
+        "title": "ServerType records the WebSphere server type label (for example `app_server`, `dmgr`, `nodeagent`).",
         "type": "string"
       },
       "update_every": {
-        "default": 1,
+        "default": 5,
         "minimum": 1,
         "title": "Data collection frequency",
         "type": "integer"
@@ -152,7 +164,6 @@
         "type": "string"
       }
     },
-    "required": null,
     "title": "websphere_pmi collector configuration",
     "type": "object"
   }

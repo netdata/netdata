@@ -6,6 +6,7 @@ description: |
 link: https://www.ibm.com/products/websphere-application-server
 categories:
   - data-collection.application_servers
+icon: ibm.svg
 keywords:
   - websphere
   - liberty

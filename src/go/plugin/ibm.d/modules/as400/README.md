@@ -280,9 +280,9 @@ The following options can be defined globally or per job.
 | update_every | Data collection frequency | `10` | no | 1 | - |
 | Vnode | Vnode allows binding the collector to a virtual node. | `` | no | - | - |
 | DSN | DSN provides a full IBM i ODBC connection string if manual override is needed. | `` | no | - | - |
-| Timeout | Timeout controls how long to wait for SQL statements and RPCs. | `<no value>` | no | - | - |
+| Timeout | Timeout controls how long to wait for SQL statements and RPCs. | `2000000000` | no | - | - |
 | MaxDbConns | MaxDbConns restricts the maximum number of open ODBC connections. | `1` | no | - | - |
-| MaxDbLifeTime | MaxDbLifeTime limits how long a pooled connection may live before being recycled. | `<no value>` | no | - | - |
+| MaxDbLifeTime | MaxDbLifeTime limits how long a pooled connection may live before being recycled. | `600000000000` | no | - | - |
 | Hostname | Hostname is the remote IBM i host to monitor. | `` | no | - | - |
 | Port | Port is the TCP port for the IBM i Access ODBC server. | `8471` | no | 1 | 65535 |
 | Username | Username supplies the credentials used for authentication. | `` | no | - | - |

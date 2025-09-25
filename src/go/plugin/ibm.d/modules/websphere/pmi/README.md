@@ -557,38 +557,38 @@ The following options can be defined globally or per job.
 
 | Name | Description | Default | Required | Min | Max |
 |:-----|:------------|:--------|:---------|:----|:----|
-| update_every | Data collection frequency | `1` | no | 1 | - |
+| update_every | Data collection frequency | `5` | no | 1 | - |
 | Vnode | Vnode allows binding the collector to a virtual node. | `` | no | - | - |
-| PMIStatsType | PMIStatsType selects which PMI statistics tier to request (basic, extended, all). | `extended` | no | - | - |
-| PMIRefreshRate | PMIRefreshRate overrides the PMI servlet refresh interval in seconds. | `60` | no | - | - |
-| ClusterName | ClusterName appends a cluster label to every timeseries. | `` | no | - | - |
-| CellName | CellName appends the cell label to every timeseries. | `` | no | - | - |
-| NodeName | NodeName appends the node label to every timeseries. | `` | no | - | - |
-| ServerType | ServerType annotates metrics with the WebSphere server type (e.g. app_server, dmgr). | `` | no | - | - |
-| CollectJVMMetrics | CollectJVMMetrics toggles JVM runtime metrics. | `<no value>` | no | - | - |
-| CollectThreadPoolMetrics | CollectThreadPoolMetrics toggles thread pool metrics. | `<no value>` | no | - | - |
-| CollectJDBCMetrics | CollectJDBCMetrics toggles JDBC pool metrics. | `<no value>` | no | - | - |
-| CollectJCAMetrics | CollectJCAMetrics toggles JCA resource adapter metrics. | `<no value>` | no | - | - |
-| CollectJMSMetrics | CollectJMSMetrics toggles JMS destination metrics. | `<no value>` | no | - | - |
-| CollectWebAppMetrics | CollectWebAppMetrics toggles Web application metrics. | `<no value>` | no | - | - |
-| CollectSessionMetrics | CollectSessionMetrics toggles HTTP session manager metrics. | `<no value>` | no | - | - |
-| CollectTransactionMetrics | CollectTransactionMetrics toggles transaction manager metrics. | `<no value>` | no | - | - |
-| CollectClusterMetrics | CollectClusterMetrics toggles cluster health metrics. | `<no value>` | no | - | - |
-| CollectServletMetrics | CollectServletMetrics toggles servlet response-time metrics. | `<no value>` | no | - | - |
-| CollectEJBMetrics | CollectEJBMetrics toggles Enterprise Java Bean metrics. | `<no value>` | no | - | - |
-| CollectJDBCAdvanced | CollectJDBCAdvanced toggles advanced JDBC timing metrics. | `<no value>` | no | - | - |
-| MaxThreadPools | MaxThreadPools caps the number of thread pools charted per server. | `50` | no | - | - |
-| MaxJDBCPools | MaxJDBCPools caps the number of JDBC pools charted. | `50` | no | - | - |
-| MaxJCAPools | MaxJCAPools caps the number of JCA pools charted. | `50` | no | - | - |
-| MaxJMSDestinations | MaxJMSDestinations caps the number of JMS destinations charted. | `50` | no | - | - |
-| MaxApplications | MaxApplications caps the number of web applications charted. | `100` | no | - | - |
-| MaxServlets | MaxServlets caps the number of servlets charted. | `50` | no | - | - |
-| MaxEJBs | MaxEJBs caps the number of EJBs charted. | `50` | no | - | - |
-| CollectAppsMatching | CollectAppsMatching filters applications by name using glob patterns. | `` | no | - | - |
-| CollectPoolsMatching | CollectPoolsMatching filters pools (JDBC/JCA) by name using glob patterns. | `` | no | - | - |
-| CollectJMSMatching | CollectJMSMatching filters JMS destinations by name using glob patterns. | `` | no | - | - |
-| CollectServletsMatching | CollectServletsMatching filters servlets by name using glob patterns. | `` | no | - | - |
-| CollectEJBsMatching | CollectEJBsMatching filters EJBs by name using glob patterns. | `` | no | - | - |
+| PMIStatsType | PMIStatsType selects which PMI statistics tier to request (`basic`, `extended`, `all`, or `custom`). | `extended` | no | - | - |
+| PMIRefreshRate | PMIRefreshRate overrides the global PMI servlet refresh interval in seconds when a value >0 is provided. | `60` | no | - | - |
+| ClusterName | ClusterName appends the WebSphere cluster identifier label to every exported time-series. | `` | no | - | - |
+| CellName | CellName appends the WebSphere cell identifier label to every exported time-series. | `` | no | - | - |
+| NodeName | NodeName appends the WebSphere node identifier label to every exported time-series. | `` | no | - | - |
+| ServerType | ServerType records the WebSphere server type label (for example `app_server`, `dmgr`, `nodeagent`). | `` | no | - | - |
+| CollectJVMMetrics | CollectJVMMetrics toggles JVM runtime metrics; defaults to enabled when unset. | `nil` | no | - | - |
+| CollectThreadPoolMetrics | CollectThreadPoolMetrics toggles thread-pool metrics; defaults to enabled when unset. | `nil` | no | - | - |
+| CollectJDBCMetrics | CollectJDBCMetrics toggles JDBC connection-pool metrics; defaults to enabled when unset. | `nil` | no | - | - |
+| CollectJCAMetrics | CollectJCAMetrics toggles JCA resource-adapter metrics; defaults to enabled when unset. | `nil` | no | - | - |
+| CollectJMSMetrics | CollectJMSMetrics toggles JMS destination metrics; defaults to enabled when unset. | `nil` | no | - | - |
+| CollectWebAppMetrics | CollectWebAppMetrics toggles Web application metrics (includes servlet/session data); defaults to enabled when unset. | `nil` | no | - | - |
+| CollectSessionMetrics | CollectSessionMetrics toggles HTTP session manager metrics; defaults to enabled when unset. | `nil` | no | - | - |
+| CollectTransactionMetrics | CollectTransactionMetrics toggles transaction manager metrics; defaults to enabled when unset. | `nil` | no | - | - |
+| CollectClusterMetrics | CollectClusterMetrics toggles cluster-level health metrics; defaults to enabled when unset. | `nil` | no | - | - |
+| CollectServletMetrics | CollectServletMetrics enables servlet response-time metrics; defaults to enabled when unset (may add high-cardinality charts). | `nil` | no | - | - |
+| CollectEJBMetrics | CollectEJBMetrics enables Enterprise Java Bean workload metrics; defaults to enabled when unset. | `nil` | no | - | - |
+| CollectJDBCAdvanced | CollectJDBCAdvanced enables additional JDBC latency/timing statistics; defaults to disabled when unset. | `nil` | no | - | - |
+| MaxThreadPools | MaxThreadPools caps the number of thread pools charted per server (0 disables the limit). | `50` | no | - | - |
+| MaxJDBCPools | MaxJDBCPools caps the number of JDBC connection pools charted (0 disables the limit). | `50` | no | - | - |
+| MaxJCAPools | MaxJCAPools caps the number of JCA resource adapters charted (0 disables the limit). | `50` | no | - | - |
+| MaxJMSDestinations | MaxJMSDestinations caps the number of JMS destinations charted (0 disables the limit). | `50` | no | - | - |
+| MaxApplications | MaxApplications caps the number of web applications charted (0 disables the limit). | `100` | no | - | - |
+| MaxServlets | MaxServlets caps the number of servlet contexts charted when servlet collection is enabled (0 disables the limit). | `50` | no | - | - |
+| MaxEJBs | MaxEJBs caps the number of Enterprise Java Beans charted (0 disables the limit). | `50` | no | - | - |
+| CollectAppsMatching | CollectAppsMatching filters Web applications by name using glob patterns (supports `*`, `?`, `!` prefixes). | `` | no | - | - |
+| CollectPoolsMatching | CollectPoolsMatching filters JDBC and JCA pools by name using glob patterns (supports `*`, `?`, `!` prefixes). | `` | no | - | - |
+| CollectJMSMatching | CollectJMSMatching filters JMS destinations by name using glob patterns (supports `*`, `?`, `!` prefixes). | `` | no | - | - |
+| CollectServletsMatching | CollectServletsMatching filters servlet contexts by name using glob patterns (supports `*`, `?`, `!` prefixes). | `` | no | - | - |
+| CollectEJBsMatching | CollectEJBsMatching filters Enterprise Java Beans by name using glob patterns (supports `*`, `?`, `!` prefixes). | `` | no | - | - |
 
 ### Examples
 

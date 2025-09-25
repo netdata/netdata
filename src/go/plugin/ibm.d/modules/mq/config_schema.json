@@ -156,7 +156,7 @@
         "type": "string"
       },
       "update_every": {
-        "default": 1,
+        "default": 10,
         "minimum": 1,
         "title": "Data collection frequency",
         "type": "integer"
@@ -167,7 +167,6 @@
         "type": "string"
       }
     },
-    "required": null,
     "title": "mq collector configuration",
     "type": "object"
   }

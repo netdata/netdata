@@ -265,7 +265,7 @@ The following options can be defined globally or per job.
 
 | Name | Description | Default | Required | Min | Max |
 |:-----|:------------|:--------|:---------|:----|:----|
-| update_every | Data collection frequency | `1` | no | 1 | - |
+| update_every | Data collection frequency | `10` | no | 1 | - |
 | QueueManager | IBM MQ Queue Manager name to connect to | `QM1` | no | - | - |
 | Channel | IBM MQ channel name for connection | `SYSTEM.DEF.SVRCONN` | no | - | - |
 | Host | IBM MQ server hostname or IP address | `localhost` | no | - | - |
