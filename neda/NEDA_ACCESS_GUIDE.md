@@ -42,19 +42,6 @@ Add to your Claude Code configuration (`claude_config.json`):
 }
 ```
 
-Or use WebSocket for persistent connection:
-
-```json
-{
-  "mcpServers": {
-    "neda": {
-      "url": "ws://10.20.4.205:8803/mcp",
-      "transport": "websocket"
-    }
-  }
-}
-```
-
 Or use Server-Sent Events (SSE):
 
 ```json
@@ -84,26 +71,6 @@ Since Claude Desktop doesn't support remote MCP directly, use `mcp-remote`:
         "--transport",
         "http",
         "http://10.20.4.205:8801/mcp"
-      ]
-    }
-  }
-}
-```
-
-For WebSocket transport:
-
-```json
-{
-  "mcpServers": {
-    "neda": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@modelcontextprotocol/mcp-remote",
-        "connect",
-        "--transport",
-        "websocket",
-        "ws://10.20.4.205:8803/mcp"
       ]
     }
   }
