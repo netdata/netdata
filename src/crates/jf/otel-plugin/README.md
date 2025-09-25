@@ -69,8 +69,8 @@ For example, the following bit from the
  configuration file for the [hostmetrics](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/receiver/hostmetricsreceiver/internal/scraper/networkscraper/documentation.md) receiver:
 ```yaml
 select:
-  instrumentation_scope_name: .*hostmetricsreceiver.*networkscraper$
-  metric_name: system\.network\.connections
+  instrumentation_scope_name: hostmetricsreceiver.*networkscraper
+  metric_name: system.network.connections
 extract:
     chart_instance_pattern: metric.attributes.protocol
     dimension_name: metric.attributes.state
