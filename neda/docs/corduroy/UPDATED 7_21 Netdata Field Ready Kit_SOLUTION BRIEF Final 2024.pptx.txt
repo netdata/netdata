@@ -1,0 +1,61 @@
+Benefits
+Per-second visibility without ingesting or sampling data
+
+Netdata captures every metric as it happens and stores it locally. No rollups, gaps, or delayed insights.
+
+Faster incident response without dashboards or tuning
+
+VAI runs on every node and flags real-time anomalies instantly. Teams get plain-English answers, not just alerts.
+
+Predictable pricing that scales with the team
+
+Flat per-node pricing means no surprise bills and no penalties for more data, more nodes, or deeper coverage.
+
+Challenges
+Why observability fails small teams in expanding environments. 
+
+
+Lean infra teams are expected to move fast, but most observability tools weren’t built for them. They rely on sampled data, lagging alerts, and sprawling dashboards. Visibility comes at the cost of complexity: PromQL, manual tuning, and rising bills. Teams burn time jumping between tools instead of fixing issues. AI features promise insight but rarely deliver real help. The result? Slower response, mounting toil, and tools that serve the stack, not the team
+Netdata helps lean infra teams detect and resolve issues faster, with lower overhead and fewer tools to manage.
+
+The Netdata Solution
+Netdata Observability Platform featuring our AI Co-Engineer. Your teammate that never misses a signal.
+
+
+Netdata is an observability platform for small DevOps and infrastructure teams. It runs AI directly on each node to detect anomalies in real time with high accuracy. Metrics are captured every second, never sampled or delayed. No tuning. No custom dashboards. Just clear answers to what’s broken, why, and how to fix it. All designed to make our AI Co-Engineer an effective team member that interacts in plain English. With flat per-node pricing and no setup required, teams get from install to insight in under five minutes. Netdata runs fully in your AWS environment.
+
+Netdata Contact: Shyam Sreevalsan   |   shyam@netdata.cloud
+
+Netdata Observability. Running at the Edge. Real-Time AI Insights and Answers. All on AWS
+
+
+Case Study: 
+Barcelona Metropolitan Transport (TMB)
+
+Challenges
+TMB faced the difficulty of monitoring a vast, heterogeneous infrastructure across AWS and on-premises environments. The lack of a unified monitoring tool made it challenging to gain real-time insights, leading to potential downtime and performance issues.
+Features
+Netdata runs unsupervised ML directly at the edge, not in a central backend, enabling real-time anomaly detection with near-zero false positives, even on busy infrastructure.
+
+Visit AWS Marketplace the (Netdata website) to purchase or start a Free Trial today. 
+Netdata on AWS
+Netdata  delivers a purpose-built observability platform designed to make its AI Co-Engineer the fastest and most effective way to monitor and troubleshoot infrastructure in real time. The Netdata Observability Platform runs directly on AWS environments, capturing per-second metrics with zero sampling and scoring anomalies in real time at the edge. With built-in support for Amazon Bedrock, customers can integrate their preferred LLMs into the Netdata AI Co-Engineer for secure, in-context analysis of infrastructure issues. This seamless integration enables proactive management, reduces downtime, and helps teams achieve operational excellence across their AWS footprint.
+Get started with Netdata solutions on AWS
+Anomaly Detection Running on Every Node
+Netdata captures and analyzes every metric at its original resolution — maintaining second-by-second detail across systems, containers, and services to ensure nothing gets lost, averaged, or delayed.
+
+Full-Fidelity, Per-Second Visibility
+Solution
+By implementing Netdata Cloud, TMB achieved comprehensive, real-time monitoring of their diverse infrastructure. Netdata's agent-based architecture and compatibility with various platforms allowed TMB to unify their monitoring efforts and gain per-second visibility into their systems.
+Results
+TMB significantly improved troubleshooting capabilities, reduced time spent on monitoring configuration, and enhanced performance across their AWS and on-premises environments. Netdata enabled faster observability and proactive issue resolution, leading to increased operational efficiency.
+Netdata Contact: Shyam Sreevalsan   |   shyam@netdata.cloud
+
+
+Instant On, Fully Automated Setup
+Netdata installs in seconds, automatically discovers your infrastructure, and begins scoring anomalies immediately — with built-in dashboards, pre-trained models, and smart defaults that work out of the box.
+
+Conversational AI That Knows Your Infrastructure
+Netdata AI Co-Engineer isn’t a chatbot, it’s a contextual interface to real anomaly data, trained on your live metrics, and ready to answer in plain English.
+
+

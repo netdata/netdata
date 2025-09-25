@@ -23,6 +23,7 @@ Neda is available at **10.20.4.205** and provides multiple interfaces for integr
 - `ga` - Google Analytics traffic insights
 - `cloudflare` - Website performance and security
 - `encharge` - Email marketing analytics
+- `product-messaging` - AI Product Messaging Expert for positioning strategies
 - `neda-second-opinion` - Critical analysis second opinion
 
 ## 1. Using Neda as an MCP Tool

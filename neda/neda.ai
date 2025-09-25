@@ -30,6 +30,7 @@ agents:
   - ga.ai
   - cloudflare.ai
   - encharge.ai
+  - product-messaging.ai
   - neda-second-opinion.ai
 llmTimeout: 180000
 toolTimeout: 600000

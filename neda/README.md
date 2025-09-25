@@ -7,7 +7,7 @@ Neda is an AI-powered assistant integrated with Slack that provides access to in
 ## Architecture
 
 - **Host Agent**: Main orchestrator (neda.ai) that manages conversations and coordinates sub-agents
-- **Sub-Agents**: 20 specialized agents with focused capabilities and tool access
+- **Sub-Agents**: 21 specialized agents with focused capabilities and tool access
 - **MCP Tools**: Model Context Protocol servers that provide specific functionalities
 - **REST Tools**: Direct API integrations for specific services
 
@@ -283,7 +283,24 @@ Output: File paths with code snippets and GitHub links
 ---
 
 
-### Marketing Agents
+### Marketing & Messaging Agents
+
+#### product-messaging
+**Purpose**: Provide tailored messaging strategies for any customer segment, industry, or competitor using Netdata's positioning framework
+**Integrations Used**:
+- `jina` - Web content extraction
+- `brave` - Web search engine
+- `fetcher` - URL content fetching
+
+**Features**: Adapts Netdata's core messaging from Corduroy agency guidelines to specific contexts
+
+**Example Usage**:
+```
+Input: How should Netdata be positioned for the Healthcare industry?
+Output: Detailed messaging strategy tailored for healthcare with hero messages, value propositions, CTAs
+```
+
+---
 
 #### gsc
 **Purpose**: Google Search Console SEO performance insights for Netdata websites
@@ -379,9 +396,24 @@ su neda -c '/opt/neda/cloudflare.ai "analyze AI bot traffic on learn.netdata.clo
 ---
 
 #### encharge
-**Purpose**: Access to mailing lists
-**Status**: Partially implemented
-**Current Tools**: `encharge` OpenAPI spec available in config
+**Purpose**: Email marketing data from Encharge - campaigns, automations, engagement metrics, segments
+**Status**: Implemented
+**Tools**: `encharge` OpenAPI spec
+**Testing**:
+```bash
+su neda -c '/opt/neda/encharge.ai "find email marketing profile for john.smith@example.com" --verbose'
+```
+
+---
+
+#### product-messaging
+**Purpose**: AI Product Messaging Expert providing tailored positioning strategies
+**Status**: Implemented
+**Tools**: `jina`, `brave`, `fetcher`
+**Testing**:
+```bash
+su neda -c '/opt/neda/product-messaging.ai "position Netdata against Datadog" --verbose'
+```
 
 ---
 

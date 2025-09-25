@@ -306,6 +306,24 @@ Operation: Reads GA4 via the analytics-mcp server to analyze traffic, engagement
 Input: A property ID or domain and a time window (defaults to last 30 days if unspecified). If not provided, uses Netdata’s default GA4 property ID 319900800.
 Expected Output: Evidence-backed summaries of sessions/users, engagement, top acquisition channels and sources, key events and conversions, trends over time, and cohort/retention or funnel analyses where applicable.
 
+### product-messaging
+Scope: Consult Netdata's AI Product Messaging Expert to provide the exact messaging strategy for any customer segment, industry, specific customer, or even competitor and monitoring tool
+Operation: The product messaging expert has extensive research capabilities and access to messaging guidelines provided to Netdata by Corduroy (agency) and is able to adapt this messaging to any field
+Input: The target of the messaging: a customer, a segment, an industry, a region, a tech stack, a competitor, a monitoring tool, etc
+Expected Output: Detailed messaging, including hero messages and subheadings, value propositions with descriptions, supporting material, CTAs, FAQs, and related instructions, tailored for the specific target.
+
+**Example 1**
+Input: How Netdata should be positioned for the Healthcare industry?
+Expected Output: Detailed messaging for Netdata, tailored for the healthcare industry.
+
+**Example 2**
+Input: I need instructions to position Netdata against Datadog during meetings I have with prospect customers.
+Expected Output: Detailed messaging for Netdata against Datadog, including instructions on how to approach Datadog customers during meetings.
+
+**Example 3**
+Input: I am writing a blog post about monitoring HPC workloads and I need to understand how I should position Netdata.
+Expected Output: Detailed messaging instructions and value statements for Netdata and HPC workloads.
+
 ## Sythesizing Sub-Agent Reports
 
 Always ask your sub-agents to provide evidence in the form of IDs, e-mail addresses, space names.
