@@ -2,6 +2,11 @@
 
 package rabbitmq
 
+import (
+	"encoding/json"
+	"fmt"
+)
+
 const (
 	urlPathAPIWhoami      = "/api/whoami"
 	urlPathAPIDefinitions = "/api/definitions"
@@ -12,8 +17,31 @@ const (
 )
 
 type apiWhoamiResp struct {
-	Name string   `json:"name"`
-	Tags []string `json:"tags"`
+	Name string        `json:"name"`
+	Tags apiWhoamiTags `json:"tags"`
+}
+
+type apiWhoamiTags []string
+
+func (a *apiWhoamiTags) UnmarshalJSON(data []byte) error {
+	var multi []string
+	if err := json.Unmarshal(data, &multi); err == nil {
+		*a = multi
+		return nil
+	}
+
+	var single string
+	if err := json.Unmarshal(data, &single); err == nil {
+		*a = []string{single}
+		return nil
+	}
+
+	if string(data) == "null" {
+		*a = nil
+		return nil
+	}
+
+	return fmt.Errorf("unexpected tags format: %s", string(data))
 }
 
 type apiDefinitionsResp struct {
