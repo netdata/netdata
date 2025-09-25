@@ -1,0 +1,5 @@
+{
+  "name": "guest",
+  "tags": "administrator",
+  "is_internal_user": true
+}

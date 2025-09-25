@@ -2,6 +2,10 @@
 
 package rabbitmq
 
+import (
+	"encoding/json"
+)
+
 const (
 	urlPathAPIWhoami      = "/api/whoami"
 	urlPathAPIDefinitions = "/api/definitions"
@@ -11,9 +15,34 @@ const (
 	urlPathAPIQueues      = "/api/queues"
 )
 
+// FlexibleStringSlice is a slice of strings that can unmarshal from either a single string or an array of strings.
+// This is needed to handle RabbitMQ API responses where older versions (e.g., v3.8.2) return a single string
+// while newer versions return an array of strings.
+type FlexibleStringSlice []string
+
+// UnmarshalJSON implements custom JSON unmarshaling that supports both string and []string formats.
+func (f *FlexibleStringSlice) UnmarshalJSON(data []byte) error {
+	// Try to unmarshal as []string first
+	var multi []string
+	err := json.Unmarshal(data, &multi)
+	if err == nil {
+		*f = FlexibleStringSlice(multi)
+		return nil
+	}
+	
+	// If that fails, try to unmarshal as a single string
+	var single string
+	err = json.Unmarshal(data, &single)
+	if err != nil {
+		return err
+	}
+	*f = FlexibleStringSlice([]string{single})
+	return nil
+}
+
 type apiWhoamiResp struct {
-	Name string   `json:"name"`
-	Tags []string `json:"tags"`
+	Name string              `json:"name"`
+	Tags FlexibleStringSlice `json:"tags"`
 }
 
 type apiDefinitionsResp struct {

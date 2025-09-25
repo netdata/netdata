@@ -62,7 +62,7 @@ func (c *Collector) getClusterMeta() (id string, name string, err error) {
 		return "", "", fmt.Errorf("unexpected response: whoami: user name n is empty")
 	}
 
-	if !slices.Contains(user.Tags, "administrator") {
+	if !slices.Contains([]string(user.Tags), "administrator") {
 		c.Warningf("user %s lacks 'administrator' tag: cluster ID and name cannot be collected.", user.Name)
 		return "", "", nil
 	}
