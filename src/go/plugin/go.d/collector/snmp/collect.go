@@ -3,6 +3,7 @@
 package snmp
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"maps"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/gosnmp/gosnmp"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/vnodes"
@@ -20,8 +22,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
 )
-
-const oidSysUptime = "1.3.6.1.2.1.1.3.0"
 
 func (c *Collector) collect() (map[string]int64, error) {
 	if c.snmpClient == nil {
@@ -59,18 +59,44 @@ func (c *Collector) collect() (map[string]int64, error) {
 
 		c.sysInfo = si
 	}
+	var (
+		snmpMx map[string]int64
+		pingMx map[string]int64
+	)
+
+	ctx := context.Background()
+
+	g, _ := errgroup.WithContext(ctx)
+
+	g.Go(func() error {
+		m := make(map[string]int64)
+		if err := c.collectSNMP(m); err != nil {
+			return err
+		}
+		snmpMx = m
+		return nil
+	})
+
+	if c.Ping.Enabled && c.prober != nil {
+		g.Go(func() error {
+			m := make(map[string]int64)
+			if err := c.collectPing(m); err != nil {
+				c.Debugf("ping: %v", err)
+				return nil
+			}
+			pingMx = m
+			return nil
+		})
+	}
+
+	if err := g.Wait(); err != nil {
+		return nil, err
+	}
 
 	mx := make(map[string]int64)
 
-	if err := c.collectProfiles(mx); err != nil {
-		c.Infof("failed to collect profiles: %v", err)
-	}
-
-	if !c.DisableLegacyCollection && len(c.customOids) > 0 {
-		if err := c.collectOIDs(mx); err != nil {
-			return nil, err
-		}
-	}
+	maps.Copy(mx, snmpMx)
+	maps.Copy(mx, pingMx)
 
 	return mx, nil
 }
@@ -192,7 +218,7 @@ func (c *Collector) adjustMaxRepetitions(snmpClient gosnmp.Handler) (bool, error
 		}
 
 		if len(v) > 0 {
-			//c.Config.Options.MaxRepetitions = maxReps
+			//c.Config.OptionsConfig.MaxRepetitions = maxReps
 			if orig != maxReps {
 				c.Infof("adjusted max_repetitions: %d → %d (took %d attempts)", orig, maxReps, attempts)
 			}

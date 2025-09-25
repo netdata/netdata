@@ -31,27 +31,25 @@ func init() {
 func New() *Collector {
 	return &Collector{
 		Config: Config{
-			Network:     "ip",
-			Privileged:  true,
-			SendPackets: 5,
-			Interval:    confopt.Duration(time.Millisecond * 100),
+			ProberConfig: ProberConfig{
+				Network:    "ip",
+				Privileged: true,
+				Packets:    5,
+				Interval:   confopt.Duration(time.Millisecond * 100),
+			},
 		},
 
 		charts:    &module.Charts{},
 		hosts:     make(map[string]bool),
-		newProber: newPingProber,
+		newProber: NewProber,
 	}
 }
 
 type Config struct {
-	Vnode       string           `yaml:"vnode,omitempty" json:"vnode"`
-	UpdateEvery int              `yaml:"update_every,omitempty" json:"update_every"`
-	Hosts       []string         `yaml:"hosts" json:"hosts"`
-	Network     string           `yaml:"network,omitempty" json:"network"`
-	Privileged  bool             `yaml:"privileged" json:"privileged"`
-	SendPackets int              `yaml:"packets,omitempty" json:"packets"`
-	Interval    confopt.Duration `yaml:"interval,omitempty" json:"interval"`
-	Interface   string           `yaml:"interface,omitempty" json:"interface"`
+	Vnode        string   `yaml:"vnode,omitempty" json:"vnode"`
+	UpdateEvery  int      `yaml:"update_every,omitempty" json:"update_every"`
+	Hosts        []string `yaml:"hosts" json:"hosts"`
+	ProberConfig `yaml:",inline" json:",inline"`
 }
 
 type Collector struct {
@@ -60,8 +58,8 @@ type Collector struct {
 
 	charts *module.Charts
 
-	prober    prober
-	newProber func(pingProberConfig, *logger.Logger) prober
+	prober    Prober
+	newProber func(ProberConfig, *logger.Logger) Prober
 
 	hosts map[string]bool
 }
@@ -78,7 +76,7 @@ func (c *Collector) Init(context.Context) error {
 
 	pr, err := c.initProber()
 	if err != nil {
-		return fmt.Errorf("init prober: %v", err)
+		return fmt.Errorf("init Prober: %v", err)
 	}
 	c.prober = pr
 

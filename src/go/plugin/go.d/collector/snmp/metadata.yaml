@@ -199,6 +199,38 @@ modules:
               default_value: 60
               required: false
 
+            - name: ping.enabled
+              group: Ping
+              description: Enable ICMP round-trip measurements (runs alongside SNMP). When disabled, no ping metrics are collected.
+              default_value: false
+              required: false
+            - name: ping.network
+              group: Ping
+              description: "DNS resolution mode. Options: `ip` (IPv4 or IPv6), `ip4` (IPv4 only), `ip6` (IPv6 only)."
+              default_value: ip
+              required: false
+            - name: ping.privileged
+              group: Ping
+              description: Use raw ICMP (privileged). If false, unprivileged mode is used.
+              default_value: true
+              required: false
+            - name: ping.interface
+              group: Ping
+              description: "Network interface to use for ICMP echo requests (e.g., `eth0`, `wlan0`)."
+              default_value: ""
+              required: false
+            - name: ping.packets
+              group: Ping
+              description: Number of ping packets to send per iteration.
+              default_value: 3
+              required: false
+            - name: ping.interval
+              group: Ping
+              description: Interval between sending ping packets.
+              default_value: 100ms
+              required: false
+
+
             - name: manual_profiles
               group: Profiles
               description: Profiles to apply if automatic detection cannot be used.

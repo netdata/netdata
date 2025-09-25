@@ -9,6 +9,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/iprange"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
 )
 
 type (
@@ -122,7 +123,7 @@ func (c *Config) validateAndParse() ([]subnet, error) {
 }
 
 func setCredential(client gosnmp.Handler, cred CredentialConfig) {
-	switch parseSNMPVersion(cred) {
+	switch snmputils.ParseSNMPVersion(cred.Version) {
 	case gosnmp.Version1:
 		client.SetVersion(gosnmp.Version1)
 		client.SetCommunity(cred.Community)
@@ -132,81 +133,13 @@ func setCredential(client gosnmp.Handler, cred CredentialConfig) {
 	case gosnmp.Version3:
 		client.SetVersion(gosnmp.Version3)
 		client.SetSecurityModel(gosnmp.UserSecurityModel)
-		client.SetMsgFlags(parseSNMPv3SecurityLevel(cred))
+		client.SetMsgFlags(snmputils.ParseSNMPv3SecurityLevel(cred.SecurityLevel))
 		client.SetSecurityParameters(&gosnmp.UsmSecurityParameters{
 			UserName:                 cred.UserName,
-			AuthenticationProtocol:   parseSNMPv3AuthProtocol(cred),
+			AuthenticationProtocol:   snmputils.ParseSNMPv3AuthProtocol(cred.AuthProtocol),
 			AuthenticationPassphrase: cred.AuthPassphrase,
-			PrivacyProtocol:          parseSNMPv3PrivProtocol(cred),
+			PrivacyProtocol:          snmputils.ParseSNMPv3PrivProtocol(cred.PrivacyProtocol),
 			PrivacyPassphrase:        cred.PrivacyPassphrase,
 		})
-	}
-}
-
-func parseSNMPVersion(cred CredentialConfig) gosnmp.SnmpVersion {
-	switch cred.Version {
-	case "0", "1":
-		return gosnmp.Version1
-	case "2", "2c", "":
-		return gosnmp.Version2c
-	case "3":
-		return gosnmp.Version3
-	default:
-		return gosnmp.Version2c
-	}
-}
-
-func parseSNMPv3SecurityLevel(cred CredentialConfig) gosnmp.SnmpV3MsgFlags {
-	switch cred.SecurityLevel {
-	case "1", "none", "noAuthNoPriv", "":
-		return gosnmp.NoAuthNoPriv
-	case "2", "authNoPriv":
-		return gosnmp.AuthNoPriv
-	case "3", "authPriv":
-		return gosnmp.AuthPriv
-	default:
-		return gosnmp.NoAuthNoPriv
-	}
-}
-
-func parseSNMPv3AuthProtocol(cred CredentialConfig) gosnmp.SnmpV3AuthProtocol {
-	switch cred.AuthProtocol {
-	case "1", "none", "noAuth", "":
-		return gosnmp.NoAuth
-	case "2", "md5", "MD5":
-		return gosnmp.MD5
-	case "3", "sha", "SHA":
-		return gosnmp.SHA
-	case "4", "sha224", "SHA224":
-		return gosnmp.SHA224
-	case "5", "sha256", "SHA256":
-		return gosnmp.SHA256
-	case "6", "sha384", "SHA384":
-		return gosnmp.SHA384
-	case "7", "sha512", "SHA512":
-		return gosnmp.SHA512
-	default:
-		return gosnmp.NoAuth
-	}
-}
-
-func parseSNMPv3PrivProtocol(cred CredentialConfig) gosnmp.SnmpV3PrivProtocol {
-	switch cred.PrivacyProtocol {
-	case "1", "none", "noPriv", "":
-		return gosnmp.NoPriv
-	case "2", "des", "DES":
-		return gosnmp.DES
-	case "3", "aes", "AES":
-		return gosnmp.AES
-	case "4", "aes192", "AES192":
-		return gosnmp.AES192
-	case "5", "aes256", "AES256":
-		return gosnmp.AES256
-	case "6", "aes192c", "AES192C":
-		return gosnmp.AES192C
-	case "7", "aes256c", "AES256C":
-		return gosnmp.AES256C
-	default:
-		return gosnmp.NoPriv
 	}
 }

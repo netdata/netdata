@@ -348,6 +348,58 @@
           "type": "string"
         },
         "uniqueItems": true
+      },
+      "ping": {
+        "title": "Ping",
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "enabled": {
+            "title": "Enable ping",
+            "type": "boolean",
+            "default": false,
+            "description": "Collect ICMP round-trip time using pro-bing alongside SNMP."
+          },
+          "network": {
+            "title": "Network",
+            "description": "The protocol version used for resolving the specified hosts IP addresses.",
+            "type": "string",
+            "default": "ip",
+            "enum": [
+              "ip",
+              "ip4",
+              "ip6"
+            ]
+          },
+          "privileged": {
+            "title": "Privileged mode",
+            "description": "If set, sends raw ICMP ping packets; otherwise, sends unprivileged UDP ping packets (require [additional configuration](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/ping#overview)).",
+            "type": "boolean",
+            "default": true
+          },
+          "interface": {
+            "title": "Interface",
+            "description": "The network device name (e.g., `eth0`, `wlan0`) used as the source for ICMP echo requests.",
+            "type": "string",
+            "default": ""
+          },
+          "packets": {
+            "title": "Packets",
+            "description": "Number of echo requests sent each collection cycle.",
+            "type": "integer",
+            "minimum": 1,
+            "default": 3
+          },
+          "interval": {
+            "title": "Interval",
+            "description": "Timeout between sending ping packets, in seconds.",
+            "type": "number",
+            "minimum": 0.1,
+            "default": 0.1
+          }
+        }
       }
     },
     "required": [
@@ -464,9 +516,9 @@
           ]
         },
         {
-          "title": "Charts",
+          "title": "Ping",
           "fields": [
-            "charts"
+            "ping"
           ]
         },
         {
@@ -474,6 +526,12 @@
           "fields": [
             "manual_profiles",
             "disable_legacy_collection"
+          ]
+        },
+        {
+          "title": "Charts",
+          "fields": [
+            "charts"
           ]
         }
       ]

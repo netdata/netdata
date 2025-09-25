@@ -47,8 +47,10 @@ func TestCollector_Init(t *testing.T) {
 		"success when 'hosts' set": {
 			wantFail: false,
 			config: Config{
-				SendPackets: 1,
-				Hosts:       []string{"192.0.2.0"},
+				ProberConfig: ProberConfig{
+					Packets: 1,
+				},
+				Hosts: []string{"192.0.2.0"},
 			},
 		},
 	}
@@ -81,11 +83,11 @@ func TestCollector_Check(t *testing.T) {
 		wantFail bool
 		prepare  func(t *testing.T) *Collector
 	}{
-		"success when ping does not return an error": {
+		"success when Ping does not return an error": {
 			wantFail: false,
 			prepare:  casePingSuccess,
 		},
-		"fail when ping returns an error": {
+		"fail when Ping returns an error": {
 			wantFail: true,
 			prepare:  casePingError,
 		},
@@ -110,7 +112,7 @@ func TestCollector_Collect(t *testing.T) {
 		wantMetrics   map[string]int64
 		wantNumCharts int
 	}{
-		"success when ping does not return an error": {
+		"success when Ping does not return an error": {
 			prepare: casePingSuccess,
 			wantMetrics: map[string]int64{
 				"host_192.0.2.1_avg_rtt":        15000,
@@ -137,7 +139,7 @@ func TestCollector_Collect(t *testing.T) {
 			},
 			wantNumCharts: 3 * len(hostChartsTmpl),
 		},
-		"fail when ping returns an error": {
+		"fail when Ping returns an error": {
 			prepare:       casePingError,
 			wantMetrics:   nil,
 			wantNumCharts: 0,
@@ -163,7 +165,7 @@ func casePingSuccess(t *testing.T) *Collector {
 	collr := New()
 	collr.UpdateEvery = 1
 	collr.Hosts = []string{"192.0.2.1", "192.0.2.2", "example.com"}
-	collr.newProber = func(_ pingProberConfig, _ *logger.Logger) prober {
+	collr.newProber = func(_ ProberConfig, _ *logger.Logger) Prober {
 		return &mockProber{}
 	}
 	require.NoError(t, collr.Init(context.Background()))
@@ -174,7 +176,7 @@ func casePingError(t *testing.T) *Collector {
 	collr := New()
 	collr.UpdateEvery = 1
 	collr.Hosts = []string{"192.0.2.1", "192.0.2.2", "example.com"}
-	collr.newProber = func(_ pingProberConfig, _ *logger.Logger) prober {
+	collr.newProber = func(_ ProberConfig, _ *logger.Logger) Prober {
 		return &mockProber{errOnPing: true}
 	}
 	require.NoError(t, collr.Init(context.Background()))
@@ -185,9 +187,9 @@ type mockProber struct {
 	errOnPing bool
 }
 
-func (m *mockProber) ping(host string) (*probing.Statistics, error) {
+func (m *mockProber) Ping(host string) (*probing.Statistics, error) {
 	if m.errOnPing {
-		return nil, errors.New("mock.ping() error")
+		return nil, errors.New("mock.Ping() error")
 	}
 
 	stats := probing.Statistics{

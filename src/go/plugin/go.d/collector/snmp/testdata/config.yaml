@@ -5,13 +5,16 @@ vnode_device_down_threshold: 123
 disable_legacy_collection: yes
 manual_profiles:
   - "ok"
+
 vnode:
   name: "ok"
   guid: "ok"
   hostname: "ok"
   labels:
     ok: "ok"
+
 community: "ok"
+
 user:
   name: "ok"
   level: "ok"
@@ -19,6 +22,7 @@ user:
   auth_key: "ok"
   priv_proto: "ok"
   priv_key: "ok"
+
 options:
   port: 123
   retries: 123
@@ -26,6 +30,7 @@ options:
   version: "ok"
   max_request_size: 123
   max_repetitions: 123
+
 charts:
   - id: "ok"
     title: "ok"
@@ -41,3 +46,11 @@ charts:
         algorithm: "ok"
         multiplier: 123
         divisor: 123
+
+ping:
+  enabled: yes
+  network: ip
+  privileged: yes
+  interface: eth0
+  packets: 5
+  interval: 123.123
