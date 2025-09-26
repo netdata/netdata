@@ -8,9 +8,14 @@
         "type": "integer"
       },
       "collect_bufferpool_metrics": {
-        "default": "\u003cauto\u003e",
+        "default": "auto",
+        "enum": [
+          "auto",
+          "enabled",
+          "disabled"
+        ],
         "title": "CollectBufferpoolMetrics toggles buffer pool efficiency metrics.",
-        "type": "boolean"
+        "type": "string"
       },
       "collect_bufferpools_matching": {
         "default": "",
@@ -18,9 +23,14 @@
         "type": "string"
       },
       "collect_connection_metrics": {
-        "default": "\u003cauto\u003e",
+        "default": "auto",
+        "enum": [
+          "auto",
+          "enabled",
+          "disabled"
+        ],
         "title": "CollectConnectionMetrics toggles per-connection activity metrics.",
-        "type": "boolean"
+        "type": "string"
       },
       "collect_connections_matching": {
         "default": "",
@@ -28,9 +38,14 @@
         "type": "string"
       },
       "collect_database_metrics": {
-        "default": "\u003cauto\u003e",
+        "default": "auto",
+        "enum": [
+          "auto",
+          "enabled",
+          "disabled"
+        ],
         "title": "CollectDatabaseMetrics toggles high-level database status metrics.",
-        "type": "boolean"
+        "type": "string"
       },
       "collect_databases_matching": {
         "default": "",
@@ -38,9 +53,14 @@
         "type": "string"
       },
       "collect_index_metrics": {
-        "default": "\u003cauto\u003e",
+        "default": "auto",
+        "enum": [
+          "auto",
+          "enabled",
+          "disabled"
+        ],
         "title": "CollectIndexMetrics toggles index usage metrics.",
-        "type": "boolean"
+        "type": "string"
       },
       "collect_indexes_matching": {
         "default": "",
@@ -48,9 +68,14 @@
         "type": "string"
       },
       "collect_lock_metrics": {
-        "default": "\u003cauto\u003e",
+        "default": "auto",
+        "enum": [
+          "auto",
+          "enabled",
+          "disabled"
+        ],
         "title": "CollectLockMetrics toggles lock contention metrics.",
-        "type": "boolean"
+        "type": "string"
       },
       "collect_memory_metrics": {
         "default": true,
@@ -63,9 +88,14 @@
         "type": "boolean"
       },
       "collect_table_metrics": {
-        "default": "\u003cauto\u003e",
+        "default": "auto",
+        "enum": [
+          "auto",
+          "enabled",
+          "disabled"
+        ],
         "title": "CollectTableMetrics toggles table-level size and row metrics.",
-        "type": "boolean"
+        "type": "string"
       },
       "collect_tables_matching": {
         "default": "",
@@ -73,9 +103,14 @@
         "type": "string"
       },
       "collect_tablespace_metrics": {
-        "default": "\u003cauto\u003e",
+        "default": "auto",
+        "enum": [
+          "auto",
+          "enabled",
+          "disabled"
+        ],
         "title": "CollectTablespaceMetrics toggles tablespace capacity metrics.",
-        "type": "boolean"
+        "type": "string"
       },
       "collect_tablespaces_matching": {
         "default": "",
@@ -151,5 +186,89 @@
     },
     "title": "db2 collector configuration",
     "type": "object"
+  },
+  "uiSchema": {
+    "ui:flavour": "tabs",
+    "ui:options": {
+      "tabs": [
+        {
+          "fields": [
+            "update_every",
+            "vnode",
+            "dsn",
+            "timeout"
+          ],
+          "title": "Connection"
+        },
+        {
+          "fields": [
+            "max_db_conns",
+            "max_db_life_time",
+            "backup_history_days"
+          ],
+          "title": "Advanced"
+        },
+        {
+          "fields": [
+            "collect_database_metrics",
+            "max_databases",
+            "collect_databases_matching"
+          ],
+          "title": "Databases"
+        },
+        {
+          "fields": [
+            "collect_bufferpool_metrics",
+            "max_bufferpools",
+            "collect_bufferpools_matching"
+          ],
+          "title": "Buffer Pools"
+        },
+        {
+          "fields": [
+            "collect_tablespace_metrics",
+            "max_tablespaces",
+            "collect_tablespaces_matching"
+          ],
+          "title": "Tablespaces"
+        },
+        {
+          "fields": [
+            "collect_connection_metrics",
+            "max_connections",
+            "collect_connections_matching"
+          ],
+          "title": "Connections Monitoring"
+        },
+        {
+          "fields": [
+            "collect_lock_metrics",
+            "collect_memory_metrics",
+            "collect_wait_metrics",
+            "collect_table_io_metrics"
+          ],
+          "title": "Other Metrics"
+        },
+        {
+          "fields": [
+            "collect_table_metrics",
+            "max_tables",
+            "collect_tables_matching"
+          ],
+          "title": "Tables"
+        },
+        {
+          "fields": [
+            "collect_index_metrics",
+            "max_indexes",
+            "collect_indexes_matching"
+          ],
+          "title": "Indexes"
+        }
+      ]
+    },
+    "uiOptions": {
+      "fullPage": true
+    }
   }
 }

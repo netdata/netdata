@@ -18,14 +18,24 @@
         "type": "string"
       },
       "collect_cluster_metrics": {
-        "default": "nil",
+        "default": "auto",
+        "enum": [
+          "auto",
+          "enabled",
+          "disabled"
+        ],
         "title": "CollectClusterMetrics toggles cluster-level health metrics; defaults to enabled when unset.",
-        "type": "boolean"
+        "type": "string"
       },
       "collect_ejb_metrics": {
-        "default": "nil",
+        "default": "auto",
+        "enum": [
+          "auto",
+          "enabled",
+          "disabled"
+        ],
         "title": "CollectEJBMetrics enables Enterprise Java Bean workload metrics; defaults to enabled when unset.",
-        "type": "boolean"
+        "type": "string"
       },
       "collect_ejbs_matching": {
         "default": "",
@@ -33,19 +43,34 @@
         "type": "string"
       },
       "collect_jca_metrics": {
-        "default": "nil",
+        "default": "auto",
+        "enum": [
+          "auto",
+          "enabled",
+          "disabled"
+        ],
         "title": "CollectJCAMetrics toggles JCA resource-adapter metrics; defaults to enabled when unset.",
-        "type": "boolean"
+        "type": "string"
       },
       "collect_jdbc_advanced": {
-        "default": "nil",
+        "default": "auto",
+        "enum": [
+          "auto",
+          "enabled",
+          "disabled"
+        ],
         "title": "CollectJDBCAdvanced enables additional JDBC latency/timing statistics; defaults to disabled when unset.",
-        "type": "boolean"
+        "type": "string"
       },
       "collect_jdbc_metrics": {
-        "default": "nil",
+        "default": "auto",
+        "enum": [
+          "auto",
+          "enabled",
+          "disabled"
+        ],
         "title": "CollectJDBCMetrics toggles JDBC connection-pool metrics; defaults to enabled when unset.",
-        "type": "boolean"
+        "type": "string"
       },
       "collect_jms_matching": {
         "default": "",
@@ -53,14 +78,24 @@
         "type": "string"
       },
       "collect_jms_metrics": {
-        "default": "nil",
+        "default": "auto",
+        "enum": [
+          "auto",
+          "enabled",
+          "disabled"
+        ],
         "title": "CollectJMSMetrics toggles JMS destination metrics; defaults to enabled when unset.",
-        "type": "boolean"
+        "type": "string"
       },
       "collect_jvm_metrics": {
-        "default": "nil",
+        "default": "auto",
+        "enum": [
+          "auto",
+          "enabled",
+          "disabled"
+        ],
         "title": "CollectJVMMetrics toggles JVM runtime metrics; defaults to enabled when unset.",
-        "type": "boolean"
+        "type": "string"
       },
       "collect_pools_matching": {
         "default": "",
@@ -68,9 +103,14 @@
         "type": "string"
       },
       "collect_servlet_metrics": {
-        "default": "nil",
+        "default": "auto",
+        "enum": [
+          "auto",
+          "enabled",
+          "disabled"
+        ],
         "title": "CollectServletMetrics enables servlet response-time metrics; defaults to enabled when unset (may add high-cardinality charts).",
-        "type": "boolean"
+        "type": "string"
       },
       "collect_servlets_matching": {
         "default": "",
@@ -78,24 +118,48 @@
         "type": "string"
       },
       "collect_session_metrics": {
-        "default": "nil",
+        "default": "auto",
+        "enum": [
+          "auto",
+          "enabled",
+          "disabled"
+        ],
         "title": "CollectSessionMetrics toggles HTTP session manager metrics; defaults to enabled when unset.",
-        "type": "boolean"
+        "type": "string"
       },
       "collect_threadpool_metrics": {
-        "default": "nil",
+        "default": "auto",
+        "enum": [
+          "auto",
+          "enabled",
+          "disabled"
+        ],
         "title": "CollectThreadPoolMetrics toggles thread-pool metrics; defaults to enabled when unset.",
-        "type": "boolean"
+        "type": "string"
       },
       "collect_transaction_metrics": {
-        "default": "nil",
+        "default": "auto",
+        "enum": [
+          "auto",
+          "enabled",
+          "disabled"
+        ],
         "title": "CollectTransactionMetrics toggles transaction manager metrics; defaults to enabled when unset.",
-        "type": "boolean"
+        "type": "string"
       },
       "collect_webapp_metrics": {
-        "default": "nil",
+        "default": "auto",
+        "enum": [
+          "auto",
+          "enabled",
+          "disabled"
+        ],
         "title": "CollectWebAppMetrics toggles Web application metrics (includes servlet/session data); defaults to enabled when unset.",
-        "type": "boolean"
+        "type": "string"
+      },
+      "headers": {
+        "title": "Custom headers",
+        "type": "object"
       },
       "max_applications": {
         "default": 100,
@@ -137,6 +201,16 @@
         "title": "NodeName appends the WebSphere node identifier label to every exported time-series.",
         "type": "string"
       },
+      "not_follow_redirects": {
+        "default": false,
+        "title": "Disable HTTP redirects",
+        "type": "boolean"
+      },
+      "password": {
+        "default": "",
+        "title": "Password for authentication",
+        "type": "string"
+      },
       "pmi_refresh_rate": {
         "default": 60,
         "title": "PMIRefreshRate overrides the global PMI servlet refresh interval in seconds when a value \u003e0 is provided.",
@@ -147,16 +221,66 @@
         "title": "PMIStatsType selects which PMI statistics tier to request (`basic`, `extended`, `all`, or `custom`).",
         "type": "string"
       },
+      "proxy_password": {
+        "default": "",
+        "title": "Proxy password",
+        "type": "string"
+      },
+      "proxy_url": {
+        "default": "",
+        "title": "Proxy URL",
+        "type": "string"
+      },
+      "proxy_username": {
+        "default": "",
+        "title": "Proxy username",
+        "type": "string"
+      },
       "server_type": {
         "default": "",
         "title": "ServerType records the WebSphere server type label (for example `app_server`, `dmgr`, `nodeagent`).",
         "type": "string"
+      },
+      "timeout": {
+        "default": 5000000000,
+        "title": "Request timeout in seconds",
+        "type": "integer"
+      },
+      "tls_ca": {
+        "default": "",
+        "title": "Custom CA bundle path",
+        "type": "string"
+      },
+      "tls_cert": {
+        "default": "",
+        "title": "Client certificate path",
+        "type": "string"
+      },
+      "tls_key": {
+        "default": "",
+        "title": "Client key path",
+        "type": "string"
+      },
+      "tls_skip_verify": {
+        "default": false,
+        "title": "Skip TLS certificate verification",
+        "type": "boolean"
       },
       "update_every": {
         "default": 5,
         "minimum": 1,
         "title": "Data collection frequency",
         "type": "integer"
+      },
+      "url": {
+        "default": "",
+        "title": "Target URL",
+        "type": "string"
+      },
+      "username": {
+        "default": "",
+        "title": "Username for authentication",
+        "type": "string"
       },
       "vnode": {
         "default": "",
@@ -166,5 +290,126 @@
     },
     "title": "websphere_pmi collector configuration",
     "type": "object"
+  },
+  "uiSchema": {
+    "password": {
+      "ui:widget": "password"
+    },
+    "proxy_password": {
+      "ui:widget": "password"
+    },
+    "ui:flavour": "tabs",
+    "ui:options": {
+      "tabs": [
+        {
+          "fields": [
+            "tls_key",
+            "tls_cert",
+            "tls_ca",
+            "tls_skip_verify",
+            "headers",
+            "proxy_password",
+            "proxy_username",
+            "proxy_url",
+            "not_follow_redirects"
+          ],
+          "title": "HTTP"
+        },
+        {
+          "fields": [
+            "timeout",
+            "password",
+            "username",
+            "url",
+            "update_every",
+            "vnode"
+          ],
+          "title": "Connection"
+        },
+        {
+          "fields": [
+            "pmi_stats_type",
+            "pmi_refresh_rate"
+          ],
+          "title": "PMI Settings"
+        },
+        {
+          "fields": [
+            "cluster_name",
+            "cell_name",
+            "node_name",
+            "server_type"
+          ],
+          "title": "Identity"
+        },
+        {
+          "fields": [
+            "collect_jvm_metrics",
+            "collect_session_metrics",
+            "collect_transaction_metrics",
+            "collect_cluster_metrics"
+          ],
+          "title": "Other Metrics"
+        },
+        {
+          "fields": [
+            "collect_threadpool_metrics",
+            "max_threadpools",
+            "collect_pools_matching"
+          ],
+          "title": "Thread Pools"
+        },
+        {
+          "fields": [
+            "collect_jdbc_metrics",
+            "collect_jdbc_advanced",
+            "max_jdbc_pools"
+          ],
+          "title": "JDBC"
+        },
+        {
+          "fields": [
+            "collect_jca_metrics",
+            "max_jca_pools"
+          ],
+          "title": "JCA"
+        },
+        {
+          "fields": [
+            "collect_jms_metrics",
+            "max_jms_destinations",
+            "collect_jms_matching"
+          ],
+          "title": "JMS"
+        },
+        {
+          "fields": [
+            "collect_webapp_metrics",
+            "max_applications",
+            "collect_apps_matching"
+          ],
+          "title": "Applications"
+        },
+        {
+          "fields": [
+            "collect_servlet_metrics",
+            "max_servlets",
+            "collect_servlets_matching"
+          ],
+          "title": "Servlets"
+        },
+        {
+          "fields": [
+            "collect_ejb_metrics",
+            "max_ejbs",
+            "collect_ejbs_matching"
+          ],
+          "title": "EJBs"
+        }
+      ]
+    },
+    "uiOptions": {
+      "fullPage": true
+    }
   }
 }

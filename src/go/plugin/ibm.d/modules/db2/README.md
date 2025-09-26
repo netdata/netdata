@@ -294,13 +294,13 @@ The following options can be defined globally or per job.
 | Timeout | Timeout controls how long DB2 RPCs may run before cancellation. | `2000000000` | no | - | - |
 | MaxDbConns | MaxDbConns limits the connection pool size. | `1` | no | - | - |
 | MaxDbLifeTime | MaxDbLifeTime forces pooled connections to be recycled after the specified duration. | `600000000000` | no | - | - |
-| CollectDatabaseMetrics | CollectDatabaseMetrics toggles high-level database status metrics. | `<auto>` | no | - | - |
-| CollectBufferpoolMetrics | CollectBufferpoolMetrics toggles buffer pool efficiency metrics. | `<auto>` | no | - | - |
-| CollectTablespaceMetrics | CollectTablespaceMetrics toggles tablespace capacity metrics. | `<auto>` | no | - | - |
-| CollectConnectionMetrics | CollectConnectionMetrics toggles per-connection activity metrics. | `<auto>` | no | - | - |
-| CollectLockMetrics | CollectLockMetrics toggles lock contention metrics. | `<auto>` | no | - | - |
-| CollectTableMetrics | CollectTableMetrics toggles table-level size and row metrics. | `<auto>` | no | - | - |
-| CollectIndexMetrics | CollectIndexMetrics toggles index usage metrics. | `<auto>` | no | - | - |
+| CollectDatabaseMetrics | CollectDatabaseMetrics toggles high-level database status metrics. | `auto` | no | - | - |
+| CollectBufferpoolMetrics | CollectBufferpoolMetrics toggles buffer pool efficiency metrics. | `auto` | no | - | - |
+| CollectTablespaceMetrics | CollectTablespaceMetrics toggles tablespace capacity metrics. | `auto` | no | - | - |
+| CollectConnectionMetrics | CollectConnectionMetrics toggles per-connection activity metrics. | `auto` | no | - | - |
+| CollectLockMetrics | CollectLockMetrics toggles lock contention metrics. | `auto` | no | - | - |
+| CollectTableMetrics | CollectTableMetrics toggles table-level size and row metrics. | `auto` | no | - | - |
+| CollectIndexMetrics | CollectIndexMetrics toggles index usage metrics. | `auto` | no | - | - |
 | MaxDatabases | MaxDatabases caps the number of databases charted. | `10` | no | - | - |
 | MaxBufferpools | MaxBufferpools caps the number of buffer pools charted. | `20` | no | - | - |
 | MaxTablespaces | MaxTablespaces caps the number of tablespaces charted. | `100` | no | - | - |

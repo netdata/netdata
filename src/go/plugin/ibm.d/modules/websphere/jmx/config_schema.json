@@ -23,14 +23,24 @@
         "type": "string"
       },
       "collect_cluster_metrics": {
-        "default": true,
+        "default": "enabled",
+        "enum": [
+          "auto",
+          "enabled",
+          "disabled"
+        ],
         "title": "Enable collection of cluster metrics metrics",
-        "type": "boolean"
+        "type": "string"
       },
       "collect_ejb_metrics": {
-        "default": true,
+        "default": "enabled",
+        "enum": [
+          "auto",
+          "enabled",
+          "disabled"
+        ],
         "title": "Enable collection of e j b metrics metrics",
-        "type": "boolean"
+        "type": "string"
       },
       "collect_ejbs_matching": {
         "default": "",
@@ -38,19 +48,34 @@
         "type": "string"
       },
       "collect_jca_metrics": {
-        "default": true,
+        "default": "enabled",
+        "enum": [
+          "auto",
+          "enabled",
+          "disabled"
+        ],
         "title": "Enable collection of j c a metrics metrics",
-        "type": "boolean"
+        "type": "string"
       },
       "collect_jdbc_advanced": {
-        "default": false,
+        "default": "disabled",
+        "enum": [
+          "auto",
+          "enabled",
+          "disabled"
+        ],
         "title": "Enable collection of j d b c advanced metrics",
-        "type": "boolean"
+        "type": "string"
       },
       "collect_jdbc_metrics": {
-        "default": true,
+        "default": "enabled",
+        "enum": [
+          "auto",
+          "enabled",
+          "disabled"
+        ],
         "title": "Enable collection of j d b c metrics metrics",
-        "type": "boolean"
+        "type": "string"
       },
       "collect_jms_matching": {
         "default": "",
@@ -58,14 +83,24 @@
         "type": "string"
       },
       "collect_jms_metrics": {
-        "default": true,
+        "default": "enabled",
+        "enum": [
+          "auto",
+          "enabled",
+          "disabled"
+        ],
         "title": "Enable collection of j m s metrics metrics",
-        "type": "boolean"
+        "type": "string"
       },
       "collect_jvm_metrics": {
-        "default": true,
+        "default": "enabled",
+        "enum": [
+          "auto",
+          "enabled",
+          "disabled"
+        ],
         "title": "Metric toggles",
-        "type": "boolean"
+        "type": "string"
       },
       "collect_pools_matching": {
         "default": "",
@@ -73,9 +108,14 @@
         "type": "string"
       },
       "collect_servlet_metrics": {
-        "default": true,
+        "default": "enabled",
+        "enum": [
+          "auto",
+          "enabled",
+          "disabled"
+        ],
         "title": "Enable collection of servlet metrics metrics",
-        "type": "boolean"
+        "type": "string"
       },
       "collect_servlets_matching": {
         "default": "",
@@ -83,24 +123,44 @@
         "type": "string"
       },
       "collect_session_metrics": {
-        "default": true,
+        "default": "enabled",
+        "enum": [
+          "auto",
+          "enabled",
+          "disabled"
+        ],
         "title": "Enable collection of session metrics metrics",
-        "type": "boolean"
+        "type": "string"
       },
       "collect_threadpool_metrics": {
-        "default": true,
+        "default": "enabled",
+        "enum": [
+          "auto",
+          "enabled",
+          "disabled"
+        ],
         "title": "Enable collection of thread pool metrics metrics",
-        "type": "boolean"
+        "type": "string"
       },
       "collect_transaction_metrics": {
-        "default": true,
+        "default": "enabled",
+        "enum": [
+          "auto",
+          "enabled",
+          "disabled"
+        ],
         "title": "Enable collection of transaction metrics metrics",
-        "type": "boolean"
+        "type": "string"
       },
       "collect_webapp_metrics": {
-        "default": true,
+        "default": "enabled",
+        "enum": [
+          "auto",
+          "enabled",
+          "disabled"
+        ],
         "title": "Enable collection of web app metrics metrics",
-        "type": "boolean"
+        "type": "string"
       },
       "helper_restart_max": {
         "default": 3,
@@ -222,5 +282,116 @@
     },
     "title": "websphere_jmx collector configuration",
     "type": "object"
+  },
+  "uiSchema": {
+    "jmx_password": {
+      "ui:widget": "password"
+    },
+    "ui:flavour": "tabs",
+    "ui:options": {
+      "tabs": [
+        {
+          "fields": [
+            "update_every",
+            "vnode",
+            "jmx_url",
+            "jmx_username",
+            "jmx_password",
+            "jmx_classpath",
+            "java_exec_path"
+          ],
+          "title": "Connection"
+        },
+        {
+          "fields": [
+            "jmx_timeout",
+            "init_timeout",
+            "shutdown_delay",
+            "max_retries",
+            "retry_backoff_multiplier",
+            "circuit_breaker_threshold",
+            "helper_restart_max"
+          ],
+          "title": "Advanced"
+        },
+        {
+          "fields": [
+            "cluster_name",
+            "cell_name",
+            "node_name",
+            "server_name",
+            "server_type"
+          ],
+          "title": "Identity"
+        },
+        {
+          "fields": [
+            "collect_jvm_metrics",
+            "collect_session_metrics",
+            "collect_transaction_metrics",
+            "collect_cluster_metrics"
+          ],
+          "title": "Other Metrics"
+        },
+        {
+          "fields": [
+            "collect_threadpool_metrics",
+            "max_threadpools",
+            "collect_pools_matching"
+          ],
+          "title": "Thread Pools"
+        },
+        {
+          "fields": [
+            "collect_jdbc_metrics",
+            "collect_jdbc_advanced",
+            "max_jdbc_pools"
+          ],
+          "title": "JDBC"
+        },
+        {
+          "fields": [
+            "collect_jca_metrics",
+            "max_jca_pools"
+          ],
+          "title": "JCA"
+        },
+        {
+          "fields": [
+            "collect_jms_metrics",
+            "max_jms_destinations",
+            "collect_jms_matching"
+          ],
+          "title": "JMS"
+        },
+        {
+          "fields": [
+            "collect_webapp_metrics",
+            "max_applications",
+            "collect_apps_matching"
+          ],
+          "title": "Applications"
+        },
+        {
+          "fields": [
+            "collect_servlet_metrics",
+            "max_servlets",
+            "collect_servlets_matching"
+          ],
+          "title": "Servlets"
+        },
+        {
+          "fields": [
+            "collect_ejb_metrics",
+            "max_ejbs",
+            "collect_ejbs_matching"
+          ],
+          "title": "EJBs"
+        }
+      ]
+    },
+    "uiOptions": {
+      "fullPage": true
+    }
   }
 }

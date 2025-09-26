@@ -175,18 +175,18 @@ The following options can be defined globally or per job.
 | NodeName | Node name | `` | no | - | - |
 | ServerName | Server name | `` | no | - | - |
 | ServerType | Server type | `` | no | - | - |
-| CollectJVMMetrics | Metric toggles | `true` | no | - | - |
-| CollectThreadPoolMetrics | Enable collection of thread pool metrics metrics | `true` | no | - | - |
-| CollectJDBCMetrics | Enable collection of j d b c metrics metrics | `true` | no | - | - |
-| CollectJCAMetrics | Enable collection of j c a metrics metrics | `true` | no | - | - |
-| CollectJMSMetrics | Enable collection of j m s metrics metrics | `true` | no | - | - |
-| CollectWebAppMetrics | Enable collection of web app metrics metrics | `true` | no | - | - |
-| CollectSessionMetrics | Enable collection of session metrics metrics | `true` | no | - | - |
-| CollectTransactionMetrics | Enable collection of transaction metrics metrics | `true` | no | - | - |
-| CollectClusterMetrics | Enable collection of cluster metrics metrics | `true` | no | - | - |
-| CollectServletMetrics | Enable collection of servlet metrics metrics | `true` | no | - | - |
-| CollectEJBMetrics | Enable collection of e j b metrics metrics | `true` | no | - | - |
-| CollectJDBCAdvanced | Enable collection of j d b c advanced metrics | `false` | no | - | - |
+| CollectJVMMetrics | Metric toggles | `enabled` | no | - | - |
+| CollectThreadPoolMetrics | Enable collection of thread pool metrics metrics | `enabled` | no | - | - |
+| CollectJDBCMetrics | Enable collection of j d b c metrics metrics | `enabled` | no | - | - |
+| CollectJCAMetrics | Enable collection of j c a metrics metrics | `enabled` | no | - | - |
+| CollectJMSMetrics | Enable collection of j m s metrics metrics | `enabled` | no | - | - |
+| CollectWebAppMetrics | Enable collection of web app metrics metrics | `enabled` | no | - | - |
+| CollectSessionMetrics | Enable collection of session metrics metrics | `enabled` | no | - | - |
+| CollectTransactionMetrics | Enable collection of transaction metrics metrics | `enabled` | no | - | - |
+| CollectClusterMetrics | Enable collection of cluster metrics metrics | `enabled` | no | - | - |
+| CollectServletMetrics | Enable collection of servlet metrics metrics | `enabled` | no | - | - |
+| CollectEJBMetrics | Enable collection of e j b metrics metrics | `enabled` | no | - | - |
+| CollectJDBCAdvanced | Enable collection of j d b c advanced metrics | `disabled` | no | - | - |
 | MaxThreadPools | Cardinality guards | `50` | no | - | - |
 | MaxJDBCPools | Maximum number of j d b c pools to monitor | `50` | no | - | - |
 | MaxJCAPools | Maximum number of j c a pools to monitor | `50` | no | - | - |

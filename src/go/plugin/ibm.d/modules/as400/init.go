@@ -38,6 +38,15 @@ func defaultConfig() Config {
 		UseSSL:          false,
 		ResetStatistics: false,
 
+		CollectDiskMetrics:        framework.AutoBoolAuto,
+		CollectSubsystemMetrics:   framework.AutoBoolAuto,
+		CollectJobQueueMetrics:    framework.AutoBoolAuto,
+		CollectActiveJobs:         framework.AutoBoolAuto,
+		CollectHTTPServerMetrics:  framework.AutoBoolAuto,
+		CollectMessageQueueMetrics: framework.AutoBoolAuto,
+		CollectOutputQueueMetrics: framework.AutoBoolAuto,
+		CollectPlanCacheMetrics:   framework.AutoBoolAuto,
+
 		MaxDisks:         100,
 		MaxSubsystems:    100,
 		MaxJobQueues:     100,

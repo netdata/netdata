@@ -3,14 +3,24 @@
     "$schema": "http://json-schema.org/draft-07/schema#",
     "properties": {
       "collect_active_jobs": {
-        "default": "\u003cauto\u003e",
+        "default": "auto",
+        "enum": [
+          "auto",
+          "enabled",
+          "disabled"
+        ],
         "title": "CollectActiveJobs toggles collection of detailed per-job metrics.",
-        "type": "boolean"
+        "type": "string"
       },
       "collect_disk_metrics": {
-        "default": "\u003cauto\u003e",
+        "default": "auto",
+        "enum": [
+          "auto",
+          "enabled",
+          "disabled"
+        ],
         "title": "CollectDiskMetrics toggles collection of disk unit statistics.",
-        "type": "boolean"
+        "type": "string"
       },
       "collect_disks_matching": {
         "default": "",
@@ -18,14 +28,24 @@
         "type": "string"
       },
       "collect_http_server_metrics": {
-        "default": "\u003cauto\u003e",
+        "default": "auto",
+        "enum": [
+          "auto",
+          "enabled",
+          "disabled"
+        ],
         "title": "CollectHTTPServerMetrics toggles collection of IBM HTTP Server statistics.",
-        "type": "boolean"
+        "type": "string"
       },
       "collect_job_queue_metrics": {
-        "default": "\u003cauto\u003e",
+        "default": "auto",
+        "enum": [
+          "auto",
+          "enabled",
+          "disabled"
+        ],
         "title": "CollectJobQueueMetrics toggles collection of job queue backlog metrics.",
-        "type": "boolean"
+        "type": "string"
       },
       "collect_job_queues_matching": {
         "default": "",
@@ -33,24 +53,44 @@
         "type": "string"
       },
       "collect_message_queue_metrics": {
-        "default": "\u003cauto\u003e",
+        "default": "auto",
+        "enum": [
+          "auto",
+          "enabled",
+          "disabled"
+        ],
         "title": "CollectMessageQueueMetrics toggles collection of IBM i message queue metrics.",
-        "type": "boolean"
+        "type": "string"
       },
       "collect_output_queue_metrics": {
-        "default": "\u003cauto\u003e",
+        "default": "auto",
+        "enum": [
+          "auto",
+          "enabled",
+          "disabled"
+        ],
         "title": "CollectOutputQueueMetrics toggles collection of IBM i output queue metrics.",
-        "type": "boolean"
+        "type": "string"
       },
       "collect_plan_cache_metrics": {
-        "default": "\u003cauto\u003e",
+        "default": "auto",
+        "enum": [
+          "auto",
+          "enabled",
+          "disabled"
+        ],
         "title": "CollectPlanCacheMetrics toggles collection of plan cache analysis metrics.",
-        "type": "boolean"
+        "type": "string"
       },
       "collect_subsystem_metrics": {
-        "default": "\u003cauto\u003e",
+        "default": "auto",
+        "enum": [
+          "auto",
+          "enabled",
+          "disabled"
+        ],
         "title": "CollectSubsystemMetrics toggles collection of subsystem activity metrics.",
-        "type": "boolean"
+        "type": "string"
       },
       "collect_subsystems_matching": {
         "default": "",
@@ -169,5 +209,95 @@
     },
     "title": "as400 collector configuration",
     "type": "object"
+  },
+  "uiSchema": {
+    "password": {
+      "ui:widget": "password"
+    },
+    "ui:flavour": "tabs",
+    "ui:options": {
+      "tabs": [
+        {
+          "fields": [
+            "update_every",
+            "vnode",
+            "dsn",
+            "timeout",
+            "hostname",
+            "port",
+            "username",
+            "password",
+            "database",
+            "connection_type",
+            "odbc_driver",
+            "use_ssl"
+          ],
+          "title": "Connection"
+        },
+        {
+          "fields": [
+            "max_db_conns",
+            "max_db_life_time",
+            "reset_statistics"
+          ],
+          "title": "Advanced"
+        },
+        {
+          "fields": [
+            "collect_disk_metrics",
+            "max_disks",
+            "collect_disks_matching"
+          ],
+          "title": "Disks"
+        },
+        {
+          "fields": [
+            "collect_subsystem_metrics",
+            "max_subsystems",
+            "collect_subsystems_matching"
+          ],
+          "title": "Subsystems"
+        },
+        {
+          "fields": [
+            "collect_job_queue_metrics",
+            "max_job_queues",
+            "collect_job_queues_matching"
+          ],
+          "title": "Job Queues"
+        },
+        {
+          "fields": [
+            "collect_active_jobs",
+            "max_active_jobs"
+          ],
+          "title": "Active Jobs"
+        },
+        {
+          "fields": [
+            "collect_http_server_metrics",
+            "collect_plan_cache_metrics"
+          ],
+          "title": "Other Metrics"
+        },
+        {
+          "fields": [
+            "collect_message_queue_metrics",
+            "max_message_queues"
+          ],
+          "title": "Message Queues"
+        },
+        {
+          "fields": [
+            "collect_output_queue_metrics",
+            "max_output_queues"
+          ],
+          "title": "Output Queues"
+        }
+      ]
+    },
+    "uiOptions": {
+      "fullPage": true
+    }
   }
 }

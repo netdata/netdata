@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/framework"
 )
 
 func safeDSN(dsn string) string {
@@ -199,52 +201,60 @@ func (c *Collector) parseDB2Version() {
 }
 
 func (c *Collector) setConfigurationDefaults() {
-	boolPtr := func(v bool) *bool { return &v }
-
-	if c.CollectDatabaseMetrics == nil {
+	if c.CollectDatabaseMetrics.IsAuto() {
 		defaultValue := c.edition == "LUW" || c.edition == "Cloud"
-		c.CollectDatabaseMetrics = boolPtr(defaultValue)
+		c.CollectDatabaseMetrics = framework.AutoBoolFromBool(defaultValue)
 		c.Debugf("CollectDatabaseMetrics not configured, defaulting to %v (edition: %s)", defaultValue, c.edition)
 	}
 
-	if c.CollectBufferpoolMetrics == nil {
+	if c.CollectBufferpoolMetrics.IsAuto() {
 		defaultValue := c.edition != "i"
-		c.CollectBufferpoolMetrics = boolPtr(defaultValue)
+		c.CollectBufferpoolMetrics = framework.AutoBoolFromBool(defaultValue)
 		c.Debugf("CollectBufferpoolMetrics not configured, defaulting to %v (edition: %s)", defaultValue, c.edition)
 	}
 
-	if c.CollectTablespaceMetrics == nil {
+	if c.CollectTablespaceMetrics.IsAuto() {
 		defaultValue := true
-		c.CollectTablespaceMetrics = boolPtr(defaultValue)
+		c.CollectTablespaceMetrics = framework.AutoBoolFromBool(defaultValue)
 		c.Debugf("CollectTablespaceMetrics not configured, defaulting to %v", defaultValue)
 	}
 
-	if c.CollectConnectionMetrics == nil {
+	if c.CollectConnectionMetrics.IsAuto() {
 		defaultValue := c.edition == "LUW" || (c.edition == "Cloud" && !c.isDisabled("connection_instances"))
-		c.CollectConnectionMetrics = boolPtr(defaultValue)
+		c.CollectConnectionMetrics = framework.AutoBoolFromBool(defaultValue)
 		c.Debugf("CollectConnectionMetrics not configured, defaulting to %v (edition: %s)", defaultValue, c.edition)
 	}
 
-	if c.CollectLockMetrics == nil {
+	if c.CollectLockMetrics.IsAuto() {
 		defaultValue := true
-		c.CollectLockMetrics = boolPtr(defaultValue)
+		c.CollectLockMetrics = framework.AutoBoolFromBool(defaultValue)
 		c.Debugf("CollectLockMetrics not configured, defaulting to %v", defaultValue)
 	}
 
-	if c.CollectTableMetrics == nil {
+	if c.CollectTableMetrics.IsAuto() {
 		defaultValue := false
-		c.CollectTableMetrics = boolPtr(defaultValue)
+		c.CollectTableMetrics = framework.AutoBoolFromBool(defaultValue)
 		c.Debugf("CollectTableMetrics not configured, defaulting to %v", defaultValue)
 	}
 
-	if c.CollectIndexMetrics == nil {
+	if c.CollectIndexMetrics.IsAuto() {
 		defaultValue := false
-		c.CollectIndexMetrics = boolPtr(defaultValue)
+		c.CollectIndexMetrics = framework.AutoBoolFromBool(defaultValue)
 		c.Debugf("CollectIndexMetrics not configured, defaulting to %v", defaultValue)
 	}
 
-	c.Infof("Configuration after defaults: DB=%v Bufferpool=%v Tablespace=%v Connection=%v", *c.CollectDatabaseMetrics, *c.CollectBufferpoolMetrics, *c.CollectTablespaceMetrics, *c.CollectConnectionMetrics)
-	c.Infof("Lock=%v Table=%v Index=%v Memory=%v Wait=%v TableIO=%v", *c.CollectLockMetrics, *c.CollectTableMetrics, *c.CollectIndexMetrics, c.CollectMemoryMetrics, c.CollectWaitMetrics, c.CollectTableIOMetrics)
+	c.Infof("Configuration after defaults: DB=%t Bufferpool=%t Tablespace=%t Connection=%t",
+		c.CollectDatabaseMetrics.IsEnabled(),
+		c.CollectBufferpoolMetrics.IsEnabled(),
+		c.CollectTablespaceMetrics.IsEnabled(),
+		c.CollectConnectionMetrics.IsEnabled())
+	c.Infof("Lock=%t Table=%t Index=%t Memory=%v Wait=%v TableIO=%v",
+		c.CollectLockMetrics.IsEnabled(),
+		c.CollectTableMetrics.IsEnabled(),
+		c.CollectIndexMetrics.IsEnabled(),
+		c.CollectMemoryMetrics,
+		c.CollectWaitMetrics,
+		c.CollectTableIOMetrics)
 }
 
 func (c *Collector) logVersionInformation() {

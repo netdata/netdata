@@ -252,32 +252,15 @@ func (c *Collector) logVersionInformation() {
 }
 
 func (c *Collector) setConfigurationDefaults() {
-	boolPtr := func(v bool) *bool { return &v }
-
-	if c.CollectDiskMetrics == nil {
-		c.CollectDiskMetrics = boolPtr(true)
-	}
-
-	if c.CollectSubsystemMetrics == nil {
-		c.CollectSubsystemMetrics = boolPtr(true)
-	}
-
-	if c.CollectJobQueueMetrics == nil {
-		defaultValue := c.versionMajor >= 7 && c.versionRelease >= 2
-		c.CollectJobQueueMetrics = boolPtr(defaultValue)
-	}
-
-	if c.CollectActiveJobs == nil {
-		c.CollectActiveJobs = boolPtr(false)
-	}
-
-	if c.CollectMessageQueueMetrics == nil {
-		c.CollectMessageQueueMetrics = boolPtr(true)
-	}
-
-	if c.CollectOutputQueueMetrics == nil {
-		c.CollectOutputQueueMetrics = boolPtr(true)
-	}
+	jobQueuesDefault := c.versionMajor >= 7 && c.versionRelease >= 2
+	c.CollectDiskMetrics = c.CollectDiskMetrics.WithDefault(true)
+	c.CollectSubsystemMetrics = c.CollectSubsystemMetrics.WithDefault(true)
+	c.CollectJobQueueMetrics = c.CollectJobQueueMetrics.WithDefault(jobQueuesDefault)
+	c.CollectActiveJobs = c.CollectActiveJobs.WithDefault(false)
+	c.CollectMessageQueueMetrics = c.CollectMessageQueueMetrics.WithDefault(true)
+	c.CollectOutputQueueMetrics = c.CollectOutputQueueMetrics.WithDefault(true)
+	c.CollectHTTPServerMetrics = c.CollectHTTPServerMetrics.WithDefault(true)
+	c.CollectPlanCacheMetrics = c.CollectPlanCacheMetrics.WithDefault(true)
 
 	if c.MaxMessageQueues <= 0 {
 		c.MaxMessageQueues = messageQueueLimit
@@ -287,20 +270,15 @@ func (c *Collector) setConfigurationDefaults() {
 		c.MaxOutputQueues = outputQueueLimit
 	}
 
-	c.Infof("Configuration after defaults: DiskMetrics=%v, SubsystemMetrics=%v, JobQueueMetrics=%v, MessageQueues=%v, OutputQueues=%v, ActiveJobs=%v",
-		boolValue(c.CollectDiskMetrics),
-		boolValue(c.CollectSubsystemMetrics),
-		boolValue(c.CollectJobQueueMetrics),
-		boolValue(c.CollectMessageQueueMetrics),
-		boolValue(c.CollectOutputQueueMetrics),
-		boolValue(c.CollectActiveJobs))
-}
-
-func boolValue(v *bool) bool {
-	if v == nil {
-		return false
-	}
-	return *v
+	c.Infof("Configuration after defaults: DiskMetrics=%t, SubsystemMetrics=%t, JobQueueMetrics=%t, MessageQueues=%t, OutputQueues=%t, ActiveJobs=%t, HTTPServer=%t, PlanCache=%t",
+		c.CollectDiskMetrics.IsEnabled(),
+		c.CollectSubsystemMetrics.IsEnabled(),
+		c.CollectJobQueueMetrics.IsEnabled(),
+		c.CollectMessageQueueMetrics.IsEnabled(),
+		c.CollectOutputQueueMetrics.IsEnabled(),
+		c.CollectActiveJobs.IsEnabled(),
+		c.CollectHTTPServerMetrics.IsEnabled(),
+		c.CollectPlanCacheMetrics.IsEnabled())
 }
 
 func (c *Collector) systemStatusQuery() string {

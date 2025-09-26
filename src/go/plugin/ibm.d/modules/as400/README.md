@@ -292,14 +292,14 @@ The following options can be defined globally or per job.
 | ODBCDriver | ODBCDriver specifies the driver name registered on the host. | `IBM i Access ODBC Driver` | no | - | - |
 | UseSSL | UseSSL enables TLS for the ODBC connection when supported by the driver. | `false` | no | - | - |
 | ResetStatistics | ResetStatistics toggles destructive SQL services that reset system statistics on each query. | `false` | no | - | - |
-| CollectDiskMetrics | CollectDiskMetrics toggles collection of disk unit statistics. | `<auto>` | no | - | - |
-| CollectSubsystemMetrics | CollectSubsystemMetrics toggles collection of subsystem activity metrics. | `<auto>` | no | - | - |
-| CollectJobQueueMetrics | CollectJobQueueMetrics toggles collection of job queue backlog metrics. | `<auto>` | no | - | - |
-| CollectActiveJobs | CollectActiveJobs toggles collection of detailed per-job metrics. | `<auto>` | no | - | - |
-| CollectHTTPServerMetrics | CollectHTTPServerMetrics toggles collection of IBM HTTP Server statistics. | `<auto>` | no | - | - |
-| CollectMessageQueueMetrics | CollectMessageQueueMetrics toggles collection of IBM i message queue metrics. | `<auto>` | no | - | - |
-| CollectOutputQueueMetrics | CollectOutputQueueMetrics toggles collection of IBM i output queue metrics. | `<auto>` | no | - | - |
-| CollectPlanCacheMetrics | CollectPlanCacheMetrics toggles collection of plan cache analysis metrics. | `<auto>` | no | - | - |
+| CollectDiskMetrics | CollectDiskMetrics toggles collection of disk unit statistics. | `auto` | no | - | - |
+| CollectSubsystemMetrics | CollectSubsystemMetrics toggles collection of subsystem activity metrics. | `auto` | no | - | - |
+| CollectJobQueueMetrics | CollectJobQueueMetrics toggles collection of job queue backlog metrics. | `auto` | no | - | - |
+| CollectActiveJobs | CollectActiveJobs toggles collection of detailed per-job metrics. | `auto` | no | - | - |
+| CollectHTTPServerMetrics | CollectHTTPServerMetrics toggles collection of IBM HTTP Server statistics. | `auto` | no | - | - |
+| CollectMessageQueueMetrics | CollectMessageQueueMetrics toggles collection of IBM i message queue metrics. | `auto` | no | - | - |
+| CollectOutputQueueMetrics | CollectOutputQueueMetrics toggles collection of IBM i output queue metrics. | `auto` | no | - | - |
+| CollectPlanCacheMetrics | CollectPlanCacheMetrics toggles collection of plan cache analysis metrics. | `auto` | no | - | - |
 | MaxDisks | MaxDisks caps how many disk units may be charted. | `100` | no | - | - |
 | MaxSubsystems | MaxSubsystems caps how many subsystems may be charted. | `100` | no | - | - |
 | MaxJobQueues | MaxJobQueues caps how many job queues may be charted. | `100` | no | - | - |

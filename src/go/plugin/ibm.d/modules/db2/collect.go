@@ -43,7 +43,7 @@ func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
 	}
 
 	// Collect per-instance metrics if enabled and supported
-	if c.CollectDatabaseMetrics != nil && *c.CollectDatabaseMetrics {
+	if c.CollectDatabaseMetrics.IsEnabled() {
 		c.Debugf("collecting database instance metrics (limit: %d)", c.MaxDatabases)
 		if err := c.collectDatabaseInstances(ctx); err != nil {
 			if isSQLFeatureError(err) {
@@ -54,7 +54,7 @@ func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
 		}
 	}
 
-	if c.CollectBufferpoolMetrics != nil && *c.CollectBufferpoolMetrics {
+	if c.CollectBufferpoolMetrics.IsEnabled() {
 		c.Debugf("collecting bufferpool instance metrics (limit: %d)", c.MaxBufferpools)
 		if err := c.collectBufferpoolInstances(ctx); err != nil {
 			if isSQLFeatureError(err) {
@@ -65,7 +65,7 @@ func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
 		}
 	}
 
-	if c.CollectTablespaceMetrics != nil && *c.CollectTablespaceMetrics {
+	if c.CollectTablespaceMetrics.IsEnabled() {
 		c.Debugf("collecting tablespace instance metrics (limit: %d)", c.MaxTablespaces)
 		if err := c.collectTablespaceInstances(ctx); err != nil {
 			if isSQLFeatureError(err) {
@@ -76,7 +76,7 @@ func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
 		}
 	}
 
-	if c.CollectConnectionMetrics != nil && *c.CollectConnectionMetrics {
+	if c.CollectConnectionMetrics.IsEnabled() {
 		c.Debugf("collecting connection instance metrics (limit: %d)", c.MaxConnections)
 		if err := c.collectConnectionInstances(ctx); err != nil {
 			if isSQLFeatureError(err) {
@@ -87,7 +87,7 @@ func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
 		}
 	}
 
-	if c.CollectTableMetrics != nil && *c.CollectTableMetrics {
+	if c.CollectTableMetrics.IsEnabled() {
 		c.Debugf("collecting table instance metrics (limit: %d)", c.MaxTables)
 		if err := c.collectTableInstances(ctx); err != nil {
 			if isSQLFeatureError(err) {
@@ -98,7 +98,7 @@ func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
 		}
 	}
 
-	if c.CollectIndexMetrics != nil && *c.CollectIndexMetrics {
+	if c.CollectIndexMetrics.IsEnabled() {
 		c.Debugf("collecting index instance metrics (limit: %d)", c.MaxIndexes)
 		if err := c.collectIndexInstances(ctx); err != nil {
 			if isSQLFeatureError(err) {
@@ -142,7 +142,7 @@ func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
 		}
 	}
 
-	if c.CollectWaitMetrics && c.CollectConnectionMetrics != nil && *c.CollectConnectionMetrics {
+	if c.CollectWaitMetrics && c.CollectConnectionMetrics.IsEnabled() {
 		c.Debugf("collecting enhanced wait metrics")
 		if err := c.collectConnectionWaits(ctx); err != nil {
 			if isSQLFeatureError(err) {

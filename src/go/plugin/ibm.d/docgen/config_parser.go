@@ -11,10 +11,13 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
 	"unicode"
+
+	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/framework"
 )
 
 // parseConfigFromGoFile parses a Go config file to extract configuration fields
@@ -46,7 +49,7 @@ func (g *DocGenerator) parseConfigFromGoFile() ([]ConfigField, map[string]interf
 	})
 
 	if configStruct != nil {
-		fields = extractFieldsFromStruct(configStruct, node.Comments)
+		fields = extractFieldsFromStruct(g, configStruct, node.Comments)
 	}
 
 	// Try to parse defaults from init.go
@@ -58,16 +61,26 @@ func (g *DocGenerator) parseConfigFromGoFile() ([]ConfigField, map[string]interf
 	// Validate that ALL fields have defaults and apply them
 	var missingDefaults []string
 	for i := range fields {
-		if defaultValue, exists := defaults[fields[i].Name]; exists {
-			fields[i].Default = defaultValue
-			// If field has a default, it's not required
-			fields[i].Required = false
-		} else if fields[i].Pointer {
-			fields[i].Default = "<auto>"
-			fields[i].Required = false
-		} else {
-			missingDefaults = append(missingDefaults, fields[i].Name)
+		field := &fields[i]
+		if field.GoType == "framework.AutoBool" {
+			field.Type = "string"
+			field.Enum = toStringSlice(framework.AutoBoolEnum)
 		}
+
+		if defaultValue, exists := defaults[field.Name]; exists {
+			field.Default = normalizeDefaultValue(*field, defaultValue)
+			field.Required = false
+		} else if field.GoType == "framework.AutoBool" {
+			field.Default = framework.AutoBoolAuto.String()
+			field.Required = false
+		} else if field.Pointer {
+			field.Default = "<auto>"
+			field.Required = false
+		} else {
+			missingDefaults = append(missingDefaults, field.Name)
+		}
+
+		assignDefaultUIGroup(field)
 	}
 
 	// FAIL HARD if any field lacks a default
@@ -78,12 +91,16 @@ func (g *DocGenerator) parseConfigFromGoFile() ([]ConfigField, map[string]interf
 	return fields, defaults, nil
 }
 
-func extractFieldsFromStruct(structType *ast.StructType, comments []*ast.CommentGroup) []ConfigField {
+func extractFieldsFromStruct(g *DocGenerator, structType *ast.StructType, comments []*ast.CommentGroup) []ConfigField {
 	var fields []ConfigField
 
 	for _, field := range structType.Fields.List {
 		// Skip embedded fields (like framework.Config)
 		if len(field.Names) == 0 {
+			typeName := extractGoType(field.Type)
+			if typeName == "web.HTTPConfig" {
+				g.hasHTTPConfig = true
+			}
 			continue
 		}
 
@@ -111,7 +128,7 @@ func extractConfigField(fieldName string, field *ast.Field, comments []*ast.Comm
 	}
 
 	// Extract struct tags
-	yamlName, jsonName := extractStructTags(field.Tag)
+	yamlName, jsonName, uiTag := extractStructTags(field.Tag)
 	if yamlName == "" {
 		yamlName = convertToSnakeCase(fieldName)
 	}
@@ -139,7 +156,10 @@ func extractConfigField(fieldName string, field *ast.Field, comments []*ast.Comm
 		Required:    !strings.Contains(yamlName, "omitempty"),
 		Description: description,
 		Pointer:     isPointer,
+		GoType:      fieldType,
 	}
+
+	applyUITag(configField, uiTag)
 
 	// Set defaults and constraints based on field name and type
 	setFieldDefaults(configField)
@@ -166,30 +186,19 @@ func extractGoType(expr ast.Expr) string {
 	return ""
 }
 
-func extractStructTags(tag *ast.BasicLit) (yaml, json string) {
+func extractStructTags(tag *ast.BasicLit) (yaml, json, ui string) {
 	if tag == nil {
-		return "", ""
+		return "", "", ""
 	}
 
 	tagValue := strings.Trim(tag.Value, "`")
+	structTag := reflect.StructTag(tagValue)
 
-	// Parse yaml tag
-	if yamlStart := strings.Index(tagValue, "yaml:\""); yamlStart >= 0 {
-		yamlPart := tagValue[yamlStart+6:] // Skip 'yaml:"'
-		if quoteEnd := strings.Index(yamlPart, "\""); quoteEnd >= 0 {
-			yaml = yamlPart[:quoteEnd]
-		}
-	}
+	yaml = structTag.Get("yaml")
+	json = structTag.Get("json")
+	ui = structTag.Get("ui")
 
-	// Parse json tag
-	if jsonStart := strings.Index(tagValue, "json:\""); jsonStart >= 0 {
-		jsonPart := tagValue[jsonStart+6:] // Skip 'json:"'
-		if quoteEnd := strings.Index(jsonPart, "\""); quoteEnd >= 0 {
-			json = jsonPart[:quoteEnd]
-		}
-	}
-
-	return yaml, json
+	return yaml, json, ui
 }
 
 func convertToSnakeCase(s string) string {
@@ -418,10 +427,132 @@ func setFieldDefaults(field *ConfigField) {
 	fieldLower := strings.ToLower(field.Name)
 	if strings.Contains(fieldLower, "password") || strings.Contains(fieldLower, "pass") {
 		field.Format = "password"
+		if field.UIWidget == "" {
+			field.UIWidget = "password"
+		}
 	}
 
 	// TODO: In the future, extract defaults from SetDefaults method in config.go
 	// This would make defaults module-specific rather than hardcoded in framework
+}
+
+func applyUITag(field *ConfigField, tag string) {
+	if tag == "" {
+		return
+	}
+	opts := parseUIOptions(tag)
+	if group, ok := opts["group"]; ok {
+		field.UIGroup = group
+	}
+	if widget, ok := opts["widget"]; ok {
+		field.UIWidget = widget
+	}
+	if help, ok := opts["help"]; ok {
+		field.UIHelp = help
+	}
+	if placeholder, ok := opts["placeholder"]; ok {
+		field.UIPlaceholder = placeholder
+	}
+}
+
+func parseUIOptions(tag string) map[string]string {
+	result := make(map[string]string)
+	if tag == "" {
+		return result
+	}
+	parts := strings.Split(tag, ",")
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		kv := strings.SplitN(part, ":", 2)
+		key := strings.TrimSpace(kv[0])
+		if key == "" {
+			continue
+		}
+		value := ""
+		if len(kv) == 2 {
+			value = strings.TrimSpace(kv[1])
+		}
+		result[key] = value
+	}
+	return result
+}
+
+func assignDefaultUIGroup(field *ConfigField) {
+	if field.UIGroup != "" {
+		return
+	}
+
+	name := field.JSONName
+	lower := strings.ToLower(name)
+
+	switch {
+	case name == "update_every" || name == "vnode" || name == "dsn" || strings.Contains(lower, "endpoint") || strings.Contains(lower, "url"):
+		field.UIGroup = "Connection"
+	case strings.HasPrefix(lower, "collect_"):
+		field.UIGroup = "Collection"
+	case lower == "timeout" || strings.HasSuffix(lower, "_timeout"):
+		field.UIGroup = "Connection"
+	case strings.HasSuffix(lower, "_matching") || strings.HasSuffix(lower, "_selector"):
+		field.UIGroup = "Filters"
+	case strings.HasPrefix(lower, "max_"):
+		field.UIGroup = "Limits"
+	case strings.HasPrefix(lower, "tls_") || strings.Contains(lower, "proxy") || strings.Contains(lower, "header") || strings.Contains(lower, "redirect"):
+		field.UIGroup = "HTTP"
+	case strings.Contains(lower, "password") || strings.Contains(lower, "username") || strings.Contains(lower, "auth") || strings.Contains(lower, "token") || strings.Contains(lower, "api_key"):
+		field.UIGroup = "Auth"
+	default:
+		field.UIGroup = "Advanced"
+	}
+}
+
+func toStringSlice(values []framework.AutoBool) []string {
+	result := make([]string, 0, len(values))
+	for _, v := range values {
+		result = append(result, v.String())
+	}
+	return result
+}
+
+func normalizeDefaultValue(field ConfigField, value interface{}) interface{} {
+	if field.GoType != "framework.AutoBool" {
+		return value
+	}
+	switch v := value.(type) {
+	case string:
+		return normalizeAutoBoolLiteral(v)
+	case bool:
+		if v {
+			return framework.AutoBoolEnabled.String()
+		}
+		return framework.AutoBoolDisabled.String()
+	case nil:
+		return framework.AutoBoolAuto.String()
+	default:
+		return framework.AutoBoolAuto.String()
+	}
+}
+
+func normalizeAutoBoolLiteral(value string) string {
+	lower := strings.ToLower(strings.TrimSpace(value))
+	switch lower {
+	case "", framework.AutoBoolAuto.String():
+		return framework.AutoBoolAuto.String()
+	case framework.AutoBoolEnabled.String():
+		return framework.AutoBoolEnabled.String()
+	case framework.AutoBoolDisabled.String():
+		return framework.AutoBoolDisabled.String()
+	}
+
+	if strings.HasSuffix(lower, "autoboolenabled") {
+		return framework.AutoBoolEnabled.String()
+	}
+	if strings.HasSuffix(lower, "autobooldisabled") {
+		return framework.AutoBoolDisabled.String()
+	}
+	return framework.AutoBoolAuto.String()
 }
 
 // parseDefaultsFromInitFile parses init.go to find the defaultConfig() function
@@ -574,9 +705,21 @@ func (g *DocGenerator) extractValue(expr ast.Expr) interface{} {
 		}
 		return exprToString(v)
 	case *ast.SelectorExpr:
-		if ident, ok := v.X.(*ast.Ident); ok && ident.Name == "time" {
-			if duration, ok := timeConstant(v.Sel.Name); ok {
-				return duration
+		if ident, ok := v.X.(*ast.Ident); ok {
+			if ident.Name == "time" {
+				if duration, ok := timeConstant(v.Sel.Name); ok {
+					return duration
+				}
+			}
+			if ident.Name == "framework" {
+				switch v.Sel.Name {
+				case "AutoBoolAuto":
+					return framework.AutoBoolAuto.String()
+				case "AutoBoolEnabled":
+					return framework.AutoBoolEnabled.String()
+				case "AutoBoolDisabled":
+					return framework.AutoBoolDisabled.String()
+				}
 			}
 		}
 		return exprToString(v)

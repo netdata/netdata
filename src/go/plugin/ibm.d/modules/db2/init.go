@@ -29,6 +29,14 @@ func defaultConfig() Config {
 		MaxDbConns:    1,
 		MaxDbLifeTime: confopt.Duration(10 * time.Minute),
 
+		CollectDatabaseMetrics:   framework.AutoBoolAuto,
+		CollectBufferpoolMetrics: framework.AutoBoolAuto,
+		CollectTablespaceMetrics: framework.AutoBoolAuto,
+		CollectConnectionMetrics: framework.AutoBoolAuto,
+		CollectLockMetrics:       framework.AutoBoolAuto,
+		CollectTableMetrics:      framework.AutoBoolAuto,
+		CollectIndexMetrics:      framework.AutoBoolAuto,
+
 		CollectMemoryMetrics:  true,
 		CollectWaitMetrics:    true,
 		CollectTableIOMetrics: true,

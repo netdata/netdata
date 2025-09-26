@@ -82,14 +82,14 @@ func (c *Collector) CollectOnce() error {
 		endpoint := sample.Labels.Get("endpoint")
 
 		if method != "" && endpoint != "" {
-			if !c.CollectRESTMetrics {
+			if !c.CollectRESTMetrics.IsEnabled() {
 				continue
 			}
 			c.collectRESTMetric(restData, method, endpoint, normalized, sample.Value)
 			continue
 		}
 
-		if !c.CollectJVMMetrics && isCoreMetric(normalized) {
+		if !c.CollectJVMMetrics.IsEnabled() && isCoreMetric(normalized) {
 			continue
 		}
 

@@ -557,6 +557,19 @@ The following options can be defined globally or per job.
 
 | Name | Description | Default | Required | Min | Max |
 |:-----|:------------|:--------|:---------|:----|:----|
+| tls_key | Client key path | `` | no | - | - |
+| tls_cert | Client certificate path | `` | no | - | - |
+| tls_ca | Custom CA bundle path | `` | no | - | - |
+| tls_skip_verify | Skip TLS certificate verification | `false` | no | - | - |
+| headers | Custom headers | `<no value>` | no | - | - |
+| proxy_password | Proxy password | `` | no | - | - |
+| proxy_username | Proxy username | `` | no | - | - |
+| proxy_url | Proxy URL | `` | no | - | - |
+| not_follow_redirects | Disable HTTP redirects | `false` | no | - | - |
+| timeout | Request timeout in seconds | `5000000000` | no | - | - |
+| password | Password for authentication | `` | no | - | - |
+| username | Username for authentication | `` | no | - | - |
+| url | Target URL | `` | no | - | - |
 | update_every | Data collection frequency | `5` | no | 1 | - |
 | Vnode | Vnode allows binding the collector to a virtual node. | `` | no | - | - |
 | PMIStatsType | PMIStatsType selects which PMI statistics tier to request (`basic`, `extended`, `all`, or `custom`). | `extended` | no | - | - |
@@ -565,18 +578,18 @@ The following options can be defined globally or per job.
 | CellName | CellName appends the WebSphere cell identifier label to every exported time-series. | `` | no | - | - |
 | NodeName | NodeName appends the WebSphere node identifier label to every exported time-series. | `` | no | - | - |
 | ServerType | ServerType records the WebSphere server type label (for example `app_server`, `dmgr`, `nodeagent`). | `` | no | - | - |
-| CollectJVMMetrics | CollectJVMMetrics toggles JVM runtime metrics; defaults to enabled when unset. | `nil` | no | - | - |
-| CollectThreadPoolMetrics | CollectThreadPoolMetrics toggles thread-pool metrics; defaults to enabled when unset. | `nil` | no | - | - |
-| CollectJDBCMetrics | CollectJDBCMetrics toggles JDBC connection-pool metrics; defaults to enabled when unset. | `nil` | no | - | - |
-| CollectJCAMetrics | CollectJCAMetrics toggles JCA resource-adapter metrics; defaults to enabled when unset. | `nil` | no | - | - |
-| CollectJMSMetrics | CollectJMSMetrics toggles JMS destination metrics; defaults to enabled when unset. | `nil` | no | - | - |
-| CollectWebAppMetrics | CollectWebAppMetrics toggles Web application metrics (includes servlet/session data); defaults to enabled when unset. | `nil` | no | - | - |
-| CollectSessionMetrics | CollectSessionMetrics toggles HTTP session manager metrics; defaults to enabled when unset. | `nil` | no | - | - |
-| CollectTransactionMetrics | CollectTransactionMetrics toggles transaction manager metrics; defaults to enabled when unset. | `nil` | no | - | - |
-| CollectClusterMetrics | CollectClusterMetrics toggles cluster-level health metrics; defaults to enabled when unset. | `nil` | no | - | - |
-| CollectServletMetrics | CollectServletMetrics enables servlet response-time metrics; defaults to enabled when unset (may add high-cardinality charts). | `nil` | no | - | - |
-| CollectEJBMetrics | CollectEJBMetrics enables Enterprise Java Bean workload metrics; defaults to enabled when unset. | `nil` | no | - | - |
-| CollectJDBCAdvanced | CollectJDBCAdvanced enables additional JDBC latency/timing statistics; defaults to disabled when unset. | `nil` | no | - | - |
+| CollectJVMMetrics | CollectJVMMetrics toggles JVM runtime metrics; defaults to enabled when unset. | `auto` | no | - | - |
+| CollectThreadPoolMetrics | CollectThreadPoolMetrics toggles thread-pool metrics; defaults to enabled when unset. | `auto` | no | - | - |
+| CollectJDBCMetrics | CollectJDBCMetrics toggles JDBC connection-pool metrics; defaults to enabled when unset. | `auto` | no | - | - |
+| CollectJCAMetrics | CollectJCAMetrics toggles JCA resource-adapter metrics; defaults to enabled when unset. | `auto` | no | - | - |
+| CollectJMSMetrics | CollectJMSMetrics toggles JMS destination metrics; defaults to enabled when unset. | `auto` | no | - | - |
+| CollectWebAppMetrics | CollectWebAppMetrics toggles Web application metrics (includes servlet/session data); defaults to enabled when unset. | `auto` | no | - | - |
+| CollectSessionMetrics | CollectSessionMetrics toggles HTTP session manager metrics; defaults to enabled when unset. | `auto` | no | - | - |
+| CollectTransactionMetrics | CollectTransactionMetrics toggles transaction manager metrics; defaults to enabled when unset. | `auto` | no | - | - |
+| CollectClusterMetrics | CollectClusterMetrics toggles cluster-level health metrics; defaults to enabled when unset. | `auto` | no | - | - |
+| CollectServletMetrics | CollectServletMetrics enables servlet response-time metrics; defaults to enabled when unset (may add high-cardinality charts). | `auto` | no | - | - |
+| CollectEJBMetrics | CollectEJBMetrics enables Enterprise Java Bean workload metrics; defaults to enabled when unset. | `auto` | no | - | - |
+| CollectJDBCAdvanced | CollectJDBCAdvanced enables additional JDBC latency/timing statistics; defaults to disabled when unset. | `auto` | no | - | - |
 | MaxThreadPools | MaxThreadPools caps the number of thread pools charted per server (0 disables the limit). | `50` | no | - | - |
 | MaxJDBCPools | MaxJDBCPools caps the number of JDBC connection pools charted (0 disables the limit). | `50` | no | - | - |
 | MaxJCAPools | MaxJCAPools caps the number of JCA resource adapters charted (0 disables the limit). | `50` | no | - | - |

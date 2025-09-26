@@ -16,11 +16,6 @@ import (
 
 const precision = 1000 // Precision multiplier for floating-point values
 
-// boolPtr returns a pointer to the bool value
-func boolPtr(v bool) *bool {
-	return &v
-}
-
 func parseNumericValue(value string, multiplier int64) (int64, bool) {
 	trimmed := strings.TrimSpace(value)
 	if trimmed == "" || strings.EqualFold(trimmed, "NULL") || strings.EqualFold(trimmed, "N/A") {
@@ -314,7 +309,7 @@ func (a *Collector) collectJobInfo(ctx context.Context) error {
 }
 
 func (a *Collector) collectMessageQueues(ctx context.Context) error {
-	if a.CollectMessageQueueMetrics != nil && !*a.CollectMessageQueueMetrics {
+	if !a.CollectMessageQueueMetrics.IsEnabled() {
 		return nil
 	}
 
@@ -384,7 +379,7 @@ func (a *Collector) collectMessageQueues(ctx context.Context) error {
 }
 
 func (a *Collector) collectOutputQueues(ctx context.Context) error {
-	if a.CollectOutputQueueMetrics != nil && !*a.CollectOutputQueueMetrics {
+	if !a.CollectOutputQueueMetrics.IsEnabled() {
 		return nil
 	}
 
@@ -1331,7 +1326,7 @@ func (a *Collector) collectNetworkInterfaces(ctx context.Context) error {
 }
 
 func (a *Collector) collectHTTPServerInfo(ctx context.Context) error {
-	if a.CollectHTTPServerMetrics != nil && !*a.CollectHTTPServerMetrics {
+	if !a.CollectHTTPServerMetrics.IsEnabled() {
 		return nil
 	}
 
@@ -1459,7 +1454,7 @@ func (a *Collector) collectHTTPServerInfo(ctx context.Context) error {
 }
 
 func (a *Collector) collectPlanCache(ctx context.Context) error {
-	if a.CollectPlanCacheMetrics != nil && !*a.CollectPlanCacheMetrics {
+	if !a.CollectPlanCacheMetrics.IsEnabled() {
 		return nil
 	}
 

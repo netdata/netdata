@@ -631,6 +631,19 @@ type jmsStoreSectionMetrics struct {
 }
 
 func newAggregator(cfg Config) *aggregator {
+	cfg.CollectJVMMetrics = cfg.CollectJVMMetrics.WithDefault(true)
+	cfg.CollectThreadPoolMetrics = cfg.CollectThreadPoolMetrics.WithDefault(true)
+	cfg.CollectJDBCMetrics = cfg.CollectJDBCMetrics.WithDefault(true)
+	cfg.CollectJCAMetrics = cfg.CollectJCAMetrics.WithDefault(true)
+	cfg.CollectJMSMetrics = cfg.CollectJMSMetrics.WithDefault(true)
+	cfg.CollectWebAppMetrics = cfg.CollectWebAppMetrics.WithDefault(true)
+	cfg.CollectSessionMetrics = cfg.CollectSessionMetrics.WithDefault(true)
+	cfg.CollectTransactionMetrics = cfg.CollectTransactionMetrics.WithDefault(true)
+	cfg.CollectClusterMetrics = cfg.CollectClusterMetrics.WithDefault(true)
+	cfg.CollectServletMetrics = cfg.CollectServletMetrics.WithDefault(true)
+	cfg.CollectEJBMetrics = cfg.CollectEJBMetrics.WithDefault(true)
+	cfg.CollectJDBCAdvanced = cfg.CollectJDBCAdvanced.WithDefault(false)
+
 	return &aggregator{
 		cfg:           cfg,
 		threadPools:   make(map[string]threadPoolMetrics),
@@ -2185,7 +2198,7 @@ func (a *aggregator) processEnterpriseBeans(node, server string, stat *pmiproto.
 		return
 	}
 	a.coverage.Handle(stat)
-	if a.cfg.CollectEJBMetrics != nil && !*a.cfg.CollectEJBMetrics {
+	if !a.cfg.CollectEJBMetrics.IsEnabled() {
 		return
 	}
 
@@ -2988,31 +3001,19 @@ func (a *aggregator) exportMetrics(state *framework.CollectorState) {
 }
 
 func (a *aggregator) collectJDBCMetricsEnabled() bool {
-	if a.cfg.CollectJDBCMetrics != nil {
-		return *a.cfg.CollectJDBCMetrics
-	}
-	return true
+	return a.cfg.CollectJDBCMetrics.IsEnabled()
 }
 
 func (a *aggregator) collectWebAppMetricsEnabled() bool {
-	if a.cfg.CollectWebAppMetrics != nil {
-		return *a.cfg.CollectWebAppMetrics
-	}
-	return true
+	return a.cfg.CollectWebAppMetrics.IsEnabled()
 }
 
 func (a *aggregator) collectSessionMetricsEnabled() bool {
-	if a.cfg.CollectSessionMetrics != nil {
-		return *a.cfg.CollectSessionMetrics
-	}
-	return true
+	return a.cfg.CollectSessionMetrics.IsEnabled()
 }
 
 func (a *aggregator) collectDynamicCacheMetricsEnabled() bool {
-	if a.cfg.CollectWebAppMetrics != nil {
-		return *a.cfg.CollectWebAppMetrics
-	}
-	return true
+	return a.cfg.CollectWebAppMetrics.IsEnabled()
 }
 
 func (a *aggregator) collectSystemDataEnabled() bool {
@@ -3020,24 +3021,15 @@ func (a *aggregator) collectSystemDataEnabled() bool {
 }
 
 func (a *aggregator) collectServletMetricsEnabled() bool {
-	if a.cfg.CollectServletMetrics != nil {
-		return *a.cfg.CollectServletMetrics
-	}
-	return true
+	return a.cfg.CollectServletMetrics.IsEnabled()
 }
 
 func (a *aggregator) collectJCAMetricsEnabled() bool {
-	if a.cfg.CollectJCAMetrics != nil {
-		return *a.cfg.CollectJCAMetrics
-	}
-	return true
+	return a.cfg.CollectJCAMetrics.IsEnabled()
 }
 
 func (a *aggregator) collectJMSMetricsEnabled() bool {
-	if a.cfg.CollectJMSMetrics != nil {
-		return *a.cfg.CollectJMSMetrics
-	}
-	return true
+	return a.cfg.CollectJMSMetrics.IsEnabled()
 }
 
 func parseCount(value string) (int64, bool) {

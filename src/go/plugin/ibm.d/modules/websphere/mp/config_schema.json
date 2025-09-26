@@ -8,9 +8,14 @@
         "type": "string"
       },
       "collect_jvm_metrics": {
-        "default": true,
+        "default": "enabled",
+        "enum": [
+          "auto",
+          "enabled",
+          "disabled"
+        ],
         "title": "CollectJVMMetrics toggles JVM/base scope metrics scraped from the MicroProfile endpoint.",
-        "type": "boolean"
+        "type": "string"
       },
       "collect_rest_matching": {
         "default": "",
@@ -18,9 +23,18 @@
         "type": "string"
       },
       "collect_rest_metrics": {
-        "default": true,
+        "default": "enabled",
+        "enum": [
+          "auto",
+          "enabled",
+          "disabled"
+        ],
         "title": "CollectRESTMetrics toggles per-endpoint REST/JAX-RS metrics (may introduce cardinality).",
-        "type": "boolean"
+        "type": "string"
+      },
+      "headers": {
+        "title": "Custom headers",
+        "type": "object"
       },
       "max_rest_endpoints": {
         "default": 50,
@@ -37,16 +51,76 @@
         "title": "NodeName appends the Liberty node label to every exported time-series.",
         "type": "string"
       },
+      "not_follow_redirects": {
+        "default": false,
+        "title": "Disable HTTP redirects",
+        "type": "boolean"
+      },
+      "password": {
+        "default": "",
+        "title": "Password for authentication",
+        "type": "string"
+      },
+      "proxy_password": {
+        "default": "",
+        "title": "Proxy password",
+        "type": "string"
+      },
+      "proxy_url": {
+        "default": "",
+        "title": "Proxy URL",
+        "type": "string"
+      },
+      "proxy_username": {
+        "default": "",
+        "title": "Proxy username",
+        "type": "string"
+      },
       "server_name": {
         "default": "",
         "title": "ServerName appends the Liberty server label to every exported time-series.",
         "type": "string"
+      },
+      "timeout": {
+        "default": 10000000000,
+        "title": "Request timeout in seconds",
+        "type": "integer"
+      },
+      "tls_ca": {
+        "default": "",
+        "title": "Custom CA bundle path",
+        "type": "string"
+      },
+      "tls_cert": {
+        "default": "",
+        "title": "Client certificate path",
+        "type": "string"
+      },
+      "tls_key": {
+        "default": "",
+        "title": "Client key path",
+        "type": "string"
+      },
+      "tls_skip_verify": {
+        "default": false,
+        "title": "Skip TLS certificate verification",
+        "type": "boolean"
       },
       "update_every": {
         "default": 1,
         "minimum": 1,
         "title": "Data collection frequency",
         "type": "integer"
+      },
+      "url": {
+        "default": "",
+        "title": "Target URL",
+        "type": "string"
+      },
+      "username": {
+        "default": "",
+        "title": "Username for authentication",
+        "type": "string"
       },
       "vnode": {
         "default": "",
@@ -56,5 +130,69 @@
     },
     "title": "websphere_mp collector configuration",
     "type": "object"
+  },
+  "uiSchema": {
+    "password": {
+      "ui:widget": "password"
+    },
+    "proxy_password": {
+      "ui:widget": "password"
+    },
+    "ui:flavour": "tabs",
+    "ui:options": {
+      "tabs": [
+        {
+          "fields": [
+            "tls_key",
+            "tls_cert",
+            "tls_ca",
+            "tls_skip_verify",
+            "headers",
+            "proxy_password",
+            "proxy_username",
+            "proxy_url",
+            "not_follow_redirects"
+          ],
+          "title": "HTTP"
+        },
+        {
+          "fields": [
+            "timeout",
+            "password",
+            "username",
+            "url",
+            "update_every",
+            "vnode",
+            "metrics_endpoint"
+          ],
+          "title": "Connection"
+        },
+        {
+          "fields": [
+            "cell_name",
+            "node_name",
+            "server_name"
+          ],
+          "title": "Identity"
+        },
+        {
+          "fields": [
+            "collect_jvm_metrics"
+          ],
+          "title": "Other Metrics"
+        },
+        {
+          "fields": [
+            "collect_rest_metrics",
+            "max_rest_endpoints",
+            "collect_rest_matching"
+          ],
+          "title": "REST Endpoints"
+        }
+      ]
+    },
+    "uiOptions": {
+      "fullPage": true
+    }
   }
 }

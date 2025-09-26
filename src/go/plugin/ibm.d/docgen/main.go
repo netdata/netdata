@@ -56,17 +56,23 @@ type Dimension struct {
 
 // ConfigField represents a configuration field for schema generation
 type ConfigField struct {
-	Name        string
-	JSONName    string
-	Type        string
-	Required    bool
-	Default     interface{}
-	Description string
-	Format      string
-	Minimum     *int
-	Maximum     *int
-	Examples    []string
-	Pointer     bool
+	Name          string
+	JSONName      string
+	Type          string
+	Required      bool
+	Default       interface{}
+	Description   string
+	Format        string
+	Minimum       *int
+	Maximum       *int
+	Examples      []string
+	Pointer       bool
+	Enum          []string
+	GoType        string
+	UIGroup       string
+	UIWidget      string
+	UIHelp        string
+	UIPlaceholder string
 }
 
 func main() {
@@ -99,12 +105,13 @@ func main() {
 }
 
 type DocGenerator struct {
-	ModuleName  string
-	ContextFile string
-	ConfigFile  string
-	OutputDir   string
-	ModuleInfo  string
-	consts      map[string]interface{}
+	ModuleName    string
+	ContextFile   string
+	ConfigFile    string
+	OutputDir     string
+	ModuleInfo    string
+	consts        map[string]interface{}
+	hasHTTPConfig bool
 }
 
 func (g *DocGenerator) Generate() error {
@@ -213,7 +220,7 @@ func (g *DocGenerator) parseConfig() ([]ConfigField, error) {
 	}
 
 	// Ensure standard fields are present even if they come from embedded structs
-	ensureField := func(name string, desc string, defaultKey string, fallback interface{}, fieldType string, min *int, max *int) {
+	ensureField := func(name string, desc string, defaultKey string, fallback interface{}, fieldType string, uiGroup string, uiWidget string, min *int, max *int) {
 		for _, f := range fields {
 			if f.JSONName == name {
 				return
@@ -235,10 +242,29 @@ func (g *DocGenerator) parseConfig() ([]ConfigField, error) {
 			Description: desc,
 			Minimum:     min,
 			Maximum:     max,
+			GoType:      fieldType,
+			UIGroup:     uiGroup,
+			UIWidget:    uiWidget,
 		}}, fields...)
 	}
 
-	ensureField("update_every", "Data collection frequency", "UpdateEvery", 10, "integer", intPtr(1), nil)
+	ensureField("update_every", "Data collection frequency", "UpdateEvery", 10, "integer", "Connection", "", intPtr(1), nil)
+
+	if g.hasHTTPConfig {
+		ensureField("url", "Target URL", "", "", "string", "Connection", "", nil, nil)
+		ensureField("username", "Username for authentication", "", "", "string", "Connection", "", nil, nil)
+		ensureField("password", "Password for authentication", "", "", "string", "Connection", "password", nil, nil)
+		ensureField("timeout", "Request timeout in seconds", "HTTPConfig.ClientConfig.Timeout", 0, "integer", "Connection", "", nil, nil)
+		ensureField("not_follow_redirects", "Disable HTTP redirects", "", false, "boolean", "HTTP", "", nil, nil)
+		ensureField("proxy_url", "Proxy URL", "", "", "string", "HTTP", "", nil, nil)
+		ensureField("proxy_username", "Proxy username", "", "", "string", "HTTP", "", nil, nil)
+		ensureField("proxy_password", "Proxy password", "", "", "string", "HTTP", "password", nil, nil)
+		ensureField("headers", "Custom headers", "", nil, "object", "HTTP", "", nil, nil)
+		ensureField("tls_skip_verify", "Skip TLS certificate verification", "", false, "boolean", "HTTP", "", nil, nil)
+		ensureField("tls_ca", "Custom CA bundle path", "", "", "string", "HTTP", "", nil, nil)
+		ensureField("tls_cert", "Client certificate path", "", "", "string", "HTTP", "", nil, nil)
+		ensureField("tls_key", "Client key path", "", "", "string", "HTTP", "", nil, nil)
+	}
 
 	return fields, nil
 }
@@ -363,6 +389,9 @@ func (g *DocGenerator) generateConfigSchema(fields []ConfigField) error {
 
 	properties := make(map[string]interface{})
 	var required []string
+	groupOrder := make([]string, 0)
+	groupFields := make(map[string][]string)
+	fieldUIOptions := make(map[string]map[string]interface{})
 
 	for _, field := range fields {
 		prop := map[string]interface{}{
@@ -390,10 +419,37 @@ func (g *DocGenerator) generateConfigSchema(fields []ConfigField) error {
 			prop["examples"] = field.Examples
 		}
 
+		if len(field.Enum) > 0 {
+			prop["enum"] = field.Enum
+		}
+
 		properties[field.JSONName] = prop
 
 		if field.Required {
 			required = append(required, field.JSONName)
+		}
+
+		group := field.UIGroup
+		if group == "" {
+			group = "Advanced"
+		}
+		if _, exists := groupFields[group]; !exists {
+			groupOrder = append(groupOrder, group)
+		}
+		groupFields[group] = append(groupFields[group], field.JSONName)
+
+		if field.UIWidget != "" || field.UIHelp != "" || field.UIPlaceholder != "" {
+			opts := make(map[string]interface{})
+			if field.UIWidget != "" {
+				opts["ui:widget"] = field.UIWidget
+			}
+			if field.UIHelp != "" {
+				opts["ui:help"] = field.UIHelp
+			}
+			if field.UIPlaceholder != "" {
+				opts["ui:placeholder"] = field.UIPlaceholder
+			}
+			fieldUIOptions[field.JSONName] = opts
 		}
 	}
 
@@ -401,6 +457,38 @@ func (g *DocGenerator) generateConfigSchema(fields []ConfigField) error {
 	if len(required) > 0 {
 		schema["jsonSchema"].(map[string]interface{})["required"] = required
 	}
+
+	uiSchema := map[string]interface{}{
+		"uiOptions": map[string]interface{}{
+			"fullPage": true,
+		},
+	}
+
+	if len(groupOrder) > 0 {
+		tabs := make([]map[string]interface{}, 0, len(groupOrder))
+		for _, group := range groupOrder {
+			fieldsForGroup := groupFields[group]
+			if len(fieldsForGroup) == 0 {
+				continue
+			}
+			tabs = append(tabs, map[string]interface{}{
+				"title":  group,
+				"fields": fieldsForGroup,
+			})
+		}
+		if len(tabs) > 0 {
+			uiSchema["ui:flavour"] = "tabs"
+			uiSchema["ui:options"] = map[string]interface{}{
+				"tabs": tabs,
+			}
+		}
+	}
+
+	for fieldName, opts := range fieldUIOptions {
+		uiSchema[fieldName] = opts
+	}
+
+	schema["uiSchema"] = uiSchema
 
 	// Marshal to JSON with proper formatting
 	data, err := json.MarshalIndent(schema, "", "  ")

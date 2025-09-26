@@ -97,14 +97,27 @@ The following options can be defined globally or per job.
 
 | Name | Description | Default | Required | Min | Max |
 |:-----|:------------|:--------|:---------|:----|:----|
+| tls_key | Client key path | `` | no | - | - |
+| tls_cert | Client certificate path | `` | no | - | - |
+| tls_ca | Custom CA bundle path | `` | no | - | - |
+| tls_skip_verify | Skip TLS certificate verification | `false` | no | - | - |
+| headers | Custom headers | `<no value>` | no | - | - |
+| proxy_password | Proxy password | `` | no | - | - |
+| proxy_username | Proxy username | `` | no | - | - |
+| proxy_url | Proxy URL | `` | no | - | - |
+| not_follow_redirects | Disable HTTP redirects | `false` | no | - | - |
+| timeout | Request timeout in seconds | `10000000000` | no | - | - |
+| password | Password for authentication | `` | no | - | - |
+| username | Username for authentication | `` | no | - | - |
+| url | Target URL | `` | no | - | - |
 | update_every | Data collection frequency | `1` | no | 1 | - |
 | Vnode | Vnode | `` | no | - | - |
 | CellName | CellName appends the Liberty cell label to every exported time-series. | `` | no | - | - |
 | NodeName | NodeName appends the Liberty node label to every exported time-series. | `` | no | - | - |
 | ServerName | ServerName appends the Liberty server label to every exported time-series. | `` | no | - | - |
 | MetricsEndpoint | MetricsEndpoint overrides the metrics path relative to the base URL (accepts absolute URLs as well). | `/metrics` | no | - | - |
-| CollectJVMMetrics | CollectJVMMetrics toggles JVM/base scope metrics scraped from the MicroProfile endpoint. | `true` | no | - | - |
-| CollectRESTMetrics | CollectRESTMetrics toggles per-endpoint REST/JAX-RS metrics (may introduce cardinality). | `true` | no | - | - |
+| CollectJVMMetrics | CollectJVMMetrics toggles JVM/base scope metrics scraped from the MicroProfile endpoint. | `enabled` | no | - | - |
+| CollectRESTMetrics | CollectRESTMetrics toggles per-endpoint REST/JAX-RS metrics (may introduce cardinality). | `enabled` | no | - | - |
 | MaxRESTEndpoints | MaxRESTEndpoints limits how many REST endpoints are exported when REST metrics are enabled (0 disables the limit). | `50` | no | - | - |
 | CollectRESTMatching | CollectRESTMatching filters REST endpoints using glob-style patterns (supports `*`, `?`, `!` prefixes). | `` | no | - | - |
 

@@ -5,7 +5,11 @@ package as400
 
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import "context"
+import (
+	"context"
+
+	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/framework"
+)
 
 type collectionGroup interface {
 	Name() string
@@ -88,7 +92,7 @@ type subsystemGroup struct {
 
 func (g *subsystemGroup) Name() string { return "subsystems" }
 func (g *subsystemGroup) Enabled() bool {
-	return g.c.CollectSubsystemMetrics == nil || *g.c.CollectSubsystemMetrics
+	return g.c.CollectSubsystemMetrics.IsEnabled()
 }
 
 func (g *subsystemGroup) Collect(ctx context.Context) error {
@@ -111,7 +115,7 @@ type jobQueueGroup struct {
 
 func (g *jobQueueGroup) Name() string { return "job_queues" }
 func (g *jobQueueGroup) Enabled() bool {
-	return g.c.CollectJobQueueMetrics != nil && *g.c.CollectJobQueueMetrics
+	return g.c.CollectJobQueueMetrics.IsEnabled()
 }
 
 func (g *jobQueueGroup) Collect(ctx context.Context) error {
@@ -134,7 +138,7 @@ type messageQueueGroup struct {
 
 func (g *messageQueueGroup) Name() string { return "message_queues" }
 func (g *messageQueueGroup) Enabled() bool {
-	return g.c.CollectMessageQueueMetrics == nil || *g.c.CollectMessageQueueMetrics
+	return g.c.CollectMessageQueueMetrics.IsEnabled()
 }
 
 func (g *messageQueueGroup) Collect(ctx context.Context) error {
@@ -144,7 +148,7 @@ func (g *messageQueueGroup) Collect(ctx context.Context) error {
 	if err := g.c.collectMessageQueues(ctx); err != nil {
 		if isSQLFeatureError(err) {
 			g.c.Warningf("message queue metrics not available on this IBM i version: %v", err)
-			g.c.CollectMessageQueueMetrics = boolPtr(false)
+			g.c.CollectMessageQueueMetrics = framework.AutoBoolDisabled
 			return nil
 		}
 		if isSQLTemporaryError(err) {
@@ -162,7 +166,7 @@ type outputQueueGroup struct {
 
 func (g *outputQueueGroup) Name() string { return "output_queues" }
 func (g *outputQueueGroup) Enabled() bool {
-	return g.c.CollectOutputQueueMetrics == nil || *g.c.CollectOutputQueueMetrics
+	return g.c.CollectOutputQueueMetrics.IsEnabled()
 }
 
 func (g *outputQueueGroup) Collect(ctx context.Context) error {
@@ -172,7 +176,7 @@ func (g *outputQueueGroup) Collect(ctx context.Context) error {
 	if err := g.c.collectOutputQueues(ctx); err != nil {
 		if isSQLFeatureError(err) {
 			g.c.Warningf("output queue metrics not available on this IBM i version: %v", err)
-			g.c.CollectOutputQueueMetrics = boolPtr(false)
+			g.c.CollectOutputQueueMetrics = framework.AutoBoolDisabled
 			return nil
 		}
 		if isSQLTemporaryError(err) {
@@ -190,7 +194,7 @@ type diskGroup struct {
 
 func (g *diskGroup) Name() string { return "disks" }
 func (g *diskGroup) Enabled() bool {
-	return g.c.CollectDiskMetrics == nil || *g.c.CollectDiskMetrics
+	return g.c.CollectDiskMetrics.IsEnabled()
 }
 
 func (g *diskGroup) Collect(ctx context.Context) error {
@@ -216,7 +220,7 @@ type activeJobGroup struct {
 
 func (g *activeJobGroup) Name() string { return "active_jobs" }
 func (g *activeJobGroup) Enabled() bool {
-	return g.c.CollectActiveJobs != nil && *g.c.CollectActiveJobs
+	return g.c.CollectActiveJobs.IsEnabled()
 }
 
 func (g *activeJobGroup) Collect(ctx context.Context) error {
@@ -226,7 +230,7 @@ func (g *activeJobGroup) Collect(ctx context.Context) error {
 	if err := g.c.collectActiveJobs(ctx); err != nil {
 		if isSQLFeatureError(err) {
 			g.c.Warningf("active job metrics not available on this IBM i version: %v", err)
-			g.c.CollectActiveJobs = boolPtr(false)
+			g.c.CollectActiveJobs = framework.AutoBoolDisabled
 			return nil
 		}
 		g.c.Errorf("failed to collect active jobs: %v", err)
@@ -280,7 +284,7 @@ type httpServerGroup struct {
 
 func (g *httpServerGroup) Name() string { return "http_server" }
 func (g *httpServerGroup) Enabled() bool {
-	return g.c.CollectHTTPServerMetrics == nil || *g.c.CollectHTTPServerMetrics
+	return g.c.CollectHTTPServerMetrics.IsEnabled()
 }
 
 func (g *httpServerGroup) Collect(ctx context.Context) error {
@@ -290,7 +294,7 @@ func (g *httpServerGroup) Collect(ctx context.Context) error {
 	if err := g.c.collectHTTPServerInfo(ctx); err != nil {
 		if isSQLFeatureError(err) {
 			g.c.Warningf("HTTP server metrics not available on this IBM i version: %v", err)
-			g.c.CollectHTTPServerMetrics = boolPtr(false)
+			g.c.CollectHTTPServerMetrics = framework.AutoBoolDisabled
 			return nil
 		}
 		if isSQLTemporaryError(err) {
@@ -308,7 +312,7 @@ type planCacheGroup struct {
 
 func (g *planCacheGroup) Name() string { return "plan_cache" }
 func (g *planCacheGroup) Enabled() bool {
-	return g.c.CollectPlanCacheMetrics == nil || *g.c.CollectPlanCacheMetrics
+	return g.c.CollectPlanCacheMetrics.IsEnabled()
 }
 
 func (g *planCacheGroup) Collect(ctx context.Context) error {
@@ -318,7 +322,7 @@ func (g *planCacheGroup) Collect(ctx context.Context) error {
 	if err := g.c.collectPlanCache(ctx); err != nil {
 		if isSQLFeatureError(err) {
 			g.c.Warningf("plan cache analysis not available or requires additional authority: %v", err)
-			g.c.CollectPlanCacheMetrics = boolPtr(false)
+			g.c.CollectPlanCacheMetrics = framework.AutoBoolDisabled
 			return nil
 		}
 		if isSQLTemporaryError(err) {

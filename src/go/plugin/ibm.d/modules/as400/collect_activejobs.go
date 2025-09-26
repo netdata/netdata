@@ -27,7 +27,7 @@ func (a *Collector) countActiveJobs(ctx context.Context) (int, error) {
 // collectActiveJobs collects metrics for top CPU-consuming active jobs
 func (a *Collector) collectActiveJobs(ctx context.Context) error {
 	// Check if feature is enabled
-	if a.CollectActiveJobs == nil || !*a.CollectActiveJobs {
+	if !a.CollectActiveJobs.IsEnabled() {
 		return nil
 	}
 

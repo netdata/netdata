@@ -7,6 +7,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/framework"
 	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/modules/websphere/common"
 	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/modules/websphere/jmx/contexts"
 	jmxproto "github.com/netdata/netdata/go/plugins/plugin/ibm.d/protocols/websphere/jmx"
@@ -138,7 +139,7 @@ func TestCollectorCollectOnceExportsJVMMetrics(t *testing.T) {
 	}
 
 	collector := newTestCollector(t, client)
-	collector.Config.CollectThreadPoolMetrics = false
+	collector.Config.CollectThreadPoolMetrics = framework.AutoBoolDisabled
 
 	metrics := collector.Collect(context.Background())
 
@@ -220,7 +221,7 @@ func TestCollectorCollectsJDBCPools(t *testing.T) {
 	}
 
 	collector := newTestCollector(t, client)
-	collector.Config.CollectThreadPoolMetrics = false
+	collector.Config.CollectThreadPoolMetrics = framework.AutoBoolDisabled
 
 	metrics := collector.Collect(context.Background())
 
@@ -260,8 +261,8 @@ func TestCollectorCollectsJMSDestinations(t *testing.T) {
 	}
 
 	collector := newTestCollector(t, client)
-	collector.Config.CollectThreadPoolMetrics = false
-	collector.Config.CollectJDBCMetrics = false
+	collector.Config.CollectThreadPoolMetrics = framework.AutoBoolDisabled
+	collector.Config.CollectJDBCMetrics = framework.AutoBoolDisabled
 
 	metrics := collector.Collect(context.Background())
 
@@ -301,12 +302,12 @@ func TestCollectorCollectsApplications(t *testing.T) {
 	}
 
 	collector := newTestCollector(t, client)
-	collector.Config.CollectThreadPoolMetrics = false
-	collector.Config.CollectJDBCMetrics = false
-	collector.Config.CollectJMSMetrics = false
-	collector.Config.CollectWebAppMetrics = true
-	collector.Config.CollectSessionMetrics = true
-	collector.Config.CollectTransactionMetrics = true
+	collector.Config.CollectThreadPoolMetrics = framework.AutoBoolDisabled
+	collector.Config.CollectJDBCMetrics = framework.AutoBoolDisabled
+	collector.Config.CollectJMSMetrics = framework.AutoBoolDisabled
+	collector.Config.CollectWebAppMetrics = framework.AutoBoolEnabled
+	collector.Config.CollectSessionMetrics = framework.AutoBoolEnabled
+	collector.Config.CollectTransactionMetrics = framework.AutoBoolEnabled
 
 	metrics := collector.Collect(context.Background())
 
@@ -348,10 +349,10 @@ func TestCollectorCollectsJCAPools(t *testing.T) {
 	}
 
 	collector := newTestCollector(t, client)
-	collector.Config.CollectThreadPoolMetrics = false
-	collector.Config.CollectJDBCMetrics = false
-	collector.Config.CollectJMSMetrics = false
-	collector.Config.CollectWebAppMetrics = false
+	collector.Config.CollectThreadPoolMetrics = framework.AutoBoolDisabled
+	collector.Config.CollectJDBCMetrics = framework.AutoBoolDisabled
+	collector.Config.CollectJMSMetrics = framework.AutoBoolDisabled
+	collector.Config.CollectWebAppMetrics = framework.AutoBoolDisabled
 
 	metrics := collector.Collect(context.Background())
 

@@ -56,31 +56,31 @@ func (c *Collector) CollectOnce() error {
 	}
 	c.exportJVM(stats)
 
-	if c.Config.CollectThreadPoolMetrics {
+	if c.Config.CollectThreadPoolMetrics.IsEnabled() {
 		if err := c.collectThreadPools(context.Background()); err != nil {
 			c.Warningf("failed to collect thread pool metrics: %v", err)
 		}
 	}
 
-	if c.Config.CollectJDBCMetrics {
+	if c.Config.CollectJDBCMetrics.IsEnabled() {
 		if err := c.collectJDBCPools(context.Background()); err != nil {
 			c.Warningf("failed to collect JDBC metrics: %v", err)
 		}
 	}
 
-	if c.Config.CollectJCAMetrics {
+	if c.Config.CollectJCAMetrics.IsEnabled() {
 		if err := c.collectJCAPools(context.Background()); err != nil {
 			c.Warningf("failed to collect JCA metrics: %v", err)
 		}
 	}
 
-	if c.Config.CollectJMSMetrics {
+	if c.Config.CollectJMSMetrics.IsEnabled() {
 		if err := c.collectJMSDestinations(context.Background()); err != nil {
 			c.Warningf("failed to collect JMS metrics: %v", err)
 		}
 	}
 
-	if c.Config.CollectWebAppMetrics {
+	if c.Config.CollectWebAppMetrics.IsEnabled() {
 		if err := c.collectApplications(context.Background()); err != nil {
 			c.Warningf("failed to collect application metrics: %v", err)
 		}
@@ -350,7 +350,7 @@ func (c *Collector) collectJMSDestinations(ctx context.Context) error {
 
 func (c *Collector) collectApplications(ctx context.Context) error {
 	max := c.Config.MaxApplications
-	apps, err := c.client.FetchApplications(ctx, max, c.Config.CollectSessionMetrics, c.Config.CollectTransactionMetrics)
+	apps, err := c.client.FetchApplications(ctx, max, c.Config.CollectSessionMetrics.IsEnabled(), c.Config.CollectTransactionMetrics.IsEnabled())
 	if err != nil {
 		return err
 	}
@@ -386,7 +386,7 @@ func (c *Collector) collectApplications(ctx context.Context) error {
 			Response_time: int64(app.ResponseTime * precision),
 		})
 
-		if c.Config.CollectSessionMetrics {
+		if c.Config.CollectSessionMetrics.IsEnabled() {
 			contexts.Applications.SessionsActive.Set(c.State, labels, contexts.ApplicationsSessionsActiveValues{
 				Active: int64(app.ActiveSessions),
 			})
@@ -401,7 +401,7 @@ func (c *Collector) collectApplications(ctx context.Context) error {
 			})
 		}
 
-		if c.Config.CollectTransactionMetrics {
+		if c.Config.CollectTransactionMetrics.IsEnabled() {
 			contexts.Applications.Transactions.Set(c.State, labels, contexts.ApplicationsTransactionsValues{
 				Committed:  int64(app.TransactionsCommitted),
 				Rolledback: int64(app.TransactionsRolledback),
