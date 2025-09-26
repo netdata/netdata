@@ -4,14 +4,14 @@ package snmp
 
 import (
 	"context"
-	"encoding/hex"
 	"errors"
-	"fmt"
 	"os"
 	"strings"
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
 
 	"github.com/golang/mock/gomock"
@@ -130,89 +130,78 @@ func TestCollector_Cleanup(t *testing.T) {
 	}
 }
 
-func TestCollector_Charts(t *testing.T) {
-	tests := map[string]struct {
-		prepareSNMP   func(t *testing.T, m *snmpmock.MockHandler) *Collector
-		wantNumCharts int
-		doCollect     bool
-	}{
-		"custom, no if-mib": {
-			wantNumCharts: 10,
-			prepareSNMP: func(t *testing.T, m *snmpmock.MockHandler) *Collector {
-				collr := New()
-				collr.Config = prepareConfigWithUserCharts(prepareV2Config(), 0, 9)
-
-				return collr
-			},
-		},
-	}
-
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			mockSNMP, cleanup := mockInit(t)
-			defer cleanup()
-
-			setMockClientInitExpect(mockSNMP)
-
-			collr := test.prepareSNMP(t, mockSNMP)
-			collr.newSnmpClient = func() gosnmp.Handler { return mockSNMP }
-
-			require.NoError(t, collr.Init(context.Background()))
-
-			if test.doCollect {
-				_ = collr.Check(context.Background())
-				_ = collr.Collect(context.Background())
-			}
-
-			assert.Equal(t, test.wantNumCharts, len(*collr.Charts()))
-		})
-	}
-}
-
 func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
-		wantFail    bool
-		prepareSNMP func(m *snmpmock.MockHandler) *Collector
+		prepare func(m *snmpmock.MockHandler) *Collector
+		wantErr bool
 	}{
-		"success when sysinfo collected": {
-			wantFail: false,
-			prepareSNMP: func(m *snmpmock.MockHandler) *Collector {
-				collr := New()
-				collr.Config = prepareV2Config()
-
+		"success: connects and reads sysInfo": {
+			wantErr: false,
+			prepare: func(m *snmpmock.MockHandler) *Collector {
+				setMockClientInitExpect(m)
 				setMockClientSysInfoExpect(m)
 
-				return collr
+				c := New()
+				c.Config = prepareV2Config()
+				c.CreateVnode = false
+				c.Ping.Enabled = false
+				c.newSnmpClient = func() gosnmp.Handler { return m }
+				return c
 			},
 		},
-		"fail when snmp client Get fails": {
-			wantFail: true,
-			prepareSNMP: func(m *snmpmock.MockHandler) *Collector {
-				collr := New()
-				collr.Config = prepareConfigWithUserCharts(prepareV2Config(), 0, 3)
-				m.EXPECT().WalkAll(snmputils.RootOidMibSystem).Return(nil, errors.New("mock Get() error")).Times(1)
 
-				return collr
+		"failure: SNMP connect error": {
+			wantErr: true,
+			prepare: func(m *snmpmock.MockHandler) *Collector {
+				setMockClientSetterExpect(m)
+				m.EXPECT().Connect().Return(errors.New("connect failed")).AnyTimes()
+
+				c := New()
+				c.Config = prepareV2Config()
+				c.CreateVnode = false
+				c.Ping.Enabled = false
+				c.newSnmpClient = func() gosnmp.Handler { return m }
+				return c
+			},
+		},
+
+		"failure: sysInfo walk error": {
+			wantErr: true,
+			prepare: func(m *snmpmock.MockHandler) *Collector {
+				// Normal init succeeds
+				setMockClientInitExpect(m)
+				// But sysInfo retrieval (WalkAll on system tree) fails
+				// If your helper is too opinionated, stub directly:
+				// The collector ultimately calls WalkAll on the system OID tree.
+				m.EXPECT().
+					WalkAll(gomock.Any()).
+					Return(nil, errors.New("walk failed"))
+
+				c := New()
+				c.Config = prepareV2Config()
+				c.CreateVnode = false
+				c.Ping.Enabled = false
+				c.newSnmpClient = func() gosnmp.Handler { return m }
+				return c
 			},
 		},
 	}
 
-	for name, test := range tests {
+	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			mockSNMP, cleanup := mockInit(t)
-			defer cleanup()
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
 
-			setMockClientInitExpect(mockSNMP)
+			mockSNMP := snmpmock.NewMockHandler(ctrl)
 
-			collr := test.prepareSNMP(mockSNMP)
-			collr.newSnmpClient = func() gosnmp.Handler { return mockSNMP }
-
+			collr := tc.prepare(mockSNMP)
 			require.NoError(t, collr.Init(context.Background()))
 
-			if test.wantFail {
-				assert.Error(t, collr.Check(context.Background()))
+			err := collr.Check(context.Background())
+			if tc.wantErr {
+				assert.Error(t, err)
 			} else {
-				assert.NoError(t, collr.Check(context.Background()))
+				assert.NoError(t, err)
 			}
 		})
 	}
@@ -220,118 +209,114 @@ func TestCollector_Check(t *testing.T) {
 
 func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
-		prepareSNMP   func(m *snmpmock.MockHandler) *Collector
-		wantCollected map[string]int64
+		prepare func(m *snmpmock.MockHandler) *Collector
+		want    map[string]int64
 	}{
-		"success only custom OIDs supported type": {
-			prepareSNMP: func(m *snmpmock.MockHandler) *Collector {
+		"collects scalar metric": {
+			prepare: func(m *snmpmock.MockHandler) *Collector {
+				setMockClientInitExpect(m)
+				setMockClientSysInfoExpect(m)
+
 				collr := New()
-				collr.Config = prepareConfigWithUserCharts(prepareV2Config(), 0, 3)
-				collr.enableProfiles = false
-
-				m.EXPECT().Get(gomock.Any()).Return(&gosnmp.SnmpPacket{
-					Variables: []gosnmp.SnmpPDU{
-						{Value: 10, Type: gosnmp.Counter32},
-						{Value: 20, Type: gosnmp.Counter64},
-						{Value: 30, Type: gosnmp.Gauge32},
-						{Value: 1, Type: gosnmp.Boolean},
-						{Value: 40, Type: gosnmp.Gauge32},
-						{Value: 50, Type: gosnmp.TimeTicks},
-						{Value: 60, Type: gosnmp.Uinteger32},
-						{Value: 70, Type: gosnmp.Integer},
-					},
-				}, nil).Times(1)
-
+				collr.Config = prepareV2Config()
+				collr.CreateVnode = false
+				collr.Ping.Enabled = false
+				collr.snmpProfiles = []*ddsnmp.Profile{{}} // non-empty to enable collectSNMP()
+				collr.newSnmpClient = func() gosnmp.Handler { return m }
+				collr.newDdSnmpColl = func(ddsnmpcollector.Config) ddCollector {
+					return &mockDdSnmpCollector{pms: []*ddsnmp.ProfileMetrics{
+						{
+							Metrics: []ddsnmp.Metric{
+								{
+									Name:    "uptime",
+									IsTable: false,
+									Value:   123,
+									Unit:    "s",
+									Tags:    map[string]string{},
+									Profile: &ddsnmp.ProfileMetrics{Tags: map[string]string{}},
+								},
+							},
+						},
+					}}
+				}
 				return collr
 			},
-			wantCollected: map[string]int64{
-				//"TestMetric":             1,
-				"1.3.6.1.2.1.2.2.1.10.0": 10,
-				"1.3.6.1.2.1.2.2.1.16.0": 20,
-				"1.3.6.1.2.1.2.2.1.10.1": 30,
-				"1.3.6.1.2.1.2.2.1.16.1": 1,
-				"1.3.6.1.2.1.2.2.1.10.2": 40,
-				"1.3.6.1.2.1.2.2.1.16.2": 50,
-				"1.3.6.1.2.1.2.2.1.10.3": 60,
-				"1.3.6.1.2.1.2.2.1.16.3": 70,
+			want: map[string]int64{
+				// scalar → "snmp_device_prof_<name>"
+				"snmp_device_prof_uptime": 123,
 			},
 		},
-		"success only custom OIDs supported and unsupported type": {
-			prepareSNMP: func(m *snmpmock.MockHandler) *Collector {
+		"collects table multivalue metric": {
+			prepare: func(m *snmpmock.MockHandler) *Collector {
+				setMockClientInitExpect(m)
+				setMockClientSysInfoExpect(m)
+
 				collr := New()
-				collr.Config = prepareConfigWithUserCharts(prepareV2Config(), 0, 2)
-				collr.enableProfiles = false
-
-				m.EXPECT().Get(gomock.Any()).Return(&gosnmp.SnmpPacket{
-					Variables: []gosnmp.SnmpPDU{
-						{Value: 10, Type: gosnmp.Counter32},
-						{Value: 20, Type: gosnmp.Counter64},
-						{Value: 30, Type: gosnmp.Gauge32},
-						{Value: nil, Type: gosnmp.NoSuchInstance},
-						{Value: nil, Type: gosnmp.NoSuchInstance},
-						{Value: nil, Type: gosnmp.NoSuchInstance},
-					},
-				}, nil).Times(1)
-
+				collr.Config = prepareV2Config()
+				collr.CreateVnode = false
+				collr.Ping.Enabled = false
+				collr.snmpProfiles = []*ddsnmp.Profile{{}}
+				collr.newSnmpClient = func() gosnmp.Handler { return m }
+				collr.newDdSnmpColl = func(ddsnmpcollector.Config) ddCollector {
+					return &mockDdSnmpCollector{pms: []*ddsnmp.ProfileMetrics{
+						{
+							Metrics: []ddsnmp.Metric{
+								{
+									Name:    "if_octets",
+									IsTable: true,
+									Unit:    "bit/s",
+									Tags:    map[string]string{"ifName": "eth0"},
+									Profile: &ddsnmp.ProfileMetrics{Tags: map[string]string{}},
+									MultiValue: map[string]int64{
+										"in":  1,
+										"out": 2,
+									},
+								},
+							},
+						},
+					}}
+				}
 				return collr
 			},
-			wantCollected: map[string]int64{
-				//"TestMetric":             1,
-				"1.3.6.1.2.1.2.2.1.10.0": 10,
-				"1.3.6.1.2.1.2.2.1.16.0": 20,
-				"1.3.6.1.2.1.2.2.1.10.1": 30,
-			},
-		},
-		"fails when only custom OIDs unsupported type": {
-			prepareSNMP: func(m *snmpmock.MockHandler) *Collector {
-				collr := New()
-				collr.Config = prepareConfigWithUserCharts(prepareV2Config(), 0, 2)
-				collr.enableProfiles = false
-
-				m.EXPECT().Get(gomock.Any()).Return(&gosnmp.SnmpPacket{
-					Variables: []gosnmp.SnmpPDU{
-						{Value: nil, Type: gosnmp.NoSuchInstance},
-						{Value: nil, Type: gosnmp.NoSuchInstance},
-						{Value: nil, Type: gosnmp.NoSuchObject},
-						{Value: "192.0.2.0", Type: gosnmp.NsapAddress},
-						{Value: []uint8{118, 101, 116}, Type: gosnmp.OctetString},
-						{Value: ".1.3.6.1.2.1.4.32.1.5.2.1.4.10.19.0.0.16", Type: gosnmp.ObjectIdentifier},
-					},
-				}, nil).Times(1)
-
-				return collr
+			want: map[string]int64{
+				// table key: "snmp_device_prof_<name>_<sorted tag values>_<subkey>"
+				// here tags = {"ifName":"eth0"} → key part becomes "_eth0"
+				"snmp_device_prof_if_octets_eth0_in":  1,
+				"snmp_device_prof_if_octets_eth0_out": 2,
 			},
 		},
 	}
 
-	for name, test := range tests {
+	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			mockSNMP, cleanup := mockInit(t)
-			defer cleanup()
+			mockCtl := gomock.NewController(t)
+			defer mockCtl.Finish()
 
-			setMockClientInitExpect(mockSNMP)
-			setMockClientSysInfoExpect(mockSNMP)
+			mockSNMP := snmpmock.NewMockHandler(mockCtl)
 
-			collr := test.prepareSNMP(mockSNMP)
-			collr.newSnmpClient = func() gosnmp.Handler { return mockSNMP }
-
+			collr := tc.prepare(mockSNMP)
 			require.NoError(t, collr.Init(context.Background()))
 
 			_ = collr.Check(context.Background())
 
-			mx := collr.Collect(context.Background())
-
-			assert.Equal(t, test.wantCollected, mx)
+			got := collr.Collect(context.Background())
+			assert.Equal(t, tc.want, got)
 		})
 	}
 }
 
-func mockInit(t *testing.T) (*snmpmock.MockHandler, func()) {
-	mockCtl := gomock.NewController(t)
-	cleanup := func() { mockCtl.Finish() }
-	mockSNMP := snmpmock.NewMockHandler(mockCtl)
+type mockDdSnmpCollector struct {
+	pms  []*ddsnmp.ProfileMetrics
+	meta map[string]ddsnmp.MetaTag
+	err  error
+}
 
-	return mockSNMP, cleanup
+func (m *mockDdSnmpCollector) Collect() ([]*ddsnmp.ProfileMetrics, error) {
+	return m.pms, m.err
+}
+
+func (m *mockDdSnmpCollector) CollectDeviceMetadata() (map[string]ddsnmp.MetaTag, error) {
+	return m.meta, nil
 }
 
 func prepareV3Config() Config {
@@ -370,45 +355,20 @@ func prepareV1Config() Config {
 	}
 }
 
-func prepareConfigWithUserCharts(cfg Config, start, end int) Config {
-	if start > end || start < 0 || end < 1 {
-		panic(fmt.Sprintf("invalid index range ('%d'-'%d')", start, end))
-	}
-	cfg.ChartsInput = []ChartConfig{
-		{
-			ID:       "test_chart1",
-			Title:    "This is Test Chart1",
-			Units:    "kilobits/s",
-			Family:   "family",
-			Type:     module.Area.String(),
-			Priority: module.Priority,
-			Dimensions: []DimensionConfig{
-				{
-					OID:        "1.3.6.1.2.1.2.2.1.10",
-					Name:       "in",
-					Algorithm:  module.Incremental.String(),
-					Multiplier: 8,
-					Divisor:    1000,
-				},
-				{
-					OID:        "1.3.6.1.2.1.2.2.1.16",
-					Name:       "out",
-					Algorithm:  module.Incremental.String(),
-					Multiplier: 8,
-					Divisor:    1000,
-				},
-			},
-		},
-	}
+func mockInit(t *testing.T) (*snmpmock.MockHandler, func()) {
+	mockCtl := gomock.NewController(t)
+	cleanup := func() { mockCtl.Finish() }
+	mockSNMP := snmpmock.NewMockHandler(mockCtl)
 
-	for i := range cfg.ChartsInput {
-		cfg.ChartsInput[i].IndexRange = []int{start, end}
-	}
-
-	return cfg
+	return mockSNMP, cleanup
 }
 
 func setMockClientInitExpect(m *snmpmock.MockHandler) {
+	setMockClientSetterExpect(m)
+	m.EXPECT().Connect().Return(nil).AnyTimes()
+}
+
+func setMockClientSetterExpect(m *snmpmock.MockHandler) {
 	m.EXPECT().Target().AnyTimes()
 	m.EXPECT().Port().AnyTimes()
 	m.EXPECT().Version().AnyTimes()
@@ -425,24 +385,7 @@ func setMockClientInitExpect(m *snmpmock.MockHandler) {
 	m.EXPECT().SetSecurityModel(gomock.Any()).AnyTimes()
 	m.EXPECT().SetMsgFlags(gomock.Any()).AnyTimes()
 	m.EXPECT().SetSecurityParameters(gomock.Any()).AnyTimes()
-	m.EXPECT().Connect().Return(nil).AnyTimes()
 	m.EXPECT().MaxRepetitions().Return(uint32(25)).AnyTimes()
-}
-
-func setMockClientSysObjectidExpect(m *snmpmock.MockHandler) {
-	m.EXPECT().Get([]string{snmputils.OidSysObject}).Return(&gosnmp.SnmpPacket{
-		Variables: []gosnmp.SnmpPDU{
-			{Value: ".1.1.1",
-				Name: ".1.3.6.1.2.1.1.2.0",
-				Type: gosnmp.ObjectIdentifier},
-		},
-	}, nil).MinTimes(1)
-	m.EXPECT().Get([]string{"1.1.1.0"}).Return(&gosnmp.SnmpPacket{
-		Variables: []gosnmp.SnmpPDU{
-			{Name: "1.1.1.0", Value: 1, Type: gosnmp.Integer},
-		},
-	}, nil).MinTimes(1)
-
 }
 
 func setMockClientSysInfoExpect(m *snmpmock.MockHandler) {
@@ -453,10 +396,4 @@ func setMockClientSysInfoExpect(m *snmpmock.MockHandler) {
 		{Name: snmputils.OidSysName, Value: []uint8("mock sysName"), Type: gosnmp.OctetString},
 		{Name: snmputils.OidSysLocation, Value: []uint8("mock sysLocation"), Type: gosnmp.OctetString},
 	}, nil).MinTimes(1)
-}
-
-func decodePhysAddr(s string) []uint8 {
-	s = strings.ReplaceAll(s, ":", "")
-	v, _ := hex.DecodeString(s)
-	return v
 }

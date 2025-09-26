@@ -4612,7 +4612,12 @@ func TestCollector_Collect_TableCaching(t *testing.T) {
 			mockHandler := snmpmock.NewMockHandler(ctrl)
 			tc.setupMock(mockHandler)
 
-			collector := New(mockHandler, tc.profiles, logger.New(), "")
+			collector := New(Config{
+				SnmpClient:  mockHandler,
+				Profiles:    tc.profiles,
+				Log:         logger.New(),
+				SysObjectID: "",
+			})
 
 			// Configure cache based on test requirements
 			if tc.enableCache {

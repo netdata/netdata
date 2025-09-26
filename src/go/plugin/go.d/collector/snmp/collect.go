@@ -86,14 +86,7 @@ func (c *Collector) collectMetrics() (map[string]int64, error) {
 
 func (c *Collector) ensureInitialized() error {
 	if c.snmpClient == nil {
-		snmpClient, err := c.initAndConnectSNMPClient()
-		if err != nil {
-			return err
-		}
-		c.snmpClient = snmpClient
-		if c.ddSnmpColl != nil {
-			c.ddSnmpColl.SetSNMPClient(snmpClient)
-		}
+		return errors.New("snmp client not initialized")
 	}
 
 	if c.sysInfo != nil {
@@ -105,12 +98,17 @@ func (c *Collector) ensureInitialized() error {
 		return err
 	}
 
-	if c.enableProfiles {
+	if c.snmpProfiles == nil {
 		c.snmpProfiles = c.setupProfiles(si)
 	}
 
-	if c.ddSnmpColl == nil {
-		c.ddSnmpColl = ddsnmpcollector.New(c.snmpClient, c.snmpProfiles, c.Logger, si.SysObjectID)
+	if c.ddSnmpColl == nil && len(c.snmpProfiles) > 0 {
+		c.ddSnmpColl = c.newDdSnmpColl(ddsnmpcollector.Config{
+			SnmpClient:  c.snmpClient,
+			Profiles:    c.snmpProfiles,
+			Log:         c.Logger,
+			SysObjectID: si.SysObjectID,
+		})
 	}
 
 	if c.CreateVnode {
@@ -227,7 +225,6 @@ func (c *Collector) initAndConnectSNMPClient() (gosnmp.Handler, error) {
 			c.Warningf("SNMP bulk walk disabled: table metrics collection unavailable (device may not support GETBULK or max-repetitions adjustment failed)")
 		}
 		c.adjMaxRepetitions = snmpClient.MaxRepetitions()
-		c.snmpBulkWalkOk = ok
 	}
 
 	return snmpClient, nil
