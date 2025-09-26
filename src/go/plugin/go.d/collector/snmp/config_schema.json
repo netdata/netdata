@@ -190,7 +190,7 @@
       },
       "manual_profiles": {
         "title": "Manual SNMP Profiles",
-        "description": "Profiles to apply if automatic detection cannot be used.",
+        "description": "Profiles to apply if automatic detection cannot be used. In most cases, **leave this empty**.",
         "type": [
           "array",
           "null"
@@ -327,7 +327,8 @@
           "fields": [
             "update_every",
             "hostname",
-            "community"
+            "community",
+            "manual_profiles"
           ]
         },
         {
@@ -354,12 +355,6 @@
           "title": "SNMPv3",
           "fields": [
             "user"
-          ]
-        },
-        {
-          "title": "Profiles",
-          "fields": [
-            "manual_profiles"
           ]
         }
       ]
