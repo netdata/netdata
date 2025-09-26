@@ -11,7 +11,7 @@ import (
 )
 
 func (c *Collector) collectSNMP(mx map[string]int64) error {
-	if len(c.snmpProfiles) == 0 || c.ddSnmpColl == nil {
+	if c.ddSnmpColl == nil {
 		return nil
 	}
 

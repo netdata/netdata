@@ -69,36 +69,42 @@ func New() *Collector {
 
 		newProber:     ping.NewProber,
 		newSnmpClient: gosnmp.NewHandler,
-
-		enableProfiles: true,
+		newDdSnmpColl: func(cfg ddsnmpcollector.Config) ddCollector {
+			return ddsnmpcollector.New(cfg)
+		},
 	}
 }
 
-type Collector struct {
-	module.Base
-	Config `yaml:",inline" json:""`
+type (
+	Collector struct {
+		module.Base
+		Config `yaml:",inline" json:""`
 
-	vnode *vnodes.VirtualNode
+		vnode *vnodes.VirtualNode
 
-	charts            *module.Charts
-	seenScalarMetrics map[string]bool
-	seenTableMetrics  map[string]bool
+		charts            *module.Charts
+		seenScalarMetrics map[string]bool
+		seenTableMetrics  map[string]bool
 
-	prober    ping.Prober
-	newProber func(ping.ProberConfig, *logger.Logger) ping.Prober
+		prober    ping.Prober
+		newProber func(ping.ProberConfig, *logger.Logger) ping.Prober
 
-	newSnmpClient func() gosnmp.Handler
-	snmpClient    gosnmp.Handler
-	ddSnmpColl    *ddsnmpcollector.Collector
+		snmpClient    gosnmp.Handler
+		newSnmpClient func() gosnmp.Handler
 
-	sysInfo      *snmputils.SysInfo
-	snmpProfiles []*ddsnmp.Profile
+		ddSnmpColl    ddCollector
+		newDdSnmpColl func(ddsnmpcollector.Config) ddCollector
 
-	adjMaxRepetitions uint32
+		sysInfo      *snmputils.SysInfo
+		snmpProfiles []*ddsnmp.Profile
 
-	// only for tests
-	enableProfiles bool
-}
+		adjMaxRepetitions uint32
+	}
+	ddCollector interface {
+		Collect() ([]*ddsnmp.ProfileMetrics, error)
+		CollectDeviceMetadata() (map[string]ddsnmp.MetaTag, error)
+	}
+)
 
 func (c *Collector) Configuration() any {
 	return c.Config
