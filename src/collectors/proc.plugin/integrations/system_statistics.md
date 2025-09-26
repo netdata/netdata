@@ -68,7 +68,6 @@ The default configuration for this integration does not impose any limits on dat
 The collector disables cpu frequency and idle state monitoring when there are more than 128 CPU cores available.
 
 
-
 ## Metrics
 
 Metrics grouped by *scope*.

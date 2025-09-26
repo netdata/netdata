@@ -44,38 +44,138 @@ func Test_loadDDSnmpProfiles(t *testing.T) {
 
 func Test_FindProfiles(t *testing.T) {
 	test := map[string]struct {
-		sysObjOId   string
-		wanProfiles int
+		sysObjOId      string
+		manualProfiles []string
+		wanProfiles    []string
 	}{
-		"mikrotik": {
+		"MikroTik": {
 			sysObjOId:   "1.3.6.1.4.1.14988.1",
-			wanProfiles: 2,
+			wanProfiles: []string{"mikrotik-router", "generic-device"},
 		},
-		"aruba": {
+		"net-snmp linux": {
+			sysObjOId:   "1.3.6.1.4.1.8072.3.2.10",
+			wanProfiles: []string{"net-snmp", "generic-device"},
+		},
+		"Kyocera printer": {
+			sysObjOId:   "1.3.6.1.4.1.1347.41",
+			wanProfiles: []string{"kyocera-printer", "generic-device"},
+		},
+		"APC pdu": {
+			sysObjOId:   "1.3.6.1.4.1.318.1.3.4.5",
+			wanProfiles: []string{"apc-pdu", "apc-ups", "apc", "generic-device"},
+		},
+		"IBM RackSwitch G8052-2 ": {
+			sysObjOId:   "1.3.6.1.4.1.26543.1.7.7",
+			wanProfiles: []string{"generic-device"},
+		},
+		"Aruba WLC 7210": {
 			sysObjOId:   "1.3.6.1.4.1.14823.1.1.32",
-			wanProfiles: 4,
+			wanProfiles: []string{"aruba-wireless-controller", "aruba-switch", "aruba", "generic-device"},
 		},
+		"FortiGate 200": {
+			sysObjOId:   "1.3.6.1.4.1.12356.15.200",
+			wanProfiles: []string{"generic-device"},
+		},
+		"Cisco 7204 VXR": {
+			sysObjOId:   "1.3.6.1.4.1.9.1.223",
+			wanProfiles: []string{"cisco", "generic-device"},
+		},
+		"NetApp Cluster": {
+			sysObjOId:   "1.3.6.1.4.1.789.2.5",
+			wanProfiles: []string{"netapp", "generic-device"},
+		},
+		"Zyxel ZyAIR B-1000": {
+			sysObjOId:   "1.3.6.1.4.1.890.1.2",
+			wanProfiles: []string{"generic-device"},
+		},
+		"HP ProCurve 2650-PWR": {
+			sysObjOId:   "1.3.6.1.4.1.11.2.3.7.11.35",
+			wanProfiles: []string{"hp-icf-switch", "generic-device"},
+		},
+		"Aruba  2930F-8G-PoE+-2SFP+": {
+			sysObjOId:   "1.3.6.1.4.1.11.2.3.7.11.181.16",
+			wanProfiles: []string{"hp-icf-switch", "generic-device"},
+		},
+		"HP LaserJet 4050 Series": {
+			sysObjOId:   "1.3.6.1.4.1.11.2.3.9.1",
+			wanProfiles: []string{"generic-device"},
+		},
+		"Huawei H3C s2008-HI": {
+			sysObjOId:   "1.3.6.1.4.1.2011.10.1.152",
+			wanProfiles: []string{"generic-device"},
+		},
+		"Avaya AVX571040": {
+			sysObjOId:   "1.3.6.1.4.1.6889.1.69.4",
+			wanProfiles: []string{"generic-device"},
+		},
+		"Aruba IAP-225": {
+			sysObjOId:   "1.3.6.1.4.1.14823.1.2.59",
+			wanProfiles: []string{"aruba-access-point", "aruba", "generic-device"},
+		},
+		"Brocade MLXe-16 slot": {
+			sysObjOId:   "1.3.6.1.4.1.1991.1.3.55.1.2",
+			wanProfiles: []string{"generic-device"},
+		},
+		"FortiGate-100D": {
+			sysObjOId:   "1.3.6.1.4.1.12356.101.1.1004",
+			wanProfiles: []string{"fortinet-fortigate", "generic-device"},
+		},
+		"Summit X450-24x": {
+			sysObjOId:   "1.3.6.1.4.1.1916.2.65",
+			wanProfiles: []string{"extreme-switching", "generic-device"},
+		},
+		"Meraki MX84": {
+			sysObjOId:   "1.3.6.1.4.1.29671.2.109",
+			wanProfiles: []string{"meraki", "generic-device"},
+		},
+		"Palo Alto WF-500": {
+			sysObjOId:   "1.3.6.1.4.1.25461.2.3.33",
+			wanProfiles: []string{"palo-alto", "generic-device"},
+		},
+		"Cisco UCS 6120XP": {
+			sysObjOId:   "1.3.6.1.4.1.9.12.3.1.3.847",
+			wanProfiles: []string{"cisco-nexus", "cisco", "generic-device"},
+		},
+		"Cisco 5520 Wireless Controller": {
+			sysObjOId:   "1.3.6.1.4.1.9.1.2170",
+			wanProfiles: []string{"cisco-legacy-wlc", "cisco", "generic-device"},
+		},
+		"Linksys BEFSX41": {
+			sysObjOId:   "1.3.6.1.4.1.3955.1.1",
+			wanProfiles: []string{"linksys", "generic-device"},
+		},
+		"Juniper ERX-705": {
+			sysObjOId:   "1.3.6.1.4.1.4874.1.1.1.1.4",
+			wanProfiles: []string{"generic-device"},
+		},
+
 		"no match": {
 			sysObjOId:   "0.1.2.3",
-			wanProfiles: 0,
+			wanProfiles: nil,
 		},
-		"Cisco-WLC-5520": {
-			sysObjOId:   "1.3.6.1.4.1.9.1.2170",
-			wanProfiles: 3,
+		"no sysObjectID, manual profile applied": {
+			sysObjOId:      "",
+			manualProfiles: []string{"generic-device"},
+			wanProfiles:    []string{"generic-device"},
 		},
 	}
 
 	for name, test := range test {
 		t.Run(name, func(t *testing.T) {
-			profiles := FindProfiles(test.sysObjOId)
+			profiles := FindProfiles(test.sysObjOId, "", test.manualProfiles)
 
-			require.Len(t, profiles, test.wanProfiles)
+			var names []string
+			for _, p := range profiles {
+				names = append(names, stripFileNameExt(p.SourceFile))
+			}
+
+			assert.Equal(t, test.wanProfiles, names)
 		})
 	}
 }
 
 func Test_Profile_merge(t *testing.T) {
-	profiles := FindProfiles("1.3.6.1.4.1.9.1.1216") // cisco-nexus
+	profiles := FindProfiles("1.3.6.1.4.1.9.1.1216", "", nil) // cisco-nexus
 
 	i := slices.IndexFunc(profiles, func(p *Profile) bool {
 		return strings.HasSuffix(p.SourceFile, "cisco-nexus.yaml")
@@ -836,6 +936,54 @@ func TestSortProfilesBySpecificity(t *testing.T) {
 				"specific.yaml",
 				"generic.yaml",
 			},
+		},
+		"mix: longer > shorter; OID > descr-only": {
+			profiles:    []string{"a.yaml", "b.yaml", "c.yaml", "d.yaml"},
+			matchedOIDs: []string{"1.3.6.1", "1.3.*", "", "1.3.6.1.4"},
+			// d: longest "1.3.6.1.4"  > a: "1.3.6.1" > b: "1.3.*" > c: descr-only
+			expected: []string{"d.yaml", "a.yaml", "b.yaml", "c.yaml"},
+		},
+		"oid match outranks descr-only": {
+			profiles:    []string{"descr-only.yaml", "exact.yaml"},
+			matchedOIDs: []string{"", "1.2.3"},
+			expected:    []string{"exact.yaml", "descr-only.yaml"},
+		},
+		"same length: exact before pattern": {
+			profiles:    []string{"exact.yaml", "pattern.yaml"},
+			matchedOIDs: []string{"1.3.4", "1.3.*"}, // both len == 5
+			expected:    []string{"exact.yaml", "pattern.yaml"},
+		},
+		"longer pattern beats shorter exact (by design)": {
+			profiles:    []string{"exact-short.yaml", "pattern-long.yaml"},
+			matchedOIDs: []string{"1.3.4", "1.3.4.5.*"}, // len(pattern) > len(exact)
+			expected:    []string{"pattern-long.yaml", "exact-short.yaml"},
+		},
+		"lexicographic tiebreaker (same type & same length, both exact)": {
+			profiles:    []string{"a.yaml", "b.yaml"},
+			matchedOIDs: []string{"1.10", "1.20"},     // same len, both exact
+			expected:    []string{"a.yaml", "b.yaml"}, // "1.10" < "1.20"
+		},
+		"stability when both descr-only (both empty)": {
+			profiles:    []string{"x.yaml", "y.yaml", "z.yaml"},
+			matchedOIDs: []string{"", "", ""},
+			// comparator returns 0 → SortStable preserves original order
+			expected: []string{"x.yaml", "y.yaml", "z.yaml"},
+		},
+		"patterns by length (no exacts)": {
+			profiles:    []string{"p1.yaml", "p2.yaml", "p3.yaml"},
+			matchedOIDs: []string{"1.*", "1.2.*", "1.2.3.*"},
+			expected:    []string{"p3.yaml", "p2.yaml", "p1.yaml"},
+		},
+		"tie: same length patterns → lexicographic": {
+			profiles:    []string{"pA.yaml", "pB.yaml"},
+			matchedOIDs: []string{"1.9.*", "1.10.*"},    // same length strings
+			expected:    []string{"pB.yaml", "pA.yaml"}, // "1.10.*" < "1.9.*" lexicographically
+		},
+		"mixed: two OID matches + one descr-only; ensure empty last": {
+			profiles:    []string{"o1.yaml", "desc.yaml", "o2.yaml"},
+			matchedOIDs: []string{"1.2.*", "", "1.2.3"},
+			// longer first among OID matches, then empty
+			expected: []string{"o2.yaml", "o1.yaml", "desc.yaml"},
 		},
 	}
 

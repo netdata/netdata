@@ -47,7 +47,6 @@ The default configuration for this integration does not impose any limits on dat
 
 Linux kernel module for IPMI can create big overhead.
 
-
 ## Metrics
 
 Metrics grouped by *scope*.

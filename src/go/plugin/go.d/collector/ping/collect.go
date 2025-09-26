@@ -22,7 +22,7 @@ func (c *Collector) collect() (map[string]int64, error) {
 }
 
 func (c *Collector) pingHost(host string, mx map[string]int64, mu *sync.Mutex) {
-	stats, err := c.prober.ping(host)
+	stats, err := c.prober.Ping(host)
 	if err != nil {
 		c.Error(err)
 		return

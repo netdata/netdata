@@ -2,8 +2,6 @@
 
 Netdata provides hundreds of pre-configured health alerts to notify you when an anomaly or performance issue affects your node or its applications.
 
----
-
 ## Raised Alerts Tab
 
 The **Raised Alerts** tab shows all current alerts in your Room that are in a **warning** or **critical** state.
@@ -25,8 +23,6 @@ The table provides key details about each active alert:
 
 Use the **gear icon** (top right) to control which columns are visible. Sort alerts by clicking on column headers.
 
----
-
 ## Filtering Alerts
 
 Filter the alert list using the right-hand bar:
@@ -42,7 +38,6 @@ Filter the alert list using the right-hand bar:
 | **Netdata Version**        | Filter by the Netdata version.                                                   |
 | **Nodes**                  | Filter by specific nodes.                                                        |
 
----
 
 ## Viewing Alert Details
 
@@ -63,8 +58,6 @@ At the bottom of this page, click **View alert page** to open a dynamic view whe
 - Run metric correlations.
 - Navigate to the specific node’s chart that triggered the alert.
 
----
-
 ## Silencing Alerts
 
 In the **Raised Alerts** tab:
@@ -73,8 +66,6 @@ In the **Raised Alerts** tab:
 - The **Actions column** allows you to:
     - Create a new [silencing rule](/docs/alerts-and-notifications/notifications/centralized-cloud-notifications/centralized-cloud-notifications-reference.md#alert-notification-silencing-rules).
     - Ask for help from the [Netdata Assistant](/docs/netdata-assistant.md).
-
----
 
 ## Alert Configurations Tab
 
@@ -98,8 +89,6 @@ The **Alert Configurations** tab shows the configuration of all running alerts i
 
 Use the **gear icon** to adjust which columns are displayed.
 
----
-
 ## Viewing Alert Configuration
 
 From the **Actions column**, click **Show Configuration** to:
@@ -114,21 +103,31 @@ This allows you to investigate:
 - When the alert last triggered.
 - All configuration parameters per node.
 
----
-
 ## Alert Lifecycle Diagram
 
 ```mermaid
-graph TD
-    A[Metric Collection] --> B[Alert Evaluation]
-    B --> C{Condition Met}
-    C -- Yes --> D[Trigger Alert]
-    D --> E[Alert in Raised Alerts Tab]
-    E --> F[Details and Chart Snapshot]
-    E --> G[Apply Silencing Rule]
-    F --> H[Explore Metrics<br/>Run Correlations]
-    G --> I[No Notification Sent]
-    C -- No --> J[No Alert Triggered]
+flowchart TD
+    A("Metric Collection") --> B("Alert Evaluation")
+    B --> C("Condition Met?")
+    C -->|"Yes"| D("Trigger Alert")
+    C -->|"No"| J("No Alert Triggered")
+    D --> E("Alert in Raised Alerts Tab")
+    E --> F("Details and Chart Snapshot")
+    E --> G("Apply Silencing Rule")
+    F --> H("Explore Metrics<br/>Run Correlations")
+    G --> I("No Notification Sent")
+    
+    %% Style definitions
+    classDef alert fill:#ffeb3b,stroke:#000000,stroke-width:3px,color:#000000,font-size:14px
+    classDef neutral fill:#f9f9f9,stroke:#000000,stroke-width:3px,color:#000000,font-size:14px
+    classDef complete fill:#4caf50,stroke:#000000,stroke-width:3px,color:#000000,font-size:14px
+    classDef database fill:#2196F3,stroke:#000000,stroke-width:3px,color:#000000,font-size:14px
+
+    %% Apply styles
+    class A,D alert
+    class B,C,E neutral
+    class F,H,J complete
+    class G,I database
 ```
 
 :::tip

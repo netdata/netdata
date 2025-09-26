@@ -72,7 +72,6 @@ The default configuration for this integration does not impose any limits on dat
 **Concurrent access**: If multiple collectors or tools access the same SNMP device simultaneously, data points might be skipped. This is a limitation of the device itself, not this collector. To mitigate this, consider increasing the collection interval (update_every) to reduce the frequency of requests.
 
 
-
 ## Metrics
 
 Metrics grouped by *scope*.
@@ -187,16 +186,16 @@ The following options can be defined globally: update_every, autodetection_retry
 |  | options.timeout | SNMP request/response timeout. | 5 | no |
 |  | options.max_repetitions | Controls how many SNMP variables to retrieve in a single GETBULK request. | 25 | no |
 |  | options.max_request_size | Maximum number of OIDs allowed in a single GET request. | 60 | no |
-| **Profiles** | enable_profiles | Enable collection of metrics using SNMP profiles. | true | no |
-|  | enable_profiles_table_metrics | Enable collection of SNMP table metrics from profiles. Enabling this may **increase collection time and memory usage** for devices with many network interfaces. | true | no |
-|  | disable_legacy_collection | Disable the legacy SNMP collection method, forcing the collector to use only SNMP profiles (YAML-based configuration). When enabled, the collector will ignore any non-profile based collection logic. | false | no |
+| **Ping** | ping.enabled | Enable ICMP round-trip measurements (runs alongside SNMP). When disabled, no ping metrics are collected. | yes | no |
+|  | ping.privileged | Use raw ICMP (privileged). If false, unprivileged mode is used. | yes | no |
+|  | ping.packets | Number of ping packets to send per iteration. | 3 | no |
+|  | ping.interval | Interval between sending ping packets. | 100ms | no |
+| **Profiles** | manual_profiles | Profiles to apply if automatic detection cannot be used. | [] | no |
 | **Virtual node** | create_vnode | If set, the collector will create a Netdata Virtual Node for this SNMP device, which will appear as a separate Node in Netdata. | true | no |
 |  | vnode_device_down_threshold | Number of consecutive failed data collections before marking the device as down. | 3 | no |
 |  | vnode.guid | A unique identifier for the Virtual Node. If not set, a GUID will be automatically generated from the device's IP address. |  | no |
 |  | vnode.hostname | The hostname that will be used for the Virtual Node. If not set, the device's hostname will be used. |  | no |
 |  | vnode.labels | Additional key-value pairs to associate with the Virtual Node. |  | no |
-| **Filters** | network_interface_filter.by_name | Filter interfaces by their names using [simple patterns](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md#simple-patterns). |  | no |
-|  | network_interface_filter.by_type | Filter interfaces by their types using [simple patterns](https://github.com/netdata/netdata/blob/master/src/libnetdata/simple_pattern/README.md#simple-patterns). |  | no |
 
 ##### user.level
 

@@ -9,5 +9,7 @@ metadata:
       vendor:
         value: "Ruckus"
 
-sysobjectid:
-  - 1.3.6.1.4.1.25053.3.*
+selector:
+  - sysobjectid:
+      include:
+        - 1.3.6.1.4.1.25053.3.*

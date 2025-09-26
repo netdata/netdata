@@ -22,7 +22,6 @@ Use the Prometheus remote write exporting connector to archive your Netdata metr
 
 The remote write exporting connector does not support buffer on failures.
 
-
 ## Setup
 
 

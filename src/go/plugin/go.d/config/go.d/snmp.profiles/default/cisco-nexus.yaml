@@ -12,14 +12,16 @@ metadata:
       vendor:
         value: "Cisco"
 
-sysobjectid:
-  - 1.3.6.1.4.1.9.1.1216 # ciscoN7KC7018IOS
-  - 1.3.6.1.4.1.9.1.1217 # ciscoN7KC7010IOS
-  - 1.3.6.1.4.1.9.1.1915 # ciscoN9KC9508
-  - 1.3.6.1.4.1.9.1.1923 # ciscoN9KC93128TX
-  - 1.3.6.1.4.1.9.1.1924 # ciscoN9KC9396TX
-  - 1.3.6.1.4.1.9.1.1925 # ciscoN9KC9396PX
-  - 1.3.6.1.4.1.9.12.3.1.3.*
+selector:
+  - sysobjectid:
+      include:
+        - 1.3.6.1.4.1.9.1.1216 # ciscoN7KC7018IOS
+        - 1.3.6.1.4.1.9.1.1217 # ciscoN7KC7010IOS
+        - 1.3.6.1.4.1.9.1.1915 # ciscoN9KC9508
+        - 1.3.6.1.4.1.9.1.1923 # ciscoN9KC93128TX
+        - 1.3.6.1.4.1.9.1.1924 # ciscoN9KC9396TX
+        - 1.3.6.1.4.1.9.1.1925 # ciscoN9KC9396PX
+        - 1.3.6.1.4.1.9.12.3.1.3.*
 
 metrics:
   - MIB: CISCO-ENTITY-SENSOR-MIB   # TODO: put in abstract profile

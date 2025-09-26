@@ -16,8 +16,6 @@ Local package tools like `apt-offline` may work for DEB/RPM installs — but we 
 
 :::
 
----
-
 ## Step 1: Prepare the Offline Installation Package
 
 On your internet-connected machine, you'll need::
@@ -61,8 +59,6 @@ The script creates a directory with all necessary files:
    └── sha256sums.txt      # Verification hashes
 ```
 
----
-
 ## Step 2: Transfer to Offline System
 
 Copy the entire `netdata-offline` directory to your offline system using your preferred method (USB drive, secure copy, etc.).
@@ -79,8 +75,6 @@ The installation script expects the exact directory structure and filenames.
 The folder name `netdata-offline` is just an example — use any name you want.
 
 :::
-
----
 
 ### Output
 
@@ -125,8 +119,6 @@ sh /tmp/netdata-kickstart.sh --release-channel stable --prepare-offline-install-
 Don't rename or modify the files.
 
 :::
-
----
 
 2. On the offline system, run:
 

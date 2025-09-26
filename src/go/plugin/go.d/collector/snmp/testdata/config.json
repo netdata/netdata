@@ -12,10 +12,6 @@
     }
   },
   "community": "ok",
-  "network_interface_filter": {
-    "by_name": "ok",
-    "by_type": "ok"
-  },
   "user": {
     "name": "ok",
     "level": "ok",
@@ -32,29 +28,15 @@
     "max_request_size": 123,
     "max_repetitions": 123
   },
-  "charts": [
-    {
-      "id": "ok",
-      "title": "ok",
-      "units": "ok",
-      "family": "ok",
-      "type": "ok",
-      "priority": 123,
-      "multiply_range": [
-        123
-      ],
-      "dimensions": [
-        {
-          "oid": "ok",
-          "name": "ok",
-          "algorithm": "ok",
-          "multiplier": 123,
-          "divisor": 123
-        }
-      ]
-    }
+  "manual_profiles": [
+    "ok"
   ],
-  "enable_profiles": true,
-  "enable_profiles_table_metrics": true,
-  "disable_legacy_collection": true
+  "ping": {
+    "enabled": true,
+    "network": "ip",
+    "privileged": true,
+    "interface": "eth0",
+    "packets": 5,
+    "interval": 123.123
+  }
 }

@@ -1,8 +1,10 @@
 extends:
   - servertech.yaml
 
-sysobjectid:
-  - 1.3.6.1.4.1.1718.3  # Sentry 3rd Gen PDU
+selector:
+  - sysobjectid:
+      include:
+        - 1.3.6.1.4.1.1718.3  # Sentry 3rd Gen PDU
 
 metadata:
   device:

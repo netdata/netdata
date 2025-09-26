@@ -6,7 +6,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"strings"
 	"time"
 
 	"github.com/gohugoio/hashstructure"
@@ -179,7 +178,7 @@ func (d *Discoverer) discoverNetwork(ctx context.Context, in chan<- []model.Targ
 	client.SetTimeout(d.timeout)
 	client.SetRetries(0)
 	setCredential(client, sub.credential)
-	d.Debugf("SNMP client info for '%s': %s", sub.str, snmpClientConnInfo(client))
+	d.Debugf("SNMP client info for '%s': %s", sub.str, snmputils.SnmpClientConnInfo(client))
 
 	for ip := range sub.ips.Iterate() {
 		ipAddr := ip.String()
@@ -281,16 +280,4 @@ func isDone(ctx context.Context) bool {
 	default:
 		return false
 	}
-}
-
-func snmpClientConnInfo(c gosnmp.Handler) string {
-	var info strings.Builder
-	info.WriteString(fmt.Sprintf("hostname='%s',port='%d',snmp_version='%s'", c.Target(), c.Port(), c.Version()))
-	switch c.Version() {
-	case gosnmp.Version1, gosnmp.Version2c:
-		info.WriteString(fmt.Sprintf(",community='%s'", c.Community()))
-	case gosnmp.Version3:
-		info.WriteString(fmt.Sprintf(",security_level='%d,%s'", c.MsgFlags(), c.SecurityParameters().Description()))
-	}
-	return info.String()
 }

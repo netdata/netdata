@@ -89,7 +89,6 @@ There you can see that discovering took `525.614041ms`, and collecting metrics t
 `update_every` and `timeout` parameters should be adjusted based on these numbers.
 
 
-
 ## Metrics
 
 Metrics grouped by *scope*.

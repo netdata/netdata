@@ -17,7 +17,6 @@ Send notifications to `smstools3` using Netdata's Agent alert notification featu
 The SMS Server Tools 3 is a SMS Gateway software which can send and receive short messages through GSM modems and mobile phones.
 
 
-
 <img src="https://img.shields.io/badge/maintained%20by-Netdata-%2300ab44" />
 
 ## Setup

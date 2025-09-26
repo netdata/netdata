@@ -22,8 +22,6 @@ This installation script works on all major Linux distributions. It automaticall
 
 </details>  
 
----
-
 ## Quick Overview
 
 | Task                  | Command / Location             | Notes                                   |
@@ -32,8 +30,6 @@ This installation script works on all major Linux distributions. It automaticall
 | Connect to Cloud      | Use claim token                | Connect node to Netdata Cloud           |
 | Customize install     | Pass flags to control behavior | Directory, release, update control      |
 | Export config for IaC | Copy config from Cloud UI      | For automation & Infrastructure as Code |
-
----
 
 ## Run the One-Line Install Command
 
@@ -67,8 +63,6 @@ To install and connect to Netdata Cloud in a single step from your terminal:
 
 </details>
 
----
-
 ## Optional Parameters for kickstart.sh
 
 Use these flags to customize your installation.
@@ -88,8 +82,6 @@ Use these flags to customize your installation.
 | **Reinstall/Uninstall** | `--reinstall`          | Reinstall existing Netdata          |
 |                         | `--uninstall`          | Uninstall Netdata completely        |
 
----
-
 ## Environment Variables
 
 These environment variables provide additional customization options (most users won't need these):
@@ -103,8 +95,6 @@ These environment variables provide additional customization options (most users
 > [!NOTE]
 > The user running the script needs write and execute permissions in the temporary directory specified by TMPDIR.
 
----
-
 ## Verify Script Integrity
 
 Before running the installation script, you can verify its integrity using the following command:
@@ -115,16 +105,12 @@ Before running the installation script, you can verify its integrity using the f
 
 If the script is valid, this command will return `OK, VALID`. We recommend verifying script integrity before installation, especially in production environments.
 
----
-
 ## Notes & Best Practices
 
 - Stop the Agent with `sudo systemctl stop netdata` before reinstalling
 - Customize install location or behavior with flags
 - Always verify the downloaded script for security
 - Use the `--non-interactive` flag in CI/CD pipelines
-
----
 
 ## Related Docs
 

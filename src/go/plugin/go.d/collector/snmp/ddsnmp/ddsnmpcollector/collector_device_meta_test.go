@@ -8,9 +8,8 @@ import (
 
 	"github.com/golang/mock/gomock"
 	"github.com/gosnmp/gosnmp"
-	"github.com/stretchr/testify/assert"
-
 	snmpmock "github.com/gosnmp/gosnmp/mocks"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
@@ -802,7 +801,13 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 		"base metadata exact via sysObjectIDs": {
 			profile: &ddsnmp.Profile{
 				Definition: &ddprofiledefinition.ProfileDefinition{
-					SysObjectIDs: []string{"1.3.6.1.4.1.9.1.669"},
+					Selector: ddprofiledefinition.SelectorSpec{
+						{
+							SysObjectID: ddprofiledefinition.SelectorIncludeExclude{
+								Include: []string{"1.3.6.1.4.1.9.1.669"},
+							},
+						},
+					},
 					Metadata: ddprofiledefinition.MetadataConfig{
 						"device": {
 							Fields: ddprofiledefinition.ListMap[ddprofiledefinition.MetadataField]{
@@ -826,7 +831,13 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 		"sysObjectIDs exact + sysobjectid wildcard → base wins overlap": {
 			profile: &ddsnmp.Profile{
 				Definition: &ddprofiledefinition.ProfileDefinition{
-					SysObjectIDs: []string{"1.3.6.1.4.1.9.1.669"},
+					Selector: ddprofiledefinition.SelectorSpec{
+						{
+							SysObjectID: ddprofiledefinition.SelectorIncludeExclude{
+								Include: []string{"1.3.6.1.4.1.9.1.669"},
+							},
+						},
+					},
 					Metadata: ddprofiledefinition.MetadataConfig{
 						"device": {
 							Fields: ddprofiledefinition.ListMap[ddprofiledefinition.MetadataField]{

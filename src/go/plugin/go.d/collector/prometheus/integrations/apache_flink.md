@@ -47,7 +47,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-
 ## Metrics
 
 This collector has built-in grouping logic based on the [type of metrics](https://prometheus.io/docs/concepts/metric_types/).

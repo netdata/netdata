@@ -7,8 +7,10 @@ metadata:
       type:
         value: "Room Alert Monitor"
 
-sysobjectid:
-  - 1.3.6.1.4.1.20916.1.9.*
+selector:
+  - sysobjectid:
+      include:
+        - 1.3.6.1.4.1.20916.1.9.*
 
 metrics:
   - MIB: ROOMALERT3E-MIB

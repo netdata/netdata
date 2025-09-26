@@ -33,47 +33,53 @@ You can send notifications via email or through third-party services like PagerD
 ### Service Level
 
 ```mermaid
-%%{init: {'theme': 'dark', 'themeVariables': { 'primaryColor': '#2b2b2b', 'primaryTextColor': '#fff', 'primaryBorderColor': '#7C0000', 'lineColor': '#F8B229', 'secondaryColor': '#006100', 'tertiaryColor': '#333'}}}%%
 flowchart LR
-    ServiceLevel[Service Level] --> Personal[Personal]
-    ServiceLevel --> System[System]
+    ServiceLevel("Service Level") --> Personal("Personal")
+    ServiceLevel --> System("System")
     
-    Personal --> PersonalManaged[Managed By Users]
-    System --> SystemManaged[Managed By Admins]
+    Personal --> PersonalManaged("Managed By Users")
+    System --> SystemManaged("Managed By Admins")
     
-    PersonalManaged --> PersonalDest[User Specific destinations<br/>such as Email]
-    SystemManaged --> SystemDest[General Targets<br/>like Slack Channels]
+    PersonalManaged --> PersonalDest("User Specific destinations<br/>such as Email")
+    SystemManaged --> SystemDest("General Targets<br/>like Slack Channels")
     
-    style ServiceLevel fill:#ffeb3b,stroke:#555,color:#333,stroke-width:2px,rx:10,ry:10
-    style Personal fill:#4caf50,stroke:#333,color:#fff,stroke-width:1px,rx:10,ry:10
-    style System fill:#2196F3,stroke:#333,color:#fff,stroke-width:1px,rx:10,ry:10
-    style PersonalManaged fill:#4caf50,stroke:#333,color:#fff,stroke-width:1px,rx:10,ry:10
-    style SystemManaged fill:#2196F3,stroke:#333,color:#fff,stroke-width:1px,rx:10,ry:10
-    style PersonalDest fill:#f9f9f9,stroke:#444,color:#333,stroke-width:1px,rx:10,ry:10
-    style SystemDest fill:#f9f9f9,stroke:#444,color:#333,stroke-width:1px,rx:10,ry:10
+    %% Style definitions
+    classDef alert fill:#ffeb3b,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+    classDef neutral fill:#f9f9f9,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+    classDef complete fill:#4caf50,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+    classDef database fill:#2196F3,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+
+    %% Apply styles
+    class ServiceLevel alert
+    class Personal,PersonalManaged complete
+    class System,SystemManaged database
+    class PersonalDest,SystemDest neutral
 ```
 
 ### Service Classification
 
 ```mermaid
-%%{init: {'theme': 'dark', 'themeVariables': { 'primaryColor': '#2b2b2b', 'primaryTextColor': '#fff', 'primaryBorderColor': '#7C0000', 'lineColor': '#F8B229', 'secondaryColor': '#006100', 'tertiaryColor': '#333'}}}%%
 flowchart LR
-    Classification[Service Classification] --> Community[Community]
-    Classification --> Business[Business]
+    Classification("Service Classification") --> Community("Community")
+    Classification --> Business("Business")
     
-    Community --> CommunityType[Basic Methods]
-    Business --> BusinessType[Advanced Methods]
+    Community --> CommunityType("Basic Methods")
+    Business --> BusinessType("Advanced Methods")
     
-    CommunityType --> CommunityMethods[e.g. Email & Discord]
-    BusinessType --> BusinessMethods[e.g. PagerDuty & Slack]
+    CommunityType --> CommunityMethods("e.g. Email & Discord")
+    BusinessType --> BusinessMethods("e.g. PagerDuty & Slack")
     
-    style Classification fill:#ffeb3b,stroke:#555,color:#333,stroke-width:2px,rx:10,ry:10
-    style Community fill:#4caf50,stroke:#333,color:#fff,stroke-width:1px,rx:10,ry:10
-    style Business fill:#2196F3,stroke:#333,color:#fff,stroke-width:1px,rx:10,ry:10
-    style CommunityType fill:#4caf50,stroke:#333,color:#fff,stroke-width:1px,rx:10,ry:10
-    style BusinessType fill:#2196F3,stroke:#333,color:#fff,stroke-width:1px,rx:10,ry:10
-    style CommunityMethods fill:#f9f9f9,stroke:#444,color:#333,stroke-width:1px,rx:10,ry:10
-    style BusinessMethods fill:#f9f9f9,stroke:#444,color:#333,stroke-width:1px,rx:10,ry:10
+    %% Style definitions
+    classDef alert fill:#ffeb3b,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+    classDef neutral fill:#f9f9f9,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+    classDef complete fill:#4caf50,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+    classDef database fill:#2196F3,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+
+    %% Apply styles
+    class Classification alert
+    class Community,CommunityType complete
+    class Business,BusinessType database
+    class CommunityMethods,BusinessMethods neutral
 ```
 
 ## Alert Notification Silencing Rules
@@ -95,43 +101,24 @@ You can turn off all notifications for a user at the space or war room level at 
 ## Anatomy of an Email Alert Notification
 
 ```mermaid
-%%{init: {'theme': 'dark', 'themeVariables': { 'primaryColor': '#2b2b2b', 'primaryTextColor': '#fff', 'primaryBorderColor': '#7C0000', 'lineColor': '#F8B229', 'secondaryColor': '#006100', 'tertiaryColor': '#333'}}}%%
 flowchart TD
-   Alert[Alert Triggered] --> Email{Generate Email}
-   style Alert fill:#f44336,stroke:#333,color:#fff,stroke-width:1px,rx:10,ry:10
-   style Email fill:#2196F3,stroke:#333,color:#fff,stroke-width:1px,rx:10,ry:10
+   Alert("Alert Triggered") --> Email("Generate Email")
    
-   Email --> Space[Space Name]
-   Email --> Node[Node Name]
-   Email --> Status[Alert Status]
-   Email --> Previous[Previous Status]
+   Email --> BasicInfo("Basic Info<br/>Space, Node, Status")
+   Email --> AlertDetails("Alert Details<br/>Name, Value, Threshold")
+   Email --> Technical("Technical Info<br/>Context, Calculation, Source")
+   Email --> Action("Action Link<br/>Dashboard Access")
    
-   Email --> Time[Trigger Time]
-   Email --> Context[Chart Context]
-   Email --> AlertInfo[Alert Name & Info]
-   Email --> Value[Alert Value]
-   
-   Email --> Count[Total Alerts Count]
-   Email --> Threshold[Trigger Threshold]
-   Email --> Calculation[Calculation Method]
-   Email --> Source[Alert Source File]
-   Email --> Link[Dashboard Link]
-   
-   style Space fill:#f9f9f9,stroke:#444,color:#333,stroke-width:1px,rx:10,ry:10
-   style Node fill:#f9f9f9,stroke:#444,color:#333,stroke-width:1px,rx:10,ry:10
-   style Status fill:#f9f9f9,stroke:#444,color:#333,stroke-width:1px,rx:10,ry:10
-   style Previous fill:#f9f9f9,stroke:#444,color:#333,stroke-width:1px,rx:10,ry:10
-   
-   style Time fill:#4caf50,stroke:#333,color:#fff,stroke-width:1px,rx:10,ry:10
-   style Context fill:#4caf50,stroke:#333,color:#fff,stroke-width:1px,rx:10,ry:10
-   style AlertInfo fill:#4caf50,stroke:#333,color:#fff,stroke-width:1px,rx:10,ry:10
-   style Value fill:#4caf50,stroke:#333,color:#fff,stroke-width:1px,rx:10,ry:10
-   
-   style Count fill:#ffeb3b,stroke:#555,color:#333,stroke-width:1px,rx:10,ry:10
-   style Threshold fill:#ffeb3b,stroke:#555,color:#333,stroke-width:1px,rx:10,ry:10
-   style Calculation fill:#ffeb3b,stroke:#555,color:#333,stroke-width:1px,rx:10,ry:10
-   style Source fill:#ffeb3b,stroke:#555,color:#333,stroke-width:1px,rx:10,ry:10
-   style Link fill:#ffeb3b,stroke:#555,color:#333,stroke-width:1px,rx:10,ry:10
+   %% Style definitions
+   classDef alert fill:#ffeb3b,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+   classDef neutral fill:#f9f9f9,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+   classDef complete fill:#4caf50,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+   classDef database fill:#2196F3,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+
+   %% Apply styles
+   class Alert alert
+   class Email database
+   class BasicInfo,AlertDetails,Technical,Action complete
 ```
 
 Email notifications provide comprehensive details to help you understand and respond to alerts effectively.

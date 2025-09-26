@@ -15,7 +15,6 @@ endmeta-->
 
 Integrate your organization's Okta account with Netdata to better manage your team's access controls to Netdata Cloud.
 
-
 <img src="https://img.shields.io/badge/maintained%20by-Netdata-%2300ab44" />
 
 ## Setup

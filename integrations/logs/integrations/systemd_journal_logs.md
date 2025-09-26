@@ -39,7 +39,6 @@ You can start exploring `systemd` journal logs on the "Logs" tab of the Netdata 
 - Supports coloring log entries, the same way `journalctl` does.
 - In PLAY mode provides the same experience as `journalctl -f`, showing new log entries immediately after they are received.
 
-
 ## Setup
 
 ## Prerequisites
