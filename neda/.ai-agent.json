@@ -3,21 +3,27 @@
     "vllm": {
       "type": "openai",
       "apiKey": "vllm",
-      "baseUrl": "http://nova:8083/v1",
-      "openaiMode": "chat"
+      "baseUrl": "http://nova:8345/v1",
+      "openaiMode": "chat",
+      "stringSchemaFormatsAllowed": ["*"],
+      "stringSchemaFormatsDenied": [ "uri" ]
     },
     "llama.cpp": {
       "type": "openai",
       "apiKey": "localkey",
       "baseUrl": "http://nova:8234/v1",
-      "openaiMode": "chat"
+      "openaiMode": "chat",
+      "stringSchemaFormatsAllowed": ["*"],
+      "stringSchemaFormatsDenied": []
     },
     "openai": {
       "apiKey": "${OPENAI_API_KEY}",
       "baseUrl": "https://api.openai.com/v1",
       "headers": {},
       "custom": {},
-      "mergeStrategy": "overlay"
+      "mergeStrategy": "overlay",
+      "stringSchemaFormatsAllowed": ["*"],
+      "stringSchemaFormatsDenied": []
     },
     "anthropic": {
       "apiKey": "${ANTHROPIC_API_KEY}",
@@ -25,6 +31,8 @@
       "headers": {},
       "custom": {},
       "mergeStrategy": "overlay",
+      "stringSchemaFormatsAllowed": ["*"],
+      "stringSchemaFormatsDenied": [],
       "models": {
         "claude-opus-4-1-20250805": {
           "overrides": {
@@ -43,7 +51,9 @@
       "baseUrl": "https://generativelanguage.googleapis.com/v1beta",
       "headers": {},
       "custom": {},
-      "mergeStrategy": "overlay"
+      "mergeStrategy": "overlay",
+      "stringSchemaFormatsAllowed": ["*"],
+      "stringSchemaFormatsDenied": []
     },
     "openrouter": {
       "apiKey": "${OPENROUTER_API_KEY}",
@@ -55,7 +65,9 @@
         }
       },
       "headers": {},
-      "mergeStrategy": "overlay"
+      "mergeStrategy": "overlay",
+      "stringSchemaFormatsAllowed": ["*"],
+      "stringSchemaFormatsDenied": []
     },
     "ollama": {
       "baseUrl": "http://nova:11434/v1",
@@ -76,7 +88,9 @@
           }
         }
       },
-      "headers": {}
+      "headers": {},
+      "stringSchemaFormatsAllowed": ["*"],
+      "stringSchemaFormatsDenied": []
     }
   },
   "restTools": {
@@ -166,7 +180,9 @@
     "file-ops": {
       "type": "stdio",
       "command": "/usr/local/bin/file-mcp-server",
-      "enabled": true
+      "enabled": true,
+      "toolsAllowed": ["*"],
+      "toolsDenied": []
     },
     "brave": {
       "type": "stdio",
@@ -180,7 +196,9 @@
       "env": {
         "BRAVE_API_KEY": "${BRAVE_API_KEY}"
       },
-      "enabled": true
+      "enabled": true,
+      "toolsAllowed": ["*"],
+      "toolsDenied": []
     },
     "jina": {
       "type": "sse",
@@ -188,22 +206,30 @@
       "headers": {
         "Authorization": "Bearer ${JINA_API_KEY}"
       },
-      "enabled": true
+      "enabled": true,
+      "toolsAllowed": ["*"],
+      "toolsDenied": []
     },
     "netdata_costa": {
       "type": "websocket",
       "url": "ws://localhost:19999/mcp?api_key=b1eb964a-ff57-48f1-b87a-15b01702cdc7",
-      "enabled": true
+      "enabled": true,
+      "toolsAllowed": ["*"],
+      "toolsDenied": []
     },
     "netdata_production": {
       "type": "websocket",
       "url": "ws://10.20.1.126:19999/mcp?api_key=1ddcfc20-0f08-4562-a5e5-f016786f1641",
-      "enabled": true
+      "enabled": true,
+      "toolsAllowed": ["*"],
+      "toolsDenied": []
     },
     "netdata_demos": {
       "type": "websocket",
       "url": "ws://10.20.1.96:19999/mcp?api_key=edfa4484-c721-4973-8ff4-58adc360031d",
-      "enabled": true
+      "enabled": true,
+      "toolsAllowed": ["*"],
+      "toolsDenied": []
     },
     "slack": {
       "type": "stdio",
@@ -219,7 +245,9 @@
         "SLACK_MCP_XOXD_TOKEN": "${SLACK_MCP_XOXD_TOKEN}",
         "SLACK_MCP_ADD_MESSAGE_TOOL": "${SLACK_MCP_ADD_MESSAGE_TOOL}"
       },
-      "enabled": true
+      "enabled": true,
+      "toolsAllowed": ["*"],
+      "toolsDenied": []
     },
     "reddit": {
       "type": "stdio",
@@ -232,7 +260,9 @@
         "REDDIT_CLIENT_SECRET": "${REDDIT_CLIENT_SECRET}",
         "REDDIT_USER_AGENT": "${REDDIT_USER_AGENT}"
       },
-      "enabled": true
+      "enabled": true,
+      "toolsAllowed": ["*"],
+      "toolsDenied": []
     },
     "freshdesk": {
       "type": "stdio",
@@ -244,7 +274,9 @@
         "FRESHDESK_API_KEY": "${FRESHDESK_API_KEY}",
         "FRESHDESK_DOMAIN": "${FRESHDESK_DOMAIN}"
       },
-      "enabled": true
+      "enabled": true,
+      "toolsAllowed": ["*"],
+      "toolsDenied": []
     },
     "github": {
       "type": "stdio",
@@ -256,7 +288,9 @@
       "env": {
         "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_PERSONAL_ACCESS_TOKEN}"
       },
-      "enabled": true
+      "enabled": true,
+      "toolsAllowed": ["*"],
+      "toolsDenied": []
     },
     "context7": {
       "type": "http",
@@ -264,7 +298,9 @@
       "headers": {
         "CONTEXT7_API_KEY": "${CONTEXT7_API_KEY}"
       },
-      "enabled": true
+      "enabled": true,
+      "toolsAllowed": ["*"],
+      "toolsDenied": []
     },
     "playwright": {
       "type": "stdio",
@@ -274,7 +310,9 @@
         "playwright-mcp"
       ],
       "env": {},
-      "enabled": true
+      "enabled": true,
+      "toolsAllowed": ["*"],
+      "toolsDenied": []
     },
     "hubspot": {
       "type": "stdio",
@@ -286,7 +324,9 @@
       "env": {
         "PRIVATE_APP_ACCESS_TOKEN": "${PRIVATE_APP_ACCESS_TOKEN}"
       },
-      "enabled": true
+      "enabled": true,
+      "toolsAllowed": ["*"],
+      "toolsDenied": []
     },
     "fireflies": {
       "type": "http",
@@ -294,7 +334,9 @@
       "headers": {
         "Authorization": "Bearer ${FIREFLIES_API_KEY}"
       },
-      "enabled": true
+      "enabled": true,
+      "toolsAllowed": ["*"],
+      "toolsDenied": []
     },
     "bigquery": {
       "type": "stdio",
@@ -308,7 +350,9 @@
         "GOOGLE_APPLICATION_CREDENTIALS": "${BIGQUERY_CREDENTIALS}",
         "BIGQUERY_PROJECT": "${BIGQUERY_PROJECT}"
       },
-      "enabled": true
+      "enabled": true,
+      "toolsAllowed": ["*"],
+      "toolsDenied": []
     },
     "posthog": {
       "type": "http",
@@ -316,7 +360,9 @@
       "headers": {
         "Authorization": "Bearer ${POSTHOG_API_KEY}"
       },
-      "enabled": true
+      "enabled": true,
+      "toolsAllowed": ["*"],
+      "toolsDenied": []
     },
     "stripe": {
       "type": "http",
@@ -324,7 +370,9 @@
       "headers": {
         "Authorization": "Bearer ${STRIPE_SECRET_KEY}"
       },
-      "enabled": true
+      "enabled": true,
+      "toolsAllowed": ["*"],
+      "toolsDenied": []
     },
     "sequential-thinking": {
       "type": "stdio",
@@ -333,7 +381,9 @@
         "-y",
         "@modelcontextprotocol/server-sequential-thinking"
       ],
-      "enabled": true
+      "enabled": true,
+      "toolsAllowed": ["*"],
+      "toolsDenied": []
     },
     "clear-thought": {
       "type": "stdio",
@@ -348,7 +398,9 @@
         "--profile",
         "cool-locust-uy2Zhe"
       ],
-      "enabled": true
+      "enabled": true,
+      "toolsAllowed": ["*"],
+      "toolsDenied": []
     },
     "fetcher": {
       "type": "stdio",
@@ -357,7 +409,9 @@
         "-y",
         "fetcher-mcp"
       ],
-      "enabled": true
+      "enabled": true,
+      "toolsAllowed": ["*"],
+      "toolsDenied": []
     },
     "filesystem_repos": {
       "type": "stdio",
@@ -366,7 +420,9 @@
         "/opt/ai-agent/mcp/fs/fs-mcp-server.js",
         "${NETDATA_REPOS_DIR}"
       ],
-      "enabled": true
+      "enabled": true,
+      "toolsAllowed": ["*"],
+      "toolsDenied": []
     },
     "filesystem_cwd": {
       "type": "stdio",
@@ -375,7 +431,9 @@
         "/opt/ai-agent/mcp/fs/fs-mcp-server.js",
         "${MCP_ROOT}"
       ],
-      "enabled": true
+      "enabled": true,
+      "toolsAllowed": ["*"],
+      "toolsDenied": []
     },
     "gsc1": {
       "type": "stdio",
@@ -387,7 +445,9 @@
         "GSC_CREDENTIALS_PATH": "${GSC_CREDENTIALS}",
         "GSC_SKIP_OAUTH": "true"
       },
-      "enabled": true
+      "enabled": true,
+      "toolsAllowed": ["*"],
+      "toolsDenied": []
     },
     "gsc2": {
       "type": "stdio",
@@ -396,7 +456,9 @@
       "env": {
         "GOOGLE_APPLICATION_CREDENTIALS": "${GSC_CREDENTIALS}"
       },
-      "enabled": true
+      "enabled": true,
+      "toolsAllowed": ["*"],
+      "toolsDenied": []
     },
     "analytics-mcp": {
       "type": "stdio",
@@ -409,7 +471,9 @@
         "GOOGLE_APPLICATION_CREDENTIALS": "${GA_CREDENTIALS}",
         "GOOGLE_PROJECT_ID": "${GA_PROJECT_ID}"
       },
-      "enabled": true
+      "enabled": true,
+      "toolsAllowed": ["*"],
+      "toolsDenied": []
     },
     "cloudflare-browser": {
       "type": "sse",
@@ -417,7 +481,9 @@
       "headers": {
         "Authorization": "Bearer ${CLOUDFLARE_API_KEY}"
       },
-      "enabled": true
+      "enabled": true,
+      "toolsAllowed": ["*"],
+      "toolsDenied": []
     },
     "cloudflare-radar": {
       "type": "sse",
@@ -425,7 +491,9 @@
       "headers": {
         "Authorization": "Bearer ${CLOUDFLARE_API_KEY}"
       },
-      "enabled": true
+      "enabled": true,
+      "toolsAllowed": ["*"],
+      "toolsDenied": []
     },
     "cloudflare-graphql": {
       "type": "sse",
@@ -433,7 +501,9 @@
       "headers": {
         "Authorization": "Bearer ${CLOUDFLARE_API_KEY}"
       },
-      "enabled": true
+      "enabled": true,
+      "toolsAllowed": ["*"],
+      "toolsDenied": []
     }
   },
   "slack": {

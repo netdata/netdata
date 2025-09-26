@@ -8,7 +8,7 @@ import Ajv from 'ajv';
 
 import type { OutputFormatId } from './formats.js';
 import type { SessionNode } from './session-tree.js';
-import type { AIAgentSessionConfig, AIAgentResult, ConversationMessage, LogEntry, AccountingEntry, Configuration, TurnRequest, LLMAccountingEntry, ToolAccountingEntry, RestToolConfig } from './types.js';
+import type { AIAgentSessionConfig, AIAgentResult, ConversationMessage, LogEntry, AccountingEntry, Configuration, TurnRequest, LLMAccountingEntry, MCPTool, ToolAccountingEntry, RestToolConfig } from './types.js';
 
 // Exit codes according to DESIGN.md
 type ExitCode = 
@@ -41,6 +41,9 @@ type ExitCode =
   | 'EXIT-SIGNAL-RECEIVED'
   | 'EXIT-UNKNOWN';
 
+interface ToolPatternEntry { raw: string; normalized: string }
+interface ToolPatternSet { entries: ToolPatternEntry[]; wildcard: boolean; empty: boolean }
+
 // empty line between import groups enforced by linter
 import { validateProviders, validateMCPServers, validatePrompts } from './config.js';
 import { parseFrontmatter, parsePairs, extractBodyWithoutFrontmatter } from './frontmatter.js';
@@ -60,6 +63,9 @@ export class AIAgentSession {
   // Log identifiers (avoid duplicate string literals)
   private static readonly REMOTE_CONC_SLOT = 'agent:concurrency-slot';
   private static readonly REMOTE_CONC_HINT = 'agent:concurrency-hint';
+  private static readonly REMOTE_AGENT_TOOLS = 'agent:tools';
+  private static readonly FINAL_REPORT_TOOL = 'agent__final_report';
+  private static readonly FINAL_REPORT_SHORT = 'final_report';
   readonly config: Configuration;
   readonly conversation: ConversationMessage[];
   readonly logs: LogEntry[];
@@ -733,7 +739,7 @@ export class AIAgentSession {
           subturn: 0,
           direction: 'response',
           type: 'llm',
-          remoteIdentifier: 'agent:tools',
+          remoteIdentifier: AIAgentSession.REMOTE_AGENT_TOOLS,
           fatal: false,
           message: `tools: mcp=${String(mcpToolNames.length)} [${mcpToolNames.join(', ')}]; rest=${String(restToolNames.length)} [${restToolNames.join(', ')}]; subagents=${String(subAgentTools.length)} [${subAgentTools.join(', ')}]`
         };
@@ -1029,7 +1035,7 @@ export class AIAgentSession {
             if ((attempts === maxRetries - 1) && currentTurn < (maxTurns - 1)) {
               attemptConversation.push({
                 role: 'user',
-                content: 'Reminder: do not end with plain text. Use an available tool (excluding `agent__progress_report`) to make progress. When ready to conclude, call the tool `agent__final_report` to provide the final answer.'
+                content: `Reminder: do not end with plain text. Use an available tool (excluding \`agent__progress_report\`) to make progress. When ready to conclude, call the tool \`${AIAgentSession.FINAL_REPORT_TOOL}\` to provide the final answer.`
               });
             }
             // Do not inject final-turn user message here to avoid duplication.
@@ -1046,7 +1052,7 @@ export class AIAgentSession {
                 type: 'llm',
                 remoteIdentifier: 'agent:final-turn',
                 fatal: false,
-                message: 'Final turn detected: restricting tools to `agent__final_report` and injecting finalization instruction.'
+                message: `Final turn detected: restricting tools to \`${AIAgentSession.FINAL_REPORT_TOOL}\` and injecting finalization instruction.`
               };
               this.log(warn);
               finalTurnWarnLogged = true;
@@ -1082,7 +1088,7 @@ export class AIAgentSession {
             try {
               // Consider only internal tool set as always known
               // Internal tools always available; include optional batch tool if enabled for this session
-              const internal = new Set<string>(['agent__progress_report', 'agent__final_report']);
+        const internal = new Set<string>(['agent__progress_report', AIAgentSession.FINAL_REPORT_TOOL]);
               if (this.sessionConfig.tools.includes('batch')) internal.add('agent__batch');
               const normalizeTool = (n: string) => n.replace(/^<\|[^|]+\|>/, '').trim();
               const lastAssistant = turnResult.messages.filter((m) => m.role === 'assistant');
@@ -1261,7 +1267,7 @@ export class AIAgentSession {
           }
 
           // Log successful exit
-        this.logExit('EXIT-FINAL-ANSWER', 'Final report received (agent__final_report), session complete', currentTurn);
+        this.logExit('EXIT-FINAL-ANSWER', `Final report received (${AIAgentSession.FINAL_REPORT_TOOL}), session complete`, currentTurn);
 
           // Emit FIN summary log entry
           this.emitFinalSummary(logs, accounting);
@@ -1324,7 +1330,7 @@ export class AIAgentSession {
                   const count = toolCalls.reduce((acc, tc) => {
                     const name = (typeof tc.name === 'string' ? tc.name : '').trim();
                     if (name.length === 0) return acc;
-                    if (name === 'agent__progress_report' || name === 'agent__final_report' || name === 'agent__batch') return acc;
+                    if (name === 'agent__progress_report' || name === AIAgentSession.FINAL_REPORT_TOOL || name === 'agent__batch') return acc;
                     // Count only known tools (non-internal) present in orchestrator
                     const isKnown = this.toolsOrchestrator?.hasTool(name) ?? false;
                     return isKnown ? acc + 1 : acc;
@@ -1643,9 +1649,13 @@ export class AIAgentSession {
   ) {
     // no spans; opTree is canonical
     // Expose provider tools (which includes internal tools from InternalToolProvider)
-    const availableTools = [
+    const allTools = [
       ...(this.toolsOrchestrator?.listTools() ?? [])
     ];
+
+    const filteredTools = this.filterToolsForProvider(allTools, provider, currentTurn);
+    const availableTools = filteredTools.tools;
+    const allowedToolNames = filteredTools.allowedNames;
 
     
     // Track if we've shown thinking for this turn
@@ -1661,7 +1671,7 @@ export class AIAgentSession {
       // Advance subturn for each tool call within this turn
       subturnCounter += 1;
       if (subturnCounter > maxToolCallsPerTurn) {
-        const msg = `Tool calls per turn exceeded: limit=${String(maxToolCallsPerTurn)}. Switch strategy: avoid further tool calls this turn; either summarize progress or call agent__final_report to conclude.`;
+        const msg = `Tool calls per turn exceeded: limit=${String(maxToolCallsPerTurn)}. Switch strategy: avoid further tool calls this turn; either summarize progress or call ${AIAgentSession.FINAL_REPORT_TOOL} to conclude.`;
         const warn: LogEntry = { timestamp: Date.now(), severity: 'WRN', turn: currentTurn, subturn: subturnCounter, direction: 'response', type: 'tool', remoteIdentifier: 'agent:limits', fatal: false, message: msg };
         this.log(warn);
         throw new Error('tool_calls_per_turn_limit_exceeded');
@@ -1674,6 +1684,21 @@ export class AIAgentSession {
       const effectiveToolName = sanitizeToolName(toolName);
       const startTime = Date.now();
       try {
+        if (!allowedToolNames.has(effectiveToolName)) {
+      const blocked: LogEntry = {
+        timestamp: Date.now(),
+        severity: 'WRN',
+        turn: currentTurn,
+        subturn: subturnCounter,
+        direction: 'response',
+        type: 'tool',
+        remoteIdentifier: AIAgentSession.REMOTE_AGENT_TOOLS,
+        fatal: false,
+        message: `Tool '${effectiveToolName}' is not permitted for provider '${provider}'`
+      };
+          this.log(blocked);
+          throw new Error('tool_not_permitted');
+        }
         // Internal tools are handled by InternalToolProvider via orchestrator
 
         // Sub-agent execution is handled by the orchestrator (AgentProvider)
@@ -1723,7 +1748,7 @@ export class AIAgentSession {
         try { this.sessionConfig.callbacks?.onAccounting?.(accountingEntry); } catch (e) { warn(`tool accounting callback failed: ${e instanceof Error ? e.message : String(e)}`); }
 
         // Check if this is an incomplete final_report error
-        if (toolName === 'agent__final_report') {
+        if (toolName === AIAgentSession.FINAL_REPORT_TOOL) {
           incompleteFinalReportDetected = true;
         }
 
@@ -1800,6 +1825,149 @@ export class AIAgentSession {
     }
   }
 
+  private filterToolsForProvider(tools: MCPTool[], provider: string, currentTurn: number): { tools: MCPTool[]; allowedNames: Set<string> } {
+    const providerConfig = this.sessionConfig.config.providers[provider];
+    const allowedRaw = Array.isArray(providerConfig.toolsAllowed) ? providerConfig.toolsAllowed : ['*'];
+    const deniedRaw = Array.isArray(providerConfig.toolsDenied) ? providerConfig.toolsDenied : [];
+
+    const allowedPatterns = this.normalizeToolPatterns(allowedRaw);
+    const deniedPatterns = this.normalizeToolPatterns(deniedRaw);
+    const verbose = this.sessionConfig.verbose === true;
+
+    const filtered: MCPTool[] = [];
+    const allowedNames = new Set<string>();
+    const filteredOut: { name: string; reason: string }[] = [];
+
+    const FINAL_TOOL_NAME = AIAgentSession.FINAL_REPORT_TOOL;
+    const FINAL_SHORT_NAME = AIAgentSession.FINAL_REPORT_SHORT;
+
+    tools.forEach((tool) => {
+      const sanitizedFull = sanitizeToolName(tool.name);
+      if (sanitizedFull === FINAL_TOOL_NAME) {
+        filtered.push(tool);
+        allowedNames.add(FINAL_TOOL_NAME);
+        return;
+      }
+
+      const fullLower = sanitizedFull.toLowerCase();
+      const shortLower = sanitizedFull.includes('__')
+        ? sanitizedFull.slice(sanitizedFull.lastIndexOf('__') + 2).toLowerCase()
+        : fullLower;
+
+      const allowMatch = this.matchesToolPattern(allowedPatterns, fullLower, shortLower);
+      const denyMatch = this.matchesToolPattern(deniedPatterns, fullLower, shortLower);
+
+      const isAllowed = allowedPatterns.empty ? false : allowMatch.matched;
+      const isDenied = denyMatch.matched;
+
+      if (isAllowed && !isDenied) {
+        filtered.push(tool);
+        allowedNames.add(sanitizedFull);
+      } else {
+        const reason = isDenied
+          ? `denied by '${denyMatch.pattern ?? '*'}'`
+          : (allowedPatterns.empty ? 'no allowed tools configured' : 'not allowed by allow list');
+        filteredOut.push({ name: sanitizedFull, reason });
+      }
+    });
+
+    const finalPolicyDenied = this.matchesToolPattern(deniedPatterns, FINAL_TOOL_NAME, FINAL_SHORT_NAME).matched;
+    const finalPolicyAllowed = allowedPatterns.empty
+      ? false
+      : (allowedPatterns.wildcard || this.matchesToolPattern(allowedPatterns, FINAL_TOOL_NAME, FINAL_SHORT_NAME).matched);
+
+    if (!allowedNames.has(FINAL_TOOL_NAME)) {
+      const fallback = tools.find((tool) => sanitizeToolName(tool.name) === FINAL_TOOL_NAME);
+      if (fallback !== undefined) {
+        filtered.push(fallback);
+        allowedNames.add(FINAL_TOOL_NAME);
+        if (verbose) {
+          const msg = `Tool "${AIAgentSession.FINAL_REPORT_TOOL}" forced allowed (final report tool is mandatory)`;
+          this.log({
+            timestamp: Date.now(),
+            severity: 'VRB',
+            turn: currentTurn,
+            subturn: 0,
+            direction: 'response',
+            type: 'tool',
+            remoteIdentifier: AIAgentSession.REMOTE_AGENT_TOOLS,
+            fatal: false,
+            message: msg
+          });
+        }
+      }
+    } else if (verbose && (finalPolicyDenied || (!finalPolicyAllowed && !allowedPatterns.wildcard))) {
+      const msg = finalPolicyDenied
+        ? `Ignoring denial for tool "${AIAgentSession.FINAL_REPORT_TOOL}" (final report tool is mandatory)`
+        : `Tool "${AIAgentSession.FINAL_REPORT_TOOL}" implicitly allowed despite allow list (final report tool is mandatory)`;
+      this.log({
+        timestamp: Date.now(),
+        severity: 'VRB',
+        turn: currentTurn,
+        subturn: 0,
+        direction: 'response',
+        type: 'tool',
+        remoteIdentifier: AIAgentSession.REMOTE_AGENT_TOOLS,
+        fatal: false,
+        message: msg
+      });
+    }
+
+    if (verbose) {
+      filteredOut.forEach((item) => {
+        this.log({
+          timestamp: Date.now(),
+          severity: 'VRB',
+          turn: currentTurn,
+          subturn: 0,
+          direction: 'response',
+          type: 'tool',
+          remoteIdentifier: AIAgentSession.REMOTE_AGENT_TOOLS,
+          fatal: false,
+          message: `Filtered tool '${item.name}' (${item.reason})`
+        });
+      });
+    }
+
+    return { tools: filtered, allowedNames };
+  }
+
+  private normalizeToolPatterns(patterns: string[]): ToolPatternSet {
+    const trimmed = patterns
+      .map((p) => (typeof p === 'string' ? p.trim() : ''))
+      .filter((p) => p.length > 0);
+
+    if (trimmed.length === 0) return { entries: [], wildcard: false, empty: true };
+
+    let wildcard = false;
+    const entries: ToolPatternEntry[] = [];
+    const seen = new Set<string>();
+
+    trimmed.forEach((raw) => {
+      const lower = raw.toLowerCase();
+      if (lower === '*' || lower === 'any') {
+        wildcard = true;
+        return;
+      }
+      const normalized = sanitizeToolName(raw).toLowerCase();
+      if (normalized.length === 0) return;
+      if (seen.has(normalized)) return;
+      seen.add(normalized);
+      entries.push({ raw, normalized });
+    });
+
+    return { entries, wildcard, empty: false };
+  }
+
+  private matchesToolPattern(patterns: ToolPatternSet, full: string, short: string): { matched: boolean; pattern?: string } {
+    if (patterns.empty) return { matched: false };
+    if (patterns.wildcard) return { matched: true, pattern: '*' };
+    const targetFull = full.toLowerCase();
+    const targetShort = short.toLowerCase();
+    const match = patterns.entries.find((entry) => entry.normalized === targetFull || entry.normalized === targetShort);
+    return match === undefined ? { matched: false } : { matched: true, pattern: match.raw };
+  }
+
   private enhanceSystemPrompt(systemPrompt: string, toolsInstructions: string): string {
     const blocks: string[] = [systemPrompt];
     if (toolsInstructions.trim().length > 0) blocks.push(`## TOOLS' INSTRUCTIONS\n\n${toolsInstructions}`);
@@ -1866,7 +2034,7 @@ export class AIAgentSession {
     const results = await Promise.all(bi.calls.map(async (c) => {
       const t0 = Date.now();
       // Allow progress_report in batch, but not final_report or nested batch
-      if (c.tool === 'agent__final_report' || c.tool === 'agent__batch') {
+      if (c.tool === AIAgentSession.FINAL_REPORT_TOOL || c.tool === 'agent__batch') {
         return { id: c.id, tool: c.tool, ok: false, elapsedMs: 0, error: { code: 'INTERNAL_NOT_ALLOWED', message: 'Internal tools are not allowed in batch' } };
       }
       // Handle progress_report directly in batch

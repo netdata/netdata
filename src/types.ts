@@ -119,6 +119,8 @@ export interface MCPServerConfig {
   env?: Record<string, string>;
   enabled?: boolean;
   toolSchemas?: Record<string, unknown>;
+  toolsAllowed?: string[];
+  toolsDenied?: string[];
 }
 
 export interface MCPTool {
@@ -155,6 +157,10 @@ export interface ProviderConfig {
   type?: 'openai' | 'anthropic' | 'google' | 'openrouter' | 'ollama';
   openaiMode?: 'responses' | 'chat';
   models?: Record<string, ProviderModelConfig>;
+  toolsAllowed?: string[];
+  toolsDenied?: string[];
+  stringSchemaFormatsAllowed?: string[];
+  stringSchemaFormatsDenied?: string[];
 }
 
 export interface Configuration {

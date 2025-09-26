@@ -11,7 +11,7 @@ export class OpenRouterProvider extends BaseLLMProvider {
   private config: ProviderConfig;
 
   constructor(config: ProviderConfig, tracedFetch?: typeof fetch) {
-    super();
+    super({ formatPolicy: { allowed: config.stringSchemaFormatsAllowed, denied: config.stringSchemaFormatsDenied } });
     this.config = config;
     const prov = createOpenRouter({
       apiKey: config.apiKey,

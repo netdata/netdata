@@ -25,6 +25,10 @@ const ProviderConfigSchema = z.object({
   type: z.enum(['openai','anthropic','google','openrouter','ollama']).optional(),
   openaiMode: z.enum(['responses','chat']).optional(),
   models: z.record(z.string(), ProviderModelConfigSchema).optional(),
+  toolsAllowed: z.array(z.string()).optional(),
+  toolsDenied: z.array(z.string()).optional(),
+  stringSchemaFormatsAllowed: z.array(z.string()).optional(),
+  stringSchemaFormatsDenied: z.array(z.string()).optional(),
 });
 
 const MCPServerConfigSchema = z.object({
@@ -36,6 +40,8 @@ const MCPServerConfigSchema = z.object({
   env: z.record(z.string(), z.string()).optional(),
   enabled: z.boolean().optional(),
   toolSchemas: z.record(z.string(), z.unknown()).optional(),
+  toolsAllowed: z.array(z.string()).optional(),
+  toolsDenied: z.array(z.string()).optional(),
 });
 
 const EngageEnum = z.enum(['mentions','channel-posts','dms']);

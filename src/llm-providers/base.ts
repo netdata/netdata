@@ -6,12 +6,36 @@ import type { LanguageModel, ModelMessage, StreamTextResult, ToolSet } from 'ai'
 
 import { clampToolName, sanitizeToolName, TOOL_NAME_MAX_LENGTH, warn } from '../utils.js';
 
+const GUIDANCE_STRING_FORMATS = ['date-time', 'time', 'date', 'duration', 'email', 'hostname', 'ipv4', 'ipv6', 'uuid'] as const;
+
 interface LLMProviderInterface {
   name: string;
   executeTurn: (request: TurnRequest) => Promise<TurnResult>;
 }
 
+interface FormatList {
+  tokens: Set<string>;
+  wildcard: boolean;
+  empty: boolean;
+}
+
+interface FormatPolicyNormalized {
+  allowed: FormatList;
+  denied: FormatList;
+}
+
+interface FormatPolicyInput {
+  allowed?: string[];
+  denied?: string[];
+}
+
 export abstract class BaseLLMProvider implements LLMProviderInterface {
+  private readonly stringFormatPolicy: FormatPolicyNormalized;
+
+  protected constructor(options?: { formatPolicy?: FormatPolicyInput }) {
+    this.stringFormatPolicy = this.normalizeFormatPolicy(options?.formatPolicy);
+  }
+
   abstract name: string;
   abstract executeTurn(request: TurnRequest): Promise<TurnResult>;
 
@@ -352,7 +376,7 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
         tool.name,
         {
           description: tool.description,
-          inputSchema: jsonSchema(tool.inputSchema),
+          inputSchema: jsonSchema(this.sanitizeStringFormatsInSchema(tool.inputSchema)),
           execute: async (args: unknown, opt?: { toolCallId?: string }) => {
             const parameters = args as Record<string, unknown>;
             return await toolExecutor(tool.name, parameters, { toolCallId: opt?.toolCallId });
@@ -400,6 +424,92 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
     }
 
     return response;
+  }
+
+  private normalizeFormatPolicy(policy?: FormatPolicyInput): FormatPolicyNormalized {
+    const allowedRaw = Array.isArray(policy?.allowed) ? policy.allowed : ['*'];
+    const deniedRaw = Array.isArray(policy?.denied) ? policy.denied : [];
+    return {
+      allowed: this.normalizeFormatList(allowedRaw),
+      denied: this.normalizeFormatList(deniedRaw)
+    };
+  }
+
+  private normalizeFormatList(values: string[]): FormatList {
+    const expanded: string[] = [];
+    values.forEach((raw) => {
+      if (typeof raw !== 'string') return;
+      const trimmed = raw.trim();
+      if (trimmed.length === 0) return;
+      if (trimmed.toLowerCase() === 'guidance') {
+        GUIDANCE_STRING_FORMATS.forEach((fmt) => { expanded.push(fmt); });
+      } else {
+        expanded.push(trimmed);
+      }
+    });
+
+    if (expanded.length === 0) return { tokens: new Set<string>(), wildcard: false, empty: true };
+
+    let wildcard = false;
+    const tokens = new Set<string>();
+
+    expanded.forEach((value) => {
+      const lower = value.toLowerCase();
+      if (lower === '*' || lower === 'any') {
+        wildcard = true;
+        return;
+      }
+      tokens.add(lower);
+    });
+
+    return { tokens, wildcard, empty: false };
+  }
+
+  private sanitizeStringFormatsInSchema(schema: Record<string, unknown>): Record<string, unknown> {
+    return this.sanitizeSchemaNode(schema) as Record<string, unknown>;
+  }
+
+  private sanitizeSchemaNode(node: unknown): unknown {
+    if (Array.isArray(node)) {
+      return node.map((item) => this.sanitizeSchemaNode(item));
+    }
+    if (node !== null && typeof node === 'object') {
+      const obj = node as Record<string, unknown>;
+      const out: Record<string, unknown> = {};
+      Object.entries(obj).forEach(([key, value]) => {
+        out[key] = this.sanitizeSchemaNode(value);
+      });
+      if (typeof out.format === 'string' && this.shouldStripStringFormat(out.type, out.format)) {
+        delete out.format;
+      }
+      return out;
+    }
+    return node;
+  }
+
+  private shouldStripStringFormat(typeValue: unknown, formatValue: string): boolean {
+    const normalizedFormat = formatValue.trim().toLowerCase();
+    if (normalizedFormat.length === 0) return false;
+    if (!this.schemaTypeIncludesString(typeValue)) return false;
+
+    const allowed = this.stringFormatPolicy.allowed;
+    const denied = this.stringFormatPolicy.denied;
+
+    const isAllowed = allowed.empty ? false : (allowed.wildcard || allowed.tokens.has(normalizedFormat));
+    const isDenied = denied.empty ? false : (denied.wildcard || denied.tokens.has(normalizedFormat));
+
+    if (!isAllowed) return true;
+    if (isDenied) return true;
+    return false;
+  }
+
+  private schemaTypeIncludesString(typeValue: unknown): boolean {
+    if (typeValue === undefined) return true;
+    if (typeof typeValue === 'string') return typeValue === 'string';
+    if (Array.isArray(typeValue)) {
+      return typeValue.some((entry) => typeof entry === 'string' && entry === 'string');
+    }
+    return false;
   }
 
   protected async executeStreamingTurn(
