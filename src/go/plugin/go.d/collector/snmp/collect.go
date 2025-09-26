@@ -96,29 +96,35 @@ func (c *Collector) ensureInitialized() error {
 		}
 	}
 
-	if c.sysInfo == nil {
-		si, err := snmputils.GetSysInfo(c.snmpClient)
+	if c.sysInfo != nil {
+		return nil
+	}
+
+	si, err := snmputils.GetSysInfo(c.snmpClient)
+	if err != nil {
+		return err
+	}
+
+	if c.enableProfiles {
+		c.snmpProfiles = c.setupProfiles(si)
+	}
+
+	if c.ddSnmpColl == nil {
+		c.ddSnmpColl = ddsnmpcollector.New(c.snmpClient, c.snmpProfiles, c.Logger, si.SysObjectID)
+	}
+
+	if c.CreateVnode {
+		deviceMeta, err := c.ddSnmpColl.CollectDeviceMetadata()
 		if err != nil {
 			return err
 		}
+		c.vnode = c.setupVnode(si, deviceMeta)
+	}
 
-		if c.enableProfiles {
-			c.snmpProfiles = c.setupProfiles(si)
-		}
+	c.sysInfo = si
 
-		if c.ddSnmpColl == nil {
-			c.ddSnmpColl = ddsnmpcollector.New(c.snmpClient, c.snmpProfiles, c.Logger, si.SysObjectID)
-		}
-
-		if c.CreateVnode {
-			deviceMeta, err := c.ddSnmpColl.CollectDeviceMetadata()
-			if err != nil {
-				return err
-			}
-			c.vnode = c.setupVnode(si, deviceMeta)
-		}
-
-		c.sysInfo = si
+	if c.Ping.Enabled {
+		c.addPingCharts()
 	}
 
 	return nil

@@ -131,7 +131,6 @@ func (c *Collector) Init(context.Context) error {
 			return fmt.Errorf("failed to initialize ping prober: %v", err)
 		}
 		c.prober = pr
-		c.addPingCharts()
 	}
 
 	c.customOids = c.initCustomOIDs()
