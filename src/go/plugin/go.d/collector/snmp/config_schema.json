@@ -459,6 +459,14 @@
         "ui:widget": "password"
       }
     },
+    "ping": {
+      "interface": {
+        "ui:widget": "hidden"
+      },
+      "network": {
+        "ui:widget": "hidden"
+      }
+    },
     "charts": {
       "items": {
         "ui:collapsible": true,
