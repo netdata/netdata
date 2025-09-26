@@ -188,12 +188,6 @@
           }
         }
       },
-      "disable_legacy_collection": {
-        "title": "Disable Legacy SNMP Collection",
-        "description": "Disable the legacy SNMP collection method, forcing the collector to use only SNMP profiles (YAML-based configuration). When enabled, the collector will ignore any non-profile based collection logic.",
-        "type": "boolean",
-        "default": true
-      },
       "manual_profiles": {
         "title": "Manual SNMP Profiles",
         "description": "Profiles to apply if automatic detection cannot be used.",
@@ -365,8 +359,7 @@
         {
           "title": "Profiles",
           "fields": [
-            "manual_profiles",
-            "disable_legacy_collection"
+            "manual_profiles"
           ]
         }
       ]

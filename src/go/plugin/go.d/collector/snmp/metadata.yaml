@@ -226,11 +226,6 @@ modules:
               description: Profiles to apply if automatic detection cannot be used.
               default_value: "[]"
               required: false
-            - name: disable_legacy_collection
-              group: Profiles
-              description: Disable the legacy SNMP collection method, forcing the collector to use only SNMP profiles (YAML-based configuration). When enabled, the collector will ignore any non-profile based collection logic.
-              default_value: "true"
-              required: false
 
             - name: create_vnode
               group: Virtual node
