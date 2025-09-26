@@ -504,6 +504,12 @@
           ]
         },
         {
+          "title": "Ping",
+          "fields": [
+            "ping"
+          ]
+        },
+        {
           "title": "Vnode",
           "fields": [
             "create_vnode",
@@ -521,12 +527,6 @@
           "title": "SNMPv3",
           "fields": [
             "user"
-          ]
-        },
-        {
-          "title": "Ping",
-          "fields": [
-            "ping"
           ]
         },
         {
