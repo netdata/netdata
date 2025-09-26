@@ -260,8 +260,8 @@ static inline void netdata_set_hd_usage(PERF_DATA_BLOCK *pDataBlock,
 
     // Description of incompatibilities present in both methods we are using
     // https://devblogs.microsoft.com/oldnewthing/20071101-00/?p=24613
-    // We are using the variable that should not be affected by qyota ()
-    if ((GetDriveTypeA(path) != DRIVE_FIXED) || !GetDiskFreeSpaceExA(path,
+    // We are using the variable that should not be affected by quota ()
+    if ((GetDriveTypeA(path) == DRIVE_UNKNOWN) || !GetDiskFreeSpaceExA(path,
                                                                      NULL,
                                                                      &totalNumberOfBytes,
                                                                      &totalNumberOfFreeBytes)) {
