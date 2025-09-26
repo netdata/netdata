@@ -55,8 +55,8 @@ func New() *Collector {
 				PrivProto:     "aes192c",
 			},
 			Ping: PingConfig{
+				Enabled: true,
 				ProberConfig: ping.ProberConfig{
-					Network:    "ip",
 					Privileged: true,
 					Packets:    3,
 					Interval:   confopt.Duration(time.Millisecond * 100),

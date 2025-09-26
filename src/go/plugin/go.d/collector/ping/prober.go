@@ -48,6 +48,7 @@ func (p *pingProber) Ping(host string) (*probing.Statistics, error) {
 	}
 
 	pr.RecordRtts = false
+	pr.RecordTTLs = false
 	pr.Interval = p.conf.Interval.Duration()
 	pr.Count = p.conf.Packets
 	pr.Timeout = p.conf.Timeout
