@@ -397,19 +397,3 @@ func setMockClientSysInfoExpect(m *snmpmock.MockHandler) {
 		{Name: snmputils.OidSysLocation, Value: []uint8("mock sysLocation"), Type: gosnmp.OctetString},
 	}, nil).MinTimes(1)
 }
-
-func setMockClientInitExpectConnectErr(m *snmpmock.MockHandler, err error) {
-	m.EXPECT().SetTarget("192.0.2.1").AnyTimes()
-	m.EXPECT().SetPort(uint16(161)).AnyTimes()
-	m.EXPECT().SetVersion(gosnmp.Version2c).AnyTimes()
-	m.EXPECT().SetTimeout(gomock.Any()).AnyTimes()
-	m.EXPECT().SetRetries(gomock.Any()).AnyTimes()
-	m.EXPECT().SetMaxRepetitions(gomock.Any()).AnyTimes()
-	m.EXPECT().SetCommunity("public").AnyTimes()
-	m.EXPECT().SetMaxOids(gomock.Any()).AnyTimes()
-	m.EXPECT().Target().AnyTimes()
-	m.EXPECT().Port().AnyTimes()
-	m.EXPECT().Version().AnyTimes()
-	m.EXPECT().Community().AnyTimes()
-	m.EXPECT().Connect().Return(err)
-}
