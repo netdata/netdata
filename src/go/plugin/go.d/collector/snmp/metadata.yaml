@@ -202,7 +202,7 @@ modules:
             - name: ping.enabled
               group: Ping
               description: Enable ICMP round-trip measurements (runs alongside SNMP). When disabled, no ping metrics are collected.
-              default_value: false
+              default_value: true
               required: false
             - name: ping.privileged
               group: Ping
