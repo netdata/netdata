@@ -53,5 +53,13 @@
   "disable_legacy_collection": true,
   "manual_profiles": [
     "ok"
-  ]
+  ],
+  "ping": {
+    "enabled": true,
+    "network": "ip",
+    "privileged": true,
+    "interface": "eth0",
+    "packets": 5,
+    "interval": 123.123
+  }
 }

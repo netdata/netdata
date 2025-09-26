@@ -2,33 +2,39 @@
 
 package snmp
 
-import "github.com/netdata/netdata/go/plugins/plugin/go.d/agent/vnodes"
+import (
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/vnodes"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/ping"
+)
 
 type (
 	Config struct {
 		UpdateEvery int    `yaml:"update_every,omitempty" json:"update_every"`
 		Hostname    string `yaml:"hostname" json:"hostname"`
 
+		Community string        `yaml:"community,omitempty" json:"community"`
+		User      UserConfig    `yaml:"user,omitempty" json:"user"`
+		Options   OptionsConfig `yaml:"options,omitempty" json:"options"`
+
 		CreateVnode              bool               `yaml:"create_vnode,omitempty" json:"create_vnode"`
 		VnodeDeviceDownThreshold int                `yaml:"vnode_device_down_threshold,omitempty" json:"vnode_device_down_threshold"`
 		Vnode                    vnodes.VirtualNode `yaml:"vnode,omitempty" json:"vnode"`
 
-		Community string `yaml:"community,omitempty" json:"community"`
-		User      User   `yaml:"user,omitempty" json:"user"`
-
-		Options Options `yaml:"options,omitempty" json:"options"`
-
 		ManualProfiles []string `yaml:"manual_profiles,omitempty" json:"manual_profiles"`
+
+		Ping PingConfig `yaml:"ping,omitempty" json:"ping"`
 
 		// legacy
 		ChartsInput             []ChartConfig `yaml:"charts,omitempty" json:"charts"`
 		DisableLegacyCollection bool          `yaml:"disable_legacy_collection,omitempty" json:"disable_legacy_collection"`
 	}
-	NetworkInterfaceFilter struct {
-		ByName string `yaml:"by_name,omitempty" json:"by_name"`
-		ByType string `yaml:"by_type,omitempty" json:"by_type"`
+
+	PingConfig struct {
+		Enabled           bool `yaml:"enabled" json:"enabled"`
+		ping.ProberConfig `yaml:",inline" json:",inline"`
 	}
-	User struct {
+
+	UserConfig struct {
 		Name          string `yaml:"name,omitempty" json:"name"`
 		SecurityLevel string `yaml:"level,omitempty" json:"level"`
 		AuthProto     string `yaml:"auth_proto,omitempty" json:"auth_proto"`
@@ -36,7 +42,7 @@ type (
 		PrivProto     string `yaml:"priv_proto,omitempty" json:"priv_proto"`
 		PrivKey       string `yaml:"priv_key,omitempty" json:"priv_key"`
 	}
-	Options struct {
+	OptionsConfig struct {
 		Port           int    `yaml:"port,omitempty" json:"port"`
 		Retries        int    `yaml:"retries,omitempty" json:"retries"`
 		Timeout        int    `yaml:"timeout,omitempty" json:"timeout"`
@@ -44,6 +50,9 @@ type (
 		MaxOIDs        int    `yaml:"max_request_size,omitempty" json:"max_request_size"`
 		MaxRepetitions int    `yaml:"max_repetitions,omitempty" json:"max_repetitions"`
 	}
+)
+
+type (
 	ChartConfig struct {
 		ID         string            `yaml:"id" json:"id"`
 		Title      string            `yaml:"title" json:"title"`

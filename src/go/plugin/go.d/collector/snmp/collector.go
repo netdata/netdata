@@ -6,13 +6,17 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
+	"time"
 
 	"github.com/gosnmp/gosnmp"
 
+	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/vnodes"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/ping"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
 )
 
@@ -37,7 +41,7 @@ func New() *Collector {
 			VnodeDeviceDownThreshold: 3,
 			Community:                "public",
 			DisableLegacyCollection:  true,
-			Options: Options{
+			Options: OptionsConfig{
 				Port:           161,
 				Retries:        1,
 				Timeout:        5,
@@ -45,10 +49,18 @@ func New() *Collector {
 				MaxOIDs:        60,
 				MaxRepetitions: 25,
 			},
-			User: User{
+			User: UserConfig{
 				SecurityLevel: "authPriv",
 				AuthProto:     "sha512",
 				PrivProto:     "aes192c",
+			},
+			Ping: PingConfig{
+				ProberConfig: ping.ProberConfig{
+					Network:    "ip",
+					Privileged: true,
+					Packets:    3,
+					Interval:   confopt.Duration(time.Millisecond * 100),
+				},
 			},
 		},
 
@@ -56,6 +68,7 @@ func New() *Collector {
 		seenScalarMetrics: make(map[string]bool),
 		seenTableMetrics:  make(map[string]bool),
 
+		newProber:     ping.NewProber,
 		newSnmpClient: gosnmp.NewHandler,
 
 		snmpBulkWalkOk: true,
@@ -72,6 +85,9 @@ type Collector struct {
 	charts            *module.Charts
 	seenScalarMetrics map[string]bool
 	seenTableMetrics  map[string]bool
+
+	prober    ping.Prober
+	newProber func(ping.ProberConfig, *logger.Logger) ping.Prober
 
 	newSnmpClient func() gosnmp.Handler
 	snmpClient    gosnmp.Handler
@@ -109,7 +125,16 @@ func (c *Collector) Init(context.Context) error {
 	}
 	c.charts = charts
 
-	c.customOids = c.initOIDs()
+	if c.Ping.Enabled {
+		pr, err := c.initProber()
+		if err != nil {
+			return fmt.Errorf("failed to initialize ping prober: %v", err)
+		}
+		c.prober = pr
+		c.addPingCharts()
+	}
+
+	c.customOids = c.initCustomOIDs()
 
 	return nil
 }
