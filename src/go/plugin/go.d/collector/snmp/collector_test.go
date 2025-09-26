@@ -337,7 +337,7 @@ func mockInit(t *testing.T) (*snmpmock.MockHandler, func()) {
 func prepareV3Config() Config {
 	cfg := prepareV2Config()
 	cfg.Options.Version = gosnmp.Version3.String()
-	cfg.User = User{
+	cfg.User = UserConfig{
 		Name:          "name",
 		SecurityLevel: "authPriv",
 		AuthProto:     strings.ToLower(gosnmp.MD5.String()),
@@ -359,7 +359,7 @@ func prepareV1Config() Config {
 		UpdateEvery: 1,
 		Hostname:    "192.0.2.1",
 		Community:   "public",
-		Options: Options{
+		Options: OptionsConfig{
 			Port:           161,
 			Retries:        1,
 			Timeout:        5,

@@ -1,32 +1,32 @@
-# AI DevOps Copilot
+# MCP Clients
 
-Command-line AI assistants like **Claude Code** and **Gemini CLI** represent a revolutionary shift in how infrastructure professionals work. These tools combine the power of large language models with access to observability data and the ability to execute system commands, creating unprecedented automation opportunities.
+Model Context Protocol (MCP) clients like **Claude Desktop**, **Cursor**, **Visual Studio Code**, **JetBrains IDEs**, **Netdata Web Client**, **Claude Code**, and **Gemini CLI** can connect to Netdata’s MCP server to bring real observability data into your AI workflows. This enables natural‑language analysis with context from your infrastructure and, for CLI tools, optional automation.
 
-## The Power of CLI-based AI Assistants
+## The power of MCP clients
 
 ### Key Capabilities
 
-**Observability-Driven Operations:**
+**Observability‑driven operations**
 
 - Access real-time metrics and logs from monitoring systems
 - Analyze performance trends and identify bottlenecks
 - Correlate issues across multiple systems and services
 
-**System Configuration Management:**
+**System configuration management**
 
 - Generate and modify configuration files based on observed conditions
 - Implement best practices automatically
 - Adapt configurations to changing requirements
 
-**Automated Troubleshooting:**
+**Automated troubleshooting**
 
 - Diagnose issues using multiple data sources
 - Execute diagnostic commands and interpret results
 - Implement fixes based on root cause analysis
 
-## Observability + Automation Use Cases
+## Observability + automation use cases
 
-When AI assistants have access to observability data (like Netdata through MCP), they can make informed decisions about system changes:
+When MCP clients have access to Netdata, they can make informed decisions about system changes:
 
 ### Infrastructure Optimization Examples
 
@@ -106,9 +106,9 @@ Keep in mind however, that usually this prompt should be split into multiple sma
 
 This showcases how AI can combine application expertise, infrastructure knowledge, and observability best practices to create sophisticated testing environments that would typically require weeks of manual setup and deep domain expertise.
 
-## ⚠️ Critical Security and Safety Considerations
+## ⚠️ Critical security and safety considerations
 
-### Command Execution Risks
+### Command execution risks
 
 **LLMs Are Not Infallible:**
 
@@ -122,7 +122,7 @@ This showcases how AI can combine application expertise, infrastructure knowledg
 - Changes may have cascading effects across interconnected services
 - Recovery from AI-generated misconfigurations can be time-consuming
 
-### Data Privacy and Security Concerns
+### Data privacy and security concerns
 
 **External LLM Provider Exposure:**
 
@@ -138,7 +138,7 @@ This showcases how AI can combine application expertise, infrastructure knowledg
 - Application secrets and encryption keys
 - User data and personally identifiable information
 
-### Recommended Safe Usage Practices
+### Recommended safe usage practices
 
 **1. Analysis-First Approach:**
 
@@ -176,9 +176,9 @@ high usage and what solutions you recommend
 - Implement change management processes for AI-suggested modifications
 - Maintain air-gapped environments for highly sensitive systems
 
-## Best Practices for Implementation
+## Best practices for implementation
 
-### Safe Integration Workflow
+### Safe integration workflow
 
 1. **Discovery Phase:** Let AI analyze your current setup and identify opportunities
 2. **Planning Phase:** Have AI generate detailed implementation plans with explanations
@@ -187,14 +187,26 @@ high usage and what solutions you recommend
 5. **Validation Phase:** Verify results match expectations before production deployment
 6. **Documentation Phase:** Have AI help document the changes and their rationale
 
-### Building Trust Over Time
+### Building trust over time
 
 - Start with simple, low-risk tasks to build confidence
 - Gradually increase complexity as you validate AI accuracy
 - Develop institutional knowledge about AI strengths and limitations
 - Create feedback loops to improve AI prompts and instructions
 
-### Team Education and Guidelines
+### Team education and guidelines
+
+## Client guides
+
+See dedicated configuration guides for each client:
+
+- Claude Desktop
+- Cursor
+- Visual Studio Code
+- JetBrains IDEs
+- Netdata Web Client
+- Claude Code
+- Gemini CLI
 
 - Train team members on safe AI usage practices
 - Establish clear guidelines for when AI assistance is appropriate

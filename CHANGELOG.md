@@ -2,11 +2,22 @@
 
 ## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v2.6.3...HEAD)
+[Full Changelog](https://github.com/netdata/netdata/compare/v2.7.0...HEAD)
 
 **Merged pull requests:**
 
+- improve\(go.d/rabbitmq\): add support for old RabbitMQ whoami tags format [\#21049](https://github.com/netdata/netdata/pull/21049) ([ilyam8](https://github.com/ilyam8))
+- ai-docs [\#21043](https://github.com/netdata/netdata/pull/21043) ([shyamvalsan](https://github.com/shyamvalsan))
+
+## [v2.7.0](https://github.com/netdata/netdata/tree/v2.7.0) (2025-09-25)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v2.6.3...v2.7.0)
+
+**Merged pull requests:**
+
+- Revert "ml: implement fixed time-based training windows \(\#20638\)" [\#21045](https://github.com/netdata/netdata/pull/21045) ([vkalintiris](https://github.com/vkalintiris))
 - chore\(go.d/ddsnmp\): Improve profile sorting by match specificity [\#21042](https://github.com/netdata/netdata/pull/21042) ([ilyam8](https://github.com/ilyam8))
+- Add documentation on using custom CA certificates to Learn [\#21041](https://github.com/netdata/netdata/pull/21041) ([ralphm](https://github.com/ralphm))
 - Context loading priority to vnodes [\#21040](https://github.com/netdata/netdata/pull/21040) ([stelfrag](https://github.com/stelfrag))
 - improve\(go.d/ddsnmp\): switch profile matching to `selector` [\#21039](https://github.com/netdata/netdata/pull/21039) ([ilyam8](https://github.com/ilyam8))
 - fix\(docs\): update mermaid diagrams leftovers plus syntax issues [\#21034](https://github.com/netdata/netdata/pull/21034) ([kanelatechnical](https://github.com/kanelatechnical))
@@ -138,6 +149,7 @@
 - Update documentation [\#20865](https://github.com/netdata/netdata/pull/20865) ([thiagoftsm](https://github.com/thiagoftsm))
 - Update documentation \(Windows.plugin\) [\#20864](https://github.com/netdata/netdata/pull/20864) ([thiagoftsm](https://github.com/thiagoftsm))
 - chore\(go.d/snmp\): more vendor-scoped meta yaml files [\#20863](https://github.com/netdata/netdata/pull/20863) ([ilyam8](https://github.com/ilyam8))
+- Properly integrate Rust code checks in CI. [\#20862](https://github.com/netdata/netdata/pull/20862) ([Ferroin](https://github.com/Ferroin))
 - improve\(go.d/snmp\): update snmp meta copilot [\#20861](https://github.com/netdata/netdata/pull/20861) ([ilyam8](https://github.com/ilyam8))
 - Handle virtual host disconnection [\#20860](https://github.com/netdata/netdata/pull/20860) ([stelfrag](https://github.com/stelfrag))
 - Add cargo lock file. [\#20855](https://github.com/netdata/netdata/pull/20855) ([vkalintiris](https://github.com/vkalintiris))
@@ -440,14 +452,6 @@
 - test\(go.d/ddsnmp\): add more tests for table metrics [\#20510](https://github.com/netdata/netdata/pull/20510) ([ilyam8](https://github.com/ilyam8))
 - chore\(go.d/ddsnmp\): fix table collection with caching [\#20509](https://github.com/netdata/netdata/pull/20509) ([ilyam8](https://github.com/ilyam8))
 - feat\(go.d/snmp profile\): add fallback support for duplicate metric tags [\#20508](https://github.com/netdata/netdata/pull/20508) ([ilyam8](https://github.com/ilyam8))
-- feat\(go.d/snmp profile\): add sensors to mikrotik-router.yaml [\#20507](https://github.com/netdata/netdata/pull/20507) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations docs [\#20506](https://github.com/netdata/netdata/pull/20506) ([netdatabot](https://github.com/netdatabot))
-- improve\(go.d/snmp profiles\): simplify \_generic-if.yaml and add interface type tags [\#20505](https://github.com/netdata/netdata/pull/20505) ([ilyam8](https://github.com/ilyam8))
-- fix snmp prof mikrotik mem tagging [\#20504](https://github.com/netdata/netdata/pull/20504) ([ilyam8](https://github.com/ilyam8))
-- feat\(go.d/ddsnmp\): make SNMP profile collection configurable [\#20503](https://github.com/netdata/netdata/pull/20503) ([ilyam8](https://github.com/ilyam8))
-- Use ARAL for labels [\#20502](https://github.com/netdata/netdata/pull/20502) ([stelfrag](https://github.com/stelfrag))
-- SNMP: audiocodes profile [\#20501](https://github.com/netdata/netdata/pull/20501) ([Ancairon](https://github.com/Ancairon))
-- chore\(go.d/ddsnmp\): better label values sanitization [\#20500](https://github.com/netdata/netdata/pull/20500) ([ilyam8](https://github.com/ilyam8))
 
 ## [v2.5.4](https://github.com/netdata/netdata/tree/v2.5.4) (2025-06-24)
 
