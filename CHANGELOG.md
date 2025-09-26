@@ -1,5 +1,14 @@
 # Changelog
 
+## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v2.7.0...HEAD)
+
+**Merged pull requests:**
+
+- improve\(go.d/rabbitmq\): add support for old RabbitMQ whoami tags format [\#21049](https://github.com/netdata/netdata/pull/21049) ([ilyam8](https://github.com/ilyam8))
+- ai-docs [\#21043](https://github.com/netdata/netdata/pull/21043) ([shyamvalsan](https://github.com/shyamvalsan))
+
 ## [v2.7.0](https://github.com/netdata/netdata/tree/v2.7.0) (2025-09-25)
 
 [Full Changelog](https://github.com/netdata/netdata/compare/v2.6.3...v2.7.0)
@@ -443,10 +452,6 @@
 - test\(go.d/ddsnmp\): add more tests for table metrics [\#20510](https://github.com/netdata/netdata/pull/20510) ([ilyam8](https://github.com/ilyam8))
 - chore\(go.d/ddsnmp\): fix table collection with caching [\#20509](https://github.com/netdata/netdata/pull/20509) ([ilyam8](https://github.com/ilyam8))
 - feat\(go.d/snmp profile\): add fallback support for duplicate metric tags [\#20508](https://github.com/netdata/netdata/pull/20508) ([ilyam8](https://github.com/ilyam8))
-- feat\(go.d/snmp profile\): add sensors to mikrotik-router.yaml [\#20507](https://github.com/netdata/netdata/pull/20507) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations docs [\#20506](https://github.com/netdata/netdata/pull/20506) ([netdatabot](https://github.com/netdatabot))
-- improve\(go.d/snmp profiles\): simplify \_generic-if.yaml and add interface type tags [\#20505](https://github.com/netdata/netdata/pull/20505) ([ilyam8](https://github.com/ilyam8))
-- fix snmp prof mikrotik mem tagging [\#20504](https://github.com/netdata/netdata/pull/20504) ([ilyam8](https://github.com/ilyam8))
 
 ## [v2.5.4](https://github.com/netdata/netdata/tree/v2.5.4) (2025-06-24)
 
