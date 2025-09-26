@@ -191,7 +191,6 @@ The following options can be defined globally: update_every, autodetection_retry
 |  | ping.packets | Number of ping packets to send per iteration. | 3 | no |
 |  | ping.interval | Interval between sending ping packets. | 100ms | no |
 | **Profiles** | manual_profiles | Profiles to apply if automatic detection cannot be used. | [] | no |
-|  | disable_legacy_collection | Disable the legacy SNMP collection method, forcing the collector to use only SNMP profiles (YAML-based configuration). When enabled, the collector will ignore any non-profile based collection logic. | true | no |
 | **Virtual node** | create_vnode | If set, the collector will create a Netdata Virtual Node for this SNMP device, which will appear as a separate Node in Netdata. | true | no |
 |  | vnode_device_down_threshold | Number of consecutive failed data collections before marking the device as down. | 3 | no |
 |  | vnode.guid | A unique identifier for the Virtual Node. If not set, a GUID will be automatically generated from the device's IP address. |  | no |
