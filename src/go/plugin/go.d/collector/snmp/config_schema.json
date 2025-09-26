@@ -468,6 +468,7 @@
       }
     },
     "charts": {
+      "ui:widget": "hidden",
       "items": {
         "ui:collapsible": true,
         "type": {
@@ -534,12 +535,6 @@
           "fields": [
             "manual_profiles",
             "disable_legacy_collection"
-          ]
-        },
-        {
-          "title": "Charts",
-          "fields": [
-            "charts"
           ]
         }
       ]
