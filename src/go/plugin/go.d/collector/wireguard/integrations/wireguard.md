@@ -50,7 +50,6 @@ Doesn't work if Netdata or WireGuard is installed in the container.
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-
 ## Metrics
 
 Metrics grouped by *scope*.

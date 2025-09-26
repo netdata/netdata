@@ -17,7 +17,6 @@ Use the MongoDB connector for the exporting engine to archive your Agent's metri
 for long-term storage, further analysis, or correlation with data from other sources.
 
 
-
 <img src="https://img.shields.io/badge/maintained%20by-Netdata-%2300ab44" />
 
 ## Setup

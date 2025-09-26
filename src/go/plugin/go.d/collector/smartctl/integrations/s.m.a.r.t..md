@@ -55,7 +55,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-
 ## Metrics
 
 Metrics grouped by *scope*.
@@ -169,27 +168,27 @@ The following options can be defined globally: update_every.
 
 
 
-| Option | Description | Default | Required |
-|:-----|:------------|:--------|:---------:|
-| update_every | interval for updating Netdata charts, measured in seconds. Collector might use cached data if less than **Devices poll interval**. | 10 | no |
-| timeout | smartctl binary execution timeout. | 5 | no |
-| scan_every | interval for discovering new devices using `smartctl --scan`, measured in seconds. Set to 0 to scan devices only once on startup. | 900 | no |
-| poll_devices_every | interval for gathering data for every device, measured in seconds. Data is cached for this interval. | 300 | no |
-| device_selector | Specifies a pattern to match the 'info name' of devices as reported by `smartctl --scan --json`. | * | no |
-| concurrent_scans | Number of devices to scan concurrently. Set to 0 for sequential scanning (default behavior). Improves performance when monitoring many devices. | 0 | no |
-| extra_devices | Allows manual specification of devices not automatically detected by `smartctl --scan`. Each device entry must include both a name and a type. See "Configuration Examples" for details. | [] | no |
-| no_check_power_mode | Skip data collection when the device is in a low-power mode. Prevents unnecessary disk spin-up. | standby | no |
+| Group | Option | Description | Default | Required |
+|:------|:-----|:------------|:--------|:---------:|
+| **Collection** | update_every | Netdata chart update interval (seconds). Collector may use cached data if this is less than **poll_devices_every**. | 10 | no |
+|  | timeout | `smartctl` binary execution timeout (seconds). | 5 | no |
+|  | scan_every | Device discovery interval using `smartctl --scan` (seconds). Set 0 to scan only once at startup. | 900 | no |
+|  | poll_devices_every | Device polling interval (seconds). Data is cached for this interval. | 300 | no |
+| **Target** | device_selector | Pattern to match the 'info name' of devices as reported by `smartctl --scan --json`. | * | no |
+|  | extra_devices | Manually specify devices not auto-detected by `smartctl --scan`. Each entry must include both a name and a type. | [] | no |
+| **Performance** | concurrent_scans | Number of devices to scan concurrently. Set 0 for sequential scanning (default). Helps performance when monitoring many devices. | 0 | no |
+|  | no_check_power_mode | Skip data collection when device is in low-power mode (avoids unnecessary spin-up). | standby | no |
 
 ##### no_check_power_mode
 
-The valid arguments to this option are:
+Valid arguments:
 
 | Mode    | Description                                                                                                                                                                            |
 |---------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | never   | Check the device always.                                                                                                                                                               |
-| sleep   | Check the device unless it is in SLEEP mode.                                                                                                                                           |
-| standby | Check the device unless it is in SLEEP or STANDBY mode. In these modes most disks are not spinning, so if you want to prevent a disk from spinning up, this is probably what you want. |
-| idle    | Check the device unless it is in SLEEP, STANDBY or IDLE mode. In the IDLE state, most disks are still spinning, so this is probably not what you want.                                 |
+| sleep   | Skip check if device is in SLEEP mode.                                                                                                                                                 |
+| standby | Skip check if device is in SLEEP or STANDBY mode (prevents spin-up).                                                                                                                   |
+| idle    | Skip check if device is in SLEEP, STANDBY, or IDLE mode (not recommended since disks may still be spinning).                                                                           |
 
 
 

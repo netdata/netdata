@@ -57,25 +57,43 @@ modules:
             enabled: true
           list:
             - name: update_every
-              description: Data collection frequency.
+              description: Data collection interval (seconds).
               default_value: 1
               required: false
+              group: Collection
             - name: autodetection_retry
-              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              description: Autodetection retry interval (seconds). Set 0 to disable.
               default_value: 0
               required: false
+              group: Collection
+
             - name: address
-              description: Server address.
+              description: FreeRADIUS server address.
               default_value: 127.0.0.1
               required: true
+              group: Target
+            - name: timeout
+              description: Connection, read, and write timeout (seconds).
+              default_value: 1
+              required: false
+              group: Target
             - name: port
-              description: Server port.
+              description: FreeRADIUS server port.
               default_value: 18121
               required: false
+              group: Target
+
             - name: secret
-              description: FreeRADIUS secret.
+              description: FreeRADIUS shared secret.
               default_value: adminsecret
               required: false
+              group: Auth
+
+            - name: vnode
+              description: Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).
+              default_value: ""
+              required: false
+              group: Virtual Node
         examples:
           folding:
             title: Config

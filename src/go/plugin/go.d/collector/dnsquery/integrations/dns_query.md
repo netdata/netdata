@@ -45,7 +45,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-
 ## Metrics
 
 Metrics grouped by *scope*.
@@ -117,16 +116,17 @@ The following options can be defined globally: update_every, autodetection_retry
 
 
 
-| Option | Description | Default | Required |
-|:-----|:------------|:--------|:---------:|
-| update_every | Data collection frequency. | 1 | no |
-| autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
-| domains | Domain or subdomains to query. The collector will choose a random domain from the list on every iteration. |  | yes |
-| servers | Servers to query. If empty, the collector will automatically use DNS servers from `/etc/resolv.conf`. |  | no |
-| port | DNS server port. | 53 | no |
-| network | Network protocol name. Available options: udp, tcp, tcp-tls. | udp | no |
-| record_types | Query record type. Available options: A, AAAA, CNAME, MX, NS, PTR, TXT, SOA, SPF, TXT, SRV. | A | no |
-| timeout | Query read timeout. | 2 | no |
+| Group | Option | Description | Default | Required |
+|:------|:-----|:------------|:--------|:---------:|
+| **Collection** | update_every | Data collection interval (seconds). | 1 | no |
+|  | autodetection_retry | Autodetection retry interval (seconds). Set 0 to disable. | 0 | no |
+| **Target** | domains | One or more domains/subdomains to query. A random domain from the list is selected on each iteration. | [] | yes |
+|  | servers | DNS servers to query. If empty, servers from `/etc/resolv.conf` are used automatically. | [] | no |
+|  | timeout | Query timeout (seconds). | 2 | no |
+|  | port | DNS server port. | 53 | no |
+|  | network | DNS query transport protocol. Options: `udp`, `tcp`, `tcp-tls`. | udp | no |
+| **DNS Query** | record_types | DNS record types to query. Options: A, AAAA, CNAME, MX, NS, PTR, TXT, SOA, SPF, SRV. | A | no |
+| **Virtual Node** | vnode | Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). |  | no |
 
 
 </details>

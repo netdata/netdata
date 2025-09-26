@@ -15,17 +15,26 @@ Learn more: [Metric Correlations documentation](/docs/metric-correlations.md)
 
 :::
 
----
-
 ## Metrics Tab Structure Overview
 
 ```mermaid
-graph TD
-    A[Metrics Tab - Multi-node]
-    A --> B[Integrations Tab]
-    A --> C[Metric Correlations]
-    A --> D[Single Node Tabs]
-    D --> E[Node-specific charts]
+flowchart TD
+    A("Metrics Tab - Multi-node")
+    A --> B("Integrations Tab")
+    A --> C("Metric Correlations")
+    A --> D("Single Node Tabs")
+    D --> E("Node-specific charts")
+
+    %% Style definitions
+    classDef alert fill:#ffeb3b,stroke:#000000,stroke-width:3px,color:#000000,font-size:14px
+    classDef neutral fill:#f9f9f9,stroke:#000000,stroke-width:3px,color:#000000,font-size:14px
+    classDef complete fill:#4caf50,stroke:#000000,stroke-width:3px,color:#000000,font-size:14px
+    classDef database fill:#2196F3,stroke:#000000,stroke-width:3px,color:#000000,font-size:14px
+
+    %% Apply styles
+    class A alert
+    class B,C neutral
+    class D,E complete
 ```
 
 :::tip
@@ -33,8 +42,6 @@ graph TD
 The diagram above shows how the Metrics tab connects to related features and single-node dashboards, making it easier to navigate between views.
 
 :::
-
----
 
 ## How the Dashboard is Organized
 
@@ -47,8 +54,6 @@ The available chart types and grouping options allow flexible data visualization
 Use the chart arrangement at the start of each section to quickly identify patterns, spikes, or anomalies before diving into detailed chart filtering.
 
 :::
-
----
 
 ## Chart Navigation Menu
 

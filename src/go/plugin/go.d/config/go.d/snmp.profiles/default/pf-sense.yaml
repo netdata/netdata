@@ -4,7 +4,10 @@ extends:
   - _std-if-mib.yaml
   - _std-ucd-mib.yaml
 
-sysobjectid: 1.3.6.1.4.1.12325.*
+selector:
+  - sysobjectid:
+      include:
+        - 1.3.6.1.4.1.12325.*
 
 metadata:
   device:

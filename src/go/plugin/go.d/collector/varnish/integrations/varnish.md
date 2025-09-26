@@ -52,7 +52,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-
 ## Metrics
 
 Metrics grouped by *scope*.
@@ -149,12 +148,12 @@ The following options can be defined globally: update_every.
 
 
 
-| Option | Description | Default | Required |
-|:-----|:------------|:--------|:---------:|
-| update_every | Data collection frequency. | 10 | no |
-| timeout | Timeout for executing the binary, specified in seconds. | 2 | no |
-| instance_name | Specifies the name of the Varnish instance to collect metrics from. This corresponds to the `-n` argument used with the [varnishstat](https://varnish-cache.org/docs/trunk/reference/varnishstat.html) command. |  | no |
-| docker_container | Specifies the name of the Docker container where the Varnish instance is running. If set, the `varnishstat` command will be executed within this container. |  | no |
+| Group | Option | Description | Default | Required |
+|:------|:-----|:------------|:--------|:---------:|
+| **Collection** | update_every | Data collection frequency. | 10 | no |
+|  | timeout | Timeout for executing the binary, specified in seconds. | 2 | no |
+| **Target** | instance_name | Specifies the name of the Varnish instance to collect metrics from. This corresponds to the `-n` argument used with the [varnishstat](https://varnish-cache.org/docs/trunk/reference/varnishstat.html) command. |  | no |
+|  | docker_container | Specifies the name of the Docker container where the Varnish instance is running. If set, the `varnishstat` command will be executed within this container. |  | no |
 
 
 </details>

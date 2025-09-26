@@ -45,7 +45,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-
 ## Metrics
 
 Metrics grouped by *scope*.
@@ -178,19 +177,19 @@ The following options can be defined globally: update_every, autodetection_retry
 
 
 
-| Option | Description | Default | Required |
-|:-----|:------------|:--------|:---------:|
-| update_every | Data collection frequency. | 5 | no |
-| autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
-| address | Server address in IP:PORT format. | 127.0.0.1:8953 | yes |
-| timeout | Connection/read/write/ssl handshake timeout. | 1 | no |
-| conf_path | Absolute path to the unbound configuration file. | /etc/unbound/unbound.conf | no |
-| cumulative_stats | Statistics collection mode. Should have the same value as the `statistics-cumulative` parameter in the unbound configuration file. | no | no |
-| use_tls | Whether to use TLS or not. | yes | no |
-| tls_skip_verify | Server certificate chain and hostname validation policy. Controls whether the client performs this check. | yes | no |
-| tls_ca | Certificate authority that client use when verifying server certificates. |  | no |
-| tls_cert | Client tls certificate. | /etc/unbound/unbound_control.pem | no |
-| tls_key | Client tls key. | /etc/unbound/unbound_control.key | no |
+| Group | Option | Description | Default | Required |
+|:------|:-----|:------------|:--------|:---------:|
+| **Collection** | update_every | Data collection frequency. | 5 | no |
+|  | autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
+| **Target** | address | Server address in IP:PORT format. | 127.0.0.1:8953 | yes |
+|  | timeout | Connection/read/write/SSL handshake timeout. | 1 | no |
+|  | conf_path | Absolute path to the Unbound configuration file. Used to adjust behavior based on the `remote-control` section. | /etc/unbound/unbound.conf | no |
+| **Customization** | cumulative_stats | Statistics collection mode. Should match the `statistics-cumulative` parameter in the Unbound configuration file. | no | no |
+| **TLS** | use_tls | Whether to use TLS or not. | yes | no |
+|  | tls_skip_verify | Server certificate chain and hostname validation policy. Controls whether the client performs this check. | yes | no |
+|  | tls_ca | Certificate authority that the client uses when verifying server certificates. |  | no |
+|  | tls_cert | Client TLS certificate. | /etc/unbound/unbound_control.pem | no |
+|  | tls_key | Client TLS key. | /etc/unbound/unbound_control.key | no |
 
 
 </details>

@@ -60,21 +60,32 @@ modules:
             enabled: true
           list:
             - name: update_every
-              description: Data collection frequency.
+              description: Data collection interval (seconds).
               default_value: 1
               required: false
+              group: Collection
             - name: autodetection_retry
-              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              description: Autodetection retry interval (seconds). Set 0 to disable.
               default_value: 0
               required: false
+              group: Collection
+
             - name: address
-              description: "The Unix or TCP socket address where the Dovecot [old_stats](https://doc.dovecot.org/configuration_manual/stats/old_statistics/#old-statistics) plugin listens for connections."
+              description: "Dovecot socket address (Unix or TCP). Used by the [old_stats](https://doc.dovecot.org/configuration_manual/stats/old_statistics/#old-statistics) plugin."
               default_value: 127.0.0.1:24242
               required: true
+              group: Target
             - name: timeout
-              description: Connection, read, and write timeout duration in seconds. The timeout includes name resolution.
+              description: Connection, read, write, and name resolution timeout (seconds).
               default_value: 1
               required: false
+              group: Target
+
+            - name: vnode
+              description: Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).
+              default_value: ""
+              required: false
+              group: Virtual Node
         examples:
           folding:
             title: Config

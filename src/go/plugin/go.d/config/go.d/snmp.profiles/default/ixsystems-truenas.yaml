@@ -12,7 +12,10 @@ extends:
   - _std-if-mib.yaml
   - _std-ucd-mib.yaml
 
-sysobjectid: 1.3.6.1.4.1.50536.3.2  # TrueNAS
+selector:
+  - sysobjectid:
+      include:
+        - 1.3.6.1.4.1.50536.3.2  # TrueNAS
 
 metadata:
   device:

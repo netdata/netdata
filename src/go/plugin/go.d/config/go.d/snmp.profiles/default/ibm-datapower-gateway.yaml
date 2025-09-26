@@ -1,8 +1,10 @@
 extends:
   - ibm.yaml
 
-sysobjectid:
-  - 1.3.6.1.4.1.14685.1.8
+selector:
+  - sysobjectid:
+      include:
+        - 1.3.6.1.4.1.14685.1.8
 
 # https://github.com/DanielleHuisman/observium-community-edition/blob/main/mibs/ibm/DATAPOWER-STATUS-MIB
 

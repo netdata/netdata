@@ -10,8 +10,8 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 )
 
-func (c *Collector) collectProfiles(mx map[string]int64) error {
-	if len(c.snmpProfiles) == 0 || c.ddSnmpColl == nil {
+func (c *Collector) collectSNMP(mx map[string]int64) error {
+	if c.ddSnmpColl == nil {
 		return nil
 	}
 
@@ -61,6 +61,9 @@ func (c *Collector) collectProfileTableMetrics(mx map[string]int64, pms []*ddsnm
 			}
 
 			key := tableMetricKey(m)
+			if key == "" {
+				continue
+			}
 
 			seen[key] = true
 
@@ -90,21 +93,33 @@ func (c *Collector) collectProfileTableMetrics(mx map[string]int64, pms []*ddsnm
 }
 
 func tableMetricKey(m ddsnmp.Metric) string {
-	keys := make([]string, 0, len(m.Tags))
-	for k := range m.Tags {
-		keys = append(keys, k)
+	if m.Name == "" {
+		return ""
 	}
-	sort.Strings(keys)
+
+	// Filter keys we actually use (skip "_" and empty values) and precompute final length.
+	include := make([]string, 0, len(m.Tags))
+	totalLen := len(m.Name)
+	for k, v := range m.Tags {
+		if v == "" || strings.HasPrefix(k, "_") {
+			continue
+		}
+		include = append(include, k)
+		totalLen += len("_") + len(v)
+	}
+	if len(include) == 0 {
+		return m.Name
+	}
+
+	sort.Strings(include)
 
 	var sb strings.Builder
+	sb.Grow(totalLen)
 
 	sb.WriteString(m.Name)
-
-	for _, k := range keys {
-		if v := m.Tags[k]; v != "" && !strings.HasPrefix(k, "_") {
-			sb.WriteString("_")
-			sb.WriteString(v)
-		}
+	for _, k := range include {
+		sb.WriteByte('_')
+		sb.WriteString(m.Tags[k])
 	}
 
 	return sb.String()

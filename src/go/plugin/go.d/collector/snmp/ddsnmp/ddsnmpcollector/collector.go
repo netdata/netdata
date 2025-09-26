@@ -18,24 +18,31 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 )
 
-func New(snmpClient gosnmp.Handler, profiles []*ddsnmp.Profile, log *logger.Logger, sysobjectid string) *Collector {
+type Config struct {
+	SnmpClient  gosnmp.Handler
+	Profiles    []*ddsnmp.Profile
+	Log         *logger.Logger
+	SysObjectID string
+}
+
+func New(cfg Config) *Collector {
 	coll := &Collector{
-		log:         log.With(slog.String("ddsnmp", "collector")),
+		log:         cfg.Log.With(slog.String("ddsnmp", "collector")),
 		profiles:    make(map[string]*profileState),
 		missingOIDs: make(map[string]bool),
 		tableCache:  newTableCache(30*time.Minute, 1),
 	}
 
-	for _, prof := range profiles {
+	for _, prof := range cfg.Profiles {
 		prof := prof
 		handleCrossTableTagsWithoutMetrics(prof)
 		coll.profiles[prof.SourceFile] = &profileState{profile: prof}
 	}
 
-	coll.globalTagsCollector = newGlobalTagsCollector(snmpClient, coll.missingOIDs, coll.log)
-	coll.deviceMetadataCollector = newDeviceMetadataCollector(snmpClient, coll.missingOIDs, coll.log, sysobjectid)
-	coll.scalarCollector = newScalarCollector(snmpClient, coll.missingOIDs, coll.log)
-	coll.tableCollector = newTableCollector(snmpClient, coll.missingOIDs, coll.tableCache, coll.log)
+	coll.globalTagsCollector = newGlobalTagsCollector(cfg.SnmpClient, coll.missingOIDs, coll.log)
+	coll.deviceMetadataCollector = newDeviceMetadataCollector(cfg.SnmpClient, coll.missingOIDs, coll.log, cfg.SysObjectID)
+	coll.scalarCollector = newScalarCollector(cfg.SnmpClient, coll.missingOIDs, coll.log)
+	coll.tableCollector = newTableCollector(cfg.SnmpClient, coll.missingOIDs, coll.tableCache, coll.log)
 	coll.vmetricsCollector = newVirtualMetricsCollector(coll.log)
 
 	return coll
@@ -53,8 +60,6 @@ type (
 		scalarCollector         *scalarCollector
 		tableCollector          *tableCollector
 		vmetricsCollector       *vmetricsCollector
-
-		DoTableMetrics bool
 	}
 	profileState struct {
 		profile        *ddsnmp.Profile
@@ -160,13 +165,11 @@ func (c *Collector) collectProfile(ps *profileState) (*ddsnmp.ProfileMetrics, er
 	}
 	metrics = append(metrics, scalarMetrics...)
 
-	if c.DoTableMetrics {
-		tableMetrics, err := c.tableCollector.Collect(ps.profile)
-		if err != nil {
-			return nil, err
-		}
-		metrics = append(metrics, tableMetrics...)
+	tableMetrics, err := c.tableCollector.Collect(ps.profile)
+	if err != nil {
+		return nil, err
 	}
+	metrics = append(metrics, tableMetrics...)
 
 	pm := &ddsnmp.ProfileMetrics{
 		Source:         ps.profile.SourceFile,

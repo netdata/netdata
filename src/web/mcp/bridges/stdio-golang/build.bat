@@ -34,7 +34,7 @@ if not exist "go.mod" (
 
 REM Add required dependencies
 echo Adding dependencies...
-go get nhooyr.io/websocket
+go get github.com/coder/websocket
 go mod tidy
 
 REM Build the binary

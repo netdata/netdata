@@ -61,7 +61,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-
 ## Metrics
 
 Metrics grouped by *scope*.
@@ -190,25 +189,28 @@ The following options can be defined globally: update_every.
 
 
 
-| Option | Description | Default | Required |
-|:-----|:------------|:--------|:---------:|
-| update_every | Data collection frequency. | 1 | no |
-| autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
-| url | The URL of the [Ceph Manager API](https://docs.ceph.com/en/reef/mgr/ceph_api/). | https://127.0.0.1:8443 | yes |
-| timeout | HTTP request timeout. | 2 | no |
-| username | Username for basic HTTP authentication. |  | yes |
-| password | Password for basic HTTP authentication. |  | yes |
-| proxy_url | Proxy URL. |  | no |
-| proxy_username | Username for proxy basic HTTP authentication. |  | no |
-| proxy_password | Password for proxy basic HTTP authentication. |  | no |
-| method | HTTP request method. | GET | no |
-| body | HTTP request body. |  | no |
-| headers | HTTP request headers. |  | no |
-| not_follow_redirects | Redirect handling policy. Controls whether the client follows redirects. | no | no |
-| tls_skip_verify | Server certificate chain and hostname validation policy. Controls whether the client performs this check. | yes | no |
-| tls_ca | Certification authority that the client uses when verifying the server's certificates. |  | no |
-| tls_cert | Client TLS certificate. |  | no |
-| tls_key | Client TLS key. |  | no |
+| Group | Option | Description | Default | Required |
+|:------|:-----|:------------|:--------|:---------:|
+| **Collection** | update_every | Data collection interval (seconds). | 1 | no |
+|  | autodetection_retry | Autodetection retry interval (seconds). Set 0 to disable. | 0 | no |
+| **Target** | url | The URL of the [Ceph Manager API](https://docs.ceph.com/en/reef/mgr/ceph_api/). | https://127.0.0.1:8443 | yes |
+|  | timeout | HTTP request timeout (seconds). | 2 | no |
+| **HTTP Auth** | username | Username for Basic HTTP authentication. |  | yes |
+|  | password | Password for Basic HTTP authentication. |  | yes |
+|  | bearer_token_file | Path to a file containing a bearer token (used for `Authorization: Bearer`). |  | no |
+| **TLS** | tls_skip_verify | Skip TLS certificate and hostname verification (insecure). | yes | no |
+|  | tls_ca | Path to CA bundle used to validate the server certificate. |  | no |
+|  | tls_cert | Path to client TLS certificate (for mTLS). |  | no |
+|  | tls_key | Path to client TLS private key (for mTLS). |  | no |
+| **Proxy** | proxy_url | HTTP proxy URL. |  | no |
+|  | proxy_username | Username for proxy Basic HTTP authentication. |  | no |
+|  | proxy_password | Password for proxy Basic HTTP authentication. |  | no |
+| **Request** | method | HTTP method to use. | GET | no |
+|  | body | Request body (e.g., for POST/PUT). |  | no |
+|  | headers | Additional HTTP headers (one per line as key: value). |  | no |
+|  | not_follow_redirects | Do not follow HTTP redirects. | no | no |
+|  | force_http2 | Force HTTP/2 (including h2c over TCP). | no | no |
+| **Virtual Node** | vnode | Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). |  | no |
 
 
 </details>

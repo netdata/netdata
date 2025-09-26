@@ -5,13 +5,13 @@ package snmp
 import (
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/gosnmp/gosnmp"
 
-	"github.com/netdata/netdata/go/plugins/pkg/matcher"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/ping"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
 )
 
 func (c *Collector) validateConfig() error {
@@ -36,7 +36,7 @@ func (c *Collector) initSNMPClient() (gosnmp.Handler, error) {
 	client.SetMaxOids(c.Options.MaxOIDs)
 	client.SetMaxRepetitions(uint32(c.Options.MaxRepetitions))
 
-	ver := parseSNMPVersion(c.Options.Version)
+	ver := snmputils.ParseSNMPVersion(c.Options.Version)
 	comm := c.Community
 
 	switch ver {
@@ -52,130 +52,34 @@ func (c *Collector) initSNMPClient() (gosnmp.Handler, error) {
 		}
 		client.SetVersion(gosnmp.Version3)
 		client.SetSecurityModel(gosnmp.UserSecurityModel)
-		client.SetMsgFlags(parseSNMPv3SecurityLevel(c.User.SecurityLevel))
+		client.SetMsgFlags(snmputils.ParseSNMPv3SecurityLevel(c.User.SecurityLevel))
 		client.SetSecurityParameters(&gosnmp.UsmSecurityParameters{
 			UserName:                 c.User.Name,
-			AuthenticationProtocol:   parseSNMPv3AuthProtocol(c.User.AuthProto),
+			AuthenticationProtocol:   snmputils.ParseSNMPv3AuthProtocol(c.User.AuthProto),
 			AuthenticationPassphrase: c.User.AuthKey,
-			PrivacyProtocol:          parseSNMPv3PrivProtocol(c.User.PrivProto),
+			PrivacyProtocol:          snmputils.ParseSNMPv3PrivProtocol(c.User.PrivProto),
 			PrivacyPassphrase:        c.User.PrivKey,
 		})
 	default:
 		return nil, fmt.Errorf("invalid SNMP version: %s", c.Options.Version)
 	}
 
-	c.Info(snmpClientConnInfo(client))
+	c.Info(snmputils.SnmpClientConnInfo(client))
 
 	return client, nil
 }
 
-func (c *Collector) initNetIfaceFilters() (matcher.Matcher, matcher.Matcher, error) {
-	byName, byType := matcher.FALSE(), matcher.FALSE()
+func (c *Collector) initProber() (ping.Prober, error) {
+	// base timeout = update_every seconds
+	timeout := time.Duration(c.UpdateEvery) * time.Second
 
-	if v := c.NetworkInterfaceFilter.ByName; v != "" {
-		m, err := matcher.NewSimplePatternsMatcher(v)
-		if err != nil {
-			return nil, nil, err
-		}
-		byName = m
-	}
+	// clamp between 1s and 3s
+	const minTimeout = time.Second
+	const maxTimeout = 3 * time.Second
+	timeout = max(min(timeout, maxTimeout), minTimeout)
 
-	if v := c.NetworkInterfaceFilter.ByType; v != "" {
-		m, err := matcher.NewSimplePatternsMatcher(v)
-		if err != nil {
-			return nil, nil, err
-		}
-		byType = m
-	}
+	conf := c.Ping.ProberConfig
+	conf.Timeout = timeout
 
-	return byName, byType, nil
-}
-
-func (c *Collector) initOIDs() (oids []string) {
-	for _, c := range *c.charts {
-		for _, d := range c.Dims {
-			oids = append(oids, d.ID)
-		}
-	}
-	return oids
-}
-
-func parseSNMPVersion(version string) gosnmp.SnmpVersion {
-	switch version {
-	case "0", "1":
-		return gosnmp.Version1
-	case "2", "2c", "":
-		return gosnmp.Version2c
-	case "3":
-		return gosnmp.Version3
-	default:
-		return gosnmp.Version2c
-	}
-}
-
-func parseSNMPv3SecurityLevel(level string) gosnmp.SnmpV3MsgFlags {
-	switch level {
-	case "1", "none", "noAuthNoPriv", "":
-		return gosnmp.NoAuthNoPriv
-	case "2", "authNoPriv":
-		return gosnmp.AuthNoPriv
-	case "3", "authPriv":
-		return gosnmp.AuthPriv
-	default:
-		return gosnmp.NoAuthNoPriv
-	}
-}
-
-func parseSNMPv3AuthProtocol(protocol string) gosnmp.SnmpV3AuthProtocol {
-	switch protocol {
-	case "1", "none", "noAuth", "":
-		return gosnmp.NoAuth
-	case "2", "md5":
-		return gosnmp.MD5
-	case "3", "sha":
-		return gosnmp.SHA
-	case "4", "sha224":
-		return gosnmp.SHA224
-	case "5", "sha256":
-		return gosnmp.SHA256
-	case "6", "sha384":
-		return gosnmp.SHA384
-	case "7", "sha512":
-		return gosnmp.SHA512
-	default:
-		return gosnmp.NoAuth
-	}
-}
-
-func parseSNMPv3PrivProtocol(protocol string) gosnmp.SnmpV3PrivProtocol {
-	switch protocol {
-	case "1", "none", "noPriv", "":
-		return gosnmp.NoPriv
-	case "2", "des":
-		return gosnmp.DES
-	case "3", "aes":
-		return gosnmp.AES
-	case "4", "aes192":
-		return gosnmp.AES192
-	case "5", "aes256":
-		return gosnmp.AES256
-	case "6", "aes192c":
-		return gosnmp.AES192C
-	case "7", "aes256c":
-		return gosnmp.AES256C
-	default:
-		return gosnmp.NoPriv
-	}
-}
-
-func snmpClientConnInfo(c gosnmp.Handler) string {
-	var info strings.Builder
-	info.WriteString(fmt.Sprintf("hostname='%s',port='%d',snmp_version='%s'", c.Target(), c.Port(), c.Version()))
-	switch c.Version() {
-	case gosnmp.Version1, gosnmp.Version2c:
-		info.WriteString(fmt.Sprintf(",community='%s'", c.Community()))
-	case gosnmp.Version3:
-		info.WriteString(fmt.Sprintf(",security_level='%d,%s'", c.MsgFlags(), c.SecurityParameters().Description()))
-	}
-	return info.String()
+	return c.newProber(conf, c.Logger), nil
 }

@@ -5,7 +5,7 @@ This Go bridge converts MCP stdio communication to Netdata's MCP over WebSocket.
 ## Requirements
 
 - Go 1.16+
-- nhooyr.io/websocket package
+- github.com/coder/websocket package
 
 ## Installation
 
@@ -32,7 +32,7 @@ Alternatively, you can build it manually:
 go mod init netdata/nd-mcp-bridge
 
 # Add dependencies
-go get nhooyr.io/websocket
+go get github.com/coder/websocket
 go mod tidy
 
 # Build the binary
@@ -89,7 +89,7 @@ The reconnection algorithm starts with a 1-second delay and doubles the wait tim
 ## Implementation Notes
 
 This implementation:
-- Uses the nhooyr.io/websocket library for WebSocket communication
+- Uses the github.com/coder/websocket library for WebSocket communication
 - Explicitly sets WebSocket headers including Sec-WebSocket-Key and Sec-WebSocket-Version
 - Implements proper WebSocket handshake to ensure compatibility with Netdata's WebSocket server
 - Sends and receives raw text messages directly (without JSON serialization/deserialization)

@@ -164,7 +164,10 @@ static inline PARSER_RC pluginsd_host_dictionary(char **words, size_t num_words,
         return PLUGINSD_DISABLE_PLUGIN(parser, keyword, "host is not defined, send " PLUGINSD_KEYWORD_HOST_DEFINE " before this");
 
     rrdlabels_add(labels, name, value, RRDLABEL_SRC_CONFIG);
-
+    if (strcmp(name, "_node_stale_after_seconds") == 0) {
+        uint32_t seconds = str2u(value);
+        parser->user.host_define.node_stale_after_seconds = seconds;
+    }
     return PARSER_RC_OK;
 }
 
@@ -189,6 +192,8 @@ static inline void pluginsd_update_host_ephemerality(RRDHOST *host) {
     if(!rrdlabels_exist(host->rrdlabels, HOST_LABEL_IS_EPHEMERAL))
         rrdlabels_add(host->rrdlabels, HOST_LABEL_IS_EPHEMERAL, value, RRDLABEL_SRC_CONFIG);
 }
+
+#define VNODE_BASE_EPOCH (1704067200L)  // Jan 1, 2024 00:00:00 UTC
 
 static inline PARSER_RC pluginsd_host_define_end(char **words __maybe_unused, size_t num_words __maybe_unused, PARSER *parser) {
     if(!parser->user.host_define.parsing_host)
@@ -251,14 +256,55 @@ static inline PARSER_RC pluginsd_host_define_end(char **words __maybe_unused, si
         schedule_node_state_update(host, 100);
 
     rrdhost_flag_set(host, RRDHOST_FLAG_METADATA_LABELS | RRDHOST_FLAG_METADATA_UPDATE);
+    uint32_t *Pvalue = (uint32_t *) JudyLIns(&parser->user.vnodes.JudyL, (Word_t) host, PJE0);
+    if (Pvalue != PJERR)
+        *Pvalue = (uint32_t) (now_realtime_sec() - VNODE_BASE_EPOCH);
+    else
+        nd_log_daemon(NDLP_ERR, "VNODE: Cannot track virtual host \"%s\" for staleness - JudyLIns error", rrdhost_hostname(host));
+    host->node_stale_after_seconds = parser->user.host_define.node_stale_after_seconds;
+    nd_log_daemon(NDLP_INFO, "VNODE: Configuring node stale after %u seconds for host \"%s\"", host->node_stale_after_seconds, rrdhost_hostname(host));
     return PARSER_RC_OK;
 }
 
-static inline PARSER_RC pluginsd_host(char **words, size_t num_words, PARSER *parser) {
+static inline PARSER_RC pluginsd_host(char **words, size_t num_words, PARSER *parser)
+{
+    static time_t last_host_stale_check = 0;
     char *guid = get_word(words, num_words, 1);
 
     if(!guid || !*guid || strcmp(guid, "localhost") == 0) {
         parser->user.host = localhost;
+        // Check if we need to switch any nodes to stale
+        uint32_t min_check_interval = UINT_MAX;
+        time_t now = now_realtime_sec();
+        if (last_host_stale_check < now) {
+            Word_t Index = 0;
+            bool first_then_next = true;
+            uint32_t *Pvalue;
+            while ((Pvalue = (uint32_t *) JudyLFirstThenNext(parser->user.vnodes.JudyL, &Index, &first_then_next))) {
+                RRDHOST *virtual_host = (RRDHOST *) Index;
+                uint32_t stale_after_seconds = virtual_host->node_stale_after_seconds;
+                if (!stale_after_seconds)
+                    continue;
+
+                min_check_interval = MIN(min_check_interval, stale_after_seconds);
+                if (rrdhost_option_check(virtual_host, RRDHOST_OPTION_VIRTUAL_HOST)) {
+                    time_t last_seen = (*Pvalue + VNODE_BASE_EPOCH);
+                    uint32_t seen_seconds_ago = (uint32_t) (now - last_seen);
+
+                    if (seen_seconds_ago >= stale_after_seconds) {
+                        rrdhost_option_clear(virtual_host, RRDHOST_OPTION_VIRTUAL_HOST);
+                        rrdhost_flag_clear(virtual_host, RRDHOST_FLAG_COLLECTOR_ONLINE);
+                        nd_log_daemon(NDLP_INFO, "VNODE: Marking node \"%s\" as STALE, last seen %u seconds ago", rrdhost_hostname(virtual_host), seen_seconds_ago);
+                        schedule_node_state_update(virtual_host, 1000);
+                        stream_sender_signal_to_stop_and_wait(virtual_host, STREAM_HANDSHAKE_SND_VNODE_IS_STALE, false);
+                    }
+                }
+            }
+            if (min_check_interval == UINT_MAX)
+                min_check_interval = 60;
+
+            last_host_stale_check = now_realtime_sec() + min_check_interval;
+        }
         return PARSER_RC_OK;
     }
 
@@ -272,7 +318,17 @@ static inline PARSER_RC pluginsd_host(char **words, size_t num_words, PARSER *pa
         return PLUGINSD_DISABLE_PLUGIN(parser, PLUGINSD_KEYWORD_HOST, "cannot find a host with this machine guid - have you created it?");
 
     parser->user.host = host;
-
+    uint32_t *Pvalue = (uint32_t *) JudyLGet(parser->user.vnodes.JudyL, (Word_t) host, PJE0);
+    if (Pvalue) {
+        *Pvalue = (uint32_t) (now_realtime_sec() - VNODE_BASE_EPOCH);
+        // Check if we need to enable
+        if (!rrdhost_option_check(host, RRDHOST_OPTION_VIRTUAL_HOST)) {
+            rrdhost_option_set(host, RRDHOST_OPTION_VIRTUAL_HOST);
+            rrdhost_flag_set(host, RRDHOST_FLAG_COLLECTOR_ONLINE);
+            nd_log_daemon(NDLP_INFO, "VNODE: Re-enabling virtual host \"%s\"", rrdhost_hostname(host));
+            schedule_node_state_update(host, 1000);
+        }
+    }
     return PARSER_RC_OK;
 }
 
@@ -1259,6 +1315,22 @@ inline size_t pluginsd_process(RRDHOST *host, struct plugind *cd, int fd_input, 
     }
     else
         cd->serial_failures++;
+
+    {
+        Word_t Index = 0;
+        bool first_then_next = true;
+        while (JudyLFirstThenNext(parser->user.vnodes.JudyL, &Index, &first_then_next)) {
+            RRDHOST *virtual_host = (RRDHOST *) Index;
+            nd_log_daemon(NDLP_INFO, "PLUGINSD: Checking virtual status for %s", rrdhost_hostname(virtual_host));
+            if (rrdhost_option_check(virtual_host, RRDHOST_OPTION_VIRTUAL_HOST)) {
+                nd_log_daemon(NDLP_INFO, "PLUGINSD: Reseting virtual host status for %s", rrdhost_hostname(virtual_host));
+                rrdhost_option_clear(virtual_host, RRDHOST_OPTION_VIRTUAL_HOST);
+                rrdhost_flag_clear(virtual_host, RRDHOST_FLAG_COLLECTOR_ONLINE);
+                schedule_node_state_update(virtual_host, 1000);
+            }
+        }
+        (void) JudyLFreeArray(&parser->user.vnodes.JudyL, PJE0);
+    }
 
     // mark all charts of this plugin as obsolete
     RRDSET *st;

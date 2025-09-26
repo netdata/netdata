@@ -19,16 +19,25 @@ If you receive an error saying that your node can’t execute Functions, check t
 
 :::
 
----
-
 ## Top Tab Structure Overview
 
 ```mermaid
-graph TD
-    A[Functions Bar]
-    A --> B[Function Execution]
-    B --> C[Visualization]
-    C --> D[Results Table]
+flowchart TD
+    A("Functions Bar")
+    A --> B("Function Execution")
+    B --> C("Visualization")
+    C --> D("Results Table")
+
+    %% Style definitions
+    classDef alert fill:#ffeb3b,stroke:#000000,stroke-width:3px,color:#000000,font-size:14px
+    classDef neutral fill:#f9f9f9,stroke:#000000,stroke-width:3px,color:#000000,font-size:14px
+    classDef complete fill:#4caf50,stroke:#000000,stroke-width:3px,color:#000000,font-size:14px
+    classDef database fill:#2196F3,stroke:#000000,stroke-width:3px,color:#000000,font-size:14px
+
+    %% Apply styles
+    class A alert
+    class B neutral
+    class C,D complete
 ```
 
 :::tip
@@ -36,8 +45,6 @@ graph TD
 The diagram above shows how Function selection and execution work in the Top tab, helping you visualize the flow from choosing a Function to viewing the results.
 
 :::
-
----
 
 ## Top Tab View
 
@@ -56,8 +63,6 @@ You can control the data refresh and update settings in the top right-hand corne
 |-------------------------|--------------------------------------------------------------------------|
 | **Refresh results**     | Manually refresh results (works when the dashboard is in `Paused` mode). |
 | **Set update interval** | Configure how often the results should refresh.                          |
-
----
 
 ## Functions Bar
 

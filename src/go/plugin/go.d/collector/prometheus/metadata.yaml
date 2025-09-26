@@ -55,21 +55,32 @@ modules:
             enabled: true
           list:
             - name: update_every
-              description: Data collection frequency.
+              description: Data collection interval (seconds).
               default_value: 10
               required: false
+              group: Collection
             - name: autodetection_retry
-              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              description: Autodetection retry interval (seconds). Set 0 to disable.
               default_value: 0
               required: false
+              group: Collection
+
             - name: url
-              description: Server URL.
+              description: Target endpoint URL.
               default_value: ""
               required: true
+              group: Target
+            - name: timeout
+              description: HTTP request timeout (seconds).
+              default_value: 10
+              required: false
+              group: Target
+
             - name: selector
               description: Time series selector (filter).
               default_value: ""
               required: false
+              group: Filters
               detailed_description: |
                 This option allows you to filter out unwanted time series. Only metrics matching the selector will be collected.
 
@@ -86,10 +97,24 @@ modules:
                     - pattern3
                     - pattern4
                 ```
+
+            - name: max_time_series
+              description: Global time series limit. If an endpoint returns more time series than this, the data is not processed.
+              default_value: 2000
+              required: false
+              group: Limits
+
+            - name: max_time_series_per_metric
+              description: Per-metric time series limit. Metrics with more time series than this are skipped.
+              default_value: 200
+              required: false
+              group: Limits
+
             - name: fallback_type
-              description: Time series selector (filter).
+              description: Fallback type rules for untyped metrics.
               default_value: ""
               required: false
+              group: Customization
               detailed_description: |
                 This option allows you to process Untyped metrics as Counter or Gauge instead of ignoring them.
 
@@ -105,74 +130,97 @@ modules:
                     - metric_name_pattern3
                     - metric_name_pattern4
                 ```
-            - name: max_time_series
-              description: Global time series limit. If an endpoint returns number of time series > limit the data is not processed.
-              default_value: 2000
-              required: false
-            - name: max_time_series_per_metric
-              description: Time series per metric (metric name) limit. Metrics with number of time series > limit are skipped.
-              default_value: 200
-              required: false
+
             - name: label_prefix
-              description: "An optional prefix that will be added to all labels of all charts. If set, the label names will be automatically formatted as `prefix_name` (the prefix followed by an underscore and the original name)."
+              description: "Optional prefix added to all labels of all charts. Labels will be formatted as `prefix_name`."
               default_value: ""
               required: false
-            - name: timeout
-              description: HTTP request timeout.
-              default_value: 10
-              required: false
+              group: Customization
+
             - name: username
-              description: Username for basic HTTP authentication.
+              description: Username for Basic HTTP authentication.
               default_value: ""
               required: false
+              group: HTTP Auth
             - name: password
-              description: Password for basic HTTP authentication.
+              description: Password for Basic HTTP authentication.
               default_value: ""
               required: false
+              group: HTTP Auth
+            - name: bearer_token_file
+              description: "Path to a file containing a bearer token (used for `Authorization: Bearer`)."
+              default_value: ""
+              required: false
+              group: HTTP Auth
+
+            - name: tls_skip_verify
+              description: Skip TLS certificate and hostname verification (insecure).
+              default_value: no
+              required: false
+              group: TLS
+            - name: tls_ca
+              description: Path to CA bundle used to validate the server certificate.
+              default_value: ""
+              required: false
+              group: TLS
+            - name: tls_cert
+              description: Path to client TLS certificate (for mTLS).
+              default_value: ""
+              required: false
+              group: TLS
+            - name: tls_key
+              description: Path to client TLS private key (for mTLS).
+              default_value: ""
+              required: false
+              group: TLS
+
             - name: proxy_url
-              description: Proxy URL.
+              description: HTTP proxy URL.
               default_value: ""
               required: false
+              group: Proxy
             - name: proxy_username
-              description: Username for proxy basic HTTP authentication.
+              description: Username for proxy Basic HTTP authentication.
               default_value: ""
               required: false
+              group: Proxy
             - name: proxy_password
-              description: Password for proxy basic HTTP authentication.
+              description: Password for proxy Basic HTTP authentication.
               default_value: ""
               required: false
+              group: Proxy
+
             - name: method
-              description: HTTP request method.
+              description: HTTP method to use.
               default_value: "GET"
               required: false
+              group: Request
             - name: body
-              description: HTTP request body.
+              description: Request body (e.g., for POST/PUT).
               default_value: ""
               required: false
+              group: Request
             - name: headers
-              description: HTTP request headers.
+              description: "Additional HTTP headers (one per line as key: value)."
               default_value: ""
               required: false
+              group: Request
             - name: not_follow_redirects
-              description: Redirect handling policy. Controls whether the client follows redirects.
+              description: Do not follow HTTP redirects.
               default_value: no
               required: false
-            - name: tls_skip_verify
-              description: Server certificate chain and hostname validation policy. Controls whether the client performs this check.
+              group: Request
+            - name: force_http2
+              description: Force HTTP/2 (including h2c over TCP).
               default_value: no
               required: false
-            - name: tls_ca
-              description: Certification authority that the client uses when verifying the server's certificates.
+              group: Request
+
+            - name: vnode
+              description: Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).
               default_value: ""
               required: false
-            - name: tls_cert
-              description: Client TLS certificate.
-              default_value: ""
-              required: false
-            - name: tls_key
-              description: Client TLS key.
-              default_value: ""
-              required: false
+              group: Virtual Node
         examples:
           folding:
             title: Config

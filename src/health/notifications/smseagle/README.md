@@ -16,7 +16,6 @@ endmeta-->
 Forward notifications to SMSEagle device to send SMS, MMS, wake-up, or text-to-speech calls.
 
 
-
 <img src="https://img.shields.io/badge/maintained%20by-Netdata-%2300ab44" />
 
 ## Setup

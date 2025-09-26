@@ -89,7 +89,6 @@ There you can see that discovering took `525.614041ms`, and collecting metrics t
 `update_every` and `timeout` parameters should be adjusted based on these numbers.
 
 
-
 ## Metrics
 
 Metrics grouped by *scope*.
@@ -204,25 +203,31 @@ The following options can be defined globally: update_every, autodetection_retry
 
 
 
-| Option | Description | Default | Required |
-|:-----|:------------|:--------|:---------:|
-| update_every | Data collection frequency. | 20 | no |
-| autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
-| url | vCenter server URL. |  | yes |
-| host_include | Hosts selector (filter). |  | no |
-| vm_include | Virtual machines selector (filter). |  | no |
-| discovery_interval | Hosts and VMs discovery interval. | 300 | no |
-| timeout | HTTP request timeout. | 20 | no |
-| username | Username for basic HTTP authentication. |  | no |
-| password | Password for basic HTTP authentication. |  | no |
-| proxy_url | Proxy URL. |  | no |
-| proxy_username | Username for proxy basic HTTP authentication. |  | no |
-| proxy_password | Password for proxy basic HTTP authentication. |  | no |
-| not_follow_redirects | Redirect handling policy. Controls whether the client follows redirects. | no | no |
-| tls_skip_verify | Server certificate chain and hostname validation policy. Controls whether the client performs this check. | no | no |
-| tls_ca | Certification authority that the client uses when verifying the server's certificates. |  | no |
-| tls_cert | Client TLS certificate. |  | no |
-| tls_key | Client TLS key. |  | no |
+| Group | Option | Description | Default | Required |
+|:------|:-----|:------------|:--------|:---------:|
+| **Collection** | update_every | Data collection interval (seconds). | 1 | no |
+|  | autodetection_retry | Autodetection retry interval (seconds). Set 0 to disable. | 0 | no |
+| **Target** | url | Target endpoint URL. | http://127.0.0.1/server-status?auto | yes |
+|  | timeout | HTTP request timeout (seconds). | 1 | no |
+| **Discovery** | discovery_interval | Hosts and VMs discovery interval (seconds). | 300 | no |
+| **Filters** | host_include | Hosts selector (filter). | /* | no |
+|  | vm_include | VM selector (filter). | /* | no |
+| **HTTP Auth** | username | Username for Basic HTTP authentication. |  | yes |
+|  | password | Password for Basic HTTP authentication. |  | yes |
+|  | bearer_token_file | Path to a file containing a bearer token (used for `Authorization: Bearer`). |  | no |
+| **TLS** | tls_skip_verify | Skip TLS certificate and hostname verification (insecure). | no | no |
+|  | tls_ca | Path to CA bundle used to validate the server certificate. |  | no |
+|  | tls_cert | Path to client TLS certificate (for mTLS). |  | no |
+|  | tls_key | Path to client TLS private key (for mTLS). |  | no |
+| **Proxy** | proxy_url | HTTP proxy URL. |  | no |
+|  | proxy_username | Username for proxy Basic HTTP authentication. |  | no |
+|  | proxy_password | Password for proxy Basic HTTP authentication. |  | no |
+| **Request** | method | HTTP method to use. | GET | no |
+|  | body | Request body (e.g., for POST/PUT). |  | no |
+|  | headers | Additional HTTP headers (one per line as key: value). |  | no |
+|  | not_follow_redirects | Do not follow HTTP redirects. | no | no |
+|  | force_http2 | Force HTTP/2 (including h2c over TCP). | no | no |
+| **Virtual Node** | vnode | Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). |  | no |
 
 ##### host_include
 
@@ -234,9 +239,9 @@ Metrics of hosts matching the selector will be collected.
 
   ```yaml
   host_include:
-    - '/DC1/*'           # select all hosts from datacenter DC1
-    - '/DC2/*/!Host2 *'  # select all hosts from datacenter DC2 except HOST2
-    - '/DC3/Cluster3/*'  # select all hosts from datacenter DC3 cluster Cluster3
+    - '/DC1/*'           # all hosts from datacenter DC1
+    - '/DC2/*/!Host2 *'  # all hosts from datacenter DC2 except HOST2
+    - '/DC3/Cluster3/*'  # all hosts from DC3, cluster Cluster3
   ```
 
 
@@ -250,9 +255,9 @@ Metrics of VMs matching the selector will be collected.
 
   ```yaml
   vm_include:
-    - '/DC1/*'           # select all VMs from datacenter DC
-    - '/DC2/*/*/!VM2 *'  # select all VMs from datacenter DC2 except VM2
-    - '/DC3/Cluster3/*'  # select all VMs from datacenter DC3 cluster Cluster3
+    - '/DC1/*'           # all VMs from datacenter DC1
+    - '/DC2/*/*/!VM2 *'  # all VMs from DC2 except VM2
+    - '/DC3/Cluster3/*'  # all VMs from DC3, cluster Cluster3
   ```
 
 

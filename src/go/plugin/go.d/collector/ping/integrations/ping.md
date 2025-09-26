@@ -69,7 +69,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-
 ## Metrics
 
 Metrics grouped by *scope*.
@@ -143,16 +142,17 @@ The following options can be defined globally: update_every, autodetection_retry
 
 
 
-| Option | Description | Default | Required |
-|:-----|:------------|:--------|:---------:|
-| update_every | Data collection frequency. | 5 | no |
-| autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
-| hosts | Network hosts. |  | yes |
-| network | Allows configuration of DNS resolution. Supported options: ip (select IPv4 or IPv6), ip4 (select IPv4), ip6 (select IPv6). | ip | no |
-| interface | The network device name (e.g., `eth0`, `wlan0`) used as the source for ICMP echo requests. |  | no |
-| privileged | Ping packets type. "yes" means raw ICMP ping, "no" - "unprivileged" UDP ping. | yes | yes |
-| packets | Number of ping packets to send. | 5 | no |
-| interval | Timeout between sending ping packets. | 100ms | no |
+| Group | Option | Description | Default | Required |
+|:------|:-----|:------------|:--------|:---------:|
+| **Collection** | update_every | Data collection interval (seconds). | 5 | no |
+|  | autodetection_retry | Autodetection retry interval (seconds). Set 0 to disable. | 0 | no |
+| **Target** | hosts | List of hosts to ping. | [] | yes |
+| **Ping Settings** | network | DNS resolution mode. Options: `ip` (IPv4 or IPv6), `ip4` (IPv4 only), `ip6` (IPv6 only). | ip | no |
+|  | interface | Network interface to use for ICMP echo requests (e.g., `eth0`, `wlan0`). |  | no |
+|  | privileged | Ping packet type. `yes` = raw ICMP ping, `no` = unprivileged UDP ping. | yes | yes |
+|  | packets | Number of ping packets to send per iteration. | 5 | no |
+|  | interval | Interval between sending ping packets. | 100ms | no |
+| **Virtual Node** | vnode | Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). |  | no |
 
 
 </details>

@@ -4,6 +4,8 @@ go 1.24.0
 
 replace github.com/prometheus/prometheus => github.com/prometheus/prometheus v0.302.0
 
+replace github.com/gosnmp/gosnmp => github.com/ilyam8/gosnmp v0.0.0-20250912202722-388b2cb5192e
+
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/Masterminds/sprig/v3 v3.3.0

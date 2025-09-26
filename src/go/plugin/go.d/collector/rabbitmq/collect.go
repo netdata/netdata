@@ -62,7 +62,12 @@ func (c *Collector) getClusterMeta() (id string, name string, err error) {
 		return "", "", fmt.Errorf("unexpected response: whoami: user name n is empty")
 	}
 
-	if !slices.Contains(user.Tags, "administrator") {
+	// In RabbitMQ < 3.8.3 the `tags` field may be returned as a single string
+	// (e.g. "administrator,management") instead of an array. We intentionally
+	// treat it as one tag and do not split on commas here.
+	if !slices.ContainsFunc(user.Tags, func(s string) bool {
+		return strings.Contains(s, "administrator")
+	}) {
 		c.Warningf("user %s lacks 'administrator' tag: cluster ID and name cannot be collected.", user.Name)
 		return "", "", nil
 	}

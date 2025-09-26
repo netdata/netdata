@@ -6,7 +6,10 @@ extends:
   - _cisco-base.yaml
   - _cisco-catalyst.yaml
 
-sysobjectid: 1.3.6.1.4.1.9.1.1745 # cat38xxstack
+selector:
+  - sysobjectid:
+      include:
+        - 1.3.6.1.4.1.9.1.1745 # cat38xxstack
 
 # Example sysDescr:
 #   Cisco IOS Software, IOS-XE Software, Catalyst L3 Switch Software (CAT3K_CAA-UNIVERSALK9-M), Version 03.06.06E RELEASE SOFTWARE (fc1) Technical Support: http://www.cisco.com/techsupport Copyright (c) 1986-2016 by Cisco Systems, Inc. Compiled Sat 17-Dec-

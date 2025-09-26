@@ -16,8 +16,6 @@ This page explains how Netdata designs and operates secure, privacy-respecting s
 
 Netdata builds security into every layer. You retain control over your observability data while benefiting from powerful real-time monitoring and insights.
 
----
-
 ## Netdata's Security Principles
 
 ### Security by Design
@@ -37,10 +35,22 @@ Here is how your data flows through Netdata:
 
 ```mermaid
 flowchart TD
-    A[Your System] -->|Collect metrics and logs| B(Netdata Agent)
-    B --> C[Observability Data<br/>Stored locally]
-    B --> D[Observability Metadata<br/>securely routed to Cloud]
-    D --> E[Cloud dashboards, routing<br/>& notifications]
+    A("Your System") -->|"Collect metrics and logs"| B("Netdata Agent")
+    B --> C("Observability Data<br/>Stored locally")
+    B --> D("Observability Metadata<br/>securely routed to Cloud")
+    D --> E("Cloud dashboards, routing<br/>& notifications")
+
+    %% Style definitions
+    classDef alert fill:#ffeb3b,stroke:#000000,stroke-width:3px,color:#000000,font-size:14px
+    classDef neutral fill:#f9f9f9,stroke:#000000,stroke-width:3px,color:#000000,font-size:14px
+    classDef complete fill:#4caf50,stroke:#000000,stroke-width:3px,color:#000000,font-size:14px
+    classDef database fill:#2196F3,stroke:#000000,stroke-width:3px,color:#000000,font-size:14px
+
+    %% Apply styles
+    class A alert
+    class B neutral
+    class C complete
+    class D,E database
 ```
 
 :::tip
@@ -78,8 +88,6 @@ Netdata handles vulnerabilities with a clear process:
 Stay updated by subscribing to [Netdata’s GitHub releases](https://github.com/netdata/netdata/security/policy).
 
 :::
-
----
 
 ## Compliance with Regulations
 
@@ -125,8 +133,6 @@ Deleting your account removes all associated personal data, including email and 
 
 Netdata continuously updates its policies and technical controls to stay aligned with evolving regulations.
 
----
-
 ## Anonymous Statistics
 
 Netdata collects anonymous installation and telemetry statistics to improve its services.
@@ -154,8 +160,6 @@ See [installation documentation](https://learn.netdata.cloud/docs/netdata-agent/
 
 Netdata does not sell or share anonymous statistics with any third parties.
 
----
-
 ## Internal Security Measures
 
 Netdata enforces layered security controls:
@@ -176,8 +180,6 @@ Need additional security configurations? Contact Netdata Support.
 
 :::
 
----
-
 ## Standards Alignment
 
 ### PCI DSS Alignment
@@ -197,8 +199,6 @@ Consult a PCI DSS compliance expert if you use Netdata as part of your PCI envir
 
 :::
 
----
-
 ### HIPAA Alignment
 
 Netdata aligns with HIPAA security practices:
@@ -214,8 +214,6 @@ Request a BAA through Netdata Support if required.
 
 :::
 
----
-
 ### SOC 2 Compliance
 
 Netdata achieved SOC2 Type 1 compliance on May 14, 2025 for these Service Criteria:
@@ -225,8 +223,6 @@ Netdata achieved SOC2 Type 1 compliance on May 14, 2025 for these Service Criter
 | Security             | TLS encryption, strict access controls   |
 | Availability         | Resilient systems, continuous monitoring |
 | Confidentiality      | Metadata isolation, role-based access    |
-
----
 
 ## Conclusion
 

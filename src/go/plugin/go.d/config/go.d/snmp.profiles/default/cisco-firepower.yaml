@@ -12,15 +12,17 @@ metadata:
       vendor:
         value: Cisco
 
-sysobjectid:
-  - 1.3.6.1.4.1.9.1.2404 # Cisco FPR 2110td
-  - 1.3.6.1.4.1.9.1.2405 # Cisco FPR 2120td
-  - 1.3.6.1.4.1.9.1.2406 # Cisco FPR 2130td
-  - 1.3.6.1.4.1.9.1.2407 # Cisco FPR 2140td
-  - 1.3.6.1.4.1.9.1.2778 # Cisco FPR 4125 K9
-  - 1.3.6.1.4.1.9.1.2292 # Cisco FPR 4150 K9
-  # Following sysObjectID requires more investigation to be certain if we should include it:
-  # - 1.3.6.1.4.1.9.12.3.1.3.1788    # Cisco FPR 4120
+selector:
+  - sysobjectid:
+      include:
+        - 1.3.6.1.4.1.9.1.2404 # Cisco FPR 2110td
+        - 1.3.6.1.4.1.9.1.2405 # Cisco FPR 2120td
+        - 1.3.6.1.4.1.9.1.2406 # Cisco FPR 2130td
+        - 1.3.6.1.4.1.9.1.2407 # Cisco FPR 2140td
+        - 1.3.6.1.4.1.9.1.2778 # Cisco FPR 4125 K9
+        - 1.3.6.1.4.1.9.1.2292 # Cisco FPR 4150 K9
+        # Following sysObjectID requires more investigation to be certain if we should include it:
+        # - 1.3.6.1.4.1.9.12.3.1.3.1788    # Cisco FPR 4120
 
 metrics:
   - MIB: CISCO-PROCESS-MIB

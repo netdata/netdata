@@ -58,29 +58,44 @@ modules:
             enabled: true
           list:
             - name: update_every
-              description: Data collection frequency.
+              description: Data collection interval (seconds).
               default_value: 1
               required: false
+              group: Collection
             - name: autodetection_retry
-              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              description: Autodetection retry interval (seconds). Set 0 to disable.
               default_value: 0
               required: false
+              group: Collection
+
             - name: address
-              description: 'Docker daemon''s listening address. When using a TCP socket, the format is: tcp://[ip]:[port]'
+              description: "Docker daemon address. For TCP sockets: `tcp://IP:PORT`."
               default_value: unix:///var/run/docker.sock
               required: true
+              group: Target
             - name: timeout
-              description: Request timeout in seconds.
+              description: Request timeout (seconds).
               default_value: 2
               required: false
+              group: Target
+
             - name: container_selector
-              description: "[Pattern](https://github.com/netdata/netdata/tree/master/src/libnetdata/simple_pattern#readme) to specify which containers to monitor."
+              description: "Container selector. Defines which containers to monitor. Uses [simple patterns](https://github.com/netdata/netdata/tree/master/src/libnetdata/simple_pattern#readme)."
               default_value: "*"
               required: false
+              group: Filters
+
             - name: collect_container_size
-              description: Whether to collect container writable layer size.
-              default_value: "no"
+              description: Collect container writable layer size metrics.
+              default_value: no
               required: false
+              group: Metrics Selection
+
+            - name: vnode
+              description: Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).
+              default_value: ""
+              required: false
+              group: Virtual Node
         examples:
           folding:
             enabled: true
