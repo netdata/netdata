@@ -76,7 +76,7 @@ func (c *Collector) Init(context.Context) error {
 
 	pr, err := c.initProber()
 	if err != nil {
-		return fmt.Errorf("init Prober: %v", err)
+		return fmt.Errorf("init ping prober: %v", err)
 	}
 	c.prober = pr
 

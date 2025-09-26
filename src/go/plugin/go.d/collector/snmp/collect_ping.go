@@ -13,7 +13,7 @@ func (c *Collector) collectPing(mx map[string]int64) error {
 	}
 
 	if stats.PacketsRecv == 0 {
-		//  do not emit metrics if no replies
+		// do not emit metrics if no replies
 		return nil
 	}
 

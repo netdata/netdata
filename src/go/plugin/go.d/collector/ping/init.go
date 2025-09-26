@@ -24,7 +24,7 @@ func (c *Collector) initProber() (Prober, error) {
 	}
 	timeout := time.Millisecond * time.Duration(float64(c.UpdateEvery)*mul*1000)
 	if timeout.Milliseconds() == 0 {
-		return nil, errors.New("zero Ping timeout")
+		return nil, errors.New("zero ping timeout")
 	}
 	conf := c.Config.ProberConfig
 	conf.Timeout = timeout

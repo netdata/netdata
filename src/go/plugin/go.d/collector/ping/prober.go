@@ -62,7 +62,7 @@ func (p *pingProber) Ping(host string) (*probing.Statistics, error) {
 
 	stats := pr.Statistics()
 
-	p.Debugf("Ping stats for host '%s' (ip '%s'): %+v", pr.Addr(), pr.IPAddr(), stats)
+	p.Debugf("ping stats for host '%s' (ip '%s'): %+v", pr.Addr(), pr.IPAddr(), stats)
 
 	return stats, nil
 }
