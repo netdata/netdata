@@ -83,12 +83,3 @@ func (c *Collector) initProber() (ping.Prober, error) {
 
 	return c.newProber(conf, c.Logger), nil
 }
-
-func (c *Collector) initCustomOIDs() (oids []string) {
-	for _, c := range *c.charts {
-		for _, d := range c.Dims {
-			oids = append(oids, d.ID)
-		}
-	}
-	return oids
-}

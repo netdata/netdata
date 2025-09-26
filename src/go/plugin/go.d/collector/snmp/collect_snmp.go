@@ -7,26 +7,10 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/gosnmp/gosnmp"
-
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 )
 
 func (c *Collector) collectSNMP(mx map[string]int64) error {
-	if err := c.collectProfiles(mx); err != nil {
-		return err
-	}
-
-	if !c.DisableLegacyCollection && len(c.customOids) > 0 {
-		if err := c.collectLegacyCustomOIDs(mx); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (c *Collector) collectProfiles(mx map[string]int64) error {
 	if len(c.snmpProfiles) == 0 || c.ddSnmpColl == nil {
 		return nil
 	}
@@ -139,42 +123,4 @@ func tableMetricKey(m ddsnmp.Metric) string {
 	}
 
 	return sb.String()
-}
-
-func (c *Collector) collectLegacyCustomOIDs(mx map[string]int64) error {
-	for i, end := 0, 0; i < len(c.customOids); i += c.Options.MaxOIDs {
-		if end = i + c.Options.MaxOIDs; end > len(c.customOids) {
-			end = len(c.customOids)
-		}
-
-		oids := c.customOids[i:end]
-		resp, err := c.snmpClient.Get(oids)
-		if err != nil {
-			c.Errorf("cannot get SNMP data: %v", err)
-			return err
-		}
-
-		for i, oid := range oids {
-			if i >= len(resp.Variables) {
-				continue
-			}
-
-			switch v := resp.Variables[i]; v.Type {
-			case gosnmp.Boolean,
-				gosnmp.Counter32,
-				gosnmp.Counter64,
-				gosnmp.Gauge32,
-				gosnmp.TimeTicks,
-				gosnmp.Uinteger32,
-				gosnmp.OpaqueFloat,
-				gosnmp.OpaqueDouble,
-				gosnmp.Integer:
-				mx[oid] = gosnmp.ToBigInt(v.Value).Int64()
-			default:
-				c.Debugf("skipping OID '%s' (unsupported type '%s')", oid, v.Type)
-			}
-		}
-	}
-
-	return nil
 }

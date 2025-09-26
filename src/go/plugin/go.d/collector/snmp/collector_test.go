@@ -5,8 +5,6 @@ package snmp
 import (
 	"context"
 	"encoding/hex"
-	"errors"
-	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -130,72 +128,11 @@ func TestCollector_Cleanup(t *testing.T) {
 	}
 }
 
-func TestCollector_Charts(t *testing.T) {
-	tests := map[string]struct {
-		prepareSNMP   func(t *testing.T, m *snmpmock.MockHandler) *Collector
-		wantNumCharts int
-		doCollect     bool
-	}{
-		"custom, no if-mib": {
-			wantNumCharts: 10,
-			prepareSNMP: func(t *testing.T, m *snmpmock.MockHandler) *Collector {
-				collr := New()
-				collr.Config = prepareConfigWithUserCharts(prepareV2Config(), 0, 9)
-
-				return collr
-			},
-		},
-	}
-
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			mockSNMP, cleanup := mockInit(t)
-			defer cleanup()
-
-			setMockClientInitExpect(mockSNMP)
-
-			collr := test.prepareSNMP(t, mockSNMP)
-			collr.newSnmpClient = func() gosnmp.Handler { return mockSNMP }
-
-			require.NoError(t, collr.Init(context.Background()))
-
-			if test.doCollect {
-				_ = collr.Check(context.Background())
-				_ = collr.Collect(context.Background())
-			}
-
-			assert.Equal(t, test.wantNumCharts, len(*collr.Charts()))
-		})
-	}
-}
-
 func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
 		wantFail    bool
 		prepareSNMP func(m *snmpmock.MockHandler) *Collector
-	}{
-		"success when sysinfo collected": {
-			wantFail: false,
-			prepareSNMP: func(m *snmpmock.MockHandler) *Collector {
-				collr := New()
-				collr.Config = prepareV2Config()
-
-				setMockClientSysInfoExpect(m)
-
-				return collr
-			},
-		},
-		"fail when snmp client Get fails": {
-			wantFail: true,
-			prepareSNMP: func(m *snmpmock.MockHandler) *Collector {
-				collr := New()
-				collr.Config = prepareConfigWithUserCharts(prepareV2Config(), 0, 3)
-				m.EXPECT().WalkAll(snmputils.RootOidMibSystem).Return(nil, errors.New("mock Get() error")).Times(1)
-
-				return collr
-			},
-		},
-	}
+	}{}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -222,87 +159,7 @@ func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
 		prepareSNMP   func(m *snmpmock.MockHandler) *Collector
 		wantCollected map[string]int64
-	}{
-		"success only custom OIDs supported type": {
-			prepareSNMP: func(m *snmpmock.MockHandler) *Collector {
-				collr := New()
-				collr.Config = prepareConfigWithUserCharts(prepareV2Config(), 0, 3)
-				collr.enableProfiles = false
-
-				m.EXPECT().Get(gomock.Any()).Return(&gosnmp.SnmpPacket{
-					Variables: []gosnmp.SnmpPDU{
-						{Value: 10, Type: gosnmp.Counter32},
-						{Value: 20, Type: gosnmp.Counter64},
-						{Value: 30, Type: gosnmp.Gauge32},
-						{Value: 1, Type: gosnmp.Boolean},
-						{Value: 40, Type: gosnmp.Gauge32},
-						{Value: 50, Type: gosnmp.TimeTicks},
-						{Value: 60, Type: gosnmp.Uinteger32},
-						{Value: 70, Type: gosnmp.Integer},
-					},
-				}, nil).Times(1)
-
-				return collr
-			},
-			wantCollected: map[string]int64{
-				//"TestMetric":             1,
-				"1.3.6.1.2.1.2.2.1.10.0": 10,
-				"1.3.6.1.2.1.2.2.1.16.0": 20,
-				"1.3.6.1.2.1.2.2.1.10.1": 30,
-				"1.3.6.1.2.1.2.2.1.16.1": 1,
-				"1.3.6.1.2.1.2.2.1.10.2": 40,
-				"1.3.6.1.2.1.2.2.1.16.2": 50,
-				"1.3.6.1.2.1.2.2.1.10.3": 60,
-				"1.3.6.1.2.1.2.2.1.16.3": 70,
-			},
-		},
-		"success only custom OIDs supported and unsupported type": {
-			prepareSNMP: func(m *snmpmock.MockHandler) *Collector {
-				collr := New()
-				collr.Config = prepareConfigWithUserCharts(prepareV2Config(), 0, 2)
-				collr.enableProfiles = false
-
-				m.EXPECT().Get(gomock.Any()).Return(&gosnmp.SnmpPacket{
-					Variables: []gosnmp.SnmpPDU{
-						{Value: 10, Type: gosnmp.Counter32},
-						{Value: 20, Type: gosnmp.Counter64},
-						{Value: 30, Type: gosnmp.Gauge32},
-						{Value: nil, Type: gosnmp.NoSuchInstance},
-						{Value: nil, Type: gosnmp.NoSuchInstance},
-						{Value: nil, Type: gosnmp.NoSuchInstance},
-					},
-				}, nil).Times(1)
-
-				return collr
-			},
-			wantCollected: map[string]int64{
-				//"TestMetric":             1,
-				"1.3.6.1.2.1.2.2.1.10.0": 10,
-				"1.3.6.1.2.1.2.2.1.16.0": 20,
-				"1.3.6.1.2.1.2.2.1.10.1": 30,
-			},
-		},
-		"fails when only custom OIDs unsupported type": {
-			prepareSNMP: func(m *snmpmock.MockHandler) *Collector {
-				collr := New()
-				collr.Config = prepareConfigWithUserCharts(prepareV2Config(), 0, 2)
-				collr.enableProfiles = false
-
-				m.EXPECT().Get(gomock.Any()).Return(&gosnmp.SnmpPacket{
-					Variables: []gosnmp.SnmpPDU{
-						{Value: nil, Type: gosnmp.NoSuchInstance},
-						{Value: nil, Type: gosnmp.NoSuchInstance},
-						{Value: nil, Type: gosnmp.NoSuchObject},
-						{Value: "192.0.2.0", Type: gosnmp.NsapAddress},
-						{Value: []uint8{118, 101, 116}, Type: gosnmp.OctetString},
-						{Value: ".1.3.6.1.2.1.4.32.1.5.2.1.4.10.19.0.0.16", Type: gosnmp.ObjectIdentifier},
-					},
-				}, nil).Times(1)
-
-				return collr
-			},
-		},
-	}
+	}{}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -368,44 +225,6 @@ func prepareV1Config() Config {
 			MaxRepetitions: 25,
 		},
 	}
-}
-
-func prepareConfigWithUserCharts(cfg Config, start, end int) Config {
-	if start > end || start < 0 || end < 1 {
-		panic(fmt.Sprintf("invalid index range ('%d'-'%d')", start, end))
-	}
-	cfg.ChartsInput = []ChartConfig{
-		{
-			ID:       "test_chart1",
-			Title:    "This is Test Chart1",
-			Units:    "kilobits/s",
-			Family:   "family",
-			Type:     module.Area.String(),
-			Priority: module.Priority,
-			Dimensions: []DimensionConfig{
-				{
-					OID:        "1.3.6.1.2.1.2.2.1.10",
-					Name:       "in",
-					Algorithm:  module.Incremental.String(),
-					Multiplier: 8,
-					Divisor:    1000,
-				},
-				{
-					OID:        "1.3.6.1.2.1.2.2.1.16",
-					Name:       "out",
-					Algorithm:  module.Incremental.String(),
-					Multiplier: 8,
-					Divisor:    1000,
-				},
-			},
-		},
-	}
-
-	for i := range cfg.ChartsInput {
-		cfg.ChartsInput[i].IndexRange = []int{start, end}
-	}
-
-	return cfg
 }
 
 func setMockClientInitExpect(m *snmpmock.MockHandler) {

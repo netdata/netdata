@@ -227,7 +227,6 @@ func (c *Collector) initAndConnectSNMPClient() (gosnmp.Handler, error) {
 			c.Warningf("SNMP bulk walk disabled: table metrics collection unavailable (device may not support GETBULK or max-repetitions adjustment failed)")
 		}
 		c.adjMaxRepetitions = snmpClient.MaxRepetitions()
-		c.snmpBulkWalkOk = ok
 	}
 
 	return snmpClient, nil

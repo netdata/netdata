@@ -40,7 +40,6 @@ func New() *Collector {
 			CreateVnode:              true,
 			VnodeDeviceDownThreshold: 3,
 			Community:                "public",
-			DisableLegacyCollection:  true,
 			Options: OptionsConfig{
 				Port:           161,
 				Retries:        1,
@@ -71,7 +70,6 @@ func New() *Collector {
 		newProber:     ping.NewProber,
 		newSnmpClient: gosnmp.NewHandler,
 
-		snmpBulkWalkOk: true,
 		enableProfiles: true,
 	}
 }
@@ -97,10 +95,6 @@ type Collector struct {
 	snmpProfiles []*ddsnmp.Profile
 
 	adjMaxRepetitions uint32
-	snmpBulkWalkOk    bool
-
-	// legacy data collection parameters
-	customOids []string
 
 	// only for tests
 	enableProfiles bool
@@ -119,12 +113,6 @@ func (c *Collector) Init(context.Context) error {
 		return fmt.Errorf("failed to initialize SNMP client: %v", err)
 	}
 
-	charts, err := newUserInputCharts(c.ChartsInput)
-	if err != nil {
-		return fmt.Errorf("failed to create user charts: %v", err)
-	}
-	c.charts = charts
-
 	if c.Ping.Enabled {
 		pr, err := c.initProber()
 		if err != nil {
@@ -132,8 +120,6 @@ func (c *Collector) Init(context.Context) error {
 		}
 		c.prober = pr
 	}
-
-	c.customOids = c.initCustomOIDs()
 
 	return nil
 }
