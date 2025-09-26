@@ -32,11 +32,6 @@ int do_kstat_zfs_misc_arcstats(int update_every, usec_t dt) {
         int deleted[5];
         int mutex_miss[5];
         int evict_skip[5];
-        // int evict_not_enough[5];
-        // int evict_l2_cached[5];
-        // int evict_l2_eligible[5];
-        // int evict_l2_ineligible[5];
-        // int evict_l2_skip[5];
         int hash_elements[5];
         int hash_elements_max[5];
         int hash_collisions[5];
@@ -49,65 +44,15 @@ int do_kstat_zfs_misc_arcstats(int update_every, usec_t dt) {
         int c_min[5];
         int c_max[5];
         int size[5];
-        // int hdr_size[5];
-        // int data_size[5];
-        // int metadata_size[5];
-        // int other_size[5];
-        // int anon_size[5];
-        // int anon_evictable_data[5];
-        // int anon_evictable_metadata[5];
         int mru_size[5];
-        // int mru_evictable_data[5];
-        // int mru_evictable_metadata[5];
-        // int mru_ghost_size[5];
-        // int mru_ghost_evictable_data[5];
-        // int mru_ghost_evictable_metadata[5];
         int mfu_size[5];
-        // int mfu_evictable_data[5];
-        // int mfu_evictable_metadata[5];
-        // int mfu_ghost_size[5];
-        // int mfu_ghost_evictable_data[5];
-        // int mfu_ghost_evictable_metadata[5];
         int l2_hits[5];
         int l2_misses[5];
-        // int l2_feeds[5];
-        // int l2_rw_clash[5];
         int l2_read_bytes[5];
         int l2_write_bytes[5];
-        // int l2_writes_sent[5];
-        // int l2_writes_done[5];
-        // int l2_writes_error[5];
-        // int l2_writes_lock_retry[5];
-        // int l2_evict_lock_retry[5];
-        // int l2_evict_reading[5];
-        // int l2_evict_l1cached[5];
-        // int l2_free_on_write[5];
-        // int l2_cdata_free_on_write[5];
-        // int l2_abort_lowmem[5];
-        // int l2_cksum_bad[5];
-        // int l2_io_error[5];
         int l2_size[5];
         int l2_asize[5];
-        // int l2_hdr_size[5];
-        // int l2_compress_successes[5];
-        // int l2_compress_zeros[5];
-        // int l2_compress_failures[5];
         int memory_throttle_count[5];
-        // int duplicate_buffers[5];
-        // int duplicate_buffers_size[5];
-        // int duplicate_reads[5];
-        // int memory_direct_count[5];
-        // int memory_indirect_count[5];
-        // int arc_no_grow[5];
-        // int arc_tempreserve[5];
-        // int arc_loaned_bytes[5];
-        // int arc_prune[5];
-        // int arc_meta_used[5];
-        // int arc_meta_limit[5];
-        // int arc_meta_max[5];
-        // int arc_meta_min[5];
-        // int arc_need_free[5];
-        // int arc_sys_free[5];
     } mibs;
 
     arcstats.l2exist = -1;
@@ -137,11 +82,6 @@ int do_kstat_zfs_misc_arcstats(int update_every, usec_t dt) {
     GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.deleted", mibs.deleted, arcstats.deleted);
     GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.mutex_miss", mibs.mutex_miss, arcstats.mutex_miss);
     GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.evict_skip", mibs.evict_skip, arcstats.evict_skip);
-    // not used: GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.evict_not_enough", mibs.evict_not_enough, arcstats.evict_not_enough);
-    // not used: GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.evict_l2_cached", mibs.evict_l2_cached, arcstats.evict_l2_cached);
-    // not used: GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.evict_l2_eligible", mibs.evict_l2_eligible, arcstats.evict_l2_eligible);
-    // not used: GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.evict_l2_ineligible", mibs.evict_l2_ineligible, arcstats.evict_l2_ineligible);
-    // not used: GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.evict_l2_skip", mibs.evict_l2_skip, arcstats.evict_l2_skip);
     GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.hash_elements", mibs.hash_elements, arcstats.hash_elements);
     GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.hash_elements_max", mibs.hash_elements_max, arcstats.hash_elements_max);
     GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.hash_collisions", mibs.hash_collisions, arcstats.hash_collisions);
@@ -159,65 +99,15 @@ int do_kstat_zfs_misc_arcstats(int update_every, usec_t dt) {
     GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.c_min", mibs.c_min, arcstats.c_min);
     GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.c_max", mibs.c_max, arcstats.c_max);
     GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.size", mibs.size, arcstats.size);
-    // not used: GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.hdr_size", mibs.hdr_size, arcstats.hdr_size);
-    // not used: GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.data_size", mibs.data_size, arcstats.data_size);
-    // not used: GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.metadata_size", mibs.metadata_size, arcstats.metadata_size);
-    // not used: GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.other_size", mibs.other_size, arcstats.other_size);
-    // not used: GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.anon_size", mibs.anon_size, arcstats.anon_size);
-    // not used: GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.anon_evictable_data", mibs.anon_evictable_data, arcstats.anon_evictable_data);
-    // not used: GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.anon_evictable_metadata", mibs.anon_evictable_metadata, arcstats.anon_evictable_metadata);
     GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.mru_size", mibs.mru_size, arcstats.mru_size);
-    // not used: GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.mru_evictable_data", mibs.mru_evictable_data, arcstats.mru_evictable_data);
-    // not used: GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.mru_evictable_metadata", mibs.mru_evictable_metadata, arcstats.mru_evictable_metadata);
-    // not used: GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.mru_ghost_size", mibs.mru_ghost_size, arcstats.mru_ghost_size);
-    // not used: GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.mru_ghost_evictable_data", mibs.mru_ghost_evictable_data, arcstats.mru_ghost_evictable_data);
-    // not used: GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.mru_ghost_evictable_metadata", mibs.mru_ghost_evictable_metadata, arcstats.mru_ghost_evictable_metadata);
     GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.mfu_size", mibs.mfu_size, arcstats.mfu_size);
-    // not used: GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.mfu_evictable_data", mibs.mfu_evictable_data, arcstats.mfu_evictable_data);
-    // not used: GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.mfu_evictable_metadata", mibs.mfu_evictable_metadata, arcstats.mfu_evictable_metadata);
-    // not used: GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.mfu_ghost_size", mibs.mfu_ghost_size, arcstats.mfu_ghost_size);
-    // not used: GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.mfu_ghost_evictable_data", mibs.mfu_ghost_evictable_data, arcstats.mfu_ghost_evictable_data);
-    // not used: GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.mfu_ghost_evictable_metadata", mibs.mfu_ghost_evictable_metadata, arcstats.mfu_ghost_evictable_metadata);
     GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.l2_hits", mibs.l2_hits, arcstats.l2_hits);
     GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.l2_misses", mibs.l2_misses, arcstats.l2_misses);
-    // not used: GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.l2_feeds", mibs.l2_feeds, arcstats.l2_feeds);
-    // not used: GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.l2_rw_clash", mibs.l2_rw_clash, arcstats.l2_rw_clash);
     GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.l2_read_bytes", mibs.l2_read_bytes, arcstats.l2_read_bytes);
     GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.l2_write_bytes", mibs.l2_write_bytes, arcstats.l2_write_bytes);
-    // not used: GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.l2_writes_sent", mibs.l2_writes_sent, arcstats.l2_writes_sent);
-    // not used: GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.l2_writes_done", mibs.l2_writes_done, arcstats.l2_writes_done);
-    // not used: GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.l2_writes_error", mibs.l2_writes_error, arcstats.l2_writes_error);
-    // not used: GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.l2_writes_lock_retry", mibs.l2_writes_lock_retry, arcstats.l2_writes_lock_retry);
-    // not used: GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.l2_evict_lock_retry", mibs.l2_evict_lock_retry, arcstats.l2_evict_lock_retry);
-    // not used: GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.l2_evict_reading", mibs.l2_evict_reading, arcstats.l2_evict_reading);
-    // not used: GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.l2_evict_l1cached", mibs.l2_evict_l1cached, arcstats.l2_evict_l1cached);
-    // not used: GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.l2_free_on_write", mibs.l2_free_on_write, arcstats.l2_free_on_write);
-    // missing mib: GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.l2_cdata_free_on_write", mibs.l2_cdata_free_on_write, arcstats.l2_cdata_free_on_write);
-    // not used: GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.l2_abort_lowmem", mibs.l2_abort_lowmem, arcstats.l2_abort_lowmem);
-    // not used: GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.l2_cksum_bad", mibs.l2_cksum_bad, arcstats.l2_cksum_bad);
-    // not used: GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.l2_io_error", mibs.l2_io_error, arcstats.l2_io_error);
     GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.l2_size", mibs.l2_size, arcstats.l2_size);
     GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.l2_asize", mibs.l2_asize, arcstats.l2_asize);
-    // not used: GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.l2_hdr_size", mibs.l2_hdr_size, arcstats.l2_hdr_size);
-    // missing mib: GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.l2_compress_successes", mibs.l2_compress_successes, arcstats.l2_compress_successes);
-    // missing mib: GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.l2_compress_zeros", mibs.l2_compress_zeros, arcstats.l2_compress_zeros);
-    // missing mib: GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.l2_compress_failures", mibs.l2_compress_failures, arcstats.l2_compress_failures);
     GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.memory_throttle_count", mibs.memory_throttle_count, arcstats.memory_throttle_count);
-    // missing mib: GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.duplicate_buffers", mibs.duplicate_buffers, arcstats.duplicate_buffers);
-    // missing mib: GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.duplicate_buffers_size", mibs.duplicate_buffers_size, arcstats.duplicate_buffers_size);
-    // missing mib: GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.duplicate_reads", mibs.duplicate_reads, arcstats.duplicate_reads);
-    // missing mib: GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.memory_direct_count", mibs.memory_direct_count, arcstats.memory_direct_count);
-    // missing mib: GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.memory_indirect_count", mibs.memory_indirect_count, arcstats.memory_indirect_count);
-    // missing mib: GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.arc_no_grow", mibs.arc_no_grow, arcstats.arc_no_grow);
-    // missing mib: GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.arc_tempreserve", mibs.arc_tempreserve, arcstats.arc_tempreserve);
-    // missing mib: GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.arc_loaned_bytes", mibs.arc_loaned_bytes, arcstats.arc_loaned_bytes);
-    // missing mib: GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.arc_prune", mibs.arc_prune, arcstats.arc_prune);
-    // not used: GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.arc_meta_used", mibs.arc_meta_used, arcstats.arc_meta_used);
-    // not used: GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.arc_meta_limit", mibs.arc_meta_limit, arcstats.arc_meta_limit);
-    // not used: GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.arc_meta_max", mibs.arc_meta_max, arcstats.arc_meta_max);
-    // not used: GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.arc_meta_min", mibs.arc_meta_min, arcstats.arc_meta_min);
-    // missing mib: GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.arc_need_free", mibs.arc_need_free, arcstats.arc_need_free);
-    // missing mib: GETSYSCTL_SIMPLE("kstat.zfs.misc.arcstats.arc_sys_free", mibs.arc_sys_free, arcstats.arc_sys_free);
 
     if (arcstats.size > arcstats.c_min) {
         zfs_arcstats_shrinkable_cache_size_bytes = arcstats.size - arcstats.c_min;
@@ -231,79 +121,180 @@ int do_kstat_zfs_misc_arcstats(int update_every, usec_t dt) {
     return 0;
 }
 
-// kstat.zfs.misc.zio_trim
+struct trim_mib_group {
+    int bytes_failed[6];
+    int bytes_skipped[6];
+    int bytes_written[6];
+    int extents_failed[6];
+    int extents_skipped[6];
+    int extents_written[6];
+};
 
+struct trim_stats {
+    uint64_t bytes_failed;
+    uint64_t bytes_skipped;
+    uint64_t bytes_written;
+    uint64_t extents_failed;
+    uint64_t extents_skipped;
+    uint64_t extents_written;
+};
+
+#define ZFS_TRIM_BASE "kstat.zfs.zroot.misc.iostats"
 int do_kstat_zfs_misc_zio_trim(int update_every, usec_t dt) {
     (void)dt;
-    static int mib_bytes[5] = {0, 0, 0, 0, 0}, mib_success[5] = {0, 0, 0, 0, 0},
-               mib_failed[5] = {0, 0, 0, 0, 0}, mib_unsupported[5] = {0, 0, 0, 0, 0};
-    uint64_t bytes, success, failed, unsupported;
 
-    if (unlikely(GETSYSCTL_SIMPLE("kstat.zfs.misc.zio_trim.bytes", mib_bytes, bytes) ||
-                 GETSYSCTL_SIMPLE("kstat.zfs.misc.zio_trim.success", mib_success, success) ||
-                 GETSYSCTL_SIMPLE("kstat.zfs.misc.zio_trim.failed", mib_failed, failed) ||
-                 GETSYSCTL_SIMPLE("kstat.zfs.misc.zio_trim.unsupported", mib_unsupported, unsupported))) {
-        collector_error("DISABLED: zfs.trim_bytes chart");
-        collector_error("DISABLED: zfs.trim_success chart");
-        collector_error("DISABLED: kstat.zfs.misc.zio_trim module");
+    static struct {
+        struct trim_mib_group atrim;
+        struct trim_mib_group trim;
+    } mibs;
+
+    struct trim_stats astats = {0}, stats = {0};
+
+    if (GETSYSCTL_SIMPLE(ZFS_TRIM_BASE ".autotrim_bytes_failed", mibs.atrim.bytes_failed, astats.bytes_failed) ||
+        GETSYSCTL_SIMPLE(ZFS_TRIM_BASE ".autotrim_bytes_skipped", mibs.atrim.bytes_skipped, astats.bytes_skipped) ||
+        GETSYSCTL_SIMPLE(ZFS_TRIM_BASE ".autotrim_bytes_written", mibs.atrim.bytes_written, astats.bytes_written) ||
+        GETSYSCTL_SIMPLE(ZFS_TRIM_BASE ".autotrim_extents_failed", mibs.atrim.extents_failed, astats.extents_failed) ||
+        GETSYSCTL_SIMPLE(ZFS_TRIM_BASE ".autotrim_extents_skipped", mibs.atrim.extents_skipped, astats.extents_skipped) ||
+        GETSYSCTL_SIMPLE(ZFS_TRIM_BASE ".autotrim_extents_written", mibs.atrim.extents_written, astats.extents_written) ||
+        GETSYSCTL_SIMPLE(ZFS_TRIM_BASE ".trim_bytes_failed", mibs.trim.bytes_failed, stats.bytes_failed) ||
+        GETSYSCTL_SIMPLE(ZFS_TRIM_BASE ".trim_bytes_skipped", mibs.trim.bytes_skipped, stats.bytes_skipped) ||
+        GETSYSCTL_SIMPLE(ZFS_TRIM_BASE ".trim_bytes_written", mibs.trim.bytes_written, stats.bytes_written) ||
+        GETSYSCTL_SIMPLE(ZFS_TRIM_BASE ".trim_extents_failed", mibs.trim.extents_failed, stats.extents_failed) ||
+        GETSYSCTL_SIMPLE(ZFS_TRIM_BASE ".trim_extents_skipped", mibs.trim.extents_skipped, stats.extents_skipped) ||
+        GETSYSCTL_SIMPLE(ZFS_TRIM_BASE ".trim_extents_written", mibs.trim.extents_written, stats.extents_written)) {
+        collector_error("DISABLED: zfs trim charts");
         return 1;
-     } else {
+    }
 
-        static RRDSET *st_bytes = NULL;
-        static RRDDIM *rd_bytes = NULL;
+    static RRDSET *st_auto_bytes = NULL;
+    static RRDDIM *rd_auto_bytes_written = NULL;
+    static RRDDIM *rd_auto_bytes_failed = NULL;
+    static RRDDIM *rd_auto_bytes_skipped = NULL;
 
-        if (unlikely(!st_bytes)) {
-            st_bytes = rrdset_create_localhost(
-                    "zfs",
-                    "trim_bytes",
-                    NULL,
-                    "trim",
-                    NULL,
-                    "Successfully TRIMmed bytes",
-                    "bytes",
-                    "freebsd.plugin",
-                    "zfs",
-                    2320,
-                    update_every,
-                    RRDSET_TYPE_LINE
-            );
+    if (unlikely(!st_auto_bytes)) {
+        st_auto_bytes = rrdset_create_localhost(
+            "zfs",
+            "autotrim_bytes",
+            NULL,
+            "trim",
+            "zfs.trim_bytes",
+            "TRIMmed bytes",
+            "bytes/s",
+            "freebsd.plugin",
+            "zfs",
+            2320,
+            update_every,
+            RRDSET_TYPE_LINE);
 
-            rd_bytes = rrddim_add(st_bytes, "TRIMmed", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-        }
+        rrdlabels_add(st_auto_bytes->rrdlabels, "trim_mode", "auto", RRDLABEL_SRC_AUTO);
 
-        rrddim_set_by_pointer(st_bytes, rd_bytes, bytes);
-        rrdset_done(st_bytes);
+        rd_auto_bytes_written = rrddim_add(st_auto_bytes, "written", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rd_auto_bytes_failed = rrddim_add(st_auto_bytes, "failed", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rd_auto_bytes_skipped = rrddim_add(st_auto_bytes, "skipped", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
 
-        static RRDSET *st_requests = NULL;
-        static RRDDIM *rd_successful = NULL, *rd_failed = NULL, *rd_unsupported = NULL;
+    rrddim_set_by_pointer(st_auto_bytes, rd_auto_bytes_written, astats.bytes_written);
+    rrddim_set_by_pointer(st_auto_bytes, rd_auto_bytes_failed, astats.bytes_failed);
+    rrddim_set_by_pointer(st_auto_bytes, rd_auto_bytes_skipped, astats.bytes_skipped);
+    rrdset_done(st_auto_bytes);
 
-        if (unlikely(!st_requests)) {
-            st_requests = rrdset_create_localhost(
-                    "zfs",
-                    "trim_requests",
-                    NULL,
-                    "trim",
-                    NULL,
-                    "TRIM requests",
-                    "requests",
-                    "freebsd.plugin",
-                    "zfs",
-                    2321,
-                    update_every,
-                    RRDSET_TYPE_STACKED
-            );
 
-            rd_successful  = rrddim_add(st_requests, "successful",  NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rd_failed      = rrddim_add(st_requests, "failed",      NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-            rd_unsupported = rrddim_add(st_requests, "unsupported", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-        }
+    static RRDSET *st_auto_extents = NULL;
+    static RRDDIM *rd_auto_extents_written = NULL;
+    static RRDDIM *rd_auto_extents_failed = NULL;
+    static RRDDIM *rd_auto_extents_skipped = NULL;
 
-        rrddim_set_by_pointer(st_requests, rd_successful,  success);
-        rrddim_set_by_pointer(st_requests, rd_failed,      failed);
-        rrddim_set_by_pointer(st_requests, rd_unsupported, unsupported);
-        rrdset_done(st_requests);
+    if (unlikely(!st_auto_extents)) {
+        st_auto_extents = rrdset_create_localhost(
+            "zfs",
+            "autotrim_extents",
+            NULL,
+            "trim",
+            "zfs.trim_extents",
+            "TRIMmed extents",
+            "extents/s",
+            "freebsd.plugin",
+            "zfs",
+            2321,
+            update_every,
+            RRDSET_TYPE_LINE);
 
-     }
+        rrdlabels_add(st_auto_extents->rrdlabels, "trim_mode", "auto", RRDLABEL_SRC_AUTO);
+
+        rd_auto_extents_written = rrddim_add(st_auto_extents, "written", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rd_auto_extents_failed = rrddim_add(st_auto_extents, "failed", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rd_auto_extents_skipped = rrddim_add(st_auto_extents, "skipped", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(st_auto_extents, rd_auto_extents_written, astats.extents_written);
+    rrddim_set_by_pointer(st_auto_extents, rd_auto_extents_failed, astats.extents_failed);
+    rrddim_set_by_pointer(st_auto_extents, rd_auto_extents_skipped, astats.extents_skipped);
+    rrdset_done(st_auto_extents);
+
+
+    static RRDSET *st_bytes = NULL;
+    static RRDDIM *rd_bytes_written = NULL;
+    static RRDDIM *rd_bytes_failed = NULL;
+    static RRDDIM *rd_bytes_skipped = NULL;
+
+    if (unlikely(!st_bytes)) {
+        st_bytes = rrdset_create_localhost(
+            "zfs",
+            "trim_bytes",
+            NULL,
+            "trim",
+            "zfs.trim_bytes",
+            "TRIMmed bytes",
+            "bytes/s",
+            "freebsd.plugin",
+            "zfs",
+            2322,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        rrdlabels_add(st_bytes->rrdlabels, "trim_mode", "manual_full", RRDLABEL_SRC_AUTO);
+
+        rd_bytes_written = rrddim_add(st_bytes, "written", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rd_bytes_failed = rrddim_add(st_bytes, "failed", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rd_bytes_skipped = rrddim_add(st_bytes, "skipped", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(st_bytes, rd_bytes_written, stats.bytes_written);
+    rrddim_set_by_pointer(st_bytes, rd_bytes_failed, stats.bytes_failed);
+    rrddim_set_by_pointer(st_bytes, rd_bytes_skipped, stats.bytes_skipped);
+    rrdset_done(st_bytes);
+
+    static RRDSET *st_extents = NULL;
+    static RRDDIM *rd_extents_written = NULL;
+    static RRDDIM *rd_extents_failed = NULL;
+    static RRDDIM *rd_extents_skipped = NULL;
+
+    if (unlikely(!st_extents)) {
+        st_extents = rrdset_create_localhost(
+            "zfs",
+            "trim_extents",
+            NULL,
+            "trim",
+            "zfs.trim_extents",
+            "TRIMmed extents",
+            "extents/s",
+            "freebsd.plugin",
+            "zfs",
+            2323,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        rrdlabels_add(st_extents->rrdlabels, "trim_mode", "manual_full", RRDLABEL_SRC_AUTO);
+
+        rd_extents_written = rrddim_add(st_extents, "written", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rd_extents_failed = rrddim_add(st_extents, "failed", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+        rd_extents_skipped = rrddim_add(st_extents, "skipped", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+    }
+
+    rrddim_set_by_pointer(st_extents, rd_extents_written, stats.extents_written);
+    rrddim_set_by_pointer(st_extents, rd_extents_failed, stats.extents_failed);
+    rrddim_set_by_pointer(st_extents, rd_extents_skipped, stats.extents_skipped);
+    rrdset_done(st_extents);
 
     return 0;
 }
