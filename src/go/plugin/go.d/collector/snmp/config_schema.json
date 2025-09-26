@@ -359,7 +359,7 @@
           "enabled": {
             "title": "Enable ping",
             "type": "boolean",
-            "default": false,
+            "default": true,
             "description": "Collect ICMP round-trip time using pro-bing alongside SNMP."
           },
           "network": {

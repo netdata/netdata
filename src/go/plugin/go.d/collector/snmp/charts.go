@@ -51,7 +51,17 @@ var (
 )
 
 func (c *Collector) addPingCharts() {
-	if err := c.Charts().Add(*pingCharts.Copy()...); err != nil {
+	charts := pingCharts.Copy()
+
+	labels := c.chartBaseLabels()
+
+	for _, chart := range *charts {
+		for k, v := range labels {
+			chart.Labels = append(chart.Labels, module.Label{Key: k, Value: v})
+		}
+	}
+
+	if err := c.Charts().Add(*charts...); err != nil {
 		c.Warningf("failed to add ping charts: %v", err)
 	}
 }
@@ -83,10 +93,7 @@ func (c *Collector) addProfileScalarMetricChart(m ddsnmp.Metric) {
 		chart.Type = module.Area
 	}
 
-	tags := map[string]string{
-		"vendor":  c.sysInfo.Organization,
-		"sysName": c.sysInfo.Name,
-	}
+	tags := c.chartBaseLabels()
 
 	maps.Copy(tags, m.Profile.Tags)
 	for k, v := range tags {
@@ -142,10 +149,8 @@ func (c *Collector) addProfileTableMetricChart(m ddsnmp.Metric) {
 		chart.Type = module.Area
 	}
 
-	tags := map[string]string{
-		"vendor":  c.sysInfo.Organization,
-		"sysName": c.sysInfo.Name,
-	}
+	tags := c.chartBaseLabels()
+
 	maps.Copy(tags, m.Profile.Tags)
 	for k, v := range m.Tags {
 		newKey := strings.TrimPrefix(k, "_")
@@ -183,6 +188,29 @@ func (c *Collector) removeProfileTableMetricChart(key string) {
 		chart.MarkRemove()
 		chart.MarkNotCreated()
 	}
+}
+
+func (c *Collector) chartBaseLabels() map[string]string {
+	si := c.sysInfo
+
+	labels := map[string]string{
+		"sysName": si.Name,
+		"address": c.Hostname,
+	}
+
+	if si.Vendor != "" {
+		labels["vendor"] = si.Vendor
+	} else if si.Organization != "" {
+		labels["vendor"] = si.Organization
+	}
+	if si.Category != "" {
+		labels["device_type"] = si.Category
+	}
+	if si.Model != "" {
+		labels["model"] = si.Model
+	}
+
+	return labels
 }
 
 func dimAlgoFromDdSnmpType(m ddsnmp.Metric) module.DimAlgo {

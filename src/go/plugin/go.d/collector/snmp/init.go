@@ -70,14 +70,13 @@ func (c *Collector) initSNMPClient() (gosnmp.Handler, error) {
 }
 
 func (c *Collector) initProber() (ping.Prober, error) {
-	mul := 0.9
-	if c.UpdateEvery > 1 {
-		mul = 0.8
-	}
-	timeout := time.Millisecond * time.Duration(float64(c.UpdateEvery)*mul*1000)
-	if timeout.Milliseconds() == 0 {
-		return nil, errors.New("zero ping timeout")
-	}
+	// base timeout = update_every seconds
+	timeout := time.Duration(c.UpdateEvery) * time.Second
+
+	// clamp between 1s and 3s
+	const minTimeout = time.Second
+	const maxTimeout = 3 * time.Second
+	timeout = max(min(timeout, maxTimeout), minTimeout)
 
 	conf := c.Ping.ProberConfig
 	conf.Timeout = timeout
