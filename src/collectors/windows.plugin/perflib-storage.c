@@ -272,8 +272,10 @@ static inline void netdata_set_hd_usage(PERF_DATA_BLOCK *pDataBlock,
         return;
     }
 
+    // Free
     d->percentDiskFree.current.Data = convertToBytes(totalNumberOfFreeBytes.QuadPart, 1024 * 1024 * 1024);
-    d->percentDiskFree.current.Time = convertToBytes(totalNumberOfBytes.QuadPart, 1024 * 1024 * 1024);
+    // Disk Used
+    d->percentDiskFree.current.Time = convertToBytes(totalNumberOfBytes.QuadPart, 1024 * 1024 * 1024) - convertToBytes(totalNumberOfFreeBytes.QuadPart, 1024 * 1024 * 1024);
 }
 
 static bool do_logical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every, usec_t now_ut)
