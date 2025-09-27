@@ -43,7 +43,6 @@ target_include_directories(vendored_libsensors PUBLIC
 # Compile definitions
 target_compile_definitions(vendored_libsensors PRIVATE
         ETCDIR="/etc"       # Define ETCDIR
-        _GNU_SOURCE         # Define GNU extensions
 )
 
 # Suppress warnings for Flex and Bison files
