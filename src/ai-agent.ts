@@ -8,7 +8,7 @@ import Ajv from 'ajv';
 
 import type { OutputFormatId } from './formats.js';
 import type { SessionNode } from './session-tree.js';
-import type { AIAgentSessionConfig, AIAgentResult, ConversationMessage, LogEntry, AccountingEntry, Configuration, TurnRequest, LLMAccountingEntry, MCPTool, ToolAccountingEntry, RestToolConfig } from './types.js';
+import type { AIAgentSessionConfig, AIAgentResult, ConversationMessage, LogEntry, AccountingEntry, Configuration, TurnRequest, LLMAccountingEntry, MCPTool, ToolAccountingEntry, RestToolConfig, ProgressMetrics } from './types.js';
 
 // Exit codes according to DESIGN.md
 type ExitCode = 
@@ -47,6 +47,7 @@ import { validateProviders, validateMCPServers, validatePrompts } from './config
 import { parseFrontmatter, parsePairs, extractBodyWithoutFrontmatter } from './frontmatter.js';
 import { LLMClient } from './llm-client.js';
 import { buildPromptVars, applyFormat, expandVars } from './prompt-builder.js';
+import { SessionProgressReporter } from './session-progress-reporter.js';
 import { SessionTreeBuilder } from './session-tree.js';
 import { SubAgentRegistry } from './subagent-registry.js';
 import { AgentProvider } from './tools/agent-provider.js';
@@ -88,6 +89,7 @@ export class AIAgentSession {
   // opTree-only tracking (canonical)
   private readonly toolsOrchestrator?: ToolsOrchestrator;
   private readonly opTree: SessionTreeBuilder;
+  private readonly progressReporter: SessionProgressReporter;
   // Per-turn planned subturns (tool call count) discovered when LLM yields toolCalls
   private plannedSubturns: Map<number, number> = new Map<number, number>();
   private resolvedFormat?: OutputFormatId;
@@ -153,6 +155,68 @@ export class AIAgentSession {
     }
 
     return result;
+  }
+
+  private getCallPathLabel(): string {
+    if (typeof this.callPath === 'string' && this.callPath.length > 0) return this.callPath;
+    if (typeof this.sessionConfig.agentId === 'string' && this.sessionConfig.agentId.length > 0) {
+      return this.sessionConfig.agentId;
+    }
+    return 'agent';
+  }
+
+  private getAgentIdLabel(): string {
+    if (typeof this.sessionConfig.agentId === 'string' && this.sessionConfig.agentId.length > 0) {
+      return this.sessionConfig.agentId;
+    }
+    return this.getCallPathLabel();
+  }
+
+  private getAgentDisplayName(): string {
+    const label = this.getCallPathLabel();
+    const parts = label.split('->').map((part) => part.trim()).filter((part) => part.length > 0);
+    if (parts.length > 0) return parts[parts.length - 1];
+    return label;
+  }
+
+  private buildMetricsFromSession(session: SessionNode | undefined): ProgressMetrics | undefined {
+    if (session === undefined) return undefined;
+    const metrics: ProgressMetrics = {};
+    if (typeof session.startedAt === 'number') {
+      const endTs = typeof session.endedAt === 'number' ? session.endedAt : Date.now();
+      metrics.durationMs = Math.max(0, endTs - session.startedAt);
+    }
+    const totals = session.totals;
+    if (totals !== undefined) {
+      if (typeof totals.tokensIn === 'number' && totals.tokensIn > 0) metrics.tokensIn = totals.tokensIn;
+      if (typeof totals.tokensOut === 'number' && totals.tokensOut > 0) metrics.tokensOut = totals.tokensOut;
+      if (typeof totals.tokensCacheRead === 'number' && totals.tokensCacheRead > 0) metrics.tokensCacheRead = totals.tokensCacheRead;
+      if (typeof totals.tokensCacheWrite === 'number' && totals.tokensCacheWrite > 0) metrics.tokensCacheWrite = totals.tokensCacheWrite;
+      if (typeof totals.toolsRun === 'number' && totals.toolsRun > 0) metrics.toolsRun = totals.toolsRun;
+      if (typeof totals.costUsd === 'number' && totals.costUsd > 0) metrics.costUsd = totals.costUsd;
+    }
+    const hasMetrics = Object.keys(metrics).length > 0;
+    return hasMetrics ? metrics : undefined;
+  }
+
+  private emitAgentCompletion(success: boolean, error?: string): void {
+    const sessionSnapshot = (() => {
+      try { return this.opTree.getSession(); } catch { return undefined; }
+    })();
+    const metrics = this.buildMetricsFromSession(sessionSnapshot);
+    const payload = {
+      callPath: this.getCallPathLabel(),
+      agentId: this.getAgentIdLabel(),
+      agentName: this.getAgentDisplayName(),
+      txnId: this.txnId,
+      metrics,
+      error,
+    };
+    if (success) {
+      this.progressReporter.agentFinished(payload);
+    } else {
+      this.progressReporter.agentFailed(payload);
+    }
   }
 
   // Find the last LLM op for a given turn to anchor agent-emitted logs (debug/FIN)
@@ -242,6 +306,14 @@ export class AIAgentSession {
 
     // Hierarchical operation tree (Option C)
     this.opTree = new SessionTreeBuilder({ traceId: this.txnId, agentId: sessionConfig.agentId, callPath: this.callPath, sessionTitle: sessionConfig.initialTitle ?? '' });
+
+    this.progressReporter = new SessionProgressReporter((event) => {
+      try {
+        this.sessionConfig.callbacks?.onProgress?.(event);
+      } catch (e) {
+        warn(`onProgress callback failed: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    });
     // Begin system preflight turn (turn 0) and log init
     try {
       if (!this.systemTurnBegan) {
@@ -261,7 +333,13 @@ export class AIAgentSession {
       maxConcurrentTools: sessionConfig.maxConcurrentTools,
       parallelToolCalls: sessionConfig.parallelToolCalls,
       traceTools: sessionConfig.traceMCP === true,
-    }, this.opTree, (tree: SessionNode) => { try { this.sessionConfig.callbacks?.onOpTree?.(tree); } catch (e) { warn(`onOpTree callback failed: ${e instanceof Error ? e.message : String(e)}`); } }, (entry, opts) => { this.log(entry, opts); }, sessionConfig.callbacks?.onAccounting);
+    },
+    this.opTree,
+    (tree: SessionNode) => { try { this.sessionConfig.callbacks?.onOpTree?.(tree); } catch (e) { warn(`onOpTree callback failed: ${e instanceof Error ? e.message : String(e)}`); } },
+    (entry, opts) => { this.log(entry, opts); },
+    sessionConfig.callbacks?.onAccounting,
+    { agentId: sessionConfig.agentId, callPath: this.getCallPathLabel(), txnId: this.txnId },
+    this.progressReporter);
     orch.register(new MCPProvider('mcp', sessionConfig.config.mcpServers, {
       trace: sessionConfig.traceMCP,
       verbose: sessionConfig.verbose,
@@ -324,6 +402,12 @@ export class AIAgentSession {
               message: `[PROGRESS UPDATE] ${t}`,
             };
             this.log(entry);
+            this.progressReporter.agentUpdate({
+              callPath: this.getCallPathLabel(),
+              agentId: this.getAgentIdLabel(),
+              agentName: this.getAgentDisplayName(),
+              message: t,
+            });
           }
         },
         setTitle: (title: string, emoji?: string) => {
@@ -644,6 +728,14 @@ export class AIAgentSession {
     let currentAccounting = [...this.accounting];
     let currentTurn = this.currentTurn;
 
+    this.progressReporter.agentStarted({
+      callPath: this.getCallPathLabel(),
+      agentId: this.getAgentIdLabel(),
+      agentName: this.getAgentDisplayName(),
+      txnId: this.txnId,
+      reason: this.sessionTitle?.title ?? this.sessionConfig.initialTitle,
+    });
+
     try {
       // Start execution session in the tree
       // opTree is canonical; no separate session
@@ -871,6 +963,7 @@ export class AIAgentSession {
         this.opTree.endTurn(0);
         this.opTree.endSession(result.success, result.error);
       } catch (e) { warn(`endSession failed: ${e instanceof Error ? e.message : String(e)}`); }
+      this.emitAgentCompletion(result.success, result.error);
       // Phase B/C: persist final session and accounting ledger
       try {
         this.persistSessionSnapshot('final');
@@ -925,6 +1018,7 @@ export class AIAgentSession {
         this.opTree.endTurn(0);
         this.opTree.endSession(false, message);
       } catch (e) { warn(`endSession failed: ${e instanceof Error ? e.message : String(e)}`); }
+      this.emitAgentCompletion(false, message);
       return failShape;
     } finally {
       await this.toolsOrchestrator?.cleanup();
@@ -1921,6 +2015,12 @@ export class AIAgentSession {
           } catch (e) {
             warn(`onOpTree callback failed: ${e instanceof Error ? e.message : String(e)}`);
           }
+          this.progressReporter.agentUpdate({
+            callPath: this.getCallPathLabel(),
+            agentId: this.getAgentIdLabel(),
+            agentName: this.getAgentDisplayName(),
+            message: progress,
+          });
         }
         return { id: c.id, tool: c.tool, ok: true, elapsedMs: 0, output: JSON.stringify({ ok: true }) };
       }

@@ -111,22 +111,22 @@ After each search iteration:
 - Adjust search strategy based on findings
 - Decide if more searches are needed or if you can synthesize results
 
-## Output Requirements
-
-### Research Transparency
+## Research Transparency
 Document your process:
 1. **Search Strategy**: Explain your initial approach and how it evolved
 2. **Source Analysis**: Categorize sources as official vs. unofficial
 3. **Verification Process**: Show how you cross-referenced information
 4. **Conflicting Information**: Detail any discrepancies found and attempted resolutions
 
-### Final Response Structure
-1. **Executive Summary**: Direct answer to the user's question
-2. **Detailed Findings**: Comprehensive information organized by topic/subtopic
-3. **Source Credibility Analysis**: Which sources were most reliable and why
+## Final Response Structure
+1. **TL;DR**: summarized answer to the user
+2. **Findings**: Comprehensive and detailed information, organized by topic/subtopic
+3. **Sources**: Which sources (URLs) were most reliable and why, use this format:
+  - URL (relevance %, credibility %, why and how it helped)
 4. **Knowledge Gaps**: What questions remain unanswered despite thorough research
-5. **Conflicting Information**: Any disagreements between sources with analysis
-6. **Complete Source List**: All URLs used in a numbered list
+5. **Conflicting Information**: Any disagreements between sources
+6. **Methodology**: Describe the key areas you decided to research (not your tools, but the search terms)
+7. **Confidence Level**: Your confidence level for the information you provided
 
 ## Quality Standards
 
@@ -152,7 +152,7 @@ Your research is complete when you can:
 
 ### Verifiable Research
 - Always provide URLs for all your claims
-- If you have found contradicting results, show them both
+- If you have found contradicting results, reveal them
 - Always ensure your users can use the provided evidence (URLs) to verify your conclusions
 
 ${include:web-tools.md}

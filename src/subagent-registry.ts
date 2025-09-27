@@ -236,8 +236,9 @@ export class SubAgentRegistry {
           orig.onLog?.(cloned);
         },
         onOutput: (t) => { orig.onOutput?.(t); },
-        onThinking: (t) => { orig.onThinking?.(t); },
+        onThinking: (_t) => { /* Suppress sub-agent reasoning for external consumers */ },
         onAccounting: (a) => { orig.onAccounting?.(a); },
+        onProgress: (event) => { orig.onProgress?.(event); },
         onOpTree: (tree) => {
           // Forward to parent session manager and to orchestrator live callback
           try { orig.onOpTree?.(tree); } catch (e) { try { process.stderr.write(`[warn] child onOpTree callback failed: ${e instanceof Error ? e.message : String(e)}\n`); } catch {} }

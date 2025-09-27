@@ -43,9 +43,9 @@ Follow this process:
 
 1. Research their strength and weaknesses. What they are good at, what they are bad at?
 2. Research what their customers say. Rate them, how many positive comments, how many negative comments, why positive, why negative.
-3. Research what their customer do to work around the problems they have with them - THIS IS THE REAL PROBLEM for the customers.
-4. Use multiple research iterations until you have clear understand of their strong and weak areas.
-5. We are addressing customers, not them. Even when we talk about a competitor, our focus is their customers, not them.
+3. Research what their customers do to work around the problems they have with them - THIS IS THE REAL PROBLEMS problems we need to focus - the effect their weaknesses have on their customers.
+4. Use multiple research iterations until you have clear understanding of their strong and weak areas.
+5. We are addressing THEIR customers, not our competitor. Even when we talk about a competitor, our focus is THEIR CUSTOMERS.
 
 ## PHASE 2: Understand Netdata
 
@@ -64,7 +64,7 @@ Follow this process:
 1. Use the Corduroy messaging for Netdata
 2. Adapt the messaging to the specific analysis
    - surface the best of Netdata for this target
-   - eliminate the weaknesses of Netdata. Do not lie. Be smart. Hide them.
+   - eliminate the weaknesses of Netdata. Do not lie. Be smart. Avoid them.
 
 ## PHASE 5: Your report
 
@@ -105,9 +105,9 @@ In your report include:
 
 ## General Rules
 
-Be creative. You have all the tools, knowledge and expertise to identify the unique value proposition of Netdata versus competitors, and come up with strong messaging that addresses the key pain-points of the industry/segment/customer, in a simple, direct and aggressive way, backed with facts about Netdata's unique design and architecture. Simple, direct and aggressive: means to put clear benefits for the customer first. The end-user benefit is not supporting material, it is the KEY MESSAGE to start with.
+Be creative. You have all the tools, knowledge and expertise to identify the unique value proposition of Netdata versus competitors, and come up with strong messaging that addresses the key pain-points of the industry/segment/customer, in a simple, direct and aggressive way, backed with facts about Netdata's unique design and architecture. "Simple, direct and aggressive" means to put the benefits for the customer first. The end-user benefit is the KEY MESSAGE to start with.
 
-Your messaging MUST be a "punch on the face" of Datadog, Dynatrace, NewRelic, Grafana, Zabbix, Nagios, CheckMk, SolarWinds: Netdata does the impossible. But we don't want a legal war. You MUST do it elegantly. As aggressive as possible, up to the borderline. You MUST be smart on this.
+Your messaging MUST be a "punch on the face" of Datadog, Dynatrace, NewRelic, Grafana, Zabbix, Nagios, CheckMk, SolarWinds: Netdata does the impossible. But respect their work and their contribution to the world. We don't want to be assholes. Focus on the facts, and the effects of their weaknesses on their customers. Win their customers with clear, direct, and aggresive messaging, while respecting the competitors.
 
 You MUST:
 - Put the customers FIRST, their needs, their pain-points, the benefits they will get by using Netdata for monitoring their infrastructure.

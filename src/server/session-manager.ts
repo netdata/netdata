@@ -1,10 +1,15 @@
 import crypto from 'node:crypto';
 
-import type { AIAgentCallbacks, AIAgentResult, ConversationMessage, LogEntry } from '../types.js';
+import type { AIAgentCallbacks, AIAgentResult, ConversationMessage, LogEntry, ProgressEvent } from '../types.js';
 import { warn } from '../utils.js';
 import type { RunKey, RunMeta } from './types.js';
 
-interface Callbacks { onTreeUpdate?: (runId: string) => void; onLog?: (entry: LogEntry) => void; }
+interface Callbacks {
+  onTreeUpdate?: (runId: string) => void;
+  onLog?: (entry: LogEntry) => void;
+  onProgress?: (runId: string, event: ProgressEvent) => void;
+  onThinking?: (runId: string, chunk: string) => void;
+}
 
 export class SessionManager {
   private readonly runs = new Map<string, RunMeta>();
@@ -149,6 +154,12 @@ export class SessionManager {
             outputBuf.push(t);
             this.outputs.set(runId, outputBuf.join(''));
             try { this.callbacks.onTreeUpdate?.(runId); } catch (e) { warn(`callbacks.onTreeUpdate failed: ${e instanceof Error ? e.message : String(e)}`); }
+          },
+          onThinking: (chunk: string) => {
+            try { this.callbacks.onThinking?.(runId, chunk); } catch (e) { warn(`callbacks.onThinking failed: ${e instanceof Error ? e.message : String(e)}`); }
+          },
+          onProgress: (event: ProgressEvent) => {
+            try { this.callbacks.onProgress?.(runId, event); } catch (e) { warn(`callbacks.onProgress failed: ${e instanceof Error ? e.message : String(e)}`); }
           },
             onAccounting: (_a) => {
               // No flat accounting storage; rely on opTree updates

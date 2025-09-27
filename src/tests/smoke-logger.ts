@@ -32,7 +32,7 @@ async function run(): Promise<void> {
     tree.appendLog(opId, entry);
     logs.push(entry);
   };
-  const orch = new ToolsOrchestrator({ toolTimeout: 2000, toolResponseMaxBytes: 1024, maxConcurrentTools: 2, parallelToolCalls: true, traceTools: true }, tree, (tr) => { void tr; }, onLog, undefined);
+  const orch = new ToolsOrchestrator({ toolTimeout: 2000, toolResponseMaxBytes: 1024, maxConcurrentTools: 2, parallelToolCalls: true, traceTools: true }, tree, (tr) => { void tr; }, onLog, undefined, { agentId: 'agent', callPath: 'agent' });
   orch.register(new FakeRestProvider());
 
   // Success path

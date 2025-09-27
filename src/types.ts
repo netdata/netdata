@@ -89,6 +89,75 @@ export interface LogEntry {
   'max_subturns'?: number;
 }
 
+export interface ProgressMetrics {
+  durationMs?: number;
+  tokensIn?: number;
+  tokensOut?: number;
+  tokensCacheRead?: number;
+  tokensCacheWrite?: number;
+  toolsRun?: number;
+  costUsd?: number;
+  latencyMs?: number;
+  charactersIn?: number;
+  charactersOut?: number;
+}
+
+interface AgentProgressBase {
+  type: 'agent_started' | 'agent_update' | 'agent_finished' | 'agent_failed';
+  callPath: string;
+  agentId: string;
+  agentName?: string;
+  timestamp: number;
+  txnId?: string;
+}
+
+export interface AgentStartedEvent extends AgentProgressBase {
+  type: 'agent_started';
+  reason?: string;
+}
+
+export interface AgentUpdateEvent extends AgentProgressBase {
+  type: 'agent_update';
+  message: string;
+}
+
+export interface AgentFinishedEvent extends AgentProgressBase {
+  type: 'agent_finished';
+  metrics?: ProgressMetrics;
+}
+
+export interface AgentFailedEvent extends AgentProgressBase {
+  type: 'agent_failed';
+  metrics?: ProgressMetrics;
+  error?: string;
+}
+
+interface ToolProgressBase {
+  callPath: string;
+  agentId: string;
+  timestamp: number;
+  tool: { name: string; provider: string };
+  metrics?: ProgressMetrics;
+  error?: string;
+}
+
+export interface ToolStartedEvent extends ToolProgressBase {
+  type: 'tool_started';
+}
+
+export interface ToolFinishedEvent extends ToolProgressBase {
+  type: 'tool_finished';
+  status: 'ok' | 'failed';
+}
+
+export type ProgressEvent =
+  | AgentStartedEvent
+  | AgentUpdateEvent
+  | AgentFinishedEvent
+  | AgentFailedEvent
+  | ToolStartedEvent
+  | ToolFinishedEvent;
+
 // Core data structures
 export interface ToolCall {
   id: string;
@@ -305,6 +374,7 @@ export interface AIAgentCallbacks {
   onOutput?: (text: string) => void;
   onThinking?: (text: string) => void;
   onAccounting?: (entry: AccountingEntry) => void;
+  onProgress?: (event: ProgressEvent) => void;
   // Live snapshot of the hierarchical operation tree (Option C)
   onOpTree?: (tree: unknown) => void;
 }

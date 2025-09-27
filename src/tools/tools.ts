@@ -1,5 +1,6 @@
+import type { SessionProgressReporter } from '../session-progress-reporter.js';
 import type { SessionTreeBuilder, SessionNode } from '../session-tree.js';
-import type { MCPTool, LogEntry, AccountingEntry } from '../types.js';
+import type { MCPTool, LogEntry, AccountingEntry, ProgressMetrics } from '../types.js';
 import type { ToolExecuteOptions, ToolExecuteResult, ToolKind, ToolProvider, ToolExecutionContext } from './types.js';
 
 import { truncateUtf8WithNotice, formatToolRequestCompact, sanitizeToolName, warn } from '../utils.js';
@@ -15,6 +16,7 @@ export class ToolsOrchestrator {
   private slotsInUse = 0;
   private waiters: (() => void)[] = [];
   private canceled = false;
+  private readonly sessionInfo: { agentId?: string; callPath?: string; txnId?: string };
 
   constructor(
     private readonly opts: { toolTimeout?: number; toolResponseMaxBytes?: number; maxConcurrentTools?: number; parallelToolCalls?: boolean; traceTools?: boolean },
@@ -23,7 +25,11 @@ export class ToolsOrchestrator {
     // Unified logger: session-level log() (must never throw)
     private readonly onLog: (entry: LogEntry, opts?: { opId?: string }) => void,
     private readonly onAccounting?: (entry: AccountingEntry) => void,
-  ) {}
+    sessionInfo?: { agentId?: string; callPath?: string; txnId?: string },
+    private readonly progress?: SessionProgressReporter,
+  ) {
+    this.sessionInfo = sessionInfo ?? {};
+  }
 
   register(provider: ToolProvider): void {
     this.providers.push(provider);
@@ -36,6 +42,19 @@ export class ToolsOrchestrator {
     await Promise.all(this.providers.map(async (p) => { try { await p.warmup(); } catch (e) { warn(`provider warmup failed: ${e instanceof Error ? e.message : String(e)}`); } }));
     // Refresh mapping now that providers are warmed
     this.listTools();
+  }
+
+  private getSessionCallPath(): string {
+    const { callPath, agentId } = this.sessionInfo;
+    if (typeof callPath === 'string' && callPath.length > 0) return callPath;
+    if (typeof agentId === 'string' && agentId.length > 0) return agentId;
+    return 'agent';
+  }
+
+  private getSessionAgentId(): string {
+    const { agentId } = this.sessionInfo;
+    if (typeof agentId === 'string' && agentId.length > 0) return agentId;
+    return this.getSessionCallPath();
   }
 
   listTools(): MCPTool[] {
@@ -121,6 +140,10 @@ export class ToolsOrchestrator {
     const opId = (() => {
       try { return this.opTree.beginOp(ctx.turn, opKind, { name: effective, provider: provider.id, kind }); } catch { return undefined; }
     })();
+    const callPathLabel = this.getSessionCallPath();
+    const agentIdLabel = this.getSessionAgentId();
+    const instrumentTool = opKind !== 'session' && provider.id !== 'agent';
+
     // For sub-agent session ops, attach a placeholder child session immediately so live views can show it
     try {
       if (opKind === 'session' && opId !== undefined) {
@@ -158,6 +181,14 @@ export class ToolsOrchestrator {
     };
     // Single emission point via session logger
     this.onLog(reqLog, { opId });
+
+    if (instrumentTool) {
+      this.progress?.toolStarted({
+        callPath: callPathLabel,
+        agentId: agentIdLabel,
+        tool: { name: effective, provider: provider.id },
+      });
+    }
     try {
       if (opId !== undefined) {
         const argSize = (() => { try { return JSON.stringify(args).length; } catch { return undefined; } })();
@@ -317,6 +348,21 @@ export class ToolsOrchestrator {
         message: `error ${name}: ${msg}`,
       };
       this.onLog(errLog, { opId });
+      if (instrumentTool) {
+        const failureMetrics: ProgressMetrics = {
+          latencyMs: latency,
+          charactersIn,
+          charactersOut: 0,
+        };
+        this.progress?.toolFinished({
+          callPath: callPathLabel,
+          agentId: agentIdLabel,
+          tool: { name: effective, provider: provider.id },
+          metrics: failureMetrics,
+          error: msg,
+          status: 'failed',
+        });
+      }
       const acc: AccountingEntry = {
         type: 'tool', timestamp: start, status: 'failed', latency,
         mcpServer: provider.id, command: name, charactersIn, charactersOut: 0, error: msg,
@@ -397,6 +443,20 @@ export class ToolsOrchestrator {
       message: `ok ${effective}: ${String(result.length)} chars`,
     };
     this.onLog(resLog, { opId });
+    if (instrumentTool) {
+      const successMetrics: ProgressMetrics = {
+        latencyMs: latency,
+        charactersIn,
+        charactersOut: result.length,
+      };
+      this.progress?.toolFinished({
+        callPath: callPathLabel,
+        agentId: agentIdLabel,
+        tool: { name: effective, provider: provider.id },
+        metrics: successMetrics,
+        status: 'ok',
+      });
+    }
     try {
       if (opId !== undefined) {
         this.opTree.setResponse(opId, { payload: result.length > 0 ? result.slice(0, 4096) : '', size: Buffer.byteLength(result, 'utf8'), truncated: result.length > 4096 });
