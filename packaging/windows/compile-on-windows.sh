@@ -23,7 +23,7 @@ fi
 COMMON_CFLAGS="-Wa,-mbig-obj -pipe -D_FILE_OFFSET_BITS=64 -D__USE_MINGW_ANSI_STDIO=1"
 
 if [ "${CMAKE_BUILD_TYPE}" = "Debug" ]; then
-    BUILD_CFLAGS="-fstack-protector-all -O0 -ggdb -Wall -Wextra -Wno-char-subscripts -DNETDATA_INTERNAL_CHECKS=1 ${COMMON_CFLAGS} ${CFLAGS:-}"
+    BUILD_CFLAGS="-O0 -ggdb -Wall -Wextra -Wno-char-subscripts -DNETDATA_INTERNAL_CHECKS=1 ${COMMON_CFLAGS} ${CFLAGS:-}"
 else
     BUILD_CFLAGS="-O2 ${COMMON_CFLAGS} ${CFLAGS:-}"
 fi
