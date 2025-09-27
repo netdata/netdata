@@ -43,7 +43,15 @@ export interface SessionNode {
   error?: string;
   attributes?: Record<string, unknown>;
   // Aggregated totals recomputed after mutations
-  totals?: { tokensIn: number; tokensOut: number; tokensCacheRead: number; tokensCacheWrite: number; costUsd?: number; toolsRun: number };
+  totals?: {
+    tokensIn: number;
+    tokensOut: number;
+    tokensCacheRead: number;
+    tokensCacheWrite: number;
+    costUsd?: number;
+    toolsRun: number;
+    agentsRun: number;
+  };
   turns: TurnNode[];
 }
 
@@ -244,7 +252,7 @@ export class SessionTreeBuilder {
     lines.push(`SessionTree ${s.id}${(typeof s.traceId === 'string' && s.traceId.length > 0) ? ` trace=${s.traceId}` : ''}${(typeof s.agentId === 'string' && s.agentId.length > 0) ? ` agent=${s.agentId}` : ''}${(typeof s.callPath === 'string' && s.callPath.length > 0) ? ` callPath=${s.callPath}` : ''}`);
     const totals = s.totals;
     const totalsStr = totals !== undefined
-      ? ` tokens in=${String(totals.tokensIn)} out=${String(totals.tokensOut)} cR=${String(totals.tokensCacheRead)} cW=${String(totals.tokensCacheWrite)} tools=${String(totals.toolsRun)} cost=$${(totals.costUsd ?? 0).toFixed(2)}`
+      ? ` tokens in=${String(totals.tokensIn)} out=${String(totals.tokensOut)} cR=${String(totals.tokensCacheRead)} cW=${String(totals.tokensCacheWrite)} tools=${String(totals.toolsRun)} agents=${String(totals.agentsRun)} cost=$${(totals.costUsd ?? 0).toFixed(2)}`
       : '';
     lines.push(`├─ started=${fmtTs(s.startedAt)}${(typeof s.endedAt === 'number') ? ` ended=${fmtTs(s.endedAt)} dur=${dur(s.startedAt, s.endedAt)}` : ''}${(typeof s.success === 'boolean') ? ` success=${String(s.success)}` : ''}${(typeof s.error === 'string' && s.error.length > 0) ? ` error=${s.error}` : ''}${totalsStr ? ` | ${totalsStr}` : ''}`);
     lines.push(`├─ turns=${String(s.turns.length)}`);
@@ -344,9 +352,24 @@ export class SessionTreeBuilder {
   }
 
   // Recompute and store aggregated totals on the session node
-  private recomputeTotals(): { tokensIn: number; tokensOut: number; tokensCacheRead: number; tokensCacheWrite: number; costUsd?: number; toolsRun: number } {
-    let tokensIn = 0; let tokensOut = 0; let tokensCacheRead = 0; let tokensCacheWrite = 0; let costUsd = 0; let toolsRun = 0;
+  private recomputeTotals(): {
+    tokensIn: number;
+    tokensOut: number;
+    tokensCacheRead: number;
+    tokensCacheWrite: number;
+    costUsd?: number;
+    toolsRun: number;
+    agentsRun: number;
+  } {
+    let tokensIn = 0;
+    let tokensOut = 0;
+    let tokensCacheRead = 0;
+    let tokensCacheWrite = 0;
+    let costUsd = 0;
+    let toolsRun = 0;
+    let agentsRun = 0;
     const visit = (node: SessionNode): void => {
+      agentsRun += 1;
       const turns = Array.isArray(node.turns) ? node.turns : [];
       // eslint-disable-next-line functional/no-loop-statements
       for (const t of turns) {
@@ -374,7 +397,16 @@ export class SessionTreeBuilder {
       }
     };
     visit(this.session);
-    const totals = { tokensIn, tokensOut, tokensCacheRead, tokensCacheWrite, costUsd: costUsd > 0 ? Number(costUsd.toFixed(4)) : undefined, toolsRun };
+    const normalizedCost = Number(costUsd.toFixed(4));
+    const totals = {
+      tokensIn,
+      tokensOut,
+      tokensCacheRead,
+      tokensCacheWrite,
+      costUsd: Number.isFinite(normalizedCost) ? normalizedCost : undefined,
+      toolsRun,
+      agentsRun,
+    };
     this.session.totals = totals;
     return totals;
   }

@@ -4,11 +4,12 @@ import path from 'node:path';
 import { URL } from 'node:url';
 
 import type { AgentMetadata, AgentRegistry } from '../agent-registry.js';
-import type { AccountingEntry, AIAgentCallbacks, LLMAccountingEntry, LogEntry } from '../types.js';
+import type { AccountingEntry, AIAgentCallbacks, LLMAccountingEntry, LogEntry, ProgressEvent, ProgressMetrics } from '../types.js';
 import type { Headend, HeadendClosedEvent, HeadendContext, HeadendDescription } from './types.js';
 
 import { ConcurrencyLimiter } from './concurrency.js';
 import { HttpError, readJson, writeJson, writeSseChunk, writeSseDone } from './http-utils.js';
+import { escapeMarkdown, formatMetricsLine, italicize } from './summary-utils.js';
 
 interface Deferred<T> {
   promise: Promise<T>;
@@ -271,6 +272,31 @@ export class AnthropicCompletionsHeadend implements Headend {
     const streamed = body.stream === true;
     let output = '';
     const accounting: AccountingEntry[] = [];
+    let masterSummary: { text: string; origin?: string } | undefined;
+    let rootOriginTxnId: string | undefined;
+    const resolveOriginFromAccounting = (): string | undefined => {
+      const entry = accounting.find((item) => typeof item.originTxnId === 'string' && item.originTxnId.length > 0);
+      return entry?.originTxnId;
+    };
+    const handleProgressEvent = (event: ProgressEvent): void => {
+      if (event.type !== 'agent_finished' && event.type !== 'agent_failed') return;
+      if (event.agentId !== agent.id) return;
+      const metrics = 'metrics' in event ? (event as { metrics?: ProgressMetrics }).metrics : undefined;
+      const metricsText = formatMetricsLine(metrics);
+      const originCandidate = (event as { originTxnId?: string }).originTxnId;
+      if (typeof originCandidate === 'string' && originCandidate.length > 0) {
+        rootOriginTxnId = originCandidate;
+      }
+      const errorText = event.type === 'agent_failed' && typeof event.error === 'string' && event.error.length > 0
+        ? italicize(event.error)
+        : undefined;
+      const summary = metricsText.length > 0
+        ? metricsText
+        : (event.type === 'agent_failed' ? (errorText !== undefined ? `failed: ${errorText}` : 'failed') : 'completed');
+      const origin = originCandidate ?? rootOriginTxnId;
+      if (typeof origin === 'string' && origin.length > 0) rootOriginTxnId = origin;
+      masterSummary = { text: summary, origin };
+    };
     const callbacks: AIAgentCallbacks = {
       onOutput: (chunk) => {
         output += chunk;
@@ -282,6 +308,7 @@ export class AnthropicCompletionsHeadend implements Headend {
           writeSseChunk(res, event);
         }
       },
+      onProgress: (event) => { handleProgressEvent(event); },
       onLog: (entry) => { this.logEntry(entry); },
       onAccounting: (entry) => { accounting.push(entry); },
     };
@@ -326,6 +353,72 @@ export class AnthropicCompletionsHeadend implements Headend {
       const usage = collectUsage(accounting);
       if (streamed) {
         const contentStop = { type: 'content_block_stop' as const };
+        const fallbackMetrics = masterSummary === undefined
+          ? (() => {
+            const agentIds = new Set<string>();
+            let toolsRun = 0;
+            let tokensCacheRead = 0;
+            let tokensCacheWrite = 0;
+            let costUsd = 0;
+            let minTs: number | undefined;
+            let maxTs: number | undefined;
+            accounting.forEach((entry) => {
+              if (typeof entry.agentId === 'string' && entry.agentId.length > 0) agentIds.add(entry.agentId);
+              if (entry.type === 'tool') toolsRun += 1;
+              if (entry.type === 'llm') {
+                tokensCacheRead += entry.tokens.cacheReadInputTokens ?? entry.tokens.cachedTokens ?? 0;
+                tokensCacheWrite += entry.tokens.cacheWriteInputTokens ?? 0;
+                if (typeof entry.costUsd === 'number' && Number.isFinite(entry.costUsd)) {
+                  costUsd += entry.costUsd;
+                }
+              }
+              const ts = entry.timestamp;
+              if (typeof ts === 'number' && Number.isFinite(ts)) {
+                minTs = minTs === undefined ? ts : Math.min(minTs, ts);
+                maxTs = maxTs === undefined ? ts : Math.max(maxTs, ts);
+              }
+            });
+            const durationMs = (minTs !== undefined && maxTs !== undefined) ? Math.max(0, maxTs - minTs) : undefined;
+            const agentsRun = agentIds.size > 0 ? agentIds.size : 1;
+            const normalizedCost = Number(costUsd.toFixed(4));
+            const metrics: ProgressMetrics = {
+              durationMs,
+              tokensIn: usage.input,
+              tokensOut: usage.output,
+              tokensCacheRead,
+              tokensCacheWrite,
+              toolsRun,
+              agentsRun,
+              costUsd: Number.isFinite(normalizedCost) ? normalizedCost : undefined,
+            };
+            return metrics;
+          })()
+          : undefined;
+        const summaryText = masterSummary?.text
+          ?? (() => {
+            const metricsLine = fallbackMetrics !== undefined ? formatMetricsLine(fallbackMetrics) : '';
+            if (metricsLine.length > 0) return metricsLine;
+            if (usage.total > 0) {
+              return `tokens →${String(usage.input)} ←${String(usage.output)}`;
+            }
+            return 'completed';
+          })();
+        const summaryOrigin = masterSummary?.origin
+          ?? rootOriginTxnId
+          ?? resolveOriginFromAccounting()
+          ?? requestId;
+        if (masterSummary === undefined) {
+          masterSummary = { text: summaryText, origin: summaryOrigin };
+          if (typeof summaryOrigin === 'string' && summaryOrigin.length > 0) rootOriginTxnId = summaryOrigin;
+        }
+        const originSuffix = typeof summaryOrigin === 'string' && summaryOrigin.length > 0
+          ? ` | origin ${escapeMarkdown(summaryOrigin)}`
+          : '';
+        const summaryEvent = {
+          type: 'content_block_delta' as const,
+          content_block: { type: 'text' as const, text_delta: `\nTransaction summary: ${summaryText}${originSuffix}\n` },
+        };
+        writeSseChunk(res, summaryEvent);
         writeSseChunk(res, contentStop);
         const stopEvent = { type: 'message_stop' as const };
         writeSseChunk(res, stopEvent);

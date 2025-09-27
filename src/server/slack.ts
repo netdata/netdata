@@ -655,7 +655,7 @@ const elog = (msg: string): void => { try { process.stderr.write(`[SRV] ← [0.0
           const opTree = sm.getOpTree(runId) as any | undefined;
           const snap = opTree
             ? buildSnapshotFromOpTree(opTree as any, Date.now())
-            : { lines: [], totals: { tokensIn: 0, tokensOut: 0, tokensCacheRead: 0, tokensCacheWrite: 0, toolsRun: 0 }, sessionCount: 0 } as any;
+            : { lines: [], totals: { tokensIn: 0, tokensOut: 0, tokensCacheRead: 0, tokensCacheWrite: 0, toolsRun: 0, agentsRun: 0 }, sessionCount: 0 } as any;
           const countFromOpTree = (node: any | undefined): { tools: number; sessions: number } => {
             if (!node || typeof node !== 'object') return { tools: 0, sessions: 0 };
             let tools = 0; let sessions = 1; // count this session
@@ -686,7 +686,7 @@ const elog = (msg: string): void => { try { process.stderr.write(`[SRV] ← [0.0
           const opTree = sessionManager.getOpTree(runId) as any | undefined;
           const snap = opTree
             ? buildSnapshotFromOpTree(opTree as any, Date.now())
-            : { lines: [], totals: { tokensIn: 0, tokensOut: 0, tokensCacheRead: 0, tokensCacheWrite: 0, toolsRun: 0 }, sessionCount: 0 } as any;
+            : { lines: [], totals: { tokensIn: 0, tokensOut: 0, tokensCacheRead: 0, tokensCacheWrite: 0, toolsRun: 0, agentsRun: 0 }, sessionCount: 0 } as any;
           const countFromOpTree = (node: any | undefined): { tools: number; sessions: number } => {
             if (!node || typeof node !== 'object') return { tools: 0, sessions: 0 };
             let tools = 0; let sessions = 1;
@@ -872,7 +872,7 @@ const elog = (msg: string): void => { try { process.stderr.write(`[SRV] ← [0.0
             return buildSnapshotFromOpTree(maybeTree as any, now);
           }
         } catch (e) { warn(`slack progress update failed: ${e instanceof Error ? e.message : String(e)}`); }
-        return { lines: [], totals: { tokensIn: 0, tokensOut: 0, tokensCacheRead: 0, tokensCacheWrite: 0, toolsRun: 0 }, sessionCount: 0 } as any;
+        return { lines: [], totals: { tokensIn: 0, tokensOut: 0, tokensCacheRead: 0, tokensCacheWrite: 0, toolsRun: 0, agentsRun: 0 }, sessionCount: 0 } as any;
       })();
       const text = formatSlackStatus(snap);
       const blocks = buildStatusBlocks(snap, (maybeTree as any)?.agentId, (maybeTree as any)?.startedAt);
@@ -1127,7 +1127,7 @@ const elog = (msg: string): void => { try { process.stderr.write(`[SRV] ← [0.0
               return buildSnapshotFromOpTree(maybeTree as any, now);
             }
           } catch (e) { warn(`slack follow-up update failed: ${e instanceof Error ? e.message : String(e)}`); }
-          return { lines: [], totals: { tokensIn: 0, tokensOut: 0, tokensCacheRead: 0, tokensCacheWrite: 0, toolsRun: 0 } } as any;
+          return { lines: [], totals: { tokensIn: 0, tokensOut: 0, tokensCacheRead: 0, tokensCacheWrite: 0, toolsRun: 0, agentsRun: 0 } } as any;
         })();
         const text2 = formatSlackStatus(snap);
         const blocks = buildStatusBlocks(snap, (maybeTree as any)?.agentId, (maybeTree as any)?.startedAt);

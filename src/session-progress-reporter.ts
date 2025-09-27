@@ -14,6 +14,8 @@ interface AgentStartPayload {
   agentId: string;
   agentName?: string;
   txnId?: string;
+  parentTxnId?: string;
+  originTxnId?: string;
   reason?: string;
 }
 
@@ -21,6 +23,9 @@ interface AgentUpdatePayload {
   callPath: string;
   agentId: string;
   agentName?: string;
+  txnId?: string;
+  parentTxnId?: string;
+  originTxnId?: string;
   message: string;
 }
 
@@ -29,6 +34,8 @@ interface AgentCompletionPayload {
   agentId: string;
   agentName?: string;
   txnId?: string;
+  parentTxnId?: string;
+  originTxnId?: string;
   metrics?: ProgressMetrics;
   error?: string;
 }
@@ -58,6 +65,8 @@ export class SessionProgressReporter {
       agentId: payload.agentId,
       agentName: payload.agentName,
       txnId: payload.txnId,
+      parentTxnId: payload.parentTxnId,
+      originTxnId: payload.originTxnId,
       reason: payload.reason,
       timestamp: Date.now(),
     };
@@ -76,6 +85,9 @@ export class SessionProgressReporter {
       callPath: payload.callPath,
       agentId: payload.agentId,
       agentName: payload.agentName,
+      txnId: payload.txnId,
+      parentTxnId: payload.parentTxnId,
+      originTxnId: payload.originTxnId,
       message: trimmed,
       timestamp: Date.now(),
     };
@@ -90,6 +102,8 @@ export class SessionProgressReporter {
       agentId: payload.agentId,
       agentName: payload.agentName,
       txnId: payload.txnId,
+      parentTxnId: payload.parentTxnId,
+      originTxnId: payload.originTxnId,
       metrics: payload.metrics,
       timestamp: Date.now(),
     };
@@ -105,6 +119,8 @@ export class SessionProgressReporter {
       agentId: payload.agentId,
       agentName: payload.agentName,
       txnId: payload.txnId,
+      parentTxnId: payload.parentTxnId,
+      originTxnId: payload.originTxnId,
       metrics: payload.metrics,
       error: payload.error,
       timestamp: Date.now(),

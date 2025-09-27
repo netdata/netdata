@@ -100,6 +100,7 @@ export interface ProgressMetrics {
   latencyMs?: number;
   charactersIn?: number;
   charactersOut?: number;
+  agentsRun?: number;
 }
 
 interface AgentProgressBase {
@@ -109,6 +110,8 @@ interface AgentProgressBase {
   agentName?: string;
   timestamp: number;
   txnId?: string;
+  parentTxnId?: string;
+  originTxnId?: string;
 }
 
 export interface AgentStartedEvent extends AgentProgressBase {

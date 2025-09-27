@@ -9,6 +9,7 @@ import type { Headend, HeadendClosedEvent, HeadendContext, HeadendDescription } 
 
 import { ConcurrencyLimiter } from './concurrency.js';
 import { HttpError, readJson, writeJson, writeSseChunk, writeSseDone } from './http-utils.js';
+import { escapeMarkdown, formatMetricsLine, italicize } from './summary-utils.js';
 
 interface Deferred<T> {
   promise: Promise<T>;
@@ -90,54 +91,11 @@ const collectUsage = (entries: AccountingEntry[]): { prompt: number; completion:
   return { ...usage, total: usage.prompt + usage.completion };
 };
 
-const formatDuration = (ms?: number): string | undefined => {
-  if (ms === undefined || !Number.isFinite(ms) || ms <= 0) return undefined;
-  const seconds = Math.max(1, Math.round(ms / 1000));
-  if (seconds < 60) return `${String(seconds)}s`;
-  const minutes = Math.floor(seconds / 60);
-  const remaining = seconds % 60;
-  return remaining > 0
-    ? `${String(minutes)}m${String(remaining)}s`
-    : `${String(minutes)}m`;
-};
-
-const escapeMarkdown = (value: string): string => value
-  .replace(/\r/gu, '')
-  .replace(/([*_`])/gu, '\\$1')
-  .trim();
-
-const italicize = (value: string): string => {
-  const escaped = escapeMarkdown(value);
-  return escaped.length > 0 ? `_${escaped}_` : escaped;
-};
-
 const formatAgentLabel = (params: { agentId: string; agentName?: string; callPath?: string }): string => {
   const source = typeof params.agentName === 'string' && params.agentName.length > 0
     ? params.agentName
     : (typeof params.callPath === 'string' && params.callPath.length > 0 ? params.callPath : params.agentId);
   return `**${escapeMarkdown(source)}**`;
-};
-
-const formatTokenSegments = (metrics: ProgressMetrics): string | undefined => {
-  const segments: string[] = [];
-  if (typeof metrics.tokensIn === 'number' && metrics.tokensIn > 0) segments.push(`→${String(metrics.tokensIn)}`);
-  if (typeof metrics.tokensOut === 'number' && metrics.tokensOut > 0) segments.push(`←${String(metrics.tokensOut)}`);
-  if (typeof metrics.tokensCacheRead === 'number' && metrics.tokensCacheRead > 0) segments.push(`c→${String(metrics.tokensCacheRead)}`);
-  if (typeof metrics.tokensCacheWrite === 'number' && metrics.tokensCacheWrite > 0) segments.push(`c←${String(metrics.tokensCacheWrite)}`);
-  if (segments.length === 0) return undefined;
-  return `tokens ${segments.join(' ')}`;
-};
-
-const formatMetricsLine = (metrics?: ProgressMetrics): string => {
-  if (metrics === undefined) return '';
-  const parts: string[] = [];
-  const duration = formatDuration(metrics.durationMs);
-  if (typeof duration === 'string' && duration.length > 0) parts.push(`duration **${escapeMarkdown(duration)}**`);
-  const tokens = formatTokenSegments(metrics);
-  if (tokens !== undefined) parts.push(tokens);
-  if (typeof metrics.toolsRun === 'number' && metrics.toolsRun > 0) parts.push(`tools ${String(metrics.toolsRun)}`);
-  if (typeof metrics.costUsd === 'number' && metrics.costUsd > 0) parts.push(`cost $**${metrics.costUsd.toFixed(4)}**`);
-  return parts.join(', ');
 };
 
 interface FormatResolution {
@@ -322,12 +280,17 @@ export class OpenAICompletionsHeadend implements Headend {
     let assistantRoleSent = false;
     let transactionHeaderSent = false;
     let rootTxnId: string | undefined;
+    let rootOriginTxnId: string | undefined;
     let summaryEmitted = false;
     let thinkingOpen = false;
     let rootCallPath: string | undefined;
     const accounting: AccountingEntry[] = [];
     const rootAgentLabel = formatAgentLabel({ agentId: agent.id, agentName: agent.toolName, callPath: agent.id });
-    let masterSummaryText: string | undefined;
+    let masterSummary: { text: string; origin?: string } | undefined;
+    const resolveOriginFromAccounting = (): string | undefined => {
+      const entry = accounting.find((item) => typeof item.originTxnId === 'string' && item.originTxnId.length > 0);
+      return entry?.originTxnId;
+    };
     const emitAssistantRole = (): void => {
       if (!streamed || assistantRoleSent) return;
       assistantRoleSent = true;
@@ -387,12 +350,15 @@ export class OpenAICompletionsHeadend implements Headend {
       emitReasoning('_\n');
       thinkingOpen = false;
     };
-    const emitSummaryLine = (summary: string): void => {
+    const emitSummaryLine = (summary: string, originId?: string): void => {
       if (summaryEmitted) return;
       const trimmed = summary.trim();
       const text = trimmed.length > 0 ? trimmed : 'completed';
       closeThinking();
-      emitReasoning(`\nTransaction summary: ${text}\n`);
+      const originSuffix = typeof originId === 'string' && originId.length > 0
+        ? ` | origin ${escapeMarkdown(originId)}`
+        : '';
+      emitReasoning(`\nTransaction summary: ${text}${originSuffix}\n`);
       summaryEmitted = true;
     };
     const ensureHeader = (txnId?: string, callPath?: string, agentIdParam?: string): void => {
@@ -437,7 +403,12 @@ export class OpenAICompletionsHeadend implements Headend {
         ? (event as { agentName?: string }).agentName
         : undefined;
       const agentLabel = formatAgentLabel({ agentId: event.agentId, agentName: eventAgentName, callPath: event.callPath });
-      const metricsText = formatMetricsLine('metrics' in event ? (event as { metrics?: ProgressMetrics }).metrics : undefined);
+      const eventMetrics = 'metrics' in event ? (event as { metrics?: ProgressMetrics }).metrics : undefined;
+      const metricsText = formatMetricsLine(eventMetrics);
+      const originCandidate = (event as { originTxnId?: string }).originTxnId;
+      if (typeof originCandidate === 'string' && originCandidate.length > 0) {
+        rootOriginTxnId = originCandidate;
+      }
 
       switch (event.type) {
         case 'agent_started': {
@@ -458,8 +429,10 @@ export class OpenAICompletionsHeadend implements Headend {
           emitBullet(line);
           if (agentMatches && (callPath === undefined || callPath === rootCallPath)) {
             const summary = metricsText.length > 0 ? metricsText : 'completed';
-            masterSummaryText = summary;
-            emitSummaryLine(summary);
+            const origin = (event as { originTxnId?: string }).originTxnId ?? rootOriginTxnId;
+            if (origin !== undefined && origin.length > 0) rootOriginTxnId = origin;
+            masterSummary = { text: summary, origin };
+            emitSummaryLine(summary, origin);
           }
           return;
         }
@@ -478,8 +451,10 @@ export class OpenAICompletionsHeadend implements Headend {
             const summary = metricsText.length > 0
               ? metricsText
               : (errorText !== undefined ? `failed: ${errorText}` : 'failed');
-            masterSummaryText = summary;
-            emitSummaryLine(summary);
+            const origin = (event as { originTxnId?: string }).originTxnId ?? rootOriginTxnId;
+            if (origin !== undefined && origin.length > 0) rootOriginTxnId = origin;
+            masterSummary = { text: summary, origin };
+            emitSummaryLine(summary, origin);
           }
           return;
         }
@@ -569,13 +544,70 @@ export class OpenAICompletionsHeadend implements Headend {
           };
           writeSseChunk(res, contentChunk);
         }
-        const fallbackParts: string[] = [];
-        const tokenSegments: string[] = [];
-        if (usage.prompt > 0) tokenSegments.push(`→${String(usage.prompt)}`);
-        if (usage.completion > 0) tokenSegments.push(`←${String(usage.completion)}`);
-        if (tokenSegments.length > 0) fallbackParts.push(`tokens ${tokenSegments.join(' ')}`);
-        const fallbackSummary = masterSummaryText ?? (fallbackParts.length > 0 ? fallbackParts.join(', ') : 'completed');
-        emitSummaryLine(fallbackSummary);
+        const fallbackMetrics = masterSummary === undefined
+          ? (() => {
+            const agentIds = new Set<string>();
+            let toolsRun = 0;
+            let tokensCacheRead = 0;
+            let tokensCacheWrite = 0;
+            let costUsd = 0;
+            let minTs: number | undefined;
+            let maxTs: number | undefined;
+            accounting.forEach((entry) => {
+              if (typeof entry.agentId === 'string' && entry.agentId.length > 0) agentIds.add(entry.agentId);
+              if (entry.type === 'tool') toolsRun += 1;
+              if (entry.type === 'llm') {
+                tokensCacheRead += entry.tokens.cacheReadInputTokens ?? entry.tokens.cachedTokens ?? 0;
+                tokensCacheWrite += entry.tokens.cacheWriteInputTokens ?? 0;
+                if (typeof entry.costUsd === 'number' && Number.isFinite(entry.costUsd)) {
+                  costUsd += entry.costUsd;
+                }
+              }
+              const ts = entry.timestamp;
+              if (typeof ts === 'number' && Number.isFinite(ts)) {
+                minTs = minTs === undefined ? ts : Math.min(minTs, ts);
+                maxTs = maxTs === undefined ? ts : Math.max(maxTs, ts);
+              }
+            });
+            const durationMs = (minTs !== undefined && maxTs !== undefined) ? Math.max(0, maxTs - minTs) : undefined;
+            const agentsRun = agentIds.size > 0 ? agentIds.size : 1;
+            const normalizedCost = Number(costUsd.toFixed(4));
+            const metrics: ProgressMetrics = {
+              durationMs,
+              tokensIn: usage.prompt,
+              tokensOut: usage.completion,
+              tokensCacheRead,
+              tokensCacheWrite,
+              toolsRun,
+              agentsRun,
+              costUsd: Number.isFinite(normalizedCost) ? normalizedCost : undefined,
+            };
+            return metrics;
+          })()
+          : undefined;
+        const fallbackSummaryText = masterSummary?.text
+          ?? (() => {
+            const metricsLine = fallbackMetrics !== undefined ? formatMetricsLine(fallbackMetrics) : '';
+            if (metricsLine.length > 0) return metricsLine;
+            if (usage.total > 0) {
+              const tokenSegments = [`→${String(usage.prompt)}`, `←${String(usage.completion)}`];
+              return `tokens ${tokenSegments.join(' ')}`;
+            }
+            return 'completed';
+          })();
+        const fallbackOrigin = masterSummary?.origin
+          ?? rootOriginTxnId
+          ?? resolveOriginFromAccounting()
+          ?? (accounting.find((entry) => typeof entry.txnId === 'string' && entry.txnId.length > 0)?.txnId)
+          ?? rootTxnId
+          ?? agent.id;
+        if (masterSummary === undefined) {
+          masterSummary = { text: fallbackSummaryText, origin: fallbackOrigin };
+          if (typeof fallbackOrigin === 'string' && fallbackOrigin.length > 0) {
+            rootOriginTxnId = fallbackOrigin;
+          }
+        }
+        emitSummaryLine(fallbackSummaryText, fallbackOrigin);
         const finalChunk: Record<string, unknown> = {
           id: responseId,
           object: CHAT_CHUNK_OBJECT,

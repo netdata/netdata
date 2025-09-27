@@ -188,12 +188,13 @@ export class AIAgentSession {
     }
     const totals = session.totals;
     if (totals !== undefined) {
-      if (typeof totals.tokensIn === 'number' && totals.tokensIn > 0) metrics.tokensIn = totals.tokensIn;
-      if (typeof totals.tokensOut === 'number' && totals.tokensOut > 0) metrics.tokensOut = totals.tokensOut;
-      if (typeof totals.tokensCacheRead === 'number' && totals.tokensCacheRead > 0) metrics.tokensCacheRead = totals.tokensCacheRead;
-      if (typeof totals.tokensCacheWrite === 'number' && totals.tokensCacheWrite > 0) metrics.tokensCacheWrite = totals.tokensCacheWrite;
-      if (typeof totals.toolsRun === 'number' && totals.toolsRun > 0) metrics.toolsRun = totals.toolsRun;
-      if (typeof totals.costUsd === 'number' && totals.costUsd > 0) metrics.costUsd = totals.costUsd;
+      if (typeof totals.tokensIn === 'number') metrics.tokensIn = totals.tokensIn;
+      if (typeof totals.tokensOut === 'number') metrics.tokensOut = totals.tokensOut;
+      if (typeof totals.tokensCacheRead === 'number') metrics.tokensCacheRead = totals.tokensCacheRead;
+      if (typeof totals.tokensCacheWrite === 'number') metrics.tokensCacheWrite = totals.tokensCacheWrite;
+      if (typeof totals.toolsRun === 'number') metrics.toolsRun = totals.toolsRun;
+      if (typeof totals.costUsd === 'number') metrics.costUsd = totals.costUsd;
+      if (typeof totals.agentsRun === 'number') metrics.agentsRun = totals.agentsRun;
     }
     const hasMetrics = Object.keys(metrics).length > 0;
     return hasMetrics ? metrics : undefined;
@@ -209,6 +210,8 @@ export class AIAgentSession {
       agentId: this.getAgentIdLabel(),
       agentName: this.getAgentDisplayName(),
       txnId: this.txnId,
+      parentTxnId: this.parentTxnId,
+      originTxnId: this.originTxnId,
       metrics,
       error,
     };
@@ -406,6 +409,9 @@ export class AIAgentSession {
               callPath: this.getCallPathLabel(),
               agentId: this.getAgentIdLabel(),
               agentName: this.getAgentDisplayName(),
+              txnId: this.txnId,
+              parentTxnId: this.parentTxnId,
+              originTxnId: this.originTxnId,
               message: t,
             });
           }
@@ -733,6 +739,8 @@ export class AIAgentSession {
       agentId: this.getAgentIdLabel(),
       agentName: this.getAgentDisplayName(),
       txnId: this.txnId,
+      parentTxnId: this.parentTxnId,
+      originTxnId: this.originTxnId,
       reason: this.sessionTitle?.title ?? this.sessionConfig.initialTitle,
     });
 
@@ -2019,6 +2027,9 @@ export class AIAgentSession {
             callPath: this.getCallPathLabel(),
             agentId: this.getAgentIdLabel(),
             agentName: this.getAgentDisplayName(),
+            txnId: this.txnId,
+            parentTxnId: this.parentTxnId,
+            originTxnId: this.originTxnId,
             message: progress,
           });
         }

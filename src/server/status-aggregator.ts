@@ -23,6 +23,7 @@ interface SnapshotSummary {
     tokensCacheWrite: number;
     toolsRun: number;
     costUsd?: number;
+    agentsRun: number;
   };
   // Optional overall timing when available (from opTree)
   runStartedAt?: number;
@@ -57,7 +58,9 @@ export function formatFooterLines(summary: SnapshotSummary, options?: FooterOpti
   const costVal = summary.totals.costUsd ?? 0;
   const costStr = `$${costVal.toFixed(2)}`;
   const origin = options?.originTxnId ?? summary.originTxnId ?? 'unknown-txn';
-  const agentsCount = typeof options?.agentsCount === 'number' ? options.agentsCount : summary.sessionCount;
+  const agentsCount = typeof options?.agentsCount === 'number'
+    ? options.agentsCount
+    : (summary.totals.agentsRun ?? summary.sessionCount);
   const toolsCount = typeof options?.toolsCount === 'number' ? options.toolsCount : summary.totals.toolsRun;
   const line1 = `*${clock}* | cost: *${costStr}* | ${origin}`;
   const line2 = `agents ${agentsCount} | tools ${toolsCount} | tokens →${formatThousands(summary.totals.tokensIn)} ←${formatThousands(summary.totals.tokensOut)} c→${formatThousands(summary.totals.tokensCacheRead)} c←${formatThousands(summary.totals.tokensCacheWrite)}`;
@@ -110,9 +113,18 @@ export function buildSnapshotFromOpTree(root: SessionNode, nowTs: number): Snaps
   };
   visit(root);
 
+  const normalizedCost = Number(costUsd.toFixed(4));
   return {
     lines,
-    totals: { tokensIn: tokens.in, tokensOut: tokens.out, tokensCacheRead: tokens.read, tokensCacheWrite: tokens.write, toolsRun, costUsd: costUsd > 0 ? Number(costUsd.toFixed(4)) : undefined },
+    totals: {
+      tokensIn: tokens.in,
+      tokensOut: tokens.out,
+      tokensCacheRead: tokens.read,
+      tokensCacheWrite: tokens.write,
+      toolsRun,
+      costUsd: Number.isFinite(normalizedCost) ? normalizedCost : undefined,
+      agentsRun: sessionCount,
+    },
     runStartedAt: root.startedAt,
     runElapsedSec: Math.max(0, Math.round((nowTs - root.startedAt) / 1000)),
     originTxnId: root.traceId ?? root.id,
