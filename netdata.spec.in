@@ -160,6 +160,7 @@ BuildRequires: gcc-c++
 BuildRequires: make
 BuildRequires: git-core
 BuildRequires: cmake
+BuildRequires: cargo
 %if 0%{!?suse_version:1}
 BuildRequires: ninja-build
 %else
@@ -1082,6 +1083,8 @@ fi
 %endif
 
 %changelog
+* Fri Sep 26 2025 Konstantin Shalygin <k0ste@k0ste.ru> 0.0.0-35
+- Added cargo to BuildRequires (rust is dependency for plugin-otel)
 * Tue Jul 29 2025 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-34
 - Add OpenTelemetry plugin
 * Tue Jul 15 2025 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-33
