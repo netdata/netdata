@@ -148,6 +148,27 @@ else()
         message(FATAL_ERROR "Unknown/unsupported platform: ${CMAKE_SYSTEM_NAME} (Supported platforms: FreeBSD, Linux, macOS, Windows)")
 endif()
 
+if(NOT NETDATA_RUNTIME_PREFIX STREQUAL "")
+  string(REGEX REPLACE "/$" "" NETDATA_RUNTIME_PREFIX "${NETDATA_RUNTIME_PREFIX}")
+endif()
+
+set(CACHE_DIR "${NETDATA_RUNTIME_PREFIX}/var/cache/netdata")
+set(CONFIG_DIR "${NETDATA_RUNTIME_PREFIX}/etc/netdata")
+set(LIBCONFIG_DIR "${NETDATA_RUNTIME_PREFIX}/usr/lib/netdata/conf.d")
+set(LOG_DIR "${NETDATA_RUNTIME_PREFIX}/var/log/netdata")
+set(PLUGINS_DIR "${NETDATA_RUNTIME_PREFIX}/usr/libexec/netdata/plugins.d")
+set(VARLIB_DIR "${NETDATA_RUNTIME_PREFIX}/var/lib/netdata")
+set(NETDATA_BIN_DIR "${NETDATA_RUNTIME_PREFIX}/${BINDIR}")
+
+# A non-default value is only used when building Debian packages (/var/lib/netdata/www)
+if(NOT DEFINED WEB_DIR)
+  set(WEB_DIR "usr/share/netdata/web")
+else()
+  string(REGEX REPLACE "^/" "" WEB_DIR "${WEB_DIR}")
+endif()
+set(WEB_DEST "${WEB_DIR}")
+set(WEB_DIR "${NETDATA_RUNTIME_PREFIX}/${WEB_DEST}")
+
 include(NetdataCompilerFlags)
 
 check_c_compiler_flag("-fexceptions" HAVE_FEXCEPTIONS)
@@ -474,9 +495,6 @@ check_include_file("sys/socket.h" HAVE_SYS_SOCKET_H)
 check_include_file("sys/wait.h" HAVE_SYS_WAIT_H)
 check_include_file("sys/un.h" HAVE_SYS_UN_H)
 check_include_file("spawn.h" HAVE_SPAWN_H)
-if(OS_LINUX)
-    check_include_file("sys/capability.h" HAVE_SYS_CAPABILITY_H)
-endif()
 
 #
 # check symbols
@@ -490,6 +508,10 @@ check_symbol_exists(strerror_r "string.h" HAVE_STRERROR_R)
 check_symbol_exists(finite "math.h" HAVE_FINITE)
 check_symbol_exists(isfinite "math.h" HAVE_ISFINITE)
 check_symbol_exists(dlsym "dlfcn.h" HAVE_DLSYM)
+check_symbol_exists(clearenv "stdlib.h" HAVE_CLEARENV)
+
+check_function_exists(setresuid HAVE_SETRESUID)
+check_function_exists(setresgid HAVE_SETRESGID)
 
 check_function_exists(pthread_getthreadid_np HAVE_PTHREAD_GETTHREADID_NP)
 check_function_exists(pthread_threadid_np HAVE_PTHREAD_THREADID_NP)
@@ -2472,13 +2494,34 @@ list(APPEND ACLK_FILES ${ACLK_PROTO_BUILT_SRCS}
                        ${ACLK_PROTO_BUILT_HDRS})
 
 #
+# nd-run helper program
+#
+
+if(OS_LINUX)
+  pkg_check_modules(CAP IMPORTED_TARGET libcap)
+else()
+  set(CAP_FOUND False)
+endif()
+
+if(CAP_FOUND)
+  set(HAVE_CAPABILITY True)
+endif()
+
+set(NDRUN_FILES src/collectors/utils/nd-run.c)
+add_executable(nd-run ${NDRUN_FILES})
+if(CAP_FOUND)
+  target_link_libraries(nd-run PRIVATE PkgConfig::CAP)
+endif()
+target_include_directories(nd-run PRIVATE ${CONFIG_H_DIR})
+install(TARGETS nd-run
+        COMPONENT netdata
+        DESTINATION "${BINDIR}")
+
+#
 # build plugins
 #
 
 if(ENABLE_PLUGIN_DEBUGFS)
-    # Check for libcap (optional)
-    pkg_check_modules(CAP QUIET libcap)
-
     # Define debugfs.plugin source files
     set(DEBUGFS_PLUGIN_FILES
             src/collectors/debugfs.plugin/debugfs_plugin.c
@@ -2533,8 +2576,6 @@ add_executable(spawn-tester src/libnetdata/spawn_server/spawn-tester.c)
 target_link_libraries(spawn-tester libnetdata)
 
 if(ENABLE_PLUGIN_APPS)
-    pkg_check_modules(CAP QUIET libcap)
-
     set(APPS_PLUGIN_FILES
             src/collectors/apps.plugin/apps_plugin.c
             src/collectors/apps.plugin/apps_plugin.h
@@ -2575,10 +2616,6 @@ if(ENABLE_PLUGIN_APPS)
                 COMPONENT plugin-apps
                 DESTINATION usr/share/doc/netdata-plugin-apps)
     endif()
-endif()
-
-if(CAP_FOUND)
-    set(HAVE_CAPABILITY True)
 endif()
 
 if(ENABLE_PLUGIN_FREEIPMI)
@@ -3193,25 +3230,6 @@ endif()
 #
 # Generate config file
 #
-if(NOT NETDATA_RUNTIME_PREFIX STREQUAL "")
-  string(REGEX REPLACE "/$" "" NETDATA_RUNTIME_PREFIX "${NETDATA_RUNTIME_PREFIX}")
-endif()
-
-set(CACHE_DIR "${NETDATA_RUNTIME_PREFIX}/var/cache/netdata")
-set(CONFIG_DIR "${NETDATA_RUNTIME_PREFIX}/etc/netdata")
-set(LIBCONFIG_DIR "${NETDATA_RUNTIME_PREFIX}/usr/lib/netdata/conf.d")
-set(LOG_DIR "${NETDATA_RUNTIME_PREFIX}/var/log/netdata")
-set(PLUGINS_DIR "${NETDATA_RUNTIME_PREFIX}/usr/libexec/netdata/plugins.d")
-set(VARLIB_DIR "${NETDATA_RUNTIME_PREFIX}/var/lib/netdata")
-
-# A non-default value is only used when building Debian packages (/var/lib/netdata/www)
-if(NOT DEFINED WEB_DIR)
-  set(WEB_DIR "usr/share/netdata/web")
-else()
-  string(REGEX REPLACE "^/" "" WEB_DIR "${WEB_DIR}")
-endif()
-set(WEB_DEST "${WEB_DIR}")
-set(WEB_DIR "${NETDATA_RUNTIME_PREFIX}/${WEB_DEST}")
 
 # Collect all compiler flags
 get_directory_property(NETDATA_COMPILE_OPTIONS COMPILE_OPTIONS)
@@ -3273,12 +3291,12 @@ install(DIRECTORY COMPONENT netdata DESTINATION ${WEB_DEST})
 set(libsysdir_POST "${NETDATA_RUNTIME_PREFIX}/usr/lib/netdata/system")
 set(pkglibexecdir_POST "${NETDATA_RUNTIME_PREFIX}/usr/libexec/netdata")
 set(localstatedir_POST "${NETDATA_RUNTIME_PREFIX}/var")
-set(sbindir_POST "${NETDATA_RUNTIME_PREFIX}/${BINDIR}")
-set(configdir_POST "${NETDATA_RUNTIME_PREFIX}/etc/netdata")
-set(libconfigdir_POST "${NETDATA_RUNTIME_PREFIX}/usr/lib/netdata/conf.d")
-set(cachedir_POST "${NETDATA_RUNTIME_PREFIX}/var/cache/netdata")
-set(registrydir_POST "${NETDATA_RUNTIME_PREFIX}/var/lib/netdata/registry")
-set(varlibdir_POST "${NETDATA_RUNTIME_PREFIX}/var/lib/netdata")
+set(sbindir_POST "${NETDATA_BIN_DIR}")
+set(configdir_POST "${CONFIG_DIR}")
+set(libconfigdir_POST "${LIBCONFIG_DIR}")
+set(cachedir_POST "${CACHE_DIR}")
+set(varlibdir_POST "${VARLIB_DIR}")
+set(registrydir_POST "${VARLIB_DIR}/registry")
 set(netdata_user_POST "${NETDATA_USER}")
 set(netdata_group_POST "${NETDATA_USER}")
 

@@ -33,7 +33,6 @@
 #cmakedefine HAVE_SYS_STATVFS_H
 #cmakedefine HAVE_INTTYPES_H
 #cmakedefine HAVE_STDINT_H
-#cmakedefine HAVE_SYS_CAPABILITY_H
 #cmakedefine HAVE_ARPA_INET_H
 #cmakedefine HAVE_NETINET_TCP_H
 #cmakedefine HAVE_SYS_IOCTL_H
@@ -72,8 +71,13 @@
 #cmakedefine HAVE_GETPRIORITY
 #cmakedefine HAVE_SETENV
 #cmakedefine HAVE_DLSYM
+#cmakedefine HAVE_CLEARENV
+
 #cmakedefine HAVE_LIBCURL
 #cmakedefine HAVE_LIBICONV
+
+#cmakedefine HAVE_SETRESUID
+#cmakedefine HAVE_SETRESGID
 
 #cmakedefine HAVE_ARC4RANDOM_BUF
 #cmakedefine HAVE_ARC4RANDOM_UNIFORM
