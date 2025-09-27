@@ -1,0 +1,4 @@
+pattern: '(?P<MESSAGE>.*)'
+
+filename:
+  key: LOG_FILENAME
