@@ -4595,7 +4595,7 @@ sysobjectids:
       model: ciscoCSE340G32K9
     1.3.6.1.4.1.9.1.1631:
       category: Wireless LAN Controller
-      model:  Virtual-WLC
+      model: Virtual-WLC
     1.3.6.1.4.1.9.1.1632:
       model: AIRAP802agn
     1.3.6.1.4.1.9.1.1633:
@@ -4634,7 +4634,7 @@ sysobjectids:
       category: Layer 3 Switch
       model: Catalyst 3850-24T
     1.3.6.1.4.1.9.1.1645:
-      category: Wireless Lan Controller
+      category: Wireless LAN Controller
       model: AIR 5760 WLC
     1.3.6.1.4.1.9.1.1646:
       model: VSGateway

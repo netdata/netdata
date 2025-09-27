@@ -273,7 +273,7 @@ func validateEnrichSymbol(symbol *SymbolConfig, symbolContext SymbolContext) err
 	if symbol.MatchPattern != "" {
 		pattern, err := regexp.Compile(symbol.MatchPattern)
 		if err != nil {
-			errs = append(errs, fmt.Errorf("cannot compile `extract_value` (%s): %s", symbol.ExtractValue, err.Error()))
+			errs = append(errs, fmt.Errorf("cannot compile `match_pattern` (%s): %s", symbol.MatchPattern, err.Error()))
 		} else {
 			symbol.MatchPatternCompiled = pattern
 		}
