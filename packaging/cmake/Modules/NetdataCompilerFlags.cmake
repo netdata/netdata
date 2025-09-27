@@ -3,6 +3,7 @@
 
 include(CheckCCompilerFlag)
 include(CheckCXXCompilerFlag)
+include(NetdataUtil)
 
 # Construct a pre-processor safe name
 #
@@ -99,18 +100,18 @@ else()
 endif()
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-        option(DISABLE_HARDENING "Disable adding extra compiler flags for hardening" TRUE)
-        option(USE_LTO "Attempt to use of LTO when building. Defaults to being enabled if supported for release builds." FALSE)
+  option(DISABLE_HARDENING "Disable adding extra compiler flags for hardening" TRUE)
+  option(USE_LTO "Attempt to use of LTO when building. Defaults to being enabled if supported for release builds." FALSE)
 else()
-        option(DISABLE_HARDENING "Disable adding extra compiler flags for hardening" FALSE)
-        option(USE_LTO "Attempt to use of LTO when building. Defaults to being enabled if supported for release builds." TRUE)
+  option(DISABLE_HARDENING "Disable adding extra compiler flags for hardening" FALSE)
+  option(USE_LTO "Attempt to use of LTO when building. Defaults to being enabled if supported for release builds." TRUE)
 endif()
 
 option(ENABLE_ADDRESS_SANITIZER "Build with address sanitizer enabled" False)
 mark_as_advanced(ENABLE_ADDRESS_SANITIZER)
 
 if(ENABLE_ADDRESS_SANITIZER)
-        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address")
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address")
 endif()
 
 if(USE_LTO)
@@ -151,3 +152,18 @@ endforeach()
 
 add_simple_extra_compiler_flag("-Wbuiltin-macro-redefined" "-Wno-builtin-macro-redefined")
 add_simple_extra_compiler_flag("-fexceptions" "-fexceptions")
+
+if(CMAKE_SYSTEM_PROCESSOR STREQUAL "arm" AND CMAKE_SIZEOF_VOID_P EQUAL 4)
+  if(STATIC_BUILD)
+    netdata_detect_libc(LIBC_ID)
+    if(LIBC_ID STREQUAL "musl")
+      # Fix for bad thread-local storage behavior on static musl builds on 32-bit ARM.
+      add_simple_extra_compiler_flag("-ftls-model", "-ftls-model=initial-exec")
+    endif()
+  endif()
+
+  if(NOT CMAKE_BUILD_TYPE MATCHES "Release|MinSizeRel")
+    add_simple_extra_compiler_flag("-funwind-tables" "-funwind-tables")
+    add_simple_extra_compiler_flag("-fasynchronous-unwind-tables" "-fasynchronous-unwind-tables")
+  endif()
+endif()
