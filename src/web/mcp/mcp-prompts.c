@@ -39,8 +39,8 @@
 #include "mcp-prompts.h"
 
 // Implementation of prompts/list (transport-agnostic)
-static MCP_RETURN_CODE mcp_prompts_method_list(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, MCP_REQUEST_ID id) {
-    if (!mcpc || id == 0)
+static MCP_RETURN_CODE mcp_prompts_method_list(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, MCP_REQUEST_ID id __maybe_unused) {
+    if (!mcpc)
         return MCP_RC_ERROR;
 
     // Initialize success response
@@ -70,13 +70,9 @@ static MCP_RETURN_CODE mcp_prompts_method_get(MCP_CLIENT *mcpc, struct json_obje
 // Prompts namespace method dispatcher (transport-agnostic)
 MCP_RETURN_CODE mcp_prompts_route(MCP_CLIENT *mcpc, const char *method, struct json_object *params, MCP_REQUEST_ID id) {
     if (!mcpc || !method) return MCP_RC_INTERNAL_ERROR;
-    
+
     netdata_log_debug(D_MCP, "MCP prompts method: %s", method);
-    
-    // Flush previous buffers
-    buffer_flush(mcpc->result);
-    buffer_flush(mcpc->error);
-    
+
     MCP_RETURN_CODE rc;
     
     if (strcmp(method, "list") == 0) {

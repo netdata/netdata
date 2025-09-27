@@ -66,6 +66,9 @@ typedef enum __attribute__((packed)) {
     // websocket flags
     WEB_CLIENT_FLAG_WEBSOCKET_CLIENT        = (1 << 23), // this is a websocket client
     WEB_CLIENT_FLAG_WEBSOCKET_HANDSHAKE     = (1 << 24), // websocket handshake detected
+    WEB_CLIENT_FLAG_ACCEPT_JSON             = (1 << 25),
+    WEB_CLIENT_FLAG_ACCEPT_SSE              = (1 << 26),
+    WEB_CLIENT_FLAG_ACCEPT_TEXT             = (1 << 27),
 } WEB_CLIENT_FLAGS;
 
 #define WEB_CLIENT_FLAG_PATH_WITH_VERSION (WEB_CLIENT_FLAG_PATH_IS_V0|WEB_CLIENT_FLAG_PATH_IS_V1|WEB_CLIENT_FLAG_PATH_IS_V2|WEB_CLIENT_FLAG_PATH_IS_V3)

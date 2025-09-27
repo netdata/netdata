@@ -2,40 +2,88 @@
 
 Configure Claude Code to access your Netdata infrastructure through MCP.
 
+## Transport Support
+
+Claude Code supports multiple MCP transport types, giving you flexibility in how you connect to Netdata:
+
+| Transport | Support | Use Case |
+|-----------|---------|----------|
+| **stdio** (via nd-mcp bridge) | ✅ Fully Supported | Local bridge to WebSocket |
+| **Streamable HTTP** | ✅ Fully Supported | Direct connection to Netdata's HTTP endpoint |
+| **SSE** (Server-Sent Events) | ⚠️ Limited Support | Legacy, being deprecated |
+| **WebSocket** | ❌ Not Supported | Use nd-mcp bridge or HTTP instead |
+
 ## Prerequisites
 
 1. **Claude Code installed** - Available at [anthropic.com/claude-code](https://www.anthropic.com/claude-code)
 2. **The IP and port (usually 19999) of a running Netdata Agent** - Prefer a Netdata Parent to get infrastructure level visibility. Currently the latest nightly version of Netdata has MCP support (not released to the stable channel yet). Your AI Client (running on your desktop or laptop) needs to have direct network access to this IP and port.
-3. **`nd-mcp` program available on your desktop or laptop** - This is the bridge that translates `stdio` to `websocket`, connecting your AI Client to your Netdata Agent or Parent. [Find its absolute path](/docs/learn/mcp.md#finding-the-nd-mcp-bridge)
+3. **For stdio connections only: `nd-mcp` bridge** - The stdio-to-websocket bridge. [Find its absolute path](/docs/learn/mcp.md#finding-the-nd-mcp-bridge). Not needed for direct HTTP connections.
 4. **Optionally, the Netdata MCP API key** that unlocks full access to sensitive observability data (protected functions, full access to logs) on your Netdata. Each Netdata Agent or Parent has its own unique API key for MCP - [Find your Netdata MCP API key](/docs/learn/mcp.md#finding-your-api-key)
 
-## Configuration
+## Configuration Methods
 
 Claude Code has comprehensive MCP server management capabilities. For detailed documentation on all configuration options and commands, see the [official Claude Code MCP documentation](https://docs.anthropic.com/en/docs/claude-code/mcp).
 
-### Adding Netdata MCP Server
+### Method 1: Direct HTTP Connection (Recommended)
 
-Use Claude Code's built-in MCP commands to add your Netdata server:
+Connect directly to Netdata's HTTP endpoint without needing the nd-mcp bridge:
 
 ```bash
-# Add Netdata MCP server (project-scoped for team sharing)
-claude mcp add --scope project netdata /usr/sbin/nd-mcp ws://YOUR_NETDATA_IP:19999/mcp?api_key=NETDATA_MCP_API_KEY
+# Add Netdata via direct HTTP connection (project-scoped for team sharing)
+claude mcp add --transport http --scope project netdata \
+  http://YOUR_NETDATA_IP:19999/mcp?api_key=NETDATA_MCP_API_KEY
 
 # Or add locally for personal use only
-claude mcp add netdata /usr/sbin/nd-mcp ws://YOUR_NETDATA_IP:19999/mcp?api_key=NETDATA_MCP_API_KEY
+claude mcp add --transport http netdata \
+  http://YOUR_NETDATA_IP:19999/mcp?api_key=NETDATA_MCP_API_KEY
 
-# List configured servers to verify
+# For HTTPS connections
+claude mcp add --transport http --scope project netdata \
+  https://YOUR_NETDATA_IP:19999/mcp?api_key=NETDATA_MCP_API_KEY
+```
+
+### Method 2: Using nd-mcp Bridge (stdio)
+
+For environments where you prefer or need to use the bridge:
+
+```bash
+# Add Netdata via nd-mcp bridge (project-scoped)
+claude mcp add --scope project netdata /usr/sbin/nd-mcp \
+  ws://YOUR_NETDATA_IP:19999/mcp?api_key=NETDATA_MCP_API_KEY
+
+# Or add locally for personal use only
+claude mcp add netdata /usr/sbin/nd-mcp \
+  ws://YOUR_NETDATA_IP:19999/mcp?api_key=NETDATA_MCP_API_KEY
+```
+
+### Method 3: Using npx remote-mcp (Alternative Bridge)
+
+If nd-mcp is not available, you can use the official MCP remote client:
+
+```bash
+# Using SSE transport
+claude mcp add --scope project netdata npx @modelcontextprotocol/remote-mcp \
+  --sse http://YOUR_NETDATA_IP:19999/mcp?api_key=NETDATA_MCP_API_KEY
+
+# Using HTTP transport
+claude mcp add --scope project netdata npx @modelcontextprotocol/remote-mcp \
+  --http http://YOUR_NETDATA_IP:19999/mcp?api_key=NETDATA_MCP_API_KEY
+```
+
+### Verify Configuration
+
+```bash
+# List configured servers
 claude mcp list
 
 # Get server details
 claude mcp get netdata
 ```
 
-Replace:
-
-- `/usr/sbin/nd-mcp` - With your [actual nd-mcp path](/docs/learn/mcp.md#finding-the-nd-mcp-bridge)
+Replace in all examples:
 - `YOUR_NETDATA_IP` - IP address or hostname of your Netdata Agent/Parent
 - `NETDATA_MCP_API_KEY` - Your [Netdata MCP API key](/docs/learn/mcp.md#finding-your-api-key)
+- `/usr/sbin/nd-mcp` - With your [actual nd-mcp path](/docs/learn/mcp.md#finding-the-nd-mcp-bridge) (stdio method only)
 
 **Project-scoped configuration** creates a `.mcp.json` file that can be shared with your team via version control.
 
@@ -69,9 +117,26 @@ This is particularly useful when you have multiple MCP servers configured and wa
 
 ## Project-Based Configuration
 
-Claude Code's strength is project-specific configurations. So you can have different project directories with different MCP servers on each of them, allowing you to control the MCP servers that will be used, based on the directory from which you started it.
+Claude Code's strength is project-specific configurations. You can have different project directories with different MCP servers, allowing you to control the MCP servers based on the directory from which you started Claude Code.
 
-### Production Environment
+### Configuration File Format (`.mcp.json`)
+
+#### Direct HTTP Connection (Recommended)
+
+Create `~/projects/production/.mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "netdata": {
+      "type": "http",
+      "url": "http://prod-parent.company.com:19999/mcp?api_key=${NETDATA_API_KEY}"
+    }
+  }
+}
+```
+
+#### Using nd-mcp Bridge
 
 Create `~/projects/production/.mcp.json`:
 
@@ -80,30 +145,42 @@ Create `~/projects/production/.mcp.json`:
   "mcpServers": {
     "netdata": {
       "command": "/usr/sbin/nd-mcp",
-      "args": ["ws://prod-parent.company.com:19999/mcp?api_key=PROD_KEY"]
+      "args": ["ws://prod-parent.company.com:19999/mcp?api_key=${NETDATA_API_KEY}"]
     }
   }
 }
 ```
 
-### Development Environment
+#### Using npx remote-mcp
 
-Create `~/projects/development/.mcp.json`:
+Create `~/projects/production/.mcp.json`:
 
 ```json
 {
   "mcpServers": {
     "netdata": {
-      "command": "/usr/sbin/nd-mcp",
-      "args": ["ws://dev-parent.company.com:19999/mcp?api_key=DEV_KEY"]
+      "command": "npx",
+      "args": [
+        "@modelcontextprotocol/remote-mcp",
+        "--sse",
+        "http://prod-parent.company.com:19999/mcp?api_key=${NETDATA_API_KEY}"
+      ]
     }
   }
 }
 ```
 
+### Environment Variables
+
+Claude Code supports environment variable expansion in `.mcp.json`:
+- `${VAR}` - Expands to the value of environment variable `VAR`
+- `${VAR:-default}` - Uses `VAR` if set, otherwise uses `default`
+
+This allows you to keep sensitive API keys out of version control.
+
 ## Claude Instructions
 
-Create a `Claude.md` file in your project root with default instructions:
+Create a `CLAUDE.md` file in your project root with default instructions:
 
 ```markdown
 # Claude Instructions
@@ -140,3 +217,12 @@ Our key services to monitor:
 
 - Verify API key is included in the connection string
 - Check that the Netdata agent is claimed
+
+## Documentation Links
+
+- [Official Claude Code Documentation](https://docs.claude.com/en/docs/claude-code)
+- [Claude Code MCP Configuration Guide](https://docs.claude.com/en/docs/claude-code/mcp)
+- [Claude Code Getting Started](https://docs.claude.com/en/docs/claude-code/getting-started)
+- [Claude Code Commands Reference](https://docs.claude.com/en/docs/claude-code/commands)
+- [Netdata MCP Setup](/docs/learn/mcp.md)
+- [AI DevOps Best Practices](/docs/ml-ai/ai-devops-copilot/ai-devops-copilot.md)

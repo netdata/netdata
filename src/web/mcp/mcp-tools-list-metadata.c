@@ -387,9 +387,9 @@ void mcp_unified_list_tool_schema(BUFFER *buffer, const MCP_LIST_TOOL_CONFIG *co
 
 // Unified execution
 MCP_RETURN_CODE mcp_unified_list_tool_execute(MCP_CLIENT *mcpc, const MCP_LIST_TOOL_CONFIG *config,
-                                               struct json_object *params, MCP_REQUEST_ID id)
+                                               struct json_object *params, MCP_REQUEST_ID id __maybe_unused)
 {
-    if (!mcpc || !config || id == 0)
+    if (!mcpc || !config)
         return MCP_RC_ERROR;
 
     // Extract parameters based on configuration

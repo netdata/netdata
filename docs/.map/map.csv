@@ -190,6 +190,10 @@ https://github.com/netdata/netdata/edit/master/docs/ml-ai/ai-chat-netdata/jetbra
 https://github.com/netdata/netdata/edit/master/docs/ml-ai/ai-chat-netdata/netdata-web-client.md,Netdata Web Client,Published,Netdata AI/MCP/MCP Clients,
 https://github.com/netdata/netdata/edit/master/docs/ml-ai/ai-devops-copilot/claude-code.md,Claude Code,Published,Netdata AI/MCP/MCP Clients,
 https://github.com/netdata/netdata/edit/master/docs/ml-ai/ai-devops-copilot/gemini-cli.md,Gemini CLI,Published,Netdata AI/MCP/MCP Clients,
+https://github.com/netdata/netdata/edit/master/docs/ml-ai/ai-devops-copilot/codex-cli.md,OpenAI Codex CLI,Published,Netdata AI/MCP/MCP Clients,
+https://github.com/netdata/netdata/edit/master/docs/ml-ai/ai-devops-copilot/crush.md,Crush,Published,Netdata AI/MCP/MCP Clients,
+https://github.com/netdata/netdata/edit/master/docs/ml-ai/ai-devops-copilot/opencode.md,OpenCode,Published,Netdata AI/MCP/MCP Clients,
+,,,
 https://github.com/netdata/netdata/edit/master/docs/netdata-assistant.md,AI powered troubleshooting assistant,Unpublished,AI and Machine Learning,
 https://github.com/netdata/netdata/edit/master/src/ml/README.md,ML models and anomaly detection,Unpublished,AI and Machine Learning,This is an in-depth look at how Netdata uses ML to detect anomalies.
 ,,,,

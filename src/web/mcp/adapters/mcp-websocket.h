@@ -15,10 +15,6 @@ void mcp_websocket_on_message(struct websocket_server_client *wsc, const char *m
 void mcp_websocket_on_close(struct websocket_server_client *wsc, WEBSOCKET_CLOSE_CODE code, const char *reason);
 void mcp_websocket_on_disconnect(struct websocket_server_client *wsc);
 
-// Helper functions for the WebSocket adapter
-int mcp_websocket_send_json(struct websocket_server_client *wsc, struct json_object *json);
-int mcp_websocket_send_buffer(struct websocket_server_client *wsc, BUFFER *buffer);
-
 // Get and set MCP context from a WebSocket client
 MCP_CLIENT *mcp_websocket_get_context(struct websocket_server_client *wsc);
 void mcp_websocket_set_context(struct websocket_server_client *wsc, MCP_CLIENT *ctx);

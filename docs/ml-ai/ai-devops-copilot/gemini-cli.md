@@ -2,11 +2,22 @@
 
 Configure Google's Gemini CLI to access your Netdata infrastructure through MCP for powerful AI-driven operations.
 
+## Transport Support
+
+Gemini CLI supports all major MCP transport types, giving you maximum flexibility:
+
+| Transport | Support | Use Case |
+|-----------|---------|----------|
+| **stdio** (via nd-mcp bridge) | ✅ Fully Supported | Local bridge to WebSocket |
+| **Streamable HTTP** | ✅ Fully Supported | Direct connection to Netdata's HTTP endpoint |
+| **SSE** (Server-Sent Events) | ✅ Fully Supported | Direct connection to Netdata's SSE endpoint |
+| **WebSocket** | ❌ Not Supported | Use nd-mcp bridge or HTTP/SSE instead |
+
 ## Prerequisites
 
 1. **Gemini CLI installed** - Available from [GitHub](https://github.com/google-gemini/gemini-cli)
 2. **The IP and port (usually 19999) of a running Netdata Agent** - Prefer a Netdata Parent to get infrastructure level visibility. Currently the latest nightly version of Netdata has MCP support (not released to the stable channel yet). Your AI Client (running on your desktop or laptop) needs to have direct network access to this IP and port.
-3. **`nd-mcp` program available on your desktop or laptop** - This is the bridge that translates `stdio` to `websocket`, connecting your AI Client to your Netdata Agent or Parent. [Find its absolute path](/docs/learn/mcp.md#finding-the-nd-mcp-bridge)
+3. **For stdio connections only: `nd-mcp` bridge** - The stdio-to-websocket bridge. [Find its absolute path](/docs/learn/mcp.md#finding-the-nd-mcp-bridge). Not needed for direct HTTP/SSE connections.
 4. **Optionally, the Netdata MCP API key** that unlocks full access to sensitive observability data (protected functions, full access to logs) on your Netdata. Each Netdata Agent or Parent has its own unique API key for MCP - [Find your Netdata MCP API key](/docs/learn/mcp.md#finding-your-api-key)
 
 ## Installation
@@ -22,38 +33,137 @@ npm install
 npm run build
 ```
 
-## Configuration
+## Configuration Methods
 
 Gemini CLI has built-in MCP server support. For detailed MCP configuration, see the [official MCP documentation](https://github.com/google-gemini/gemini-cli/blob/main/docs/tools/mcp-server.md).
 
-### Adding Netdata MCP Server
+### Method 1: Direct HTTP Connection (Recommended)
 
-Configure your Gemini settings to include the Netdata MCP server:
+Connect directly to Netdata's HTTP endpoint without needing any bridge:
 
 ```bash
-# Edit Gemini settings file
-~/.gemini/settings.json
+# Using CLI command
+gemini mcp add --transport http netdata http://YOUR_NETDATA_IP:19999/mcp?api_key=NETDATA_MCP_API_KEY
+
+# For HTTPS connections
+gemini mcp add --transport http netdata https://YOUR_NETDATA_IP:19999/mcp?api_key=NETDATA_MCP_API_KEY
 ```
 
-Add your Netdata MCP server configuration:
+Or configure in `~/.gemini/settings.json`:
+
+```json
+{
+  "mcpServers": {
+    "netdata": {
+      "httpUrl": "http://YOUR_NETDATA_IP:19999/mcp?api_key=NETDATA_MCP_API_KEY",
+      "timeout": 30000
+    }
+  }
+}
+```
+
+### Method 2: Direct SSE Connection
+
+Connect directly to Netdata's SSE endpoint:
+
+```bash
+# Using CLI command
+gemini mcp add --transport sse netdata http://YOUR_NETDATA_IP:19999/mcp?api_key=NETDATA_MCP_API_KEY&transport=sse
+```
+
+Or configure in `~/.gemini/settings.json`:
+
+```json
+{
+  "mcpServers": {
+    "netdata": {
+      "url": "http://YOUR_NETDATA_IP:19999/mcp?api_key=NETDATA_MCP_API_KEY&transport=sse",
+      "timeout": 30000
+    }
+  }
+}
+```
+
+### Method 3: Using nd-mcp Bridge (stdio)
+
+For environments where you prefer or need to use the bridge:
+
+```bash
+# Using CLI command
+gemini mcp add netdata /usr/sbin/nd-mcp ws://YOUR_NETDATA_IP:19999/mcp?api_key=NETDATA_MCP_API_KEY
+```
+
+Or configure in `~/.gemini/settings.json`:
 
 ```json
 {
   "mcpServers": {
     "netdata": {
       "command": "/usr/sbin/nd-mcp",
-      "args": ["ws://YOUR_NETDATA_IP:19999/mcp?api_key=NETDATA_MCP_API_KEY"]
+      "args": ["ws://YOUR_NETDATA_IP:19999/mcp?api_key=NETDATA_MCP_API_KEY"],
+      "timeout": 30000
     }
   }
 }
 ```
 
-### Verify MCP Configuration
+### Method 4: Using npx remote-mcp (Alternative Bridge)
 
-Use the `/mcp` command to verify your setup:
+If nd-mcp is not available, use the official MCP remote client:
 
 ```bash
-# List configured MCP servers
+# Using CLI command with SSE
+gemini mcp add netdata npx @modelcontextprotocol/remote-mcp \
+  --sse http://YOUR_NETDATA_IP:19999/mcp?api_key=NETDATA_MCP_API_KEY
+
+# Using HTTP transport
+gemini mcp add netdata npx @modelcontextprotocol/remote-mcp \
+  --http http://YOUR_NETDATA_IP:19999/mcp?api_key=NETDATA_MCP_API_KEY
+```
+
+Or configure in `~/.gemini/settings.json`:
+
+```json
+{
+  "mcpServers": {
+    "netdata": {
+      "command": "npx",
+      "args": [
+        "@modelcontextprotocol/remote-mcp",
+        "--sse",
+        "http://YOUR_NETDATA_IP:19999/mcp?api_key=NETDATA_MCP_API_KEY"
+      ]
+    }
+  }
+}
+```
+
+## Environment Variables
+
+Gemini CLI supports environment variable expansion in `settings.json`:
+- `$VAR_NAME` or `${VAR_NAME}` - Expands to the value of environment variable
+
+Example configuration with environment variables:
+
+```json
+{
+  "mcpServers": {
+    "netdata": {
+      "httpUrl": "http://${NETDATA_HOST}:19999/mcp?api_key=${NETDATA_API_KEY}"
+    }
+  }
+}
+```
+
+## Verify MCP Configuration
+
+Use these commands to verify your setup:
+
+```bash
+# List all configured MCP servers
+gemini mcp list
+
+# Interactive MCP status (within Gemini session)
 /mcp
 
 # Show detailed descriptions of MCP servers and tools
@@ -63,11 +173,10 @@ Use the `/mcp` command to verify your setup:
 /mcp schema
 ```
 
-Replace:
-
-- `/usr/sbin/nd-mcp` - With your [actual nd-mcp path](/docs/learn/mcp.md#finding-the-nd-mcp-bridge)
+Replace in all examples:
 - `YOUR_NETDATA_IP` - IP address or hostname of your Netdata Agent/Parent
 - `NETDATA_MCP_API_KEY` - Your [Netdata MCP API key](/docs/learn/mcp.md#finding-your-api-key)
+- `/usr/sbin/nd-mcp` - With your [actual nd-mcp path](/docs/learn/mcp.md#finding-the-nd-mcp-bridge) (stdio method only)
 
 ## How to Use
 
@@ -122,9 +231,49 @@ Explain the current active alerts and their potential impact
 - Check MCP server configuration parameters
 - Verify that MCP protocol is supported in your Gemini CLI installation
 
+## Advanced Configuration
+
+### Multiple Environments
+
+Configure different Netdata instances for different purposes:
+
+```json
+{
+  "mcpServers": {
+    "netdata-prod": {
+      "httpUrl": "https://prod-parent.company.com:19999/mcp?api_key=${PROD_API_KEY}"
+    },
+    "netdata-staging": {
+      "httpUrl": "https://staging-parent.company.com:19999/mcp?api_key=${STAGING_API_KEY}"
+    },
+    "netdata-local": {
+      "command": "/usr/sbin/nd-mcp",
+      "args": ["ws://localhost:19999/mcp?api_key=${LOCAL_API_KEY}"]
+    }
+  }
+}
+```
+
+### Tool Filtering
+
+Control which Netdata tools are available:
+
+```json
+{
+  "mcpServers": {
+    "netdata": {
+      "httpUrl": "http://YOUR_NETDATA_IP:19999/mcp?api_key=NETDATA_MCP_API_KEY",
+      "includeTools": ["query_metrics", "list_alerts", "list_nodes"],
+      "excludeTools": ["execute_function", "systemd_journal"]
+    }
+  }
+}
+```
+
 ## Documentation Links
 
 - [Gemini CLI GitHub Repository](https://github.com/google-gemini/gemini-cli)
-- [Gemini CLI Official Documentation](https://developers.google.com/gemini-code-assist/docs/gemini-cli)
+- [Gemini CLI MCP Documentation](https://github.com/google-gemini/gemini-cli/blob/main/docs/tools/mcp-server.md)
+- [Gemini CLI Configuration Guide](https://github.com/google-gemini/gemini-cli/blob/main/docs/cli/configuration.md)
 - [Netdata MCP Setup](/docs/learn/mcp.md)
 - [AI DevOps Best Practices](/docs/ml-ai/ai-devops-copilot/ai-devops-copilot.md)
