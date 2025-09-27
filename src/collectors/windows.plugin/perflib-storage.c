@@ -250,7 +250,8 @@ static inline void netdata_set_hd_usage(PERF_DATA_BLOCK *pDataBlock,
                                         PERF_INSTANCE_DEFINITION *pi,
                                         struct logical_disk *d)
 {
-    ULARGE_INTEGER totalNumberOfBytes;
+    ULARGE_INTEGER freeBytesAvaiable;
+    ULARGE_INTEGER totalBytes;
     ULARGE_INTEGER totalNumberOfFreeBytes;
 
 // https://learn.microsoft.com/en-us/windows/win32/fileio/maximum-file-path-limitation?tabs=registry
@@ -262,8 +263,8 @@ static inline void netdata_set_hd_usage(PERF_DATA_BLOCK *pDataBlock,
     // https://devblogs.microsoft.com/oldnewthing/20071101-00/?p=24613
     // We are using the variable that should not be affected by quota ()
     if ((GetDriveTypeA(path) == DRIVE_UNKNOWN) || !GetDiskFreeSpaceExA(path,
-                                                                     NULL,
-                                                                     &totalNumberOfBytes,
+                                                                     &freeBytesAvaiable,
+                                                                     &totalBytes,
                                                                      &totalNumberOfFreeBytes)) {
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->percentDiskFree);
 
@@ -272,10 +273,10 @@ static inline void netdata_set_hd_usage(PERF_DATA_BLOCK *pDataBlock,
         return;
     }
 
-    // Free
+    // Available
     d->percentDiskFree.current.Data = convertToBytes(totalNumberOfFreeBytes.QuadPart, 1024 * 1024 * 1024);
     // Disk Used
-    d->percentDiskFree.current.Time = convertToBytes(totalNumberOfBytes.QuadPart, 1024 * 1024 * 1024) - convertToBytes(totalNumberOfFreeBytes.QuadPart, 1024 * 1024 * 1024);
+    d->percentDiskFree.current.Time = convertToBytes(totalBytes.QuadPart, 1024 * 1024 * 1024);
 }
 
 static bool do_logical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every, usec_t now_ut)
