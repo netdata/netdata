@@ -149,7 +149,6 @@ func TestCloneMetricsConfig(t *testing.T) {
 					IndexTransform: make([]MetricIndexTransform, 0),
 				},
 			},
-			ForcedType: ProfileMetricTypeCounter,
 			MetricType: ProfileMetricTypeGauge,
 			Options: MetricsConfigOption{
 				Placement:    1,
