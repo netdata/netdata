@@ -155,6 +155,63 @@ export class MCPProvider extends ToolProvider {
     await this.ensureInitialized();
   }
 
+  private filterToolsForServer(serverName: string, config: MCPServerConfig, tools: MCPTool[]): MCPTool[] {
+    const allowedRaw = Array.isArray(config.toolsAllowed) && config.toolsAllowed.length > 0 ? config.toolsAllowed : ['*'];
+    const deniedRaw = Array.isArray(config.toolsDenied) ? config.toolsDenied : [];
+
+    const normalize = (values: string[]): { entries: Set<string>; wildcard: boolean } => {
+      let wildcard = false;
+      const entries = new Set<string>();
+      values.forEach((item) => {
+        if (typeof item !== 'string') return;
+        const trimmed = item.trim();
+        if (trimmed.length === 0) return;
+        const lower = trimmed.toLowerCase();
+        if (lower === '*' || lower === 'any') {
+          wildcard = true;
+          return;
+        }
+        entries.add(lower);
+      });
+      return { entries, wildcard };
+    };
+
+    const allowed = normalize(allowedRaw);
+    const denied = normalize(deniedRaw);
+
+    const isAllowed = (toolName: string): boolean => {
+      const key = toolName.toLowerCase();
+      if (allowed.wildcard) return true;
+      return allowed.entries.has(key);
+    };
+
+    const isDenied = (toolName: string): boolean => {
+      const key = toolName.toLowerCase();
+      if (denied.wildcard) return true;
+      return denied.entries.has(key);
+    };
+
+    const initialCount = tools.length;
+    const filtered = tools.filter((tool) => {
+      if (!isAllowed(tool.name)) return false;
+      if (isDenied(tool.name)) return false;
+      return true;
+    });
+
+    if (this.verbose && initialCount !== filtered.length) {
+      const removedNames = tools
+        .filter((tool) => !filtered.includes(tool))
+        .map((tool) => tool.name)
+        .join(', ');
+      const msg = removedNames.length > 0
+        ? `filtered tools for '${serverName}': removed [${removedNames}]`
+        : `filtered tools for '${serverName}': no tools removed`;
+      this.log('VRB', msg, `mcp:${serverName}`);
+    }
+
+    return filtered;
+  }
+
   private async initializeServer(name: string, config: MCPServerConfig): Promise<MCPServer> {
     const client = new Client(
       { name: 'ai-agent', version: '1.0.0' },
@@ -209,12 +266,13 @@ export class MCPProvider extends ToolProvider {
     }
     const toolsResponse = await client.listTools();
     interface ToolItem { name: string; description?: string; inputSchema?: unknown; parameters?: unknown; instructions?: string }
-    const tools: MCPTool[] = (toolsResponse.tools as ToolItem[]).map((t) => ({
+    const rawTools: MCPTool[] = (toolsResponse.tools as ToolItem[]).map((t) => ({
       name: t.name,
       description: t.description ?? '',
       inputSchema: (t.inputSchema ?? t.parameters ?? {}) as Record<string, unknown>,
       instructions: t.instructions,
     }));
+    const tools = this.filterToolsForServer(name, config, rawTools);
     if (this.trace) {
       const names = tools.map((t) => t.name).join(', ');
       this.log('TRC', `listTools('${name}') -> ${String(tools.length)} tools [${names}]`, `mcp:${name}`);

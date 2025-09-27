@@ -12,12 +12,12 @@ import type { LoadAgentOptions } from './agent-loader.js';
 import type { FrontmatterOptions } from './frontmatter.js';
 import type { McpTransportSpec } from './headends/mcp-headend.js';
 import type { Headend, HeadendLogSink } from './headends/types.js';
-import type { LogEntry, AccountingEntry, AIAgentCallbacks, ConversationMessage, Configuration } from './types.js';
+import type { LogEntry, AccountingEntry, AIAgentCallbacks, ConversationMessage, Configuration, MCPTool } from './types.js';
 import type { CommanderError } from 'commander';
 
 import { loadAgentFromContent } from './agent-loader.js';
 import { AgentRegistry } from './agent-registry.js';
-import { discoverLayers, resolveDefaults } from './config-resolver.js';
+import { buildUnifiedConfiguration, discoverLayers, resolveDefaults } from './config-resolver.js';
 import { formatPromptValue, resolveFormatIdForCli } from './formats.js';
 import { parseFrontmatter, stripFrontmatter, parseList, parsePairs, buildFrontmatterTemplate } from './frontmatter.js';
 import { AnthropicCompletionsHeadend } from './headends/anthropic-completions-headend.js';
@@ -30,6 +30,7 @@ import { resolveIncludes } from './include-resolver.js';
 import { formatLog } from './log-formatter.js';
 import { makeTTYLogCallbacks } from './log-sink-tty.js';
 import { getOptionsByGroup, formatCliNames, OPTIONS_REGISTRY } from './options-registry.js';
+import { MCPProvider } from './tools/mcp-provider.js';
 import { formatAgentResultHumanReadable } from './utils.js';
 
 // FrontmatterOptions is sourced from frontmatter.ts (single definition)
@@ -111,6 +112,108 @@ const parsePositive = (value: string): number => {
   }
   return num;
 };
+
+const indentMultiline = (text: string, spaces: number): string => {
+  const pad = ' '.repeat(spaces);
+  return text.split('\n').map((line) => `${pad}${line}`).join('\n');
+};
+
+async function listMcpTools(targets: string[], options: Record<string, unknown>): Promise<void> {
+  const configPathValue = typeof options.config === 'string' && options.config.length > 0
+    ? options.config
+    : undefined;
+  const wantsAll = targets.some((t) => t.toLowerCase() === 'all');
+  const requested = wantsAll ? undefined : targets;
+
+  const layers = (() => {
+    try {
+      return discoverLayers({ configPath: configPathValue, promptPath: undefined });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      exitWith(1, `failed to discover configuration layers: ${message}`, 'EXIT-LIST-TOOLS-CONFIG');
+    }
+  })();
+
+  const candidateNames = (() => {
+    if (requested === undefined) {
+      const names = new Set<string>();
+      layers.forEach((layer) => {
+        const json = layer.json as { mcpServers?: Record<string, unknown> } | undefined;
+        if (json?.mcpServers !== undefined) {
+          Object.keys(json.mcpServers).forEach((name) => { names.add(name); });
+        }
+      });
+      return Array.from(names);
+    }
+    return requested;
+  })();
+  const unique = Array.from(new Set(candidateNames));
+
+  if (unique.length === 0) {
+    console.log('No MCP server names provided.');
+    exitWith(0, 'no MCP servers requested for listing', 'EXIT-LIST-TOOLS');
+  }
+
+  const config = buildUnifiedConfiguration({ providers: [], mcpServers: unique, restTools: [] }, layers, { verbose: options.verbose === true });
+  const servers = config.mcpServers;
+
+  const missing = unique.filter((name) => !Object.prototype.hasOwnProperty.call(servers, name));
+  if (missing.length > 0) {
+    exitWith(3, `Unknown MCP servers: ${missing.join(', ')}`, 'EXIT-LIST-TOOLS-MISSING');
+  }
+
+  const traceMcpFlag = options.traceMcp === true;
+  const verboseFlag = options.verbose === true;
+
+  // eslint-disable-next-line functional/no-loop-statements
+  for (const name of unique) {
+    const serverConfig = servers[name];
+    const provider = new MCPProvider('cli-list-tools', { [name]: serverConfig }, { trace: traceMcpFlag, verbose: verboseFlag });
+    let tools: MCPTool[] = [];
+    try {
+      await provider.warmup();
+      tools = provider.listTools();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      await provider.cleanup().catch(() => undefined);
+      exitWith(3, `failed to initialize MCP server '${name}': ${message}`, 'EXIT-LIST-TOOLS-INIT');
+    }
+    await provider.cleanup().catch(() => undefined);
+
+    console.log(`MCP server '${name}':`);
+    if (tools.length === 0) {
+      console.log('  (no tools reported)');
+      console.log('');
+      continue;
+    }
+    tools.forEach((tool) => {
+      const separator = tool.name.indexOf('__');
+      const shortName = separator >= 0 ? tool.name.slice(separator + 2) : tool.name;
+      const namespace = separator >= 0 ? tool.name.slice(0, separator) : undefined;
+      const header = namespace !== undefined
+        ? `  - ${shortName} (exposed as ${tool.name})`
+        : `  - ${shortName}`;
+      console.log(header);
+      if (typeof tool.description === 'string' && tool.description.trim().length > 0) {
+        console.log(`    description: ${tool.description.trim()}`);
+      }
+      const inputSchema = tool.inputSchema;
+      try {
+        const schemaJson = JSON.stringify(inputSchema, null, 2);
+        console.log('    inputSchema:');
+        console.log(indentMultiline(schemaJson, 6));
+      } catch {
+        console.log('    inputSchema: [unserializable]');
+      }
+      if (typeof tool.instructions === 'string' && tool.instructions.trim().length > 0) {
+        console.log('    instructions:');
+        console.log(indentMultiline(tool.instructions.trim(), 6));
+      }
+    });
+    console.log('');
+  }
+  exitWith(0, 'listed MCP tools', 'EXIT-LIST-TOOLS');
+}
 
 // Build a Resolved Defaults section using frontmatter + config (if available)
 function buildResolvedDefaultsHelp(): string {
@@ -303,8 +406,7 @@ program.addHelpText('after', () => {
 program
   .name('ai-agent')
   .description('Universal LLM Tool Calling Interface with MCP support')
-  .version('1.0.0')
-  .hook('preSubcommand', () => { /* placeholder */ });
+  .version('1.0.0');
 
 const agentOption = new Option('--agent <path>', 'Register an agent (.ai) file; repeat to add multiple agents')
   .argParser((value: string, previous: string[]) => appendValue(value, previous))
@@ -336,6 +438,9 @@ const anthropicCompletionsConcurrencyOption = new Option('--anthropic-completion
   .argParser(parsePositive);
 
 const slackHeadendOption = new Option('--slack', 'Start Slack Socket Mode headend');
+const listToolsOption = new Option('--list-tools <server>', 'List tools for the specified MCP server (use "all" to list every server)')
+  .argParser((value: string, previous: string[]) => appendValue(value, previous))
+  .default([], undefined);
 
 program.addOption(agentOption);
 program.addOption(apiHeadendOption);
@@ -346,6 +451,7 @@ program.addOption(apiConcurrencyOption);
 program.addOption(openaiCompletionsConcurrencyOption);
 program.addOption(anthropicCompletionsConcurrencyOption);
 program.addOption(slackHeadendOption);
+program.addOption(listToolsOption);
 
 interface HeadendModeConfig {
   agentPaths: string[];
@@ -580,7 +686,6 @@ program
   .argument('[user-prompt]', 'User prompt (string, @filename, or - for stdin)')
   .option('--save-all <dir>', 'Save all agent and sub-agent conversations to directory')
   .option('--show-tree', 'Dump the full execution tree (ASCII) at the end')
-  .hook('preAction', () => { /* placeholder to ensure options added first */ })
   .action(async (systemPrompt: string | undefined, userPrompt: string | undefined, options: Record<string, unknown>) => {
     try {
       const agentFlags = Array.isArray(options.agent) ? (options.agent as string[]) : [];
@@ -588,6 +693,12 @@ program
       const mcpTargets = Array.isArray(options.mcp) ? (options.mcp as string[]) : [];
       const openaiCompletionsPorts = Array.isArray(options.openaiCompletions) ? (options.openaiCompletions as number[]) : [];
       const anthropicCompletionsPorts = Array.isArray(options.anthropicCompletions) ? (options.anthropicCompletions as number[]) : [];
+      const listToolsTargets = Array.isArray(options.listTools) ? (options.listTools as string[]) : [];
+
+      if (listToolsTargets.length > 0) {
+        await listMcpTools(listToolsTargets, options);
+        return;
+      }
 
       if (apiPorts.length > 0 || mcpTargets.length > 0 || openaiCompletionsPorts.length > 0 || anthropicCompletionsPorts.length > 0) {
         await runHeadendMode({

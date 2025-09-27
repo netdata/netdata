@@ -200,6 +200,16 @@
       "toolsAllowed": ["*"],
       "toolsDenied": []
     },
+    "jina-reader": {
+      "type": "sse",
+      "url": "https://mcp.jina.ai/sse",
+      "headers": {
+        "Authorization": "Bearer ${JINA_API_KEY}"
+      },
+      "enabled": true,
+      "toolsAllowed": [ "read_url" ],
+      "toolsDenied": []
+    },
     "jina": {
       "type": "sse",
       "url": "https://mcp.jina.ai/sse",
@@ -207,8 +217,8 @@
         "Authorization": "Bearer ${JINA_API_KEY}"
       },
       "enabled": true,
-      "toolsAllowed": ["*"],
-      "toolsDenied": []
+      "toolsAllowed": [ "*" ],
+      "toolsDenied": [ "show_api_key", "primer", "capture_screenshot_url", "search_images", "parallel_read_url", "sort_by_relevance", "deduplicate_strings", "deduplicate_images" ]
     },
     "netdata_costa": {
       "type": "websocket",
@@ -483,7 +493,7 @@
       },
       "enabled": true,
       "toolsAllowed": ["*"],
-      "toolsDenied": []
+      "toolsDenied": [ "accounts_list", "get_url_html_content", "get_url_screenshot" ]
     },
     "cloudflare-radar": {
       "type": "sse",

@@ -14,7 +14,7 @@
       {
         "name": "Ask Neda",
         "type": "message",
-        "callback_id": "ask_neda",
+        "callback_id": "ask_bot",
         "description": "Ask Neda about this message"
       }
     ],

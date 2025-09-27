@@ -996,8 +996,8 @@ const elog = (msg: string): void => { try { process.stderr.write(`[SRV] ← [0.0
     }
   };
 
-  // Message shortcut: Ask Neda — routes like channel-post with self-only context
-  app.shortcut('ask_neda', async (args: any) => {
+  // Message shortcut: Ask Bot — routes like channel-post with self-only context
+  app.shortcut('ask_bot', async (args: any) => {
     const { ack, body, client } = args;
     try { await ack(); } catch (e) { warn(`slack ack failed: ${e instanceof Error ? e.message : String(e)}`); }
     try {
@@ -1013,7 +1013,7 @@ const elog = (msg: string): void => { try { process.stderr.write(`[SRV] ← [0.0
             !userId ? 'userId' : undefined,
             !msg?.ts ? 'ts' : undefined
           ].filter(Boolean).join(', ');
-          vlog(`ask_neda shortcut ignored: missing ${why || 'unknown data'}`);
+        vlog(`ask_bot shortcut ignored: missing ${why || 'unknown data'}`);
         }
         return;
       }
@@ -1044,12 +1044,12 @@ const elog = (msg: string): void => { try { process.stderr.write(`[SRV] ← [0.0
               return '[unserializable body]';
             }
           })();
-          vlog(`ask_neda shortcut ignored: empty text (channel=${channelId} user=${userId}) body=${bodyPreview}`);
+        vlog(`ask_bot shortcut ignored: empty text (channel=${channelId} user=${userId}) body=${bodyPreview}`);
         }
         return;
       }
       if (options.verbose) {
-        vlog(`ask_neda shortcut invoked channel=${channelId} user=${userId}`);
+        vlog(`ask_bot shortcut invoked channel=${channelId} user=${userId}`);
       }
       const chName = await getChannelName(client, channelId);
       const permalink = await getPermalink(client, channelId, msg.ts as string);
@@ -1153,7 +1153,7 @@ const elog = (msg: string): void => { try { process.stderr.write(`[SRV] ← [0.0
         await finalizeAndPost(activeSessions, client, targetChannel, liveTs, runId, { error: meta.error });
       }, updateIntervalMs);
     } catch (e) {
-      elog(`shortcut ask_neda failed: ${(e as Error).message}`);
+      elog(`shortcut ask_bot failed: ${(e as Error).message}`);
     }
   });
 

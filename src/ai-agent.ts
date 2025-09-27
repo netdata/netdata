@@ -41,8 +41,6 @@ type ExitCode =
   | 'EXIT-SIGNAL-RECEIVED'
   | 'EXIT-UNKNOWN';
 
-interface ToolPatternEntry { raw: string; normalized: string }
-interface ToolPatternSet { entries: ToolPatternEntry[]; wildcard: boolean; empty: boolean }
 
 // empty line between import groups enforced by linter
 import { validateProviders, validateMCPServers, validatePrompts } from './config.js';
@@ -123,6 +121,7 @@ export class AIAgentSession {
 
   // Per-turn buffer of tool failures to synthesize messages when provider omits tool_error
   private pendingToolErrors: { id?: string; name: string; message: string; parameters?: Record<string, unknown> }[] = [];
+
 
   private resolveModelOverrides(
     provider: string,
@@ -1653,9 +1652,9 @@ export class AIAgentSession {
       ...(this.toolsOrchestrator?.listTools() ?? [])
     ];
 
-    const filteredTools = this.filterToolsForProvider(allTools, provider, currentTurn);
-    const availableTools = filteredTools.tools;
-    const allowedToolNames = filteredTools.allowedNames;
+    const filteredSelection = this.filterToolsForProvider(allTools, provider);
+    const availableTools = filteredSelection.tools;
+    const allowedToolNames = filteredSelection.allowedNames;
 
     
     // Track if we've shown thinking for this turn
@@ -1825,147 +1824,21 @@ export class AIAgentSession {
     }
   }
 
-  private filterToolsForProvider(tools: MCPTool[], provider: string, currentTurn: number): { tools: MCPTool[]; allowedNames: Set<string> } {
-    const providerConfig = this.sessionConfig.config.providers[provider];
-    const allowedRaw = Array.isArray(providerConfig.toolsAllowed) ? providerConfig.toolsAllowed : ['*'];
-    const deniedRaw = Array.isArray(providerConfig.toolsDenied) ? providerConfig.toolsDenied : [];
-
-    const allowedPatterns = this.normalizeToolPatterns(allowedRaw);
-    const deniedPatterns = this.normalizeToolPatterns(deniedRaw);
-    const verbose = this.sessionConfig.verbose === true;
-
-    const filtered: MCPTool[] = [];
+  private filterToolsForProvider(tools: MCPTool[], provider: string): { tools: MCPTool[]; allowedNames: Set<string> } {
+    void provider;
     const allowedNames = new Set<string>();
-    const filteredOut: { name: string; reason: string }[] = [];
-
-    const FINAL_TOOL_NAME = AIAgentSession.FINAL_REPORT_TOOL;
-    const FINAL_SHORT_NAME = AIAgentSession.FINAL_REPORT_SHORT;
-
-    tools.forEach((tool) => {
-      const sanitizedFull = sanitizeToolName(tool.name);
-      if (sanitizedFull === FINAL_TOOL_NAME) {
-        filtered.push(tool);
-        allowedNames.add(FINAL_TOOL_NAME);
-        return;
-      }
-
-      const fullLower = sanitizedFull.toLowerCase();
-      const shortLower = sanitizedFull.includes('__')
-        ? sanitizedFull.slice(sanitizedFull.lastIndexOf('__') + 2).toLowerCase()
-        : fullLower;
-
-      const allowMatch = this.matchesToolPattern(allowedPatterns, fullLower, shortLower);
-      const denyMatch = this.matchesToolPattern(deniedPatterns, fullLower, shortLower);
-
-      const isAllowed = allowedPatterns.empty ? false : allowMatch.matched;
-      const isDenied = denyMatch.matched;
-
-      if (isAllowed && !isDenied) {
-        filtered.push(tool);
-        allowedNames.add(sanitizedFull);
-      } else {
-        const reason = isDenied
-          ? `denied by '${denyMatch.pattern ?? '*'}'`
-          : (allowedPatterns.empty ? 'no allowed tools configured' : 'not allowed by allow list');
-        filteredOut.push({ name: sanitizedFull, reason });
-      }
+    const filtered = tools.map((tool) => {
+      const sanitized = sanitizeToolName(tool.name);
+      allowedNames.add(sanitized);
+      return tool;
     });
 
-    const finalPolicyDenied = this.matchesToolPattern(deniedPatterns, FINAL_TOOL_NAME, FINAL_SHORT_NAME).matched;
-    const finalPolicyAllowed = allowedPatterns.empty
-      ? false
-      : (allowedPatterns.wildcard || this.matchesToolPattern(allowedPatterns, FINAL_TOOL_NAME, FINAL_SHORT_NAME).matched);
-
-    if (!allowedNames.has(FINAL_TOOL_NAME)) {
-      const fallback = tools.find((tool) => sanitizeToolName(tool.name) === FINAL_TOOL_NAME);
-      if (fallback !== undefined) {
-        filtered.push(fallback);
-        allowedNames.add(FINAL_TOOL_NAME);
-        if (verbose) {
-          const msg = `Tool "${AIAgentSession.FINAL_REPORT_TOOL}" forced allowed (final report tool is mandatory)`;
-          this.log({
-            timestamp: Date.now(),
-            severity: 'VRB',
-            turn: currentTurn,
-            subturn: 0,
-            direction: 'response',
-            type: 'tool',
-            remoteIdentifier: AIAgentSession.REMOTE_AGENT_TOOLS,
-            fatal: false,
-            message: msg
-          });
-        }
-      }
-    } else if (verbose && (finalPolicyDenied || (!finalPolicyAllowed && !allowedPatterns.wildcard))) {
-      const msg = finalPolicyDenied
-        ? `Ignoring denial for tool "${AIAgentSession.FINAL_REPORT_TOOL}" (final report tool is mandatory)`
-        : `Tool "${AIAgentSession.FINAL_REPORT_TOOL}" implicitly allowed despite allow list (final report tool is mandatory)`;
-      this.log({
-        timestamp: Date.now(),
-        severity: 'VRB',
-        turn: currentTurn,
-        subturn: 0,
-        direction: 'response',
-        type: 'tool',
-        remoteIdentifier: AIAgentSession.REMOTE_AGENT_TOOLS,
-        fatal: false,
-        message: msg
-      });
-    }
-
-    if (verbose) {
-      filteredOut.forEach((item) => {
-        this.log({
-          timestamp: Date.now(),
-          severity: 'VRB',
-          turn: currentTurn,
-          subturn: 0,
-          direction: 'response',
-          type: 'tool',
-          remoteIdentifier: AIAgentSession.REMOTE_AGENT_TOOLS,
-          fatal: false,
-          message: `Filtered tool '${item.name}' (${item.reason})`
-        });
-      });
+    if (!allowedNames.has(AIAgentSession.FINAL_REPORT_TOOL)) {
+      const fallback = tools.find((tool) => sanitizeToolName(tool.name) === AIAgentSession.FINAL_REPORT_TOOL);
+      if (fallback !== undefined) allowedNames.add(AIAgentSession.FINAL_REPORT_TOOL);
     }
 
     return { tools: filtered, allowedNames };
-  }
-
-  private normalizeToolPatterns(patterns: string[]): ToolPatternSet {
-    const trimmed = patterns
-      .map((p) => (typeof p === 'string' ? p.trim() : ''))
-      .filter((p) => p.length > 0);
-
-    if (trimmed.length === 0) return { entries: [], wildcard: false, empty: true };
-
-    let wildcard = false;
-    const entries: ToolPatternEntry[] = [];
-    const seen = new Set<string>();
-
-    trimmed.forEach((raw) => {
-      const lower = raw.toLowerCase();
-      if (lower === '*' || lower === 'any') {
-        wildcard = true;
-        return;
-      }
-      const normalized = sanitizeToolName(raw).toLowerCase();
-      if (normalized.length === 0) return;
-      if (seen.has(normalized)) return;
-      seen.add(normalized);
-      entries.push({ raw, normalized });
-    });
-
-    return { entries, wildcard, empty: false };
-  }
-
-  private matchesToolPattern(patterns: ToolPatternSet, full: string, short: string): { matched: boolean; pattern?: string } {
-    if (patterns.empty) return { matched: false };
-    if (patterns.wildcard) return { matched: true, pattern: '*' };
-    const targetFull = full.toLowerCase();
-    const targetShort = short.toLowerCase();
-    const match = patterns.entries.find((entry) => entry.normalized === targetFull || entry.normalized === targetShort);
-    return match === undefined ? { matched: false } : { matched: true, pattern: match.raw };
   }
 
   private enhanceSystemPrompt(systemPrompt: string, toolsInstructions: string): string {
