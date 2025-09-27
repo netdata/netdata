@@ -24,15 +24,23 @@ import (
 )
 
 const (
-	dyncfgCollectorIDPrefix = "go.d:collector:"
-	dyncfgCollectorPath     = "/collectors/jobs"
+	DefaultDyncfgCollectorPrefix = "go.d:collector:"
+	dyncfgCollectorPath          = "/collectors/jobs"
 )
 
-func dyncfgModID(name string) string {
-	return fmt.Sprintf("%s%s", dyncfgCollectorIDPrefix, name)
+func (m *Manager) dyncfgCollectorPrefixValue() string {
+	if strings.TrimSpace(m.dyncfgCollectorPrefix) == "" {
+		return DefaultDyncfgCollectorPrefix
+	}
+	return m.dyncfgCollectorPrefix
 }
-func dyncfgJobID(cfg confgroup.Config) string {
-	return fmt.Sprintf("%s%s:%s", dyncfgCollectorIDPrefix, cfg.Module(), cfg.Name())
+
+func (m *Manager) dyncfgModID(name string) string {
+	return fmt.Sprintf("%s%s", m.dyncfgCollectorPrefixValue(), name)
+}
+
+func (m *Manager) dyncfgJobID(cfg confgroup.Config) string {
+	return fmt.Sprintf("%s%s:%s", m.dyncfgCollectorPrefixValue(), cfg.Module(), cfg.Name())
 }
 
 func dyncfgModCmds() string {
@@ -48,7 +56,7 @@ func dyncfgJobCmds(cfg confgroup.Config) string {
 
 func (m *Manager) dyncfgCollectorModuleCreate(name string) {
 	m.api.CONFIGCREATE(netdataapi.ConfigOpts{
-		ID:                dyncfgModID(name),
+		ID:                m.dyncfgModID(name),
 		Status:            dyncfgAccepted.String(),
 		ConfigType:        "template",
 		Path:              dyncfgCollectorPath,
@@ -60,7 +68,7 @@ func (m *Manager) dyncfgCollectorModuleCreate(name string) {
 
 func (m *Manager) dyncfgCollectorJobCreate(cfg confgroup.Config, status dyncfgStatus) {
 	m.api.CONFIGCREATE(netdataapi.ConfigOpts{
-		ID:                dyncfgJobID(cfg),
+		ID:                m.dyncfgJobID(cfg),
 		Status:            status.String(),
 		ConfigType:        "job",
 		Path:              dyncfgCollectorPath,
@@ -71,11 +79,11 @@ func (m *Manager) dyncfgCollectorJobCreate(cfg confgroup.Config, status dyncfgSt
 }
 
 func (m *Manager) dyncfgJobRemove(cfg confgroup.Config) {
-	m.api.CONFIGDELETE(dyncfgJobID(cfg))
+	m.api.CONFIGDELETE(m.dyncfgJobID(cfg))
 }
 
 func (m *Manager) dyncfgJobStatus(cfg confgroup.Config, status dyncfgStatus) {
-	m.api.CONFIGSTATUS(dyncfgJobID(cfg), status.String())
+	m.api.CONFIGSTATUS(m.dyncfgJobID(cfg), status.String())
 }
 
 func (m *Manager) dyncfgCollectorExec(fn functions.Function) {
@@ -135,7 +143,7 @@ func (m *Manager) dyncfgConfigUserconfig(fn functions.Function) {
 		jn = fn.Args[2]
 	}
 
-	mn, ok := extractModuleName(id)
+	mn, ok := m.extractModuleName(id)
 	if !ok {
 		m.Warningf("dyncfg: userconfig: could not extract module and job from id (%s)", id)
 		m.dyncfgRespf(fn, 400,
@@ -167,7 +175,7 @@ func (m *Manager) dyncfgConfigUserconfig(fn functions.Function) {
 
 func (m *Manager) dyncfgConfigTest(fn functions.Function) {
 	id := fn.Args[0]
-	mn, ok := extractModuleName(id)
+	mn, ok := m.extractModuleName(id)
 	if !ok {
 		m.Warningf("dyncfg: test: could not extract module and job from id (%s)", id)
 		m.dyncfgRespf(fn, 400,
@@ -242,7 +250,7 @@ func (m *Manager) dyncfgConfigTest(fn functions.Function) {
 
 func (m *Manager) dyncfgConfigSchema(fn functions.Function) {
 	id := fn.Args[0]
-	mn, ok := extractModuleName(id)
+	mn, ok := m.extractModuleName(id)
 	if !ok {
 		m.Warningf("dyncfg: schema: could not extract module from id (%s)", id)
 		m.dyncfgRespf(fn, 400, "Invalid ID format. Could not extract module name from ID. Provided ID: %s.", id)
@@ -269,7 +277,7 @@ func (m *Manager) dyncfgConfigSchema(fn functions.Function) {
 
 func (m *Manager) dyncfgConfigGet(fn functions.Function) {
 	id := fn.Args[0]
-	mn, jn, ok := extractModuleJobName(id)
+	mn, jn, ok := m.extractModuleJobName(id)
 	if !ok {
 		m.Warningf("dyncfg: get: could not extract module and job from id (%s)", id)
 		m.dyncfgRespf(fn, 400,
@@ -320,7 +328,7 @@ func (m *Manager) dyncfgConfigGet(fn functions.Function) {
 
 func (m *Manager) dyncfgConfigRestart(fn functions.Function) {
 	id := fn.Args[0]
-	mn, jn, ok := extractModuleJobName(id)
+	mn, jn, ok := m.extractModuleJobName(id)
 	if !ok {
 		m.Warningf("dyncfg: restart: could not extract module from id (%s)", id)
 		m.dyncfgRespf(fn, 400, "Invalid ID format. Could not extract module name from ID. Provided ID: %s.", id)
@@ -379,7 +387,7 @@ func (m *Manager) dyncfgConfigRestart(fn functions.Function) {
 
 func (m *Manager) dyncfgConfigEnable(fn functions.Function) {
 	id := fn.Args[0]
-	mn, jn, ok := extractModuleJobName(id)
+	mn, jn, ok := m.extractModuleJobName(id)
 	if !ok {
 		m.Warningf("dyncfg: enable: could not extract module and job from id (%s)", id)
 		m.dyncfgRespf(fn, 400, "Invalid ID format. Could not extract module and job name from ID. Provided ID: %s.", id)
@@ -456,7 +464,7 @@ func (m *Manager) dyncfgConfigEnable(fn functions.Function) {
 
 func (m *Manager) dyncfgConfigDisable(fn functions.Function) {
 	id := fn.Args[0]
-	mn, jn, ok := extractModuleJobName(id)
+	mn, jn, ok := m.extractModuleJobName(id)
 	if !ok {
 		m.Warningf("dyncfg: disable: could not extract module from id (%s)", id)
 		m.dyncfgRespf(fn, 400, "Invalid ID format. Could not extract module name from ID. Provided ID: %s.", id)
@@ -505,7 +513,7 @@ func (m *Manager) dyncfgConfigAdd(fn functions.Function) {
 
 	id := fn.Args[0]
 	jn := fn.Args[2]
-	mn, ok := extractModuleName(id)
+	mn, ok := m.extractModuleName(id)
 	if !ok {
 		m.Warningf("dyncfg: add: could not extract module from id (%s)", id)
 		m.dyncfgRespf(fn, 400, "Invalid ID format. Could not extract module name from ID. Provided ID: %s.", id)
@@ -561,7 +569,7 @@ func (m *Manager) dyncfgConfigAdd(fn functions.Function) {
 
 func (m *Manager) dyncfgConfigRemove(fn functions.Function) {
 	id := fn.Args[0]
-	mn, jn, ok := extractModuleJobName(id)
+	mn, jn, ok := m.extractModuleJobName(id)
 	if !ok {
 		m.Warningf("dyncfg: remove: could not extract module and job from id (%s)", id)
 		m.dyncfgRespf(fn, 400, "Invalid ID format. Could not extract module and job name from ID. Provided ID: %s.", id)
@@ -595,7 +603,7 @@ func (m *Manager) dyncfgConfigRemove(fn functions.Function) {
 
 func (m *Manager) dyncfgConfigUpdate(fn functions.Function) {
 	id := fn.Args[0]
-	mn, jn, ok := extractModuleJobName(id)
+	mn, jn, ok := m.extractModuleJobName(id)
 	if !ok {
 		m.Warningf("dyncfg: update: could not extract module from id (%s)", id)
 		m.dyncfgRespf(fn, 400, "Invalid ID format. Could not extract module name from ID. Provided ID: %s.", id)
@@ -786,8 +794,8 @@ func configFromPayload(fn functions.Function) (confgroup.Config, error) {
 	return cfg, nil
 }
 
-func extractModuleJobName(id string) (mn string, jn string, ok bool) {
-	if mn, ok = extractModuleName(id); !ok {
+func (m *Manager) extractModuleJobName(id string) (mn string, jn string, ok bool) {
+	if mn, ok = m.extractModuleName(id); !ok {
 		return "", "", false
 	}
 	if jn, ok = extractJobName(id); !ok {
@@ -796,8 +804,8 @@ func extractModuleJobName(id string) (mn string, jn string, ok bool) {
 	return mn, jn, true
 }
 
-func extractModuleName(id string) (string, bool) {
-	id = strings.TrimPrefix(id, dyncfgCollectorIDPrefix)
+func (m *Manager) extractModuleName(id string) (string, bool) {
+	id = strings.TrimPrefix(id, m.dyncfgCollectorPrefixValue())
 	i := strings.IndexByte(id, ':')
 	if i == -1 {
 		return id, id != ""

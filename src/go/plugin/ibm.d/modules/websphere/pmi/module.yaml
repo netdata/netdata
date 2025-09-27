@@ -1,0 +1,14 @@
+name: websphere_pmi
+display_name: IBM WebSphere PMI
+description: |
+  Collects WebSphere Application Server performance metrics via the PerfServlet (PMI) interface,
+  covering JVM, thread pools, JDBC/JMS resources, applications, and clustering information.
+link: https://www.ibm.com/docs/en/was
+categories:
+  - data-collection.application_servers
+icon: ibm.svg
+keywords:
+  - websphere
+  - pmi
+  - perfservlet
+  - ibm

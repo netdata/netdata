@@ -1,0 +1,15 @@
+name: db2
+display_name: IBM DB2
+description: |
+  Monitors IBM DB2 databases using system catalog views and MON_GET_* table
+  functions to expose connections, locking, buffer pool efficiency, tablespace
+  capacity, and workload performance metrics.
+icon: ibm.svg
+categories:
+  - data-collection.database-servers
+link: https://www.ibm.com/products/db2
+keywords:
+  - db2
+  - database
+  - rdbms
+  - ibm

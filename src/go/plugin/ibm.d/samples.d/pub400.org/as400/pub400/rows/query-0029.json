@@ -1,0 +1,10 @@
+{
+  "columns": [
+    "JOB_QUEUE_LENGTH"
+  ],
+  "rows": [
+    {
+      "JOB_QUEUE_LENGTH": "0"
+    }
+  ]
+}

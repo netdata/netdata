@@ -98,6 +98,11 @@ jobs:
         if: needs.file-check.outputs.run == 'true'
         run: go mod download
         working-directory: ${{ matrix.module }}
+      - name: Install CGO system dependencies
+        if: needs.file-check.outputs.run == 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y unixodbc-dev
       - name: Compile
         if: needs.file-check.outputs.run == 'true'
         run: |
@@ -112,7 +117,8 @@ jobs:
         working-directory: ${{ matrix.module }}
       - name: Go vet
         if: needs.file-check.outputs.run == 'true'
-        run: go vet ./...
+        run: |
+          CGO_ENABLED=0 go vet -tests=false ./...
         working-directory: ${{ matrix.module }}
       - name: Set up gotestfmt
         if: needs.file-check.outputs.run == 'true'
@@ -124,7 +130,13 @@ jobs:
         if: needs.file-check.outputs.run == 'true'
         run: |
           set -euo pipefail
-          go test -json ./... -race -count=1 2>&1 | gotestfmt -hide all
+          # The race detector requires CGO; explicitly enable it to avoid go emitting
+          # non-JSON diagnostics that crash gotestfmt when CGO is disabled upstream.
+          # Some toolchain output still lacks package metadata, so normalize the stream
+          # before passing it to gotestfmt.
+          CGO_ENABLED=1 go test -json ./... -race -count=1 2>&1 \
+            | "$GITHUB_WORKSPACE/.github/scripts/normalize-go-test-json.py" \
+            | gotestfmt -hide all
         working-directory: ${{ matrix.module }}
 
   build-tests:
