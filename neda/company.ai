@@ -11,23 +11,22 @@ models:
 #  - google/gemini-1.5-flash
   - openai/gpt-5
 tools:
-  - jina
-  - fetcher
-  - brave
   - batch
-  - cloudflare-browser
-agents: []
+agents:
+  - web-fetch.ai
+  - web-search.ai
 llmTimeout: 120000
 toolTimeout: 60000
-toolResponseMaxBytes: 25000
-maxConcurrentTools: 2
+toolResponseMaxBytes: 100000
+maxConcurrentTools: 3
+maxToolCallsPerTurn: 20
+parallelToolCalls: true
 temperature: 0.7
 topP: 1
 maxOutputTokens: 16384
-repeatPenalty: 1.1
-maxRetries: 3
-maxToolTurns: 15
-parallelToolCalls: true
+repeatPenalty: 1
+maxRetries: 5
+maxToolTurns: 20
 ---
 You are an elite AI company researcher.
 
@@ -89,8 +88,6 @@ Finalization:
 
 You markdown to format your report and document your findings.
 All your claims MUST have a related markdown link.
-
-${include:web-tools.md}
 
 ## CRITICAL REMINDERS FOR TOOL USAGE
 

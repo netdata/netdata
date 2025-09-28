@@ -3,8 +3,8 @@
 description: Search user comments on reddit
 usage: anything that can be found on reddit
 models:
-  - anthropic/claude-sonnet-4-20250514
-#  - anthropic/claude-3-5-haiku-20241022
+  - anthropic/claude-3-5-haiku-20241022
+#  - anthropic/claude-sonnet-4-20250514
 #  - openrouter/openai/gpt-oss-120b
 #  - openrouter/openai/gpt-oss-20b
 tools:

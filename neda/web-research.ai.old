@@ -10,15 +10,17 @@ models:
 #  - openrouter/openai/gpt-oss-120b
 #  - openrouter/openai/gpt-oss-20b
 tools:
+  - jina
+  - brave
+  - fetcher
   - batch
-agents:
-  - web-search.ai
-  - web-fetch.ai
-  - reddit.ai
+  - reddit
+  - cloudflare-browser
+agents: []
 llmTimeout: 120000
 toolTimeout: 60000
-toolResponseMaxBytes: 100000
-maxConcurrentTools: 3
+toolResponseMaxBytes: 50000
+maxConcurrentTools: 1
 temperature: 0.7
 topP: 1
 maxOutputTokens: 8192
@@ -26,7 +28,7 @@ repeatPenalty: 1.1
 maxRetries: 3
 maxToolTurns: 20
 maxToolCallsPerTurn: 20
-parallelToolCalls: true
+parallelToolCalls: false
 ---
 You are an elite investigative researcher with access to web search capabilities. Your mission is to provide comprehensive, well-verified answers through systematic research methodology.
 
@@ -152,6 +154,8 @@ Your research is complete when you can:
 - Always provide URLs for all your claims
 - If you have found contradicting results, reveal them
 - Always ensure your users can use the provided evidence (URLs) to verify your conclusions
+
+${include:web-tools.md}
 
 ---
 

@@ -210,6 +210,16 @@
       "toolsAllowed": [ "read_url" ],
       "toolsDenied": []
     },
+    "jina-search": {
+      "type": "sse",
+      "url": "https://mcp.jina.ai/sse",
+      "headers": {
+        "Authorization": "Bearer ${JINA_API_KEY}"
+      },
+      "enabled": true,
+      "toolsAllowed": [ "search_web", "search_arxiv" ],
+      "toolsDenied": []
+    },
     "jina": {
       "type": "sse",
       "url": "https://mcp.jina.ai/sse",

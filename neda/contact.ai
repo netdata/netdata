@@ -12,24 +12,22 @@ models:
 #  - openrouter/openai/gpt-oss-120b
 #  - openrouter/openai/gpt-oss-20b
 tools:
-  - fetcher
-  - brave
-  - jina
-  - cloudflare-browser
   - batch
-agents: []
+agents:
+  - web-fetch.ai
+  - web-search.ai
 llmTimeout: 120000
 toolTimeout: 60000
-toolResponseMaxBytes: 12288
+toolResponseMaxBytes: 100000
 maxConcurrentTools: 3
+maxToolCallsPerTurn: 20
+parallelToolCalls: true
 temperature: 0.7
 topP: 1
-maxOutputTokens: 8192
-repeatPenalty: 1.1
-maxRetries: 3
-maxToolTurns: 10
-maxToolCallsPerTurn: 10
-parallelToolCalls: false
+maxOutputTokens: 16384
+repeatPenalty: 1
+maxRetries: 5
+maxToolTurns: 20
 ---
 You are an elite AI researcher tasked with preparing **professional background reports** on a specific individual who has contacted us for sales discussions for observability solutions, infrastructure management, and related services.
 
@@ -89,10 +87,7 @@ Although your task is to provide a complete professional profile for the individ
 
 **CRITICAL**: Pay attention to detail when merging profiles across social media identiies. They many not be the same, even if they are named exactly the same. Find more evidence, than just their name, to correlate their identities.
 
-${include:web-tools.md}
-
 ${include:tone-and-language.md}
-
 
 Current Date and Time: ${DATETIME}, ${DAY}
 IMPORTANT: Check the date. When searching for recent information use the year from the current date, not your training cut-off year.

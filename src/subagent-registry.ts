@@ -138,7 +138,22 @@ export class SubAgentRegistry {
         const reasonProp = { type: 'string', minLength: 1, description: '3-7 words about the reason of running this tool' };
         if (c.inputFormat === 'json') {
           const base = (c.inputSchema ?? { type: 'object' });
-          return { allOf: [ base, { type: 'object', required: ['reason'], properties: { reason: reasonProp } } ] };
+          const baseProperties = (base as { properties?: Record<string, unknown> }).properties ?? {};
+          const baseRequired = Array.isArray((base as { required?: unknown[] }).required)
+            ? ([...(base as { required: unknown[] }).required] as string[])
+            : [];
+          const mergedRequired = Array.from(new Set<string>([...baseRequired, 'reason']));
+          const mergedProperties = {
+            ...baseProperties,
+            reason: reasonProp,
+          };
+          const mergedSchema: Record<string, unknown> = {
+            ...base,
+            type: 'object',
+            properties: mergedProperties,
+            required: mergedRequired,
+          };
+          return mergedSchema;
         }
         return { type: 'object', additionalProperties: false, required: ['input', 'reason'], properties: { input: { type: 'string', minLength: 1, description: (typeof c.usage === 'string' && c.usage.length > 0) ? c.usage : 'User prompt for the sub-agent' }, reason: reasonProp } };
       })();
@@ -252,12 +267,19 @@ export class SubAgentRegistry {
       const basePath = parentSession.trace?.callPath;
       const callPath = (typeof basePath === 'string' && basePath.length > 0) ? `${basePath}->${info.toolName}` : info.toolName;
       const childTrace = { selfId: crypto.randomUUID(), originId: parentSession.trace?.originId, parentId: parentSession.trace?.parentId, callPath };
+      const outputFormat = (() => {
+        const fmt = loaded.expectedOutput?.format;
+        if (fmt === 'json') return 'json';
+        if (fmt === 'markdown') return 'markdown';
+        if (fmt === 'text') return 'pipe';
+        return 'markdown';
+      })();
       result = await loaded.run(loaded.systemTemplate, userPrompt, {
         history,
         callbacks: cb,
         trace: childTrace,
         renderTarget: 'sub-agent',
-        outputFormat: 'sub-agent',
+        outputFormat,
         initialTitle: reason,
         // propagate control signals from parent session
         abortSignal: parentSession.abortSignal,
