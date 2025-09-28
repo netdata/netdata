@@ -64,18 +64,23 @@ modules:
               description: Data collection frequency.
               default_value: 10
               required: false
+              group: Collection
             - name: timeout
               description: Timeout for executing the binary, specified in seconds.
               default_value: 2
               required: false
+              group: Collection
+
             - name: instance_name
               description: "Specifies the name of the Varnish instance to collect metrics from. This corresponds to the `-n` argument used with the [varnishstat](https://varnish-cache.org/docs/trunk/reference/varnishstat.html) command."
               default_value: ""
               required: false
+              group: Target
             - name: docker_container
               description: "Specifies the name of the Docker container where the Varnish instance is running. If set, the `varnishstat` command will be executed within this container."
               default_value: ""
               required: false
+              group: Target
         examples:
           folding:
             title: ""

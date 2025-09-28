@@ -51,7 +51,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-
 ## Metrics
 
 Metrics grouped by *scope*.
@@ -131,17 +130,18 @@ The following options can be defined globally: update_every, autodetection_retry
 
 
 
-| Option | Description | Default | Required |
-|:-----|:------------|:--------|:---------:|
-| update_every | Data collection frequency. | 1 | no |
-| autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
-| address | Server address. The format is IP:PORT. | 127.0.0.1:2181 | yes |
-| timeout | Connection/read/write/ssl handshake timeout. | 1 | no |
-| use_tls | Whether to use TLS or not. | no | no |
-| tls_skip_verify | Server certificate chain and hostname validation policy. Controls whether the client performs this check. | no | no |
-| tls_ca | Certification authority that the client uses when verifying the server's certificates. |  | no |
-| tls_cert | Client TLS certificate. |  | no |
-| tls_key | Client TLS key. |  | no |
+| Group | Option | Description | Default | Required |
+|:------|:-----|:------------|:--------|:---------:|
+| **Collection** | update_every | Data collection interval (seconds). | 1 | no |
+|  | autodetection_retry | Autodetection retry interval (seconds). Set 0 to disable. | 0 | no |
+| **Target** | address | Zookeeper server address (`IP:PORT`). | 127.0.0.1:2181 | yes |
+|  | timeout | Connection, read, write, and TLS handshake timeout (seconds). | 1 | no |
+| **TLS** | use_tls | Enable TLS for the connection. | no | no |
+|  | tls_skip_verify | Skip TLS certificate and hostname verification (insecure). | no | no |
+|  | tls_ca | Path to CA bundle used to validate the server certificate. |  | no |
+|  | tls_cert | Path to client TLS certificate (for mTLS). |  | no |
+|  | tls_key | Path to client TLS private key (for mTLS). |  | no |
+| **Virtual Node** | vnode | Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). |  | no |
 
 
 </details>

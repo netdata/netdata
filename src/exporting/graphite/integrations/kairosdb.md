@@ -16,7 +16,6 @@ endmeta-->
 Export your Netdata metrics to KairosDB using the Graphite protocol, allowing you to archive your data for long-term storage, further analysis, or correlation with data from other sources.
 
 
-
 <img src="https://img.shields.io/badge/maintained%20by-Netdata-%2300ab44" />
 
 ## Setup

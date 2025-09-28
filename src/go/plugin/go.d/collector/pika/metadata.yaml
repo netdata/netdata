@@ -55,50 +55,69 @@ modules:
             enabled: true
           list:
             - name: update_every
-              description: Data collection frequency.
+              description: Data collection frequency (seconds).
               default_value: 5
               required: false
+              group: Collection
             - name: autodetection_retry
-              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              description: Autodetection retry interval (seconds). Set 0 to disable.
               default_value: 0
               required: false
+              group: Collection
+
             - name: address
               description: Pika server address.
               default_value: redis://@localhost:9221
               required: true
+              group: Target
               details: |
-                There are two connection types: by tcp socket and by unix socket.
-                
-                - Tcp connection: `redis://<user>:<password>@<host>:<port>/<db_number>`
+                There are two connection types: by TCP socket and by Unix socket.
+
+                - TCP connection: `redis://<user>:<password>@<host>:<port>/<db_number>`
                 - Unix connection: `unix://<user>:<password>@</path/to/redis.sock>?db=<db_number>`
             - name: timeout
-              description: Dial (establishing new connections), read (socket reads) and write (socket writes) timeout in seconds.
+              description: Dial (establishing new connections), read (socket reads), and write (socket writes) timeout (seconds).
               default_value: 1
               required: false
+              group: Target
+
             - name: username
-              description: Username used for authentication.
+              description: Username for authentication.
               default_value: ""
               required: false
+              group: Auth
             - name: password
-              description: Password used for authentication.
+              description: Password for authentication.
               default_value: ""
               required: false
+              group: Auth
+
             - name: tls_skip_verify
               description: Server certificate chain and hostname validation policy. Controls whether the client performs this check.
               default_value: false
               required: false
+              group: TLS
             - name: tls_ca
-              description: Certificate authority that client use when verifying server certificates.
+              description: Certification authority that the client uses when verifying the server’s certificates.
               default_value: ""
               required: false
+              group: TLS
             - name: tls_cert
-              description: Client tls certificate.
+              description: Client TLS certificate.
               default_value: ""
               required: false
+              group: TLS
             - name: tls_key
-              description: Client tls key.
+              description: Client TLS key.
               default_value: ""
               required: false
+              group: TLS
+
+            - name: vnode
+              description: Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).
+              default_value: ""
+              required: false
+              group: Virtual Node
         examples:
           folding:
             title: Config

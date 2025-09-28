@@ -45,7 +45,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-
 ## Metrics
 
 Metrics grouped by *scope*.
@@ -118,18 +117,19 @@ The following options can be defined globally: update_every, autodetection_retry
 
 
 
-| Option | Description | Default | Required |
-|:-----|:------------|:--------|:---------:|
-| update_every | Data collection frequency. | 1 | no |
-| autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
-| source | Certificate source. Allowed schemes: https, tcp, tcp4, tcp6, udp, udp4, udp6, file, smtp. |  | no |
-| check_full_chain | Monitor expiration time for all certificates in the SSL/TLS chain, including intermediate and root certificates. | no | no |
-| check_revocation_status | Whether to check the revocation status of the certificate. | no | no |
-| timeout | SSL connection timeout. | 2 | no |
-| tls_skip_verify | Server certificate chain and hostname validation policy. Controls whether the client performs this check. | no | no |
-| tls_ca | Certification authority that the client uses when verifying the server's certificates. |  | no |
-| tls_cert | Client TLS certificate. |  | no |
-| tls_key | Client TLS key. |  | no |
+| Group | Option | Description | Default | Required |
+|:------|:-----|:------------|:--------|:---------:|
+| **Collection** | update_every | Data collection interval (seconds). | 1 | no |
+|  | autodetection_retry | Autodetection retry interval (seconds). Set 0 to disable. | 0 | no |
+| **Target** | source | Certificate source. Allowed schemes: https, tcp, tcp4, tcp6, udp, udp4, udp6, file, smtp. |  | no |
+|  | timeout | SSL connection timeout (seconds). | 2 | no |
+| **Validation** | check_full_chain | Monitor expiration time for all certificates in the chain (including intermediates and root). | no | no |
+|  | check_revocation_status | Check the revocation status of the certificate. | no | no |
+| **TLS** | tls_skip_verify | Skip TLS certificate and hostname verification (insecure). | no | no |
+|  | tls_ca | Path to CA bundle used to validate the server certificate. |  | no |
+|  | tls_cert | Path to client TLS certificate (for mTLS). |  | no |
+|  | tls_key | Path to client TLS private key (for mTLS). |  | no |
+| **Virtual Node** | vnode | Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). |  | no |
 
 
 </details>

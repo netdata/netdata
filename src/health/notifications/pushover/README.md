@@ -19,7 +19,6 @@ Send notification to Pushover using Netdata's Agent alert notification feature, 
 - All other notifications will be delivered silently.
 
 
-
 <img src="https://img.shields.io/badge/maintained%20by-Netdata-%2300ab44" />
 
 ## Setup

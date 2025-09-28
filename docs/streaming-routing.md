@@ -2,7 +2,7 @@
 
 Streaming routing controls how Netdata child nodes connect to parent nodes when multiple parents are available. It handles three key operations: initial parent selection, connection management, and failover.
 
-:::info Prerequisites
+:::info
 
 This feature requires configuring streaming in `netdata.conf`. See [Streaming Configuration](/src/streaming/README.md) for setup instructions.
 
@@ -15,24 +15,34 @@ This feature requires configuring streaming in `netdata.conf`. See [Streaming Co
 When a child node starts, it queries all configured parents simultaneously to determine the best connection:
 
 ```mermaid
-graph LR
-    A[Start] --> B[Query all parents]
-    B --> C{Data recency<br/>delta < 1min?}
-    C -->|Multiple| D[Random select]
-    C -->|One best| E[Connect to<br/>most recent]
+flowchart LR
+    A("**Start**<br/>Child node startup") --> B("**Query all parents**<br/>Parallel HTTP requests")
+    B --> C("**Data recency<br/>delta < 1min?**<br/>Compare timestamps")
+    C -->|Multiple| D("**Random select**<br/>Load balancing")
+    C -->|One best| E("**Connect to<br/>most recent**<br/>Data continuity")
     C -->|No data| D
-    D --> F[Connect]
+    D --> F("**Connect**<br/>Streaming active")
     E --> F
+%% Style definitions matching the reference
+    classDef alert fill: #ffeb3b, stroke: #000000, stroke-width: 3px, color: #000000, font-size: 18px
+    classDef neutral fill: #f9f9f9, stroke: #000000, stroke-width: 3px, color: #000000, font-size: 18px
+    classDef complete fill: #4caf50, stroke: #000000, stroke-width: 3px, color: #000000, font-size: 18px
+    classDef database fill: #2196F3, stroke: #000000, stroke-width: 3px, color: #000000, font-size: 18px
+%% Apply styles
+    class A alert
+    class B neutral
+    class C neutral
+    class D database
+    class E database
+    class F complete
 ```
 
 **How it works:**
 
 1. Child sends HTTP requests to all parents in parallel
 2. Each parent responds with:
-
-- Last timestamp of this child's data (if any)
-- Random seed for load balancing
-
+    - Last timestamp of this child's data (if any)
+    - Random seed for load balancing
 3. Child calculates time delta for each parent
 4. Selection based on data recency (not data amount)
 
@@ -65,7 +75,7 @@ Once connected, the child maintains a persistent connection:
 - **No automatic rebalancing**: Child stays connected until failure
 - **Data integrity**: Historical metrics are replicated automatically after reconnection
 
-:::info Data Recovery
+:::info
 
 Netdata automatically replicates missing historical data when reconnection occurs. Data is only lost if:
 
@@ -77,7 +87,7 @@ For persistent data, use `memory mode = dbengine`.
 
 :::
 
-:::warning Important
+:::warning
 
 Children do not automatically reconnect to their original parent after failover. This prevents connection flapping but requires manual intervention for load redistribution.
 
@@ -88,17 +98,30 @@ Children do not automatically reconnect to their original parent after failover.
 When the active connection fails, the child repeats the parent selection process:
 
 ```mermaid
-graph LR
-    A[Failed] --> B[Wait 5-X sec]
-    B --> C[Query all parents]
-    C --> D{Select best<br/>by recency}
-    D --> E[Try connect]
-    E --> F{OK?}
+flowchart LR
+    A("**Failed**<br/>Connection lost") --> B("**Wait 5-X sec**<br/>Randomized delay")
+    B --> C("**Query all parents**<br/>Re-evaluate options")
+    C --> D("**Select best<br/>by recency**<br/>Data continuity priority")
+    D --> E("**Try connect**<br/>Attempt connection")
+    E --> F("**OK?**<br/>Connection test")
     F -->|No| B
-    F -->|Yes| G[Stream]
+    F -->|Yes| G("**Stream**<br/>Active monitoring")
+%% Style definitions matching the reference
+    classDef alert fill: #ffeb3b, stroke: #000000, stroke-width: 3px, color: #000000, font-size: 18px
+    classDef neutral fill: #f9f9f9, stroke: #000000, stroke-width: 3px, color: #000000, font-size: 18px
+    classDef complete fill: #4caf50, stroke: #000000, stroke-width: 3px, color: #000000, font-size: 18px
+    classDef database fill: #2196F3, stroke: #000000, stroke-width: 3px, color: #000000, font-size: 18px
+%% Apply styles
+    class A alert
+    class B neutral
+    class C neutral
+    class E neutral
+    class D database
+    class F database
+    class G complete
 ```
 
-:::note Smart Failover
+:::note
 
 Unlike traditional round-robin failover, Netdata re-evaluates all parents on each attempt. This means a child might connect to a different parent than expected if data states have changed.
 
@@ -203,7 +226,7 @@ If a child connects to an unexpected parent, check the data retention on all par
 
 :::caution Maintenance Planning
 
-When taking a parent offline for maintenance, its children will failover to other parents and won't automatically return. Plan capacity accordingly.
+When taking a parent offline for maintenance, its children will fail over to other parents and won't automatically return. Plan capacity accordingly.
 
 :::
 

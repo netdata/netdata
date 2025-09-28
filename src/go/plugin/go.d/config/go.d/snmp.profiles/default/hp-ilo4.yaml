@@ -6,13 +6,15 @@
 extends:
   - hp-ilo.yaml
 
-device:
-  vendor: "hp"
-
-sysobjectid: 1.3.6.1.4.1.232.9.4.10
+selector:
+  - sysobjectid:
+      include:
+        - 1.3.6.1.4.1.232.9.4.10
 
 metadata:
   device:
     fields:
       model:
         value: iLO4
+      vendor:
+        value: HP

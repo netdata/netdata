@@ -17,7 +17,6 @@ The [Alerta](https://alerta.io/) monitoring system is a tool used to consolidate
 You can send Netdata alerts to Alerta to see alerts coming from many Netdata hosts or also from a multi-host Netdata configuration.
 
 
-
 <img src="https://img.shields.io/badge/maintained%20by-Netdata-%2300ab44" />
 
 ## Setup

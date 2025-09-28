@@ -45,7 +45,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-
 ## Metrics
 
 Metrics grouped by *scope*.
@@ -151,16 +150,16 @@ The following options can be defined globally: update_every, autodetection_retry
 
 
 
-| Option | Description | Default | Required |
-|:-----|:------------|:--------|:---------:|
-| update_every | Data collection frequency. | 1 | no |
-| autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
-| timeout | System bus requests timeout. | 1 | no |
-| include | Systemd units selector. | *.service | no |
-| skip_transient | If set, skip data collection for systemd transient units. | false | no |
-| collect_unit_files | If set to true, collect the state of installed unit files. Enabling this may increase system overhead. | false | no |
-| collect_unit_files_every | Interval for querying systemd about unit files and their enablement state, measured in seconds. Data is cached for this interval to reduce system overhead. | 300 | no |
-| include_unit_files | Systemd unit files selector. | *.service | no |
+| Group | Option | Description | Default | Required |
+|:------|:-----|:------------|:--------|:---------:|
+| **Collection** | update_every | Data collection frequency. | 1 | no |
+|  | autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
+|  | timeout | System bus requests timeout. | 1 | no |
+| **Units** | include | Systemd units selector. | *.service | no |
+|  | skip_transient | If set, skip data collection for systemd transient units. | false | no |
+| **Unit Files** | collect_unit_files | If set to true, collect the state of installed unit files. Enabling this may increase system overhead. | false | no |
+|  | collect_unit_files_every | Interval for querying systemd about unit files and their enablement state, measured in seconds. Data is cached for this interval to reduce system overhead. | 300 | no |
+|  | include_unit_files | Systemd unit files selector. | *.service | no |
 
 ##### include
 

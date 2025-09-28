@@ -67,7 +67,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-
 ## Metrics
 
 Metrics grouped by *scope*.
@@ -159,14 +158,15 @@ The following options can be defined globally: update_every, autodetection_retry
 
 
 
-| Option | Description | Default | Required |
-|:-----|:------------|:--------|:---------:|
-| update_every | Data collection frequency. | 5 | no |
-| autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
-| host | Remote host address in IPv4, IPv6 format, or DNS name. |  | yes |
-| ports | Target TCP ports. Must be specified in numeric format. |  | no |
-| udp_ports | Target UDP ports. Must be specified in numeric format. |  | no |
-| timeout | HTTP request timeout. | 2 | no |
+| Group | Option | Description | Default | Required |
+|:------|:-----|:------------|:--------|:---------:|
+| **Collection** | update_every | Data collection frequency (seconds). | 5 | no |
+|  | autodetection_retry | Autodetection retry interval (seconds). Set 0 to disable. | 0 | no |
+| **Target** | host | Remote host address (IPv4, IPv6, or DNS name). |  | yes |
+|  | ports | List of TCP ports to check (numeric format). | [] | no |
+|  | udp_ports | List of UDP ports to check (numeric format). | [] | no |
+|  | timeout | Port check timeout (seconds). | 2 | no |
+| **Virtual Node** | vnode | Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). |  | no |
 
 
 </details>

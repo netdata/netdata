@@ -65,26 +65,6 @@
           }
         }
       },
-      "network_interface_filter": {
-        "title": "Network interface filter",
-        "description": "Configuration for filtering specific network interfaces. If left empty, no interfaces will be filtered. You can filter interfaces by name or type using [simple patterns](/src/libnetdata/simple_pattern/README.md#simple-patterns).",
-        "type": [
-          "object",
-          "null"
-        ],
-        "properties": {
-          "by_name": {
-            "title": "By Name",
-            "description": "Specify the interface name or a pattern to match against the [ifName](https://cric.grenoble.cnrs.fr/Administrateurs/Outils/MIBS/?oid=1.3.6.1.2.1.31.1.1.1.1) label.",
-            "type": "string"
-          },
-          "by_type": {
-            "title": "By Type",
-            "description": "Specify the interface type or a pattern to match against the [ifType](https://cric.grenoble.cnrs.fr/Administrateurs/Outils/MIBS/?oid=1.3.6.1.2.1.2.2.1.3) label.",
-            "type": "string"
-          }
-        }
-      },
       "options": {
         "title": "Options",
         "description": "Configuration options for SNMP monitoring.",
@@ -208,165 +188,76 @@
           }
         }
       },
-      "charts": {
-        "title": "Charts configuration",
+      "manual_profiles": {
+        "title": "Manual SNMP Profiles",
+        "description": "Profiles to apply if automatic detection cannot be used. In most cases, **leave this empty**.",
         "type": [
           "array",
           "null"
         ],
-        "uniqueItems": true,
         "items": {
-          "title": "Chart",
-          "type": [
-            "object",
-            "null"
-          ],
-          "properties": {
-            "id": {
-              "title": "ID",
-              "description": "Unique identifier for the chart.",
-              "type": "string"
-            },
-            "title": {
-              "title": "Title",
-              "description": "Title of the chart.",
-              "type": "string"
-            },
-            "units": {
-              "title": "Units",
-              "description": "Unit label for the vertical axis on charts.",
-              "type": "string"
-            },
-            "family": {
-              "title": "Family",
-              "description": "Subsection on the dashboard where the chart will be displayed.",
-              "type": "string"
-            },
-            "type": {
-              "title": "Type",
-              "type": "string",
-              "enum": [
-                "line",
-                "area",
-                "stacked"
-              ],
-              "default": "line"
-            },
-            "priority": {
-              "title": "Priority",
-              "description": "Rendering priority of the chart on the dashboard. Lower priority values will cause the chart to appear before those with higher priority values.",
-              "type": "integer",
-              "minimum": 1,
-              "default": 90000
-            },
-            "multiply_range": {
-              "title": "OID index range",
-              "description": "Specifies the range of indexes used to create multiple charts. If set, a chart will be created for each index in the specified range. Each chart will have the index appended to the OID dimension.",
-              "type": [
-                "array",
-                "null"
-              ],
-              "items": {
-                "title": "Index",
-                "type": "integer",
-                "minimum": 0
-              },
-              "uniqueItems": true,
-              "maxItems": 2
-            },
-            "dimensions": {
-              "title": "Dimensions",
-              "description": "Configuration for dimensions of the chart.",
-              "type": [
-                "array",
-                "null"
-              ],
-              "uniqueItems": true,
-              "minItems": 1,
-              "items": {
-                "title": "Dimension configuration",
-                "type": [
-                  "object",
-                  "null"
-                ],
-                "properties": {
-                  "oid": {
-                    "title": "OID",
-                    "description": "SNMP OID.",
-                    "type": "string"
-                  },
-                  "name": {
-                    "title": "Dimension",
-                    "description": "Name of the dimension.",
-                    "type": "string"
-                  },
-                  "algorithm": {
-                    "title": "Algorithm",
-                    "description": "Algorithm of the dimension.",
-                    "type": "string",
-                    "enum": [
-                      "absolute",
-                      "incremental"
-                    ],
-                    "default": "absolute"
-                  },
-                  "multiplier": {
-                    "title": "Multiplier",
-                    "description": "Value to multiply the collected value.",
-                    "type": "integer",
-                    "not": {
-                      "const": 0
-                    },
-                    "default": 1
-                  },
-                  "divisor": {
-                    "title": "Divisor",
-                    "description": "Value to divide the collected value.",
-                    "type": "integer",
-                    "not": {
-                      "const": 0
-                    },
-                    "default": 1
-                  }
-                },
-                "required": [
-                  "oid",
-                  "name",
-                  "algorithm",
-                  "multiplier",
-                  "divisor"
-                ]
-              }
-            }
-          },
-          "required": [
-            "id",
-            "title",
-            "units",
-            "family",
-            "type",
-            "priority",
-            "dimensions"
-          ]
-        }
+          "title": "Profile",
+          "type": "string"
+        },
+        "uniqueItems": true
       },
-      "enable_profiles": {
-        "title": "Enable SNMP Profile Collection",
-        "description": "Enable collection of metrics using SNMP profiles.",
-        "type": "boolean",
-        "default": true
-      },
-      "enable_profiles_table_metrics": {
-        "title": "Enable SNMP Table Metrics",
-        "description": "Enable collection of SNMP table metrics from profiles. Enabling this may **increase collection time and memory usage** for devices with many network interfaces*.",
-        "type": "boolean",
-        "default": true
-      },
-      "disable_legacy_collection": {
-        "title": "Disable Legacy SNMP Collection",
-        "description": "Disable the legacy SNMP collection method, forcing the collector to use only SNMP profiles (YAML-based configuration). When enabled, the collector will ignore any non-profile based collection logic.",
+      "ping_only": {
+        "title": "Ping only",
+        "description": "Collect only ICMP round-trip time and skip SNMP profile metrics.",
         "type": "boolean",
         "default": false
+      },
+      "ping": {
+        "title": "Ping",
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "enabled": {
+            "title": "Enable ping",
+            "type": "boolean",
+            "default": true,
+            "description": "Collect ICMP round-trip time using pro-bing alongside SNMP."
+          },
+          "network": {
+            "title": "Network",
+            "description": "The protocol version used for resolving the specified hosts IP addresses.",
+            "type": "string",
+            "default": "ip",
+            "enum": [
+              "ip",
+              "ip4",
+              "ip6"
+            ]
+          },
+          "privileged": {
+            "title": "Privileged mode",
+            "description": "If set, sends raw ICMP ping packets; otherwise, sends unprivileged UDP ping packets (require [additional configuration](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/ping#overview)).",
+            "type": "boolean",
+            "default": true
+          },
+          "interface": {
+            "title": "Interface",
+            "description": "The network device name (e.g., `eth0`, `wlan0`) used as the source for ICMP echo requests.",
+            "type": "string",
+            "default": ""
+          },
+          "packets": {
+            "title": "Packets",
+            "description": "Number of echo requests sent each collection cycle.",
+            "type": "integer",
+            "minimum": 1,
+            "default": 3
+          },
+          "interval": {
+            "title": "Interval",
+            "description": "Timeout between sending ping packets, in seconds.",
+            "type": "number",
+            "minimum": 0.1,
+            "default": 0.1
+          }
+        }
       }
     },
     "required": [
@@ -379,14 +270,9 @@
     "uiOptions": {
       "fullPage": true
     },
-    "enable_profiles": {
-      "ui:help": "Profiles provide pre-configured monitoring for specific device models and MIBs, including network interfaces, system information, and device-specific metrics."
-    },
-    "enable_profiles_table_metrics": {
-      "ui:help": "Table metrics include interface statistics, routing tables, and other tabular data."
-    },
-    "network_interface_filter": {
-      "ui:collapsible": true
+    "manual_profiles": {
+      "ui:listFlavour": "list",
+      "ui:help": "**Profiles are always applied automatically** based on the device sysObjectID. **If no sysObjectID is provided** (rare case, e.g. some printers), the profiles listed here will be applied instead. In most cases, **leave this empty**."
     },
     "community": {
       "ui:widget": "password"
@@ -431,29 +317,15 @@
         "ui:widget": "password"
       }
     },
-    "charts": {
-      "items": {
-        "ui:collapsible": true,
-        "type": {
-          "ui:widget": "radio",
-          "ui:options": {
-            "inline": true
-          }
-        },
-        "multiply_range": {
-          "ui:listFlavour": "list"
-        },
-        "dimensions": {
-          "items": {
-            "ui:collapsible": true,
-            "algorithm": {
-              "ui:widget": "radio",
-              "ui:options": {
-                "inline": true
-              }
-            }
-          }
-        }
+    "ping_only": {
+      "ui:help": "A minimal SNMP sysInfo query still runs during vnode setup for identification/metadata."
+    },
+    "ping": {
+      "interface": {
+        "ui:widget": "hidden"
+      },
+      "network": {
+        "ui:widget": "hidden"
       }
     },
     "ui:flavour": "tabs",
@@ -464,7 +336,15 @@
           "fields": [
             "update_every",
             "hostname",
-            "community"
+            "community",
+            "manual_profiles"
+          ]
+        },
+        {
+          "title": "Ping",
+          "fields": [
+            "ping_only",
+            "ping"
           ]
         },
         {
@@ -478,7 +358,6 @@
         {
           "title": "Options",
           "fields": [
-            "network_interface_filter",
             "options"
           ]
         },
@@ -486,20 +365,6 @@
           "title": "SNMPv3",
           "fields": [
             "user"
-          ]
-        },
-        {
-          "title": "Charts",
-          "fields": [
-            "charts"
-          ]
-        },
-        {
-          "title": "Profiles",
-          "fields": [
-            "enable_profiles",
-            "enable_profiles_table_metrics",
-            "disable_legacy_collection"
           ]
         }
       ]

@@ -47,7 +47,6 @@ The default configuration for this integration does not impose any limits on dat
 
 This thread will add overhead every time that an internal kernel function monitored by this thread is called.
 
-
 ## Metrics
 
 Metrics grouped by *scope*.

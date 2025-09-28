@@ -4,14 +4,19 @@ package snmp
 
 import (
 	"context"
-	"encoding/hex"
 	"errors"
-	"fmt"
 	"os"
 	"strings"
 	"testing"
+	"time"
 
+	probing "github.com/prometheus-community/pro-bing"
+
+	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/ping"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
 
 	"github.com/golang/mock/gomock"
@@ -130,106 +135,78 @@ func TestCollector_Cleanup(t *testing.T) {
 	}
 }
 
-func TestCollector_Charts(t *testing.T) {
-	tests := map[string]struct {
-		prepareSNMP   func(t *testing.T, m *snmpmock.MockHandler) *Collector
-		wantNumCharts int
-		doCollect     bool
-	}{
-		"if-mib, no custom": {
-			doCollect:     true,
-			wantNumCharts: len(netIfaceChartsTmpl)*4 + 1,
-			prepareSNMP: func(t *testing.T, m *snmpmock.MockHandler) *Collector {
-				collr := New()
-				collr.Config = prepareV2Config()
-				if collr.EnableProfiles {
-					setMockClientSysObjectidExpect(m)
-				}
-				setMockClientSysinfoAndUptimeExpect(m)
-				setMockClientIfMibExpect(m)
-
-				return collr
-			},
-		},
-		"custom, no if-mib": {
-			wantNumCharts: 10,
-			prepareSNMP: func(t *testing.T, m *snmpmock.MockHandler) *Collector {
-				collr := New()
-				collr.Config = prepareConfigWithUserCharts(prepareV2Config(), 0, 9)
-				collr.collectIfMib = false
-
-				return collr
-			},
-		},
-	}
-
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			mockSNMP, cleanup := mockInit(t)
-			defer cleanup()
-
-			setMockClientInitExpect(mockSNMP)
-
-			collr := test.prepareSNMP(t, mockSNMP)
-			collr.newSnmpClient = func() gosnmp.Handler { return mockSNMP }
-
-			require.NoError(t, collr.Init(context.Background()))
-
-			if test.doCollect {
-				_ = collr.Check(context.Background())
-				_ = collr.Collect(context.Background())
-			}
-
-			assert.Equal(t, test.wantNumCharts, len(*collr.Charts()))
-		})
-	}
-}
-
 func TestCollector_Check(t *testing.T) {
 	tests := map[string]struct {
-		wantFail    bool
-		prepareSNMP func(m *snmpmock.MockHandler) *Collector
+		prepare func(m *snmpmock.MockHandler) *Collector
+		wantErr bool
 	}{
-		"success when sysinfo collected": {
-			wantFail: false,
-			prepareSNMP: func(m *snmpmock.MockHandler) *Collector {
-				collr := New()
-				collr.Config = prepareV2Config()
-
+		"success: connects and reads sysInfo": {
+			wantErr: false,
+			prepare: func(m *snmpmock.MockHandler) *Collector {
+				setMockClientInitExpect(m)
 				setMockClientSysInfoExpect(m)
 
-				return collr
+				c := New()
+				c.Config = prepareV2Config()
+				c.CreateVnode = false
+				c.Ping.Enabled = false
+				c.newSnmpClient = func() gosnmp.Handler { return m }
+				return c
 			},
 		},
-		"fail when snmp client Get fails": {
-			wantFail: true,
-			prepareSNMP: func(m *snmpmock.MockHandler) *Collector {
-				collr := New()
-				collr.Config = prepareConfigWithUserCharts(prepareV2Config(), 0, 3)
-				collr.collectIfMib = false
-				m.EXPECT().WalkAll(snmputils.RootOidMibSystem).Return(nil, errors.New("mock Get() error")).Times(1)
 
-				return collr
+		"failure: SNMP connect error": {
+			wantErr: true,
+			prepare: func(m *snmpmock.MockHandler) *Collector {
+				setMockClientSetterExpect(m)
+				m.EXPECT().Connect().Return(errors.New("connect failed")).AnyTimes()
+
+				c := New()
+				c.Config = prepareV2Config()
+				c.CreateVnode = false
+				c.Ping.Enabled = false
+				c.newSnmpClient = func() gosnmp.Handler { return m }
+				return c
+			},
+		},
+
+		"failure: sysInfo walk error": {
+			wantErr: true,
+			prepare: func(m *snmpmock.MockHandler) *Collector {
+				// Normal init succeeds
+				setMockClientInitExpect(m)
+				// But sysInfo retrieval (WalkAll on system tree) fails
+				// If your helper is too opinionated, stub directly:
+				// The collector ultimately calls WalkAll on the system OID tree.
+				m.EXPECT().
+					WalkAll(gomock.Any()).
+					Return(nil, errors.New("walk failed"))
+
+				c := New()
+				c.Config = prepareV2Config()
+				c.CreateVnode = false
+				c.Ping.Enabled = false
+				c.newSnmpClient = func() gosnmp.Handler { return m }
+				return c
 			},
 		},
 	}
 
-	for name, test := range tests {
+	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			mockSNMP, cleanup := mockInit(t)
-			defer cleanup()
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
 
-			setMockClientInitExpect(mockSNMP)
+			mockSNMP := snmpmock.NewMockHandler(ctrl)
 
-			collr := test.prepareSNMP(mockSNMP)
-			collr.newSnmpClient = func() gosnmp.Handler { return mockSNMP }
-
+			collr := tc.prepare(mockSNMP)
 			require.NoError(t, collr.Init(context.Background()))
 
-			if test.wantFail {
-				assert.Error(t, collr.Check(context.Background()))
+			err := collr.Check(context.Background())
+			if tc.wantErr {
+				assert.Error(t, err)
 			} else {
-				assert.NoError(t, collr.Check(context.Background()))
+				assert.NoError(t, err)
 			}
 		})
 	}
@@ -237,250 +214,166 @@ func TestCollector_Check(t *testing.T) {
 
 func TestCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
-		prepareSNMP   func(m *snmpmock.MockHandler) *Collector
-		wantCollected map[string]int64
+		prepare func(m *snmpmock.MockHandler) *Collector
+		want    map[string]int64
 	}{
-		"success only IF-MIB": {
-			prepareSNMP: func(m *snmpmock.MockHandler) *Collector {
+		"collects scalar metric": {
+			prepare: func(m *snmpmock.MockHandler) *Collector {
+				setMockClientInitExpect(m)
+				setMockClientSysInfoExpect(m)
+
 				collr := New()
 				collr.Config = prepareV2Config()
-
-				if collr.EnableProfiles {
-					setMockClientSysObjectidExpect(m)
+				collr.CreateVnode = false
+				collr.Ping.Enabled = false
+				collr.snmpProfiles = []*ddsnmp.Profile{{}} // non-empty to enable collectSNMP()
+				collr.newSnmpClient = func() gosnmp.Handler { return m }
+				collr.newDdSnmpColl = func(ddsnmpcollector.Config) ddCollector {
+					return &mockDdSnmpCollector{pms: []*ddsnmp.ProfileMetrics{
+						{
+							Metrics: []ddsnmp.Metric{
+								{
+									Name:    "uptime",
+									IsTable: false,
+									Value:   123,
+									Unit:    "s",
+									Tags:    map[string]string{},
+									Profile: &ddsnmp.ProfileMetrics{Tags: map[string]string{}},
+								},
+							},
+						},
+					}}
 				}
-				setMockClientIfMibExpect(m)
-
 				return collr
 			},
-			wantCollected: map[string]int64{
-				"net_iface_ether1_admin_status_down":                0,
-				"net_iface_ether1_admin_status_testing":             0,
-				"net_iface_ether1_admin_status_up":                  1,
-				"net_iface_ether1_bcast_in":                         0,
-				"net_iface_ether1_bcast_out":                        0,
-				"net_iface_ether1_discards_in":                      0,
-				"net_iface_ether1_discards_out":                     0,
-				"net_iface_ether1_errors_in":                        0,
-				"net_iface_ether1_errors_out":                       0,
-				"net_iface_ether1_mcast_in":                         0,
-				"net_iface_ether1_mcast_out":                        0,
-				"net_iface_ether1_oper_status_dormant":              0,
-				"net_iface_ether1_oper_status_down":                 1,
-				"net_iface_ether1_oper_status_lowerLayerDown":       0,
-				"net_iface_ether1_oper_status_notPresent":           0,
-				"net_iface_ether1_oper_status_testing":              0,
-				"net_iface_ether1_oper_status_unknown":              0,
-				"net_iface_ether1_oper_status_up":                   0,
-				"net_iface_ether1_traffic_in":                       0,
-				"net_iface_ether1_traffic_out":                      0,
-				"net_iface_ether1_ucast_in":                         0,
-				"net_iface_ether1_ucast_out":                        0,
-				"net_iface_ether2_admin_status_down":                0,
-				"net_iface_ether2_admin_status_testing":             0,
-				"net_iface_ether2_admin_status_up":                  1,
-				"net_iface_ether2_bcast_in":                         0,
-				"net_iface_ether2_bcast_out":                        7386,
-				"net_iface_ether2_discards_in":                      0,
-				"net_iface_ether2_discards_out":                     0,
-				"net_iface_ether2_errors_in":                        0,
-				"net_iface_ether2_errors_out":                       0,
-				"net_iface_ether2_mcast_in":                         1891,
-				"net_iface_ether2_mcast_out":                        28844,
-				"net_iface_ether2_oper_status_dormant":              0,
-				"net_iface_ether2_oper_status_down":                 0,
-				"net_iface_ether2_oper_status_lowerLayerDown":       0,
-				"net_iface_ether2_oper_status_notPresent":           0,
-				"net_iface_ether2_oper_status_testing":              0,
-				"net_iface_ether2_oper_status_unknown":              0,
-				"net_iface_ether2_oper_status_up":                   1,
-				"net_iface_ether2_traffic_in":                       615057509,
-				"net_iface_ether2_traffic_out":                      159677206,
-				"net_iface_ether2_ucast_in":                         71080332,
-				"net_iface_ether2_ucast_out":                        39509661,
-				"net_iface_sfp-sfpplus1_admin_status_down":          0,
-				"net_iface_sfp-sfpplus1_admin_status_testing":       0,
-				"net_iface_sfp-sfpplus1_admin_status_up":            1,
-				"net_iface_sfp-sfpplus1_bcast_in":                   0,
-				"net_iface_sfp-sfpplus1_bcast_out":                  0,
-				"net_iface_sfp-sfpplus1_discards_in":                0,
-				"net_iface_sfp-sfpplus1_discards_out":               0,
-				"net_iface_sfp-sfpplus1_errors_in":                  0,
-				"net_iface_sfp-sfpplus1_errors_out":                 0,
-				"net_iface_sfp-sfpplus1_mcast_in":                   0,
-				"net_iface_sfp-sfpplus1_mcast_out":                  0,
-				"net_iface_sfp-sfpplus1_oper_status_dormant":        0,
-				"net_iface_sfp-sfpplus1_oper_status_down":           0,
-				"net_iface_sfp-sfpplus1_oper_status_lowerLayerDown": 0,
-				"net_iface_sfp-sfpplus1_oper_status_notPresent":     1,
-				"net_iface_sfp-sfpplus1_oper_status_testing":        0,
-				"net_iface_sfp-sfpplus1_oper_status_unknown":        0,
-				"net_iface_sfp-sfpplus1_oper_status_up":             0,
-				"net_iface_sfp-sfpplus1_traffic_in":                 0,
-				"net_iface_sfp-sfpplus1_traffic_out":                0,
-				"net_iface_sfp-sfpplus1_ucast_in":                   0,
-				"net_iface_sfp-sfpplus1_ucast_out":                  0,
-				"net_iface_sfp-sfpplus2_admin_status_down":          0,
-				"net_iface_sfp-sfpplus2_admin_status_testing":       0,
-				"net_iface_sfp-sfpplus2_admin_status_up":            1,
-				"net_iface_sfp-sfpplus2_bcast_in":                   0,
-				"net_iface_sfp-sfpplus2_bcast_out":                  0,
-				"net_iface_sfp-sfpplus2_discards_in":                0,
-				"net_iface_sfp-sfpplus2_discards_out":               0,
-				"net_iface_sfp-sfpplus2_errors_in":                  0,
-				"net_iface_sfp-sfpplus2_errors_out":                 0,
-				"net_iface_sfp-sfpplus2_mcast_in":                   0,
-				"net_iface_sfp-sfpplus2_mcast_out":                  0,
-				"net_iface_sfp-sfpplus2_oper_status_dormant":        0,
-				"net_iface_sfp-sfpplus2_oper_status_down":           0,
-				"net_iface_sfp-sfpplus2_oper_status_lowerLayerDown": 0,
-				"net_iface_sfp-sfpplus2_oper_status_notPresent":     1,
-				"net_iface_sfp-sfpplus2_oper_status_testing":        0,
-				"net_iface_sfp-sfpplus2_oper_status_unknown":        0,
-				"net_iface_sfp-sfpplus2_oper_status_up":             0,
-				"net_iface_sfp-sfpplus2_traffic_in":                 0,
-				"net_iface_sfp-sfpplus2_traffic_out":                0,
-				"net_iface_sfp-sfpplus2_ucast_in":                   0,
-				"net_iface_sfp-sfpplus2_ucast_out":                  0,
-				"uptime":                                            60,
+			want: map[string]int64{
+				// scalar → "snmp_device_prof_<name>"
+				"snmp_device_prof_uptime": 123,
 			},
 		},
-		"success only custom OIDs supported type": {
-			prepareSNMP: func(m *snmpmock.MockHandler) *Collector {
+		"collects table multivalue metric": {
+			prepare: func(m *snmpmock.MockHandler) *Collector {
+				setMockClientInitExpect(m)
+				setMockClientSysInfoExpect(m)
+
 				collr := New()
-				collr.Config = prepareConfigWithUserCharts(prepareV2Config(), 0, 3)
-				collr.collectIfMib = false
-
-				if collr.EnableProfiles {
-					setMockClientSysObjectidExpect(m)
+				collr.Config = prepareV2Config()
+				collr.CreateVnode = false
+				collr.Ping.Enabled = false
+				collr.snmpProfiles = []*ddsnmp.Profile{{}}
+				collr.newSnmpClient = func() gosnmp.Handler { return m }
+				collr.newDdSnmpColl = func(ddsnmpcollector.Config) ddCollector {
+					return &mockDdSnmpCollector{pms: []*ddsnmp.ProfileMetrics{
+						{
+							Metrics: []ddsnmp.Metric{
+								{
+									Name:    "if_octets",
+									IsTable: true,
+									Unit:    "bit/s",
+									Tags:    map[string]string{"ifName": "eth0"},
+									Profile: &ddsnmp.ProfileMetrics{Tags: map[string]string{}},
+									MultiValue: map[string]int64{
+										"in":  1,
+										"out": 2,
+									},
+								},
+							},
+						},
+					}}
 				}
-
-				m.EXPECT().Get(gomock.Any()).Return(&gosnmp.SnmpPacket{
-					Variables: []gosnmp.SnmpPDU{
-						{Value: 10, Type: gosnmp.Counter32},
-						{Value: 20, Type: gosnmp.Counter64},
-						{Value: 30, Type: gosnmp.Gauge32},
-						{Value: 1, Type: gosnmp.Boolean},
-						{Value: 40, Type: gosnmp.Gauge32},
-						{Value: 50, Type: gosnmp.TimeTicks},
-						{Value: 60, Type: gosnmp.Uinteger32},
-						{Value: 70, Type: gosnmp.Integer},
-					},
-				}, nil).Times(1)
-
 				return collr
 			},
-			wantCollected: map[string]int64{
-				//"TestMetric":             1,
-				"1.3.6.1.2.1.2.2.1.10.0": 10,
-				"1.3.6.1.2.1.2.2.1.16.0": 20,
-				"1.3.6.1.2.1.2.2.1.10.1": 30,
-				"1.3.6.1.2.1.2.2.1.16.1": 1,
-				"1.3.6.1.2.1.2.2.1.10.2": 40,
-				"1.3.6.1.2.1.2.2.1.16.2": 50,
-				"1.3.6.1.2.1.2.2.1.10.3": 60,
-				"1.3.6.1.2.1.2.2.1.16.3": 70,
-				"uptime":                 60,
+			want: map[string]int64{
+				// table key: "snmp_device_prof_<name>_<sorted tag values>_<subkey>"
+				// here tags = {"ifName":"eth0"} → key part becomes "_eth0"
+				"snmp_device_prof_if_octets_eth0_in":  1,
+				"snmp_device_prof_if_octets_eth0_out": 2,
 			},
 		},
-		"success only custom OIDs supported and unsupported type": {
-			prepareSNMP: func(m *snmpmock.MockHandler) *Collector {
+		"collects ping only metrics": {
+			prepare: func(m *snmpmock.MockHandler) *Collector {
+				setMockClientInitExpect(m)
+				setMockClientSysInfoExpect(m)
+
 				collr := New()
-				collr.Config = prepareConfigWithUserCharts(prepareV2Config(), 0, 2)
-				collr.collectIfMib = false
-
-				if collr.EnableProfiles {
-					setMockClientSysObjectidExpect(m)
-				}
-
-				m.EXPECT().Get(gomock.Any()).Return(&gosnmp.SnmpPacket{
-					Variables: []gosnmp.SnmpPDU{
-						{Value: 10, Type: gosnmp.Counter32},
-						{Value: 20, Type: gosnmp.Counter64},
-						{Value: 30, Type: gosnmp.Gauge32},
-						{Value: nil, Type: gosnmp.NoSuchInstance},
-						{Value: nil, Type: gosnmp.NoSuchInstance},
-						{Value: nil, Type: gosnmp.NoSuchInstance},
-					},
-				}, nil).Times(1)
+				collr.Config = prepareV2Config()
+				collr.PingOnly = true
+				collr.CreateVnode = false
+				collr.newSnmpClient = func() gosnmp.Handler { return m }
+				collr.newProber = func(cfg ping.ProberConfig, log *logger.Logger) ping.Prober { return &mockProber{} }
 
 				return collr
 			},
-			wantCollected: map[string]int64{
-				//"TestMetric":             1,
-				"1.3.6.1.2.1.2.2.1.10.0": 10,
-				"1.3.6.1.2.1.2.2.1.16.0": 20,
-				"1.3.6.1.2.1.2.2.1.10.1": 30,
-				"uptime":                 60,
-			},
-		},
-		"success only custom OIDs unsupported type": {
-			prepareSNMP: func(m *snmpmock.MockHandler) *Collector {
-				collr := New()
-				collr.Config = prepareConfigWithUserCharts(prepareV2Config(), 0, 2)
-				collr.collectIfMib = false
-
-				if collr.EnableProfiles {
-					setMockClientSysObjectidExpect(m)
-				}
-
-				m.EXPECT().Get(gomock.Any()).Return(&gosnmp.SnmpPacket{
-					Variables: []gosnmp.SnmpPDU{
-						{Value: nil, Type: gosnmp.NoSuchInstance},
-						{Value: nil, Type: gosnmp.NoSuchInstance},
-						{Value: nil, Type: gosnmp.NoSuchObject},
-						{Value: "192.0.2.0", Type: gosnmp.NsapAddress},
-						{Value: []uint8{118, 101, 116}, Type: gosnmp.OctetString},
-						{Value: ".1.3.6.1.2.1.4.32.1.5.2.1.4.10.19.0.0.16", Type: gosnmp.ObjectIdentifier},
-					},
-				}, nil).Times(1)
-
-				return collr
-			},
-			wantCollected: map[string]int64{
-				//"TestMetric": 1,
-				"uptime": 60,
+			want: map[string]int64{
+				"ping_rtt_min":    (10 * time.Millisecond).Microseconds(),
+				"ping_rtt_max":    (20 * time.Millisecond).Microseconds(),
+				"ping_rtt_avg":    (15 * time.Millisecond).Microseconds(),
+				"ping_rtt_stddev": (5 * time.Millisecond).Microseconds(),
 			},
 		},
 	}
 
-	for name, test := range tests {
+	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			mockSNMP, cleanup := mockInit(t)
-			defer cleanup()
+			mockCtl := gomock.NewController(t)
+			defer mockCtl.Finish()
 
-			setMockClientInitExpect(mockSNMP)
-			setMockClientSysinfoAndUptimeExpect(mockSNMP)
+			mockSNMP := snmpmock.NewMockHandler(mockCtl)
 
-			collr := test.prepareSNMP(mockSNMP)
-			collr.newSnmpClient = func() gosnmp.Handler { return mockSNMP }
-
+			collr := tc.prepare(mockSNMP)
 			require.NoError(t, collr.Init(context.Background()))
 
 			_ = collr.Check(context.Background())
 
-			mx := collr.Collect(context.Background())
-
-			if collr.EnableProfiles {
-				mx["TestMetric"] = 1
-			}
-
-			assert.Equal(t, test.wantCollected, mx)
+			got := collr.Collect(context.Background())
+			assert.Equal(t, tc.want, got)
 		})
 	}
 }
 
-func mockInit(t *testing.T) (*snmpmock.MockHandler, func()) {
-	mockCtl := gomock.NewController(t)
-	cleanup := func() { mockCtl.Finish() }
-	mockSNMP := snmpmock.NewMockHandler(mockCtl)
+type mockProber struct {
+	errOnPing bool
+}
 
-	return mockSNMP, cleanup
+func (m *mockProber) Ping(host string) (*probing.Statistics, error) {
+	if m.errOnPing {
+		return nil, errors.New("mock.Ping() error")
+	}
+
+	stats := probing.Statistics{
+		PacketsRecv:           5,
+		PacketsSent:           5,
+		PacketsRecvDuplicates: 0,
+		PacketLoss:            0,
+		Addr:                  host,
+		Rtts:                  nil,
+		MinRtt:                time.Millisecond * 10,
+		MaxRtt:                time.Millisecond * 20,
+		AvgRtt:                time.Millisecond * 15,
+		StdDevRtt:             time.Millisecond * 5,
+	}
+
+	return &stats, nil
+}
+
+type mockDdSnmpCollector struct {
+	pms  []*ddsnmp.ProfileMetrics
+	meta map[string]ddsnmp.MetaTag
+	err  error
+}
+
+func (m *mockDdSnmpCollector) Collect() ([]*ddsnmp.ProfileMetrics, error) {
+	return m.pms, m.err
+}
+
+func (m *mockDdSnmpCollector) CollectDeviceMetadata() (map[string]ddsnmp.MetaTag, error) {
+	return m.meta, nil
 }
 
 func prepareV3Config() Config {
 	cfg := prepareV2Config()
 	cfg.Options.Version = gosnmp.Version3.String()
-	cfg.User = User{
+	cfg.User = UserConfig{
 		Name:          "name",
 		SecurityLevel: "authPriv",
 		AuthProto:     strings.ToLower(gosnmp.MD5.String()),
@@ -502,7 +395,7 @@ func prepareV1Config() Config {
 		UpdateEvery: 1,
 		Hostname:    "192.0.2.1",
 		Community:   "public",
-		Options: Options{
+		Options: OptionsConfig{
 			Port:           161,
 			Retries:        1,
 			Timeout:        5,
@@ -513,45 +406,20 @@ func prepareV1Config() Config {
 	}
 }
 
-func prepareConfigWithUserCharts(cfg Config, start, end int) Config {
-	if start > end || start < 0 || end < 1 {
-		panic(fmt.Sprintf("invalid index range ('%d'-'%d')", start, end))
-	}
-	cfg.ChartsInput = []ChartConfig{
-		{
-			ID:       "test_chart1",
-			Title:    "This is Test Chart1",
-			Units:    "kilobits/s",
-			Family:   "family",
-			Type:     module.Area.String(),
-			Priority: module.Priority,
-			Dimensions: []DimensionConfig{
-				{
-					OID:        "1.3.6.1.2.1.2.2.1.10",
-					Name:       "in",
-					Algorithm:  module.Incremental.String(),
-					Multiplier: 8,
-					Divisor:    1000,
-				},
-				{
-					OID:        "1.3.6.1.2.1.2.2.1.16",
-					Name:       "out",
-					Algorithm:  module.Incremental.String(),
-					Multiplier: 8,
-					Divisor:    1000,
-				},
-			},
-		},
-	}
+func mockInit(t *testing.T) (*snmpmock.MockHandler, func()) {
+	mockCtl := gomock.NewController(t)
+	cleanup := func() { mockCtl.Finish() }
+	mockSNMP := snmpmock.NewMockHandler(mockCtl)
 
-	for i := range cfg.ChartsInput {
-		cfg.ChartsInput[i].IndexRange = []int{start, end}
-	}
-
-	return cfg
+	return mockSNMP, cleanup
 }
 
 func setMockClientInitExpect(m *snmpmock.MockHandler) {
+	setMockClientSetterExpect(m)
+	m.EXPECT().Connect().Return(nil).AnyTimes()
+}
+
+func setMockClientSetterExpect(m *snmpmock.MockHandler) {
 	m.EXPECT().Target().AnyTimes()
 	m.EXPECT().Port().AnyTimes()
 	m.EXPECT().Version().AnyTimes()
@@ -568,24 +436,7 @@ func setMockClientInitExpect(m *snmpmock.MockHandler) {
 	m.EXPECT().SetSecurityModel(gomock.Any()).AnyTimes()
 	m.EXPECT().SetMsgFlags(gomock.Any()).AnyTimes()
 	m.EXPECT().SetSecurityParameters(gomock.Any()).AnyTimes()
-	m.EXPECT().Connect().Return(nil).AnyTimes()
 	m.EXPECT().MaxRepetitions().Return(uint32(25)).AnyTimes()
-}
-
-func setMockClientSysObjectidExpect(m *snmpmock.MockHandler) {
-	m.EXPECT().Get([]string{snmputils.OidSysObject}).Return(&gosnmp.SnmpPacket{
-		Variables: []gosnmp.SnmpPDU{
-			{Value: ".1.1.1",
-				Name: ".1.3.6.1.2.1.1.2.0",
-				Type: gosnmp.ObjectIdentifier},
-		},
-	}, nil).MinTimes(1)
-	m.EXPECT().Get([]string{"1.1.1.0"}).Return(&gosnmp.SnmpPacket{
-		Variables: []gosnmp.SnmpPDU{
-			{Name: "1.1.1.0", Value: 1, Type: gosnmp.Integer},
-		},
-	}, nil).MinTimes(1)
-
 }
 
 func setMockClientSysInfoExpect(m *snmpmock.MockHandler) {
@@ -596,168 +447,4 @@ func setMockClientSysInfoExpect(m *snmpmock.MockHandler) {
 		{Name: snmputils.OidSysName, Value: []uint8("mock sysName"), Type: gosnmp.OctetString},
 		{Name: snmputils.OidSysLocation, Value: []uint8("mock sysLocation"), Type: gosnmp.OctetString},
 	}, nil).MinTimes(1)
-}
-
-func setMockClientSysinfoAndUptimeExpect(m *snmpmock.MockHandler) {
-	setMockClientSysInfoExpect(m)
-
-	m.EXPECT().Get([]string{oidSysUptime}).Return(&gosnmp.SnmpPacket{
-		Variables: []gosnmp.SnmpPDU{
-			{Value: uint32(6048), Type: gosnmp.TimeTicks},
-		},
-	}, nil).MinTimes(1)
-}
-
-func setMockClientIfMibExpect(m *snmpmock.MockHandler) {
-	m.EXPECT().WalkAll(rootOidIfMibIfTable).Return([]gosnmp.SnmpPDU{
-		{Name: oidIfIndex + ".1", Value: 1, Type: gosnmp.Integer},
-		{Name: oidIfIndex + ".2", Value: 2, Type: gosnmp.Integer},
-		{Name: oidIfIndex + ".17", Value: 17, Type: gosnmp.Integer},
-		{Name: oidIfIndex + ".18", Value: 18, Type: gosnmp.Integer},
-		{Name: oidIfDescr + ".1", Value: []uint8("ether1"), Type: gosnmp.OctetString},
-		{Name: oidIfDescr + ".2", Value: []uint8("ether2"), Type: gosnmp.OctetString},
-		{Name: oidIfDescr + ".17", Value: []uint8("sfp-sfpplus2"), Type: gosnmp.OctetString},
-		{Name: oidIfDescr + ".18", Value: []uint8("sfp-sfpplus1"), Type: gosnmp.OctetString},
-		{Name: oidIfType + ".1", Value: 6, Type: gosnmp.Integer},
-		{Name: oidIfType + ".2", Value: 6, Type: gosnmp.Integer},
-		{Name: oidIfType + ".17", Value: 6, Type: gosnmp.Integer},
-		{Name: oidIfType + ".18", Value: 6, Type: gosnmp.Integer},
-		{Name: oidIfMtu + ".1", Value: 1500, Type: gosnmp.Integer},
-		{Name: oidIfMtu + ".2", Value: 1500, Type: gosnmp.Integer},
-		{Name: oidIfMtu + ".17", Value: 1500, Type: gosnmp.Integer},
-		{Name: oidIfMtu + ".18", Value: 1500, Type: gosnmp.Integer},
-		{Name: oidIfSpeed + ".1", Value: 0, Type: gosnmp.Gauge32},
-		{Name: oidIfSpeed + ".2", Value: 1000000000, Type: gosnmp.Gauge32},
-		{Name: oidIfSpeed + ".17", Value: 0, Type: gosnmp.Gauge32},
-		{Name: oidIfSpeed + ".18", Value: 0, Type: gosnmp.Gauge32},
-		{Name: oidIfPhysAddress + ".1", Value: decodePhysAddr("18:fd:74:7e:c5:80"), Type: gosnmp.OctetString},
-		{Name: oidIfPhysAddress + ".2", Value: decodePhysAddr("18:fd:74:7e:c5:81"), Type: gosnmp.OctetString},
-		{Name: oidIfPhysAddress + ".17", Value: decodePhysAddr("18:fd:74:7e:c5:90"), Type: gosnmp.OctetString},
-		{Name: oidIfPhysAddress + ".18", Value: decodePhysAddr("18:fd:74:7e:c5:91"), Type: gosnmp.OctetString},
-		{Name: oidIfAdminStatus + ".1", Value: 1, Type: gosnmp.Integer},
-		{Name: oidIfAdminStatus + ".2", Value: 1, Type: gosnmp.Integer},
-		{Name: oidIfAdminStatus + ".17", Value: 1, Type: gosnmp.Integer},
-		{Name: oidIfAdminStatus + ".18", Value: 1, Type: gosnmp.Integer},
-		{Name: oidIfOperStatus + ".1", Value: 2, Type: gosnmp.Integer},
-		{Name: oidIfOperStatus + ".2", Value: 1, Type: gosnmp.Integer},
-		{Name: oidIfOperStatus + ".17", Value: 6, Type: gosnmp.Integer},
-		{Name: oidIfOperStatus + ".18", Value: 6, Type: gosnmp.Integer},
-		{Name: oidIfLastChange + ".1", Value: 0, Type: gosnmp.TimeTicks},
-		{Name: oidIfLastChange + ".2", Value: 3243, Type: gosnmp.TimeTicks},
-		{Name: oidIfLastChange + ".17", Value: 0, Type: gosnmp.TimeTicks},
-		{Name: oidIfLastChange + ".18", Value: 0, Type: gosnmp.TimeTicks},
-		{Name: oidIfInOctets + ".1", Value: 0, Type: gosnmp.Counter32},
-		{Name: oidIfInOctets + ".2", Value: 3827243723, Type: gosnmp.Counter32},
-		{Name: oidIfInOctets + ".17", Value: 0, Type: gosnmp.Counter32},
-		{Name: oidIfInOctets + ".18", Value: 0, Type: gosnmp.Counter32},
-		{Name: oidIfInUcastPkts + ".1", Value: 0, Type: gosnmp.Counter32},
-		{Name: oidIfInUcastPkts + ".2", Value: 71035992, Type: gosnmp.Counter32},
-		{Name: oidIfInUcastPkts + ".17", Value: 0, Type: gosnmp.Counter32},
-		{Name: oidIfInUcastPkts + ".18", Value: 0, Type: gosnmp.Counter32},
-		{Name: oidIfInNUcastPkts + ".1", Value: 0, Type: gosnmp.Counter32},
-		{Name: oidIfInNUcastPkts + ".2", Value: 0, Type: gosnmp.Counter32},
-		{Name: oidIfInNUcastPkts + ".17", Value: 0, Type: gosnmp.Counter32},
-		{Name: oidIfInNUcastPkts + ".18", Value: 0, Type: gosnmp.Counter32},
-		{Name: oidIfInDiscards + ".1", Value: 0, Type: gosnmp.Counter32},
-		{Name: oidIfInDiscards + ".2", Value: 0, Type: gosnmp.Counter32},
-		{Name: oidIfInDiscards + ".17", Value: 0, Type: gosnmp.Counter32},
-		{Name: oidIfInDiscards + ".18", Value: 0, Type: gosnmp.Counter32},
-		{Name: oidIfInErrors + ".1", Value: 0, Type: gosnmp.Counter32},
-		{Name: oidIfInErrors + ".2", Value: 0, Type: gosnmp.Counter32},
-		{Name: oidIfInErrors + ".17", Value: 0, Type: gosnmp.Counter32},
-		{Name: oidIfInErrors + ".18", Value: 0, Type: gosnmp.Counter32},
-		{Name: oidIfInUnknownProtos + ".1", Value: 0, Type: gosnmp.Counter32},
-		{Name: oidIfInUnknownProtos + ".2", Value: 0, Type: gosnmp.Counter32},
-		{Name: oidIfInUnknownProtos + ".17", Value: 0, Type: gosnmp.Counter32},
-		{Name: oidIfInUnknownProtos + ".18", Value: 0, Type: gosnmp.Counter32},
-		{Name: oidIfOutOctets + ".1", Value: 0, Type: gosnmp.Counter32},
-		{Name: oidIfOutOctets + ".2", Value: 2769838772, Type: gosnmp.Counter32},
-		{Name: oidIfOutOctets + ".17", Value: 0, Type: gosnmp.Counter32},
-		{Name: oidIfOutOctets + ".18", Value: 0, Type: gosnmp.Counter32},
-		{Name: oidIfOutUcastPkts + ".1", Value: 0, Type: gosnmp.Counter32},
-		{Name: oidIfOutUcastPkts + ".2", Value: 39482929, Type: gosnmp.Counter32},
-		{Name: oidIfOutUcastPkts + ".17", Value: 0, Type: gosnmp.Counter32},
-		{Name: oidIfOutUcastPkts + ".18", Value: 0, Type: gosnmp.Counter32},
-		{Name: oidIfOutNUcastPkts + ".1", Value: 0, Type: gosnmp.Counter32},
-		{Name: oidIfOutNUcastPkts + ".2", Value: 0, Type: gosnmp.Counter32},
-		{Name: oidIfOutNUcastPkts + ".17", Value: 0, Type: gosnmp.Counter32},
-		{Name: oidIfOutNUcastPkts + ".18", Value: 0, Type: gosnmp.Counter32},
-		{Name: oidIfOutDiscards + ".1", Value: 0, Type: gosnmp.Counter32},
-		{Name: oidIfOutDiscards + ".2", Value: 0, Type: gosnmp.Counter32},
-		{Name: oidIfOutDiscards + ".17", Value: 0, Type: gosnmp.Counter32},
-		{Name: oidIfOutDiscards + ".18", Value: 0, Type: gosnmp.Counter32},
-		{Name: oidIfOutErrors + ".1", Value: 0, Type: gosnmp.Counter32},
-		{Name: oidIfOutErrors + ".2", Value: 0, Type: gosnmp.Counter32},
-		{Name: oidIfOutErrors + ".17", Value: 0, Type: gosnmp.Counter32},
-		{Name: oidIfOutErrors + ".18", Value: 0, Type: gosnmp.Counter32},
-	}, nil).MinTimes(1)
-
-	m.EXPECT().WalkAll(rootOidIfMibIfXTable).Return([]gosnmp.SnmpPDU{
-		{Name: oidIfName + ".1", Value: []uint8("ether1"), Type: gosnmp.OctetString},
-		{Name: oidIfName + ".2", Value: []uint8("ether2"), Type: gosnmp.OctetString},
-		{Name: oidIfName + ".17", Value: []uint8("sfp-sfpplus2"), Type: gosnmp.OctetString},
-		{Name: oidIfName + ".18", Value: []uint8("sfp-sfpplus1"), Type: gosnmp.OctetString},
-		{Name: oidIfInMulticastPkts + ".1", Value: 0, Type: gosnmp.Counter32},
-		{Name: oidIfInMulticastPkts + ".2", Value: 0, Type: gosnmp.Counter32},
-		{Name: oidIfInMulticastPkts + ".17", Value: 0, Type: gosnmp.Counter32},
-		{Name: oidIfInMulticastPkts + ".18", Value: 0, Type: gosnmp.Counter32},
-		{Name: oidIfInBroadcastPkts + ".1", Value: 0, Type: gosnmp.Counter32},
-		{Name: oidIfInBroadcastPkts + ".2", Value: 0, Type: gosnmp.Counter32},
-		{Name: oidIfInBroadcastPkts + ".17", Value: 0, Type: gosnmp.Counter32},
-		{Name: oidIfInBroadcastPkts + ".18", Value: 0, Type: gosnmp.Counter32},
-		{Name: oidIfOutMulticastPkts + ".1", Value: 0, Type: gosnmp.Counter32},
-		{Name: oidIfOutMulticastPkts + ".2", Value: 0, Type: gosnmp.Counter32},
-		{Name: oidIfOutMulticastPkts + ".17", Value: 0, Type: gosnmp.Counter32},
-		{Name: oidIfOutMulticastPkts + ".18", Value: 0, Type: gosnmp.Counter32},
-		{Name: oidIfOutBroadcastPkts + ".1", Value: 0, Type: gosnmp.Counter32},
-		{Name: oidIfOutBroadcastPkts + ".2", Value: 0, Type: gosnmp.Counter32},
-		{Name: oidIfOutBroadcastPkts + ".17", Value: 0, Type: gosnmp.Counter32},
-		{Name: oidIfOutBroadcastPkts + ".18", Value: 0, Type: gosnmp.Counter32},
-		{Name: oidIfHCInOctets + ".1", Value: 0, Type: gosnmp.Counter64},
-		{Name: oidIfHCInOctets + ".2", Value: 76882188712, Type: gosnmp.Counter64},
-		{Name: oidIfHCInOctets + ".17", Value: 0, Type: gosnmp.Counter64},
-		{Name: oidIfHCInOctets + ".18", Value: 0, Type: gosnmp.Counter64},
-		{Name: oidIfHCInUcastPkts + ".1", Value: 0, Type: gosnmp.Counter64},
-		{Name: oidIfHCInUcastPkts + ".2", Value: 71080332, Type: gosnmp.Counter64},
-		{Name: oidIfHCInUcastPkts + ".17", Value: 0, Type: gosnmp.Counter64},
-		{Name: oidIfHCInUcastPkts + ".18", Value: 0, Type: gosnmp.Counter64},
-		{Name: oidIfHCInMulticastPkts + ".1", Value: 0, Type: gosnmp.Counter64},
-		{Name: oidIfHCInMulticastPkts + ".2", Value: 1891, Type: gosnmp.Counter64},
-		{Name: oidIfHCInMulticastPkts + ".17", Value: 0, Type: gosnmp.Counter64},
-		{Name: oidIfHCInMulticastPkts + ".18", Value: 0, Type: gosnmp.Counter64},
-		{Name: oidIfHCInBroadcastPkts + ".1", Value: 0, Type: gosnmp.Counter64},
-		{Name: oidIfHCInBroadcastPkts + ".2", Value: 0, Type: gosnmp.Counter64},
-		{Name: oidIfHCInBroadcastPkts + ".17", Value: 0, Type: gosnmp.Counter64},
-		{Name: oidIfHCInBroadcastPkts + ".18", Value: 0, Type: gosnmp.Counter64},
-		{Name: oidIfHCOutOctets + ".1", Value: 0, Type: gosnmp.Counter64},
-		{Name: oidIfHCOutOctets + ".2", Value: 19959650810, Type: gosnmp.Counter64},
-		{Name: oidIfHCOutOctets + ".17", Value: 0, Type: gosnmp.Counter64},
-		{Name: oidIfHCOutOctets + ".18", Value: 0, Type: gosnmp.Counter64},
-		{Name: oidIfHCOutUcastPkts + ".1", Value: 0, Type: gosnmp.Counter64},
-		{Name: oidIfHCOutUcastPkts + ".2", Value: 39509661, Type: gosnmp.Counter64},
-		{Name: oidIfHCOutUcastPkts + ".17", Value: 0, Type: gosnmp.Counter64},
-		{Name: oidIfHCOutUcastPkts + ".18", Value: 0, Type: gosnmp.Counter64},
-		{Name: oidIfHCOutMulticastPkts + ".1", Value: 0, Type: gosnmp.Counter64},
-		{Name: oidIfHCOutMulticastPkts + ".2", Value: 28844, Type: gosnmp.Counter64},
-		{Name: oidIfHCOutMulticastPkts + ".17", Value: 0, Type: gosnmp.Counter64},
-		{Name: oidIfHCOutMulticastPkts + ".18", Value: 0, Type: gosnmp.Counter64},
-		{Name: oidIfHCOutBroadcastPkts + ".1", Value: 0, Type: gosnmp.Counter64},
-		{Name: oidIfHCOutBroadcastPkts + ".2", Value: 7386, Type: gosnmp.Counter64},
-		{Name: oidIfHCOutBroadcastPkts + ".17", Value: 0, Type: gosnmp.Counter64},
-		{Name: oidIfHCOutBroadcastPkts + ".18", Value: 0, Type: gosnmp.Counter64},
-		{Name: oidIfHighSpeed + ".1", Value: 0, Type: gosnmp.Gauge32},
-		{Name: oidIfHighSpeed + ".2", Value: 1000, Type: gosnmp.Gauge32},
-		{Name: oidIfHighSpeed + ".17", Value: 0, Type: gosnmp.Gauge32},
-		{Name: oidIfHighSpeed + ".18", Value: 0, Type: gosnmp.Gauge32},
-		{Name: oidIfAlias + ".1", Value: []uint8(""), Type: gosnmp.OctetString},
-		{Name: oidIfAlias + ".2", Value: []uint8("UPLINK2 (2.1)"), Type: gosnmp.OctetString},
-		{Name: oidIfAlias + ".17", Value: []uint8(""), Type: gosnmp.OctetString},
-		{Name: oidIfAlias + ".18", Value: []uint8(""), Type: gosnmp.OctetString},
-	}, nil).MinTimes(1)
-}
-
-func decodePhysAddr(s string) []uint8 {
-	s = strings.ReplaceAll(s, ":", "")
-	v, _ := hex.DecodeString(s)
-	return v
 }

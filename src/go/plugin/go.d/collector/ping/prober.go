@@ -7,62 +7,66 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 
 	probing "github.com/prometheus-community/pro-bing"
 )
 
-type prober interface {
-	ping(host string) (*probing.Statistics, error)
+type Prober interface {
+	Ping(host string) (*probing.Statistics, error)
 }
 
-func newPingProber(conf pingProberConfig, log *logger.Logger) prober {
+func NewProber(conf ProberConfig, log *logger.Logger) Prober {
 	return &pingProber{
-		network:       conf.network,
-		interfaceName: conf.ifaceName,
-		privileged:    conf.privileged,
-		packets:       conf.packets,
-		interval:      conf.interval,
-		deadline:      conf.deadline,
-		Logger:        log,
+		conf:   conf,
+		Logger: log,
 	}
 }
 
-type pingProberConfig struct {
-	network    string
-	ifaceName  string
-	privileged bool
-	packets    int
-	interval   time.Duration
-	deadline   time.Duration
+type ProberConfig struct {
+	Network    string           `yaml:"network,omitempty" json:"network"`
+	Interface  string           `yaml:"interface,omitempty" json:"interface"`
+	Privileged bool             `yaml:"privileged" json:"privileged"`
+	Packets    int              `yaml:"packets,omitempty" json:"packets"`
+	Interval   confopt.Duration `yaml:"interval,omitempty" json:"interval"`
+	Timeout    time.Duration    `yaml:"-,omitempty" json:",omitempty"`
 }
 
 type pingProber struct {
 	*logger.Logger
 
-	network       string
-	interfaceName string
-	privileged    bool
-	packets       int
-	interval      time.Duration
-	deadline      time.Duration
+	conf ProberConfig
 }
 
-func (p *pingProber) ping(host string) (*probing.Statistics, error) {
+func (p *pingProber) Ping(host string) (*probing.Statistics, error) {
 	pr := probing.New(host)
 
-	pr.SetNetwork(p.network)
+	pr.SetNetwork(p.conf.Network)
 
 	if err := pr.Resolve(); err != nil {
 		return nil, fmt.Errorf("DNS lookup '%s' : %v", host, err)
 	}
 
-	pr.RecordRtts = false
-	pr.Interval = p.interval
-	pr.Count = p.packets
-	pr.Timeout = p.deadline
-	pr.InterfaceName = p.interfaceName
-	pr.SetPrivileged(p.privileged)
 	pr.SetLogger(nil)
+	pr.RecordRtts = false
+	pr.RecordTTLs = false
+
+	pr.InterfaceName = p.conf.Interface
+	pr.SetPrivileged(p.conf.Privileged)
+
+	pr.Interval = time.Millisecond * 100
+	pr.Count = 3
+	pr.Timeout = time.Second * 5
+
+	if p.conf.Interval.Duration().Milliseconds() > 0 {
+		pr.Interval = p.conf.Interval.Duration()
+	}
+	if p.conf.Packets > 0 {
+		pr.Count = p.conf.Packets
+	}
+	if p.conf.Timeout.Milliseconds() > 0 {
+		pr.Timeout = p.conf.Timeout
+	}
 
 	if err := pr.Run(); err != nil {
 		return nil, fmt.Errorf("pinging host '%s' (ip '%s' iface '%s'): %v",

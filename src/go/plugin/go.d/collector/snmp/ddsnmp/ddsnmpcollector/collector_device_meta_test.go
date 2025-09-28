@@ -8,9 +8,8 @@ import (
 
 	"github.com/golang/mock/gomock"
 	"github.com/gosnmp/gosnmp"
-	"github.com/stretchr/testify/assert"
-
 	snmpmock "github.com/gosnmp/gosnmp/mocks"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
@@ -41,7 +40,7 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 				Definition: &ddprofiledefinition.ProfileDefinition{
 					Metadata: ddprofiledefinition.MetadataConfig{
 						"device": ddprofiledefinition.MetadataResourceConfig{
-							Fields: ddprofiledefinition.ListMap[ddprofiledefinition.MetadataField]{
+							Fields: map[string]ddprofiledefinition.MetadataField{
 								"vendor": {Value: "dell"},
 								"type":   {Value: "router"},
 								"model":  {Value: "PowerEdge R740"},
@@ -63,7 +62,7 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 				Definition: &ddprofiledefinition.ProfileDefinition{
 					Metadata: ddprofiledefinition.MetadataConfig{
 						"device": ddprofiledefinition.MetadataResourceConfig{
-							Fields: ddprofiledefinition.ListMap[ddprofiledefinition.MetadataField]{
+							Fields: map[string]ddprofiledefinition.MetadataField{
 								"vendor": {Value: "dell"},
 								"serial_number": {
 									Symbol: ddprofiledefinition.SymbolConfig{
@@ -108,7 +107,7 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 				Definition: &ddprofiledefinition.ProfileDefinition{
 					Metadata: ddprofiledefinition.MetadataConfig{
 						"device": ddprofiledefinition.MetadataResourceConfig{
-							Fields: ddprofiledefinition.ListMap[ddprofiledefinition.MetadataField]{
+							Fields: map[string]ddprofiledefinition.MetadataField{
 								"serial_number": {
 									Symbols: []ddprofiledefinition.SymbolConfig{
 										{OID: "1.3.6.1.4.1.674.10892.5.1.3.2.0", Name: "chassisSerialNumber"},
@@ -144,7 +143,7 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 				Definition: &ddprofiledefinition.ProfileDefinition{
 					Metadata: ddprofiledefinition.MetadataConfig{
 						"device": ddprofiledefinition.MetadataResourceConfig{
-							Fields: ddprofiledefinition.ListMap[ddprofiledefinition.MetadataField]{
+							Fields: map[string]ddprofiledefinition.MetadataField{
 								"version": {
 									Symbol: ddprofiledefinition.SymbolConfig{
 										OID:                  "1.3.6.1.2.1.1.1.0",
@@ -178,7 +177,7 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 				Definition: &ddprofiledefinition.ProfileDefinition{
 					Metadata: ddprofiledefinition.MetadataConfig{
 						"device": ddprofiledefinition.MetadataResourceConfig{
-							Fields: ddprofiledefinition.ListMap[ddprofiledefinition.MetadataField]{
+							Fields: map[string]ddprofiledefinition.MetadataField{
 								"temperature": {
 									Symbol: ddprofiledefinition.SymbolConfig{
 										OID:                  "1.3.6.1.4.1.674.10892.5.4.200.10.1.2.1.3.1",
@@ -211,7 +210,7 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 				Definition: &ddprofiledefinition.ProfileDefinition{
 					Metadata: ddprofiledefinition.MetadataConfig{
 						"device": ddprofiledefinition.MetadataResourceConfig{
-							Fields: ddprofiledefinition.ListMap[ddprofiledefinition.MetadataField]{
+							Fields: map[string]ddprofiledefinition.MetadataField{
 								"status": {
 									Symbol: ddprofiledefinition.SymbolConfig{
 										OID:  "1.3.6.1.4.1.674.10892.5.2.1.0",
@@ -251,7 +250,7 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 				Definition: &ddprofiledefinition.ProfileDefinition{
 					Metadata: ddprofiledefinition.MetadataConfig{
 						"device": ddprofiledefinition.MetadataResourceConfig{
-							Fields: ddprofiledefinition.ListMap[ddprofiledefinition.MetadataField]{
+							Fields: map[string]ddprofiledefinition.MetadataField{
 								"mac_address": {
 									Symbol: ddprofiledefinition.SymbolConfig{
 										OID:    "1.3.6.1.2.1.2.2.1.6.1",
@@ -284,12 +283,12 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 				Definition: &ddprofiledefinition.ProfileDefinition{
 					Metadata: ddprofiledefinition.MetadataConfig{
 						"interface": ddprofiledefinition.MetadataResourceConfig{
-							Fields: ddprofiledefinition.ListMap[ddprofiledefinition.MetadataField]{
+							Fields: map[string]ddprofiledefinition.MetadataField{
 								"name": {Value: "eth0"},
 							},
 						},
 						"device": ddprofiledefinition.MetadataResourceConfig{
-							Fields: ddprofiledefinition.ListMap[ddprofiledefinition.MetadataField]{
+							Fields: map[string]ddprofiledefinition.MetadataField{
 								"vendor": {Value: "cisco"},
 							},
 						},
@@ -307,7 +306,7 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 				Definition: &ddprofiledefinition.ProfileDefinition{
 					Metadata: ddprofiledefinition.MetadataConfig{
 						"device": ddprofiledefinition.MetadataResourceConfig{
-							Fields: ddprofiledefinition.ListMap[ddprofiledefinition.MetadataField]{
+							Fields: map[string]ddprofiledefinition.MetadataField{
 								"serial_number": {
 									Symbol: ddprofiledefinition.SymbolConfig{
 										OID:  "1.3.6.1.4.1.674.10892.5.1.3.2.0",
@@ -332,7 +331,7 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 				Definition: &ddprofiledefinition.ProfileDefinition{
 					Metadata: ddprofiledefinition.MetadataConfig{
 						"device": ddprofiledefinition.MetadataResourceConfig{
-							Fields: ddprofiledefinition.ListMap[ddprofiledefinition.MetadataField]{
+							Fields: map[string]ddprofiledefinition.MetadataField{
 								"vendor": {Value: "dell"},
 								"serial_number": {
 									Symbol: ddprofiledefinition.SymbolConfig{
@@ -376,7 +375,7 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 				Definition: &ddprofiledefinition.ProfileDefinition{
 					Metadata: ddprofiledefinition.MetadataConfig{
 						"device": ddprofiledefinition.MetadataResourceConfig{
-							Fields: ddprofiledefinition.ListMap[ddprofiledefinition.MetadataField]{
+							Fields: map[string]ddprofiledefinition.MetadataField{
 								"field1": {Symbol: ddprofiledefinition.SymbolConfig{OID: "1.3.6.1.2.1.1.1.0", Name: "oid1"}},
 								"field2": {Symbol: ddprofiledefinition.SymbolConfig{OID: "1.3.6.1.2.1.1.2.0", Name: "oid2"}},
 								"field3": {Symbol: ddprofiledefinition.SymbolConfig{OID: "1.3.6.1.2.1.1.3.0", Name: "oid3"}},
@@ -415,7 +414,7 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 				Definition: &ddprofiledefinition.ProfileDefinition{
 					Metadata: ddprofiledefinition.MetadataConfig{
 						"device": {
-							Fields: ddprofiledefinition.ListMap[ddprofiledefinition.MetadataField]{
+							Fields: map[string]ddprofiledefinition.MetadataField{
 								"vendor": {Value: "Cisco"},
 								"type":   {Value: "Firewall"},
 							},
@@ -424,14 +423,14 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 					SysobjectIDMetadata: []ddprofiledefinition.SysobjectIDMetadataEntryConfig{
 						{
 							SysobjectID: "1.3.6.1.4.1.9.1.669",
-							Metadata: ddprofiledefinition.ListMap[ddprofiledefinition.MetadataField]{
+							Metadata: map[string]ddprofiledefinition.MetadataField{
 								"model":  {Value: "ASA5510"},
 								"series": {Value: "ASA5500"},
 							},
 						},
 						{
 							SysobjectID: "1.3.6.1.4.1.9.1.670",
-							Metadata: ddprofiledefinition.ListMap[ddprofiledefinition.MetadataField]{
+							Metadata: map[string]ddprofiledefinition.MetadataField{
 								"model": {Value: "ASA5520"},
 							},
 						},
@@ -453,7 +452,7 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 				Definition: &ddprofiledefinition.ProfileDefinition{
 					Metadata: ddprofiledefinition.MetadataConfig{
 						"device": {
-							Fields: ddprofiledefinition.ListMap[ddprofiledefinition.MetadataField]{
+							Fields: map[string]ddprofiledefinition.MetadataField{
 								"vendor":   {Value: "Cisco"},
 								"platform": {Value: "Default Platform"},
 							},
@@ -462,14 +461,14 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 					SysobjectIDMetadata: []ddprofiledefinition.SysobjectIDMetadataEntryConfig{
 						{
 							SysobjectID: "1.3.6.1.4.1.9.*",
-							Metadata: ddprofiledefinition.ListMap[ddprofiledefinition.MetadataField]{
+							Metadata: map[string]ddprofiledefinition.MetadataField{
 								"platform": {Value: "Enterprise"},
 								"support":  {Value: "Premium"},
 							},
 						},
 						{
 							SysobjectID: "1.3.6.1.4.1.9.1.*",
-							Metadata: ddprofiledefinition.ListMap[ddprofiledefinition.MetadataField]{
+							Metadata: map[string]ddprofiledefinition.MetadataField{
 								"type":    {Value: "Firewall"},
 								"series":  {Value: "ASA"},
 								"support": {Value: "Standard"},
@@ -477,7 +476,7 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 						},
 						{
 							SysobjectID: "1.3.6.1.4.1.9.1.669",
-							Metadata: ddprofiledefinition.ListMap[ddprofiledefinition.MetadataField]{
+							Metadata: map[string]ddprofiledefinition.MetadataField{
 								"model":  {Value: "ASA5510"},
 								"series": {Value: "ASA5500"},
 							},
@@ -501,12 +500,12 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 			profile: &ddsnmp.Profile{
 				Definition: &ddprofiledefinition.ProfileDefinition{
 					Metadata: ddprofiledefinition.MetadataConfig{
-						"device": {Fields: ddprofiledefinition.ListMap[ddprofiledefinition.MetadataField]{"vendor": {Value: "Cisco"}}},
+						"device": {Fields: map[string]ddprofiledefinition.MetadataField{"vendor": {Value: "Cisco"}}},
 					},
 					SysobjectIDMetadata: []ddprofiledefinition.SysobjectIDMetadataEntryConfig{
 						{
 							SysobjectID: "1.3.6.1.4.1.9.1.669",
-							Metadata: ddprofiledefinition.ListMap[ddprofiledefinition.MetadataField]{
+							Metadata: map[string]ddprofiledefinition.MetadataField{
 								"model": {Value: "ASA5510"},
 								"firmware": {Symbol: ddprofiledefinition.SymbolConfig{
 									OID:  "1.3.6.1.4.1.9.9.109.1.1.1.1.3.1",
@@ -538,7 +537,7 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 				Definition: &ddprofiledefinition.ProfileDefinition{
 					Metadata: ddprofiledefinition.MetadataConfig{
 						"device": {
-							Fields: ddprofiledefinition.ListMap[ddprofiledefinition.MetadataField]{
+							Fields: map[string]ddprofiledefinition.MetadataField{
 								"vendor": {Value: "Cisco"},
 								"type":   {Value: "Firewall"},
 							},
@@ -547,7 +546,7 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 					SysobjectIDMetadata: []ddprofiledefinition.SysobjectIDMetadataEntryConfig{
 						{
 							SysobjectID: "1.3.6.1.4.1.9.1.669",
-							Metadata:    ddprofiledefinition.ListMap[ddprofiledefinition.MetadataField]{"model": {Value: "ASA5510"}},
+							Metadata:    map[string]ddprofiledefinition.MetadataField{"model": {Value: "ASA5510"}},
 						},
 					},
 				},
@@ -564,16 +563,16 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 			profile: &ddsnmp.Profile{
 				Definition: &ddprofiledefinition.ProfileDefinition{
 					Metadata: ddprofiledefinition.MetadataConfig{
-						"device": {Fields: ddprofiledefinition.ListMap[ddprofiledefinition.MetadataField]{"vendor": {Value: "Cisco"}}},
+						"device": {Fields: map[string]ddprofiledefinition.MetadataField{"vendor": {Value: "Cisco"}}},
 					},
 					SysobjectIDMetadata: []ddprofiledefinition.SysobjectIDMetadataEntryConfig{
 						{
 							SysobjectID: "1.3.6.1.4.1.9.1.[invalid",
-							Metadata:    ddprofiledefinition.ListMap[ddprofiledefinition.MetadataField]{"model": {Value: "ASA5510"}},
+							Metadata:    map[string]ddprofiledefinition.MetadataField{"model": {Value: "ASA5510"}},
 						},
 						{
 							SysobjectID: "1.3.6.1.4.1.9.1.669",
-							Metadata:    ddprofiledefinition.ListMap[ddprofiledefinition.MetadataField]{"series": {Value: "ASA5500"}},
+							Metadata:    map[string]ddprofiledefinition.MetadataField{"series": {Value: "ASA5500"}},
 						},
 					},
 				},
@@ -591,7 +590,7 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 				Definition: &ddprofiledefinition.ProfileDefinition{
 					Metadata: ddprofiledefinition.MetadataConfig{
 						"device": {
-							Fields: ddprofiledefinition.ListMap[ddprofiledefinition.MetadataField]{
+							Fields: map[string]ddprofiledefinition.MetadataField{
 								"vendor": {Value: "Generic"},
 								"type":   {Value: "Unknown"},
 								"model":  {Value: "Generic Model"},
@@ -601,7 +600,7 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 					SysobjectIDMetadata: []ddprofiledefinition.SysobjectIDMetadataEntryConfig{
 						{
 							SysobjectID: "1.3.6.1.4.1.9.1.669",
-							Metadata: ddprofiledefinition.ListMap[ddprofiledefinition.MetadataField]{
+							Metadata: map[string]ddprofiledefinition.MetadataField{
 								"vendor": {Value: "Cisco Systems"},
 								"model":  {Value: "ASA5510"},
 							},
@@ -622,12 +621,12 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 			profile: &ddsnmp.Profile{
 				Definition: &ddprofiledefinition.ProfileDefinition{
 					Metadata: ddprofiledefinition.MetadataConfig{
-						"device": {Fields: ddprofiledefinition.ListMap[ddprofiledefinition.MetadataField]{"vendor": {Value: "Cisco"}}},
+						"device": {Fields: map[string]ddprofiledefinition.MetadataField{"vendor": {Value: "Cisco"}}},
 					},
 					SysobjectIDMetadata: []ddprofiledefinition.SysobjectIDMetadataEntryConfig{
 						{
 							SysobjectID: "1.3.6.1.4.1.9.1.669",
-							Metadata: ddprofiledefinition.ListMap[ddprofiledefinition.MetadataField]{
+							Metadata: map[string]ddprofiledefinition.MetadataField{
 								"model": {Value: "ASA5510"},
 								"firmware": {Symbol: ddprofiledefinition.SymbolConfig{
 									OID:  "1.3.6.1.4.1.9.9.109.1.1.1.1.3.1",
@@ -654,7 +653,7 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 				Definition: &ddprofiledefinition.ProfileDefinition{
 					Metadata: ddprofiledefinition.MetadataConfig{
 						"device": {
-							Fields: ddprofiledefinition.ListMap[ddprofiledefinition.MetadataField]{
+							Fields: map[string]ddprofiledefinition.MetadataField{
 								"vendor": {Value: "Cisco"},
 								"os_name": {
 									Symbols: []ddprofiledefinition.SymbolConfig{
@@ -690,7 +689,7 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 				Definition: &ddprofiledefinition.ProfileDefinition{
 					Metadata: ddprofiledefinition.MetadataConfig{
 						"device": {
-							Fields: ddprofiledefinition.ListMap[ddprofiledefinition.MetadataField]{
+							Fields: map[string]ddprofiledefinition.MetadataField{
 								"vendor": {Value: "Juniper"},
 								"os_name": {
 									Symbols: []ddprofiledefinition.SymbolConfig{
@@ -723,7 +722,7 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 				Definition: &ddprofiledefinition.ProfileDefinition{
 					Metadata: ddprofiledefinition.MetadataConfig{
 						"device": {
-							Fields: ddprofiledefinition.ListMap[ddprofiledefinition.MetadataField]{
+							Fields: map[string]ddprofiledefinition.MetadataField{
 								"vendor": {Value: "Generic"},
 								"os_name": {
 									Symbol: ddprofiledefinition.SymbolConfig{
@@ -758,7 +757,7 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 				Definition: &ddprofiledefinition.ProfileDefinition{
 					Metadata: ddprofiledefinition.MetadataConfig{
 						"device": {
-							Fields: ddprofiledefinition.ListMap[ddprofiledefinition.MetadataField]{
+							Fields: map[string]ddprofiledefinition.MetadataField{
 								"vendor": {Value: "Cisco"},
 								"version": {Symbol: ddprofiledefinition.SymbolConfig{
 									OID:                  "1.3.6.1.2.1.1.1.0",
@@ -802,10 +801,16 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 		"base metadata exact via sysObjectIDs": {
 			profile: &ddsnmp.Profile{
 				Definition: &ddprofiledefinition.ProfileDefinition{
-					SysObjectIDs: []string{"1.3.6.1.4.1.9.1.669"},
+					Selector: ddprofiledefinition.SelectorSpec{
+						{
+							SysObjectID: ddprofiledefinition.SelectorIncludeExclude{
+								Include: []string{"1.3.6.1.4.1.9.1.669"},
+							},
+						},
+					},
 					Metadata: ddprofiledefinition.MetadataConfig{
 						"device": {
-							Fields: ddprofiledefinition.ListMap[ddprofiledefinition.MetadataField]{
+							Fields: map[string]ddprofiledefinition.MetadataField{
 								"vendor": {Value: "Cisco"},
 								"type":   {Value: "Firewall"},
 								"model":  {Value: "Generic"},
@@ -826,10 +831,16 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 		"sysObjectIDs exact + sysobjectid wildcard → base wins overlap": {
 			profile: &ddsnmp.Profile{
 				Definition: &ddprofiledefinition.ProfileDefinition{
-					SysObjectIDs: []string{"1.3.6.1.4.1.9.1.669"},
+					Selector: ddprofiledefinition.SelectorSpec{
+						{
+							SysObjectID: ddprofiledefinition.SelectorIncludeExclude{
+								Include: []string{"1.3.6.1.4.1.9.1.669"},
+							},
+						},
+					},
 					Metadata: ddprofiledefinition.MetadataConfig{
 						"device": {
-							Fields: ddprofiledefinition.ListMap[ddprofiledefinition.MetadataField]{
+							Fields: map[string]ddprofiledefinition.MetadataField{
 								"platform": {Value: "Enterprise-Exact"},
 								"series":   {Value: "ASA-Exact"},
 							},
@@ -838,7 +849,7 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 					SysobjectIDMetadata: []ddprofiledefinition.SysobjectIDMetadataEntryConfig{
 						{
 							SysobjectID: "1.3.6.1.4.1.9.1.*", // wildcard match (not exact)
-							Metadata: ddprofiledefinition.ListMap[ddprofiledefinition.MetadataField]{
+							Metadata: map[string]ddprofiledefinition.MetadataField{
 								"platform": {Value: "Enterprise-Wildcard"},
 								"series":   {Value: "ASA-Wildcard"},
 								"model":    {Value: "ASA5510-Wildcard"},
@@ -863,7 +874,7 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 				Definition: &ddprofiledefinition.ProfileDefinition{
 					Metadata: ddprofiledefinition.MetadataConfig{
 						"device": {
-							Fields: ddprofiledefinition.ListMap[ddprofiledefinition.MetadataField]{
+							Fields: map[string]ddprofiledefinition.MetadataField{
 								"platform": {Value: "Enterprise-Base"},
 								"series":   {Value: "ASA-Base"},
 							},
@@ -872,7 +883,7 @@ func TestDeviceMetadataCollector_Collect(t *testing.T) {
 					SysobjectIDMetadata: []ddprofiledefinition.SysobjectIDMetadataEntryConfig{
 						{
 							SysobjectID: "1.3.6.1.4.1.9.1.*", // wildcard
-							Metadata: ddprofiledefinition.ListMap[ddprofiledefinition.MetadataField]{
+							Metadata: map[string]ddprofiledefinition.MetadataField{
 								"platform": {Value: "Enterprise-Wildcard"},
 								"series":   {Value: "ASA-Wildcard"},
 								"model":    {Value: "ASA5510"},

@@ -312,9 +312,26 @@ func (j *Job) Cleanup() {
 		return
 	}
 
-	if !j.vnodeCreated && j.vnode.GUID != "" {
-		j.sendVnodeHostInfo()
-		j.vnodeCreated = true
+	// Netdata automatically obsoletes vnode charts when no updates are sent.
+	// For virtual nodes with a stale label, we must not send anything:
+	//   - Sending a HOST line would incorrectly mark the vnode as active.
+	isVnodeWithStaleConfig := j.vnode.Labels["_node_stale_after_seconds"] != ""
+
+	if !isVnodeWithStaleConfig {
+		if !j.vnodeCreated && j.vnode.GUID != "" {
+			j.sendVnodeHostInfo()
+			j.vnodeCreated = true
+		}
+		j.api.HOST(j.vnode.GUID)
+
+		if j.charts != nil {
+			for _, chart := range *j.charts {
+				if chart.created {
+					chart.MarkRemove()
+					j.createChart(chart)
+				}
+			}
+		}
 	}
 
 	j.api.HOST("")
@@ -326,17 +343,6 @@ func (j *Job) Cleanup() {
 	if j.collectDurationChart.created {
 		j.collectDurationChart.MarkRemove()
 		j.createChart(j.collectDurationChart)
-	}
-
-	j.api.HOST(j.vnode.GUID)
-
-	if j.charts != nil {
-		for _, chart := range *j.charts {
-			if chart.created {
-				chart.MarkRemove()
-				j.createChart(chart)
-			}
-		}
 	}
 
 	if j.buf.Len() > 0 {
@@ -439,11 +445,12 @@ func (j *Job) processMetrics(metrics map[string]int64, startTime time.Time, sinc
 		}
 	}
 
+	bufLenBeforeHost := j.buf.Len()
 	j.api.HOST(j.vnode.GUID)
 
 	elapsed := int64(durationTo(time.Since(startTime), time.Millisecond))
 
-	var i, updated int
+	var i, updated, created int
 	for _, chart := range *j.charts {
 		if !chart.created || createChart {
 			typeID := fmt.Sprintf("%s.%s", j.FullName(), chart.ID)
@@ -453,6 +460,7 @@ func (j *Job) processMetrics(metrics map[string]int64, startTime time.Time, sinc
 				chart.ignore = true
 			}
 			j.createChart(chart)
+			created++
 		}
 		if chart.remove {
 			continue
@@ -467,6 +475,10 @@ func (j *Job) processMetrics(metrics map[string]int64, startTime time.Time, sinc
 		}
 	}
 	*j.charts = (*j.charts)[:i]
+
+	if updated == 0 && created == 0 && j.vnode.GUID != "" {
+		j.buf.Truncate(bufLenBeforeHost)
+	}
 
 	j.api.HOST("")
 

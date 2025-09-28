@@ -4,8 +4,6 @@ With **Netdata Cloud**, you can build **custom dashboards** that target your inf
 
 Click the **Dashboards** tab in any Room to get started.
 
----
-
 ## Create Your First Dashboard
 
 To create a new dashboard:
@@ -48,20 +46,30 @@ Always click the **Save** button after making changes to your dashboard.
 
 :::
 
----
-
 ## Dashboard Layout Overview
 
 ```mermaid
-graph TD
-    A[Dashboard Grid]
-    A --> B[Chart Element]
-    A --> C[Text Card]
-    B --> D[Move / Resize]
+flowchart TD
+    A("Dashboard Grid")
+    A --> B("Chart Element")
+    A --> C("Text Card")
+    B --> D("Move / Resize")
     C --> D
-    D --> E[Save Changes]
-    B --> F[Delete Option]
+    D --> E("Save Changes")
+    B --> F("Delete Option")
     C --> F
+
+    %% Style definitions
+    classDef alert fill:#ffeb3b,stroke:#000000,stroke-width:3px,color:#000000,font-size:14px
+    classDef neutral fill:#f9f9f9,stroke:#000000,stroke-width:3px,color:#000000,font-size:14px
+    classDef complete fill:#4caf50,stroke:#000000,stroke-width:3px,color:#000000,font-size:14px
+    classDef database fill:#2196F3,stroke:#000000,stroke-width:3px,color:#000000,font-size:14px
+
+    %% Apply styles
+    class A alert
+    class B,C neutral
+    class D,F complete
+    class E database
 ```
 
 :::tip
@@ -75,8 +83,6 @@ The diagram above shows how charts and text cards interact within the dashboard 
 Keep related charts close together to improve visual correlation between metrics.
 
 :::
-
----
 
 ## Using Your Dashboard
 
@@ -93,8 +99,6 @@ Charts on custom dashboards are [fully interactive](/docs/dashboards-and-charts/
 
 Text cards allow you to explain the arrangement or intent behind the dashboard. Share insights with your team directly on the dashboard.
 
----
-
 ## Organizing Dashboard Elements
 
 ### Move Elements
@@ -110,8 +114,6 @@ Elements automatically align to the grid system after moving or resizing.
 
 :::
 
----
-
 ## Chart Management Actions
 
 | Action                     | How to Perform                                                                                                                                                                                              |
@@ -119,8 +121,6 @@ Elements automatically align to the grid system after moving or resizing.
 | **Go to chart**            | Use the 3-dot icon on any chart → click **Go-to-Chart**. Navigate directly to the chart in the [Metrics tab](/docs/dashboards-and-charts/metrics-tab-and-single-node-tabs.md) or the single-node dashboard. |
 | **Rename a chart**         | Use the 3-dot icon on any chart → click **Rename**.                                                                                                                                                         |
 | **Remove a chart or card** | Use the 3-dot icon on the element → click **Remove**.                                                                                                                                                       |
-
----
 
 ## Managing Your Dashboard
 
@@ -136,13 +136,9 @@ If multiple users edit the same dashboard at once, the second user who clicks **
 
 :::
 
----
-
 ## Minimum Browser Viewport Requirement
 
 Due to the visual complexity of individual charts, dashboards require a **minimum browser viewport width of 800px**.
-
----
 
 ## Next Steps
 

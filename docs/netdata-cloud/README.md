@@ -18,46 +18,22 @@ By serving as a lightweight control plane, Netdata Cloud provides you with:
 
 ```mermaid
 flowchart TB
-   NC[NC]
-   Users[Users]
-   Notifications[Notifications]
+   NC("**Netdata Cloud**<br/>Horizontal scalability<br/>Role based access<br/>Access from anywhere<br/>Central dispatch of<br/>Alert notifications<br/>Custom Dashboards<br/>Advanced customization")
 
-   NC("**Netdata Cloud**
-• Horizontal scalability
-• Role based access
-• Access from anywhere
-• Central dispatch of<br/>Alert notifications
-• Custom Dashboards
-• Advanced customization")
+Users("**Unified Dashboards**<br/>across the infrastructure,<br/>multi-cloud, hybrid-cloud")
 
-Users("**Unified Dashboards**
-across the infrastructure,
-multi-cloud, hybrid-cloud")
-
-Notifications("**Alert Notifications**
-Slack, e-mail, Mobile App,
-PagerDuty, and more")
+Notifications("**Alert Notifications**<br/>Slack, e-mail,<br/> Mobile App,<br/>PagerDuty, and more")
 
 Users <--> NC
 NC --> Notifications
 
 subgraph infrastructure["On-Prem Infrastructure"]
 direction TB
-Agents[Agents]
-TimeSeries[TimeSeries]
-PrivateAgents[PrivateAgents]
+Agents("**Netdata Agents**<br/>Standalone,<br/>Children, Parents<br/>(possibly overlapping)")
 
-Agents("**Netdata Agents**
-Standalone,
-Children, Parents
-(possibly overlapping)")
+TimeSeries("Time-Series<br/>metric samples<br/>database")
 
-TimeSeries("Time-Series
-metric samples
-database")
-
-PrivateAgents("Private
-Netdata Agents")
+PrivateAgents("Private<br/>Netdata Agents")
 
 Agents <--> TimeSeries
 Agents --- PrivateAgents
@@ -65,21 +41,17 @@ end
 
 NC <--> Agents
 
-classDef cloud fill: #e8f4fd, stroke: #4a90e2, stroke-width: 2px, color: #2c3e50, rx: 10, ry: 10
-classDef users fill: #fff2e8, stroke: #f39c12, stroke-width: 2px, color: #2c3e50, rx: 10, ry: 10
-classDef notifications fill: #ffe8e8, stroke: #e74c3c, stroke-width: 2px, color: #2c3e50, rx: 10, ry: 10
-classDef agents fill: #e8f5e8, stroke: #27ae60, stroke-width: 2px, color: #2c3e50, rx: 10, ry: 10
-classDef timeseries fill: #f3e8ff, stroke: #9b59b6, stroke-width: 2px, color: #2c3e50, rx: 10, ry: 10
-classDef private fill: #f0f8ff, stroke: #87ceeb, stroke-width: 2px, color: #2c3e50, rx: 10, ry: 10
-classDef subgraphStyle fill: #f8f9fa, stroke: #6c757d, stroke-width: 2px, color: #2c3e50, rx: 15, ry: 15
+%% Style definitions
+classDef alert fill:#ffeb3b,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+classDef neutral fill:#f9f9f9,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+classDef complete fill:#4caf50,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
+classDef database fill:#2196F3,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
 
-class NC cloud
-class Users users
-class Notifications notifications
-class Agents agents
-class TimeSeries timeseries
-class PrivateAgents private
-class infrastructure subgraphStyle
+%% Apply styles
+class Users,Agents alert
+class NC,Notifications neutral
+class TimeSeries,PrivateAgents complete
+class infrastructure database
 ```
 
 </details><br/>

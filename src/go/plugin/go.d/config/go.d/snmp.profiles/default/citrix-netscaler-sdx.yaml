@@ -1,8 +1,10 @@
 extends:
   - citrix.yaml
 
-sysobjectid:
-  - 1.3.6.1.4.1.5951.6
+selector:
+  - sysobjectid:
+      include:
+        - 1.3.6.1.4.1.5951.6
 
 metadata:
   device:

@@ -5,11 +5,11 @@ import TabItem from '@theme/TabItem';
 
 ## Limitations running the Agent in Docker
 
-We don’t officially support using Docker’s `--user` option or Docker Compose’s `user:` parameter with our images. While they may work, some features could be unavailable. The Agent drops privileges at startup, so most processes don’t run as UID 0 even without these options.  
+We don’t officially support using Docker’s `--user` option or Docker Compose’s `user:` parameter with our images. While they may work, some features could be unavailable. The Agent drops privileges at startup, so most processes don’t run as UID 0 even without these options.
 
 ## Create a new Netdata Agent container
 
-You can create a new Agent container with `docker run` or `docker-compose`, then access the dashboard at `http://NODE:19999`.  
+You can create a new Agent container with `docker run` or `docker-compose`, then access the dashboard at `http://NODE:19999`.
 
 The Netdata container requires specific **privileges** and **mounts** to provide full monitoring capabilities equivalent to a direct host installation. Below is a list of required components and their purposes.
 
@@ -127,9 +127,11 @@ volumes:
 </TabItem>
 </Tabs>
 
-> :bookmark_tabs: Note
->
-> If you plan to connect the node to Netdata Cloud, you can find the command with the right parameters by clicking the "Add Nodes" button in your Space's "Nodes" view.
+:::note
+
+If you plan to connect the node to Netdata Cloud, you can find the command with the right parameters by clicking the "Add Nodes" button in your Space's "Nodes" view.
+
+:::
 
 ### With NVIDIA GPUs monitoring
 
@@ -252,7 +254,7 @@ volumes:
 
 ### With SSL/TLS enabled HTTP Proxy
 
-Below is an example of installing Netdata with an **SSL reverse proxy** and **basic authentication** using Docker.  
+Below is an example of installing Netdata with an **SSL reverse proxy** and **basic authentication** using Docker.
 
 #### Caddyfile Setup
 
@@ -326,9 +328,13 @@ to Caddyfile.
 
 ### With Docker socket proxy
 
-> **Note:** Using Netdata with a Docker socket proxy may cause some features to not work as expected. It hasn't been fully tested by the Netdata team.
+:::note
 
-For better security, deploy a **Docker socket proxy** with a tool like [HAProxy](/docs/netdata-agent/configuration/running-the-netdata-agent-behind-a-reverse-proxy/Running-behind-haproxy.md) or [CetusGuard](https://github.com/hectorm/cetusguard). This ensures the socket is **read-only** and restricted to the `/containers` endpoint.  
+Using Netdata with a Docker socket proxy may cause some features to not work as expected. It hasn't been fully tested by the Netdata team.
+
+:::
+
+For better security, deploy a **Docker socket proxy** with a tool like [HAProxy](/docs/netdata-agent/configuration/running-the-netdata-agent-behind-a-reverse-proxy/Running-behind-haproxy.md) or [CetusGuard](https://github.com/hectorm/cetusguard). This ensures the socket is **read-only** and restricted to the `/containers` endpoint.
 
 Exposing the socket to a proxy is safer because Netdata’s TCP port is accessible outside the Docker network, while the proxy container remains isolated within it.
 
@@ -376,11 +382,19 @@ volumes:
   netdatacache:
 ```
 
-**Note:** Replace `2375` with the port of your proxy.
+:::note
+
+Replace `2375` with the port of your proxy.
+
+:::
 
 #### CetusGuard
 
-> Note: This deployment method is supported by the community
+:::note
+
+This deployment method is supported by the community
+
+:::
 
 ```yaml
 version: '3'
@@ -429,14 +443,17 @@ volumes:
   netdatacache:
 ```
 
-You can run the socket proxy in its own Docker Compose file and leave it on a private network that you can add to
-other services that require access.
+:::tip
+
+You can run the socket proxy in its own Docker Compose file and leave it on a private network that you can add to other services that require access.
+
+:::
 
 ### Rootless mode
 
 Netdata can be run successfully in a non-root environment, such as [rootless Docker](https://docs.docker.com/engine/security/rootless/).
 
-Netdata can run in a rootless Docker environment, but its data collection is limited due to restricted access to resources requiring elevated privileges. 
+Netdata can run in a rootless Docker environment, but its data collection is limited due to restricted access to resources requiring elevated privileges.
 The following components won't work:
 
 - container network interfaces monitoring (cgroup-network helper)
@@ -481,9 +498,11 @@ docker run -d --name=netdata \
 
 </Tabs>
 
-> :bookmark_tabs: Note
->
-> If you plan to connect the node to Netdata Cloud, you can find the command with the right parameters by clicking the "Add Nodes" button in your Space's "Nodes" view.
+:::note
+
+If you plan to connect the node to Netdata Cloud, you can find the command with the right parameters by clicking the "Add Nodes" button in your Space's "Nodes" view.
+
+:::
 
 ## Docker tags
 
@@ -539,15 +558,15 @@ services:
     hostname: my_docker_compose_netdata
 ```
 
-If you prefer not to recreate the container, edit the Agent’s `netdata.conf` file. See [configuring Agent containers](#configure-agent-containers) for the right method based on how you created it.  
+If you prefer not to recreate the container, edit the Agent’s `netdata.conf` file. See [configuring Agent containers](#configure-agent-containers) for the right method based on how you created it.
 
-Alternatively, use the **host’s hostname** by mounting `/etc/hostname` in the container:  
+Alternatively, use the **host’s hostname** by mounting `/etc/hostname` in the container:
 
-- **With `docker run`**, add:  
+- **With `docker run`**, add:
   ```sh
   --volume /etc/hostname:/host/etc/hostname:ro
   ```  
-- **With Docker Compose**, add this to the `volumes` section:  
+- **With Docker Compose**, add this to the `volumes` section:
   ```yaml
   - /etc/hostname:/host/etc/hostname:ro
   ```
@@ -556,16 +575,17 @@ Alternatively, use the **host’s hostname** by mounting `/etc/hostname` in the 
 
 By default, Netdata’s official container images exclude some optional runtime dependencies. You can install them at runtime by setting the `NETDATA_EXTRA_DEB_PACKAGES` environment variable.
 
-Commonly useful packages:  
-- `apcupsd` – Monitors APC UPS devices.  
-- `lm-sensors` – Monitors hardware sensors.  
+Commonly useful packages:
+
+- `apcupsd` – Monitors APC UPS devices.
+- `lm-sensors` – Monitors hardware sensors.
 - `netcat-openbsd` – Enables IRC alerts.
 
 ## Health Checks
 
-Netdata’s Docker image supports **health checks** via standard Docker interfaces. You can control them using the `NETDATA_HEALTHCHECK_TARGET` environment variable:  
+Netdata’s Docker image supports **health checks** via standard Docker interfaces. You can control them using the `NETDATA_HEALTHCHECK_TARGET` environment variable:
 
-- **Unset** – Defaults to checking `/api/v1/info`.  
+- **Unset** – Defaults to checking `/api/v1/info`.
 - **`cli`** – Uses `netdatacli ping` to confirm the Agent is running (but not full data collection).
 
 The default `/api/v1/info` check is usually sufficient. However, if the web server is disabled or API access is restricted, you'll need to customize the health check configuration.
@@ -574,4 +594,8 @@ The default `/api/v1/info` check is usually sufficient. However, if the web serv
 
 At Netdata, we provide multiple ways of testing your Docker images using your own repositories.
 
+:::tip
+
 You may either use the command line tools available or take advantage of our GitHub Actions infrastructure.
+
+:::

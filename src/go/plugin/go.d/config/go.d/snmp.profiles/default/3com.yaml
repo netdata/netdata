@@ -8,5 +8,7 @@ metadata:
       vendor:
         value: "3Com-Huawei"
 
-sysobjectid:
-  - 1.3.6.1.4.1.43.1.* # 3Com products
+selector:
+  - sysobjectid:
+      include:
+        - 1.3.6.1.4.1.43.1.* # 3Com products

@@ -1,8 +1,10 @@
 extends:
   - tripplite.yaml
 
-sysobjectid:
-  - 1.3.6.1.4.1.850.1.1.1 # Tripp Lite PDU
+selector:
+  - sysobjectid:
+      include:
+        - 1.3.6.1.4.1.850.1.1.1 # Tripp Lite PDU
 
 metadata:
   device:

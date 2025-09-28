@@ -15,6 +15,8 @@ extends:
 # Products are defined under 1.3.6.1.4.1.2636.1.1.1.2 (jnxProductName).
 # Variations are defined under 1.3.6.1.4.1.2636.1.1.1.4 (jnxProductVariation).
 # Reference: https://mibs.observium.org/mib/JUNIPER-CHASSIS-DEFINES-MIB/
-sysobjectid:
-  - 1.3.6.1.4.1.2636.1.1.1.2.* # Products
-  - 1.3.6.1.4.1.2636.1.1.1.4.* # Variations
+selector:
+  - sysobjectid:
+      include:
+        - 1.3.6.1.4.1.2636.1.1.1.2.* # Products
+        - 1.3.6.1.4.1.2636.1.1.1.4.* # Variations

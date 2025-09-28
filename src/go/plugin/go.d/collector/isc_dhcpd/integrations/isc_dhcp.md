@@ -48,7 +48,6 @@ The default configuration for this integration does not impose any limits on dat
 
 The default configuration for this integration is not expected to impose a significant performance impact on the system.
 
-
 ## Metrics
 
 Metrics grouped by *scope*.
@@ -125,12 +124,12 @@ The following options can be defined globally: update_every, autodetection_retry
 
 
 
-| Option | Description | Default | Required |
-|:-----|:------------|:--------|:---------:|
-| update_every | Data collection frequency. | 1 | no |
-| autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
-| leases_path | Path to DHCP client lease database. | /var/lib/dhcp/dhcpd.leases | no |
-| pools | List of IP pools to monitor. |  | yes |
+| Group | Option | Description | Default | Required |
+|:------|:-----|:------------|:--------|:---------:|
+| **Collection** | update_every | Data collection interval (seconds). | 1 | no |
+|  | autodetection_retry | Autodetection retry interval (seconds). Set 0 to disable. | 0 | no |
+| **Target** | leases_path | Path to DHCP client lease database. | /var/lib/dhcp/dhcpd.leases | no |
+|  | pools | DHCP IP pools to monitor. |  | yes |
 
 ##### pools
 
