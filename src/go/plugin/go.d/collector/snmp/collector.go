@@ -119,7 +119,7 @@ func (c *Collector) Init(context.Context) error {
 		return fmt.Errorf("failed to initialize SNMP client: %v", err)
 	}
 
-	if c.Ping.Enabled {
+	if c.PingOnly || c.Ping.Enabled {
 		pr, err := c.initProber()
 		if err != nil {
 			return fmt.Errorf("failed to initialize ping prober: %v", err)
