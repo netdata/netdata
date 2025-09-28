@@ -103,6 +103,9 @@ AutoReqProv: yes
 %global _have_xenstat 0
 %endif
 
+# Disable IBM plugin by default (requires proprietary libraries)
+%global _have_ibm_plugin 0
+
 # Skip MongoDB exporter on known problem platforms
 %if 0%{?oraclelinux} || 0%{?suse_version} || 0%{?amzn}
 %global _have_mongo_exporter 0
@@ -229,6 +232,9 @@ Requires: %{name}-plugin-nfacct = %{version}
 %endif
 %if %{_have_xenstat}
 Suggests: %{name}-plugin-xenstat = %{version}
+%endif
+%if %{_have_ibm_plugin}
+Suggests: %{name}-plugin-ibm = %{version}
 %endif
 %if %{_have_freeipmi} && 0%{?centos_ver} != 6 && 0%{?centos_ver} != 7 && 0%{?amazon_linux} != 2
 Suggests: %{name}-plugin-freeipmi = %{version}
@@ -412,6 +418,11 @@ advanced correlations and fast root cause analysis, native horizontal scalabilit
 	-DENABLE_PLUGIN_CGROUP_NETWORK=On \
 	-DENABLE_PLUGIN_DEBUGFS=On \
 	-DENABLE_PLUGIN_GO=On \
+	%if %{_have_ibm_plugin}
+	-DENABLE_PLUGIN_IBM=On \
+	%else
+	-DENABLE_PLUGIN_IBM=Off \
+	%endif
 	-DENABLE_PLUGIN_PYTHON=On \
 	-DENABLE_PLUGIN_CHARTS=On \
 	-DENABLE_PLUGIN_LOCAL_LISTENERS=On \
@@ -654,6 +665,14 @@ rm -rf "${RPM_BUILD_ROOT}"
 # xenstat belongs to a different sub-package
 %exclude %{_libexecdir}/%{name}/plugins.d/xenstat.plugin
 
+# IBM plugin belongs to a different sub-package
+%if %{_have_ibm_plugin}
+%exclude %{_libexecdir}/%{name}/plugins.d/ibm.d.plugin
+%exclude %{_libexecdir}/%{name}/install-ibm-libs.sh
+%exclude %{_libdir}/%{name}/conf.d/ibm.d.conf
+%dir %exclude %{_libdir}/%{name}/conf.d/ibm.d
+%endif
+
 # Network viewer belongs to a different sub-package
 %exclude %{_libexecdir}/%{name}/plugins.d/network-viewer.plugin
 
@@ -864,6 +883,48 @@ fi
 %defattr(0644,root,netdata,0755)
 %{_libdir}/%{name}/conf.d/go.d.conf
 %{_libdir}/%{name}/conf.d/go.d
+
+%if %{_have_ibm_plugin}
+%package plugin-ibm
+Summary: The IBM ecosystem metrics collection plugin for the Netdata Agent
+Group: Applications/System
+Requires: %{name} = %{version}
+Requires: unixODBC
+Conflicts: %{name} < %{version}
+
+%description plugin-ibm
+This plugin adds IBM ecosystem collectors (AS/400, DB2, MQ, WebSphere) to the Netdata Agent.
+Database collectors (AS/400, DB2) use unixODBC exclusively and require appropriate ODBC drivers.
+MQ collectors require IBM MQ client libraries to be installed separately.
+
+%pre plugin-ibm
+
+if ! getent group %{name} > /dev/null; then
+  groupadd --system %{name}
+fi
+
+%post plugin-ibm
+# Run the IBM library installation script
+if [ -x %{_libexecdir}/%{name}/install-ibm-libs.sh ]; then
+    %{_libexecdir}/%{name}/install-ibm-libs.sh || {
+        echo "WARNING: Failed to download IBM libraries."
+        echo "The ibm.d.plugin will not work until libraries are installed."
+        echo "You can run the following command manually to install them:"
+        echo "  %{_libexecdir}/%{name}/install-ibm-libs.sh"
+    }
+else
+    echo "WARNING: IBM library installation script not found."
+    echo "The ibm.d.plugin will not work until libraries are installed."
+fi
+
+%files plugin-ibm
+%defattr(0750,root,netdata,0750)
+%{_libexecdir}/%{name}/plugins.d/ibm.d.plugin
+%attr(0755,root,root) %{_libexecdir}/%{name}/install-ibm-libs.sh
+%defattr(0644,root,netdata,0755)
+%{_libdir}/%{name}/conf.d/ibm.d.conf
+%{_libdir}/%{name}/conf.d/ibm.d
+%endif
 
 %package plugin-apps
 Summary: The per-application metrics collection plugin for the Netdata Agent

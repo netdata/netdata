@@ -1,0 +1,35 @@
+#!/bin/sh
+
+set -e
+
+case "$1" in
+  configure|reconfigure)
+    chown root:netdata /usr/libexec/netdata/plugins.d/ibm.d.plugin
+    chmod 0750 /usr/libexec/netdata/plugins.d/ibm.d.plugin
+    
+    # Try to install IBM MQ libraries using the unified script
+    if [ -x /usr/libexec/netdata/install-ibm-libs.sh ]; then
+        if ! /usr/libexec/netdata/install-ibm-libs.sh; then
+            echo "WARNING: Failed to download IBM MQ libraries."
+            echo "The MQ PCF collector will not work until MQ libraries are installed."
+            echo "You can run the following command manually to install them:"
+            echo "  /usr/libexec/netdata/install-ibm-libs.sh"
+            echo ""
+            echo "For database monitoring (DB2, AS/400), install unixODBC and appropriate ODBC drivers:"
+            echo "  apt-get install unixodbc"
+            echo "  Download IBM DB2 ODBC Driver from IBM Data Server Driver Package"
+            echo "  Download IBM i Access ODBC Driver from IBM i Access Client Solutions"
+        fi
+    else
+        echo "INFO: IBM library installation script not found."
+        echo "MQ PCF collector will not work until MQ libraries are installed."
+        echo ""
+        echo "For database monitoring (DB2, AS/400), install unixODBC and appropriate ODBC drivers:"
+        echo "  apt-get install unixodbc"
+        echo "  Download IBM DB2 ODBC Driver from IBM Data Server Driver Package"
+        echo "  Download IBM i Access ODBC Driver from IBM i Access Client Solutions"
+    fi
+    ;;
+esac
+
+exit 0

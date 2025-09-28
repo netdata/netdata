@@ -1,0 +1,168 @@
+JVM:
+  labels: []
+  contexts:
+    - name: HeapUsage
+      context: websphere_mp.jvm_memory_heap_usage
+      title: JVM Heap Memory Usage
+      family: memory/heap
+      units: bytes
+      type: stacked
+      priority: 201
+      dimensions:
+        - name: used
+          algo: absolute
+        - name: free
+          algo: absolute
+    - name: HeapCommitted
+      context: websphere_mp.jvm_memory_heap_committed
+      title: JVM Heap Memory Committed
+      family: memory/heap
+      units: bytes
+      type: line
+      priority: 202
+      dimensions:
+        - name: committed
+          algo: absolute
+    - name: HeapMax
+      context: websphere_mp.jvm_memory_heap_max
+      title: JVM Heap Memory Maximum
+      family: memory/heap
+      units: bytes
+      type: line
+      priority: 203
+      dimensions:
+        - name: limit
+          algo: absolute
+    - name: HeapUtilization
+      context: websphere_mp.jvm_heap_utilization
+      title: JVM Heap Utilization
+      family: memory/heap
+      units: percentage
+      type: line
+      priority: 204
+      dimensions:
+        - name: utilization
+          algo: absolute
+          div: 1000
+    - name: GCCollections
+      context: websphere_mp.jvm_gc_collections
+      title: JVM Garbage Collection Rate
+      family: compute/gc
+      units: collections/s
+      type: line
+      priority: 205
+      dimensions:
+        - name: rate
+          algo: incremental
+    - name: GCTime
+      context: websphere_mp.jvm_gc_time
+      title: JVM GC Time
+      family: compute/gc
+      units: milliseconds
+      type: line
+      priority: 206
+      dimensions:
+        - name: total
+          algo: absolute
+        - name: per_cycle
+          algo: absolute
+    - name: ThreadsCurrent
+      context: websphere_mp.jvm_threads_current
+      title: JVM Current Threads
+      family: compute/threads
+      units: threads
+      type: stacked
+      priority: 301
+      dimensions:
+        - name: daemon
+          algo: absolute
+        - name: other
+          algo: absolute
+    - name: ThreadsPeak
+      context: websphere_mp.jvm_threads_peak
+      title: JVM Peak Threads
+      family: compute/threads
+      units: threads
+      type: line
+      priority: 302
+      dimensions:
+        - name: peak
+          algo: absolute
+CPU:
+  labels: []
+  contexts:
+    - name: Usage
+      context: websphere_mp.cpu_usage
+      title: JVM CPU Usage
+      family: compute/cpu
+      units: percentage
+      type: line
+      priority: 101
+      dimensions:
+        - name: process
+          algo: absolute
+          div: 1000
+        - name: utilization
+          algo: absolute
+          div: 1000
+    - name: Time
+      context: websphere_mp.cpu_time
+      title: JVM CPU Time
+      family: compute/cpu
+      units: seconds
+      type: line
+      priority: 102
+      dimensions:
+        - name: total
+          algo: absolute
+          div: 1000
+Vendor:
+  labels: []
+  contexts:
+    - name: ThreadPoolUsage
+      context: websphere_mp.threadpool_usage
+      title: Thread Pool Usage
+      family: workloads/threadpools
+      units: threads
+      type: stacked
+      priority: 401
+      dimensions:
+        - name: active
+          algo: absolute
+        - name: idle
+          algo: absolute
+    - name: ThreadPoolSize
+      context: websphere_mp.threadpool_size
+      title: Thread Pool Size
+      family: workloads/threadpools
+      units: threads
+      type: line
+      priority: 402
+      dimensions:
+        - name: size
+          algo: absolute
+RESTEndpoint:
+  labels:
+    - method
+    - endpoint
+  contexts:
+    - name: Requests
+      context: websphere_mp.rest_requests
+      title: REST Request Rate
+      family: workloads/rest
+      units: requests/s
+      type: line
+      priority: 501
+      dimensions:
+        - name: requests
+          algo: incremental
+    - name: ResponseTime
+      context: websphere_mp.rest_response_time
+      title: REST Response Time
+      family: workloads/rest
+      units: milliseconds
+      type: line
+      priority: 502
+      dimensions:
+        - name: average
+          algo: absolute

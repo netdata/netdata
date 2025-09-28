@@ -1,0 +1,1143 @@
+System:
+  labels: []
+  contexts:
+    - name: CPU
+      context: websphere_pmi.cpu_utilization
+      title: CPU Utilization
+      family: compute/cpu
+      units: percentage
+      type: line
+      priority: 101
+      dimensions:
+        - name: utilization
+          algo: absolute
+          div: 1000
+JVM:
+  labels: []
+  contexts:
+    - name: HeapUsage
+      context: websphere_pmi.jvm_heap_usage
+      title: JVM Heap Memory Usage
+      family: memory/heap
+      units: bytes
+      type: stacked
+      priority: 201
+      dimensions:
+        - name: used
+          algo: absolute
+        - name: free
+          algo: absolute
+    - name: HeapCommitted
+      context: websphere_pmi.jvm_heap_committed
+      title: JVM Heap Committed
+      family: memory/heap
+      units: bytes
+      type: line
+      priority: 202
+      dimensions:
+        - name: committed
+          algo: absolute
+    - name: HeapMax
+      context: websphere_pmi.jvm_heap_max
+      title: JVM Heap Maximum
+      family: memory/heap
+      units: bytes
+      type: line
+      priority: 203
+      dimensions:
+        - name: limit
+          algo: absolute
+    - name: Uptime
+      context: websphere_pmi.jvm_uptime
+      title: JVM Uptime
+      family: compute/runtime
+      units: seconds
+      type: line
+      priority: 210
+      dimensions:
+        - name: uptime
+          algo: absolute
+    - name: CPU
+      context: websphere_pmi.jvm_cpu
+      title: JVM CPU Usage
+      family: compute/cpu
+      units: percentage
+      type: line
+      priority: 211
+      dimensions:
+        - name: usage
+          algo: absolute
+          div: 1000
+    - name: GCCollections
+      context: websphere_pmi.jvm_gc_collections
+      title: JVM GC Collections
+      family: compute/gc
+      units: collections/s
+      type: line
+      priority: 220
+      dimensions:
+        - name: collections
+          algo: incremental
+    - name: GCTime
+      context: websphere_pmi.jvm_gc_time
+      title: JVM GC Time
+      family: compute/gc
+      units: milliseconds
+      type: line
+      priority: 221
+      dimensions:
+        - name: total
+          algo: absolute
+    - name: Threads
+      context: websphere_pmi.jvm_threads
+      title: JVM Threads
+      family: compute/threads
+      units: threads
+      type: stacked
+      priority: 230
+      dimensions:
+        - name: daemon
+          algo: absolute
+        - name: other
+          algo: absolute
+    - name: ThreadPeak
+      context: websphere_pmi.jvm_threads_peak
+      title: JVM Peak Threads
+      family: compute/threads
+      units: threads
+      type: line
+      priority: 231
+      dimensions:
+        - name: peak
+          algo: absolute
+ThreadPool:
+  labels:
+    - name
+  contexts:
+    - name: Usage
+      context: websphere_pmi.threadpool_usage
+      title: Thread Pool Usage
+      family: workloads/threadpools
+      units: threads
+      type: stacked
+      priority: 301
+      dimensions:
+        - name: active
+          algo: absolute
+        - name: size
+          algo: absolute
+TransactionManager:
+  labels:
+    - node
+    - server
+  contexts:
+    - name: Counts
+      context: websphere_pmi.transaction_counts
+      title: Transaction Counts
+      family: workloads/transactions
+      units: transactions/s
+      type: line
+      priority: 401
+      dimensions:
+        - name: global_begun
+          algo: incremental
+        - name: global_committed
+          algo: incremental
+        - name: global_rolled_back
+          algo: incremental
+        - name: global_timeout
+          algo: incremental
+        - name: global_involved
+          algo: incremental
+        - name: optimizations
+          algo: incremental
+        - name: local_begun
+          algo: incremental
+        - name: local_committed
+          algo: incremental
+        - name: local_rolled_back
+          algo: incremental
+        - name: local_timeout
+          algo: incremental
+    - name: Active
+      context: websphere_pmi.transaction_active
+      title: Active Transactions
+      family: workloads/transactions
+      units: transactions
+      type: line
+      priority: 402
+      dimensions:
+        - name: global
+          algo: absolute
+        - name: local
+          algo: absolute
+    - name: Time
+      context: websphere_pmi.transaction_time
+      title: Transaction Durations
+      family: workloads/transactions
+      units: milliseconds
+      type: line
+      priority: 403
+      dimensions:
+        - name: global_total
+          algo: absolute
+        - name: global_prepare
+          algo: absolute
+        - name: global_commit
+          algo: absolute
+        - name: global_before_completion
+          algo: absolute
+        - name: local_total
+          algo: absolute
+        - name: local_commit
+          algo: absolute
+        - name: local_before_completion
+          algo: absolute
+JDBCPool:
+  labels:
+    - node
+    - server
+    - pool
+  contexts:
+    - name: Usage
+      context: websphere_pmi.jdbc_pool_usage
+      title: JDBC Pool Utilization
+      family: workloads/jdbc/usage
+      units: percentage
+      type: line
+      priority: 501
+      dimensions:
+        - name: percent_used
+          algo: absolute
+          div: 1000
+        - name: percent_maxed
+          algo: absolute
+          div: 1000
+    - name: Waiting
+      context: websphere_pmi.jdbc_pool_waiting
+      title: JDBC Pool Waiting Threads
+      family: workloads/jdbc/wait
+      units: threads
+      type: line
+      priority: 502
+      dimensions:
+        - name: waiting_threads
+          algo: absolute
+    - name: Connections
+      context: websphere_pmi.jdbc_pool_connections
+      title: JDBC Pool Connections
+      family: workloads/jdbc/connections
+      units: connections
+      type: line
+      priority: 503
+      dimensions:
+        - name: managed
+          algo: absolute
+        - name: handles
+          algo: absolute
+    - name: Operations
+      context: websphere_pmi.jdbc_pool_operations
+      title: JDBC Pool Operations
+      family: workloads/jdbc/operations
+      units: operations/s
+      type: line
+      priority: 504
+      dimensions:
+        - name: created
+          algo: incremental
+        - name: closed
+          algo: incremental
+        - name: allocated
+          algo: incremental
+        - name: returned
+          algo: incremental
+        - name: faults
+          algo: incremental
+        - name: prep_stmt_cache_discard
+          algo: incremental
+    - name: Time
+      context: websphere_pmi.jdbc_pool_time
+      title: JDBC Pool Time
+      family: workloads/jdbc/time
+      units: milliseconds
+      type: line
+      priority: 505
+      dimensions:
+        - name: use
+          algo: absolute
+        - name: wait
+          algo: absolute
+        - name: jdbc
+          algo: absolute
+WebApp:
+  labels:
+    - node
+    - server
+    - app
+  contexts:
+    - name: Load
+      context: websphere_pmi.webapp_load
+      title: Web Application Load
+      family: workloads/webapps
+      units: events
+      type: line
+      priority: 520
+      dimensions:
+        - name: loaded_servlets
+          algo: absolute
+        - name: reloads
+          algo: incremental
+SessionManager:
+  labels:
+    - node
+    - server
+    - app
+  contexts:
+    - name: Active
+      context: websphere_pmi.session_manager_active
+      title: Session Manager Active Sessions
+      family: workloads/sessions
+      units: sessions
+      type: line
+      priority: 530
+      dimensions:
+        - name: active
+          algo: absolute
+        - name: live
+          algo: absolute
+    - name: Events
+      context: websphere_pmi.session_manager_events
+      title: Session Manager Events
+      family: workloads/sessions
+      units: events/s
+      type: line
+      priority: 531
+      dimensions:
+        - name: created
+          algo: incremental
+        - name: invalidated
+          algo: incremental
+        - name: timeout_invalidations
+          algo: incremental
+        - name: affinity_breaks
+          algo: incremental
+        - name: cache_discards
+          algo: incremental
+        - name: no_room
+          algo: incremental
+        - name: activate_non_exist
+          algo: incremental
+DynamicCache:
+  labels:
+    - node
+    - server
+    - cache
+  contexts:
+    - name: InMemory
+      context: websphere_pmi.dynamic_cache_in_memory
+      title: Dynamic Cache Entries
+      family: workloads/cache
+      units: entries
+      type: line
+      priority: 540
+      dimensions:
+        - name: entries
+          algo: absolute
+    - name: Capacity
+      context: websphere_pmi.dynamic_cache_capacity
+      title: Dynamic Cache Capacity
+      family: workloads/cache
+      units: entries
+      type: line
+      priority: 541
+      dimensions:
+        - name: max_entries
+          algo: absolute
+URL:
+  labels:
+    - node
+    - server
+    - url
+  contexts:
+    - name: Requests
+      context: websphere_pmi.url_requests
+      title: URL Requests
+      family: workloads/urls
+      units: requests/s
+      type: line
+      priority: 550
+      dimensions:
+        - name: requests
+          algo: incremental
+    - name: Time
+      context: websphere_pmi.url_time
+      title: URL Service Time
+      family: workloads/urls
+      units: milliseconds
+      type: line
+      priority: 551
+      dimensions:
+        - name: service
+          algo: absolute
+        - name: async
+          algo: absolute
+SecurityAuth:
+  labels:
+    - node
+    - server
+  contexts:
+    - name: Counts
+      context: websphere_pmi.security_auth_counts
+      title: Security Authentication Counts
+      family: security/authentication
+      units: events/s
+      type: line
+      priority: 560
+      dimensions:
+        - name: web
+          algo: incremental
+        - name: tai
+          algo: incremental
+        - name: identity
+          algo: incremental
+        - name: basic
+          algo: incremental
+        - name: token
+          algo: incremental
+        - name: jaas_identity
+          algo: incremental
+        - name: jaas_basic
+          algo: incremental
+        - name: jaas_token
+          algo: incremental
+        - name: rmi
+          algo: incremental
+SecurityAuthz:
+  labels:
+    - node
+    - server
+  contexts:
+    - name: Time
+      context: websphere_pmi.security_authz_time
+      title: Security Authorization Time
+      family: security/authorization
+      units: milliseconds
+      type: line
+      priority: 561
+      dimensions:
+        - name: web
+          algo: absolute
+        - name: ejb
+          algo: absolute
+        - name: admin
+          algo: absolute
+        - name: cwwja
+          algo: absolute
+ORB:
+  labels:
+    - node
+    - server
+  contexts:
+    - name: Concurrent
+      context: websphere_pmi.orb_concurrent
+      title: ORB Concurrent Requests
+      family: workloads/orb
+      units: requests
+      type: line
+      priority: 570
+      dimensions:
+        - name: concurrent_requests
+          algo: absolute
+    - name: Requests
+      context: websphere_pmi.orb_requests
+      title: ORB Requests
+      family: workloads/orb
+      units: requests/s
+      type: line
+      priority: 571
+      dimensions:
+        - name: requests
+          algo: incremental
+SystemData:
+  labels: []
+  contexts:
+    - name: Usage
+      context: websphere_pmi.system_data_usage
+      title: System Data Snapshot
+      family: system/overview
+      units: value
+      type: line
+      priority: 100
+      dimensions:
+        - name: cpu_since_last
+          algo: absolute
+        - name: free_memory
+          algo: absolute
+HAManager:
+  labels:
+    - node
+    - server
+  contexts:
+    - name: Groups
+      context: websphere_pmi.ha_manager_groups
+      title: HA Manager Groups
+      family: reliability/ha
+      units: groups
+      type: line
+      priority: 600
+      dimensions:
+        - name: local
+          algo: absolute
+    - name: BulletinBoard
+      context: websphere_pmi.ha_manager_bulletin_board
+      title: HA Manager Bulletin Board
+      family: reliability/ha
+      units: items
+      type: line
+      priority: 601
+      dimensions:
+        - name: subjects
+          algo: absolute
+        - name: subscriptions
+          algo: absolute
+        - name: local_subjects
+          algo: absolute
+        - name: local_subscriptions
+          algo: absolute
+    - name: RebuildTime
+      context: websphere_pmi.ha_manager_rebuild_time
+      title: HA Manager Rebuild Time
+      family: reliability/ha
+      units: milliseconds
+      type: line
+      priority: 602
+      dimensions:
+        - name: group_state
+          algo: absolute
+        - name: bulletin_board
+          algo: absolute
+JCAPool:
+  labels:
+    - node
+    - server
+    - provider
+    - pool
+  contexts:
+    - name: Operations
+      context: websphere_pmi.jca_pool_operations
+      title: JCA Pool Operations
+      family: connectivity/jca
+      units: operations/s
+      type: line
+      priority: 580
+      dimensions:
+        - name: create
+          algo: incremental
+        - name: close
+          algo: incremental
+        - name: allocate
+          algo: incremental
+        - name: freed
+          algo: incremental
+        - name: faults
+          algo: incremental
+    - name: Managed
+      context: websphere_pmi.jca_pool_managed
+      title: JCA Pool Managed Resources
+      family: connectivity/jca
+      units: resources
+      type: line
+      priority: 581
+      dimensions:
+        - name: managed_connections
+          algo: absolute
+        - name: connection_handles
+          algo: absolute
+    - name: Utilization
+      context: websphere_pmi.jca_pool_utilization
+      title: JCA Pool Utilization
+      family: connectivity/jca
+      units: percentage
+      type: line
+      priority: 582
+      dimensions:
+        - name: percent_used
+          algo: absolute
+          div: 1000
+        - name: percent_maxed
+          algo: absolute
+          div: 1000
+    - name: Waiting
+      context: websphere_pmi.jca_pool_waiting
+      title: JCA Pool Waiting Threads
+      family: connectivity/jca
+      units: threads
+      type: line
+      priority: 583
+      dimensions:
+        - name: waiting_threads
+          algo: absolute
+AlarmManager:
+  labels:
+    - node
+    - server
+    - manager
+  contexts:
+    - name: Events
+      context: websphere_pmi.alarm_manager_events
+      title: Alarm Manager Events
+      family: workloads/alarms
+      units: events/s
+      type: line
+      priority: 610
+      dimensions:
+        - name: created
+          algo: incremental
+        - name: cancelled
+          algo: incremental
+        - name: fired
+          algo: incremental
+JMSQueue:
+  labels:
+    - node
+    - server
+    - engine
+    - destination
+  contexts:
+    - name: MessagesProduced
+      context: websphere_pmi.jms_queue_messages_produced
+      title: JMS Queue Messages Produced
+      family: messaging/jms/queues
+      units: messages/s
+      type: line
+      priority: 700
+      dimensions:
+        - name: total
+          algo: incremental
+        - name: best_effort
+          algo: incremental
+        - name: express
+          algo: incremental
+        - name: reliable_nonpersistent
+          algo: incremental
+        - name: reliable_persistent
+          algo: incremental
+        - name: assured_persistent
+          algo: incremental
+    - name: MessagesConsumed
+      context: websphere_pmi.jms_queue_messages_consumed
+      title: JMS Queue Messages Consumed
+      family: messaging/jms/queues
+      units: messages/s
+      type: line
+      priority: 701
+      dimensions:
+        - name: total
+          algo: incremental
+        - name: best_effort
+          algo: incremental
+        - name: express
+          algo: incremental
+        - name: reliable_nonpersistent
+          algo: incremental
+        - name: reliable_persistent
+          algo: incremental
+        - name: assured_persistent
+          algo: incremental
+        - name: expired
+          algo: incremental
+    - name: Clients
+      context: websphere_pmi.jms_queue_clients
+      title: JMS Queue Clients
+      family: messaging/jms/queues
+      units: clients
+      type: line
+      priority: 702
+      dimensions:
+        - name: local_producers
+          algo: absolute
+        - name: local_producer_attaches
+          algo: incremental
+        - name: local_consumers
+          algo: absolute
+        - name: local_consumer_attaches
+          algo: incremental
+    - name: Storage
+      context: websphere_pmi.jms_queue_storage
+      title: JMS Queue Storage
+      family: messaging/jms/queues
+      units: messages
+      type: line
+      priority: 703
+      dimensions:
+        - name: available
+          algo: absolute
+        - name: unavailable
+          algo: absolute
+        - name: oldest_age
+          algo: absolute
+    - name: WaitTime
+      context: websphere_pmi.jms_queue_wait_time
+      title: JMS Queue Wait Time
+      family: messaging/jms/queues
+      units: milliseconds
+      type: line
+      priority: 704
+      dimensions:
+        - name: aggregate
+          algo: absolute
+        - name: local
+          algo: absolute
+JMSTopic:
+  labels:
+    - node
+    - server
+    - engine
+    - destination
+  contexts:
+    - name: Publications
+      context: websphere_pmi.jms_topic_publications
+      title: JMS Topic Publications
+      family: messaging/jms/topics
+      units: messages/s
+      type: line
+      priority: 720
+      dimensions:
+        - name: assured
+          algo: incremental
+        - name: best_effort
+          algo: incremental
+        - name: express
+          algo: incremental
+    - name: SubscriptionHits
+      context: websphere_pmi.jms_topic_subscription_hits
+      title: JMS Topic Subscription Hits
+      family: messaging/jms/topics
+      units: events/s
+      type: line
+      priority: 721
+      dimensions:
+        - name: assured
+          algo: incremental
+        - name: best_effort
+          algo: incremental
+        - name: express
+          algo: incremental
+    - name: Subscriptions
+      context: websphere_pmi.jms_topic_subscriptions
+      title: JMS Topic Subscriptions
+      family: messaging/jms/topics
+      units: subscriptions
+      type: line
+      priority: 722
+      dimensions:
+        - name: durable_local
+          algo: absolute
+    - name: Events
+      context: websphere_pmi.jms_topic_events
+      title: JMS Topic Events
+      family: messaging/jms/topics
+      units: events/s
+      type: line
+      priority: 723
+      dimensions:
+        - name: incomplete_publications
+          algo: incremental
+        - name: publisher_attaches
+          algo: incremental
+        - name: subscriber_attaches
+          algo: incremental
+    - name: Age
+      context: websphere_pmi.jms_topic_age
+      title: JMS Topic Oldest Publication Age
+      family: messaging/jms/topics
+      units: milliseconds
+      type: line
+      priority: 724
+      dimensions:
+        - name: local_oldest
+          algo: absolute
+JMSStore:
+  labels:
+    - node
+    - server
+    - engine
+    - section
+  contexts:
+    - name: Cache
+      context: websphere_pmi.jms_store_cache
+      title: JMS Store Cache
+      family: messaging/jms/store
+      units: events
+      type: line
+      priority: 740
+      dimensions:
+        - name: add_stored
+          algo: incremental
+        - name: add_not_stored
+          algo: incremental
+        - name: stored_current
+          algo: absolute
+        - name: stored_bytes
+          algo: absolute
+        - name: not_stored_current
+          algo: absolute
+        - name: not_stored_bytes
+          algo: absolute
+        - name: discard_count
+          algo: incremental
+        - name: discard_bytes
+          algo: incremental
+    - name: Datastore
+      context: websphere_pmi.jms_store_datastore
+      title: JMS Store Datastore Operations
+      family: messaging/jms/store
+      units: events/s
+      type: line
+      priority: 741
+      dimensions:
+        - name: insert_batches
+          algo: incremental
+        - name: update_batches
+          algo: incremental
+        - name: delete_batches
+          algo: incremental
+        - name: insert_count
+          algo: incremental
+        - name: update_count
+          algo: incremental
+        - name: delete_count
+          algo: incremental
+        - name: open_count
+          algo: incremental
+        - name: abort_count
+          algo: incremental
+        - name: transaction_ms
+          algo: absolute
+    - name: Transactions
+      context: websphere_pmi.jms_store_transactions
+      title: JMS Store Transactions
+      family: messaging/jms/store
+      units: transactions/s
+      type: line
+      priority: 742
+      dimensions:
+        - name: global_start
+          algo: incremental
+        - name: global_commit
+          algo: incremental
+        - name: global_abort
+          algo: incremental
+        - name: global_indoubt
+          algo: incremental
+        - name: local_start
+          algo: incremental
+        - name: local_commit
+          algo: incremental
+        - name: local_abort
+          algo: incremental
+    - name: Expiry
+      context: websphere_pmi.jms_store_expiry
+      title: JMS Store Expiry Index
+      family: messaging/jms/store
+      units: items
+      type: line
+      priority: 743
+      dimensions:
+        - name: index_items
+          algo: absolute
+Schedulers:
+  labels:
+    - node
+    - server
+    - scheduler
+  contexts:
+    - name: Activity
+      context: websphere_pmi.scheduler_activity
+      title: Scheduler Activity
+      family: workloads/schedulers
+      units: events/s
+      type: line
+      priority: 620
+      dimensions:
+        - name: finished
+          algo: incremental
+        - name: failures
+          algo: incremental
+        - name: polls
+          algo: incremental
+ObjectPool:
+  labels:
+    - node
+    - server
+    - pool
+  contexts:
+    - name: Operations
+      context: websphere_pmi.object_pool_operations
+      title: Object Pool Operations
+      family: workloads/object_pool
+      units: operations/s
+      type: line
+      priority: 630
+      dimensions:
+        - name: created
+          algo: incremental
+    - name: Size
+      context: websphere_pmi.object_pool_size
+      title: Object Pool Size
+      family: workloads/object_pool
+      units: objects
+      type: line
+      priority: 631
+      dimensions:
+        - name: allocated
+          algo: absolute
+        - name: returned
+          algo: absolute
+        - name: idle
+          algo: absolute
+EnterpriseBeans:
+  labels:
+    - node
+    - server
+    - bean
+  contexts:
+    - name: Operations
+      context: websphere_pmi.ejb_operations
+      title: EJB Operations
+      family: workloads/ejb
+      units: operations/s
+      type: line
+      priority: 640
+      dimensions:
+        - name: create
+          algo: incremental
+        - name: remove
+          algo: incremental
+        - name: activate
+          algo: incremental
+        - name: passivate
+          algo: incremental
+        - name: instantiate
+          algo: incremental
+        - name: store
+          algo: incremental
+        - name: load
+          algo: incremental
+    - name: Messages
+      context: websphere_pmi.ejb_messages
+      title: EJB Message Activity
+      family: workloads/ejb
+      units: messages/s
+      type: line
+      priority: 641
+      dimensions:
+        - name: received
+          algo: incremental
+        - name: backout
+          algo: incremental
+    - name: Pool
+      context: websphere_pmi.ejb_pool
+      title: EJB Pool Usage
+      family: workloads/ejb
+      units: beans
+      type: line
+      priority: 642
+      dimensions:
+        - name: ready
+          algo: absolute
+        - name: live
+          algo: absolute
+        - name: pooled
+          algo: absolute
+        - name: active_method
+          algo: absolute
+        - name: passive
+          algo: absolute
+        - name: server_session_pool
+          algo: absolute
+        - name: method_ready
+          algo: absolute
+        - name: async_queue
+          algo: absolute
+    - name: Time
+      context: websphere_pmi.ejb_time
+      title: EJB Operation Time
+      family: workloads/ejb
+      units: milliseconds
+      type: line
+      priority: 643
+      dimensions:
+        - name: activation
+          algo: absolute
+        - name: passivation
+          algo: absolute
+        - name: create
+          algo: absolute
+        - name: remove
+          algo: absolute
+        - name: load
+          algo: absolute
+        - name: store
+          algo: absolute
+        - name: method_response
+          algo: absolute
+        - name: wait
+          algo: absolute
+        - name: async_wait
+          algo: absolute
+        - name: read_lock
+          algo: absolute
+        - name: write_lock
+          algo: absolute
+WebServices:
+  labels:
+    - node
+    - server
+    - service
+  contexts:
+    - name: Loaded
+      context: websphere_pmi.web_services_loaded
+      title: Web Services Loaded
+      family: integration/web_services
+      units: services
+      type: line
+      priority: 650
+      dimensions:
+        - name: loaded
+          algo: absolute
+WebServicesGateway:
+  labels:
+    - node
+    - server
+    - gateway
+  contexts:
+    - name: Requests
+      context: websphere_pmi.web_services_gateway_requests
+      title: Web Services Gateway Requests
+      family: integration/web_services_gateway
+      units: requests/s
+      type: line
+      priority: 651
+      dimensions:
+        - name: synchronous
+          algo: incremental
+        - name: synchronous_responses
+          algo: incremental
+        - name: asynchronous
+          algo: incremental
+        - name: asynchronous_responses
+          algo: incremental
+PMIWebServiceModule:
+  labels:
+    - node
+    - server
+    - module
+  contexts:
+    - name: Services
+      context: websphere_pmi.pmi_web_service_module_services
+      title: PMI Web Service Module Services
+      family: integration/web_services
+      units: services
+      type: line
+      priority: 652
+      dimensions:
+        - name: loaded
+          algo: absolute
+ExtensionRegistry:
+  labels:
+    - node
+    - server
+  contexts:
+    - name: Requests
+      context: websphere_pmi.extension_registry_requests
+      title: Extension Registry Requests
+      family: platform/extensions
+      units: events/s
+      type: line
+      priority: 660
+      dimensions:
+        - name: requests
+          algo: incremental
+        - name: hits
+          algo: incremental
+        - name: displacements
+          algo: incremental
+    - name: HitRate
+      context: websphere_pmi.extension_registry_hit_rate
+      title: Extension Registry Hit Rate
+      family: platform/extensions
+      units: percentage
+      type: line
+      priority: 661
+      dimensions:
+        - name: hit_rate
+          algo: absolute
+          div: 1000
+PortletApplication:
+  labels:
+    - node
+    - server
+  contexts:
+    - name: Loaded
+      context: websphere_pmi.portlet_application_loaded
+      title: Loaded Portlets
+      family: platform/portlets
+      units: portlets
+      type: line
+      priority: 800
+      dimensions:
+        - name: loaded
+          algo: absolute
+Portlet:
+  labels:
+    - node
+    - server
+    - portlet
+  contexts:
+    - name: Requests
+      context: websphere_pmi.portlet_requests
+      title: Portlet Requests
+      family: platform/portlets
+      units: requests/s
+      type: line
+      priority: 801
+      dimensions:
+        - name: requests
+          algo: incremental
+    - name: Concurrent
+      context: websphere_pmi.portlet_concurrent
+      title: Portlet Concurrent Requests
+      family: platform/portlets
+      units: requests
+      type: line
+      priority: 802
+      dimensions:
+        - name: concurrent
+          algo: absolute
+    - name: Errors
+      context: websphere_pmi.portlet_errors
+      title: Portlet Errors
+      family: platform/portlets
+      units: errors/s
+      type: line
+      priority: 803
+      dimensions:
+        - name: errors
+          algo: incremental
+    - name: ResponseTime
+      context: websphere_pmi.portlet_response_time
+      title: Portlet Response Time
+      family: platform/portlets
+      units: milliseconds
+      type: line
+      priority: 804
+      dimensions:
+        - name: render
+          algo: absolute
+        - name: action
+          algo: absolute
+        - name: process_event
+          algo: absolute
+        - name: serve_resource
+          algo: absolute

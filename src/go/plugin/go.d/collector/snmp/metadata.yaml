@@ -199,11 +199,6 @@ modules:
               default_value: 60
               required: false
 
-            - name: ping_only
-              group: Ping
-              description: Collect only ICMP round-trip metrics and skip periodic SNMP metrics. A minimal SNMP sysInfo request is still performed when setting up the Virtual Node (for naming/labels and metadata).
-              default_value: false
-              required: false
             - name: ping.enabled
               group: Ping
               description: Enable ICMP round-trip measurements (runs alongside SNMP). When disabled, no ping metrics are collected.

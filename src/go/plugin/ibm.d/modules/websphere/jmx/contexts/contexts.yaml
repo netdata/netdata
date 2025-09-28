@@ -1,0 +1,397 @@
+JVM:
+  labels: []
+  contexts:
+    - name: HeapMemory
+      context: websphere_jmx.jvm_heap_memory
+      title: JVM Heap Memory
+      family: memory/heap
+      units: bytes
+      type: stacked
+      priority: 201
+      dimensions:
+        - name: used
+          algo: absolute
+        - name: committed
+          algo: absolute
+        - name: max
+          algo: absolute
+    - name: HeapUsage
+      context: websphere_jmx.jvm_heap_usage
+      title: JVM Heap Usage
+      family: memory/heap
+      units: percentage
+      type: line
+      priority: 202
+      dimensions:
+        - name: usage
+          algo: absolute
+          div: 1000
+    - name: NonHeapMemory
+      context: websphere_jmx.jvm_nonheap_memory
+      title: JVM Non-Heap Memory
+      family: memory/nonheap
+      units: bytes
+      type: stacked
+      priority: 203
+      dimensions:
+        - name: used
+          algo: absolute
+        - name: committed
+          algo: absolute
+    - name: GCCycles
+      context: websphere_jmx.jvm_gc_count
+      title: JVM Garbage Collection Count
+      family: compute/gc
+      units: collections
+      type: line
+      priority: 301
+      dimensions:
+        - name: collections
+          algo: absolute
+    - name: GCTime
+      context: websphere_jmx.jvm_gc_time
+      title: JVM Garbage Collection Time
+      family: compute/gc
+      units: milliseconds
+      type: line
+      priority: 302
+      dimensions:
+        - name: time
+          algo: absolute
+    - name: Threads
+      context: websphere_jmx.jvm_threads
+      title: JVM Threads
+      family: compute/threads
+      units: threads
+      type: stacked
+      priority: 303
+      dimensions:
+        - name: total
+          algo: absolute
+        - name: daemon
+          algo: absolute
+    - name: ThreadStates
+      context: websphere_jmx.jvm_thread_states
+      title: JVM Thread States
+      family: compute/threads
+      units: threads
+      type: line
+      priority: 304
+      dimensions:
+        - name: peak
+          algo: absolute
+        - name: started
+          algo: absolute
+    - name: Classes
+      context: websphere_jmx.jvm_classes
+      title: JVM Classes
+      family: compute/classes
+      units: classes
+      type: line
+      priority: 305
+      dimensions:
+        - name: loaded
+          algo: absolute
+        - name: unloaded
+          algo: absolute
+    - name: ProcessCPU
+      context: websphere_jmx.jvm_process_cpu_usage
+      title: JVM Process CPU Usage
+      family: compute/cpu
+      units: percentage
+      type: line
+      priority: 103
+      dimensions:
+        - name: cpu
+          algo: absolute
+          div: 1000
+    - name: Uptime
+      context: websphere_jmx.jvm_uptime
+      title: JVM Uptime
+      family: compute/runtime
+      units: seconds
+      type: line
+      priority: 110
+      dimensions:
+        - name: uptime
+          algo: absolute
+JDBC:
+  labels:
+    - pool
+  contexts:
+    - name: PoolSize
+      context: websphere_jmx.jdbc_pool_size
+      title: JDBC Pool Size
+      family: workloads/jdbc
+      units: connections
+      type: line
+      priority: 601
+      dimensions:
+        - name: size
+          algo: absolute
+    - name: PoolUsage
+      context: websphere_jmx.jdbc_pool_usage
+      title: JDBC Pool Usage
+      family: workloads/jdbc
+      units: connections
+      type: stacked
+      priority: 602
+      dimensions:
+        - name: active
+          algo: absolute
+        - name: free
+          algo: absolute
+    - name: WaitTime
+      context: websphere_jmx.jdbc_pool_wait_time
+      title: JDBC Average Wait Time
+      family: workloads/jdbc
+      units: milliseconds
+      type: line
+      priority: 603
+      dimensions:
+        - name: wait
+          algo: absolute
+    - name: UseTime
+      context: websphere_jmx.jdbc_pool_use_time
+      title: JDBC Average Use Time
+      family: workloads/jdbc
+      units: milliseconds
+      type: line
+      priority: 604
+      dimensions:
+        - name: use
+          algo: absolute
+    - name: ConnectionsTotals
+      context: websphere_jmx.jdbc_pool_connections
+      title: JDBC Connections Totals
+      family: workloads/jdbc
+      units: connections
+      type: line
+      priority: 605
+      dimensions:
+        - name: created
+          algo: absolute
+        - name: destroyed
+          algo: absolute
+    - name: WaitingThreads
+      context: websphere_jmx.jdbc_pool_waiting_threads
+      title: JDBC Waiting Threads
+      family: workloads/jdbc
+      units: threads
+      type: line
+      priority: 606
+      dimensions:
+        - name: waiting
+          algo: absolute
+
+
+JCA:
+  labels:
+    - pool
+  contexts:
+    - name: PoolSize
+      context: websphere_jmx.jca_pool_size
+      title: JCA Pool Size
+      family: workloads/jca
+      units: connections
+      type: line
+      priority: 651
+      dimensions:
+        - name: size
+          algo: absolute
+    - name: PoolUsage
+      context: websphere_jmx.jca_pool_usage
+      title: JCA Pool Usage
+      family: workloads/jca
+      units: connections
+      type: stacked
+      priority: 652
+      dimensions:
+        - name: active
+          algo: absolute
+        - name: free
+          algo: absolute
+    - name: WaitTime
+      context: websphere_jmx.jca_pool_wait_time
+      title: JCA Average Wait Time
+      family: workloads/jca
+      units: milliseconds
+      type: line
+      priority: 653
+      dimensions:
+        - name: wait
+          algo: absolute
+    - name: UseTime
+      context: websphere_jmx.jca_pool_use_time
+      title: JCA Average Use Time
+      family: workloads/jca
+      units: milliseconds
+      type: line
+      priority: 654
+      dimensions:
+        - name: use
+          algo: absolute
+    - name: ConnectionsTotals
+      context: websphere_jmx.jca_pool_connections
+      title: JCA Connections Totals
+      family: workloads/jca
+      units: connections
+      type: line
+      priority: 655
+      dimensions:
+        - name: created
+          algo: absolute
+        - name: destroyed
+          algo: absolute
+    - name: WaitingThreads
+      context: websphere_jmx.jca_pool_waiting_threads
+      title: JCA Waiting Threads
+      family: workloads/jca
+      units: threads
+      type: line
+      priority: 656
+      dimensions:
+        - name: waiting
+          algo: absolute
+JMS:
+  labels:
+    - destination
+    - destination_type
+  contexts:
+    - name: MessagesCurrent
+      context: websphere_jmx.jms_messages_current
+      title: JMS Messages Current Depth
+      family: workloads/jms
+      units: messages
+      type: line
+      priority: 701
+      dimensions:
+        - name: current
+          algo: absolute
+    - name: MessagesPending
+      context: websphere_jmx.jms_messages_pending
+      title: JMS Messages Pending
+      family: workloads/jms
+      units: messages
+      type: line
+      priority: 702
+      dimensions:
+        - name: pending
+          algo: absolute
+    - name: MessagesTotal
+      context: websphere_jmx.jms_messages_total
+      title: JMS Messages Added Total
+      family: workloads/jms
+      units: messages
+      type: line
+      priority: 703
+      dimensions:
+        - name: total
+          algo: absolute
+    - name: Consumers
+      context: websphere_jmx.jms_consumers
+      title: JMS Consumers
+      family: workloads/jms
+      units: consumers
+      type: line
+      priority: 704
+      dimensions:
+        - name: consumers
+          algo: absolute
+
+Applications:
+  labels:
+    - application
+    - module
+  contexts:
+    - name: Requests
+      context: websphere_jmx.app_requests
+      title: Application Requests
+      family: workloads/applications
+      units: requests
+      type: line
+      priority: 801
+      dimensions:
+        - name: requests
+          algo: absolute
+    - name: ResponseTime
+      context: websphere_jmx.app_response_time
+      title: Application Response Time
+      family: workloads/applications
+      units: milliseconds
+      type: line
+      priority: 802
+      dimensions:
+        - name: response_time
+          algo: absolute
+    - name: SessionsActive
+      context: websphere_jmx.app_sessions_active
+      title: Active Sessions
+      family: workloads/applications
+      units: sessions
+      type: line
+      priority: 803
+      dimensions:
+        - name: active
+          algo: absolute
+    - name: SessionsLive
+      context: websphere_jmx.app_sessions_live
+      title: Live Sessions
+      family: workloads/applications
+      units: sessions
+      type: line
+      priority: 804
+      dimensions:
+        - name: live
+          algo: absolute
+    - name: SessionEvents
+      context: websphere_jmx.app_session_events
+      title: Session Events
+      family: workloads/applications
+      units: sessions
+      type: stacked
+      priority: 805
+      dimensions:
+        - name: creates
+          algo: absolute
+        - name: invalidates
+          algo: absolute
+    - name: Transactions
+      context: websphere_jmx.app_transactions
+      title: Application Transactions
+      family: workloads/applications
+      units: transactions
+      type: line
+      priority: 806
+      dimensions:
+        - name: committed
+          algo: absolute
+        - name: rolledback
+          algo: absolute
+
+ThreadPools:
+  labels:
+    - pool
+  contexts:
+    - name: Size
+      context: websphere_jmx.threadpool_size
+      title: Thread Pool Size
+      family: workloads/threadpools
+      units: threads
+      type: line
+      priority: 401
+      dimensions:
+        - name: size
+          algo: absolute
+        - name: max
+          algo: absolute
+    - name: Active
+      context: websphere_jmx.threadpool_active
+      title: Thread Pool Active Threads
+      family: workloads/threadpools
+      units: threads
+      type: line
+      priority: 402
+      dimensions:
+        - name: active
+          algo: absolute

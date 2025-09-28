@@ -176,6 +176,7 @@ mark_as_advanced(ENABLE_DASHBOARD)
 # Data collection plugins
 option(ENABLE_PLUGIN_GO "Enable metric collectors written in Go" ${DEFAULT_FEATURE_STATE})
 option(ENABLE_PLUGIN_OTEL "Enable collection of OpenTelemetry metrics and logs" ${DEFAULT_FEATURE_STATE})
+option(ENABLE_PLUGIN_IBM "Enable IBM ecosystem collectors (requires CGO)" False)
 option(ENABLE_PLUGIN_PYTHON "Enable metric collectors written in Python" ${DEFAULT_FEATURE_STATE})
 
 cmake_dependent_option(ENABLE_PLUGIN_APPS "Enable per-process resource usage monitoring" ${DEFAULT_FEATURE_STATE} "OS_LINUX OR OS_FREEBSD OR OS_MACOS OR OS_WINDOWS" False)
@@ -3171,7 +3172,44 @@ if(ENABLE_PLUGIN_GO)
 endif()
 
 #
+# Build ibm.d.plugin
+#
+
+if(ENABLE_PLUGIN_IBM)
+    include(NetdataIBMPlugin)
+    add_ibm_plugin_target()
+
+    install(PROGRAMS ${CMAKE_BINARY_DIR}/ibm.d.plugin
+            COMPONENT plugin-ibm
+            DESTINATION usr/libexec/netdata/plugins.d)
+
+    # Install IBM plugin configuration files
+    install(FILES src/go/plugin/ibm.d/config/ibm.d.conf
+            COMPONENT plugin-ibm
+            DESTINATION usr/lib/netdata/conf.d)
+
+    install(FILES
+            src/go/plugin/ibm.d/config/ibm.d/as400.conf
+            src/go/plugin/ibm.d/config/ibm.d/db2.conf
+            src/go/plugin/ibm.d/config/ibm.d/websphere_jmx.conf
+            src/go/plugin/ibm.d/config/ibm.d/websphere_mp.conf
+            src/go/plugin/ibm.d/config/ibm.d/websphere_pmi.conf
+            COMPONENT plugin-ibm
+            DESTINATION usr/lib/netdata/conf.d/ibm.d)
+
+    # Configure and install IBM library download script
+    configure_file(packaging/installer/install-ibm-libs.sh.in
+                   packaging/installer/install-ibm-libs.sh @ONLY)
+
+    install(PROGRAMS ${CMAKE_BINARY_DIR}/packaging/installer/install-ibm-libs.sh
+            COMPONENT plugin-ibm
+            DESTINATION usr/libexec/netdata)
+endif()
+
+#
 # otel.plugin
+#
+# Handle OTel Collector plugin
 #
 if(ENABLE_PLUGIN_OTEL)
     corrosion_install(TARGETS otel-plugin
@@ -3798,6 +3836,12 @@ if(ENABLE_PLUGIN_GO)
                 DESTINATION usr/share/doc/netdata-plugin-go)
     endif()
 endif()
+
+#
+# ibm.d.plugin (requires CGO)
+#
+
+include(src/go/plugin/ibm.d/CMakeLists.txt)
 
 #
 # dashboard

@@ -299,9 +299,9 @@ prepare_cmake_options() {
 
   if [ -n "${NETDATA_ENABLE_LTO}" ]; then
     if [ "${NETDATA_ENABLE_LTO}" -eq 1 ]; then
-      NETDATA_CMAKE_OPTIONS="${NETDATA_CMAKE_OPTIONS} -DDISABLE_LTO=Off"
+      NETDATA_CMAKE_OPTIONS="${NETDATA_CMAKE_OPTIONS} -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=On -DUSE_LTO=On"
     else
-      NETDATA_CMAKE_OPTIONS="${NETDATA_CMAKE_OPTIONS} -DDISABLE_LTO=On"
+      NETDATA_CMAKE_OPTIONS="${NETDATA_CMAKE_OPTIONS} -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=Off -DUSE_LTO=Off"
     fi
   fi
 
@@ -309,6 +309,12 @@ prepare_cmake_options() {
     enable_feature PLUGIN_GO 1
   else
     enable_feature PLUGIN_GO 0
+  fi
+
+  if [ "${ENABLE_IBM:-0}" -eq 1 ]; then
+    enable_feature PLUGIN_IBM 1
+  else
+    enable_feature PLUGIN_IBM 0
   fi
 
   if [ "${ENABLE_PYTHON:-1}" -eq 1 ]; then

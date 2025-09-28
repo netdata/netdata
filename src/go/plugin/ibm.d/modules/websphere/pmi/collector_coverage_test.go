@@ -1,0 +1,81 @@
+//go:build cgo
+// +build cgo
+
+package pmi
+
+import (
+	"encoding/xml"
+	"os"
+	"path/filepath"
+	"testing"
+
+	"github.com/netdata/netdata/go/plugins/pkg/matcher"
+	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/framework"
+	pmiproto "github.com/netdata/netdata/go/plugins/plugin/ibm.d/protocols/websphere/pmi"
+)
+
+func TestPMICollectorCoverageActivatedSamples(t *testing.T) {
+	samples := []string{
+		"traditional-8.5.5.27-pmi-activated-port-10080.xml",
+		"traditional-9.0.5.x-pmi-activated-port-11080.xml",
+	}
+
+	for _, sample := range samples {
+		t.Run(sample, func(t *testing.T) {
+			snapshot := loadPMISnapshot(t, sample)
+
+			agg := newAggregator(Config{
+				CollectJVMMetrics:         framework.AutoBoolEnabled,
+				CollectThreadPoolMetrics:  framework.AutoBoolEnabled,
+				CollectJDBCMetrics:        framework.AutoBoolEnabled,
+				CollectJCAMetrics:         framework.AutoBoolEnabled,
+				CollectJMSMetrics:         framework.AutoBoolEnabled,
+				CollectWebAppMetrics:      framework.AutoBoolEnabled,
+				CollectSessionMetrics:     framework.AutoBoolEnabled,
+				CollectTransactionMetrics: framework.AutoBoolEnabled,
+				CollectServletMetrics:     framework.AutoBoolEnabled,
+				CollectEJBMetrics:         framework.AutoBoolEnabled,
+				CollectJDBCAdvanced:       framework.AutoBoolEnabled,
+				MaxThreadPools:            0,
+				MaxJDBCPools:              0,
+				MaxJCAPools:               0,
+				MaxJMSDestinations:        0,
+				MaxApplications:           0,
+				MaxServlets:               0,
+				MaxEJBs:                   0,
+			})
+
+			selectors := selectorBundle{
+				app:     matcher.Must(matcher.New(matcher.FmtGlob, "*")),
+				pool:    matcher.Must(matcher.New(matcher.FmtGlob, "*")),
+				jms:     matcher.Must(matcher.New(matcher.FmtGlob, "*")),
+				servlet: matcher.Must(matcher.New(matcher.FmtGlob, "*")),
+				ejb:     matcher.Must(matcher.New(matcher.FmtGlob, "*")),
+			}
+
+			agg.processSnapshot(snapshot, selectors)
+
+			if missing := agg.coverageMissing(); len(missing) > 0 {
+				t.Fatalf("unhandled PMI stats: %v", missing)
+			}
+		})
+	}
+}
+
+func loadPMISnapshot(t *testing.T, filename string) *pmiproto.Snapshot {
+	t.Helper()
+	filePath := filepath.Join("..", "..", "..", "samples.d", filename)
+	f, err := os.Open(filePath)
+	if err != nil {
+		t.Fatalf("failed to open sample %s: %v", filename, err)
+	}
+	defer f.Close()
+
+	decoder := xml.NewDecoder(f)
+	var snapshot pmiproto.Snapshot
+	if err := decoder.Decode(&snapshot); err != nil {
+		t.Fatalf("failed to decode sample %s: %v", filename, err)
+	}
+	snapshot.Normalize()
+	return &snapshot
+}
