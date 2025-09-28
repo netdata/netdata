@@ -28,10 +28,7 @@ import (
 	_ "github.com/netdata/netdata/go/plugins/plugin/ibm.d/modules/websphere/jmx" // Requires CGO
 	_ "github.com/netdata/netdata/go/plugins/plugin/ibm.d/modules/websphere/mp"  // Pure Go
 	_ "github.com/netdata/netdata/go/plugins/plugin/ibm.d/modules/websphere/pmi" // Requires CGO
-
-	// New framework example modules
-	_ "github.com/netdata/netdata/go/plugins/plugin/ibm.d/modules/example" // Framework demo
-	_ "github.com/netdata/netdata/go/plugins/plugin/ibm.d/modules/mq"      // MQ monitoring with PCF protocol
+	_ "github.com/netdata/netdata/go/plugins/plugin/ibm.d/modules/mq"            // MQ monitoring with PCF protocol
 )
 
 const pluginName = "ibm.d.plugin"

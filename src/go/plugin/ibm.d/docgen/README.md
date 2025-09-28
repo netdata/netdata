@@ -295,17 +295,17 @@ The tool generates good defaults, but always review:
 
 ## Example Integration
 
-See the example module for a complete integration:
+Review any existing production module (for example `modules/mq/`) for a complete integration:
 
 ```
-modules/example/
+modules/mq/
 ├── contexts/contexts.yaml    # Metric definitions
-├── config.go                # Configuration struct  
-├── module.yaml              # Module metadata
-├── generate.go              # go:generate directive
-├── metadata.yaml            # Generated ✓
-├── config_schema.json       # Generated ✓
-└── README.md                # Generated ✓
+├── config.go                 # Configuration struct
+├── module.yaml               # Module metadata
+├── generate.go               # go:generate directive
+├── metadata.yaml             # Generated ✓
+├── config_schema.json        # Generated ✓
+└── README.md                 # Generated ✓
 ```
 
-Run `go generate` in the example directory to see it in action!
+Run `go generate` in the module directory to see it in action.
