@@ -18,6 +18,7 @@ type Collector struct {
 	charts             *module.Charts
 	impl               CollectorImpl  // The actual collector implementation
 	globalLabels       []module.Label // Job-level labels applied to all charts
+	instanceCharts     map[string]struct{}
 }
 
 // Init initializes the collector (go.d framework requirement)
@@ -28,6 +29,7 @@ func (c *Collector) Init(ctx context.Context) error {
 	c.contextMap = make(map[string]interface{})
 	c.charts = &module.Charts{}
 	c.globalLabels = make([]module.Label, 0)
+	c.instanceCharts = make(map[string]struct{})
 
 	// Set defaults
 	if c.Config.ObsoletionIterations == 0 {
@@ -156,7 +158,15 @@ func (c *Collector) convertMetrics() map[string]int64 {
 								Value: v,
 							})
 						}
-						c.charts.Add(chart)
+						if c.charts.Has(chart.ID) {
+							c.markInstanceChartsPresent(instanceKey)
+							continue
+						}
+						if err := c.charts.Add(chart); err != nil {
+							c.Errorf("failed adding chart for %s: %v", instanceKey, err)
+						} else {
+							c.markInstanceChartsPresent(instanceKey)
+						}
 					}
 					break
 				}
@@ -243,9 +253,10 @@ func (c *Collector) createChartFromContext(ctx interface{}, instanceID string, i
 	}
 
 	// Add dimensions with full dimension IDs
+	instancePrefix := instanceID + "."
 	for _, dim := range contextMeta.Dimensions {
 		// Use the full dimension ID: {instance_id}.{dimension_name}
-		dimID := instanceID + "." + dim.Name
+		dimID := instancePrefix + dim.Name
 		chartDim := &module.Dim{
 			ID:   dimID,
 			Name: dim.Name,
@@ -269,17 +280,17 @@ func cleanChartID(contextName string) string {
 	return strings.ReplaceAll(contextName, ".", "_")
 }
 
+func (c *Collector) markInstanceChartsPresent(instanceKey string) {
+	if c.instanceCharts == nil {
+		c.instanceCharts = make(map[string]struct{})
+	}
+	c.instanceCharts[instanceKey] = struct{}{}
+}
+
 // hasChartsForInstance checks if charts exist for a given instance
 func (c *Collector) hasChartsForInstance(instanceKey string) bool {
-	// Check if any chart has dimensions with this instance key prefix
-	for _, chart := range *c.charts {
-		for _, dim := range chart.Dims {
-			if strings.HasPrefix(dim.ID, instanceKey+".") {
-				return true
-			}
-		}
-	}
-	return false
+	_, ok := c.instanceCharts[instanceKey]
+	return ok
 }
 
 // markChartsObsolete marks all charts for a given instance as obsolete
