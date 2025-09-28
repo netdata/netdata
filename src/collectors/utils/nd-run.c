@@ -5,6 +5,7 @@
 #include <pwd.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "config.h"
 
@@ -77,12 +78,39 @@ static void set_env_var(const char *name, const char *value) {
 static void clean_environment(struct passwd *pw) {
     // Explicitly scrub the environment, only passing on a few things
     // we know are needed to make things work correctly.
-    const char * PATH = getenv("PATH");
-    const char * TZ = getenv("TZ");
-    const char * TZDIR = getenv("TZDIR");
-    const char * TMPDIR = getenv("TMPDIR");
-    const char * PWD = getenv("PWD");
 
+    // First, save copies of the environment variables we want to keep.
+    // We must copy them before clearing the environment, as getenv()
+    // returns pointers into the environment block which will be invalidated.
+    char *saved_path = NULL;
+    char *saved_tz = NULL;
+    char *saved_tzdir = NULL;
+    char *saved_tmpdir = NULL;
+    char *saved_pwd = NULL;
+
+    const char *tmp;
+    if ((tmp = getenv("PATH")) != NULL) {
+        saved_path = strdup(tmp);
+        if (!saved_path) fatal("strdup PATH");
+    }
+    if ((tmp = getenv("TZ")) != NULL) {
+        saved_tz = strdup(tmp);
+        if (!saved_tz) fatal("strdup TZ");
+    }
+    if ((tmp = getenv("TZDIR")) != NULL) {
+        saved_tzdir = strdup(tmp);
+        if (!saved_tzdir) fatal("strdup TZDIR");
+    }
+    if ((tmp = getenv("TMPDIR")) != NULL) {
+        saved_tmpdir = strdup(tmp);
+        if (!saved_tmpdir) fatal("strdup TMPDIR");
+    }
+    if ((tmp = getenv("PWD")) != NULL) {
+        saved_pwd = strdup(tmp);
+        if (!saved_pwd) fatal("strdup PWD");
+    }
+
+    // Now clear the environment
     #ifdef HAVE_CLEARENV
     clearenv();
     #else
@@ -90,16 +118,24 @@ static void clean_environment(struct passwd *pw) {
     environ = NULL;
     #endif
 
+    // Set the new environment with our saved values
     set_env_var("USER", pw->pw_name);
     set_env_var("LOGNAME", pw->pw_name);
     set_env_var("HOME", pw->pw_dir);
     set_env_var("SHELL", "/bin/sh"); // Ignore user default shell
     set_env_var("LC_ALL", "C"); // Force C locale
-    set_env_var("PATH", PATH);
-    set_env_var("PWD", PWD);
-    set_env_var("TZ", TZ);
-    set_env_var("TZDIR", TZDIR);
-    set_env_var("TMPDIR", (TMPDIR == NULL) ? "/tmp" : TMPDIR); // Use a sane default for TMPDIR if it wasn’t set.
+    set_env_var("PATH", saved_path);
+    set_env_var("PWD", saved_pwd);
+    set_env_var("TZ", saved_tz);
+    set_env_var("TZDIR", saved_tzdir);
+    set_env_var("TMPDIR", (saved_tmpdir == NULL) ? "/tmp" : saved_tmpdir); // Use a sane default for TMPDIR if it wasn't set.
+
+    // Free the saved copies
+    free(saved_path);
+    free(saved_tz);
+    free(saved_tzdir);
+    free(saved_tmpdir);
+    free(saved_pwd);
 }
 
 int main(int argc, char *argv[]) {
