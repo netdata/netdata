@@ -2,7 +2,6 @@ update_every: 123
 hostname: "ok"
 create_vnode: yes
 vnode_device_down_threshold: 123
-disable_legacy_collection: yes
 manual_profiles:
   - "ok"
 
@@ -30,22 +29,6 @@ options:
   version: "ok"
   max_request_size: 123
   max_repetitions: 123
-
-charts:
-  - id: "ok"
-    title: "ok"
-    units: "ok"
-    family: "ok"
-    type: "ok"
-    priority: 123
-    multiply_range:
-      - 123
-    dimensions:
-      - oid: "ok"
-        name: "ok"
-        algorithm: "ok"
-        multiplier: 123
-        divisor: 123
 
 ping:
   enabled: yes

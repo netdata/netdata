@@ -23,10 +23,6 @@ type (
 		ManualProfiles []string `yaml:"manual_profiles,omitempty" json:"manual_profiles"`
 
 		Ping PingConfig `yaml:"ping,omitempty" json:"ping"`
-
-		// legacy
-		ChartsInput             []ChartConfig `yaml:"charts,omitempty" json:"charts"`
-		DisableLegacyCollection bool          `yaml:"disable_legacy_collection,omitempty" json:"disable_legacy_collection"`
 	}
 
 	PingConfig struct {

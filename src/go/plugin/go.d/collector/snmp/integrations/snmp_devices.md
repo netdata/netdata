@@ -186,12 +186,11 @@ The following options can be defined globally: update_every, autodetection_retry
 |  | options.timeout | SNMP request/response timeout. | 5 | no |
 |  | options.max_repetitions | Controls how many SNMP variables to retrieve in a single GETBULK request. | 25 | no |
 |  | options.max_request_size | Maximum number of OIDs allowed in a single GET request. | 60 | no |
-| **Ping** | ping.enabled | Enable ICMP round-trip measurements (runs alongside SNMP). When disabled, no ping metrics are collected. | no | no |
+| **Ping** | ping.enabled | Enable ICMP round-trip measurements (runs alongside SNMP). When disabled, no ping metrics are collected. | yes | no |
 |  | ping.privileged | Use raw ICMP (privileged). If false, unprivileged mode is used. | yes | no |
 |  | ping.packets | Number of ping packets to send per iteration. | 3 | no |
 |  | ping.interval | Interval between sending ping packets. | 100ms | no |
 | **Profiles** | manual_profiles | Profiles to apply if automatic detection cannot be used. | [] | no |
-|  | disable_legacy_collection | Disable the legacy SNMP collection method, forcing the collector to use only SNMP profiles (YAML-based configuration). When enabled, the collector will ignore any non-profile based collection logic. | true | no |
 | **Virtual node** | create_vnode | If set, the collector will create a Netdata Virtual Node for this SNMP device, which will appear as a separate Node in Netdata. | true | no |
 |  | vnode_device_down_threshold | Number of consecutive failed data collections before marking the device as down. | 3 | no |
 |  | vnode.guid | A unique identifier for the Virtual Node. If not set, a GUID will be automatically generated from the device's IP address. |  | no |

@@ -6,9 +6,6 @@
 extends:
   - hp-ilo.yaml
 
-device:
-  vendor: "hp"
-
 selector:
   - sysobjectid:
       include:
@@ -19,3 +16,5 @@ metadata:
     fields:
       model:
         value: iLO4
+      vendor:
+        value: HP
