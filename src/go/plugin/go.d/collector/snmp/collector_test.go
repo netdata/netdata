@@ -17,7 +17,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/ping"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
 
 	"github.com/golang/mock/gomock"
@@ -299,8 +298,6 @@ func TestCollector_Collect(t *testing.T) {
 				collr := New()
 				collr.Config = prepareV2Config()
 				collr.PingOnly = true
-				collr.Ping.Interval = confopt.Duration(100 * time.Millisecond)
-				collr.Ping.Packets = 3
 				collr.CreateVnode = false
 				collr.newSnmpClient = func() gosnmp.Handler { return m }
 				collr.newProber = func(cfg ping.ProberConfig, log *logger.Logger) ping.Prober { return &mockProber{} }
