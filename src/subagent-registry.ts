@@ -18,6 +18,7 @@ import type {
 import { loadAgentFromContent } from './agent-loader.js';
 import { parseFrontmatter, stripFrontmatter, parsePairs } from './frontmatter.js';
 import { isReservedAgentName } from './internal-tools.js';
+import { clampToolName, sanitizeToolName as coreSanitizeToolName } from './utils.js';
 
 interface ChildInfo {
   toolName: string;
@@ -33,14 +34,6 @@ interface ChildInfo {
 
 function canonical(p: string): string {
   try { return fs.realpathSync(p); } catch { return p; }
-}
-
-function sanitizeToolName(name: string): string {
-  return name
-    .replace(/[^A-Za-z0-9_.-]/g, '_')
-    .replace(/_+/g, '_')
-    .replace(/^_+|_+$/g, '')
-    .toLowerCase();
 }
 
 export class SubAgentRegistry {
@@ -77,7 +70,11 @@ export class SubAgentRegistry {
     // Determine tool name
     const fileBase = path.basename(id, path.extname(id));
     const baseName = fileBase;
-    const toolName = sanitizeToolName(baseName);
+    const toolName = (() => {
+      const sanitized = coreSanitizeToolName(baseName);
+      const normalized = sanitized.length > 0 ? sanitized.toLowerCase() : sanitized;
+      return clampToolName(normalized).name;
+    })();
     if (isReservedAgentName(toolName)) {
       throw new Error(`Sub-agent '${id}' uses a reserved tool name '${toolName}'`);
     }

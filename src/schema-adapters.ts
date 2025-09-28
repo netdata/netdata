@@ -1,3 +1,5 @@
+import { clampToolName, sanitizeToolName as coreSanitizeToolName } from './utils.js';
+
 export interface AgentSchemaSummary {
   id: string;
   toolName?: string;
@@ -15,10 +17,10 @@ const cloneSchema = (schema: Record<string, unknown> | undefined): Record<string
 };
 
 const sanitizeToolName = (name: string): string => {
-  const normalized = name.toLowerCase().replace(/[^a-z0-9_]/g, '_');
-  const trimmed = normalized.replace(/_+/g, '_').replace(/^_+|_+$/g, '');
-  const safe = trimmed.length > 0 ? trimmed : 'agent_tool';
-  return safe.length > OPENAI_NAME_LIMIT ? safe.slice(0, OPENAI_NAME_LIMIT) : safe;
+  const sanitized = coreSanitizeToolName(name);
+  const normalized = sanitized.length > 0 ? sanitized.toLowerCase() : sanitized;
+  const { name: clamped } = clampToolName(normalized, OPENAI_NAME_LIMIT);
+  return clamped;
 };
 
 const buildDescription = (agent: AgentSchemaSummary): string | undefined => {
