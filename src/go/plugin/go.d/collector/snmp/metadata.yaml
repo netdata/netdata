@@ -202,7 +202,7 @@ modules:
             - name: ping.enabled
               group: Ping
               description: Enable ICMP round-trip measurements (runs alongside SNMP). When disabled, no ping metrics are collected.
-              default_value: false
+              default_value: true
               required: false
             - name: ping.privileged
               group: Ping
@@ -225,11 +225,6 @@ modules:
               group: Profiles
               description: Profiles to apply if automatic detection cannot be used.
               default_value: "[]"
-              required: false
-            - name: disable_legacy_collection
-              group: Profiles
-              description: Disable the legacy SNMP collection method, forcing the collector to use only SNMP profiles (YAML-based configuration). When enabled, the collector will ignore any non-profile based collection logic.
-              default_value: "true"
               required: false
 
             - name: create_vnode

@@ -188,157 +188,9 @@
           }
         }
       },
-      "charts": {
-        "title": "Charts configuration",
-        "type": [
-          "array",
-          "null"
-        ],
-        "uniqueItems": true,
-        "items": {
-          "title": "Chart",
-          "type": [
-            "object",
-            "null"
-          ],
-          "properties": {
-            "id": {
-              "title": "ID",
-              "description": "Unique identifier for the chart.",
-              "type": "string"
-            },
-            "title": {
-              "title": "Title",
-              "description": "Title of the chart.",
-              "type": "string"
-            },
-            "units": {
-              "title": "Units",
-              "description": "Unit label for the vertical axis on charts.",
-              "type": "string"
-            },
-            "family": {
-              "title": "Family",
-              "description": "Subsection on the dashboard where the chart will be displayed.",
-              "type": "string"
-            },
-            "type": {
-              "title": "Type",
-              "type": "string",
-              "enum": [
-                "line",
-                "area",
-                "stacked"
-              ],
-              "default": "line"
-            },
-            "priority": {
-              "title": "Priority",
-              "description": "Rendering priority of the chart on the dashboard. Lower priority values will cause the chart to appear before those with higher priority values.",
-              "type": "integer",
-              "minimum": 1,
-              "default": 90000
-            },
-            "multiply_range": {
-              "title": "OID index range",
-              "description": "Specifies the range of indexes used to create multiple charts. If set, a chart will be created for each index in the specified range. Each chart will have the index appended to the OID dimension.",
-              "type": [
-                "array",
-                "null"
-              ],
-              "items": {
-                "title": "Index",
-                "type": "integer",
-                "minimum": 0
-              },
-              "uniqueItems": true,
-              "maxItems": 2
-            },
-            "dimensions": {
-              "title": "Dimensions",
-              "description": "Configuration for dimensions of the chart.",
-              "type": [
-                "array",
-                "null"
-              ],
-              "uniqueItems": true,
-              "minItems": 1,
-              "items": {
-                "title": "Dimension configuration",
-                "type": [
-                  "object",
-                  "null"
-                ],
-                "properties": {
-                  "oid": {
-                    "title": "OID",
-                    "description": "SNMP OID.",
-                    "type": "string"
-                  },
-                  "name": {
-                    "title": "Dimension",
-                    "description": "Name of the dimension.",
-                    "type": "string"
-                  },
-                  "algorithm": {
-                    "title": "Algorithm",
-                    "description": "Algorithm of the dimension.",
-                    "type": "string",
-                    "enum": [
-                      "absolute",
-                      "incremental"
-                    ],
-                    "default": "absolute"
-                  },
-                  "multiplier": {
-                    "title": "Multiplier",
-                    "description": "Value to multiply the collected value.",
-                    "type": "integer",
-                    "not": {
-                      "const": 0
-                    },
-                    "default": 1
-                  },
-                  "divisor": {
-                    "title": "Divisor",
-                    "description": "Value to divide the collected value.",
-                    "type": "integer",
-                    "not": {
-                      "const": 0
-                    },
-                    "default": 1
-                  }
-                },
-                "required": [
-                  "oid",
-                  "name",
-                  "algorithm",
-                  "multiplier",
-                  "divisor"
-                ]
-              }
-            }
-          },
-          "required": [
-            "id",
-            "title",
-            "units",
-            "family",
-            "type",
-            "priority",
-            "dimensions"
-          ]
-        }
-      },
-      "disable_legacy_collection": {
-        "title": "Disable Legacy SNMP Collection",
-        "description": "Disable the legacy SNMP collection method, forcing the collector to use only SNMP profiles (YAML-based configuration). When enabled, the collector will ignore any non-profile based collection logic.",
-        "type": "boolean",
-        "default": true
-      },
       "manual_profiles": {
         "title": "Manual SNMP Profiles",
-        "description": "Profiles to apply if automatic detection cannot be used.",
+        "description": "Profiles to apply if automatic detection cannot be used. In most cases, **leave this empty**.",
         "type": [
           "array",
           "null"
@@ -359,7 +211,7 @@
           "enabled": {
             "title": "Enable ping",
             "type": "boolean",
-            "default": false,
+            "default": true,
             "description": "Collect ICMP round-trip time using pro-bing alongside SNMP."
           },
           "network": {
@@ -467,32 +319,6 @@
         "ui:widget": "hidden"
       }
     },
-    "charts": {
-      "ui:widget": "hidden",
-      "items": {
-        "ui:collapsible": true,
-        "type": {
-          "ui:widget": "radio",
-          "ui:options": {
-            "inline": true
-          }
-        },
-        "multiply_range": {
-          "ui:listFlavour": "list"
-        },
-        "dimensions": {
-          "items": {
-            "ui:collapsible": true,
-            "algorithm": {
-              "ui:widget": "radio",
-              "ui:options": {
-                "inline": true
-              }
-            }
-          }
-        }
-      }
-    },
     "ui:flavour": "tabs",
     "ui:options": {
       "tabs": [
@@ -501,7 +327,8 @@
           "fields": [
             "update_every",
             "hostname",
-            "community"
+            "community",
+            "manual_profiles"
           ]
         },
         {
@@ -528,13 +355,6 @@
           "title": "SNMPv3",
           "fields": [
             "user"
-          ]
-        },
-        {
-          "title": "Profiles",
-          "fields": [
-            "manual_profiles",
-            "disable_legacy_collection"
           ]
         }
       ]

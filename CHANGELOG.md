@@ -6,6 +6,12 @@
 
 **Merged pull requests:**
 
+- Regenerate integrations docs [\#21058](https://github.com/netdata/netdata/pull/21058) ([netdatabot](https://github.com/netdatabot))
+- chore\(go.d/snmp\): remove legacy custom oid collection [\#21056](https://github.com/netdata/netdata/pull/21056) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations docs [\#21055](https://github.com/netdata/netdata/pull/21055) ([netdatabot](https://github.com/netdatabot))
+- feat\(go.d/snmp\): enable ping by default [\#21054](https://github.com/netdata/netdata/pull/21054) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations docs [\#21053](https://github.com/netdata/netdata/pull/21053) ([netdatabot](https://github.com/netdatabot))
+- feat\(go.d/snmp\): add optional ICMP ping metrics [\#21052](https://github.com/netdata/netdata/pull/21052) ([ilyam8](https://github.com/ilyam8))
 - improve\(go.d/rabbitmq\): add support for old RabbitMQ whoami tags format [\#21049](https://github.com/netdata/netdata/pull/21049) ([ilyam8](https://github.com/ilyam8))
 - ai-docs [\#21043](https://github.com/netdata/netdata/pull/21043) ([shyamvalsan](https://github.com/shyamvalsan))
 
@@ -445,13 +451,6 @@
 - fix\(go.d/ddsnmp\): remove singular-to-plural conversion in metric family [\#20517](https://github.com/netdata/netdata/pull/20517) ([ilyam8](https://github.com/ilyam8))
 - improve\(go.d/snmp-profiles\): Add hrSystemUptime metric [\#20516](https://github.com/netdata/netdata/pull/20516) ([ilyam8](https://github.com/ilyam8))
 - Update mcp.md [\#20515](https://github.com/netdata/netdata/pull/20515) ([Ancairon](https://github.com/Ancairon))
-- Update machine-learning-and-assisted-troubleshooting.md [\#20514](https://github.com/netdata/netdata/pull/20514) ([kanelatechnical](https://github.com/kanelatechnical))
-- docs: add Netdata MCP Server preview announcement [\#20513](https://github.com/netdata/netdata/pull/20513) ([ilyam8](https://github.com/ilyam8))
-- improve\(go.d/snmp\): add SNMP- prefix for vnode hostname [\#20512](https://github.com/netdata/netdata/pull/20512) ([ilyam8](https://github.com/ilyam8))
-- Cleanup pending statements during shutdown [\#20511](https://github.com/netdata/netdata/pull/20511) ([stelfrag](https://github.com/stelfrag))
-- test\(go.d/ddsnmp\): add more tests for table metrics [\#20510](https://github.com/netdata/netdata/pull/20510) ([ilyam8](https://github.com/ilyam8))
-- chore\(go.d/ddsnmp\): fix table collection with caching [\#20509](https://github.com/netdata/netdata/pull/20509) ([ilyam8](https://github.com/ilyam8))
-- feat\(go.d/snmp profile\): add fallback support for duplicate metric tags [\#20508](https://github.com/netdata/netdata/pull/20508) ([ilyam8](https://github.com/ilyam8))
 
 ## [v2.5.4](https://github.com/netdata/netdata/tree/v2.5.4) (2025-06-24)
 

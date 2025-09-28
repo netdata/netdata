@@ -19,9 +19,6 @@ selector:
       include:
         - 1.3.6.1.4.1.14823.1.2.*
 
-device:
-  vendor: "Aruba"
-
 metadata:
   device:
     fields:
@@ -58,3 +55,5 @@ metadata:
           # Example: `6.5.1.0` part of `Version 6.5.1.0-4.3.1.2`
       type:
         value: "Access Point"
+      vendor:
+        value: Aruba
