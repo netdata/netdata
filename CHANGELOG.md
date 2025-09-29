@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- Regenerate integrations docs [\#21065](https://github.com/netdata/netdata/pull/21065) ([netdatabot](https://github.com/netdatabot))
+- feat\(go.d/snmp\): add `ping_only` option [\#21064](https://github.com/netdata/netdata/pull/21064) ([ilyam8](https://github.com/ilyam8))
+- chore\(go.d/ddsmp\): profile definition cleanup [\#21062](https://github.com/netdata/netdata/pull/21062) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations docs [\#21058](https://github.com/netdata/netdata/pull/21058) ([netdatabot](https://github.com/netdatabot))
 - chore\(go.d/snmp\): remove legacy custom oid collection [\#21056](https://github.com/netdata/netdata/pull/21056) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations docs [\#21055](https://github.com/netdata/netdata/pull/21055) ([netdatabot](https://github.com/netdatabot))
@@ -446,11 +449,6 @@
 - Hardware \(Windows.plugin\) [\#20522](https://github.com/netdata/netdata/pull/20522) ([thiagoftsm](https://github.com/thiagoftsm))
 - upd generic check in snmp prof metrics deduplication [\#20521](https://github.com/netdata/netdata/pull/20521) ([ilyam8](https://github.com/ilyam8))
 - improve\(go.d/snmp-profiles\): metrics deduplication [\#20520](https://github.com/netdata/netdata/pull/20520) ([ilyam8](https://github.com/ilyam8))
-- chore\(go.d/snmp-profiles\): remove unsupported constant\_value\_one metrics [\#20519](https://github.com/netdata/netdata/pull/20519) ([ilyam8](https://github.com/ilyam8))
-- Drop POWER8+ builds. [\#20518](https://github.com/netdata/netdata/pull/20518) ([Ferroin](https://github.com/Ferroin))
-- fix\(go.d/ddsnmp\): remove singular-to-plural conversion in metric family [\#20517](https://github.com/netdata/netdata/pull/20517) ([ilyam8](https://github.com/ilyam8))
-- improve\(go.d/snmp-profiles\): Add hrSystemUptime metric [\#20516](https://github.com/netdata/netdata/pull/20516) ([ilyam8](https://github.com/ilyam8))
-- Update mcp.md [\#20515](https://github.com/netdata/netdata/pull/20515) ([Ancairon](https://github.com/Ancairon))
 
 ## [v2.5.4](https://github.com/netdata/netdata/tree/v2.5.4) (2025-06-24)
 
