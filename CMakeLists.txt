@@ -3187,11 +3187,20 @@ install(TARGETS netdatacli
 #
 
 if(ENABLE_PLUGIN_GO)
-    add_go_target(go-plugin go.d.plugin src/go cmd/godplugin)
+    if (OS_WINDOWS)
+        add_go_target(go-plugin go.d.plugin.exe src/go cmd/godplugin)
 
-    install(PROGRAMS ${CMAKE_BINARY_DIR}/go.d.plugin
-            COMPONENT plugin-go
-            DESTINATION usr/libexec/netdata/plugins.d)
+        install(PROGRAMS ${CMAKE_BINARY_DIR}/go.d.plugin.exe
+                COMPONENT plugin-go
+                DESTINATION usr/libexec/netdata/plugins.d)
+    else()
+        add_go_target(go-plugin go.d.plugin src/go cmd/godplugin)
+
+        install(PROGRAMS ${CMAKE_BINARY_DIR}/go.d.plugin
+                COMPONENT plugin-go
+                DESTINATION usr/libexec/netdata/plugins.d)
+    endif()
+
 
     # Build and install nd-mcp (stdio-golang bridge) exactly like go.d.plugin
     if (OS_WINDOWS)
