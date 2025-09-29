@@ -89,65 +89,10 @@ set(CONFIG_H ${CONFIG_H_DIR}/config.h)
 # detect OS
 #
 
-set(OS_FREEBSD     False)
-set(OS_LINUX       False)
-set(OS_MACOS       False)
-set(OS_WINDOWS     False)
-
 set(NETDATA_RUNTIME_PREFIX "${CMAKE_INSTALL_PREFIX}")
 set(BINDIR usr/sbin)
 
-if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
-        set(OS_MACOS True)
-        find_library(IOKIT IOKit)
-        find_library(FOUNDATION Foundation)
-        message(STATUS " Compiling for MacOS... ")
-elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "FreeBSD")
-        set(OS_FREEBSD True)
-        message(STATUS " Compiling for FreeBSD... ")
-elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Linux")
-        set(OS_LINUX True)
-        add_definitions(-D_GNU_SOURCE)
-        message(STATUS " Compiling for Linux... ")
-elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "CYGWIN" OR "${CMAKE_SYSTEM_NAME}" STREQUAL "MSYS" OR "${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
-        set(OS_WINDOWS True)
-
-        if(NOT "${CMAKE_INSTALL_PREFIX}" STREQUAL "/opt/netdata")
-                message(FATAL_ERROR "CMAKE_INSTALL_PREFIX must be set to /opt/netdata, but it is set to ${CMAKE_INSTALL_PREFIX}")
-        endif()
-
-        if(BUILD_FOR_PACKAGING)
-                set(NETDATA_RUNTIME_PREFIX "/")
-        endif()
-
-        set(BINDIR usr/bin)
-        set(CMAKE_RC_COMPILER_INIT windres)
-        ENABLE_LANGUAGE(RC)
-
-        SET(CMAKE_RC_COMPILE_OBJECT "<CMAKE_RC_COMPILER> <FLAGS> -O coff <DEFINES> -i <SOURCE> -o <OBJECT>")
-        add_definitions(-D_GNU_SOURCE)
-
-        if($ENV{CLION_IDE})
-                set(RUN_UNDER_CLION True)
-
-                # clion needs these to find the includes
-                if("${CMAKE_SYSTEM_NAME}" STREQUAL "MSYS" OR "${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
-                        if("$ENV{MSYSTEM}" STREQUAL "MSYS")
-                                include_directories(c:/msys64/usr/include)
-                                include_directories(c:/msys64/usr/include/w32api)
-                        elseif("$ENV{MSYSTEM}" STREQUAL "MINGW64")
-                                include_directories(c:/msys64/mingw64/include)
-                        elseif("$ENV{MSYSTEM}" STREQUAL "UCRT64")
-                                include_directories(c:/msys64/ucrt64/include)
-                        endif()
-                endif()
-        endif()
-
-        message(STATUS " Compiling for Windows (${CMAKE_SYSTEM_NAME}, MSYSTEM=$ENV{MSYSTEM})... ")
-else()
-        message(FATAL_ERROR "Unknown/unsupported platform: ${CMAKE_SYSTEM_NAME} (Supported platforms: FreeBSD, Linux, macOS, Windows)")
-endif()
-
+include(NetdataPlatform)
 include(NetdataCompilerFlags)
 
 check_c_compiler_flag("-fexceptions" HAVE_FEXCEPTIONS)
@@ -181,7 +126,6 @@ option(ENABLE_PLUGIN_PYTHON "Enable metric collectors written in Python" ${DEFAU
 cmake_dependent_option(ENABLE_PLUGIN_APPS "Enable per-process resource usage monitoring" ${DEFAULT_FEATURE_STATE} "OS_LINUX OR OS_FREEBSD OR OS_MACOS OR OS_WINDOWS" False)
 cmake_dependent_option(ENABLE_PLUGIN_CHARTS "Enable metric collectors written in Bash" ${DEFAULT_FEATURE_STATE} "NOT OS_WINDOWS" False)
 cmake_dependent_option(ENABLE_PLUGIN_CUPS "Enable CUPS monitoring" ${DEFAULT_FEATURE_STATE} "NOT OS_WINDOWS" False)
-cmake_dependent_option(ENABLE_PLUGIN_IBM "Enable IBM ecosystem collectors (requires CGO)" False "NOT OS_WINDOWS" False)
 
 cmake_dependent_option(ENABLE_PLUGIN_FREEIPMI "Enable IPMI monitoring" ${DEFAULT_FEATURE_STATE} "OS_LINUX OR OS_FREEBSD" False)
 
@@ -198,6 +142,8 @@ cmake_dependent_option(ENABLE_PLUGIN_SLABINFO "Enable Linux kernel SLAB allocato
 cmake_dependent_option(ENABLE_PLUGIN_SYSTEMD_JOURNAL "Enable systemd journal log collection" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
 cmake_dependent_option(ENABLE_PLUGIN_SYSTEMD_UNITS "Enable systemd units information collection" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
 cmake_dependent_option(ENABLE_PLUGIN_XENSTAT "Enable Xen domain monitoring" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
+
+cmake_dependent_option(ENABLE_PLUGIN_IBM "Enable IBM ecosystem collectors (requires CGO)" False "OS_LINUX AND CPU_X86_64" False)
 
 # Metrics exporters
 option(ENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE "Enable exporting to Prometheus via remote write API" ${DEFAULT_FEATURE_STATE})
@@ -328,7 +274,7 @@ if(ENABLE_JEMALLOC)
     endif()
 endif()
 
-if(ENABLE_PLUGIN_GO)
+if(ENABLE_PLUGIN_GO OR ENABLE_PLUGIN_IBM)
     include(NetdataGoTools)
 
     find_min_go_version("${CMAKE_SOURCE_DIR}/src/go")
