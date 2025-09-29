@@ -19,6 +19,8 @@ static void register_libuv_worker_jobs_internal(void) {
     worker_register_job_name(UV_EVENT_DBENGINE_EXTENT_PAGE_LOOKUP, "page lookup");
     worker_register_job_name(UV_EVENT_DBENGINE_EXTENT_PAGE_POPULATION, "page populate");
     worker_register_job_name(UV_EVENT_DBENGINE_EXTENT_PAGE_ALLOCATION, "page allocate");
+    // Weights
+    worker_register_job_name(UV_EVENT_WEIGHTS_CALCULATION, "weights calculation");
 
     // flushing related
     worker_register_job_name(UV_EVENT_DBENGINE_FLUSH_MAIN_CACHE, "flush main");
