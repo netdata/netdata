@@ -1,8 +1,11 @@
 # Base profile for Cisco Wireless LAN Controllers
 # This profile is only compatible with the core SNMP integration
 
-device:
-  vendor: "cisco"
+metadata:
+  device:
+    fields:
+      vendor:
+        value: Cisco
 
 metrics:
   # Connected APs metrics

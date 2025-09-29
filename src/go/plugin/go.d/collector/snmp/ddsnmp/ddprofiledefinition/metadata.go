@@ -5,45 +5,28 @@
 
 package ddprofiledefinition
 
-import "github.com/invopop/jsonschema"
-
 // MetadataDeviceResource is the device resource name
 const MetadataDeviceResource = "device"
 
 // MetadataConfig holds configs per resource type
-type MetadataConfig ListMap[MetadataResourceConfig]
-
-// JSONSchema defines the JSON schema for MetadataConfig
-func (mc MetadataConfig) JSONSchema() *jsonschema.Schema {
-	return ListMap[MetadataResourceConfig](mc).JSONSchema()
-}
-
-// MarshalJSON marshals the metadata config
-func (mc MetadataConfig) MarshalJSON() ([]byte, error) {
-	return ListMap[MetadataResourceConfig](mc).MarshalJSON()
-}
-
-// UnmarshalJSON unmarshals the metadata config
-func (mc *MetadataConfig) UnmarshalJSON(data []byte) error {
-	return (*ListMap[MetadataResourceConfig])(mc).UnmarshalJSON(data)
-}
+type MetadataConfig map[string]MetadataResourceConfig
 
 // Clone duplicates this MetadataConfig
 func (mc MetadataConfig) Clone() MetadataConfig {
-	return CloneMap(mc)
+	return cloneMap(mc)
 }
 
 // MetadataResourceConfig holds configs for a metadata resource
 type MetadataResourceConfig struct {
-	Fields ListMap[MetadataField] `yaml:"fields" json:"fields"`
-	IDTags MetricTagConfigList    `yaml:"id_tags,omitempty" json:"id_tags,omitempty"`
+	Fields map[string]MetadataField `yaml:"fields" json:"fields"`
+	IDTags MetricTagConfigList      `yaml:"id_tags,omitempty" json:"id_tags,omitempty"`
 }
 
 // Clone duplicates this MetadataResourceConfig
 func (c MetadataResourceConfig) Clone() MetadataResourceConfig {
 	return MetadataResourceConfig{
-		Fields: CloneMap(c.Fields),
-		IDTags: CloneSlice(c.IDTags),
+		Fields: cloneMap(c.Fields),
+		IDTags: cloneSlice(c.IDTags),
 	}
 }
 
@@ -58,30 +41,19 @@ type MetadataField struct {
 func (c MetadataField) Clone() MetadataField {
 	return MetadataField{
 		Symbol:  c.Symbol.Clone(),
-		Symbols: CloneSlice(c.Symbols),
+		Symbols: cloneSlice(c.Symbols),
 		Value:   c.Value,
 	}
 }
 
-// NewMetadataResourceConfig returns a new metadata resource config
-func NewMetadataResourceConfig() MetadataResourceConfig {
-	return MetadataResourceConfig{}
-}
-
-// IsMetadataResourceWithScalarOids returns true if the resource is based on scalar OIDs
-// at the moment, we only expect "device" resource to be based on scalar OIDs
-func IsMetadataResourceWithScalarOids(resource string) bool {
-	return resource == MetadataDeviceResource
-}
-
 type SysobjectIDMetadataEntryConfig struct {
-	SysobjectID string                 `yaml:"sysobjectid"`
-	Metadata    ListMap[MetadataField] `yaml:"metadata"`
+	SysobjectID string                   `yaml:"sysobjectid"`
+	Metadata    map[string]MetadataField `yaml:"metadata"`
 }
 
 func (e SysobjectIDMetadataEntryConfig) Clone() SysobjectIDMetadataEntryConfig {
 	return SysobjectIDMetadataEntryConfig{
 		SysobjectID: e.SysobjectID,
-		Metadata:    CloneMap(e.Metadata),
+		Metadata:    cloneMap(e.Metadata),
 	}
 }

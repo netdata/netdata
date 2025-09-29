@@ -22,7 +22,8 @@ type (
 
 		ManualProfiles []string `yaml:"manual_profiles,omitempty" json:"manual_profiles"`
 
-		Ping PingConfig `yaml:"ping,omitempty" json:"ping"`
+		PingOnly bool       `yaml:"ping_only,omitempty" json:"ping_only"`
+		Ping     PingConfig `yaml:"ping,omitempty" json:"ping"`
 	}
 
 	PingConfig struct {
@@ -45,25 +46,5 @@ type (
 		Version        string `yaml:"version,omitempty" json:"version"`
 		MaxOIDs        int    `yaml:"max_request_size,omitempty" json:"max_request_size"`
 		MaxRepetitions int    `yaml:"max_repetitions,omitempty" json:"max_repetitions"`
-	}
-)
-
-type (
-	ChartConfig struct {
-		ID         string            `yaml:"id" json:"id"`
-		Title      string            `yaml:"title" json:"title"`
-		Units      string            `yaml:"units" json:"units"`
-		Family     string            `yaml:"family" json:"family"`
-		Type       string            `yaml:"type" json:"type"`
-		Priority   int               `yaml:"priority" json:"priority"`
-		IndexRange []int             `yaml:"multiply_range,omitempty" json:"multiply_range"`
-		Dimensions []DimensionConfig `yaml:"dimensions" json:"dimensions"`
-	}
-	DimensionConfig struct {
-		OID        string `yaml:"oid" json:"oid"`
-		Name       string `yaml:"name" json:"name"`
-		Algorithm  string `yaml:"algorithm" json:"algorithm"`
-		Multiplier int    `yaml:"multiplier" json:"multiplier"`
-		Divisor    int    `yaml:"divisor" json:"divisor"`
 	}
 )

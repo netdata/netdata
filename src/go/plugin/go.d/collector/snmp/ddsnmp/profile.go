@@ -195,7 +195,7 @@ func (p *Profile) mergeMetadata(base *Profile) {
 	for resName, baseRes := range base.Definition.Metadata {
 		targetRes, exists := p.Definition.Metadata[resName]
 		if !exists {
-			targetRes = ddprofiledefinition.NewMetadataResourceConfig()
+			targetRes = ddprofiledefinition.MetadataResourceConfig{}
 		}
 
 		targetRes.IDTags = append(targetRes.IDTags, baseRes.IDTags...)

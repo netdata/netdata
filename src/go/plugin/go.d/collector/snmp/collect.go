@@ -30,15 +30,23 @@ func (c *Collector) collect() (map[string]int64, error) {
 		return nil, err
 	}
 
-	mx, err := c.collectMetrics()
-	if err != nil {
+	if c.PingOnly {
+		return c.collectPingOnly()
+	}
+	return c.collectDeviceMetrics()
+}
+
+func (c *Collector) collectPingOnly() (map[string]int64, error) {
+	mx := make(map[string]int64)
+
+	if err := c.collectPing(mx); err != nil {
 		return nil, err
 	}
 
 	return mx, nil
 }
 
-func (c *Collector) collectMetrics() (map[string]int64, error) {
+func (c *Collector) collectDeviceMetrics() (map[string]int64, error) {
 	var (
 		snmpMx map[string]int64
 		pingMx map[string]int64
@@ -121,7 +129,7 @@ func (c *Collector) ensureInitialized() error {
 
 	c.sysInfo = si
 
-	if c.Ping.Enabled {
+	if c.PingOnly || c.Ping.Enabled {
 		c.addPingCharts()
 	}
 

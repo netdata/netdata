@@ -5,15 +5,15 @@
 
 package ddprofiledefinition
 
-// Cloneable is a generic type for objects that can duplicate themselves.
-// It is exclusively used in the form [T Cloneable[T]], i.e. a type that
+// cloneable is a generic type for objects that can duplicate themselves.
+// It is exclusively used in the form [T cloneable[T]], i.e. a type that
 // has a .Clone() that returns a new instance of itself.
-type Cloneable[T any] interface {
+type cloneable[T any] interface {
 	Clone() T
 }
 
 // CloneSlice clones all the objects in a slice into a new slice.
-func CloneSlice[Slice ~[]T, T Cloneable[T]](s Slice) Slice {
+func cloneSlice[Slice ~[]T, T cloneable[T]](s Slice) Slice {
 	if s == nil {
 		return nil
 	}
@@ -26,7 +26,7 @@ func CloneSlice[Slice ~[]T, T Cloneable[T]](s Slice) Slice {
 
 // CloneMap clones a map[K]T for any cloneable type T.
 // The map keys are shallow-copied; values are cloned.
-func CloneMap[Map ~map[K]T, K comparable, T Cloneable[T]](m Map) Map {
+func cloneMap[Map ~map[K]T, K comparable, T cloneable[T]](m Map) Map {
 	if m == nil {
 		return nil
 	}
