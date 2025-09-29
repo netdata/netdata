@@ -411,7 +411,7 @@ modules:
           metrics:
             - name: disk.space
               description: Disk Space Usage
-              unit: "GiB"
+              unit: "MiB"
               chart_type: stacked
               dimensions:
                 - name: avail
