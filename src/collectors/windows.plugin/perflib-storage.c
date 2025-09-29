@@ -185,7 +185,7 @@ static STRING *getFileSystemType(struct logical_disk *d, const char *diskName)
         snprintf(pathBuffer, sizeof(pathBuffer), "%s\\", diskName); // Format as "C:\"
     else
         // Assume it's a Volume GUID path or a device path
-        snprintf(pathBuffer, sizeof(pathBuffer), "\\\\.\\%s\\", diskName); // Format as "\\.\HarddiskVolume1\"
+        snprintf(pathBuffer, sizeof(pathBuffer), "%s", diskName);
 
     d->DriveType = GetDriveTypeA(pathBuffer);
 
@@ -245,59 +245,37 @@ static inline LONGLONG convertToBytes(LONGLONG value, double factor) {
     return (LONGLONG) dvalue*100;
 }
 
-static inline void netdata_set_hd_usage(PERF_DATA_BLOCK *pDataBlock,
-                                        PERF_OBJECT_TYPE *pObjectType,
-                                        PERF_INSTANCE_DEFINITION *pi,
-                                        struct logical_disk *d)
+static inline void netdata_set_hd_usage(struct logical_disk *d)
 {
-    ULARGE_INTEGER freeBytesAvaiable;
-    ULARGE_INTEGER totalBytes;
-    ULARGE_INTEGER totalNumberOfFreeBytes;
+    ULARGE_INTEGER freeBytesAvaiable, totalBytes, totalNumberOfFreeBytes;
 
-// https://learn.microsoft.com/en-us/windows/win32/fileio/maximum-file-path-limitation?tabs=registry
-#define MAX_DRIVE_LENGTH 255
-    char path[MAX_DRIVE_LENGTH + 1];
-    snprintfz(path, MAX_DRIVE_LENGTH, "%s\\", windows_shared_buffer);
-
-    // Description of incompatibilities present in both methods we are using
-    // https://devblogs.microsoft.com/oldnewthing/20071101-00/?p=24613
-    // We are using the variable that should not be affected by quota ()
-    if ((GetDriveTypeA(path) == DRIVE_UNKNOWN) || !GetDiskFreeSpaceExA(path,
-                                                                     &freeBytesAvaiable,
-                                                                     &totalBytes,
-                                                                     &totalNumberOfFreeBytes)) {
-        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->percentDiskFree);
-
-        d->percentDiskFree.current.Data = convertToBytes(d->percentDiskFree.current.Data, 1024);
-        d->percentDiskFree.current.Time = convertToBytes(d->percentDiskFree.current.Time, 1024);
+    if (!GetDiskFreeSpaceExA(windows_shared_buffer, &freeBytesAvaiable, &totalBytes, &totalNumberOfFreeBytes)) {
         return;
     }
 
     // Available
-    d->percentDiskFree.current.Data = convertToBytes(totalNumberOfFreeBytes.QuadPart, 1024 * 1024 * 1024);
+    d->percentDiskFree.current.Data = convertToBytes(totalNumberOfFreeBytes.QuadPart, 1024 * 1024);
     // Disk Used
-    d->percentDiskFree.current.Time = convertToBytes(totalBytes.QuadPart, 1024 * 1024 * 1024);
+    d->percentDiskFree.current.Time = convertToBytes(totalBytes.QuadPart, 1024 * 1024);
 }
 
 static bool do_logical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every, usec_t now_ut)
 {
     DICTIONARY *dict = logicalDisks;
-
-    PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, "LogicalDisk");
-    if (!pObjectType)
+    HANDLE hFind = FindFirstVolumeA(windows_shared_buffer, 8192);
+    if (hFind == INVALID_HANDLE_VALUE) {
+        nd_log(
+                NDLS_COLLECTORS,
+                NDLP_ERR,
+                "Storage Error %d", GetLastError());
         return false;
+    }
 
-    PERF_INSTANCE_DEFINITION *pi = NULL;
-    for (LONG i = 0; i < pObjectType->NumInstances; i++) {
-        pi = perflibForEachInstance(pDataBlock, pObjectType, pi);
-        if (!pi)
-            break;
-
-        if (!getInstanceName(pDataBlock, pObjectType, pi, windows_shared_buffer, sizeof(windows_shared_buffer)))
-            strncpyz(windows_shared_buffer, "[unknown]", sizeof(windows_shared_buffer) - 1);
-
-        if (strcasecmp(windows_shared_buffer, "_Total") == 0)
+    do {
+        size_t len = strlen(windows_shared_buffer);
+        if (windows_shared_buffer[0] != '\\' || windows_shared_buffer[len-1] != '\\') {
             continue;
+        }
 
         struct logical_disk *d = dictionary_set(dict, windows_shared_buffer, NULL, sizeof(*d));
         d->last_collected = now_ut;
@@ -307,32 +285,40 @@ static bool do_logical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every, usec_
             d->collected_metadata = true;
         }
 
-        netdata_set_hd_usage(pDataBlock, pObjectType, pi, d);
-        // perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->freeMegabytes);
+        netdata_set_hd_usage(d);
 
         if (!d->st_disk_space) {
+            char id[RRD_ID_LENGTH_MAX + 1];
+            strncpyz(id, windows_shared_buffer, RRD_ID_LENGTH_MAX);
+            netdata_fix_chart_name(id);
             d->st_disk_space = rrdset_create_localhost(
-                "disk_space",
-                windows_shared_buffer,
-                NULL,
-                windows_shared_buffer,
-                "disk.space",
-                "Disk Space Usage",
-                "GiB",
-                PLUGIN_WINDOWS_NAME,
-                "PerflibStorage",
-                NETDATA_CHART_PRIO_DISKSPACE_SPACE,
-                update_every,
-                RRDSET_TYPE_STACKED);
+                    "disk_space",
+                    id,
+                    NULL,
+                    id,
+                    "disk.space",
+                    "Disk Space Usage",
+                    "MiB",
+                    PLUGIN_WINDOWS_NAME,
+                    "PerflibStorage",
+                    NETDATA_CHART_PRIO_DISKSPACE_SPACE,
+                    update_every,
+                    RRDSET_TYPE_STACKED);
 
-            rrdlabels_add(d->st_disk_space->rrdlabels, "mount_point", windows_shared_buffer, RRDLABEL_SRC_AUTO);
+            DWORD returnLen = 0;
+            if (GetVolumePathNamesForVolumeNameA(windows_shared_buffer, id, RRD_ID_LENGTH_MAX, &returnLen)) {
+                if (id[0]) {
+                    rrdlabels_add(d->st_disk_space->rrdlabels, "mount_point", id, RRDLABEL_SRC_AUTO);
+                }
+            }
+
             rrdlabels_add(
-                d->st_disk_space->rrdlabels, "drive_type", drive_type_to_str(d->DriveType), RRDLABEL_SRC_AUTO);
+                    d->st_disk_space->rrdlabels, "drive_type", drive_type_to_str(d->DriveType), RRDLABEL_SRC_AUTO);
             rrdlabels_add(
-                d->st_disk_space->rrdlabels,
-                "filesystem",
-                d->filesystem ? string2str(d->filesystem) : "unknown",
-                RRDLABEL_SRC_AUTO);
+                    d->st_disk_space->rrdlabels,
+                    "filesystem",
+                    d->filesystem ? string2str(d->filesystem) : "unknown",
+                    RRDLABEL_SRC_AUTO);
             rrdlabels_add(d->st_disk_space->rrdlabels, "rw_mode", d->readonly ? "ro" : "rw", RRDLABEL_SRC_AUTO);
 
             {
@@ -347,13 +333,15 @@ static bool do_logical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every, usec_
 
         // percentDiskFree has the free space in Data and the size of the disk in Time, in MiB.
         rrddim_set_by_pointer(
-            d->st_disk_space, d->rd_disk_space_free, (collected_number)d->percentDiskFree.current.Data);
+                d->st_disk_space, d->rd_disk_space_free, (collected_number)d->percentDiskFree.current.Data);
         rrddim_set_by_pointer(
-            d->st_disk_space,
-            d->rd_disk_space_used,
-            (collected_number)(d->percentDiskFree.current.Time - d->percentDiskFree.current.Data));
+                d->st_disk_space,
+                d->rd_disk_space_used,
+                (collected_number)(d->percentDiskFree.current.Time - d->percentDiskFree.current.Data));
         rrdset_done(d->st_disk_space);
-    }
+    } while (FindNextVolumeA(hFind, windows_shared_buffer, 8192));
+
+    FindVolumeClose(hFind);
 
     // cleanup
     {
