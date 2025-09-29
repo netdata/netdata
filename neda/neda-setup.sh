@@ -272,10 +272,9 @@ if [ ! -d "$MCP_GSC_DIR" ]; then
     
     run sudo -u "$NEDA_USER" git clone https://github.com/AminForou/mcp-gsc "$MCP_GSC_DIR"
     
-    run sudo -u "$NEDA_USER" python3 -m venv "$MCP_GSC_DIR/.venv"
-    
-    run sudo -u "$NEDA_USER" bash -c \
-        "cd '$MCP_GSC_DIR' && source .venv/bin/activate && pip install --upgrade pip && pip install -r requirements.txt"
+    run sudo -u "$NEDA_USER" python3 -m venv --upgrade-deps "$MCP_GSC_DIR/.venv"
+
+    run sudo -u "$NEDA_USER" "$MCP_GSC_DIR/.venv/bin/pip" install -r "$MCP_GSC_DIR/requirements.txt"
     
     log_info "mcp-gsc installed successfully"
 else
