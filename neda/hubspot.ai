@@ -3,7 +3,7 @@
 description: HubSpot Intelligence Agent - Extract comprehensive company data from HubSpot CRM
 usage: company name OR company domain OR contact email
 models:
-  - anthropic/claude-sonnet-4-20250514
+  - anthropic/claude-sonnet-4-5
 tools:
   - hubspot
   - batch

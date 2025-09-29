@@ -6,7 +6,7 @@ description: |
 usage: |
   company name or domain name
 models:
-  - anthropic/claude-sonnet-4-20250514
+  - anthropic/claude-sonnet-4-5
 #  - anthropic/claude-3-5-haiku-20241022
 #  - google/gemini-1.5-flash
   - openai/gpt-5

@@ -1,6 +1,6 @@
 # Neda AI CRM Agent - Complete Access Guide
 
-Neda is available at **10.20.4.205** and provides multiple interfaces for integration. This guide covers all methods to access Neda's capabilities.
+Neda is available at **10.20.1.106** and provides multiple interfaces for integration. This guide covers all methods to access Neda's capabilities.
 
 ## Available Neda Agents
 
@@ -36,7 +36,7 @@ Add to your Claude Code configuration (`claude_config.json`):
 {
   "mcpServers": {
     "neda": {
-      "url": "http://10.20.4.205:8801/mcp",
+      "url": "http://10.20.1.106:8801/mcp",
       "transport": "http"
     }
   }
@@ -49,7 +49,7 @@ Or use Server-Sent Events (SSE):
 {
   "mcpServers": {
     "neda": {
-      "url": "http://10.20.4.205:8802/mcp/sse",
+      "url": "http://10.20.1.106:8802/mcp/sse",
       "transport": "sse"
     }
   }
@@ -71,7 +71,7 @@ Since Claude Desktop doesn't support remote MCP directly, use `mcp-remote`:
         "connect",
         "--transport",
         "http",
-        "http://10.20.4.205:8801/mcp"
+        "http://10.20.1.106:8801/mcp"
       ]
     }
   }
@@ -93,7 +93,7 @@ Add to your Codex configuration (`~/.codex/config.json`):
         "connect",
         "--transport",
         "http",
-        "http://10.20.4.205:8801/mcp"
+        "http://10.20.1.106:8801/mcp"
       ]
     }
   }
@@ -112,7 +112,7 @@ from openai import OpenAI
 
 client = OpenAI(
     api_key="your-key-here",  # Any non-empty string
-    base_url="http://10.20.4.205:8804/v1"
+    base_url="http://10.20.1.106:8804/v1"
 )
 
 response = client.chat.completions.create(
@@ -130,7 +130,7 @@ import OpenAI from 'openai';
 
 const openai = new OpenAI({
   apiKey: 'your-key-here', // Any non-empty string
-  baseURL: 'http://10.20.4.205:8804/v1',
+  baseURL: 'http://10.20.1.106:8804/v1',
 });
 
 const response = await openai.chat.completions.create({
@@ -147,7 +147,7 @@ console.log(response.choices[0].message.content);
 import httpx
 
 response = httpx.post(
-    "http://10.20.4.205:8805/v1/messages",
+    "http://10.20.1.106:8805/v1/messages",
     headers={
         "x-api-key": "your-key-here",  # Any non-empty string
         "anthropic-version": "2023-06-01",
@@ -166,7 +166,7 @@ print(response.json()["content"][0]["text"])
 
 ```javascript
 // JavaScript/TypeScript example
-const response = await fetch('http://10.20.4.205:8805/v1/messages', {
+const response = await fetch('http://10.20.1.106:8805/v1/messages', {
   method: 'POST',
   headers: {
     'x-api-key': 'your-key-here', // Any non-empty string
@@ -188,7 +188,7 @@ console.log(data.content[0].text);
 ### Health Check
 
 ```bash
-curl http://10.20.4.205:8800/health
+curl http://10.20.1.106:8800/health
 ```
 
 Response:
@@ -202,12 +202,12 @@ Response:
 
 ```bash
 # Get customer information
-curl -G "http://10.20.4.205:8800/v1/neda" \
+curl -G "http://10.20.1.106:8800/v1/neda" \
   --data-urlencode "q=Tell me everything about customer Acme Corp" \
   --data-urlencode "format=markdown"
 
 # Search for prospects
-curl -G "http://10.20.4.205:8800/v1/neda" \
+curl -G "http://10.20.1.106:8800/v1/neda" \
   --data-urlencode "q=Find companies using Kubernetes in healthcare" \
   --data-urlencode "format=json"
 ```
@@ -216,12 +216,12 @@ curl -G "http://10.20.4.205:8800/v1/neda" \
 
 ```bash
 # Research a company
-curl -G "http://10.20.4.205:8800/v1/company" \
+curl -G "http://10.20.1.106:8800/v1/company" \
   --data-urlencode "q=research Microsoft" \
   --data-urlencode "format=markdown"
 
 # Research by email domain
-curl -G "http://10.20.4.205:8800/v1/company" \
+curl -G "http://10.20.1.106:8800/v1/company" \
   --data-urlencode "q=john@acmecorp.com" \
   --data-urlencode "format=json"
 ```
@@ -230,7 +230,7 @@ curl -G "http://10.20.4.205:8800/v1/company" \
 
 ```bash
 # Identify tech stack
-curl -G "http://10.20.4.205:8800/v1/company-tech" \
+curl -G "http://10.20.1.106:8800/v1/company-tech" \
   --data-urlencode "q=netflix.com" \
   --data-urlencode "format=markdown"
 ```
@@ -239,7 +239,7 @@ curl -G "http://10.20.4.205:8800/v1/company-tech" \
 
 ```bash
 # Research a person
-curl -G "http://10.20.4.205:8800/v1/contact" \
+curl -G "http://10.20.1.106:8800/v1/contact" \
   --data-urlencode "q=John Smith at Microsoft" \
   --data-urlencode "format=markdown"
 ```
@@ -248,7 +248,7 @@ curl -G "http://10.20.4.205:8800/v1/contact" \
 
 ```bash
 # General research query
-curl -G "http://10.20.4.205:8800/v1/web-research" \
+curl -G "http://10.20.1.106:8800/v1/web-research" \
   --data-urlencode "q=Latest trends in observability and monitoring 2024" \
   --data-urlencode "format=markdown"
 ```
@@ -257,7 +257,7 @@ curl -G "http://10.20.4.205:8800/v1/web-research" \
 
 ```bash
 # Get Stripe data for a company
-curl -G "http://10.20.4.205:8800/v1/stripe" \
+curl -G "http://10.20.1.106:8800/v1/stripe" \
   --data-urlencode "q=acmecorp.com" \
   --data-urlencode "format=json"
 ```
@@ -266,7 +266,7 @@ curl -G "http://10.20.4.205:8800/v1/stripe" \
 
 ```bash
 # Extract HubSpot CRM data
-curl -G "http://10.20.4.205:8800/v1/hubspot" \
+curl -G "http://10.20.1.106:8800/v1/hubspot" \
   --data-urlencode "q=acmecorp.com" \
   --data-urlencode "format=markdown"
 ```
@@ -275,7 +275,7 @@ curl -G "http://10.20.4.205:8800/v1/hubspot" \
 
 ```bash
 # Analyze meeting transcripts
-curl -G "http://10.20.4.205:8800/v1/fireflies" \
+curl -G "http://10.20.1.106:8800/v1/fireflies" \
   --data-urlencode "q=Acme Corp meetings last 30 days" \
   --data-urlencode "format=markdown"
 ```
@@ -284,7 +284,7 @@ curl -G "http://10.20.4.205:8800/v1/fireflies" \
 
 ```bash
 # Query production data
-curl -G "http://10.20.4.205:8800/v1/bigquery" \
+curl -G "http://10.20.1.106:8800/v1/bigquery" \
   --data-urlencode "q=Show infrastructure scale for space xyz last 7 days" \
   --data-urlencode "format=json"
 ```
@@ -293,7 +293,7 @@ curl -G "http://10.20.4.205:8800/v1/bigquery" \
 
 ```bash
 # Analyze product usage
-curl -G "http://10.20.4.205:8800/v1/posthog" \
+curl -G "http://10.20.1.106:8800/v1/posthog" \
   --data-urlencode "q=acme@corp.com usage patterns last month" \
   --data-urlencode "format=markdown"
 ```
@@ -302,12 +302,12 @@ curl -G "http://10.20.4.205:8800/v1/posthog" \
 
 ```bash
 # Business metrics
-curl -G "http://10.20.4.205:8800/v1/executive" \
+curl -G "http://10.20.1.106:8800/v1/executive" \
   --data-urlencode "q=What is our current ARR and growth rate?" \
   --data-urlencode "format=markdown"
 
 # Revenue analytics
-curl -G "http://10.20.4.205:8800/v1/executive" \
+curl -G "http://10.20.1.106:8800/v1/executive" \
   --data-urlencode "q=Show me churn analysis for Q3 2024" \
   --data-urlencode "format=json"
 ```
@@ -344,7 +344,7 @@ import requests
 from urllib.parse import urlencode
 
 class NedaClient:
-    def __init__(self, base_url="http://10.20.4.205:8800"):
+    def __init__(self, base_url="http://10.20.1.106:8800"):
         self.base_url = base_url
 
     def query(self, agent, prompt, format="markdown"):
@@ -375,7 +375,7 @@ web_research = client.query("web-research", "Latest AI trends 2024")
 class NedaClient {
   private baseUrl: string;
 
-  constructor(baseUrl = 'http://10.20.4.205:8800') {
+  constructor(baseUrl = 'http://10.20.1.106:8800') {
     this.baseUrl = baseUrl;
   }
 
@@ -408,15 +408,15 @@ const webResearch = await client.query('web-research', 'Latest AI trends 2024');
 
 ```bash
 # Test MCP HTTP endpoint
-curl -X POST http://10.20.4.205:8801/mcp \
+curl -X POST http://10.20.1.106:8801/mcp \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc": "2.0", "method": "initialize", "params": {"protocolVersion": "2024-11-05", "capabilities": {}, "clientInfo": {"name": "test", "version": "1.0.0"}}, "id": 1}'
 
 # Test REST API
-curl http://10.20.4.205:8800/health
+curl http://10.20.1.106:8800/health
 
 # Test OpenAI-compatible endpoint
-curl http://10.20.4.205:8804/v1/chat/completions \
+curl http://10.20.1.106:8804/v1/chat/completions \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer test-key" \
   -d '{
@@ -425,7 +425,7 @@ curl http://10.20.4.205:8804/v1/chat/completions \
   }'
 
 # Test Anthropic-compatible endpoint
-curl http://10.20.4.205:8805/v1/messages \
+curl http://10.20.1.106:8805/v1/messages \
   -H "x-api-key: test-key" \
   -H "anthropic-version: 2023-06-01" \
   -H "Content-Type: application/json" \

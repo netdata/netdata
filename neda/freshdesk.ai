@@ -6,7 +6,7 @@ description: |
 usage: |
   company or requester email or ticket ID (optional date range/keywords)
 models:
-  - anthropic/claude-sonnet-4-20250514
+  - anthropic/claude-sonnet-4-5
 tools:
   - freshdesk
   - batch

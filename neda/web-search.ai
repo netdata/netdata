@@ -4,7 +4,7 @@ description: Perform a web search
 usage: The search term to be searched
 models:
   - anthropic/claude-3-5-haiku-20241022
-#  - anthropic/claude-sonnet-4-20250514
+#  - anthropic/claude-sonnet-4-5
 #  - openrouter/openai/gpt-oss-120b
 #  - openrouter/openai/gpt-oss-20b
 tools:

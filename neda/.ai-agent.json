@@ -651,6 +651,14 @@
         "cacheRead": 0.3,
         "cacheWrite": 3.75
       },
+      "claude-sonnet-4-5": {
+        "unit": "per_1m",
+        "currency": "USD",
+        "prompt": 3,
+        "completion": 15,
+        "cacheRead": 0.3,
+        "cacheWrite": 3.75
+      },
       "claude-3-7-sonnet-20250219": {
         "unit": "per_1m",
         "currency": "USD",

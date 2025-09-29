@@ -6,7 +6,7 @@ usage: |
   the target of the messaging (industry, segment, customer, competitor, monitoring tool)
 models:
   - anthropic/claude-opus-4-1-20250805
-#  - anthropic/claude-sonnet-4-20250514
+#  - anthropic/claude-sonnet-4-5
 #  - openai/gpt-5
 agents:
   - web-research.ai

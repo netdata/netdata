@@ -6,7 +6,7 @@ description: |
 usage: |
   repo/name or code search term or PR/issue URL
 models:
-  - anthropic/claude-sonnet-4-20250514
+  - anthropic/claude-sonnet-4-5
 tools:
   - github
   - batch
