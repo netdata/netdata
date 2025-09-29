@@ -43,6 +43,11 @@
           "overrides": {
             "top_p": null
           }
+        },
+        "claude-sonnet-4-5": {
+          "overrides": {
+            "top_p": null
+          }
         }
       }
     },
