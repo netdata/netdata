@@ -366,7 +366,7 @@ Channel:
       context: mq.channel.status
       title: Channel Status
       units: status
-      family: channels
+      family: channels/overview
       type: stacked
       priority: 3000
       dimensions:
@@ -386,7 +386,7 @@ Channel:
       context: mq.channel.messages
       title: Channel Message Rate
       units: messages/s
-      family: channels
+      family: channels/overview
       type: line
       priority: 3001
       dimensions:
@@ -395,7 +395,7 @@ Channel:
       context: mq.channel.bytes
       title: Channel Data Transfer Rate
       units: bytes/s
-      family: channels
+      family: channels/overview
       type: line
       priority: 3002
       dimensions:
@@ -404,7 +404,7 @@ Channel:
       context: mq.channel.batches
       title: Channel Batch Rate
       units: batches/s
-      family: channels
+      family: channels/overview
       type: line
       priority: 3003
       dimensions:
@@ -413,7 +413,7 @@ Channel:
       context: mq.channel.batch_size
       title: Channel Batch Size
       units: messages
-      family: channels
+      family: channels/overview
       type: line
       priority: 3004
       dimensions:
@@ -422,7 +422,7 @@ Channel:
       context: mq.channel.batch_interval
       title: Channel Batch Interval
       units: milliseconds
-      family: channels
+      family: channels/overview
       type: line
       priority: 3005
       dimensions:
@@ -431,7 +431,7 @@ Channel:
       context: mq.channel.intervals
       title: Channel Intervals
       units: seconds
-      family: channels
+      family: channels/overview
       type: line
       priority: 3006
       dimensions:
@@ -442,7 +442,7 @@ Channel:
       context: mq.channel.short_retry_count
       title: Channel Short Retry Count
       units: retries
-      family: channels
+      family: channels/overview
       type: line
       priority: 3007
       dimensions:
@@ -451,7 +451,7 @@ Channel:
       context: mq.channel.long_retry_interval
       title: Channel Long Retry Interval
       units: seconds
-      family: channels
+      family: channels/overview
       type: line
       priority: 3008
       dimensions:
@@ -460,7 +460,7 @@ Channel:
       context: mq.channel.max_msg_length
       title: Channel Max Message Length
       units: bytes
-      family: channels
+      family: channels/overview
       type: line
       priority: 3009
       dimensions:
@@ -469,7 +469,7 @@ Channel:
       context: mq.channel.sharing_conversations
       title: Channel Sharing Conversations
       units: conversations
-      family: channels
+      family: channels/overview
       type: line
       priority: 3010
       dimensions:
@@ -478,7 +478,7 @@ Channel:
       context: mq.channel.network_priority
       title: Channel Network Priority
       units: priority
-      family: channels
+      family: channels/overview
       type: line
       priority: 3011
       dimensions:
@@ -487,7 +487,7 @@ Channel:
       context: mq.channel.buffer_counts
       title: Channel Buffer Counts
       units: buffers
-      family: channels
+      family: channels/overview
       type: line
       priority: 3012
       dimensions:
@@ -497,7 +497,7 @@ Channel:
       context: mq.channel.current_messages
       title: Channel Current Messages
       units: messages
-      family: channels
+      family: channels/overview
       type: line
       priority: 3013
       dimensions:
@@ -506,7 +506,7 @@ Channel:
       context: mq.channel.xmitq_time
       title: Channel Transmission Queue Time
       units: milliseconds
-      family: channels
+      family: channels/overview
       type: line
       priority: 3014
       dimensions:
@@ -515,7 +515,7 @@ Channel:
       context: mq.channel.mca_status
       title: Channel MCA Status
       units: status
-      family: channels
+      family: channels/overview
       type: line
       priority: 3015
       dimensions:
@@ -524,7 +524,7 @@ Channel:
       context: mq.channel.indoubt_status
       title: Channel In-Doubt Status
       units: status
-      family: channels
+      family: channels/overview
       type: line
       priority: 3016
       dimensions:
@@ -533,7 +533,7 @@ Channel:
       context: mq.channel.ssl_key_resets
       title: Channel SSL Key Resets
       units: resets
-      family: channels
+      family: channels/overview
       type: line
       priority: 3017
       dimensions:
@@ -542,7 +542,7 @@ Channel:
       context: mq.channel.npm_speed
       title: Channel Non-Persistent Message Speed
       units: speed
-      family: channels
+      family: channels/overview
       type: line
       priority: 3018
       dimensions:
@@ -551,7 +551,7 @@ Channel:
       context: mq.channel.current_sharing_convs
       title: Channel Current Sharing Conversations
       units: conversations
-      family: channels
+      family: channels/overview
       type: line
       priority: 3019
       dimensions:
