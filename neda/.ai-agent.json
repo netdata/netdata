@@ -562,7 +562,7 @@
           "agent": "neda.ai",
           "engage": ["channel-posts"],
           "promptTemplates": {
-            "channelPost": "Neda, they have just posted this contact form:\n\nChannel: {channel.name} ({channel.id})\nUser: {user.label} ({user.id})\nTime: {ts}\nMessage: {text}\nURL: {message.url}\n\nResearch the company profile, their technology stack, and calculate IPC and estimate ARR. Check our contact (research its profile). Give us a hint on how they found us (focus on pre and post form submission events on posthog). Check hubspot and fireflies for past engagements and encharge to find if they were in our mailing lists before this form submission (they may have been added now)."
+            "channelPost": "Neda, they have just posted this contact form:\n\nChannel: {channel.name} ({channel.id})\nUser: {user.label} ({user.id})\nTime: {ts}\nMessage: {text}\nURL: {message.url}\n\nResearch the company profile, their technology stack, and calculate IPC and estimate ARR. Check our contact (research its profile). Give us a hint on how they found us (focus on pre and post form submission events on posthog). Check hubspot and fireflies for past engagements and encharge to find if they were in our mailing lists before this form submission (they may have been added now). Do not run the product-messaging agent for this session."
           }
         },
         {
