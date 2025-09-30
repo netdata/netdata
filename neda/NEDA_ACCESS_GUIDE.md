@@ -7,6 +7,8 @@ Neda is an AI-powered assistant that provides comprehensive business intelligenc
 - [Integration Options](#integration-options)
 - [Available Agents](#available-agents)
 - [Integration Methods](#integration-methods)
+  - [Slack](#slack)
+  - [Open WebUI](#open-webui)
   - [MCP Tool Integration](#mcp-tool-integration)
   - [OpenAI-Compatible LLM API](#openai-compatible-llm-api)
   - [Anthropic-Compatible LLM API](#anthropic-compatible-llm-api)
@@ -28,10 +30,12 @@ Neda is an AI-powered assistant that provides comprehensive business intelligenc
 
 ## Integration Options
 
-Neda supports four integration methods:
+Neda supports six integration methods:
 
-| Integration Type | Best For | Endpoints |
-|-----------------|----------|-----------|
+| Integration Type | Best For | Endpoints / Access |
+|-----------------|----------|-------------------|
+| **Slack** | Team collaboration, quick queries | `@Neda` mentions or "Ask Neda" context menu |
+| **Open WebUI** | Web-based chat interface | `https://10.20.1.106/` (sign-up/sign-in required) |
 | **MCP Tool** | AI assistants (Claude Code, Claude Desktop, Codex CLI) | `http://10.20.1.106:8801/mcp` (HTTP)<br>`http://10.20.1.106:8802/mcp/sse` (SSE)<br>`ws://10.20.1.106:8803/mcp` (WebSocket) |
 | **OpenAI-Compatible API** | Applications using OpenAI SDK | `http://10.20.1.106:8804/v1` |
 | **Anthropic-Compatible API** | Applications using Anthropic SDK | `http://10.20.1.106:8805/v1` |
@@ -115,6 +119,55 @@ All agents support these output formats via the `format` parameter:
 ---
 
 # Integration Methods
+
+## Slack
+
+**What is it?** Neda is available as a Slack bot in your workspace for quick access and team collaboration.
+
+**How to access:**
+- **@Neda mentions**: Mention `@Neda` in any channel where Neda is invited, or send direct messages
+- **Context menu**: Right-click on any message → "Ask Neda" to analyze or respond to that message
+
+**Setup:**
+1. Invite Neda to a channel: `/invite @Neda`
+2. Ask questions by mentioning: `@Neda tell me about customer Acme Corp`
+3. Use context menu on messages for quick analysis
+
+**Use cases:**
+- Quick customer intelligence queries during team discussions
+- Share research findings with team members
+- Collaborative data analysis in channels
+- Ad-hoc questions without leaving Slack
+
+---
+
+## Open WebUI
+
+**What is it?** A web-based chat interface for interacting with Neda and all its agents.
+
+**Access:** `https://10.20.1.106/`
+
+**Setup:**
+1. Navigate to `https://10.20.1.106/`
+2. Sign up for an account (first-time users)
+3. Sign in with your credentials
+
+**How to use:**
+1. Select a model from the dropdown:
+   - `neda` - Main orchestrator with access to all capabilities
+   - Any specific agent name (e.g., `company`, `web-research`, `bigquery`)
+2. Type your query in the chat interface
+3. Receive responses in real-time
+
+**Note:** Open WebUI uses Neda's OpenAI-compatible API (port 8804) behind the scenes.
+
+**Use cases:**
+- Browser-based access without client configuration
+- Visual chat interface for interactive queries
+- Testing different agents and comparing responses
+- Sharing access with team members via web link
+
+---
 
 ## MCP Tool Integration
 
