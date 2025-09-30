@@ -40,16 +40,14 @@ var defaultRunner = newRunnerFromBuildinfo()
 // RunUnprivileged runs binPath via nd-run with a timeout.
 // Returns stdout. On error, wraps the original error and includes a trimmed stderr snippet.
 func RunUnprivileged(log *logger.Logger, timeout time.Duration, binPath string, args ...string) ([]byte, error) {
-	argv := append([]string{binPath}, args...)
-	out, _, err := defaultRunner.run(log, timeout, defaultRunner.ndRunPath, "RunUnprivileged", argv...)
+	out, _, err := RunUnprivilegedWithCmd(log, timeout, binPath, args...)
 	return out, err
 }
 
 // RunNDSudo runs cmd via ndsudo with a timeout.
 // Returns stdout. On error, wraps the original error and includes a trimmed stderr snippet
 func RunNDSudo(log *logger.Logger, timeout time.Duration, cmd string, args ...string) ([]byte, error) {
-	argv := append([]string{cmd}, args...)
-	out, _, err := defaultRunner.run(log, timeout, defaultRunner.ndSudoPath, "RunNDSudo", argv...)
+	out, _, err := RunNDSudoWithCmd(log, timeout, cmd, args...)
 	return out, err
 }
 
@@ -85,9 +83,10 @@ func (r *runner) run(log *logger.Logger, timeout time.Duration, helperPath, labe
 			s = s[:stderrLimit] + "… (truncated)"
 		}
 		// Normalize context-related errors so callers can errors.Is(..., context.DeadlineExceeded)
-		if ctxErr := ctx.Err(); ctxErr != nil {
-			return nil, cmdStr, fmt.Errorf("%s: %v: %w (stderr: %s)", label, ex, ctxErr, strings.TrimSpace(s))
+		if ctx.Err() != nil {
+			err = ctx.Err()
 		}
+
 		return nil, cmdStr, fmt.Errorf("%s: %v: %w (stderr: %s)", label, ex, err, strings.TrimSpace(s))
 	}
 
