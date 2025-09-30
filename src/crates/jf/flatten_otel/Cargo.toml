@@ -6,5 +6,5 @@ rust-version.workspace = true
 
 [dependencies]
 opentelemetry-proto = { workspace = true, features = ["logs", "metrics", "with-serde"] }
-flatten-serde-json = { git = "https://github.com/meilisearch/meilisearch" }
+flatten-serde-json = { workspace = true }
 serde_json = { workspace = true }
