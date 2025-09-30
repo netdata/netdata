@@ -43,7 +43,7 @@ Neda supports four integration methods:
 
 Neda provides 24 specialized agents for different business intelligence needs.
 
-**Note:** When Neda is exposed as an MCP tool, all agents (except `icp`) are available as individual MCP tools that can be called directly.
+**Note:** When Neda is exposed as an MCP tool, all agents below are available as individual MCP tools that can be called directly.
 
 ### Main Orchestrator
 
