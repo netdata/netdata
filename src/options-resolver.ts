@@ -18,6 +18,7 @@ interface CLIOverrides {
   mcpInitConcurrency?: number;
   traceLLM?: boolean;
   traceMCP?: boolean;
+  traceSlack?: boolean;
   verbose?: boolean;
 }
 
@@ -52,6 +53,7 @@ interface ResolvedEffectiveOptions {
   maxConcurrentTools: number;
   traceLLM: boolean;
   traceMCP: boolean;
+  traceSlack: boolean;
   verbose: boolean;
   mcpInitConcurrency?: number;
 }
@@ -118,6 +120,7 @@ export function resolveEffectiveOptions(args: {
     maxConcurrentTools: readNum('maxConcurrentTools', (fm as { maxConcurrentTools?: number } | undefined)?.maxConcurrentTools, 3),
     traceLLM: cli?.traceLLM === true,
     traceMCP: cli?.traceMCP === true,
+    traceSlack: cli?.traceSlack === true,
     verbose: cli?.verbose === true,
     mcpInitConcurrency: ((): number | undefined => {
       if (typeof cli?.mcpInitConcurrency === 'number' && Number.isFinite(cli.mcpInitConcurrency)) return Math.trunc(cli.mcpInitConcurrency);
