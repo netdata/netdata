@@ -228,18 +228,16 @@ static STRING *getFileSystemType(struct logical_disk *d, const char *diskName)
     return NULL;
 }
 
-static void netdata_get_disk_info(struct logical_disk *d, char *volumeName) {
-    HANDLE hVol = CreateFile(volumeName, 0,
-                              FILE_SHARE_READ | FILE_SHARE_WRITE,
-                              NULL, OPEN_EXISTING, 0, NULL);
+static void netdata_get_disk_info(struct logical_disk *d, char *volumeName)
+{
+    HANDLE hVol = CreateFile(volumeName, 0, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
     if (hVol == INVALID_HANDLE_VALUE) {
         return;
     }
 
     VOLUME_DISK_EXTENTS ext;
     DWORD br;
-    if (DeviceIoControl(hVol, IOCTL_VOLUME_GET_VOLUME_DISK_EXTENTS,
-                        NULL, 0, &ext, sizeof(ext), &br, NULL)) {
+    if (DeviceIoControl(hVol, IOCTL_VOLUME_GET_VOLUME_DISK_EXTENTS, NULL, 0, &ext, sizeof(ext), &br, NULL)) {
         if (ext.NumberOfDiskExtents == 1) {
             d->DiskNumber = ext.Extents[0].DiskNumber;
             d->Offset = ext.Extents[0].StartingOffset;
@@ -284,19 +282,17 @@ static inline void netdata_set_hd_usage(struct logical_disk *d, usec_t now_ut)
     d->percentDiskFree.current.Time = totalBytes.QuadPart;
 }
 
-static void netdata_get_volume_size(DICTIONARY *dict, usec_t now_ut) {
+static void netdata_get_volume_size(DICTIONARY *dict, usec_t now_ut)
+{
     HANDLE hFind = FindFirstVolumeA(windows_shared_buffer, 8192);
     if (hFind == INVALID_HANDLE_VALUE) {
-        nd_log(
-                NDLS_COLLECTORS,
-                NDLP_ERR,
-                "Storage Error %d", GetLastError());
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Storage Error %d", GetLastError());
         return;
     }
 
     do {
         size_t len = strlen(windows_shared_buffer);
-        if (windows_shared_buffer[0] != '\\' || windows_shared_buffer[len-1] != '\\') {
+        if (windows_shared_buffer[0] != '\\' || windows_shared_buffer[len - 1] != '\\') {
             continue;
         }
 
@@ -320,142 +316,40 @@ static void netdata_get_volume_size(DICTIONARY *dict, usec_t now_ut) {
     FindVolumeClose(hFind);
 }
 
-static void netdata_plot_storage_chart(DICTIONARY *dict, int update_every) {
+static void netdata_plot_storage_chart(DICTIONARY *dict, int update_every)
+{
     struct logical_disk *d;
-    dfe_start_read(dict, d) {
+    dfe_start_read(dict, d)
+    {
         if (!d->st_disk_space) {
             char id[RRD_ID_LENGTH_MAX + 1];
             strncpyz(id, d->volume_name, RRD_ID_LENGTH_MAX);
             netdata_fix_chart_name(id);
             d->st_disk_space = rrdset_create_localhost(
-                            "disk_space",
-                            id,
-                            NULL,
-                            id,
-                            "disk.space",
-                            "Disk Space Usage",
-                            "GiB",
-                            PLUGIN_WINDOWS_NAME,
-                            "PerflibStorage",
-                            NETDATA_CHART_PRIO_DISKSPACE_SPACE,
-                            update_every,
-                            RRDSET_TYPE_STACKED);
+                "disk_space",
+                id,
+                NULL,
+                id,
+                "disk.space",
+                "Disk Space Usage",
+                "GiB",
+                PLUGIN_WINDOWS_NAME,
+                "PerflibStorage",
+                NETDATA_CHART_PRIO_DISKSPACE_SPACE,
+                update_every,
+                RRDSET_TYPE_STACKED);
 
             if (d->mount_point[0]) {
                 rrdlabels_add(d->st_disk_space->rrdlabels, "mount_point", id, RRDLABEL_SRC_AUTO);
             }
 
-                    rrdlabels_add(
-                            d->st_disk_space->rrdlabels, "drive_type", drive_type_to_str(d->DriveType), RRDLABEL_SRC_AUTO);
-                    rrdlabels_add(
-                            d->st_disk_space->rrdlabels,
-                            "filesystem",
-                            d->filesystem ? string2str(d->filesystem) : "unknown",
-                            RRDLABEL_SRC_AUTO);
-                    rrdlabels_add(d->st_disk_space->rrdlabels, "rw_mode", d->readonly ? "ro" : "rw", RRDLABEL_SRC_AUTO);
-
-                    {
-                        char buf[UINT64_HEX_MAX_LENGTH];
-                        print_uint64_hex(buf, d->SerialNumber);
-                        rrdlabels_add(d->st_disk_space->rrdlabels, "serial_number", buf, RRDLABEL_SRC_AUTO);
-                    }
-
-                    d->rd_disk_space_free = rrddim_add(d->st_disk_space, "avail", NULL, 1, GIGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
-                    d->rd_disk_space_used = rrddim_add(d->st_disk_space, "used", NULL, 1, GIGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
-                }
-
-                // percentDiskFree has the free space in Data and the size of the disk in Time, in MiB.
-                rrddim_set_by_pointer(
-                        d->st_disk_space, d->rd_disk_space_free, (collected_number)d->percentDiskFree.current.Data);
-                rrddim_set_by_pointer(
-                        d->st_disk_space,
-                        d->rd_disk_space_used,
-                        (collected_number)(d->percentDiskFree.current.Time - d->percentDiskFree.current.Data));
-                rrdset_done(d->st_disk_space);
-    }
-    dfe_done(d);
-}
-
-static void netdata_clean_chart(DICTIONARY *dict, usec_t now_ut) {
-    {
-        struct logical_disk *d;
-        dfe_start_write(dict, d)
-                {
-                    if (d->last_collected < now_ut) {
-                        logical_disk_cleanup(d);
-                        dictionary_del(dict, d_dfe.name);
-                    }
-                }
-        dfe_done(d);
-        dictionary_garbage_collect(dict);
-    }
-}
-
-static bool do_logical_disk(int update_every, usec_t now_ut)
-{
-    netdata_get_volume_size(logicalDisks, now_ut);
-    netdata_plot_storage_chart(logicalDisks, update_every);
-    netdata_clean_chart(logicalDisks, now_ut);
-
-    /*
-    DICTIONARY *dict = logicalDisks;
-    HANDLE hFind = FindFirstVolumeA(windows_shared_buffer, 8192);
-    if (hFind == INVALID_HANDLE_VALUE) {
-        nd_log(
-                NDLS_COLLECTORS,
-                NDLP_ERR,
-                "Storage Error %d", GetLastError());
-        return false;
-    }
-
-    do {
-        size_t len = strlen(windows_shared_buffer);
-        if (windows_shared_buffer[0] != '\\' || windows_shared_buffer[len-1] != '\\') {
-            continue;
-        }
-
-        struct logical_disk *d = dictionary_set(dict, windows_shared_buffer, NULL, sizeof(*d));
-        d->last_collected = now_ut;
-
-        if (!d->collected_metadata) {
-            d->filesystem = getFileSystemType(d, windows_shared_buffer);
-            d->collected_metadata = true;
-        }
-
-        netdata_set_hd_usage(d);
-
-        if (!d->st_disk_space) {
-            char id[RRD_ID_LENGTH_MAX + 1];
-            strncpyz(id, windows_shared_buffer, RRD_ID_LENGTH_MAX);
-            netdata_fix_chart_name(id);
-            d->st_disk_space = rrdset_create_localhost(
-                    "disk_space",
-                    id,
-                    NULL,
-                    id,
-                    "disk.space",
-                    "Disk Space Usage",
-                    "GiB",
-                    PLUGIN_WINDOWS_NAME,
-                    "PerflibStorage",
-                    NETDATA_CHART_PRIO_DISKSPACE_SPACE,
-                    update_every,
-                    RRDSET_TYPE_STACKED);
-
-            DWORD returnLen = 0;
-            if (GetVolumePathNamesForVolumeNameA(windows_shared_buffer, id, RRD_ID_LENGTH_MAX, &returnLen)) {
-                if (id[0]) {
-                    rrdlabels_add(d->st_disk_space->rrdlabels, "mount_point", id, RRDLABEL_SRC_AUTO);
-                }
-            }
-
             rrdlabels_add(
-                    d->st_disk_space->rrdlabels, "drive_type", drive_type_to_str(d->DriveType), RRDLABEL_SRC_AUTO);
+                d->st_disk_space->rrdlabels, "drive_type", drive_type_to_str(d->DriveType), RRDLABEL_SRC_AUTO);
             rrdlabels_add(
-                    d->st_disk_space->rrdlabels,
-                    "filesystem",
-                    d->filesystem ? string2str(d->filesystem) : "unknown",
-                    RRDLABEL_SRC_AUTO);
+                d->st_disk_space->rrdlabels,
+                "filesystem",
+                d->filesystem ? string2str(d->filesystem) : "unknown",
+                RRDLABEL_SRC_AUTO);
             rrdlabels_add(d->st_disk_space->rrdlabels, "rw_mode", d->readonly ? "ro" : "rw", RRDLABEL_SRC_AUTO);
 
             {
@@ -470,17 +364,18 @@ static bool do_logical_disk(int update_every, usec_t now_ut)
 
         // percentDiskFree has the free space in Data and the size of the disk in Time, in MiB.
         rrddim_set_by_pointer(
-                d->st_disk_space, d->rd_disk_space_free, (collected_number)d->percentDiskFree.current.Data);
+            d->st_disk_space, d->rd_disk_space_free, (collected_number)d->percentDiskFree.current.Data);
         rrddim_set_by_pointer(
-                d->st_disk_space,
-                d->rd_disk_space_used,
-                (collected_number)(d->percentDiskFree.current.Time - d->percentDiskFree.current.Data));
+            d->st_disk_space,
+            d->rd_disk_space_used,
+            (collected_number)(d->percentDiskFree.current.Time - d->percentDiskFree.current.Data));
         rrdset_done(d->st_disk_space);
-    } while (FindNextVolumeA(hFind, windows_shared_buffer, 8192));
+    }
+    dfe_done(d);
+}
 
-    FindVolumeClose(hFind);
-
-    // cleanup
+static void netdata_clean_chart(DICTIONARY *dict, usec_t now_ut)
+{
     {
         struct logical_disk *d;
         dfe_start_write(dict, d)
@@ -493,7 +388,13 @@ static bool do_logical_disk(int update_every, usec_t now_ut)
         dfe_done(d);
         dictionary_garbage_collect(dict);
     }
-     */
+}
+
+static bool do_logical_disk(int update_every, usec_t now_ut)
+{
+    netdata_get_volume_size(logicalDisks, now_ut);
+    netdata_plot_storage_chart(logicalDisks, update_every);
+    netdata_clean_chart(logicalDisks, now_ut);
 
     return true;
 }
