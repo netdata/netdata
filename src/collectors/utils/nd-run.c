@@ -148,8 +148,6 @@ int main(int argc, char *argv[]) {
 
     struct passwd *pw = getpwnam(NETDATA_USER);
     if (!pw) {
-        fprintf(stderr, "User '%s' not found, falling back to '%s'\n",
-                NETDATA_USER, FALLBACK_USER);
         pw = getpwnam(FALLBACK_USER);
         if (!pw) {
             fprintf(stderr, "Fallback user '%s' not found either\n", FALLBACK_USER);
@@ -158,13 +156,9 @@ int main(int argc, char *argv[]) {
     }
 
     if (euid != pw->pw_uid) {
-        fprintf(stderr, "Attempting to run as user: %s (UID=%d, GID=%d)\n", pw->pw_name, (int)pw->pw_uid, (int)pw->pw_gid);
-
         // Set supplementary groups for this user (must be done before dropping privs)
         if (initgroups(pw->pw_name, pw->pw_gid) != 0) {
             if (euid == 0) {
-                perror("initgroups");
-
                 if (setgroups(0, NULL) != 0) {
                     fatal("setgroups");
                 }

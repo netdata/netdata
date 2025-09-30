@@ -60,7 +60,7 @@ func main() {
 		MinUpdateEvery:            opts.UpdateEvery,
 	})
 
-	a.Debugf("plugin: name=%s, version=%s", a.Name, buildinfo.Version)
+	a.Debugf("plugin: name=%s, %s", a.Name, buildinfo.Info())
 	if u, err := user.Current(); err == nil {
 		a.Debugf("current user: name=%s, uid=%s", u.Username, u.Uid)
 	}

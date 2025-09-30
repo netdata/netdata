@@ -3,44 +3,29 @@
 package chrony
 
 import (
-	"context"
-	"fmt"
-	"os/exec"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 )
 
 type chronyBinary interface {
 	serverStats() ([]byte, error)
 }
 
-func newChronycExec(ndsudoPath string, timeout time.Duration, log *logger.Logger) *chronycExec {
+func newChronycExec(timeout time.Duration, log *logger.Logger) *chronycExec {
 	return &chronycExec{
-		Logger:     log,
-		ndsudoPath: ndsudoPath,
-		timeout:    timeout,
+		Logger:  log,
+		timeout: timeout,
 	}
 }
 
 type chronycExec struct {
 	*logger.Logger
 
-	ndsudoPath string
-	timeout    time.Duration
+	timeout time.Duration
 }
 
 func (e *chronycExec) serverStats() ([]byte, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), e.timeout)
-	defer cancel()
-
-	cmd := exec.CommandContext(ctx, e.ndsudoPath, "chronyc-serverstats")
-	e.Debugf("executing '%s'", cmd)
-
-	bs, err := cmd.Output()
-	if err != nil {
-		return nil, fmt.Errorf("error on '%s': %v", cmd, err)
-	}
-
-	return bs, nil
+	return ndexec.RunNDSudo(e.Logger, e.timeout, "chronyc-serverstats")
 }
