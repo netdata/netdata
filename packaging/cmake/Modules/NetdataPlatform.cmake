@@ -79,7 +79,8 @@ else()
   message(FATAL_ERROR "Unknown/unsupported platform: ${CMAKE_SYSTEM_NAME} (Supported platforms: FreeBSD, Linux, macOS, Windows)")
 endif()
 
-string(TOLOWER "${CMAKE_SYSTEM_PROCESSOR}" _nd_cpu)
+string(STRIP "${CMAKE_SYSTEM_PROCESSOR}" _nd_cpu_raw)
+string(TOLOWER "${_nd_cpu_raw}" _nd_cpu)
 
 message(STATUS "Detected CPU: ${CMAKE_SYSTEM_PROCESSOR}")
 
