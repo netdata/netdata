@@ -99,7 +99,7 @@ exec "$@"
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			out, err := r.run(nil, tt.timeout, tt.helperPath, "RunTest", tt.argv...)
+			out, _, err := r.run(nil, tt.timeout, tt.helperPath, "RunTest", tt.argv...)
 
 			if tt.wantErr {
 				require.Error(t, err)
