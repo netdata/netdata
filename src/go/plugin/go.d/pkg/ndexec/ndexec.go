@@ -17,41 +17,40 @@ import (
 
 const stderrLimit = 8 << 10 // 8 KiB
 
+// Runner holds helper paths for execution.
+type runner struct {
+	ndRunPath  string
+	ndSudoPath string
+}
+
+func newRunnerFromBuildinfo() *runner {
+	return &runner{
+		ndRunPath:  filepath.Join(buildinfo.NetdataBinDir, "nd-run"),
+		ndSudoPath: filepath.Join(buildinfo.PluginsDir, "ndsudo"),
+	}
+}
+
+var defaultRunner = newRunnerFromBuildinfo()
+
 // RunUnprivileged runs binPath via nd-run with a timeout.
 // Returns stdout. On error, wraps the original error and includes a trimmed stderr snippet.
 func RunUnprivileged(log *logger.Logger, timeout time.Duration, binPath string, args ...string) ([]byte, error) {
-	ndrun := filepath.Join(buildinfo.NetdataBinDir, "nd-run")
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
 	argv := append([]string{binPath}, args...)
-	ex := exec.CommandContext(ctx, ndrun, argv...)
-
-	log.Debugf("executing: %v", ex)
-
-	var stderr bytes.Buffer
-	ex.Stderr = &stderr
-
-	out, err := ex.Output()
-	if err != nil {
-		s := stderr.String()
-		if len(s) > stderrLimit {
-			s = s[:stderrLimit] + "… (truncated)"
-		}
-		return nil, fmt.Errorf("RunUnprivileged: %v: %w (stderr: %s)", ex, err, strings.TrimSpace(s))
-	}
-	return out, nil
+	return defaultRunner.run(log, timeout, defaultRunner.ndRunPath, "RunUnprivileged", argv...)
 }
 
 // RunNDSudo runs cmd via ndsudo with a timeout.
-// Returns stdout. On error, wraps the original error and includes a trimmed stderr snippet.
+// Returns stdout. On error, wraps the original error and includes a trimmed stderr snippet
 func RunNDSudo(log *logger.Logger, timeout time.Duration, cmd string, args ...string) ([]byte, error) {
-	ndsudo := filepath.Join(buildinfo.PluginsDir, "ndsudo")
+	argv := append([]string{cmd}, args...)
+	return defaultRunner.run(log, timeout, defaultRunner.ndSudoPath, "RunNDSudo", argv...)
+}
+
+func (r *runner) run(log *logger.Logger, timeout time.Duration, helperPath, label string, argv ...string) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	argv := append([]string{cmd}, args...)
-	ex := exec.CommandContext(ctx, ndsudo, argv...)
+	ex := exec.CommandContext(ctx, helperPath, argv...) // argv comes from trusted sources; no shell, args passed separately
 
 	log.Debugf("executing: %v", ex)
 
@@ -64,38 +63,12 @@ func RunNDSudo(log *logger.Logger, timeout time.Duration, cmd string, args ...st
 		if len(s) > stderrLimit {
 			s = s[:stderrLimit] + "… (truncated)"
 		}
-		return nil, fmt.Errorf("RunNDSudo: %v: %w (stderr: %s)", ex, err, strings.TrimSpace(s))
+		// Normalize context-related errors so callers can errors.Is(..., context.DeadlineExceeded)
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return nil, fmt.Errorf("%s: %v: %w (stderr: %s)", label, ex, ctxErr, strings.TrimSpace(s))
+		}
+		return nil, fmt.Errorf("%s: %v: %w (stderr: %s)", label, ex, err, strings.TrimSpace(s))
 	}
+
 	return out, nil
-}
-
-func CommandUnprivileged(ctx context.Context, logger *logger.Logger, arg ...string) *exec.Cmd {
-	ndrunPath := filepath.Join(buildinfo.NetdataBinDir, "nd-run")
-
-	cmd := exec.CommandContext(ctx, ndrunPath, arg...)
-	if logger != nil {
-		logger.Debugf("executing '%s'", cmd)
-	}
-
-	return cmd
-}
-
-// CommandNDSudo runs a command via the ndsudo helper and returns the exec.Cmd instance.
-//
-// ctx is a context.Context to use to run the command. logger is a Logger
-// instance to use to log the command to be executed.  timeout indicates
-// the timeout for the command. arg is a list of the command arguments,
-// with the first string in the slice being the command to run.
-//
-// This invokes the command and logs a debug message that the command
-// is being executed, and then returns the exec.Cmd object for the command.
-func CommandNDSudo(ctx context.Context, logger *logger.Logger, arg ...string) *exec.Cmd {
-	ndsudoPath := filepath.Join(buildinfo.PluginsDir, "ndsudo")
-
-	cmd := exec.CommandContext(ctx, ndsudoPath, arg...)
-	if logger != nil {
-		logger.Debugf("executing '%s'", cmd)
-	}
-
-	return cmd
 }
