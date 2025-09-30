@@ -64,7 +64,7 @@ modules:
             ```bash
              cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
              sudo ./edit-config go.d/sd/snmp.conf
-             ````
+             ```
         limits:
           description: ""
         performance_impact:
