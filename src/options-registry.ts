@@ -242,6 +242,15 @@ export const OPTIONS_REGISTRY: OptionDef[] = [
     groups: [G_ALL_MODELS],
   }),
   boolDef({
+    key: 'traceSlack',
+    description: 'Log Slack Bolt SDK WebSocket messages and API calls',
+    default: false,
+    cli: { names: ['--trace-slack'], showInHelp: true },
+    fm: { allowed: false },
+    scope: 'allAgents',
+    groups: [G_ALL_MODELS],
+  }),
+  boolDef({
     key: 'verbose',
     description: 'Enable debug logging to stderr',
     default: false,

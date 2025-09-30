@@ -32,6 +32,7 @@ interface SlackHeadendOptions {
   verbose?: boolean;
   traceLLM?: boolean;
   traceMCP?: boolean;
+  traceSlack?: boolean;
 }
 
 type SlackClient = unknown;
@@ -73,6 +74,7 @@ export class SlackHeadend implements Headend {
   private readonly verbose: boolean;
   private readonly traceLLM: boolean;
   private readonly traceMCP: boolean;
+  private readonly traceSlack: boolean;
   private readonly closeDeferred = this.createDeferred<HeadendClosedEvent>();
   private readonly agentCache = new Map<string, LoadedAgentRecord>();
   private readonly loaderCache = new LoadedAgentCache();
@@ -100,6 +102,7 @@ export class SlackHeadend implements Headend {
     this.verbose = options.verbose === true;
     this.traceLLM = options.traceLLM === true;
     this.traceMCP = options.traceMCP === true;
+    this.traceSlack = options.traceSlack === true;
     this.closed = this.closeDeferred.promise;
   }
 
@@ -143,7 +146,7 @@ export class SlackHeadend implements Headend {
       token: slackBotToken,
       appToken: slackAppToken,
       socketMode: true,
-      logLevel: this.verbose ? LogLevel.DEBUG : LogLevel.WARN,
+      logLevel: this.traceSlack ? LogLevel.DEBUG : LogLevel.WARN,
     });
     this.slackApp = slackApp;
     this.slackClient = (slackApp as any).client;

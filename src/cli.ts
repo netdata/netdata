@@ -497,6 +497,7 @@ async function runHeadendMode(config: HeadendModeConfig): Promise<void> {
   const verbose = config.options.verbose === true;
   const traceLLMFlag = config.options.traceLlm === true;
   const traceMCPFlag = config.options.traceMcp === true;
+  const traceSlackFlag = config.options.traceSlack === true;
 
   let parsedTargets: LoadAgentOptions['targets'];
   const cliModels = typeof config.options.models === 'string' && config.options.models.length > 0
@@ -577,6 +578,7 @@ async function runHeadendMode(config: HeadendModeConfig): Promise<void> {
       verbose,
       traceLLM: traceLLMFlag,
       traceMCP: traceMCPFlag,
+      traceSlack: traceSlackFlag,
     });
   }
 

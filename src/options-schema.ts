@@ -19,6 +19,7 @@ const EFFECTIVE_KEYS = [
   'maxConcurrentTools',
   'traceLLM',
   'traceMCP',
+  'traceSlack',
   'verbose',
   'mcpInitConcurrency',
 ] as const;
