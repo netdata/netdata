@@ -71,7 +71,8 @@ export class AIAgentSession {
   readonly accounting: AccountingEntry[];
   readonly success: boolean;
   readonly error?: string;
-  readonly currentTurn: number;
+  private _currentTurn: number;
+  get currentTurn(): number { return this._currentTurn; }
   
   private readonly llmClient: LLMClient;
   private readonly sessionConfig: AIAgentSessionConfig;
@@ -279,7 +280,7 @@ export class AIAgentSession {
     this.accounting = [...accounting]; // Defensive copy
     this.success = success;
     this.error = error;
-    this.currentTurn = currentTurn;
+    this._currentTurn = currentTurn;
     this.llmClient = llmClient;
     this.sessionConfig = sessionConfig;
     this.abortSignal = sessionConfig.abortSignal;
@@ -437,6 +438,7 @@ export class AIAgentSession {
         },
         setFinalReport: (p) => { this.finalReport = { status: p.status, format: p.format as 'json'|'markdown'|'markdown+mermaid'|'slack-block-kit'|'tty'|'pipe'|'sub-agent'|'text', content: p.content, content_json: p.content_json, metadata: p.metadata, ts: Date.now() }; },
         orchestrator: orch,
+        getCurrentTurn: () => this.currentTurn,
         toolTimeoutMs: sessionConfig.toolTimeout
       });
       const formatInfo = internalProvider.getFormatInfo();
@@ -806,21 +808,6 @@ export class AIAgentSession {
         };
         this.log(entry);
 
-        // Emit a concise concurrency hint for quick visibility
-        const cap = Math.max(1, this.sessionConfig.maxConcurrentTools ?? 1);
-        const effectiveCap = (this.sessionConfig.parallelToolCalls === false) ? 1 : cap;
-        const concEntry: LogEntry = {
-          timestamp: Date.now(),
-          severity: 'VRB',
-          turn: currentTurn,
-          subturn: 0,
-          direction: 'response',
-          type: 'llm',
-          remoteIdentifier: AIAgentSession.REMOTE_CONC_HINT,
-          fatal: false,
-          message: `tool concurrency: cap=${String(effectiveCap)} (parallelToolCalls=${String(this.sessionConfig.parallelToolCalls === true)}, maxConcurrentTools=${String(this.sessionConfig.maxConcurrentTools)})`,
-        };
-        this.log(concEntry);
       }
       // MCP servers initialize lazily via provider; no explicit init here
 
@@ -1060,6 +1047,7 @@ export class AIAgentSession {
         // Graceful stop: do not start further turns
         return this.finalizeGracefulStopSession(conversation, logs, accounting);
       }
+      this._currentTurn = currentTurn;
       try {
         // Capture effective prompts for this turn (post expansion/enhancement)
         const turnAttrs = {

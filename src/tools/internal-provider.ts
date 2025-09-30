@@ -19,6 +19,7 @@ interface InternalToolProviderOptions {
   setFinalReport: (payload: { status: 'success'|'failure'|'partial'; format: string; content?: string; content_json?: Record<string, unknown>; metadata?: Record<string, unknown>; messages?: unknown[] }) => void;
   logError: (message: string) => void;
   orchestrator: ToolsOrchestrator;
+  getCurrentTurn: () => number;
   toolTimeoutMs?: number;
 }
 
@@ -589,6 +590,14 @@ export class InternalToolProvider extends ToolProvider {
       // Minimal batch: always use orchestrator for inner calls
       const rawCalls = (args as { calls?: unknown }).calls;
       let calls: unknown[] = [];
+      const batchTurn = (() => {
+        try {
+          const t = this.opts.getCurrentTurn();
+          return Number.isFinite(t) && t > 0 ? Math.trunc(t) : 1;
+        } catch {
+          return 1;
+        }
+      })();
 
       // Handle both array and JSON string formats
       if (Array.isArray(rawCalls)) {
@@ -682,7 +691,7 @@ export class InternalToolProvider extends ToolProvider {
         }
         try {
           if (!(this.opts.orchestrator.hasTool(tool))) return { id, tool, ok: false, elapsedMs: 0, error: { code: 'UNKNOWN_TOOL', message: `Unknown tool: ${tool}` } };
-          const managed = await this.opts.orchestrator.executeWithManagement(tool, a, { turn: 0, subturn: 0 }, { timeoutMs: this.opts.toolTimeoutMs });
+          const managed = await this.opts.orchestrator.executeWithManagement(tool, a, { turn: batchTurn, subturn: 0 }, { timeoutMs: this.opts.toolTimeoutMs });
           return { id, tool, ok: true, elapsedMs: managed.latency, output: managed.result };
         } catch (e) {
           const msg = e instanceof Error ? e.message : String(e);

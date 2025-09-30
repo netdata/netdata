@@ -57,7 +57,7 @@ export function formatLog(entry: LogEntry, opts: LogFormatOptions = {}): string 
     if (typeof id === 'string' && id.length > 0) return `[HEADEND ${id}] `;
     return '';
   })();
-  const raw = `${headendPrefix}[txn:${txn}] [path:${pathLabel}] ${agentPrefix}[${entry.severity}] ${dir} ${base}`;
+  const raw = `${headendPrefix}[txn:${txn}] [${pathLabel}] ${agentPrefix}[${entry.severity}] ${dir} ${base}`;
   // Color by severity (support bold hint on VRB)
   switch (entry.severity) {
     case 'ERR': return ansi(useColor, '\x1b[31m', raw); // red

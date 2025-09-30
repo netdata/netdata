@@ -163,18 +163,19 @@ export class SessionTreeBuilder {
     this.recomputeTotals();
   }
 
-  // Compute a stable, bijective path label (e.g., 1.2 or 1.2.1.1) for a given opId
+  // Compute a stable, bijective path label (e.g., 1-1 or 1-1.2-3) for a given opId
   getOpPath(opId: string): string {
-    // const parts: string[] = [];
+    const formatSegment = (turn: number, op: number): string => `${String(turn)}-${String(op)}`;
     const walk = (node: SessionNode, prefix: string[]): string | undefined => {
       // eslint-disable-next-line functional/no-loop-statements -- iterative traversal is clearer here
       for (const t of node.turns) {
-        const base = [...prefix, String(t.index)];
+        const turnIndex = t.index;
         // eslint-disable-next-line functional/no-loop-statements -- index needed for stable path labels
         for (let i = 0; i < t.ops.length; i++) {
           const o = t.ops[i];
-          const opIdx = String(i + 1);
-          const label = [...base, opIdx];
+          const opIdx = i + 1;
+          const seg = formatSegment(turnIndex, opIdx);
+          const label = [...prefix, seg];
           if (o.opId === opId) return label.join('.');
           if (o.kind === 'session' && o.childSession !== undefined) {
             const child = walk(o.childSession, label);
