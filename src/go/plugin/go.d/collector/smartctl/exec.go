@@ -27,15 +27,13 @@ type smartctlCli interface {
 type ndsudoSmartctlCli struct {
 	*logger.Logger
 
-	ndsudoPath string
-	timeout    time.Duration
+	timeout time.Duration
 }
 
-func newNdsudoSmartctlCli(ndsudoPath string, timeout time.Duration, log *logger.Logger) *ndsudoSmartctlCli {
+func newNdsudoSmartctlCli(timeout time.Duration, log *logger.Logger) *ndsudoSmartctlCli {
 	return &ndsudoSmartctlCli{
-		Logger:     log,
-		ndsudoPath: ndsudoPath,
-		timeout:    timeout,
+		Logger:  log,
+		timeout: timeout,
 	}
 }
 
@@ -54,23 +52,18 @@ func (e *ndsudoSmartctlCli) deviceInfo(deviceName, deviceType, powerMode string)
 	)
 }
 
-func (e *ndsudoSmartctlCli) execute(args ...string) (*gjson.Result, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), e.timeout)
-	defer cancel()
-
-	command := ndexec.CommandNDSudo(ctx, e.Logger, args...)
-
-	bs, err := command.Output()
+func (e *ndsudoSmartctlCli) execute(cmd string, args ...string) (*gjson.Result, error) {
+	bs, cmdStr, err := ndexec.RunNDSudoWithCmd(e.Logger, e.timeout, cmd, args...)
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) || isExecExitCode(err, 1) || len(bs) == 0 {
-			return nil, fmt.Errorf("'%s' execution failed: %v", command, err)
+			return nil, fmt.Errorf("'%s' execution failed: %v", cmdStr, err)
 		}
 	}
 
-	return parseOutput(command.String(), bs, args, e.Logger)
+	return parseOutput(cmdStr, bs, args, e.Logger)
 }
 
-// directSmartctlCli executes smartctl directly (Windows, macOS, etc.)
+// directSmartctlCli executes smartctl directly (Windows only)
 type directSmartctlCli struct {
 	*logger.Logger
 
@@ -109,7 +102,8 @@ func (e *directSmartctlCli) execute(args ...string) (*gjson.Result, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), e.timeout)
 	defer cancel()
 
-	cmd := ndexec.CommandUnprivileged(ctx, e.Logger, args...)
+	cmd := exec.CommandContext(ctx, e.smartctlPath, args...)
+	e.Debugf("executing '%s'", cmd)
 
 	bs, err := cmd.Output()
 	if err != nil {

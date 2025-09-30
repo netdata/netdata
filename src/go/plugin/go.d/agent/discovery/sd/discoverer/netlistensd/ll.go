@@ -40,7 +40,6 @@ func (e *localListenersExec) discover(ctx context.Context) ([]byte, error) {
 	// TCPv4/6 and UPDv4 sockets in LISTEN state
 	// https://github.com/netdata/netdata/blob/master/src/collectors/utils/local_listeners.c
 	args := []string{
-		e.binPath,
 		"no-udp6",
 		"no-local",
 		"no-inbound",
@@ -48,5 +47,5 @@ func (e *localListenersExec) discover(ctx context.Context) ([]byte, error) {
 		"no-namespaces",
 	}
 
-	return ndexec.RunUnprivileged(nil, e.timeout, args...)
+	return ndexec.RunUnprivileged(nil, e.timeout, e.binPath, args...)
 }

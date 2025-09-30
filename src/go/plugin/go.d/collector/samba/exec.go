@@ -13,19 +13,17 @@ type smbStatusBinary interface {
 	profile() ([]byte, error)
 }
 
-func newSmbStatusBinary(ndsudoPath string, timeout time.Duration, log *logger.Logger) smbStatusBinary {
+func newSmbStatusBinary(timeout time.Duration, log *logger.Logger) smbStatusBinary {
 	return &smbStatusExec{
-		Logger:     log,
-		ndsudoPath: ndsudoPath,
-		timeout:    timeout,
+		Logger:  log,
+		timeout: timeout,
 	}
 }
 
 type smbStatusExec struct {
 	*logger.Logger
 
-	ndsudoPath string
-	timeout    time.Duration
+	timeout time.Duration
 }
 
 func (e *smbStatusExec) profile() ([]byte, error) {

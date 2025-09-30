@@ -13,19 +13,17 @@ type ethtoolCli interface {
 	moduleEeprom(iface string) ([]byte, error)
 }
 
-func newEthtoolExec(ndsudoPath string, timeout time.Duration, logger *logger.Logger) *ethtoolCLIExec {
+func newEthtoolExec(timeout time.Duration, logger *logger.Logger) *ethtoolCLIExec {
 	return &ethtoolCLIExec{
-		Logger:     logger,
-		ndsudoPath: ndsudoPath,
-		timeout:    timeout,
+		Logger:  logger,
+		timeout: timeout,
 	}
 }
 
 type ethtoolCLIExec struct {
 	*logger.Logger
 
-	ndsudoPath string
-	timeout    time.Duration
+	timeout time.Duration
 }
 
 func (e *ethtoolCLIExec) moduleEeprom(iface string) ([]byte, error) {

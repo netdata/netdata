@@ -16,19 +16,17 @@ type storCli interface {
 	drivesInfo() ([]byte, error)
 }
 
-func newStorCliExec(ndsudoPath string, timeout time.Duration, log *logger.Logger) *storCliExec {
+func newStorCliExec(timeout time.Duration, log *logger.Logger) *storCliExec {
 	return &storCliExec{
-		Logger:     log,
-		ndsudoPath: ndsudoPath,
-		timeout:    timeout,
+		Logger:  log,
+		timeout: timeout,
 	}
 }
 
 type storCliExec struct {
 	*logger.Logger
 
-	ndsudoPath string
-	timeout    time.Duration
+	timeout time.Duration
 }
 
 func (e *storCliExec) controllersInfo() ([]byte, error) {

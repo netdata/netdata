@@ -16,10 +16,9 @@ type varnishstatBinary interface {
 	statistics() ([]byte, error)
 }
 
-func newVarnishstatExecBinary(binPath string, cfg Config, log *logger.Logger) varnishstatBinary {
+func newVarnishstatExecBinary(cfg Config, log *logger.Logger) varnishstatBinary {
 	return &varnishstatExec{
 		Logger:       log,
-		binPath:      binPath,
 		timeout:      cfg.Timeout.Duration(),
 		instanceName: cfg.InstanceName,
 	}
@@ -28,13 +27,12 @@ func newVarnishstatExecBinary(binPath string, cfg Config, log *logger.Logger) va
 type varnishstatExec struct {
 	*logger.Logger
 
-	binPath      string
 	timeout      time.Duration
 	instanceName string
 }
 
 func (e *varnishstatExec) statistics() ([]byte, error) {
-	return ndexec.RunUnprivileged(e.Logger, e.timeout, "varnishstat-stats", "--instanceName", e.instanceName)
+	return ndexec.RunNDSudo(e.Logger, e.timeout, "varnishstat-stats", "--instanceName", e.instanceName)
 }
 
 func newVarnishstatDockerExecBinary(cfg Config, log *logger.Logger) varnishstatBinary {

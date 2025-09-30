@@ -16,19 +16,16 @@ type arcconfCli interface {
 	physicalDevicesInfo() ([]byte, error)
 }
 
-func newArcconfCliExec(ndsudoPath string, timeout time.Duration, log *logger.Logger) *arcconfCliExec {
+func newArcconfCliExec(timeout time.Duration, log *logger.Logger) *arcconfCliExec {
 	return &arcconfCliExec{
-		Logger:     log,
-		ndsudoPath: ndsudoPath,
-		timeout:    timeout,
+		Logger:  log,
+		timeout: timeout,
 	}
 }
 
 type arcconfCliExec struct {
 	*logger.Logger
-
-	ndsudoPath string
-	timeout    time.Duration
+	timeout time.Duration
 }
 
 func (e *arcconfCliExec) logicalDevicesInfo() ([]byte, error) {

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -24,9 +25,13 @@ type runner struct {
 }
 
 func newRunnerFromBuildinfo() *runner {
+	var sfx string
+	if runtime.GOOS == "windows" {
+		sfx = ".exe"
+	}
 	return &runner{
-		ndRunPath:  filepath.Join(buildinfo.NetdataBinDir, "nd-run"),
-		ndSudoPath: filepath.Join(buildinfo.PluginsDir, "ndsudo"),
+		ndRunPath:  filepath.Join(buildinfo.NetdataBinDir, "nd-run"+sfx),
+		ndSudoPath: filepath.Join(buildinfo.PluginsDir, "ndsudo"+sfx),
 	}
 }
 
@@ -36,17 +41,31 @@ var defaultRunner = newRunnerFromBuildinfo()
 // Returns stdout. On error, wraps the original error and includes a trimmed stderr snippet.
 func RunUnprivileged(log *logger.Logger, timeout time.Duration, binPath string, args ...string) ([]byte, error) {
 	argv := append([]string{binPath}, args...)
-	return defaultRunner.run(log, timeout, defaultRunner.ndRunPath, "RunUnprivileged", argv...)
+	out, _, err := defaultRunner.run(log, timeout, defaultRunner.ndRunPath, "RunUnprivileged", argv...)
+	return out, err
 }
 
 // RunNDSudo runs cmd via ndsudo with a timeout.
 // Returns stdout. On error, wraps the original error and includes a trimmed stderr snippet
 func RunNDSudo(log *logger.Logger, timeout time.Duration, cmd string, args ...string) ([]byte, error) {
 	argv := append([]string{cmd}, args...)
+	out, _, err := defaultRunner.run(log, timeout, defaultRunner.ndSudoPath, "RunNDSudo", argv...)
+	return out, err
+}
+
+// RunUnprivilegedWithCmd runs binPath via nd-run and also returns the formatted command string.
+func RunUnprivilegedWithCmd(log *logger.Logger, timeout time.Duration, binPath string, args ...string) ([]byte, string, error) {
+	argv := append([]string{binPath}, args...)
+	return defaultRunner.run(log, timeout, defaultRunner.ndRunPath, "RunUnprivileged", argv...)
+}
+
+// RunNDSudoWithCmd runs cmd via ndsudo and also returns the formatted command string.
+func RunNDSudoWithCmd(log *logger.Logger, timeout time.Duration, cmd string, args ...string) ([]byte, string, error) {
+	argv := append([]string{cmd}, args...)
 	return defaultRunner.run(log, timeout, defaultRunner.ndSudoPath, "RunNDSudo", argv...)
 }
 
-func (r *runner) run(log *logger.Logger, timeout time.Duration, helperPath, label string, argv ...string) ([]byte, error) {
+func (r *runner) run(log *logger.Logger, timeout time.Duration, helperPath, label string, argv ...string) ([]byte, string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
@@ -57,6 +76,8 @@ func (r *runner) run(log *logger.Logger, timeout time.Duration, helperPath, labe
 	var stderr bytes.Buffer
 	ex.Stderr = &stderr
 
+	cmdStr := ex.String()
+
 	out, err := ex.Output()
 	if err != nil {
 		s := stderr.String()
@@ -65,10 +86,10 @@ func (r *runner) run(log *logger.Logger, timeout time.Duration, helperPath, labe
 		}
 		// Normalize context-related errors so callers can errors.Is(..., context.DeadlineExceeded)
 		if ctxErr := ctx.Err(); ctxErr != nil {
-			return nil, fmt.Errorf("%s: %v: %w (stderr: %s)", label, ex, ctxErr, strings.TrimSpace(s))
+			return nil, cmdStr, fmt.Errorf("%s: %v: %w (stderr: %s)", label, ex, ctxErr, strings.TrimSpace(s))
 		}
-		return nil, fmt.Errorf("%s: %v: %w (stderr: %s)", label, ex, err, strings.TrimSpace(s))
+		return nil, cmdStr, fmt.Errorf("%s: %v: %w (stderr: %s)", label, ex, err, strings.TrimSpace(s))
 	}
 
-	return out, nil
+	return out, cmdStr, nil
 }

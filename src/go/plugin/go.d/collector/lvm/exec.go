@@ -15,19 +15,17 @@ type lvmCLI interface {
 	lvsReportJson() ([]byte, error)
 }
 
-func newLVMCLIExec(ndsudoPath string, timeout time.Duration, log *logger.Logger) *lvmCLIExec {
+func newLVMCLIExec(timeout time.Duration, log *logger.Logger) *lvmCLIExec {
 	return &lvmCLIExec{
-		Logger:     log,
-		ndsudoPath: ndsudoPath,
-		timeout:    timeout,
+		Logger:  log,
+		timeout: timeout,
 	}
 }
 
 type lvmCLIExec struct {
 	*logger.Logger
 
-	ndsudoPath string
-	timeout    time.Duration
+	timeout time.Duration
 }
 
 func (e *lvmCLIExec) lvsReportJson() ([]byte, error) {

@@ -13,19 +13,17 @@ type chronyBinary interface {
 	serverStats() ([]byte, error)
 }
 
-func newChronycExec(ndsudoPath string, timeout time.Duration, log *logger.Logger) *chronycExec {
+func newChronycExec(timeout time.Duration, log *logger.Logger) *chronycExec {
 	return &chronycExec{
-		Logger:     log,
-		ndsudoPath: ndsudoPath,
-		timeout:    timeout,
+		Logger:  log,
+		timeout: timeout,
 	}
 }
 
 type chronycExec struct {
 	*logger.Logger
 
-	ndsudoPath string
-	timeout    time.Duration
+	timeout time.Duration
 }
 
 func (e *chronycExec) serverStats() ([]byte, error) {

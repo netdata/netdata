@@ -16,19 +16,17 @@ type megaCli interface {
 	bbuInfo() ([]byte, error)
 }
 
-func newMegaCliExec(ndsudoPath string, timeout time.Duration, log *logger.Logger) *megaCliExec {
+func newMegaCliExec(timeout time.Duration, log *logger.Logger) *megaCliExec {
 	return &megaCliExec{
-		Logger:     log,
-		ndsudoPath: ndsudoPath,
-		timeout:    timeout,
+		Logger:  log,
+		timeout: timeout,
 	}
 }
 
 type megaCliExec struct {
 	*logger.Logger
 
-	ndsudoPath string
-	timeout    time.Duration
+	timeout time.Duration
 }
 
 func (e *megaCliExec) physDrivesInfo() ([]byte, error) {

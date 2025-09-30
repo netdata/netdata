@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"runtime"
 
-	"github.com/netdata/netdata/go/plugins/pkg/executable"
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 )
 
@@ -50,12 +49,7 @@ func (c *Collector) initSmartctlCli() (smartctlCli, error) {
 }
 
 func (c *Collector) initNdsudoSmartctlCli() (smartctlCli, error) {
-	ndsudoPath := filepath.Join(executable.Directory, "ndsudo")
-	if _, err := os.Stat(ndsudoPath); err != nil {
-		return nil, fmt.Errorf("ndsudo executable not found: %v", err)
-	}
-
-	smartctlExec := newNdsudoSmartctlCli(ndsudoPath, c.Timeout.Duration(), c.Logger)
+	smartctlExec := newNdsudoSmartctlCli(c.Timeout.Duration(), c.Logger)
 	return smartctlExec, nil
 }
 

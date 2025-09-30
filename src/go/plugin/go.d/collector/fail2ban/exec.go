@@ -22,12 +22,11 @@ type fail2banClientCli interface {
 	jailStatus(s string) ([]byte, error)
 }
 
-func newFail2BanClientCliExec(ndsudoPath string, timeout time.Duration, log *logger.Logger) *fail2banClientCliExec {
+func newFail2BanClientCliExec(timeout time.Duration, log *logger.Logger) *fail2banClientCliExec {
 	_, err := os.Stat("/host/var/run")
 
 	return &fail2banClientCliExec{
 		Logger:         log,
-		ndsudoPath:     ndsudoPath,
 		timeout:        timeout,
 		isInsideDocker: err == nil,
 	}
@@ -36,7 +35,6 @@ func newFail2BanClientCliExec(ndsudoPath string, timeout time.Duration, log *log
 type fail2banClientCliExec struct {
 	*logger.Logger
 
-	ndsudoPath     string
 	timeout        time.Duration
 	isInsideDocker bool
 }
@@ -62,6 +60,6 @@ func (e *fail2banClientCliExec) jailStatus(jail string) ([]byte, error) {
 	)
 }
 
-func (e *fail2banClientCliExec) execute(args ...string) ([]byte, error) {
-	return ndexec.RunNDSudo(e.Logger, e.timeout, args...)
+func (e *fail2banClientCliExec) execute(cmd string, args ...string) ([]byte, error) {
+	return ndexec.RunNDSudo(e.Logger, e.timeout, cmd, args...)
 }

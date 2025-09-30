@@ -15,19 +15,17 @@ type nsdControlBinary interface {
 	stats() ([]byte, error)
 }
 
-func newNsdControlExec(ndsudoPath string, timeout time.Duration, log *logger.Logger) *nsdControlExec {
+func newNsdControlExec(timeout time.Duration, log *logger.Logger) *nsdControlExec {
 	return &nsdControlExec{
-		Logger:     log,
-		ndsudoPath: ndsudoPath,
-		timeout:    timeout,
+		Logger:  log,
+		timeout: timeout,
 	}
 }
 
 type nsdControlExec struct {
 	*logger.Logger
 
-	ndsudoPath string
-	timeout    time.Duration
+	timeout time.Duration
 }
 
 func (e *nsdControlExec) stats() ([]byte, error) {

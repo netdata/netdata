@@ -15,19 +15,17 @@ type dmsetupCli interface {
 	cacheStatus() ([]byte, error)
 }
 
-func newDmsetupExec(ndsudoPath string, timeout time.Duration, log *logger.Logger) *dmsetupExec {
+func newDmsetupExec(timeout time.Duration, log *logger.Logger) *dmsetupExec {
 	return &dmsetupExec{
-		Logger:     log,
-		ndsudoPath: ndsudoPath,
-		timeout:    timeout,
+		Logger:  log,
+		timeout: timeout,
 	}
 }
 
 type dmsetupExec struct {
 	*logger.Logger
 
-	ndsudoPath string
-	timeout    time.Duration
+	timeout time.Duration
 }
 
 func (e *dmsetupExec) cacheStatus() ([]byte, error) {

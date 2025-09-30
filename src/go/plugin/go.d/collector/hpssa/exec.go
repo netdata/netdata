@@ -13,19 +13,17 @@ type ssacliBinary interface {
 	controllersInfo() ([]byte, error)
 }
 
-func newSsacliExec(ndsudoPath string, timeout time.Duration, log *logger.Logger) *ssacliExec {
+func newSsacliExec(timeout time.Duration, log *logger.Logger) *ssacliExec {
 	return &ssacliExec{
-		Logger:     log,
-		ndsudoPath: ndsudoPath,
-		timeout:    timeout,
+		Logger:  log,
+		timeout: timeout,
 	}
 }
 
 type ssacliExec struct {
 	*logger.Logger
 
-	ndsudoPath string
-	timeout    time.Duration
+	timeout time.Duration
 }
 
 func (e *ssacliExec) controllersInfo() ([]byte, error) {

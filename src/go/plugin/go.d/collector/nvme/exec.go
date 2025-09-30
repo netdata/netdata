@@ -144,8 +144,7 @@ type nvmeCli interface {
 }
 
 type nvmeCLIExec struct {
-	ndsudoPath string
-	timeout    time.Duration
+	timeout time.Duration
 }
 
 func (n *nvmeCLIExec) list() (*nvmeDeviceList, error) {
