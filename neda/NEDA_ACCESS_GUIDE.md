@@ -32,7 +32,7 @@ Neda supports four integration methods:
 
 | Integration Type | Best For | Endpoints |
 |-----------------|----------|-----------|
-| **MCP Tool** | AI assistants (Claude Code, Claude Desktop, Codex CLI) | `http://10.20.1.106:8801/mcp` (HTTP)<br>`http://10.20.1.106:8802/mcp/sse` (SSE) |
+| **MCP Tool** | AI assistants (Claude Code, Claude Desktop, Codex CLI) | `http://10.20.1.106:8801/mcp` (HTTP)<br>`http://10.20.1.106:8802/mcp/sse` (SSE)<br>`ws://10.20.1.106:8803/mcp` (WebSocket) |
 | **OpenAI-Compatible API** | Applications using OpenAI SDK | `http://10.20.1.106:8804/v1` |
 | **Anthropic-Compatible API** | Applications using Anthropic SDK | `http://10.20.1.106:8805/v1` |
 | **REST API** | Custom integrations, curl commands | `http://10.20.1.106:8800/v1/{agent}` |
@@ -125,8 +125,9 @@ All agents support these output formats via the `format` parameter:
 **Supported transports:**
 - **SSE (Server-Sent Events)**: `http://10.20.1.106:8802/mcp/sse` - Recommended for better streaming support
 - **HTTP**: `http://10.20.1.106:8801/mcp` - Standard request/response
+- **WebSocket**: `ws://10.20.1.106:8803/mcp` - Bidirectional streaming
 
-**Security note:** Neda runs on HTTP (not HTTPS) within the secure private network at 10.20.1.106. When using `mcp-remote`, you must include the `--allow-http` flag. This flag should only be used in trusted private networks.
+**Security note:** Neda runs on HTTP/WS (not HTTPS/WSS) within the secure private network at 10.20.1.106. When using `mcp-remote`, you must include the `--allow-http` flag. This flag should only be used in trusted private networks.
 
 ---
 
