@@ -2,10 +2,11 @@
 
 ## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v2.7.0...HEAD)
+[Full Changelog](https://github.com/netdata/netdata/compare/v2.7.1...HEAD)
 
 **Merged pull requests:**
 
+- Win plugin files with .plugin extension [\#21068](https://github.com/netdata/netdata/pull/21068) ([stelfrag](https://github.com/stelfrag))
 - Regenerate integrations docs [\#21065](https://github.com/netdata/netdata/pull/21065) ([netdatabot](https://github.com/netdatabot))
 - feat\(go.d/snmp\): add `ping_only` option [\#21064](https://github.com/netdata/netdata/pull/21064) ([ilyam8](https://github.com/ilyam8))
 - chore\(go.d/ddsmp\): profile definition cleanup [\#21062](https://github.com/netdata/netdata/pull/21062) ([ilyam8](https://github.com/ilyam8))
@@ -17,6 +18,11 @@
 - feat\(go.d/snmp\): add optional ICMP ping metrics [\#21052](https://github.com/netdata/netdata/pull/21052) ([ilyam8](https://github.com/ilyam8))
 - improve\(go.d/rabbitmq\): add support for old RabbitMQ whoami tags format [\#21049](https://github.com/netdata/netdata/pull/21049) ([ilyam8](https://github.com/ilyam8))
 - ai-docs [\#21043](https://github.com/netdata/netdata/pull/21043) ([shyamvalsan](https://github.com/shyamvalsan))
+- Add helper to run external commands without additional privileges. [\#20990](https://github.com/netdata/netdata/pull/20990) ([Ferroin](https://github.com/Ferroin))
+
+## [v2.7.1](https://github.com/netdata/netdata/tree/v2.7.1) (2025-09-29)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v2.7.0...v2.7.1)
 
 ## [v2.7.0](https://github.com/netdata/netdata/tree/v2.7.0) (2025-09-25)
 
@@ -446,9 +452,6 @@
 - SNMP: avaya profiles [\#20525](https://github.com/netdata/netdata/pull/20525) ([Ancairon](https://github.com/Ancairon))
 - improve\(go.d/snmp\): log device profiles matched by sysObjectID [\#20524](https://github.com/netdata/netdata/pull/20524) ([ilyam8](https://github.com/ilyam8))
 - update units in \_generic-if.yaml [\#20523](https://github.com/netdata/netdata/pull/20523) ([ilyam8](https://github.com/ilyam8))
-- Hardware \(Windows.plugin\) [\#20522](https://github.com/netdata/netdata/pull/20522) ([thiagoftsm](https://github.com/thiagoftsm))
-- upd generic check in snmp prof metrics deduplication [\#20521](https://github.com/netdata/netdata/pull/20521) ([ilyam8](https://github.com/ilyam8))
-- improve\(go.d/snmp-profiles\): metrics deduplication [\#20520](https://github.com/netdata/netdata/pull/20520) ([ilyam8](https://github.com/ilyam8))
 
 ## [v2.5.4](https://github.com/netdata/netdata/tree/v2.5.4) (2025-06-24)
 

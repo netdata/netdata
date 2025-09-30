@@ -3187,9 +3187,15 @@ install(TARGETS netdatacli
 #
 
 if(ENABLE_PLUGIN_GO)
-    add_go_target(go-plugin go.d.plugin src/go cmd/godplugin)
+    if (OS_WINDOWS)
+        set(GO_PLUGIN_BIN go.d.plugin.exe)
+    else()
+        set(GO_PLUGIN_BIN go.d.plugin)
+    endif()
 
-    install(PROGRAMS ${CMAKE_BINARY_DIR}/go.d.plugin
+    add_go_target(go-plugin ${GO_PLUGIN_BIN} src/go cmd/godplugin)
+
+    install(PROGRAMS ${CMAKE_BINARY_DIR}/${GO_PLUGIN_BIN}
             COMPONENT plugin-go
             DESTINATION usr/libexec/netdata/plugins.d)
 

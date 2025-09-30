@@ -3,104 +3,92 @@
 package ndexec
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"os/exec"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/buildinfo"
 )
 
-// CommandUnprivileged runs a command without any extra privileges and
-// returns the exec.Cmd instance.
-//
-// ctx is a context.Context to use to run the command. logger is a Logger
-// instance to use to log the command to be executed.  timeout indicates
-// the timeout for the command. arg is a list of the command arguments,
-// with the first string in the slice being the command to run.
-//
-// This invokes the command and logs a debug message that the command
-// is being executed, and then returns the exec.Cmd object for the command.
-func CommandUnprivileged(ctx context.Context, logger *logger.Logger, arg ...string) *exec.Cmd {
-	ndrunPath := filepath.Join(buildinfo.NetdataBinDir, "nd-run")
+const stderrLimit = 8 << 10 // 8 KiB
 
-	cmd := exec.CommandContext(ctx, ndrunPath, arg...)
-	if logger != nil {
-		logger.Debugf("executing '%s'", cmd)
-	}
-
-	return cmd
+// Runner holds helper paths for execution.
+type runner struct {
+	ndRunPath  string
+	ndSudoPath string
 }
 
-// RunUnprivileged runs a command without any inherited privileges via
-// the nd-run helper.
-//
-// logger is a Logger instance to use to log the command to be executed.
-// timeout indicates the timeout for the command. arg is a list of the
-// command arguments, with the first string in the slice being the command
-// to run.
-//
-// This handles constructing the context for execution, logs a debug
-// message that the command is being executed, and checks for errors in
-// the command invocation, then returns the command output.
-func RunUnprivileged(logger *logger.Logger, timeout time.Duration, arg ...string) ([]byte, error) {
+func newRunnerFromBuildinfo() *runner {
+	var sfx string
+	if runtime.GOOS == "windows" {
+		sfx = ".exe"
+	}
+	return &runner{
+		ndRunPath:  filepath.Join(buildinfo.NetdataBinDir, "nd-run"+sfx),
+		ndSudoPath: filepath.Join(buildinfo.PluginsDir, "ndsudo"+sfx),
+	}
+}
+
+var defaultRunner = newRunnerFromBuildinfo()
+
+// RunUnprivileged runs binPath via nd-run with a timeout.
+// Returns stdout. On error, wraps the original error and includes a trimmed stderr snippet.
+func RunUnprivileged(log *logger.Logger, timeout time.Duration, binPath string, args ...string) ([]byte, error) {
+	out, _, err := RunUnprivilegedWithCmd(log, timeout, binPath, args...)
+	return out, err
+}
+
+// RunNDSudo runs cmd via ndsudo with a timeout.
+// Returns stdout. On error, wraps the original error and includes a trimmed stderr snippet
+func RunNDSudo(log *logger.Logger, timeout time.Duration, cmd string, args ...string) ([]byte, error) {
+	out, _, err := RunNDSudoWithCmd(log, timeout, cmd, args...)
+	return out, err
+}
+
+// RunUnprivilegedWithCmd runs binPath via nd-run and also returns the formatted command string.
+func RunUnprivilegedWithCmd(log *logger.Logger, timeout time.Duration, binPath string, args ...string) ([]byte, string, error) {
+	argv := append([]string{binPath}, args...)
+	return defaultRunner.run(log, timeout, defaultRunner.ndRunPath, "RunUnprivileged", argv...)
+}
+
+// RunNDSudoWithCmd runs cmd via ndsudo and also returns the formatted command string.
+func RunNDSudoWithCmd(log *logger.Logger, timeout time.Duration, cmd string, args ...string) ([]byte, string, error) {
+	argv := append([]string{cmd}, args...)
+	return defaultRunner.run(log, timeout, defaultRunner.ndSudoPath, "RunNDSudo", argv...)
+}
+
+func (r *runner) run(log *logger.Logger, timeout time.Duration, helperPath, label string, argv ...string) ([]byte, string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	cmd := CommandUnprivileged(ctx, logger, arg...)
+	ex := exec.CommandContext(ctx, helperPath, argv...) // argv comes from trusted sources; no shell, args passed separately
 
-	bs, err := cmd.Output()
+	log.Debugf("executing: %v", ex)
+
+	var stderr bytes.Buffer
+	ex.Stderr = &stderr
+
+	cmdStr := ex.String()
+
+	out, err := ex.Output()
 	if err != nil {
-		return nil, fmt.Errorf("error on '%s': %v", cmd, err)
+		s := stderr.String()
+		if len(s) > stderrLimit {
+			s = s[:stderrLimit] + "… (truncated)"
+		}
+		// Normalize context-related errors so callers can errors.Is(..., context.DeadlineExceeded)
+		if ctx.Err() != nil {
+			err = ctx.Err()
+		}
+
+		return nil, cmdStr, fmt.Errorf("%s: %v: %w (stderr: %s)", label, ex, err, strings.TrimSpace(s))
 	}
 
-	return bs, nil
-}
-
-// CommandNDSudo runs a command via the ndsudo helper and returns the exec.Cmd instance.
-//
-// ctx is a context.Context to use to run the command. logger is a Logger
-// instance to use to log the command to be executed.  timeout indicates
-// the timeout for the command. arg is a list of the command arguments,
-// with the first string in the slice being the command to run.
-//
-// This invokes the command and logs a debug message that the command
-// is being executed, and then returns the exec.Cmd object for the command.
-func CommandNDSudo(ctx context.Context, logger *logger.Logger, arg ...string) *exec.Cmd {
-	ndsudoPath := filepath.Join(buildinfo.PluginsDir, "ndsudo")
-
-	cmd := exec.CommandContext(ctx, ndsudoPath, arg...)
-	if logger != nil {
-		logger.Debugf("executing '%s'", cmd)
-	}
-
-	return cmd
-}
-
-// RunNDSudo runs a command via the ndsudo helper.
-//
-// logger is a Logger instance to use to log the command to be executed.
-// timeout indicates the timeout for the command. arg is a list of the
-// command arguments, with the first string in the slice being the command
-// to run.
-//
-// This handles constructing the context for execution, logs a debug
-// message that the command is being executed, and checks for errors in
-// the command invocation, then returns the command output.
-//
-// The command to be run must also be properly handled by ndsudo.
-func RunNDSudo(logger *logger.Logger, timeout time.Duration, arg ...string) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	cmd := CommandNDSudo(ctx, logger, arg...)
-
-	bs, err := cmd.Output()
-	if err != nil {
-		return nil, fmt.Errorf("error on '%s': %v", cmd, err)
-	}
-
-	return bs, nil
+	return out, cmdStr, nil
 }

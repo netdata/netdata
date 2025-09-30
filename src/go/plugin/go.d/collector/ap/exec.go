@@ -5,12 +5,10 @@
 package ap
 
 import (
-	"context"
-	"fmt"
-	"os/exec"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 )
 
 type iwBinary interface {
@@ -33,31 +31,9 @@ type iwCliExec struct {
 }
 
 func (e *iwCliExec) devices() ([]byte, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), e.timeout)
-	defer cancel()
-
-	cmd := exec.CommandContext(ctx, e.binPath, "dev")
-	e.Debugf("executing '%s'", cmd)
-
-	bs, err := cmd.Output()
-	if err != nil {
-		return nil, fmt.Errorf("error on '%s': %v", cmd, err)
-	}
-
-	return bs, nil
+	return ndexec.RunUnprivileged(e.Logger, e.timeout, e.binPath, "dev")
 }
 
 func (e *iwCliExec) stationStatistics(ifaceName string) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), e.timeout)
-	defer cancel()
-
-	cmd := exec.CommandContext(ctx, e.binPath, ifaceName, "station", "dump")
-	e.Debugf("executing '%s'", cmd)
-
-	bs, err := cmd.Output()
-	if err != nil {
-		return nil, fmt.Errorf("error on '%s': %v", cmd, err)
-	}
-
-	return bs, nil
+	return ndexec.RunUnprivileged(e.Logger, e.timeout, e.binPath, ifaceName, "station", "dump")
 }

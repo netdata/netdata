@@ -4,23 +4,21 @@ package varnish
 
 import (
 	"context"
-	"fmt"
-	"os/exec"
 	"strconv"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/dockerhost"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 )
 
 type varnishstatBinary interface {
 	statistics() ([]byte, error)
 }
 
-func newVarnishstatExecBinary(binPath string, cfg Config, log *logger.Logger) varnishstatBinary {
+func newVarnishstatExecBinary(cfg Config, log *logger.Logger) varnishstatBinary {
 	return &varnishstatExec{
 		Logger:       log,
-		binPath:      binPath,
 		timeout:      cfg.Timeout.Duration(),
 		instanceName: cfg.InstanceName,
 	}
@@ -29,24 +27,12 @@ func newVarnishstatExecBinary(binPath string, cfg Config, log *logger.Logger) va
 type varnishstatExec struct {
 	*logger.Logger
 
-	binPath      string
 	timeout      time.Duration
 	instanceName string
 }
 
 func (e *varnishstatExec) statistics() ([]byte, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), e.timeout)
-	defer cancel()
-
-	cmd := exec.CommandContext(ctx, e.binPath, "varnishstat-stats", "--instanceName", e.instanceName)
-	e.Debugf("executing '%s'", cmd)
-
-	bs, err := cmd.Output()
-	if err != nil {
-		return nil, fmt.Errorf("error on '%s': %v", cmd, err)
-	}
-
-	return bs, nil
+	return ndexec.RunNDSudo(e.Logger, e.timeout, "varnishstat-stats", "--instanceName", e.instanceName)
 }
 
 func newVarnishstatDockerExecBinary(cfg Config, log *logger.Logger) varnishstatBinary {
