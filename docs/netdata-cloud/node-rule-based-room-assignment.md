@@ -13,6 +13,17 @@ Rules automatically assign Nodes to Rooms based on their host labels. When you c
 
 In cases where both an inclusion and exclusion rule match, the exclusion rule takes precedence.
 
+**Child Node Behavior**
+
+- Child nodes that are only indirectly connected to Cloud (through a Parent Agent) are no longer automatically added to the same Room as the Parent. 
+- If your workflow depended on this automatic grouping, we recommend setting up Room assignment rules. 
+
+:::tip
+
+This allows for fine-grained automatic assignment of nodes to Rooms based on hostnames or other host labels.
+
+:::
+
 :::important
 
 - You can use rules with all Rooms except the "All Nodes" Room, as it includes all Nodes by default
