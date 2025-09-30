@@ -21,17 +21,24 @@ Module: snmp
 
 ## Overview
 
-This SNMP collector discovers and gathers statistics for network interfaces on SNMP-enabled devices:
+This SNMP collector discovers and monitors SNMP-enabled devices using **profiles**.
 
-- Traffic
-- Packets (unicast, multicast, broadcast)
-- Errors
-- Discards
-- Administrative and operational status
+A *profile* declares:
+- device selectors (e.g. `sysObjectID`, `sysDescr`) for auto-matching,
+- which OIDs to collect (scalars and tables),
+- how to label rows (metric tags), and
+- chart/metric metadata (units, families, types), including optional **virtual metrics**.
 
-Additionally, it collects overall device uptime.
+At runtime, the collector:
+1) identifies the device by reading standard system OIDs (e.g. `sysObjectID`, `sysDescr`),
+2) picks the best-matching profile(s), and
+3) collects exactly the metrics defined by those profiles.
 
-It is compatible with all SNMP versions (v1, v2c, and v3) and uses the [gosnmp](https://github.com/gosnmp/gosnmp) package.
+Because profiles vary per vendor/model/OS, there is **no fixed list of metrics** in this page. Netdata renders the charts that each matched profile defines (interfaces, optics, CPU/mem, environment, VLANs, etc., depending on the device).
+
+The collector optionally runs **ICMP round-trip (ping)** alongside SNMP for availability and latency. A `ping_only` mode is available to skip periodic SNMP polling.
+
+SNMP versions v1, v2c, and v3 are supported, implemented via the [gosnmp](https://github.com/gosnmp/gosnmp) library.
 
 
 
@@ -45,11 +52,13 @@ This collector supports collecting metrics from multiple instances of this integ
 
 #### Auto-Detection
 
-SNMP service discovery is a dedicated component that automatically scans configured networks to find SNMP-enabled devices. 
+SNMP service discovery can automatically scan configured networks and feed the SNMP collector with discovered devices.
 
-- This feature is disabled by default and requires explicit user configuration to activate.
-- When enabled, it discovers devices using customizable credentials, supports various IP range formats (single IPs, ranges, CIDR) with a limit of 512 IPs per subnet, and optimizes network traffic through configurable caching of discovery results.
-- Discovered devices are automatically made available to the SNMP collector for monitoring.
+- Disabled by default; enable and configure explicitly.
+- Supports single IPs, ranges, and CIDR blocks (up to 512 IPs per subnet).
+- Uses the provided SNMP credentials (v1/v2c/v3) to probe devices.
+- Caches discovery results (configurable) to reduce network load.
+- At collection time, each discovered device is matched to the appropriate profile based on its `sysObjectID`, `sysDescr`, and the profile’s selector rules.
 
 The configuration file name is [go.d/sd/snmp.conf](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/sd/snmp.conf).
 
@@ -67,60 +76,16 @@ The default configuration for this integration does not impose any limits on dat
 
 #### Performance Impact
 
-**Device limitations**: Many SNMP switches and routers have limited processing power. They might not be able to report data as frequently as desired. You can monitor response times using go.d.plugin in debug mode to identify potential bottlenecks.
+**Device constraints**: Many SNMP devices (e.g., access switches) have limited CPU/ASIC time for management. If you see timeouts or gaps, reduce `update_every` or `max_repetitions`, or stagger polling across devices.
 
-**Concurrent access**: If multiple collectors or tools access the same SNMP device simultaneously, data points might be skipped. This is a limitation of the device itself, not this collector. To mitigate this, consider increasing the collection interval (update_every) to reduce the frequency of requests.
+**Concurrent polling**: Parallel access by multiple tools may cause missed counters on some devices. Increase the collection interval (`update_every`) to reduce request pressure.
 
 
 ## Metrics
 
-Metrics grouped by *scope*.
+Metrics and charts are **defined by the matched SNMP profile(s)** at runtime. They differ by vendor/model/OS and may include, for example, interface counters, optics, CPU/memory, temperature, VLANs, and more. Use the **Metrics** tab on the device’s dashboard to see exactly what is collected for that device.
 
-The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
-
-The metrics that will be collected are defined in the configuration file.
-
-### Per snmp device
-
-These metrics refer to the SNMP device.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| sysName | SNMP device's system name (OID: [1.3.6.1.2.1.1.5](https://oidref.com/1.3.6.1.2.1.1.5)). |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| snmp.device_uptime | uptime | seconds |
-
-### Per network interface
-
-Network interfaces of the SNMP device being monitored. These metrics refer to each interface.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| sysName | SNMP device's system name (OID: [1.3.6.1.2.1.1.5](https://oidref.com/1.3.6.1.2.1.1.5)). |
-| ifDescr | Network interface description (OID: [1.3.6.1.2.1.2.2.1.2](https://cric.grenoble.cnrs.fr/Administrateurs/Outils/MIBS/?oid=1.3.6.1.2.1.2.2.1.2)). |
-| ifName | Network interface name (OID: [1.3.6.1.2.1.2.2.1.2](https://cric.grenoble.cnrs.fr/Administrateurs/Outils/MIBS/?oid=1.3.6.1.2.1.31.1.1.1.1)). |
-| ifType | Network interface type (OID: [1.3.6.1.2.1.2.2.1.2](https://cric.grenoble.cnrs.fr/Administrateurs/Outils/MIBS/?oid=1.3.6.1.2.1.2.2.1.3)). |
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:------|:----------|:----|
-| snmp.device_net_interface_traffic | received, sent | kilobits/s |
-| snmp.device_net_interface_unicast | received, sent | packets/s |
-| snmp.device_net_interface_multicast | received, sent | packets/s |
-| snmp.device_net_interface_broadcast | received, sent | packets/s |
-| snmp.device_net_interface_errors | inbound, outbound | errors/s |
-| snmp.device_net_interface_discards | inbound, outbound | discards/s |
-| snmp.device_net_interface_admin_status | up, down, testing | status |
-| snmp.device_net_interface_oper_status | up, down, testing, unknown, dormant, not_present, lower_layer_down | status |
+If `ping.enabled` is true, ICMP latency/packet-loss charts are also provided (or exclusively, when `ping_only: true`).
 
 
 
@@ -151,9 +116,9 @@ UI configuration requires paid Netdata Cloud plan.
 #### Prepare the SNMP device
 
 Before configuring the collector:
-- Enable the SNMP service on the target device (through its management interface).
-- Make sure the device is reachable from the Netdata node on port 161/UDP.
-- Have ready the required connection details: IP address, SNMP version, and either a community string (v1/v2c) or user credentials (v3).
+- Enable the SNMP service on the target device (via its management interface).
+- Ensure the device is reachable from the Netdata node on UDP/161.
+- Gather connection details: IP/DNS, SNMP version, and either a community (v1/v2c) or v3 credentials (user, auth/priv).
 
 
 
@@ -186,12 +151,12 @@ The following options can be defined globally: update_every, autodetection_retry
 |  | options.timeout | SNMP request/response timeout. | 5 | no |
 |  | options.max_repetitions | Controls how many SNMP variables to retrieve in a single GETBULK request. | 25 | no |
 |  | options.max_request_size | Maximum number of OIDs allowed in a single GET request. | 60 | no |
-| **Ping** | ping_only | Collect only ICMP round-trip metrics and skip periodic SNMP metrics. A minimal SNMP sysInfo request is still performed when setting up the Virtual Node (for naming/labels and metadata). | no | no |
+| **Ping** | ping_only | Collect only ICMP round-trip metrics and skip periodic SNMP polling. A minimal SNMP sysInfo probe still runs at setup for naming/labels/metadata. | no | no |
 |  | ping.enabled | Enable ICMP round-trip measurements (runs alongside SNMP). When disabled, no ping metrics are collected. | yes | no |
 |  | ping.privileged | Use raw ICMP (privileged). If false, unprivileged mode is used. | yes | no |
 |  | ping.packets | Number of ping packets to send per iteration. | 3 | no |
 |  | ping.interval | Interval between sending ping packets. | 100ms | no |
-| **Profiles** | manual_profiles | Profiles to apply if automatic detection cannot be used. | [] | no |
+| **Profiles** | manual_profiles | A list of profiles to force-apply when auto-detection cannot be used. | [] | no |
 | **Virtual node** | create_vnode | If set, the collector will create a Netdata Virtual Node for this SNMP device, which will appear as a separate Node in Netdata. | true | no |
 |  | vnode_device_down_threshold | Number of consecutive failed data collections before marking the device as down. | 3 | no |
 |  | vnode.guid | A unique identifier for the Virtual Node. If not set, a GUID will be automatically generated from the device's IP address. |  | no |
@@ -288,6 +253,8 @@ In this example:
 - the SNMP version is `2`.
 - the SNMP community is `public`.
 - we will update the values every 10 seconds.
+
+Profiles are auto-selected at runtime
 
 
 <details open><summary>Config</summary>
