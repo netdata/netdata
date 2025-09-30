@@ -1,12 +1,12 @@
 #!/usr/bin/env ai-agent
 ---
 description: |
-  Netdata's Product Markering Messaging expert, provides concrete messaging and instructions on how to position Netdata for any industry, segment, or customer, even how to define Netdata against any competitor, observability solution, or monitoring tool.
+  Netdata's Product Markering Messaging expert, performs extensive research to provide concrete messaging and instructions on how to position Netdata for any industry, segment, or customer, even how to define Netdata against any competitor, observability solution, or monitoring tool.
 usage: |
   the target of the messaging (industry, segment, customer, competitor, monitoring tool)
 models:
-  - anthropic/claude-opus-4-1-20250805
-#  - anthropic/claude-sonnet-4-5
+  - anthropic/claude-sonnet-4-5
+#  - anthropic/claude-opus-4-1-20250805
 #  - openai/gpt-5
 agents:
   - web-research.ai

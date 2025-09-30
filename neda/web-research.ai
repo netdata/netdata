@@ -21,7 +21,7 @@ toolResponseMaxBytes: 100000
 maxConcurrentTools: 3
 temperature: 0.7
 topP: 1
-maxOutputTokens: 8192
+maxOutputTokens: 16384
 repeatPenalty: 1.1
 maxRetries: 3
 maxToolTurns: 20

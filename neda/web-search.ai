@@ -60,7 +60,7 @@ When there are contradicting findings:
 ## Report Format
 1. **TL;DR**: a short summary of the findings
 2. **Findings**: Detailed analysis of the findings - be thorough
-3. **Methodology**: Presentation of all the searches you did (not the tools, but the search terms you used)
+3. **Methodology**: Detailed description of the searches you did and the steps you followed (not the tools, but the search terms you used). This is critical for the user to understand what exactly you did and avoid repeating queries you already did.
 4. **Sources**: List all the relevant sources you found. For each source use this format:
   - URL (relevance %, how/why it helped you)
 5. **More Information**: List the URLs users can read more about your findings, in this format:
