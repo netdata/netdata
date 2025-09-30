@@ -60,7 +60,7 @@ func (e *ndsudoSmartctlCli) execute(cmd string, args ...string) (*gjson.Result, 
 		}
 	}
 
-	return parseOutput(cmdStr, bs, args, e.Logger)
+	return parseOutput(cmdStr, bs, e.Logger)
 }
 
 // directSmartctlCli executes smartctl directly (Windows only)
@@ -112,11 +112,11 @@ func (e *directSmartctlCli) execute(args ...string) (*gjson.Result, error) {
 		}
 	}
 
-	return parseOutput(cmd.String(), bs, args, e.Logger)
+	return parseOutput(cmd.String(), bs, e.Logger)
 }
 
 // Common output parsing function
-func parseOutput(cmdStr string, bs []byte, args []string, log *logger.Logger) (*gjson.Result, error) {
+func parseOutput(cmdStr string, bs []byte, log *logger.Logger) (*gjson.Result, error) {
 	if len(bs) == 0 {
 		return nil, fmt.Errorf("'%s' returned no output", cmdStr)
 	}
@@ -124,7 +124,7 @@ func parseOutput(cmdStr string, bs []byte, args []string, log *logger.Logger) (*
 	if logger.Level.Enabled(slog.LevelDebug) {
 		var buf bytes.Buffer
 		if err := json.Compact(&buf, bs); err == nil {
-			log.Debugf("exec: %v, resp: %s", args, buf.String())
+			log.Debugf("exec: %v, resp: %s", cmdStr, buf.String())
 		}
 	}
 

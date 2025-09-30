@@ -7,6 +7,7 @@ package fail2ban
 import (
 	"errors"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
@@ -61,5 +62,12 @@ func (e *fail2banClientCliExec) jailStatus(jail string) ([]byte, error) {
 }
 
 func (e *fail2banClientCliExec) execute(cmd string, args ...string) ([]byte, error) {
-	return ndexec.RunNDSudo(e.Logger, e.timeout, cmd, args...)
+	bs, err := ndexec.RunNDSudo(e.Logger, e.timeout, cmd, args...)
+	if err != nil {
+		if strings.HasPrefix(strings.TrimSpace(string(bs)), "Sorry but the jail") {
+			return nil, errJailNotExist
+		}
+		return nil, err
+	}
+	return bs, err
 }
