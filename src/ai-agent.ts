@@ -1055,31 +1055,10 @@ export class AIAgentSession {
     // Turn 0 is initialization; action turns are 1..maxTurns
     // eslint-disable-next-line functional/no-loop-statements
     for (currentTurn = 1; currentTurn <= maxTurns; currentTurn++) {
-      if (this.canceled) {
-        const errMsg = 'canceled';
-        this.emitFinalSummary(logs, accounting);
-      try {
-        if (!this.systemTurnBegan) { this.opTree.beginTurn(0, { system: true, label: 'init' }); this.systemTurnBegan = true; }
-        const finOp = this.opTree.beginOp(0, 'system', { label: 'fin' });
-        this.log({ timestamp: Date.now(), severity: 'VRB', turn: 0, subturn: 0, direction: 'response', type: 'llm', remoteIdentifier: 'agent:fin', fatal: false, message: `session finalization (uncaught)` }, { opId: finOp });
-        this.opTree.endOp(finOp, 'ok');
-        this.opTree.endTurn(0);
-        this.opTree.endSession(false, errMsg);
-      } catch (e) { warn(`endSession failed: ${e instanceof Error ? e.message : String(e)}`); }
-        return { success: false, error: errMsg, conversation, logs, accounting };
-      }
+      if (this.canceled) return this.finalizeCanceledSession(conversation, logs, accounting);
       if (this.stopRef?.stopping === true) {
         // Graceful stop: do not start further turns
-        this.emitFinalSummary(logs, accounting);
-      try {
-        if (!this.systemTurnBegan) { this.opTree.beginTurn(0, { system: true, label: 'init' }); this.systemTurnBegan = true; }
-        const finOp = this.opTree.beginOp(0, 'system', { label: 'fin' });
-        this.log({ timestamp: Date.now(), severity: 'VRB', turn: 0, subturn: 0, direction: 'response', type: 'llm', remoteIdentifier: 'agent:fin', fatal: false, message: 'session finalization' }, { opId: finOp });
-        this.opTree.endOp(finOp, 'ok');
-        this.opTree.endTurn(0);
-        this.opTree.endSession(true);
-      } catch (e) { warn(`endSession failed: ${e instanceof Error ? e.message : String(e)}`); }
-        return { success: true, conversation, logs, accounting } as AIAgentResult;
+        return this.finalizeGracefulStopSession(conversation, logs, accounting);
       }
       try {
         // Capture effective prompts for this turn (post expansion/enhancement)
@@ -1102,6 +1081,8 @@ export class AIAgentSession {
       // Global attempts across all provider/model pairs for this turn
       let attempts = 0;
       let pairCursor = 0;
+      let rateLimitedInCycle = 0;
+      let maxRateLimitWaitMs = 0;
       // eslint-disable-next-line functional/no-loop-statements
       while (attempts < maxRetries && !turnSuccessful) {
         // Emit the same startup verbose line also when the master LLM runs (once per session)
@@ -1128,7 +1109,9 @@ export class AIAgentSession {
         const pair = pairs[pairCursor % pairs.length];
         pairCursor += 1;
         const { provider, model } = pair;
-          
+        let cycleIndex = 0;
+        let cycleComplete = false;
+
           try {
             // Build per-attempt conversation with optional guidance injection
             let attemptConversation = [...conversation];
@@ -1161,6 +1144,8 @@ export class AIAgentSession {
 
             this.llmAttempts++;
             attempts += 1;
+            cycleIndex = pairs.length > 0 ? (attempts - 1) % pairs.length : 0;
+            cycleComplete = pairs.length > 0 ? (cycleIndex === pairs.length - 1) : false;
             // Begin hierarchical LLM operation (Option C)
             const llmOpId = (() => { try { return this.opTree.beginOp(currentTurn, 'llm', { provider, model, isFinalTurn }); } catch { return undefined; } })();
             this.currentLlmOpId = llmOpId;
@@ -1286,30 +1271,34 @@ export class AIAgentSession {
             this.currentLlmOpId = undefined;
 
       // Handle turn result based on status
-      if (turnResult.status.type === 'success') {
-        // Synthetic error: success with content but no tools and no final_report → retry this turn
-        if (this.finalReport === undefined) {
+            if (turnResult.status.type === 'success') {
+              // Synthetic error: success with content but no tools and no final_report → retry this turn
+              if (this.finalReport === undefined) {
           const lastAssistant = [...turnResult.messages].filter(m => m.role === 'assistant').pop();
           const hasTools = (lastAssistant?.toolCalls?.length ?? 0) > 0;
           const hasText = (lastAssistant?.content.trim().length ?? 0) > 0;
           if (!hasTools && hasText) {
-            const warnEntry: LogEntry = {
-              timestamp: Date.now(),
-              severity: 'WRN',
-              turn: currentTurn,
-              subturn: 0,
-              direction: 'response',
-              type: 'llm',
-              remoteIdentifier: `${provider}:${model}`,
-              fatal: false,
-              message: 'Synthetic retry: assistant returned content without tool calls and without final_report.'
-            };
-            this.log(warnEntry);
-            lastError = 'invalid_response: content_without_tools_or_final';
-            // do not append these messages; try next provider/model in same turn
-            continue;
-          }
-        }
+                const warnEntry: LogEntry = {
+                  timestamp: Date.now(),
+                  severity: 'WRN',
+                  turn: currentTurn,
+                  subturn: 0,
+                  direction: 'response',
+                  type: 'llm',
+                  remoteIdentifier: `${provider}:${model}`,
+                  fatal: false,
+                  message: 'Synthetic retry: assistant returned content without tool calls and without final_report.'
+                };
+                this.log(warnEntry);
+                lastError = 'invalid_response: content_without_tools_or_final';
+                if (cycleComplete) {
+                  rateLimitedInCycle = 0;
+                  maxRateLimitWaitMs = 0;
+                }
+                // do not append these messages; try next provider/model in same turn
+                continue;
+              }
+            }
 
         // (removed misplaced orchestrator path; correct handling is below in toolExecutor)
 
@@ -1490,6 +1479,10 @@ export class AIAgentSession {
                 this.log(warnEntry);
                 this.llmSyntheticFailures++;
                 lastError = 'invalid_response: empty_without_tools';
+                if (cycleComplete) {
+                  rateLimitedInCycle = 0;
+                  maxRateLimitWaitMs = 0;
+                }
                 // do not mark turnSuccessful; continue retry loop
                 continue;
               }
@@ -1528,33 +1521,101 @@ export class AIAgentSession {
                     subturn: 0,
                     direction: 'response',
                     type: 'llm',
-                    remoteIdentifier: remoteId,
-                    fatal: false,
-                    message: 'Final turn did not produce final_report; retrying with next provider/model in this turn.'
-                  };
-                  this.log(warnEntry);
-                  // Continue attempts loop (do not mark successful)
-                  continue;
+                  remoteIdentifier: remoteId,
+                  fatal: false,
+                  message: 'Final turn did not produce final_report; retrying with next provider/model in this turn.'
+                };
+                this.log(warnEntry);
+                // Continue attempts loop (do not mark successful)
+                if (cycleComplete) {
+                  rateLimitedInCycle = 0;
+                  maxRateLimitWaitMs = 0;
                 }
-                // Non-final turns: proceed to next turn; tools already executed if present
-                turnSuccessful = true;
-                break;
+                continue;
               }
-            } else {
-              // Handle various error types
-              lastError = 'message' in turnResult.status ? turnResult.status.message : turnResult.status.type;
-              
-              // Some errors should skip this provider entirely
-              if (turnResult.status.type === 'auth_error' || turnResult.status.type === 'quota_exceeded') {
-                break; // Skip to next provider/model pair
+              // Non-final turns: proceed to next turn; tools already executed if present
+              turnSuccessful = true;
+              break;
+            }
+          } else {
+            // Handle various error types
+            lastError = 'message' in turnResult.status ? turnResult.status.message : turnResult.status.type;
+            
+            // Some errors should skip this provider entirely
+            if (turnResult.status.type === 'auth_error' || turnResult.status.type === 'quota_exceeded') {
+              break; // Skip to next provider/model pair
+            }
+            if (turnResult.status.type === 'rate_limit') {
+              rateLimitedInCycle += 1;
+              const routed = this.llmClient.getLastActualRouting();
+              const remoteId = (provider === 'openrouter' && routed.provider !== undefined)
+                ? `${provider}/${routed.provider}:${model}`
+                : `${provider}:${model}`;
+              const RATE_LIMIT_MIN_WAIT_MS = 1_000;
+              const RATE_LIMIT_MAX_WAIT_MS = 60_000;
+              const fallbackWait = Math.min(Math.max(attempts * 1_000, RATE_LIMIT_MIN_WAIT_MS), RATE_LIMIT_MAX_WAIT_MS);
+              const providerWaitRaw = turnResult.status.retryAfterMs;
+              const providerWaitMs = typeof providerWaitRaw === 'number' && Number.isFinite(providerWaitRaw)
+                ? providerWaitRaw
+                : undefined;
+              const effectiveWaitMs = Math.min(
+                Math.max(Math.round(providerWaitMs ?? fallbackWait), RATE_LIMIT_MIN_WAIT_MS),
+                RATE_LIMIT_MAX_WAIT_MS
+              );
+              maxRateLimitWaitMs = Math.max(maxRateLimitWaitMs, effectiveWaitMs);
+              const warnEntry: LogEntry = {
+                timestamp: Date.now(),
+                severity: 'WRN',
+                turn: currentTurn,
+                subturn: 0,
+                direction: 'response',
+                type: 'llm',
+                remoteIdentifier: remoteId,
+                fatal: false,
+                message: `Rate limited; suggested wait ${String(effectiveWaitMs)}ms before retry.`
+              };
+              this.log(warnEntry);
+
+              if (cycleComplete) {
+                const allRateLimited = rateLimitedInCycle >= pairs.length;
+                if (allRateLimited && attempts < maxRetries && maxRateLimitWaitMs > 0) {
+                  const waitLog: LogEntry = {
+                    timestamp: Date.now(),
+                    severity: 'WRN',
+                    turn: currentTurn,
+                    subturn: 0,
+                    direction: 'response',
+                    type: 'llm',
+                    remoteIdentifier: 'agent:retry',
+                    fatal: false,
+                    message: `All ${String(pairs.length)} providers rate-limited; backing off for ${String(maxRateLimitWaitMs)}ms before retry.`
+                  };
+                  this.log(waitLog);
+                  const sleepResult = await this.sleepWithAbort(maxRateLimitWaitMs);
+                  if (sleepResult === 'aborted_cancel') {
+                    return this.finalizeCanceledSession(conversation, logs, accounting);
+                  }
+                  if (sleepResult === 'aborted_stop') {
+                    return this.finalizeGracefulStopSession(conversation, logs, accounting);
+                  }
+                }
+                rateLimitedInCycle = 0;
+                maxRateLimitWaitMs = 0;
               }
-              
-              // Continue trying other providers
+
               continue;
             }
-          } catch (error) {
-            lastError = error instanceof Error ? error.message : String(error);
-            // Ensure accounting entry even if an unexpected error occurred before turnResult
+            
+            // Continue trying other providers
+            if (cycleComplete) {
+              rateLimitedInCycle = 0;
+              maxRateLimitWaitMs = 0;
+            }
+            continue;
+          }
+        } catch (error) {
+          lastError = error instanceof Error ? error.message : String(error);
+          // Ensure accounting entry even if an unexpected error occurred before turnResult
             const accountingEntry: AccountingEntry = {
               type: 'llm',
               timestamp: Date.now(),
@@ -1569,8 +1630,12 @@ export class AIAgentSession {
             accounting.push(accountingEntry);
             try { if (typeof this.currentLlmOpId === 'string') this.opTree.appendAccounting(this.currentLlmOpId, accountingEntry); } catch (e) { warn(`appendAccounting failed: ${e instanceof Error ? e.message : String(e)}`); }
             try { this.sessionConfig.callbacks?.onAccounting?.(accountingEntry); } catch (e) { warn(`onAccounting callback failed: ${e instanceof Error ? e.message : String(e)}`); }
+            if (cycleComplete) {
+              rateLimitedInCycle = 0;
+              maxRateLimitWaitMs = 0;
+            }
             continue;
-          }
+        }
       }
 
       if (!turnSuccessful) {
@@ -1627,6 +1692,91 @@ export class AIAgentSession {
       accounting,
       childConversations: this.childConversations
     };
+  }
+
+  private finalizeCanceledSession(
+    conversation: ConversationMessage[],
+    logs: LogEntry[],
+    accounting: AccountingEntry[]
+  ): AIAgentResult {
+    const errMsg = 'canceled';
+    this.emitFinalSummary(logs, accounting);
+    try {
+      if (!this.systemTurnBegan) { this.opTree.beginTurn(0, { system: true, label: 'init' }); this.systemTurnBegan = true; }
+      const finOp = this.opTree.beginOp(0, 'system', { label: 'fin' });
+      this.log({ timestamp: Date.now(), severity: 'VRB', turn: 0, subturn: 0, direction: 'response', type: 'llm', remoteIdentifier: 'agent:fin', fatal: false, message: 'session finalization (uncaught)' }, { opId: finOp });
+      this.opTree.endOp(finOp, 'ok');
+      this.opTree.endTurn(0);
+      this.opTree.endSession(false, errMsg);
+    } catch (e) { warn(`endSession failed: ${e instanceof Error ? e.message : String(e)}`); }
+    return { success: false, error: errMsg, conversation, logs, accounting };
+  }
+
+  private finalizeGracefulStopSession(
+    conversation: ConversationMessage[],
+    logs: LogEntry[],
+    accounting: AccountingEntry[]
+  ): AIAgentResult {
+    this.emitFinalSummary(logs, accounting);
+    try {
+      if (!this.systemTurnBegan) { this.opTree.beginTurn(0, { system: true, label: 'init' }); this.systemTurnBegan = true; }
+      const finOp = this.opTree.beginOp(0, 'system', { label: 'fin' });
+      this.log({ timestamp: Date.now(), severity: 'VRB', turn: 0, subturn: 0, direction: 'response', type: 'llm', remoteIdentifier: 'agent:fin', fatal: false, message: 'session finalization' }, { opId: finOp });
+      this.opTree.endOp(finOp, 'ok');
+      this.opTree.endTurn(0);
+      this.opTree.endSession(true);
+    } catch (e) { warn(`endSession failed: ${e instanceof Error ? e.message : String(e)}`); }
+    return { success: true, conversation, logs, accounting } as AIAgentResult;
+  }
+
+  private async sleepWithAbort(
+    ms: number
+  ): Promise<'completed' | 'aborted_cancel' | 'aborted_stop'> {
+    if (ms <= 0) return 'completed';
+    if (this.canceled) return 'aborted_cancel';
+    if (this.stopRef?.stopping === true) return 'aborted_stop';
+
+    return await new Promise<'completed' | 'aborted_cancel' | 'aborted_stop'>((resolve) => {
+      let settled = false;
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      let stopInterval: ReturnType<typeof setInterval> | undefined;
+      let abortHandler: (() => void) | undefined;
+
+      const cleanup = () => {
+        if (timer !== undefined) clearTimeout(timer);
+        if (stopInterval !== undefined) clearInterval(stopInterval);
+        if (abortHandler !== undefined && this.abortSignal !== undefined) {
+          try { this.abortSignal.removeEventListener('abort', abortHandler); } catch (e) { warn(`abort cleanup failed: ${e instanceof Error ? e.message : String(e)}`); }
+        }
+      };
+
+      const finish = (result: 'completed' | 'aborted_cancel' | 'aborted_stop') => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        resolve(result);
+      };
+
+      timer = setTimeout(() => {
+        finish('completed');
+      }, ms);
+
+      if (this.abortSignal !== undefined) {
+        abortHandler = () => {
+          this.canceled = true;
+          finish('aborted_cancel');
+        };
+        try { this.abortSignal.addEventListener('abort', abortHandler, { once: true }); } catch (e) { warn(`abortSignal listener failed: ${e instanceof Error ? e.message : String(e)}`); }
+      }
+
+      if (this.stopRef !== undefined) {
+        stopInterval = setInterval(() => {
+          if (this.stopRef?.stopping === true) {
+            finish('aborted_stop');
+          }
+        }, 100);
+      }
+    });
   }
 
   // Compose and emit FIN summary log
