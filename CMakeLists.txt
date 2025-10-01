@@ -3173,15 +3173,10 @@ if(ENABLE_PLUGIN_IBM)
             src/go/plugin/ibm.d/config/ibm.d/websphere_mp.conf
             src/go/plugin/ibm.d/config/ibm.d/websphere_pmi.conf
             COMPONENT plugin-ibm
-            DESTINATION usr/lib/netdata/conf.d/ibm.d)
+            DESTINATION usr/lib/netdata/conf.d/ibm.d
+    )
 
-    # Configure and install IBM library download script
-    configure_file(packaging/installer/install-ibm-libs.sh.in
-                   packaging/installer/install-ibm-libs.sh @ONLY)
-
-    install(PROGRAMS ${CMAKE_BINARY_DIR}/packaging/installer/install-ibm-libs.sh
-            COMPONENT plugin-ibm
-            DESTINATION usr/libexec/netdata)
+    install_ibm_runtime(plugin-ibm)
 endif()
 
 #

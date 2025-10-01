@@ -9,6 +9,7 @@ else()
 endif()
 
 set(CPACK_THREADS 0)
+set(CPACK_COMPONENTS_GROUPING IGNORE)
 
 set(CPACK_STRIP_FILES NO)
 set(CPACK_DEBIAN_DEBUGINFO_PACKAGE NO)
@@ -315,20 +316,18 @@ set(CPACK_DEBIAN_PLUGIN-GO_DEBUGINFO_PACKAGE Off)
 # ibm.plugin
 #
 
-set(CPACK_COMPONENT_PLUGIN-IBM_DEPENDS "netdata")
+set(CPACK_COMPONENT_PLUGIN-IBM_DEPENDS "netdata unixodbc netdata-plugin-ibm-libs")
 set(CPACK_COMPONENT_PLUGIN-IBM_DESCRIPTION
 		"The IBM ecosystem metrics collection plugin for the Netdata Agent
  This plugin allows the Netdata Agent to collect metrics from IBM
  systems including AS/400 (IBM i), DB2 databases, MQ queues, and WebSphere
  application servers. Database collectors use unixODBC and require appropriate
- ODBC drivers. MQ collectors require IBM MQ client libraries which will be
- downloaded automatically on first run.")
+ ODBC drivers.")
 
 set(CPACK_DEBIAN_PLUGIN-IBM_PACKAGE_NAME "netdata-plugin-ibm")
 set(CPACK_DEBIAN_PLUGIN-IBM_PACKAGE_SECTION "net")
 set(CPACK_DEBIAN_PLUGIN-IBM_PACKAGE_CONFLICTS "netdata (<< 1.40)")
 set(CPACK_DEBIAN_PLUGIN-IBM_PACKAGE_PREDEPENDS "adduser")
-set(CPACK_DEBIAN_PLUGIN-IBM_PACKAGE_DEPENDS "netdata, unixodbc")
 set(CPACK_DEBIAN_PLUGIN-IBM_PACKAGE_SUGGESTS "libxml2")
 
 set(CPACK_DEBIAN_PLUGIN-IBM_PACKAGE_CONTROL_EXTRA
@@ -337,11 +336,26 @@ set(CPACK_DEBIAN_PLUGIN-IBM_PACKAGE_CONTROL_EXTRA
 
 set(CPACK_DEBIAN_PLUGIN-IBM_DEBUGINFO_PACKAGE Off)
 
+set(CPACK_DEBIAN_PLUGIN-IBM-LIBS_DESCRIPTION
+		"IBM MQ client libraries for the Netdata IBM ecosystem metrics collection plugin.
+ This package provides the IBM MQ client libraries needed by Netdata IBM
+ ecosystem metrics collection plugin.")
+
+set(CPACK_DEBIAN_PLUGIN-IBM-LIBS_PACKAGE_NAME "netdata-plugin-ibm-libs")
+set(CPACK_DEBIAN_PLUGIN-IBM-LIBS_PACKAGE_SECTION "net")
+set(CPACK_DEBIAN_PLUGIN-IBM-LIBS_PACKAGE_CONFLICTS "netdata (<< 1.40)")
+set(CPACK_DEBIAN_PLUGIN-IBM-LIBS_PACKAGE_PREDEPENDS "adduser")
+
+set(CPACK_DEBIAN_PLUGIN-IBM-LIBS_PACKAGE_CONTROL_EXTRA
+	  "${PKG_FILES_PATH}/deb/plugin-ibm-libs/preinst")
+
+set(CPACK_DEBIAN_PLUGIN-IBM-LIBS_DEBUGINFO_PACKAGE Off)
+set(CPACK_DEBIAN_PLUGIN-IBM-LIBS_PACKAGE_SHLIBDEPS Off)
+
 #
 # network-viewer.plugin
 #
 
-# TODO: recommends netdata-plugin-ebpf
 set(CPACK_COMPONENT_PLUGIN-NETWORK-VIEWER_DEPENDS "netdata")
 set(CPACK_COMPONENT_PLUGIN-NETWORK-VIEWER_DESCRIPTION
 		"The network viewer plugin for the Netdata Agent
@@ -562,7 +576,8 @@ if(ENABLE_PLUGIN_GO)
         list(APPEND CPACK_COMPONENTS_ALL "plugin-go")
 endif()
 if(ENABLE_PLUGIN_IBM)
-        list(APPEND CPACK_COMPONENTS_ALL "plugin-ibm")
+  list(APPEND CPACK_COMPONENTS_ALL "plugin-ibm")
+  list(APPEND CPACK_COMPONENTS_ALL "plugin-ibm-libs")
 endif()
 if(ENABLE_PLUGIN_NETWORK_VIEWER)
         list(APPEND CPACK_COMPONENTS_ALL "plugin-network-viewer")
