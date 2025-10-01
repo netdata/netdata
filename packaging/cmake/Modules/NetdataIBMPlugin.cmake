@@ -9,6 +9,7 @@ include(FetchContent)
 # The plugin will download IBM libraries on first run.
 macro(add_ibm_plugin_target)
   set(IBM_MQ_BUILD_DIR "${CMAKE_BINARY_DIR}/ibm-mqclient")
+  set(IBM_MQ_INSTALL_DIR "${CMAKE_INSTALL_PREFIX}/usr/lib/netdata/ibm-mqclient")
 
   FetchContent_Declare(
     ibm_mq
@@ -43,7 +44,7 @@ macro(add_ibm_plugin_target)
   if(EXISTS "${IBM_MQ_BUILD_DIR}/inc/cmqc.h")
     set(IBM_CGO_CFLAGS "-I${IBM_MQ_BUILD_DIR}/inc")
     set(IBM_CGO_LDFLAGS "-L${IBM_MQ_BUILD_DIR}/lib64 -lmqic_r")
-    set(IBM_RPATH_FLAGS "-Wl,-rpath,${IBM_MQ_BUILD_DIR}/lib64")
+    set(IBM_RPATH_FLAGS "-Wl,-rpath,${IBM_MQ_INSTALL_DIR}/lib64")
     set(MQ_INSTALLATION_PATH "${IBM_MQ_BUILD_DIR}")
   else()
     message(WARNING "IBM MQ client libraries not found - MQ PCF collector will be disabled")
