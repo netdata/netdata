@@ -260,9 +260,6 @@ static inline void netdata_set_hd_usage(PERF_DATA_BLOCK *pDataBlock,
                                                                      &totalNumberOfBytes,
                                                                      &totalNumberOfFreeBytes)) {
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->percentDiskFree);
-
-        d->percentDiskFree.current.Data = d->percentDiskFree.current.Data;
-        d->percentDiskFree.current.Time = d->percentDiskFree.current.Time;
         d->divisor = 1024;
         return;
     }
