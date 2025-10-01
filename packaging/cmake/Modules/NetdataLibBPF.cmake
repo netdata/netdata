@@ -69,7 +69,7 @@ function(netdata_bundle_libbpf)
         GIT_TAG ${_libbpf_tag}
         SOURCE_DIR "${libbpf_SOURCE_DIR}"
         CONFIGURE_COMMAND ""
-        BUILD_COMMAND ${MAKE_COMMAND} -C src CC=${CMAKE_C_COMPILER} BUILD_STATIC_ONLY=1 OBJDIR=build/ DESTDIR=../ install
+        BUILD_COMMAND ${MAKE_COMMAND} -C src CC=${CMAKE_C_COMPILER} BUILD_STATIC_ONLY=1 OBJDIR=build/ DESTDIR=../ LIBSUBDIR=${_libbpf_lib_dir} install
         BUILD_IN_SOURCE 1
         BUILD_BYPRODUCTS "${_libbpf_library}"
         INSTALL_COMMAND ""
