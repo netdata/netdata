@@ -92,7 +92,7 @@ function(install_ibm_runtime component)
       continue()
     endif()
 
-    if(NOT "${line}" MATCHES ",Runtime,")
+    if(NOT "${line}" MATCHES ",(Runtime|GSKit),")
       continue()
     endif()
 

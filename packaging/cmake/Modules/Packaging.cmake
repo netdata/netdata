@@ -316,7 +316,7 @@ set(CPACK_DEBIAN_PLUGIN-GO_DEBUGINFO_PACKAGE Off)
 # ibm.plugin
 #
 
-set(CPACK_COMPONENT_PLUGIN-IBM_DEPENDS "netdata unixodbc netdata-plugin-ibm-libs")
+set(CPACK_COMPONENT_PLUGIN-IBM_DEPENDS "netdata, unixodbc, netdata-plugin-ibm-libs")
 set(CPACK_COMPONENT_PLUGIN-IBM_DESCRIPTION
 		"The IBM ecosystem metrics collection plugin for the Netdata Agent
  This plugin allows the Netdata Agent to collect metrics from IBM
