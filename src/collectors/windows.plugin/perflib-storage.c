@@ -26,6 +26,7 @@ struct logical_disk {
     char mount_point[256];
     char *volume_name;
 
+    ULONG divisor;
     bool readonly;
 
     STRING *filesystem;
@@ -269,10 +270,18 @@ static const char *drive_type_to_str(UINT type)
     }
 }
 
+<<<<<<< HEAD
 static inline void netdata_set_hd_usage(struct logical_disk *d, usec_t now_ut)
+=======
+static inline void netdata_set_hd_usage(PERF_DATA_BLOCK *pDataBlock,
+                                        PERF_OBJECT_TYPE *pObjectType,
+                                        PERF_INSTANCE_DEFINITION *pi,
+                                        struct logical_disk *d)
+>>>>>>> master
 {
     ULARGE_INTEGER freeBytesAvaiable, totalBytes, totalNumberOfFreeBytes;
 
+<<<<<<< HEAD
     if (!GetDiskFreeSpaceExA(windows_shared_buffer, &freeBytesAvaiable, &totalBytes, &totalNumberOfFreeBytes)) {
         return;
     }
@@ -281,6 +290,28 @@ static inline void netdata_set_hd_usage(struct logical_disk *d, usec_t now_ut)
     d->percentDiskFree.current.Data = totalNumberOfFreeBytes.QuadPart;
     // Disk Used
     d->percentDiskFree.current.Time = totalBytes.QuadPart;
+=======
+// https://learn.microsoft.com/en-us/windows/win32/fileio/maximum-file-path-limitation?tabs=registry
+#define MAX_DRIVE_LENGTH 255
+    char path[MAX_DRIVE_LENGTH + 1];
+    snprintfz(path, MAX_DRIVE_LENGTH, "%s\\", windows_shared_buffer);
+
+    // Description of incompatibilities present in both methods we are using
+    // https://devblogs.microsoft.com/oldnewthing/20071101-00/?p=24613
+    // We are using the variable that should not be affected by qyota ()
+    if ((GetDriveTypeA(path) == DRIVE_UNKNOWN) || !GetDiskFreeSpaceExA(path,
+                                                                     NULL,
+                                                                     &totalNumberOfBytes,
+                                                                     &totalNumberOfFreeBytes)) {
+        perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->percentDiskFree);
+        d->divisor = 1024;
+        return;
+    }
+
+    d->divisor = GIGA_FACTOR;
+    d->percentDiskFree.current.Data = totalNumberOfFreeBytes.QuadPart;
+    d->percentDiskFree.current.Time = totalNumberOfBytes.QuadPart;
+>>>>>>> master
 }
 
 static void netdata_get_volume_size(DICTIONARY *dict, usec_t now_ut)
@@ -360,8 +391,13 @@ static void netdata_plot_storage_chart(DICTIONARY *dict, int update_every)
                 rrdlabels_add(d->st_disk_space->rrdlabels, "serial_number", buf, RRDLABEL_SRC_AUTO);
             }
 
+<<<<<<< HEAD
             d->rd_disk_space_free = rrddim_add(d->st_disk_space, "avail", NULL, 1, GIGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
             d->rd_disk_space_used = rrddim_add(d->st_disk_space, "used", NULL, 1, GIGA_FACTOR, RRD_ALGORITHM_ABSOLUTE);
+=======
+            d->rd_disk_space_free = rrddim_add(d->st_disk_space, "avail", NULL, 1, d->divisor, RRD_ALGORITHM_ABSOLUTE);
+            d->rd_disk_space_used = rrddim_add(d->st_disk_space, "used", NULL, 1, d->divisor, RRD_ALGORITHM_ABSOLUTE);
+>>>>>>> master
         }
 
         // percentDiskFree has the free space in Data and the size of the disk in Time, in MiB.
