@@ -2,10 +2,18 @@
 # Macros and functions to assist in working with Go
 
 if(CMAKE_BUILD_TYPE STREQUAL Debug)
-    set(GO_LDFLAGS "-X github.com/netdata/netdata/go/plugins/pkg/buildinfo.Version=${NETDATA_VERSION_STRING}")
+    set(GO_LDFLAGS "")
 else()
-    set(GO_LDFLAGS "-w -s -X github.com/netdata/netdata/go/plugins/pkg/buildinfo.Version=${NETDATA_VERSION_STRING}")
+    set(GO_LDFLAGS "-w -s")
 endif()
+
+set(BUILDINFO_PKG "github.com/netdata/netdata/go/plugins/pkg/buildinfo")
+
+set(GO_LDFLAGS "${GO_LDFLAGS} -X ${BUILDINFO_PKG}.Version=${NETDATA_VERSION_STRING}")
+set(GO_LDFLAGS "${GO_LDFLAGS} -X ${BUILDINFO_PKG}.NetdataBinDir=${NETDATA_BIN_DIR}")
+set(GO_LDFLAGS "${GO_LDFLAGS} -X ${BUILDINFO_PKG}.PluginsDir=${PLUGINS_DIR}")
+set(GO_LDFLAGS "${GO_LDFLAGS} -X ${BUILDINFO_PKG}.UserConfigDir=${CONFIG_DIR}")
+set(GO_LDFLAGS "${GO_LDFLAGS} -X ${BUILDINFO_PKG}.StockConfigDir=${LIBCONFIG_DIR}")
 
 # add_go_target: Add a new target that needs to be built using the Go toolchain.
 #

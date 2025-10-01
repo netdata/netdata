@@ -4,12 +4,7 @@ package chrony
 
 import (
 	"errors"
-	"fmt"
 	"net"
-	"os"
-	"path/filepath"
-
-	"github.com/netdata/netdata/go/plugins/pkg/executable"
 )
 
 func (c *Collector) validateConfig() error {
@@ -30,13 +25,7 @@ func (c *Collector) initChronycBinary() (chronyBinary, error) {
 		return nil, nil
 	}
 
-	ndsudoPath := filepath.Join(executable.Directory, "ndsudo")
-
-	if _, err := os.Stat(ndsudoPath); err != nil {
-		return nil, fmt.Errorf("ndsudo executable not found: %v", err)
-	}
-
-	chronyc := newChronycExec(ndsudoPath, c.Timeout.Duration(), c.Logger)
+	chronyc := newChronycExec(c.Timeout.Duration(), c.Logger)
 
 	return chronyc, nil
 }

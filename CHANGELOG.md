@@ -2,10 +2,23 @@
 
 ## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v2.7.0...HEAD)
+[Full Changelog](https://github.com/netdata/netdata/compare/v2.7.1...HEAD)
 
 **Merged pull requests:**
 
+- Regenerate integrations docs [\#21079](https://github.com/netdata/netdata/pull/21079) ([netdatabot](https://github.com/netdatabot))
+- docs: update SNMP collector metadata to reflect profile-based collection [\#21078](https://github.com/netdata/netdata/pull/21078) ([ilyam8](https://github.com/ilyam8))
+- build\(go\): add config dirs [\#21077](https://github.com/netdata/netdata/pull/21077) ([ilyam8](https://github.com/ilyam8))
+- Make `nd-run` silent unless exiting with an error [\#21076](https://github.com/netdata/netdata/pull/21076) ([ilyam8](https://github.com/ilyam8))
+- docs: add note about using ``--init` when not running with `pid: host` [\#21075](https://github.com/netdata/netdata/pull/21075) ([ilyam8](https://github.com/ilyam8))
+- build\(deps\): bump openssl version in static build [\#21074](https://github.com/netdata/netdata/pull/21074) ([ilyam8](https://github.com/ilyam8))
+- Declare flatten-serde-json at the workspace. [\#21072](https://github.com/netdata/netdata/pull/21072) ([vkalintiris](https://github.com/vkalintiris))
+- Add missing extension go.d \(Windows\) [\#21070](https://github.com/netdata/netdata/pull/21070) ([thiagoftsm](https://github.com/thiagoftsm))
+- Win plugin files with .plugin extension [\#21068](https://github.com/netdata/netdata/pull/21068) ([stelfrag](https://github.com/stelfrag))
+- Convert go collectors to use ndexec module for external command invocation [\#21067](https://github.com/netdata/netdata/pull/21067) ([Ferroin](https://github.com/Ferroin))
+- Regenerate integrations docs [\#21065](https://github.com/netdata/netdata/pull/21065) ([netdatabot](https://github.com/netdatabot))
+- feat\(go.d/snmp\): add `ping_only` option [\#21064](https://github.com/netdata/netdata/pull/21064) ([ilyam8](https://github.com/ilyam8))
+- chore\(go.d/ddsmp\): profile definition cleanup [\#21062](https://github.com/netdata/netdata/pull/21062) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations docs [\#21058](https://github.com/netdata/netdata/pull/21058) ([netdatabot](https://github.com/netdatabot))
 - chore\(go.d/snmp\): remove legacy custom oid collection [\#21056](https://github.com/netdata/netdata/pull/21056) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations docs [\#21055](https://github.com/netdata/netdata/pull/21055) ([netdatabot](https://github.com/netdatabot))
@@ -13,7 +26,13 @@
 - Regenerate integrations docs [\#21053](https://github.com/netdata/netdata/pull/21053) ([netdatabot](https://github.com/netdatabot))
 - feat\(go.d/snmp\): add optional ICMP ping metrics [\#21052](https://github.com/netdata/netdata/pull/21052) ([ilyam8](https://github.com/ilyam8))
 - improve\(go.d/rabbitmq\): add support for old RabbitMQ whoami tags format [\#21049](https://github.com/netdata/netdata/pull/21049) ([ilyam8](https://github.com/ilyam8))
+- ml: implement fixed time-based training windows - corrected [\#21046](https://github.com/netdata/netdata/pull/21046) ([ktsaou](https://github.com/ktsaou))
 - ai-docs [\#21043](https://github.com/netdata/netdata/pull/21043) ([shyamvalsan](https://github.com/shyamvalsan))
+- Add helper to run external commands without additional privileges. [\#20990](https://github.com/netdata/netdata/pull/20990) ([Ferroin](https://github.com/Ferroin))
+
+## [v2.7.1](https://github.com/netdata/netdata/tree/v2.7.1) (2025-09-29)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v2.7.0...v2.7.1)
 
 ## [v2.7.0](https://github.com/netdata/netdata/tree/v2.7.0) (2025-09-25)
 
@@ -433,24 +452,6 @@
 - SNMP: bluecat profile [\#20538](https://github.com/netdata/netdata/pull/20538) ([Ancairon](https://github.com/Ancairon))
 - SNMP: barracuda Profiles [\#20537](https://github.com/netdata/netdata/pull/20537) ([Ancairon](https://github.com/Ancairon))
 - Lock before checking the statement pool [\#20536](https://github.com/netdata/netdata/pull/20536) ([stelfrag](https://github.com/stelfrag))
-- SNMP: avtech Profiles [\#20535](https://github.com/netdata/netdata/pull/20535) ([Ancairon](https://github.com/Ancairon))
-- build\(deps\): bump k8s.io/client-go from 0.33.1 to 0.33.2 in /src/go [\#20532](https://github.com/netdata/netdata/pull/20532) ([dependabot[bot]](https://github.com/apps/dependabot))
-- improve\(go.d/snmp\): dd support for non-identifying tags in table metrics [\#20530](https://github.com/netdata/netdata/pull/20530) ([ilyam8](https://github.com/ilyam8))
-- Mcp5 [\#20529](https://github.com/netdata/netdata/pull/20529) ([ktsaou](https://github.com/ktsaou))
-- improve\(go.d/snmp\): add Go template-based metric transformations for SNMP profiles [\#20528](https://github.com/netdata/netdata/pull/20528) ([ilyam8](https://github.com/ilyam8))
-- SNMP: avocent profile [\#20527](https://github.com/netdata/netdata/pull/20527) ([Ancairon](https://github.com/Ancairon))
-- improve\(go.d/snmp-profiles\): allow users to add custom SNMP profiles [\#20526](https://github.com/netdata/netdata/pull/20526) ([ilyam8](https://github.com/ilyam8))
-- SNMP: avaya profiles [\#20525](https://github.com/netdata/netdata/pull/20525) ([Ancairon](https://github.com/Ancairon))
-- improve\(go.d/snmp\): log device profiles matched by sysObjectID [\#20524](https://github.com/netdata/netdata/pull/20524) ([ilyam8](https://github.com/ilyam8))
-- update units in \_generic-if.yaml [\#20523](https://github.com/netdata/netdata/pull/20523) ([ilyam8](https://github.com/ilyam8))
-- Hardware \(Windows.plugin\) [\#20522](https://github.com/netdata/netdata/pull/20522) ([thiagoftsm](https://github.com/thiagoftsm))
-- upd generic check in snmp prof metrics deduplication [\#20521](https://github.com/netdata/netdata/pull/20521) ([ilyam8](https://github.com/ilyam8))
-- improve\(go.d/snmp-profiles\): metrics deduplication [\#20520](https://github.com/netdata/netdata/pull/20520) ([ilyam8](https://github.com/ilyam8))
-- chore\(go.d/snmp-profiles\): remove unsupported constant\_value\_one metrics [\#20519](https://github.com/netdata/netdata/pull/20519) ([ilyam8](https://github.com/ilyam8))
-- Drop POWER8+ builds. [\#20518](https://github.com/netdata/netdata/pull/20518) ([Ferroin](https://github.com/Ferroin))
-- fix\(go.d/ddsnmp\): remove singular-to-plural conversion in metric family [\#20517](https://github.com/netdata/netdata/pull/20517) ([ilyam8](https://github.com/ilyam8))
-- improve\(go.d/snmp-profiles\): Add hrSystemUptime metric [\#20516](https://github.com/netdata/netdata/pull/20516) ([ilyam8](https://github.com/ilyam8))
-- Update mcp.md [\#20515](https://github.com/netdata/netdata/pull/20515) ([Ancairon](https://github.com/Ancairon))
 
 ## [v2.5.4](https://github.com/netdata/netdata/tree/v2.5.4) (2025-06-24)
 
