@@ -6,6 +6,7 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <winioctl.h>
+#include <psapi.h>
 
 #define _COMMON_PLUGIN_NAME PLUGIN_WINDOWS_NAME
 #define _COMMON_PLUGIN_MODULE_NAME "PerflibStorage"
@@ -22,7 +23,7 @@ struct logical_disk {
     LARGE_INTEGER Offset;
     LARGE_INTEGER Length;
 
-    char mount_point[RRD_ID_LENGTH_MAX + 1];
+    char mount_point[256];
     char *volume_name;
 
     bool readonly;
@@ -305,7 +306,8 @@ static void netdata_get_volume_size(DICTIONARY *dict, usec_t now_ut)
             netdata_get_disk_info(d, windows_shared_buffer);
 
             DWORD returnLen = 0;
-            GetVolumePathNamesForVolumeNameA(windows_shared_buffer, d->mount_point, RRD_ID_LENGTH_MAX, &returnLen);
+            if (!GetVolumePathNamesForVolumeNameA(windows_shared_buffer, d->mount_point, 255, &returnLen))
+                d->mount_point[0] = '\0';
 
             d->collected_metadata = true;
         }
@@ -340,7 +342,7 @@ static void netdata_plot_storage_chart(DICTIONARY *dict, int update_every)
                 RRDSET_TYPE_STACKED);
 
             if (d->mount_point[0]) {
-                rrdlabels_add(d->st_disk_space->rrdlabels, "mount_point", id, RRDLABEL_SRC_AUTO);
+                rrdlabels_add(d->st_disk_space->rrdlabels, "mount_point", d->mount_point, RRDLABEL_SRC_AUTO);
             }
 
             rrdlabels_add(
@@ -376,23 +378,87 @@ static void netdata_plot_storage_chart(DICTIONARY *dict, int update_every)
 
 static void netdata_clean_chart(DICTIONARY *dict, usec_t now_ut)
 {
+    struct logical_disk *d;
+    dfe_start_write(dict, d)
     {
-        struct logical_disk *d;
-        dfe_start_write(dict, d)
-        {
-            if (d->last_collected < now_ut) {
-                logical_disk_cleanup(d);
-                dictionary_del(dict, d_dfe.name);
+        if (d->last_collected < now_ut) {
+            logical_disk_cleanup(d);
+            dictionary_del(dict, d_dfe.name);
+        }
+    }
+    dfe_done(d);
+    dictionary_garbage_collect(dict);
+}
+
+static DWORD netdata_count_drivers()
+{
+    LPVOID drivers[1024]; // Array to store driver addresses
+    DWORD cbNeeded;       // Bytes needed for the driver list
+    DWORD cDrivers;       // Number of drivers found
+
+    // Enumerate the device drivers
+    if (EnumDeviceDrivers(drivers, sizeof(drivers), &cbNeeded)) {
+        return cbNeeded / sizeof(LPVOID);
+    }
+
+    return 0;
+}
+
+static void netdata_get_partition_name(DICTIONARY *dict)
+{
+    static DWORD last_check = 0;
+    DWORD end = netdata_count_drivers();
+
+    if (end == last_check)
+        return;
+
+    int diskNum;
+    for (diskNum = 0; diskNum < end; diskNum++) {
+        char physPath[64];
+        snprintfz(physPath, 63, "\\\\.\\PhysicalDrive%d", diskNum);
+
+        HANDLE hDisk =
+            CreateFileA(physPath, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
+
+        if (hDisk == INVALID_HANDLE_VALUE) {
+            if (GetLastError() == ERROR_FILE_NOT_FOUND)
+                break; // no more disks
+            else
+                continue;
+        }
+
+        DWORD br;
+        BYTE buffer[4096];
+        DRIVE_LAYOUT_INFORMATION_EX *layout = (DRIVE_LAYOUT_INFORMATION_EX *)buffer;
+        if (DeviceIoControl(hDisk, IOCTL_DISK_GET_DRIVE_LAYOUT_EX, NULL, 0, layout, sizeof(buffer), &br, NULL)) {
+            for (DWORD i = 0; i < layout->PartitionCount; i++) {
+                PARTITION_INFORMATION_EX *p = &layout->PartitionEntry[i];
+                if (p->PartitionLength.QuadPart == 0)
+                    continue;
+
+                struct logical_disk *d;
+                dfe_start_read(dict, d)
+                {
+                    if (d->mount_point[0])
+                        continue;
+
+                    if (d->DiskNumber == (DWORD)diskNum && d->Offset.QuadPart == p->StartingOffset.QuadPart &&
+                        d->Length.QuadPart == p->PartitionLength.QuadPart) {
+                        snprintfz(d->mount_point, 255, "HardDisk%dPart%d", diskNum + 1, i + 1);
+                    }
+                }
+                dfe_done(d);
             }
         }
-        dfe_done(d);
-        dictionary_garbage_collect(dict);
+        CloseHandle(hDisk);
     }
+    last_check = end;
 }
 
 static bool do_logical_disk(int update_every, usec_t now_ut)
 {
     netdata_get_volume_size(logicalDisks, now_ut);
+    netdata_get_partition_name(logicalDisks);
     netdata_plot_storage_chart(logicalDisks, update_every);
     netdata_clean_chart(logicalDisks, now_ut);
 
