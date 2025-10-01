@@ -20,15 +20,13 @@ include(CMakeDependentOption)
 include(NetdataUtil)
 netdata_fixup_system_processor()
 
-if(DEFINED BUILD_SHARED_LIBS)
-    if(NOT BUILD_SHARED_LIBS)
-        set(STATIC_BUILD TRUE)
-    endif()
-endif()
+option(STATIC_BUILD "Use static linking instead of dynamic linking for the build." FALSE)
+mark_as_advanced(STATIC_BUILD)
+set(BUILD_SHARED_LIBS "${STATIC_BUILD}")
 
 if(STATIC_BUILD)
-    set(CMAKE_FIND_LIBRARY_PREFIXES "${CMAKE_STATIC_LIBRARY_PREFIX}")
-    set(CMAKE_FIND_LIBRARY_SUFFIXES "${CMAKE_STATIC_LIBRARY_SUFFIX}")
+  set(CMAKE_FIND_LIBRARY_PREFIXES "${CMAKE_STATIC_LIBRARY_PREFIX}")
+  set(CMAKE_FIND_LIBRARY_SUFFIXES "${CMAKE_STATIC_LIBRARY_SUFFIX}")
 endif()
 
 find_package(PkgConfig REQUIRED)
@@ -170,11 +168,6 @@ set(WEB_DEST "${WEB_DIR}")
 set(WEB_DIR "${NETDATA_RUNTIME_PREFIX}/${WEB_DEST}")
 
 include(NetdataCompilerFlags)
-
-check_c_compiler_flag("-fexceptions" HAVE_FEXCEPTIONS)
-if (NOT HAVE_FEXCEPTIONS)
-    message(FATAL_ERROR "Missing required compiler flag: -fexceptions.")
-endif()
 
 # This is intended to make life easier for developers who are working on one
 # specific feature.
