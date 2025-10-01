@@ -147,15 +147,6 @@ static const char *http_req_type_to_str(http_req_type_t req) {
 
 #define TRANSFER_ENCODING_CHUNKED (-2)
 
-void http_parse_ctx_create(http_parse_ctx *ctx, enum http_parse_state parse_state)
-{
-    ctx->state = parse_state;
-    ctx->content_length = -1;
-    ctx->http_code = 0;
-    ctx->headers = c_rhash_new(0);
-    ctx->flags = HTTP_PARSE_FLAGS_DEFAULT;
-}
-
 void http_parse_ctx_destroy(http_parse_ctx *ctx)
 {
     if(!ctx->headers)
@@ -173,6 +164,23 @@ void http_parse_ctx_destroy(http_parse_ctx *ctx)
 
     c_rhash_destroy(ctx->headers);
     ctx->headers = NULL;
+}
+
+void http_parse_ctx_create(http_parse_ctx *ctx, enum http_parse_state parse_state)
+{
+    http_parse_ctx_destroy(ctx);
+
+    ctx->state = parse_state;
+    ctx->content_length = -1;
+    ctx->http_code = 0;
+    ctx->headers = c_rhash_new(0);
+    ctx->flags = HTTP_PARSE_FLAGS_DEFAULT;
+    ctx->chunked_content_state = CHUNKED_CONTENT_CHUNK_SIZE;
+    ctx->chunk_size = 0;
+    ctx->chunk_got = 0;
+    ctx->chunked_response_written = 0;
+    ctx->chunked_response_size = 0;
+    ctx->chunked_response = NULL;
 }
 
 #define POLL_TO_MS 100
@@ -214,6 +222,10 @@ static int process_http_hdr(http_parse_ctx *parse_ctx, const char *key, const ch
         }
         return 0;
     }
+    void *prev_val = NULL;
+    if (!c_rhash_get_ptr_by_str(parse_ctx->headers, key, &prev_val))
+        freez(prev_val); // drop previous allocation before overwriting
+
     char *val_cpy = strdupz(val);
     c_rhash_insert_str_ptr(parse_ctx->headers, key, val_cpy);
     return 0;
@@ -710,8 +722,12 @@ static https_client_resp_t handle_http_request(https_req_ctx_t *ctx) {
     rc = read_parse_response(ctx);
     if (rc != HTTPS_CLIENT_RESP_OK) {
         netdata_log_error("ACLK: error reading or parsing response from server");
-        if (ctx->parse_ctx.chunked_response)
+        if (ctx->parse_ctx.chunked_response) {
             freez(ctx->parse_ctx.chunked_response);
+            ctx->parse_ctx.chunked_response = NULL;
+            ctx->parse_ctx.chunked_response_size = 0;
+            ctx->parse_ctx.chunked_response_written = 0;
+        }
     }
 
 err_exit:
@@ -887,6 +903,9 @@ https_client_resp_t https_request(https_req_t *request, https_req_response_t *re
     if (ctx->parse_ctx.content_length == TRANSFER_ENCODING_CHUNKED) {
         response->payload_size = ctx->parse_ctx.chunked_response_size;
         response->payload = ctx->parse_ctx.chunked_response;
+        ctx->parse_ctx.chunked_response = NULL;
+        ctx->parse_ctx.chunked_response_size = 0;
+        ctx->parse_ctx.chunked_response_written = 0;
     }
     if (ctx->parse_ctx.content_length > 0) {
         response->payload_size = ctx->parse_ctx.content_length;
@@ -918,6 +937,7 @@ exit_sock:
 exit_buf_rx:
     rbuf_free(ctx->buf_rx);
 exit_req_ctx:
+    http_parse_ctx_destroy(&ctx->parse_ctx);
     freez(ctx);
     return rc;
 }
