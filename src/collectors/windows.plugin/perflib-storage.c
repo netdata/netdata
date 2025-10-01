@@ -14,6 +14,7 @@ struct logical_disk {
 
     UINT DriveType;
     DWORD SerialNumber;
+    ULONG divisor;
     bool readonly;
 
     STRING *filesystem;
@@ -238,13 +239,6 @@ static const char *drive_type_to_str(UINT type)
     }
 }
 
-static inline LONGLONG convertToBytes(LONGLONG value, double factor) {
-    double dvalue = value;
-    dvalue /= (factor);
-
-    return (LONGLONG) dvalue*100;
-}
-
 static inline void netdata_set_hd_usage(PERF_DATA_BLOCK *pDataBlock,
                                         PERF_OBJECT_TYPE *pObjectType,
                                         PERF_INSTANCE_DEFINITION *pi,
@@ -261,19 +255,21 @@ static inline void netdata_set_hd_usage(PERF_DATA_BLOCK *pDataBlock,
     // Description of incompatibilities present in both methods we are using
     // https://devblogs.microsoft.com/oldnewthing/20071101-00/?p=24613
     // We are using the variable that should not be affected by qyota ()
-    if ((GetDriveTypeA(path) != DRIVE_FIXED) || !GetDiskFreeSpaceExA(path,
+    if ((GetDriveTypeA(path) == DRIVE_UNKNOWN) || !GetDiskFreeSpaceExA(path,
                                                                      NULL,
                                                                      &totalNumberOfBytes,
                                                                      &totalNumberOfFreeBytes)) {
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->percentDiskFree);
 
-        d->percentDiskFree.current.Data = convertToBytes(d->percentDiskFree.current.Data, 1024);
-        d->percentDiskFree.current.Time = convertToBytes(d->percentDiskFree.current.Time, 1024);
+        d->percentDiskFree.current.Data = d->percentDiskFree.current.Data;
+        d->percentDiskFree.current.Time = d->percentDiskFree.current.Time;
+        d->divisor = 1024;
         return;
     }
 
-    d->percentDiskFree.current.Data = convertToBytes(totalNumberOfFreeBytes.QuadPart, 1024 * 1024 * 1024);
-    d->percentDiskFree.current.Time = convertToBytes(totalNumberOfBytes.QuadPart, 1024 * 1024 * 1024);
+    d->divisor = GIGA_FACTOR;
+    d->percentDiskFree.current.Data = totalNumberOfFreeBytes.QuadPart;
+    d->percentDiskFree.current.Time = totalNumberOfBytes.QuadPart;
 }
 
 static bool do_logical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every, usec_t now_ut)
@@ -338,8 +334,8 @@ static bool do_logical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every, usec_
                 rrdlabels_add(d->st_disk_space->rrdlabels, "serial_number", buf, RRDLABEL_SRC_AUTO);
             }
 
-            d->rd_disk_space_free = rrddim_add(d->st_disk_space, "avail", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
-            d->rd_disk_space_used = rrddim_add(d->st_disk_space, "used", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
+            d->rd_disk_space_free = rrddim_add(d->st_disk_space, "avail", NULL, 1, d->divisor, RRD_ALGORITHM_ABSOLUTE);
+            d->rd_disk_space_used = rrddim_add(d->st_disk_space, "used", NULL, 1, d->divisor, RRD_ALGORITHM_ABSOLUTE);
         }
 
         // percentDiskFree has the free space in Data and the size of the disk in Time, in MiB.
