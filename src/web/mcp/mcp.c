@@ -9,7 +9,9 @@
 #include "mcp-logging.h"
 #include "mcp-completion.h"
 #include "mcp-tools-execute-function-registry.h"
-#include "mcp-api-key.h"
+#include "web/api/mcp_auth.h"
+
+static bool mcp_initialized = false;
 
 // Define the enum to string mapping for protocol versions
 ENUM_STR_MAP_DEFINE(MCP_PROTOCOL_VERSION) = {
@@ -376,6 +378,9 @@ MCP_RETURN_CODE mcp_dispatch_method(MCP_CLIENT *mcpc, const char *method, struct
 
 // Initialize the MCP subsystem
 void mcp_initialize_subsystem(void) {
+    if (unlikely(mcp_initialized))
+        return;
+
     mcp_functions_registry_init();
 
 #ifdef NETDATA_MCP_DEV_PREVIEW_API_KEY
@@ -385,4 +390,5 @@ void mcp_initialize_subsystem(void) {
     // debug_flags |= D_MCP;
 
     netdata_log_info("MCP subsystem initialized");
+    mcp_initialized = true;
 }

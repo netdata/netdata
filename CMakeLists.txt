@@ -1852,8 +1852,8 @@ set(WEB_PLUGIN_FILES
         src/web/mcp/mcp-logging.h
         src/web/mcp/mcp-completion.c
         src/web/mcp/mcp-completion.h
-        src/web/mcp/mcp-api-key.c
-        src/web/mcp/mcp-api-key.h
+        src/web/api/mcp_auth.c
+        src/web/api/mcp_auth.h
         src/web/mcp/mcp.c
         src/web/mcp/mcp.h
         src/web/server/static/static-threaded.c

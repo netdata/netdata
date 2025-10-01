@@ -22,6 +22,11 @@ OpenCode supports both local and remote MCP servers:
 3. **For local connections only: `nd-mcp` bridge** - The stdio-to-websocket bridge. [Find its absolute path](/docs/learn/mcp.md#finding-the-nd-mcp-bridge). Not needed for remote HTTP connections.
 4. **Optionally, the Netdata MCP API key** that unlocks full access to sensitive observability data (protected functions, full access to logs) on your Netdata. Each Netdata Agent or Parent has its own unique API key for MCP - [Find your Netdata MCP API key](/docs/learn/mcp.md#finding-your-api-key)
 
+> Export `ND_MCP_BEARER_TOKEN` with your MCP key before launching OpenCode to keep secrets out of configuration files:
+> ```bash
+> export ND_MCP_BEARER_TOKEN="$(cat /var/lib/netdata/mcp_dev_preview_api_key)"
+> ```
+
 ## Installation
 
 Install OpenCode using one of these methods:
@@ -50,7 +55,10 @@ Connect directly to Netdata's HTTP endpoint without needing the nd-mcp bridge:
   "mcp": {
     "netdata": {
       "type": "remote",
-      "url": "http://YOUR_NETDATA_IP:19999/mcp?api_key=NETDATA_MCP_API_KEY",
+      "url": "http://YOUR_NETDATA_IP:19999/mcp",
+      "headers": {
+        "Authorization": "Bearer NETDATA_MCP_API_KEY"
+      },
       "enabled": true
     }
   }
@@ -64,7 +72,10 @@ For HTTPS connections:
   "mcp": {
     "netdata": {
       "type": "remote",
-      "url": "https://YOUR_NETDATA_IP:19999/mcp?api_key=NETDATA_MCP_API_KEY",
+      "url": "https://YOUR_NETDATA_IP:19999/mcp",
+      "headers": {
+        "Authorization": "Bearer NETDATA_MCP_API_KEY"
+      },
       "enabled": true
     }
   }
@@ -80,7 +91,7 @@ For environments where you prefer or need to use the bridge:
   "mcp": {
     "netdata": {
       "type": "local",
-      "command": ["/usr/sbin/nd-mcp", "ws://YOUR_NETDATA_IP:19999/mcp?api_key=NETDATA_MCP_API_KEY"],
+      "command": ["/usr/sbin/nd-mcp", "ws://YOUR_NETDATA_IP:19999/mcp"],
       "enabled": true
     }
   }
@@ -96,7 +107,15 @@ If nd-mcp is not available, use the official MCP remote client:
   "mcp": {
     "netdata": {
       "type": "local",
-      "command": ["npx", "@modelcontextprotocol/remote-mcp", "--http", "http://YOUR_NETDATA_IP:19999/mcp?api_key=NETDATA_MCP_API_KEY"],
+      "command": [
+        "npx",
+        "mcp-remote@latest",
+        "--http",
+        "http://YOUR_NETDATA_IP:19999/mcp",
+        "--allow-http",
+        "--header",
+        "Authorization: Bearer NETDATA_MCP_API_KEY"
+      ],
       "enabled": true
     }
   }
@@ -115,7 +134,7 @@ OpenCode supports environment variables in local server configurations:
       "command": ["/usr/sbin/nd-mcp", "ws://YOUR_NETDATA_IP:19999/mcp"],
       "enabled": true,
       "environment": {
-        "NETDATA_API_KEY": "your-api-key-here"
+        "ND_MCP_BEARER_TOKEN": "your-api-key-here"
       }
     }
   }
@@ -129,7 +148,10 @@ For remote servers with environment variables:
   "mcp": {
     "netdata": {
       "type": "remote",
-      "url": "https://YOUR_NETDATA_IP:19999/mcp?api_key=${NETDATA_API_KEY}",
+      "url": "https://YOUR_NETDATA_IP:19999/mcp",
+      "headers": {
+        "Authorization": "Bearer ${NETDATA_API_KEY}"
+      },
       "enabled": true
     }
   }
@@ -138,7 +160,7 @@ For remote servers with environment variables:
 
 Replace in all examples:
 - `YOUR_NETDATA_IP` - IP address or hostname of your Netdata Agent/Parent
-- `NETDATA_MCP_API_KEY` - Your [Netdata MCP API key](/docs/learn/mcp.md#finding-your-api-key)
+- `ND_MCP_BEARER_TOKEN` - Export with your [Netdata MCP API key](/docs/learn/mcp.md#finding-your-api-key) before launching OpenCode
 - `/usr/sbin/nd-mcp` - With your [actual nd-mcp path](/docs/learn/mcp.md#finding-the-nd-mcp-bridge) (local method only)
 
 ## How to Use
@@ -165,7 +187,10 @@ OpenCode allows fine-grained control over MCP tool availability per agent:
   "mcp": {
     "netdata": {
       "type": "remote",
-      "url": "http://YOUR_NETDATA_IP:19999/mcp?api_key=NETDATA_MCP_API_KEY",
+      "url": "http://YOUR_NETDATA_IP:19999/mcp",
+      "headers": {
+        "Authorization": "Bearer NETDATA_MCP_API_KEY"
+      },
       "enabled": true
     }
   },
@@ -248,17 +273,26 @@ Configure different Netdata instances for different purposes:
   "mcp": {
     "netdata-prod": {
       "type": "remote",
-      "url": "https://prod-parent.company.com:19999/mcp?api_key=${PROD_API_KEY}",
+      "url": "https://prod-parent.company.com:19999/mcp",
+      "headers": {
+        "Authorization": "Bearer ${PROD_API_KEY}"
+      },
       "enabled": true
     },
     "netdata-staging": {
       "type": "remote",
-      "url": "https://staging-parent.company.com:19999/mcp?api_key=${STAGING_API_KEY}",
+      "url": "https://staging-parent.company.com:19999/mcp",
+      "headers": {
+        "Authorization": "Bearer ${STAGING_API_KEY}"
+      },
       "enabled": false
     },
     "netdata-local": {
       "type": "local",
-      "command": ["/usr/sbin/nd-mcp", "ws://localhost:19999/mcp?api_key=${LOCAL_API_KEY}"],
+      "command": ["/usr/sbin/nd-mcp", "ws://localhost:19999/mcp"],
+      "environment": {
+        "ND_MCP_BEARER_TOKEN": "${LOCAL_API_KEY}"
+      },
       "enabled": true
     }
   }
@@ -274,7 +308,10 @@ Enable verbose logging to troubleshoot MCP issues:
   "mcp": {
     "netdata": {
       "type": "remote",
-      "url": "http://YOUR_NETDATA_IP:19999/mcp?api_key=NETDATA_MCP_API_KEY",
+      "url": "http://YOUR_NETDATA_IP:19999/mcp",
+      "headers": {
+        "Authorization": "Bearer NETDATA_MCP_API_KEY"
+      },
       "enabled": true,
       "debug": true
     }

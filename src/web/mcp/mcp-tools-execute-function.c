@@ -1274,7 +1274,12 @@ static void mcp_process_table_result(MCP_FUNCTION_DATA *data, size_t max_size_th
 
     // Apply row limit
     size_t limit = row_idx;
-    if (data->request.limit > 0 && data->request.limit < limit && data->input.type == FN_TYPE_TABLE) {
+    bool force_limit = (data->output.status == MCP_TABLE_RESPONSE_TOO_BIG && data->request.limit > 0);
+
+    if (force_limit && data->request.limit < limit) {
+        limit = data->request.limit;
+    }
+    else if (!force_limit && data->request.limit > 0 && data->request.limit < limit && data->input.type == FN_TYPE_TABLE) {
         // we don't limit history functions, only regular tables
         // for history functions, we sent the limit to the backend
         // so whatever it returns is what we show

@@ -8,7 +8,8 @@
 #include <stdbool.h>
 #include <string.h>
 
-static inline bool mcp_http_extract_api_key(struct web_client *w, char *buffer, size_t buffer_len) {
+static inline bool mcp_http_extract_api_key(struct web_client *w, char *buffer, size_t buffer_len)
+{
     if (!w || !buffer || buffer_len == 0)
         return false;
 
@@ -38,15 +39,13 @@ static inline bool mcp_http_extract_api_key(struct web_client *w, char *buffer, 
     return i > 0;
 }
 
-static inline void mcp_http_disable_compression(struct web_client *w) {
+static inline void mcp_http_disable_compression(struct web_client *w)
+{
     if (!w)
         return;
 
-    web_client_flag_clear(w, WEB_CLIENT_ENCODING_GZIP);
-    web_client_flag_clear(w, WEB_CLIENT_ENCODING_DEFLATE);
     web_client_flag_clear(w, WEB_CLIENT_CHUNKED_TRANSFER);
     w->response.zoutput = false;
-    w->response.zinitialized = false;
 }
 
 #endif // NETDATA_MCP_HTTP_COMMON_H

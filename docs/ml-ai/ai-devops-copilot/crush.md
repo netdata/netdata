@@ -20,6 +20,11 @@ Crush has comprehensive MCP transport support, making it highly flexible for con
 3. **For stdio connections only: `nd-mcp` bridge** - The stdio-to-websocket bridge. [Find its absolute path](/docs/learn/mcp.md#finding-the-nd-mcp-bridge). Not needed for direct HTTP/SSE connections.
 4. **Optionally, the Netdata MCP API key** that unlocks full access to sensitive observability data (protected functions, full access to logs) on your Netdata. Each Netdata Agent or Parent has its own unique API key for MCP - [Find your Netdata MCP API key](/docs/learn/mcp.md#finding-your-api-key)
 
+> Export `ND_MCP_BEARER_TOKEN` with your MCP key before launching Crush so credentials never appear in command-line arguments or config files:
+> ```bash
+> export ND_MCP_BEARER_TOKEN="$(cat /var/lib/netdata/mcp_dev_preview_api_key)"
+> ```
+
 ## Installation
 
 Install Crush using one of these methods:
@@ -62,7 +67,10 @@ Connect directly to Netdata's HTTP endpoint without needing the nd-mcp bridge:
   "mcp": {
     "netdata": {
       "type": "http",
-      "url": "http://YOUR_NETDATA_IP:19999/mcp?api_key=NETDATA_MCP_API_KEY",
+      "url": "http://YOUR_NETDATA_IP:19999/mcp",
+      "headers": {
+        "Authorization": "Bearer NETDATA_MCP_API_KEY"
+      },
       "timeout": 120,
       "disabled": false
     }
@@ -78,7 +86,10 @@ For HTTPS connections:
   "mcp": {
     "netdata": {
       "type": "http",
-      "url": "https://YOUR_NETDATA_IP:19999/mcp?api_key=NETDATA_MCP_API_KEY",
+      "url": "https://YOUR_NETDATA_IP:19999/mcp",
+      "headers": {
+        "Authorization": "Bearer NETDATA_MCP_API_KEY"
+      },
       "timeout": 120
     }
   }
@@ -95,7 +106,10 @@ Connect directly to Netdata's SSE endpoint for real-time streaming:
   "mcp": {
     "netdata": {
       "type": "sse",
-      "url": "http://YOUR_NETDATA_IP:19999/mcp?api_key=NETDATA_MCP_API_KEY&transport=sse",
+      "url": "http://YOUR_NETDATA_IP:19999/mcp?transport=sse",
+      "headers": {
+        "Authorization": "Bearer NETDATA_MCP_API_KEY"
+      },
       "timeout": 120,
       "disabled": false
     }
@@ -114,7 +128,7 @@ For environments where you prefer or need to use the bridge:
     "netdata": {
       "type": "stdio",
       "command": "/usr/sbin/nd-mcp",
-      "args": ["ws://YOUR_NETDATA_IP:19999/mcp?api_key=NETDATA_MCP_API_KEY"],
+      "args": ["ws://YOUR_NETDATA_IP:19999/mcp"],
       "timeout": 120,
       "disabled": false
     }
@@ -134,9 +148,12 @@ If nd-mcp is not available, use the official MCP remote client:
       "type": "stdio",
       "command": "npx",
       "args": [
-        "@modelcontextprotocol/remote-mcp",
+        "mcp-remote@latest",
         "--http",
-        "http://YOUR_NETDATA_IP:19999/mcp?api_key=NETDATA_MCP_API_KEY"
+        "http://YOUR_NETDATA_IP:19999/mcp",
+        "--allow-http",
+        "--header",
+        "Authorization: Bearer NETDATA_MCP_API_KEY"
       ],
       "timeout": 120
     }
@@ -154,7 +171,10 @@ Crush supports environment variable expansion using `$(echo $VAR)` syntax:
   "mcp": {
     "netdata": {
       "type": "http",
-      "url": "http://YOUR_NETDATA_IP:19999/mcp?api_key=$(echo $NETDATA_API_KEY)",
+      "url": "http://YOUR_NETDATA_IP:19999/mcp",
+      "headers": {
+        "Authorization": "Bearer $(echo $NETDATA_API_KEY)"
+      },
       "timeout": 120
     }
   }
@@ -171,12 +191,18 @@ Create project-specific configurations by placing `.crush.json` or `crush.json` 
   "mcp": {
     "netdata-prod": {
       "type": "http",
-      "url": "https://prod-parent.company.com:19999/mcp?api_key=$(echo $PROD_API_KEY)",
+      "url": "https://prod-parent.company.com:19999/mcp",
+      "headers": {
+        "Authorization": "Bearer $(echo $PROD_API_KEY)"
+      },
       "timeout": 120
     },
     "netdata-staging": {
       "type": "sse",
-      "url": "https://staging-parent.company.com:19999/mcp?api_key=$(echo $STAGING_API_KEY)&transport=sse",
+      "url": "https://staging-parent.company.com:19999/mcp?transport=sse",
+      "headers": {
+        "Authorization": "Bearer $(echo $STAGING_API_KEY)"
+      },
       "timeout": 120
     }
   }
@@ -285,22 +311,30 @@ Configure different Netdata instances using different transport methods:
     "netdata-local": {
       "type": "stdio",
       "command": "/usr/sbin/nd-mcp",
-      "args": ["ws://localhost:19999/mcp?api_key=$(echo $LOCAL_API_KEY)"],
+      "args": ["ws://localhost:19999/mcp"],
       "timeout": 60
     },
     "netdata-parent": {
       "type": "http",
-      "url": "https://parent.company.com:19999/mcp?api_key=$(echo $PARENT_API_KEY)",
+      "url": "https://parent.company.com:19999/mcp",
+      "headers": {
+        "Authorization": "Bearer ${PARENT_API_KEY}"
+      },
       "timeout": 180
     },
     "netdata-streaming": {
       "type": "sse",
-      "url": "https://stream-parent.company.com:19999/mcp?api_key=$(echo $STREAM_API_KEY)&transport=sse",
+      "url": "https://stream-parent.company.com:19999/mcp?transport=sse",
+      "headers": {
+        "Authorization": "Bearer ${STREAM_API_KEY}"
+      },
       "timeout": 300
     }
   }
 }
 ```
+
+> ℹ️ Before switching between environments, export `ND_MCP_BEARER_TOKEN` with the matching key so the bridge authenticates without exposing credentials in the JSON file.
 
 ### Debugging MCP Connections
 

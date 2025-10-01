@@ -37,6 +37,7 @@ void web_client_reset_permissions(struct web_client *w) {
     w->user_auth.method = USER_AUTH_METHOD_NONE;
     w->user_auth.access = HTTP_ACCESS_NONE;
     w->user_auth.user_role = HTTP_USER_ROLE_NONE;
+    web_client_clear_mcp_preview_key(w);
 }
 
 void web_client_set_permissions(struct web_client *w, HTTP_ACCESS access, HTTP_USER_ROLE role, USER_AUTH_METHOD type) {

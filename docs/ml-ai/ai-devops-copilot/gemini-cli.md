@@ -43,10 +43,12 @@ Connect directly to Netdata's HTTP endpoint without needing any bridge:
 
 ```bash
 # Using CLI command
-gemini mcp add --transport http netdata http://YOUR_NETDATA_IP:19999/mcp?api_key=NETDATA_MCP_API_KEY
+gemini mcp add --transport http netdata http://YOUR_NETDATA_IP:19999/mcp \
+  --header "Authorization: Bearer NETDATA_MCP_API_KEY"
 
 # For HTTPS connections
-gemini mcp add --transport http netdata https://YOUR_NETDATA_IP:19999/mcp?api_key=NETDATA_MCP_API_KEY
+gemini mcp add --transport http netdata https://YOUR_NETDATA_IP:19999/mcp \
+  --header "Authorization: Bearer NETDATA_MCP_API_KEY"
 ```
 
 Or configure in `~/.gemini/settings.json`:
@@ -55,7 +57,10 @@ Or configure in `~/.gemini/settings.json`:
 {
   "mcpServers": {
     "netdata": {
-      "httpUrl": "http://YOUR_NETDATA_IP:19999/mcp?api_key=NETDATA_MCP_API_KEY",
+      "httpUrl": "http://YOUR_NETDATA_IP:19999/mcp",
+      "headers": [
+        "Authorization: Bearer NETDATA_MCP_API_KEY"
+      ],
       "timeout": 30000
     }
   }
@@ -68,7 +73,8 @@ Connect directly to Netdata's SSE endpoint:
 
 ```bash
 # Using CLI command
-gemini mcp add --transport sse netdata http://YOUR_NETDATA_IP:19999/mcp?api_key=NETDATA_MCP_API_KEY&transport=sse
+gemini mcp add --transport sse netdata http://YOUR_NETDATA_IP:19999/mcp?transport=sse \
+  --header "Authorization: Bearer NETDATA_MCP_API_KEY"
 ```
 
 Or configure in `~/.gemini/settings.json`:
@@ -77,7 +83,10 @@ Or configure in `~/.gemini/settings.json`:
 {
   "mcpServers": {
     "netdata": {
-      "url": "http://YOUR_NETDATA_IP:19999/mcp?api_key=NETDATA_MCP_API_KEY&transport=sse",
+      "url": "http://YOUR_NETDATA_IP:19999/mcp?transport=sse",
+      "headers": [
+        "Authorization: Bearer NETDATA_MCP_API_KEY"
+      ],
       "timeout": 30000
     }
   }
@@ -90,7 +99,8 @@ For environments where you prefer or need to use the bridge:
 
 ```bash
 # Using CLI command
-gemini mcp add netdata /usr/sbin/nd-mcp ws://YOUR_NETDATA_IP:19999/mcp?api_key=NETDATA_MCP_API_KEY
+gemini mcp add netdata /usr/sbin/nd-mcp --bearer NETDATA_MCP_API_KEY \
+  ws://YOUR_NETDATA_IP:19999/mcp
 ```
 
 Or configure in `~/.gemini/settings.json`:
@@ -100,7 +110,11 @@ Or configure in `~/.gemini/settings.json`:
   "mcpServers": {
     "netdata": {
       "command": "/usr/sbin/nd-mcp",
-      "args": ["ws://YOUR_NETDATA_IP:19999/mcp?api_key=NETDATA_MCP_API_KEY"],
+      "args": [
+        "--bearer",
+        "NETDATA_MCP_API_KEY",
+        "ws://YOUR_NETDATA_IP:19999/mcp"
+      ],
       "timeout": 30000
     }
   }
@@ -113,12 +127,16 @@ If nd-mcp is not available, use the official MCP remote client:
 
 ```bash
 # Using CLI command with SSE
-gemini mcp add netdata npx @modelcontextprotocol/remote-mcp \
-  --sse http://YOUR_NETDATA_IP:19999/mcp?api_key=NETDATA_MCP_API_KEY
+gemini mcp add netdata npx mcp-remote@latest \
+  --sse http://YOUR_NETDATA_IP:19999/mcp \
+  --allow-http \
+  --header "Authorization: Bearer NETDATA_MCP_API_KEY"
 
 # Using HTTP transport
-gemini mcp add netdata npx @modelcontextprotocol/remote-mcp \
-  --http http://YOUR_NETDATA_IP:19999/mcp?api_key=NETDATA_MCP_API_KEY
+gemini mcp add netdata npx mcp-remote@latest \
+  --http http://YOUR_NETDATA_IP:19999/mcp \
+  --allow-http \
+  --header "Authorization: Bearer NETDATA_MCP_API_KEY"
 ```
 
 Or configure in `~/.gemini/settings.json`:
@@ -129,9 +147,12 @@ Or configure in `~/.gemini/settings.json`:
     "netdata": {
       "command": "npx",
       "args": [
-        "@modelcontextprotocol/remote-mcp",
+        "mcp-remote@latest",
         "--sse",
-        "http://YOUR_NETDATA_IP:19999/mcp?api_key=NETDATA_MCP_API_KEY"
+        "http://YOUR_NETDATA_IP:19999/mcp",
+        "--allow-http",
+        "--header",
+        "Authorization: Bearer NETDATA_MCP_API_KEY",
       ]
     }
   }
@@ -149,7 +170,10 @@ Example configuration with environment variables:
 {
   "mcpServers": {
     "netdata": {
-      "httpUrl": "http://${NETDATA_HOST}:19999/mcp?api_key=${NETDATA_API_KEY}"
+      "httpUrl": "http://${NETDATA_HOST}:19999/mcp",
+      "headers": [
+        "Authorization: Bearer ${NETDATA_API_KEY}"
+      ]
     }
   }
 }
@@ -217,11 +241,11 @@ Explain the current active alerts and their potential impact
 
 - Verify Netdata is accessible: `curl http://YOUR_NETDATA_IP:19999/api/v3/info`
 - Check that the bridge path exists and is executable
-- Ensure API key is correct and properly formatted
+- Ensure the Authorization header is correctly formatted
 
 ### Limited Data Access
 
-- Verify API key is included in the connection string
+- Verify the Authorization header is present on each request
 - Check that the Netdata agent is properly configured for MCP
 - Ensure network connectivity between Gemini CLI and Netdata
 
@@ -241,14 +265,24 @@ Configure different Netdata instances for different purposes:
 {
   "mcpServers": {
     "netdata-prod": {
-      "httpUrl": "https://prod-parent.company.com:19999/mcp?api_key=${PROD_API_KEY}"
+      "httpUrl": "https://prod-parent.company.com:19999/mcp",
+      "headers": [
+        "Authorization: Bearer ${PROD_API_KEY}"
+      ]
     },
     "netdata-staging": {
-      "httpUrl": "https://staging-parent.company.com:19999/mcp?api_key=${STAGING_API_KEY}"
+      "httpUrl": "https://staging-parent.company.com:19999/mcp",
+      "headers": [
+        "Authorization: Bearer ${STAGING_API_KEY}"
+      ]
     },
     "netdata-local": {
       "command": "/usr/sbin/nd-mcp",
-      "args": ["ws://localhost:19999/mcp?api_key=${LOCAL_API_KEY}"]
+      "args": [
+        "--bearer",
+        "${LOCAL_API_KEY}",
+        "ws://localhost:19999/mcp"
+      ]
     }
   }
 }
@@ -262,7 +296,10 @@ Control which Netdata tools are available:
 {
   "mcpServers": {
     "netdata": {
-      "httpUrl": "http://YOUR_NETDATA_IP:19999/mcp?api_key=NETDATA_MCP_API_KEY",
+      "httpUrl": "http://YOUR_NETDATA_IP:19999/mcp",
+      "headers": [
+        "Authorization: Bearer NETDATA_MCP_API_KEY"
+      ],
       "includeTools": ["query_metrics", "list_alerts", "list_nodes"],
       "excludeTools": ["execute_function", "systemd_journal"]
     }

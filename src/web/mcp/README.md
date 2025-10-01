@@ -43,7 +43,9 @@ The configuration of most AI assistants is done via a configuration file, which 
     "netdata": {
       "command": "/usr/bin/nd-mcp",
       "args": [
-        "ws://IP_OF_YOUR_NETDATA:19999/mcp?api_key=YOUR_API_KEY"
+        "--bearer",
+        "YOUR_API_KEY",
+        "ws://IP_OF_YOUR_NETDATA:19999/mcp"
       ]
     }
   }
@@ -72,14 +74,16 @@ To test quickly with the official MCP CLI:
 
 ```bash
 npx @modelcontextprotocol/remote-mcp \
-  --sse http://IP_OF_YOUR_NETDATA:19999/mcp?api_key=YOUR_API_KEY
+  --sse http://IP_OF_YOUR_NETDATA:19999/mcp \
+  --header "Authorization: Bearer YOUR_API_KEY"
 ```
 
 Or, to prefer streamable HTTP:
 
 ```bash
 npx @modelcontextprotocol/remote-mcp \
-  --http http://IP_OF_YOUR_NETDATA:19999/mcp?api_key=YOUR_API_KEY
+  --http http://IP_OF_YOUR_NETDATA:19999/mcp \
+  --header "Authorization: Bearer YOUR_API_KEY"
 ```
 
 These commands let you browse the Netdata MCP tools without installing `nd-mcp`. You can still keep `nd-mcp` in your assistant configuration as a fallback for clients that only speak `stdio`.
@@ -139,7 +143,7 @@ For [Claude Code](https://claude.ai/code), add to your project's root, the file 
 Alternatively, you can add it using a Claude CLI command like this:
 
 ```bash
-claude mcp add netdata /usr/bin/nd-mcp ws://IP_OF_YOUR_NETDATA:19999/mcp?api_key=YOUR_API_KEY
+claude mcp add netdata /usr/bin/nd-mcp --bearer YOUR_API_KEY ws://IP_OF_YOUR_NETDATA:19999/mcp
 ```
 
 Once configured correctly, run `claude mcp list` or you can issue the command `/mcp` to your Claude Code. It should show you the available MCP servers, including "netdata".
@@ -359,16 +363,20 @@ If you need to configure multiple MCP servers, you can add them under the `mcpSe
 {
   "mcpServers": {
     "netdata-production": {
-      "command": "/usr/bin/nd-mcp",
-      "args": [
-        "ws://IP_OF_YOUR_NETDATA:19999/mcp?api_key=YOUR_API_KEY"
-      ]
+        "command": "/usr/bin/nd-mcp",
+        "args": [
+          "--bearer",
+          "YOUR_API_KEY",
+          "ws://IP_OF_YOUR_NETDATA:19999/mcp"
+        ]
     },
     "netdata-testing": {
-      "command": "/usr/bin/nd-mcp",
-      "args": [
-        "ws://IP_OF_YOUR_NETDATA:19999/mcp?api_key=YOUR_API_KEY"
-      ]
+        "command": "/usr/bin/nd-mcp",
+        "args": [
+          "--bearer",
+          "YOUR_API_KEY",
+          "ws://IP_OF_YOUR_NETDATA:19999/mcp"
+        ]
     }
   }
 }

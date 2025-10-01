@@ -22,7 +22,7 @@ Codex CLI currently has limited MCP transport support:
 2. **The IP and port (usually 19999) of a running Netdata Agent** - Prefer a Netdata Parent to get infrastructure level visibility. Currently the latest nightly version of Netdata has MCP support (not released to the stable channel yet). Your AI Client (running on your desktop or laptop) needs to have direct network access to this IP and port.
 3. **Bridge required: Choose one:**
    - `nd-mcp` bridge - The stdio-to-websocket bridge. [Find its absolute path](/docs/learn/mcp.md#finding-the-nd-mcp-bridge)
-   - `npx @modelcontextprotocol/remote-mcp` - Official MCP remote client supporting HTTP/SSE
+   - `npx mcp-remote@latest` - Official MCP remote client supporting HTTP/SSE
 4. **Optionally, the Netdata MCP API key** that unlocks full access to sensitive observability data (protected functions, full access to logs) on your Netdata. Each Netdata Agent or Parent has its own unique API key for MCP - [Find your Netdata MCP API key](/docs/learn/mcp.md#finding-your-api-key)
 
 ## Installation
@@ -54,9 +54,12 @@ This method allows Codex CLI to connect to Netdata's HTTP/SSE endpoints through 
 [mcp_servers.netdata]
 command = "npx"
 args = [
-  "@modelcontextprotocol/remote-mcp",
+  "mcp-remote@latest",
   "--http",
-  "http://YOUR_NETDATA_IP:19999/mcp?api_key=NETDATA_MCP_API_KEY"
+  "--allow-http",
+  "http://YOUR_NETDATA_IP:19999/mcp",
+  "--header",
+  "Authorization: Bearer NETDATA_MCP_API_KEY"
 ]
 startup_timeout_sec = 20  # Optional: increase for remote connections
 tool_timeout_sec = 120     # Optional: increase for complex queries
@@ -68,9 +71,12 @@ For SSE transport instead of HTTP:
 [mcp_servers.netdata]
 command = "npx"
 args = [
-  "@modelcontextprotocol/remote-mcp",
+  "mcp-remote@latest",
   "--sse",
-  "http://YOUR_NETDATA_IP:19999/mcp?api_key=NETDATA_MCP_API_KEY"
+  "http://YOUR_NETDATA_IP:19999/mcp",
+  "--allow-http",
+  "--header",
+  "Authorization: Bearer NETDATA_MCP_API_KEY",
 ]
 ```
 
@@ -83,33 +89,20 @@ For environments where nd-mcp is available and preferred:
 
 [mcp_servers.netdata]
 command = "/usr/sbin/nd-mcp"
-args = ["ws://YOUR_NETDATA_IP:19999/mcp?api_key=NETDATA_MCP_API_KEY"]
+args = ["ws://YOUR_NETDATA_IP:19999/mcp"]
+env = { "ND_MCP_BEARER_TOKEN" = "YOUR_API_KEY_HERE" }
 startup_timeout_sec = 15
 tool_timeout_sec = 60
-```
 
-### Method 3: Using Environment Variables
-
-Codex CLI supports environment variables in the configuration:
-
-```toml
-# ~/.codex/config.toml
-
-[mcp_servers.netdata]
-command = "npx"
-args = [
-  "@modelcontextprotocol/remote-mcp",
-  "--http",
-  "http://YOUR_NETDATA_IP:19999/mcp"
-]
-env = { "NETDATA_API_KEY" = "YOUR_API_KEY_HERE" }
-
-# Or reference system environment variables
 [mcp_servers.netdata_prod]
 command = "/usr/sbin/nd-mcp"
 args = ["ws://prod-parent:19999/mcp"]
-env = { "API_KEY" = "${NETDATA_PROD_API_KEY}" }
+env = { "ND_MCP_BEARER_TOKEN" = "${NETDATA_PROD_API_KEY}" }
 ```
+
+Export `ND_MCP_BEARER_TOKEN` before starting Codex CLI (or define it in your shell profile) so the bridge authenticates without exposing the key in command-line arguments.
+
+When Codex CLI starts the bridge it will inject the environment variable, so `nd-mcp` authenticates without exposing the token in the connection arguments.
 
 ## CLI Management (Experimental)
 
@@ -117,7 +110,9 @@ Codex CLI provides experimental commands for managing MCP servers:
 
 ```bash
 # Add a new MCP server
-codex mcp add netdata -- npx @modelcontextprotocol/remote-mcp --http http://YOUR_NETDATA_IP:19999/mcp?api_key=NETDATA_MCP_API_KEY
+codex mcp add netdata -- npx mcp-remote@latest --http http://YOUR_NETDATA_IP:19999/mcp \
+  --allow-http \
+  --header "Authorization: Bearer NETDATA_MCP_API_KEY"
 
 # List configured MCP servers
 codex mcp list
@@ -191,7 +186,7 @@ Explain the current active alerts and their potential impact
 
 ### Limited Data Access
 
-- Verify API key is included in the connection string
+- Verify the Authorization header is set to `Bearer <your key>`
 - Ensure the Netdata agent is properly configured for MCP
 - Check that MCP is enabled in your Netdata build
 
@@ -210,30 +205,21 @@ Configure different Netdata instances for different purposes:
 ```toml
 # Production environment
 [mcp_servers.netdata_prod]
-command = "npx"
-args = [
-  "@modelcontextprotocol/remote-mcp",
-  "--http",
-  "https://prod-parent.company.com:19999/mcp"
-]
-env = { "API_KEY" = "${PROD_API_KEY}" }
+command = "/usr/sbin/nd-mcp"
+args = ["ws://prod-parent.company.com:19999/mcp"]
+env = { "ND_MCP_BEARER_TOKEN" = "${PROD_API_KEY}" }
 startup_timeout_sec = 30
 tool_timeout_sec = 120
 
-# Staging environment
 [mcp_servers.netdata_staging]
-command = "npx"
-args = [
-  "@modelcontextprotocol/remote-mcp",
-  "--http",
-  "https://staging-parent.company.com:19999/mcp"
-]
-env = { "API_KEY" = "${STAGING_API_KEY}" }
+command = "/usr/sbin/nd-mcp"
+args = ["ws://staging-parent.company.com:19999/mcp"]
+env = { "ND_MCP_BEARER_TOKEN" = "${STAGING_API_KEY}" }
 
-# Local development
 [mcp_servers.netdata_local]
 command = "/usr/sbin/nd-mcp"
-args = ["ws://localhost:19999/mcp?api_key=${LOCAL_API_KEY}"]
+args = ["ws://localhost:19999/mcp"]
+env = { "ND_MCP_BEARER_TOKEN" = "${LOCAL_API_KEY}" }
 ```
 
 ### Timeout Configuration
@@ -243,7 +229,14 @@ Adjust timeouts based on your network and query complexity:
 ```toml
 [mcp_servers.netdata]
 command = "npx"
-args = ["@modelcontextprotocol/remote-mcp", "--http", "http://remote-netdata:19999/mcp"]
+args = [
+  "mcp-remote@latest",
+  "--http",
+  "http://remote-netdata:19999/mcp",
+  "--allow-http",
+  "--header",
+  "Authorization: Bearer NETDATA_MCP_API_KEY"
+]
 startup_timeout_sec = 30  # Time to wait for MCP server to start
 tool_timeout_sec = 180     # Time limit for individual tool calls
 ```

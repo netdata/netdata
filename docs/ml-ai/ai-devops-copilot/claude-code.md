@@ -31,15 +31,18 @@ Connect directly to Netdata's HTTP endpoint without needing the nd-mcp bridge:
 ```bash
 # Add Netdata via direct HTTP connection (project-scoped for team sharing)
 claude mcp add --transport http --scope project netdata \
-  http://YOUR_NETDATA_IP:19999/mcp?api_key=NETDATA_MCP_API_KEY
+  http://YOUR_NETDATA_IP:19999/mcp \
+  --header "Authorization: Bearer NETDATA_MCP_API_KEY"
 
 # Or add locally for personal use only
 claude mcp add --transport http netdata \
-  http://YOUR_NETDATA_IP:19999/mcp?api_key=NETDATA_MCP_API_KEY
+  http://YOUR_NETDATA_IP:19999/mcp \
+  --header "Authorization: Bearer NETDATA_MCP_API_KEY"
 
 # For HTTPS connections
 claude mcp add --transport http --scope project netdata \
-  https://YOUR_NETDATA_IP:19999/mcp?api_key=NETDATA_MCP_API_KEY
+  https://YOUR_NETDATA_IP:19999/mcp \
+  --header "Authorization: Bearer NETDATA_MCP_API_KEY"
 ```
 
 ### Method 2: Using nd-mcp Bridge (stdio)
@@ -49,11 +52,13 @@ For environments where you prefer or need to use the bridge:
 ```bash
 # Add Netdata via nd-mcp bridge (project-scoped)
 claude mcp add --scope project netdata /usr/sbin/nd-mcp \
-  ws://YOUR_NETDATA_IP:19999/mcp?api_key=NETDATA_MCP_API_KEY
+  --bearer NETDATA_MCP_API_KEY \
+  ws://YOUR_NETDATA_IP:19999/mcp
 
 # Or add locally for personal use only
 claude mcp add netdata /usr/sbin/nd-mcp \
-  ws://YOUR_NETDATA_IP:19999/mcp?api_key=NETDATA_MCP_API_KEY
+  --bearer NETDATA_MCP_API_KEY \
+  ws://YOUR_NETDATA_IP:19999/mcp
 ```
 
 ### Method 3: Using npx remote-mcp (Alternative Bridge)
@@ -62,12 +67,16 @@ If nd-mcp is not available, you can use the official MCP remote client:
 
 ```bash
 # Using SSE transport
-claude mcp add --scope project netdata npx @modelcontextprotocol/remote-mcp \
-  --sse http://YOUR_NETDATA_IP:19999/mcp?api_key=NETDATA_MCP_API_KEY
+claude mcp add --scope project netdata npx mcp-remote@latest \
+  --sse http://YOUR_NETDATA_IP:19999/mcp \
+  --allow-http \
+  --header "Authorization: Bearer NETDATA_MCP_API_KEY"
 
 # Using HTTP transport
-claude mcp add --scope project netdata npx @modelcontextprotocol/remote-mcp \
-  --http http://YOUR_NETDATA_IP:19999/mcp?api_key=NETDATA_MCP_API_KEY
+claude mcp add --scope project netdata npx mcp-remote@latest \
+  --http http://YOUR_NETDATA_IP:19999/mcp \
+  --allow-http \
+  --header "Authorization: Bearer NETDATA_MCP_API_KEY"
 ```
 
 ### Verify Configuration
@@ -130,7 +139,10 @@ Create `~/projects/production/.mcp.json`:
   "mcpServers": {
     "netdata": {
       "type": "http",
-      "url": "http://prod-parent.company.com:19999/mcp?api_key=${NETDATA_API_KEY}"
+      "url": "http://prod-parent.company.com:19999/mcp",
+      "headers": [
+        "Authorization: Bearer ${NETDATA_API_KEY}"
+      ]
     }
   }
 }
@@ -145,7 +157,11 @@ Create `~/projects/production/.mcp.json`:
   "mcpServers": {
     "netdata": {
       "command": "/usr/sbin/nd-mcp",
-      "args": ["ws://prod-parent.company.com:19999/mcp?api_key=${NETDATA_API_KEY}"]
+      "args": [
+        "--bearer",
+        "${NETDATA_API_KEY}",
+        "ws://prod-parent.company.com:19999/mcp"
+      ]
     }
   }
 }
@@ -161,9 +177,12 @@ Create `~/projects/production/.mcp.json`:
     "netdata": {
       "command": "npx",
       "args": [
-        "@modelcontextprotocol/remote-mcp",
-        "--sse",
-        "http://prod-parent.company.com:19999/mcp?api_key=${NETDATA_API_KEY}"
+        "mcp-remote@latest",
+    "--sse",
+    "http://prod-parent.company.com:19999/mcp",
+    "--allow-http",
+    "--header",
+    "Authorization: Bearer ${NETDATA_API_KEY}",
       ]
     }
   }
