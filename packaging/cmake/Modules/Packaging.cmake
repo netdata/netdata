@@ -316,7 +316,7 @@ set(CPACK_DEBIAN_PLUGIN-GO_DEBUGINFO_PACKAGE Off)
 # ibm.plugin
 #
 
-set(CPACK_COMPONENT_PLUGIN-IBM_DEPENDS "netdata, unixodbc, netdata-plugin-ibm-libs")
+set(CPACK_COMPONENT_PLUGIN-IBM_DEPENDS "netdata")
 set(CPACK_COMPONENT_PLUGIN-IBM_DESCRIPTION
 		"The IBM ecosystem metrics collection plugin for the Netdata Agent
  This plugin allows the Netdata Agent to collect metrics from IBM
@@ -328,6 +328,7 @@ set(CPACK_DEBIAN_PLUGIN-IBM_PACKAGE_NAME "netdata-plugin-ibm")
 set(CPACK_DEBIAN_PLUGIN-IBM_PACKAGE_SECTION "net")
 set(CPACK_DEBIAN_PLUGIN-IBM_PACKAGE_CONFLICTS "netdata (<< 1.40)")
 set(CPACK_DEBIAN_PLUGIN-IBM_PACKAGE_PREDEPENDS "adduser")
+set(CPACK_DEBIAN_PLUGIN-IBM_PACKAGE_DEPENDS "unixodbc, netdata-plugin-ibm-libs (= ${CPACK_PACKAGE_VERSION})")
 set(CPACK_DEBIAN_PLUGIN-IBM_PACKAGE_SUGGESTS "libxml2")
 
 set(CPACK_DEBIAN_PLUGIN-IBM_PACKAGE_CONTROL_EXTRA
