@@ -74,7 +74,7 @@ static void mcp_http_apply_api_key(struct web_client *w) {
 
     char api_key_buffer[MCP_DEV_PREVIEW_API_KEY_LENGTH + 1];
     if (mcp_http_extract_api_key(w, api_key_buffer, sizeof(api_key_buffer)) &&
-        mcp_api_key_verify(api_key_buffer)) {
+        mcp_api_key_verify(api_key_buffer, false)) {  // silent=false for MCP requests
         web_client_set_permissions(w, HTTP_ACCESS_ALL, HTTP_USER_ROLE_ADMIN, USER_AUTH_METHOD_GOD);
     }
 }
