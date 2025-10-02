@@ -4,25 +4,23 @@ Configure OpenAI's Codex CLI to access your Netdata infrastructure through MCP f
 
 ## Transport Support
 
-Codex CLI currently has limited MCP transport support:
+Codex CLI supports both stdio launchers and direct Streamable HTTP when the RMCP client is enabled (https://github.com/openai/codex/blob/main/docs/config.md#mcp-servers).
 
-| Transport | Support | Use Case |
-|-----------|---------|----------|
-| **stdio** (via nd-mcp bridge) | ✅ Supported | Local bridge to WebSocket |
-| **stdio** (via npx remote-mcp) | ✅ Supported | Alternative bridge with HTTP/SSE support |
-| **Streamable HTTP** | ❌ Not Supported | Use npx remote-mcp bridge |
-| **SSE** (Server-Sent Events) | ❌ Not Supported | Use npx remote-mcp bridge |
-| **WebSocket** | ❌ Not Supported | Use nd-mcp bridge |
-
-> **Note:** Codex CLI currently only supports stdio-based MCP servers. For HTTP/SSE connections to Netdata, you must use a bridge like nd-mcp or npx remote-mcp.
+| Transport | Support | Netdata Version | Notes |
+|-----------|---------|-----------------|-------|
+| **stdio** (via `nd-mcp`) | ✅ Supported | v2.6.0+ | Default transport |
+| **stdio** (via `npx mcp-remote`) | ✅ Supported | v2.7.2+ | Wraps Netdata HTTP/SSE in stdio |
+| **Streamable HTTP** | ✅ Supported | v2.7.2+ | Requires `experimental_use_rmcp_client = true` |
+| **SSE** | ❌ Not Supported | - | Use streamable HTTP or stdio bridge |
+| **WebSocket** | ❌ Not Supported | - | Use stdio bridge |
 
 ## Prerequisites
 
 1. **OpenAI Codex CLI installed** - Available via npm, Homebrew, or direct download from [GitHub](https://github.com/openai/codex)
-2. **The IP and port (usually 19999) of a running Netdata Agent** - Prefer a Netdata Parent to get infrastructure level visibility. Currently the latest nightly version of Netdata has MCP support (not released to the stable channel yet). Your AI Client (running on your desktop or laptop) needs to have direct network access to this IP and port.
-3. **Bridge required: Choose one:**
-   - `nd-mcp` bridge - The stdio-to-websocket bridge. [Find its absolute path](/docs/learn/mcp.md#finding-the-nd-mcp-bridge)
-   - `npx mcp-remote@latest` - Official MCP remote client supporting HTTP/SSE
+2. **Netdata v2.6.0 or later** with MCP support - Prefer a Netdata Parent to get infrastructure level visibility. Your AI Client (running on your desktop or laptop) needs to have direct network access to the Netdata IP and port (usually 19999).
+   - **v2.6.0 - v2.7.1**: Only WebSocket transport available, requires `nd-mcp` bridge
+   - **v2.7.2+**: Can use `npx mcp-remote` bridge for HTTP/SSE support
+3. **Launcher** – Run Netdata through `nd-mcp` (always) or `npx mcp-remote` (useful when you want a single stdio launcher for multiple MCP clients). Direct HTTP is also available for v2.7.2+ when you enable the RMCP client.
 4. **Optionally, the Netdata MCP API key** that unlocks full access to sensitive observability data (protected functions, full access to logs) on your Netdata. Each Netdata Agent or Parent has its own unique API key for MCP - [Find your Netdata MCP API key](/docs/learn/mcp.md#finding-your-api-key)
 
 ## Installation
@@ -44,9 +42,27 @@ brew install codex
 
 Codex CLI uses a TOML configuration file at `~/.codex/config.toml` for MCP server settings.
 
-### Method 1: Using npx remote-mcp (Recommended for HTTP/SSE)
+### Method 1: Native Streamable HTTP (Recommended for v2.7.2+)
 
-This method allows Codex CLI to connect to Netdata's HTTP/SSE endpoints through the official MCP remote client:
+Enable the RMCP client and point Codex directly at Netdata’s HTTP endpoint:
+
+```toml
+# ~/.codex/config.toml
+
+experimental_use_rmcp_client = true
+
+[mcp_servers.netdata]
+url = "https://YOUR_NETDATA_IP:19999/mcp"
+bearer_token = "${NETDATA_MCP_API_KEY}"
+startup_timeout_sec = 20
+tool_timeout_sec = 120
+```
+
+> `bearer_token` is sent as `Authorization: Bearer <token>`. Consider sourcing it from an environment variable to avoid plain-text secrets.
+
+### Method 2: Using `npx mcp-remote` (Works for HTTP or SSE)
+
+This launcher wraps Netdata’s remote transports in stdio for clients that cannot speak HTTP directly or when you prefer a consistent launcher across tools. For detailed options, see [Using MCP Remote Client](/docs/learn/mcp.md#using-mcp-remote-client).
 
 ```toml
 # ~/.codex/config.toml
@@ -80,7 +96,7 @@ args = [
 ]
 ```
 
-### Method 2: Using nd-mcp Bridge
+### Method 3: Using nd-mcp Bridge (WebSocket only)
 
 For environments where nd-mcp is available and preferred:
 

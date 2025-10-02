@@ -6,25 +6,29 @@ Configure Claude Code to access your Netdata infrastructure through MCP.
 
 Claude Code supports multiple MCP transport types, giving you flexibility in how you connect to Netdata:
 
-| Transport | Support | Use Case |
-|-----------|---------|----------|
-| **stdio** (via nd-mcp bridge) | ✅ Fully Supported | Local bridge to WebSocket |
-| **Streamable HTTP** | ✅ Fully Supported | Direct connection to Netdata's HTTP endpoint |
-| **SSE** (Server-Sent Events) | ⚠️ Limited Support | Legacy, being deprecated |
-| **WebSocket** | ❌ Not Supported | Use nd-mcp bridge or HTTP instead |
+| Transport | Support | Netdata Version | Use Case |
+|-----------|---------|-----------------|----------|
+| **stdio** (via nd-mcp bridge) | ✅ Fully Supported | v2.6.0+ | Local bridge to WebSocket |
+| **Streamable HTTP** | ✅ Fully Supported | v2.7.2+ | Direct connection to Netdata's HTTP endpoint (recommended) |
+| **SSE** (Server-Sent Events) | ✅ Fully Supported | v2.7.2+ | Remote SCP servers that expose SSE |
+| **WebSocket** | ❌ Not Supported | - | Use nd-mcp bridge or HTTP/SSE wrappers |
 
 ## Prerequisites
 
 1. **Claude Code installed** - Available at [anthropic.com/claude-code](https://www.anthropic.com/claude-code)
-2. **The IP and port (usually 19999) of a running Netdata Agent** - Prefer a Netdata Parent to get infrastructure level visibility. Currently the latest nightly version of Netdata has MCP support (not released to the stable channel yet). Your AI Client (running on your desktop or laptop) needs to have direct network access to this IP and port.
-3. **For stdio connections only: `nd-mcp` bridge** - The stdio-to-websocket bridge. [Find its absolute path](/docs/learn/mcp.md#finding-the-nd-mcp-bridge). Not needed for direct HTTP connections.
+2. **Netdata v2.6.0 or later** with MCP support - Prefer a Netdata Parent to get infrastructure level visibility. Your AI Client (running on your desktop or laptop) needs to have direct network access to the Netdata IP and port (usually 19999).
+   - **v2.6.0 - v2.7.1**: Only WebSocket transport available, requires `nd-mcp` bridge
+   - **v2.7.2+**: Direct HTTP/SSE support available (recommended)
+3. **For WebSocket or stdio connections: `nd-mcp` bridge** - The stdio-to-websocket bridge. [Find its absolute path](/docs/learn/mcp.md#finding-the-nd-mcp-bridge). Not needed for direct HTTP connections on v2.7.2+.
 4. **Optionally, the Netdata MCP API key** that unlocks full access to sensitive observability data (protected functions, full access to logs) on your Netdata. Each Netdata Agent or Parent has its own unique API key for MCP - [Find your Netdata MCP API key](/docs/learn/mcp.md#finding-your-api-key)
 
 ## Configuration Methods
 
 Claude Code has comprehensive MCP server management capabilities. For detailed documentation on all configuration options and commands, see the [official Claude Code MCP documentation](https://docs.anthropic.com/en/docs/claude-code/mcp).
 
-### Method 1: Direct HTTP Connection (Recommended)
+> **Reference:** Claude Code’s official guide documents HTTP, SSE, and stdio transports with both CLI and `.mcp.json` configurations (https://docs.claude.com/en/docs/claude-code/mcp).
+
+### Method 1: Direct HTTP Connection (Recommended for v2.7.2+)
 
 Connect directly to Netdata's HTTP endpoint without needing the nd-mcp bridge:
 
@@ -61,9 +65,9 @@ claude mcp add netdata /usr/sbin/nd-mcp \
   ws://YOUR_NETDATA_IP:19999/mcp
 ```
 
-### Method 3: Using npx remote-mcp (Alternative Bridge)
+### Method 3: Using npx remote-mcp (Alternative Bridge for v2.7.2+)
 
-If nd-mcp is not available, you can use the official MCP remote client:
+If nd-mcp is not available, you can use the official MCP remote client (requires Netdata v2.7.2+). For detailed options and troubleshooting, see [Using MCP Remote Client](/docs/learn/mcp.md#using-mcp-remote-client).
 
 ```bash
 # Using SSE transport
