@@ -239,7 +239,7 @@ Requires: %{name}-plugin-nfacct = %{version}
 %if %{_have_xenstat}
 Suggests: %{name}-plugin-xenstat = %{version}
 %endif
-%if %{_have_ibm_plugin}
+%if %{_have_ibm_plugin} && 0%{?centos_ver} != 6 && 0%{?centos_ver} != 7 && 0%{?amazon_linux} != 2
 Suggests: %{name}-plugin-ibm = %{version}
 %endif
 %if %{_have_freeipmi} && 0%{?centos_ver} != 6 && 0%{?centos_ver} != 7 && 0%{?amazon_linux} != 2
@@ -677,7 +677,8 @@ rm -rf "${RPM_BUILD_ROOT}"
 %if %{_have_ibm_plugin}
 %exclude %{_libexecdir}/%{name}/plugins.d/ibm.d.plugin
 %exclude %{_libdir}/%{name}/conf.d/ibm.d.conf
-%dir %exclude %{_libdir}/%{name}/conf.d/ibm.d
+%exclude %{_libdir}/%{name}/conf.d/ibm.d
+%exclude %{_libdir}/%{name}/ibm-mqclient
 %endif
 
 # Network viewer belongs to a different sub-package
@@ -899,6 +900,7 @@ Requires: %{name} = %{version}
 Requires: %{name}-plugin-ibm-libs = %{version}
 Requires: unixODBC
 Conflicts: %{name} < %{version}
+AutoReqProv: no
 
 %description plugin-ibm
 This plugin adds IBM ecosystem collectors (AS/400, DB2, MQ, WebSphere) to the Netdata Agent.
@@ -921,6 +923,7 @@ fi
 Summary: IBM MQ client libraries for the Netdata IBM ecosystem metrics collection plugin.
 Group: Applications/System
 Conflicts: %{name} < %{version}
+AutoReqProv: no
 
 %description plugin-ibm-libs
 This package provides the IBM MQ client libraries needed by Netdata IBM
