@@ -18,7 +18,11 @@ Autonomous coding agent that can use MCP tools.
 2. **MCP-compatible extension** - Install from VS Code Marketplace
 3. **The IP and port (usually 19999) of a running Netdata Agent** - Prefer a Netdata Parent to get infrastructure level visibility. Currently the latest nightly version of Netdata has MCP support (not released to the stable channel yet). Your AI Client (running on your desktop or laptop) needs to have direct network access to this IP and port.
 4. **`nd-mcp` program available on your desktop or laptop** - This is the bridge that translates `stdio` to `websocket`, connecting your AI Client to your Netdata Agent or Parent. [Find its absolute path](/docs/learn/mcp.md#finding-the-nd-mcp-bridge)
-5. **Optionally, the Netdata MCP API key** that unlocks full access to sensitive observability data (protected functions, full access to logs) on your Netdata. Each Netdata Agent or Parent has its own unique API key for MCP - [Find your Netdata MCP API key](/docs/learn/mcp.md#finding-your-api-key)
+5. **Netdata MCP API key exported before launching VS Code** - keep secrets out of config files by setting:
+   ```bash
+   export ND_MCP_BEARER_TOKEN="$(cat /var/lib/netdata/mcp_dev_preview_api_key)"
+   ```
+   Each Netdata Agent or Parent has its own unique API key for MCP - [Find your Netdata MCP API key](/docs/learn/mcp.md#finding-your-api-key)
 
 ## Continue Extension Setup
 
@@ -56,13 +60,13 @@ Autonomous coding agent that can use MCP tools.
        - name: netdata
          command: /usr/sbin/nd-mcp
          args:
-            - ws://YOUR_NETDATA_IP:19999/mcp?api_key=NETDATA_MCP_API_KEY
+            - ws://YOUR_NETDATA_IP:19999/mcp
          env: {}
     ```
 5. Replace:
     - `/usr/sbin/nd-mcp` with your actual nd-mcp path
     - `YOUR_NETDATA_IP` with your Netdata instance IP/hostname
-    - `NETDATA_MCP_API_KEY` with your Netdata MCP API key
+    - `ND_MCP_BEARER_TOKEN` exported with your Netdata MCP API key before launching VS Code
 6. Save the file
 
 ### Usage
@@ -95,7 +99,7 @@ Press `Ctrl+L` to open Continue chat, then:
       "name": "netdata",
       "command": "/usr/sbin/nd-mcp",
       "args": [
-        "ws://YOUR_NETDATA_IP:19999/mcp?api_key=NETDATA_MCP_API_KEY"
+        "ws://YOUR_NETDATA_IP:19999/mcp"
       ]
     }
   ]
@@ -128,7 +132,7 @@ Create `.vscode/settings.json` in your project:
     "netdata-prod": {
       "command": "/usr/sbin/nd-mcp",
       "args": [
-        "ws://prod-parent:19999/mcp?api_key=PROD_NETDATA_MCP_API_KEY"
+        "ws://prod-parent:19999/mcp"
       ]
     }
   }
@@ -142,6 +146,8 @@ Different projects can have different Netdata connections:
 - `~/projects/frontend/.vscode/settings.json` → Frontend servers
 - `~/projects/backend/.vscode/settings.json` → Backend servers
 - `~/projects/infrastructure/.vscode/settings.json` → All servers
+
+> ℹ️ Export `ND_MCP_BEARER_TOKEN` with the appropriate key before opening VS Code so the bridge picks up credentials without storing them in `.vscode/settings.json`.
 
 ## Advanced Usage
 

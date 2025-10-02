@@ -7,7 +7,11 @@ Configure Claude Desktop to access your Netdata infrastructure through MCP.
 1. **Claude Desktop installed** - Download from [claude.ai/download](https://claude.ai/download)
 2. **The IP and port (usually 19999) of a running Netdata Agent** - Prefer a Netdata Parent to get infrastructure level visibility. Currently the latest nightly version of Netdata has MCP support (not released to the stable channel yet). Your AI Client (running on your desktop or laptop) needs to have direct network access to this IP and port.
 3. **`nd-mcp` program available on your desktop or laptop** - This is the bridge that translates `stdio` to `websocket`, connecting your AI Client to your Netdata Agent or Parent. [Find its absolute path](/docs/learn/mcp.md#finding-the-nd-mcp-bridge)
-4. **Optionally, the Netdata MCP API key** that unlocks full access to sensitive observability data (protected functions, full access to logs) on your Netdata. Each Netdata Agent or Parent has its own unique API key for MCP - [Find your Netdata MCP API key](/docs/learn/mcp.md#finding-your-api-key)
+4. **Netdata MCP API key loaded into the environment** (recommended) - export it before launching Claude Code to avoid exposing it in config files:
+   ```bash
+   export ND_MCP_BEARER_TOKEN="$(cat /var/lib/netdata/mcp_dev_preview_api_key)"
+   ```
+   Each Netdata Agent or Parent has its own unique API key for MCP - [Find your Netdata MCP API key](/docs/learn/mcp.md#finding-your-api-key)
 
 ## Platform-Specific Installation
 
@@ -37,7 +41,7 @@ Use the community AppImage project:
     "netdata": {
       "command": "/usr/sbin/nd-mcp",
       "args": [
-        "ws://YOUR_NETDATA_IP:19999/mcp?api_key=NETDATA_MCP_API_KEY"
+        "ws://YOUR_NETDATA_IP:19999/mcp"
       ]
     }
   }
@@ -48,7 +52,7 @@ Replace:
 
 - `/usr/sbin/nd-mcp` - With your [actual nd-mcp path](/docs/learn/mcp.md#finding-the-nd-mcp-bridge)
 - `YOUR_NETDATA_IP` - IP address or hostname of your Netdata Agent/Parent
-- `NETDATA_MCP_API_KEY` - Your [Netdata MCP API key](/docs/learn/mcp.md#finding-your-api-key)
+- `ND_MCP_BEARER_TOKEN` - Export this environment variable with your [Netdata MCP API key](/docs/learn/mcp.md#finding-your-api-key) before launching Claude Desktop
 
 5. Save the configuration
 6. **Restart Claude Desktop** (required for changes to take effect)
@@ -84,17 +88,19 @@ Add multiple configurations and enable/disable as needed:
   "mcpServers": {
     "netdata-production": {
       "command": "/usr/sbin/nd-mcp",
-      "args": ["ws://prod-parent:19999/mcp?api_key=PROD_KEY"]
+      "args": ["ws://prod-parent:19999/mcp"]
     },
     "netdata-staging": {
       "command": "/usr/sbin/nd-mcp",
-      "args": ["ws://stage-parent:19999/mcp?api_key=STAGE_KEY"]
+      "args": ["ws://stage-parent:19999/mcp"]
     }
   }
 }
 ```
 
 Use the toggle switch in settings to enable only one at a time.
+
+> ℹ️ Set `ND_MCP_BEARER_TOKEN` to the appropriate key before switching between environments to avoid storing secrets in the configuration file.
 
 ### Option 2: Single Parent
 

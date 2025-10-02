@@ -5,7 +5,10 @@
 
 #include "libnetdata/libnetdata.h"
 #include <json-c/json.h>
-#include "mcp-request-id.h"
+#include "libnetdata/buffer/buffer.h"
+
+// Request ID type - adapters may use 0 when no correlation is required
+typedef size_t MCP_REQUEST_ID;
 
 // MCP tool names - use these constants when referring to tools
 #define MCP_TOOL_LIST_METRICS "list_metrics"
@@ -126,6 +129,7 @@ typedef enum {
     MCP_TRANSPORT_UNKNOWN = 0,
     MCP_TRANSPORT_WEBSOCKET,
     MCP_TRANSPORT_HTTP,
+    MCP_TRANSPORT_SSE,
     // Add more as needed
 } MCP_TRANSPORT;
 
@@ -179,17 +183,24 @@ typedef struct mcp_client {
     
     // Logging configuration
     MCP_LOGGING_LEVEL logging_level;              // Current logging level set by client
-    
-    // Response buffers
-    BUFFER *result;                                // Pre-allocated buffer for success responses
-    BUFFER *error;                                 // Pre-allocated buffer for error messages
-    
-    // Utility buffers
-    BUFFER *uri;                                  // Pre-allocated buffer for URI decoding
-    
-    // Request IDs tracking
-    size_t request_id_counter;                     // Counter for generating sequential request IDs
-    Pvoid_t request_ids;                          // JudyL array for mapping internal IDs to client IDs
+
+    // Per-request response data
+    BUFFER *error;                                 // Persistent buffer accumulating error messages
+    BUFFER *result;                                // Convenience pointer to currently active response chunk
+    struct mcp_response_chunk {
+        BUFFER *buffer;                            // Response payload
+        enum mcp_response_chunk_type {
+            MCP_RESPONSE_CHUNK_JSON = 0,
+            MCP_RESPONSE_CHUNK_TEXT,
+            MCP_RESPONSE_CHUNK_BINARY,
+        } type;                                    // Encoding hint for adapters
+    } *response_chunks;
+    size_t response_chunks_used;
+    size_t response_chunks_size;
+
+    // Last response status
+    MCP_RETURN_CODE last_return_code;
+    bool last_response_error;
 } MCP_CLIENT;
 
 // Helper function to convert string version to numeric version
@@ -206,12 +217,18 @@ void mcp_free_client(MCP_CLIENT *mcpc);
 
 // Helper functions for creating and sending JSON-RPC responses
 
-// Functions to initialize and build MCP responses
+// Response lifecycle helpers
+void mcp_client_prepare_response(MCP_CLIENT *mcpc);
+void mcp_client_release_response(MCP_CLIENT *mcpc);
+BUFFER *mcp_response_add_json_chunk(MCP_CLIENT *mcpc, size_t initial_capacity);
+BUFFER *mcp_response_add_text_chunk(MCP_CLIENT *mcpc, size_t initial_capacity);
+size_t mcp_client_response_chunk_count(const MCP_CLIENT *mcpc);
+const struct mcp_response_chunk *mcp_client_response_chunks(const MCP_CLIENT *mcpc);
+size_t mcp_client_response_size(const MCP_CLIENT *mcpc);
 void mcp_init_success_result(MCP_CLIENT *mcpc, MCP_REQUEST_ID id);
 MCP_RETURN_CODE mcp_error_result(MCP_CLIENT *mcpc, MCP_REQUEST_ID id, MCP_RETURN_CODE rc);
-
-// Send prepared buffer content as response
-int mcp_send_response_buffer(MCP_CLIENT *mcpc);
+const char *mcp_client_error_message(MCP_CLIENT *mcpc);
+void mcp_client_clear_error(MCP_CLIENT *mcpc);
 
 // Check if a capability is supported by the transport
 static inline bool mcp_has_capability(MCP_CLIENT *mcpc, MCP_CAPABILITY capability) {
@@ -221,7 +238,7 @@ static inline bool mcp_has_capability(MCP_CLIENT *mcpc, MCP_CAPABILITY capabilit
 // Initialize the MCP subsystem
 void mcp_initialize_subsystem(void);
 
-// Main MCP entry point - handle a JSON-RPC request (single or batch)
-MCP_RETURN_CODE mcp_handle_request(MCP_CLIENT *mcpc, struct json_object *request);
+// Transport-agnostic dispatcher (method string follows MCP namespace semantics)
+MCP_RETURN_CODE mcp_dispatch_method(MCP_CLIENT *mcpc, const char *method, struct json_object *params, MCP_REQUEST_ID id);
 
 #endif // NETDATA_MCP_H

@@ -1814,6 +1814,13 @@ set(WEB_PLUGIN_FILES
         src/web/api/v3/api_v3_stream_path.c
         src/web/mcp/adapters/mcp-websocket.c
         src/web/mcp/adapters/mcp-websocket.h
+        src/web/mcp/adapters/mcp-http.c
+        src/web/mcp/adapters/mcp-http.h
+        src/web/mcp/adapters/mcp-http-common.h
+        src/web/mcp/adapters/mcp-sse.c
+        src/web/mcp/adapters/mcp-sse.h
+        src/web/mcp/mcp-jsonrpc.c
+        src/web/mcp/mcp-jsonrpc.h
         src/web/mcp/mcp-initialize.c
         src/web/mcp/mcp-initialize.h
         src/web/mcp/mcp-prompts.c
@@ -1839,16 +1846,14 @@ set(WEB_PLUGIN_FILES
         src/web/mcp/mcp-tools-configured-alerts.h
         src/web/mcp/mcp-params.c
         src/web/mcp/mcp-params.h
-        src/web/mcp/mcp-request-id.c
-        src/web/mcp/mcp-request-id.h
         src/web/mcp/mcp-ping.c
         src/web/mcp/mcp-ping.h
         src/web/mcp/mcp-logging.c
         src/web/mcp/mcp-logging.h
         src/web/mcp/mcp-completion.c
         src/web/mcp/mcp-completion.h
-        src/web/mcp/mcp-api-key.c
-        src/web/mcp/mcp-api-key.h
+        src/web/api/mcp_auth.c
+        src/web/api/mcp_auth.h
         src/web/mcp/mcp.c
         src/web/mcp/mcp.h
         src/web/server/static/static-threaded.c
