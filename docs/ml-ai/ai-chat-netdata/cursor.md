@@ -4,27 +4,22 @@ Configure Cursor IDE to access your Netdata infrastructure through MCP.
 
 ## Transport Support
 
-Cursor currently supports stdio-based MCP servers only:
+Cursor’s MCP client natively supports multiple transports (https://cursor.com/docs/context/mcp):
 
-| Transport | Support | Netdata Version | Use Case |
-|-----------|---------|-----------------|----------|
-| **stdio** (via nd-mcp bridge) | ✅ Fully Supported | v2.6.0+ | Local bridge to WebSocket |
-| **stdio** (via npx remote-mcp) | ✅ Fully Supported | v2.7.2+ | Alternative bridge with HTTP/SSE support |
-| **Streamable HTTP** | ❌ Not Supported | - | Use npx remote-mcp bridge |
-| **SSE** (Server-Sent Events) | ❌ Not Supported | - | Use npx remote-mcp bridge |
-| **WebSocket** | ❌ Not Supported | - | Use nd-mcp bridge |
-
-> **Note:** Cursor only supports stdio-based MCP servers. For HTTP/SSE connections to Netdata v2.7.2+, you must use a bridge like npx remote-mcp. For older Netdata versions (v2.6.0 - v2.7.1), use the nd-mcp bridge with WebSocket.
+| Transport | Support | Netdata Version | Notes |
+|-----------|---------|-----------------|-------|
+| **stdio** | ✅ Fully Supported | v2.6.0+ | Launch Netdata via `nd-mcp` or `npx mcp-remote` |
+| **SSE** | ✅ Fully Supported | v2.7.2+ | Configure `type: "sse"` with Netdata SSE endpoint |
+| **Streamable HTTP** | ✅ Fully Supported | v2.7.2+ | Configure `type: "streamable-http"` for Netdata HTTP endpoint |
+| **WebSocket** | ❌ Not Supported | - | Use the stdio bridge for v2.6.0–v2.7.1 |
 
 ## Prerequisites
 
 1. **Cursor installed** - Download from [cursor.com](https://www.cursor.com)
 2. **Netdata v2.6.0 or later** with MCP support - Prefer a Netdata Parent to get infrastructure level visibility. Your AI Client (running on your desktop or laptop) needs to have direct network access to the Netdata IP and port (usually 19999).
-   - **v2.6.0 - v2.7.1**: Only WebSocket transport available, requires `nd-mcp` bridge
-   - **v2.7.2+**: Can use `npx mcp-remote` bridge for HTTP/SSE support
-3. **Bridge required: Choose one:**
-   - `nd-mcp` bridge - The stdio-to-websocket bridge for all Netdata versions. [Find its absolute path](/docs/learn/mcp.md#finding-the-nd-mcp-bridge)
-   - `npx mcp-remote@latest` - Official MCP remote client supporting HTTP/SSE (requires Netdata v2.7.2+)
+   - **v2.6.0 - v2.7.1**: Only WebSocket transport is available, so launch Netdata through `nd-mcp`
+   - **v2.7.2+**: Expose Netdata over SSE or HTTP directly, or continue to use `nd-mcp`
+3. **Optional bridge** - `npx mcp-remote@latest` remains useful if you prefer stdio-only setups or want to re-use the same launcher for multiple clients.
 4. **Netdata MCP API key loaded into the environment** (recommended) - export it before launching Cursor:
    ```bash
    export ND_MCP_BEARER_TOKEN="$(cat /var/lib/netdata/mcp_dev_preview_api_key)"
@@ -33,21 +28,15 @@ Cursor currently supports stdio-based MCP servers only:
 
 ## Configuration Methods
 
-Cursor uses a `.cursor/mcp.json` configuration file for MCP servers. You can place this file in two locations:
+Cursor reads MCP definitions from `.cursor/mcp.json` in the workspace root. For user-wide defaults, open Cursor’s Settings and add the same structure to the global config path documented by Cursor (https://cursor.com/docs/context/mcp#configuration-locations).
 
-- **Project-specific**: `.cursor/mcp.json` in your project root directory
-- **Global**: In your user configuration directory
-
-### Method 1: Using nd-mcp Bridge
-
-For all Netdata versions (v2.6.0+):
-
-Create or edit `.cursor/mcp.json` in your project directory:
+### Method 1: stdio Bridge (All Netdata versions)
 
 ```json
 {
   "mcpServers": {
     "netdata": {
+      "type": "stdio",
       "command": "/usr/sbin/nd-mcp",
       "args": [
         "ws://YOUR_NETDATA_IP:19999/mcp"
@@ -57,58 +46,41 @@ Create or edit `.cursor/mcp.json` in your project directory:
 }
 ```
 
-### Method 2: Using npx remote-mcp (Recommended for v2.7.2+)
-
-For Netdata v2.7.2+ with HTTP/SSE support. For detailed options and troubleshooting, see [Using MCP Remote Client](/docs/learn/mcp.md#using-mcp-remote-client).
-
-**HTTP transport:**
+### Method 2: Direct SSE (Netdata v2.7.2+)
 
 ```json
 {
   "mcpServers": {
     "netdata": {
-      "command": "npx",
-      "args": [
-        "mcp-remote@latest",
-        "--http",
-        "http://YOUR_NETDATA_IP:19999/mcp",
-        "--allow-http",
-        "--header",
-        "Authorization: Bearer NETDATA_MCP_API_KEY"
-      ]
+      "type": "sse",
+      "url": "https://YOUR_NETDATA_IP:19999/mcp",
+      "headers": {
+        "Authorization": "Bearer NETDATA_MCP_API_KEY"
+      }
     }
   }
 }
 ```
 
-**SSE transport:**
+### Method 3: Streamable HTTP (Netdata v2.7.2+)
 
 ```json
 {
   "mcpServers": {
     "netdata": {
-      "command": "npx",
-      "args": [
-        "mcp-remote@latest",
-        "--sse",
-        "http://YOUR_NETDATA_IP:19999/mcp",
-        "--allow-http",
-        "--header",
-        "Authorization: Bearer NETDATA_MCP_API_KEY"
-      ]
+      "type": "streamable-http",
+      "url": "https://YOUR_NETDATA_IP:19999/mcp",
+      "headers": {
+        "Authorization": "Bearer NETDATA_MCP_API_KEY"
+      }
     }
   }
 }
 ```
 
-After creating the configuration file, restart Cursor for changes to take effect.
+> Cursor supports config interpolation such as `${env:NETDATA_MCP_API_KEY}` or `${workspaceFolder}` inside `command`, `args`, `env`, `url`, and `headers` (https://cursor.com/docs/context/mcp#config-interpolation). Use these to avoid storing secrets in plain text.
 
-Replace in all examples:
-
-- `/usr/sbin/nd-mcp` - With your [actual nd-mcp path](/docs/learn/mcp.md#finding-the-nd-mcp-bridge) (nd-mcp method only)
-- `YOUR_NETDATA_IP` - IP address or hostname of your Netdata Agent/Parent
-- `NETDATA_MCP_API_KEY` - Your [Netdata MCP API key](/docs/learn/mcp.md#finding-your-api-key)
-- `ND_MCP_BEARER_TOKEN` - Export with your API key before launching Cursor (nd-mcp method only)
+After editing `.cursor/mcp.json`, restart Cursor or run “Reload Window” for the new server to appear in **Settings → MCP**.
 
 ## Using Netdata in Cursor
 
@@ -150,10 +122,12 @@ Cursor allows multiple MCP servers but requires manual toggling:
 {
   "mcpServers": {
     "netdata-prod": {
+      "type": "stdio",
       "command": "/usr/sbin/nd-mcp",
       "args": ["ws://prod-parent:19999/mcp"]
     },
     "netdata-dev": {
+      "type": "stdio",
       "command": "/usr/sbin/nd-mcp",
       "args": ["ws://dev-parent:19999/mcp"]
     }

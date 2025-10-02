@@ -16,28 +16,25 @@ Configure JetBrains IDEs to access your Netdata infrastructure through MCP.
 
 ## Transport Support
 
-JetBrains IDEs typically support stdio-based MCP servers through plugins:
+JetBrains AI Assistant currently communicates with MCP servers over `stdio` only (https://www.jetbrains.com/help/ai-assistant/mcp.html).
 
-| Transport | Support | Netdata Version | Use Case |
-|-----------|---------|-----------------|----------|
-| **stdio** (via nd-mcp bridge) | ✅ Fully Supported | v2.6.0+ | Local bridge to WebSocket |
-| **stdio** (via npx remote-mcp) | ✅ Fully Supported | v2.7.2+ | Alternative bridge with HTTP/SSE support |
-| **Streamable HTTP** | ⚠️ Check Plugin | v2.7.2+ | Depends on AI Assistant plugin version |
-| **SSE** (Server-Sent Events) | ⚠️ Check Plugin | v2.7.2+ | Depends on AI Assistant plugin version |
-| **WebSocket** | ❌ Not Supported | - | Use nd-mcp bridge |
+| Transport | Support | Netdata Version | Notes |
+|-----------|---------|-----------------|-------|
+| **stdio** (via `nd-mcp`) | ✅ Fully Supported | v2.6.0+ | Launches bridge as subprocess |
+| **stdio** (via `npx mcp-remote`) | ✅ Fully Supported | v2.7.2+ | Wrap remote HTTP/SSE in stdio |
+| **Streamable HTTP / SSE** | ❌ Not Supported | - | Use a stdio launcher |
+| **WebSocket** | ❌ Not Supported | - | Accessible only through `nd-mcp` |
 
-> **Note:** JetBrains IDEs typically support stdio-based MCP servers through the AI Assistant plugin. For HTTP/SSE connections to Netdata v2.7.2+, you can use npx remote-mcp bridge. For older Netdata versions (v2.6.0 - v2.7.1), use the nd-mcp bridge with WebSocket.
+> JetBrains documents a “workaround for remote servers” that relies on launching a stdio wrapper. Native HTTP/SSE support is not available yet.
 
 ## Prerequisites
 
 1. **JetBrains IDE installed** - Any IDE from the list above
 2. **AI Assistant plugin** - Install from IDE marketplace
-3. **Netdata v2.6.0 or later** with MCP support - Prefer a Netdata Parent to get infrastructure level visibility. Your AI Client (running on your desktop or laptop) needs to have direct network access to the Netdata IP and port (usually 19999).
-   - **v2.6.0 - v2.7.1**: Only WebSocket transport available, requires `nd-mcp` bridge
-   - **v2.7.2+**: Can use `npx mcp-remote` bridge for HTTP/SSE support
-4. **Bridge required: Choose one:**
-   - `nd-mcp` bridge - The stdio-to-websocket bridge for all Netdata versions. [Find its absolute path](/docs/learn/mcp.md#finding-the-nd-mcp-bridge)
-   - `npx mcp-remote@latest` - Official MCP remote client supporting HTTP/SSE (requires Netdata v2.7.2+)
+3. **Netdata v2.6.0 or later** with MCP support - Prefer a Netdata Parent for full infrastructure visibility.
+4. **Stdio launcher**:
+   - `nd-mcp` bridge - Required for Netdata versions that only expose WebSocket (v2.6.0–v2.7.1)
+   - `npx mcp-remote@latest` - Optional wrapper that exposes Netdata HTTP/SSE as stdio (useful for v2.7.2+)
 5. **Netdata MCP API key exported before launching the IDE**:
    ```bash
    export ND_MCP_BEARER_TOKEN="$(cat /var/lib/netdata/mcp_dev_preview_api_key)"
@@ -86,9 +83,9 @@ MCP support in JetBrains IDEs may require additional plugins or configuration. C
    - **Program**: `/usr/sbin/nd-mcp`
    - **Arguments**: `ws://YOUR_NETDATA_IP:19999/mcp`
 
-### Method 2: Using npx remote-mcp (Recommended for v2.7.2+)
+### Method 2: Using npx mcp-remote (Netdata v2.7.2+)
 
-For detailed options and troubleshooting, see [Using MCP Remote Client](/docs/learn/mcp.md#using-mcp-remote-client).
+For detailed options and troubleshooting, see [Using MCP Remote Client](/docs/learn/mcp.md#using-mcp-remote-client). JetBrains still launches this command over stdio; `mcp-remote` converts the remote HTTP/SSE session into the format AI Assistant understands.
 
 **AI Assistant Settings:**
 

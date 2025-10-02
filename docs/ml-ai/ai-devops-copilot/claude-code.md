@@ -10,8 +10,8 @@ Claude Code supports multiple MCP transport types, giving you flexibility in how
 |-----------|---------|-----------------|----------|
 | **stdio** (via nd-mcp bridge) | ✅ Fully Supported | v2.6.0+ | Local bridge to WebSocket |
 | **Streamable HTTP** | ✅ Fully Supported | v2.7.2+ | Direct connection to Netdata's HTTP endpoint (recommended) |
-| **SSE** (Server-Sent Events) | ⚠️ Limited Support | v2.7.2+ | Legacy, being deprecated |
-| **WebSocket** | ❌ Not Supported | - | Use nd-mcp bridge or HTTP instead |
+| **SSE** (Server-Sent Events) | ✅ Fully Supported | v2.7.2+ | Remote SCP servers that expose SSE |
+| **WebSocket** | ❌ Not Supported | - | Use nd-mcp bridge or HTTP/SSE wrappers |
 
 ## Prerequisites
 
@@ -25,6 +25,8 @@ Claude Code supports multiple MCP transport types, giving you flexibility in how
 ## Configuration Methods
 
 Claude Code has comprehensive MCP server management capabilities. For detailed documentation on all configuration options and commands, see the [official Claude Code MCP documentation](https://docs.anthropic.com/en/docs/claude-code/mcp).
+
+> **Reference:** Claude Code’s official guide documents HTTP, SSE, and stdio transports with both CLI and `.mcp.json` configurations (https://docs.claude.com/en/docs/claude-code/mcp).
 
 ### Method 1: Direct HTTP Connection (Recommended for v2.7.2+)
 

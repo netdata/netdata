@@ -66,68 +66,59 @@ VS Code extensions typically support stdio-based MCP servers:
 
 #### Step 2: Add Netdata MCP Server
 
-**Method 1: Using nd-mcp Bridge** (All Netdata versions v2.6.0+)
+Continue stores MCP definitions as YAML or JSON blocks. The recommended flow is:
 
-1. Click "**MCP**" in the top toolbar
-2. Click "**+ Add MCP Servers**"
-3. It creates the file in your current project's `.continue/mcpServers/` directory as `new-mcp-server.yaml`. You might want to rename the file to something more descriptive like `netdata.yaml` after editing.
-4. Replace the content with:
-    ```yaml
-    name: Netdata MCP
-    version: 0.0.1
-    schema: v1
-    mcpServers:
-       - name: netdata
-         command: /usr/sbin/nd-mcp
-         args:
-            - ws://YOUR_NETDATA_IP:19999/mcp
-         env: {}
-    ```
-5. Replace:
-    - `/usr/sbin/nd-mcp` with your actual nd-mcp path
-    - `YOUR_NETDATA_IP` with your Netdata instance IP/hostname
-    - `ND_MCP_BEARER_TOKEN` exported with your Netdata MCP API key before launching VS Code
-6. Save the file
+1. Click "**MCP**" in the Continue toolbar
+2. Click "**+ Add MCP Servers**" to scaffold `.continue/mcpServers/<name>.yaml`
+3. Replace the contents with one of the configurations below
 
-**Method 2: Using npx remote-mcp** (Recommended for Netdata v2.7.2+)
+> Continue’s reference guide documents the `type` field (`stdio`, `sse`, or `streamable-http`) and block syntax (https://docs.continue.dev/customize/deep-dives/mcp).
 
-For detailed options and troubleshooting, see [Using MCP Remote Client](/docs/learn/mcp.md#using-mcp-remote-client).
+**Method 1: stdio launcher (all Netdata versions)**
 
 ```yaml
-name: Netdata MCP
+name: Netdata (nd-mcp)
 version: 0.0.1
 schema: v1
 mcpServers:
-   - name: netdata
-     command: npx
-     args:
-        - mcp-remote@latest
-        - --http
-        - http://YOUR_NETDATA_IP:19999/mcp
-        - --allow-http
-        - --header
-        - "Authorization: Bearer NETDATA_MCP_API_KEY"
-     env: {}
+  - name: netdata
+    type: stdio
+    command: /usr/sbin/nd-mcp
+    args:
+      - ws://YOUR_NETDATA_IP:19999/mcp
 ```
 
-For SSE transport:
+Export `ND_MCP_BEARER_TOKEN` before launching Continue so `nd-mcp` can authenticate without embedding secrets in YAML.
+
+**Method 2: Direct SSE (Netdata v2.7.2+)**
 
 ```yaml
-name: Netdata MCP
+name: Netdata (SSE)
 version: 0.0.1
 schema: v1
 mcpServers:
-   - name: netdata
-     command: npx
-     args:
-        - mcp-remote@latest
-        - --sse
-        - http://YOUR_NETDATA_IP:19999/mcp
-        - --allow-http
-        - --header
-        - "Authorization: Bearer NETDATA_MCP_API_KEY"
-     env: {}
+  - name: netdata
+    type: sse
+    url: https://YOUR_NETDATA_IP:19999/mcp
+    headers:
+      Authorization: Bearer ${NETDATA_MCP_API_KEY}
 ```
+
+**Method 3: Streamable HTTP (Netdata v2.7.2+)**
+
+```yaml
+name: Netdata (HTTP)
+version: 0.0.1
+schema: v1
+mcpServers:
+  - name: netdata
+    type: streamable-http
+    url: https://YOUR_NETDATA_IP:19999/mcp
+    headers:
+      Authorization: Bearer ${NETDATA_MCP_API_KEY}
+```
+
+Continue expands environment placeholders such as `${NETDATA_MCP_API_KEY}` so you can keep API keys out of source control. After saving, reload the window to pick up the new server.
 
 ### Usage
 
@@ -148,64 +139,48 @@ Press `Ctrl+L` to open Continue chat, then:
 
 ### Configuration
 
-Cline supports two configuration methods: UI-based (recommended) and JSON-based (advanced).
+Cline’s official docs describe two workflows (https://docs.cline.bot/mcp/configuring-mcp-servers):
 
-#### Method 1: UI-Based Configuration (Recommended)
+- **UI configuration** – Click the MCP Servers icon → Configure tab → add/update servers, restart, toggle, and set timeouts.
+- **JSON configuration** – Click **Configure MCP Servers** to open `cline_mcp_settings.json` and edit the underlying JSON.
 
-1. Click the "**MCP Servers**" icon in Cline's navigation bar
-2. Click "**Configure**" button
-3. The UI shows two tabs:
-   - **Installed**: View and manage configured servers
-   - **Marketplace**: Browse available MCP servers
-4. Add Netdata configuration through the UI:
-   - **Name**: `netdata`
-   - **Command**: `/usr/sbin/nd-mcp` (or `npx` for mcp-remote)
-   - **Arguments**: `ws://YOUR_NETDATA_IP:19999/mcp` (or mcp-remote args)
+#### JSON examples
 
-> **Note:** The UI method is recommended as it handles configuration validation and provides a better user experience.
-
-#### Method 2: JSON Configuration (Advanced)
-
-For advanced users who prefer editing configuration files directly, you can edit `cline_mcp_settings.json`:
-
-**Using nd-mcp Bridge** (All Netdata versions v2.6.0+):
+**Stdio (`nd-mcp`)**
 
 ```json
 {
-  "cline.mcpServers": [
-    {
-      "name": "netdata",
+  "mcpServers": {
+    "netdata": {
       "command": "/usr/sbin/nd-mcp",
       "args": [
         "ws://YOUR_NETDATA_IP:19999/mcp"
-      ]
+      ],
+      "alwaysAllow": [],
+      "disabled": false
     }
-  ]
+  }
 }
 ```
 
-**Using npx remote-mcp** (Recommended for Netdata v2.7.2+):
-
-For detailed options and troubleshooting, see [Using MCP Remote Client](/docs/learn/mcp.md#using-mcp-remote-client).
+**SSE for Netdata v2.7.2+**
 
 ```json
 {
-  "cline.mcpServers": [
-    {
-      "name": "netdata",
-      "command": "npx",
-      "args": [
-        "mcp-remote@latest",
-        "--http",
-        "http://YOUR_NETDATA_IP:19999/mcp",
-        "--allow-http",
-        "--header",
-        "Authorization: Bearer NETDATA_MCP_API_KEY"
-      ]
+  "mcpServers": {
+    "netdata": {
+      "url": "https://YOUR_NETDATA_IP:19999/mcp",
+      "headers": {
+        "Authorization": "Bearer NETDATA_MCP_API_KEY"
+      },
+      "alwaysAllow": [],
+      "disabled": false
     }
-  ]
+  }
 }
 ```
+
+> Optional fields such as `networkTimeout`, `alwaysAllow`, and `env` map directly to Cline’s UI controls. SSE and stdio are the two transports Cline supports today; pick the one that matches your Netdata deployment.
 
 ### Usage
 
@@ -233,10 +208,10 @@ version: 0.0.1
 schema: v1
 mcpServers:
    - name: netdata-prod
+     type: stdio
      command: /usr/sbin/nd-mcp
      args:
-        - ws://prod-parent:19999/mcp
-     env: {}
+       - ws://prod-parent:19999/mcp
 ```
 
 ### Environment Switching
