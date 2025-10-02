@@ -2,7 +2,7 @@
 name: Update MCP Registry
 on:
   release:
-    type: released
+    types: [released]
 concurrency:
   group: update-mcp-registry-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: true
@@ -54,7 +54,7 @@ jobs:
           SLACK_TITLE: 'Failed to publish to MCP Registry:'
           SLACK_USERNAME: 'GitHub Actions'
           SLACK_MESSAGE: |-
-              ${{ github.repository }}: Failed to publish ${{ needs.update-changelogs.outputs.version }} to MCP Registry.
+              ${{ github.repository }}: Failed to publish new agent version to MCP Registry.
               Checkout: ${{ steps.checkout.outcome }}
               Update version: ${{ steps.update-version.outcome }}
               Install mcp-publisher: ${{ steps.install.outcome }}
