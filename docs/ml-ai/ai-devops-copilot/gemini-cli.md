@@ -6,18 +6,20 @@ Configure Google's Gemini CLI to access your Netdata infrastructure through MCP 
 
 Gemini CLI supports all major MCP transport types, giving you maximum flexibility:
 
-| Transport | Support | Use Case |
-|-----------|---------|----------|
-| **stdio** (via nd-mcp bridge) | ✅ Fully Supported | Local bridge to WebSocket |
-| **Streamable HTTP** | ✅ Fully Supported | Direct connection to Netdata's HTTP endpoint |
-| **SSE** (Server-Sent Events) | ✅ Fully Supported | Direct connection to Netdata's SSE endpoint |
-| **WebSocket** | ❌ Not Supported | Use nd-mcp bridge or HTTP/SSE instead |
+| Transport | Support | Netdata Version | Use Case |
+|-----------|---------|-----------------|----------|
+| **stdio** (via nd-mcp bridge) | ✅ Fully Supported | v2.6.0+ | Local bridge to WebSocket |
+| **Streamable HTTP** | ✅ Fully Supported | v2.7.2+ | Direct connection to Netdata's HTTP endpoint (recommended) |
+| **SSE** (Server-Sent Events) | ✅ Fully Supported | v2.7.2+ | Direct connection to Netdata's SSE endpoint |
+| **WebSocket** | ❌ Not Supported | - | Use nd-mcp bridge or HTTP/SSE instead |
 
 ## Prerequisites
 
 1. **Gemini CLI installed** - Available from [GitHub](https://github.com/google-gemini/gemini-cli)
-2. **The IP and port (usually 19999) of a running Netdata Agent** - Prefer a Netdata Parent to get infrastructure level visibility. Currently the latest nightly version of Netdata has MCP support (not released to the stable channel yet). Your AI Client (running on your desktop or laptop) needs to have direct network access to this IP and port.
-3. **For stdio connections only: `nd-mcp` bridge** - The stdio-to-websocket bridge. [Find its absolute path](/docs/learn/mcp.md#finding-the-nd-mcp-bridge). Not needed for direct HTTP/SSE connections.
+2. **Netdata v2.6.0 or later** with MCP support - Prefer a Netdata Parent to get infrastructure level visibility. Your AI Client (running on your desktop or laptop) needs to have direct network access to the Netdata IP and port (usually 19999).
+   - **v2.6.0 - v2.7.1**: Only WebSocket transport available, requires `nd-mcp` bridge
+   - **v2.7.2+**: Direct HTTP/SSE support available (recommended)
+3. **For WebSocket or stdio connections: `nd-mcp` bridge** - The stdio-to-websocket bridge. [Find its absolute path](/docs/learn/mcp.md#finding-the-nd-mcp-bridge). Not needed for direct HTTP/SSE connections on v2.7.2+.
 4. **Optionally, the Netdata MCP API key** that unlocks full access to sensitive observability data (protected functions, full access to logs) on your Netdata. Each Netdata Agent or Parent has its own unique API key for MCP - [Find your Netdata MCP API key](/docs/learn/mcp.md#finding-your-api-key)
 
 ## Installation
@@ -37,7 +39,7 @@ npm run build
 
 Gemini CLI has built-in MCP server support. For detailed MCP configuration, see the [official MCP documentation](https://github.com/google-gemini/gemini-cli/blob/main/docs/tools/mcp-server.md).
 
-### Method 1: Direct HTTP Connection (Recommended)
+### Method 1: Direct HTTP Connection (Recommended for v2.7.2+)
 
 Connect directly to Netdata's HTTP endpoint without needing any bridge:
 
@@ -67,7 +69,7 @@ Or configure in `~/.gemini/settings.json`:
 }
 ```
 
-### Method 2: Direct SSE Connection
+### Method 2: Direct SSE Connection (v2.7.2+)
 
 Connect directly to Netdata's SSE endpoint:
 
@@ -121,9 +123,9 @@ Or configure in `~/.gemini/settings.json`:
 }
 ```
 
-### Method 4: Using npx remote-mcp (Alternative Bridge)
+### Method 4: Using npx remote-mcp (Alternative Bridge for v2.7.2+)
 
-If nd-mcp is not available, use the official MCP remote client:
+If nd-mcp is not available, use the official MCP remote client (requires Netdata v2.7.2+). For detailed options and troubleshooting, see [Using MCP Remote Client](/docs/learn/mcp.md#using-mcp-remote-client).
 
 ```bash
 # Using CLI command with SSE

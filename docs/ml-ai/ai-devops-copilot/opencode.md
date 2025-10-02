@@ -6,20 +6,22 @@ Configure SST's OpenCode to access your Netdata infrastructure through MCP for t
 
 OpenCode supports both local and remote MCP servers:
 
-| Transport | Support | Use Case |
-|-----------|---------|----------|
-| **stdio** (local) | ✅ Fully Supported | Local servers via nd-mcp bridge |
-| **Streamable HTTP** (remote) | ✅ Fully Supported | Direct connection to Netdata's HTTP endpoint |
-| **SSE** (Server-Sent Events) | ⚠️ Limited Support | Known issues with SSE servers |
-| **WebSocket** | ❌ Not Supported | Use nd-mcp bridge or HTTP instead |
+| Transport | Support | Netdata Version | Use Case |
+|-----------|---------|-----------------|----------|
+| **stdio** (via nd-mcp bridge) | ✅ Fully Supported | v2.6.0+ | Local bridge to WebSocket |
+| **Streamable HTTP** (remote) | ✅ Fully Supported | v2.7.2+ | Direct connection to Netdata's HTTP endpoint (recommended) |
+| **SSE** (Server-Sent Events) | ⚠️ Limited Support | v2.7.2+ | Known issues with SSE servers |
+| **WebSocket** | ❌ Not Supported | - | Use nd-mcp bridge or HTTP instead |
 
 > **Note:** OpenCode has reported issues with SSE-based MCP servers ([GitHub Issue #834](https://github.com/sst/opencode/issues/834)). Use HTTP streamable transport for best compatibility.
 
 ## Prerequisites
 
 1. **OpenCode installed** - Available via npm, brew, or direct download from [GitHub](https://github.com/sst/opencode)
-2. **The IP and port (usually 19999) of a running Netdata Agent** - Prefer a Netdata Parent to get infrastructure level visibility. Currently the latest nightly version of Netdata has MCP support (not released to the stable channel yet). Your AI Client (running on your desktop or laptop) needs to have direct network access to this IP and port.
-3. **For local connections only: `nd-mcp` bridge** - The stdio-to-websocket bridge. [Find its absolute path](/docs/learn/mcp.md#finding-the-nd-mcp-bridge). Not needed for remote HTTP connections.
+2. **Netdata v2.6.0 or later** with MCP support - Prefer a Netdata Parent to get infrastructure level visibility. Your AI Client (running on your desktop or laptop) needs to have direct network access to the Netdata IP and port (usually 19999).
+   - **v2.6.0 - v2.7.1**: Only WebSocket transport available, requires `nd-mcp` bridge
+   - **v2.7.2+**: Direct HTTP/SSE support available (recommended)
+3. **For WebSocket or stdio connections: `nd-mcp` bridge** - The stdio-to-websocket bridge. [Find its absolute path](/docs/learn/mcp.md#finding-the-nd-mcp-bridge). Not needed for direct HTTP connections on v2.7.2+.
 4. **Optionally, the Netdata MCP API key** that unlocks full access to sensitive observability data (protected functions, full access to logs) on your Netdata. Each Netdata Agent or Parent has its own unique API key for MCP - [Find your Netdata MCP API key](/docs/learn/mcp.md#finding-your-api-key)
 
 > Export `ND_MCP_BEARER_TOKEN` with your MCP key before launching OpenCode to keep secrets out of configuration files:
@@ -46,7 +48,7 @@ curl -fsSL https://opencode.ai/install.sh | bash
 
 OpenCode uses an `opencode.json` configuration file with MCP servers defined under the `mcp` key.
 
-### Method 1: Direct HTTP Connection (Recommended)
+### Method 1: Direct HTTP Connection (Recommended for v2.7.2+)
 
 Connect directly to Netdata's HTTP endpoint without needing the nd-mcp bridge:
 
@@ -98,9 +100,9 @@ For environments where you prefer or need to use the bridge:
 }
 ```
 
-### Method 3: Using npx remote-mcp (Alternative Bridge)
+### Method 3: Using npx remote-mcp (Alternative Bridge for v2.7.2+)
 
-If nd-mcp is not available, use the official MCP remote client:
+If nd-mcp is not available, use the official MCP remote client (requires Netdata v2.7.2+). For detailed options and troubleshooting, see [Using MCP Remote Client](/docs/learn/mcp.md#using-mcp-remote-client).
 
 ```json
 {

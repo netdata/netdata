@@ -12,12 +12,30 @@ The most popular open-source AI code assistant with MCP support.
 
 Autonomous coding agent that can use MCP tools.
 
+## Transport Support
+
+VS Code extensions typically support stdio-based MCP servers:
+
+| Transport | Support | Netdata Version | Use Case |
+|-----------|---------|-----------------|----------|
+| **stdio** (via nd-mcp bridge) | ✅ Fully Supported | v2.6.0+ | Local bridge to WebSocket |
+| **stdio** (via npx remote-mcp) | ✅ Fully Supported | v2.7.2+ | Alternative bridge with HTTP/SSE support |
+| **Streamable HTTP** | ⚠️ Varies by Extension | v2.7.2+ | Check extension documentation |
+| **SSE** (Server-Sent Events) | ⚠️ Varies by Extension | v2.7.2+ | Check extension documentation |
+| **WebSocket** | ❌ Not Supported | - | Use nd-mcp bridge |
+
+> **Note:** Most VS Code extensions support stdio-based MCP servers. For HTTP/SSE connections to Netdata v2.7.2+, you can use npx remote-mcp bridge. For older Netdata versions (v2.6.0 - v2.7.1), use the nd-mcp bridge with WebSocket.
+
 ## Prerequisites
 
 1. **VS Code installed** - [Download VS Code](https://code.visualstudio.com)
 2. **MCP-compatible extension** - Install from VS Code Marketplace
-3. **The IP and port (usually 19999) of a running Netdata Agent** - Prefer a Netdata Parent to get infrastructure level visibility. Currently the latest nightly version of Netdata has MCP support (not released to the stable channel yet). Your AI Client (running on your desktop or laptop) needs to have direct network access to this IP and port.
-4. **`nd-mcp` program available on your desktop or laptop** - This is the bridge that translates `stdio` to `websocket`, connecting your AI Client to your Netdata Agent or Parent. [Find its absolute path](/docs/learn/mcp.md#finding-the-nd-mcp-bridge)
+3. **Netdata v2.6.0 or later** with MCP support - Prefer a Netdata Parent to get infrastructure level visibility. Your AI Client (running on your desktop or laptop) needs to have direct network access to the Netdata IP and port (usually 19999).
+   - **v2.6.0 - v2.7.1**: Only WebSocket transport available, requires `nd-mcp` bridge
+   - **v2.7.2+**: Can use `npx mcp-remote` bridge for HTTP/SSE support
+4. **Bridge required: Choose one:**
+   - `nd-mcp` bridge - The stdio-to-websocket bridge for all Netdata versions. [Find its absolute path](/docs/learn/mcp.md#finding-the-nd-mcp-bridge)
+   - `npx mcp-remote@latest` - Official MCP remote client supporting HTTP/SSE (requires Netdata v2.7.2+)
 5. **Netdata MCP API key exported before launching VS Code** - keep secrets out of config files by setting:
    ```bash
    export ND_MCP_BEARER_TOKEN="$(cat /var/lib/netdata/mcp_dev_preview_api_key)"
@@ -48,6 +66,8 @@ Autonomous coding agent that can use MCP tools.
 
 #### Step 2: Add Netdata MCP Server
 
+**Method 1: Using nd-mcp Bridge** (All Netdata versions v2.6.0+)
+
 1. Click "**MCP**" in the top toolbar
 2. Click "**+ Add MCP Servers**"
 3. It creates the file in your current project's `.continue/mcpServers/` directory as `new-mcp-server.yaml`. You might want to rename the file to something more descriptive like `netdata.yaml` after editing.
@@ -69,6 +89,46 @@ Autonomous coding agent that can use MCP tools.
     - `ND_MCP_BEARER_TOKEN` exported with your Netdata MCP API key before launching VS Code
 6. Save the file
 
+**Method 2: Using npx remote-mcp** (Recommended for Netdata v2.7.2+)
+
+For detailed options and troubleshooting, see [Using MCP Remote Client](/docs/learn/mcp.md#using-mcp-remote-client).
+
+```yaml
+name: Netdata MCP
+version: 0.0.1
+schema: v1
+mcpServers:
+   - name: netdata
+     command: npx
+     args:
+        - mcp-remote@latest
+        - --http
+        - http://YOUR_NETDATA_IP:19999/mcp
+        - --allow-http
+        - --header
+        - "Authorization: Bearer NETDATA_MCP_API_KEY"
+     env: {}
+```
+
+For SSE transport:
+
+```yaml
+name: Netdata MCP
+version: 0.0.1
+schema: v1
+mcpServers:
+   - name: netdata
+     command: npx
+     args:
+        - mcp-remote@latest
+        - --sse
+        - http://YOUR_NETDATA_IP:19999/mcp
+        - --allow-http
+        - --header
+        - "Authorization: Bearer NETDATA_MCP_API_KEY"
+     env: {}
+```
+
 ### Usage
 
 Press `Ctrl+L` to open Continue chat, then:
@@ -88,9 +148,27 @@ Press `Ctrl+L` to open Continue chat, then:
 
 ### Configuration
 
-1. Open Settings (Ctrl+,)
-2. Search for "Cline MCP"
-3. Add configuration:
+Cline supports two configuration methods: UI-based (recommended) and JSON-based (advanced).
+
+#### Method 1: UI-Based Configuration (Recommended)
+
+1. Click the "**MCP Servers**" icon in Cline's navigation bar
+2. Click "**Configure**" button
+3. The UI shows two tabs:
+   - **Installed**: View and manage configured servers
+   - **Marketplace**: Browse available MCP servers
+4. Add Netdata configuration through the UI:
+   - **Name**: `netdata`
+   - **Command**: `/usr/sbin/nd-mcp` (or `npx` for mcp-remote)
+   - **Arguments**: `ws://YOUR_NETDATA_IP:19999/mcp` (or mcp-remote args)
+
+> **Note:** The UI method is recommended as it handles configuration validation and provides a better user experience.
+
+#### Method 2: JSON Configuration (Advanced)
+
+For advanced users who prefer editing configuration files directly, you can edit `cline_mcp_settings.json`:
+
+**Using nd-mcp Bridge** (All Netdata versions v2.6.0+):
 
 ```json
 {
@@ -100,6 +178,29 @@ Press `Ctrl+L` to open Continue chat, then:
       "command": "/usr/sbin/nd-mcp",
       "args": [
         "ws://YOUR_NETDATA_IP:19999/mcp"
+      ]
+    }
+  ]
+}
+```
+
+**Using npx remote-mcp** (Recommended for Netdata v2.7.2+):
+
+For detailed options and troubleshooting, see [Using MCP Remote Client](/docs/learn/mcp.md#using-mcp-remote-client).
+
+```json
+{
+  "cline.mcpServers": [
+    {
+      "name": "netdata",
+      "command": "npx",
+      "args": [
+        "mcp-remote@latest",
+        "--http",
+        "http://YOUR_NETDATA_IP:19999/mcp",
+        "--allow-http",
+        "--header",
+        "Authorization: Bearer NETDATA_MCP_API_KEY"
       ]
     }
   ]
@@ -124,30 +225,29 @@ Create a Python script that checks Netdata for high CPU usage and sends an alert
 
 ### Workspace-Specific Configuration
 
-Create `.vscode/settings.json` in your project:
+Create a YAML file in your project's `.continue/mcpServers/` directory (e.g., `netdata-prod.yaml`):
 
-```json
-{
-  "continue.mcpServers": {
-    "netdata-prod": {
-      "command": "/usr/sbin/nd-mcp",
-      "args": [
-        "ws://prod-parent:19999/mcp"
-      ]
-    }
-  }
-}
+```yaml
+name: Netdata Production
+version: 0.0.1
+schema: v1
+mcpServers:
+   - name: netdata-prod
+     command: /usr/sbin/nd-mcp
+     args:
+        - ws://prod-parent:19999/mcp
+     env: {}
 ```
 
 ### Environment Switching
 
 Different projects can have different Netdata connections:
 
-- `~/projects/frontend/.vscode/settings.json` → Frontend servers
-- `~/projects/backend/.vscode/settings.json` → Backend servers
-- `~/projects/infrastructure/.vscode/settings.json` → All servers
+- `~/projects/frontend/.continue/mcpServers/netdata.yaml` → Frontend servers
+- `~/projects/backend/.continue/mcpServers/netdata.yaml` → Backend servers
+- `~/projects/infrastructure/.continue/mcpServers/netdata.yaml` → All servers
 
-> ℹ️ Export `ND_MCP_BEARER_TOKEN` with the appropriate key before opening VS Code so the bridge picks up credentials without storing them in `.vscode/settings.json`.
+> ℹ️ Export `ND_MCP_BEARER_TOKEN` with the appropriate key before opening VS Code so the bridge picks up credentials without storing them in the YAML files.
 
 ## Advanced Usage
 

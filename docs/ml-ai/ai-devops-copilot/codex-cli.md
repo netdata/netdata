@@ -6,23 +6,25 @@ Configure OpenAI's Codex CLI to access your Netdata infrastructure through MCP f
 
 Codex CLI currently has limited MCP transport support:
 
-| Transport | Support | Use Case |
-|-----------|---------|----------|
-| **stdio** (via nd-mcp bridge) | ✅ Supported | Local bridge to WebSocket |
-| **stdio** (via npx remote-mcp) | ✅ Supported | Alternative bridge with HTTP/SSE support |
-| **Streamable HTTP** | ❌ Not Supported | Use npx remote-mcp bridge |
-| **SSE** (Server-Sent Events) | ❌ Not Supported | Use npx remote-mcp bridge |
-| **WebSocket** | ❌ Not Supported | Use nd-mcp bridge |
+| Transport | Support | Netdata Version | Use Case |
+|-----------|---------|-----------------|----------|
+| **stdio** (via nd-mcp bridge) | ✅ Supported | v2.6.0+ | Local bridge to WebSocket |
+| **stdio** (via npx remote-mcp) | ✅ Supported | v2.7.2+ | Alternative bridge with HTTP/SSE support |
+| **Streamable HTTP** | ❌ Not Supported | - | Use npx remote-mcp bridge |
+| **SSE** (Server-Sent Events) | ❌ Not Supported | - | Use npx remote-mcp bridge |
+| **WebSocket** | ❌ Not Supported | - | Use nd-mcp bridge |
 
-> **Note:** Codex CLI currently only supports stdio-based MCP servers. For HTTP/SSE connections to Netdata, you must use a bridge like nd-mcp or npx remote-mcp.
+> **Note:** Codex CLI currently only supports stdio-based MCP servers. For HTTP/SSE connections to Netdata v2.7.2+, you must use a bridge like npx remote-mcp. For older Netdata versions (v2.6.0 - v2.7.1), use the nd-mcp bridge with WebSocket.
 
 ## Prerequisites
 
 1. **OpenAI Codex CLI installed** - Available via npm, Homebrew, or direct download from [GitHub](https://github.com/openai/codex)
-2. **The IP and port (usually 19999) of a running Netdata Agent** - Prefer a Netdata Parent to get infrastructure level visibility. Currently the latest nightly version of Netdata has MCP support (not released to the stable channel yet). Your AI Client (running on your desktop or laptop) needs to have direct network access to this IP and port.
+2. **Netdata v2.6.0 or later** with MCP support - Prefer a Netdata Parent to get infrastructure level visibility. Your AI Client (running on your desktop or laptop) needs to have direct network access to the Netdata IP and port (usually 19999).
+   - **v2.6.0 - v2.7.1**: Only WebSocket transport available, requires `nd-mcp` bridge
+   - **v2.7.2+**: Can use `npx mcp-remote` bridge for HTTP/SSE support
 3. **Bridge required: Choose one:**
-   - `nd-mcp` bridge - The stdio-to-websocket bridge. [Find its absolute path](/docs/learn/mcp.md#finding-the-nd-mcp-bridge)
-   - `npx mcp-remote@latest` - Official MCP remote client supporting HTTP/SSE
+   - `nd-mcp` bridge - The stdio-to-websocket bridge for all Netdata versions. [Find its absolute path](/docs/learn/mcp.md#finding-the-nd-mcp-bridge)
+   - `npx mcp-remote@latest` - Official MCP remote client supporting HTTP/SSE (requires Netdata v2.7.2+)
 4. **Optionally, the Netdata MCP API key** that unlocks full access to sensitive observability data (protected functions, full access to logs) on your Netdata. Each Netdata Agent or Parent has its own unique API key for MCP - [Find your Netdata MCP API key](/docs/learn/mcp.md#finding-your-api-key)
 
 ## Installation
@@ -44,9 +46,9 @@ brew install codex
 
 Codex CLI uses a TOML configuration file at `~/.codex/config.toml` for MCP server settings.
 
-### Method 1: Using npx remote-mcp (Recommended for HTTP/SSE)
+### Method 1: Using npx remote-mcp (Recommended for v2.7.2+)
 
-This method allows Codex CLI to connect to Netdata's HTTP/SSE endpoints through the official MCP remote client:
+This method allows Codex CLI to connect to Netdata's HTTP/SSE endpoints through the official MCP remote client (requires Netdata v2.7.2+). For detailed options and troubleshooting, see [Using MCP Remote Client](/docs/learn/mcp.md#using-mcp-remote-client).
 
 ```toml
 # ~/.codex/config.toml

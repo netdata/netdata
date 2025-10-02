@@ -14,12 +14,30 @@ Configure JetBrains IDEs to access your Netdata infrastructure through MCP.
 - CLion
 - RubyMine
 
+## Transport Support
+
+JetBrains IDEs typically support stdio-based MCP servers through plugins:
+
+| Transport | Support | Netdata Version | Use Case |
+|-----------|---------|-----------------|----------|
+| **stdio** (via nd-mcp bridge) | ✅ Fully Supported | v2.6.0+ | Local bridge to WebSocket |
+| **stdio** (via npx remote-mcp) | ✅ Fully Supported | v2.7.2+ | Alternative bridge with HTTP/SSE support |
+| **Streamable HTTP** | ⚠️ Check Plugin | v2.7.2+ | Depends on AI Assistant plugin version |
+| **SSE** (Server-Sent Events) | ⚠️ Check Plugin | v2.7.2+ | Depends on AI Assistant plugin version |
+| **WebSocket** | ❌ Not Supported | - | Use nd-mcp bridge |
+
+> **Note:** JetBrains IDEs typically support stdio-based MCP servers through the AI Assistant plugin. For HTTP/SSE connections to Netdata v2.7.2+, you can use npx remote-mcp bridge. For older Netdata versions (v2.6.0 - v2.7.1), use the nd-mcp bridge with WebSocket.
+
 ## Prerequisites
 
 1. **JetBrains IDE installed** - Any IDE from the list above
 2. **AI Assistant plugin** - Install from IDE marketplace
-3. **The IP and port (usually 19999) of a running Netdata Agent** - Prefer a Netdata Parent to get infrastructure level visibility. Currently the latest nightly version of Netdata has MCP support (not released to the stable channel yet). Your AI Client (running on your desktop or laptop) needs to have direct network access to this IP and port.
-4. **`nd-mcp` program available on your desktop or laptop** - This is the bridge that translates `stdio` to `websocket`, connecting your AI Client to your Netdata Agent or Parent. [Find its absolute path](/docs/learn/mcp.md#finding-the-nd-mcp-bridge)
+3. **Netdata v2.6.0 or later** with MCP support - Prefer a Netdata Parent to get infrastructure level visibility. Your AI Client (running on your desktop or laptop) needs to have direct network access to the Netdata IP and port (usually 19999).
+   - **v2.6.0 - v2.7.1**: Only WebSocket transport available, requires `nd-mcp` bridge
+   - **v2.7.2+**: Can use `npx mcp-remote` bridge for HTTP/SSE support
+4. **Bridge required: Choose one:**
+   - `nd-mcp` bridge - The stdio-to-websocket bridge for all Netdata versions. [Find its absolute path](/docs/learn/mcp.md#finding-the-nd-mcp-bridge)
+   - `npx mcp-remote@latest` - Official MCP remote client supporting HTTP/SSE (requires Netdata v2.7.2+)
 5. **Netdata MCP API key exported before launching the IDE**:
    ```bash
    export ND_MCP_BEARER_TOKEN="$(cat /var/lib/netdata/mcp_dev_preview_api_key)"
@@ -41,7 +59,9 @@ Configure JetBrains IDEs to access your Netdata infrastructure through MCP.
 MCP support in JetBrains IDEs may require additional plugins or configuration. Check the plugin documentation for the latest setup instructions.
 :::
 
-### Method 1: AI Assistant Settings
+### Method 1: Using nd-mcp Bridge (All Netdata versions v2.6.0+)
+
+**AI Assistant Settings:**
 
 1. Go to Settings → Tools → AI Assistant
 2. Look for MCP or External Tools configuration
@@ -57,9 +77,7 @@ MCP support in JetBrains IDEs may require additional plugins or configuration. C
 }
 ```
 
-### Method 2: External Tools
-
-If direct MCP support is not available, configure as an External Tool:
+**External Tools (if AI Assistant doesn't support MCP directly):**
 
 1. Go to Settings → Tools → External Tools
 2. Click "+" to add new tool
@@ -68,11 +86,39 @@ If direct MCP support is not available, configure as an External Tool:
    - **Program**: `/usr/sbin/nd-mcp`
    - **Arguments**: `ws://YOUR_NETDATA_IP:19999/mcp`
 
-Replace:
+### Method 2: Using npx remote-mcp (Recommended for v2.7.2+)
 
-- `/usr/sbin/nd-mcp` - With your [actual nd-mcp path](/docs/learn/mcp.md#finding-the-nd-mcp-bridge)
+For detailed options and troubleshooting, see [Using MCP Remote Client](/docs/learn/mcp.md#using-mcp-remote-client).
+
+**AI Assistant Settings:**
+
+```json
+{
+  "name": "netdata",
+  "command": "npx",
+  "args": [
+    "mcp-remote@latest",
+    "--http",
+    "http://YOUR_NETDATA_IP:19999/mcp",
+    "--allow-http",
+    "--header",
+    "Authorization: Bearer NETDATA_MCP_API_KEY"
+  ]
+}
+```
+
+**External Tools:**
+
+- **Name**: Netdata MCP
+- **Program**: `npx`
+- **Arguments**: `mcp-remote@latest --http http://YOUR_NETDATA_IP:19999/mcp --allow-http --header "Authorization: Bearer NETDATA_MCP_API_KEY"`
+
+Replace in all examples:
+
+- `/usr/sbin/nd-mcp` - With your [actual nd-mcp path](/docs/learn/mcp.md#finding-the-nd-mcp-bridge) (nd-mcp method only)
 - `YOUR_NETDATA_IP` - IP address or hostname of your Netdata Agent/Parent
-- `ND_MCP_BEARER_TOKEN` - Export with your [Netdata MCP API key](/docs/learn/mcp.md#finding-your-api-key) before launching the IDE
+- `NETDATA_MCP_API_KEY` - Your [Netdata MCP API key](/docs/learn/mcp.md#finding-your-api-key)
+- `ND_MCP_BEARER_TOKEN` - Export with your API key before launching the IDE (nd-mcp method only)
 
 ## Usage in Different IDEs
 
