@@ -5,7 +5,7 @@
 #include "websocket-jsonrpc.h"
 #include "websocket-echo.h"
 #include "../mcp/adapters/mcp-websocket.h"
-#include "../mcp/mcp-api-key.h"
+#include "web/api/mcp_auth.h"
 
 // Global array of WebSocket threads
 WEBSOCKET_THREAD websocket_threads[WEBSOCKET_MAX_THREADS];
@@ -332,29 +332,36 @@ short int websocket_handle_handshake(struct web_client *w) {
         }
         
 #ifdef NETDATA_MCP_DEV_PREVIEW_API_KEY
-        // Check for api_key parameter for MCP developer preview
-        char *api_key_str = strstr(query, "api_key=");
-        if (api_key_str) {
-            api_key_str += strlen("api_key=");
-            
-            // Extract the API key value (until & or end of string)
-            char api_key_buffer[MCP_DEV_PREVIEW_API_KEY_LENGTH + 1];
-            size_t i = 0;
-            while (api_key_str[i] && api_key_str[i] != '&' && i < MCP_DEV_PREVIEW_API_KEY_LENGTH) {
-                api_key_buffer[i] = api_key_str[i];
-                i++;
-            }
-            api_key_buffer[i] = '\0';
-            
-            // Verify the API key
-            if (mcp_api_key_verify(api_key_buffer)) {
-                // Override authentication with god mode
-                wsc->user_auth.access = HTTP_ACCESS_ALL;
-                wsc->user_auth.method = USER_AUTH_METHOD_GOD;
-                wsc->user_auth.user_role = HTTP_USER_ROLE_ADMIN;
-                websocket_debug(wsc, "MCP developer preview API key verified - enabling full access");
-            } else {
-                websocket_debug(wsc, "Invalid MCP developer preview API key provided");
+        if (web_client_has_mcp_preview_key(w)) {
+            wsc->user_auth.access = HTTP_ACCESS_ALL;
+            wsc->user_auth.method = USER_AUTH_METHOD_GOD;
+            wsc->user_auth.user_role = HTTP_USER_ROLE_ADMIN;
+            websocket_debug(wsc, "MCP developer preview API key verified via Authorization header - enabling full access");
+        } else {
+            // Check for api_key parameter for MCP developer preview
+            char *api_key_str = strstr(query, "api_key=");
+            if (api_key_str) {
+                api_key_str += strlen("api_key=");
+
+                // Extract the API key value (until & or end of string)
+                char api_key_buffer[MCP_DEV_PREVIEW_API_KEY_LENGTH + 1];
+                size_t i = 0;
+                while (api_key_str[i] && api_key_str[i] != '&' && i < MCP_DEV_PREVIEW_API_KEY_LENGTH) {
+                    api_key_buffer[i] = api_key_str[i];
+                    i++;
+                }
+                api_key_buffer[i] = '\0';
+
+                // Verify the API key
+                if (mcp_api_key_verify(api_key_buffer)) {
+                    // Override authentication with god mode
+                    wsc->user_auth.access = HTTP_ACCESS_ALL;
+                    wsc->user_auth.method = USER_AUTH_METHOD_GOD;
+                    wsc->user_auth.user_role = HTTP_USER_ROLE_ADMIN;
+                    websocket_debug(wsc, "MCP developer preview API key verified - enabling full access");
+                } else {
+                    websocket_debug(wsc, "Invalid MCP developer preview API key provided");
+                }
             }
         }
 #endif

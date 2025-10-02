@@ -4,7 +4,7 @@
 import sys
 import asyncio
 import websockets
-import os.path
+import os
 import random
 import time
 import signal
@@ -43,7 +43,7 @@ def create_jsonrpc_error(id, code, message, data=None):
         response["error"]["data"] = data
     return json.dumps(response)
 
-async def connect_with_backoff(uri):
+async def connect_with_backoff(uri, bearer_token):
     max_delay = 60  # Maximum delay between reconnections in seconds
     base_delay = 1   # Initial delay in seconds
     retry_count = 0
@@ -168,18 +168,27 @@ async def connect_with_backoff(uri):
                     pass
                     
             print(f"{PROGRAM_NAME}: Connecting to {uri}...", file=sys.stderr)
-            
+
             try:
                 # Connect with timeout
                 # In newer versions of websockets, connect() is already awaitable
+                connect_kwargs = {
+                    "compression": 'deflate',
+                    "max_size": 16*1024*1024,
+                    "ping_interval": 30,
+                    "ping_timeout": 10,
+                    "close_timeout": 5
+                }
+
+                if bearer_token:
+                    connect_kwargs["extra_headers"] = {
+                        "Authorization": f"Bearer {bearer_token}"
+                    }
+
                 ws = await asyncio.wait_for(
                     websockets.connect(
-                        uri, 
-                        compression='deflate', 
-                        max_size=16*1024*1024,
-                        ping_interval=30,  # Send keep-alive pings every 30 seconds
-                        ping_timeout=10,   # Wait 10 seconds for pong response
-                        close_timeout=5    # Wait 5 seconds for close frame
+                        uri,
+                        **connect_kwargs
                     ),
                     timeout=15  # 15 second timeout
                 )
@@ -324,11 +333,49 @@ async def connect_with_backoff(uri):
             print(f"{PROGRAM_NAME}: Unexpected error: {e}", file=sys.stderr)
             retry_count += 1
 
+def usage():
+    print(f"{PROGRAM_NAME}: Usage: {PROGRAM_NAME} [--bearer TOKEN] ws://host/path", file=sys.stderr)
+    sys.exit(1)
+
+
+def parse_args(argv):
+    target = None
+    bearer = None
+    idx = 0
+
+    while idx < len(argv):
+        arg = argv[idx]
+        if arg == '--bearer':
+            if idx + 1 >= len(argv):
+                usage()
+            bearer = argv[idx + 1].strip()
+            idx += 2
+        elif arg.startswith('--bearer='):
+            bearer = arg.split('=', 1)[1].strip()
+            idx += 1
+        else:
+            if target is not None:
+                usage()
+            target = arg
+            idx += 1
+
+    if not target:
+        usage()
+
+    return target, bearer
+
+
 def main():
-    if len(sys.argv) != 2:
-        print(f"{PROGRAM_NAME}: Usage: {PROGRAM_NAME} ws://host/path", file=sys.stderr)
-        sys.exit(1)
-    
+    target_uri, bearer_token = parse_args(sys.argv[1:])
+
+    if not bearer_token:
+        env_token = os.environ.get("ND_MCP_BEARER_TOKEN", "")
+        if env_token:
+            bearer_token = env_token.strip()
+
+    if bearer_token:
+        print(f"{PROGRAM_NAME}: Authorization header enabled for MCP connection", file=sys.stderr)
+
     # Set up signal handling
     def signal_handler(sig, frame):
         print(f"{PROGRAM_NAME}: Received signal {sig}, exiting", file=sys.stderr)
@@ -338,7 +385,7 @@ def main():
     signal.signal(signal.SIGTERM, signal_handler)
     
     try:
-        asyncio.run(connect_with_backoff(sys.argv[1]))
+        asyncio.run(connect_with_backoff(target_uri, bearer_token))
     except KeyboardInterrupt:
         print(f"{PROGRAM_NAME}: Interrupted by user, exiting", file=sys.stderr)
     

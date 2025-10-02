@@ -13,6 +13,32 @@ This document outlines the complete plan for implementing the Model Context Prot
 4. **Multi-buffer responses** - Support ordered responses using libnetdata double-linked lists
 5. **Clean job-based execution** - Each request becomes a structured job
 
+## Phase 1 – Transport Decoupling (Current Focus)
+
+### Goals
+- Keep request parsing inside each adapter while handing a parsed `json_object *` to the core. [done]
+- Transform `MCP_CLIENT` into a session container with a per-request array of `BUFFER *` chunks instead of a single result buffer and JSON-RPC metadata. [done]
+- Provide helper APIs (e.g. `mcp_response_reset`, `mcp_response_add_json`, `mcp_response_add_text`, `mcp_response_finalize`) so namespace handlers build transport-neutral responses without touching envelopes. [done]
+- Ensure adapters own correlation data: WebSocket keeps JSON-RPC ids, future transports can pick their own tokens. [done]
+- Preserve existing namespace function signatures by passing the same `MCP_CLIENT *`, params object, and `MCP_REQUEST_ID` while changing only the response building helpers they call. [done]
+
+### Deliverables
+- Response buffer management implementation with request-level limits and ownership handled by `MCP_CLIENT`. [done]
+- Updated namespace implementations (initialize, ping, tools, resources, prompts, logging, completion, etc.) to use the new helper APIs. [done]
+- WebSocket adapter refactor that wraps/unwraps JSON-RPC entirely in adapter code, including batching and notifications. [done]
+- Documentation updates describing the new lifecycle and expectations for adapters. [done]
+
+### Open Questions / Checks
+- Confirm memory caps for accumulated response buffers and expose configuration knobs if required. [done]
+- Validate streaming semantics: adapters must never split a single `BUFFER`, but may send multiple buffers sequentially. [done]
+- Identify any shared utilities (UUID helpers, auth context) that should remain in core versus adapter. [done]
+
+Status:
+- [x] Response buffer helpers implemented in mcp.c (prepare, add_json/text, finalize via buffer_json_finalize in handlers)
+- [x] Namespaces updated to use helpers (initialize, ping, tools, resources, prompts, logging, completion)
+- [x] WebSocket adapter wraps JSON-RPC (batching, notifications) and converts MCP response chunks to JSON-RPC payloads
+- [x] Error handling unified via mcp_error_result and mcpc->error buffer
+
 ## 1. Core MCP Architecture Refactoring
 
 ### A. Job-Based Request Processing
@@ -171,61 +197,54 @@ const MCP_TOOL_REGISTRY_ENTRY **mcp_get_tools_by_namespace(MCP_NAMESPACE namespa
 
 ### A. HTTP Adapter (Integrated with Netdata Web Server)
 
-#### HTTP Route Registration
+#### HTTP Routing Hooks
 ```c
-// HTTP adapter decides its own URL structure
-int mcp_http_adapter_init_routes(void) {
-    // Direct tool execution endpoints
-    web_client_api_request_v3_register("/api/v3/mcp/execute_function", mcp_http_handle_execute_function);
-    web_client_api_request_v3_register("/api/v3/mcp/query_metrics", mcp_http_handle_query_metrics);
-    
-    // Generic endpoints using registry
-    web_client_api_request_v3_register("/api/v3/mcp/tools", mcp_http_handle_tools_list);
-    web_client_api_request_v3_register("/api/v3/mcp/tools/*/call", mcp_http_handle_tool_call);
-    web_client_api_request_v3_register("/api/v3/mcp/tools/*/schema", mcp_http_handle_tool_schema);
-    
-    return 0;
+// src/web/server/web_client.c
+else if (unlikely(hash == hash_mcp && strcmp(tok, "mcp") == 0)) {
+    if (!http_can_access_dashboard(w))
+        return web_client_permission_denied_acl(w);
+    return mcp_http_handle_request(host, w);
+}
+else if (unlikely(hash == hash_sse && strcmp(tok, "sse") == 0)) {
+    if (!http_can_access_dashboard(w))
+        return web_client_permission_denied_acl(w);
+    return mcp_sse_handle_request(host, w);
 }
 ```
 
-#### Authorization Integration (Following Netdata Pattern Exactly)
+`mcp_http_handle_request()` streams the accumulated MCP response as JSON (chunked when multiple buffers are present). `mcp_sse_handle_request()` produces Server-Sent Event frames and disables compression before returning.
+
+#### Authorization Integration
 ```c
-// Generic tool execution using registry (like web_client_api_request_vX)
-int mcp_http_handle_tool_call(RRDHOST *host, struct web_client *w, char *url) {
-    const char *tool_name = extract_tool_name_from_url(url);
-    
-    // Look up in registry
-    const MCP_TOOL_REGISTRY_ENTRY *tool = mcp_find_tool(tool_name);
-    if (!tool) {
-        return web_client_api_request_v1_info_fill_buffer(host, w, "Tool not found");
-    }
-    
-    // Check ACL and access (following Netdata pattern exactly)
-    if(tool->acl != HTTP_ACL_NOCHECK) {
-        if(!(w->acl & tool->acl)) {
-            web_client_permission_denied_acl(w);
-            return HTTP_RESP_FORBIDDEN;
-        }
-        
-        if(tool->access != HTTP_ACCESS_NONE) {
-            if(!web_client_can_access_with_auth(w, tool->access)) {
-                web_client_permission_denied_access(w, tool->access);
-                return HTTP_ACCESS_PERMISSION_DENIED_HTTP_CODE(tool->access);
-            }
-        }
-    }
-    
-    // Execute tool
-    // ... implementation
+static inline bool mcp_adapter_authorize(struct web_client *w, const MCP_TOOL_REGISTRY_ENTRY *tool) {
+    if (!tool)
+        return false;
+    if (tool->acl != HTTP_ACL_NOCHECK && !(w->acl & tool->acl))
+        return false;
+    if (tool->access != HTTP_ACCESS_NONE && !web_client_can_access_with_auth(w, tool->access))
+        return false;
+    return true;
+}
+
+int mcp_http_handle_request(RRDHOST *host, struct web_client *w) {
+    struct json_object *request = mcp_http_parse_request_body(w);
+    const char *method = mcp_http_request_method(request);
+    const MCP_TOOL_REGISTRY_ENTRY *tool = mcp_find_tool(method);
+    if (!mcp_adapter_authorize(w, tool))
+        return web_client_permission_denied_acl(w);
+
+    MCP_CLIENT *mcpc = mcp_create_client(MCP_TRANSPORT_HTTP, w);
+    MCP_RETURN_CODE rc = mcp_dispatch_method(mcpc, method, mcp_http_request_params(request), 1);
+    return mcp_http_send_response(w, mcpc, rc);
 }
 ```
 
 **Status**: 
-- [ ] Implement HTTP route registration
-- [ ] Implement HTTP request parsing (JSON body to params)
-- [ ] Implement HTTP response conversion (BUFFER list to HTTP JSON)
-- [ ] Integrate with existing Netdata authorization system
-- [ ] Add HTTP-specific error handling
+- [ ] Add `/mcp` and `/sse` branches in `web_client_process_url()`
+- [ ] Implement HTTP JSON parsing helpers (`mcp_http_parse_request_body`, etc.)
+- [ ] Implement chunked JSON serializer (`mcp_http_send_response`)
+- [ ] Implement SSE serializer (`mcp_sse_send_response`)
+- [ ] Share authorization helpers between HTTP and SSE adapters
 
 ### B. WebSocket/JSON-RPC Adapter (Manages MCP_CLIENT)
 
@@ -344,7 +363,8 @@ src/web/mcp/
 │   │   ├── mcp-jsonrpc-adapter.c/h  # tools/list, tools/call implementation
 │   │   └── mcp-client.c/h          # MCP_CLIENT management
 │   └── http/
-│       └── mcp-http-adapter.c/h    # HTTP routes using registry
+│       ├── mcp-http-adapter.c/h    # /mcp chunked JSON responses
+│       └── mcp-sse-adapter.c/h     # /sse server-sent events
 ├── schemas/
 │   ├── execute_function.json       # Static schema definitions
 │   ├── query_metrics.json
@@ -383,25 +403,13 @@ src/web/mcp/
 
 ## 7. Implementation Phases
 
-### Phase 1: Core Infrastructure (Priority: High)
-1. **MCP_REQ_JOB and response buffer structures**
-2. **Registry system with authorization**
-3. **Core execution function**
-4. **Basic HTTP adapter**
-
-### Phase 2: Transport Separation (Priority: High)  
-1. **Extract JSON-RPC from WebSocket adapter**
-2. **Update all existing tools to use job interface**
-3. **Implement multi-buffer response system**
-4. **Complete HTTP adapter with full feature parity**
-
-### Phase 3: Advanced Features (Priority: Medium)
-1. **Specialized logs tools**
-2. **Enhanced error handling and status reporting**
+### Phase 1: Advanced Features (Priority: Medium)
+1. Specialized logs tools workflow.
+2. Enhanced error handling, status reporting, and potential job queue abstractions once multiple transports are stable.
 3. **Performance optimizations**
 4. **Comprehensive testing**
 
-### Phase 4: Future Enhancements (Priority: Low)
+### Phase 2: Future Enhancements (Priority: Low)
 1. **Streaming support for long-running operations**
 2. **Additional MCP namespaces (resources, prompts)**
 3. **Advanced caching strategies**

@@ -20,7 +20,11 @@ Configure JetBrains IDEs to access your Netdata infrastructure through MCP.
 2. **AI Assistant plugin** - Install from IDE marketplace
 3. **The IP and port (usually 19999) of a running Netdata Agent** - Prefer a Netdata Parent to get infrastructure level visibility. Currently the latest nightly version of Netdata has MCP support (not released to the stable channel yet). Your AI Client (running on your desktop or laptop) needs to have direct network access to this IP and port.
 4. **`nd-mcp` program available on your desktop or laptop** - This is the bridge that translates `stdio` to `websocket`, connecting your AI Client to your Netdata Agent or Parent. [Find its absolute path](/docs/learn/mcp.md#finding-the-nd-mcp-bridge)
-5. **Optionally, the Netdata MCP API key** that unlocks full access to sensitive observability data (protected functions, full access to logs) on your Netdata. Each Netdata Agent or Parent has its own unique API key for MCP - [Find your Netdata MCP API key](/docs/learn/mcp.md#finding-your-api-key)
+5. **Netdata MCP API key exported before launching the IDE**:
+   ```bash
+   export ND_MCP_BEARER_TOKEN="$(cat /var/lib/netdata/mcp_dev_preview_api_key)"
+   ```
+   Each Netdata Agent or Parent has its own unique API key for MCP - [Find your Netdata MCP API key](/docs/learn/mcp.md#finding-your-api-key)
 
 ## Installing AI Assistant
 
@@ -48,7 +52,7 @@ MCP support in JetBrains IDEs may require additional plugins or configuration. C
   "name": "netdata",
   "command": "/usr/sbin/nd-mcp",
   "args": [
-    "ws://YOUR_NETDATA_IP:19999/mcp?api_key=NETDATA_MCP_API_KEY"
+    "ws://YOUR_NETDATA_IP:19999/mcp"
   ]
 }
 ```
@@ -62,13 +66,13 @@ If direct MCP support is not available, configure as an External Tool:
 3. Configure:
    - **Name**: Netdata MCP
    - **Program**: `/usr/sbin/nd-mcp`
-   - **Arguments**: `ws://YOUR_NETDATA_IP:19999/mcp?api_key=NETDATA_MCP_API_KEY`
+   - **Arguments**: `ws://YOUR_NETDATA_IP:19999/mcp`
 
 Replace:
 
 - `/usr/sbin/nd-mcp` - With your [actual nd-mcp path](/docs/learn/mcp.md#finding-the-nd-mcp-bridge)
 - `YOUR_NETDATA_IP` - IP address or hostname of your Netdata Agent/Parent
-- `NETDATA_MCP_API_KEY` - Your [Netdata MCP API key](/docs/learn/mcp.md#finding-your-api-key)
+- `ND_MCP_BEARER_TOKEN` - Export with your [Netdata MCP API key](/docs/learn/mcp.md#finding-your-api-key) before launching the IDE
 
 ## Usage in Different IDEs
 

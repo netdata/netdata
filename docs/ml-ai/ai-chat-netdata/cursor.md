@@ -7,7 +7,11 @@ Configure Cursor IDE to access your Netdata infrastructure through MCP.
 1. **Cursor installed** - Download from [cursor.com](https://www.cursor.com)
 2. **The IP and port (usually 19999) of a running Netdata Agent** - Prefer a Netdata Parent to get infrastructure level visibility. Currently the latest nightly version of Netdata has MCP support (not released to the stable channel yet). Your AI Client (running on your desktop or laptop) needs to have direct network access to this IP and port.
 3. **`nd-mcp` program available on your desktop or laptop** - This is the bridge that translates `stdio` to `websocket`, connecting your AI Client to your Netdata Agent or Parent. [Find its absolute path](/docs/learn/mcp.md#finding-the-nd-mcp-bridge)
-4. **Optionally, the Netdata MCP API key** that unlocks full access to sensitive observability data (protected functions, full access to logs) on your Netdata. Each Netdata Agent or Parent has its own unique API key for MCP - [Find your Netdata MCP API key](/docs/learn/mcp.md#finding-your-api-key)
+4. **Netdata MCP API key loaded into the environment** (recommended) - export it before launching Cursor:
+   ```bash
+   export ND_MCP_BEARER_TOKEN="$(cat /var/lib/netdata/mcp_dev_preview_api_key)"
+   ```
+   Each Netdata Agent or Parent has its own unique API key for MCP - [Find your Netdata MCP API key](/docs/learn/mcp.md#finding-your-api-key)
 
 ## Configuration
 
@@ -26,7 +30,7 @@ The configuration format:
     "netdata": {
       "command": "/usr/sbin/nd-mcp",
       "args": [
-        "ws://YOUR_NETDATA_IP:19999/mcp?api_key=NETDATA_MCP_API_KEY"
+        "ws://YOUR_NETDATA_IP:19999/mcp"
       ]
     }
   }
@@ -80,17 +84,19 @@ Cursor allows multiple MCP servers but requires manual toggling:
   "mcpServers": {
     "netdata-prod": {
       "command": "/usr/sbin/nd-mcp",
-      "args": ["ws://prod-parent:19999/mcp?api_key=PROD_KEY"]
+      "args": ["ws://prod-parent:19999/mcp"]
     },
     "netdata-dev": {
       "command": "/usr/sbin/nd-mcp",
-      "args": ["ws://dev-parent:19999/mcp?api_key=DEV_KEY"]
+      "args": ["ws://dev-parent:19999/mcp"]
     }
   }
 }
 ```
 
 Use the toggle in settings to enable only the environment you need.
+
+> ℹ️ Before switching environments, set `ND_MCP_BEARER_TOKEN` to the matching key so the bridge picks up the correct credentials without embedding them in the config file.
 
 ## Best Practices
 
