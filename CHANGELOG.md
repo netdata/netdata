@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- Fix duplicate header leak in ACLK HTTPS client [\#21084](https://github.com/netdata/netdata/pull/21084) ([ktsaou](https://github.com/ktsaou))
+- Adjust Disk Size \(Windows.plugin\) [\#21081](https://github.com/netdata/netdata/pull/21081) ([thiagoftsm](https://github.com/thiagoftsm))
 - Regenerate integrations docs [\#21079](https://github.com/netdata/netdata/pull/21079) ([netdatabot](https://github.com/netdatabot))
 - docs: update SNMP collector metadata to reflect profile-based collection [\#21078](https://github.com/netdata/netdata/pull/21078) ([ilyam8](https://github.com/ilyam8))
 - build\(go\): add config dirs [\#21077](https://github.com/netdata/netdata/pull/21077) ([ilyam8](https://github.com/ilyam8))
@@ -25,10 +27,12 @@
 - feat\(go.d/snmp\): enable ping by default [\#21054](https://github.com/netdata/netdata/pull/21054) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations docs [\#21053](https://github.com/netdata/netdata/pull/21053) ([netdatabot](https://github.com/netdatabot))
 - feat\(go.d/snmp\): add optional ICMP ping metrics [\#21052](https://github.com/netdata/netdata/pull/21052) ([ilyam8](https://github.com/ilyam8))
+- Fix libbpf.a build path [\#21051](https://github.com/netdata/netdata/pull/21051) ([hack3ric](https://github.com/hack3ric))
 - improve\(go.d/rabbitmq\): add support for old RabbitMQ whoami tags format [\#21049](https://github.com/netdata/netdata/pull/21049) ([ilyam8](https://github.com/ilyam8))
 - ml: implement fixed time-based training windows - corrected [\#21046](https://github.com/netdata/netdata/pull/21046) ([ktsaou](https://github.com/ktsaou))
 - ai-docs [\#21043](https://github.com/netdata/netdata/pull/21043) ([shyamvalsan](https://github.com/shyamvalsan))
 - Add helper to run external commands without additional privileges. [\#20990](https://github.com/netdata/netdata/pull/20990) ([Ferroin](https://github.com/Ferroin))
+- Clean up handling of compiler flags in our build code. [\#20821](https://github.com/netdata/netdata/pull/20821) ([Ferroin](https://github.com/Ferroin))
 
 ## [v2.7.1](https://github.com/netdata/netdata/tree/v2.7.1) (2025-09-29)
 
@@ -447,11 +451,6 @@
 - SNMP: brocade profiles [\#20546](https://github.com/netdata/netdata/pull/20546) ([Ancairon](https://github.com/Ancairon))
 - build\(deps\): bump github.com/prometheus/common from 0.64.0 to 0.65.0 in /src/go [\#20545](https://github.com/netdata/netdata/pull/20545) ([dependabot[bot]](https://github.com/apps/dependabot))
 - refactor\(go.d/ddsnmpcollector\): restructure into components [\#20543](https://github.com/netdata/netdata/pull/20543) ([ilyam8](https://github.com/ilyam8))
-- Properly parse disconnect reason [\#20540](https://github.com/netdata/netdata/pull/20540) ([stelfrag](https://github.com/stelfrag))
-- Update SQLITE to version 3.50.1 [\#20539](https://github.com/netdata/netdata/pull/20539) ([stelfrag](https://github.com/stelfrag))
-- SNMP: bluecat profile [\#20538](https://github.com/netdata/netdata/pull/20538) ([Ancairon](https://github.com/Ancairon))
-- SNMP: barracuda Profiles [\#20537](https://github.com/netdata/netdata/pull/20537) ([Ancairon](https://github.com/Ancairon))
-- Lock before checking the statement pool [\#20536](https://github.com/netdata/netdata/pull/20536) ([stelfrag](https://github.com/stelfrag))
 
 ## [v2.5.4](https://github.com/netdata/netdata/tree/v2.5.4) (2025-06-24)
 
