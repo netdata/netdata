@@ -105,9 +105,12 @@ AutoReqProv: yes
 %global _have_xenstat 0
 %endif
 
-# Only build IBM plugin on 64-bit x86
+# Only build IBM plugin on 64-bit x86 and skip it on RHEL 7 equivalent systems
 %ifarch x86_64
+%if 0%{?centos_ver} != 7 && 0%{?amazon_linux} != 2
 %global _have_ibm_plugin 1
+%else
+%global _have_ibm_plugin 0
 %else
 %global _have_ibm_plugin 0
 %endif
@@ -922,6 +925,7 @@ fi
 %package plugin-ibm-libs
 Summary: IBM MQ client libraries for the Netdata IBM ecosystem metrics collection plugin.
 Group: Applications/System
+Requires: %{name} = %{version}
 Conflicts: %{name} < %{version}
 AutoReqProv: no
 
