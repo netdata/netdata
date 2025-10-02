@@ -117,31 +117,34 @@ void mcp_api_key_initialize(void) {
     netdata_log_info("MCP: Developer preview API key initialized. Location: %s", path);
 }
 
-bool mcp_api_key_verify(const char *api_key) {
+bool mcp_api_key_verify(const char *api_key, bool silent) {
     if (!api_key || !*api_key) {
-        netdata_log_error("MCP: No API key provided");
+        if (!silent)
+            netdata_log_error("MCP: No API key provided");
         return false;
     }
-    
+
     // Check if agent is claimed
     if (!is_agent_claimed()) {
-        netdata_log_error("MCP: API key authentication rejected - agent is not claimed to Netdata Cloud");
+        if (!silent)
+            netdata_log_error("MCP: API key authentication rejected - agent is not claimed to Netdata Cloud");
         return false;
     }
-    
+
     // Check if we have a loaded API key
     if (!mcp_dev_preview_api_key[0]) {
-        netdata_log_error("MCP: No API key loaded");
+        if (!silent)
+            netdata_log_error("MCP: No API key loaded");
         return false;
     }
-    
+
     // Compare the keys
     bool valid = (strcmp(api_key, mcp_dev_preview_api_key) == 0);
-    
-    if (!valid) {
+
+    if (!valid && !silent) {
         netdata_log_error("MCP: Invalid API key provided");
     }
-    
+
     return valid;
 }
 
