@@ -111,6 +111,7 @@ AutoReqProv: yes
 %global _have_ibm_plugin 1
 %else
 %global _have_ibm_plugin 0
+%endif
 %else
 %global _have_ibm_plugin 0
 %endif
