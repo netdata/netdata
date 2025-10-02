@@ -1,8 +1,8 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-09-29/server.schema.json",
   "name": "io.github.netdata/mcp-server",
-  "description": "AI-powered infrastructure monitoring and troubleshooting. Query real-time metrics, logs, alerts, and live system info (processes, services, connections) across all your nodes. Features ML-powered anomaly detection, metric correlation, and root cause analysis.",
-  "version": "2.7.0",
+  "description": "AI-powered infrastructure monitoring with real-time metrics, logs, alerts, and ML anomaly detection.",
+  "version": "2.7.1-1",
   "homepage": "https://www.netdata.cloud",
   "documentation": "https://learn.netdata.cloud/docs/netdata-ai/mcp",
   "license": "GPL-3.0",
@@ -13,12 +13,12 @@
   },
   "capabilities": {
     "features": [
-      "Real-time metrics from all infrastructure nodes",
+      "Real-time infrastructure observability",
       "Per-second granularity with ML anomaly detection",
       "System logs (systemd-journal, Windows events)",
-      "Live system functions (processes, network connections, systemd services)",
+      "Live system functions (processes, network connections, systemd services, ipmi)",
       "Alert history and transitions",
-      "Metric correlation and root cause analysis"
+      "Anomaly detection, metric correlation, root cause analysis, blast radius detection"
     ],
     "transports": [
       "stdio (via nd-mcp bridge)",
