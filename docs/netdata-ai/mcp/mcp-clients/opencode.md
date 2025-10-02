@@ -100,7 +100,7 @@ For environments where you prefer or need to use the bridge:
 }
 ```
 
-### Method 3: Using npx remote-mcp (Alternative Bridge for v2.7.2+)
+### Method 3: Using npx mcp-remote (Alternative Bridge for v2.7.2+)
 
 If nd-mcp is not available, use the official MCP remote client (requires Netdata v2.7.2+). For detailed options and troubleshooting, see [Using MCP Remote Client](/docs/learn/mcp.md#using-mcp-remote-client).
 

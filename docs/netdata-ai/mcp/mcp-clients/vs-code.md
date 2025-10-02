@@ -19,12 +19,12 @@ VS Code extensions typically support stdio-based MCP servers:
 | Transport | Support | Netdata Version | Use Case |
 |-----------|---------|-----------------|----------|
 | **stdio** (via nd-mcp bridge) | ✅ Fully Supported | v2.6.0+ | Local bridge to WebSocket |
-| **stdio** (via npx remote-mcp) | ✅ Fully Supported | v2.7.2+ | Alternative bridge with HTTP/SSE support |
+| **stdio** (via npx mcp-remote) | ✅ Fully Supported | v2.7.2+ | Alternative bridge with HTTP/SSE support |
 | **Streamable HTTP** | ⚠️ Varies by Extension | v2.7.2+ | Check extension documentation |
 | **SSE** (Server-Sent Events) | ⚠️ Varies by Extension | v2.7.2+ | Check extension documentation |
 | **WebSocket** | ❌ Not Supported | - | Use nd-mcp bridge |
 
-> **Note:** Most VS Code extensions support stdio-based MCP servers. For HTTP/SSE connections to Netdata v2.7.2+, you can use npx remote-mcp bridge. For older Netdata versions (v2.6.0 - v2.7.1), use the nd-mcp bridge with WebSocket.
+> **Note:** Most VS Code extensions support stdio-based MCP servers. For HTTP/SSE connections to Netdata v2.7.2+, you can use npx mcp-remote bridge. For older Netdata versions (v2.6.0 - v2.7.1), use the nd-mcp bridge with WebSocket.
 
 ## Prerequisites
 
