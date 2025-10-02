@@ -4,9 +4,45 @@ All Netdata Agents and Parents are Model Context Protocol (MCP) servers, enablin
 
 Every Netdata Agent and Parent includes an MCP server that:
 
-- Implements the protocol as WebSocket for transport
+- Implements the protocol with multiple transport options: WebSocket, HTTP streamable, and SSE (Server-Sent Events)
 - Provides read-only access to metrics, logs, alerts, and live system information
 - Requires no additional installation - it's part of Netdata
+
+## Transport Options
+
+Netdata MCP supports three transport mechanisms:
+
+| Transport | Endpoint | Use Case |
+|-----------|----------|----------|
+| **WebSocket** | `ws://YOUR_IP:19999/mcp` | Original transport, requires nd-mcp bridge for stdio clients |
+| **HTTP Streamable** | `http://YOUR_IP:19999/mcp` | Direct connection from AI clients supporting HTTP |
+| **SSE** | `http://YOUR_IP:19999/mcp?transport=sse` | Server-Sent Events for real-time streaming |
+
+### Direct Connection vs Bridge
+
+With the new HTTP and SSE transports, many AI clients can now connect directly to Netdata without needing the nd-mcp bridge:
+
+- **Direct Connection**: AI clients that support HTTP or SSE transports can connect directly to Netdata
+- **Bridge Required**: AI clients that only support stdio (like some desktop apps) still need the nd-mcp bridge or the official MCP remote client
+
+### Official MCP Remote Client
+
+If your AI client doesn't support HTTP/SSE directly and you don't want to use nd-mcp, you can use the official MCP remote client:
+
+```bash
+# Export your MCP key once per shell
+export NETDATA_MCP_API_KEY="$(cat /var/lib/netdata/mcp_dev_preview_api_key)"
+
+# For SSE transport
+npx mcp-remote@latest --sse http://YOUR_NETDATA_IP:19999/mcp \
+  --allow-http \
+  --header "Authorization: Bearer $NETDATA_MCP_API_KEY"
+
+# For HTTP transport
+npx mcp-remote@latest --http http://YOUR_NETDATA_IP:19999/mcp \
+  --allow-http \
+  --header "Authorization: Bearer $NETDATA_MCP_API_KEY"
+```
 
 ## Visibility Scope
 
@@ -22,7 +58,7 @@ Netdata provides comprehensive access to all available observability data throug
 - **Function Execution** - Execute Netdata functions on any connected node (requires Netdata Parent)
 - **Log Exploration** - Access logs from any connected node (requires Netdata Parent)
 
-For sensitive features currently protected by Netdata Cloud SSO, a temporary MCP API key is generated on each Netdata instance. When included in the MCP connection string, this key unlocks access to sensitive data and protected functions (like `systemd-journal`, `windows-events` and `processes`). This temporary API key mechanism will eventually be replaced with a new authentication system integrated with Netdata Cloud.
+For sensitive features currently protected by Netdata Cloud SSO, a temporary MCP API key is generated on each Netdata instance. When presented via the `Authorization: Bearer` header, this key unlocks access to sensitive data and protected functions (like `systemd-journal`, `windows-events` and `processes`). This temporary API key mechanism will eventually be replaced with a new authentication system integrated with Netdata Cloud.
 
 AI assistants have different visibility depending on where they connect:
 
@@ -31,6 +67,13 @@ AI assistants have different visibility depending on where they connect:
 - **Netdata Child/Standalone Node**: Visibility only into that specific node
 
 ## Finding the nd-mcp Bridge
+
+> **Note**: With the new HTTP and SSE transports, many AI clients can now connect directly to Netdata without nd-mcp. Check your AI client's documentation to see if it supports direct HTTP or SSE connections.
+
+The nd-mcp bridge is only needed for AI clients that:
+- Only support `stdio` communication (like some desktop applications)
+- Cannot use HTTP or SSE transports directly
+- Cannot use `npx mcp-remote@latest`
 
 AI clients like Claude Desktop run locally on your computer and use `stdio` communication. Since your Netdata runs remotely on a server, you need a bridge to convert `stdio` to WebSocket communication.
 
@@ -201,7 +244,45 @@ If the file doesn't exist:
 
 ## AI Client Configuration
 
-Most AI clients use a similar configuration format:
+AI clients can connect to Netdata MCP in different ways depending on their transport support:
+
+### Direct Connection (HTTP/SSE)
+
+For AI clients that support HTTP or SSE transports:
+
+```json
+{
+  "mcpServers": {
+    "netdata": {
+      "type": "http",
+      "url": "http://IP_OF_YOUR_NETDATA:19999/mcp",
+      "headers": [
+        "Authorization: Bearer YOUR_API_KEY"
+      ]
+    }
+  }
+}
+```
+
+Or for SSE:
+
+```json
+{
+  "mcpServers": {
+    "netdata": {
+      "type": "sse",
+      "url": "http://IP_OF_YOUR_NETDATA:19999/mcp?transport=sse",
+      "headers": [
+        "Authorization: Bearer YOUR_API_KEY"
+      ]
+    }
+  }
+}
+```
+
+### Using nd-mcp Bridge (stdio)
+
+For AI clients that only support stdio:
 
 ```json
 {
@@ -209,7 +290,28 @@ Most AI clients use a similar configuration format:
     "netdata": {
       "command": "/usr/sbin/nd-mcp",
       "args": [
-        "ws://IP_OF_YOUR_NETDATA:19999/mcp?api_key=YOUR_API_KEY"
+        "--bearer",
+        "YOUR_API_KEY",
+        "ws://IP_OF_YOUR_NETDATA:19999/mcp"
+      ]
+    }
+  }
+}
+```
+
+### Using Official MCP Remote Client
+
+```json
+{
+  "mcpServers": {
+    "netdata": {
+      "command": "npx",
+      "args": [
+        "mcp-remote@latest",
+        "--http",
+        "http://IP_OF_YOUR_NETDATA:19999/mcp",
+        "--header",
+        "Authorization: Bearer YOUR_API_KEY"
       ]
     }
   }
@@ -218,9 +320,9 @@ Most AI clients use a similar configuration format:
 
 Replace:
 
-- `/usr/sbin/nd-mcp` - With your actual nd-mcp path
 - `IP_OF_YOUR_NETDATA`: Your Netdata instance IP/hostname
 - `YOUR_API_KEY`: The API key from the file mentioned above
+- `/usr/sbin/nd-mcp`: With your actual nd-mcp path (if using the bridge)
 
 ### Multiple MCP Servers
 
@@ -231,14 +333,30 @@ You can configure multiple Netdata instances:
   "mcpServers": {
     "netdata-production": {
       "command": "/usr/sbin/nd-mcp",
-      "args": ["ws://prod-parent:19999/mcp?api_key=PROD_KEY"]
+      "args": ["--bearer", "PROD_KEY", "ws://prod-parent:19999/mcp"]
     },
     "netdata-testing": {
       "command": "/usr/sbin/nd-mcp",
-      "args": ["ws://test-parent:19999/mcp?api_key=TEST_KEY"]
+      "args": ["--bearer", "TEST_KEY", "ws://test-parent:19999/mcp"]
     }
   }
 }
 ```
 
 Note: Most AI clients have difficulty choosing between multiple MCP servers. You may need to enable/disable them manually.
+
+### Legacy Query String Support
+
+For compatibility with older tooling, Netdata still accepts the `?api_key=YOUR_API_KEY` query parameter on the `/mcp` endpoints. New integrations should prefer the `Authorization: Bearer YOUR_API_KEY` header, but the query-string form remains available if you are migrating gradually.
+
+## AI Client Specific Documentation
+
+For detailed configuration instructions for specific AI clients, see:
+
+- [Claude Code](/docs/ml-ai/ai-devops-copilot/claude-code.md) - Anthropic's CLI for Claude
+- [Gemini CLI](/docs/ml-ai/ai-devops-copilot/gemini-cli.md) - Google's Gemini CLI
+- [OpenAI Codex CLI](/docs/ml-ai/ai-devops-copilot/codex-cli.md) - OpenAI's Codex CLI
+- [Crush](/docs/ml-ai/ai-devops-copilot/crush.md) - Charmbracelet's glamorous terminal AI
+- [OpenCode](/docs/ml-ai/ai-devops-copilot/opencode.md) - SST's terminal-based AI assistant
+
+Each guide includes specific transport support matrices and configuration examples optimized for that client.

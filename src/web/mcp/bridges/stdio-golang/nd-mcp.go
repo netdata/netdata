@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -74,9 +75,45 @@ func main() {
 		programName = os.Args[0]
 	}
 
-	if len(os.Args) != 2 {
-		fmt.Fprintf(os.Stderr, "%s: Usage: %s ws://host/path\n", programName, programName)
+	args := os.Args[1:]
+	var targetURL string
+	var bearerToken string
+
+	for len(args) > 0 {
+		arg := args[0]
+		switch {
+		case arg == "--bearer":
+			if len(args) < 2 {
+				fmt.Fprintf(os.Stderr, "%s: Usage: %s [--bearer TOKEN] ws://host/path\n", programName, programName)
+				os.Exit(1)
+			}
+			bearerToken = strings.TrimSpace(args[1])
+			args = args[2:]
+		case strings.HasPrefix(arg, "--bearer="):
+			bearerToken = strings.TrimSpace(strings.TrimPrefix(arg, "--bearer="))
+			args = args[1:]
+		default:
+			if targetURL != "" {
+				fmt.Fprintf(os.Stderr, "%s: Unexpected argument '%s'\n", programName, arg)
+				fmt.Fprintf(os.Stderr, "%s: Usage: %s [--bearer TOKEN] ws://host/path\n", programName, programName)
+				os.Exit(1)
+			}
+			targetURL = arg
+			args = args[1:]
+		}
+	}
+
+	if targetURL == "" {
+		fmt.Fprintf(os.Stderr, "%s: Usage: %s [--bearer TOKEN] ws://host/path\n", programName, programName)
 		os.Exit(1)
+	}
+
+	if bearerToken == "" {
+		bearerToken = strings.TrimSpace(os.Getenv("ND_MCP_BEARER_TOKEN"))
+	}
+
+	if bearerToken != "" {
+		fmt.Fprintf(os.Stderr, "%s: Authorization header enabled for MCP connection\n", programName)
 	}
 
 	// Set up channels for communication
@@ -335,15 +372,18 @@ func main() {
 		connectionCtx, connectionCancel := context.WithTimeout(ctx, 15*time.Second)
 		defer connectionCancel()
 
-		fmt.Fprintf(os.Stderr, "%s: Connecting to %s...\n", programName, os.Args[1])
+		fmt.Fprintf(os.Stderr, "%s: Connecting to %s...\n", programName, targetURL)
 
 		// Create a custom header with the WebSocket key
 		header := http.Header{}
 		header.Set("Sec-WebSocket-Key", generateWebSocketKey())
 		header.Set("Sec-WebSocket-Version", "13")
+		if bearerToken != "" {
+			header.Set("Authorization", "Bearer "+bearerToken)
+		}
 
 		// Connect to WebSocket
-		conn, _, err := websocket.Dial(connectionCtx, os.Args[1], &websocket.DialOptions{
+		conn, _, err := websocket.Dial(connectionCtx, targetURL, &websocket.DialOptions{
 			CompressionMode: websocket.CompressionContextTakeover,
 			HTTPHeader:      header,
 		})

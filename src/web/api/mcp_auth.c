@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "mcp-api-key.h"
+#include "mcp_auth.h"
 #include "claim/claim.h"
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -111,7 +111,7 @@ void mcp_api_key_initialize(void) {
             return;
         }
     }
-    
+
     char path[PATH_MAX];
     snprintf(path, sizeof(path), "%s/%s", netdata_configured_varlib_dir, MCP_DEV_PREVIEW_API_KEY_FILENAME);
     netdata_log_info("MCP: Developer preview API key initialized. Location: %s", path);
