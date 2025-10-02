@@ -1,0 +1,213 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-09-29/server.schema.json",
+  "name": "io.github.netdata/mcp-server",
+  "description": "AI-powered infrastructure monitoring and troubleshooting. Query real-time metrics, logs, alerts, and live system info (processes, services, connections) across all your nodes. Features ML-powered anomaly detection, metric correlation, and root cause analysis.",
+  "version": "2.7.0",
+  "homepage": "https://www.netdata.cloud",
+  "documentation": "https://learn.netdata.cloud/docs/netdata-ai/mcp",
+  "license": "GPL-3.0",
+  "repository": {
+    "url": "https://github.com/netdata/netdata",
+    "source": "github",
+    "subfolder": "docs/netdata-ai/mcp"
+  },
+  "capabilities": {
+    "features": [
+      "Real-time metrics from all infrastructure nodes",
+      "Per-second granularity with ML anomaly detection",
+      "System logs (systemd-journal, Windows events)",
+      "Live system functions (processes, network connections, systemd services)",
+      "Alert history and transitions",
+      "Metric correlation and root cause analysis"
+    ],
+    "transports": [
+      "stdio (via nd-mcp bridge)",
+      "stdio (via npx mcp-remote)",
+      "HTTP Streamable (direct, v2.7.2+)",
+      "SSE (direct, v2.7.2+)",
+      "WebSocket (direct, v2.6.0+)"
+    ]
+  },
+  "configuration": {
+    "examples": {
+      "stdio_via_nd-mcp": {
+        "description": "Use system-installed nd-mcp bridge (all Netdata versions v2.6.0+)",
+        "config": {
+          "mcpServers": {
+            "netdata": {
+              "command": "/usr/bin/nd-mcp",
+              "args": [
+                "--bearer",
+                "${NETDATA_MCP_API_KEY}",
+                "ws://localhost:19999/mcp"
+              ]
+            }
+          }
+        },
+        "notes": [
+          "nd-mcp is installed with Netdata at /usr/bin/nd-mcp or /usr/sbin/nd-mcp",
+          "Supports WebSocket transport only",
+          "Get API key: sudo cat /var/lib/netdata/mcp_dev_preview_api_key"
+        ]
+      },
+      "stdio_via_npx_mcp-remote_http": {
+        "description": "Use official mcp-remote with HTTP transport (Netdata v2.7.2+)",
+        "config": {
+          "mcpServers": {
+            "netdata": {
+              "command": "npx",
+              "args": [
+                "mcp-remote@latest",
+                "--http",
+                "http://localhost:19999/mcp",
+                "--allow-http",
+                "--header",
+                "Authorization: Bearer ${NETDATA_MCP_API_KEY}"
+              ]
+            }
+          }
+        },
+        "notes": [
+          "Requires Netdata v2.7.2 or later (currently in nightly builds)",
+          "Use --allow-http for non-HTTPS connections",
+          "For HTTPS, remove --allow-http flag"
+        ]
+      },
+      "stdio_via_npx_mcp-remote_sse": {
+        "description": "Use official mcp-remote with SSE transport (Netdata v2.7.2+)",
+        "config": {
+          "mcpServers": {
+            "netdata": {
+              "command": "npx",
+              "args": [
+                "mcp-remote@latest",
+                "--sse",
+                "http://localhost:19999/mcp",
+                "--allow-http",
+                "--header",
+                "Authorization: Bearer ${NETDATA_MCP_API_KEY}"
+              ]
+            }
+          }
+        },
+        "notes": [
+          "Requires Netdata v2.7.2 or later (currently in nightly builds)",
+          "SSE provides real-time streaming",
+          "Alternative to HTTP transport"
+        ]
+      },
+      "direct_http": {
+        "description": "Direct HTTP connection (Netdata v2.7.2+, if AI client supports)",
+        "config": {
+          "mcpServers": {
+            "netdata": {
+              "type": "http",
+              "url": "http://localhost:19999/mcp",
+              "headers": {
+                "Authorization": "Bearer ${NETDATA_MCP_API_KEY}"
+              }
+            }
+          }
+        },
+        "notes": [
+          "Requires Netdata v2.7.2 or later",
+          "Only works if AI client supports HTTP transport directly",
+          "No bridge needed"
+        ]
+      },
+      "direct_sse": {
+        "description": "Direct SSE connection (Netdata v2.7.2+, if AI client supports)",
+        "config": {
+          "mcpServers": {
+            "netdata": {
+              "type": "sse",
+              "url": "http://localhost:19999/mcp?transport=sse",
+              "headers": {
+                "Authorization": "Bearer ${NETDATA_MCP_API_KEY}"
+              }
+            }
+          }
+        },
+        "notes": [
+          "Requires Netdata v2.7.2 or later",
+          "Only works if AI client supports SSE transport directly",
+          "No bridge needed"
+        ]
+      }
+    },
+    "authentication": {
+      "description": "Netdata MCP uses bearer token authentication for sensitive operations (logs, live system functions)",
+      "finding_api_key": [
+        "Default location: /var/lib/netdata/mcp_dev_preview_api_key",
+        "Static installations: /opt/netdata/var/lib/netdata/mcp_dev_preview_api_key",
+        "Command: sudo cat /var/lib/netdata/mcp_dev_preview_api_key"
+      ],
+      "usage": [
+        "Set environment variable: export NETDATA_MCP_API_KEY=\"$(cat /var/lib/netdata/mcp_dev_preview_api_key)\"",
+        "Use ${NETDATA_MCP_API_KEY} in configuration files",
+        "Or pass directly via --bearer flag (nd-mcp) or --header flag (mcp-remote)"
+      ]
+    },
+    "remote_access": {
+      "description": "To connect to remote Netdata instances, replace localhost:19999 with your Netdata IP/hostname",
+      "examples": {
+        "production_parent": "ws://prod-parent.example.com:19999/mcp",
+        "staging_environment": "http://staging-netdata:19999/mcp",
+        "cloud_instance": "https://netdata.example.com:19999/mcp"
+      }
+    }
+  },
+  "installation": {
+    "netdata": {
+      "description": "Netdata Agent with built-in MCP server",
+      "methods": [
+        {
+          "name": "Kickstart script (recommended)",
+          "command": "wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /tmp/netdata-kickstart.sh"
+        },
+        {
+          "name": "Docker",
+          "command": "docker run -d --name=netdata -p 19999:19999 netdata/netdata:latest"
+        },
+        {
+          "name": "Package managers",
+          "platforms": {
+            "Ubuntu/Debian": "apt install netdata",
+            "RHEL/CentOS": "yum install netdata",
+            "macOS": "brew install netdata"
+          }
+        }
+      ],
+      "documentation": "https://learn.netdata.cloud/docs/netdata-agent/installation"
+    },
+    "nd-mcp": {
+      "description": "stdio-to-WebSocket bridge (installed automatically with Netdata)",
+      "locations": [
+        "/usr/bin/nd-mcp",
+        "/usr/sbin/nd-mcp",
+        "/opt/netdata/usr/bin/nd-mcp (static installations)",
+        "/usr/local/netdata/usr/bin/nd-mcp (built from source)",
+        "C:\\Program Files\\Netdata\\usr\\bin\\nd-mcp.exe (Windows)"
+      ],
+      "verify": "which nd-mcp || find / -name nd-mcp 2>/dev/null"
+    }
+  },
+  "version_compatibility": {
+    "v2.6.0-v2.7.1": {
+      "transports": ["WebSocket"],
+      "required_bridge": "nd-mcp",
+      "direct_connection": false
+    },
+    "v2.7.2+": {
+      "transports": ["WebSocket", "HTTP Streamable", "SSE"],
+      "required_bridge": "nd-mcp or mcp-remote (optional for stdio clients)",
+      "direct_connection": true,
+      "notes": "Currently available in nightly builds"
+    }
+  },
+  "support": {
+    "documentation": "https://learn.netdata.cloud/docs/netdata-ai/mcp",
+    "community": "https://discord.gg/netdata",
+    "issues": "https://github.com/netdata/netdata/issues"
+  }
+}
