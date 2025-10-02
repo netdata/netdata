@@ -353,7 +353,7 @@ short int websocket_handle_handshake(struct web_client *w) {
                 api_key_buffer[i] = '\0';
 
                 // Verify the API key
-                if (mcp_api_key_verify(api_key_buffer)) {
+                if (mcp_api_key_verify(api_key_buffer, false)) {  // silent=false for websocket MCP requests
                     // Override authentication with god mode
                     wsc->user_auth.access = HTTP_ACCESS_ALL;
                     wsc->user_auth.method = USER_AUTH_METHOD_GOD;

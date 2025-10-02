@@ -308,7 +308,7 @@ bool web_client_bearer_token_auth(struct web_client *w, const char *v) {
         return rc;
 
 #ifdef NETDATA_MCP_DEV_PREVIEW_API_KEY
-    if (mcp_api_key_verify(v)) {
+    if (mcp_api_key_verify(v, true)) {  // silent=true for speculative check
         web_client_set_mcp_preview_key(w);
         return true;
     }

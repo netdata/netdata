@@ -12,22 +12,25 @@ Every Netdata Agent and Parent includes an MCP server that:
 
 Netdata MCP supports three transport mechanisms:
 
-| Transport | Endpoint | Use Case |
-|-----------|----------|----------|
-| **WebSocket** | `ws://YOUR_IP:19999/mcp` | Original transport, requires nd-mcp bridge for stdio clients |
-| **HTTP Streamable** | `http://YOUR_IP:19999/mcp` | Direct connection from AI clients supporting HTTP |
-| **SSE** | `http://YOUR_IP:19999/mcp?transport=sse` | Server-Sent Events for real-time streaming |
+| Transport | Endpoint | Use Case | Version Requirement |
+|-----------|----------|----------|---------------------|
+| **WebSocket** | `ws://YOUR_IP:19999/mcp` | Original transport, requires nd-mcp bridge for stdio clients | v2.6.0+ |
+| **HTTP Streamable** | `http://YOUR_IP:19999/mcp` | Direct connection from AI clients supporting HTTP | v2.7.2+ |
+| **SSE** | `http://YOUR_IP:19999/mcp?transport=sse` | Server-Sent Events for real-time streaming | v2.7.2+ |
+
+**Important:** MCP support requires Netdata v2.6.0 or later. If you're running v2.6.x through v2.7.1, you must use WebSocket transport via the `nd-mcp` bridge. HTTP and SSE transports are only available in v2.7.2 and later.
 
 ### Direct Connection vs Bridge
 
-With the new HTTP and SSE transports, many AI clients can now connect directly to Netdata without needing the nd-mcp bridge:
+With the new HTTP and SSE transports (v2.7.2+), many AI clients can now connect directly to Netdata without needing the nd-mcp bridge:
 
-- **Direct Connection**: AI clients that support HTTP or SSE transports can connect directly to Netdata
-- **Bridge Required**: AI clients that only support stdio (like some desktop apps) still need the nd-mcp bridge or the official MCP remote client
+- **Direct Connection** (v2.7.2+): AI clients that support HTTP or SSE transports can connect directly to Netdata
+- **Bridge Required**: AI clients that only support stdio (like some desktop apps) need the nd-mcp bridge or the official MCP remote client
+- **WebSocket Only** (v2.6.0 - v2.7.1): Older Netdata versions only support WebSocket, requiring the nd-mcp bridge for all connections
 
 ### Official MCP Remote Client
 
-If your AI client doesn't support HTTP/SSE directly and you don't want to use nd-mcp, you can use the official MCP remote client:
+If your AI client doesn't support HTTP/SSE directly and you don't want to use nd-mcp, you can use the official MCP remote client (requires Netdata v2.7.2+):
 
 ```bash
 # Export your MCP key once per shell
@@ -43,6 +46,8 @@ npx mcp-remote@latest --http http://YOUR_NETDATA_IP:19999/mcp \
   --allow-http \
   --header "Authorization: Bearer $NETDATA_MCP_API_KEY"
 ```
+
+**Note:** The `--allow-http` flag is required for non-HTTPS connections. Only use this on trusted networks as traffic will not be encrypted.
 
 ## Visibility Scope
 
@@ -202,6 +207,144 @@ Once you have nd-mcp (either from existing installation or built), test it:
 # nd-mcp: Connected
 # Press Ctrl+C to stop the test
 ```
+
+## Using MCP Remote Client
+
+The official MCP remote client (`mcp-remote`) is an alternative bridge that enables stdio-only AI clients to connect to Netdata's HTTP and SSE transports (requires Netdata v2.7.2+). Unlike nd-mcp which only supports WebSocket, mcp-remote provides broader transport compatibility.
+
+### When to Use MCP Remote
+
+Use `mcp-remote` when:
+- Your AI client only supports stdio communication
+- You want to use HTTP or SSE transports instead of WebSocket
+- You're running Netdata v2.7.2 or later
+- You don't want to build/install nd-mcp
+
+### Installation
+
+No installation required - `mcp-remote` runs via `npx`:
+
+```bash
+# Test the connection
+npx mcp-remote@latest --http http://YOUR_NETDATA_IP:19999/mcp \
+  --allow-http \
+  --header "Authorization: Bearer YOUR_API_KEY"
+```
+
+### Transport Options
+
+`mcp-remote` supports multiple transport strategies:
+
+```bash
+# HTTP transport (recommended)
+npx mcp-remote@latest --http http://YOUR_NETDATA_IP:19999/mcp \
+  --allow-http \
+  --header "Authorization: Bearer YOUR_API_KEY"
+
+# SSE transport
+npx mcp-remote@latest --sse http://YOUR_NETDATA_IP:19999/mcp \
+  --allow-http \
+  --header "Authorization: Bearer YOUR_API_KEY"
+
+# Auto-detect with fallback (tries SSE first, falls back to HTTP)
+npx mcp-remote@latest --transport sse-first http://YOUR_NETDATA_IP:19999/mcp \
+  --allow-http \
+  --header "Authorization: Bearer YOUR_API_KEY"
+
+# HTTPS (no --allow-http flag needed)
+npx mcp-remote@latest --http https://YOUR_NETDATA_IP:19999/mcp \
+  --header "Authorization: Bearer YOUR_API_KEY"
+```
+
+### Common Options
+
+| Option | Description | Example |
+|--------|-------------|---------|
+| `--http` | Use HTTP transport | `--http http://host:19999/mcp` |
+| `--sse` | Use SSE transport | `--sse http://host:19999/mcp` |
+| `--allow-http` | Allow non-HTTPS connections (required for HTTP URLs) | `--allow-http` |
+| `--header` | Add custom headers (for authentication) | `--header "Authorization: Bearer KEY"` |
+| `--transport` | Transport strategy | `--transport sse-first` (tries SSE, falls back to HTTP) |
+| `--debug` | Enable debug logging | `--debug` |
+| `--host` | OAuth callback host (default: localhost) | `--host 127.0.0.1` |
+| Port number | OAuth callback port (optional) | `9696` |
+
+### Authentication
+
+For Netdata MCP, pass the API key via the Authorization header:
+
+```bash
+# Using environment variable (recommended)
+export NETDATA_MCP_API_KEY="$(cat /var/lib/netdata/mcp_dev_preview_api_key)"
+
+npx mcp-remote@latest --http http://YOUR_NETDATA_IP:19999/mcp \
+  --allow-http \
+  --header "Authorization: Bearer $NETDATA_MCP_API_KEY"
+```
+
+**Security Note:** The `--allow-http` flag is required for non-HTTPS connections. Only use this on trusted networks as traffic will not be encrypted.
+
+### Troubleshooting
+
+**Connection Issues:**
+```bash
+# Enable debug logging
+npx mcp-remote@latest --debug --http http://YOUR_NETDATA_IP:19999/mcp \
+  --allow-http \
+  --header "Authorization: Bearer YOUR_API_KEY"
+
+# Check debug logs (stored in ~/.mcp-auth/)
+cat ~/.mcp-auth/*_debug.log
+```
+
+**Clear Authentication State:**
+```bash
+# Remove cached credentials
+rm -rf ~/.mcp-auth
+```
+
+**Spaces in Arguments:**
+
+Some AI clients (Cursor, Claude Desktop on Windows) have issues with spaces in arguments. Use environment variables as a workaround:
+
+```json
+{
+  "mcpServers": {
+    "netdata": {
+      "command": "npx",
+      "args": [
+        "mcp-remote@latest",
+        "--http",
+        "http://YOUR_IP:19999/mcp",
+        "--allow-http",
+        "--header",
+        "Authorization:${AUTH_HEADER}"
+      ],
+      "env": {
+        "AUTH_HEADER": "Bearer YOUR_API_KEY"
+      }
+    }
+  }
+}
+```
+
+### Version Management
+
+Always use the latest version:
+
+```bash
+# Force npx to check for latest version
+npx mcp-remote@latest --http http://YOUR_NETDATA_IP:19999/mcp
+```
+
+Or in AI client configurations:
+```json
+{
+  "args": ["mcp-remote@latest", "--http", "..."]
+}
+```
+
+For more details, see the [official mcp-remote documentation](https://github.com/geelen/mcp-remote).
 
 ## Finding Your API Key
 
