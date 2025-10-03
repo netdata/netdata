@@ -97,6 +97,41 @@
             <WixVariable Id="WixUIDialogBmp" Value="BackGround.bmp" />
             <UIRef Id="WixUI_ErrorProgressText" />
             <ui:WixUI Id="FeatureTree_ViewLicense" />
+
+            <SetProperty
+                Id="NDKillProcess"
+                Value="&quot;[WindowsFolder]System32\taskkill.exe&quot; /T /F /IM netdata.exe"
+                Before="NDKillProcess"
+                Sequence="execute"
+            />
+            <CustomAction
+                Id="NDKillProcess"
+                BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)"
+                DllEntry="WixQuietExec"
+                Execute="deferred"
+                Return="ignore"
+                Impersonate="no"
+            />
+
+            <SetProperty
+                Id="NDConfigureServiceRecovery"
+                Value="&quot;[WindowsFolder]System32\sc.exe&quot; failureflag &quot;netdata&quot; 1"
+                Before="NDConfigureServiceRecovery"
+                Sequence="execute"
+            />
+            <CustomAction
+                Id="NDConfigureServiceRecovery"
+                BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)"
+                DllEntry="WixQuietExec"
+                Execute="deferred"
+                Return="ignore"
+                Impersonate="no"
+            />
+
+            <InstallExecuteSequence>
+                <Custom Action="NDConfigureServiceRecovery" After="InstallServices" Condition="NOT REMOVE" />
+                <Custom Action="NDKillProcess" Before="RemoveFiles" />
+            </InstallExecuteSequence>
     </Package>
 
     <Fragment>
