@@ -1,0 +1,171 @@
+name: netdata # you probably want to 'snapcraft register <name>'
+base: core24 # the base snap is the execution environment for this snap
+build-base: devel
+version: '0.1' # just for humans, typically '1.2+git' or '1.3.2'
+summary: Netdata Agent
+description: |
+  Netdata is distributed, real-time, performance and health monitoring for
+  systems and applications. It provides insights of everything happening on the
+  systems it runs using interactive web dashboards.
+
+grade: devel # must be 'stable' to release into candidate/stable channels
+confinement: strict # use 'strict' once you have the right plugs and slots
+
+layout:
+#  /etc/netdata:
+#    symlink: $SNAP_COMMON/etc/netdata
+#  /usr/lib/netdata:
+#    symlink: $SNAP/usr/lib/netdata
+#  /usr/libexec/netdata:
+#    symlink: $SNAP/usr/libexec/netdata
+#  /usr/share/netdata:
+#    symlink: $SNAP/usr/share/netdata
+#  /var/cache/netdata:
+#    symlink: $SNAP_DATA/var/cache/netdata
+#  /var/lib/netdata:
+#    symlink: $SNAP_DATA/var/lib/netdata
+#  /var/log/netdata:
+#    symlink: $SNAP_DATA/var/log/netdata
+  /etc/sensors3.conf:
+    symlink: $SNAP/etc/sensors3.conf
+  /usr/bin/lsns:
+    bind-file: $SNAP/usr/bin/lsns
+
+parts:
+  deps:
+    plugin: nil
+    source: .
+    source-type: local
+    override-build: |
+      packaging/installer/install-required-packages.sh --dont-wait --non-interactive -i netdata-all
+
+
+  netdata:
+    plugin: cmake
+    source: .
+    source-type: local
+    build-environment:
+      - CFLAGS: ${CFLAGS:-"-O2 pipe"}
+      - DESTDIR: $CRAFT_PART_INSTALL
+    build-packages:
+      - golang-1.21-go
+      - libbrotli-dev
+      - libcap-dev
+      - libcups2-dev
+      - libipmimonitoring-dev
+      - libmongoc-dev
+      - libnetfilter-acct-dev
+      - libpcre2-dev
+      - libprotobuf-dev
+      - libsnappy-dev
+      - libxen-dev
+      - protobuf-compiler
+    cmake-generator: Ninja
+    cmake-parameters:
+      - -DCMAKE_INSTALL_PREFIX=/snap/netdata/current
+      - -DENABLE_ACLK=On
+      - -DENABLE_CLOUD=On
+      - -DENABLE_DBENGINE=On
+      - -DENABLE_H2O=On
+      - -DENABLE_ML=On
+      - -DENABLE_PLUGIN_APPS=On
+      - -DENABLE_PLUGIN_CGROUP_NETWORK=On
+      - -DENABLE_PLUGIN_DEBUGFS=On
+      - -DENABLE_PLUGIN_EBPF=On
+      - -DENABLE_PLUGIN_FREEIPMI=On
+      - -DENABLE_PLUGIN_GO=On
+      - -DENABLE_PLUGIN_LOCAL_LISTENERS=On
+      - -DENABLE_PLUGIN_LOGS_MANAGEMENT=On
+      - -DENABLE_PLUGIN_NFACCT=On
+      - -DENABLE_PLUGIN_PERF=On
+      - -DENABLE_PLUGIN_SLABINFO=On
+      - -DENABLE_PLUGIN_SYSTEMD_JOURNAL=On
+      - -DENABLE_PLUGIN_XENSTAT=On
+      - -DENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE=On
+      - -DENABLE_EXPORTER_MONGODB=On
+      - -DENABLE_BUNDLED_PROTOBUF=Off
+      - -DENABLE_BUNDLED_JSONC=Off
+      # - ${SENTRY_CONFIG}
+      - -DENABLE_BUNDLED_YAML=Off
+    override-build: |
+      "${CRAFT_PART_SRC}/packaging/bundle-libbpf.sh" "${CRAFT_PART_SRC}" "${CRAFT_PART_INSTALL}/usr/libexec/netdata/plugins.d"
+      "${CRAFT_PART_SRC}/packaging/bundle-ebpf-co-re.sh" "${CRAFT_PART_SRC}" "${CRAFT_PART_INSTALL}/usr/libexec/netdata/plugins.d"
+      update-alternatives --install /usr/bin/go go /usr/lib/go-1.21/bin/go 3
+      update-alternatives --install /usr/bin/gofmt gofmt /usr/lib/go-1.21/bin/gofmt 3
+      craftctl default
+      mkdir -p "$CRAFT_PART_INSTALL/etc/netdata"
+      cp -p "$CRAFT_PART_SRC/snap/local/netdata.conf" "$CRAFT_PART_INSTALL/etc/netdata/netdata.conf"
+    organize:
+      "snap/netdata/current": "/"
+    stage-packages:
+      - apcupsd
+      - curl
+      - iproute2
+      - iw
+      - libatm1
+      - libavahi-client3
+      - libavahi-common3
+      - libbson-1.0-0
+      - libcups2
+      - libfreeipmi17
+      - libipmimonitoring6
+      - libmongoc-1.0-0
+      - libmongocrypt0
+      - libnetfilter-acct1
+      - libsnappy1v5
+      - libutf8proc3
+      - libuv1
+      - libxencall1
+      - libxendevicemodel1
+      - libxenevtchn1
+      - libxenforeignmemory1
+      - libxengnttab1
+      - libxenhypfs1
+      - libxenmisc4.17
+      - libxenstore4
+      - libxentoolcore1
+      - libxentoollog1
+      - libyajl2
+      - lm-sensors
+      - nvme-cli
+      - util-linux
+    prime:
+      - -snap/netdata
+
+  ebpf-kernel-collector:
+    plugin: nil
+    source: .
+    source-type: local
+    override-pull: |
+      craftctl default
+      NETDATA_PLUGINDIR=$CRAFT_PART_INSTALL/usr/libexec/netdata/plugins.d
+      mkdir -p "${NETDATA_PLUGINDIR}"
+      sh -x "${CRAFT_PART_SRC}/packaging/bundle-ebpf.sh" "${CRAFT_PART_SRC}" "${NETDATA_PLUGINDIR}" force
+
+apps:
+  agent:
+    command: usr/sbin/netdata -u root -D -P $SNAP_DATA/var/run/netdata/netdata.pid -c $SNAP_COMMON/etc/netdata/netdata.conf
+    daemon: simple
+    plugs:
+      - docker-support  # Allows access to /prod/[0-9]*/limits
+      - hardware-observe
+      - kubernetes-support  # cgroups (incl. systemd services)
+      - log-observe
+      - login-session-observe
+      - mount-observe
+      - network
+      - network-bind
+      - network-observe  # network connections function
+      - network-setup-observe  # ip{,4,6}.*, wireless.*, netfilter.conntrack_sockets
+      - system-observe  # many disk.*, cpu and memory pressure, system.io
+      - time-control # needed for timex to call clock_adjtime to measure jitter
+  claim:
+    command: usr/sbin/netdata-claim.sh
+    plugs:
+      - network
+  cli:
+    command: usr/sbin/netdatacli
+  log2journal:
+    command: usr/sbin/log2journal
+  systemd-cat-native:
+    command: usr/sbin/systemd-cat-native
