@@ -97,6 +97,41 @@
             <WixVariable Id="WixUIDialogBmp" Value="BackGround.bmp" />
             <UIRef Id="WixUI_ErrorProgressText" />
             <ui:WixUI Id="FeatureTree_ViewLicense" />
+
+            <SetProperty
+                Id="NDKillProcess"
+                Value="&quot;[WindowsFolder]System32\taskkill.exe&quot; /T /F /IM netdata.exe"
+                Before="NDKillProcess"
+                Sequence="execute"
+            />
+            <CustomAction
+                Id="NDKillProcess"
+                BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)"
+                DllEntry="WixQuietExec"
+                Execute="deferred"
+                Return="ignore"
+                Impersonate="no"
+            />
+
+            <SetProperty
+                Id="NDConfigureServiceRecovery"
+                Value="&quot;[WindowsFolder]System32\sc.exe&quot; failureflag &quot;netdata&quot; 1"
+                Before="NDConfigureServiceRecovery"
+                Sequence="execute"
+            />
+            <CustomAction
+                Id="NDConfigureServiceRecovery"
+                BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)"
+                DllEntry="WixQuietExec"
+                Execute="deferred"
+                Return="ignore"
+                Impersonate="no"
+            />
+
+            <InstallExecuteSequence>
+                <Custom Action="NDConfigureServiceRecovery" After="InstallServices" Condition="NOT REMOVE" />
+                <Custom Action="NDKillProcess" Before="RemoveFiles" />
+            </InstallExecuteSequence>
     </Package>
 
     <Fragment>
@@ -190,12 +225,6 @@
                 <Custom Action="InstallManifest" After="InstallFiles" />
             </InstallExecuteSequence>
 
-            <!-- Added StopNetdataService custom action to ensure service is stopped before file operations -->
-            <CustomAction Id="StopNetdataService" Directory="System64Folder" ExeCommand='net stop Netdata' Execute="immediate" Return="ignore" />
-            <InstallExecuteSequence>
-                <Custom Action="StopNetdataService" Before="InstallValidate" Condition="Installed AND NOT REMOVE" />
-            </InstallExecuteSequence>
-
             <Component Id="NetdataService" Directory="USRBINDIR">
                 <File Id="netdata.exe" Source="C:\msys64\opt\netdata\usr\bin\netdata.exe" KeyPath="yes" />
 
@@ -204,22 +233,27 @@
                                 DisplayName="Netdata Agent"
                                 Description="Distributed, real-time, performance and health monitoring for systems and applications."
                                 Type="ownProcess"
+                                Interactive="no"
                                 Start="auto"
-                                ErrorControl="normal" />
+                                ErrorControl="normal"
+                                Vital="yes">
 
-                <!-- Modified to ensure proper service handling during update -->
-                <ServiceControl Id="ControlService"
-                                Name="Netdata"
-                                Stop="both"
-                                Start="install"
-                                Remove="uninstall"
-                                Wait="yes" />
+                    <ServiceConfig
+                        DelayedAutoStart="yes"
+                        OnInstall="yes"
+                        OnReinstall="yes" />
 
-                 <RegistryValue Root="HKLM"
-                               Key="System\CurrentControlSet\Services\Netdata"
-                               Name="DelayedAutoStart"
-                               Value="1"
-                               Type="integer" />
+                    <util:ServiceConfig
+                            ResetPeriodInDays="0"
+                            FirstFailureActionType="restart"
+                            SecondFailureActionType="restart"
+                            ThirdFailureActionType="restart"
+                            RestartServiceDelayInSeconds="60"
+                     />
+                </ServiceInstall>
+
+                <ServiceControl Id="StartService" Name="Netdata" Start="install" Wait="no" />
+                <ServiceControl Id="StopService" Name="Netdata" Remove="uninstall" Stop="both" Wait="yes" />
             </Component>
     </Fragment>
 
