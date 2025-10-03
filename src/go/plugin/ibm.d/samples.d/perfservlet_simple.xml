@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE PerformanceMonitor
+  SYSTEM '/wasPerfTool/dtd/performancemonitor.dtd'>
+<PerformanceMonitor responseStatus="success" version="8.5.5.15">
+    <Node name="wp04Node">
+        <Server name="WebSphere_Portal">
+            <Stat name="server">
+                <Stat name="JDBC Connection Pools">
+                    <Stat name="wpdbJDBC_db2">
+                        <Stat name="jdbc/ladbDS">
+                            <BoundedRangeStatistic ID="5" highWaterMark="1" integral="1.3286598E7" lastSampleTime="1582817269149" lowWaterMark="0" lowerBound="0" mean="0.9750545223658751" name="PoolSize" startTime="1582803642631" unit="N/A" upperBound="50" value="1"/>
+                            <BoundedRangeStatistic ID="6" highWaterMark="1" integral="1.3286546E7" lastSampleTime="1582817269149" lowWaterMark="0" lowerBound="0" mean="0.975050706277275" name="FreePoolSize" startTime="1582803642631" unit="N/A" upperBound="50" value="1"/>
+                            <RangeStatistic ID="7" highWaterMark="0" integral="0.0" lastSampleTime="1582817269149" lowWaterMark="0" mean="0.0" name="WaitingThreadCount" startTime="1582803642631" unit="N/A" value="0"/>
+                            <RangeStatistic ID="9" highWaterMark="100" integral="104.0" lastSampleTime="1582817269149" lowWaterMark="98" mean="7.632177760465128E-6" name="PercentUsed" startTime="1582803642632" unit="N/A" value="0"/>
+                            <TimeStatistic ID="12" lastSampleTime="1582817269115" max="17" min="1" name="UseTime" startTime="1582803642632" totalTime="52" unit="MILLISECOND"/>
+                            <TimeStatistic ID="13" lastSampleTime="1582803642632" max="0" min="0" name="WaitTime" startTime="1582803642632" totalTime="0" unit="MILLISECOND"/>
+                            <CountStatistic ID="21" count="0" lastSampleTime="1582803642632" name="PrepStmtCacheDiscardCount" startTime="1582803642632" unit="N/A"/>
+                            <TimeStatistic ID="22" lastSampleTime="1582817269114" max="3" min="0" name="JDBCTime" startTime="1582803642632" totalTime="17" unit="MILLISECOND"/>
+                        </Stat>
+                        <Stat name="jdbc/xyz">
+                            <BoundedRangeStatistic ID="5" highWaterMark="1" integral="1.3286598E7" lastSampleTime="1582817269149" lowWaterMark="0" lowerBound="0" mean="0.9750545223658751" name="PoolSize" startTime="1582803642631" unit="N/A" upperBound="50" value="1"/>
+                            <BoundedRangeStatistic ID="6" highWaterMark="1" integral="1.3286546E7" lastSampleTime="1582817269149" lowWaterMark="0" lowerBound="0" mean="0.975050706277275" name="FreePoolSize" startTime="1582803642631" unit="N/A" upperBound="50" value="1"/>
+                            <RangeStatistic ID="7" highWaterMark="0" integral="0.0" lastSampleTime="1582817269149" lowWaterMark="0" mean="0.0" name="WaitingThreadCount" startTime="1582803642631" unit="N/A" value="0"/>
+                            <RangeStatistic ID="9" highWaterMark="100" integral="104.0" lastSampleTime="1582817269149" lowWaterMark="98" mean="7.632177760465128E-6" name="PercentUsed" startTime="1582803642632" unit="N/A" value="0"/>
+                            <TimeStatistic ID="12" lastSampleTime="1582817269115" max="17" min="1" name="UseTime" startTime="1582803642632" totalTime="52" unit="MILLISECOND"/>
+                            <TimeStatistic ID="13" lastSampleTime="1582803642632" max="0" min="0" name="WaitTime" startTime="1582803642632" totalTime="0" unit="MILLISECOND"/>
+                            <CountStatistic ID="21" count="0" lastSampleTime="1582803642632" name="PrepStmtCacheDiscardCount" startTime="1582803642632" unit="N/A"/>
+                            <TimeStatistic ID="22" lastSampleTime="1582817269114" max="3" min="0" name="JDBCTime" startTime="1582803642632" totalTime="17" unit="MILLISECOND"/>
+                        </Stat>
+                        <CountStatistic ID="1" count="14" lastSampleTime="1582816264668" name="CreateCount" startTime="1582803642631" unit="N/A"/>
+                        <CountStatistic ID="2" count="1" lastSampleTime="1582805698274" name="CloseCount" startTime="1582803642631" unit="N/A"/>
+                        <CountStatistic ID="3" count="6952" lastSampleTime="1582817269113" name="AllocateCount" startTime="1582803642631" unit="N/A"/>
+                        <CountStatistic ID="4" count="6942" lastSampleTime="1582817269115" name="ReturnCount" startTime="1582803642631" unit="N/A"/>
+                        <BoundedRangeStatistic ID="5" highWaterMark="11" integral="1.33500306E8" lastSampleTime="1582817269149" lowWaterMark="0" lowerBound="0" mean="9.797096073993371" name="PoolSize" startTime="1582803642631" unit="N/A" upperBound="0" value="13"/>
+                        <BoundedRangeStatistic ID="6" highWaterMark="3" integral="4.7781504E7" lastSampleTime="1582817269149" lowWaterMark="0" lowerBound="0" mean="3.50650870603921" name="FreePoolSize" startTime="1582803642631" unit="N/A" upperBound="0" value="3"/>
+                        <RangeStatistic ID="7" highWaterMark="0" integral="0.0" lastSampleTime="1582817269149" lowWaterMark="0" mean="0.0" name="WaitingThreadCount" startTime="1582803642631" unit="N/A" value="0"/>
+                        <CountStatistic ID="8" count="0" lastSampleTime="1582803642655" name="FaultCount" startTime="1582803642631" unit="N/A"/>
+                        <RangeStatistic ID="9" highWaterMark="0" integral="0.0" lastSampleTime="1582817269149" lowWaterMark="0" mean="0.0" name="PercentUsed" startTime="1582803642631" unit="N/A" value="0"/>
+                        <TimeStatistic ID="12" lastSampleTime="1582817269115" max="3041" min="0" name="UseTime" startTime="1582803642631" totalTime="37187" unit="MILLISECOND"/>
+                        <TimeStatistic ID="13" lastSampleTime="1582803642655" max="0" min="0" name="WaitTime" startTime="1582803642631" totalTime="0" unit="MILLISECOND"/>
+                        <CountStatistic ID="21" count="928" lastSampleTime="1582816867623" name="PrepStmtCacheDiscardCount" startTime="1582803642631" unit="N/A"/>
+                        <TimeStatistic ID="22" lastSampleTime="1582817269114" max="90" min="0" name="JDBCTime" startTime="1582803642631" totalTime="15425" unit="MILLISECOND"/>
+                    </Stat>
+                </Stat>
+            </Stat>
+        </Server>
+    </Node>
+</PerformanceMonitor>

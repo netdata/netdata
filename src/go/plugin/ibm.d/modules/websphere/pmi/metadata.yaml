@@ -1,0 +1,893 @@
+# Generated metadata.yaml for websphere_pmi module
+plugin_name: ibm.d.plugin
+modules:
+  - meta:
+      plugin_name: ibm.d.plugin
+      module_name: websphere_pmi
+      monitored_instance:
+        name: IBM WebSphere PMI
+        link: https://www.ibm.com/docs/en/was
+        categories:
+          - data-collection.application_servers
+        icon_filename: "ibm.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - websphere_pmi
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          Collects WebSphere Application Server performance metrics via the PerfServlet (PMI) interface,
+          covering JVM, thread pools, JDBC/JMS resources, applications, and clustering information.
+
+        method_description: |
+          The collector connects to IBM WebSphere PMI and collects metrics via its monitoring interface.
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+    setup:
+      prerequisites:
+        list:
+          - title: Enable monitoring interface
+            description: |
+              Ensure the IBM WebSphere PMI monitoring interface is accessible.
+      configuration:
+        file:
+          name: ibm.d/websphere_pmi.conf
+        options:
+          description: |
+            Configuration options for the websphere_pmi collector.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+            - name: endpoint
+              description: Connection endpoint.
+              default_value: "dummy://localhost"
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: Config
+          list:
+            - name: Basic
+              description: Basic configuration example.
+              config: |
+                jobs:
+                  - name: local
+                    endpoint: dummy://localhost
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: alarmmanager
+          description: These metrics refer to alarmmanager instances.
+          labels:
+            - name: node
+              description: Node identifier
+            - name: server
+              description: Server identifier
+            - name: manager
+              description: Manager identifier
+          metrics:
+            - name: websphere_pmi.alarm_manager_events
+              description: Alarm Manager Events
+              unit: events/s
+              chart_type: line
+              dimensions:
+                - name: created
+                - name: cancelled
+                - name: fired
+        - name: dynamiccache
+          description: These metrics refer to dynamiccache instances.
+          labels:
+            - name: node
+              description: Node identifier
+            - name: server
+              description: Server identifier
+            - name: cache
+              description: Cache identifier
+          metrics:
+            - name: websphere_pmi.dynamic_cache_in_memory
+              description: Dynamic Cache Entries
+              unit: entries
+              chart_type: line
+              dimensions:
+                - name: entries
+            - name: websphere_pmi.dynamic_cache_capacity
+              description: Dynamic Cache Capacity
+              unit: entries
+              chart_type: line
+              dimensions:
+                - name: max_entries
+        - name: enterprisebeans
+          description: These metrics refer to enterprisebeans instances.
+          labels:
+            - name: node
+              description: Node identifier
+            - name: server
+              description: Server identifier
+            - name: bean
+              description: Bean identifier
+          metrics:
+            - name: websphere_pmi.ejb_operations
+              description: EJB Operations
+              unit: operations/s
+              chart_type: line
+              dimensions:
+                - name: create
+                - name: remove
+                - name: activate
+                - name: passivate
+                - name: instantiate
+                - name: store
+                - name: load
+            - name: websphere_pmi.ejb_messages
+              description: EJB Message Activity
+              unit: messages/s
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: backout
+            - name: websphere_pmi.ejb_pool
+              description: EJB Pool Usage
+              unit: beans
+              chart_type: line
+              dimensions:
+                - name: ready
+                - name: live
+                - name: pooled
+                - name: active_method
+                - name: passive
+                - name: server_session_pool
+                - name: method_ready
+                - name: async_queue
+            - name: websphere_pmi.ejb_time
+              description: EJB Operation Time
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: activation
+                - name: passivation
+                - name: create
+                - name: remove
+                - name: load
+                - name: store
+                - name: method_response
+                - name: wait
+                - name: async_wait
+                - name: read_lock
+                - name: write_lock
+        - name: extensionregistry
+          description: These metrics refer to extensionregistry instances.
+          labels:
+            - name: node
+              description: Node identifier
+            - name: server
+              description: Server identifier
+          metrics:
+            - name: websphere_pmi.extension_registry_requests
+              description: Extension Registry Requests
+              unit: events/s
+              chart_type: line
+              dimensions:
+                - name: requests
+                - name: hits
+                - name: displacements
+            - name: websphere_pmi.extension_registry_hit_rate
+              description: Extension Registry Hit Rate
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: hit_rate
+        - name: hamanager
+          description: These metrics refer to hamanager instances.
+          labels:
+            - name: node
+              description: Node identifier
+            - name: server
+              description: Server identifier
+          metrics:
+            - name: websphere_pmi.ha_manager_groups
+              description: HA Manager Groups
+              unit: groups
+              chart_type: line
+              dimensions:
+                - name: local
+            - name: websphere_pmi.ha_manager_bulletin_board
+              description: HA Manager Bulletin Board
+              unit: items
+              chart_type: line
+              dimensions:
+                - name: subjects
+                - name: subscriptions
+                - name: local_subjects
+                - name: local_subscriptions
+            - name: websphere_pmi.ha_manager_rebuild_time
+              description: HA Manager Rebuild Time
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: group_state
+                - name: bulletin_board
+        - name: jcapool
+          description: These metrics refer to jcapool instances.
+          labels:
+            - name: node
+              description: Node identifier
+            - name: server
+              description: Server identifier
+            - name: provider
+              description: Provider identifier
+            - name: pool
+              description: Pool identifier
+          metrics:
+            - name: websphere_pmi.jca_pool_operations
+              description: JCA Pool Operations
+              unit: operations/s
+              chart_type: line
+              dimensions:
+                - name: create
+                - name: close
+                - name: allocate
+                - name: freed
+                - name: faults
+            - name: websphere_pmi.jca_pool_managed
+              description: JCA Pool Managed Resources
+              unit: resources
+              chart_type: line
+              dimensions:
+                - name: managed_connections
+                - name: connection_handles
+            - name: websphere_pmi.jca_pool_utilization
+              description: JCA Pool Utilization
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: percent_used
+                - name: percent_maxed
+            - name: websphere_pmi.jca_pool_waiting
+              description: JCA Pool Waiting Threads
+              unit: threads
+              chart_type: line
+              dimensions:
+                - name: waiting_threads
+        - name: jdbcpool
+          description: These metrics refer to jdbcpool instances.
+          labels:
+            - name: node
+              description: Node identifier
+            - name: server
+              description: Server identifier
+            - name: pool
+              description: Pool identifier
+          metrics:
+            - name: websphere_pmi.jdbc_pool_usage
+              description: JDBC Pool Utilization
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: percent_used
+                - name: percent_maxed
+            - name: websphere_pmi.jdbc_pool_waiting
+              description: JDBC Pool Waiting Threads
+              unit: threads
+              chart_type: line
+              dimensions:
+                - name: waiting_threads
+            - name: websphere_pmi.jdbc_pool_connections
+              description: JDBC Pool Connections
+              unit: connections
+              chart_type: line
+              dimensions:
+                - name: managed
+                - name: handles
+            - name: websphere_pmi.jdbc_pool_operations
+              description: JDBC Pool Operations
+              unit: operations/s
+              chart_type: line
+              dimensions:
+                - name: created
+                - name: closed
+                - name: allocated
+                - name: returned
+                - name: faults
+                - name: prep_stmt_cache_discard
+            - name: websphere_pmi.jdbc_pool_time
+              description: JDBC Pool Time
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: use
+                - name: wait
+                - name: jdbc
+        - name: jmsqueue
+          description: These metrics refer to jmsqueue instances.
+          labels:
+            - name: node
+              description: Node identifier
+            - name: server
+              description: Server identifier
+            - name: engine
+              description: Engine identifier
+            - name: destination
+              description: Destination identifier
+          metrics:
+            - name: websphere_pmi.jms_queue_messages_produced
+              description: JMS Queue Messages Produced
+              unit: messages/s
+              chart_type: line
+              dimensions:
+                - name: total
+                - name: best_effort
+                - name: express
+                - name: reliable_nonpersistent
+                - name: reliable_persistent
+                - name: assured_persistent
+            - name: websphere_pmi.jms_queue_messages_consumed
+              description: JMS Queue Messages Consumed
+              unit: messages/s
+              chart_type: line
+              dimensions:
+                - name: total
+                - name: best_effort
+                - name: express
+                - name: reliable_nonpersistent
+                - name: reliable_persistent
+                - name: assured_persistent
+                - name: expired
+            - name: websphere_pmi.jms_queue_clients
+              description: JMS Queue Clients
+              unit: clients
+              chart_type: line
+              dimensions:
+                - name: local_producers
+                - name: local_producer_attaches
+                - name: local_consumers
+                - name: local_consumer_attaches
+            - name: websphere_pmi.jms_queue_storage
+              description: JMS Queue Storage
+              unit: messages
+              chart_type: line
+              dimensions:
+                - name: available
+                - name: unavailable
+                - name: oldest_age
+            - name: websphere_pmi.jms_queue_wait_time
+              description: JMS Queue Wait Time
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: aggregate
+                - name: local
+        - name: jmsstore
+          description: These metrics refer to jmsstore instances.
+          labels:
+            - name: node
+              description: Node identifier
+            - name: server
+              description: Server identifier
+            - name: engine
+              description: Engine identifier
+            - name: section
+              description: Section identifier
+          metrics:
+            - name: websphere_pmi.jms_store_cache
+              description: JMS Store Cache
+              unit: events
+              chart_type: line
+              dimensions:
+                - name: add_stored
+                - name: add_not_stored
+                - name: stored_current
+                - name: stored_bytes
+                - name: not_stored_current
+                - name: not_stored_bytes
+                - name: discard_count
+                - name: discard_bytes
+            - name: websphere_pmi.jms_store_datastore
+              description: JMS Store Datastore Operations
+              unit: events/s
+              chart_type: line
+              dimensions:
+                - name: insert_batches
+                - name: update_batches
+                - name: delete_batches
+                - name: insert_count
+                - name: update_count
+                - name: delete_count
+                - name: open_count
+                - name: abort_count
+                - name: transaction_ms
+            - name: websphere_pmi.jms_store_transactions
+              description: JMS Store Transactions
+              unit: transactions/s
+              chart_type: line
+              dimensions:
+                - name: global_start
+                - name: global_commit
+                - name: global_abort
+                - name: global_indoubt
+                - name: local_start
+                - name: local_commit
+                - name: local_abort
+            - name: websphere_pmi.jms_store_expiry
+              description: JMS Store Expiry Index
+              unit: items
+              chart_type: line
+              dimensions:
+                - name: index_items
+        - name: jmstopic
+          description: These metrics refer to jmstopic instances.
+          labels:
+            - name: node
+              description: Node identifier
+            - name: server
+              description: Server identifier
+            - name: engine
+              description: Engine identifier
+            - name: destination
+              description: Destination identifier
+          metrics:
+            - name: websphere_pmi.jms_topic_publications
+              description: JMS Topic Publications
+              unit: messages/s
+              chart_type: line
+              dimensions:
+                - name: assured
+                - name: best_effort
+                - name: express
+            - name: websphere_pmi.jms_topic_subscription_hits
+              description: JMS Topic Subscription Hits
+              unit: events/s
+              chart_type: line
+              dimensions:
+                - name: assured
+                - name: best_effort
+                - name: express
+            - name: websphere_pmi.jms_topic_subscriptions
+              description: JMS Topic Subscriptions
+              unit: subscriptions
+              chart_type: line
+              dimensions:
+                - name: durable_local
+            - name: websphere_pmi.jms_topic_events
+              description: JMS Topic Events
+              unit: events/s
+              chart_type: line
+              dimensions:
+                - name: incomplete_publications
+                - name: publisher_attaches
+                - name: subscriber_attaches
+            - name: websphere_pmi.jms_topic_age
+              description: JMS Topic Oldest Publication Age
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: local_oldest
+        - name: global
+          description: These metrics refer to the entire monitored instance.
+          labels: []
+          metrics:
+            - name: websphere_pmi.jvm_heap_usage
+              description: JVM Heap Memory Usage
+              unit: bytes
+              chart_type: stacked
+              dimensions:
+                - name: used
+                - name: free
+            - name: websphere_pmi.jvm_heap_committed
+              description: JVM Heap Committed
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: committed
+            - name: websphere_pmi.jvm_heap_max
+              description: JVM Heap Maximum
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: limit
+            - name: websphere_pmi.jvm_uptime
+              description: JVM Uptime
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: uptime
+            - name: websphere_pmi.jvm_cpu
+              description: JVM CPU Usage
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: usage
+            - name: websphere_pmi.jvm_gc_collections
+              description: JVM GC Collections
+              unit: collections/s
+              chart_type: line
+              dimensions:
+                - name: collections
+            - name: websphere_pmi.jvm_gc_time
+              description: JVM GC Time
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: total
+            - name: websphere_pmi.jvm_threads
+              description: JVM Threads
+              unit: threads
+              chart_type: stacked
+              dimensions:
+                - name: daemon
+                - name: other
+            - name: websphere_pmi.jvm_threads_peak
+              description: JVM Peak Threads
+              unit: threads
+              chart_type: line
+              dimensions:
+                - name: peak
+        - name: orb
+          description: These metrics refer to orb instances.
+          labels:
+            - name: node
+              description: Node identifier
+            - name: server
+              description: Server identifier
+          metrics:
+            - name: websphere_pmi.orb_concurrent
+              description: ORB Concurrent Requests
+              unit: requests
+              chart_type: line
+              dimensions:
+                - name: concurrent_requests
+            - name: websphere_pmi.orb_requests
+              description: ORB Requests
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: requests
+        - name: objectpool
+          description: These metrics refer to objectpool instances.
+          labels:
+            - name: node
+              description: Node identifier
+            - name: server
+              description: Server identifier
+            - name: pool
+              description: Pool identifier
+          metrics:
+            - name: websphere_pmi.object_pool_operations
+              description: Object Pool Operations
+              unit: operations/s
+              chart_type: line
+              dimensions:
+                - name: created
+            - name: websphere_pmi.object_pool_size
+              description: Object Pool Size
+              unit: objects
+              chart_type: line
+              dimensions:
+                - name: allocated
+                - name: returned
+                - name: idle
+        - name: pmiwebservicemodule
+          description: These metrics refer to pmiwebservicemodule instances.
+          labels:
+            - name: node
+              description: Node identifier
+            - name: server
+              description: Server identifier
+            - name: module
+              description: Module identifier
+          metrics:
+            - name: websphere_pmi.pmi_web_service_module_services
+              description: PMI Web Service Module Services
+              unit: services
+              chart_type: line
+              dimensions:
+                - name: loaded
+        - name: portlet
+          description: These metrics refer to portlet instances.
+          labels:
+            - name: node
+              description: Node identifier
+            - name: server
+              description: Server identifier
+            - name: portlet
+              description: Portlet identifier
+          metrics:
+            - name: websphere_pmi.portlet_requests
+              description: Portlet Requests
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: requests
+            - name: websphere_pmi.portlet_concurrent
+              description: Portlet Concurrent Requests
+              unit: requests
+              chart_type: line
+              dimensions:
+                - name: concurrent
+            - name: websphere_pmi.portlet_errors
+              description: Portlet Errors
+              unit: errors/s
+              chart_type: line
+              dimensions:
+                - name: errors
+            - name: websphere_pmi.portlet_response_time
+              description: Portlet Response Time
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: render
+                - name: action
+                - name: process_event
+                - name: serve_resource
+        - name: portletapplication
+          description: These metrics refer to portletapplication instances.
+          labels:
+            - name: node
+              description: Node identifier
+            - name: server
+              description: Server identifier
+          metrics:
+            - name: websphere_pmi.portlet_application_loaded
+              description: Loaded Portlets
+              unit: portlets
+              chart_type: line
+              dimensions:
+                - name: loaded
+        - name: schedulers
+          description: These metrics refer to schedulers instances.
+          labels:
+            - name: node
+              description: Node identifier
+            - name: server
+              description: Server identifier
+            - name: scheduler
+              description: Scheduler identifier
+          metrics:
+            - name: websphere_pmi.scheduler_activity
+              description: Scheduler Activity
+              unit: events/s
+              chart_type: line
+              dimensions:
+                - name: finished
+                - name: failures
+                - name: polls
+        - name: securityauth
+          description: These metrics refer to securityauth instances.
+          labels:
+            - name: node
+              description: Node identifier
+            - name: server
+              description: Server identifier
+          metrics:
+            - name: websphere_pmi.security_auth_counts
+              description: Security Authentication Counts
+              unit: events/s
+              chart_type: line
+              dimensions:
+                - name: web
+                - name: tai
+                - name: identity
+                - name: basic
+                - name: token
+                - name: jaas_identity
+                - name: jaas_basic
+                - name: jaas_token
+                - name: rmi
+        - name: securityauthz
+          description: These metrics refer to securityauthz instances.
+          labels:
+            - name: node
+              description: Node identifier
+            - name: server
+              description: Server identifier
+          metrics:
+            - name: websphere_pmi.security_authz_time
+              description: Security Authorization Time
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: web
+                - name: ejb
+                - name: admin
+                - name: cwwja
+        - name: sessionmanager
+          description: These metrics refer to sessionmanager instances.
+          labels:
+            - name: node
+              description: Node identifier
+            - name: server
+              description: Server identifier
+            - name: app
+              description: App identifier
+          metrics:
+            - name: websphere_pmi.session_manager_active
+              description: Session Manager Active Sessions
+              unit: sessions
+              chart_type: line
+              dimensions:
+                - name: active
+                - name: live
+            - name: websphere_pmi.session_manager_events
+              description: Session Manager Events
+              unit: events/s
+              chart_type: line
+              dimensions:
+                - name: created
+                - name: invalidated
+                - name: timeout_invalidations
+                - name: affinity_breaks
+                - name: cache_discards
+                - name: no_room
+                - name: activate_non_exist
+        - name: global
+          description: These metrics refer to the entire monitored instance.
+          labels: []
+          metrics:
+            - name: websphere_pmi.cpu_utilization
+              description: CPU Utilization
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: utilization
+        - name: global
+          description: These metrics refer to the entire monitored instance.
+          labels: []
+          metrics:
+            - name: websphere_pmi.system_data_usage
+              description: System Data Snapshot
+              unit: value
+              chart_type: line
+              dimensions:
+                - name: cpu_since_last
+                - name: free_memory
+        - name: threadpool
+          description: These metrics refer to threadpool instances.
+          labels:
+            - name: name
+              description: Name identifier
+          metrics:
+            - name: websphere_pmi.threadpool_usage
+              description: Thread Pool Usage
+              unit: threads
+              chart_type: stacked
+              dimensions:
+                - name: active
+                - name: size
+        - name: transactionmanager
+          description: These metrics refer to transactionmanager instances.
+          labels:
+            - name: node
+              description: Node identifier
+            - name: server
+              description: Server identifier
+          metrics:
+            - name: websphere_pmi.transaction_counts
+              description: Transaction Counts
+              unit: transactions/s
+              chart_type: line
+              dimensions:
+                - name: global_begun
+                - name: global_committed
+                - name: global_rolled_back
+                - name: global_timeout
+                - name: global_involved
+                - name: optimizations
+                - name: local_begun
+                - name: local_committed
+                - name: local_rolled_back
+                - name: local_timeout
+            - name: websphere_pmi.transaction_active
+              description: Active Transactions
+              unit: transactions
+              chart_type: line
+              dimensions:
+                - name: global
+                - name: local
+            - name: websphere_pmi.transaction_time
+              description: Transaction Durations
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: global_total
+                - name: global_prepare
+                - name: global_commit
+                - name: global_before_completion
+                - name: local_total
+                - name: local_commit
+                - name: local_before_completion
+        - name: url
+          description: These metrics refer to url instances.
+          labels:
+            - name: node
+              description: Node identifier
+            - name: server
+              description: Server identifier
+            - name: url
+              description: Url identifier
+          metrics:
+            - name: websphere_pmi.url_requests
+              description: URL Requests
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: requests
+            - name: websphere_pmi.url_time
+              description: URL Service Time
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: service
+                - name: async
+        - name: webapp
+          description: These metrics refer to webapp instances.
+          labels:
+            - name: node
+              description: Node identifier
+            - name: server
+              description: Server identifier
+            - name: app
+              description: App identifier
+          metrics:
+            - name: websphere_pmi.webapp_load
+              description: Web Application Load
+              unit: events
+              chart_type: line
+              dimensions:
+                - name: loaded_servlets
+                - name: reloads
+        - name: webservices
+          description: These metrics refer to webservices instances.
+          labels:
+            - name: node
+              description: Node identifier
+            - name: server
+              description: Server identifier
+            - name: service
+              description: Service identifier
+          metrics:
+            - name: websphere_pmi.web_services_loaded
+              description: Web Services Loaded
+              unit: services
+              chart_type: line
+              dimensions:
+                - name: loaded
+        - name: webservicesgateway
+          description: These metrics refer to webservicesgateway instances.
+          labels:
+            - name: node
+              description: Node identifier
+            - name: server
+              description: Server identifier
+            - name: gateway
+              description: Gateway identifier
+          metrics:
+            - name: websphere_pmi.web_services_gateway_requests
+              description: Web Services Gateway Requests
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: synchronous
+                - name: synchronous_responses
+                - name: asynchronous
+                - name: asynchronous_responses

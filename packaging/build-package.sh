@@ -62,18 +62,22 @@ case "${PKG_TYPE}" in
             amd64)
                 add_cmake_option ENABLE_PLUGIN_XENSTAT On
                 add_cmake_option ENABLE_PLUGIN_EBPF On
+                add_cmake_option ENABLE_PLUGIN_IBM On
                 ;;
             arm64)
                 add_cmake_option ENABLE_PLUGIN_XENSTAT On
                 add_cmake_option ENABLE_PLUGIN_EBPF Off
+                add_cmake_option ENABLE_PLUGIN_IBM Off
                 ;;
             armhf)
                 add_cmake_option ENABLE_PLUGIN_XENSTAT Off
                 add_cmake_option ENABLE_PLUGIN_EBPF Off
+                add_cmake_option ENABLE_PLUGIN_IBM Off
                 ;;
             *)
                 add_cmake_option ENABLE_PLUGIN_XENSTAT Off
                 add_cmake_option ENABLE_PLUGIN_EBPF Off
+                add_cmake_option ENABLE_PLUGIN_IBM Off
                 ;;
         esac
         ;;

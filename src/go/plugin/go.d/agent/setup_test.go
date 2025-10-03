@@ -53,11 +53,11 @@ func TestConfig_UnmarshalYAML(t *testing.T) {
 
 func TestAgent_loadConfig(t *testing.T) {
 	tests := map[string]struct {
-		agent   Agent
+		agent   *Agent
 		wantCfg config
 	}{
 		"valid config file": {
-			agent: Agent{
+			agent: &Agent{
 				Name:      "agent-valid",
 				ConfigDir: []string{"testdata"},
 			},
@@ -72,25 +72,25 @@ func TestAgent_loadConfig(t *testing.T) {
 			},
 		},
 		"no config path provided": {
-			agent:   Agent{},
+			agent:   &Agent{},
 			wantCfg: defaultConfig(),
 		},
 		"config file not found": {
-			agent: Agent{
+			agent: &Agent{
 				Name:      "agent",
 				ConfigDir: []string{"testdata/not-exist"},
 			},
 			wantCfg: defaultConfig(),
 		},
 		"empty config file": {
-			agent: Agent{
+			agent: &Agent{
 				Name:      "agent-empty",
 				ConfigDir: []string{"testdata"},
 			},
 			wantCfg: defaultConfig(),
 		},
 		"invalid syntax config file": {
-			agent: Agent{
+			agent: &Agent{
 				Name:      "agent-invalid-syntax",
 				ConfigDir: []string{"testdata"},
 			},
@@ -107,12 +107,12 @@ func TestAgent_loadConfig(t *testing.T) {
 
 func TestAgent_loadEnabledModules(t *testing.T) {
 	tests := map[string]struct {
-		agent       Agent
+		agent       *Agent
 		cfg         config
 		wantModules module.Registry
 	}{
 		"load all, module disabled by default but explicitly enabled": {
-			agent: Agent{
+			agent: &Agent{
 				ModuleRegistry: module.Registry{
 					"module1": module.Creator{Defaults: module.Defaults{Disabled: true}},
 				},
@@ -125,7 +125,7 @@ func TestAgent_loadEnabledModules(t *testing.T) {
 			},
 		},
 		"load all, module disabled by default and not explicitly enabled": {
-			agent: Agent{
+			agent: &Agent{
 				ModuleRegistry: module.Registry{
 					"module1": module.Creator{Defaults: module.Defaults{Disabled: true}},
 				},
@@ -133,7 +133,7 @@ func TestAgent_loadEnabledModules(t *testing.T) {
 			wantModules: module.Registry{},
 		},
 		"load all, module in config modules (default_run=true)": {
-			agent: Agent{
+			agent: &Agent{
 				ModuleRegistry: module.Registry{
 					"module1": module.Creator{},
 				},
@@ -147,7 +147,7 @@ func TestAgent_loadEnabledModules(t *testing.T) {
 			},
 		},
 		"load all, module not in config modules (default_run=true)": {
-			agent: Agent{
+			agent: &Agent{
 				ModuleRegistry: module.Registry{"module1": module.Creator{}},
 			},
 			cfg: config{
@@ -156,7 +156,7 @@ func TestAgent_loadEnabledModules(t *testing.T) {
 			wantModules: module.Registry{"module1": module.Creator{}},
 		},
 		"load all, module in config modules (default_run=false)": {
-			agent: Agent{
+			agent: &Agent{
 				ModuleRegistry: module.Registry{
 					"module1": module.Creator{},
 				},
@@ -169,7 +169,7 @@ func TestAgent_loadEnabledModules(t *testing.T) {
 			},
 		},
 		"load all, module not in config modules (default_run=false)": {
-			agent: Agent{
+			agent: &Agent{
 				ModuleRegistry: module.Registry{
 					"module1": module.Creator{},
 				},
@@ -177,7 +177,7 @@ func TestAgent_loadEnabledModules(t *testing.T) {
 			wantModules: module.Registry{},
 		},
 		"load specific, module exist in registry": {
-			agent: Agent{
+			agent: &Agent{
 				RunModule: "module1",
 				ModuleRegistry: module.Registry{
 					"module1": module.Creator{},
@@ -188,7 +188,7 @@ func TestAgent_loadEnabledModules(t *testing.T) {
 			},
 		},
 		"load specific, module doesnt exist in registry": {
-			agent: Agent{
+			agent: &Agent{
 				RunModule:      "module3",
 				ModuleRegistry: module.Registry{},
 			},

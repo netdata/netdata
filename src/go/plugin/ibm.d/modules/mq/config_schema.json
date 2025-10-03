@@ -1,0 +1,173 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "properties": {
+      "channel": {
+        "default": "SYSTEM.DEF.SVRCONN",
+        "title": "IBM MQ channel name for connection",
+        "type": "string"
+      },
+      "channel_selector": {
+        "default": "",
+        "title": "Pattern to filter channels (wildcards supported)",
+        "type": "string"
+      },
+      "collect_channel_config": {
+        "default": true,
+        "title": "Enable collection of channel configuration metrics",
+        "type": "boolean"
+      },
+      "collect_channels": {
+        "default": true,
+        "title": "Enable collection of channel metrics",
+        "type": "boolean"
+      },
+      "collect_listeners": {
+        "default": true,
+        "title": "Enable collection of listener metrics",
+        "type": "boolean"
+      },
+      "collect_queue_config": {
+        "default": true,
+        "title": "Enable collection of queue configuration metrics",
+        "type": "boolean"
+      },
+      "collect_queues": {
+        "default": true,
+        "title": "Enable collection of queue metrics",
+        "type": "boolean"
+      },
+      "collect_reset_queue_stats": {
+        "default": false,
+        "title": "Enable collection of queue statistics (destructive operation)",
+        "type": "boolean"
+      },
+      "collect_statistics_queue": {
+        "default": false,
+        "title": "Enable collection of statistics queue metrics (SYSTEM.ADMIN.STATISTICS.QUEUE provides advanced metrics like min/max depth)",
+        "type": "boolean"
+      },
+      "collect_subscriptions": {
+        "default": true,
+        "title": "Enable collection of subscription metrics",
+        "type": "boolean"
+      },
+      "collect_sys_topics": {
+        "default": false,
+        "title": "Enable collection of $SYS topic metrics (provides Queue Manager CPU, memory, and log utilization)",
+        "type": "boolean"
+      },
+      "collect_system_channels": {
+        "default": true,
+        "title": "Enable collection of system channel metrics (SYSTEM.* channels show clustering and administrative health)",
+        "type": "boolean"
+      },
+      "collect_system_listeners": {
+        "default": true,
+        "title": "Enable collection of system listener metrics (SYSTEM.* listeners show internal connectivity)",
+        "type": "boolean"
+      },
+      "collect_system_queues": {
+        "default": true,
+        "title": "Enable collection of system queue metrics (SYSTEM.* queues provide critical infrastructure visibility)",
+        "type": "boolean"
+      },
+      "collect_system_topics": {
+        "default": true,
+        "title": "Enable collection of system topic metrics (SYSTEM.* topics show internal messaging patterns)",
+        "type": "boolean"
+      },
+      "collect_topics": {
+        "default": true,
+        "title": "Enable collection of topic metrics",
+        "type": "boolean"
+      },
+      "host": {
+        "default": "localhost",
+        "title": "IBM MQ server hostname or IP address",
+        "type": "string"
+      },
+      "listener_selector": {
+        "default": "",
+        "title": "Pattern to filter listeners (wildcards supported)",
+        "type": "string"
+      },
+      "max_channels": {
+        "default": 100,
+        "title": "Maximum number of channels to collect (0 = no limit)",
+        "type": "integer"
+      },
+      "max_listeners": {
+        "default": 100,
+        "title": "Maximum number of listeners to collect (0 = no limit)",
+        "type": "integer"
+      },
+      "max_queues": {
+        "default": 100,
+        "title": "Maximum number of queues to collect (0 = no limit)",
+        "type": "integer"
+      },
+      "max_topics": {
+        "default": 100,
+        "title": "Maximum number of topics to collect (0 = no limit)",
+        "type": "integer"
+      },
+      "password": {
+        "default": "",
+        "format": "password",
+        "title": "Password for IBM MQ authentication",
+        "type": "string"
+      },
+      "port": {
+        "default": 1414,
+        "maximum": 65535,
+        "minimum": 1,
+        "title": "IBM MQ server port number",
+        "type": "integer"
+      },
+      "queue_manager": {
+        "default": "QM1",
+        "title": "IBM MQ Queue Manager name to connect to",
+        "type": "string"
+      },
+      "queue_selector": {
+        "default": "",
+        "title": "Pattern to filter queues (wildcards supported)",
+        "type": "string"
+      },
+      "statistics_interval,omitempty": {
+        "default": 60,
+        "title": "Statistics collection interval in seconds (auto-detected STATINT overwrites this value)",
+        "type": "integer"
+      },
+      "subscription_selector": {
+        "default": "",
+        "title": "Pattern to filter subscriptions (wildcards supported)",
+        "type": "string"
+      },
+      "sys_topic_interval,omitempty": {
+        "default": 10,
+        "title": "$SYS topic collection interval in seconds (user override for customized MQ configurations)",
+        "type": "integer"
+      },
+      "topic_selector": {
+        "default": "",
+        "title": "Pattern to filter topics (wildcards supported)",
+        "type": "string"
+      },
+      "update_every": {
+        "default": 10,
+        "minimum": 1,
+        "title": "Data collection frequency",
+        "type": "integer"
+      },
+      "user": {
+        "default": "",
+        "title": "Username for IBM MQ authentication",
+        "type": "string"
+      }
+    },
+    "title": "mq collector configuration",
+    "type": "object"
+  }
+}

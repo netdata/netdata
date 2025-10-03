@@ -1,0 +1,14 @@
+{
+  "columns": [
+    "OS_NAME",
+    "OS_VERSION",
+    "OS_RELEASE"
+  ],
+  "rows": [
+    {
+      "OS_NAME": "IBM i",
+      "OS_RELEASE": "5",
+      "OS_VERSION": "7"
+    }
+  ]
+}

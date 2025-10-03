@@ -141,9 +141,9 @@
             <!-- All the files except for the ones we need to handle specially -->
             <ComponentGroup Id="NetdataComponents" Directory="INSTALLFOLDER">
                 <Files Include="C:\msys64\opt\netdata\**">
-                    <Exclude Files="C:\msys64\opt\netdata\usr\bin\netdata.exe" />
-                    <Exclude Files="C:\msys64\opt\netdata\usr\bin\wevt_netdata_manifest.xml" />
-                    <Exclude Files="C:\msys64\opt\netdata\usr\bin\wevt_netdata.dll" />
+                    <Exclude Files="C:\msys64\opt\netdata\usr\sbin\netdata.exe" />
+                    <Exclude Files="C:\msys64\opt\netdata\usr\sbin\wevt_netdata_manifest.xml" />
+                    <Exclude Files="C:\msys64\opt\netdata\usr\sbin\wevt_netdata.dll" />
                 </Files>
             </ComponentGroup>
 
@@ -208,10 +208,10 @@
 
             <!-- Install wevt manifest/dll files -->
             <ComponentGroup Id="WevtComponents" Directory="System64Folder">
-                <File Id="WevtDll" Name="wevt_netdata.dll" Source="C:\msys64\opt\netdata\usr\bin\wevt_netdata.dll">
+                <File Id="WevtDll" Name="wevt_netdata.dll" Source="C:\msys64\opt\netdata\usr\sbin\wevt_netdata.dll">
                 </File>
 
-                <File Id="WevtManifest" Name="wevt_netdata_manifest.xml" Source="C:\msys64\opt\netdata\usr\bin\wevt_netdata_manifest.xml">
+                <File Id="WevtManifest" Name="wevt_netdata_manifest.xml" Source="C:\msys64\opt\netdata\usr\sbin\wevt_netdata_manifest.xml">
                 </File>
             </ComponentGroup>
 
@@ -226,7 +226,7 @@
             </InstallExecuteSequence>
 
             <Component Id="NetdataService" Directory="USRBINDIR">
-                <File Id="netdata.exe" Source="C:\msys64\opt\netdata\usr\bin\netdata.exe" KeyPath="yes" />
+                <File Id="netdata.exe" Source="C:\msys64\opt\netdata\usr\sbin\netdata.exe" KeyPath="yes" />
 
                 <ServiceInstall Id="InstallService"
                                 Name="Netdata"

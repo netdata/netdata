@@ -1,0 +1,11 @@
+{
+  "generated_at": "2025-09-25T02:42:48.331113003+03:00",
+  "jobs": [
+    {
+      "name": "pub400",
+      "module": "as400",
+      "directory": "/usr/src/netdata-ktsaou.git/src/go/plugin/ibm.d/samples.d/pub400.org/as400/pub400",
+      "collections": 1
+    }
+  ]
+}

@@ -2,6 +2,8 @@ module github.com/netdata/netdata/go/plugins
 
 go 1.24.0
 
+replace github.com/netdata/netdata/go/plugins/plugin/go.d => ./plugin/go.d
+
 replace github.com/prometheus/prometheus => github.com/prometheus/prometheus v0.302.0
 
 replace github.com/gosnmp/gosnmp => github.com/ilyam8/gosnmp v0.0.0-20250912202722-388b2cb5192e
@@ -29,6 +31,8 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/gorcon/rcon v1.4.0
 	github.com/gosnmp/gosnmp v1.42.1
+	github.com/ibmdb/go_ibm_db v0.4.5 // Used by ibm.d.plugin (requires CGO)
+	github.com/invopop/jsonschema v0.13.0
 	github.com/jackc/pgx/v4 v4.18.3
 	github.com/jackc/pgx/v5 v5.7.6
 	github.com/jessevdk/go-flags v1.6.1
@@ -63,6 +67,12 @@ require (
 	k8s.io/apimachinery v0.34.1
 	k8s.io/client-go v0.34.1
 	layeh.com/radius v0.0.0-20190322222518-890bc1058917
+)
+
+require (
+	github.com/alexbrainman/odbc v0.0.0-20250601004241-49e6b2bc0cf0
+	github.com/ibm-messaging/mq-golang/v5 v5.6.4
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
@@ -165,7 +175,6 @@ require (
 	gopkg.in/cenkalti/backoff.v2 v2.2.1 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.12.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 	k8s.io/klog/v2 v2.130.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20250710124328-f3f2b991d03b // indirect
 	k8s.io/utils v0.0.0-20250604170112-4c0f3b243397 // indirect

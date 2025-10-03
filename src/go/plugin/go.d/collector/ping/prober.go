@@ -47,26 +47,14 @@ func (p *pingProber) Ping(host string) (*probing.Statistics, error) {
 		return nil, fmt.Errorf("DNS lookup '%s' : %v", host, err)
 	}
 
-	pr.SetLogger(nil)
 	pr.RecordRtts = false
 	pr.RecordTTLs = false
-
+	pr.Interval = p.conf.Interval.Duration()
+	pr.Count = p.conf.Packets
+	pr.Timeout = p.conf.Timeout
 	pr.InterfaceName = p.conf.Interface
 	pr.SetPrivileged(p.conf.Privileged)
-
-	pr.Interval = time.Millisecond * 100
-	pr.Count = 3
-	pr.Timeout = time.Second * 5
-
-	if p.conf.Interval.Duration().Milliseconds() > 0 {
-		pr.Interval = p.conf.Interval.Duration()
-	}
-	if p.conf.Packets > 0 {
-		pr.Count = p.conf.Packets
-	}
-	if p.conf.Timeout.Milliseconds() > 0 {
-		pr.Timeout = p.conf.Timeout
-	}
+	pr.SetLogger(nil)
 
 	if err := pr.Run(); err != nil {
 		return nil, fmt.Errorf("pinging host '%s' (ip '%s' iface '%s'): %v",
