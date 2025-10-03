@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- Register Netdata to MCP Registry [\#21088](https://github.com/netdata/netdata/pull/21088) ([ktsaou](https://github.com/ktsaou))
+- MCP docs and log spamming fix [\#21087](https://github.com/netdata/netdata/pull/21087) ([ktsaou](https://github.com/ktsaou))
+- Fix app.mem\_usage  \(Windows\) [\#21085](https://github.com/netdata/netdata/pull/21085) ([thiagoftsm](https://github.com/thiagoftsm))
 - Fix duplicate header leak in ACLK HTTPS client [\#21084](https://github.com/netdata/netdata/pull/21084) ([ktsaou](https://github.com/ktsaou))
 - Adjust Disk Size \(Windows.plugin\) [\#21081](https://github.com/netdata/netdata/pull/21081) ([thiagoftsm](https://github.com/thiagoftsm))
 - Regenerate integrations docs [\#21079](https://github.com/netdata/netdata/pull/21079) ([netdatabot](https://github.com/netdatabot))
@@ -31,6 +34,7 @@
 - improve\(go.d/rabbitmq\): add support for old RabbitMQ whoami tags format [\#21049](https://github.com/netdata/netdata/pull/21049) ([ilyam8](https://github.com/ilyam8))
 - ml: implement fixed time-based training windows - corrected [\#21046](https://github.com/netdata/netdata/pull/21046) ([ktsaou](https://github.com/ktsaou))
 - ai-docs [\#21043](https://github.com/netdata/netdata/pull/21043) ([shyamvalsan](https://github.com/shyamvalsan))
+- Remote MCP support \(streamable http and sse\) [\#21036](https://github.com/netdata/netdata/pull/21036) ([ktsaou](https://github.com/ktsaou))
 - Add helper to run external commands without additional privileges. [\#20990](https://github.com/netdata/netdata/pull/20990) ([Ferroin](https://github.com/Ferroin))
 - Clean up handling of compiler flags in our build code. [\#20821](https://github.com/netdata/netdata/pull/20821) ([Ferroin](https://github.com/Ferroin))
 
@@ -448,9 +452,6 @@
 - Add Remove Node guide [\#20549](https://github.com/netdata/netdata/pull/20549) ([kanelatechnical](https://github.com/kanelatechnical))
 - SNMP: brother profile [\#20548](https://github.com/netdata/netdata/pull/20548) ([Ancairon](https://github.com/Ancairon))
 - improve\(go.d/snmp-profiles\): add DHCP tags transform to bluecat profile [\#20547](https://github.com/netdata/netdata/pull/20547) ([ilyam8](https://github.com/ilyam8))
-- SNMP: brocade profiles [\#20546](https://github.com/netdata/netdata/pull/20546) ([Ancairon](https://github.com/Ancairon))
-- build\(deps\): bump github.com/prometheus/common from 0.64.0 to 0.65.0 in /src/go [\#20545](https://github.com/netdata/netdata/pull/20545) ([dependabot[bot]](https://github.com/apps/dependabot))
-- refactor\(go.d/ddsnmpcollector\): restructure into components [\#20543](https://github.com/netdata/netdata/pull/20543) ([ilyam8](https://github.com/ilyam8))
 
 ## [v2.5.4](https://github.com/netdata/netdata/tree/v2.5.4) (2025-06-24)
 
