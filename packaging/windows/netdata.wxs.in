@@ -190,12 +190,6 @@
                 <Custom Action="InstallManifest" After="InstallFiles" />
             </InstallExecuteSequence>
 
-            <!-- Added StopNetdataService custom action to ensure service is stopped before file operations -->
-            <!-- CustomAction Id="StopNetdataService" Directory="System64Folder" ExeCommand='net stop Netdata' Execute="immediate" Return="ignore" />
-            <InstallExecuteSequence>
-                <Custom Action="StopNetdataService" Before="InstallValidate" Condition="Installed AND NOT REMOVE" />
-            </InstallExecuteSequence -->
-
             <Component Id="NetdataService" Directory="USRBINDIR">
                 <File Id="netdata.exe" Source="C:\msys64\opt\netdata\usr\bin\netdata.exe" KeyPath="yes" />
 
@@ -225,21 +219,6 @@
 
                 <ServiceControl Id="StartService" Name="Netdata" Start="install" Wait="no" />
                 <ServiceControl Id="StopService" Name="Netdata" Remove="uninstall" Stop="both" Wait="yes" />
-
-                <!-- Modified to ensure proper service handling during update -->
-                <!--ServiceControl Id="ControlService"
-                                Name="Netdata"
-                                Stop="both"
-                                Start="install"
-                                Remove="uninstall"
-                                Wait="yes" /-->
-
-
-                 <!-- RegistryValue Root="HKLM"
-                               Key="System\CurrentControlSet\Services\Netdata"
-                               Name="DelayedAutoStart"
-                               Value="1"
-                               Type="integer" / -->
             </Component>
     </Fragment>
 
