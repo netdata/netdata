@@ -209,8 +209,6 @@ USAGE: ${PROGRAM} [options]
   --enable-plugin-go         Enable the Go plugin. Default: Enabled when possible.
   --disable-plugin-go        Disable the Go plugin.
   --disable-go               Disable all Go components.
-  --enable-plugin-ibm        Enable the IBM ecosystem plugin (requires CGO). Default: Disabled.
-  --disable-plugin-ibm       Disable the IBM ecosystem plugin.
   --enable-plugin-nfacct     Enable nfacct plugin. Default: enable it when libmnl and libnetfilter_acct are available.
   --disable-plugin-nfacct    Explicitly disable the nfacct plugin.
   --enable-plugin-xenstat    Enable the xenstat plugin. Default: enable it when libxenstat and libyajl are available.
@@ -261,7 +259,6 @@ LIBS_ARE_HERE=0
 NETDATA_ENABLE_ML=""
 ENABLE_DBENGINE=1
 ENABLE_GO=1
-ENABLE_IBM=0
 ENABLE_PYTHON=1
 ENABLE_CHARTS=1
 ENABLE_OTEL=0
@@ -294,8 +291,6 @@ while [ -n "${1}" ]; do
     "--enable-plugin-go") ENABLE_GO=1 ;;
     "--disable-plugin-go") ENABLE_GO=0 ;;
     "--disable-go") ENABLE_GO=0 ;;
-    "--enable-plugin-ibm") ENABLE_IBM=1 ;;
-    "--disable-plugin-ibm") ENABLE_IBM=0 ;;
     "--enable-plugin-python") ENABLE_PYTHON=1 ;;
     "--disable-plugin-python") ENABLE_PYTHON=0 ;;
     "--enable-plugin-charts") ENABLE_CHARTS=1 ;;
@@ -1037,16 +1032,6 @@ if grep -q docker /proc/1/cgroup > /dev/null 2>&1; then
   echo >&2
 else
   install_netdata_service || run_failed "Cannot install netdata init service."
-fi
-
-# -----------------------------------------------------------------------------
-# If IBM plugin is enabled, try to download IBM libraries
-if [ ${ENABLE_IBM} -eq 1 ] && [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/install-ibm-libs.sh" ]; then
-  progress "Downloading IBM MQ client libraries for IBM plugin"
-  if ! NETDATA_PREFIX="${NETDATA_PREFIX}" run "${NETDATA_PREFIX}/usr/libexec/netdata/install-ibm-libs.sh"; then
-    warning "Failed to download IBM MQ client libraries. The MQ PCF collector will not work until libraries are installed."
-    warning "You can manually run: NETDATA_PREFIX=\"${NETDATA_PREFIX}\" ${NETDATA_PREFIX}/usr/libexec/netdata/install-ibm-libs.sh"
-  fi
 fi
 
 # -----------------------------------------------------------------------------
