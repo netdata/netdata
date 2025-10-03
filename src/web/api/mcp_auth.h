@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#ifndef NETDATA_MCP_API_KEY_H
-#define NETDATA_MCP_API_KEY_H
+#ifndef NETDATA_MCP_AUTH_H
+#define NETDATA_MCP_AUTH_H
 
 #include "daemon/common.h"
 
@@ -17,7 +17,8 @@ void mcp_api_key_initialize(void);
 
 // Verify if the provided API key matches the stored one
 // Returns true if valid and agent is claimed, false otherwise
-bool mcp_api_key_verify(const char *api_key);
+// silent: if true, suppresses error logging (for speculative checks)
+bool mcp_api_key_verify(const char *api_key, bool silent);
 
 // Get the current API key (for display purposes)
 // Returns a static buffer that should not be freed
@@ -25,4 +26,4 @@ const char *mcp_api_key_get(void);
 
 #endif // NETDATA_MCP_DEV_PREVIEW_API_KEY
 
-#endif // NETDATA_MCP_API_KEY_H
+#endif // NETDATA_MCP_AUTH_H

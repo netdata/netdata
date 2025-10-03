@@ -21,7 +21,9 @@ You can use Netdata with the following AI assistants:
 
 Probably more: Check the [MCP documentation](https://modelcontextprotocol.io/clients) for a full list of supported AI assistants.
 
-All these AI assistants need local access to the MCP servers. This means that the application you run locally on your computer (Claude Desktop, Cursor, etc) needs to be able to connect to the Netdata using `stdio` communication. However, since your Netdata runs remotely on a server, you need a bridge to convert the `stdio` communication to `WebSocket` communication. Netdata provides bridges in multiple languages (Node.js, Python, Go) to facilitate this.
+All these AI assistants need local access to the MCP servers. When the client supports **HTTP streamable** or **Server-Sent Events (SSE)** transports (for example, `npx @modelcontextprotocol/remote-mcp`), it can now connect directly to Netdata's `/mcp` (HTTP) or `/sse` endpoints—no custom bridge required.
+
+Many desktop assistants, however, still talk to MCP servers over `stdio`. For them you still need a bridge that converts `stdio` to a network transport. Netdata keeps shipping the `nd-mcp` bridge (plus the polyglot bridges in `bridges/`) for this purpose.
 
 Once MCP is integrated into Netdata Cloud, Web-based AI assistants will also be supported. For Web-based AI assistants, the backend of the assistant connects to a publicly accessible MCP server (i.e. Netdata Cloud) to access infrastructure observability data, without needing a bridge.
 
@@ -41,14 +43,16 @@ The configuration of most AI assistants is done via a configuration file, which 
     "netdata": {
       "command": "/usr/bin/nd-mcp",
       "args": [
-        "ws://IP_OF_YOUR_NETDATA:19999/mcp?api_key=YOUR_API_KEY"
+        "--bearer",
+        "YOUR_API_KEY",
+        "ws://IP_OF_YOUR_NETDATA:19999/mcp"
       ]
     }
   }
 }
 ```
 
-The program `nd-mcp` is the bridge program that converts `stdio` communication to `WebSocket` communication. This program is part of all Netdata installations, so by installing Netdata on your personal computer (Linux, MacOS, Windows) you will have it available.
+The program `nd-mcp` is still the universal bridge that converts `stdio` communication to network transports. This program is part of all Netdata installations, so by installing Netdata on your personal computer (Linux, macOS, Windows) you will have it available.
 
 There may be different paths for it, depending on how you installed Netdata:
 
@@ -56,6 +60,33 @@ There may be different paths for it, depending on how you installed Netdata:
 - `/opt/netdata/usr/bin/nd-mcp`: Linux static Netdata installations
 - `/usr/local/netdata/usr/bin/nd-mcp`: MacOS installations from source
 - `C:\\Program Files\\Netdata\\usr\\bin\\nd-mcp.exe`: Windows installations
+
+### Native HTTP/SSE connection (remote-mcp)
+
+If your client supports HTTP or SSE, you can skip the bridge entirely. The Netdata agent exposes two MCP HTTP endpoints on the same port as the dashboard:
+
+| Endpoint | Transport | Notes |
+| --- | --- | --- |
+| `http://IP_OF_YOUR_NETDATA:19999/mcp` | Streamable HTTP (chunked JSON) | Default response; add `Accept: application/json` |
+| `http://IP_OF_YOUR_NETDATA:19999/mcp?transport=sse` | Server-Sent Events | Equivalent to sending `Accept: text/event-stream` |
+
+To test quickly with the official MCP CLI:
+
+```bash
+npx @modelcontextprotocol/remote-mcp \
+  --sse http://IP_OF_YOUR_NETDATA:19999/mcp \
+  --header "Authorization: Bearer YOUR_API_KEY"
+```
+
+Or, to prefer streamable HTTP:
+
+```bash
+npx @modelcontextprotocol/remote-mcp \
+  --http http://IP_OF_YOUR_NETDATA:19999/mcp \
+  --header "Authorization: Bearer YOUR_API_KEY"
+```
+
+These commands let you browse the Netdata MCP tools without installing `nd-mcp`. You can still keep `nd-mcp` in your assistant configuration as a fallback for clients that only speak `stdio`.
 
 You will also need:
 
@@ -112,7 +143,7 @@ For [Claude Code](https://claude.ai/code), add to your project's root, the file 
 Alternatively, you can add it using a Claude CLI command like this:
 
 ```bash
-claude mcp add netdata /usr/bin/nd-mcp ws://IP_OF_YOUR_NETDATA:19999/mcp?api_key=YOUR_API_KEY
+claude mcp add netdata /usr/bin/nd-mcp --bearer YOUR_API_KEY ws://IP_OF_YOUR_NETDATA:19999/mcp
 ```
 
 Once configured correctly, run `claude mcp list` or you can issue the command `/mcp` to your Claude Code. It should show you the available MCP servers, including "netdata".
@@ -122,6 +153,7 @@ Once configured correctly, run `claude mcp list` or you can issue the command `/
 For [Cursor](https://www.cursor.com/), add the configuration to the MCP settings.
 
 ## Alternative `stdio` to `websocket` Bridges
+These bridges remain useful for AI assistants that only support `stdio`. If your tooling can use Netdata's native HTTP/SSE endpoints you can skip this section.
 
 We provide 3 different bridges for you to choose the one that best fits your environment:
 
@@ -268,7 +300,7 @@ Once configured, you can ask questions like:
   - A: Yes, MCP supports multiple AI assistants. Check the [MCP documentation](https://modelcontextprotocol.io/clients) for a full list.
 
 - **Q: Do I need to run a bridge on my local machine?**
-- A: Yes, the bridge converts `stdio` communication to `WebSocket` for remote access to Netdata. The bridge is run on your local machine (personal computer) to connect to the Netdata instance.
+- A: Only if your client speaks `stdio` (Claude Desktop, Cursor, etc). Modern MCP clients such as `npx @modelcontextprotocol/remote-mcp` can talk HTTP/SSE directly to Netdata's `/mcp` endpoints, so no bridge is required in that case. Keep `nd-mcp` as a fallback for assistants that still require `stdio`.
 
 - **Q: How do I find my API key?**
   - A: The API key is automatically generated by Netdata and stored in `/var/lib/netdata/mcp_dev_preview_api_key` or `/opt/netdata/var/lib/netdata/mcp_dev_preview_api_key` on the Netdata Agent you will connect to. Use `sudo cat` to view it.
@@ -331,16 +363,20 @@ If you need to configure multiple MCP servers, you can add them under the `mcpSe
 {
   "mcpServers": {
     "netdata-production": {
-      "command": "/usr/bin/nd-mcp",
-      "args": [
-        "ws://IP_OF_YOUR_NETDATA:19999/mcp?api_key=YOUR_API_KEY"
-      ]
+        "command": "/usr/bin/nd-mcp",
+        "args": [
+          "--bearer",
+          "YOUR_API_KEY",
+          "ws://IP_OF_YOUR_NETDATA:19999/mcp"
+        ]
     },
     "netdata-testing": {
-      "command": "/usr/bin/nd-mcp",
-      "args": [
-        "ws://IP_OF_YOUR_NETDATA:19999/mcp?api_key=YOUR_API_KEY"
-      ]
+        "command": "/usr/bin/nd-mcp",
+        "args": [
+          "--bearer",
+          "YOUR_API_KEY",
+          "ws://IP_OF_YOUR_NETDATA:19999/mcp"
+        ]
     }
   }
 }

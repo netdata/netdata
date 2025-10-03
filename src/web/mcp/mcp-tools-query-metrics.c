@@ -293,11 +293,9 @@ static bool mcp_query_interrupt_callback(void *data) {
 // Removed extract_string_param and extract_size_param - now using mcp-params functions
 
 // Execute the metrics query
-MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id) {
-    if (!mcpc || id == 0)
+MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id __maybe_unused) {
+    if (!mcpc)
         return MCP_RC_ERROR;
-
-    buffer_flush(mcpc->result);
 
     usec_t received_ut = now_monotonic_usec();
     
@@ -592,7 +590,6 @@ MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_obj
     onewayalloc_destroy(owa);
     
     if (ret != HTTP_RESP_OK) {
-        buffer_flush(mcpc->result);
         const char *error_desc = "unknown error";
         
         // Map common HTTP error codes to more descriptive messages

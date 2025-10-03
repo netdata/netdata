@@ -2,6 +2,9 @@
 
 #include "http_header.h"
 
+#include <string.h>
+#include <strings.h>
+
 static void web_client_enable_deflate(struct web_client *w, bool gzip) {
     if(gzip)
         web_client_flag_set(w, WEB_CLIENT_ENCODING_GZIP);
@@ -79,6 +82,42 @@ static void http_header_user_agent(struct web_client *w, const char *v, size_t l
     if(w->mode == HTTP_REQUEST_MODE_STREAM) {
         freez(w->user_agent);
         w->user_agent = strdupz(v);
+    }
+}
+
+static void http_header_accept(struct web_client *w, const char *v, size_t len __maybe_unused) {
+    web_client_flag_clear(w, WEB_CLIENT_FLAG_ACCEPT_JSON |
+                             WEB_CLIENT_FLAG_ACCEPT_SSE |
+                             WEB_CLIENT_FLAG_ACCEPT_TEXT);
+
+    for (const char *p = v; p && *p; ) {
+        while (*p == ' ' || *p == '\t' || *p == ',') p++;
+        if (!*p)
+            break;
+
+        const char *start = p;
+        while (*p && *p != ',' && *p != ';')
+            p++;
+        size_t length = (size_t)(p - start);
+
+        while (*p && *p != ',')
+            p++;
+
+        if (length == 0)
+            continue;
+
+        if (length >= strlen("application/json") &&
+            strncasecmp(start, "application/json", strlen("application/json")) == 0) {
+            web_client_flag_set(w, WEB_CLIENT_FLAG_ACCEPT_JSON);
+        }
+        else if (length >= strlen("text/event-stream") &&
+                 strncasecmp(start, "text/event-stream", strlen("text/event-stream")) == 0) {
+            web_client_flag_set(w, WEB_CLIENT_FLAG_ACCEPT_SSE);
+        }
+        else if (length >= strlen("text/plain") &&
+                 strncasecmp(start, "text/plain", strlen("text/plain")) == 0) {
+            web_client_flag_set(w, WEB_CLIENT_FLAG_ACCEPT_TEXT);
+        }
     }
 }
 
@@ -302,6 +341,7 @@ struct {
     { .hash = 0, .key = "Connection",            .cb = http_header_connection },
     { .hash = 0, .key = "DNT",                   .cb = http_header_dnt },
     { .hash = 0, .key = "User-Agent",            .cb = http_header_user_agent},
+    { .hash = 0, .key = "Accept",                .cb = http_header_accept },
     { .hash = 0, .key = "X-Auth-Token",          .cb = http_header_x_auth_token },
     { .hash = 0, .key = "Host",                  .cb = http_header_host },
     { .hash = 0, .key = "Accept-Encoding",       .cb = http_header_accept_encoding },

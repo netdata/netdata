@@ -4,6 +4,8 @@
 
 When an alert fires, you can use AI to generate a detailed troubleshooting report that analyzes whether the alert requires immediate action or is just noise. The AI examines your alert's history, correlates it with thousands of other metrics across your infrastructure, and provides actionable insights—all within minutes.
 
+![Ask AI from Alerts](https://raw.githubusercontent.com/netdata/docs-images/refs/heads/master/netdata-cloud/netdata-ai/alert-troubleshoot-1.png)
+
 ### Key Benefits
 
 - **Save hours of manual investigation** - Skip the initial data collection and correlation work
@@ -63,15 +65,13 @@ Reports typically generate in 1-2 minutes. Once complete:
 - A copy is saved in the **Insights** tab under "Investigations"
 - You receive an email notification with the analysis summary
 
+![Alert Troubleshooting report example](https://raw.githubusercontent.com/netdata/docs-images/refs/heads/master/netdata-cloud/netdata-ai/alert-troubleshoot-report.png)
+
 ### Access and Availability
 
-This feature is available in preview mode for:
-
-- All Business and Homelab plan users
-- New users get 10 AI troubleshooting sessions per month during their Business plan trial
+- Generally available in Netdata Cloud (Business and Free Trial)
+- Eligible Spaces receive 10 free AI runs per month; additional usage via AI Credits
 
 :::note
-
-Community users can request access by contacting product@netdata.cloud
-
+Track AI credit usage from `Settings → Usage & Billing → AI Credits`.
 :::

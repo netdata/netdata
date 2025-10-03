@@ -83,8 +83,8 @@ typedef struct {
 } MCP_RESOURCE_TEMPLATE;
 
 // Implementation of resources/list
-static MCP_RETURN_CODE mcp_resources_method_list(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id) {
-    if (!mcpc || !params || !id) return MCP_RC_INTERNAL_ERROR;
+static MCP_RETURN_CODE mcp_resources_method_list(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id __maybe_unused) {
+    if (!mcpc || !params) return MCP_RC_INTERNAL_ERROR;
 
     // Initialize success response
     mcp_init_success_result(mcpc, id);
@@ -98,8 +98,8 @@ static MCP_RETURN_CODE mcp_resources_method_list(MCP_CLIENT *mcpc, struct json_o
 }
 
 // Implementation of resources/read
-static MCP_RETURN_CODE mcp_resources_method_read(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id) {
-    if (!mcpc || id == 0 || !params) return MCP_RC_INTERNAL_ERROR;
+static MCP_RETURN_CODE mcp_resources_method_read(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id __maybe_unused) {
+    if (!mcpc || !params) return MCP_RC_INTERNAL_ERROR;
 
     // Extract URI from params
     struct json_object *uri_obj = NULL;
@@ -122,8 +122,8 @@ static MCP_RETURN_CODE mcp_resources_method_read(MCP_CLIENT *mcpc, struct json_o
 }
 
 // Implementation of resources/templates/list
-static MCP_RETURN_CODE mcp_resources_method_templates_list(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id) {
-    if (!mcpc || !params || !id) return MCP_RC_INTERNAL_ERROR;
+static MCP_RETURN_CODE mcp_resources_method_templates_list(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id __maybe_unused) {
+    if (!mcpc || !params) return MCP_RC_INTERNAL_ERROR;
 
     // Initialize success response
     mcp_init_success_result(mcpc, id);
@@ -137,27 +137,23 @@ static MCP_RETURN_CODE mcp_resources_method_templates_list(MCP_CLIENT *mcpc, str
 }
 
 // Implementation of resources/subscribe (transport-agnostic)
-static MCP_RETURN_CODE mcp_resources_method_subscribe(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id) {
-    if (!mcpc || !id || !params) return MCP_RC_INTERNAL_ERROR;
+static MCP_RETURN_CODE mcp_resources_method_subscribe(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id __maybe_unused) {
+    if (!mcpc || !params) return MCP_RC_INTERNAL_ERROR;
     return MCP_RC_NOT_IMPLEMENTED;
 }
 
 // Implementation of resources/unsubscribe (transport-agnostic)
-static MCP_RETURN_CODE mcp_resources_method_unsubscribe(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id) {
-    if (!mcpc || id == 0 || !params) return MCP_RC_INTERNAL_ERROR;
+static MCP_RETURN_CODE mcp_resources_method_unsubscribe(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id __maybe_unused) {
+    if (!mcpc || !params) return MCP_RC_INTERNAL_ERROR;
     return MCP_RC_NOT_IMPLEMENTED;
 }
 
 // Resource namespace method dispatcher (transport-agnostic)
-MCP_RETURN_CODE mcp_resources_route(MCP_CLIENT *mcpc, const char *method, struct json_object *params, MCP_REQUEST_ID id) {
+MCP_RETURN_CODE mcp_resources_route(MCP_CLIENT *mcpc, const char *method, struct json_object *params, MCP_REQUEST_ID id __maybe_unused) {
     if (!mcpc || !method) return MCP_RC_INTERNAL_ERROR;
 
     netdata_log_debug(D_MCP, "MCP resources method: %s", method);
 
-    // Clear previous buffers
-    buffer_flush(mcpc->result);
-    buffer_flush(mcpc->error);
-    
     MCP_RETURN_CODE rc;
     
     if (strcmp(method, "list") == 0) {

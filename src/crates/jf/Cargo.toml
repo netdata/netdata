@@ -59,6 +59,8 @@ bytesize-serde = "0.2"
 
 clap = { version = "4.5", features = ["derive", "env"] }
 
+flatten-serde-json = { git = "https://github.com/meilisearch/meilisearch", tag = "v1.22.1" }
+
 [profile.release]
 lto = true
 codegen-units = 1

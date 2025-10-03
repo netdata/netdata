@@ -914,7 +914,7 @@ bool apps_os_collect_all_pids_windows(void) {
             p->perflib[PDF_UTIME].key = "% User Time";
             p->perflib[PDF_STIME].key = "% Privileged Time";
             p->perflib[PDF_VMSIZE].key = "Virtual Bytes";
-            p->perflib[PDF_VMRSS].key = "Working Set";
+            p->perflib[PDF_VMRSS].key = "Working Set - Private";
             p->perflib[PDF_VMSWAP].key = "Page File Bytes";
             p->perflib[PDF_LREAD].key = "IO Read Bytes/sec";
             p->perflib[PDF_LWRITE].key = "IO Write Bytes/sec";

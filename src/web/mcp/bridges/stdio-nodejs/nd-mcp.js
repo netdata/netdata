@@ -6,9 +6,43 @@ const path = require('path');
 // Get program name for logs
 const PROGRAM_NAME = path.basename(process.argv[1] || 'nd-mcp-nodejs');
 
-if (process.argv.length !== 3) {
-    console.error(`${PROGRAM_NAME}: Usage: ${PROGRAM_NAME} ws://host/path`);
+function usage() {
+    console.error(`${PROGRAM_NAME}: Usage: ${PROGRAM_NAME} [--bearer TOKEN] ws://host/path`);
     process.exit(1);
+}
+
+const parsedArgs = process.argv.slice(2);
+let targetURL = '';
+let bearerToken = '';
+
+for (let i = 0; i < parsedArgs.length;) {
+    const arg = parsedArgs[i];
+
+    if (arg === '--bearer') {
+        if (i + 1 >= parsedArgs.length) usage();
+        bearerToken = parsedArgs[i + 1].trim();
+        i += 2;
+    }
+    else if (arg.startsWith('--bearer=')) {
+        bearerToken = arg.substring('--bearer='.length).trim();
+        i += 1;
+    }
+    else {
+        if (targetURL) usage();
+        targetURL = arg;
+        i += 1;
+    }
+}
+
+if (!targetURL) usage();
+
+if (!bearerToken) {
+    const envToken = process.env.ND_MCP_BEARER_TOKEN;
+    if (envToken) bearerToken = envToken.trim();
+}
+
+if (bearerToken) {
+    console.error(`${PROGRAM_NAME}: Authorization header enabled for MCP connection`);
 }
 
 // Reconnection settings
@@ -209,7 +243,7 @@ function attemptConnection() {
     }
     
     connectingInProgress = true;
-    console.error(`${PROGRAM_NAME}: Connecting to ${process.argv[2]}...`);
+    console.error(`${PROGRAM_NAME}: Connecting to ${targetURL}...`);
     
     // Close any existing websocket
     if (ws) {
@@ -231,7 +265,13 @@ function attemptConnection() {
         pingTimeout: 10000   // 10 seconds to wait for pong
     };
     
-    ws = new WebSocket(process.argv[2], wsOptions);
+    if (bearerToken) {
+        wsOptions.headers = {
+            Authorization: `Bearer ${bearerToken}`
+        };
+    }
+
+    ws = new WebSocket(targetURL, wsOptions);
     
     // Set a timeout for initial connection
     const connectionTimeout = setTimeout(() => {
