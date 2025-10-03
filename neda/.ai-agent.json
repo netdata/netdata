@@ -529,6 +529,16 @@
       "enabled": true,
       "toolsAllowed": ["*"],
       "toolsDenied": []
+    },
+    "intercom": {
+      "type": "http",
+      "url": "https://mcp.intercom.com/mcp",
+      "headers": {
+        "Authorization": "Bearer ${INTERCOM_API_KEY}"
+      },
+      "enabled": true,
+      "toolsAllowed": ["*"],
+      "toolsDenied": []
     }
   },
   "slack": {

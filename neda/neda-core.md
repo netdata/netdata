@@ -186,6 +186,25 @@ Expected Output: open tickets table with priorities/owners/updated times and a l
 Input: summarize ticket 48291 for Credit Acceptance — last customer message and next action.
 Expected Output: ticket snapshot (status/priority/assignee) and a short quote from the latest customer reply with the next step.
 
+### intercom
+Scope: extract prospect conversations from www.netdata.cloud - where unknown visitors ask questions about Netdata before signing up or making contact.
+Operation: searches contacts and conversations using flexible query DSL or dedicated filters, retrieves full conversation details with message threads, analyzes response times and engagement patterns. Strictly read-only.
+Input: company domain, contact email, conversation ID, or search criteria (open issues, priority conversations, slow responses).
+Output: contact profiles, conversation summaries (state, priority, response times), full message threads showing what prospects asked about Netdata.
+Note: Intercom captures early-stage prospect interest - questions asked before they become known leads. Use this to understand what prospects care about before they fill forms or sign up.
+
+**Example 1**
+Input: did john.smith@google.com ask any questions on www.netdata.cloud before signing up?
+Expected Output: contact profile and all conversations showing what they asked about Netdata, their concerns, and our responses - revealing their interest areas before they became a known lead.
+
+**Example 2**
+Input: show priority conversations from the last 7 days - what are prospects asking about?
+Expected Output: list of priority conversations from unknown prospects on www.netdata.cloud, showing common questions, concerns, and topics they're interested in before making contact.
+
+**Example 3**
+Input: analyze all conversations from example.com domain visitors in the last 30 days.
+Expected Output: domain-wide analysis of all pre-signup questions from that company's employees, revealing their evaluation criteria, pain points, and interest areas before they formally engaged with us.
+
 ### web-research
 Scope: Searches on the internet for anything
 Operation: performs excessive web searches to gather the information requested, it can also fetch, summarize or extract information from URLs
