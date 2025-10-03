@@ -106,9 +106,9 @@
             <!-- All the files except for the ones we need to handle specially -->
             <ComponentGroup Id="NetdataComponents" Directory="INSTALLFOLDER">
                 <Files Include="C:\msys64\opt\netdata\**">
-                    <Exclude Files="C:\msys64\opt\netdata\usr\bin\netdata.exe" />
-                    <Exclude Files="C:\msys64\opt\netdata\usr\bin\wevt_netdata_manifest.xml" />
-                    <Exclude Files="C:\msys64\opt\netdata\usr\bin\wevt_netdata.dll" />
+                    <Exclude Files="C:\msys64\opt\netdata\usr\sbin\netdata.exe" />
+                    <Exclude Files="C:\msys64\opt\netdata\usr\sbin\wevt_netdata_manifest.xml" />
+                    <Exclude Files="C:\msys64\opt\netdata\usr\sbin\wevt_netdata.dll" />
                 </Files>
             </ComponentGroup>
 
