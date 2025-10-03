@@ -84,6 +84,7 @@ Neda provides 24 specialized agents for different business intelligence needs.
 |-------|---------|---------------|
 | `github` | Netdata GitHub repository intelligence (public and private repos) | "Find issues about ml_anomaly_score" |
 | `freshdesk` | Customer support tickets | "Open tickets for Acme Corp" |
+| `intercom` | Prospect conversations from www.netdata.cloud (pre-signup questions) | "Did john@acme.com ask questions before signing up?" |
 | `netdata` | Infrastructure health monitoring | "Production systems health check" |
 | `source-code` | Netdata source code analysis | "How does TROUBLESHOOT button work?" |
 

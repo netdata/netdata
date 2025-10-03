@@ -8,8 +8,31 @@ Neda is an AI-powered assistant integrated with Slack that provides access to in
 
 - **Host Agent**: Main orchestrator (neda.ai) that manages conversations and coordinates sub-agents
 - **Sub-Agents**: 21 specialized agents with focused capabilities and tool access
+- **Internal Utility Agents**: Helper agents used internally by sub-agents (web-search, web-fetch, reddit, neda-second-opinion)
 - **MCP Tools**: Model Context Protocol servers that provide specific functionalities
 - **REST Tools**: Direct API integrations for specific services
+
+### Agent Hierarchy
+
+**Level 1 - Main Orchestrator:**
+- `neda` - Coordinates all sub-agents
+
+**Level 2 - User-Facing Sub-Agents:**
+- Sales & CRM: company, company-tech, contact, hubspot, stripe, fireflies
+- Analytics: bigquery, posthog, executive, ga, cloudflare, encharge, gsc
+- Technical: github, freshdesk, intercom, netdata, source-code
+- Research: web-research
+- Messaging: product-messaging, neda-second-opinion
+
+**Level 3 - Internal Utility Agents:**
+- `web-search` - Used by company, company-tech, contact, web-research
+- `web-fetch` - Used by company, company-tech, contact, web-research, web-search
+- `reddit` - Used by web-research, web-search
+
+**Note:**
+- On Slack: Only `neda` is exposed to users; all other agents are called internally as needed
+- On CLI/MCP/LLM APIs: All agents (including internal utilities) are directly accessible
+- Internal utility agents are primarily designed to be called by higher-level agents, not directly by users
 
 ## Security & Privacy
 
@@ -265,6 +288,23 @@ Output: Churn analysis with ARR impact and trends
 ```
 Input: show open tickets for Ellusium this quarter
 Output: Open tickets table with priorities, owners, SLA status
+```
+
+---
+
+#### intercom
+**Purpose**: Extract prospect conversations from www.netdata.cloud - questions asked before they become known leads
+**Integrations Used**:
+- `intercom` - Intercom MCP server
+
+**Features**: Pre-signup conversations, prospect questions, early interest signals, evaluation criteria
+
+**Note**: Only captures website visitor conversations, not customer support tickets
+
+**Example Usage**:
+```
+Input: did john.smith@google.com ask questions on www.netdata.cloud before signing up?
+Output: All conversations showing what they asked about Netdata before becoming a known lead
 ```
 
 ---
@@ -649,14 +689,35 @@ su neda -c '/opt/neda/bigquery.ai "find spaces created yesterday" --verbose'
 FRESHDESK_API_KEY=<your-freshdesk-api-key>
 FRESHDESK_DOMAIN=netdatacloud  # without .freshdesk.com
 ```
-**Setup**: 
+**Setup**:
 - Get API key from Freshdesk settings (Profile > View Profile > API Key)
 - Domain: `netdatacloud` (appears as netdatacloud.freshdesk.com)
 - Ensure API key has appropriate read permissions
-**Testing**: 
+**Testing**:
 ```bash
 # Test freshdesk using the freshdesk agent
 su neda -c '/opt/neda/freshdesk.ai "show open tickets for this week" --verbose'
+```
+
+---
+
+#### intercom
+**Type**: MCP Server (HTTP)
+**Purpose**: Prospect conversations from www.netdata.cloud - early-stage interest before leads are known
+**Source**: Official Intercom MCP server (HTTP remote)
+**Required Environment Variables**:
+```bash
+INTERCOM_API_KEY=<your-intercom-api-key>
+```
+**Setup**:
+- Get API key from Intercom settings
+- Captures questions asked by unknown visitors on www.netdata.cloud
+- Reveals prospect evaluation criteria before they sign up or fill forms
+**Note**: Only captures pre-signup conversations from website visitors, not customer support tickets
+**Testing**:
+```bash
+# Test intercom using the intercom agent
+su neda -c '/opt/neda/intercom.ai "show conversations from the last 7 days" --verbose'
 ```
 
 ---
@@ -806,6 +867,9 @@ FRESHDESK_DOMAIN=
 # Slack Integration (built-in, not MCP)
 SLACK_BOT_TOKEN=  # Bot User OAuth Token (xoxb-)
 SLACK_APP_TOKEN=  # App-Level Token for Socket Mode (xapp-)
+
+# Prospect Communication
+INTERCOM_API_KEY=
 
 # Ticketing & Code Access
 GITHUB_PERSONAL_ACCESS_TOKEN=
