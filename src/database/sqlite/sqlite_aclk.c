@@ -650,8 +650,6 @@ static void aclk_synchronization_event_loop(void *arg)
     Pvoid_t *Pvalue;
     worker_data_t  *worker;
 
-    unsigned cmd_batch_size;
-
     config->shutdown_requested = false;
     config->initialized = true;
     completion_mark_complete(&config->start_stop_complete);
@@ -662,15 +660,10 @@ static void aclk_synchronization_event_loop(void *arg)
         struct aclk_sync_cfg_t *aclk_host_config;
         aclk_query_t *query;
         worker_is_idle();
-        uv_run(loop, UV_RUN_DEFAULT);
+        uv_run(loop, UV_RUN_ONCE);
 
-        /* wait for commands */
-        cmd_batch_size = 0;
         do {
             cmd_data_t cmd;
-
-            if (unlikely(++cmd_batch_size >= MAX_BATCH_SIZE))
-                break;
 
             if (config->run_query_batch) {
                 opcode = ACLK_QUERY_BATCH_EXECUTE;
@@ -886,6 +879,10 @@ static void aclk_synchronization_event_loop(void *arg)
                 default:
                     break;
             }
+
+            if (opcode != ACLK_DATABASE_NOOP)
+                uv_run(loop, UV_RUN_NOWAIT);
+
         } while (opcode != ACLK_DATABASE_NOOP);
     }
     config->initialized = false;

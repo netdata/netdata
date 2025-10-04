@@ -2521,14 +2521,10 @@ static void metadata_event_loop(void *arg)
         enum metadata_opcode opcode;
 
         worker_is_idle();
-        uv_run(loop, UV_RUN_DEFAULT);
+        uv_run(loop, UV_RUN_ONCE);
 
         /* wait for commands */
-        unsigned cmd_batch_size = 0;
         do {
-            if (unlikely(++cmd_batch_size >= METADATA_MAX_BATCH_SIZE))
-                break;
-
             cmd_data_t cmd;
             if (config->store_metadata && !config->metadata_running) {
                 config->store_metadata = false;
@@ -2664,6 +2660,10 @@ static void metadata_event_loop(void *arg)
                 default:
                     break;
             }
+
+            if (likely(opcode != METADATA_DATABASE_NOOP))
+                uv_run(loop, UV_RUN_NOWAIT);
+
         } while (opcode != METADATA_DATABASE_NOOP);
     }
     config->initialized = false;
