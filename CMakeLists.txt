@@ -1296,6 +1296,8 @@ set(DAEMON_FILES
         src/daemon/status-file-product.h
         src/daemon/protected-access.c
         src/daemon/protected-access.h
+        src/daemon/daemon-parent.c
+        src/daemon/daemon-parent.h
 )
 
 set(DAEMON_SYSTEMD_WATCHER_FILES
