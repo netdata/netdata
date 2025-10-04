@@ -1,0 +1,1 @@
+Error parsing YAML file tests.d/error-invalid-syntax.yaml: YAML parse error: found unexpected end of stream at line 9, column 30
