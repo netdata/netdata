@@ -6,11 +6,17 @@
 
 **Merged pull requests:**
 
+- build\(deps\): bump github.com/docker/docker from 28.4.0+incompatible to 28.5.0+incompatible in /src/go [\#21095](https://github.com/netdata/netdata/pull/21095) ([dependabot[bot]](https://github.com/apps/dependabot))
+- build\(deps\): bump github.com/go-ldap/ldap/v3 from 3.4.11 to 3.4.12 in /src/go [\#21094](https://github.com/netdata/netdata/pull/21094) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Hide  mem\_private\_usage on Windows. [\#21093](https://github.com/netdata/netdata/pull/21093) ([thiagoftsm](https://github.com/thiagoftsm))
+- Improve installer \(Windows\) [\#21090](https://github.com/netdata/netdata/pull/21090) ([thiagoftsm](https://github.com/thiagoftsm))
+- Correctly split MCP registry update to it’s own workflow. [\#21089](https://github.com/netdata/netdata/pull/21089) ([Ferroin](https://github.com/Ferroin))
 - Register Netdata to MCP Registry [\#21088](https://github.com/netdata/netdata/pull/21088) ([ktsaou](https://github.com/ktsaou))
 - MCP docs and log spamming fix [\#21087](https://github.com/netdata/netdata/pull/21087) ([ktsaou](https://github.com/ktsaou))
 - Fix app.mem\_usage  \(Windows\) [\#21085](https://github.com/netdata/netdata/pull/21085) ([thiagoftsm](https://github.com/thiagoftsm))
 - Fix duplicate header leak in ACLK HTTPS client [\#21084](https://github.com/netdata/netdata/pull/21084) ([ktsaou](https://github.com/ktsaou))
 - Adjust Disk Size \(Windows.plugin\) [\#21081](https://github.com/netdata/netdata/pull/21081) ([thiagoftsm](https://github.com/thiagoftsm))
+- Fix cgroup-network spawn server cleanup on fatal exit [\#21080](https://github.com/netdata/netdata/pull/21080) ([ktsaou](https://github.com/ktsaou))
 - Regenerate integrations docs [\#21079](https://github.com/netdata/netdata/pull/21079) ([netdatabot](https://github.com/netdatabot))
 - docs: update SNMP collector metadata to reflect profile-based collection [\#21078](https://github.com/netdata/netdata/pull/21078) ([ilyam8](https://github.com/ilyam8))
 - build\(go\): add config dirs [\#21077](https://github.com/netdata/netdata/pull/21077) ([ilyam8](https://github.com/ilyam8))
@@ -444,14 +450,6 @@
 - SNMP: chrysalis profiles [\#20557](https://github.com/netdata/netdata/pull/20557) ([Ancairon](https://github.com/Ancairon))
 - SNMP: checkpoint profiles [\#20556](https://github.com/netdata/netdata/pull/20556) ([Ancairon](https://github.com/Ancairon))
 - Check that there is a valid thread when performing ACLK sync shutdown [\#20555](https://github.com/netdata/netdata/pull/20555) ([stelfrag](https://github.com/stelfrag))
-- SNMP: Chatsworth profile [\#20554](https://github.com/netdata/netdata/pull/20554) ([Ancairon](https://github.com/Ancairon))
-- Fix save alert config transition on shutdown [\#20553](https://github.com/netdata/netdata/pull/20553) ([stelfrag](https://github.com/stelfrag))
-- Regenerate integrations docs [\#20552](https://github.com/netdata/netdata/pull/20552) ([netdatabot](https://github.com/netdatabot))
-- Migrate from stable to nightly and vice versa [\#20551](https://github.com/netdata/netdata/pull/20551) ([kanelatechnical](https://github.com/kanelatechnical))
-- MSI parameter [\#20550](https://github.com/netdata/netdata/pull/20550) ([thiagoftsm](https://github.com/thiagoftsm))
-- Add Remove Node guide [\#20549](https://github.com/netdata/netdata/pull/20549) ([kanelatechnical](https://github.com/kanelatechnical))
-- SNMP: brother profile [\#20548](https://github.com/netdata/netdata/pull/20548) ([Ancairon](https://github.com/Ancairon))
-- improve\(go.d/snmp-profiles\): add DHCP tags transform to bluecat profile [\#20547](https://github.com/netdata/netdata/pull/20547) ([ilyam8](https://github.com/ilyam8))
 
 ## [v2.5.4](https://github.com/netdata/netdata/tree/v2.5.4) (2025-06-24)
 
