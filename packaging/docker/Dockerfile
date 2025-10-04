@@ -47,6 +47,7 @@ RUN mkdir -p /app/usr/sbin/ \
     mv /etc/netdata         /app/etc/ && \
     mv /usr/sbin/netdata    /app/usr/sbin/ && \
     mv /usr/sbin/netdatacli    /app/usr/sbin/ && \
+    mv /usr/sbin/nd-run    /app/usr/sbin/ && \
     mv /usr/sbin/systemd-cat-native /app/usr/sbin/ && \
     mv packaging/docker/run.sh        /app/usr/sbin/ && \
     mv packaging/docker/health.sh     /app/usr/sbin/ && \
