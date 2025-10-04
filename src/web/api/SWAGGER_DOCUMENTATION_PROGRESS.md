@@ -363,9 +363,57 @@ Comprehensive analysis of ACL (Access Control Lists) and HTTP_ACCESS permissions
 - `HTTP_ACL_ACLK` - Cloud-only access
 - `HTTP_ACL_NOCHECK` - No restrictions
 
-**Next Action:** Add security/permissions sections to all APIs in swagger.yaml
+**Next Action:** ✅ COMPLETE - Security documentation added to all 68 APIs
 
 **Completion Date:** 2025-10-02
+
+---
+
+## SECURITY DOCUMENTATION IN SWAGGER - COMPLETE ✅
+
+**Summary:**
+All 68 APIs now have comprehensive security documentation in swagger.yaml including OpenAPI security schemes and per-endpoint security configuration.
+
+**What Was Added:**
+
+1. **Security Schemes (components/securitySchemes):**
+   - `bearerAuth` - Bearer token authentication (optional for public data APIs)
+   - `aclkAuth` - ACLK-only authentication (cloud access required)
+   - `ipAcl` - IP-based ACL documentation (informational)
+
+2. **Per-Endpoint Security Documentation:**
+
+   **ACLK-Only APIs (6 total):**
+   - Security field: `security: [aclkAuth: []]`
+   - Description: Detailed ACLK access requirements, permissions, and restrictions
+   - APIs: rtc_offer, bearer_protection, bearer_get_token (v2 & v3)
+
+   **Public Data APIs (50 total):**
+   - Security field: `security: [{}, bearerAuth: []]` (no auth OR bearer auth)
+   - Description: Bearer protection optional, IP ACL restrictions, access methods
+   - APIs: data, weights, contexts, alerts, functions, badges, config, etc. (v1, v2, v3)
+
+   **Always Public APIs (12 total):**
+   - Security field: NONE (intentionally omitted - indicates always public)
+   - Description: Always accessible, no restrictions, cannot be secured
+   - APIs: info, versions, progress, settings, claim, me, registry, manage
+
+3. **Security Section Format:**
+   Each API's description includes a **Security & Access Control** section with:
+   - Access type (ACLK-Only / Public Data / Always Public)
+   - Authentication requirements
+   - IP-based ACL restrictions (where applicable)
+   - Access methods (HTTP, Cloud, external tools)
+   - Configuration references (netdata.conf settings)
+
+**Verification:**
+- ✅ 68/68 APIs have "Security & Access Control" documentation in descriptions
+- ✅ 6 ACLK-only APIs have `aclkAuth` security scheme
+- ✅ 50 Public Data APIs have optional bearer auth `[{}, bearerAuth: []]`
+- ✅ 12 Always Public APIs correctly have NO security field
+- ✅ All security documentation matches API_PERMISSIONS_ANALYSIS.md
+
+**Completion Date:** 2025-10-04
 
 ---
 

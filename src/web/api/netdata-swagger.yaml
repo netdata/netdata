@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=https://spec.openapis.org/oas/3.0/schema/2024-10-18
 openapi: 3.0.0
 info:
   title: Netdata API
@@ -79,6 +80,16 @@ paths:
       summary: Nodes Info v2
       description: |
         Get a list of all nodes hosted by this Netdata Agent.
+
+        **Security & Access Control:**
+        - 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply
+        - **Default Access:** Public (no authentication required)
+        - **Bearer Protection:** When enabled via `/api/v3/bearer_protection`, requires bearer token
+        - **IP Restrictions:** Subject to `allow dashboard from` in netdata.conf
+        - **Access Methods:** Direct HTTP/HTTPS, Netdata Cloud, external tools
+      security:
+        - {}
+        - bearerAuth: []
       parameters:
         - $ref: '#/components/parameters/scopeNodes'
         - $ref: '#/components/parameters/scopeContexts'
@@ -114,6 +125,16 @@ paths:
       description: |
         Get a list of all nodes hosted by this Netdata Agent.
         This is the same as `/api/v2/nodes` but may support additional features in the future.
+
+        **Security & Access Control:**
+        - 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply
+        - **Default Access:** Public (no authentication required)
+        - **Bearer Protection:** When enabled via `/api/v3/bearer_protection`, requires bearer token
+        - **IP Restrictions:** Subject to `allow dashboard from` in netdata.conf
+        - **Access Methods:** Direct HTTP/HTTPS, Netdata Cloud, external tools
+      security:
+        - {}
+        - bearerAuth: []
       parameters:
         - $ref: '#/components/parameters/scopeNodes'
         - $ref: '#/components/parameters/scopeContexts'
@@ -148,6 +169,16 @@ paths:
       summary: Contexts Info v2
       description: |
         Get a list of all contexts, across all nodes, hosted by this Netdata Agent.
+
+        **Security & Access Control:**
+        - 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply
+        - **Default Access:** Public (no authentication required)
+        - **Bearer Protection:** When enabled via `/api/v3/bearer_protection`, requires bearer token
+        - **IP Restrictions:** Subject to `allow dashboard from` in netdata.conf
+        - **Access Methods:** Direct HTTP/HTTPS, Netdata Cloud, external tools
+      security:
+        - {}
+        - bearerAuth: []
       parameters:
         - $ref: '#/components/parameters/scopeNodes'
         - $ref: '#/components/parameters/scopeContexts'
@@ -170,6 +201,16 @@ paths:
       description: |
         Get a list of all contexts, across all nodes, hosted by this Netdata Agent.
         This is the same as `/api/v2/contexts` but may support additional features in the future.
+
+        **Security & Access Control:**
+        - 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply
+        - **Default Access:** Public (no authentication required)
+        - **Bearer Protection:** When enabled via `/api/v3/bearer_protection`, requires bearer token
+        - **IP Restrictions:** Subject to `allow dashboard from` in netdata.conf
+        - **Access Methods:** Direct HTTP/HTTPS, Netdata Cloud, external tools
+      security:
+        - {}
+        - bearerAuth: []
       parameters:
         - $ref: '#/components/parameters/scopeNodes'
         - $ref: '#/components/parameters/scopeContexts'
@@ -191,6 +232,16 @@ paths:
       summary: Full Text Search v2
       description: |
         Get a list of contexts, across all nodes, hosted by this Netdata Agent, matching a string expression
+
+        **Security & Access Control:**
+        - 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply
+        - **Default Access:** Public (no authentication required)
+        - **Bearer Protection:** When enabled via `/api/v3/bearer_protection`, requires bearer token
+        - **IP Restrictions:** Subject to `allow dashboard from` in netdata.conf
+        - **Access Methods:** Direct HTTP/HTTPS, Netdata Cloud, external tools
+      security:
+        - {}
+        - bearerAuth: []
       parameters:
         - name: q
           in: query
@@ -220,6 +271,16 @@ paths:
       description: |
         Get a list of contexts, across all nodes, hosted by this Netdata Agent, matching a string expression.
         This is the same as `/api/v2/q` but may support additional features in the future.
+
+        **Security & Access Control:**
+        - 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply
+        - **Default Access:** Public (no authentication required)
+        - **Bearer Protection:** When enabled via `/api/v3/bearer_protection`, requires bearer token
+        - **IP Restrictions:** Subject to `allow dashboard from` in netdata.conf
+        - **Access Methods:** Direct HTTP/HTTPS, Netdata Cloud, external tools
+      security:
+        - {}
+        - bearerAuth: []
       parameters:
         - name: q
           in: query
@@ -258,6 +319,16 @@ paths:
           * number of alarms in normal state
           * number of alarms in warning state
           * number of alarms in critical state
+
+        **Security & Access Control:**
+        - 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply
+        - **Default Access:** Public (no authentication required)
+        - **Bearer Protection:** When enabled via `/api/v3/bearer_protection`, requires bearer token
+        - **IP Restrictions:** Subject to `allow dashboard from` in netdata.conf
+        - **Access Methods:** Direct HTTP/HTTPS, Netdata Cloud, external tools
+      security:
+        - {}
+        - bearerAuth: []
       responses:
         "200":
           description: netdata basic information.
@@ -275,6 +346,16 @@ paths:
       summary: List all charts v1 - EOL
       description: The charts endpoint returns a summary about all charts stored in the
         netdata server.
+
+        **Security & Access Control:**
+        - 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply
+        - **Default Access:** Public (no authentication required)
+        - **Bearer Protection:** When enabled via `/api/v3/bearer_protection`, requires bearer token
+        - **IP Restrictions:** Subject to `allow dashboard from` in netdata.conf
+        - **Access Methods:** Direct HTTP/HTTPS, Netdata Cloud, external tools
+      security:
+        - {}
+        - bearerAuth: []
       responses:
         "200":
           description: An array of charts.
@@ -289,6 +370,16 @@ paths:
         - charts
       summary: Get one chart v1 - EOL
       description: The chart endpoint returns detailed information about a chart.
+
+        **Security & Access Control:**
+        - 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply
+        - **Default Access:** Public (no authentication required)
+        - **Bearer Protection:** When enabled via `/api/v3/bearer_protection`, requires bearer token
+        - **IP Restrictions:** Subject to `allow dashboard from` in netdata.conf
+        - **Access Methods:** Direct HTTP/HTTPS, Netdata Cloud, external tools
+      security:
+        - {}
+        - bearerAuth: []
       parameters:
         - $ref: '#/components/parameters/chart'
       responses:
@@ -310,6 +401,16 @@ paths:
       summary: Get a list of all node contexts available v1
       description: The contexts endpoint returns a summary about all contexts stored in the
         netdata server.
+
+        **Security & Access Control:**
+        - 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply
+        - **Default Access:** Public (no authentication required)
+        - **Bearer Protection:** When enabled via `/api/v3/bearer_protection`, requires bearer token
+        - **IP Restrictions:** Subject to `allow dashboard from` in netdata.conf
+        - **Access Methods:** Direct HTTP/HTTPS, Netdata Cloud, external tools
+      security:
+        - {}
+        - bearerAuth: []
       parameters:
         - $ref: '#/components/parameters/dimensions'
         - $ref: '#/components/parameters/chart_label_key'
@@ -333,6 +434,16 @@ paths:
       description: |
         The context endpoint returns detailed information about a given context.
         The `context` parameter is required for this call.
+
+        **Security & Access Control:**
+        - 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply
+        - **Default Access:** Public (no authentication required)
+        - **Bearer Protection:** When enabled via `/api/v3/bearer_protection`, requires bearer token
+        - **IP Restrictions:** Subject to `allow dashboard from` in netdata.conf
+        - **Access Methods:** Direct HTTP/HTTPS, Netdata Cloud, external tools
+      security:
+        - {}
+        - bearerAuth: []
       parameters:
         - $ref: '#/components/parameters/context'
         - $ref: '#/components/parameters/dimensions'
@@ -377,6 +488,16 @@ paths:
         - Build dynamic dashboards that adapt to available instances
 
         The response includes all charts that belong to the specified context, with their metadata, dimensions, labels, and current availability status.
+
+        **Security & Access Control:**
+        - 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply
+        - **Default Access:** Public (no authentication required)
+        - **Bearer Protection:** When enabled via `/api/v3/bearer_protection`, requires bearer token
+        - **IP Restrictions:** Subject to `allow dashboard from` in netdata.conf
+        - **Access Methods:** Direct HTTP/HTTPS, Netdata Cloud, external tools
+      security:
+        - {}
+        - bearerAuth: []
       parameters:
         - name: context
           in: query
@@ -532,6 +653,16 @@ paths:
         - dyncfg
       description: |
         Get dynamic configuration information.
+
+        **Security & Access Control:**
+        - 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply
+        - **Default Access:** Public (no authentication required)
+        - **Bearer Protection:** When enabled via `/api/v3/bearer_protection`, requires bearer token
+        - **IP Restrictions:** Subject to `allow dashboard from` in netdata.conf
+        - **Access Methods:** Direct HTTP/HTTPS, Netdata Cloud, external tools
+      security:
+        - {}
+        - bearerAuth: []
       parameters:
         - name: action
           in: query
@@ -656,6 +787,16 @@ paths:
       summary: Data Query v2
       description: |
         Multi-node, multi-context, multi-instance, multi-dimension data queries, with time and metric aggregation.
+
+        **Security & Access Control:**
+        - 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply
+        - **Default Access:** Public (no authentication required)
+        - **Bearer Protection:** When enabled via `/api/v3/bearer_protection`, requires bearer token
+        - **IP Restrictions:** Subject to `allow dashboard from` in netdata.conf
+        - **Access Methods:** Direct HTTP/HTTPS, Netdata Cloud, external tools
+      security:
+        - {}
+        - bearerAuth: []
       parameters:
         - name: group_by
           in: query
@@ -770,6 +911,16 @@ paths:
       description: |
         Multi-node, multi-context, multi-instance, multi-dimension data queries, with time and metric aggregation.
         This is the same as `/api/v2/data` but may support additional features in the future.
+
+        **Security & Access Control:**
+        - 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply
+        - **Default Access:** Public (no authentication required)
+        - **Bearer Protection:** When enabled via `/api/v3/bearer_protection`, requires bearer token
+        - **IP Restrictions:** Subject to `allow dashboard from` in netdata.conf
+        - **Access Methods:** Direct HTTP/HTTPS, Netdata Cloud, external tools
+      security:
+        - {}
+        - bearerAuth: []
       parameters:
         - name: group_by
           in: query
@@ -885,6 +1036,16 @@ paths:
         Query metric data of a chart or context of a node and return a dataset having time-series data for all dimensions available.
         For group-by functionality, use `/api/v2/data`.
         At least a `chart` or a `context` have to be given for the data query to be executed.
+
+        **Security & Access Control:**
+        - 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply
+        - **Default Access:** Public (no authentication required)
+        - **Bearer Protection:** When enabled via `/api/v3/bearer_protection`, requires bearer token
+        - **IP Restrictions:** Subject to `allow dashboard from` in netdata.conf
+        - **Access Methods:** Direct HTTP/HTTPS, Netdata Cloud, external tools
+      security:
+        - {}
+        - bearerAuth: []
       parameters:
         - $ref: '#/components/parameters/chart'
         - $ref: '#/components/parameters/context'
@@ -941,6 +1102,16 @@ paths:
       summary: All Metrics v1 - Fetch latest value for all metrics
       description: |
         The `allmetrics` endpoint returns the latest value of all metrics maintained for a netdata node.
+
+        **Security & Access Control:**
+        - 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply
+        - **Default Access:** Public (no authentication required)
+        - **Bearer Protection:** When enabled via `/api/v3/bearer_protection`, requires bearer token
+        - **IP Restrictions:** Subject to `allow dashboard from` in netdata.conf
+        - **Access Methods:** Direct HTTP/HTTPS, Netdata Cloud, external tools
+      security:
+        - {}
+        - bearerAuth: []
       parameters:
         - name: format
           in: query
@@ -1056,6 +1227,16 @@ paths:
         - badges
       summary: Generate a badge in form of SVG image for a chart (or dimension)
       description: Successful responses are SVG images.
+
+        **Security & Access Control:**
+        - 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply
+        - **Default Access:** Public (no authentication required)
+        - **Bearer Protection:** When enabled via `/api/v3/bearer_protection`, requires bearer token
+        - **IP Restrictions:** Subject to `allow badges from` in netdata.conf
+        - **Access Methods:** Direct HTTP/HTTPS, Netdata Cloud, external tools
+      security:
+        - {}
+        - bearerAuth: []
       parameters:
         - $ref: '#/components/parameters/chart'
         - $ref: '#/components/parameters/dimension'
@@ -1271,6 +1452,16 @@ paths:
         - Dynamic colors based on value thresholds or alarm status
 
         Successful responses are SVG images that can be embedded in web pages or documentation.
+
+        **Security & Access Control:**
+        - 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply
+        - **Default Access:** Public (no authentication required)
+        - **Bearer Protection:** When enabled via `/api/v3/bearer_protection`, requires bearer token
+        - **IP Restrictions:** Subject to `allow badges from` in netdata.conf
+        - **Access Methods:** Direct HTTP/HTTPS, Netdata Cloud, external tools
+      security:
+        - {}
+        - bearerAuth: []
       parameters:
         - $ref: '#/components/parameters/chart'
         - $ref: '#/components/parameters/dimension'
@@ -1529,6 +1720,16 @@ paths:
         - Shell script automation and monitoring
         - Custom metric exporters
         - Multi-host metric aggregation
+
+        **Security & Access Control:**
+        - 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply
+        - **Default Access:** Public (no authentication required)
+        - **Bearer Protection:** When enabled via `/api/v3/bearer_protection`, requires bearer token
+        - **IP Restrictions:** Subject to `allow dashboard from` in netdata.conf
+        - **Access Methods:** Direct HTTP/HTTPS, Netdata Cloud, external tools
+      security:
+        - {}
+        - bearerAuth: []
       parameters:
         - name: format
           in: query
@@ -1811,6 +2012,16 @@ paths:
 
         **Response Content:**
         The response includes comprehensive information about alerts including their current values, configured thresholds, time in current state, and associated context/chart information.
+
+        **Security & Access Control:**
+        - 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply
+        - **Default Access:** Public (no authentication required)
+        - **Bearer Protection:** When enabled via `/api/v3/bearer_protection`, requires bearer token
+        - **IP Restrictions:** Subject to `allow dashboard from` in netdata.conf
+        - **Access Methods:** Direct HTTP/HTTPS, Netdata Cloud, external tools
+      security:
+        - {}
+        - bearerAuth: []
       parameters:
         - $ref: '#/components/parameters/scopeNodes'
         - $ref: '#/components/parameters/scopeContexts'
@@ -2058,6 +2269,16 @@ paths:
         - Use cardinality limits for large result sets
         - Timeout parameter prevents long-running queries
         - Pagination via anchor_gi for processing large datasets
+
+        **Security & Access Control:**
+        - 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply
+        - **Default Access:** Public (no authentication required)
+        - **Bearer Protection:** When enabled via `/api/v3/bearer_protection`, requires bearer token
+        - **IP Restrictions:** Subject to `allow dashboard from` in netdata.conf
+        - **Access Methods:** Direct HTTP/HTTPS, Netdata Cloud, external tools
+      security:
+        - {}
+        - bearerAuth: []
       parameters:
         - name: scope_nodes
           in: query
@@ -2725,6 +2946,16 @@ paths:
         4. Review/analyze the alert configuration details
 
         **Note:** This endpoint requires the exact config hash UUID. Invalid or non-existent UUIDs will return a 400 Bad Request error.
+
+        **Security & Access Control:**
+        - 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply
+        - **Default Access:** Public (no authentication required)
+        - **Bearer Protection:** When enabled via `/api/v3/bearer_protection`, requires bearer token
+        - **IP Restrictions:** Subject to `allow dashboard from` in netdata.conf
+        - **Access Methods:** Direct HTTP/HTTPS, Netdata Cloud, external tools
+      security:
+        - {}
+        - bearerAuth: []
       parameters:
         - name: config
           in: query
@@ -2920,6 +3151,16 @@ paths:
         - Any transformations applied
 
         **Note:** This is a specialized endpoint primarily used for alert development and troubleshooting. For general metric values, use `/api/v3/data` instead.
+
+        **Security & Access Control:**
+        - 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply
+        - **Default Access:** Public (no authentication required)
+        - **Bearer Protection:** When enabled via `/api/v3/bearer_protection`, requires bearer token
+        - **IP Restrictions:** Subject to `allow dashboard from` in netdata.conf
+        - **Access Methods:** Direct HTTP/HTTPS, Netdata Cloud, external tools
+      security:
+        - {}
+        - bearerAuth: []
       parameters:
         - name: chart
           in: query
@@ -3306,6 +3547,12 @@ paths:
 
         **Response Format:**
         Returns JSON with agent information grouped by node, including complete details about each agent's capabilities, configuration, and current status.
+
+        **Security & Access Control:**
+        - 🔓 **Always Public API** - This endpoint is always accessible without authentication
+        - **No Restrictions:** Not subject to bearer protection or IP-based ACL restrictions
+        - **No Authentication:** Cannot be restricted by any configuration
+        - **Access:** Available to anyone who can reach the agent's HTTP endpoint
       parameters:
         - name: scope_nodes
           in: query
@@ -3614,6 +3861,16 @@ paths:
         - All chart instances organized by context
         - Instance-specific metadata (labels, units, dimensions)
         - Instance collection status
+
+        **Security & Access Control:**
+        - 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply
+        - **Default Access:** Public (no authentication required)
+        - **Bearer Protection:** When enabled via `/api/v3/bearer_protection`, requires bearer token
+        - **IP Restrictions:** Subject to `allow dashboard from` in netdata.conf
+        - **Access Methods:** Direct HTTP/HTTPS, Netdata Cloud, external tools
+      security:
+        - {}
+        - bearerAuth: []
       parameters:
         - name: scope_nodes
           in: query
@@ -3875,6 +4132,17 @@ paths:
         - Parent-child relationships
         - Streaming connection status (live/stale/offline)
         - Complete path from each child to root parent
+
+
+        **Security & Access Control:**
+        - 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply
+        - **Default Access:** Public (no authentication required)
+        - **Bearer Protection:** When enabled via `/api/v3/bearer_protection`, requires bearer token
+        - **IP Restrictions:** Subject to `allow dashboard from` in netdata.conf
+        - **Access Methods:** Direct HTTP/HTTPS, Netdata Cloud, external tools
+      security:
+        - {}
+        - bearerAuth: []
       parameters:
         - name: scope_nodes
           in: query
@@ -4067,6 +4335,12 @@ paths:
         - Git commit hash
         - Protocol versions
         - Feature flags and capabilities
+
+        **Security & Access Control:**
+        - 🔓 **Always Public API** - This endpoint is always accessible without authentication
+        - **No Restrictions:** Not subject to bearer protection or IP-based ACL restrictions
+        - **No Authentication:** Cannot be restricted by any configuration
+        - **Access:** Available to anyone who can reach the agent's HTTP endpoint
       parameters:
         - name: scope_nodes
           in: query
@@ -4279,6 +4553,12 @@ paths:
         - Returned by function execution endpoints
         - Valid for the lifetime of the function execution
         - Expires after completion or timeout
+
+        **Security & Access Control:**
+        - 🔓 **Always Public API** - This endpoint is always accessible without authentication
+        - **No Restrictions:** Not subject to bearer protection or IP-based ACL restrictions
+        - **No Authentication:** Cannot be restricted by any configuration
+        - **Access:** Available to anyone who can reach the agent's HTTP endpoint
       parameters:
         - name: transaction
           in: query
@@ -4454,6 +4734,17 @@ paths:
         - Some functions may require elevated permissions
         - Function execution is subject to ACL checks
         - Sensitive operations may be restricted by configuration
+
+
+        **Security & Access Control:**
+        - 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply
+        - **Default Access:** Public (no authentication required)
+        - **Bearer Protection:** When enabled via `/api/v3/bearer_protection`, requires bearer token
+        - **IP Restrictions:** Subject to `allow dashboard from` in netdata.conf
+        - **Access Methods:** Direct HTTP/HTTPS, Netdata Cloud, external tools
+      security:
+        - {}
+        - bearerAuth: []
       parameters:
         - name: function
           in: query
@@ -4694,6 +4985,17 @@ paths:
         1. Use `/api/v3/functions` to discover available functions
         2. Use `/api/v3/function?function=<name>` to execute specific functions
         3. Results tell you which nodes support which operations
+
+
+        **Security & Access Control:**
+        - 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply
+        - **Default Access:** Public (no authentication required)
+        - **Bearer Protection:** When enabled via `/api/v3/bearer_protection`, requires bearer token
+        - **IP Restrictions:** Subject to `allow dashboard from` in netdata.conf
+        - **Access Methods:** Direct HTTP/HTTPS, Netdata Cloud, external tools
+      security:
+        - {}
+        - bearerAuth: []
       parameters:
         - name: scope_nodes
           in: query
@@ -4976,6 +5278,17 @@ paths:
         - Configuration changes require appropriate permissions
         - Some actions may be restricted by ACL
         - Changes are logged for audit trail
+
+
+        **Security & Access Control:**
+        - 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply
+        - **Default Access:** Public (no authentication required)
+        - **Bearer Protection:** When enabled via `/api/v3/bearer_protection`, requires bearer token
+        - **IP Restrictions:** Subject to `allow dashboard from` in netdata.conf
+        - **Access Methods:** Direct HTTP/HTTPS, Netdata Cloud, external tools
+      security:
+        - {}
+        - bearerAuth: []
       parameters:
         - name: action
           in: query
@@ -5256,6 +5569,12 @@ paths:
 
         **Size Limit:**
         Maximum settings file size: 20 MiB
+
+        **Security & Access Control:**
+        - 🔓 **Always Public API** - This endpoint is always accessible without authentication
+        - **No Restrictions:** Not subject to bearer protection or IP-based ACL restrictions
+        - **No Authentication:** Cannot be restricted by any configuration
+        - **Access:** Available to anyone who can reach the agent's HTTP endpoint
       parameters:
         - name: file
           in: query
@@ -5572,6 +5891,12 @@ paths:
         - `buffer_used_percentage` - Buffer fill level
         - `compression_ratio` - Data compression efficiency
         - `replication_lag_seconds` - Data replication delay
+
+        **Security & Access Control:**
+        - 🔓 **Always Public API** - This endpoint is always accessible without authentication
+        - **No Restrictions:** Not subject to bearer protection or IP-based ACL restrictions
+        - **No Authentication:** Cannot be restricted by any configuration
+        - **Access:** Available to anyone who can reach the agent's HTTP endpoint
       parameters:
         - name: machine_guid
           in: query
@@ -5798,6 +6123,15 @@ paths:
         - Typical response time: 100-500ms (depending on ICE gathering)
         - Supports multiple concurrent connections
         - Automatic connection cleanup on idle timeout
+
+        **Security & Access Control:**
+        - ⚠️ **ACLK-Only API** - This endpoint is ONLY accessible via Netdata Cloud (ACLK connection)
+        - **NOT accessible via:** Direct HTTP/HTTPS to agent, local dashboard, or external tools
+        - **Authentication:** Requires Netdata Cloud authentication (`SIGNED_ID` + `SAME_SPACE`)
+        - **User Requirements:** User must be authenticated and in the same cloud space as the agent
+        - **Development Mode:** Can be enabled for testing with `ACL_DEV_OPEN_ACCESS` flag
+      security:
+        - aclkAuth: []
       requestBody:
         required: true
         content:
@@ -5941,6 +6275,13 @@ paths:
         # 3. Submit claim request with key from step 2 and token from Netdata Cloud
         curl "http://localhost:19999/api/v3/claim?key=12345678-1234-1234-1234-123456789abc&token=YOUR_CLAIM_TOKEN&url=https://api.netdata.cloud&rooms=room1,room2"
         ```
+
+        **Security & Access Control:**
+        - 🔓 **Always Public API** - This endpoint is always accessible without authentication
+        - **Security Model:** Protected by random session key verification (not ACL/bearer token)
+        - **Verification Required:** Must provide verification key from agent's file system to claim
+        - **Server Access:** Only users with server file system access can obtain the verification key
+        - **No ACL Restrictions:** Not subject to IP-based ACL or bearer protection
       parameters:
         - name: key
           in: query
@@ -6202,6 +6543,16 @@ paths:
         3. All future API calls to the agent require bearer tokens
         4. Cloud obtains tokens via `/api/v3/bearer_get_token` as needed
         5. Tokens are included in Authorization headers for authenticated requests
+
+        **Security & Access Control:**
+        - ⚠️ **ACLK-Only API** - This endpoint is ONLY accessible via Netdata Cloud (ACLK connection)
+        - **NOT accessible via:** Direct HTTP/HTTPS to agent, even with bearer token
+        - **Authentication:** Requires Netdata Cloud authentication with elevated permissions
+        - **Required Permissions:** `SIGNED_ID` + `SAME_SPACE` + `VIEW_AGENT_CONFIG` + `EDIT_AGENT_CONFIG`
+        - **User Roles:** Typically Admin or Manager role required
+        - **Development Mode:** Can be enabled for testing with `ACL_DEV_OPEN_ACCESS` flag
+      security:
+        - aclkAuth: []
       parameters:
         - name: bearer_protection
           in: query
@@ -6390,6 +6741,16 @@ paths:
         5. Client includes token in Authorization header for subsequent API calls
         6. Token is validated on each API request until expiration
         7. Client requests new token before expiration to maintain access
+
+        **Security & Access Control:**
+        - ⚠️ **ACLK-Only API** - This endpoint is ONLY accessible via Netdata Cloud (ACLK connection)
+        - **NOT accessible via:** Direct HTTP/HTTPS to agent, local dashboard, or external tools
+        - **Authentication:** Requires Netdata Cloud authentication (`SIGNED_ID` + `SAME_SPACE`)
+        - **User Requirements:** User must be authenticated and in the same cloud space as the agent
+        - **Token Scope:** Generated tokens inherit the requester's role and access permissions
+        - **Development Mode:** Can be enabled for testing with `ACL_DEV_OPEN_ACCESS` flag
+      security:
+        - aclkAuth: []
       parameters:
         - name: claim_id
           in: query
@@ -6615,6 +6976,12 @@ paths:
           "user_role": "none"
         }
         ```
+
+        **Security & Access Control:**
+        - 🔓 **Always Public API** - This endpoint is always accessible without authentication
+        - **No Restrictions:** Not subject to bearer protection or IP-based ACL restrictions
+        - **No Authentication:** Cannot be restricted by any configuration
+        - **Access:** Available to anyone who can reach the agent's HTTP endpoint
       responses:
         "200":
           description: Current user information successfully retrieved.
@@ -6697,6 +7064,16 @@ paths:
       summary: Score or weight all or some of the metrics, across all nodes, according to various algorithms.
       description: |
         This endpoint goes through all metrics and scores them according to an algorithm.
+
+        **Security & Access Control:**
+        - 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply
+        - **Default Access:** Public (no authentication required)
+        - **Bearer Protection:** When enabled via `/api/v3/bearer_protection`, requires bearer token
+        - **IP Restrictions:** Subject to `allow dashboard from` in netdata.conf
+        - **Access Methods:** Direct HTTP/HTTPS, Netdata Cloud, external tools
+      security:
+        - {}
+        - bearerAuth: []
       parameters:
         - $ref: '#/components/parameters/weightMethods'
         - $ref: '#/components/parameters/scopeNodes'
@@ -6754,6 +7131,16 @@ paths:
 
         Returns the current status of health monitoring alerts across all nodes in the infrastructure.
         Supports filtering by status, alert name, and node selection.
+
+        **Security & Access Control:**
+        - 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply
+        - **Default Access:** Public (no authentication required)
+        - **Bearer Protection:** When enabled via `/api/v3/bearer_protection`, requires bearer token
+        - **IP Restrictions:** Subject to `allow dashboard from` in netdata.conf
+        - **Access Methods:** Direct HTTP/HTTPS, Netdata Cloud, external tools
+      security:
+        - {}
+        - bearerAuth: []
       parameters:
         - $ref: '#/components/parameters/scopeNodes'
         - $ref: '#/components/parameters/filterNodes'
@@ -6796,6 +7183,16 @@ paths:
 
         Returns historical alert state transitions showing how alerts changed over time.
         Supports faceted filtering by status, type, role, class, component, node, alert name, chart name, and context.
+
+        **Security & Access Control:**
+        - 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply
+        - **Default Access:** Public (no authentication required)
+        - **Bearer Protection:** When enabled via `/api/v3/bearer_protection`, requires bearer token
+        - **IP Restrictions:** Subject to `allow dashboard from` in netdata.conf
+        - **Access Methods:** Direct HTTP/HTTPS, Netdata Cloud, external tools
+      security:
+        - {}
+        - bearerAuth: []
       parameters:
         - $ref: '#/components/parameters/scopeNodes'
         - $ref: '#/components/parameters/filterNodes'
@@ -6894,6 +7291,16 @@ paths:
 
         Retrieves the complete configuration for a specific alert using its configuration hash (UUID).
         Returns alert definition including conditions, thresholds, and notification settings.
+
+        **Security & Access Control:**
+        - 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply
+        - **Default Access:** Public (no authentication required)
+        - **Bearer Protection:** When enabled via `/api/v3/bearer_protection`, requires bearer token
+        - **IP Restrictions:** Subject to `allow dashboard from` in netdata.conf
+        - **Access Methods:** Direct HTTP/HTTPS, Netdata Cloud, external tools
+      security:
+        - {}
+        - bearerAuth: []
       parameters:
         - name: config
           in: query
@@ -6924,6 +7331,12 @@ paths:
 
         Returns comprehensive agent information including version, capabilities, OS details, hardware specs,
         and configuration. Essential for discovering agent capabilities before querying metrics.
+
+        **Security & Access Control:**
+        - 🔓 **Always Public API** - This endpoint is always accessible without authentication
+        - **No Restrictions:** Not subject to bearer protection or IP-based ACL restrictions
+        - **No Authentication:** Cannot be restricted by any configuration
+        - **Access:** Available to anyone who can reach the agent's HTTP endpoint
       parameters:
         - $ref: '#/components/parameters/scopeNodes'
         - $ref: '#/components/parameters/filterNodes'
@@ -6954,6 +7367,16 @@ paths:
 
         Returns hierarchical organization of chart instances across nodes, showing relationships between
         parent and child agents and their monitored components.
+
+        **Security & Access Control:**
+        - 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply
+        - **Default Access:** Public (no authentication required)
+        - **Bearer Protection:** When enabled via `/api/v3/bearer_protection`, requires bearer token
+        - **IP Restrictions:** Subject to `allow dashboard from` in netdata.conf
+        - **Access Methods:** Direct HTTP/HTTPS, Netdata Cloud, external tools
+      security:
+        - {}
+        - bearerAuth: []
       parameters:
         - $ref: '#/components/parameters/scopeNodes'
         - $ref: '#/components/parameters/filterNodes'
@@ -6983,6 +7406,16 @@ paths:
         All parameters and responses are identical between v2 and v3 versions.
 
         Returns agent version information across all nodes, useful for upgrade planning and compatibility checking.
+
+        **Security & Access Control:**
+        - 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply
+        - **Default Access:** Public (no authentication required)
+        - **Bearer Protection:** When enabled via `/api/v3/bearer_protection`, requires bearer token
+        - **IP Restrictions:** Subject to `allow dashboard from` in netdata.conf
+        - **Access Methods:** Direct HTTP/HTTPS, Netdata Cloud, external tools
+      security:
+        - {}
+        - bearerAuth: []
       parameters:
         - $ref: '#/components/parameters/scopeNodes'
         - $ref: '#/components/parameters/filterNodes'
@@ -7011,6 +7444,12 @@ paths:
 
         Tracks progress of long-running asynchronous operations using transaction UUID.
         Used for polling function execution status and completion percentage.
+
+        **Security & Access Control:**
+        - 🔓 **Always Public API** - This endpoint is always accessible without authentication
+        - **No Restrictions:** Not subject to bearer protection or IP-based ACL restrictions
+        - **No Authentication:** Cannot be restricted by any configuration
+        - **Access:** Available to anyone who can reach the agent's HTTP endpoint
       parameters:
         - name: transaction
           in: query
@@ -7041,6 +7480,16 @@ paths:
 
         Lists all functions available on agents, including their descriptions, parameters, and capabilities.
         Functions provide live operational data and diagnostic capabilities.
+
+        **Security & Access Control:**
+        - 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply
+        - **Default Access:** Public (no authentication required)
+        - **Bearer Protection:** When enabled via `/api/v3/bearer_protection`, requires bearer token
+        - **IP Restrictions:** Subject to `allow dashboard from` in netdata.conf
+        - **Access Methods:** Direct HTTP/HTTPS, Netdata Cloud, external tools
+      security:
+        - {}
+        - bearerAuth: []
       parameters:
         - $ref: '#/components/parameters/scopeNodes'
         - $ref: '#/components/parameters/filterNodes'
@@ -7068,6 +7517,12 @@ paths:
         All parameters and request body format are identical between v2 and v3 versions.
 
         Establishes WebRTC peer-to-peer connection by exchanging SDP offer/answer for real-time data channels.
+
+        **Security & Access Control:**
+        - ⚠️ **ACLK-Only API** - Accessible only via Netdata Cloud (ACLK connection)
+        - Same access requirements as v3 version
+      security:
+        - aclkAuth: []
       requestBody:
         required: true
         content:
@@ -7099,6 +7554,13 @@ paths:
 
         Claims (connects) agent to Netdata Cloud using server ownership verification.
         Enables centralized monitoring and team collaboration features.
+
+        **Security & Access Control:**
+        - 🔓 **Always Public API** - This endpoint is always accessible without authentication
+        - **Security Model:** Protected by random session key verification (not ACL/bearer token)
+        - **Verification Required:** Must provide verification key from agent's file system to claim
+        - **Server Access:** Only users with server file system access can obtain the verification key
+        - **No ACL Restrictions:** Not subject to IP-based ACL or bearer protection
       parameters:
         - name: key
           in: query
@@ -7148,6 +7610,13 @@ paths:
 
         Controls whether agent requires bearer token authentication for API access.
         Used by Netdata Cloud to secure agents after claiming.
+
+        **Security & Access Control:**
+        - ⚠️ **ACLK-Only API** - Accessible only via Netdata Cloud (ACLK connection)
+        - Requires elevated permissions (Admin/Manager role)
+        - Same access requirements as v3 version
+      security:
+        - aclkAuth: []
       parameters:
         - name: bearer_protection
           in: query
@@ -7196,6 +7665,12 @@ paths:
         All parameters and responses are identical between v2 and v3 versions.
 
         Generates time-limited bearer token for authenticating API requests when bearer protection is enabled.
+
+        **Security & Access Control:**
+        - ⚠️ **ACLK-Only API** - Accessible only via Netdata Cloud (ACLK connection)
+        - Same access requirements as v3 version
+      security:
+        - aclkAuth: []
       parameters:
         - name: claim_id
           in: query
@@ -7230,6 +7705,16 @@ paths:
       description: |
         This endpoint goes through all metrics and scores them according to an algorithm.
         This is the same as `/api/v2/weights` but may support additional features in the future.
+
+        **Security & Access Control:**
+        - 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply
+        - **Default Access:** Public (no authentication required)
+        - **Bearer Protection:** When enabled via `/api/v3/bearer_protection`, requires bearer token
+        - **IP Restrictions:** Subject to `allow dashboard from` in netdata.conf
+        - **Access Methods:** Direct HTTP/HTTPS, Netdata Cloud, external tools
+      security:
+        - {}
+        - bearerAuth: []
       parameters:
         - $ref: '#/components/parameters/weightMethods'
         - $ref: '#/components/parameters/scopeNodes'
@@ -7278,6 +7763,16 @@ paths:
       summary: Score or weight all or some of the metrics of a single node, according to various algorithms.
       description: |
         This endpoint goes through all metrics and scores them according to an algorithm.
+
+        **Security & Access Control:**
+        - 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply
+        - **Default Access:** Public (no authentication required)
+        - **Bearer Protection:** When enabled via `/api/v3/bearer_protection`, requires bearer token
+        - **IP Restrictions:** Subject to `allow dashboard from` in netdata.conf
+        - **Access Methods:** Direct HTTP/HTTPS, Netdata Cloud, external tools
+      security:
+        - {}
+        - bearerAuth: []
       parameters:
         - $ref: '#/components/parameters/weightMethods'
         - $ref: '#/components/parameters/context'
@@ -7315,6 +7810,16 @@ paths:
       summary: Analyze all the metrics to find their correlations - EOL
       description: |
         THIS ENDPOINT IS OBSOLETE. Use the /weights endpoint. Given two time-windows (baseline, highlight), it goes through all the available metrics, querying both windows and tries to find how these two windows relate to each other. It supports multiple algorithms to do so. The result is a list of all metrics evaluated, weighted for 0.0 (the two windows are more different) to 1.0 (the two windows are similar). The algorithm adjusts automatically the baseline window to be a power of two multiple of the highlighted (1, 2, 4, 8, etc).
+
+        **Security & Access Control:**
+        - 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply
+        - **Default Access:** Public (no authentication required)
+        - **Bearer Protection:** When enabled via `/api/v3/bearer_protection`, requires bearer token
+        - **IP Restrictions:** Subject to `allow dashboard from` in netdata.conf
+        - **Access Methods:** Direct HTTP/HTTPS, Netdata Cloud, external tools
+      security:
+        - {}
+        - bearerAuth: []
       parameters:
         - $ref: '#/components/parameters/weightMethods'
         - $ref: '#/components/parameters/baselineAfter'
@@ -7348,7 +7853,18 @@ paths:
       operationId: function1
       tags:
         - functions
-      description: "Execute a collector function."
+      description: |
+        |
+
+        **Security & Access Control:**
+        - 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply
+        - **Default Access:** Public (no authentication required)
+        - **Bearer Protection:** When enabled via `/api/v3/bearer_protection`, requires bearer token
+        - **IP Restrictions:** Subject to `allow dashboard from` in netdata.conf
+        - **Access Methods:** Direct HTTP/HTTPS, Netdata Cloud, external tools
+      security:
+        - {}
+        - bearerAuth: []
       parameters:
         - name: function
           in: query
@@ -7379,7 +7895,18 @@ paths:
       tags:
         - functions
       summary: Get a list of all registered collector functions.
-      description: Collector functions are programs that can be executed on demand.
+      description: |
+        Collector functions are programs that can be executed on demand.
+
+        **Security & Access Control:**
+        - 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply
+        - **Default Access:** Public (no authentication required)
+        - **Bearer Protection:** When enabled via `/api/v3/bearer_protection`, requires bearer token
+        - **IP Restrictions:** Subject to `allow dashboard from` in netdata.conf
+        - **Access Methods:** Direct HTTP/HTTPS, Netdata Cloud, external tools
+      security:
+        - {}
+        - bearerAuth: []
       responses:
         "200":
           description: A JSON object containing one object per supported function.
@@ -7391,6 +7918,16 @@ paths:
       summary: Get a list of active or raised alarms on the server
       description: |
         The alarms endpoint returns the list of all raised or enabled alarms on the netdata server. Called without any parameters, the raised alarms in state WARNING or CRITICAL are returned. By passing "?all", all the enabled alarms are returned.
+
+        **Security & Access Control:**
+        - 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply
+        - **Default Access:** Public (no authentication required)
+        - **Bearer Protection:** When enabled via `/api/v3/bearer_protection`, requires bearer token
+        - **IP Restrictions:** Subject to `allow dashboard from` in netdata.conf
+        - **Access Methods:** Direct HTTP/HTTPS, Netdata Cloud, external tools
+      security:
+        - {}
+        - bearerAuth: []
       parameters:
         - name: all
           in: query
@@ -7421,6 +7958,16 @@ paths:
       summary: Get a list of active or raised alarms on the server
       description: |
         The alarms_values endpoint returns the list of all raised or enabled alarms on the netdata server. Called without any parameters, the raised alarms in state WARNING or CRITICAL are returned. By passing '?all', all the enabled alarms are returned. This option output differs from `/alarms` in the number of variables delivered. This endpoint gives to user `id`, `value`, `last_updated` time, and alarm `status`.
+
+        **Security & Access Control:**
+        - 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply
+        - **Default Access:** Public (no authentication required)
+        - **Bearer Protection:** When enabled via `/api/v3/bearer_protection`, requires bearer token
+        - **IP Restrictions:** Subject to `allow dashboard from` in netdata.conf
+        - **Access Methods:** Direct HTTP/HTTPS, Netdata Cloud, external tools
+      security:
+        - {}
+        - bearerAuth: []
       parameters:
         - name: all
           in: query
@@ -7451,6 +7998,16 @@ paths:
       summary: Retrieves the entries of the alarm log
       description: |
         Returns an array of alarm_log entries, with historical information on raised and cleared alarms.
+
+        **Security & Access Control:**
+        - 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply
+        - **Default Access:** Public (no authentication required)
+        - **Bearer Protection:** When enabled via `/api/v3/bearer_protection`, requires bearer token
+        - **IP Restrictions:** Subject to `allow dashboard from` in netdata.conf
+        - **Access Methods:** Direct HTTP/HTTPS, Netdata Cloud, external tools
+      security:
+        - {}
+        - bearerAuth: []
       parameters:
         - name: after
           in: query
@@ -7476,6 +8033,16 @@ paths:
       summary: Get an overall status of the chart
       description: |
         Checks multiple charts with the same context and counts number of alarms with given status.
+
+        **Security & Access Control:**
+        - 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply
+        - **Default Access:** Public (no authentication required)
+        - **Bearer Protection:** When enabled via `/api/v3/bearer_protection`, requires bearer token
+        - **IP Restrictions:** Subject to `allow dashboard from` in netdata.conf
+        - **Access Methods:** Direct HTTP/HTTPS, Netdata Cloud, external tools
+      security:
+        - {}
+        - bearerAuth: []
       parameters:
         - $ref: '#/components/parameters/context'
         - name: status
@@ -7515,6 +8082,16 @@ paths:
       summary: List variables available to configure alarms for a chart
       description: |
         Returns the basic information of a chart and all the variables that can be used in alarm and template health configurations for the particular chart or family.
+
+        **Security & Access Control:**
+        - 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply
+        - **Default Access:** Public (no authentication required)
+        - **Bearer Protection:** When enabled via `/api/v3/bearer_protection`, requires bearer token
+        - **IP Restrictions:** Subject to `allow dashboard from` in netdata.conf
+        - **Access Methods:** Direct HTTP/HTTPS, Netdata Cloud, external tools
+      security:
+        - {}
+        - bearerAuth: []
       parameters:
         - name: chart
           in: query
@@ -7548,6 +8125,12 @@ paths:
         Accesses the health management API to control health checks and notifications at runtime.
       description: |
         Available from Netdata v1.12 and above, protected via bearer authorization. Especially useful for maintenance periods, the API allows you to disable health checks completely, silence alarm notifications, or Disable/Silence specific alarms that match selectors on alarm/template name, chart, context, host and family. For the simple disable/silence all scenarios, only the cmd parameter is required. The other parameters are used to define alarm selectors. For more information and examples, refer to the netdata documentation.
+
+        **Security & Access Control:**
+        - 🔧 **Management API** - Subject to management ACL restrictions
+        - **IP Restrictions:** Controlled by `allow management from` in netdata.conf (default: localhost only)
+        - **Internal Permissions:** Each management action has its own permission requirements
+        - **No Bearer Protection:** Not subject to bearer token authentication
       parameters:
         - name: cmd
           in: query
@@ -7598,6 +8181,16 @@ paths:
       summary: Get information about current ACLK state
       description: |
         ACLK endpoint returns detailed information about current state of ACLK (Agent to Cloud communication).
+
+        **Security & Access Control:**
+        - 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply
+        - **Default Access:** Public (no authentication required)
+        - **Bearer Protection:** When enabled via `/api/v3/bearer_protection`, requires bearer token
+        - **IP Restrictions:** Subject to `allow dashboard from` in netdata.conf
+        - **Access Methods:** Direct HTTP/HTTPS, Netdata Cloud, external tools
+      security:
+        - {}
+        - bearerAuth: []
       responses:
         "200":
           description: JSON object with ACLK information.
@@ -7637,6 +8230,16 @@ paths:
         **Security:**
         - Requires appropriate data access permissions
         - Variables may contain sensitive metrics information
+
+        **Security & Access Control:**
+        - 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply
+        - **Default Access:** Public (no authentication required)
+        - **Bearer Protection:** When enabled via `/api/v3/bearer_protection`, requires bearer token
+        - **IP Restrictions:** Subject to `allow dashboard from` in netdata.conf
+        - **Access Methods:** Direct HTTP/HTTPS, Netdata Cloud, external tools
+      security:
+        - {}
+        - bearerAuth: []
       parameters:
         - name: chart
           in: query
@@ -7734,6 +8337,11 @@ paths:
 
         **Deprecation:**
         Registry functionality is being phased out. Modern deployments should use Netdata Cloud for multi-agent management.
+
+        **Security & Access Control:**
+        - 🔓 **Always Public API** - This endpoint is always accessible without authentication
+        - **Internal ACL:** Manages its own access control internally (not via standard ACL)
+        - **No External Restrictions:** Not subject to bearer protection or IP-based ACL
       parameters:
         - name: action
           in: query
@@ -7880,6 +8488,16 @@ paths:
         - Netdata Cloud for storage monitoring across agents
         - Internal metrics: `netdata.dbengine_*` charts
         - System info API for aggregate statistics
+
+        **Security & Access Control:**
+        - 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply
+        - **Default Access:** Public (no authentication required)
+        - **Bearer Protection:** When enabled via `/api/v3/bearer_protection`, requires bearer token
+        - **IP Restrictions:** Subject to `allow dashboard from` in netdata.conf
+        - **Access Methods:** Direct HTTP/HTTPS, Netdata Cloud, external tools
+      security:
+        - {}
+        - bearerAuth: []
       responses:
         "200":
           description: DBEngine statistics for all tiers
@@ -7978,6 +8596,16 @@ paths:
         - Check Netdata Cloud for ML insights
         - Use alert transitions API to see ML-based alerts
         - Monitor anomaly rates via `/api/v2/data` with appropriate options
+
+        **Security & Access Control:**
+        - 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply
+        - **Default Access:** Public (no authentication required)
+        - **Bearer Protection:** When enabled via `/api/v3/bearer_protection`, requires bearer token
+        - **IP Restrictions:** Subject to `allow dashboard from` in netdata.conf
+        - **Access Methods:** Direct HTTP/HTTPS, Netdata Cloud, external tools
+      security:
+        - {}
+        - bearerAuth: []
       responses:
         "200":
           description: ML detection information for the host
@@ -7997,6 +8625,86 @@ paths:
         "503":
           description: Service unavailable - ML not compiled in, not enabled, or Netdata not ready
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: |
+        Bearer token authentication for API access when bearer protection is enabled.
+
+        **How to obtain a token:**
+        1. Token must be obtained via `/api/v3/bearer_get_token` endpoint
+        2. This endpoint is ACLK-only (requires Netdata Cloud access)
+        3. Token includes role-based access control and expiration time
+
+        **How to use:**
+        ```
+        Authorization: Bearer <token>
+        ```
+
+        **When required:**
+        - When bearer protection is enabled on the agent (via `/api/v3/bearer_protection`)
+        - Applies to all APIs with `HTTP_ACCESS_ANONYMOUS_DATA` permission
+        - Does not apply to APIs with `HTTP_ACL_NOCHECK` (always public)
+        - Does not apply to ACLK-only APIs (use cloud authentication)
+
+        **Token expiration:**
+        - Tokens are time-limited and must be renewed periodically
+        - Expired tokens return HTTP 401 Unauthorized
+
+    aclkAuth:
+      type: http
+      scheme: bearer
+      description: |
+        ACLK-only authentication - these APIs are ONLY accessible via Netdata Cloud (ACLK).
+
+        **Access Requirements:**
+        - User must be authenticated via Netdata Cloud (`SIGNED_ID`)
+        - User and agent must be in the same Netdata Cloud space (`SAME_SPACE`)
+        - Additional role-based permissions may apply per endpoint
+
+        **NOT accessible via:**
+        - Direct HTTP/HTTPS to agent (even with bearer token)
+        - Local dashboard
+        - External integrations
+
+        **Available only through:**
+        - Netdata Cloud web interface
+        - Netdata Cloud API (ACLK tunnel)
+
+        **Development mode:**
+        - Can be made available in dev mode with `ACL_DEV_OPEN_ACCESS` flag
+
+    ipAcl:
+      type: apiKey
+      in: header
+      name: X-Forwarded-For
+      description: |
+        IP-based Access Control List restrictions (informational only).
+
+        **Configuration:**
+        APIs are subject to IP-based ACL restrictions configured in `netdata.conf`:
+
+        ```conf
+        [web]
+            allow dashboard from = *
+            allow badges from = *
+            allow management from = localhost
+        ```
+
+        **ACL Categories:**
+        - `allow dashboard from` - Controls access to metrics, alerts, nodes, functions, config APIs
+        - `allow badges from` - Controls access to badge generation APIs
+        - `allow management from` - Controls access to management APIs
+
+        **Default behavior:**
+        - Most APIs allow access from any IP by default
+        - Management APIs restrict to localhost by default
+        - Can be customized per deployment
+
+        **Note:** This is not a standard authentication mechanism but rather IP filtering.
+        APIs with `HTTP_ACL_NOCHECK` bypass all IP restrictions.
+
   parameters:
     scopeNodes:
       name: scope_nodes
@@ -9773,9 +10481,11 @@ components:
         data:
           type: array
           items:
-            allOf:
+            anyOf:
               - type: integer
               - type: array
+                items:
+                  type: number
     data_json:
       description: Data response in `json` format.
       type: object
