@@ -6,6 +6,7 @@ import { GoogleProvider } from './llm-providers/google.js';
 import { OllamaProvider } from './llm-providers/ollama.js';
 import { OpenAIProvider } from './llm-providers/openai.js';
 import { OpenRouterProvider } from './llm-providers/openrouter.js';
+import { TestLLMProvider } from './llm-providers/test-llm.js';
 
 export class LLMClient {
   private static readonly OPENROUTER_HOST = 'openrouter.ai';
@@ -122,6 +123,8 @@ export class LLMClient {
         return new OpenRouterProvider(config, tracedFetch);
       case 'ollama':
         return new OllamaProvider(config, tracedFetch);
+      case 'test-llm':
+        return new TestLLMProvider(config);
       default:
         throw new Error(`Unsupported provider type: ${effectiveType}`);
     }
