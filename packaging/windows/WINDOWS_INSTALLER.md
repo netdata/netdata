@@ -27,6 +27,14 @@ Choose the version that suits your needs:
 
 ## Silent Installation (Command Line)
 
+:::note
+
+The silent installation may not work correctly on Windows Server versions older than
+Windows Server 2019 due to a TLS handshake failure.
+In this scenario, you can use the GUI installation instead.
+
+:::
+
 Use silent mode to deploy Netdata without user interaction (ideal for automation).
 
 :::tip
