@@ -21,7 +21,18 @@ enum netdata_win_sensor_monitored {
     NETDATA_WIN_SENSOR_POWER_WATTS,
     NETDATA_WIN_SENSOR_CURRENT_AMPS,
     NETDATA_WIN_SENSOR_RELATIVITY_HUMIDITY,
-    NETDATA_WIN_SENSOR_LIGHT_LEVEL
+    NETDATA_WIN_SENSOR_LIGHT_LEVEL,
+    NETDATA_WIN_SENSOR_DATA_TYPE_LIGHT_TEMPERATURE,
+    NETDATA_WIN_SENSOR_VOLTAGE,
+    NETDATA_WIN_SENSOR_RESISTENCE,
+    NETDATA_WIN_SENSOR_ATMOSPHERE_PRESSURE,
+    NETDATA_WIN_SENSOR_LATITUDE_DEGREES,
+    NETDATA_WIN_SENSOR_LONGITUDE_DEGREES,
+    NETDATA_WIN_SENSOR_FORCE_NEWTONS,
+    NETDATA_WIN_SENSOR_GAUGE_PRESSURE,
+    NETDATA_WIN_SENSOR_TYPE_DISTANCE_X,
+    NETDATA_WIN_SENSOR_TYPE_DISTANCE_Y,
+    NETDATA_WIN_SENSOR_TYPE_DISTANCE_Z
 };
 
 REFPROPERTYKEY sensor_keys[] = {
@@ -30,6 +41,17 @@ REFPROPERTYKEY sensor_keys[] = {
         &SENSOR_DATA_TYPE_CURRENT_AMPS,
         &SENSOR_DATA_TYPE_RELATIVE_HUMIDITY_PERCENT,
         &SENSOR_DATA_TYPE_LIGHT_LEVEL_LUX,
+        &SENSOR_DATA_TYPE_LIGHT_TEMPERATURE_KELVIN,
+        &SENSOR_DATA_TYPE_VOLTAGE_VOLTS,
+        &SENSOR_DATA_TYPE_RESISTANCE_OHMS,
+        &SENSOR_DATA_TYPE_ATMOSPHERIC_PRESSURE_BAR,
+        &SENSOR_DATA_TYPE_LATITUDE_DEGREES,
+        &SENSOR_DATA_TYPE_LONGITUDE_DEGREES,
+        &SENSOR_DATA_TYPE_FORCE_NEWTONS,
+        &SENSOR_DATA_TYPE_GAUGE_PRESSURE_PASCAL,
+        &SENSOR_DATA_TYPE_DISTANCE_X_METERS,
+        &SENSOR_DATA_TYPE_DISTANCE_Y_METERS,
+        &SENSOR_DATA_TYPE_DISTANCE_Z_METERS,
 
         NULL};
 
@@ -76,6 +98,48 @@ static struct win_sensor_config {
             .context = "system.hw.sensor.lux.input",
             .family = "illuminance",
             .priority = 70010,
+        },
+        {
+            .title = "Color temperature of light",
+            .units = "Cel",
+            .context = "system.hw.sensor.color.input",
+            .family = "Temperature",
+            .priority = 70011,
+        },
+        {
+            .title = "Electrical potential.",
+            .units = "V",
+            .context = "system.hw.sensor.voltage.input",
+            .family = "Potential",
+            .priority = 70012,
+        },
+        {
+            .title = "Electrical resistence.",
+            .units = "Ohms",
+            .context = "system.hw.sensor.resistence.input",
+            .family = "Resistence",
+            .priority = 70013,
+        },
+        {
+            .title = "Ambient atmospheric pressure",
+            .units = "Pa",
+            .context = "system.hw.sensor.pressure.input",
+            .family = "Pressure",
+            .priority = 70014,
+        },
+        {
+            .title = "Geographic latitude",
+            .units = "Degrees",
+            .context = "system.hw.sensor.latitude.input",
+            .family = "Location",
+            .priority = 70015,
+        },
+        {
+            .title = "Geographic longitude",
+            .units = "Degrees",
+            .context = "system.hw.sensor.longitude.input",
+            .family = "Location",
+            .priority = 70016,
         }
 };
 
@@ -101,6 +165,9 @@ struct sensor_data {
     RRDDIM *rd_sensor_data;
 
     collected_number current_data_value;
+    NETDATA_DOUBLE mult_factor;
+    NETDATA_DOUBLE div_factor;
+    NETDATA_DOUBLE add_factor;
 };
 
 DICTIONARY *sensors;
@@ -184,10 +251,10 @@ netdata_collect_sensor_data(struct sensor_data *s, ISensor *pSensor, REFPROPERTY
                     s->current_data_value = (collected_number)(pv.ulVal * 100);
                     break;
                 case VT_R4:
-                    s->current_data_value = (collected_number)(pv.fltVal * 100.0);
+                    s->current_data_value = (collected_number)(pv.fltVal * s->div_factor);
                     break;
                 case VT_R8:
-                    s->current_data_value = (collected_number)(pv.dblVal * 100.0);
+                    s->current_data_value = (collected_number)(pv.dblVal * s->div_factor);
                     break;
             }
             defined = 1;
@@ -206,6 +273,10 @@ static void netdata_sensors_get_data(struct sensor_data *s, ISensor *pSensor)
             s->sensor_data_type = i;
             s->config = &configs[i];
             s->enabled = true;
+            if (i == NETDATA_WIN_SENSOR_DATA_TYPE_LIGHT_TEMPERATURE) {
+                s->div_factor = 100.0;
+                s->add_factor = -27315.0; // 273.15 * 100.0
+            }
             break;
         }
     }
@@ -286,6 +357,9 @@ void dict_sensor_insert(const DICTIONARY_ITEM *item __maybe_unused, void *value,
     sd->first_time = true;
     sd->sensor_data_type = 0;
     sd->config = NULL;
+    sd->mult_factor = 1.0;
+    sd->div_factor = 100.0;
+    sd->add_factor = 0.0;
 }
 
 static int initialize(int update_every)
@@ -319,7 +393,7 @@ static int initialize(int update_every)
     return 0;
 }
 
-static void mssql_db_states_chart(struct sensor_data *sd, int update_every)
+static void sensors_states_chart(struct sensor_data *sd, int update_every)
 {
     if (!sd->st_sensor_state) {
         char id[RRD_ID_LENGTH_MAX + 1];
@@ -352,9 +426,9 @@ static void mssql_db_states_chart(struct sensor_data *sd, int update_every)
     }
 }
 
-static void mssql_sensor_state_chart_loop(struct sensor_data *sd, int update_every)
+static void sensors_state_chart_loop(struct sensor_data *sd, int update_every)
 {
-    mssql_db_states_chart(sd, update_every);
+    sensors_states_chart(sd, update_every);
     collected_number set_value = (collected_number)sd->current_state;
     for (collected_number i = 0; i < NETDATA_WIN_SENSOR_STATES; i++) {
         rrddim_set_by_pointer(sd->st_sensor_state, sd->rd_sensor_state[i], i == set_value);
@@ -362,7 +436,7 @@ static void mssql_sensor_state_chart_loop(struct sensor_data *sd, int update_eve
     rrdset_done(sd->st_sensor_state);
 }
 
-static void mssql_sensor_data_chart(struct sensor_data *sd, int update_every)
+static void sensors_data_chart(struct sensor_data *sd, int update_every)
 {
     if (!sd->st_sensor_data) {
         char id[RRD_ID_LENGTH_MAX + 1];
@@ -386,10 +460,11 @@ static void mssql_sensor_data_chart(struct sensor_data *sd, int update_every)
         rrdlabels_add(sd->st_sensor_data->rrdlabels, "manufacturer", sd->manufacturer, RRDLABEL_SRC_AUTO);
         rrdlabels_add(sd->st_sensor_data->rrdlabels, "model", sd->model, RRDLABEL_SRC_AUTO);
 
-        sd->rd_sensor_data = rrddim_add(sd->st_sensor_data, "input", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
+        sd->rd_sensor_data = rrddim_add(sd->st_sensor_data, "input", NULL, (collected_number )sd->mult_factor, (collected_number )sd->div_factor, RRD_ALGORITHM_ABSOLUTE);
     }
 
-    rrddim_set_by_pointer(sd->st_sensor_data, sd->rd_sensor_data, sd->current_data_value);
+    collected_number value = sd->current_data_value + (collected_number )sd->add_factor;
+    rrddim_set_by_pointer(sd->st_sensor_data, sd->rd_sensor_data, value);
     rrdset_done(sd->st_sensor_data);
 }
 
@@ -401,12 +476,12 @@ int dict_sensors_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *val
     if (unlikely(!sd->name))
         return 1;
 
-    mssql_sensor_state_chart_loop(sd, *update_every);
+    sensors_state_chart_loop(sd, *update_every);
 
     if (unlikely(!sd->enabled))
         return 1;
 
-    mssql_sensor_data_chart(sd, *update_every);
+    sensors_data_chart(sd, *update_every);
 
     return 1;
 }
