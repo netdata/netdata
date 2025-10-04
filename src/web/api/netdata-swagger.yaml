@@ -13,33 +13,33 @@ info:
     - **v3**: The latest API version that combines v1 and v2 endpoints and may include additional features
     
     ### v3 API Endpoints
-    
-    The v3 API provides the following endpoints (most reuse v1 or v2 implementations):
-    - `/api/v3/data` - Multi-dimensional data queries (uses v2 implementation)
-    - `/api/v3/weights` - Metric scoring/correlation (uses v2 implementation)
-    - `/api/v3/contexts` - Context metadata (uses v2 implementation)
-    - `/api/v3/nodes` - Node information (uses v2 implementation)
-    - `/api/v3/q` - Full-text search (uses v2 implementation)
-    - `/api/v3/alerts` - Alert information (uses v2 implementation)
-    - `/api/v3/alert_transitions` - Alert state transitions (uses v2 implementation)
-    - `/api/v3/alert_config` - Alert configuration (uses v2 implementation)
-    - `/api/v3/functions` - Available functions (uses v2 implementation)
-    - `/api/v3/function` - Execute functions (uses v1 implementation)
-    - `/api/v3/info` - Agent information (uses v2 implementation)
-    - `/api/v3/node_instances` - Node instance information (uses v2 implementation)
-    - `/api/v3/stream_path` - Streaming topology (v3 specific)
-    - `/api/v3/versions` - Version information (uses v2 implementation)
-    - `/api/v3/badge.svg` - Dynamic badges (uses v1 implementation)
-    - `/api/v3/allmetrics` - Export metrics (uses v1 implementation)
-    - `/api/v3/context` - Single context info (uses v1 implementation)
-    - `/api/v3/variable` - Variable information (uses v1 implementation)
-    - `/api/v3/config` - Dynamic configuration (uses v1 implementation)
-    - `/api/v3/settings` - Agent settings (v3 specific)
-    - `/api/v3/me` - Current user information (v3 specific)
-    - `/api/v3/claim` - Agent claiming (v3 specific)
+
+    The v3 API provides the current, actively maintained endpoints:
+    - `/api/v3/data` - Multi-dimensional data queries
+    - `/api/v3/weights` - Metric scoring/correlation
+    - `/api/v3/contexts` - Context metadata
+    - `/api/v3/nodes` - Node information
+    - `/api/v3/q` - Full-text search
+    - `/api/v3/alerts` - Alert information
+    - `/api/v3/alert_transitions` - Alert state transitions
+    - `/api/v3/alert_config` - Alert configuration
+    - `/api/v3/functions` - Available functions
+    - `/api/v3/function` - Execute functions
+    - `/api/v3/info` - Agent information
+    - `/api/v3/node_instances` - Node instance information
+    - `/api/v3/stream_path` - Streaming topology
+    - `/api/v3/versions` - Version information
+    - `/api/v3/badge.svg` - Dynamic badges
+    - `/api/v3/allmetrics` - Export metrics
+    - `/api/v3/context` - Single context info
+    - `/api/v3/variable` - Variable information
+    - `/api/v3/config` - Dynamic configuration
+    - `/api/v3/settings` - Agent settings
+    - `/api/v3/me` - Current user information
+    - `/api/v3/claim` - Agent claiming
     - Additional management and streaming endpoints
-    
-    Note: This documentation currently focuses on v1 and v2 endpoints. The v3 endpoints listed above generally accept the same parameters as their v1/v2 counterparts.
+
+    **Note:** V1 and V2 APIs are deprecated and maintained for backwards compatibility only. New integrations should use V3 exclusively.
   version: "v1-rolling"
   contact:
     name: Netdata Agent API
@@ -74,6 +74,7 @@ tags:
 paths:
   /api/v2/nodes:
     get:
+      deprecated: true
       operationId: getNodes2
       tags:
         - nodes
@@ -124,7 +125,6 @@ paths:
       summary: Nodes Info v3
       description: |
         Get a list of all nodes hosted by this Netdata Agent.
-        This is the same as `/api/v2/nodes` but may support additional features in the future.
 
         **Security & Access Control:**
         - 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply
@@ -163,6 +163,7 @@ paths:
                       $ref: '#/components/schemas/nodeFull'
   /api/v2/contexts:
     get:
+      deprecated: true
       operationId: getContexts2
       tags:
         - contexts
@@ -200,7 +201,6 @@ paths:
       summary: Contexts Info v3
       description: |
         Get a list of all contexts, across all nodes, hosted by this Netdata Agent.
-        This is the same as `/api/v2/contexts` but may support additional features in the future.
 
         **Security & Access Control:**
         - 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply
@@ -226,6 +226,7 @@ paths:
                 $ref: '#/components/schemas/contexts2'
   /api/v2/q:
     get:
+      deprecated: true
       operationId: q2
       tags:
         - contexts
@@ -270,7 +271,6 @@ paths:
       summary: Full Text Search v3
       description: |
         Get a list of contexts, across all nodes, hosted by this Netdata Agent, matching a string expression.
-        This is the same as `/api/v2/q` but may support additional features in the future.
 
         **Security & Access Control:**
         - 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply
@@ -303,6 +303,7 @@ paths:
                 $ref: '#/components/schemas/contexts2'
   /api/v1/info:
     get:
+      deprecated: true
       operationId: getNodeInfo1
       tags:
         - nodes
@@ -340,6 +341,7 @@ paths:
           description: netdata daemon not ready (used for health checks).
   /api/v1/charts:
     get:
+      deprecated: true
       operationId: getNodeCharts1
       tags:
         - charts
@@ -365,6 +367,7 @@ paths:
                 $ref: "#/components/schemas/chart_summary"
   /api/v1/chart:
     get:
+      deprecated: true
       operationId: getNodeChart1
       tags:
         - charts
@@ -395,6 +398,7 @@ paths:
           description: No chart with the given id is found.
   /api/v1/contexts:
     get:
+      deprecated: true
       operationId: getNodeContexts1
       tags:
         - contexts
@@ -427,6 +431,7 @@ paths:
                 $ref: "#/components/schemas/context_summary"
   /api/v1/context:
     get:
+      deprecated: true
       operationId: getNodeContext1
       tags:
         - contexts
@@ -648,6 +653,7 @@ paths:
           description: Internal server error. Usually indicates the server is out of memory.
   /api/v1/config:
     get:
+      deprecated: true
       operationId: getConfig
       tags:
         - dyncfg
@@ -781,6 +787,7 @@ paths:
                 $ref: '#/components/schemas/config_default_response'
   /api/v2/data:
     get:
+      deprecated: true
       operationId: dataQuery2
       tags:
         - data
@@ -910,7 +917,6 @@ paths:
       summary: Data Query v3
       description: |
         Multi-node, multi-context, multi-instance, multi-dimension data queries, with time and metric aggregation.
-        This is the same as `/api/v2/data` but may support additional features in the future.
 
         **Security & Access Control:**
         - 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply
@@ -1028,6 +1034,7 @@ paths:
             Internal server error. This usually means the server is out of memory.
   /api/v1/data:
     get:
+      deprecated: true
       operationId: dataQuery1
       tags:
         - data
@@ -1096,6 +1103,7 @@ paths:
             memory.
   /api/v1/allmetrics:
     get:
+      deprecated: true
       operationId: allMetrics1
       tags:
         - data
@@ -1222,6 +1230,7 @@ paths:
           description: The format requested is not supported.
   /api/v1/badge.svg:
     get:
+      deprecated: true
       operationId: badge1
       tags:
         - badges
@@ -4133,7 +4142,6 @@ paths:
         - Streaming connection status (live/stale/offline)
         - Complete path from each child to root parent
 
-
         **Security & Access Control:**
         - 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply
         - **Default Access:** Public (no authentication required)
@@ -4735,7 +4743,6 @@ paths:
         - Function execution is subject to ACL checks
         - Sensitive operations may be restricted by configuration
 
-
         **Security & Access Control:**
         - 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply
         - **Default Access:** Public (no authentication required)
@@ -4985,7 +4992,6 @@ paths:
         1. Use `/api/v3/functions` to discover available functions
         2. Use `/api/v3/function?function=<name>` to execute specific functions
         3. Results tell you which nodes support which operations
-
 
         **Security & Access Control:**
         - 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply
@@ -5278,7 +5284,6 @@ paths:
         - Configuration changes require appropriate permissions
         - Some actions may be restricted by ACL
         - Changes are logged for audit trail
-
 
         **Security & Access Control:**
         - 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply
@@ -7058,6 +7063,7 @@ paths:
                   summary: Unauthenticated local access
   /api/v2/weights:
     get:
+      deprecated: true
       operationId: weights2
       tags:
         - weights
@@ -7127,7 +7133,6 @@ paths:
         This endpoint is deprecated. Use `/api/v3/alerts` instead, which provides the same functionality.
 
         **Migration:** Replace `/api/v2/alerts` with `/api/v3/alerts` in all API calls.
-        All parameters and responses are identical between v2 and v3 versions.
 
         Returns the current status of health monitoring alerts across all nodes in the infrastructure.
         Supports filtering by status, alert name, and node selection.
@@ -7179,7 +7184,6 @@ paths:
         This endpoint is deprecated. Use `/api/v3/alert_transitions` instead, which provides the same functionality.
 
         **Migration:** Replace `/api/v2/alert_transitions` with `/api/v3/alert_transitions` in all API calls.
-        All parameters and responses are identical between v2 and v3 versions.
 
         Returns historical alert state transitions showing how alerts changed over time.
         Supports faceted filtering by status, type, role, class, component, node, alert name, chart name, and context.
@@ -7287,7 +7291,6 @@ paths:
         This endpoint is deprecated. Use `/api/v3/alert_config` instead, which provides the same functionality.
 
         **Migration:** Replace `/api/v2/alert_config` with `/api/v3/alert_config` in all API calls.
-        All parameters and responses are identical between v2 and v3 versions.
 
         Retrieves the complete configuration for a specific alert using its configuration hash (UUID).
         Returns alert definition including conditions, thresholds, and notification settings.
@@ -7327,7 +7330,6 @@ paths:
         This endpoint is deprecated. Use `/api/v3/info` instead, which provides the same functionality.
 
         **Migration:** Replace `/api/v2/info` with `/api/v3/info` in all API calls.
-        All parameters and responses are identical between v2 and v3 versions.
 
         Returns comprehensive agent information including version, capabilities, OS details, hardware specs,
         and configuration. Essential for discovering agent capabilities before querying metrics.
@@ -7363,7 +7365,6 @@ paths:
         This endpoint is deprecated. Use `/api/v3/node_instances` instead, which provides the same functionality.
 
         **Migration:** Replace `/api/v2/node_instances` with `/api/v3/node_instances` in all API calls.
-        All parameters and responses are identical between v2 and v3 versions.
 
         Returns hierarchical organization of chart instances across nodes, showing relationships between
         parent and child agents and their monitored components.
@@ -7403,7 +7404,6 @@ paths:
         This endpoint is deprecated. Use `/api/v3/versions` instead, which provides the same functionality.
 
         **Migration:** Replace `/api/v2/versions` with `/api/v3/versions` in all API calls.
-        All parameters and responses are identical between v2 and v3 versions.
 
         Returns agent version information across all nodes, useful for upgrade planning and compatibility checking.
 
@@ -7440,7 +7440,6 @@ paths:
         This endpoint is deprecated. Use `/api/v3/progress` instead, which provides the same functionality.
 
         **Migration:** Replace `/api/v2/progress` with `/api/v3/progress` in all API calls.
-        All parameters and responses are identical between v2 and v3 versions.
 
         Tracks progress of long-running asynchronous operations using transaction UUID.
         Used for polling function execution status and completion percentage.
@@ -7476,7 +7475,6 @@ paths:
         This endpoint is deprecated. Use `/api/v3/functions` instead, which provides the same functionality.
 
         **Migration:** Replace `/api/v2/functions` with `/api/v3/functions` in all API calls.
-        All parameters and responses are identical between v2 and v3 versions.
 
         Lists all functions available on agents, including their descriptions, parameters, and capabilities.
         Functions provide live operational data and diagnostic capabilities.
@@ -7514,7 +7512,6 @@ paths:
         This endpoint is deprecated. Use `/api/v3/rtc_offer` instead, which provides the same functionality.
 
         **Migration:** Replace `/api/v2/rtc_offer` with `/api/v3/rtc_offer` in all API calls.
-        All parameters and request body format are identical between v2 and v3 versions.
 
         Establishes WebRTC peer-to-peer connection by exchanging SDP offer/answer for real-time data channels.
 
@@ -7606,7 +7603,6 @@ paths:
         This endpoint is deprecated. Use `/api/v3/bearer_protection` instead, which provides the same functionality.
 
         **Migration:** Replace `/api/v2/bearer_protection` with `/api/v3/bearer_protection` in all API calls.
-        All parameters and responses are identical between v2 and v3 versions.
 
         Controls whether agent requires bearer token authentication for API access.
         Used by Netdata Cloud to secure agents after claiming.
@@ -7662,7 +7658,6 @@ paths:
         This endpoint is deprecated. Use `/api/v3/bearer_get_token` instead, which provides the same functionality.
 
         **Migration:** Replace `/api/v2/bearer_get_token` with `/api/v3/bearer_get_token` in all API calls.
-        All parameters and responses are identical between v2 and v3 versions.
 
         Generates time-limited bearer token for authenticating API requests when bearer protection is enabled.
 
@@ -7704,7 +7699,6 @@ paths:
       summary: Score or weight all or some of the metrics, across all nodes, according to various algorithms.
       description: |
         This endpoint goes through all metrics and scores them according to an algorithm.
-        This is the same as `/api/v2/weights` but may support additional features in the future.
 
         **Security & Access Control:**
         - 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply
@@ -7757,6 +7751,7 @@ paths:
           description: Timeout - the query took too long and has been cancelled.
   /api/v1/weights:
     get:
+      deprecated: true
       operationId: weights1
       tags:
         - weights
@@ -7804,6 +7799,7 @@ paths:
           description: Timeout - the query took too long and has been cancelled.
   /api/v1/metric_correlations:
     get:
+      deprecated: true
       operationId: metricCorrelations1
       tags:
         - weights
@@ -7850,6 +7846,7 @@ paths:
           description: Timeout - the query took too long and has been cancelled.
   /api/v1/function:
     get:
+      deprecated: true
       operationId: function1
       tags:
         - functions
@@ -7891,6 +7888,7 @@ paths:
           description: The collector sent a response, but it was invalid or corrupted.
   /api/v1/functions:
     get:
+      deprecated: true
       operationId: functions1
       tags:
         - functions
@@ -7912,6 +7910,7 @@ paths:
           description: A JSON object containing one object per supported function.
   /api/v1/alarms:
     get:
+      deprecated: true
       operationId: alerts1
       tags:
         - alerts
@@ -7952,6 +7951,7 @@ paths:
                 $ref: "#/components/schemas/alarms"
   /api/v1/alarms_values:
     get:
+      deprecated: true
       operationId: alertValues1
       tags:
         - alerts
@@ -7992,6 +7992,7 @@ paths:
                 $ref: "#/components/schemas/alarms_values"
   /api/v1/alarm_log:
     get:
+      deprecated: true
       operationId: alertsLog1
       tags:
         - alerts
@@ -8027,6 +8028,7 @@ paths:
                   $ref: "#/components/schemas/alarm_log_entry"
   /api/v1/alarm_count:
     get:
+      deprecated: true
       operationId: alertsCount1
       tags:
         - alerts
@@ -8076,6 +8078,7 @@ paths:
             memory.
   /api/v1/alarm_variables:
     get:
+      deprecated: true
       operationId: getNodeAlertVariables1
       tags:
         - alerts
@@ -8118,6 +8121,7 @@ paths:
             memory.
   /api/v1/manage/health:
     get:
+      deprecated: true
       operationId: health1
       tags:
         - management
@@ -8175,6 +8179,7 @@ paths:
           description: Bearer authentication error.
   /api/v1/aclk:
     get:
+      deprecated: true
       operationId: aclk1
       tags:
         - management
