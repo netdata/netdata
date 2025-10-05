@@ -6,6 +6,7 @@
 
 **Merged pull requests:**
 
+- fix\(packaging/docker\): add missing nd-run [\#21097](https://github.com/netdata/netdata/pull/21097) ([ilyam8](https://github.com/ilyam8))
 - build\(deps\): bump github.com/docker/docker from 28.4.0+incompatible to 28.5.0+incompatible in /src/go [\#21095](https://github.com/netdata/netdata/pull/21095) ([dependabot[bot]](https://github.com/apps/dependabot))
 - build\(deps\): bump github.com/go-ldap/ldap/v3 from 3.4.11 to 3.4.12 in /src/go [\#21094](https://github.com/netdata/netdata/pull/21094) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Hide  mem\_private\_usage on Windows. [\#21093](https://github.com/netdata/netdata/pull/21093) ([thiagoftsm](https://github.com/thiagoftsm))
@@ -449,7 +450,6 @@
 - Add CLI command to schedule update information [\#20558](https://github.com/netdata/netdata/pull/20558) ([stelfrag](https://github.com/stelfrag))
 - SNMP: chrysalis profiles [\#20557](https://github.com/netdata/netdata/pull/20557) ([Ancairon](https://github.com/Ancairon))
 - SNMP: checkpoint profiles [\#20556](https://github.com/netdata/netdata/pull/20556) ([Ancairon](https://github.com/Ancairon))
-- Check that there is a valid thread when performing ACLK sync shutdown [\#20555](https://github.com/netdata/netdata/pull/20555) ([stelfrag](https://github.com/stelfrag))
 
 ## [v2.5.4](https://github.com/netdata/netdata/tree/v2.5.4) (2025-06-24)
 
