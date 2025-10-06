@@ -242,23 +242,29 @@ include:
 
   - &opensuse
     distro: opensuse
-    version: "15.6"
+    version: "16.0"
     support_type: Core
     notes: ''
     eol_check: true
     bundle_sentry: *default_sentry
-    base_image: opensuse/leap:15.6
+    base_image: opensuse/leap:16.0
     jsonc_removal: |
       zypper rm -y libjson-c-devel
     packages: &opensuse_packages
       type: rpm
-      repo_distro: opensuse/15.6
+      repo_distro: opensuse/16.0
       builder_rev: *def_builder_rev
       arches:
         - x86_64
         - aarch64
     test:
       ebpf-core: true
+  - <<: *opensuse
+    version: "15.6"
+    base_image: opensuse/leap:15.6
+    packages:
+      <<: *opensuse_packages
+      repo_distro: opensuse/15.6
 
   - &oracle
     distro: oraclelinux
@@ -363,6 +369,11 @@ include:
         - arm64
     test:
       ebpf-core: true
+  - <<: *ubuntu
+    version: "25.10"
+    packages:
+      <<: *ubuntu_packages
+      repo_distro: ubuntu/questing
   - <<: *ubuntu
     version: "25.04"
     packages:
