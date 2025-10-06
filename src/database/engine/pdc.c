@@ -1308,9 +1308,8 @@ NOT_INLINE_HOT void epdl_find_extent_and_populate_pages(struct rrdengine_instanc
     bool should_stop = __atomic_load_n(&epdl->pdc->workers_should_stop, __ATOMIC_RELAXED);
     for(EPDL *ep = epdl->query.next; ep ;ep = ep->query.next) {
         internal_fatal(ep->datafile != epdl->datafile, "DBENGINE: datafiles do not match");
-        internal_fatal(ep->extent_offset != epdl->extent_offset, "DBENGINE: extent offsets do not match");
+        internal_fatal(ep->extent_block != epdl->extent_block, "DBENGINE: extent blocks do not match");
         internal_fatal(ep->extent_size != epdl->extent_size, "DBENGINE: extent sizes do not match");
-        internal_fatal(ep->file != epdl->file, "DBENGINE: files do not match");
 
         if(!__atomic_load_n(&ep->pdc->workers_should_stop, __ATOMIC_RELAXED)) {
             should_stop = false;

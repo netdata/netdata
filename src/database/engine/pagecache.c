@@ -462,9 +462,8 @@ static ALWAYS_INLINE_HOT size_t list_has_time_gaps(
 
                 internal_fatal(pd->status & PDC_PAGE_SKIP, "page is disk pending and skipped");
                 internal_fatal(!pd->datafile.ptr, "datafile is NULL");
-                internal_fatal(!pd->datafile.extent.bytes, "datafile.extent.bytes zero");
-                internal_fatal(!pd->datafile.extent.pos, "datafile.extent.pos is zero");
-                internal_fatal(!pd->datafile.fileno, "datafile.fileno is zero");
+                internal_fatal(!pd->datafile.bytes, "datafile.bytes zero");
+                internal_fatal(!pd->datafile.block, "datafile.block is zero");
             }
         }
         else {
