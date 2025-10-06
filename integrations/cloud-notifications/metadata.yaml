@@ -507,8 +507,8 @@
               - Basic: The client sends a request with an Authorization header that includes a base64-encoded string in the format **username:password**.
               - Bearer: The client sends a request with an Authorization header that includes a **bearer token**.
           - **Verification**
-            - Token: The Token from the latest **Test notification** received on webhook endpoint.
-              - Click on the **Test** button to receive a notification, Token will be imbedded on the payload.
+            - Token: The Token from the latest **Test notification** received on the webhook endpoint.
+              - Click on the **Test** button to receive a notification. Token will be embedded in the payload.
 
       ### Webhook service
 
