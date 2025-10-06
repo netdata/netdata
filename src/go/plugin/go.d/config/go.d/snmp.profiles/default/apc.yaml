@@ -9,3 +9,80 @@ selector:
   - sysobjectid:
       include:
         - 1.3.6.1.4.1.318.*
+
+metadata:
+  device:
+    fields:
+      vendor:
+        value: APC
+
+sysobjectid_metadata:
+  # ATS
+  - sysobjectid: 1.3.6.1.4.1.318.1.3.11\..*
+    metadata:
+      category:
+        value: Power
+  - sysobjectid: 1.3.6.1.4.1.318.1.3.19\..*
+    metadata:
+      category:
+        value: Power
+  - sysobjectid: 1.3.6.1.4.1.318.1.3.32\..*
+    metadata:
+      category:
+        value: Power
+  - sysobjectid: 1.3.6.1.4.1.318.1.3.38\..*
+    metadata:
+      category:
+        value: Power
+
+  # Cooling
+  - sysobjectid: 1.3.6.1.4.1.318.1.3.14\..*
+    metadata:
+      category:
+        value: Cooling
+
+  # Security
+  - sysobjectid: 1.3.6.1.4.1.318.1.3.12\..*
+    metadata:
+      category:
+        value: Security
+  - sysobjectid: 1.3.6.1.4.1.318.1.3.22\..*
+    metadata:
+      category:
+        value: Security
+
+  # Console
+  - sysobjectid: 1.3.6.1.4.1.318.1.3.20\..*
+    metadata:
+      category:
+        value: Console
+
+  # Applications
+  - sysobjectid: 1.3.6.1.4.1.318.1.3.31\..*
+    metadata:
+      category:
+        value: Application
+  - sysobjectid: 1.3.6.1.4.1.318.1.3.33\..*
+    metadata:
+      category:
+        value: Application
+
+  # Power modules
+  - sysobjectid: 1.3.6.1.4.1.318.1.3.18\..*
+    metadata:
+      category:
+        value: Power
+  - sysobjectid: 1.3.6.1.4.1.318.1.3.30\..*
+    metadata:
+      category:
+        value: Power
+  - sysobjectid: 1.3.6.1.4.1.318.1.3.34\..*
+    metadata:
+      category:
+        value: Power
+
+  # Micro Data Center
+  - sysobjectid: 1.3.6.1.4.1.318.1.3.36\..*
+    metadata:
+      category:
+        value: Micro Data Center
