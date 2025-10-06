@@ -10,6 +10,7 @@
 - build\(deps\): bump github.com/docker/docker from 28.4.0+incompatible to 28.5.0+incompatible in /src/go [\#21095](https://github.com/netdata/netdata/pull/21095) ([dependabot[bot]](https://github.com/apps/dependabot))
 - build\(deps\): bump github.com/go-ldap/ldap/v3 from 3.4.11 to 3.4.12 in /src/go [\#21094](https://github.com/netdata/netdata/pull/21094) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Hide  mem\_private\_usage on Windows. [\#21093](https://github.com/netdata/netdata/pull/21093) ([thiagoftsm](https://github.com/thiagoftsm))
+- Event loop cleanup [\#21091](https://github.com/netdata/netdata/pull/21091) ([stelfrag](https://github.com/stelfrag))
 - Improve installer \(Windows\) [\#21090](https://github.com/netdata/netdata/pull/21090) ([thiagoftsm](https://github.com/thiagoftsm))
 - Correctly split MCP registry update to it’s own workflow. [\#21089](https://github.com/netdata/netdata/pull/21089) ([Ferroin](https://github.com/Ferroin))
 - Register Netdata to MCP Registry [\#21088](https://github.com/netdata/netdata/pull/21088) ([ktsaou](https://github.com/ktsaou))
@@ -449,7 +450,6 @@
 - Improve SQLite library shutdown handling and initialization state [\#20559](https://github.com/netdata/netdata/pull/20559) ([stelfrag](https://github.com/stelfrag))
 - Add CLI command to schedule update information [\#20558](https://github.com/netdata/netdata/pull/20558) ([stelfrag](https://github.com/stelfrag))
 - SNMP: chrysalis profiles [\#20557](https://github.com/netdata/netdata/pull/20557) ([Ancairon](https://github.com/Ancairon))
-- SNMP: checkpoint profiles [\#20556](https://github.com/netdata/netdata/pull/20556) ([Ancairon](https://github.com/Ancairon))
 
 ## [v2.5.4](https://github.com/netdata/netdata/tree/v2.5.4) (2025-06-24)
 
