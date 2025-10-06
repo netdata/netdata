@@ -100,16 +100,16 @@ sysobjectids:
       category: Access Point
       model: AP9617
     1.3.6.1.4.1.318.1.3.4.5:
-      category: UPS
+      category: PDU
       model: Switched Rack PDU
     1.3.6.1.4.1.318.1.3.4.5.1.3.4.5:
-      category: Power
+      category: PDU
       model: Rack PDU (AP7811)
     1.3.6.1.4.1.318.1.3.4.6:
-      category: Power
+      category: PDU
       model: Rack PDU (AP8858)
     1.3.6.1.4.1.318.1.3.4.8:
-      category: Power
+      category: PDU
       model: Rack PDU (AP7811B)
     1.3.6.1.4.1.318.1.3.5.1:
       category: UPS
@@ -181,7 +181,7 @@ sysobjectids:
       category: Other
       model: Uniflair LE DXG2 (0N-9582)
     1.3.6.1.4.1.318.1.3.15:
-      category: Power
+      category: PDU
       model: InfraStruXure PDU (0M-5103)
     1.3.6.1.4.1.318.1.3.16:
       category: UPS
