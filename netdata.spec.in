@@ -112,16 +112,8 @@ AutoReqProv: yes
 %global _have_mongo_exporter 1
 %endif
 
-# log2journal can’t build on some systems
-%if 0%{?sle_version}
-%if %{sle_version} < 150600
-%global _have_log2journal 0
-%else
+# log2journal can’t build on some systems, but we don’t support those systems anymore.
 %global _have_log2journal 1
-%endif
-%else
-%global _have_log2journal 1
-%endif
 
 # If ML hasn’t been explicitly disabled or enabled yet, enable it now.
 %if 0%{!?_have_ml:1}
