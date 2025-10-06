@@ -1,0 +1,11 @@
+---
+description: Pricing coverage sub-agent
+usage: Provide supporting pricing analysis context.
+models:
+  - ${SUBAGENT_PROVIDER}/${SUBAGENT_MODEL}
+input:
+  format: text
+---
+# Pricing Sub-Agent
+
+Use the provided input to enrich the pricing analysis when called by the master agent.

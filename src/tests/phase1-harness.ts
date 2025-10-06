@@ -1,3 +1,5 @@
+import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -8,6 +10,29 @@ import { sanitizeToolName } from '../utils.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+const MODEL_NAME = 'deterministic-model';
+const PRIMARY_PROVIDER = 'primary';
+const SECONDARY_PROVIDER = 'secondary';
+const SUBAGENT_TOOL = 'agent__pricing-subagent';
+const BASE_DEFAULTS = {
+  stream: false,
+  maxToolTurns: 3,
+  maxRetries: 2,
+  llmTimeout: 10_000,
+  toolTimeout: 10_000,
+} as const;
+const TMP_PREFIX = 'ai-agent-phase1-';
+const SUBAGENT_PRICING_PROMPT = path.resolve(process.cwd(), 'src/tests/fixtures/subagents/pricing-subagent.ai');
+const SUBAGENT_PRICING_SUCCESS_PROMPT = path.resolve(process.cwd(), 'src/tests/fixtures/subagents-success/pricing-subagent-success.ai');
+const SUBAGENT_SUCCESS_TOOL = 'agent__pricing-subagent-success';
+
+function makeTempDir(label: string): string {
+  return fs.mkdtempSync(path.join(os.tmpdir(), `${TMP_PREFIX}${label}-`));
+}
+
+let runTest16Paths: { sessionsDir: string; billingFile: string } | undefined;
+let runTest20Paths: { baseDir: string; blockerFile: string; billingFile: string } | undefined;
 
 function invariant(condition: boolean, message: string): asserts condition {
   if (!condition) throw new Error(message);
@@ -23,6 +48,11 @@ function isLlmAccounting(entry: AccountingEntry): entry is AccountingEntry & { t
 
 interface HarnessTest {
   id: string;
+  configure?: (
+    configuration: Configuration,
+    sessionConfig: AIAgentSessionConfig,
+    defaults: NonNullable<Configuration['defaults']>
+  ) => void;
   expect: (result: AIAgentResult) => void;
 }
 
@@ -40,17 +70,17 @@ const TEST_SCENARIOS: HarnessTest[] = [
       const firstAssistant = assistantMessages.at(0);
       invariant(firstAssistant !== undefined, 'Missing first assistant message for run-test-1.');
       const toolCallNames = (firstAssistant.toolCalls ?? []).map((call) => call.name);
-      const expectedTool = 'toy__toy';
+      const expectedTool = 'test__test';
       const sanitizedExpectedTool = sanitizeToolName(expectedTool);
       invariant(
         toolCallNames.includes(expectedTool) || toolCallNames.includes(sanitizedExpectedTool),
-        'Expected toy__toy tool call in first turn for run-test-1.',
+        'Expected test__test tool call in first turn for run-test-1.',
       );
 
       const toolEntries = result.accounting.filter(isToolAccounting);
-      const toyEntry = toolEntries.find((entry) => entry.mcpServer === 'toy' && entry.command === 'toy__toy');
-      invariant(toyEntry !== undefined, 'Expected accounting entry for toy MCP server in run-test-1.');
-      invariant(toyEntry.status === 'ok', 'Toy MCP tool accounting should be ok for run-test-1.');
+      const testEntry = toolEntries.find((entry) => entry.mcpServer === 'test' && entry.command === 'test__test');
+      invariant(testEntry !== undefined, 'Expected accounting entry for test MCP server in run-test-1.');
+      invariant(testEntry.status === 'ok', 'Test MCP tool accounting should be ok for run-test-1.');
     },
   },
   {
@@ -62,7 +92,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
       invariant(finalReport.status === 'failure', 'Final report should indicate failure for run-test-2.');
 
       const toolEntries = result.accounting.filter(isToolAccounting);
-      const failureEntry = toolEntries.find((entry) => entry.command === 'toy__toy');
+      const failureEntry = toolEntries.find((entry) => entry.command === 'test__test');
       invariant(failureEntry !== undefined, 'Expected MCP accounting entry for run-test-2.');
       invariant(failureEntry.status === 'failed', 'Accounting entry must reflect MCP failure for run-test-2.');
     },
@@ -79,56 +109,400 @@ const TEST_SCENARIOS: HarnessTest[] = [
       invariant(llmEntries.length >= 2, 'LLM retries expected for run-test-3.');
     },
   },
+  {
+    id: 'run-test-4',
+    configure: (configuration, sessionConfig) => {
+      configuration.providers = {
+        [PRIMARY_PROVIDER]: { type: 'test-llm' },
+        [SECONDARY_PROVIDER]: { type: 'test-llm' },
+      };
+      sessionConfig.targets = [
+        { provider: PRIMARY_PROVIDER, model: MODEL_NAME },
+        { provider: SECONDARY_PROVIDER, model: MODEL_NAME },
+      ];
+    },
+    expect: (result) => {
+      invariant(result.success, 'Scenario run-test-4 expected success.');
+      const llmEntries = result.accounting.filter(isLlmAccounting);
+      const providersUsed = new Set(llmEntries.map((entry) => entry.provider));
+      invariant(providersUsed.has(SECONDARY_PROVIDER), 'Fallback provider should be used in run-test-4.');
+    },
+  },
+  {
+    id: 'run-test-5',
+    configure: (configuration, sessionConfig, defaults) => {
+      defaults.maxRetries = 1;
+      configuration.defaults = defaults;
+      sessionConfig.maxRetries = 1;
+    },
+    expect: (result) => {
+      invariant(!result.success, 'Scenario run-test-5 should fail due to timeout.');
+      invariant(typeof result.error === 'string' && result.error.includes('timeout'), 'Timeout error expected for run-test-5.');
+    },
+  },
+  {
+    id: 'run-test-6',
+    configure: (configuration, sessionConfig, defaults) => {
+      defaults.maxRetries = 1;
+      configuration.defaults = defaults;
+      sessionConfig.maxRetries = 1;
+    },
+    expect: (result) => {
+      invariant(!result.success, 'Scenario run-test-6 should fail after retries exhausted.');
+      const exitLog = result.logs.find((log) => log.remoteIdentifier === 'agent:EXIT-NO-LLM-RESPONSE');
+      invariant(exitLog !== undefined, 'Expected EXIT-NO-LLM-RESPONSE log for run-test-6.');
+      invariant(typeof exitLog.message === 'string' && exitLog.message.includes('No LLM response after'), 'Exit log should indicate retries exhausted for run-test-6.');
+    },
+  },
+  {
+    id: 'run-test-7',
+    configure: (configuration, sessionConfig, defaults) => {
+      defaults.toolTimeout = 200;
+      configuration.defaults = defaults;
+      sessionConfig.toolTimeout = 200;
+    },
+    expect: (result) => {
+      invariant(result.success, 'Scenario run-test-7 completes with failure report.');
+      const toolEntries = result.accounting.filter(isToolAccounting);
+      const timeoutEntry = toolEntries.find((entry) => entry.command === 'test__test');
+      invariant(timeoutEntry !== undefined, 'Expected MCP accounting entry for run-test-7.');
+      invariant(timeoutEntry.status === 'failed', 'Tool timeout should be recorded as failure for run-test-7.');
+    },
+  },
+  {
+    id: 'run-test-8',
+    configure: (configuration, sessionConfig, defaults) => {
+      sessionConfig.toolResponseMaxBytes = 64;
+      defaults.toolResponseMaxBytes = 64;
+      configuration.defaults = defaults;
+    },
+    expect: (result) => {
+      invariant(result.success, 'Scenario run-test-8 expected success.');
+      const toolMessages = result.conversation.filter((message) => message.role === 'tool');
+      invariant(toolMessages.some((message) => message.content.includes('[TRUNCATED]')), 'Truncation notice expected in run-test-8.');
+    },
+  },
+  {
+    id: 'run-test-9',
+    expect: (result) => {
+      invariant(result.success, 'Scenario run-test-9 should complete with failure report.');
+      const finalReport = result.finalReport;
+      invariant(finalReport !== undefined && finalReport.status === 'failure', 'Final report should mark failure for run-test-9.');
+      const log = result.logs.find((entry) => typeof entry.message === 'string' && entry.message.includes('Unknown tool requested'));
+      invariant(log !== undefined, 'Unknown tool warning log expected for run-test-9.');
+    },
+  },
+  {
+    id: 'run-test-10',
+    expect: (result) => {
+      invariant(result.success, 'Scenario run-test-10 expected success.');
+      const assistantMessages = result.conversation.filter((message) => message.role === 'assistant');
+      const firstAssistant = assistantMessages.at(0);
+      invariant(firstAssistant !== undefined, 'Assistant message missing in run-test-10.');
+      const toolCallNames = (firstAssistant.toolCalls ?? []).map((call) => call.name);
+      invariant(toolCallNames.includes('agent__progress_report'), 'Progress report tool call expected in run-test-10.');
+    },
+  },
+  {
+    id: 'run-test-11',
+    expect: (result) => {
+      invariant(result.success, 'Scenario run-test-11 expected success.');
+      const logs = result.logs;
+      invariant(logs.some((log) => typeof log.message === 'string' && log.message.includes('agent__final_report(') && log.message.includes('report_format:json')), 'Final report log should capture JSON format attempt in run-test-11.');
+    },
+  },
+  {
+    id: 'run-test-12',
+    configure: (configuration, sessionConfig, defaults) => {
+      defaults.maxToolTurns = 1;
+      configuration.defaults = defaults;
+      sessionConfig.maxTurns = 1;
+    },
+    expect: (result) => {
+      invariant(result.success, 'Scenario run-test-12 expected success.');
+      const finalReport = result.finalReport;
+      invariant(finalReport !== undefined && finalReport.status === 'success', 'Final report should complete successfully for run-test-12.');
+      const finalTurnLog = result.logs.find((log) => typeof log.remoteIdentifier === 'string' && log.remoteIdentifier.includes('primary:') && typeof log.message === 'string' && log.message.includes('final turn'));
+      invariant(finalTurnLog !== undefined, 'LLM request log should reflect final turn for run-test-12.');
+    },
+  },
+  {
+    id: 'run-test-13',
+    configure: (configuration, sessionConfig) => {
+      sessionConfig.tools = ['test', 'batch'];
+      configuration.defaults = { ...configuration.defaults, parallelToolCalls: true };
+      sessionConfig.parallelToolCalls = true;
+    },
+    expect: (result) => {
+      invariant(result.success, 'Scenario run-test-13 expected success.');
+      const assistantMessages = result.conversation.filter((message) => message.role === 'assistant');
+      const firstAssistant = assistantMessages.at(0);
+      const hasBatchCall = firstAssistant?.toolCalls?.some((call) => call.name === 'agent__batch') ?? false;
+      invariant(hasBatchCall, 'agent__batch tool call expected in run-test-13.');
+      const batchAccounting = result.accounting.filter(isToolAccounting).find((entry) => entry.command === 'agent__batch');
+      invariant(batchAccounting?.status === 'ok', 'Batch tool accounting should be ok for run-test-13.');
+      const batchResult = result.conversation.find((message) => message.role === 'tool' && message.toolCallId === 'call-batch-success');
+      const hasBatchResult = batchResult?.content.includes('batch-success') ?? false;
+      invariant(hasBatchResult, 'Batch result should include test payload for run-test-13.');
+    },
+  },
+  {
+    id: 'run-test-14',
+    configure: (configuration, sessionConfig) => {
+      sessionConfig.tools = ['test', 'batch'];
+      configuration.defaults = { ...configuration.defaults, parallelToolCalls: false };
+      sessionConfig.parallelToolCalls = false;
+    },
+    expect: (result) => {
+      invariant(result.success, 'Scenario run-test-14 should conclude with failure report.');
+      const finalReport = result.finalReport;
+      invariant(finalReport !== undefined && finalReport.status === 'failure', 'Final report should mark failure for run-test-14.');
+      const log = result.logs.find((entry) => typeof entry.message === 'string' && entry.message.includes('error agent__batch'));
+      invariant(log !== undefined, 'Batch execution failure log expected for run-test-14.');
+      const batchAccounting = result.accounting.filter(isToolAccounting).find((entry) => entry.command === 'agent__batch');
+      invariant(batchAccounting !== undefined && batchAccounting.status === 'failed', 'Batch accounting must record failure for run-test-14.');
+    },
+  },
+  {
+    id: 'run-test-15',
+    configure: (configuration) => {
+      configuration.pricing = {
+        [PRIMARY_PROVIDER]: {
+          [MODEL_NAME]: {
+            unit: 'per_1k',
+            prompt: 0.001,
+            completion: 0.002,
+          },
+        },
+      };
+    },
+    expect: (result) => {
+      invariant(result.success, 'Scenario run-test-15 expected success.');
+      const llmEntry = result.accounting.filter(isLlmAccounting).at(-1);
+      invariant(llmEntry !== undefined && typeof llmEntry.costUsd === 'number' && llmEntry.costUsd > 0, 'LLM accounting should include computed cost for run-test-15.');
+      const summaryLog = result.logs.find((entry) => entry.remoteIdentifier === 'summary');
+      invariant(summaryLog !== undefined && typeof summaryLog.message === 'string' && summaryLog.message.includes('cost total=$') && !summaryLog.message.includes('cost total=$0.00000'), 'Summary log should report non-zero cost for run-test-15.');
+    },
+  },
+  {
+    id: 'run-test-16',
+    configure: (configuration) => {
+      const baseDir = makeTempDir('persistence');
+      const sessionsDir = path.join(baseDir, 'sessions');
+      const billingFile = path.join(baseDir, 'billing.jsonl');
+      configuration.persistence = { sessionsDir, billingFile };
+      runTest16Paths = { sessionsDir, billingFile };
+    },
+    expect: (result) => {
+      invariant(result.success, 'Scenario run-test-16 expected success.');
+      invariant(runTest16Paths !== undefined, 'Persistence paths should be initialized for run-test-16.');
+      const { sessionsDir, billingFile } = runTest16Paths;
+      try {
+        const sessionFiles = fs.existsSync(sessionsDir) ? fs.readdirSync(sessionsDir) : [];
+        invariant(sessionFiles.length === 1 && sessionFiles[0].endsWith('.json.gz'), 'Session snapshot should be written for run-test-16.');
+        invariant(fs.existsSync(path.join(sessionsDir, sessionFiles[0])), 'Session snapshot file missing for run-test-16.');
+        invariant(fs.existsSync(billingFile) && fs.statSync(billingFile).size > 0, 'Billing ledger should be written for run-test-16.');
+      } finally {
+        fs.rmSync(path.dirname(sessionsDir), { recursive: true, force: true });
+        runTest16Paths = undefined;
+      }
+    },
+  },
+  {
+    id: 'run-test-17',
+    configure: (configuration, sessionConfig) => {
+      configuration.providers[PRIMARY_PROVIDER] = {
+        type: 'test-llm',
+        models: {
+          [MODEL_NAME]: {
+            overrides: {
+              temperature: 0.42,
+              topP: 0.85,
+            },
+          },
+        },
+      };
+      sessionConfig.targets = [{ provider: PRIMARY_PROVIDER, model: MODEL_NAME }];
+    },
+    expect: (result) => {
+      invariant(result.success, 'Scenario run-test-17 expected success.');
+      const finalReport = result.finalReport;
+      invariant(finalReport !== undefined && finalReport.status === 'success', 'Final report should indicate success for run-test-17.');
+    },
+  },
+  {
+    id: 'run-test-18',
+    configure: (_configuration, sessionConfig) => {
+      const controller = new AbortController();
+      controller.abort();
+      sessionConfig.abortSignal = controller.signal;
+    },
+    expect: (result) => {
+      invariant(!result.success, 'Scenario run-test-18 should cancel the session.');
+      invariant(result.error === 'canceled', 'Run-test-18 should report canceled error.');
+      const hasLlmLogs = result.logs.some((log) => typeof log.remoteIdentifier === 'string' && log.remoteIdentifier.includes('deterministic-model'));
+      invariant(!hasLlmLogs, 'No LLM requests should execute for run-test-18.');
+    },
+  },
+  {
+    id: 'run-test-19',
+    configure: (configuration, sessionConfig) => {
+      configuration.providers[SECONDARY_PROVIDER] = { type: 'test-llm' };
+      configuration.pricing = configuration.pricing ?? {};
+      sessionConfig.subAgentPaths = [SUBAGENT_PRICING_PROMPT];
+    },
+    expect: (result) => {
+      invariant(result.success, 'Scenario run-test-19 expected success.');
+      const subAgentAccounting = result.accounting
+        .filter(isToolAccounting)
+        .find((entry) => entry.command === SUBAGENT_TOOL);
+      invariant(subAgentAccounting !== undefined, 'Sub-agent accounting entry expected for run-test-19.');
+      invariant(subAgentAccounting.status === 'failed', 'Sub-agent accounting should indicate failure for run-test-19.');
+      const subAgentErrorLog = result.logs.find((entry) => typeof entry.message === 'string' && entry.message.includes(SUBAGENT_TOOL) && entry.message.includes('error'));
+      invariant(subAgentErrorLog !== undefined, 'Sub-agent failure log expected for run-test-19.');
+    },
+  },
+  {
+    id: 'run-test-20',
+    configure: (configuration) => {
+      const baseDir = makeTempDir('persistence-error');
+      const blockerFile = path.join(baseDir, 'sessions-blocker');
+      fs.writeFileSync(blockerFile, 'block');
+      const billingFile = path.join(blockerFile, 'billing.jsonl');
+      configuration.persistence = { sessionsDir: blockerFile, billingFile };
+      runTest20Paths = { baseDir, blockerFile, billingFile };
+    },
+    expect: (result) => {
+      try {
+        invariant(result.success, 'Scenario run-test-20 expected success.');
+        invariant(runTest20Paths !== undefined, 'Persistence paths should be initialized for run-test-20.');
+        const billingExists = fs.existsSync(runTest20Paths.billingFile);
+        invariant(!billingExists, 'Billing ledger write should fail for run-test-20.');
+      } finally {
+        if (runTest20Paths !== undefined) {
+          fs.rmSync(runTest20Paths.baseDir, { recursive: true, force: true });
+          runTest20Paths = undefined;
+        }
+      }
+    },
+  },
+  {
+    id: 'run-test-21',
+    expect: (result) => {
+      invariant(result.success, 'Scenario run-test-21 expected success.');
+      const rateLimitLog = result.logs.find((entry) => typeof entry.message === 'string' && entry.message.includes('Rate limited'));
+      invariant(rateLimitLog !== undefined, 'Rate limit warning expected for run-test-21.');
+      const retryLog = result.logs.find((entry) => entry.remoteIdentifier === 'agent:retry');
+      invariant(retryLog !== undefined && typeof retryLog.message === 'string' && retryLog.message.includes('backing off'), 'Backoff log expected for run-test-21.');
+    },
+  },
+  {
+    id: 'run-test-22',
+    configure: (configuration, sessionConfig) => {
+      configuration.providers = {};
+      sessionConfig.targets = [{ provider: PRIMARY_PROVIDER, model: MODEL_NAME }];
+    },
+    expect: (result) => {
+      invariant(!result.success, 'Scenario run-test-22 should fail due to provider validation.');
+      invariant(typeof result.error === 'string' && result.error.includes('Unknown providers'), 'Provider validation error expected for run-test-22.');
+    },
+  },
+  {
+    id: 'run-test-23',
+    configure: (_configuration, sessionConfig) => {
+      sessionConfig.stopRef = { stopping: true };
+    },
+    expect: (result) => {
+      invariant(result.success, 'Scenario run-test-23 expected graceful success.');
+      invariant(result.finalReport === undefined, 'No final report expected for run-test-23.');
+      const assistantMessages = result.conversation.filter((message) => message.role === 'assistant');
+      invariant(assistantMessages.length === 0, 'No assistant messages should be present for run-test-23.');
+    },
+  },
+  {
+    id: 'run-test-24',
+    configure: (configuration, sessionConfig) => {
+      sessionConfig.subAgentPaths = [SUBAGENT_PRICING_SUCCESS_PROMPT];
+    },
+    expect: (result) => {
+      invariant(result.success, 'Scenario run-test-24 expected success.');
+      const subAgentAccounting = result.accounting.filter(isToolAccounting).find((entry) => entry.command === SUBAGENT_SUCCESS_TOOL);
+      invariant(subAgentAccounting !== undefined && subAgentAccounting.status === 'ok', 'Successful sub-agent accounting expected for run-test-24.');
+      const subAgentLog = result.logs.find((entry) => entry.remoteIdentifier === 'agent:subagent' && typeof entry.message === 'string' && entry.message.includes(SUBAGENT_SUCCESS_TOOL) && !entry.message.includes('error'));
+      invariant(subAgentLog !== undefined, 'Sub-agent success log expected for run-test-24.');
+    },
+  },
 ];
 
-async function runScenario(prompt: string): Promise<AIAgentResult> {
-  const serverPath = path.resolve(__dirname, 'mcp/toy-stdio-server.js');
+async function runScenario(prompt: string, configure?: HarnessTest['configure']): Promise<AIAgentResult> {
+  const serverPath = path.resolve(__dirname, 'mcp/test-stdio-server.js');
 
-  const configuration: Configuration = {
+  const baseConfiguration: Configuration = {
     providers: {
-      'phase1-provider': {
+      [PRIMARY_PROVIDER]: {
         type: 'test-llm',
       },
     },
     mcpServers: {
-      toy: {
+      test: {
         type: 'stdio',
         command: process.execPath,
         args: [serverPath],
       },
     },
-    defaults: {
-      stream: false,
-      maxToolTurns: 3,
-      maxRetries: 2,
-      llmTimeout: 10_000,
-      toolTimeout: 10_000,
-    },
+    defaults: { ...BASE_DEFAULTS },
   };
 
-  const sessionConfig: AIAgentSessionConfig = {
+  const configuration: Configuration = JSON.parse(JSON.stringify(baseConfiguration)) as Configuration;
+  configuration.defaults = { ...BASE_DEFAULTS, ...(configuration.defaults ?? {}) };
+  const defaults = configuration.defaults;
+
+  const baseSession: AIAgentSessionConfig = {
     config: configuration,
-    targets: [{ provider: 'phase1-provider', model: 'deterministic-model' }],
-    tools: ['toy'],
+    targets: [{ provider: PRIMARY_PROVIDER, model: MODEL_NAME }],
+    tools: ['test'],
     systemPrompt: 'Phase 1 deterministic harness: respond using scripted outputs.',
     userPrompt: prompt,
     outputFormat: 'markdown',
     stream: false,
     parallelToolCalls: false,
     maxTurns: 3,
-    toolTimeout: 10_000,
-    llmTimeout: 10_000,
+    toolTimeout: defaults.toolTimeout,
+    llmTimeout: defaults.llmTimeout,
     agentId: `phase1-${prompt}`,
   };
 
-  const session = AIAgentSession.create(sessionConfig);
-  return await session.run();
+  configure?.(configuration, baseSession, defaults);
+
+  const failureResult = (error: unknown): AIAgentResult => {
+    const message = error instanceof Error ? error.message : String(error);
+    return {
+      success: false,
+      error: message,
+      conversation: [],
+      logs: [],
+      accounting: [],
+    };
+  };
+
+  let session;
+  try {
+    session = AIAgentSession.create(baseSession);
+  } catch (error) {
+    return failureResult(error);
+  }
+
+  try {
+    return await session.run();
+  } catch (error) {
+    return failureResult(error);
+  }
 }
 
 async function runPhaseOne(): Promise<void> {
   // eslint-disable-next-line functional/no-loop-statements
   for (const scenario of TEST_SCENARIOS) {
-    const result = await runScenario(scenario.id);
+    const result = await runScenario(scenario.id, scenario.configure);
     scenario.expect(result);
   }
   // eslint-disable-next-line no-console

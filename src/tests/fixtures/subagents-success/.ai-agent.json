@@ -1,0 +1,8 @@
+{
+  "providers": {
+    "primary": {
+      "type": "test-llm"
+    }
+  },
+  "mcpServers": {}
+}

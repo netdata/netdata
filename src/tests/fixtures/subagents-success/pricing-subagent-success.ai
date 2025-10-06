@@ -1,0 +1,11 @@
+---
+description: Pricing coverage sub-agent (success)
+usage: Provide supporting pricing analysis context.
+models:
+  - primary/deterministic-model
+input:
+  format: text
+---
+# Pricing Sub-Agent (Success)
+
+Deliver a concise pricing insight based on the provided input.

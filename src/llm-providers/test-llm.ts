@@ -64,6 +64,26 @@ export class TestLLMProvider extends BaseLLMProvider {
       return await this.createErrorTurn(request, errorFromTools.message, scenarioId);
     }
 
+    const expectedTemperature = activeStep.expectedTemperature;
+    if (expectedTemperature !== undefined) {
+      const actualTemperature = request.temperature;
+      if (typeof actualTemperature !== 'number' || Math.abs(actualTemperature - expectedTemperature) > 1e-6) {
+        const expectedTempStr = String(expectedTemperature);
+        const actualTempStr = typeof actualTemperature === 'number' ? String(actualTemperature) : 'undefined';
+        return await this.createErrorTurn(request, `Expected temperature ${expectedTempStr} but received ${actualTempStr}.`, scenarioId);
+      }
+    }
+
+    const expectedTopP = activeStep.expectedTopP;
+    if (expectedTopP !== undefined) {
+      const actualTopP = request.topP;
+      if (typeof actualTopP !== 'number' || Math.abs(actualTopP - expectedTopP) > 1e-6) {
+        const expectedTopPStr = String(expectedTopP);
+        const actualTopPStr = typeof actualTopP === 'number' ? String(actualTopP) : 'undefined';
+        return await this.createErrorTurn(request, `Expected topP ${expectedTopPStr} but received ${actualTopPStr}.`, scenarioId);
+      }
+    }
+
     const context: StepContext = {
       scenario,
       step: activeStep,
@@ -72,21 +92,52 @@ export class TestLLMProvider extends BaseLLMProvider {
       modelId: request.model,
     };
 
-    const attemptKey = `${scenarioId}:${String(activeStep.turn)}`;
+    const providerKey = request.provider;
+    const attemptKey = `${scenarioId}:${String(activeStep.turn)}:${providerKey}`;
     const attemptCount = this.attemptCounters.get(attemptKey) ?? 0;
     const failuresAllowed = typeof activeStep.failuresBeforeSuccess === 'number' ? Math.max(0, Math.trunc(activeStep.failuresBeforeSuccess)) : 0;
     if (attemptCount < failuresAllowed) {
       this.attemptCounters.set(attemptKey, attemptCount + 1);
       const latency = Date.now() - executionStart;
-      return {
-        status: {
-          type: 'model_error',
-          message: activeStep.failureMessage ?? 'Simulated LLM failure for retry.',
-          retryable: true,
-        },
-        latencyMs: latency,
-        messages: [],
-      };
+      const failureStatus = activeStep.failureStatus ?? 'model_error';
+      const failureMessage = activeStep.failureMessage ?? 'Simulated failure';
+      const retryable = activeStep.failureRetryable !== false;
+      switch (failureStatus) {
+        case 'timeout':
+          return {
+            status: { type: 'timeout', message: failureMessage },
+            latencyMs: latency,
+            messages: [],
+          };
+        case 'invalid_response':
+          return {
+            status: { type: 'invalid_response', message: failureMessage },
+            latencyMs: latency,
+            messages: [],
+          };
+        case 'network_error':
+          return {
+            status: { type: 'network_error', message: failureMessage, retryable },
+            latencyMs: latency,
+            messages: [],
+          };
+        case 'rate_limit':
+          return {
+            status: {
+              type: 'rate_limit',
+              retryAfterMs: activeStep.failureRetryAfterMs,
+            },
+            latencyMs: latency,
+            messages: [],
+          };
+        case 'model_error':
+        default:
+          return {
+            status: { type: 'model_error', message: failureMessage, retryable },
+            latencyMs: latency,
+            messages: [],
+          };
+      }
     }
     this.attemptCounters.set(attemptKey, attemptCount);
 
@@ -140,13 +191,16 @@ export class TestLLMProvider extends BaseLLMProvider {
   }
 
   private validateTools(step: ScenarioTurn, request: TurnRequest): ErrorDescriptor | undefined {
+    if (step.allowMissingTools === true) return undefined;
     const expected = Array.isArray(step.expectedTools) ? step.expectedTools : [];
     if (step.response.kind === FINAL_REPORT_KIND || expected.length === 0) return undefined;
     const available = new Set(request.tools.map((tool) => sanitizeToolName(tool.name)));
-    const missing = expected.filter((toolName) => !available.has(sanitizeToolName(toolName)));
+    const missing = expected
+      .map((toolName) => sanitizeToolName(toolName))
+      .filter((toolName) => !toolName.startsWith('agent__'))
+      .filter((toolName) => !available.has(toolName));
     if (missing.length === 0) return undefined;
-    // Allow the step to proceed even if the orchestrator has not yet exposed the tool (warmup lag).
-    return undefined;
+    return { message: `Expected tool(s) not available in request: ${missing.join(', ')}` };
   }
 
   private async createErrorTurn(request: TurnRequest, message: string, scenarioId?: string): Promise<TurnResult> {

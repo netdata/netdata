@@ -4,6 +4,7 @@
 - docs/IMPLEMENTATION.md for AI SDK/ModelContextProtocol implementation.
 - docs/DESIGN.md for the design of the application.
 - docs/MULTI-AGENT.md for the recursive multi-agent design.
+- docs/TESTING.md for deterministic harness usage and coverage guidance.
 - docs/docs/AI-AGENT-INTERNAL-API.md current status of the ai-agent internal agent API.
 - README.md for end-user documentation of the application.
 
@@ -148,5 +149,4 @@ ai-agent MUST NOT depend on any file or external service for retreiving configur
 PR-002:
 There are no permanent tools available to all agents, except `progress_report` and `final_report`.
 Per agent tools are subject to its configuration (frontmatter, command-line).
-
 
