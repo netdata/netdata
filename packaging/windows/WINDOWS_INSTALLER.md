@@ -27,11 +27,11 @@ Choose the version that suits your needs:
 
 ## Silent Installation (Command Line)
 
-:::note
+:::warning
 
-The silent installation may not work correctly on Windows Server versions older than
-Windows Server 2019 due to a TLS handshake failure.
-In this scenario, you can use the GUI installation instead.
+Silent installation isn’t supported on Windows Server versions earlier than 2019 due to TLS compatibility issues.
+
+Use the [GUI installer](#graphical-installation-gui) instead.
 
 :::
 
