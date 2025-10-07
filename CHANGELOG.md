@@ -6,12 +6,16 @@
 
 **Merged pull requests:**
 
+- Fix freeipmi crash [\#21109](https://github.com/netdata/netdata/pull/21109) ([stelfrag](https://github.com/stelfrag))
+- Fix invalid map.csv [\#21108](https://github.com/netdata/netdata/pull/21108) ([Ancairon](https://github.com/Ancairon))
 - Regenerate integrations docs [\#21106](https://github.com/netdata/netdata/pull/21106) ([netdatabot](https://github.com/netdatabot))
 - Update `cloud-notifications` documentation [\#21105](https://github.com/netdata/netdata/pull/21105) ([car12o](https://github.com/car12o))
 - improve\(go.d/snmp\): Add APC PowerNet-MIB sysObjectID mappings and categories [\#21104](https://github.com/netdata/netdata/pull/21104) ([ilyam8](https://github.com/ilyam8))
 - Update building-native-packages-locally.md [\#21101](https://github.com/netdata/netdata/pull/21101) ([Ferroin](https://github.com/Ferroin))
+- Improve logging and packet handling for unknown packet IDs [\#21099](https://github.com/netdata/netdata/pull/21099) ([stelfrag](https://github.com/stelfrag))
 - Use datafile block pos [\#21098](https://github.com/netdata/netdata/pull/21098) ([stelfrag](https://github.com/stelfrag))
 - fix\(packaging/docker\): add missing nd-run [\#21097](https://github.com/netdata/netdata/pull/21097) ([ilyam8](https://github.com/ilyam8))
+- Update installer documentation [\#21096](https://github.com/netdata/netdata/pull/21096) ([thiagoftsm](https://github.com/thiagoftsm))
 - build\(deps\): bump github.com/docker/docker from 28.4.0+incompatible to 28.5.0+incompatible in /src/go [\#21095](https://github.com/netdata/netdata/pull/21095) ([dependabot[bot]](https://github.com/apps/dependabot))
 - build\(deps\): bump github.com/go-ldap/ldap/v3 from 3.4.11 to 3.4.12 in /src/go [\#21094](https://github.com/netdata/netdata/pull/21094) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Hide  mem\_private\_usage on Windows. [\#21093](https://github.com/netdata/netdata/pull/21093) ([thiagoftsm](https://github.com/thiagoftsm))
@@ -34,6 +38,7 @@
 - Add missing extension go.d \(Windows\) [\#21070](https://github.com/netdata/netdata/pull/21070) ([thiagoftsm](https://github.com/thiagoftsm))
 - Win plugin files with .plugin extension [\#21068](https://github.com/netdata/netdata/pull/21068) ([stelfrag](https://github.com/stelfrag))
 - Convert go collectors to use ndexec module for external command invocation [\#21067](https://github.com/netdata/netdata/pull/21067) ([Ferroin](https://github.com/Ferroin))
+- ibm.d.plugin: i, db2, mq, websphere [\#21066](https://github.com/netdata/netdata/pull/21066) ([ktsaou](https://github.com/ktsaou))
 - Regenerate integrations docs [\#21065](https://github.com/netdata/netdata/pull/21065) ([netdatabot](https://github.com/netdatabot))
 - feat\(go.d/snmp\): add `ping_only` option [\#21064](https://github.com/netdata/netdata/pull/21064) ([ilyam8](https://github.com/ilyam8))
 - chore\(go.d/ddsmp\): profile definition cleanup [\#21062](https://github.com/netdata/netdata/pull/21062) ([ilyam8](https://github.com/ilyam8))
@@ -443,11 +448,6 @@
 - SNMP: cyberpower-pdu profile [\#20575](https://github.com/netdata/netdata/pull/20575) ([Ancairon](https://github.com/Ancairon))
 - improve\(go.d/smartctl\): add Win default path for smartctl executable [\#20574](https://github.com/netdata/netdata/pull/20574) ([ilyam8](https://github.com/ilyam8))
 - NUMA Windows  [\#20573](https://github.com/netdata/netdata/pull/20573) ([thiagoftsm](https://github.com/thiagoftsm))
-- Regenerate integrations docs [\#20571](https://github.com/netdata/netdata/pull/20571) ([netdatabot](https://github.com/netdatabot))
-- Add defines for cleanup statements [\#20570](https://github.com/netdata/netdata/pull/20570) ([stelfrag](https://github.com/stelfrag))
-- improve\(go.d/smartctl\): add configurable concurrent device scanning [\#20569](https://github.com/netdata/netdata/pull/20569) ([ilyam8](https://github.com/ilyam8))
-- build\(deps\): bump github.com/redis/go-redis/v9 from 9.10.0 to 9.11.0 in /src/go [\#20568](https://github.com/netdata/netdata/pull/20568) ([dependabot[bot]](https://github.com/apps/dependabot))
-- improve\(go.d/smartctl\): enable direct smartctl execution on non-Linux [\#20567](https://github.com/netdata/netdata/pull/20567) ([ilyam8](https://github.com/ilyam8))
 
 ## [v2.5.4](https://github.com/netdata/netdata/tree/v2.5.4) (2025-06-24)
 
