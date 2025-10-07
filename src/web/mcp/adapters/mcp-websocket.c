@@ -2,6 +2,9 @@
 
 #include "mcp-websocket.h"
 #include "web/websocket/websocket-internal.h"
+#include "web/mcp/mcp-jsonrpc.h"
+
+#include <string.h>
 
 // Store the MCP context in the WebSocket client's data field
 void mcp_websocket_set_context(struct websocket_server_client *wsc, MCP_CLIENT *ctx) {
@@ -13,19 +16,6 @@ void mcp_websocket_set_context(struct websocket_server_client *wsc, MCP_CLIENT *
 MCP_CLIENT *mcp_websocket_get_context(struct websocket_server_client *wsc) {
     if (!wsc) return NULL;
     return (MCP_CLIENT *)wsc->user_data;
-}
-
-// WebSocket buffer sender function for the MCP adapter
-int mcp_websocket_send_buffer(struct websocket_server_client *wsc, BUFFER *buffer) {
-    if (!wsc || !buffer) return -1;
-    
-    const char *text = buffer_tostring(buffer);
-    if (!text || !*text) return -1;
-    
-    // Log the raw outgoing message
-    netdata_log_debug(D_MCP, "SND: %s", text);
-    
-    return websocket_protocol_send_text(wsc, text);
 }
 
 // Create a response context for a WebSocket client
@@ -55,6 +45,19 @@ void mcp_websocket_on_connect(struct websocket_server_client *wsc) {
     
     websocket_debug(wsc, "MCP client connected");
 }
+
+static void mcp_websocket_send_payload(struct websocket_server_client *wsc, BUFFER *payload) {
+    if (!wsc || !payload)
+        return;
+
+    const char *text = buffer_tostring(payload);
+    if (!text)
+        return;
+
+    netdata_log_debug(D_MCP, "SND: %s", text);
+    websocket_protocol_send_text(wsc, text);
+}
+
 
 // WebSocket message handler for MCP - receives message and routes to MCP
 void mcp_websocket_on_message(struct websocket_server_client *wsc, const char *message, size_t length, WEBSOCKET_OPCODE opcode) {
@@ -89,37 +92,68 @@ void mcp_websocket_on_message(struct websocket_server_client *wsc, const char *m
     request = json_tokener_parse_verbose(message, &jerr);
     
     if (!request || jerr != json_tokener_success) {
-        // Log the full error with payload for debugging
-        websocket_error(wsc, "Failed to parse JSON-RPC request: %s | Payload (length=%zu): '%.*s'", 
-                        json_tokener_error_desc(jerr), 
-                        length,
-                        (int)(length > 1000 ? 1000 : length), // Limit to 1000 chars in log
-                        message);
-        
-        // Also log the hex dump of first few bytes to catch non-printable characters
-        if (length > 0) {
-            char hex_dump[256];
-            size_t hex_len = 0;
-            size_t bytes_to_dump = (length > 32) ? 32 : length;
-            
-            for (size_t i = 0; i < bytes_to_dump && hex_len < sizeof(hex_dump) - 6; i++) {
-                hex_len += snprintf(hex_dump + hex_len, sizeof(hex_dump) - hex_len, 
-                                   "%02X ", (unsigned char)message[i]);
-            }
-            if (bytes_to_dump < length) {
-                hex_len += snprintf(hex_dump + hex_len, sizeof(hex_dump) - hex_len, "...");
-            }
-            
-            websocket_error(wsc, "First %zu bytes hex dump: %s", bytes_to_dump, hex_dump);
-        }
-        
+        websocket_error(wsc, "Failed to parse JSON-RPC request: %s", json_tokener_error_desc(jerr));
+
+        BUFFER *error_payload = mcp_jsonrpc_build_error_payload(NULL, -32700, "Parse error", NULL, 0);
+        mcp_websocket_send_payload(wsc, error_payload);
+        buffer_free(error_payload);
         return;
     }
-    
-    // Pass the request to the MCP handler
-    mcp_handle_request(mcpc, request);
-    
-    // Free the request object
+
+    if (json_object_is_type(request, json_type_array)) {
+        int len = (int)json_object_array_length(request);
+        BUFFER **responses = NULL;
+        size_t responses_used = 0;
+        size_t responses_size = 0;
+
+        for (int i = 0; i < len; i++) {
+            struct json_object *req_item = json_object_array_get_idx(request, i);
+            BUFFER *resp_item = mcp_jsonrpc_process_single_request(mcpc, req_item, NULL);
+            if (resp_item) {
+                if (responses_used == responses_size) {
+                    size_t new_size = responses_size ? responses_size * 2 : 4;
+                    BUFFER **tmp = reallocz(responses, new_size * sizeof(*tmp));
+                    if (!tmp) {
+                        buffer_free(resp_item);
+                        continue;
+                    }
+                    responses = tmp;
+                    responses_size = new_size;
+                }
+                responses[responses_used++] = resp_item;
+            }
+        }
+
+        if (responses_used > 0) {
+            size_t total_len = 2; // brackets
+            for (size_t i = 0; i < responses_used; i++)
+                total_len += buffer_strlen(responses[i]) + (i ? 1 : 0);
+
+            BUFFER *batch = buffer_create(total_len + 32, NULL);
+            buffer_fast_strcat(batch, "[", 1);
+            for (size_t i = 0; i < responses_used; i++) {
+                if (i)
+                    buffer_fast_strcat(batch, ",", 1);
+                const char *resp_text = buffer_tostring(responses[i]);
+                size_t resp_len = buffer_strlen(responses[i]);
+                buffer_fast_strcat(batch, resp_text, resp_len);
+            }
+            buffer_fast_strcat(batch, "]", 1);
+            mcp_websocket_send_payload(wsc, batch);
+            buffer_free(batch);
+        }
+
+        for (size_t i = 0; i < responses_used; i++)
+            buffer_free(responses[i]);
+        freez(responses);
+    } else {
+        BUFFER *response = mcp_jsonrpc_process_single_request(mcpc, request, NULL);
+        if (response) {
+            mcp_websocket_send_payload(wsc, response);
+            buffer_free(response);
+        }
+    }
+
     json_object_put(request);
 }
 

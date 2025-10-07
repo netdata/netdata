@@ -155,8 +155,8 @@ void mcp_tool_list_alert_transitions_schema(BUFFER *buffer) {
 }
 
 // Execute alert transitions query
-MCP_RETURN_CODE mcp_tool_list_alert_transitions_execute(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id) {
-    if (!mcpc || id == 0)
+MCP_RETURN_CODE mcp_tool_list_alert_transitions_execute(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id __maybe_unused) {
+    if (!mcpc)
         return MCP_RC_ERROR;
     
     // Extract nodes array

@@ -269,8 +269,8 @@ static const MCP_TOOL_DEF mcp_tools[] = {
 };
 
 // Return a list of available tools
-static MCP_RETURN_CODE mcp_tools_method_list(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, MCP_REQUEST_ID id) {
-    if (!mcpc || id == 0)
+static MCP_RETURN_CODE mcp_tools_method_list(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, MCP_REQUEST_ID id __maybe_unused) {
+    if (!mcpc)
         return MCP_RC_ERROR;
 
     // Initialize success response
@@ -312,8 +312,8 @@ static MCP_RETURN_CODE mcp_tools_method_list(MCP_CLIENT *mcpc, struct json_objec
 }
 
 // Main execute method that routes to specific tool handlers
-static MCP_RETURN_CODE mcp_tools_method_call(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id) {
-    if (!mcpc || !params || id == 0)
+static MCP_RETURN_CODE mcp_tools_method_call(MCP_CLIENT *mcpc, struct json_object *params, MCP_REQUEST_ID id __maybe_unused) {
+    if (!mcpc || !params)
         return MCP_RC_ERROR;
     
     // Extract tool name
@@ -356,10 +356,6 @@ MCP_RETURN_CODE mcp_tools_route(MCP_CLIENT *mcpc, const char *method, struct jso
 
     netdata_log_debug(D_MCP, "MCP tools method: %s", method);
 
-    // Flush previous buffers
-    buffer_flush(mcpc->result);
-    buffer_flush(mcpc->error);
-    
     MCP_RETURN_CODE rc;
 
     if (strcmp(method, "list") == 0) {

@@ -24,6 +24,9 @@
 
 extern unsigned rrdeng_pages_per_extent;
 
+#define BLOCK_TO_OFFSET(block) ((uint64_t)(block) << 12)
+#define OFFSET_TO_BLOCK(ofs) ((uint64_t)(ofs) >> 12)
+
 #define UNLINK_FILE(ctx, path, ret_var)                                                                                \
     do {                                                                                                               \
         uv_fs_t _req;                                                                                                  \
@@ -136,13 +139,8 @@ PDC *pdc_get(void);
 struct page_details {
     struct {
         struct rrdengine_datafile *ptr;
-        uv_file file;
-        unsigned fileno;
-
-        struct {
-            uint64_t pos;
-            uint32_t bytes;
-        } extent;
+        uint32_t block;     // the block in the datafile. Offset in the datafile is block * RRDENG_BLOCK_SIZE
+        uint32_t bytes;
     } datafile;
 
     struct pgc_page *page;
@@ -165,10 +163,10 @@ struct page_details *page_details_get(void);
 #define pdc_page_status_clear(pd, flag) __atomic_and_fetch(&((od)->status), ~(flag), __ATOMIC_RELEASE)
 
 struct jv2_extents_info {
-    size_t index;
-    uint64_t pos;
+    uint32_t index;
+    uint32_t block;
     unsigned bytes;
-    size_t number_of_pages;
+    uint32_t number_of_pages;
 };
 
 struct jv2_metrics_info {
@@ -301,10 +299,8 @@ enum rrdeng_opcode {
 
 struct extent_io_data {
     unsigned fileno;
-    uv_file file;
-    uint64_t pos;
+    uint32_t block;
     unsigned bytes;
-    uint16_t page_length;
 };
 
 struct extent_io_descriptor {
