@@ -110,7 +110,7 @@ https://github.com/netdata/netdata/edit/master/src/collectors/README.md,Collecti
 https://github.com/netdata/netdata/edit/master/src/collectors/REFERENCE.md,Collectors configuration,Published,Collecting Metrics,
 https://github.com/netdata/agent-service-discovery/edit/master/README.md,Service discovery,Published,Collecting Metrics,
 https://github.com/netdata/netdata/edit/master/src/collectors/statsd.plugin/README.md,StatsD,Published,Collecting Metrics,
-https://github.com/netdata/netdata/edit/master/src/crates/jf/otel-plugin/README.md,OpenTelemetry Metrics,Published,Collecting Metrics/OpenTelemetry,"Ingesting, storing and visualizing OpenTelemetry metrics",
+https://github.com/netdata/netdata/edit/master/src/crates/jf/otel-plugin/README.md,OpenTelemetry Metrics,Published,Collecting Metrics/OpenTelemetry,"Ingesting storing and visualizing OpenTelemetry metrics"
 https://github.com/netdata/netdata/edit/master/docs/observability-centralization-points/metrics-centralization-points/README.md,Metrics Centralization Points,Published,Netdata Parents/Metrics Centralization Points,
 https://github.com/netdata/netdata/edit/master/docs/observability-centralization-points/metrics-centralization-points/configuration.md,Configuring Metrics Centralization Points,Published,Netdata Parents/Metrics Centralization Points,
 https://github.com/netdata/netdata/edit/master/docs/observability-centralization-points/metrics-centralization-points/sizing-netdata-parents.md,Sizing Netdata Parents,Published,Netdata Parents/Metrics Centralization Points,
