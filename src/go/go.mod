@@ -2,8 +2,6 @@ module github.com/netdata/netdata/go/plugins
 
 go 1.24.0
 
-replace github.com/netdata/netdata/go/plugins/plugin/go.d => ./plugin/go.d
-
 replace github.com/prometheus/prometheus => github.com/prometheus/prometheus v0.302.0
 
 replace github.com/gosnmp/gosnmp => github.com/ilyam8/gosnmp v0.0.0-20250912202722-388b2cb5192e
@@ -32,7 +30,6 @@ require (
 	github.com/gorcon/rcon v1.4.0
 	github.com/gosnmp/gosnmp v1.42.1
 	github.com/ibmdb/go_ibm_db v0.4.5 // Used by ibm.d.plugin (requires CGO)
-	github.com/invopop/jsonschema v0.13.0
 	github.com/jackc/pgx/v4 v4.18.3
 	github.com/jackc/pgx/v5 v5.7.6
 	github.com/jessevdk/go-flags v1.6.1
