@@ -2114,6 +2114,7 @@ int main (int argc, char **argv) {
         if (restart_every && (now_monotonic_sec() - started_t > IPMI_RESTART_EVERY_SECONDS)) {
             collector_info("%s(): reached my lifetime expectancy. Exiting to restart.", __FUNCTION__);
             fprintf(stdout, "EXIT\n");
+            netdata_mutex_unlock(&stdout_mutex);
             plugin_exit(0);
         }
 
