@@ -29,7 +29,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/gorcon/rcon v1.4.0
 	github.com/gosnmp/gosnmp v1.42.1
-	github.com/ibmdb/go_ibm_db v0.4.5 // Used by ibm.d.plugin (requires CGO)
+	github.com/ibmdb/go_ibm_db v0.5.3 // Used by ibm.d.plugin (requires CGO)
 	github.com/jackc/pgx/v4 v4.18.3
 	github.com/jackc/pgx/v5 v5.7.6
 	github.com/jessevdk/go-flags v1.6.1
@@ -108,6 +108,7 @@ require (
 	github.com/grafana/regexp v0.0.0-20240518133315-a468a5bfb3bc // indirect
 	github.com/hailocab/go-hostpool v0.0.0-20160125115350-e80d13ce29ed // indirect
 	github.com/huandu/xstrings v1.5.0 // indirect
+	github.com/ibmruntimes/go-recordio/v2 v2.0.0-20240416213906-ae0ad556db70 // indirect
 	github.com/jackc/chunkreader/v2 v2.0.1 // indirect
 	github.com/jackc/pgconn v1.14.3 // indirect
 	github.com/jackc/pgio v1.0.0 // indirect
