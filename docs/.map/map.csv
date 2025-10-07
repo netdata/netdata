@@ -194,10 +194,8 @@ https://github.com/netdata/netdata/edit/master/docs/netdata-ai/mcp/mcp-clients/g
 https://github.com/netdata/netdata/edit/master/docs/netdata-ai/mcp/mcp-clients/codex-cli.md,OpenAI Codex CLI,Published,Netdata AI/MCP/MCP Clients,
 https://github.com/netdata/netdata/edit/master/docs/netdata-ai/mcp/mcp-clients/crush.md,Crush,Published,Netdata AI/MCP/MCP Clients,
 https://github.com/netdata/netdata/edit/master/docs/netdata-ai/mcp/mcp-clients/opencode.md,OpenCode,Published,Netdata AI/MCP/MCP Clients,
-,,,
 https://github.com/netdata/netdata/edit/master/docs/netdata-assistant.md,AI powered troubleshooting assistant,Unpublished,AI and Machine Learning,
 https://github.com/netdata/netdata/edit/master/src/ml/README.md,ML models and anomaly detection,Unpublished,AI and Machine Learning,This is an in-depth look at how Netdata uses ML to detect anomalies.
-,,,,
 https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/README.md,Dashboards and Charts,Published,Dashboards and Charts,
 https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/home-tab.md,Tabs,Published,Dashboards and Charts/Tabs,"With Netdata Cloud's War Rooms, you can see real-time metrics, from any number of nodes in your infrastructure, in composite charts."
 https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/alerts-tab.md,Alerts,Published,Dashboards and Charts/Tabs,
