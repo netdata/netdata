@@ -6,6 +6,11 @@
 
 **Merged pull requests:**
 
+- Regenerate integrations docs [\#21106](https://github.com/netdata/netdata/pull/21106) ([netdatabot](https://github.com/netdatabot))
+- Update `cloud-notifications` documentation [\#21105](https://github.com/netdata/netdata/pull/21105) ([car12o](https://github.com/car12o))
+- improve\(go.d/snmp\): Add APC PowerNet-MIB sysObjectID mappings and categories [\#21104](https://github.com/netdata/netdata/pull/21104) ([ilyam8](https://github.com/ilyam8))
+- Update building-native-packages-locally.md [\#21101](https://github.com/netdata/netdata/pull/21101) ([Ferroin](https://github.com/Ferroin))
+- Use datafile block pos [\#21098](https://github.com/netdata/netdata/pull/21098) ([stelfrag](https://github.com/stelfrag))
 - fix\(packaging/docker\): add missing nd-run [\#21097](https://github.com/netdata/netdata/pull/21097) ([ilyam8](https://github.com/ilyam8))
 - build\(deps\): bump github.com/docker/docker from 28.4.0+incompatible to 28.5.0+incompatible in /src/go [\#21095](https://github.com/netdata/netdata/pull/21095) ([dependabot[bot]](https://github.com/apps/dependabot))
 - build\(deps\): bump github.com/go-ldap/ldap/v3 from 3.4.11 to 3.4.12 in /src/go [\#21094](https://github.com/netdata/netdata/pull/21094) ([dependabot[bot]](https://github.com/apps/dependabot))
@@ -41,6 +46,7 @@
 - Fix libbpf.a build path [\#21051](https://github.com/netdata/netdata/pull/21051) ([hack3ric](https://github.com/hack3ric))
 - improve\(go.d/rabbitmq\): add support for old RabbitMQ whoami tags format [\#21049](https://github.com/netdata/netdata/pull/21049) ([ilyam8](https://github.com/ilyam8))
 - ml: implement fixed time-based training windows - corrected [\#21046](https://github.com/netdata/netdata/pull/21046) ([ktsaou](https://github.com/ktsaou))
+- Add documentation and fallback to /host/ for getting the machine id [\#21044](https://github.com/netdata/netdata/pull/21044) ([vkalintiris](https://github.com/vkalintiris))
 - ai-docs [\#21043](https://github.com/netdata/netdata/pull/21043) ([shyamvalsan](https://github.com/shyamvalsan))
 - Remote MCP support \(streamable http and sse\) [\#21036](https://github.com/netdata/netdata/pull/21036) ([ktsaou](https://github.com/ktsaou))
 - Add helper to run external commands without additional privileges. [\#20990](https://github.com/netdata/netdata/pull/20990) ([Ferroin](https://github.com/Ferroin))
@@ -442,14 +448,6 @@
 - improve\(go.d/smartctl\): add configurable concurrent device scanning [\#20569](https://github.com/netdata/netdata/pull/20569) ([ilyam8](https://github.com/ilyam8))
 - build\(deps\): bump github.com/redis/go-redis/v9 from 9.10.0 to 9.11.0 in /src/go [\#20568](https://github.com/netdata/netdata/pull/20568) ([dependabot[bot]](https://github.com/apps/dependabot))
 - improve\(go.d/smartctl\): enable direct smartctl execution on non-Linux [\#20567](https://github.com/netdata/netdata/pull/20567) ([ilyam8](https://github.com/ilyam8))
-- Switch install types [\#20564](https://github.com/netdata/netdata/pull/20564) ([kanelatechnical](https://github.com/kanelatechnical))
-- Mcp disclaimer update [\#20563](https://github.com/netdata/netdata/pull/20563) ([kanelatechnical](https://github.com/kanelatechnical))
-- Simplify MRG loading mechanism logic [\#20562](https://github.com/netdata/netdata/pull/20562) ([stelfrag](https://github.com/stelfrag))
-- SNMP: cradlepoint profile [\#20561](https://github.com/netdata/netdata/pull/20561) ([Ancairon](https://github.com/Ancairon))
-- Additional checks for valid db during db\_execute [\#20560](https://github.com/netdata/netdata/pull/20560) ([stelfrag](https://github.com/stelfrag))
-- Improve SQLite library shutdown handling and initialization state [\#20559](https://github.com/netdata/netdata/pull/20559) ([stelfrag](https://github.com/stelfrag))
-- Add CLI command to schedule update information [\#20558](https://github.com/netdata/netdata/pull/20558) ([stelfrag](https://github.com/stelfrag))
-- SNMP: chrysalis profiles [\#20557](https://github.com/netdata/netdata/pull/20557) ([Ancairon](https://github.com/Ancairon))
 
 ## [v2.5.4](https://github.com/netdata/netdata/tree/v2.5.4) (2025-06-24)
 
