@@ -80,14 +80,14 @@ if(USE_MOLD)
         endif()
 endif()
 
+set(BINDIR usr/sbin)
+set(NETDATA_RUNTIME_PREFIX "${CMAKE_INSTALL_PREFIX}")
+# This can be changed depending on the platform with the include below
 include(NetdataPlatform)
 include(NetdataCompilerFlags)
 
 set(CONFIG_H_DIR ${CMAKE_BINARY_DIR})
 set(CONFIG_H ${CONFIG_H_DIR}/config.h)
-
-set(NETDATA_RUNTIME_PREFIX "${CMAKE_INSTALL_PREFIX}")
-set(BINDIR usr/sbin)
 
 if(NOT NETDATA_RUNTIME_PREFIX STREQUAL "")
   string(REGEX REPLACE "/$" "" NETDATA_RUNTIME_PREFIX "${NETDATA_RUNTIME_PREFIX}")
