@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "http_auth.h"
+#include "web/api/mcp_auth.h"
 
 #define BEARER_TOKEN_EXPIRATION (86400 * 1)
 
@@ -305,6 +306,13 @@ bool web_client_bearer_token_auth(struct web_client *w, const char *v) {
     // javascript may send "null" or "undefined"
     if(!v || !*v || strcmp(v, "null") == 0 || strcmp(v, "undefined") == 0)
         return rc;
+
+#ifdef NETDATA_MCP_DEV_PREVIEW_API_KEY
+    if (mcp_api_key_verify(v, true)) {  // silent=true for speculative check
+        web_client_set_mcp_preview_key(w);
+        return true;
+    }
+#endif
 
     if(!uuid_parse_flexi(v, w->auth.bearer_token)) {
         char uuid_str[UUID_COMPACT_STR_LEN];

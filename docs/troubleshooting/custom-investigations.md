@@ -104,16 +104,13 @@ Click the **"Troubleshoot with AI"** button in the top right corner from any scr
 
 ### Access and Availability
 
-This feature is available in preview mode for:
+- Generally available in Netdata Cloud (Business and Free Trial)
+- Eligible Spaces receive 10 free AI runs per month; additional usage via AI Credits
 
-- All Business and Homelab plan users
-- New users get 10 AI investigation sessions per month during their Business plan trial
-- Community users can request access by contacting product@netdata.cloud
+:::note
+Track AI credit usage from `Settings → Usage & Billing → AI Credits`.
+:::
 
-### Coming Soon
+### Scheduling
 
-We're actively developing:
-
-- Scheduled recurring investigations for regular reports
-- Custom SLO report templates
-- Weekly cost-optimization analyses
+You can schedule recurring investigations from the `Insights` tab (daily/weekly/monthly). Use this to automate weekly health checks, monthly optimization reviews, or SLO conformance reports.

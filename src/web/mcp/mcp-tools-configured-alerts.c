@@ -19,8 +19,8 @@ void mcp_tool_list_configured_alerts_schema(BUFFER *buffer) {
 }
 
 // Execute list_configured_alerts - no filtering, returns all prototypes
-MCP_RETURN_CODE mcp_tool_list_configured_alerts_execute(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, MCP_REQUEST_ID id) {
-    if (!mcpc || id == 0)
+MCP_RETURN_CODE mcp_tool_list_configured_alerts_execute(MCP_CLIENT *mcpc, struct json_object *params __maybe_unused, MCP_REQUEST_ID id __maybe_unused) {
+    if (!mcpc)
         return MCP_RC_ERROR;
     
     // Create a temporary buffer for the result

@@ -62,7 +62,7 @@ func Test_FindProfiles(t *testing.T) {
 		},
 		"APC pdu": {
 			sysObjOId:   "1.3.6.1.4.1.318.1.3.4.5",
-			wanProfiles: []string{"apc-pdu", "apc-ups", "apc", "generic-device"},
+			wanProfiles: []string{"apc-pdu", "apc", "generic-device"},
 		},
 		"IBM RackSwitch G8052-2 ": {
 			sysObjOId:   "1.3.6.1.4.1.26543.1.7.7",

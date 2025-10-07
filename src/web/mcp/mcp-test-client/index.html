@@ -37,6 +37,160 @@
             flex-wrap: wrap;
             gap: 8px;
         }
+        .server-selector {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+        }
+        .server-dropdown-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 10px;
+            border: 1px solid #99c6dd;
+            border-radius: 4px;
+            background-color: #fff;
+            color: #005f8a;
+            font-size: 0.95em;
+            cursor: pointer;
+            min-width: 220px;
+        }
+        .server-dropdown-btn:hover {
+            background-color: #f0f8ff;
+        }
+        .server-dropdown-btn .caret {
+            margin-left: auto;
+            font-size: 0.9em;
+        }
+        .server-dropdown-menu {
+            position: absolute;
+            top: calc(100% + 6px);
+            left: 0;
+            min-width: 280px;
+            background-color: white;
+            border: 1px solid #99c6dd;
+            border-radius: 6px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.12);
+            z-index: 200;
+            display: none;
+            max-height: 320px;
+            overflow-y: auto;
+        }
+        .server-dropdown-menu.open {
+            display: block;
+        }
+        .server-menu-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 10px;
+            border-bottom: 1px solid #ddeaf3;
+            background-color: #f5fbff;
+            font-size: 0.9em;
+            font-weight: bold;
+            color: #005f8a;
+        }
+        .server-menu-add {
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 4px 8px;
+            font-size: 0.85em;
+            cursor: pointer;
+        }
+        .server-menu-add:hover {
+            background-color: #218838;
+        }
+        .server-menu-list {
+            display: flex;
+            flex-direction: column;
+        }
+        .server-menu-empty {
+            padding: 12px 14px;
+            font-size: 0.85em;
+            color: #666;
+            text-align: center;
+        }
+        .server-menu-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 8px 10px;
+            cursor: pointer;
+            border-bottom: 1px solid #f0f4f7;
+        }
+        .server-menu-item:last-child {
+            border-bottom: none;
+        }
+        .server-menu-item:hover {
+            background-color: #f0f8ff;
+        }
+        .server-menu-item.active {
+            background-color: #d0e8f2;
+            font-weight: bold;
+        }
+        .server-menu-info {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            flex: 1;
+        }
+        .server-menu-url {
+            font-size: 0.9em;
+            color: #003f5f;
+            word-break: break-all;
+        }
+        .server-menu-meta {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.8em;
+            color: #666;
+        }
+        .server-menu-bearer {
+            color: #0f7b0f;
+            font-weight: bold;
+        }
+        .server-menu-actions {
+            display: flex;
+            gap: 6px;
+        }
+        .server-menu-btn {
+            border: 1px solid #99c6dd;
+            background-color: #f5fbff;
+            color: #005f8a;
+            border-radius: 4px;
+            font-size: 0.78em;
+            padding: 4px 6px;
+            cursor: pointer;
+        }
+        .server-menu-btn:hover {
+            background-color: #e0f0ff;
+        }
+        .server-menu-btn.delete {
+            border-color: #d9534f;
+            color: #d9534f;
+            background-color: #fff5f5;
+        }
+        .server-menu-btn.delete:hover {
+            background-color: #ffe5e5;
+        }
+        .transport-select {
+            display: none;
+            align-items: center;
+            gap: 6px;
+        }
+        .transport-select label {
+            font-size: 0.9em;
+            color: #005f8a;
+        }
+        .transport-select select {
+            padding: 4px 6px;
+            border-radius: 4px;
+            border: 1px solid #99c6dd;
+        }
         .four-column-layout {
             display: grid;
             grid-template-columns: 112px 216px 1fr 2fr;
@@ -593,12 +747,75 @@
             margin-bottom: 10px;
             color: #666;
         }
+        #serverModal .modal-content {
+            max-width: 420px;
+        }
+        .server-modal-form {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .server-modal-form label {
+            font-size: 0.85em;
+            color: #005f8a;
+            margin-bottom: 4px;
+        }
+        .server-modal-form input,
+        .server-modal-form select {
+            padding: 6px 8px;
+            border: 1px solid #99c6dd;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+        .server-bearer-wrapper {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+        .toggle-visibility-btn {
+            border: 1px solid #99c6dd;
+            background-color: #f5fbff;
+            color: #005f8a;
+            border-radius: 4px;
+            font-size: 0.85em;
+            padding: 4px 8px;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+        .toggle-visibility-btn:hover {
+            background-color: #e0f0ff;
+        }
+        .form-hint {
+            font-size: 0.75em;
+            color: #666;
+        }
     </style>
 </head>
 <body>
     <div class="connection-panel">
-        <label for="serverUrl">Netdata MCP Test Client:</label>
-        <input type="text" id="serverUrl" value="ws://localhost:19999/mcp" style="width: 300px;">
+        <label for="serverDropdownButton">Netdata MCP Test Client:</label>
+        <div class="server-selector">
+            <button type="button" id="serverDropdownButton" class="server-dropdown-btn">
+                <span id="serverDropdownLabel">Servers</span>
+                <span class="caret">v</span>
+            </button>
+            <div id="serverDropdownMenu" class="server-dropdown-menu">
+                <div class="server-menu-header">
+                    <span>Saved Servers</span>
+                    <button type="button" id="addServerBtn" class="server-menu-add">Add</button>
+                </div>
+                <div id="serverListContainer" class="server-menu-list"></div>
+                <div id="serverEmptyState" class="server-menu-empty" style="display: none;">No servers saved yet.</div>
+            </div>
+        </div>
+        <input type="hidden" id="serverUrl" value="ws://localhost:19999/mcp">
+        <span id="httpTransportSelectWrapper" class="transport-select">
+            <label for="httpTransportSelect">Transport:</label>
+            <select id="httpTransportSelect">
+                <option value="stream-http">Streamable HTTP</option>
+                <option value="sse">Server-Sent Events</option>
+            </select>
+        </span>
         <button id="connectBtn">Connect</button>
         <button id="connectAndInitBtn">Connect and Handshake</button>
         <button id="disconnectBtn" disabled>Disconnect</button>
@@ -694,6 +911,44 @@
         </div>
     </div>
     
+    <!-- Manage Servers Modal -->
+    <div id="serverModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="serverModalTitle">Add Server</h2>
+                <span class="modal-close" id="serverModalClose">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form class="server-modal-form" onsubmit="return false;">
+                    <div>
+                        <label for="serverModalUrl">Server URL</label>
+                        <input type="text" id="serverModalUrl" placeholder="https://example.com/mcp" autocomplete="off">
+                    </div>
+                    <div>
+                        <label for="serverModalType">Transport Type</label>
+                        <select id="serverModalType">
+                            <option value="websocket">WebSocket</option>
+                            <option value="stream-http">Streamable HTTP</option>
+                            <option value="sse">Server-Sent Events</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="serverModalToken">Bearer Token</label>
+                        <div class="server-bearer-wrapper">
+                            <input type="password" id="serverModalToken" autocomplete="new-password" placeholder="Optional" spellcheck="false">
+                            <button type="button" id="toggleServerTokenVisibility" class="toggle-visibility-btn">Show</button>
+                        </div>
+                        <div class="form-hint">Leave blank if the server does not require authorization.</div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" id="serverModalCancel">Cancel</button>
+                <button type="button" id="serverModalSave" style="background-color: #28a745;">Save</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Import from LLM Modal -->
     <div id="importLLMModal" class="modal">
         <div class="modal-content">
@@ -739,15 +994,29 @@
         let schemaFormGenerator = null;
         let currentMethodSchema = null;
         let jsonPrinter = null;
-        let pendingRequests = new Map(); // Track request timestamps by ID
+        let pendingRequests = new Map(); // Track request metadata by ID
         let responseEntries = []; // Track response entries for navigation
         let currentResponseIndex = -1;
-        
+        let currentTransport = 'websocket';
+        let httpTransportPreference = 'stream-http';
+        let currentServerUrl = '';
+        let isConnected = false;
+        let activeSseController = null;
+        let serverEntries = [];
+        let selectedServerId = null;
+        let serverModalMode = 'add';
+        let serverModalEditingId = null;
+
+        const DEFAULT_WS_URL = 'ws://localhost:19999/mcp';
+
         // Local storage keys
         const STORAGE_KEYS = {
             TOOL_PARAMS: 'mcp_tool_params',
             REQUEST_HISTORY: 'mcp_request_history',
-            SERVER_URL: 'mcp_server_url'
+            SERVER_URL: 'mcp_server_url',
+            HTTP_TRANSPORT: 'mcp_http_transport',
+            SERVER_ENTRIES: 'mcp_server_entries_v1',
+            SELECTED_SERVER_ID: 'mcp_selected_server_v1'
         };
         
         // Local Storage utility functions
@@ -767,6 +1036,61 @@
                 console.warn('Failed to load from localStorage:', e);
                 return defaultValue;
             }
+        }
+
+        function removeFromLocalStorage(key) {
+            try {
+                localStorage.removeItem(key);
+            } catch (e) {
+                console.warn('Failed to remove from localStorage:', e);
+            }
+        }
+
+        function generateServerId() {
+            return 'srv_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+        }
+
+        function loadServerEntries() {
+            const entries = loadFromLocalStorage(STORAGE_KEYS.SERVER_ENTRIES, []);
+            return Array.isArray(entries) ? entries : [];
+        }
+
+        function saveServerEntries(entries) {
+            serverEntries = Array.isArray(entries) ? entries : [];
+            saveToLocalStorage(STORAGE_KEYS.SERVER_ENTRIES, serverEntries);
+        }
+
+        function loadSelectedServerKey() {
+            return loadFromLocalStorage(STORAGE_KEYS.SELECTED_SERVER_ID, null);
+        }
+
+        function saveSelectedServerKey(id) {
+            if (id) {
+                saveToLocalStorage(STORAGE_KEYS.SELECTED_SERVER_ID, id);
+            } else {
+                removeFromLocalStorage(STORAGE_KEYS.SELECTED_SERVER_ID);
+            }
+        }
+
+        function getServerById(id) {
+            if (!id) {
+                return null;
+            }
+            return serverEntries.find(server => server.id === id) || null;
+        }
+
+        function getSelectedServer() {
+            return getServerById(selectedServerId);
+        }
+
+        const TRANSPORT_LABELS = {
+            websocket: 'WebSocket',
+            'stream-http': 'Streamable HTTP',
+            sse: 'Server-Sent Events'
+        };
+
+        function formatTransportLabel(type) {
+            return TRANSPORT_LABELS[type] || type;
         }
         
         // Save tool parameters
@@ -818,10 +1142,18 @@
         function saveServerUrl(url) {
             saveToLocalStorage(STORAGE_KEYS.SERVER_URL, url);
         }
-        
+
         // Load server URL
         function loadServerUrl() {
             return loadFromLocalStorage(STORAGE_KEYS.SERVER_URL, 'ws://localhost:19999/mcp');
+        }
+
+        function saveHttpTransportPreference(transport) {
+            saveToLocalStorage(STORAGE_KEYS.HTTP_TRANSPORT, transport);
+        }
+
+        function loadHttpTransportPreference() {
+            return loadFromLocalStorage(STORAGE_KEYS.HTTP_TRANSPORT, 'stream-http');
         }
         
         // Clear saved parameters for current tool
@@ -1118,15 +1450,32 @@
         const jsonEditor = document.getElementById('jsonEditor');
         const responseViewer = document.getElementById('responseViewer');
         const statusElement = document.getElementById('status');
+        const serverDropdownButton = document.getElementById('serverDropdownButton');
+        const serverDropdownLabel = document.getElementById('serverDropdownLabel');
+        const serverDropdownMenu = document.getElementById('serverDropdownMenu');
+        const serverListContainer = document.getElementById('serverListContainer');
+        const serverEmptyState = document.getElementById('serverEmptyState');
+        const addServerBtn = document.getElementById('addServerBtn');
         const serverUrlInput = document.getElementById('serverUrl');
+        const httpTransportSelectWrapper = document.getElementById('httpTransportSelectWrapper');
+        const httpTransportSelect = document.getElementById('httpTransportSelect');
         const flowsList = document.getElementById('flowsList');
         const methodsList = document.getElementById('methodsList');
         const noSchemaMessage = document.getElementById('noSchemaMessage');
         const schemaFormEditor = document.getElementById('schemaFormEditor');
+        const serverModal = document.getElementById('serverModal');
+        const serverModalTitle = document.getElementById('serverModalTitle');
+        const serverModalUrl = document.getElementById('serverModalUrl');
+        const serverModalType = document.getElementById('serverModalType');
+        const serverModalToken = document.getElementById('serverModalToken');
+        const toggleServerTokenVisibility = document.getElementById('toggleServerTokenVisibility');
+        const serverModalCancel = document.getElementById('serverModalCancel');
+        const serverModalSave = document.getElementById('serverModalSave');
+        const serverModalClose = document.getElementById('serverModalClose');
         
         // Event listeners
-        connectBtn.addEventListener('click', connect);
-        connectAndInitBtn.addEventListener('click', connectAndInitialize);
+        connectBtn.addEventListener('click', () => { connect().catch(err => log('Connection error: ' + err.message)); });
+        connectAndInitBtn.addEventListener('click', () => { connectAndInitialize().catch(err => log('Handshake error: ' + err.message)); });
         disconnectBtn.addEventListener('click', disconnect);
         sendBtn.addEventListener('click', sendRequest);
         sendFromFormBtn.addEventListener('click', sendFromForm);
@@ -1140,10 +1489,379 @@
         nextResponseBtn.addEventListener('click', navigateToNextResponse);
         clearParamsBtn.addEventListener('click', clearCurrentToolParams);
         clearHistoryBtn.addEventListener('click', clearRequestHistory);
-        
+        httpTransportSelect.addEventListener('change', () => {
+            httpTransportPreference = httpTransportSelect.value;
+            saveHttpTransportPreference(httpTransportPreference);
+        });
+        serverDropdownButton.addEventListener('click', toggleServerDropdown);
+        addServerBtn.addEventListener('click', () => {
+            closeServerDropdown();
+            openServerModal();
+        });
+        serverListContainer.addEventListener('click', handleServerListInteraction);
+        document.addEventListener('click', (event) => {
+            if (!serverDropdownMenu.classList.contains('open')) {
+                return;
+            }
+            if (event.target.closest('.server-selector')) {
+                return;
+            }
+            closeServerDropdown();
+        });
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') {
+                if (serverDropdownMenu.classList.contains('open')) {
+                    closeServerDropdown();
+                }
+                if (serverModal.style.display === 'block') {
+                    closeServerModal();
+                }
+            }
+        });
+        serverModalCancel.addEventListener('click', closeServerModal);
+        serverModalClose.addEventListener('click', closeServerModal);
+        serverModalSave.addEventListener('click', handleServerModalSave);
+        toggleServerTokenVisibility.addEventListener('click', toggleBearerVisibility);
+        serverModal.addEventListener('click', (event) => {
+            if (event.target === serverModal) {
+                closeServerModal();
+            }
+        });
+
         // JSON editor change detection
         let jsonEditorChangeTimer = null;
-        
+
+        function toggleServerDropdown() {
+            if (serverDropdownMenu.classList.contains('open')) {
+                closeServerDropdown();
+                return;
+            }
+            renderServerDropdown();
+            const buttonWidth = serverDropdownButton.getBoundingClientRect().width;
+            serverDropdownMenu.style.minWidth = Math.max(280, Math.ceil(buttonWidth)) + 'px';
+            serverDropdownMenu.classList.add('open');
+        }
+
+        function closeServerDropdown() {
+            serverDropdownMenu.classList.remove('open');
+        }
+
+        function handleServerListInteraction(event) {
+            const action = event.target.dataset.action;
+            const serverId = event.target.dataset.serverId;
+
+            if (action === 'delete') {
+                event.stopPropagation();
+                deleteServer(serverId);
+                return;
+            }
+
+            if (action === 'edit') {
+                event.stopPropagation();
+                closeServerDropdown();
+                openServerModal({ mode: 'edit', serverId });
+                return;
+            }
+
+            const item = event.target.closest('.server-menu-item');
+            if (item) {
+                selectServer(item.dataset.serverId);
+                closeServerDropdown();
+            }
+        }
+
+        function renderServerDropdown() {
+            if (!serverListContainer) {
+                return;
+            }
+
+            serverListContainer.innerHTML = '';
+
+            if (!serverEntries.length) {
+                serverEmptyState.style.display = 'block';
+                return;
+            }
+
+            serverEmptyState.style.display = 'none';
+
+            serverEntries.forEach((server) => {
+                const item = document.createElement('div');
+                item.className = 'server-menu-item';
+                item.dataset.serverId = server.id;
+                if (server.id === selectedServerId) {
+                    item.classList.add('active');
+                }
+
+                const info = document.createElement('div');
+                info.className = 'server-menu-info';
+
+                const urlElem = document.createElement('div');
+                urlElem.className = 'server-menu-url';
+                urlElem.textContent = server.url;
+                info.appendChild(urlElem);
+
+                const meta = document.createElement('div');
+                meta.className = 'server-menu-meta';
+
+                const typeElem = document.createElement('span');
+                typeElem.className = 'server-menu-type';
+                typeElem.textContent = formatTransportLabel(server.type);
+                meta.appendChild(typeElem);
+
+                if (server.bearerToken) {
+                    const bearerElem = document.createElement('span');
+                    bearerElem.className = 'server-menu-bearer';
+                    bearerElem.title = 'Bearer token configured';
+                    bearerElem.textContent = '✓';
+                    meta.appendChild(bearerElem);
+                }
+
+                info.appendChild(meta);
+                item.appendChild(info);
+
+                const actions = document.createElement('div');
+                actions.className = 'server-menu-actions';
+
+                const editBtn = document.createElement('button');
+                editBtn.type = 'button';
+                editBtn.className = 'server-menu-btn edit';
+                editBtn.dataset.action = 'edit';
+                editBtn.dataset.serverId = server.id;
+                editBtn.textContent = 'Edit';
+                editBtn.title = 'Edit server';
+                actions.appendChild(editBtn);
+
+                const deleteBtn = document.createElement('button');
+                deleteBtn.type = 'button';
+                deleteBtn.className = 'server-menu-btn delete';
+                deleteBtn.dataset.action = 'delete';
+                deleteBtn.dataset.serverId = server.id;
+                deleteBtn.textContent = 'Delete';
+                deleteBtn.title = 'Delete server';
+                actions.appendChild(deleteBtn);
+
+                item.appendChild(actions);
+                serverListContainer.appendChild(item);
+            });
+        }
+
+        function persistSelectedServer(server) {
+            if (!server) {
+                selectedServerId = null;
+                saveSelectedServerKey(null);
+                return;
+            }
+
+            selectedServerId = server.id;
+            saveSelectedServerKey(server.id);
+            saveServerUrl(server.url);
+
+            if (server.type === 'stream-http' || server.type === 'sse') {
+                httpTransportPreference = server.type;
+                saveHttpTransportPreference(server.type);
+            }
+        }
+
+        function updateTransportControlsForServer(server) {
+            if (server && (server.type === 'stream-http' || server.type === 'sse')) {
+                httpTransportPreference = server.type;
+                httpTransportSelect.value = server.type;
+                httpTransportSelect.disabled = true;
+                httpTransportSelectWrapper.style.display = 'inline-flex';
+            } else {
+                httpTransportSelectWrapper.style.display = 'none';
+                httpTransportSelect.disabled = false;
+            }
+        }
+
+        function applyServerSelection(server) {
+            if (!server) {
+                serverDropdownLabel.textContent = 'Servers';
+                serverUrlInput.value = '';
+                currentServerUrl = '';
+                updateTransportControlsForServer(null);
+                return;
+            }
+
+            serverDropdownLabel.textContent = server.url;
+            serverUrlInput.value = server.url;
+            currentServerUrl = server.url;
+            updateTransportControlsForServer(server);
+        }
+
+        function selectServer(serverId) {
+            const server = getServerById(serverId);
+            if (!server) {
+                return;
+            }
+
+            persistSelectedServer(server);
+            applyServerSelection(server);
+            renderServerDropdown();
+        }
+
+        function deleteServer(serverId) {
+            const server = getServerById(serverId);
+            if (!server) {
+                return;
+            }
+
+            if (!confirm(`Delete server "${server.url}"?`)) {
+                return;
+            }
+
+            serverEntries = serverEntries.filter(entry => entry.id !== serverId);
+            saveServerEntries(serverEntries);
+
+            if (selectedServerId === serverId) {
+                if (serverEntries.length) {
+                    const fallback = serverEntries[0];
+                    persistSelectedServer(fallback);
+                    applyServerSelection(fallback);
+                } else {
+                    persistSelectedServer(null);
+                    applyServerSelection(null);
+                }
+            }
+
+            renderServerDropdown();
+        }
+
+        function resetServerModal() {
+            serverModalUrl.value = '';
+            serverModalType.value = 'stream-http';
+            serverModalToken.value = '';
+            serverModalToken.type = 'password';
+            toggleServerTokenVisibility.textContent = 'Show';
+        }
+
+        function openServerModal({ mode = 'add', serverId = null } = {}) {
+            serverModalMode = mode;
+            serverModalEditingId = serverId;
+
+            if (mode === 'edit') {
+                const server = getServerById(serverId);
+                if (!server) {
+                    return;
+                }
+                serverModalTitle.textContent = 'Edit Server';
+                serverModalUrl.value = server.url;
+                serverModalType.value = server.type;
+                serverModalToken.value = server.bearerToken || '';
+                serverModalToken.type = 'password';
+                toggleServerTokenVisibility.textContent = 'Show';
+            } else {
+                serverModalTitle.textContent = 'Add Server';
+                resetServerModal();
+                const activeServer = getSelectedServer();
+                if (activeServer) {
+                    serverModalType.value = activeServer.type;
+                }
+            }
+
+            serverModal.style.display = 'block';
+            setTimeout(() => {
+                serverModalUrl.focus();
+            }, 0);
+        }
+
+        function closeServerModal() {
+            serverModal.style.display = 'none';
+            resetServerModal();
+        }
+
+        function toggleBearerVisibility() {
+            if (serverModalToken.type === 'password') {
+                serverModalToken.type = 'text';
+                toggleServerTokenVisibility.textContent = 'Hide';
+            } else {
+                serverModalToken.type = 'password';
+                toggleServerTokenVisibility.textContent = 'Show';
+            }
+        }
+
+        function handleServerModalSave() {
+            const url = serverModalUrl.value.trim();
+            const type = serverModalType.value;
+            const bearerToken = serverModalToken.value.trim();
+
+            if (!url) {
+                alert('Please enter a server URL.');
+                return;
+            }
+
+            if (type === 'websocket' && !isWebSocketUrl(url)) {
+                alert('WebSocket URLs must start with ws:// or wss://');
+                return;
+            }
+
+            if ((type === 'stream-http' || type === 'sse') && !isHttpUrl(url)) {
+                alert('HTTP transports require URLs that start with http:// or https://');
+                return;
+            }
+
+            if (!['websocket', 'stream-http', 'sse'].includes(type)) {
+                alert('Unknown transport type.');
+                return;
+            }
+
+            const sanitizedToken = bearerToken || '';
+
+            if (serverModalMode === 'edit') {
+                const existing = getServerById(serverModalEditingId);
+                if (!existing) {
+                    alert('Unable to locate server to edit.');
+                    return;
+                }
+
+                const updated = {
+                    id: existing.id,
+                    url,
+                    type,
+                    bearerToken: sanitizedToken
+                };
+
+                serverEntries = [updated, ...serverEntries.filter(entry => entry.id !== existing.id)];
+                saveServerEntries(serverEntries);
+                persistSelectedServer(updated);
+                applyServerSelection(updated);
+                renderServerDropdown();
+                closeServerModal();
+                return;
+            }
+
+            const duplicate = serverEntries.find(entry => entry.url === url && entry.type === type);
+            if (duplicate) {
+                const updatedDuplicate = {
+                    id: duplicate.id,
+                    url,
+                    type,
+                    bearerToken: sanitizedToken
+                };
+                serverEntries = [updatedDuplicate, ...serverEntries.filter(entry => entry.id !== duplicate.id)];
+                saveServerEntries(serverEntries);
+                persistSelectedServer(updatedDuplicate);
+                applyServerSelection(updatedDuplicate);
+                renderServerDropdown();
+                closeServerModal();
+                return;
+            }
+
+            const newServer = {
+                id: generateServerId(),
+                url,
+                type,
+                bearerToken: sanitizedToken
+            };
+
+            serverEntries = [newServer, ...serverEntries];
+            saveServerEntries(serverEntries);
+            persistSelectedServer(newServer);
+            applyServerSelection(newServer);
+            renderServerDropdown();
+            closeServerModal();
+        }
+
         jsonEditor.addEventListener('input', () => {
             // Skip if this change was triggered by code (not user)
             if (isUpdatingFromCode) return;
@@ -1170,20 +1888,92 @@
         });
         
         // Initialize from storage
-        function initializeFromStorage() {
-            // Load server URL
-            const savedServerUrl = loadServerUrl();
-            if (savedServerUrl) {
-                serverUrlInput.value = savedServerUrl;
+        function initializeServerState() {
+            serverEntries = loadServerEntries();
+            selectedServerId = loadSelectedServerKey();
+
+            if (!serverEntries.length) {
+                const legacyUrl = loadServerUrl();
+                const fallbackUrl = typeof legacyUrl === 'string' && legacyUrl ? legacyUrl : DEFAULT_WS_URL;
+                const inferredType = isHttpUrl(fallbackUrl)
+                    ? (loadHttpTransportPreference() === 'sse' ? 'sse' : 'stream-http')
+                    : 'websocket';
+                const defaultServer = {
+                    id: generateServerId(),
+                    url: fallbackUrl,
+                    type: inferredType,
+                    bearerToken: ''
+                };
+                serverEntries = [defaultServer];
+                saveServerEntries(serverEntries);
+                selectedServerId = defaultServer.id;
+                saveSelectedServerKey(selectedServerId);
             }
-            
+
+            if (selectedServerId && !getServerById(selectedServerId)) {
+                selectedServerId = serverEntries[0]?.id || null;
+                saveSelectedServerKey(selectedServerId);
+            } else if (!selectedServerId && serverEntries.length) {
+                selectedServerId = serverEntries[0].id;
+                saveSelectedServerKey(selectedServerId);
+            }
+
+            renderServerDropdown();
+            const activeServer = getServerById(selectedServerId);
+            if (activeServer) {
+                persistSelectedServer(activeServer);
+            }
+            applyServerSelection(activeServer);
+        }
+
+        function initializeFromStorage() {
+            initializeServerState();
+
             // Load request history
             requestHistory = loadRequestHistory();
             
             // Update history flow indicator
             updateHistoryFlowIndicator();
         }
-        
+
+        function isWebSocketUrl(url) {
+            return url.startsWith('ws://') || url.startsWith('wss://');
+        }
+
+        function isHttpUrl(url) {
+            return url.startsWith('http://') || url.startsWith('https://');
+        }
+
+        function determineTransportForUrl(url) {
+            if (isWebSocketUrl(url)) {
+                return 'websocket';
+            }
+            if (isHttpUrl(url)) {
+                if (url.includes('transport=sse')) {
+                    httpTransportPreference = 'sse';
+                    httpTransportSelect.value = 'sse';
+                    saveHttpTransportPreference('sse');
+                    return 'sse';
+                }
+                return httpTransportPreference || 'stream-http';
+            }
+            return 'websocket';
+        }
+
+        function getAuthorizationHeader() {
+            const server = getSelectedServer();
+            if (!server) {
+                return null;
+            }
+            if (!server.bearerToken) {
+                return null;
+            }
+            if (server.type !== 'stream-http' && server.type !== 'sse') {
+                return null;
+            }
+            return 'Bearer ' + server.bearerToken;
+        }
+
         // Update history flow indicator
         function updateHistoryFlowIndicator() {
             const historyCount = loadRequestHistory().length;
@@ -1652,224 +2442,161 @@
         
         // Connect and Handshake automation
         async function connectAndInitialize() {
-            const url = serverUrlInput.value;
+            const server = getSelectedServer();
+            const url = server ? server.url.trim() : '';
             if (!url) {
-                alert('Please enter a WebSocket URL');
+                alert('Please add and select a server before connecting.');
                 return;
             }
 
             try {
                 log('Starting automated connection and handshake...');
-                
-                // Step 1: Connect
-                await new Promise((resolve, reject) => {
-                    log('1. Connecting to ' + url + '...');
-                    
-                    // Clear cached data from previous connection
-                    availableTools = {};
-                    availablePrompts = {};
-                    availableResources = {};
-                    
-                    ws = new WebSocket(url);
-                    
-                    ws.onopen = () => {
-                        log('✓ Connected to ' + url);
-                        updateStatus(true);
-                        saveServerUrl(url);
-                        resolve();
-                    };
-                    
-                    ws.onerror = (error) => {
-                        log('✗ WebSocket connection error: ' + error);
-                        reject(new Error('Connection failed'));
-                    };
-                    
-                    ws.onclose = () => {
-                        if (ws.readyState !== WebSocket.OPEN) {
-                            log('✗ Connection closed before opening');
-                            reject(new Error('Connection closed'));
+
+                await connect();
+
+                const transportLabel = currentTransport === 'websocket'
+                    ? 'WebSocket'
+                    : currentTransport === 'sse'
+                        ? 'SSE'
+                        : 'streamable HTTP';
+                log('✓ Connected using ' + transportLabel);
+
+                // Step 2: initialize request
+                log('2. Sending initialize request...');
+                const initRequest = {
+                    jsonrpc: '2.0',
+                    id: currentRequestId++,
+                    method: 'initialize',
+                    params: {
+                        protocolVersion: '2024-11-05',
+                        capabilities: {
+                            roots: { listChanged: true },
+                            sampling: {}
+                        },
+                        clientInfo: {
+                            name: 'Netdata MCP Test Client',
+                            version: '1.0.0'
                         }
-                    };
-                    
-                    // Set up message handler for responses
-                    ws.onmessage = (event) => {
-                        try {
-                            const data = JSON.parse(event.data);
-                            
-                            // Calculate metrics
-                            let responseTime = null;
-                            if (data.id !== undefined && pendingRequests.has(data.id)) {
-                                responseTime = Date.now() - pendingRequests.get(data.id);
-                                pendingRequests.delete(data.id);
-                            }
-                            
-                            const responseSize = new Blob([event.data]).size;
-                            const estimatedTokens = estimateTokens(event.data);
-                            
-                            logMessage(data, 'received', {
-                                responseTime,
-                                responseSize,
-                                estimatedTokens
-                            });
-                            
-                            // Handle specific responses
-                            if (data.id && data.result) {
-                                handleResponse(data);
-                            }
-                        } catch (e) {
-                            log('← Received (raw): ' + event.data);
-                        }
-                    };
-                });
-                
-                // Step 2: Send initialize
-                await new Promise((resolve, reject) => {
-                    log('2. Sending initialize request...');
-                    
-                    const initRequest = {
-                        jsonrpc: "2.0",
-                        id: currentRequestId++,
-                        method: "initialize",
-                        params: {
-                            protocolVersion: "2024-11-05",
-                            capabilities: {
-                                roots: { listChanged: true },
-                                sampling: {}
-                            },
-                            clientInfo: {
-                                name: "Netdata MCP Test Client",
-                                version: "1.0.0"
-                            }
-                        }
-                    };
-                    
-                    // Track this request
-                    pendingRequests.set(initRequest.id, Date.now());
-                    
-                    // Set up one-time response handler
-                    const originalHandler = ws.onmessage;
-                    let responseReceived = false;
-                    
-                    const timeout = setTimeout(() => {
-                        if (!responseReceived) {
-                            ws.onmessage = originalHandler;
-                            reject(new Error('Initialize request timed out'));
-                        }
-                    }, 10000); // 10 second timeout
-                    
-                    ws.onmessage = (event) => {
-                        // Call original handler first
-                        originalHandler(event);
-                        
-                        if (responseReceived) return;
-                        
-                        try {
-                            const data = JSON.parse(event.data);
-                            if (data.id === initRequest.id) {
-                                responseReceived = true;
-                                clearTimeout(timeout);
-                                ws.onmessage = originalHandler;
-                                
-                                if (data.error) {
-                                    log('✗ Initialize failed: ' + JSON.stringify(data.error));
-                                    reject(new Error('Initialize failed: ' + data.error.message));
-                                } else {
-                                    log('✓ Initialize successful');
-                                    resolve();
-                                }
-                            }
-                        } catch (e) {
-                            // Ignore parsing errors for this handler
-                        }
-                    };
-                    
-                    ws.send(JSON.stringify(initRequest));
-                    logMessage(initRequest, 'sent');
-                });
-                
-                // Step 3: Send initialized notification
+                    }
+                };
+
+                let initResponse;
+                try {
+                    initResponse = await awaitWithTimeout(
+                        dispatchRequest(initRequest, { awaitResponse: true }),
+                        10000,
+                        'Initialize request timed out'
+                    );
+                } catch (err) {
+                    pendingRequests.delete(initRequest.id);
+                    throw err;
+                }
+
+                if (initResponse && initResponse.error) {
+                    throw new Error('Initialize failed: ' + initResponse.error.message);
+                }
+                log('✓ Initialize successful');
+
+                // Step 3: Send initialized notification (no response expected)
                 log('3. Sending initialized notification...');
                 const initializedNotification = {
-                    jsonrpc: "2.0",
-                    method: "notifications/initialized"
+                    jsonrpc: '2.0',
+                    method: 'notifications/initialized'
                 };
-                
-                ws.send(JSON.stringify(initializedNotification));
-                logMessage(initializedNotification, 'sent');
+                await dispatchRequest(initializedNotification, { awaitResponse: false });
                 log('✓ Initialized notification sent');
-                
-                // Small delay to ensure notification is processed
-                await new Promise(resolve => setTimeout(resolve, 100));
-                
-                // Step 4: Send tools/list
-                await new Promise((resolve, reject) => {
-                    log('4. Requesting tools list...');
-                    
-                    const toolsRequest = {
-                        jsonrpc: "2.0",
-                        id: currentRequestId++,
-                        method: "tools/list"
-                    };
-                    
-                    // Track this request
-                    pendingRequests.set(toolsRequest.id, Date.now());
-                    
-                    // Set up one-time response handler
-                    const originalHandler = ws.onmessage;
-                    let responseReceived = false;
-                    
-                    const timeout = setTimeout(() => {
-                        if (!responseReceived) {
-                            ws.onmessage = originalHandler;
-                            reject(new Error('Tools list request timed out'));
-                        }
-                    }, 10000); // 10 second timeout
-                    
-                    ws.onmessage = (event) => {
-                        // Call original handler first
-                        originalHandler(event);
-                        
-                        if (responseReceived) return;
-                        
-                        try {
-                            const data = JSON.parse(event.data);
-                            if (data.id === toolsRequest.id) {
-                                responseReceived = true;
-                                clearTimeout(timeout);
-                                ws.onmessage = originalHandler;
-                                
-                                if (data.error) {
-                                    log('✗ Tools list failed: ' + JSON.stringify(data.error));
-                                    reject(new Error('Tools list failed: ' + data.error.message));
-                                } else {
-                                    log('✓ Tools list received (' + (data.result.tools ? data.result.tools.length : 0) + ' tools)');
-                                    resolve();
-                                }
-                            }
-                        } catch (e) {
-                            // Ignore parsing errors for this handler
-                        }
-                    };
-                    
-                    ws.send(JSON.stringify(toolsRequest));
-                    logMessage(toolsRequest, 'sent');
-                });
-                
-                // Step 5: Set up proper persistent event handlers
-                log('5. Setting up persistent connection handlers...');
-                ws.onerror = (error) => {
-                    log('WebSocket error: ' + error);
+
+                await delay(100);
+
+                // Step 4: Request tools list
+                log('4. Requesting tools list...');
+                const toolsRequest = {
+                    jsonrpc: '2.0',
+                    id: currentRequestId++,
+                    method: 'tools/list'
                 };
-                
-                ws.onclose = () => {
-                    log('Disconnected');
-                    updateStatus(false);
-                    ws = null;
+
+                let toolsResponse;
+                try {
+                    toolsResponse = await awaitWithTimeout(
+                        dispatchRequest(toolsRequest, { awaitResponse: true }),
+                        10000,
+                        'Tools list request timed out'
+                    );
+                } catch (err) {
+                    pendingRequests.delete(toolsRequest.id);
+                    throw err;
+                }
+
+                if (toolsResponse && toolsResponse.error) {
+                    throw new Error('Tools list failed: ' + toolsResponse.error.message);
+                }
+
+                const toolCount = toolsResponse && toolsResponse.result && toolsResponse.result.tools
+                    ? toolsResponse.result.tools.length
+                    : 0;
+                log('✓ Tools list received (' + toolCount + ' tools)');
+
+                // Step 5: Request prompts list
+                log('5. Requesting prompts list...');
+                const promptsRequest = {
+                    jsonrpc: '2.0',
+                    id: currentRequestId++,
+                    method: 'prompts/list'
                 };
-                log('✓ Persistent handlers configured');
-                
-                // Step 6: Switch to Tools flow
-                log('6. Switching to Tools flow...');
+
+                let promptsResponse;
+                try {
+                    promptsResponse = await awaitWithTimeout(
+                        dispatchRequest(promptsRequest, { awaitResponse: true }),
+                        10000,
+                        'Prompts list request timed out'
+                    );
+                } catch (err) {
+                    pendingRequests.delete(promptsRequest.id);
+                    throw err;
+                }
+
+                if (promptsResponse && promptsResponse.error) {
+                    log('⚠ Prompts list failed: ' + JSON.stringify(promptsResponse.error));
+                } else {
+                    const promptCount = promptsResponse && promptsResponse.result && promptsResponse.result.prompts
+                        ? promptsResponse.result.prompts.length
+                        : 0;
+                    log('✓ Prompts list received (' + promptCount + ' prompts)');
+                }
+
+                // Step 6: Request resources list
+                log('6. Requesting resources list...');
+                const resourcesRequest = {
+                    jsonrpc: '2.0',
+                    id: currentRequestId++,
+                    method: 'resources/list'
+                };
+
+                let resourcesResponse;
+                try {
+                    resourcesResponse = await awaitWithTimeout(
+                        dispatchRequest(resourcesRequest, { awaitResponse: true }),
+                        10000,
+                        'Resources list request timed out'
+                    );
+                } catch (err) {
+                    pendingRequests.delete(resourcesRequest.id);
+                    throw err;
+                }
+
+                if (resourcesResponse && resourcesResponse.error) {
+                    log('⚠ Resources list failed: ' + JSON.stringify(resourcesResponse.error));
+                } else {
+                    const resourceCount = resourcesResponse && resourcesResponse.result && resourcesResponse.result.resources
+                        ? resourcesResponse.result.resources.length
+                        : 0;
+                    log('✓ Resources list received (' + resourceCount + ' resources)');
+                }
+
+                // Step 7: Switch UI to tools flow
+                log('7. Switching to Tools flow...');
                 document.querySelectorAll('.flow-item').forEach(item => item.classList.remove('active'));
                 const toolsFlow = document.querySelector('[data-flow="tools"]');
                 if (toolsFlow) {
@@ -1879,140 +2606,163 @@
                 } else {
                     log('⚠ Tools flow not found');
                 }
-                
+
                 log('🎉 Automated connection and handshake completed successfully!');
-                
             } catch (error) {
                 log('❌ Automated connection and handshake failed: ' + error.message);
-                if (ws) {
-                    ws.close();
-                    ws = null;
+                if (currentTransport === 'websocket') {
+                    if (ws) {
+                        ws.close();
+                        ws = null;
+                    }
+                } else {
+                    if (activeSseController) {
+                        activeSseController.abort();
+                        activeSseController = null;
+                    }
+                    isConnected = false;
                     updateStatus(false);
                 }
+                pendingRequests.clear();
             }
         }
 
-        // WebSocket functions
-        function connect() {
-            const url = serverUrlInput.value;
+        // Transport helpers
+        async function connect() {
+            const server = getSelectedServer();
+            const url = server ? server.url.trim() : '';
             if (!url) {
-                alert('Please enter a WebSocket URL');
+                alert('Please add and select a server before connecting.');
                 return;
             }
-            
-            log('Connecting to ' + url + '...');
-            
+
+            if (server && (server.type === 'stream-http' || server.type === 'sse')) {
+                httpTransportPreference = server.type;
+                httpTransportSelect.value = server.type;
+                saveHttpTransportPreference(server.type);
+            } else if (isHttpUrl(url)) {
+                httpTransportPreference = httpTransportSelect.value || httpTransportPreference || 'stream-http';
+                saveHttpTransportPreference(httpTransportPreference);
+            }
+
+            currentTransport = determineTransportForUrl(url);
+            if (server && (server.type === 'stream-http' || server.type === 'sse')) {
+                currentTransport = server.type;
+            }
+
+            currentServerUrl = url;
+
             // Clear cached data from previous connection
             availableTools = {};
             availablePrompts = {};
             availableResources = {};
-            
-            ws = new WebSocket(url);
-            
-            ws.onopen = () => {
-                log('Connected to ' + url);
-                updateStatus(true);
-                // Save successful connection URL
-                saveServerUrl(url);
-            };
-            
-            ws.onmessage = (event) => {
-                try {
-                    const data = JSON.parse(event.data);
-                    
-                    // Calculate metrics
-                    let responseTime = null;
-                    if (data.id !== undefined && pendingRequests.has(data.id)) {
-                        responseTime = Date.now() - pendingRequests.get(data.id);
-                        pendingRequests.delete(data.id);
-                    }
-                    
-                    const responseSize = new Blob([event.data]).size;
-                    const estimatedTokens = estimateTokens(event.data);
-                    
-                    logMessage(data, 'received', {
-                        responseTime,
-                        responseSize,
-                        estimatedTokens
-                    });
-                    
-                    // Handle specific responses
-                    if (data.id && data.result) {
-                        handleResponse(data);
-                    }
-                } catch (e) {
-                    log('← Received (raw): ' + event.data);
-                }
-            };
-            
-            ws.onerror = (error) => {
-                log('WebSocket error: ' + error);
-            };
-            
-            ws.onclose = () => {
-                log('Disconnected');
-                updateStatus(false);
-                ws = null;
-            };
-        }
-        
-        function disconnect() {
-            if (ws) {
-                ws.close();
+            pendingRequests.clear();
+
+            if (currentTransport === 'websocket') {
+                await connectWebSocket(url);
+            } else {
+                await connectStateless(url);
             }
         }
-        
-        function sendRequest() {
-            if (!ws || ws.readyState !== WebSocket.OPEN) {
+
+        async function connectWebSocket(url) {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.close();
+            }
+
+            log('Connecting to ' + url + '...');
+
+            await new Promise((resolve, reject) => {
+                let resolved = false;
+                ws = new WebSocket(url);
+
+                ws.addEventListener('open', () => {
+                    resolved = true;
+                    isConnected = true;
+                    saveServerUrl(url);
+                    updateStatus(true);
+                    log('Connected to ' + url);
+                    resolve();
+                });
+
+                ws.addEventListener('message', (event) => {
+                    handleIncomingTransportPayload(event.data, { transport: 'websocket' });
+                });
+
+                ws.addEventListener('error', (error) => {
+                    log('WebSocket error: ' + error);
+                    if (!resolved) {
+                        reject(new Error('WebSocket connection error'));
+                    }
+                });
+
+                ws.addEventListener('close', () => {
+                    if (!resolved) {
+                        reject(new Error('WebSocket connection closed before opening'));
+                    } else {
+                        log('Disconnected');
+                    }
+                    ws = null;
+                    isConnected = false;
+                    updateStatus(false);
+                });
+            });
+        }
+
+        async function connectStateless(url) {
+            const mode = currentTransport === 'sse' ? 'SSE' : 'streamable HTTP';
+            log('Preparing ' + mode + ' session for ' + url + '...');
+            saveServerUrl(url);
+            if (activeSseController) {
+                activeSseController.abort();
+            }
+            activeSseController = null;
+            isConnected = true;
+            updateStatus(true);
+            log('Ready to send requests over ' + mode + '.');
+        }
+
+        function disconnect() {
+            if (currentTransport === 'websocket') {
+                if (ws) {
+                    ws.close();
+                }
+            } else {
+                if (activeSseController) {
+                    activeSseController.abort();
+                    activeSseController = null;
+                }
+                if (isConnected) {
+                    log('Disconnected');
+                }
+                isConnected = false;
+                updateStatus(false);
+            }
+            pendingRequests.clear();
+        }
+
+        function ensureTransportConnected() {
+            if (currentTransport === 'websocket') {
+                return ws && ws.readyState === WebSocket.OPEN;
+            }
+            return isConnected;
+        }
+
+        async function sendRequest() {
+            if (!ensureTransportConnected()) {
                 alert('Not connected to server');
                 return;
             }
-            
+
+            let request;
             try {
-                const request = JSON.parse(jsonEditor.value);
-                
-                // Track request timestamp if it has an ID
-                if (request.id !== undefined) {
-                    pendingRequests.set(request.id, Date.now());
-                }
-                
-                // Determine tool name if it's a tools/call request
-                let toolName = null;
-                if (request.method === 'tools/call' && request.params && request.params.name) {
-                    toolName = request.params.name;
-                }
-                
-                // Save to history
-                const historyItem = saveRequestToHistory(request, request.method, toolName, false);
-                
-                // Update in-memory history for immediate UI updates
-                const oldHistoryItem = {
-                    timestamp: new Date().toLocaleTimeString(),
-                    method: request.method,
-                    request: JSON.parse(JSON.stringify(request)), // Deep clone here too
-                    error: false
-                };
-                requestHistory.unshift(oldHistoryItem);
-                if (requestHistory.length > 50) {
-                    requestHistory = requestHistory.slice(0, 50);
-                }
-                
-                // Update history flow indicator
-                updateHistoryFlowIndicator();
-                
-                ws.send(JSON.stringify(request));
-                logMessage(request, 'sent');
-                
-                // Increment ID after sending for next request
-                if (request.id !== undefined && request.id === currentRequestId) {
-                    currentRequestId++;
-                }
+                request = JSON.parse(jsonEditor.value);
             } catch (e) {
                 alert('Invalid JSON: ' + e.message);
-                
+
                 // Save error to history
                 saveRequestToHistory({ error: e.message }, 'Invalid JSON', null, true);
-                
+
                 // Add error to in-memory history
                 const historyItem = {
                     timestamp: new Date().toLocaleTimeString(),
@@ -2021,9 +2771,431 @@
                     error: true
                 };
                 requestHistory.unshift(historyItem);
-                
-                // Update history flow indicator
                 updateHistoryFlowIndicator();
+                return;
+            }
+
+            // Determine tool name if it's a tools/call request
+            let toolName = null;
+            if (request.method === 'tools/call' && request.params && request.params.name) {
+                toolName = request.params.name;
+            }
+
+            // Save to history
+            saveRequestToHistory(request, request.method, toolName, false);
+
+            // Update in-memory history for immediate UI updates
+            const historyItem = {
+                timestamp: new Date().toLocaleTimeString(),
+                method: request.method,
+                request: JSON.parse(JSON.stringify(request)),
+                error: false
+            };
+            requestHistory.unshift(historyItem);
+            if (requestHistory.length > 50) {
+                requestHistory = requestHistory.slice(0, 50);
+            }
+            updateHistoryFlowIndicator();
+
+            try {
+                const shouldAwaitResponse = currentTransport !== 'websocket';
+                await dispatchRequest(request, { awaitResponse: shouldAwaitResponse });
+            } catch (err) {
+                log('Request failed: ' + err.message);
+            }
+
+            // Increment ID after sending for next request
+            if (request.id !== undefined && request.id === currentRequestId) {
+                currentRequestId++;
+            }
+        }
+
+        async function dispatchRequest(request, options = {}) {
+            const awaitResponse = options.awaitResponse !== false && request.id !== undefined;
+            const payloadText = JSON.stringify(request);
+            let tracker = null;
+
+            if (request.id !== undefined) {
+                tracker = registerPendingRequest(request.id, { createPromise: awaitResponse });
+            }
+
+            try {
+                if (currentTransport === 'websocket') {
+                    if (!ws || ws.readyState !== WebSocket.OPEN) {
+                        throw new Error('WebSocket not connected');
+                    }
+                    logMessage(request, 'sent');
+                    ws.send(payloadText);
+                } else if (currentTransport === 'stream-http') {
+                    logMessage(request, 'sent');
+                    await sendOverHttp(request, payloadText, awaitResponse);
+                } else if (currentTransport === 'sse') {
+                    logMessage(request, 'sent');
+                    await sendOverSse(request, payloadText, awaitResponse);
+                } else {
+                    throw new Error('Unsupported transport: ' + currentTransport);
+                }
+            } catch (error) {
+                if (request.id !== undefined) {
+                    pendingRequests.delete(request.id);
+                    if (tracker && tracker.reject) {
+                        tracker.reject(error);
+                    }
+                }
+                throw error;
+            }
+
+            if (awaitResponse && tracker && tracker.promise) {
+                return tracker.promise;
+            }
+            return null;
+        }
+
+        function registerPendingRequest(id, { createPromise = false } = {}) {
+            if (id === undefined || id === null) {
+                return null;
+            }
+
+            const entry = {
+                timestamp: Date.now()
+            };
+
+            if (createPromise) {
+                entry.promise = new Promise((resolve, reject) => {
+                    entry.resolve = resolve;
+                    entry.reject = reject;
+                });
+            }
+
+            pendingRequests.set(id, entry);
+            return entry;
+        }
+
+        async function awaitWithTimeout(promise, timeoutMs, errorMessage) {
+            if (!timeoutMs) {
+                return promise;
+            }
+
+            let timeoutId;
+            try {
+                return await Promise.race([
+                    promise,
+                    new Promise((_, reject) => {
+                        timeoutId = setTimeout(() => reject(new Error(errorMessage)), timeoutMs);
+                    })
+                ]);
+            } finally {
+                if (timeoutId) {
+                    clearTimeout(timeoutId);
+                }
+            }
+        }
+
+        function delay(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        async function sendOverHttp(request, payloadText, expectResponse = true) {
+            let response;
+            try {
+                const headers = {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                };
+                const authHeader = getAuthorizationHeader();
+                if (authHeader) {
+                    headers.Authorization = authHeader;
+                }
+
+                response = await fetch(currentServerUrl, {
+                    method: 'POST',
+                    headers,
+                    body: payloadText
+                });
+            } catch (error) {
+                if (!expectResponse) {
+                    log('⚠ Streamable HTTP request completed with network error (no response expected): ' + error.message);
+                    return;
+                }
+                throw error;
+            }
+
+            let responseText = '';
+            try {
+                if (expectResponse) {
+                    responseText = await response.text();
+                } else {
+                    // Drain body if any but ignore errors
+                    if (response.body) {
+                        await response.body.cancel().catch(() => {});
+                    }
+                }
+            } catch (error) {
+                if (!expectResponse) {
+                    log('⚠ Streamable HTTP response could not be fully read (no response expected): ' + error.message);
+                    return;
+                }
+                throw error;
+            }
+
+            if (!response.ok) {
+                if (responseText) {
+                    handleIncomingTransportPayload(responseText, {
+                        transport: 'stream-http',
+                        responseSize: new Blob([responseText]).size
+                    });
+                }
+                throw new Error('HTTP ' + response.status + ' ' + response.statusText);
+            }
+
+            if (!expectResponse) {
+                return;
+            }
+
+            if (responseText) {
+                handleIncomingTransportPayload(responseText, {
+                    transport: 'stream-http',
+                    responseSize: new Blob([responseText]).size
+                });
+            } else {
+                log('← Received empty response with status ' + response.status + ' (stream-http)');
+            }
+        }
+
+        async function sendOverSse(request, payloadText, expectResponse = true) {
+            if (activeSseController) {
+                activeSseController.abort();
+            }
+
+            activeSseController = new AbortController();
+
+            let response;
+            try {
+                const headers = {
+                    'Content-Type': 'application/json',
+                    'Accept': 'text/event-stream'
+                };
+                const authHeader = getAuthorizationHeader();
+                if (authHeader) {
+                    headers.Authorization = authHeader;
+                }
+
+                response = await fetch(enhanceUrlForSse(currentServerUrl), {
+                    method: 'POST',
+                    headers,
+                    body: payloadText,
+                    signal: activeSseController.signal
+                });
+            } catch (error) {
+                activeSseController = null;
+                if (!expectResponse) {
+                    log('⚠ SSE request completed with network error (no response expected): ' + error.message);
+                    return;
+                }
+                throw error;
+            }
+
+            if (!response.ok) {
+                const errorBody = await response.text().catch(() => '');
+                if (errorBody) {
+                    handleIncomingTransportPayload(errorBody, {
+                        transport: 'sse',
+                        responseSize: new Blob([errorBody]).size
+                    });
+                }
+                throw new Error('HTTP ' + response.status + ' ' + response.statusText);
+            }
+
+            if (!expectResponse) {
+                activeSseController = null;
+                return;
+            }
+
+            if (!response.body) {
+                throw new Error('SSE response has no body');
+            }
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+
+            try {
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) {
+                        break;
+                    }
+
+                    buffer += decoder.decode(value, { stream: true });
+
+                    let normalized = buffer.replace(/\r\n/g, '\n');
+                    let lastProcessedIndex = 0;
+                    let separatorIndex;
+
+                    while ((separatorIndex = normalized.indexOf('\n\n', lastProcessedIndex)) !== -1) {
+                        const rawEvent = normalized.slice(lastProcessedIndex, separatorIndex);
+                        lastProcessedIndex = separatorIndex + 2;
+
+                        const parsed = parseSseEvent(rawEvent);
+                        if (!parsed) {
+                            continue;
+                        }
+
+                        const { event, data } = parsed;
+                        if (!data) {
+                            continue;
+                        }
+
+                        try {
+                            const jsonData = JSON.parse(data);
+                            const rawJson = JSON.stringify(jsonData);
+                            handleIncomingTransportPayload(jsonData, {
+                                transport: 'sse',
+                                responseSize: new Blob([rawJson]).size
+                            });
+
+                            if (event && event.toLowerCase() === 'complete') {
+                                buffer = normalized.slice(lastProcessedIndex);
+                                return;
+                            }
+                        } catch (error) {
+                            log('Failed to parse SSE data: ' + error.message + ' (' + data + ')');
+                        }
+                    }
+
+                    buffer = normalized.slice(lastProcessedIndex);
+                }
+            } finally {
+                activeSseController = null;
+            }
+        }
+
+        function enhanceUrlForSse(url) {
+            if (url.includes('transport=sse')) {
+                return url;
+            }
+            const hasQuery = url.includes('?');
+            return url + (hasQuery ? '&' : '?') + 'transport=sse';
+        }
+
+        function parseSseEvent(rawEvent) {
+            const lines = rawEvent.split('\n');
+            const result = { event: 'message', data: '' };
+
+        for (const line of lines) {
+            if (line.startsWith('event:')) {
+                result.event = line.slice(6).trim();
+            } else if (line.startsWith('data:')) {
+                let value = line.slice(5);
+                if (value.startsWith(' ')) {
+                    value = value.slice(1);
+                }
+                value = value.replace(/\r/g, '');
+                result.data += result.data ? '\n' + value : value;
+            }
+        }
+
+        result.data = result.data.trim();
+        return result.data ? result : null;
+    }
+
+        function handleIncomingTransportPayload(payload, meta = {}) {
+            if (payload === null || payload === undefined) {
+                return;
+            }
+
+            if (typeof payload === 'string') {
+                const trimmed = payload.trim();
+                if (!trimmed) {
+                    return;
+                }
+
+                try {
+                    const parsed = JSON.parse(trimmed);
+                    dispatchParsedPayload(parsed, trimmed, meta);
+                } catch (error) {
+                    const asLines = trimmed.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+                    const parsedMessages = [];
+                    let ndjsonValid = asLines.length > 1;
+
+                    if (ndjsonValid) {
+                        for (const line of asLines) {
+                            try {
+                                parsedMessages.push(JSON.parse(line));
+                            } catch (parseError) {
+                                ndjsonValid = false;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (ndjsonValid && parsedMessages.length) {
+                        parsedMessages.forEach(item => {
+                            const raw = JSON.stringify(item);
+                            dispatchParsedPayload(item, raw, meta);
+                        });
+                    } else {
+                        log('← Received (raw): ' + payload);
+                    }
+                }
+                return;
+            }
+
+            if (Array.isArray(payload)) {
+                payload.forEach(item => {
+                    const raw = JSON.stringify(item);
+                    dispatchParsedPayload(item, raw, meta);
+                });
+            } else if (typeof payload === 'object') {
+                const raw = JSON.stringify(payload);
+                dispatchParsedPayload(payload, raw, meta);
+            }
+        }
+
+        function dispatchParsedPayload(parsed, raw, meta) {
+            if (Array.isArray(parsed)) {
+                parsed.forEach(item => {
+                    const rawItem = JSON.stringify(item);
+                    processJsonRpcMessage(item, rawItem, meta);
+                });
+            } else {
+                processJsonRpcMessage(parsed, raw, meta);
+            }
+        }
+
+        function processJsonRpcMessage(obj, rawText, meta = {}) {
+            if (!obj) {
+                return;
+            }
+
+            const text = rawText || JSON.stringify(obj);
+            const tracker = obj.id !== undefined ? pendingRequests.get(obj.id) : null;
+
+            let responseTime = null;
+            if (meta.responseTime !== undefined) {
+                responseTime = meta.responseTime;
+            } else if (tracker) {
+                responseTime = Date.now() - tracker.timestamp;
+            }
+
+            const responseSize = meta.responseSize !== undefined ? meta.responseSize : new Blob([text]).size;
+            const estimatedTokens = meta.estimatedTokens !== undefined ? meta.estimatedTokens : estimateTokens(text);
+
+            if (tracker) {
+                pendingRequests.delete(obj.id);
+                if (tracker.resolve) {
+                    tracker.resolve(obj);
+                }
+            }
+
+            logMessage(obj, 'received', {
+                responseTime,
+                responseSize,
+                estimatedTokens
+            });
+
+            if (obj.result) {
+                handleResponse(obj);
             }
         }
         

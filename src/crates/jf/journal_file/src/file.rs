@@ -19,9 +19,20 @@ use std::backtrace::Backtrace;
 
 use crate::value_guard::ValueGuard;
 
+fn read_host_file(filename: &str) -> Result<String> {
+    match std::fs::read_to_string(filename) {
+        Ok(contents) => Ok(contents),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            let filename = format!("/host/{}", filename);
+            Ok(std::fs::read_to_string(filename)?)
+        }
+        Err(e) => Err(e.into()),
+    }
+}
+
 #[cfg(target_os = "linux")]
 pub fn load_machine_id() -> Result<[u8; 16]> {
-    let content = std::fs::read_to_string("/etc/machine-id")?;
+    let content = read_host_file("/etc/machine-id")?;
     let decoded = hex::decode(content.trim()).map_err(|_| JournalError::UuidSerde)?;
     let bytes: [u8; 16] = decoded.try_into().map_err(|_| JournalError::UuidSerde)?;
     Ok(bytes)
