@@ -1,0 +1,303 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "properties": {
+      "collect_active_jobs": {
+        "default": "auto",
+        "enum": [
+          "auto",
+          "enabled",
+          "disabled"
+        ],
+        "title": "CollectActiveJobs toggles collection of detailed per-job metrics.",
+        "type": "string"
+      },
+      "collect_disk_metrics": {
+        "default": "auto",
+        "enum": [
+          "auto",
+          "enabled",
+          "disabled"
+        ],
+        "title": "CollectDiskMetrics toggles collection of disk unit statistics.",
+        "type": "string"
+      },
+      "collect_disks_matching": {
+        "default": "",
+        "title": "DiskSelector filters disk units by name using glob-style patterns.",
+        "type": "string"
+      },
+      "collect_http_server_metrics": {
+        "default": "auto",
+        "enum": [
+          "auto",
+          "enabled",
+          "disabled"
+        ],
+        "title": "CollectHTTPServerMetrics toggles collection of IBM HTTP Server statistics.",
+        "type": "string"
+      },
+      "collect_job_queue_metrics": {
+        "default": "auto",
+        "enum": [
+          "auto",
+          "enabled",
+          "disabled"
+        ],
+        "title": "CollectJobQueueMetrics toggles collection of job queue backlog metrics.",
+        "type": "string"
+      },
+      "collect_job_queues_matching": {
+        "default": "",
+        "title": "JobQueueSelector filters job queues by name using glob-style patterns.",
+        "type": "string"
+      },
+      "collect_message_queue_metrics": {
+        "default": "auto",
+        "enum": [
+          "auto",
+          "enabled",
+          "disabled"
+        ],
+        "title": "CollectMessageQueueMetrics toggles collection of IBM i message queue metrics.",
+        "type": "string"
+      },
+      "collect_output_queue_metrics": {
+        "default": "auto",
+        "enum": [
+          "auto",
+          "enabled",
+          "disabled"
+        ],
+        "title": "CollectOutputQueueMetrics toggles collection of IBM i output queue metrics.",
+        "type": "string"
+      },
+      "collect_plan_cache_metrics": {
+        "default": "auto",
+        "enum": [
+          "auto",
+          "enabled",
+          "disabled"
+        ],
+        "title": "CollectPlanCacheMetrics toggles collection of plan cache analysis metrics.",
+        "type": "string"
+      },
+      "collect_subsystem_metrics": {
+        "default": "auto",
+        "enum": [
+          "auto",
+          "enabled",
+          "disabled"
+        ],
+        "title": "CollectSubsystemMetrics toggles collection of subsystem activity metrics.",
+        "type": "string"
+      },
+      "collect_subsystems_matching": {
+        "default": "",
+        "title": "SubsystemSelector filters subsystems by name using glob-style patterns.",
+        "type": "string"
+      },
+      "connection_type": {
+        "default": "odbc",
+        "title": "ConnectionType selects how the collector connects (currently only \"odbc\").",
+        "type": "string"
+      },
+      "database": {
+        "default": "*SYSBAS",
+        "title": "Database selects the IBM i database (library) to use when building the DSN.",
+        "type": "string"
+      },
+      "dsn": {
+        "default": "",
+        "title": "DSN provides a full IBM i ODBC connection string if manual override is needed.",
+        "type": "string"
+      },
+      "hostname": {
+        "default": "",
+        "title": "Hostname is the remote IBM i host to monitor.",
+        "type": "string"
+      },
+      "max_active_jobs": {
+        "default": 100,
+        "title": "MaxActiveJobs caps how many active jobs may be charted.",
+        "type": "integer"
+      },
+      "max_db_conns": {
+        "default": 1,
+        "title": "MaxDbConns restricts the maximum number of open ODBC connections.",
+        "type": "integer"
+      },
+      "max_db_life_time": {
+        "default": 600000000000,
+        "title": "MaxDbLifeTime limits how long a pooled connection may live before being recycled.",
+        "type": "integer"
+      },
+      "max_disks": {
+        "default": 100,
+        "title": "MaxDisks caps how many disk units may be charted.",
+        "type": "integer"
+      },
+      "max_job_queues": {
+        "default": 100,
+        "title": "MaxJobQueues caps how many job queues may be charted.",
+        "type": "integer"
+      },
+      "max_message_queues": {
+        "default": 100,
+        "title": "MaxMessageQueues caps how many message queues may be charted.",
+        "type": "integer"
+      },
+      "max_output_queues": {
+        "default": 100,
+        "title": "MaxOutputQueues caps how many output queues may be charted.",
+        "type": "integer"
+      },
+      "max_subsystems": {
+        "default": 100,
+        "title": "MaxSubsystems caps how many subsystems may be charted.",
+        "type": "integer"
+      },
+      "odbc_driver": {
+        "default": "IBM i Access ODBC Driver",
+        "title": "ODBCDriver specifies the driver name registered on the host.",
+        "type": "string"
+      },
+      "password": {
+        "default": "",
+        "format": "password",
+        "title": "Password supplies the password used for authentication.",
+        "type": "string"
+      },
+      "port": {
+        "default": 8471,
+        "maximum": 65535,
+        "minimum": 1,
+        "title": "Port is the TCP port for the IBM i Access ODBC server.",
+        "type": "integer"
+      },
+      "reset_statistics": {
+        "default": false,
+        "title": "ResetStatistics toggles destructive SQL services that reset system statistics on each query.",
+        "type": "boolean"
+      },
+      "timeout": {
+        "default": 2000000000,
+        "title": "Timeout controls how long to wait for SQL statements and RPCs.",
+        "type": "integer"
+      },
+      "update_every": {
+        "default": 10,
+        "minimum": 1,
+        "title": "Data collection frequency",
+        "type": "integer"
+      },
+      "use_ssl": {
+        "default": false,
+        "title": "UseSSL enables TLS for the ODBC connection when supported by the driver.",
+        "type": "boolean"
+      },
+      "username": {
+        "default": "",
+        "title": "Username supplies the credentials used for authentication.",
+        "type": "string"
+      },
+      "vnode": {
+        "default": "",
+        "title": "Vnode allows binding the collector to a virtual node.",
+        "type": "string"
+      }
+    },
+    "title": "as400 collector configuration",
+    "type": "object"
+  },
+  "uiSchema": {
+    "password": {
+      "ui:widget": "password"
+    },
+    "ui:flavour": "tabs",
+    "ui:options": {
+      "tabs": [
+        {
+          "fields": [
+            "update_every",
+            "vnode",
+            "dsn",
+            "timeout",
+            "hostname",
+            "port",
+            "username",
+            "password",
+            "database",
+            "connection_type",
+            "odbc_driver",
+            "use_ssl"
+          ],
+          "title": "Connection"
+        },
+        {
+          "fields": [
+            "max_db_conns",
+            "max_db_life_time",
+            "reset_statistics"
+          ],
+          "title": "Advanced"
+        },
+        {
+          "fields": [
+            "collect_disk_metrics",
+            "max_disks",
+            "collect_disks_matching"
+          ],
+          "title": "Disks"
+        },
+        {
+          "fields": [
+            "collect_subsystem_metrics",
+            "max_subsystems",
+            "collect_subsystems_matching"
+          ],
+          "title": "Subsystems"
+        },
+        {
+          "fields": [
+            "collect_job_queue_metrics",
+            "max_job_queues",
+            "collect_job_queues_matching"
+          ],
+          "title": "Job Queues"
+        },
+        {
+          "fields": [
+            "collect_active_jobs",
+            "max_active_jobs"
+          ],
+          "title": "Active Jobs"
+        },
+        {
+          "fields": [
+            "collect_http_server_metrics",
+            "collect_plan_cache_metrics"
+          ],
+          "title": "Other Metrics"
+        },
+        {
+          "fields": [
+            "collect_message_queue_metrics",
+            "max_message_queues"
+          ],
+          "title": "Message Queues"
+        },
+        {
+          "fields": [
+            "collect_output_queue_metrics",
+            "max_output_queues"
+          ],
+          "title": "Output Queues"
+        }
+      ]
+    },
+    "uiOptions": {
+      "fullPage": true
+    }
+  }
+}

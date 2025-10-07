@@ -1,0 +1,15 @@
+name: mq
+display_name: IBM MQ
+description: |
+  Monitors IBM MQ queue managers, queues, channels, and topics
+  using the PCF (Programmable Command Format) protocol.
+icon: ibm-mq.svg
+categories:
+  - data-collection.message-brokers
+link: https://www.ibm.com/products/mq
+keywords:
+  - message queue
+  - middleware
+  - enterprise messaging
+  - pcf
+  - ibm mq

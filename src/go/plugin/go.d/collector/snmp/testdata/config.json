@@ -31,7 +31,6 @@
   "manual_profiles": [
     "ok"
   ],
-  "ping_only": true,
   "ping": {
     "enabled": true,
     "network": "ip",

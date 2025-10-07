@@ -182,6 +182,7 @@ src/libnetdata/gorilla/fuzz-*.log
 
 # ignore build/ directory (default dir for many IDEs/LSPs)
 build/
+build-*/
 
 # ignore rules for go plugin code
 src/go/plugin/go.d/bin/
@@ -203,3 +204,8 @@ packaging/tools/agent-events/go.sum
 .mcp.json
 .users_cache.json
 .channels_cache_v2.json
+build-ibm.sh
+compile.sh
+run-ibm.sh
+
+tmp/

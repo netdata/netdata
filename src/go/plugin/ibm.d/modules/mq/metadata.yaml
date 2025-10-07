@@ -1,0 +1,696 @@
+# Generated metadata.yaml for mq module
+plugin_name: ibm.d.plugin
+modules:
+  - meta:
+      plugin_name: ibm.d.plugin
+      module_name: mq
+      monitored_instance:
+        name: IBM MQ
+        link: https://www.ibm.com/products/mq
+        categories:
+          - data-collection.message-brokers
+        icon_filename: "ibm-mq.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - mq
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          Monitors IBM MQ queue managers, queues, channels, and topics
+          using the PCF (Programmable Command Format) protocol.
+
+        method_description: |
+          The collector connects to IBM MQ and collects metrics via its monitoring interface.
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+    setup:
+      prerequisites:
+        list:
+          - title: Enable monitoring interface
+            description: |
+              Ensure the IBM MQ monitoring interface is accessible.
+      configuration:
+        file:
+          name: ibm.d/mq.conf
+        options:
+          description: |
+            Configuration options for the mq collector.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+            - name: endpoint
+              description: Connection endpoint.
+              default_value: "dummy://localhost"
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: Config
+          list:
+            - name: Basic
+              description: Basic configuration example.
+              config: |
+                jobs:
+                  - name: local
+                    endpoint: dummy://localhost
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: channel
+          description: These metrics refer to channel instances.
+          labels:
+            - name: channel
+              description: Channel identifier
+            - name: type
+              description: Type identifier
+          metrics:
+            - name: mq.channel.status
+              description: Channel Status
+              unit: status
+              chart_type: stacked
+              dimensions:
+                - name: inactive
+                - name: binding
+                - name: starting
+                - name: running
+                - name: stopping
+                - name: retrying
+                - name: stopped
+                - name: requesting
+                - name: paused
+                - name: disconnected
+                - name: initializing
+                - name: switching
+            - name: mq.channel.messages
+              description: Channel Message Rate
+              unit: messages/s
+              chart_type: line
+              dimensions:
+                - name: messages
+            - name: mq.channel.bytes
+              description: Channel Data Transfer Rate
+              unit: bytes/s
+              chart_type: line
+              dimensions:
+                - name: bytes
+            - name: mq.channel.batches
+              description: Channel Batch Rate
+              unit: batches/s
+              chart_type: line
+              dimensions:
+                - name: batches
+            - name: mq.channel.batch_size
+              description: Channel Batch Size
+              unit: messages
+              chart_type: line
+              dimensions:
+                - name: batch_size
+            - name: mq.channel.batch_interval
+              description: Channel Batch Interval
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: batch_interval
+            - name: mq.channel.intervals
+              description: Channel Intervals
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: disc_interval
+                - name: hb_interval
+                - name: keep_alive_interval
+            - name: mq.channel.short_retry_count
+              description: Channel Short Retry Count
+              unit: retries
+              chart_type: line
+              dimensions:
+                - name: short_retry
+            - name: mq.channel.long_retry_interval
+              description: Channel Long Retry Interval
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: long_retry
+            - name: mq.channel.max_msg_length
+              description: Channel Max Message Length
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: max_msg_length
+            - name: mq.channel.sharing_conversations
+              description: Channel Sharing Conversations
+              unit: conversations
+              chart_type: line
+              dimensions:
+                - name: sharing_conversations
+            - name: mq.channel.network_priority
+              description: Channel Network Priority
+              unit: priority
+              chart_type: line
+              dimensions:
+                - name: network_priority
+            - name: mq.channel.buffer_counts
+              description: Channel Buffer Counts
+              unit: buffers
+              chart_type: line
+              dimensions:
+                - name: sent
+                - name: received
+            - name: mq.channel.current_messages
+              description: Channel Current Messages
+              unit: messages
+              chart_type: line
+              dimensions:
+                - name: current
+            - name: mq.channel.xmitq_time
+              description: Channel Transmission Queue Time
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: xmitq_time
+            - name: mq.channel.mca_status
+              description: Channel MCA Status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: mca_status
+            - name: mq.channel.indoubt_status
+              description: Channel In-Doubt Status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: indoubt_status
+            - name: mq.channel.ssl_key_resets
+              description: Channel SSL Key Resets
+              unit: resets
+              chart_type: line
+              dimensions:
+                - name: ssl_key_resets
+            - name: mq.channel.npm_speed
+              description: Channel Non-Persistent Message Speed
+              unit: speed
+              chart_type: line
+              dimensions:
+                - name: npm_speed
+            - name: mq.channel.current_sharing_convs
+              description: Channel Current Sharing Conversations
+              unit: conversations
+              chart_type: line
+              dimensions:
+                - name: current_sharing
+        - name: channelstatistics
+          description: These metrics refer to channelstatistics instances.
+          labels:
+            - name: channel
+              description: Channel identifier
+            - name: type
+              description: Type identifier
+          metrics:
+            - name: mq.channel_stats.messages
+              description: Channel Messages (Statistics)
+              unit: messages/s
+              chart_type: line
+              dimensions:
+                - name: messages
+            - name: mq.channel_stats.bytes
+              description: Channel Bytes (Statistics)
+              unit: bytes/s
+              chart_type: line
+              dimensions:
+                - name: bytes
+            - name: mq.channel_stats.batches
+              description: Channel Batches (Statistics)
+              unit: batches/s
+              chart_type: line
+              dimensions:
+                - name: full_batches
+                - name: incomplete_batches
+            - name: mq.channel_stats.batch_size
+              description: Channel Average Batch Size (Statistics)
+              unit: messages
+              chart_type: line
+              dimensions:
+                - name: avg_batch_size
+            - name: mq.channel_stats.put_retries
+              description: Channel Put Retries (Statistics)
+              unit: retries/s
+              chart_type: line
+              dimensions:
+                - name: put_retries
+        - name: listener
+          description: These metrics refer to listener instances.
+          labels:
+            - name: listener
+              description: Listener identifier
+            - name: port
+              description: Port identifier
+            - name: ip_address
+              description: Ip_address identifier
+          metrics:
+            - name: mq.listener.status
+              description: Listener Status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: stopped
+                - name: starting
+                - name: running
+                - name: stopping
+                - name: retrying
+            - name: mq.listener.backlog
+              description: Listener Connection Backlog
+              unit: connections
+              chart_type: line
+              dimensions:
+                - name: backlog
+            - name: mq.listener.uptime
+              description: Listener Uptime
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: uptime
+        - name: mqistatistics
+          description: These metrics refer to mqistatistics instances.
+          labels:
+            - name: queue_manager
+              description: Queue_manager identifier
+          metrics:
+            - name: mq.mqi_stats.opens
+              description: MQOPEN Operations (Statistics)
+              unit: operations/s
+              chart_type: line
+              dimensions:
+                - name: opens_total
+                - name: opens_failed
+            - name: mq.mqi_stats.closes
+              description: MQCLOSE Operations (Statistics)
+              unit: operations/s
+              chart_type: line
+              dimensions:
+                - name: closes_total
+                - name: closes_failed
+            - name: mq.mqi_stats.inqs
+              description: MQINQ Operations (Statistics)
+              unit: operations/s
+              chart_type: line
+              dimensions:
+                - name: inqs_total
+                - name: inqs_failed
+            - name: mq.mqi_stats.sets
+              description: MQSET Operations (Statistics)
+              unit: operations/s
+              chart_type: line
+              dimensions:
+                - name: sets_total
+                - name: sets_failed
+        - name: queue
+          description: These metrics refer to queue instances.
+          labels:
+            - name: queue
+              description: Queue identifier
+            - name: type
+              description: Type identifier
+          metrics:
+            - name: mq.queue.depth
+              description: Queue Depth
+              unit: messages
+              chart_type: line
+              dimensions:
+                - name: current
+                - name: max
+            - name: mq.queue.depth_percentage
+              description: Queue Depth Percentage
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: percentage
+            - name: mq.queue.messages
+              description: Queue Messages
+              unit: messages/s
+              chart_type: line
+              dimensions:
+                - name: enqueued
+                - name: dequeued
+            - name: mq.queue.connections
+              description: Queue Connections
+              unit: connections
+              chart_type: line
+              dimensions:
+                - name: input
+                - name: output
+            - name: mq.queue.high_depth
+              description: Queue Peak Depth
+              unit: messages
+              chart_type: line
+              dimensions:
+                - name: high_depth
+            - name: mq.queue.uncommitted_msgs
+              description: Queue Uncommitted Messages
+              unit: messages
+              chart_type: line
+              dimensions:
+                - name: uncommitted
+            - name: mq.queue.file_size
+              description: Queue File Size
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: current
+                - name: max
+            - name: mq.queue.last_activity
+              description: Time Since Last Queue Activity
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: since_last_get
+                - name: since_last_put
+            - name: mq.queue.oldest_msg_age
+              description: Queue Oldest Message Age
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: oldest_msg_age
+            - name: mq.queue.time_indicators
+              description: Queue Time Indicators
+              unit: microseconds
+              chart_type: line
+              dimensions:
+                - name: short_period
+                - name: long_period
+            - name: mq.queue.service_interval
+              description: Queue Service Interval
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: service_interval
+            - name: mq.queue.inhibit_status
+              description: Queue Inhibit Status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: inhibit_get
+                - name: inhibit_put
+            - name: mq.queue.priority
+              description: Queue Priority Configuration
+              unit: priority
+              chart_type: line
+              dimensions:
+                - name: def_priority
+            - name: mq.queue.message_persistence
+              description: Queue Default Message Persistence
+              unit: boolean
+              chart_type: line
+              dimensions:
+                - name: persistent
+                - name: non_persistent
+            - name: mq.queue.retention_interval
+              description: Queue Retention Interval
+              unit: hours
+              chart_type: line
+              dimensions:
+                - name: retention_interval
+            - name: mq.queue.triggers
+              description: Queue Trigger Configuration
+              unit: messages
+              chart_type: line
+              dimensions:
+                - name: trigger_depth
+                - name: trigger_type
+            - name: mq.queue.backout_threshold
+              description: Queue Error Handling
+              unit: retries
+              chart_type: line
+              dimensions:
+                - name: backout_threshold
+            - name: mq.queue.max_msg_length
+              description: Queue Max Message Length
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: max_msg_length
+            - name: mq.queue.scope
+              description: Queue Scope
+              unit: boolean
+              chart_type: line
+              dimensions:
+                - name: queue_manager
+                - name: cell
+            - name: mq.queue.usage
+              description: Queue Usage Type
+              unit: boolean
+              chart_type: line
+              dimensions:
+                - name: normal
+                - name: transmission
+            - name: mq.queue.msg_delivery_sequence
+              description: Message Delivery Sequence
+              unit: boolean
+              chart_type: line
+              dimensions:
+                - name: priority
+                - name: fifo
+            - name: mq.queue.harden_get_backout
+              description: Harden Get Backout
+              unit: boolean
+              chart_type: line
+              dimensions:
+                - name: enabled
+                - name: disabled
+        - name: global
+          description: These metrics refer to the entire monitored instance.
+          labels: []
+          metrics:
+            - name: mq.qmgr.status
+              description: Queue Manager Status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: status
+            - name: mq.qmgr.connection_count
+              description: Queue Manager Connections
+              unit: connections
+              chart_type: line
+              dimensions:
+                - name: connections
+            - name: mq.qmgr.uptime
+              description: Queue Manager Uptime
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: uptime
+            - name: mq.queues.overview
+              description: Queues Monitoring Status
+              unit: queues
+              chart_type: stacked
+              dimensions:
+                - name: monitored
+                - name: excluded
+                - name: invisible
+                - name: failed
+            - name: mq.channels.overview
+              description: Channels Monitoring Status
+              unit: channels
+              chart_type: stacked
+              dimensions:
+                - name: monitored
+                - name: excluded
+                - name: invisible
+                - name: failed
+            - name: mq.topics.overview
+              description: Topics Monitoring Status
+              unit: topics
+              chart_type: stacked
+              dimensions:
+                - name: monitored
+                - name: excluded
+                - name: invisible
+                - name: failed
+            - name: mq.listeners.overview
+              description: Listeners Monitoring Status
+              unit: listeners
+              chart_type: stacked
+              dimensions:
+                - name: monitored
+                - name: excluded
+                - name: invisible
+                - name: failed
+        - name: global
+          description: These metrics refer to the entire monitored instance.
+          labels: []
+          metrics:
+            - name: mq.qmgr.cpu_usage
+              description: Queue Manager CPU Usage
+              unit: percentage
+              chart_type: stacked
+              dimensions:
+                - name: user
+                - name: system
+            - name: mq.qmgr.memory_usage
+              description: Queue Manager Memory Usage
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: total
+            - name: mq.qmgr.ram_usage
+              description: Queue Manager RAM Usage
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: total
+            - name: mq.qmgr.log_utilization
+              description: Queue Manager Log Utilization
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: used
+            - name: mq.qmgr.log_file_size
+              description: Queue Manager Log File Size
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: size
+            - name: mq.qmgr.log_write_rate
+              description: Queue Manager Log Write Rate
+              unit: bytes/s
+              chart_type: line
+              dimensions:
+                - name: rate
+        - name: queuestatistics
+          description: These metrics refer to queuestatistics instances.
+          labels:
+            - name: queue
+              description: Queue identifier
+            - name: type
+              description: Type identifier
+          metrics:
+            - name: mq.queue_stats.depth_min_max
+              description: Queue Depth Min/Max (Statistics)
+              unit: messages
+              chart_type: line
+              dimensions:
+                - name: min_depth
+                - name: max_depth
+            - name: mq.queue_stats.avg_queue_time
+              description: Queue Average Time (Statistics)
+              unit: microseconds
+              chart_type: line
+              dimensions:
+                - name: non_persistent
+                - name: persistent
+            - name: mq.queue_stats.time_indicators
+              description: Queue Time Indicators (Statistics)
+              unit: microseconds
+              chart_type: line
+              dimensions:
+                - name: short_period
+                - name: long_period
+            - name: mq.queue_stats.operations
+              description: Queue Operations (Statistics)
+              unit: operations/s
+              chart_type: line
+              dimensions:
+                - name: puts_non_persistent
+                - name: puts_persistent
+                - name: gets_non_persistent
+                - name: gets_persistent
+                - name: put1s
+                - name: browses
+            - name: mq.queue_stats.bytes
+              description: Queue Bytes (Statistics)
+              unit: bytes/s
+              chart_type: line
+              dimensions:
+                - name: put_bytes_non_persistent
+                - name: put_bytes_persistent
+                - name: get_bytes_non_persistent
+                - name: get_bytes_persistent
+                - name: browse_bytes
+            - name: mq.queue_stats.failures
+              description: Queue Operation Failures (Statistics)
+              unit: failures/s
+              chart_type: line
+              dimensions:
+                - name: puts_failed
+                - name: put1s_failed
+                - name: gets_failed
+                - name: browses_failed
+            - name: mq.queue_stats.message_lifecycle
+              description: Queue Message Lifecycle (Statistics)
+              unit: messages/s
+              chart_type: line
+              dimensions:
+                - name: expired
+                - name: purged
+                - name: not_queued
+        - name: subscription
+          description: These metrics refer to subscription instances.
+          labels:
+            - name: subscription
+              description: Subscription identifier
+            - name: topic
+              description: Topic identifier
+          metrics:
+            - name: mq.subscription.messages
+              description: IBM MQ Subscription Messages
+              unit: messages
+              chart_type: line
+              dimensions:
+                - name: pending
+            - name: mq.subscription.last_message_age
+              description: IBM MQ Subscription Last Message Age
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: age
+        - name: topic
+          description: These metrics refer to topic instances.
+          labels:
+            - name: topic
+              description: Topic identifier
+          metrics:
+            - name: mq.topic.publishers
+              description: Topic Publishers
+              unit: publishers
+              chart_type: line
+              dimensions:
+                - name: publishers
+            - name: mq.topic.subscribers
+              description: Topic Subscribers
+              unit: subscribers
+              chart_type: line
+              dimensions:
+                - name: subscribers
+            - name: mq.topic.messages
+              description: Topic Message Rate
+              unit: messages/s
+              chart_type: line
+              dimensions:
+                - name: messages
+            - name: mq.topic.time_since_last_message
+              description: Time Since Last Message
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: time_since_last_msg

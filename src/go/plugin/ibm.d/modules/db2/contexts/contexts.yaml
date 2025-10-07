@@ -1,0 +1,821 @@
+# DB2 Module Metric Definitions
+# Derived from the legacy collector charts to preserve metric parity.
+
+System:
+  labels: []
+  contexts:
+    - name: ServiceHealth
+      context: db2.service_health
+      title: Service Health Status
+      family: overview
+      units: status
+      type: line
+      priority: 990
+      dimensions:
+        - {name: connection, algo: absolute}
+        - {name: database, algo: absolute}
+    - name: Connections
+      context: db2.connections
+      title: Database Connections
+      family: connections/overview
+      units: connections
+      type: line
+      priority: 1000
+      dimensions:
+        - {name: total, algo: absolute}
+        - {name: active, algo: absolute}
+        - {name: executing, algo: absolute}
+        - {name: idle, algo: absolute}
+        - {name: max_allowed, algo: absolute}
+    - name: Locking
+      context: db2.locking
+      title: Database Locking
+      family: locking
+      units: events/s
+      type: line
+      priority: 1010
+      dimensions:
+        - {name: waits, algo: incremental}
+        - {name: timeouts, algo: incremental}
+        - {name: escalations, algo: incremental}
+    - name: Deadlocks
+      context: db2.deadlocks
+      title: Database Deadlocks
+      family: locking
+      units: deadlocks/s
+      type: line
+      priority: 1011
+      dimensions:
+        - {name: deadlocks, algo: incremental}
+    - name: LockDetails
+      context: db2.lock_details
+      title: Lock Details
+      family: locking
+      units: locks
+      type: line
+      priority: 1012
+      dimensions:
+        - {name: active, algo: absolute}
+        - {name: waiting_agents, algo: absolute}
+        - {name: memory_pages, algo: absolute}
+    - name: LockWaitTime
+      context: db2.lock_wait_time
+      title: Average Lock Wait Time
+      family: locking
+      units: milliseconds
+      type: line
+      priority: 1013
+      dimensions:
+        - {name: wait_time, algo: absolute, precision: 1000, div: 1000}
+    - name: Sorting
+      context: db2.sorting
+      title: Database Sorting
+      family: activity/sorting
+      units: sorts/s
+      type: stacked
+      priority: 1020
+      dimensions:
+        - {name: sorts, algo: incremental}
+        - {name: overflows, algo: incremental}
+    - name: RowActivity
+      context: db2.row_activity
+      title: Row Activity
+      family: activity/rows
+      units: rows/s
+      type: area
+      priority: 1030
+      dimensions:
+        - {name: read, algo: incremental}
+        - {name: returned, algo: incremental}
+        - {name: modified, algo: incremental, mul: -1}
+    - name: BufferpoolHitRatio
+      context: db2.bufferpool_hit_ratio
+      title: Buffer Pool Hit Ratio
+      family: bufferpools/overview
+      units: percentage
+      type: line
+      priority: 1040
+      dimensions:
+        - {name: hits, algo: absolute, precision: 1000, div: 1000}
+        - {name: misses, algo: absolute, precision: 1000, div: 1000}
+    - name: BufferpoolDataHitRatio
+      context: db2.bufferpool_data_hit_ratio
+      title: Buffer Pool Data Page Hit Ratio
+      family: bufferpools/data
+      units: percentage
+      type: line
+      priority: 1041
+      dimensions:
+        - {name: hits, algo: absolute, precision: 1000, div: 1000}
+        - {name: misses, algo: absolute, precision: 1000, div: 1000}
+    - name: BufferpoolIndexHitRatio
+      context: db2.bufferpool_index_hit_ratio
+      title: Buffer Pool Index Page Hit Ratio
+      family: bufferpools/index
+      units: percentage
+      type: line
+      priority: 1042
+      dimensions:
+        - {name: hits, algo: absolute, precision: 1000, div: 1000}
+        - {name: misses, algo: absolute, precision: 1000, div: 1000}
+    - name: BufferpoolXDAHitRatio
+      context: db2.bufferpool_xda_hit_ratio
+      title: Buffer Pool XDA Page Hit Ratio
+      family: bufferpools/xda
+      units: percentage
+      type: line
+      priority: 1043
+      dimensions:
+        - {name: hits, algo: absolute, precision: 1000, div: 1000}
+        - {name: misses, algo: absolute, precision: 1000, div: 1000}
+    - name: BufferpoolColumnHitRatio
+      context: db2.bufferpool_column_hit_ratio
+      title: Buffer Pool Column Page Hit Ratio
+      family: bufferpools/columns
+      units: percentage
+      type: line
+      priority: 1044
+      dimensions:
+        - {name: hits, algo: absolute, precision: 1000, div: 1000}
+        - {name: misses, algo: absolute, precision: 1000, div: 1000}
+    - name: BufferpoolReads
+      context: db2.bufferpool_reads
+      title: Buffer Pool Reads
+      family: bufferpools/overview
+      units: reads/s
+      type: stacked
+      priority: 1045
+      dimensions:
+        - {name: logical, algo: incremental}
+        - {name: physical, algo: incremental}
+    - name: BufferpoolDataReads
+      context: db2.bufferpool_data_reads
+      title: Buffer Pool Data Page Reads
+      family: bufferpools/data
+      units: reads/s
+      type: stacked
+      priority: 1043
+      dimensions:
+        - {name: logical, algo: incremental}
+        - {name: physical, algo: incremental}
+    - name: BufferpoolIndexReads
+      context: db2.bufferpool_index_reads
+      title: Buffer Pool Index Page Reads
+      family: bufferpools/index
+      units: reads/s
+      type: stacked
+      priority: 1044
+      dimensions:
+        - {name: logical, algo: incremental}
+        - {name: physical, algo: incremental}
+    - name: BufferpoolXDAReads
+      context: db2.bufferpool_xda_reads
+      title: Buffer Pool XDA Page Reads
+      family: bufferpools/xda
+      units: reads/s
+      type: stacked
+      priority: 1045
+      dimensions:
+        - {name: logical, algo: incremental}
+        - {name: physical, algo: incremental}
+    - name: BufferpoolColumnReads
+      context: db2.bufferpool_column_reads
+      title: Buffer Pool Column Page Reads
+      family: bufferpools/columns
+      units: reads/s
+      type: stacked
+      priority: 1046
+      dimensions:
+        - {name: logical, algo: incremental}
+        - {name: physical, algo: incremental}
+    - name: BufferpoolWrites
+      context: db2.bufferpool_writes
+      title: Buffer Pool Writes
+      family: bufferpools/overview
+      units: writes/s
+      type: line
+      priority: 1047
+      dimensions:
+        - {name: writes, algo: incremental}
+    - name: LogSpace
+      context: db2.log_space
+      title: Log Space Usage
+      family: storage/space
+      units: bytes
+      type: stacked
+      priority: 1050
+      dimensions:
+        - {name: used, algo: absolute}
+        - {name: available, algo: absolute}
+    - name: LogUtilization
+      context: db2.log_utilization
+      title: Log Space Utilization
+      family: storage/space
+      units: percentage
+      type: line
+      priority: 1051
+      dimensions:
+        - {name: utilization, algo: absolute, precision: 1000, div: 1000}
+    - name: LogIO
+      context: db2.log_io
+      title: Log I/O Operations
+      family: storage/operations
+      units: operations/s
+      type: area
+      priority: 1052
+      dimensions:
+        - {name: reads, algo: incremental}
+        - {name: writes, algo: incremental, mul: -1}
+    - name: LogOperations
+      context: db2.log_operations
+      title: Log Operations
+      family: storage/operations
+      units: operations/s
+      type: line
+      priority: 1053
+      dimensions:
+        - {name: commits, algo: incremental}
+        - {name: rollbacks, algo: incremental}
+        - {name: reads, algo: incremental}
+        - {name: writes, algo: incremental}
+    - name: LogTiming
+      context: db2.log_timing
+      title: Log Operation Times
+      family: storage/operations
+      units: milliseconds
+      type: line
+      priority: 1054
+      dimensions:
+        - {name: avg_commit, algo: absolute, precision: 1000, div: 1000}
+        - {name: avg_read, algo: absolute, precision: 1000, div: 1000}
+        - {name: avg_write, algo: absolute, precision: 1000, div: 1000}
+    - name: LogBufferEvents
+      context: db2.log_buffer_events
+      title: Log Buffer Full Events
+      family: storage/operations
+      units: events/s
+      type: line
+      priority: 1055
+      dimensions:
+        - {name: buffer_full, algo: incremental}
+    - name: LongRunningQueries
+      context: db2.long_running_queries
+      title: Long Running Queries
+      family: activity/requests
+      units: queries
+      type: stacked
+      priority: 1060
+      dimensions:
+        - {name: total, algo: absolute}
+        - {name: warning, algo: absolute}
+        - {name: critical, algo: absolute}
+    - name: BackupStatus
+      context: db2.backup_status
+      title: Last Backup Status
+      family: storage/backup
+      units: status
+      type: line
+      priority: 1070
+      dimensions:
+        - {name: status, algo: absolute}
+    - name: BackupAge
+      context: db2.backup_age
+      title: Time Since Last Backup
+      family: storage/backup
+      units: hours
+      type: line
+      priority: 1071
+      dimensions:
+        - {name: full, algo: absolute}
+        - {name: incremental, algo: absolute}
+    - name: FederationConnections
+      context: db2.federation_connections
+      title: Federated Connections
+      family: federation
+      units: connections
+      type: line
+      priority: 1080
+      dimensions:
+        - {name: active, algo: absolute}
+        - {name: idle, algo: absolute}
+    - name: FederationOperations
+      context: db2.federation_operations
+      title: Federated Operations
+      family: federation
+      units: operations/s
+      type: line
+      priority: 1081
+      dimensions:
+        - {name: rows_read, algo: incremental}
+        - {name: selects, algo: incremental}
+        - {name: waits, algo: incremental}
+    - name: DatabaseStatus
+      context: db2.database_status
+      title: Current Database Status
+      family: overview
+      units: status
+      type: line
+      priority: 900
+      dimensions:
+        - {name: active, algo: absolute}
+        - {name: inactive, algo: absolute}
+    - name: DatabaseCount
+      context: db2.database_count
+      title: Database Count
+      family: overview
+      units: databases
+      type: line
+      priority: 899
+      dimensions:
+        - {name: active, algo: absolute}
+        - {name: inactive, algo: absolute}
+    - name: CPUUsage
+      context: db2.cpu_usage
+      title: CPU Usage (100% = 1 CPU core)
+      family: overview
+      units: percentage
+      type: stacked
+      priority: 901
+      dimensions:
+        - {name: user, algo: absolute, precision: 1000, div: 1000}
+        - {name: system, algo: absolute, precision: 1000, div: 1000}
+        - {name: idle, algo: absolute, precision: 1000, div: 1000}
+        - {name: iowait, algo: absolute, precision: 1000, div: 1000}
+    - name: ActiveConnections
+      context: db2.active_connections
+      title: Active Connections
+      family: connections/overview
+      units: connections
+      type: line
+      priority: 902
+      dimensions:
+        - {name: active, algo: absolute}
+        - {name: total, algo: absolute}
+    - name: MemoryUsage
+      context: db2.memory_usage
+      title: Memory Usage
+      family: overview
+      units: MiB
+      type: stacked
+      priority: 903
+      dimensions:
+        - {name: database, algo: absolute, div: 1048576}
+        - {name: instance, algo: absolute, div: 1048576}
+        - {name: bufferpool, algo: absolute, div: 1048576}
+        - {name: shared_sort, algo: absolute, div: 1048576}
+    - name: SQLStatements
+      context: db2.sql_statements
+      title: SQL Statements
+      family: activity/requests
+      units: statements/s
+      type: stacked
+      priority: 904
+      dimensions:
+        - {name: selects, algo: incremental}
+        - {name: modifications, algo: incremental}
+    - name: TransactionActivity
+      context: db2.transaction_activity
+      title: Transaction Activity
+      family: activity/transactions
+      units: transactions/s
+      type: stacked
+      priority: 905
+      dimensions:
+        - {name: committed, algo: incremental}
+        - {name: aborted, algo: incremental}
+    - name: TimeSpent
+      context: db2.time_spent
+      title: Average Operation Times
+      family: activity/time-spent
+      units: milliseconds
+      type: line
+      priority: 905
+      dimensions:
+        - {name: direct_read, algo: absolute, precision: 1000, div: 1000}
+        - {name: direct_write, algo: absolute, precision: 1000, div: 1000}
+        - {name: pool_read, algo: absolute, precision: 1000, div: 1000}
+        - {name: pool_write, algo: absolute, precision: 1000, div: 1000}
+
+Database:
+  labels:
+    - database
+    - status
+  contexts:
+    - name: Status
+      context: db2.database_instance_status
+      title: Database Status
+      family: databases
+      units: status
+      type: line
+      priority: 1100
+      dimensions:
+        - {name: status, algo: absolute}
+    - name: Applications
+      context: db2.database_applications
+      title: Database Applications
+      family: databases
+      units: applications
+      type: line
+      priority: 1101
+      dimensions:
+        - {name: applications, algo: absolute}
+
+Bufferpool:
+  labels:
+    - bufferpool
+    - page_size
+  contexts:
+    - name: HitRatio
+      context: db2.bufferpool_instance_hit_ratio
+      title: Buffer Pool Hit Ratio
+      family: bufferpools/instances
+      units: percentage
+      type: line
+      priority: 1110
+      dimensions:
+        - {name: overall, algo: absolute, precision: 1000, div: 1000}
+    - name: DetailedHitRatio
+      context: db2.bufferpool_instance_detailed_hit_ratio
+      title: Buffer Pool Detailed Hit Ratios
+      family: bufferpools/instances
+      units: percentage
+      type: line
+      priority: 1111
+      dimensions:
+        - {name: data, algo: absolute, precision: 1000, div: 1000}
+        - {name: index, algo: absolute, precision: 1000, div: 1000}
+        - {name: xda, algo: absolute, precision: 1000, div: 1000}
+        - {name: column, algo: absolute, precision: 1000, div: 1000}
+    - name: Reads
+      context: db2.bufferpool_instance_reads
+      title: Buffer Pool Reads
+      family: bufferpools/instances
+      units: reads/s
+      type: stacked
+      priority: 1112
+      dimensions:
+        - {name: logical, algo: incremental}
+        - {name: physical, algo: incremental}
+    - name: DataReads
+      context: db2.bufferpool_instance_data_reads
+      title: Buffer Pool Data Page Reads
+      family: bufferpools/instances
+      units: reads/s
+      type: stacked
+      priority: 1113
+      dimensions:
+        - {name: logical, algo: incremental}
+        - {name: physical, algo: incremental}
+    - name: IndexReads
+      context: db2.bufferpool_instance_index_reads
+      title: Buffer Pool Index Page Reads
+      family: bufferpools/instances
+      units: reads/s
+      type: stacked
+      priority: 1114
+      dimensions:
+        - {name: logical, algo: incremental}
+        - {name: physical, algo: incremental}
+    - name: Pages
+      context: db2.bufferpool_instance_pages
+      title: Buffer Pool Pages
+      family: bufferpools/instances
+      units: pages
+      type: stacked
+      priority: 1115
+      dimensions:
+        - {name: used, algo: absolute}
+        - {name: total, algo: absolute}
+    - name: Writes
+      context: db2.bufferpool_instance_writes
+      title: Buffer Pool Writes
+      family: bufferpools/instances
+      units: writes/s
+      type: line
+      priority: 1116
+      dimensions:
+        - {name: writes, algo: incremental}
+
+Tablespace:
+  labels:
+    - tablespace
+    - type
+    - content_type
+    - state
+  contexts:
+    - name: Usage
+      context: db2.tablespace_usage
+      title: Tablespace Usage
+      family: tablespaces
+      units: percentage
+      type: line
+      priority: 1120
+      dimensions:
+        - {name: used, algo: absolute, precision: 1000, div: 1000}
+    - name: Size
+      context: db2.tablespace_size
+      title: Tablespace Size
+      family: tablespaces
+      units: bytes
+      type: stacked
+      priority: 1121
+      dimensions:
+        - {name: used, algo: absolute}
+        - {name: free, algo: absolute}
+    - name: UsableSize
+      context: db2.tablespace_usable_size
+      title: Tablespace Usable Size
+      family: tablespaces
+      units: bytes
+      type: line
+      priority: 1122
+      dimensions:
+        - {name: total, algo: absolute}
+        - {name: usable, algo: absolute}
+    - name: State
+      context: db2.tablespace_state
+      title: Tablespace State
+      family: tablespaces
+      units: state
+      type: line
+      priority: 1123
+      dimensions:
+        - {name: state, algo: absolute}
+
+Connection:
+  labels:
+    - application_id
+    - application_name
+    - client_hostname
+    - client_ip
+    - client_user
+    - state
+  contexts:
+    - name: State
+      context: db2.connection_state
+      title: Connection State
+      family: connections/instances
+      units: state
+      type: line
+      priority: 1130
+      dimensions:
+        - {name: state, algo: absolute}
+    - name: Activity
+      context: db2.connection_activity
+      title: Connection Row Activity
+      family: connections/instances
+      units: rows/s
+      type: area
+      priority: 1131
+      dimensions:
+        - {name: read, algo: incremental}
+        - {name: written, algo: incremental}
+    - name: WaitTime
+      context: db2.connection_wait_time
+      title: Connection Wait Time
+      family: connections/instances
+      units: milliseconds
+      type: stacked
+      priority: 1132
+      dimensions:
+        - {name: lock, algo: incremental}
+        - {name: log_disk, algo: incremental}
+        - {name: log_buffer, algo: incremental}
+        - {name: pool_read, algo: incremental}
+        - {name: pool_write, algo: incremental}
+        - {name: direct_read, algo: incremental}
+        - {name: direct_write, algo: incremental}
+        - {name: fcm_recv, algo: incremental}
+        - {name: fcm_send, algo: incremental}
+    - name: ProcessingTime
+      context: db2.connection_processing_time
+      title: Connection Processing Time
+      family: connections/instances
+      units: milliseconds
+      type: stacked
+      priority: 1133
+      dimensions:
+        - {name: routine, algo: incremental}
+        - {name: compile, algo: incremental}
+        - {name: section, algo: incremental}
+        - {name: commit, algo: incremental}
+        - {name: rollback, algo: incremental}
+
+Table:
+  labels:
+    - table
+  contexts:
+    - name: Size
+      context: db2.table_size
+      title: Table Size
+      family: tables
+      units: bytes
+      type: stacked
+      priority: 1140
+      dimensions:
+        - {name: data, algo: absolute}
+        - {name: index, algo: absolute}
+        - {name: long_obj, algo: absolute}
+    - name: Activity
+      context: db2.table_activity
+      title: Table Activity
+      family: tables
+      units: rows/s
+      type: area
+      priority: 1141
+      dimensions:
+        - {name: read, algo: incremental}
+        - {name: written, algo: incremental}
+
+Index:
+  labels:
+    - index
+  contexts:
+    - name: Usage
+      context: db2.index_usage
+      title: Index Usage
+      family: indexes
+      units: scans/s
+      type: area
+      priority: 1150
+      dimensions:
+        - {name: index, algo: incremental}
+        - {name: full, algo: incremental}
+
+MemoryPool:
+  labels:
+    - pool_type
+  contexts:
+    - name: Usage
+      context: db2.memory_pool_usage
+      title: Memory Pool Usage
+      family: memory
+      units: bytes
+      type: line
+      priority: 1160
+      dimensions:
+        - {name: used, algo: absolute}
+    - name: HighWaterMark
+      context: db2.memory_pool_hwm
+      title: Memory Pool High Water Mark
+      family: memory
+      units: bytes
+      type: line
+      priority: 1161
+      dimensions:
+        - {name: hwm, algo: absolute}
+
+TableIO:
+  labels:
+    - table
+  contexts:
+    - name: Scans
+      context: db2.table_io_scans
+      title: Table Scans
+      family: table_io
+      units: scans/s
+      type: line
+      priority: 1170
+      dimensions:
+        - {name: scans, algo: incremental}
+    - name: Rows
+      context: db2.table_io_rows
+      title: Table Row Operations
+      family: table_io
+      units: rows/s
+      type: line
+      priority: 1171
+      dimensions:
+        - {name: read, algo: incremental}
+    - name: Activity
+      context: db2.table_io_activity
+      title: Table DML Activity
+      family: table_io
+      units: operations/s
+      type: stacked
+      priority: 1172
+      dimensions:
+        - {name: inserts, algo: incremental}
+        - {name: updates, algo: incremental}
+        - {name: deletes, algo: incremental}
+    - name: Overflow
+      context: db2.table_io_overflow
+      title: Table Overflow Accesses
+      family: table_io
+      units: accesses/s
+      type: line
+      priority: 1173
+      dimensions:
+        - {name: overflow, algo: incremental}
+
+MemorySet:
+  labels:
+    - host
+    - database
+    - set_type
+    - member
+  contexts:
+    - name: Usage
+      context: db2.memory_set_usage
+      title: Memory Set Usage
+      family: memory_sets
+      units: bytes
+      type: line
+      priority: 1180
+      dimensions:
+        - {name: used, algo: absolute}
+    - name: Committed
+      context: db2.memory_set_committed
+      title: Memory Set Committed
+      family: memory_sets
+      units: bytes
+      type: line
+      priority: 1181
+      dimensions:
+        - {name: committed, algo: absolute}
+    - name: HighWaterMark
+      context: db2.memory_set_high_water_mark
+      title: Memory Set High Water Mark
+      family: memory_sets
+      units: bytes
+      type: line
+      priority: 1182
+      dimensions:
+        - {name: hwm, algo: absolute}
+    - name: AdditionalCommitted
+      context: db2.memory_set_additional_committed
+      title: Memory Set Additional Committed
+      family: memory_sets
+      units: bytes
+      type: line
+      priority: 1183
+      dimensions:
+        - {name: additional, algo: absolute}
+    - name: PercentUsedHWM
+      context: db2.memory_set_percent_used_hwm
+      title: Memory Set Percent Used vs HWM
+      family: memory_sets
+      units: percentage
+      type: line
+      priority: 1184
+      dimensions:
+        - {name: used_hwm, algo: absolute, precision: 1000, div: 1000}
+
+Prefetcher:
+  labels:
+    - bufferpool
+  contexts:
+    - name: PrefetchRatio
+      context: db2.prefetcher_prefetch_ratio
+      title: Prefetcher Prefetch Ratio
+      family: prefetchers
+      units: percentage
+      type: line
+      priority: 1190
+      dimensions:
+        - {name: ratio, algo: absolute, precision: 1000, div: 1000}
+    - name: CleanerRatio
+      context: db2.prefetcher_cleaner_ratio
+      title: Prefetcher Cleaner Ratio
+      family: prefetchers
+      units: percentage
+      type: line
+      priority: 1191
+      dimensions:
+        - {name: ratio, algo: absolute, precision: 1000, div: 1000}
+    - name: PhysicalReads
+      context: db2.prefetcher_physical_reads
+      title: Prefetcher Physical Reads
+      family: prefetchers
+      units: reads/s
+      type: line
+      priority: 1192
+      dimensions:
+        - {name: reads, algo: incremental}
+    - name: AsyncReads
+      context: db2.prefetcher_async_reads
+      title: Prefetcher Asynchronous Reads
+      family: prefetchers
+      units: reads/s
+      type: line
+      priority: 1193
+      dimensions:
+        - {name: reads, algo: incremental}
+    - name: WaitTime
+      context: db2.prefetcher_wait_time
+      title: Prefetcher Wait Time
+      family: prefetchers
+      units: milliseconds
+      type: line
+      priority: 1194
+      dimensions:
+        - {name: wait_time, algo: absolute}
+    - name: UnreadPages
+      context: db2.prefetcher_unread_pages
+      title: Prefetcher Unread Pages
+      family: prefetchers
+      units: pages/s
+      type: line
+      priority: 1195
+      dimensions:
+        - {name: unread, algo: incremental}

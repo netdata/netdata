@@ -77,6 +77,8 @@ type JobConfig struct {
 	Priority        int
 	IsStock         bool
 	Vnode           vnodes.VirtualNode
+	DumpMode        bool
+	DumpAnalyzer    interface{}
 }
 
 const (
@@ -114,6 +116,8 @@ func NewJob(cfg JobConfig) *Job {
 		api:                  netdataapi.New(&buf),
 		vnode:                cfg.Vnode,
 		updVnode:             make(chan *vnodes.VirtualNode, 1),
+		dumpMode:             cfg.DumpMode,
+		dumpAnalyzer:         cfg.DumpAnalyzer,
 	}
 
 	log := logger.New().With(
@@ -167,6 +171,10 @@ type Job struct {
 	prevRun time.Time
 
 	stop chan struct{}
+
+	// Dump mode support
+	dumpMode     bool
+	dumpAnalyzer interface{} // Will be *agent.DumpAnalyzer but avoid circular dependency
 }
 
 // NetdataChartIDMaxLength is the chart ID max length. See RRD_ID_LENGTH_MAX in the netdata source code.
@@ -252,6 +260,15 @@ func (j *Job) AutoDetection() (err error) {
 		j.Errorf("postCheck failed: %v", err)
 		j.disableAutoDetection()
 		return err
+	}
+
+	// Record job structure for dump mode after successful detection
+	if j.dumpMode && j.dumpAnalyzer != nil && j.charts != nil {
+		if analyzer, ok := j.dumpAnalyzer.(interface {
+			RecordJobStructure(string, string, *Charts)
+		}); ok {
+			analyzer.RecordJobStructure(j.name, j.moduleName, j.charts)
+		}
 	}
 
 	return nil
@@ -418,7 +435,18 @@ func (j *Job) collect() (result map[string]int64) {
 			}
 		}
 	}()
-	return j.module.Collect(context.TODO())
+	result = j.module.Collect(context.TODO())
+
+	// Record collected metrics for dump mode
+	if j.dumpMode && j.dumpAnalyzer != nil && result != nil {
+		if analyzer, ok := j.dumpAnalyzer.(interface {
+			RecordCollection(string, map[string]int64)
+		}); ok {
+			analyzer.RecordCollection(j.name, result)
+		}
+	}
+
+	return result
 }
 
 func (j *Job) processMetrics(metrics map[string]int64, startTime time.Time, sinceLastRun int) bool {
@@ -492,6 +520,15 @@ func (j *Job) processMetrics(metrics map[string]int64, startTime time.Time, sinc
 		j.createChart(j.collectDurationChart)
 	}
 
+	// Update dump analyzer with current chart structure for dynamic collectors
+	if j.dumpMode && j.dumpAnalyzer != nil {
+		if analyzer, ok := j.dumpAnalyzer.(interface {
+			UpdateJobStructure(string, *Charts)
+		}); ok {
+			analyzer.UpdateJobStructure(j.name, j.charts)
+		}
+	}
+
 	j.updateChart(
 		j.collectStatusChart,
 		map[string]int64{"success": metrix.Bool(updated > 0), "failed": metrix.Bool(updated == 0)},
@@ -535,6 +572,11 @@ func (j *Job) createChart(chart *Chart) {
 		chart.Priority = j.priority
 		j.priority++
 	}
+	updateEvery := j.updateEvery
+	if chart.UpdateEvery > 0 {
+		updateEvery = chart.UpdateEvery
+	}
+
 	j.api.CHART(netdataapi.ChartOpts{
 		TypeID:      getChartType(chart, j),
 		ID:          getChartID(chart),
@@ -545,7 +587,7 @@ func (j *Job) createChart(chart *Chart) {
 		Context:     chart.Ctx,
 		ChartType:   chart.Type.String(),
 		Priority:    chart.Priority,
-		UpdateEvery: j.updateEvery,
+		UpdateEvery: updateEvery,
 		Options:     chart.Opts.String(),
 		Plugin:      j.pluginName,
 		Module:      j.moduleName,
@@ -609,7 +651,25 @@ func (j *Job) updateChart(chart *Chart, collected map[string]int64, sinceLastRun
 		return false
 	}
 
-	if !chart.updated {
+	// Handle SkipGaps: check if any dimension has data
+	if chart.SkipGaps {
+		hasData := false
+		for _, dim := range chart.Dims {
+			if dim.remove {
+				continue
+			}
+			if _, ok := collected[dim.ID]; ok {
+				hasData = true
+				break
+			}
+		}
+		if !hasData {
+			// No dimensions have data - skip this chart entirely
+			return false
+		}
+		// At least one dimension has data - proceed with deltaTime=0
+		sinceLastRun = 0
+	} else if !chart.updated {
 		sinceLastRun = 0
 	}
 
