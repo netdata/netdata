@@ -87,19 +87,27 @@ AutoReqProv: yes
 %global _have_cups 0
 %endif
 
-# Disable NFACCT for RHEL equivalents and Amazon Linux
+# Disable NFACCT for RHEL equivalents, Amazon Linux, and openSUSE 16.0 and newer
 %if 0%{?centos_ver} || 0%{?amzn}
+%global _have_nfacct 0
+%else
+%if 0%{?suse_version} >= 1600
 %global _have_nfacct 0
 %else
 %global _have_nfacct 1
 %endif
+%endif
 
-# Disable xenstat if we’re not on Fedora or openSUSE
+# Disable xenstat if we’re not on Fedora or openSUSE 15.6 or earlier
 %if 0%{?suse_version} || 0%{?fedora}
 %if 0%{!?amzm:1}
 %global _have_xenstat 0
 %else
+%if 0%{?suse_version} >= 1600
+%global _have_xenstat 0
+%else
 %global _have_xenstat 1
+%endif
 %endif
 %else
 %global _have_xenstat 0
