@@ -823,7 +823,7 @@ static int optimized_add(struct header_buffer *buf, void *data, size_t data_len,
 static void remove_packet_from_timeout_monitor_list_unsafe(struct mqtt_ng_client *client, uint16_t packet_id)
 {
     int rc = JudyLDel(&client->pending_packets.JudyL, (Word_t) packet_id, PJE0);
-    // rc = 1 if the packer was deleted, so update statistics
+    // rc = 1 if the packet was deleted, so update statistics
     if (likely(rc))
         __atomic_fetch_sub(&client->stats.packets_waiting_puback, 1, __ATOMIC_RELAXED);
 }
@@ -1213,8 +1213,9 @@ static int mark_packet_acked(struct mqtt_ng_client *client, uint16_t packet_id)
 
         frag = frag->next;
     }
-    nd_log(NDLS_DAEMON, NDLP_ERR, "Received packet_id (%" PRIu16 ") is unknown!", packet_id);
+    nd_log(NDLS_DAEMON, NDLP_WARNING, "Received packet_id (%" PRIu16 ") is unknown, removing from monitor list", packet_id);
     UNLOCK_HDR_BUFFER(&client->main_buffer);
+    remove_packet_from_timeout_monitor_list_unsafe(client, packet_id);
     spinlock_unlock(&client->pending_packets.spinlock);
     return 1;
 }
