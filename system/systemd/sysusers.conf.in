@@ -1,0 +1,3 @@
+u @NETDATA_USER@ - "Netdata Agent user" @VARLIB_DIR@ -
+g @NETDATA_USER@ -
+m @NETDATA_USER@ nobody
