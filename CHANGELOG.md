@@ -6,7 +6,9 @@
 
 **Merged pull requests:**
 
+- Properly include client compoents for IBM MQ libraries. [\#21117](https://github.com/netdata/netdata/pull/21117) ([Ferroin](https://github.com/Ferroin))
 - Fix windows build [\#21113](https://github.com/netdata/netdata/pull/21113) ([stelfrag](https://github.com/stelfrag))
+- Address NULL access \(windows.plugin\) [\#21112](https://github.com/netdata/netdata/pull/21112) ([thiagoftsm](https://github.com/thiagoftsm))
 - build\(deps\): bump github.com/prometheus/common from 0.66.1 to 0.67.1 in /src/go [\#21111](https://github.com/netdata/netdata/pull/21111) ([dependabot[bot]](https://github.com/apps/dependabot))
 - build\(deps\): bump github.com/ibmdb/go\_ibm\_db from 0.4.5 to 0.5.3 in /src/go [\#21110](https://github.com/netdata/netdata/pull/21110) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Fix freeipmi crash [\#21109](https://github.com/netdata/netdata/pull/21109) ([stelfrag](https://github.com/stelfrag))
@@ -15,6 +17,7 @@
 - Update `cloud-notifications` documentation [\#21105](https://github.com/netdata/netdata/pull/21105) ([car12o](https://github.com/car12o))
 - improve\(go.d/snmp\): Add APC PowerNet-MIB sysObjectID mappings and categories [\#21104](https://github.com/netdata/netdata/pull/21104) ([ilyam8](https://github.com/ilyam8))
 - Update building-native-packages-locally.md [\#21101](https://github.com/netdata/netdata/pull/21101) ([Ferroin](https://github.com/Ferroin))
+- Add openSUSE Leap 16.0 and Ubuntu 25.10 to CI and package builds. [\#21100](https://github.com/netdata/netdata/pull/21100) ([Ferroin](https://github.com/Ferroin))
 - Improve logging and packet handling for unknown packet IDs [\#21099](https://github.com/netdata/netdata/pull/21099) ([stelfrag](https://github.com/stelfrag))
 - Use datafile block pos [\#21098](https://github.com/netdata/netdata/pull/21098) ([stelfrag](https://github.com/stelfrag))
 - fix\(packaging/docker\): add missing nd-run [\#21097](https://github.com/netdata/netdata/pull/21097) ([ilyam8](https://github.com/ilyam8))
@@ -446,8 +449,6 @@
 - Windows Pluging \(Freedom to update every\) [\#20580](https://github.com/netdata/netdata/pull/20580) ([thiagoftsm](https://github.com/thiagoftsm))
 - Ignore duplicate entries when rebuilding the alert version table [\#20579](https://github.com/netdata/netdata/pull/20579) ([stelfrag](https://github.com/stelfrag))
 - Add Rocky Linux 10 to CI and package builds. [\#20578](https://github.com/netdata/netdata/pull/20578) ([Ferroin](https://github.com/Ferroin))
-- Regenerate integrations docs [\#20577](https://github.com/netdata/netdata/pull/20577) ([netdatabot](https://github.com/netdatabot))
-- chore\(go.d/snmp-profiles\): skip abstract when loading [\#20576](https://github.com/netdata/netdata/pull/20576) ([ilyam8](https://github.com/ilyam8))
 
 ## [v2.5.4](https://github.com/netdata/netdata/tree/v2.5.4) (2025-06-24)
 
