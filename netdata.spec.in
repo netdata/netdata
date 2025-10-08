@@ -87,19 +87,27 @@ AutoReqProv: yes
 %global _have_cups 0
 %endif
 
-# Disable NFACCT for RHEL equivalents and Amazon Linux
+# Disable NFACCT for RHEL equivalents, Amazon Linux, and openSUSE 16.0 and newer
 %if 0%{?centos_ver} || 0%{?amzn}
+%global _have_nfacct 0
+%else
+%if 0%{?suse_version} >= 1600
 %global _have_nfacct 0
 %else
 %global _have_nfacct 1
 %endif
+%endif
 
-# Disable xenstat if we’re not on Fedora or openSUSE
+# Disable xenstat if we’re not on Fedora or openSUSE 15.6 or earlier
 %if 0%{?suse_version} || 0%{?fedora}
 %if 0%{!?amzm:1}
 %global _have_xenstat 0
 %else
+%if 0%{?suse_version} >= 1600
+%global _have_xenstat 0
+%else
 %global _have_xenstat 1
+%endif
 %endif
 %else
 %global _have_xenstat 0
@@ -123,16 +131,8 @@ AutoReqProv: yes
 %global _have_mongo_exporter 1
 %endif
 
-# log2journal can’t build on some systems
-%if 0%{?sle_version}
-%if %{sle_version} < 150600
-%global _have_log2journal 0
-%else
+# log2journal can’t build on some systems, but we don’t support those systems anymore.
 %global _have_log2journal 1
-%endif
-%else
-%global _have_log2journal 1
-%endif
 
 # If ML hasn’t been explicitly disabled or enabled yet, enable it now.
 %if 0%{!?_have_ml:1}
@@ -218,6 +218,11 @@ BuildRequires: systemd
 # Core requirements for the install to succeed
 Requires(pre): /usr/sbin/groupadd
 Requires(pre): /usr/sbin/useradd
+
+%if 0%{?suse_version}
+Provides: user(netdata)
+Provides: group(netdata)
+%endif
 
 # #####################################################################
 # External plugin package dependencies
