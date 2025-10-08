@@ -258,7 +258,6 @@ Recommends: %{name}-plugin-systmed-units = %{version}
 Recommends: %{name}-plugin-network-viewer = %{version}
 %else
 Requires: %{name}-plugin-systemd-journal = %{version}
-Requires: %{name}-plugin-systemd-units = %{version}
 Requires: %{name}-plugin-network-viewer = %{version}
 %endif
 
