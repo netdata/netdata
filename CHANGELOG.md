@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- Fix windows build [\#21113](https://github.com/netdata/netdata/pull/21113) ([stelfrag](https://github.com/stelfrag))
+- build\(deps\): bump github.com/prometheus/common from 0.66.1 to 0.67.1 in /src/go [\#21111](https://github.com/netdata/netdata/pull/21111) ([dependabot[bot]](https://github.com/apps/dependabot))
+- build\(deps\): bump github.com/ibmdb/go\_ibm\_db from 0.4.5 to 0.5.3 in /src/go [\#21110](https://github.com/netdata/netdata/pull/21110) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Fix freeipmi crash [\#21109](https://github.com/netdata/netdata/pull/21109) ([stelfrag](https://github.com/stelfrag))
 - Fix invalid map.csv [\#21108](https://github.com/netdata/netdata/pull/21108) ([Ancairon](https://github.com/Ancairon))
 - Regenerate integrations docs [\#21106](https://github.com/netdata/netdata/pull/21106) ([netdatabot](https://github.com/netdatabot))
@@ -445,9 +448,6 @@
 - Add Rocky Linux 10 to CI and package builds. [\#20578](https://github.com/netdata/netdata/pull/20578) ([Ferroin](https://github.com/Ferroin))
 - Regenerate integrations docs [\#20577](https://github.com/netdata/netdata/pull/20577) ([netdatabot](https://github.com/netdatabot))
 - chore\(go.d/snmp-profiles\): skip abstract when loading [\#20576](https://github.com/netdata/netdata/pull/20576) ([ilyam8](https://github.com/ilyam8))
-- SNMP: cyberpower-pdu profile [\#20575](https://github.com/netdata/netdata/pull/20575) ([Ancairon](https://github.com/Ancairon))
-- improve\(go.d/smartctl\): add Win default path for smartctl executable [\#20574](https://github.com/netdata/netdata/pull/20574) ([ilyam8](https://github.com/ilyam8))
-- NUMA Windows  [\#20573](https://github.com/netdata/netdata/pull/20573) ([thiagoftsm](https://github.com/thiagoftsm))
 
 ## [v2.5.4](https://github.com/netdata/netdata/tree/v2.5.4) (2025-06-24)
 
