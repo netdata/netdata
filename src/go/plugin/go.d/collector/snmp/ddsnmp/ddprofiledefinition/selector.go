@@ -15,8 +15,8 @@ type (
 	}
 
 	SelectorIncludeExclude struct {
-		Include StringArray `yaml:"include,omitempty" json:"include,omitempty"`
-		Exclude StringArray `yaml:"exclude,omitempty" json:"exclude,omitempty"`
+		Include []string `yaml:"include,omitempty" json:"include,omitempty"`
+		Exclude []string `yaml:"exclude,omitempty" json:"exclude,omitempty"`
 	}
 )
 
@@ -46,12 +46,9 @@ func (ie SelectorIncludeExclude) clone() SelectorIncludeExclude {
 }
 
 func (s SelectorSpec) HasExactOidMatch(deviceSysObjectID string) bool {
-	for _, rule := range s {
-		if slices.ContainsFunc(rule.SysObjectID.Include, func(s string) bool { return deviceSysObjectID == s }) {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(s, func(rule SelectorRule) bool {
+		return slices.Contains(rule.SysObjectID.Include, deviceSysObjectID)
+	})
 }
 
 func (s SelectorSpec) Matches(deviceSysObjectID, deviceSysDescr string) (bool, string) {

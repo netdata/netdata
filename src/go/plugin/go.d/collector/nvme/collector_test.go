@@ -58,8 +58,8 @@ func TestCollector_Init(t *testing.T) {
 		config   Config
 		wantFail bool
 	}{
-		"fails if 'ndsudo' not found": {
-			wantFail: true,
+		"success with default config": {
+			wantFail: false,
 			config:   New().Config,
 		},
 	}

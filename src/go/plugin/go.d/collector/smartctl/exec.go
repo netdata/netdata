@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 
 	"github.com/tidwall/gjson"
 )
@@ -26,15 +27,13 @@ type smartctlCli interface {
 type ndsudoSmartctlCli struct {
 	*logger.Logger
 
-	ndsudoPath string
-	timeout    time.Duration
+	timeout time.Duration
 }
 
-func newNdsudoSmartctlCli(ndsudoPath string, timeout time.Duration, log *logger.Logger) *ndsudoSmartctlCli {
+func newNdsudoSmartctlCli(timeout time.Duration, log *logger.Logger) *ndsudoSmartctlCli {
 	return &ndsudoSmartctlCli{
-		Logger:     log,
-		ndsudoPath: ndsudoPath,
-		timeout:    timeout,
+		Logger:  log,
+		timeout: timeout,
 	}
 }
 
@@ -53,24 +52,18 @@ func (e *ndsudoSmartctlCli) deviceInfo(deviceName, deviceType, powerMode string)
 	)
 }
 
-func (e *ndsudoSmartctlCli) execute(args ...string) (*gjson.Result, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), e.timeout)
-	defer cancel()
-
-	cmd := exec.CommandContext(ctx, e.ndsudoPath, args...)
-	e.Debugf("executing '%s'", cmd)
-
-	bs, err := cmd.Output()
+func (e *ndsudoSmartctlCli) execute(cmd string, args ...string) (*gjson.Result, error) {
+	bs, cmdStr, err := ndexec.RunNDSudoWithCmd(e.Logger, e.timeout, cmd, args...)
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) || isExecExitCode(err, 1) || len(bs) == 0 {
-			return nil, fmt.Errorf("'%s' execution failed: %v", cmd, err)
+			return nil, fmt.Errorf("'%s' execution failed: %v", cmdStr, err)
 		}
 	}
 
-	return parseOutput(cmd.String(), bs, args, e.Logger)
+	return parseOutput(cmdStr, bs, e.Logger)
 }
 
-// directSmartctlCli executes smartctl directly (Windows, macOS, etc.)
+// directSmartctlCli executes smartctl directly (Windows only)
 type directSmartctlCli struct {
 	*logger.Logger
 
@@ -119,11 +112,11 @@ func (e *directSmartctlCli) execute(args ...string) (*gjson.Result, error) {
 		}
 	}
 
-	return parseOutput(cmd.String(), bs, args, e.Logger)
+	return parseOutput(cmd.String(), bs, e.Logger)
 }
 
 // Common output parsing function
-func parseOutput(cmdStr string, bs []byte, args []string, log *logger.Logger) (*gjson.Result, error) {
+func parseOutput(cmdStr string, bs []byte, log *logger.Logger) (*gjson.Result, error) {
 	if len(bs) == 0 {
 		return nil, fmt.Errorf("'%s' returned no output", cmdStr)
 	}
@@ -131,7 +124,7 @@ func parseOutput(cmdStr string, bs []byte, args []string, log *logger.Logger) (*
 	if logger.Level.Enabled(slog.LevelDebug) {
 		var buf bytes.Buffer
 		if err := json.Compact(&buf, bs); err == nil {
-			log.Debugf("exec: %v, resp: %s", args, buf.String())
+			log.Debugf("exec: %v, resp: %s", cmdStr, buf.String())
 		}
 	}
 

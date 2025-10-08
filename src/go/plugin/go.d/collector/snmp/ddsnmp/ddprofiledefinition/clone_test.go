@@ -40,7 +40,7 @@ func TestCloneSlice(t *testing.T) {
 		item("a", 1, 2, 3, 4),
 		item("b", 1, 2),
 	}
-	itemsCopy := CloneSlice(items)
+	itemsCopy := cloneSlice(items)
 	*itemsCopy[0].label = "aaa"
 	itemsCopy[1] = item("bbb", 10, 20)
 	itemsCopy = append(itemsCopy, item("ccc", 100, 200))
@@ -61,7 +61,7 @@ func TestCloneMap(t *testing.T) {
 		"Item A": item("a", 1, 2, 3, 4),
 		"Item B": item("b", 1, 2),
 	}
-	mCopy := CloneMap(m)
+	mCopy := cloneMap(m)
 	mCopy["Item A"].ps[0] = 100
 	mCopy["Item B"] = item("bbb", 10, 20)
 	mCopy["Item C"] = item("ccc", 100, 200)
@@ -83,7 +83,7 @@ func TestCustomSliceClone(t *testing.T) {
 		item("a", 1, 2, 3, 4),
 		item("b", 1, 2),
 	}
-	itemsCopy := CloneSlice(items)
+	itemsCopy := cloneSlice(items)
 
 	assert.IsType(t, customSlice{}, itemsCopy)
 	assert.Equal(t, items, itemsCopy)
@@ -96,7 +96,7 @@ func TestCustomMapClone(t *testing.T) {
 		"Item A": item("a", 1, 2, 3, 4),
 		"Item B": item("b", 1, 2),
 	}
-	mCopy := CloneMap(m)
+	mCopy := cloneMap(m)
 	assert.IsType(t, customMap{}, mCopy)
 	assert.Equal(t, m, mCopy)
 }

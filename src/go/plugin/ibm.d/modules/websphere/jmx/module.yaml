@@ -1,0 +1,12 @@
+name: websphere_jmx
+display_name: IBM WebSphere JMX
+description: |
+  Collects JVM, thread pool, and middleware metrics from IBM WebSphere Application Server
+  via the embedded JMX bridge helper.
+link: https://www.ibm.com/products/websphere-application-server
+categories:
+  - data-collection.application_servers
+keywords:
+  - websphere
+  - jmx
+  - application-server

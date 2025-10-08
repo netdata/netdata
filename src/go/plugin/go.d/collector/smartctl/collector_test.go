@@ -70,8 +70,8 @@ func TestCollector_Init(t *testing.T) {
 				return cfg
 			}(),
 		},
-		"fails if 'ndsudo' not found": {
-			wantFail: true,
+		"success with default config": {
+			wantFail: false,
 			config:   New().Config,
 		},
 	}
@@ -79,6 +79,7 @@ func TestCollector_Init(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			collr := New()
+			collr.Config = test.config
 
 			if test.wantFail {
 				assert.Error(t, collr.Init(context.Background()))

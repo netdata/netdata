@@ -247,6 +247,7 @@ static bool is_plugin(char *dst, size_t dst_size, const char *filename) {
         ".plugin.exe",
         "_plugin.exe",
         "-plugin.exe",
+        ".plugin",
         NULL
     };
 #else

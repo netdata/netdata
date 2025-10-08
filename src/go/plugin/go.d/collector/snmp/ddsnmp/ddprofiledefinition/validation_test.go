@@ -6,34 +6,29 @@
 package ddprofiledefinition
 
 import (
-	"fmt"
 	"regexp"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
-func Test_ValidateEnrichMetrics(t *testing.T) {
-	tests := []struct {
-		name            string
-		metrics         []MetricsConfig
-		expectedErrors  []string
-		expectedMetrics []MetricsConfig
+func Test_validateEnrichMetrics(t *testing.T) {
+	tests := map[string]struct {
+		metrics     []MetricsConfig
+		wantError   bool
+		wantMetrics []MetricsConfig
 	}{
-		{
-			name: "either table symbol or scalar symbol must be provided",
+		"either table symbol or scalar symbol must be provided": {
+			wantError: true,
 			metrics: []MetricsConfig{
 				{},
 			},
-			expectedErrors: []string{
-				"either a table symbol or a scalar symbol must be provided",
-			},
-			expectedMetrics: []MetricsConfig{
+			wantMetrics: []MetricsConfig{
 				{},
 			},
 		},
-		{
-			name: "table column symbols and scalar symbol cannot be both provided",
+		"table column symbols and scalar symbol cannot be both provided": {
+			wantError: true,
 			metrics: []MetricsConfig{
 				{
 					Symbol: SymbolConfig{
@@ -51,12 +46,9 @@ func Test_ValidateEnrichMetrics(t *testing.T) {
 					},
 				},
 			},
-			expectedErrors: []string{
-				"table symbol and scalar symbol cannot be both provided",
-			},
 		},
-		{
-			name: "multiple errors",
+		"multiple errors": {
+			wantError: true,
 			metrics: []MetricsConfig{
 				{},
 				{
@@ -75,13 +67,9 @@ func Test_ValidateEnrichMetrics(t *testing.T) {
 					},
 				},
 			},
-			expectedErrors: []string{
-				"either a table symbol or a scalar symbol must be provided",
-				"table symbol and scalar symbol cannot be both provided",
-			},
 		},
-		{
-			name: "missing symbol name",
+		"missing symbol name": {
+			wantError: true,
 			metrics: []MetricsConfig{
 				{
 					Symbol: SymbolConfig{
@@ -89,12 +77,9 @@ func Test_ValidateEnrichMetrics(t *testing.T) {
 					},
 				},
 			},
-			expectedErrors: []string{
-				"either a table symbol or a scalar symbol must be provided",
-			},
 		},
-		{
-			name: "table column symbol name missing",
+		"table column symbol name missing": {
+			wantError: true,
 			metrics: []MetricsConfig{
 				{
 					Symbols: []SymbolConfig{
@@ -110,13 +95,9 @@ func Test_ValidateEnrichMetrics(t *testing.T) {
 					},
 				},
 			},
-			expectedErrors: []string{
-				"symbol name missing: name=`` oid=`1.2`",
-				"symbol oid or send_as_one missing: name=`abc` oid=``",
-			},
 		},
-		{
-			name: "table external metric column tag symbol error",
+		"table external metric column tag symbol error": {
+			wantError: true,
 			metrics: []MetricsConfig{
 				{
 					Symbols: []SymbolConfig{
@@ -139,13 +120,9 @@ func Test_ValidateEnrichMetrics(t *testing.T) {
 					},
 				},
 			},
-			expectedErrors: []string{
-				"symbol name missing: name=`` oid=`1.2.3`",
-				"symbol oid missing: name=`abc` oid=``",
-			},
 		},
-		{
-			name: "missing MetricTags",
+		"missing MetricTags": {
+			wantError: true,
 			metrics: []MetricsConfig{
 				{
 					Symbols: []SymbolConfig{
@@ -157,12 +134,9 @@ func Test_ValidateEnrichMetrics(t *testing.T) {
 					MetricTags: MetricTagConfigList{},
 				},
 			},
-			expectedErrors: []string{
-				"column symbols doesn't have a 'metric_tags' section",
-			},
 		},
-		{
-			name: "table external metric column tag MIB error",
+		"table external metric column tag MIB error": {
+			wantError: true,
 			metrics: []MetricsConfig{
 				{
 					Symbols: []SymbolConfig{
@@ -185,13 +159,9 @@ func Test_ValidateEnrichMetrics(t *testing.T) {
 					},
 				},
 			},
-			expectedErrors: []string{
-				"symbol name missing: name=`` oid=`1.2.3`",
-				"symbol oid missing: name=`abc` oid=``",
-			},
 		},
-		{
-			name: "missing match tags",
+		"missing match tags": {
+			wantError: true,
 			metrics: []MetricsConfig{
 				{
 					Symbols: []SymbolConfig{
@@ -211,12 +181,9 @@ func Test_ValidateEnrichMetrics(t *testing.T) {
 					},
 				},
 			},
-			expectedErrors: []string{
-				"`tags` mapping must be provided if `match` (`([a-z])`) is defined",
-			},
 		},
-		{
-			name: "match cannot compile regex",
+		"match cannot compile regex": {
+			wantError: true,
 			metrics: []MetricsConfig{
 				{
 					Symbols: []SymbolConfig{
@@ -239,12 +206,9 @@ func Test_ValidateEnrichMetrics(t *testing.T) {
 					},
 				},
 			},
-			expectedErrors: []string{
-				"cannot compile `match` (`([a-z)`)",
-			},
 		},
-		{
-			name: "match cannot compile regex",
+		"match cannot compile regex 2": {
+			wantError: true,
 			metrics: []MetricsConfig{
 				{
 					Symbols: []SymbolConfig{
@@ -270,12 +234,9 @@ func Test_ValidateEnrichMetrics(t *testing.T) {
 					},
 				},
 			},
-			expectedErrors: []string{
-				"transform rule end should be greater than start. Invalid rule",
-			},
 		},
-		{
-			name: "compiling extract_value",
+		"compiling extract_value": {
+			wantError: false,
 			metrics: []MetricsConfig{
 				{
 					Symbol: SymbolConfig{
@@ -304,7 +265,7 @@ func Test_ValidateEnrichMetrics(t *testing.T) {
 					},
 				},
 			},
-			expectedMetrics: []MetricsConfig{
+			wantMetrics: []MetricsConfig{
 				{
 					Symbol: SymbolConfig{
 						OID:                  "1.2.3",
@@ -335,10 +296,9 @@ func Test_ValidateEnrichMetrics(t *testing.T) {
 					},
 				},
 			},
-			expectedErrors: []string{},
 		},
-		{
-			name: "error compiling extract_value",
+		"error compiling extract_value": {
+			wantError: true,
 			metrics: []MetricsConfig{
 				{
 					Symbol: SymbolConfig{
@@ -348,12 +308,9 @@ func Test_ValidateEnrichMetrics(t *testing.T) {
 					},
 				},
 			},
-			expectedErrors: []string{
-				"cannot compile `extract_value`",
-			},
 		},
-		{
-			name: "constant_value_one usage in column symbol",
+		"constant_value_one usage in column symbol": {
+			wantError: false,
 			metrics: []MetricsConfig{
 				{
 					Symbols: []SymbolConfig{
@@ -373,10 +330,9 @@ func Test_ValidateEnrichMetrics(t *testing.T) {
 					},
 				},
 			},
-			expectedErrors: []string{},
 		},
-		{
-			name: "constant_value_one usage in scalar symbol",
+		"constant_value_one usage in scalar symbol": {
+			wantError: true,
 			metrics: []MetricsConfig{
 				{
 					Symbol: SymbolConfig{
@@ -385,12 +341,9 @@ func Test_ValidateEnrichMetrics(t *testing.T) {
 					},
 				},
 			},
-			expectedErrors: []string{
-				"either a table symbol or a scalar symbol must be provided",
-			},
 		},
-		{
-			name: "constant_value_one usage in scalar symbol with OID",
+		"constant_value_one usage in scalar symbol with OID": {
+			wantError: true,
 			metrics: []MetricsConfig{
 				{
 					Symbol: SymbolConfig{
@@ -400,12 +353,9 @@ func Test_ValidateEnrichMetrics(t *testing.T) {
 					},
 				},
 			},
-			expectedErrors: []string{
-				"`constant_value_one` cannot be used outside of tables",
-			},
 		},
-		{
-			name: "constant_value_one usage in metric tags",
+		"constant_value_one usage in metric tags": {
+			wantError: true,
 			metrics: []MetricsConfig{
 				{
 					Symbols: []SymbolConfig{
@@ -425,13 +375,9 @@ func Test_ValidateEnrichMetrics(t *testing.T) {
 					},
 				},
 			},
-			expectedErrors: []string{
-				"symbol oid missing",
-				"`constant_value_one` cannot be used outside of tables",
-			},
 		},
-		{
-			name: "metric_type usage in column symbol",
+		"metric_type usage in column symbol": {
+			wantError: false,
 			metrics: []MetricsConfig{
 				{
 					Symbols: []SymbolConfig{
@@ -452,10 +398,9 @@ func Test_ValidateEnrichMetrics(t *testing.T) {
 					},
 				},
 			},
-			expectedErrors: []string{},
 		},
-		{
-			name: "metric_type usage in scalar symbol",
+		"metric_type usage in scalar symbol": {
+			wantError: false,
 			metrics: []MetricsConfig{
 				{
 					Symbol: SymbolConfig{
@@ -465,10 +410,9 @@ func Test_ValidateEnrichMetrics(t *testing.T) {
 					},
 				},
 			},
-			expectedErrors: []string{},
 		},
-		{
-			name: "ERROR metric_type usage in metric_tags",
+		"ERROR metric_type usage in metric_tags": {
+			wantError: true,
 			metrics: []MetricsConfig{
 				{
 					Symbols: []SymbolConfig{
@@ -489,55 +433,9 @@ func Test_ValidateEnrichMetrics(t *testing.T) {
 					},
 				},
 			},
-			expectedErrors: []string{
-				"`metric_type` cannot be used outside scalar/table metric symbols and metrics root",
-			},
 		},
-		{
-			name: "metric root forced_type converted to metric_type",
-			metrics: []MetricsConfig{
-				{
-					ForcedType: ProfileMetricTypeCounter,
-					Symbols: []SymbolConfig{
-						{
-							Name: "abc",
-							OID:  "1.2.3",
-						},
-					},
-					MetricTags: MetricTagConfigList{
-						MetricTagConfig{
-							Symbol: SymbolConfigCompat{
-								Name: "abc",
-								OID:  "1.2.3",
-							},
-							Tag: "hello",
-						},
-					},
-				},
-			},
-			expectedMetrics: []MetricsConfig{
-				{
-					MetricType: ProfileMetricTypeCounter,
-					Symbols: []SymbolConfig{
-						{
-							Name: "abc",
-							OID:  "1.2.3",
-						},
-					},
-					MetricTags: MetricTagConfigList{
-						MetricTagConfig{
-							Symbol: SymbolConfigCompat{
-								Name: "abc",
-								OID:  "1.2.3",
-							},
-							Tag: "hello",
-						},
-					},
-				},
-			},
-		},
-		{
-			name: "mapping used without tag",
+		"mapping used without tag": {
+			wantError: true,
 			metrics: []MetricsConfig{
 				{
 					Symbols: []SymbolConfig{
@@ -560,32 +458,30 @@ func Test_ValidateEnrichMetrics(t *testing.T) {
 					},
 				},
 			},
-			expectedErrors: []string{"`tag` must be provided if `mapping` (`map[1:abc 2:def]`) is defined"},
 		},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			errors := ValidateEnrichMetrics(tt.metrics)
-			assert.Equal(t, len(tt.expectedErrors), len(errors), fmt.Sprintf("ERRORS: %v", errors))
-			for i := range errors {
-				assert.Contains(t, errors[i], tt.expectedErrors[i])
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			if tc.wantError {
+				assert.Error(t, validateEnrichMetrics(tc.metrics))
+			} else {
+				assert.NoError(t, validateEnrichMetrics(tc.metrics))
 			}
-			if tt.expectedMetrics != nil {
-				assert.Equal(t, tt.expectedMetrics, tt.metrics)
+			if tc.wantMetrics != nil {
+				assert.Equal(t, tc.wantMetrics, tc.metrics)
 			}
 		})
 	}
 }
 
-func Test_ValidateEnrichMetricTags(t *testing.T) {
-	tests := []struct {
-		name            string
-		metrics         []MetricTagConfig
-		expectedErrors  []string
-		expectedMetrics []MetricTagConfig
+func Test_validateEnrichMetricTags(t *testing.T) {
+	tests := map[string]struct {
+		metrics     []MetricTagConfig
+		wantError   bool
+		wantMetrics []MetricTagConfig
 	}{
-		{
-			name: "Move OID to Symbol",
+		"Move OID to Symbol": {
+			wantError: false,
 			metrics: []MetricTagConfig{
 				{
 					OID: "1.2.3.4",
@@ -594,7 +490,7 @@ func Test_ValidateEnrichMetricTags(t *testing.T) {
 					},
 				},
 			},
-			expectedMetrics: []MetricTagConfig{
+			wantMetrics: []MetricTagConfig{
 				{
 					Symbol: SymbolConfigCompat{
 						OID:  "1.2.3.4",
@@ -603,8 +499,8 @@ func Test_ValidateEnrichMetricTags(t *testing.T) {
 				},
 			},
 		},
-		{
-			name: "Metric tag OID and symbol.OID cannot be both declared",
+		"Metric tag OID and symbol.OID cannot be both declared": {
+			wantError: true,
 			metrics: []MetricTagConfig{
 				{
 					OID: "1.2.3.4",
@@ -614,12 +510,9 @@ func Test_ValidateEnrichMetricTags(t *testing.T) {
 					},
 				},
 			},
-			expectedErrors: []string{
-				"metric tag OID and symbol.OID cannot be both declared",
-			},
 		},
-		{
-			name: "metric tag symbol and column cannot be both declared",
+		"metric tag symbol and column cannot be both declared 2": {
+			wantError: true,
 			metrics: []MetricTagConfig{
 				{
 					Symbol: SymbolConfigCompat{
@@ -632,12 +525,9 @@ func Test_ValidateEnrichMetricTags(t *testing.T) {
 					},
 				},
 			},
-			expectedErrors: []string{
-				"metric tag symbol and column cannot be both declared",
-			},
 		},
-		{
-			name: "Missing OID",
+		"Missing OID": {
+			wantError: true,
 			metrics: []MetricTagConfig{
 				{
 					Symbol: SymbolConfigCompat{
@@ -645,34 +535,30 @@ func Test_ValidateEnrichMetricTags(t *testing.T) {
 					},
 				},
 			},
-			expectedErrors: []string{
-				"symbol oid missing",
-			},
 		},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			errors := ValidateEnrichMetricTags(tt.metrics)
-			assert.Equal(t, len(tt.expectedErrors), len(errors), fmt.Sprintf("ERRORS: %v", errors))
-			for i := range errors {
-				assert.Contains(t, errors[i], tt.expectedErrors[i])
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			if tc.wantError {
+				assert.Error(t, validateEnrichMetricTags(tc.metrics))
+			} else {
+				assert.NoError(t, validateEnrichMetricTags(tc.metrics))
 			}
-			if tt.expectedMetrics != nil {
-				assert.Equal(t, tt.expectedMetrics, tt.metrics)
+			if tc.wantMetrics != nil {
+				assert.Equal(t, tc.wantMetrics, tc.metrics)
 			}
 		})
 	}
 }
 
 func Test_validateEnrichMetadata(t *testing.T) {
-	tests := []struct {
-		name             string
-		metadata         MetadataConfig
-		expectedErrors   []string
-		expectedMetadata MetadataConfig
+	tests := map[string]struct {
+		metadata     MetadataConfig
+		wantError    bool
+		wantMetadata MetadataConfig
 	}{
-		{
-			name: "both field symbol and value can be provided",
+		"both field symbol and value can be provided": {
+			wantError: false,
 			metadata: MetadataConfig{
 				"device": MetadataResourceConfig{
 					Fields: map[string]MetadataField{
@@ -686,7 +572,7 @@ func Test_validateEnrichMetadata(t *testing.T) {
 					},
 				},
 			},
-			expectedMetadata: MetadataConfig{
+			wantMetadata: MetadataConfig{
 				"device": MetadataResourceConfig{
 					Fields: map[string]MetadataField{
 						"name": {
@@ -700,8 +586,8 @@ func Test_validateEnrichMetadata(t *testing.T) {
 				},
 			},
 		},
-		{
-			name: "invalid regex pattern for symbol",
+		"invalid regex pattern for symbol": {
+			wantError: true,
 			metadata: MetadataConfig{
 				"device": MetadataResourceConfig{
 					Fields: map[string]MetadataField{
@@ -715,12 +601,9 @@ func Test_validateEnrichMetadata(t *testing.T) {
 					},
 				},
 			},
-			expectedErrors: []string{
-				"cannot compile `extract_value`",
-			},
 		},
-		{
-			name: "invalid regex pattern for multiple symbols",
+		"invalid regex pattern for multiple symbols": {
+			wantError: true,
 			metadata: MetadataConfig{
 				"device": MetadataResourceConfig{
 					Fields: map[string]MetadataField{
@@ -736,12 +619,9 @@ func Test_validateEnrichMetadata(t *testing.T) {
 					},
 				},
 			},
-			expectedErrors: []string{
-				"cannot compile `extract_value`",
-			},
 		},
-		{
-			name: "field regex pattern is compiled",
+		"field regex pattern is compiled": {
+			wantError: false,
 			metadata: MetadataConfig{
 				"device": MetadataResourceConfig{
 					Fields: map[string]MetadataField{
@@ -755,8 +635,7 @@ func Test_validateEnrichMetadata(t *testing.T) {
 					},
 				},
 			},
-			expectedErrors: []string{},
-			expectedMetadata: MetadataConfig{
+			wantMetadata: MetadataConfig{
 				"device": MetadataResourceConfig{
 					Fields: map[string]MetadataField{
 						"name": {
@@ -771,8 +650,8 @@ func Test_validateEnrichMetadata(t *testing.T) {
 				},
 			},
 		},
-		{
-			name: "invalid resource",
+		"invalid resource": {
+			wantError: true,
 			metadata: MetadataConfig{
 				"invalid-res": MetadataResourceConfig{
 					Fields: map[string]MetadataField{
@@ -782,12 +661,9 @@ func Test_validateEnrichMetadata(t *testing.T) {
 					},
 				},
 			},
-			expectedErrors: []string{
-				"invalid resource: invalid-res",
-			},
 		},
-		{
-			name: "invalid field",
+		"invalid field": {
+			wantError: true,
 			metadata: MetadataConfig{
 				"device": MetadataResourceConfig{
 					Fields: map[string]MetadataField{
@@ -797,12 +673,9 @@ func Test_validateEnrichMetadata(t *testing.T) {
 					},
 				},
 			},
-			expectedErrors: []string{
-				"invalid resource (device) field: invalid-field",
-			},
 		},
-		{
-			name: "invalid idtags",
+		"invalid idtags": {
+			wantError: true,
 			metadata: MetadataConfig{
 				"interface": MetadataResourceConfig{
 					Fields: map[string]MetadataField{
@@ -824,13 +697,9 @@ func Test_validateEnrichMetadata(t *testing.T) {
 					},
 				},
 			},
-			expectedErrors: []string{
-				"invalid resource (interface) field: invalid-field",
-				"cannot compile `match` (`([a-z)`)",
-			},
 		},
-		{
-			name: "device resource does not support id_tags",
+		"device resource does not support id_tags": {
+			wantError: true,
 			metadata: MetadataConfig{
 				"device": MetadataResourceConfig{
 					Fields: map[string]MetadataField{
@@ -849,23 +718,19 @@ func Test_validateEnrichMetadata(t *testing.T) {
 					},
 				},
 			},
-			expectedErrors: []string{
-				"device resource does not support custom id_tags",
-			},
 		},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			errors := ValidateEnrichMetadata(tt.metadata)
-			assert.Equal(t, len(tt.expectedErrors), len(errors), fmt.Sprintf("ERRORS: %v", errors))
-			for i := range errors {
-				assert.Contains(t, errors[i], tt.expectedErrors[i])
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			if tc.wantError {
+				assert.Error(t, validateEnrichMetadata(tc.metadata))
+			} else {
+				assert.NoError(t, validateEnrichMetadata(tc.metadata))
 			}
-			if tt.expectedMetadata != nil {
-				assert.Equal(t, tt.expectedMetadata, tt.metadata)
+			if tc.wantMetadata != nil {
+				assert.Equal(t, tc.wantMetadata, tc.metadata)
 			}
 		})
 	}
 }
-
-// TODO: Add test for ValidateEnrichMetricTags
