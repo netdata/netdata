@@ -26,6 +26,8 @@ const TMP_PREFIX = 'ai-agent-phase1-';
 const SUBAGENT_PRICING_PROMPT = path.resolve(process.cwd(), 'src/tests/fixtures/subagents/pricing-subagent.ai');
 const SUBAGENT_PRICING_SUCCESS_PROMPT = path.resolve(process.cwd(), 'src/tests/fixtures/subagents-success/pricing-subagent-success.ai');
 const SUBAGENT_SUCCESS_TOOL = 'agent__pricing-subagent-success';
+const CONCURRENCY_TIMEOUT_ARGUMENT = 'trigger-timeout';
+const CONCURRENCY_SECOND_ARGUMENT = 'concurrency-second';
 
 function makeTempDir(label: string): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), `${TMP_PREFIX}${label}-`));
@@ -53,6 +55,11 @@ interface HarnessTest {
     sessionConfig: AIAgentSessionConfig,
     defaults: NonNullable<Configuration['defaults']>
   ) => void;
+  execute?: (
+    configuration: Configuration,
+    sessionConfig: AIAgentSessionConfig,
+    defaults: NonNullable<Configuration['defaults']>
+  ) => Promise<AIAgentResult>;
   expect: (result: AIAgentResult) => void;
 }
 
@@ -432,9 +439,168 @@ const TEST_SCENARIOS: HarnessTest[] = [
       invariant(subAgentLog !== undefined, 'Sub-agent success log expected for run-test-24.');
     },
   },
+  {
+    id: 'run-test-25',
+    configure: (configuration, sessionConfig) => {
+      configuration.defaults = { ...configuration.defaults, parallelToolCalls: true, maxConcurrentTools: 1 };
+      sessionConfig.parallelToolCalls = true;
+      sessionConfig.maxConcurrentTools = 1;
+    },
+    expect: (result) => {
+      invariant(result.success, 'Scenario run-test-25 expected success.');
+      const finalReport = result.finalReport;
+      invariant(finalReport !== undefined && finalReport.status === 'success', 'Final report should indicate success for run-test-25.');
+
+      const toolEntries = result.accounting.filter(isToolAccounting).filter((entry) => entry.command === 'test__test');
+      invariant(toolEntries.length === 2, 'Two tool executions expected for run-test-25.');
+      const [firstToolEntry, secondToolEntry] = toolEntries;
+      invariant(typeof firstToolEntry.latency === 'number' && firstToolEntry.latency >= 1_000, 'First tool latency should reflect timeout payload for run-test-25.');
+      invariant(typeof secondToolEntry.latency === 'number' && secondToolEntry.latency < 500, 'Second tool latency should be short for run-test-25.');
+
+      const logs = result.logs;
+      const isMcpToolLog = (log: AIAgentResult['logs'][number]): boolean =>
+        log.type === 'tool' &&
+        typeof log.remoteIdentifier === 'string' &&
+        log.remoteIdentifier.startsWith('mcp:');
+      const firstRequestIndex = logs.findIndex(
+        (log) =>
+          isMcpToolLog(log) &&
+          log.direction === 'request' &&
+          typeof log.message === 'string' &&
+          log.message.includes(CONCURRENCY_TIMEOUT_ARGUMENT)
+      );
+      invariant(firstRequestIndex !== -1, 'First tool request log missing for run-test-25.');
+      const firstResponseIndex = logs.findIndex(
+        (log, idx) =>
+          idx > firstRequestIndex &&
+          isMcpToolLog(log) &&
+          log.direction === 'response' &&
+          typeof log.message === 'string' &&
+          log.message.startsWith('ok test__test')
+      );
+      invariant(firstResponseIndex !== -1, 'First tool response log missing for run-test-25.');
+      const secondRequestIndex = logs.findIndex(
+        (log, idx) =>
+          idx > firstRequestIndex &&
+          isMcpToolLog(log) &&
+          log.direction === 'request' &&
+          typeof log.message === 'string' &&
+          log.message.includes(CONCURRENCY_SECOND_ARGUMENT)
+      );
+      invariant(secondRequestIndex !== -1, 'Second tool request log missing for run-test-25.');
+      invariant(secondRequestIndex > firstResponseIndex, 'Second tool request should occur after first tool response for run-test-25.');
+    },
+  },
+  {
+    id: 'run-test-26',
+    configure: (configuration, sessionConfig) => {
+      configuration.defaults = { ...configuration.defaults, parallelToolCalls: true };
+      sessionConfig.parallelToolCalls = true;
+      sessionConfig.tools = ['test', 'batch'];
+    },
+    expect: (result) => {
+      invariant(result.success, 'Scenario run-test-26 expected session success.');
+      const finalReport = result.finalReport;
+      invariant(finalReport !== undefined && finalReport.status === 'failure', 'Final report should indicate failure for run-test-26.');
+      const batchMessage = result.conversation.find(
+        (message) => message.role === 'tool' && message.toolCallId === 'call-batch-invalid-id'
+      );
+      const invalidContent = batchMessage?.content ?? '';
+      invariant(invalidContent.includes('invalid_batch_input'), 'Batch tool message should include invalid_batch_input for run-test-26.');
+      const batchEntry = result.accounting.filter(isToolAccounting).find((entry) => entry.command === 'agent__batch');
+      invariant(batchEntry !== undefined && batchEntry.status === 'failed' && typeof batchEntry.error === 'string' && batchEntry.error.startsWith('invalid_batch_input'), 'Batch accounting should record invalid input failure for run-test-26.');
+    },
+  },
+  {
+    id: 'run-test-27',
+    configure: (configuration, sessionConfig) => {
+      configuration.defaults = { ...configuration.defaults, parallelToolCalls: true };
+      sessionConfig.parallelToolCalls = true;
+      sessionConfig.tools = ['test', 'batch'];
+    },
+    expect: (result) => {
+      invariant(result.success, 'Scenario run-test-27 expected success.');
+      const finalReport = result.finalReport;
+      invariant(finalReport !== undefined && finalReport.status === 'success', 'Final report should indicate success for run-test-27.');
+      const batchMessage = result.conversation.find(
+        (message) => message.role === 'tool' && message.toolCallId === 'call-batch-unknown-tool'
+      );
+      const unknownContent = batchMessage?.content ?? '';
+      invariant(unknownContent.includes('UNKNOWN_TOOL'), 'Batch tool message should include UNKNOWN_TOOL for run-test-27.');
+      const batchEntry = result.accounting.filter(isToolAccounting).find((entry) => entry.command === 'agent__batch');
+      invariant(batchEntry !== undefined && batchEntry.status === 'ok', 'Batch accounting should record success for run-test-27.');
+    },
+  },
+  {
+    id: 'run-test-28',
+    configure: (configuration, sessionConfig) => {
+      configuration.defaults = { ...configuration.defaults, parallelToolCalls: true };
+      sessionConfig.parallelToolCalls = true;
+      sessionConfig.tools = ['test', 'batch'];
+    },
+    expect: (result) => {
+      invariant(result.success, 'Scenario run-test-28 expected success.');
+      const finalReport = result.finalReport;
+      invariant(finalReport !== undefined && finalReport.status === 'failure', 'Final report should indicate failure for run-test-28.');
+      const batchMessage = result.conversation.find(
+        (message) => message.role === 'tool' && message.toolCallId === 'call-batch-exec-error'
+      );
+      const errorContent = batchMessage?.content ?? '';
+      invariant(errorContent.includes('EXECUTION_ERROR'), 'Batch tool message should include EXECUTION_ERROR for run-test-28.');
+      const batchEntry = result.accounting.filter(isToolAccounting).find((entry) => entry.command === 'agent__batch');
+      invariant(batchEntry !== undefined && batchEntry.status === 'ok', 'Batch accounting should remain ok for run-test-28.');
+    },
+  },
+  {
+    id: 'run-test-29',
+    configure: (configuration, sessionConfig, defaults) => {
+      defaults.maxRetries = 1;
+      configuration.defaults = defaults;
+      sessionConfig.maxRetries = 1;
+    },
+    execute: async (_configuration, sessionConfig) => {
+      const initialSession = AIAgentSession.create(sessionConfig);
+      const firstResult = await initialSession.run();
+      if (firstResult.success) {
+        return firstResult;
+      }
+      const retrySession = initialSession.retry();
+      const secondResult = await retrySession.run();
+      const augmented = secondResult as AIAgentResult & { _firstAttempt?: AIAgentResult };
+      augmented._firstAttempt = firstResult;
+      return augmented;
+    },
+    expect: (result) => {
+      invariant(result.success, 'Scenario run-test-29 expected success after retry.');
+      const finalReport = result.finalReport;
+      invariant(finalReport !== undefined && finalReport.status === 'success', 'Final report should indicate success for run-test-29.');
+      const augmented = result as AIAgentResult & { _firstAttempt?: AIAgentResult };
+      const firstAttempt = augmented._firstAttempt;
+      invariant(firstAttempt !== undefined && !firstAttempt.success, 'First attempt should fail before retry for run-test-29.');
+      invariant(typeof firstAttempt.error === 'string' && firstAttempt.error.includes('Simulated fatal error before manual retry.'), 'First attempt error message mismatch for run-test-29.');
+      const successLog = result.logs.find((entry) => entry.type === 'tool' && entry.direction === 'response' && typeof entry.message === 'string' && entry.message.startsWith('ok test__test'));
+      invariant(successLog !== undefined, 'Successful tool execution log expected after retry for run-test-29.');
+    },
+  },
+  {
+    id: 'run-test-30',
+    configure: (configuration, sessionConfig, defaults) => {
+      defaults.stream = true;
+      configuration.defaults = defaults;
+      sessionConfig.stream = true;
+    },
+    expect: (result) => {
+      invariant(result.success, 'Scenario run-test-30 expected success.');
+      const finalReport = result.finalReport;
+      invariant(finalReport !== undefined && finalReport.status === 'success', 'Final report should indicate success for run-test-30.');
+      const thinkingLog = result.logs.find((entry) => entry.severity === 'THK' && entry.remoteIdentifier === 'thinking');
+      invariant(thinkingLog !== undefined, 'Thinking log expected for run-test-30.');
+    },
+  },
 ];
 
-async function runScenario(prompt: string, configure?: HarnessTest['configure']): Promise<AIAgentResult> {
+async function runScenario(test: HarnessTest): Promise<AIAgentResult> {
+  const { id: prompt, configure, execute } = test;
   const serverPath = path.resolve(__dirname, 'mcp/test-stdio-server.js');
 
   const baseConfiguration: Configuration = {
@@ -474,6 +640,10 @@ async function runScenario(prompt: string, configure?: HarnessTest['configure'])
 
   configure?.(configuration, baseSession, defaults);
 
+  if (typeof execute === 'function') {
+    return await execute(configuration, baseSession, defaults);
+  }
+
   const failureResult = (error: unknown): AIAgentResult => {
     const message = error instanceof Error ? error.message : String(error);
     return {
@@ -499,11 +669,43 @@ async function runScenario(prompt: string, configure?: HarnessTest['configure'])
   }
 }
 
+function formatFailureHint(result: AIAgentResult): string {
+  const hints: string[] = [];
+  if (!result.success && typeof result.error === 'string' && result.error.length > 0) {
+    hints.push(`session-error="${result.error}"`);
+  }
+  const lastLog = result.logs.at(-1);
+  if (lastLog !== undefined) {
+    const msg = typeof lastLog.message === 'string' ? lastLog.message : JSON.stringify(lastLog.message);
+    hints.push(`last-log="${msg}"`);
+  }
+  if (result.finalReport !== undefined) {
+    hints.push(`final-status=${result.finalReport.status}`);
+  }
+  return hints.length > 0 ? ` (${hints.join(' | ')})` : '';
+}
+
 async function runPhaseOne(): Promise<void> {
+  const total = TEST_SCENARIOS.length;
   // eslint-disable-next-line functional/no-loop-statements
-  for (const scenario of TEST_SCENARIOS) {
-    const result = await runScenario(scenario.id, scenario.configure);
-    scenario.expect(result);
+  for (let index = 0; index < total; index += 1) {
+    const scenario = TEST_SCENARIOS[index];
+    const runPrefix = `${String(index + 1)}/${String(total)}`;
+    const label = `${runPrefix} ${scenario.id}`;
+    // eslint-disable-next-line no-console
+    console.log(`[RUN] ${label}`);
+    const result = await runScenario(scenario);
+    try {
+      scenario.expect(result);
+      // eslint-disable-next-line no-console
+      console.log(`[PASS] ${label}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const hint = formatFailureHint(result);
+      // eslint-disable-next-line no-console
+      console.error(`[FAIL] ${label}: ${message}${hint}`);
+      throw error;
+    }
   }
   // eslint-disable-next-line no-console
   console.log('phase1 scenario: ok');

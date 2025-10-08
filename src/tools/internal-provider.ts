@@ -674,12 +674,24 @@ export class InternalToolProvider extends ToolProvider {
         };
       }
 
-      interface R { id: string; tool: string; ok: boolean; elapsedMs: number; output?: string; error?: { code: string; message: string } }
-      const results: R[] = await Promise.all(calls.map(async (cUnknown) => {
+      interface NormalizedCall { id: string; tool: string; args: Record<string, unknown> }
+      const normalizedCalls: NormalizedCall[] = calls.map((cUnknown) => {
         const c = (cUnknown !== null && typeof cUnknown === 'object') ? (cUnknown as Record<string, unknown>) : {};
         const id = typeof c.id === 'string' ? c.id : (typeof c.id === 'number' ? String(c.id) : '');
         const tool = typeof c.tool === 'string' ? c.tool : '';
         const a = (c.args !== null && typeof c.args === 'object') ? (c.args as Record<string, unknown>) : {};
+        return { id, tool, args: a };
+      });
+
+      const invalidEntry = normalizedCalls.find((entry) => entry.id.trim().length === 0 || entry.tool.trim().length === 0);
+      if (invalidEntry !== undefined) {
+        const errorMsg = 'invalid_batch_input: each call requires non-empty id and tool';
+        this.opts.logError(errorMsg);
+        throw new Error(errorMsg);
+      }
+
+      interface R { id: string; tool: string; ok: boolean; elapsedMs: number; output?: string; error?: { code: string; message: string } }
+      const results: R[] = await Promise.all(normalizedCalls.map(async ({ id, tool, args: a }) => {
         const t0 = Date.now();
         // Allow progress_report in batch, but not final_report or nested batch
         if (tool === 'agent__final_report' || tool === 'agent__batch') return { id, tool, ok: false, elapsedMs: 0, error: { code: 'INTERNAL_NOT_ALLOWED', message: 'Internal tools are not allowed in batch' } };

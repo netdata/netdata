@@ -7,6 +7,9 @@ node_modules/
 .channels_cache_v2.json
 .users_cache.json
 
+.coverage/
+coverage/
+
 .venv
 mcp/mcp-gsc/
 

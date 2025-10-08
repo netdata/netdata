@@ -270,6 +270,7 @@ function buildResponse(response: ScenarioStepResponse) {
   };
   if (response.kind === TOOL_CALL_KIND) {
     const content: LanguageModelV2Content[] = buildToolCallContent(response);
+    appendReasoningParts(content, response);
     return {
       content,
       finishReason: (response.finishReason ?? 'tool-calls') as LanguageModelV2FinishReason,
@@ -279,6 +280,7 @@ function buildResponse(response: ScenarioStepResponse) {
   }
   if (response.kind === FINAL_REPORT_KIND) {
     const content: LanguageModelV2Content[] = buildFinalReportContent(response);
+    appendReasoningParts(content, response);
     return {
       content,
       finishReason: 'stop' as LanguageModelV2FinishReason,
@@ -290,6 +292,7 @@ function buildResponse(response: ScenarioStepResponse) {
   if (response.assistantText.trim().length > 0) {
     content.push({ type: 'text', text: response.assistantText });
   }
+  appendReasoningParts(content, response);
   return {
     content,
     finishReason: (response.finishReason ?? 'other') as LanguageModelV2FinishReason,
@@ -336,6 +339,15 @@ function buildFinalReportContent(response: FinalReportStep): LanguageModelV2Cont
   return items;
 }
 
+function appendReasoningParts(content: LanguageModelV2Content[], response: ScenarioStepResponse): void {
+  if (!Array.isArray(response.reasoning) || response.reasoning.length === 0) return;
+  response.reasoning.forEach((entry) => {
+    if (typeof entry === 'string' && entry.trim().length > 0) {
+      content.push({ type: 'reasoning', text: entry });
+    }
+  });
+}
+
 function convertContentToStream(
   content: LanguageModelV2Content[],
   finishReason: LanguageModelV2FinishReason,
@@ -345,6 +357,7 @@ function convertContentToStream(
     { type: 'stream-start', warnings: [] },
   ];
   let textIndex = 0;
+  let reasoningIndex = 0;
   content.forEach((entry) => {
     if (entry.type === 'text') {
       textIndex += 1;
@@ -352,6 +365,14 @@ function convertContentToStream(
       parts.push({ type: 'text-start', id });
       parts.push({ type: 'text-delta', id, delta: entry.text });
       parts.push({ type: 'text-end', id });
+      return;
+    }
+    if (entry.type === 'reasoning') {
+      reasoningIndex += 1;
+      const id = `reasoning-${String(reasoningIndex)}`;
+      parts.push({ type: 'reasoning-start', id });
+      parts.push({ type: 'reasoning-delta', id, delta: entry.text });
+      parts.push({ type: 'reasoning-end', id });
       return;
     }
     if (entry.type === TOOL_CALL_KIND || entry.type === 'tool-result') {

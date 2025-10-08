@@ -2139,7 +2139,7 @@ export class AIAgentSession {
       };
       accounting.push(accountingEntry);
       this.sessionConfig.callbacks?.onAccounting?.(accountingEntry);
-      return JSON.stringify({ ok: false, error: { code: 'INVALID_INPUT', message: 'calls[] requires id, tool, args' } });
+      throw new Error('invalid_batch_input: calls[] requires id, tool, args');
     }
 
     // Batch execution: orchestrator-only inner calls; record a span for the batch

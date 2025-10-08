@@ -14,6 +14,7 @@ export type ScenarioStepResponse =
       assistantText?: string;
       finishReason?: 'tool-calls';
       tokenUsage?: TokenUsage;
+      reasoning?: string[];
     }
   | {
       kind: 'final-report';
@@ -22,12 +23,14 @@ export type ScenarioStepResponse =
       reportFormat: string;
       status?: 'success' | 'failure' | 'partial';
       tokenUsage?: TokenUsage;
+      reasoning?: string[];
     }
   | {
       kind: 'text';
       assistantText: string;
       finishReason?: 'stop' | 'other';
       tokenUsage?: TokenUsage;
+      reasoning?: string[];
     };
 
 export interface ScenarioTurn {
@@ -69,6 +72,15 @@ const STATUS_SUCCESS = 'success' as const;
 const STATUS_FAILURE = 'failure' as const;
 const TOOL_REQUEST_TEXT = 'Requesting test to gather information.';
 const TOOL_ARGUMENT_SUCCESS = 'phase-1-tool-success';
+const CONCURRENCY_TIMEOUT_ARGUMENT = 'trigger-timeout';
+const CONCURRENCY_SECOND_ARGUMENT = 'concurrency-second';
+const BATCH_INVALID_INPUT_ARGUMENT = 'batch-missing-id';
+const BATCH_UNKNOWN_TOOL = 'unknown__tool';
+const BATCH_EXECUTION_ERROR_ARGUMENT = 'trigger-mcp-failure';
+const STREAM_REASONING_STEPS = [
+  'Deliberating over deterministic harness state.',
+  'Confirming reasoning stream emission.',
+] as const;
 
 const SCENARIOS: ScenarioDefinition[] = [
   {
@@ -999,6 +1011,271 @@ const SCENARIOS: ScenarioDefinition[] = [
             outputTokens: 30,
             totalTokens: 112,
           },
+        },
+      },
+    ],
+  },
+  {
+    id: 'run-test-25',
+    description: 'Tool concurrency saturation queue handling.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        expectedTools: [TOOL_NAME],
+        response: {
+          kind: 'tool-call',
+          assistantText: 'Issuing two MCP calls with enforced queue.',
+          toolCalls: [
+            {
+              toolName: TOOL_NAME,
+              callId: 'call-concurrency-1',
+              assistantText: 'First call triggers the timeout payload.',
+              arguments: {
+                text: CONCURRENCY_TIMEOUT_ARGUMENT,
+              },
+            },
+            {
+              toolName: TOOL_NAME,
+              callId: 'call-concurrency-2',
+              assistantText: 'Second call should wait for the slot.',
+              arguments: {
+                text: CONCURRENCY_SECOND_ARGUMENT,
+              },
+            },
+          ],
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+          finishReason: TOOL_FINISH_REASON,
+        },
+      },
+      {
+        turn: 2,
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Reporting queued tool execution results.',
+          reportContent: `${RESULT_HEADING}Queued tool execution completed successfully.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_SUCCESS,
+          tokenUsage: {
+            inputTokens: 88,
+            outputTokens: 34,
+            totalTokens: 122,
+          },
+        },
+      },
+    ],
+  },
+  {
+    id: 'run-test-26',
+    description: 'Batch invalid input detection (missing id).',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        expectedTools: ['agent__batch'],
+        response: {
+          kind: 'tool-call',
+          assistantText: 'Submitting batch payload missing identifiers.',
+          toolCalls: [
+            {
+              toolName: 'agent__batch',
+              callId: 'call-batch-invalid-id',
+              assistantText: 'Batch entry lacks the required id field.',
+              arguments: {
+                calls: [
+                  {
+                    tool: TOOL_NAME,
+                    args: {
+                      text: BATCH_INVALID_INPUT_ARGUMENT,
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+          finishReason: TOOL_FINISH_REASON,
+        },
+      },
+      {
+        turn: 2,
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Finalising invalid batch outcome.',
+          reportContent: `${RESULT_HEADING}Batch input validation failed as expected.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_FAILURE,
+          tokenUsage: {
+            inputTokens: 76,
+            outputTokens: 28,
+            totalTokens: 104,
+          },
+        },
+      },
+    ],
+  },
+  {
+    id: 'run-test-27',
+    description: 'Batch unknown tool handling.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        expectedTools: ['agent__batch'],
+        response: {
+          kind: 'tool-call',
+          assistantText: 'Submitting batch payload with unknown tool.',
+          toolCalls: [
+            {
+              toolName: 'agent__batch',
+              callId: 'call-batch-unknown-tool',
+              assistantText: 'Entry targets an unknown tool to trigger error result.',
+              arguments: {
+                calls: [
+                  {
+                    id: 'u-1',
+                    tool: BATCH_UNKNOWN_TOOL,
+                    args: {
+                      note: 'unknown-tool',
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+          finishReason: TOOL_FINISH_REASON,
+        },
+      },
+      {
+        turn: 2,
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Summarising unknown tool batch outcome.',
+          reportContent: `${RESULT_HEADING}Batch unknown tool result captured successfully.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_SUCCESS,
+          tokenUsage: {
+            inputTokens: 82,
+            outputTokens: 30,
+            totalTokens: 112,
+          },
+        },
+      },
+    ],
+  },
+  {
+    id: 'run-test-28',
+    description: 'Batch execution error propagation.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        expectedTools: ['agent__batch'],
+        response: {
+          kind: 'tool-call',
+          assistantText: 'Submitting batch payload that triggers execution error.',
+          toolCalls: [
+            {
+              toolName: 'agent__batch',
+              callId: 'call-batch-exec-error',
+              assistantText: 'Entry will surface execution failure from MCP tool.',
+              arguments: {
+                calls: [
+                  {
+                    id: 'e-1',
+                    tool: TOOL_NAME,
+                    args: {
+                      text: BATCH_EXECUTION_ERROR_ARGUMENT,
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+          finishReason: TOOL_FINISH_REASON,
+        },
+      },
+      {
+        turn: 2,
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Summarising execution error result.',
+          reportContent: `${RESULT_HEADING}Batch captured downstream execution error.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_FAILURE,
+          tokenUsage: {
+            inputTokens: 80,
+            outputTokens: 30,
+            totalTokens: 110,
+          },
+        },
+      },
+    ],
+  },
+  {
+    id: 'run-test-29',
+    description: 'Session-level retry via retry() API.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        expectedTools: [TOOL_NAME],
+        failuresBeforeSuccess: 1,
+        failureStatus: 'model_error',
+        failureRetryable: false,
+        failureMessage: 'Simulated fatal error before manual retry.',
+        response: {
+          kind: 'tool-call',
+          assistantText: 'Retry scenario executes after manual retry.',
+          toolCalls: [
+            {
+              toolName: TOOL_NAME,
+              callId: 'call-retry-session',
+              assistantText: 'Executing tool call after retry.',
+              arguments: {
+                text: TOOL_ARGUMENT_SUCCESS,
+              },
+            },
+          ],
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+          finishReason: TOOL_FINISH_REASON,
+        },
+      },
+      {
+        turn: 2,
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Reporting retry outcome.',
+          reportContent: `${RESULT_HEADING}Session retry succeeded after manual invocation.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_SUCCESS,
+          tokenUsage: {
+            inputTokens: 84,
+            outputTokens: 32,
+            totalTokens: 116,
+          },
+        },
+      },
+    ],
+  },
+  {
+    id: 'run-test-30',
+    description: 'Streaming reasoning/thinking emission.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        expectedTools: ['agent__final_report'],
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Streaming final report with reasoning.',
+          reportContent: `${RESULT_HEADING}Streaming reasoning scenario completed.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_SUCCESS,
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+          reasoning: [...STREAM_REASONING_STEPS],
         },
       },
     ],
