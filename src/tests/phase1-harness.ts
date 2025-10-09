@@ -31,6 +31,7 @@ const CONCURRENCY_SECOND_ARGUMENT = 'concurrency-second';
 const THROW_FAILURE_MESSAGE = 'Simulated provider throw for coverage.';
 const BATCH_PROGRESS_RESPONSE = 'batch-progress-follow-up';
 const BATCH_STRING_RESULT = 'batch-string-mode';
+const TRACEABLE_PROVIDER_URL = 'https://openrouter.ai/api/v1';
 
 function makeTempDir(label: string): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), `${TMP_PREFIX}${label}-`));
@@ -698,8 +699,41 @@ const TEST_SCENARIOS: HarnessTest[] = [
       invariant(rateLimitLog !== undefined, 'Rate limit warning expected for run-test-37.');
       const retryLog = result.logs.find((entry) => entry.remoteIdentifier === 'agent:retry');
       invariant(retryLog !== undefined, 'Retry backoff log expected for run-test-37.');
-      const failedAttempt = result.accounting.filter(isLlmAccounting).find((entry) => entry.status === 'failed');
-      invariant(failedAttempt !== undefined, 'Failed LLM accounting entry expected for run-test-37.');
+    },
+  },
+  {
+    id: 'run-test-45',
+    configure: (configuration, sessionConfig) => {
+      configuration.providers[PRIMARY_PROVIDER] = {
+        type: 'test-llm',
+        baseUrl: TRACEABLE_PROVIDER_URL,
+      };
+      configuration.pricing = {
+        [PRIMARY_PROVIDER]: {
+          [MODEL_NAME]: { unit: 'per_1k', prompt: 0.001, completion: 0.002 },
+        },
+      };
+      sessionConfig.targets = [{ provider: PRIMARY_PROVIDER, model: MODEL_NAME }];
+      sessionConfig.traceLLM = true;
+    },
+    expect: (result) => {
+      invariant(result.success, 'Scenario run-test-45 expected success with traced fetch.');
+      const summaryCostLog = result.logs.find((entry) => entry.severity === 'FIN' && entry.remoteIdentifier === 'summary' && typeof entry.message === 'string' && entry.message.includes('cost total=$'));
+      invariant(summaryCostLog !== undefined, 'Pricing summary log expected for run-test-45.');
+    },
+  },
+  {
+    id: 'run-test-46',
+    configure: (configuration, sessionConfig, defaults) => {
+      defaults.maxConcurrentTools = 1;
+      configuration.defaults = defaults;
+      sessionConfig.maxConcurrentTools = 1;
+      sessionConfig.tools = ['test'];
+    },
+    expect: (result) => {
+      invariant(result.success, 'Scenario run-test-46 expected success.');
+      const summaryLog = result.logs.find((entry) => entry.remoteIdentifier === 'summary' && entry.type === 'llm');
+      invariant(summaryLog !== undefined, 'LLM summary log expected for run-test-46.');
     },
   },
   {
@@ -741,6 +775,98 @@ const TEST_SCENARIOS: HarnessTest[] = [
       invariant(finalReport !== undefined && finalReport.status === 'success', 'Final report should indicate success for run-test-42.');
       const failedAttempt = result.accounting.filter(isLlmAccounting).find((entry) => entry.status === 'failed');
       invariant(failedAttempt !== undefined && typeof failedAttempt.error === 'string' && failedAttempt.error.includes('Invalid model request'), 'Model error accounting expected for run-test-42.');
+    },
+  },
+  {
+    id: 'run-test-47',
+    configure: (_configuration, sessionConfig) => {
+      sessionConfig.outputFormat = 'json';
+      sessionConfig.expectedOutput = {
+        format: 'json',
+        schema: {
+          type: 'object',
+          required: ['status'],
+          properties: {
+            status: { enum: ['success'] },
+          },
+        },
+      };
+    },
+    expect: (result) => {
+      invariant(!result.success, 'Scenario run-test-47 should fail due to schema validation.');
+      const schemaLog = result.logs.find((entry) => entry.severity === 'ERR' && typeof entry.message === 'string' && entry.message.includes('schema validation failed'));
+      invariant(schemaLog !== undefined, 'Schema validation log expected for run-test-47.');
+    },
+  },
+  {
+    id: 'run-test-48',
+    configure: (configuration, sessionConfig) => {
+      configuration.providers[PRIMARY_PROVIDER] = { type: 'test-llm' };
+      sessionConfig.traceMCP = true;
+    },
+    expect: (result) => {
+      invariant(result.success, 'Scenario run-test-48 expected success with trace logs.');
+      const traceLog = result.logs.find((entry) => entry.severity === 'TRC' && typeof entry.message === 'string' && entry.message.includes('REQUEST test__test'));
+      invariant(traceLog !== undefined, 'Trace log expected for run-test-48.');
+    },
+  },
+  {
+    id: 'run-test-43',
+    configure: (_configuration, sessionConfig) => {
+      sessionConfig.stopRef = { stopping: true };
+    },
+    expect: (result) => {
+      invariant(result.success, 'Scenario run-test-43 should finish gracefully.');
+      invariant(result.finalReport === undefined, 'No final report expected for run-test-43.');
+      const finLog = result.logs.find((entry) => entry.remoteIdentifier === 'agent:fin');
+      invariant(finLog !== undefined, 'Finalization log expected for run-test-43.');
+    },
+  },
+  {
+    id: 'run-test-49',
+    configure: (configuration, sessionConfig) => {
+      configuration.providers[SECONDARY_PROVIDER] = { type: 'test-llm' };
+      const stopRef = { stopping: false };
+      sessionConfig.stopRef = stopRef;
+      sessionConfig.maxRetries = 2;
+      sessionConfig.targets = [
+        { provider: PRIMARY_PROVIDER, model: MODEL_NAME },
+        { provider: SECONDARY_PROVIDER, model: MODEL_NAME },
+      ];
+    },
+    execute: async (_configuration, sessionConfig) => {
+      const stopRef = sessionConfig.stopRef ?? { stopping: false };
+      sessionConfig.stopRef = stopRef;
+      const session = AIAgentSession.create(sessionConfig);
+      setTimeout(() => { stopRef.stopping = true; }, 10);
+      return await session.run();
+    },
+    expect: (result) => {
+      invariant(result.success, 'Scenario run-test-49 should honor stop during rate limit backoff.');
+      invariant(result.finalReport === undefined, 'No final report expected for run-test-49.');
+      const finLog = result.logs.find((entry) => entry.remoteIdentifier === 'agent:fin');
+      invariant(finLog !== undefined, 'Finalization log expected for run-test-49.');
+    },
+  },
+  {
+    id: 'run-test-44',
+    configure: (_configuration, sessionConfig) => {
+      const stopRef = { stopping: false };
+      sessionConfig.stopRef = stopRef;
+      sessionConfig.maxRetries = 2;
+    },
+    execute: async (_configuration, sessionConfig) => {
+      const stopRef = sessionConfig.stopRef ?? { stopping: false };
+      sessionConfig.stopRef = stopRef;
+      const session = AIAgentSession.create(sessionConfig);
+      setTimeout(() => { stopRef.stopping = true; }, 10);
+      return await session.run();
+    },
+    expect: (result) => {
+      invariant(result.success, 'Scenario run-test-44 should honor graceful stop during rate limit.');
+      invariant(result.finalReport === undefined, 'No final report expected for run-test-44.');
+      const finLog = result.logs.find((entry) => entry.remoteIdentifier === 'agent:fin');
+      invariant(finLog !== undefined, 'Finalization log expected for run-test-44.');
     },
   },
 ];

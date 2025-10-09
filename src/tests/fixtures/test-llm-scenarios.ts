@@ -92,6 +92,7 @@ const BATCH_PROGRESS_STATUS = 'Batch progress update for coverage.';
 const BATCH_PROGRESS_RESPONSE = 'batch-progress-follow-up';
 const BATCH_STRING_PROGRESS = 'Batch progress conveyed via string payload.';
 const BATCH_STRING_RESULT = 'batch-string-mode';
+const RATE_LIMIT_FAILURE_MESSAGE = 'Rate limit simulated.' as const;
 
 const SCENARIOS: ScenarioDefinition[] = [
   {
@@ -1552,6 +1553,48 @@ const SCENARIOS: ScenarioDefinition[] = [
     ],
   },
   {
+    id: 'run-test-45',
+    description: 'Traced fetch and pricing enrichment.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        expectedTools: [TOOL_NAME],
+        response: {
+          kind: 'tool-call',
+          assistantText: 'Executing under traced fetch.',
+          toolCalls: [
+            {
+              toolName: TOOL_NAME,
+              callId: 'call-trace-fetch',
+              assistantText: 'Collecting data for traced fetch.',
+              arguments: {
+                text: 'trace-fetch-success',
+              },
+            },
+          ],
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+          finishReason: TOOL_FINISH_REASON,
+        },
+      },
+      {
+        turn: 2,
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Reporting traced fetch outcome.',
+          reportContent: `${RESULT_HEADING}Traced fetch completed successfully.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_SUCCESS,
+          tokenUsage: {
+            inputTokens: 80,
+            outputTokens: 28,
+            totalTokens: 108,
+          },
+        },
+      },
+    ],
+  },
+  {
     id: 'run-test-37',
     description: 'Rate limit error triggers retry.',
     systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
@@ -1560,16 +1603,9 @@ const SCENARIOS: ScenarioDefinition[] = [
         turn: 1,
         expectedTools: [TOOL_NAME],
         failuresBeforeSuccess: 1,
-        failureThrows: true,
-        failureMessage: 'Rate limit simulated.',
-        failureError: {
-          name: 'RateLimitError',
-          status: 429,
-          headers: { 'retry-after': '2' },
-          retryAfter: 2,
-          responseBody: JSON.stringify({ error: { message: 'Rate limited', metadata: { raw: JSON.stringify({ error: { status: 'rate_limit' } }) } } }),
-        },
+        failureMessage: RATE_LIMIT_FAILURE_MESSAGE,
         failureStatus: 'rate_limit',
+        failureRetryAfterMs: 2000,
         response: {
           kind: 'tool-call',
           assistantText: 'Executing after rate limit retry.',
@@ -1756,6 +1792,210 @@ const SCENARIOS: ScenarioDefinition[] = [
             inputTokens: 78,
             outputTokens: 30,
             totalTokens: 108,
+          },
+        },
+      },
+    ],
+  },
+  {
+    id: 'run-test-46',
+    description: 'Persistence paths and concurrency summary.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        expectedTools: [TOOL_NAME],
+        response: {
+          kind: 'tool-call',
+          assistantText: 'First tool call for persistence coverage.',
+          toolCalls: [
+            {
+              toolName: TOOL_NAME,
+              callId: 'call-persistence',
+              assistantText: 'Collecting data for persistence.',
+              arguments: {
+                text: 'persistence-coverage',
+              },
+            },
+          ],
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+          finishReason: TOOL_FINISH_REASON,
+        },
+      },
+      {
+        turn: 2,
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Reporting persistence coverage.',
+          reportContent: `${RESULT_HEADING}Persistence coverage completed successfully.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_SUCCESS,
+          tokenUsage: {
+            inputTokens: 80,
+            outputTokens: 28,
+            totalTokens: 108,
+          },
+        },
+      },
+    ],
+  },
+  {
+    id: 'run-test-43',
+    description: 'Immediate graceful stop without LLM call.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [],
+  },
+  {
+    id: 'run-test-44',
+    description: 'Rate limit backoff aborted by stop request.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        expectedTools: [TOOL_NAME],
+        failuresBeforeSuccess: 1,
+        failureMessage: RATE_LIMIT_FAILURE_MESSAGE,
+        failureStatus: 'rate_limit',
+        failureRetryAfterMs: 2000,
+        response: {
+          kind: 'tool-call',
+          assistantText: 'Executing after rate limit retry with stop.',
+          toolCalls: [
+            {
+              toolName: TOOL_NAME,
+              callId: 'call-rate-limit-stop',
+              assistantText: 'Collecting data after stop.',
+              arguments: {
+                text: 'rate-limit-stop-success',
+              },
+            },
+          ],
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+          finishReason: TOOL_FINISH_REASON,
+        },
+      },
+      {
+        turn: 2,
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Final report after stop-induced retry.',
+          reportContent: `${RESULT_HEADING}Stop request honored during rate limit backoff.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_SUCCESS,
+          tokenUsage: {
+            inputTokens: 78,
+            outputTokens: 30,
+            totalTokens: 108,
+          },
+        },
+      },
+    ],
+  },
+  {
+    id: 'run-test-49',
+    description: 'Graceful stop during rate limit backoff.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        expectedTools: [TOOL_NAME],
+        failuresBeforeSuccess: 1,
+        failureMessage: RATE_LIMIT_FAILURE_MESSAGE,
+        failureStatus: 'rate_limit',
+        failureRetryAfterMs: 2000,
+        response: {
+          kind: 'tool-call',
+          assistantText: 'Executing after stop-induced retry.',
+          toolCalls: [
+            {
+              toolName: TOOL_NAME,
+              callId: 'call-stop-retry',
+              assistantText: 'Collecting data after stop retry.',
+              arguments: {
+                text: 'stop-retry-success',
+              },
+            },
+          ],
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+          finishReason: TOOL_FINISH_REASON,
+        },
+      },
+      {
+        turn: 2,
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Final report after stop retry.',
+          reportContent: `${RESULT_HEADING}Stop retry completed successfully.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_SUCCESS,
+          tokenUsage: {
+            inputTokens: 78,
+            outputTokens: 30,
+            totalTokens: 108,
+          },
+        },
+      },
+    ],
+  },
+  {
+    id: 'run-test-48',
+    description: 'Internal provider trace logging.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        expectedTools: [TOOL_NAME],
+        response: {
+          kind: 'tool-call',
+          assistantText: 'Triggering trace logging.',
+          toolCalls: [
+            {
+              toolName: TOOL_NAME,
+              callId: 'call-trace-tools',
+              assistantText: 'Collecting data for trace logging.',
+              arguments: {
+                text: 'trace-tools-success',
+              },
+            },
+          ],
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+          finishReason: TOOL_FINISH_REASON,
+        },
+      },
+      {
+        turn: 2,
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Reporting trace logging.',
+          reportContent: `${RESULT_HEADING}Trace logging completed successfully.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_SUCCESS,
+          tokenUsage: {
+            inputTokens: 78,
+            outputTokens: 30,
+            totalTokens: 108,
+          },
+        },
+      },
+    ],
+  },
+  {
+    id: 'run-test-47',
+    description: 'Internal provider schema validation failure.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        expectedTools: ['agent__final_report'],
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Invalid JSON final report to trigger schema failure.',
+          reportContent: `${RESULT_HEADING}Schema failure.`,
+          reportFormat: 'json',
+          status: STATUS_SUCCESS,
+          reportContentJson: {
+            status: 'failure',
+            detail: 'Schema should reject this payload.',
           },
         },
       },
