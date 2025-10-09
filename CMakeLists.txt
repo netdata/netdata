@@ -3159,6 +3159,7 @@ endif()
 #
 
 if(ENABLE_PLUGIN_IBM)
+    pkg_check_modules(ODBC REQUIRED odbc)
     include(NetdataIBMPlugin)
     add_ibm_plugin_target()
 
