@@ -194,18 +194,18 @@ static inline char *netdata_convert_guid_to_string(HRESULT hr, GUID *value) {
     return NULL;
 }
 
-static inline void netdata_fill_sensor_type(struct sensor_data *s, ISensor *pSensor)
+static inline void netdata_fill_sensor_type(struct sensor_data *sd, ISensor *pSensor)
 {
     GUID type = {0};
     HRESULT hr = pSensor->lpVtbl->GetType(pSensor, &type);
-    s->type =  netdata_convert_guid_to_string(hr, &type);
+    sd->type =  netdata_convert_guid_to_string(hr, &type);
 }
 
-static inline void netdata_fill_sensor_category(struct sensor_data *s, ISensor *pSensor)
+static inline void netdata_fill_sensor_category(struct sensor_data *sd, ISensor *pSensor)
 {
     GUID category = {0};
     HRESULT hr = pSensor->lpVtbl->GetCategory(pSensor, &category);
-    s->category =  netdata_convert_guid_to_string(hr, &category);
+    sd->category =  netdata_convert_guid_to_string(hr, &category);
 }
 
 static inline char *netdata_pvar_to_char(const PROPERTYKEY *key, ISensor *pSensor)
@@ -224,17 +224,17 @@ static inline char *netdata_pvar_to_char(const PROPERTYKEY *key, ISensor *pSenso
     return NULL;
 }
 
-static void netdata_initialize_sensor_dict(struct sensor_data *s, ISensor *pSensor)
+static void netdata_initialize_sensor_dict(struct sensor_data *sd, ISensor *pSensor)
 {
-    netdata_fill_sensor_type(s, pSensor);
-    netdata_fill_sensor_category(s, pSensor);
-    s->name = netdata_pvar_to_char(&SENSOR_PROPERTY_FRIENDLY_NAME, pSensor);
-    s->model = netdata_pvar_to_char(&SENSOR_PROPERTY_MODEL, pSensor);
-    s->manufacturer = netdata_pvar_to_char(&SENSOR_PROPERTY_MANUFACTURER, pSensor);
+    netdata_fill_sensor_type(sd, pSensor);
+    netdata_fill_sensor_category(sd, pSensor);
+    sd->name = netdata_pvar_to_char(&SENSOR_PROPERTY_FRIENDLY_NAME, pSensor);
+    sd->model = netdata_pvar_to_char(&SENSOR_PROPERTY_MODEL, pSensor);
+    sd->manufacturer = netdata_pvar_to_char(&SENSOR_PROPERTY_MANUFACTURER, pSensor);
 }
 
 static int
-netdata_collect_sensor_data(struct sensor_data *s, ISensor *pSensor, REFPROPERTYKEY key)
+netdata_collect_sensor_data(struct sensor_data *sd, ISensor *pSensor, REFPROPERTYKEY key)
 {
     ISensorDataReport *pReport = NULL;
     PROPVARIANT pv = {};
@@ -248,13 +248,13 @@ netdata_collect_sensor_data(struct sensor_data *s, ISensor *pSensor, REFPROPERTY
         if (SUCCEEDED(hr) && (pv.vt == VT_R4 || pv.vt == VT_R8 || pv.vt == VT_UI4)) {
             switch (pv.vt) {
                 case VT_UI4:
-                    s->current_data_value = (collected_number)(pv.ulVal * 100);
+                    sd->current_data_value = (collected_number)(pv.ulVal * 100);
                     break;
                 case VT_R4:
-                    s->current_data_value = (collected_number)(pv.fltVal * s->div_factor);
+                    sd->current_data_value = (collected_number)(pv.fltVal * sd->div_factor);
                     break;
                 case VT_R8:
-                    s->current_data_value = (collected_number)(pv.dblVal * s->div_factor);
+                    sd->current_data_value = (collected_number)(pv.dblVal * sd->div_factor);
                     break;
             }
             defined = 1;
@@ -266,22 +266,22 @@ netdata_collect_sensor_data(struct sensor_data *s, ISensor *pSensor, REFPROPERTY
     return defined;
 }
 
-static void netdata_sensors_get_data(struct sensor_data *s, ISensor *pSensor)
+static void netdata_sensors_get_data(struct sensor_data *sd, ISensor *pSensor)
 {
     for (int i = 0; sensor_keys[i]; i++) {
-        if (netdata_collect_sensor_data(s, pSensor, sensor_keys[i])) {
-            s->sensor_data_type = i;
-            s->config = &configs[i];
-            s->enabled = true;
+        if (netdata_collect_sensor_data(sd, pSensor, sensor_keys[i])) {
+            sd->sensor_data_type = i;
+            sd->config = &configs[i];
+            sd->enabled = true;
             if (i == NETDATA_WIN_SENSOR_DATA_TYPE_LIGHT_TEMPERATURE) {
-                s->div_factor = 100.0;
-                s->add_factor = -27315.0; // 273.15 * 100.0
+                sd->div_factor = 100.0;
+                sd->add_factor = -27315.0; // 273.15 * 100.0
             }
             break;
         }
     }
 
-    s->first_time = false;
+    sd->first_time = false;
 }
 
 static void netdata_get_sensors()
@@ -314,20 +314,20 @@ static void netdata_get_sensors()
         }
         netdata_clsid_to_char(thread_values, &id);
 
-        struct sensor_data *s = dictionary_set(sensors, thread_values, NULL, sizeof(*s));
+        struct sensor_data *sd = dictionary_set(sensors, thread_values, NULL, sizeof(*sd));
 
-        if (unlikely(!s->initialized)) {
-            netdata_initialize_sensor_dict(s, pSensor);
-            s->initialized = true;
+        if (unlikely(!sd->initialized)) {
+            netdata_initialize_sensor_dict(sd, pSensor);
+            sd->initialized = true;
         }
 
-        s->current_state = SENSOR_STATE_MIN;
-        (void)pSensor->lpVtbl->GetState(pSensor, &s->current_state);
+        sd->current_state = SENSOR_STATE_MIN;
+        (void)pSensor->lpVtbl->GetState(pSensor, &sd->current_state);
 
-        if (likely(s->first_time))
-            netdata_sensors_get_data(s, pSensor);
-        else if (likely(s->enabled))
-            netdata_collect_sensor_data(s, pSensor, sensor_keys[s->sensor_data_type]);
+        if (likely(sd->first_time))
+            netdata_sensors_get_data(sd, pSensor);
+        else if (likely(sd->enabled))
+            netdata_collect_sensor_data(sd, pSensor, sensor_keys[sd->sensor_data_type]);
 
         pSensor->lpVtbl->Release(pSensor);
     }
