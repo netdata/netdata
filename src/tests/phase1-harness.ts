@@ -3,11 +3,17 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { WebSocketServer } from 'ws';
+
 import type { AIAgentResult, AIAgentSessionConfig, AccountingEntry, Configuration } from '../types.js';
+import type { JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js';
+import type { AddressInfo } from 'node:net';
 
 import { AIAgentSession } from '../ai-agent.js';
 import { sanitizeToolName } from '../utils.js';
+import { createWebSocketTransport } from '../websocket-transport.js';
 
+import { getScenario } from './fixtures/test-llm-scenarios.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -23,6 +29,53 @@ const BASE_DEFAULTS = {
   toolTimeout: 10_000,
 } as const;
 const TMP_PREFIX = 'ai-agent-phase1-';
+
+function resolveScenarioDescription(id: string, provided?: string): string | undefined {
+  if (provided !== undefined && provided.trim().length > 0) return provided;
+  const scenario = getScenario(id);
+  return scenario?.description;
+}
+
+function runWithTimeout<T>(promise: Promise<T>, timeoutMs: number, scenarioId: string, onTimeout?: () => void): Promise<T> {
+  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) return promise;
+  return new Promise<T>((resolve, reject) => {
+    let settled = false;
+    let timer: ReturnType<typeof setTimeout>;
+    const finalize = (action: () => void) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      action();
+    };
+    timer = setTimeout(() => {
+      finalize(() => {
+        try { onTimeout?.(); } catch { /* ignore */ }
+        reject(new Error(`Scenario ${scenarioId} timed out after ${String(timeoutMs)} ms`));
+      });
+    }, timeoutMs);
+    void (async () => {
+      try {
+        const value = await promise;
+        finalize(() => { resolve(value); });
+      } catch (error: unknown) {
+        finalize(() => { reject(error instanceof Error ? error : new Error(String(error))); });
+      }
+    })();
+  });
+}
+
+function formatDurationMs(startMs: number, endMs: number): string {
+  const seconds = (endMs - startMs) / 1000;
+  return `${seconds.toFixed(RUN_LOG_DECIMAL_PRECISION)}s`;
+}
+
+function getEffectiveTimeoutMs(test: HarnessTest): number {
+  if (typeof test.timeoutMs === 'number' && Number.isFinite(test.timeoutMs) && test.timeoutMs > 0) {
+    return test.timeoutMs;
+  }
+  return DEFAULT_SCENARIO_TIMEOUT_MS;
+}
+
 const SUBAGENT_PRICING_PROMPT = path.resolve(process.cwd(), 'src/tests/fixtures/subagents/pricing-subagent.ai');
 const SUBAGENT_PRICING_SUCCESS_PROMPT = path.resolve(process.cwd(), 'src/tests/fixtures/subagents-success/pricing-subagent-success.ai');
 const SUBAGENT_SUCCESS_TOOL = 'agent__pricing-subagent-success';
@@ -33,12 +86,26 @@ const BATCH_PROGRESS_RESPONSE = 'batch-progress-follow-up';
 const BATCH_STRING_RESULT = 'batch-string-mode';
 const TRACEABLE_PROVIDER_URL = 'https://openrouter.ai/api/v1';
 
+const GITHUB_SERVER_PATH = path.resolve(__dirname, 'mcp/github-stdio-server.js');
+
+const SLACK_OUTPUT_FORMAT = 'slack-block-kit' as const;
+
+const DEFAULT_SCENARIO_TIMEOUT_MS = (() => {
+  const raw = process.env.PHASE1_SCENARIO_TIMEOUT_MS;
+  if (raw === undefined) return 10_000;
+  const parsed = Number.parseInt(raw, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 10_000;
+})();
+
+const RUN_LOG_DECIMAL_PRECISION = 2;
+
 function makeTempDir(label: string): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), `${TMP_PREFIX}${label}-`));
 }
 
 let runTest16Paths: { sessionsDir: string; billingFile: string } | undefined;
 let runTest20Paths: { baseDir: string; blockerFile: string; billingFile: string } | undefined;
+let runTest54State: { received: JSONRPCMessage[]; serverPayloads: string[]; errors: string[] } | undefined;
 
 function invariant(condition: boolean, message: string): asserts condition {
   if (!condition) throw new Error(message);
@@ -54,6 +121,8 @@ function isLlmAccounting(entry: AccountingEntry): entry is AccountingEntry & { t
 
 interface HarnessTest {
   id: string;
+  description?: string;
+  timeoutMs?: number;
   configure?: (
     configuration: Configuration,
     sessionConfig: AIAgentSessionConfig,
@@ -811,6 +880,190 @@ const TEST_SCENARIOS: HarnessTest[] = [
     },
   },
   {
+    id: 'run-test-50',
+    configure: (_configuration, sessionConfig) => {
+      sessionConfig.outputFormat = SLACK_OUTPUT_FORMAT;
+    },
+    expect: (result) => {
+      invariant(result.success, 'Scenario run-test-50 expected success.');
+      const finalReport = result.finalReport;
+      invariant(finalReport !== undefined && finalReport.format === SLACK_OUTPUT_FORMAT, 'Slack final report expected for run-test-50.');
+      const metadataCandidate = finalReport.metadata;
+      const slackCandidate = (metadataCandidate !== undefined && typeof metadataCandidate === 'object' && !Array.isArray(metadataCandidate))
+        ? (metadataCandidate as { slack?: unknown }).slack
+        : undefined;
+      const slackMeta = (slackCandidate !== undefined && typeof slackCandidate === 'object' && !Array.isArray(slackCandidate))
+        ? (slackCandidate as { messages?: unknown[] })
+        : undefined;
+      const messagesValue = slackMeta !== undefined ? slackMeta.messages : undefined;
+      const messages = Array.isArray(messagesValue) ? messagesValue : [];
+      invariant(messages.length > 0, 'Normalized Slack messages expected for run-test-50.');
+      const first = messages.at(0);
+      invariant(first !== undefined && typeof first === 'object', 'First Slack message should be an object for run-test-50.');
+    },
+  },
+  {
+    id: 'run-test-51',
+    configure: (_configuration, sessionConfig) => {
+      sessionConfig.outputFormat = SLACK_OUTPUT_FORMAT;
+    },
+    expect: (result) => {
+      invariant(result.success, 'Scenario run-test-51 should complete the session.');
+      const finalReport = result.finalReport;
+      invariant(finalReport !== undefined && finalReport.status === 'failure', 'Final report should indicate failure for run-test-51.');
+      const errorLog = result.logs.find((entry) => entry.severity === 'ERR' && typeof entry.message === 'string' && entry.message.includes('requires `messages` or non-empty `content`'));
+      invariant(errorLog !== undefined, 'Slack content error log expected for run-test-51.');
+    },
+  },
+  {
+    id: 'run-test-52',
+    configure: (_configuration, sessionConfig) => {
+      sessionConfig.outputFormat = SLACK_OUTPUT_FORMAT;
+    },
+    expect: (result) => {
+      invariant(result.success, 'Scenario run-test-52 expected success.');
+      const finalReport = result.finalReport;
+      invariant(finalReport !== undefined && finalReport.format === SLACK_OUTPUT_FORMAT, 'Slack final report expected for run-test-52.');
+      const metadataCandidate = finalReport.metadata;
+      const slackCandidate = (metadataCandidate !== undefined && typeof metadataCandidate === 'object' && !Array.isArray(metadataCandidate))
+        ? (metadataCandidate as { slack?: unknown }).slack
+        : undefined;
+      const slackMeta = (slackCandidate !== undefined && typeof slackCandidate === 'object' && !Array.isArray(slackCandidate))
+        ? (slackCandidate as { messages?: unknown[]; footer?: unknown })
+        : undefined;
+      const messagesValue = slackMeta !== undefined ? slackMeta.messages : undefined;
+      const messages = Array.isArray(messagesValue) ? messagesValue : [];
+      invariant(messages.length >= 2, 'Multiple Slack messages expected for run-test-52.');
+    },
+  },
+  {
+    id: 'run-test-53',
+    description: 'GitHub search normalization coverage.',
+    configure: (configuration, sessionConfig) => {
+      configuration.mcpServers.github = {
+        type: 'stdio',
+        command: process.execPath,
+        args: [GITHUB_SERVER_PATH],
+      };
+      sessionConfig.tools = ['test', 'github'];
+    },
+    expect: (result) => {
+      invariant(result.success, 'Scenario run-test-53 expected success.');
+      const toolMessage = result.conversation.find((message) => message.role === 'tool' && message.toolCallId === 'call-github-search');
+      invariant(toolMessage !== undefined && typeof toolMessage.content === 'string', 'GitHub tool response expected for run-test-53.');
+      const toolPayload = toolMessage.content;
+      let parsed: { q?: unknown; language?: unknown; repo?: unknown; path?: unknown } = {};
+      try {
+        parsed = JSON.parse(toolPayload) as { q?: unknown; language?: unknown; repo?: unknown; path?: unknown };
+      } catch (error: unknown) {
+        throw new Error(`Failed to parse GitHub tool response: ${error instanceof Error ? error.message : String(error)}`);
+      }
+      const q = typeof parsed.q === 'string' ? parsed.q : '';
+      invariant(q.includes('md5 helper'), 'Normalized query should include base term for run-test-53.');
+      invariant(q.includes('repo:owner/project'), 'Normalized query should include repo qualifier for run-test-53.');
+      invariant(q.includes('path:src'), 'Normalized query should include path qualifier for run-test-53.');
+      invariant(q.includes('language:javascript'), 'Normalized query should include javascript language qualifier for run-test-53.');
+      invariant(q.includes('language:python'), 'Normalized query should include python language qualifier for run-test-53.');
+      invariant(q.includes('extension:jsx'), 'Normalized query should include jsx extension qualifier for run-test-53.');
+      invariant(!q.includes('language:js'), 'Normalized query should not include raw js language qualifier for run-test-53.');
+    },
+  },
+  {
+    id: 'run-test-54',
+    description: 'WebSocket transport round-trip coverage.',
+    execute: async () => {
+      runTest54State = undefined;
+      const server = new WebSocketServer({ port: 0 });
+      const address = server.address();
+      if (address === null || typeof address === 'string' || typeof (address as AddressInfo).port !== 'number') {
+        await new Promise<void>((resolve) => { server.close(() => { resolve(); }); });
+        throw new Error('Unable to determine WebSocket server port for run-test-54.');
+      }
+      const port = (address as AddressInfo).port;
+      const serverPayloads: string[] = [];
+      server.on('connection', (socket) => {
+        setTimeout(() => {
+          socket.send(JSON.stringify({ jsonrpc: '2.0', method: 'serverHello' }));
+        }, 5);
+        socket.on('message', (data) => {
+          let text = '';
+          if (typeof data === 'string') {
+            text = data;
+          } else if (Array.isArray(data)) {
+            text = Buffer.concat(data).toString('utf8');
+          } else if (data instanceof Buffer) {
+            text = data.toString('utf8');
+          }
+          if (text.length > 0) {
+            serverPayloads.push(text);
+            socket.send(JSON.stringify({ jsonrpc: '2.0', method: 'ack', params: { payload: text } }));
+          }
+        });
+      });
+      const received: JSONRPCMessage[] = [];
+      const errors: string[] = [];
+      let transportClosed = false;
+      let transport: Awaited<ReturnType<typeof createWebSocketTransport>> | undefined;
+      try {
+        transport = await createWebSocketTransport(`ws://127.0.0.1:${port.toString()}`);
+        let helloResolve: (() => void) | undefined;
+        const helloPromise = new Promise<void>((resolve) => { helloResolve = resolve; });
+        transport.onmessage = (message) => {
+          received.push(message);
+          if (helloResolve !== undefined) {
+            helloResolve();
+            helloResolve = undefined;
+          }
+        };
+        transport.onerror = (error) => {
+          errors.push(error.message);
+        };
+        await transport.send({ jsonrpc: '2.0', method: 'clientPing', id: 'ping-1' });
+        try {
+          await Promise.race([
+            helloPromise,
+            new Promise<void>((_resolve, reject) => {
+              setTimeout(() => { reject(new Error('serverHello not received within 1000ms')); }, 1000);
+            }),
+          ]);
+        } catch (error: unknown) {
+          errors.push(error instanceof Error ? error.message : String(error));
+          throw error;
+        }
+        await transport.close();
+        transportClosed = true;
+        return {
+          success: true,
+          conversation: [],
+          logs: [],
+          accounting: [],
+        };
+      } finally {
+        if (transport !== undefined && !transportClosed) {
+          try { await transport.close(); } catch { /* ignore */ }
+        }
+        await new Promise<void>((resolve) => { server.close(() => { resolve(); }); });
+        runTest54State = {
+          received: [...received],
+          serverPayloads: [...serverPayloads],
+          errors: [...errors],
+        };
+      }
+    },
+    expect: (result) => {
+      invariant(result.success, 'Scenario run-test-54 should succeed.');
+      invariant(runTest54State !== undefined, 'WebSocket state should be captured for run-test-54.');
+      const { received, serverPayloads, errors } = runTest54State;
+      runTest54State = undefined;
+      invariant(errors.length === 0, 'No WebSocket errors expected for run-test-54.');
+      const serverHello = received.find((message) => (message as { method?: unknown }).method === 'serverHello');
+      const ackMessage = received.find((message) => (message as { method?: unknown }).method === 'ack');
+      invariant(serverHello !== undefined || ackMessage !== undefined, 'WebSocket response expected for run-test-54.');
+      const clientPayload = serverPayloads.find((payload) => payload.includes('clientPing'));
+      invariant(clientPayload !== undefined, 'Client ping payload expected for run-test-54.');
+    },
+  },
+  {
     id: 'run-test-43',
     configure: (_configuration, sessionConfig) => {
       sessionConfig.stopRef = { stopping: true };
@@ -874,6 +1127,8 @@ const TEST_SCENARIOS: HarnessTest[] = [
 async function runScenario(test: HarnessTest): Promise<AIAgentResult> {
   const { id: prompt, configure, execute } = test;
   const serverPath = path.resolve(__dirname, 'mcp/test-stdio-server.js');
+  const effectiveTimeout = getEffectiveTimeoutMs(test);
+  const abortController = new AbortController();
 
   const baseConfiguration: Configuration = {
     providers: {
@@ -908,12 +1163,21 @@ async function runScenario(test: HarnessTest): Promise<AIAgentResult> {
     toolTimeout: defaults.toolTimeout,
     llmTimeout: defaults.llmTimeout,
     agentId: `phase1-${prompt}`,
+    abortSignal: abortController.signal,
   };
 
   configure?.(configuration, baseSession, defaults);
 
-  if (typeof execute === 'function') {
-    return await execute(configuration, baseSession, defaults);
+  let abortOnTimeout: (() => void) | undefined;
+  if (baseSession.abortSignal === undefined) {
+    baseSession.abortSignal = abortController.signal;
+    abortOnTimeout = () => {
+      try { abortController.abort(); } catch { /* ignore */ }
+    };
+  } else if (baseSession.abortSignal === abortController.signal) {
+    abortOnTimeout = () => {
+      try { abortController.abort(); } catch { /* ignore */ }
+    };
   }
 
   const failureResult = (error: unknown): AIAgentResult => {
@@ -927,18 +1191,26 @@ async function runScenario(test: HarnessTest): Promise<AIAgentResult> {
     };
   };
 
-  let session;
-  try {
-    session = AIAgentSession.create(baseSession);
-  } catch (error) {
-    return failureResult(error);
-  }
+  const runner = async (): Promise<AIAgentResult> => {
+    if (typeof execute === 'function') {
+      return await execute(configuration, baseSession, defaults);
+    }
 
-  try {
-    return await session.run();
-  } catch (error) {
-    return failureResult(error);
-  }
+    let session;
+    try {
+      session = AIAgentSession.create(baseSession);
+    } catch (error: unknown) {
+      return failureResult(error);
+    }
+
+    try {
+      return await session.run();
+    } catch (error: unknown) {
+      return failureResult(error);
+    }
+  };
+
+  return await runWithTimeout(runner(), effectiveTimeout, prompt, abortOnTimeout);
 }
 
 function formatFailureHint(result: AIAgentResult): string {
@@ -963,19 +1235,23 @@ async function runPhaseOne(): Promise<void> {
   for (let index = 0; index < total; index += 1) {
     const scenario = TEST_SCENARIOS[index];
     const runPrefix = `${String(index + 1)}/${String(total)}`;
-    const label = `${runPrefix} ${scenario.id}`;
-    // eslint-disable-next-line no-console
-    console.log(`[RUN] ${label}`);
-    const result = await runScenario(scenario);
+    const description = resolveScenarioDescription(scenario.id, scenario.description);
+    const baseLabel = `${runPrefix} ${scenario.id}`;
+    const header = `[RUN] ${baseLabel}${description !== undefined ? `: ${description}` : ''}`;
+    const startMs = Date.now();
+    let result: AIAgentResult | undefined;
     try {
+      result = await runScenario(scenario);
       scenario.expect(result);
+      const duration = formatDurationMs(startMs, Date.now());
       // eslint-disable-next-line no-console
-      console.log(`[PASS] ${label}`);
-    } catch (error) {
+      console.log(`${header} [PASS] ${duration}`);
+    } catch (error: unknown) {
+      const duration = formatDurationMs(startMs, Date.now());
       const message = error instanceof Error ? error.message : String(error);
-      const hint = formatFailureHint(result);
+      const hint = result !== undefined ? formatFailureHint(result) : '';
       // eslint-disable-next-line no-console
-      console.error(`[FAIL] ${label}: ${message}${hint}`);
+      console.error(`${header} [FAIL] ${duration} - ${message}${hint}`);
       throw error;
     }
   }

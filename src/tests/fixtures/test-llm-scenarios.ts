@@ -92,6 +92,7 @@ const BATCH_PROGRESS_STATUS = 'Batch progress update for coverage.';
 const BATCH_PROGRESS_RESPONSE = 'batch-progress-follow-up';
 const BATCH_STRING_PROGRESS = 'Batch progress conveyed via string payload.';
 const BATCH_STRING_RESULT = 'batch-string-mode';
+const SLACK_BLOCK_KIT_FORMAT = 'slack-block-kit' as const;
 const RATE_LIMIT_FAILURE_MESSAGE = 'Rate limit simulated.' as const;
 
 const SCENARIOS: ScenarioDefinition[] = [
@@ -1997,6 +1998,131 @@ const SCENARIOS: ScenarioDefinition[] = [
             status: 'failure',
             detail: 'Schema should reject this payload.',
           },
+        },
+      },
+    ],
+  },
+  {
+    id: 'run-test-50',
+    description: 'Slack block kit final report fallback.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Delivering Slack formatted summary.',
+          reportContent: `${RESULT_HEADING}*Slack* message generated for delivery.`,
+          reportFormat: SLACK_BLOCK_KIT_FORMAT,
+          status: STATUS_SUCCESS,
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+        },
+      },
+    ],
+  },
+  {
+    id: 'run-test-51',
+    description: 'Slack block kit final report missing content.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Slack report without content.',
+          reportContent: ' ',
+          reportFormat: SLACK_BLOCK_KIT_FORMAT,
+          status: STATUS_SUCCESS,
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+        },
+      },
+    ],
+  },
+  {
+    id: 'run-test-52',
+    description: 'Slack block kit messages normalization via tool call.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        response: {
+          kind: 'tool-call',
+          assistantText: 'Preparing Slack batch.',
+          toolCalls: [
+            {
+              toolName: 'agent__final_report',
+              callId: 'call-slack-messages',
+              assistantText: 'Sending rich Slack content.',
+              arguments: {
+                status: 'success',
+                report_format: SLACK_BLOCK_KIT_FORMAT,
+                messages: [
+                  'Primary message with *formatting*',
+                  { blocks: [{ type: 'section', text: { type: 'mrkdwn', text: '*Detail* section with field' }, fields: [{ type: 'mrkdwn', text: 'Field line' }] }] },
+                  JSON.stringify({ type: 'divider' }),
+                  [
+                    JSON.stringify({ type: 'header', text: { type: 'plain_text', text: 'Header Title' } }),
+                    { type: 'context', elements: ['Context line 1', { text: 'Context line 2', type: 'mrkdwn' }] }
+                  ]
+                ],
+                metadata: { slack: { footer: 'Existing metadata' } },
+              },
+            },
+          ],
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+          finishReason: TOOL_FINISH_REASON,
+        },
+      },
+      {
+        turn: 2,
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Slack tool call completed.',
+          reportContent: `${RESULT_HEADING}Slack tool call completed.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_SUCCESS,
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+        },
+      },
+    ],
+  },
+  {
+    id: 'run-test-53',
+    description: 'GitHub search normalization coverage.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        expectedTools: ['github__search_code'],
+        response: {
+          kind: 'tool-call',
+          assistantText: 'Querying GitHub code search.',
+          toolCalls: [
+            {
+              toolName: 'github__search_code',
+              callId: 'call-github-search',
+              assistantText: 'Running repository search.',
+              arguments: {
+                query: 'md5 helper',
+                repo: 'owner/project',
+                path: 'src',
+                language: 'js OR jsx | python',
+              },
+            },
+          ],
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+          finishReason: TOOL_FINISH_REASON,
+        },
+      },
+      {
+        turn: 2,
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'GitHub search normalized.',
+          reportContent: `${RESULT_HEADING}GitHub search completed successfully.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_SUCCESS,
+          tokenUsage: DEFAULT_TOKEN_USAGE,
         },
       },
     ],
