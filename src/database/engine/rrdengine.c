@@ -2301,10 +2301,8 @@ static inline void worker_dispatch_query_prep(struct rrdeng_cmd cmd, bool from_w
 uint64_t rrdeng_get_directory_free_bytes_space(struct rrdengine_instance *ctx)
 {
     uint64_t free_bytes = 0;
-    struct statvfs buff_statvfs;
-    if (statvfs(ctx->config.dbfiles_path, &buff_statvfs) == 0)
-        free_bytes = buff_statvfs.f_bavail * buff_statvfs.f_bsize;
-
+    OS_SYSTEM_DISK_SPACE space = os_disk_space(ctx->config.dbfiles_path);
+    free_bytes = OS_SYSTEM_DISK_SPACE_OK(space) ? space.free_bytes : 0;
     return (free_bytes - (free_bytes * 5 / 100));
 }
 
