@@ -15,15 +15,35 @@ This simplifies the switching process significantly:
 
 | Channel | Download URL | Update Frequency | Recommended For |
 |---------|-------------|------------------|-----------------|
-| **Stable** | `https://github.com/netdata/netdata/releases/latest/download/netdata-x64.msi` | Major releases | Production systems, most users |
+| **Stable** | `https://github.com/netdata/netdata/releases/latest/download/netdata-x64.msi` | Major and patch releases | Production systems, most users |
 | **Nightly** | `https://github.com/netdata/netdata-nightlies/releases/latest/download/netdata-x64.msi` | Daily builds | Testing, early adopters, bleeding-edge features |
+
+<details>
+<summary><strong>When to Choose Each Channel</strong></summary><br/>
+
+**Choose Stable Channel If:**
+- You're running production systems
+- You need predictable, well-tested releases
+- You prefer less frequent updates (major releases only)
+- You want maximum stability over cutting-edge features
+- You have strict change management processes
+
+**Choose Nightly Channel If:**
+- You're testing new features before production deployment
+- You want immediate bug fixes without waiting for releases
+- You're contributing to Netdata development and need latest code
+- You want to provide early feedback to the Netdata team
+
+**Update Frequency**: Stable releases occur every few weeks to months, while Nightly builds are updated daily with every commit to the master branch.
+
+</details>
 
 ## Data Preservation When Switching Channels
 
 When switching between release channels on Windows, the MSI installer automatically preserves your important data and configuration.
 
 **Preserved during channel switches:**
-- Configuration files (`netdata.conf`, collector configs)
+- Configuration files (`netdata.conf`, collector configs) in `C:\Program Files\Netdata\etc\netdata`
 - Historical metrics data
 - Alert configurations  
 - Cloud connection settings (claim token, room assignments)
@@ -86,6 +106,11 @@ Unlike switching between install types on Linux, Windows channel switching does 
 
 ### Method 2: PowerShell Installation (Automated)
 
+:::warning
+Silent installation isn't supported on Windows Server versions earlier than 2019 due to TLS compatibility issues.
+Use the [GUI installer](#method-1-gui-installation-recommended) instead.
+:::
+
 <details>
 <summary><strong>Switch to Stable Channel via PowerShell</strong></summary><br/>
 
@@ -134,7 +159,7 @@ Look for your `token` and `rooms` values.
 # Run PowerShell as Administrator
 $ProgressPreference = 'SilentlyContinue'
 Invoke-WebRequest https://github.com/netdata/netdata/releases/latest/download/netdata-x64.msi -OutFile "$env:TEMP\netdata-x64.msi"
-msiexec /qn /i "$env:TEMP\netdata-x64.msi" TOKEN="<YOUR_TOKEN>" ROOMS="<YOUR_ROOMS>" REINSTALL=ALL
+msiexec /qn /i "$env:TEMP\netdata-x64.msi" TOKEN="<YOUR_TOKEN>" ROOMS="<YOUR_ROOMS>"
 ```
 
 **Switch to Nightly with Cloud settings:**
@@ -143,7 +168,7 @@ msiexec /qn /i "$env:TEMP\netdata-x64.msi" TOKEN="<YOUR_TOKEN>" ROOMS="<YOUR_ROO
 # Run PowerShell as Administrator
 $ProgressPreference = 'SilentlyContinue'
 Invoke-WebRequest https://github.com/netdata/netdata-nightlies/releases/latest/download/netdata-x64.msi -OutFile "$env:TEMP\netdata-x64.msi"
-msiexec /qn /i "$env:TEMP\netdata-x64.msi" TOKEN="<YOUR_TOKEN>" ROOMS="<YOUR_ROOMS>" REINSTALL=ALL
+msiexec /qn /i "$env:TEMP\netdata-x64.msi" TOKEN="<YOUR_TOKEN>" ROOMS="<YOUR_ROOMS>"
 ```
 
 Replace `<YOUR_TOKEN>` with your Netdata Cloud claim token and `<YOUR_ROOMS>` with your comma-separated Room IDs.
@@ -297,24 +322,3 @@ msiexec /qn /i netdata-x64.msi TOKEN="<YOUR_TOKEN>" ROOMS="<YOUR_ROOMS>"
 ```
 
 </details>
-
-## When to Choose Each Channel
-
-**Choose Stable Channel If:**
-- You're running production systems
-- You need predictable, well-tested releases
-- You prefer less frequent updates (major releases only)
-- You want maximum stability over cutting-edge features
-- You have strict change management processes
-
-**Choose Nightly Channel If:**
-- You're testing new features before production deployment
-- You want immediate bug fixes without waiting for releases
-- You're contributing to Netdata development and need latest code
-- You want to provide early feedback to the Netdata team
-
-:::tip
-
-**Update Frequency**: Stable releases occur every few weeks to months, while Nightly builds are updated daily with every commit to the master branch.
-
-:::
