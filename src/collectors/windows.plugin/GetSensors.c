@@ -140,6 +140,41 @@ static struct win_sensor_config {
             .context = "system.hw.sensor.longitude.input",
             .family = "Location",
             .priority = 70016,
+        },
+        {
+            .title = "Force",
+            .units = "N",
+            .context = "system.hw.sensor.force.input",
+            .family = "Force",
+            .priority = 70017,
+        },
+        {
+            .title = "Gauge Pressure",
+            .units = "Pa",
+            .context = "system.hw.sensor.gauge_pressure.input",
+            .family = "Pressure",
+            .priority = 70018,
+        },
+        {
+            .title = "X Distance",
+            .units = "m",
+            .context = "system.hw.sensor.xdistance.input",
+            .family = "Distance",
+            .priority = 70019,
+        },
+        {
+            .title = "Y Distance",
+            .units = "m",
+            .context = "system.hw.sensor.ydistance.input",
+            .family = "Distance",
+            .priority = 70020,
+        },
+        {
+            .title = "Z Distance",
+            .units = "m",
+            .context = "system.hw.sensor.zdistance.input",
+            .family = "Distance",
+            .priority = 70021,
         }
 };
 
