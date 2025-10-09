@@ -135,12 +135,12 @@ func (a *Agent) buildDiscoveryConf(enabled module.Registry) discovery.Config {
 			Read:  readPaths,
 			Watch: a.CollectorsConfigWatchPath,
 		},
-		Dummy: dummy.Config{
-			Names: dummyPaths,
-		},
 	}
 
 	if !a.DisableServiceDiscovery {
+		cfg.Dummy = dummy.Config{
+			Names: dummyPaths,
+		}
 		cfg.SD = sd.Config{
 			ConfDir: a.ServiceDiscoveryConfigDir,
 		}
