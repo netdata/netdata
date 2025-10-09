@@ -47,44 +47,23 @@ The IBM monitoring plugin requires specific libraries depending on which systems
 |--------|-------------------|-----------------|
 | IBM i (AS/400) | unixODBC + IBM i Access ODBC Driver | IBM i 7.2+ |
 | IBM DB2 | unixODBC + IBM DB2 ODBC Driver | DB2 10.5+ |
-| IBM MQ | IBM MQ Redistributable Client | MQ 8.0+ |
-| WebSphere | IBM MQ Client (for JMX bridge) | WAS 8.5+ |
 
 ## Installation
 
-### Step 1: Install unixODBC (for Database Monitoring)
+### Using native DEB/RPM packages
 
-**Ubuntu/Debian:**
-```bash
-sudo apt-get update
-sudo apt-get install unixodbc unixodbc-dev
-```
+After installing Netdata normally, use your system package manager to
+install the `netdata-plugin-ibm` package.
 
-**RHEL/CentOS/Fedora:**
-```bash
-sudo yum install unixODBC unixODBC-devel
-# or for newer versions:
-sudo dnf install unixODBC unixODBC-devel
-```
+### Using a local build
 
-**SUSE/openSUSE:**
-```bash
-sudo zypper install unixODBC unixODBC-devel
-```
+1. Ensure that unixODBC development files are installed (depending on
+   your platform the required package will usually be either `unixodbc-dev`
+   or `unixODBC-devel`).
+2. Add `--local-build-options "--enable-plugin-ibm"` to the options you
+   pass to the `kickstart.sh` script for the install.
 
-### Step 2: Install IBM Libraries
-
-#### For IBM MQ Monitoring
-
-The IBM MQ client libraries are automatically installed when you build Netdata with IBM support:
-
-```bash
-sudo /usr/libexec/netdata/install-ibm-libs.sh
-```
-
-This downloads and installs the IBM MQ Redistributable Client (version 9.4.1.0) from IBM's public repository.
-
-#### For IBM i (AS/400) Monitoring
+### IBM i (AS/400) Monitoring Additional Setup
 
 1. **Download IBM i Access Client Solutions** from IBM:
    - Go to [IBM i Access Client Solutions](https://www.ibm.com/support/pages/ibm-i-access-client-solutions)
@@ -123,7 +102,7 @@ This downloads and installs the IBM MQ Redistributable Client (version 9.4.1.0) 
    Trace = 0
    ```
 
-#### For IBM DB2 Monitoring
+#### IBM DB2 Monitoring Additional Setup
 
 1. **Download IBM Data Server Driver Package** from IBM:
    - Visit [IBM Data Server Driver Downloads](https://www.ibm.com/support/pages/download-initial-version-115-clients-and-drivers)
@@ -152,20 +131,6 @@ This downloads and installs the IBM MQ Redistributable Client (version 9.4.1.0) 
    UID = your_username
    PWD = your_password
    ```
-
-### Step 3: Build and Install Netdata with IBM Support
-
-```bash
-# Clone Netdata repository
-git clone https://github.com/netdata/netdata.git
-cd netdata
-
-# Build with IBM plugin support
-mkdir build-ibm && cd build-ibm
-cmake -DENABLE_PLUGIN_IBM=On ..
-make ibm-plugin
-sudo make install
-```
 
 ## Configuration
 
