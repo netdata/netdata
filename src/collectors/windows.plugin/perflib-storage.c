@@ -175,7 +175,8 @@ static STRING *getFileSystemType(struct logical_disk *d, const char *diskName)
         return NULL;
 
     char fileSystemNameBuffer[128] = {0}; // Buffer for file system name
-    char pathBuffer[256] = {0};           // Path buffer to accommodate different formats
+    char pathBuffer[260] = {0};           // Path buffer to accommodate different formats
+    char volumeName[260] = {0};
     DWORD serialNumber = 0;
     DWORD maxComponentLength = 0;
     DWORD fileSystemFlags = 0;
@@ -183,18 +184,18 @@ static STRING *getFileSystemType(struct logical_disk *d, const char *diskName)
 
     // Check if the input is likely a drive letter (e.g., "C:")
     if (isalpha((uint8_t)diskName[0]) && diskName[1] == ':' && diskName[2] == '\0')
-        snprintf(pathBuffer, sizeof(pathBuffer), "%s\\", diskName); // Format as "C:\"
+        snprintfz(pathBuffer, sizeof(pathBuffer) - 1, "%s\\", diskName); // Format as "C:\"
     else
         // Assume it's a Volume GUID path or a device path
-        snprintf(pathBuffer, sizeof(pathBuffer), "\\\\.\\%s\\", diskName); // Format as "\\.\HarddiskVolume1\"
+        snprintfz(pathBuffer, sizeof(pathBuffer) - 1, "\\\\.\\%s\\", diskName); // Format as "\\.\HarddiskVolume1\"
 
     d->DriveType = GetDriveTypeA(pathBuffer);
 
     // Attempt to get the volume information
     success = GetVolumeInformationA(
         pathBuffer,                  // Path to the disk
-        NULL,                        // We don't need the volume name
-        0,                           // Size of volume name buffer is 0
+        volumeName,                  // Volume name buffer
+        259,                         // Size of volume name bufferr
         &serialNumber,               // Volume serial number
         &maxComponentLength,         // Maximum component length
         &fileSystemFlags,            // File system flags
@@ -246,6 +247,7 @@ static inline void netdata_set_hd_usage(PERF_DATA_BLOCK *pDataBlock,
 {
     ULARGE_INTEGER totalNumberOfBytes;
     ULARGE_INTEGER totalNumberOfFreeBytes;
+    ULARGE_INTEGER totalAvailableToCaller;
 
 // https://learn.microsoft.com/en-us/windows/win32/fileio/maximum-file-path-limitation?tabs=registry
 #define MAX_DRIVE_LENGTH 255
@@ -256,7 +258,7 @@ static inline void netdata_set_hd_usage(PERF_DATA_BLOCK *pDataBlock,
     // https://devblogs.microsoft.com/oldnewthing/20071101-00/?p=24613
     // We are using the variable that should not be affected by qyota ()
     if ((GetDriveTypeA(path) == DRIVE_UNKNOWN) || !GetDiskFreeSpaceExA(path,
-                                                                     NULL,
+                                                                     &totalAvailableToCaller,
                                                                      &totalNumberOfBytes,
                                                                      &totalNumberOfFreeBytes)) {
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->percentDiskFree);
