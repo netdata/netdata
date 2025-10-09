@@ -99,6 +99,7 @@ func main() {
 		DumpSummary:               opts.DumpSummary,
 		DumpDataDir:               dumpDataDir,
 		DynamicConfigPrefix:       "ibm.d:collector:",
+		DisableServiceDiscovery:   true,
 	})
 
 	a.Debugf("plugin: name=%s, version=%s", a.Name, buildinfo.Version)
