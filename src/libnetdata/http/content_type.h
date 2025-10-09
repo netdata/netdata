@@ -7,6 +7,7 @@ typedef enum __attribute__ ((__packed__)) {
     CT_NONE = 0,
     CT_APPLICATION_JSON,
     CT_TEXT_PLAIN,
+    CT_TEXT_EVENT_STREAM,
     CT_TEXT_HTML,
     CT_APPLICATION_X_JAVASCRIPT,
     CT_TEXT_CSS,

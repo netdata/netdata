@@ -1,0 +1,335 @@
+# Generated metadata.yaml for websphere_jmx module
+plugin_name: ibm.d.plugin
+modules:
+  - meta:
+      plugin_name: ibm.d.plugin
+      module_name: websphere_jmx
+      monitored_instance:
+        name: IBM WebSphere JMX
+        link: https://www.ibm.com/products/websphere-application-server
+        categories:
+          - data-collection.application_servers
+        icon_filename: ""
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - websphere_jmx
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          Collects JVM, thread pool, and middleware metrics from IBM WebSphere Application Server
+          via the embedded JMX bridge helper.
+
+        method_description: |
+          The collector connects to IBM WebSphere JMX and collects metrics via its monitoring interface.
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+    setup:
+      prerequisites:
+        list:
+          - title: Enable monitoring interface
+            description: |
+              Ensure the IBM WebSphere JMX monitoring interface is accessible.
+      configuration:
+        file:
+          name: ibm.d/websphere_jmx.conf
+        options:
+          description: |
+            Configuration options for the websphere_jmx collector.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+            - name: endpoint
+              description: Connection endpoint.
+              default_value: "dummy://localhost"
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: Config
+          list:
+            - name: Basic
+              description: Basic configuration example.
+              config: |
+                jobs:
+                  - name: local
+                    endpoint: dummy://localhost
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: applications
+          description: These metrics refer to applications instances.
+          labels:
+            - name: application
+              description: Application identifier
+            - name: module
+              description: Module identifier
+          metrics:
+            - name: websphere_jmx.app_requests
+              description: Application Requests
+              unit: requests
+              chart_type: line
+              dimensions:
+                - name: requests
+            - name: websphere_jmx.app_response_time
+              description: Application Response Time
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: response_time
+            - name: websphere_jmx.app_sessions_active
+              description: Active Sessions
+              unit: sessions
+              chart_type: line
+              dimensions:
+                - name: active
+            - name: websphere_jmx.app_sessions_live
+              description: Live Sessions
+              unit: sessions
+              chart_type: line
+              dimensions:
+                - name: live
+            - name: websphere_jmx.app_session_events
+              description: Session Events
+              unit: sessions
+              chart_type: stacked
+              dimensions:
+                - name: creates
+                - name: invalidates
+            - name: websphere_jmx.app_transactions
+              description: Application Transactions
+              unit: transactions
+              chart_type: line
+              dimensions:
+                - name: committed
+                - name: rolledback
+        - name: jca
+          description: These metrics refer to jca instances.
+          labels:
+            - name: pool
+              description: Pool identifier
+          metrics:
+            - name: websphere_jmx.jca_pool_size
+              description: JCA Pool Size
+              unit: connections
+              chart_type: line
+              dimensions:
+                - name: size
+            - name: websphere_jmx.jca_pool_usage
+              description: JCA Pool Usage
+              unit: connections
+              chart_type: stacked
+              dimensions:
+                - name: active
+                - name: free
+            - name: websphere_jmx.jca_pool_wait_time
+              description: JCA Average Wait Time
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: wait
+            - name: websphere_jmx.jca_pool_use_time
+              description: JCA Average Use Time
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: use
+            - name: websphere_jmx.jca_pool_connections
+              description: JCA Connections Totals
+              unit: connections
+              chart_type: line
+              dimensions:
+                - name: created
+                - name: destroyed
+            - name: websphere_jmx.jca_pool_waiting_threads
+              description: JCA Waiting Threads
+              unit: threads
+              chart_type: line
+              dimensions:
+                - name: waiting
+        - name: jdbc
+          description: These metrics refer to jdbc instances.
+          labels:
+            - name: pool
+              description: Pool identifier
+          metrics:
+            - name: websphere_jmx.jdbc_pool_size
+              description: JDBC Pool Size
+              unit: connections
+              chart_type: line
+              dimensions:
+                - name: size
+            - name: websphere_jmx.jdbc_pool_usage
+              description: JDBC Pool Usage
+              unit: connections
+              chart_type: stacked
+              dimensions:
+                - name: active
+                - name: free
+            - name: websphere_jmx.jdbc_pool_wait_time
+              description: JDBC Average Wait Time
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: wait
+            - name: websphere_jmx.jdbc_pool_use_time
+              description: JDBC Average Use Time
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: use
+            - name: websphere_jmx.jdbc_pool_connections
+              description: JDBC Connections Totals
+              unit: connections
+              chart_type: line
+              dimensions:
+                - name: created
+                - name: destroyed
+            - name: websphere_jmx.jdbc_pool_waiting_threads
+              description: JDBC Waiting Threads
+              unit: threads
+              chart_type: line
+              dimensions:
+                - name: waiting
+        - name: jms
+          description: These metrics refer to jms instances.
+          labels:
+            - name: destination
+              description: Destination identifier
+            - name: destination_type
+              description: Destination_type identifier
+          metrics:
+            - name: websphere_jmx.jms_messages_current
+              description: JMS Messages Current Depth
+              unit: messages
+              chart_type: line
+              dimensions:
+                - name: current
+            - name: websphere_jmx.jms_messages_pending
+              description: JMS Messages Pending
+              unit: messages
+              chart_type: line
+              dimensions:
+                - name: pending
+            - name: websphere_jmx.jms_messages_total
+              description: JMS Messages Added Total
+              unit: messages
+              chart_type: line
+              dimensions:
+                - name: total
+            - name: websphere_jmx.jms_consumers
+              description: JMS Consumers
+              unit: consumers
+              chart_type: line
+              dimensions:
+                - name: consumers
+        - name: global
+          description: These metrics refer to the entire monitored instance.
+          labels: []
+          metrics:
+            - name: websphere_jmx.jvm_heap_memory
+              description: JVM Heap Memory
+              unit: bytes
+              chart_type: stacked
+              dimensions:
+                - name: used
+                - name: committed
+                - name: max
+            - name: websphere_jmx.jvm_heap_usage
+              description: JVM Heap Usage
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: usage
+            - name: websphere_jmx.jvm_nonheap_memory
+              description: JVM Non-Heap Memory
+              unit: bytes
+              chart_type: stacked
+              dimensions:
+                - name: used
+                - name: committed
+            - name: websphere_jmx.jvm_gc_count
+              description: JVM Garbage Collection Count
+              unit: collections
+              chart_type: line
+              dimensions:
+                - name: collections
+            - name: websphere_jmx.jvm_gc_time
+              description: JVM Garbage Collection Time
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: time
+            - name: websphere_jmx.jvm_threads
+              description: JVM Threads
+              unit: threads
+              chart_type: stacked
+              dimensions:
+                - name: total
+                - name: daemon
+            - name: websphere_jmx.jvm_thread_states
+              description: JVM Thread States
+              unit: threads
+              chart_type: line
+              dimensions:
+                - name: peak
+                - name: started
+            - name: websphere_jmx.jvm_classes
+              description: JVM Classes
+              unit: classes
+              chart_type: line
+              dimensions:
+                - name: loaded
+                - name: unloaded
+            - name: websphere_jmx.jvm_process_cpu_usage
+              description: JVM Process CPU Usage
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: cpu
+            - name: websphere_jmx.jvm_uptime
+              description: JVM Uptime
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: uptime
+        - name: threadpools
+          description: These metrics refer to threadpools instances.
+          labels:
+            - name: pool
+              description: Pool identifier
+          metrics:
+            - name: websphere_jmx.threadpool_size
+              description: Thread Pool Size
+              unit: threads
+              chart_type: line
+              dimensions:
+                - name: size
+                - name: max
+            - name: websphere_jmx.threadpool_active
+              description: Thread Pool Active Threads
+              unit: threads
+              chart_type: line
+              dimensions:
+                - name: active

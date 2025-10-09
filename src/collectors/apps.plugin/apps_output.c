@@ -138,6 +138,7 @@ void send_collected_data_to_netdata(struct target *root, const char *type, usec_
         }
 #endif
 
+#ifndef OS_WINDOWS
         send_BEGIN(type, string2str(w->clean_name), "mem_private_usage", dt);
 #if (PROCESSES_HAVE_VMSHARED == 1)
         send_SET("mem", (w->values[PDF_VMRSS] > w->values[PDF_VMSHARED])?(w->values[PDF_VMRSS] - w->values[PDF_VMSHARED]) : 0ULL);
@@ -145,6 +146,7 @@ void send_collected_data_to_netdata(struct target *root, const char *type, usec_
         send_SET("mem", w->values[PDF_VMRSS]);
 #endif
         send_END();
+#endif //OS_WINDOWS
 
 #if (PROCESSES_HAVE_VOLCTX == 1) || (PROCESSES_HAVE_NVOLCTX == 1)
         send_BEGIN(type, string2str(w->clean_name), "cpu_context_switches", dt);
@@ -312,11 +314,13 @@ void send_charts_updates_to_netdata(struct target *root, const char *type, const
         }
 #endif
 
+#ifndef OS_WINDOWS
         fprintf(stdout, "CHART %s.%s_mem_private_usage '' '%s memory usage without shared' 'MiB' mem %s.mem_private_usage area 20050 %d\n",
                 type, string2str(w->clean_name), title, type, update_every);
         fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, string2str(w->name));
         fprintf(stdout, "CLABEL_COMMIT\n");
         fprintf(stdout, "DIMENSION mem '' absolute %ld %ld\n", 1L, 1024L * 1024L);
+#endif //OS_WINDOWS
 
 #if (PROCESSES_HAVE_VOLCTX == 1) || (PROCESSES_HAVE_NVOLCTX == 1)
         fprintf(stdout, "CHART %s.%s_cpu_context_switches '' '%s CPU context switches' 'switches/s' cpu %s.cpu_context_switches stacked 20010 %d\n",

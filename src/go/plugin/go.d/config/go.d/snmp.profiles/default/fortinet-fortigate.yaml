@@ -7,9 +7,6 @@ extends:
   - _std-if-mib.yaml
   - _fortinet-fortigate-vpn-tunnel.yaml
 
-device:
-  vendor: "fortinet"
-
 # All fortinet devices have sysObjectID starting with `1.3.6.1.4.1.12356.101.1` (fgModel)
 # We only target Fortinet Fortigate devices (1.3.6.1.4.1.12356.101/fnFortiGateMib)
 selector:

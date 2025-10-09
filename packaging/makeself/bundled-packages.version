@@ -1,7 +1,7 @@
 # Source of truth for all the packages we bundle in static builds
 PACKAGES=("OPENSSL" "CURL" "BASH" "IOPING" "LIBNETFILTER_ACT")
 SOURCE_TYPES=("GH_REPO_CLONE" "GH_REPO_CLONE" "DW_TARBALL" "GH_REPO_SOURCE" "DW_TARBALL")
-OPENSSL_VERSION="openssl-3.5.3"
+OPENSSL_VERSION="openssl-3.5.4"
 OPENSSL_SOURCE="https://github.com/openssl/openssl"
 LIBUCONTEXT_VERSION="libucontext-1.3.2"
 LIBUCONTEXT_SOURCE="https://github.com/kaniini/libucontext"

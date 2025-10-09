@@ -1,0 +1,14 @@
+name: websphere_mp
+display_name: IBM WebSphere MicroProfile
+description: |
+  Collects JVM, vendor, and REST endpoint metrics from WebSphere Liberty / Open Liberty
+  servers via the MicroProfile Metrics (Prometheus/OpenMetrics) endpoint.
+link: https://www.ibm.com/products/websphere-application-server
+categories:
+  - data-collection.application_servers
+icon: ibm.svg
+keywords:
+  - websphere
+  - liberty
+  - microprofile
+  - openmetrics

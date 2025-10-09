@@ -1,0 +1,189 @@
+# Generated metadata.yaml for websphere_mp module
+plugin_name: ibm.d.plugin
+modules:
+  - meta:
+      plugin_name: ibm.d.plugin
+      module_name: websphere_mp
+      monitored_instance:
+        name: IBM WebSphere MicroProfile
+        link: https://www.ibm.com/products/websphere-application-server
+        categories:
+          - data-collection.application_servers
+        icon_filename: "ibm.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - websphere_mp
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          Collects JVM, vendor, and REST endpoint metrics from WebSphere Liberty / Open Liberty
+          servers via the MicroProfile Metrics (Prometheus/OpenMetrics) endpoint.
+
+        method_description: |
+          The collector connects to IBM WebSphere MicroProfile and collects metrics via its monitoring interface.
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: ""
+    setup:
+      prerequisites:
+        list:
+          - title: Enable monitoring interface
+            description: |
+              Ensure the IBM WebSphere MicroProfile monitoring interface is accessible.
+      configuration:
+        file:
+          name: ibm.d/websphere_mp.conf
+        options:
+          description: |
+            Configuration options for the websphere_mp collector.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+            - name: endpoint
+              description: Connection endpoint.
+              default_value: "dummy://localhost"
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: Config
+          list:
+            - name: Basic
+              description: Basic configuration example.
+              config: |
+                jobs:
+                  - name: local
+                    endpoint: dummy://localhost
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: These metrics refer to the entire monitored instance.
+          labels: []
+          metrics:
+            - name: websphere_mp.cpu_usage
+              description: JVM CPU Usage
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: process
+                - name: utilization
+            - name: websphere_mp.cpu_time
+              description: JVM CPU Time
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: total
+        - name: global
+          description: These metrics refer to the entire monitored instance.
+          labels: []
+          metrics:
+            - name: websphere_mp.jvm_memory_heap_usage
+              description: JVM Heap Memory Usage
+              unit: bytes
+              chart_type: stacked
+              dimensions:
+                - name: used
+                - name: free
+            - name: websphere_mp.jvm_memory_heap_committed
+              description: JVM Heap Memory Committed
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: committed
+            - name: websphere_mp.jvm_memory_heap_max
+              description: JVM Heap Memory Maximum
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: limit
+            - name: websphere_mp.jvm_heap_utilization
+              description: JVM Heap Utilization
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: utilization
+            - name: websphere_mp.jvm_gc_collections
+              description: JVM Garbage Collection Rate
+              unit: collections/s
+              chart_type: line
+              dimensions:
+                - name: rate
+            - name: websphere_mp.jvm_gc_time
+              description: JVM GC Time
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: total
+                - name: per_cycle
+            - name: websphere_mp.jvm_threads_current
+              description: JVM Current Threads
+              unit: threads
+              chart_type: stacked
+              dimensions:
+                - name: daemon
+                - name: other
+            - name: websphere_mp.jvm_threads_peak
+              description: JVM Peak Threads
+              unit: threads
+              chart_type: line
+              dimensions:
+                - name: peak
+        - name: restendpoint
+          description: These metrics refer to restendpoint instances.
+          labels:
+            - name: method
+              description: Method identifier
+            - name: endpoint
+              description: Endpoint identifier
+          metrics:
+            - name: websphere_mp.rest_requests
+              description: REST Request Rate
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: requests
+            - name: websphere_mp.rest_response_time
+              description: REST Response Time
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: average
+        - name: global
+          description: These metrics refer to the entire monitored instance.
+          labels: []
+          metrics:
+            - name: websphere_mp.threadpool_usage
+              description: Thread Pool Usage
+              unit: threads
+              chart_type: stacked
+              dimensions:
+                - name: active
+                - name: idle
+            - name: websphere_mp.threadpool_size
+              description: Thread Pool Size
+              unit: threads
+              chart_type: line
+              dimensions:
+                - name: size

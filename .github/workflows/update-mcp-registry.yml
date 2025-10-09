@@ -1,0 +1,64 @@
+---
+name: Update MCP Registry
+on:
+  release:
+    types: [released]
+concurrency:
+  group: update-mcp-registry-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
+jobs:
+  publish-mcp-registry:
+    name: Publish to MCP Registry
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        id: checkout
+        uses: actions/checkout@v5
+      - name: Update server.json version
+        id: update-version
+        run: |
+          VERSION="$(cat packaging/version)"
+          # Remove 'v' prefix if present
+          VERSION="${VERSION#v}"
+          # Update version in server.json
+          sed -i "s/\"version\": \".*\"/\"version\": \"$VERSION\"/" server.json
+          echo "Updated server.json to version: $VERSION"
+      - name: Install mcp-publisher
+        id: install
+        run: |
+          # Clone and build mcp-publisher
+          git clone https://github.com/modelcontextprotocol/registry.git /tmp/registry
+          cd /tmp/registry
+          make publisher
+          sudo cp bin/mcp-publisher /usr/local/bin/
+          mcp-publisher --version
+      - name: Authenticate with GitHub
+        id: auth
+        run: |
+          # GitHub Actions automatically provides GITHUB_TOKEN with OIDC
+          # mcp-publisher will use this for authentication
+          echo "Using GitHub OIDC authentication"
+      - name: Publish to registry
+        id: publish
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cd ${{ github.workspace }}
+          mcp-publisher publish server.json
+      - name: Failure Notification
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          SLACK_COLOR: 'danger'
+          SLACK_FOOTER: ''
+          SLACK_ICON_EMOJI: ':github-actions:'
+          SLACK_TITLE: 'Failed to publish to MCP Registry:'
+          SLACK_USERNAME: 'GitHub Actions'
+          SLACK_MESSAGE: |-
+              ${{ github.repository }}: Failed to publish new agent version to MCP Registry.
+              Checkout: ${{ steps.checkout.outcome }}
+              Update version: ${{ steps.update-version.outcome }}
+              Install mcp-publisher: ${{ steps.install.outcome }}
+              Authenticate: ${{ steps.auth.outcome }}
+              Publish: ${{ steps.publish.outcome }}
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: failure()

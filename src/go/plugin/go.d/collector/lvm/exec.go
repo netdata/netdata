@@ -5,49 +5,35 @@
 package lvm
 
 import (
-	"context"
-	"fmt"
-	"os/exec"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 )
 
 type lvmCLI interface {
 	lvsReportJson() ([]byte, error)
 }
 
-func newLVMCLIExec(ndsudoPath string, timeout time.Duration, log *logger.Logger) *lvmCLIExec {
+func newLVMCLIExec(timeout time.Duration, log *logger.Logger) *lvmCLIExec {
 	return &lvmCLIExec{
-		Logger:     log,
-		ndsudoPath: ndsudoPath,
-		timeout:    timeout,
+		Logger:  log,
+		timeout: timeout,
 	}
 }
 
 type lvmCLIExec struct {
 	*logger.Logger
 
-	ndsudoPath string
-	timeout    time.Duration
+	timeout time.Duration
 }
 
 func (e *lvmCLIExec) lvsReportJson() ([]byte, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), e.timeout)
-	defer cancel()
-
-	cmd := exec.CommandContext(ctx,
-		e.ndsudoPath,
+	return ndexec.RunNDSudo(
+		e.Logger,
+		e.timeout,
 		"lvs-report-json",
 		"--options",
 		"vg_name,lv_name,lv_size,data_percent,metadata_percent,lv_attr",
 	)
-	e.Debugf("executing '%s'", cmd)
-
-	bs, err := cmd.Output()
-	if err != nil {
-		return nil, fmt.Errorf("error on '%s': %v", cmd, err)
-	}
-
-	return bs, nil
 }

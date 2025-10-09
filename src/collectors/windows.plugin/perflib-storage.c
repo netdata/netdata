@@ -14,6 +14,7 @@ struct logical_disk {
 
     UINT DriveType;
     DWORD SerialNumber;
+    ULONG divisor;
     bool readonly;
 
     STRING *filesystem;
@@ -174,7 +175,8 @@ static STRING *getFileSystemType(struct logical_disk *d, const char *diskName)
         return NULL;
 
     char fileSystemNameBuffer[128] = {0}; // Buffer for file system name
-    char pathBuffer[256] = {0};           // Path buffer to accommodate different formats
+    char pathBuffer[260] = {0};           // Path buffer to accommodate different formats
+    char volumeName[260] = {0};
     DWORD serialNumber = 0;
     DWORD maxComponentLength = 0;
     DWORD fileSystemFlags = 0;
@@ -182,18 +184,18 @@ static STRING *getFileSystemType(struct logical_disk *d, const char *diskName)
 
     // Check if the input is likely a drive letter (e.g., "C:")
     if (isalpha((uint8_t)diskName[0]) && diskName[1] == ':' && diskName[2] == '\0')
-        snprintf(pathBuffer, sizeof(pathBuffer), "%s\\", diskName); // Format as "C:\"
+        snprintfz(pathBuffer, sizeof(pathBuffer) - 1, "%s\\", diskName); // Format as "C:\"
     else
         // Assume it's a Volume GUID path or a device path
-        snprintf(pathBuffer, sizeof(pathBuffer), "\\\\.\\%s\\", diskName); // Format as "\\.\HarddiskVolume1\"
+        snprintfz(pathBuffer, sizeof(pathBuffer) - 1, "\\\\.\\%s\\", diskName); // Format as "\\.\HarddiskVolume1\"
 
     d->DriveType = GetDriveTypeA(pathBuffer);
 
     // Attempt to get the volume information
     success = GetVolumeInformationA(
         pathBuffer,                  // Path to the disk
-        NULL,                        // We don't need the volume name
-        0,                           // Size of volume name buffer is 0
+        volumeName,                  // Volume name buffer
+        259,                         // Size of volume name bufferr
         &serialNumber,               // Volume serial number
         &maxComponentLength,         // Maximum component length
         &fileSystemFlags,            // File system flags
@@ -238,13 +240,6 @@ static const char *drive_type_to_str(UINT type)
     }
 }
 
-static inline LONGLONG convertToBytes(LONGLONG value, double factor) {
-    double dvalue = value;
-    dvalue /= (factor);
-
-    return (LONGLONG) dvalue*100;
-}
-
 static inline void netdata_set_hd_usage(PERF_DATA_BLOCK *pDataBlock,
                                         PERF_OBJECT_TYPE *pObjectType,
                                         PERF_INSTANCE_DEFINITION *pi,
@@ -252,6 +247,7 @@ static inline void netdata_set_hd_usage(PERF_DATA_BLOCK *pDataBlock,
 {
     ULARGE_INTEGER totalNumberOfBytes;
     ULARGE_INTEGER totalNumberOfFreeBytes;
+    ULARGE_INTEGER totalAvailableToCaller;
 
 // https://learn.microsoft.com/en-us/windows/win32/fileio/maximum-file-path-limitation?tabs=registry
 #define MAX_DRIVE_LENGTH 255
@@ -261,19 +257,18 @@ static inline void netdata_set_hd_usage(PERF_DATA_BLOCK *pDataBlock,
     // Description of incompatibilities present in both methods we are using
     // https://devblogs.microsoft.com/oldnewthing/20071101-00/?p=24613
     // We are using the variable that should not be affected by qyota ()
-    if ((GetDriveTypeA(path) != DRIVE_FIXED) || !GetDiskFreeSpaceExA(path,
-                                                                     NULL,
+    if ((GetDriveTypeA(path) == DRIVE_UNKNOWN) || !GetDiskFreeSpaceExA(path,
+                                                                     &totalAvailableToCaller,
                                                                      &totalNumberOfBytes,
                                                                      &totalNumberOfFreeBytes)) {
         perflibGetInstanceCounter(pDataBlock, pObjectType, pi, &d->percentDiskFree);
-
-        d->percentDiskFree.current.Data = convertToBytes(d->percentDiskFree.current.Data, 1024);
-        d->percentDiskFree.current.Time = convertToBytes(d->percentDiskFree.current.Time, 1024);
+        d->divisor = 1024;
         return;
     }
 
-    d->percentDiskFree.current.Data = convertToBytes(totalNumberOfFreeBytes.QuadPart, 1024 * 1024 * 1024);
-    d->percentDiskFree.current.Time = convertToBytes(totalNumberOfBytes.QuadPart, 1024 * 1024 * 1024);
+    d->divisor = GIGA_FACTOR;
+    d->percentDiskFree.current.Data = totalNumberOfFreeBytes.QuadPart;
+    d->percentDiskFree.current.Time = totalNumberOfBytes.QuadPart;
 }
 
 static bool do_logical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every, usec_t now_ut)
@@ -338,8 +333,8 @@ static bool do_logical_disk(PERF_DATA_BLOCK *pDataBlock, int update_every, usec_
                 rrdlabels_add(d->st_disk_space->rrdlabels, "serial_number", buf, RRDLABEL_SRC_AUTO);
             }
 
-            d->rd_disk_space_free = rrddim_add(d->st_disk_space, "avail", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
-            d->rd_disk_space_used = rrddim_add(d->st_disk_space, "used", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
+            d->rd_disk_space_free = rrddim_add(d->st_disk_space, "avail", NULL, 1, d->divisor, RRD_ALGORITHM_ABSOLUTE);
+            d->rd_disk_space_used = rrddim_add(d->st_disk_space, "used", NULL, 1, d->divisor, RRD_ALGORITHM_ABSOLUTE);
         }
 
         // percentDiskFree has the free space in Data and the size of the disk in Time, in MiB.

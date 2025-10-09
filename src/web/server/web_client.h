@@ -66,6 +66,10 @@ typedef enum __attribute__((packed)) {
     // websocket flags
     WEB_CLIENT_FLAG_WEBSOCKET_CLIENT        = (1 << 23), // this is a websocket client
     WEB_CLIENT_FLAG_WEBSOCKET_HANDSHAKE     = (1 << 24), // websocket handshake detected
+    WEB_CLIENT_FLAG_ACCEPT_JSON             = (1 << 25),
+    WEB_CLIENT_FLAG_ACCEPT_SSE              = (1 << 26),
+    WEB_CLIENT_FLAG_ACCEPT_TEXT             = (1 << 27),
+    WEB_CLIENT_FLAG_MCP_PREVIEW_KEY         = (1 << 28), // Authorization header matched MCP preview key
 } WEB_CLIENT_FLAGS;
 
 #define WEB_CLIENT_FLAG_PATH_WITH_VERSION (WEB_CLIENT_FLAG_PATH_IS_V0|WEB_CLIENT_FLAG_PATH_IS_V1|WEB_CLIENT_FLAG_PATH_IS_V2|WEB_CLIENT_FLAG_PATH_IS_V3)
@@ -105,6 +109,10 @@ typedef enum __attribute__((packed)) {
 #define web_client_has_ssl_wait_send(w) web_client_flag_check(w, WEB_CLIENT_FLAG_SSL_WAIT_SEND)
 #define web_client_enable_ssl_wait_send(w) web_client_flag_set(w, WEB_CLIENT_FLAG_SSL_WAIT_SEND)
 #define web_client_disable_ssl_wait_send(w) web_client_flag_clear(w, WEB_CLIENT_FLAG_SSL_WAIT_SEND)
+
+#define web_client_has_mcp_preview_key(w) web_client_flag_check(w, WEB_CLIENT_FLAG_MCP_PREVIEW_KEY)
+#define web_client_set_mcp_preview_key(w) web_client_flag_set(w, WEB_CLIENT_FLAG_MCP_PREVIEW_KEY)
+#define web_client_clear_mcp_preview_key(w) web_client_flag_clear(w, WEB_CLIENT_FLAG_MCP_PREVIEW_KEY)
 
 #define web_client_check_conn_unix(w) web_client_flag_check(w, WEB_CLIENT_FLAG_CONN_UNIX)
 #define web_client_check_conn_tcp(w) web_client_flag_check(w, WEB_CLIENT_FLAG_CONN_TCP)

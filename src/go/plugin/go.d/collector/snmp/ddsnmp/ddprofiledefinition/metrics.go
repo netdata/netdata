@@ -42,6 +42,60 @@ const (
 	ProfileMetricTypePercent ProfileMetricType = "percent"
 )
 
+// MetricsConfig holds configs for a metric
+type MetricsConfig struct {
+	// MIB the MIB used for this metric
+	MIB string `yaml:"MIB,omitempty" json:"MIB,omitempty"`
+
+	// Symbol configs
+	Symbol SymbolConfig `yaml:"symbol,omitempty" json:"symbol,omitempty"`
+
+	// Table the table OID
+	Table SymbolConfig `yaml:"table,omitempty" json:"table,omitempty"`
+	// Table configs
+	Symbols []SymbolConfig `yaml:"symbols,omitempty" json:"symbols,omitempty"`
+
+	// `static_tags` is not exposed as json at the moment since we need to evaluate if we want to expose it via UI
+	StaticTags []string            `yaml:"static_tags,omitempty" json:"-"`
+	MetricTags MetricTagConfigList `yaml:"metric_tags,omitempty" json:"metric_tags,omitempty"`
+
+	Options MetricsConfigOption `yaml:"options,omitempty" json:"options,omitempty"`
+
+	// DEPRECATED: Use .Symbol instead
+	OID string `yaml:"OID,omitempty" json:"OID,omitempty" jsonschema:"-"`
+	// DEPRECATED: Use .Symbol instead
+	Name string `yaml:"name,omitempty" json:"name,omitempty" jsonschema:"-"`
+	// DEPRECATED: use Symbol.MetricType instead.
+	MetricType ProfileMetricType `yaml:"metric_type,omitempty" json:"metric_type,omitempty" jsonschema:"-"`
+}
+
+// Clone duplicates this MetricsConfig
+func (m MetricsConfig) Clone() MetricsConfig {
+	return MetricsConfig{
+		MIB:        m.MIB,
+		Table:      m.Table.Clone(),
+		Symbol:     m.Symbol.Clone(),
+		Symbols:    cloneSlice(m.Symbols),
+		StaticTags: slices.Clone(m.StaticTags),
+		MetricTags: cloneSlice(m.MetricTags),
+		Options:    m.Options,
+
+		OID:        m.OID,
+		Name:       m.Name,
+		MetricType: m.MetricType,
+	}
+}
+
+// IsColumn returns true if the metrics config define columns metrics
+func (m *MetricsConfig) IsColumn() bool {
+	return len(m.Symbols) > 0
+}
+
+// IsScalar returns true if the metrics config define scalar metrics
+func (m *MetricsConfig) IsScalar() bool {
+	return m.Symbol.OID != "" && m.Symbol.Name != ""
+}
+
 // SymbolConfigCompat is used to deserialize string field or SymbolConfig.
 // For OID/Name to Symbol harmonization:
 // When users declare metric tag like:
@@ -51,7 +105,7 @@ const (
 //	    symbol: aSymbol
 //
 // this will lead to OID stored as MetricTagConfig.OID  and name stored as MetricTagConfig.Symbol.Name
-// When this happens, in ValidateEnrichMetricTags we harmonize by moving MetricTagConfig.OID to MetricTagConfig.Symbol.OID.
+// When this happens, in validateEnrichMetricTags we harmonize by moving MetricTagConfig.OID to MetricTagConfig.Symbol.OID.
 type SymbolConfigCompat SymbolConfig
 
 // Clone creates a duplicate of this SymbolConfigCompat
@@ -88,18 +142,18 @@ type SymbolConfig struct {
 	TransformCompiled *template.Template `yaml:"-" json:"-"`
 }
 
-type ChartMeta struct {
-	Description string `yaml:"description,omitempty" json:"description,omitempty"`
-	Family      string `yaml:"family,omitempty" json:"family,omitempty"`
-	Unit        string `yaml:"unit,omitempty" json:"unit,omitempty"`
-	Type        string `yaml:"type,omitempty" json:"type,omitempty"`
-}
-
 // Clone creates a duplicate of this SymbolConfig
 func (s SymbolConfig) Clone() SymbolConfig {
 	ss := s
 	ss.Mapping = maps.Clone(ss.Mapping)
 	return ss
+}
+
+type ChartMeta struct {
+	Description string `yaml:"description,omitempty" json:"description,omitempty"`
+	Family      string `yaml:"family,omitempty" json:"family,omitempty"`
+	Unit        string `yaml:"unit,omitempty" json:"unit,omitempty"`
+	Type        string `yaml:"type,omitempty" json:"type,omitempty"`
 }
 
 // MetricTagConfig holds metric tag info
@@ -124,8 +178,8 @@ type MetricTagConfig struct {
 
 	IndexTransform []MetricIndexTransform `yaml:"index_transform,omitempty" json:"index_transform,omitempty"`
 
-	MappingRef string          `yaml:"mapping_ref,omitempty" json:"mapping_ref,omitempty"`
-	Mapping    ListMap[string] `yaml:"mapping,omitempty" json:"mapping,omitempty"`
+	MappingRef string            `yaml:"mapping_ref,omitempty" json:"mapping_ref,omitempty"`
+	Mapping    map[string]string `yaml:"mapping,omitempty" json:"mapping,omitempty"`
 
 	// Regex
 	// Match/Tags are not exposed as json (UI) since ExtractValue can be used instead
@@ -161,88 +215,4 @@ type MetricIndexTransform struct {
 type MetricsConfigOption struct {
 	Placement    uint   `yaml:"placement,omitempty" json:"placement,omitempty"`
 	MetricSuffix string `yaml:"metric_suffix,omitempty" json:"metric_suffix,omitempty"`
-}
-
-// MetricsConfig holds configs for a metric
-type MetricsConfig struct {
-	// MIB the MIB used for this metric
-	MIB string `yaml:"MIB,omitempty" json:"MIB,omitempty"`
-
-	// Table the table OID
-	Table SymbolConfig `yaml:"table,omitempty" json:"table,omitempty"`
-
-	// Symbol configs
-	Symbol SymbolConfig `yaml:"symbol,omitempty" json:"symbol,omitempty"`
-
-	// DEPRECATED: Use .Symbol instead
-	OID string `yaml:"OID,omitempty" json:"OID,omitempty" jsonschema:"-"`
-	// DEPRECATED: Use .Symbol instead
-	Name string `yaml:"name,omitempty" json:"name,omitempty" jsonschema:"-"`
-
-	// Table configs
-	Symbols []SymbolConfig `yaml:"symbols,omitempty" json:"symbols,omitempty"`
-
-	// `static_tags` is not exposed as json at the moment since we need to evaluate if we want to expose it via UI
-	StaticTags []string            `yaml:"static_tags,omitempty" json:"-"`
-	MetricTags MetricTagConfigList `yaml:"metric_tags,omitempty" json:"metric_tags,omitempty"`
-
-	// DEPRECATED: use Symbol.MetricType instead.
-	ForcedType ProfileMetricType `yaml:"forced_type,omitempty" json:"forced_type,omitempty" jsonschema:"-"`
-	// DEPRECATED: use Symbol.MetricType instead.
-	MetricType ProfileMetricType `yaml:"metric_type,omitempty" json:"metric_type,omitempty" jsonschema:"-"`
-
-	Options MetricsConfigOption `yaml:"options,omitempty" json:"options,omitempty"`
-}
-
-// Clone duplicates this MetricsConfig
-func (m MetricsConfig) Clone() MetricsConfig {
-	return MetricsConfig{
-		MIB:        m.MIB,
-		Table:      m.Table.Clone(),
-		Symbol:     m.Symbol.Clone(),
-		OID:        m.OID,
-		Name:       m.Name,
-		Symbols:    CloneSlice(m.Symbols),
-		StaticTags: slices.Clone(m.StaticTags),
-		MetricTags: CloneSlice(m.MetricTags),
-		ForcedType: m.ForcedType,
-		MetricType: m.MetricType,
-		Options:    m.Options,
-	}
-}
-
-// GetSymbolTags returns symbol tags
-func (m *MetricsConfig) GetSymbolTags() []string {
-	var symbolTags []string
-	for _, metricTag := range m.MetricTags {
-		symbolTags = append(symbolTags, metricTag.SymbolTag)
-	}
-	return symbolTags
-}
-
-// IsColumn returns true if the metrics config define columns metrics
-func (m *MetricsConfig) IsColumn() bool {
-	return len(m.Symbols) > 0
-}
-
-// IsScalar returns true if the metrics config define scalar metrics
-func (m *MetricsConfig) IsScalar() bool {
-	return m.Symbol.OID != "" && m.Symbol.Name != ""
-}
-
-// NormalizeMetrics converts legacy syntax to new syntax
-// 1/ converts old symbol syntax to new symbol syntax
-// metric.Name and metric.OID info are moved to metric.Symbol.Name and metric.Symbol.OID
-func NormalizeMetrics(metrics []MetricsConfig) {
-	for i := range metrics {
-		metric := &metrics[i]
-
-		// converts old symbol syntax to new symbol syntax
-		if metric.Symbol.Name == "" && metric.Symbol.OID == "" && metric.Name != "" && metric.OID != "" {
-			metric.Symbol.Name = metric.Name
-			metric.Symbol.OID = metric.OID
-			metric.Name = ""
-			metric.OID = ""
-		}
-	}
 }

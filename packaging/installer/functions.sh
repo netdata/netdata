@@ -299,9 +299,9 @@ prepare_cmake_options() {
 
   if [ -n "${NETDATA_ENABLE_LTO}" ]; then
     if [ "${NETDATA_ENABLE_LTO}" -eq 1 ]; then
-      NETDATA_CMAKE_OPTIONS="${NETDATA_CMAKE_OPTIONS} -DDISABLE_LTO=Off"
+      NETDATA_CMAKE_OPTIONS="${NETDATA_CMAKE_OPTIONS} -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=On -DUSE_LTO=On"
     else
-      NETDATA_CMAKE_OPTIONS="${NETDATA_CMAKE_OPTIONS} -DDISABLE_LTO=On"
+      NETDATA_CMAKE_OPTIONS="${NETDATA_CMAKE_OPTIONS} -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=Off -DUSE_LTO=Off"
     fi
   fi
 
@@ -378,6 +378,7 @@ prepare_cmake_options() {
   enable_feature ML "${NETDATA_ENABLE_ML:-1}"
   enable_feature PLUGIN_APPS "${ENABLE_APPS:-1}"
   enable_feature PLUGIN_OTEL "${ENABLE_OTEL:-0}"
+  enable_feature PLUGIN_IBM "${ENABLE_IBM:-0}"
 
   check_for_feature EXPORTER_PROMETHEUS_REMOTE_WRITE "${EXPORTER_PROMETHEUS}" snappy
   check_for_feature EXPORTER_MONGODB "${EXPORTER_MONGODB}" libmongoc-1.0

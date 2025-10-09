@@ -724,6 +724,13 @@ char *fix_path_variable(void) {
 // ----------------------------------------------------------------------------
 // main
 
+static void cleanup_spawn_server_on_fatal(void) {
+    if(spawn_server) {
+        spawn_server_destroy(spawn_server);
+        spawn_server = NULL;
+    }
+}
+
 void usage(void) {
     fprintf(stderr, "%s [ -p PID | --pid PID | --cgroup /path/to/cgroup ]\n", program_name);
     exit(1);
@@ -737,6 +744,7 @@ int main(int argc, const char **argv) {
 
     nd_log_initialize_for_external_plugins("cgroup-network");
     spawn_server = spawn_server_create(SPAWN_SERVER_OPTION_EXEC | SPAWN_SERVER_OPTION_CALLBACK, NULL, spawn_callback, argc, argv);
+    nd_log_register_fatal_final_cb(cleanup_spawn_server_on_fatal);
 
     // since cgroup-network runs as root, prevent it from opening symbolic links
     procfile_open_flags = O_RDONLY|O_NOFOLLOW;
@@ -819,6 +827,7 @@ int main(int argc, const char **argv) {
     int found = send_devices();
 
     spawn_server_destroy(spawn_server);
+    spawn_server = NULL;
 
     if(found <= 0) return 1;
     return 0;

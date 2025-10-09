@@ -270,9 +270,6 @@ static void work_standard_worker(uv_work_t *req) {
 
     __atomic_sub_fetch(&rrdeng_main.work_cmd.atomics.dispatched, 1, __ATOMIC_RELAXED);
     __atomic_sub_fetch(&rrdeng_main.work_cmd.atomics.executing, 1, __ATOMIC_RELAXED);
-
-    // signal the event loop a worker is available
-    rrdeng_async_wakeup();
 }
 
 static void after_work_standard_callback(uv_work_t* req, int status) {
@@ -700,12 +697,14 @@ extent_flush_to_open(struct rrdengine_instance *ctx, struct extent_io_descriptor
 
         if (likely(still_running && !have_error))
             pgc_open_add_hot_page(
-                    (Word_t)ctx, descr->metric_id,
-                    (time_t) (descr->start_time_ut / USEC_PER_SEC),
-                    (time_t) (descr->end_time_ut / USEC_PER_SEC),
-                    descr->update_every_s,
-                    datafile,
-                    xt_io_descr->pos, xt_io_descr->bytes, descr->page_length);
+                (Word_t)ctx,
+                descr->metric_id,
+                (time_t)(descr->start_time_ut / USEC_PER_SEC),
+                (time_t)(descr->end_time_ut / USEC_PER_SEC),
+                descr->update_every_s,
+                datafile,
+                xt_io_descr->pos,
+                xt_io_descr->bytes);
 
         page_descriptor_release(descr);
     }
@@ -1890,7 +1889,6 @@ void async_cb(uv_async_t *handle)
 
 #define TIMER_PERIOD_MS (1000)
 
-
 static void *extent_read_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
     EPDL *epdl = data;
     epdl_find_extent_and_populate_pages(ctx, epdl, true);
@@ -2162,13 +2160,12 @@ bool rrdeng_ctx_tier_cap_exceeded(struct rrdengine_instance *ctx)
     return false;
 }
 
-static void retention_timer_cb(uv_timer_t *handle) {
+static void retention_timer_cb(uv_timer_t *handle __maybe_unused)
+{
     if (!localhost)
         return;
 
     worker_is_busy(RRDENG_RETENTION_TIMER_CB);
-    uv_stop(handle->loop);
-    uv_update_time(handle->loop);
 
     for (size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
         STORAGE_ENGINE *eng = localhost->db[tier].eng;
@@ -2180,18 +2177,14 @@ static void retention_timer_cb(uv_timer_t *handle) {
     worker_is_idle();
 }
 
-static void timer_per_sec_cb(uv_timer_t* handle) {
+static void timer_per_sec_cb(uv_timer_t *handle __maybe_unused)
+{
     worker_is_busy(RRDENG_TIMER_CB);
-    uv_stop(handle->loop);
-    uv_update_time(handle->loop);
 
     worker_set_metric(RRDENG_OPCODES_WAITING, (NETDATA_DOUBLE)rrdeng_main.cmd_queue.unsafe.waiting);
     worker_set_metric(RRDENG_WORKS_DISPATCHED, (NETDATA_DOUBLE)__atomic_load_n(&rrdeng_main.work_cmd.atomics.dispatched, __ATOMIC_RELAXED));
     worker_set_metric(RRDENG_WORKS_EXECUTING, (NETDATA_DOUBLE)__atomic_load_n(&rrdeng_main.work_cmd.atomics.executing, __ATOMIC_RELAXED));
 
-    // rrdeng_enq_cmd(NULL, RRDENG_OPCODE_EVICT_MAIN, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
-    // rrdeng_enq_cmd(NULL, RRDENG_OPCODE_EVICT_OPEN, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
-    // rrdeng_enq_cmd(NULL, RRDENG_OPCODE_EVICT_EXTENT, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
     rrdeng_enq_cmd(NULL, RRDENG_OPCODE_FLUSH_MAIN, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
     rrdeng_enq_cmd(NULL, RRDENG_OPCODE_CLEANUP, NULL, NULL, STORAGE_PRIORITY_INTERNAL_DBENGINE, NULL, NULL);
 
@@ -2301,10 +2294,8 @@ static inline void worker_dispatch_query_prep(struct rrdeng_cmd cmd, bool from_w
 uint64_t rrdeng_get_directory_free_bytes_space(struct rrdengine_instance *ctx)
 {
     uint64_t free_bytes = 0;
-    struct statvfs buff_statvfs;
-    if (statvfs(ctx->config.dbfiles_path, &buff_statvfs) == 0)
-        free_bytes = buff_statvfs.f_bavail * buff_statvfs.f_bsize;
-
+    OS_SYSTEM_DISK_SPACE space = os_disk_space(ctx->config.dbfiles_path);
+    free_bytes = OS_SYSTEM_DISK_SPACE_OK(space) ? space.free_bytes : 0;
     return (free_bytes - (free_bytes * 5 / 100));
 }
 
@@ -2412,18 +2403,9 @@ void dbengine_event_loop(void* arg) {
 
     while (likely(!shutdown)) {
         worker_is_idle();
-        uv_run(&main->loop, UV_RUN_DEFAULT);
+        uv_run(&main->loop, UV_RUN_ONCE);
 
-        /* wait for commands */
-        size_t count = 0;
         do {
-            count++;
-
-            if(count % 100 == 0) {
-                worker_is_idle();
-                uv_run(&main->loop, UV_RUN_NOWAIT);
-            }
-
             worker_is_busy(RRDENG_OPCODE_MAX);
             cmd = rrdeng_deq_cmd(RRDENG_OPCODE_NOOP);
             opcode = cmd.opcode;
@@ -2586,6 +2568,8 @@ void dbengine_event_loop(void* arg) {
                     break;
                 }
             }
+            if (opcode != RRDENG_OPCODE_NOOP)
+                uv_run(&main->loop, UV_RUN_NOWAIT);
 
         } while (opcode != RRDENG_OPCODE_NOOP);
     }

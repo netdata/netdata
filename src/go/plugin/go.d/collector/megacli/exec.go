@@ -5,12 +5,10 @@
 package megacli
 
 import (
-	"context"
-	"fmt"
-	"os/exec"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 )
 
 type megaCli interface {
@@ -18,40 +16,23 @@ type megaCli interface {
 	bbuInfo() ([]byte, error)
 }
 
-func newMegaCliExec(ndsudoPath string, timeout time.Duration, log *logger.Logger) *megaCliExec {
+func newMegaCliExec(timeout time.Duration, log *logger.Logger) *megaCliExec {
 	return &megaCliExec{
-		Logger:     log,
-		ndsudoPath: ndsudoPath,
-		timeout:    timeout,
+		Logger:  log,
+		timeout: timeout,
 	}
 }
 
 type megaCliExec struct {
 	*logger.Logger
 
-	ndsudoPath string
-	timeout    time.Duration
+	timeout time.Duration
 }
 
 func (e *megaCliExec) physDrivesInfo() ([]byte, error) {
-	return e.execute("megacli-disk-info")
+	return ndexec.RunNDSudo(e.Logger, e.timeout, "megacli-disk-info")
 }
 
 func (e *megaCliExec) bbuInfo() ([]byte, error) {
-	return e.execute("megacli-battery-info")
-}
-
-func (e *megaCliExec) execute(args ...string) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), e.timeout)
-	defer cancel()
-
-	cmd := exec.CommandContext(ctx, e.ndsudoPath, args...)
-	e.Debugf("executing '%s'", cmd)
-
-	bs, err := cmd.Output()
-	if err != nil {
-		return nil, fmt.Errorf("error on '%s': %v", cmd, err)
-	}
-
-	return bs, nil
+	return ndexec.RunNDSudo(e.Logger, e.timeout, "megacli-battery-info")
 }

@@ -29,6 +29,10 @@ for modfile in GO_SRC.glob('**/go.mod'):
         if 'examples' in mainpath.parts:
             continue
 
+        # Skip ibmdplugin as it requires CGO
+        if 'ibmdplugin' in mainpath.parts:
+            continue
+
         modules.append({
             'module': str(modfile.parent),
             'version': str(version),

@@ -6,6 +6,7 @@
 #include "status-file.h"
 #include "static_threads.h"
 #include "web/api/queries/backfill.h"
+#include "web/mcp/mcp.h"
 
 #include "database/engine/page_test.h"
 #include <curl/curl.h>
@@ -945,6 +946,7 @@ int netdata_main(int argc, char **argv) {
     // get the certificate and start security
     netdata_conf_web_security_init();
     nd_web_api_init();
+    mcp_initialize_subsystem();
     web_server_threading_selection();
 
     delta_startup_time("web server sockets");
