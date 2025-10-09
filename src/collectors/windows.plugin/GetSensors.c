@@ -32,7 +32,10 @@ enum netdata_win_sensor_monitored {
     NETDATA_WIN_SENSOR_GAUGE_PRESSURE,
     NETDATA_WIN_SENSOR_TYPE_DISTANCE_X,
     NETDATA_WIN_SENSOR_TYPE_DISTANCE_Y,
-    NETDATA_WIN_SENSOR_TYPE_DISTANCE_Z
+    NETDATA_WIN_SENSOR_TYPE_DISTANCE_Z,
+    NETDATA_WIN_SENSOR_ACCELERATION_X_G,
+    NETDATA_WIN_SENSOR_ACCELERATION_Y_G,
+    NETDATA_WIN_SENSOR_ACCELERATION_Z_G
 };
 
 REFPROPERTYKEY sensor_keys[] = {
@@ -52,6 +55,9 @@ REFPROPERTYKEY sensor_keys[] = {
         &SENSOR_DATA_TYPE_DISTANCE_X_METERS,
         &SENSOR_DATA_TYPE_DISTANCE_Y_METERS,
         &SENSOR_DATA_TYPE_DISTANCE_Z_METERS,
+        &SENSOR_DATA_TYPE_ACCELERATION_X_G,
+        &SENSOR_DATA_TYPE_ACCELERATION_Y_G,
+        &SENSOR_DATA_TYPE_ACCELERATION_Z_G,
 
         NULL};
 
@@ -175,6 +181,27 @@ static struct win_sensor_config {
             .context = "system.hw.sensor.zdistance.input",
             .family = "Distance",
             .priority = 70021,
+        },
+        {
+            .title = "Acceleration on X axis.",
+            .units = "g",
+            .context = "system.hw.sensor.xacceleration.input",
+            .family = "Acceleration",
+            .priority = 70022,
+        },
+        {
+            .title = "Acceleration on Y axis.",
+            .units = "g",
+            .context = "system.hw.sensor.yacceleration.input",
+            .family = "Acceleration",
+            .priority = 70023,
+        },
+        {
+            .title = "Acceleration on Z axis.",
+            .units = "g",
+            .context = "system.hw.sensor.zacceleration.input",
+            .family = "Acceleration",
+            .priority = 70024,
         }
 };
 
