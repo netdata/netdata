@@ -857,10 +857,11 @@ int netdata_main(int argc, char **argv) {
 
     daemon_status_file_check_crash();
 
+#if !defined(OS_WINDOWS)
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("temp spawn server");
-
     netdata_main_spawn_server_init("init", argc, (const char **)argv);
+#endif
 
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("ssl");
@@ -980,11 +981,12 @@ int netdata_main(int argc, char **argv) {
 
     set_nofile_limit(&rlimit_nofile);
 
+#if !defined(OS_WINDOWS)
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("stop temporary spawn server");
-
     // stop the old server and later start a new one under the new permissions
     netdata_main_spawn_server_cleanup();
+#endif
 
 // ----------------------------------------------------------------------------------------------------------------
 
