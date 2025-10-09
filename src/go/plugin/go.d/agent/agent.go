@@ -30,20 +30,25 @@ var isTerminal = isatty.IsTerminal(os.Stdout.Fd())
 
 // Config is an Agent configuration.
 type Config struct {
-	Name                      string
-	PluginConfigDir           []string
+	Name            string
+	PluginConfigDir []string
+
 	CollectorsConfigDir       []string
 	CollectorsConfigWatchPath []string
 	ServiceDiscoveryConfigDir []string
 	VarLibDir                 string
-	ModuleRegistry            module.Registry
-	RunModule                 string
-	RunJob                    []string
-	MinUpdateEvery            int
-	DumpMode                  time.Duration
-	DumpSummary               bool
-	DumpDataDir               string
-	DynamicConfigPrefix       string
+
+	ModuleRegistry module.Registry
+	RunModule      string
+	RunJob         []string
+	MinUpdateEvery int
+
+	DisableServiceDiscovery bool
+
+	DumpMode            time.Duration
+	DumpSummary         bool
+	DumpDataDir         string
+	DynamicConfigPrefix string
 }
 
 // Agent represents orchestrator.
@@ -62,6 +67,8 @@ type Agent struct {
 	RunModule      string
 	RunJob         []string
 	MinUpdateEvery int
+
+	DisableServiceDiscovery bool
 
 	ModuleRegistry module.Registry
 	Out            io.Writer
@@ -108,6 +115,7 @@ func New(cfg Config) *Agent {
 		dumpMode:                  cfg.DumpMode,
 		dumpSummary:               cfg.DumpSummary,
 		DynamicConfigPrefix:       cfg.DynamicConfigPrefix,
+		DisableServiceDiscovery:   cfg.DisableServiceDiscovery,
 	}
 
 	if a.dumpMode > 0 {

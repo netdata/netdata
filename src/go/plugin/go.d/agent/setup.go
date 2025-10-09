@@ -129,7 +129,7 @@ func (a *Agent) buildDiscoveryConf(enabled module.Registry) discovery.Config {
 
 	a.Infof("dummy/read/watch paths: %d/%d/%d", len(dummyPaths), len(readPaths), len(a.CollectorsConfigWatchPath))
 
-	return discovery.Config{
+	cfg := discovery.Config{
 		Registry: reg,
 		File: file.Config{
 			Read:  readPaths,
@@ -138,10 +138,15 @@ func (a *Agent) buildDiscoveryConf(enabled module.Registry) discovery.Config {
 		Dummy: dummy.Config{
 			Names: dummyPaths,
 		},
-		SD: sd.Config{
-			ConfDir: a.ServiceDiscoveryConfigDir,
-		},
 	}
+
+	if !a.DisableServiceDiscovery {
+		cfg.SD = sd.Config{
+			ConfDir: a.ServiceDiscoveryConfigDir,
+		}
+	}
+
+	return cfg
 }
 
 func (a *Agent) setupVnodeRegistry() map[string]*vnodes.VirtualNode {
