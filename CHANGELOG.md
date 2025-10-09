@@ -6,7 +6,14 @@
 
 **Merged pull requests:**
 
+- fix\(ibm.d/mq\): change default ExponentialBackoff attempts to 2 [\#21124](https://github.com/netdata/netdata/pull/21124) ([ilyam8](https://github.com/ilyam8))
+- fix\(ibm.d\): various fixes [\#21123](https://github.com/netdata/netdata/pull/21123) ([ilyam8](https://github.com/ilyam8))
+- Update IBM plugin documentation. [\#21122](https://github.com/netdata/netdata/pull/21122) ([Ferroin](https://github.com/Ferroin))
+- Improve free disk space calculation for Windows [\#21121](https://github.com/netdata/netdata/pull/21121) ([stelfrag](https://github.com/stelfrag))
+- Fix issues with IBM libs plugin. [\#21120](https://github.com/netdata/netdata/pull/21120) ([Ferroin](https://github.com/Ferroin))
+- Make native package dependencies consistent between DEB/RPM packages. [\#21118](https://github.com/netdata/netdata/pull/21118) ([Ferroin](https://github.com/Ferroin))
 - Properly include client compoents for IBM MQ libraries. [\#21117](https://github.com/netdata/netdata/pull/21117) ([Ferroin](https://github.com/Ferroin))
+- Properly check for ODBC for IBM plugin at configuration time. [\#21116](https://github.com/netdata/netdata/pull/21116) ([Ferroin](https://github.com/Ferroin))
 - Fix windows build [\#21113](https://github.com/netdata/netdata/pull/21113) ([stelfrag](https://github.com/stelfrag))
 - Address NULL access \(windows.plugin\) [\#21112](https://github.com/netdata/netdata/pull/21112) ([thiagoftsm](https://github.com/thiagoftsm))
 - build\(deps\): bump github.com/prometheus/common from 0.66.1 to 0.67.1 in /src/go [\#21111](https://github.com/netdata/netdata/pull/21111) ([dependabot[bot]](https://github.com/apps/dependabot))
@@ -443,12 +450,6 @@
 - ddsnmp add pow transform func and allow mapping duplicate values [\#20587](https://github.com/netdata/netdata/pull/20587) ([ilyam8](https://github.com/ilyam8))
 - fix\(go.d/ddsnmp\): correct matching same profile multiple times [\#20586](https://github.com/netdata/netdata/pull/20586) ([ilyam8](https://github.com/ilyam8))
 - remove devType/Vendor/ from ddsnmp metric families [\#20585](https://github.com/netdata/netdata/pull/20585) ([ilyam8](https://github.com/ilyam8))
-- fix\(go.d/ddsnmp\): include table name in config id [\#20584](https://github.com/netdata/netdata/pull/20584) ([ilyam8](https://github.com/ilyam8))
-- fix\(go.d/ddsnmp\): walk cross-table columns when referenced table has no metrics [\#20583](https://github.com/netdata/netdata/pull/20583) ([ilyam8](https://github.com/ilyam8))
-- Rework datafiles [\#20581](https://github.com/netdata/netdata/pull/20581) ([stelfrag](https://github.com/stelfrag))
-- Windows Pluging \(Freedom to update every\) [\#20580](https://github.com/netdata/netdata/pull/20580) ([thiagoftsm](https://github.com/thiagoftsm))
-- Ignore duplicate entries when rebuilding the alert version table [\#20579](https://github.com/netdata/netdata/pull/20579) ([stelfrag](https://github.com/stelfrag))
-- Add Rocky Linux 10 to CI and package builds. [\#20578](https://github.com/netdata/netdata/pull/20578) ([Ferroin](https://github.com/Ferroin))
 
 ## [v2.5.4](https://github.com/netdata/netdata/tree/v2.5.4) (2025-06-24)
 
