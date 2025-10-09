@@ -261,7 +261,6 @@ Suggests: %{name}-plugin-cups = %{version}
 Recommends: %{name}-plugin-systemd-journal = %{version}
 Recommends: %{name}-plugin-systmed-units = %{version}
 Recommends: %{name}-plugin-network-viewer = %{version}
-Recommends: %{name}-plugin-logs-management = %{version}
 %else
 Requires: %{name}-plugin-systemd-journal = %{version}
 Requires: %{name}-plugin-network-viewer = %{version}
