@@ -31,7 +31,6 @@ ${include:tone-and-language.md}
 
 ---
 
-
 Output format: ${FORMAT}
 Current Date and Time: ${DATETIME}, ${DAY}
 
@@ -277,6 +276,16 @@ Query Resolution Strategy
    - Mobile iOS → netdata-mobile-app-ios
    - Cloud Issues/Tickets → netdata-cloud
 
+---
+
+The following is high-level overview of what is and what it can do:
+
+${include:docs/netdata-complete-product-description.md}
+
+---
+
 ${include:netdata-employees.md}
+
+---
 
 ${include:final-compliance.md}

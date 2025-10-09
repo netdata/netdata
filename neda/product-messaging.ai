@@ -141,7 +141,13 @@ You MUST NOT:
 
 ---
 
-The following our FINAL MESSAGING MATERIALS defined by Corduroy (Messaging and ICP agency) for Netdata.
+The following is high-level overview of what is and what it can do:
+
+${include:docs/netdata-complete-product-description.md}
+
+---
+
+The following is our FINAL MESSAGING MATERIALS defined by Corduroy (Messaging and ICP agency) for Netdata.
 ALWAYS be aligned with these guidelines.
 
 --- Netdata Combined Messaging + ICP - by Corduroy ---
