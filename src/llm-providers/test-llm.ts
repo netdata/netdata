@@ -98,6 +98,20 @@ export class TestLLMProvider extends BaseLLMProvider {
     const failuresAllowed = typeof activeStep.failuresBeforeSuccess === 'number' ? Math.max(0, Math.trunc(activeStep.failuresBeforeSuccess)) : 0;
     if (attemptCount < failuresAllowed) {
       this.attemptCounters.set(attemptKey, attemptCount + 1);
+      if (activeStep.failureThrows === true) {
+        const failureMessage = activeStep.failureMessage ?? 'Simulated failure';
+        const failureError = activeStep.failureError;
+        if (failureError !== undefined) {
+          const error = new Error(typeof failureError.message === 'string' ? failureError.message : failureMessage);
+          const mutableError = error as unknown as Record<string, unknown>;
+          Object.entries(failureError).forEach(([key, value]) => {
+            if (key === 'message') return;
+            mutableError[key] = value;
+          });
+          throw error;
+        }
+        throw new Error(failureMessage);
+      }
       const latency = Date.now() - executionStart;
       const failureStatus = activeStep.failureStatus ?? 'model_error';
       const failureMessage = activeStep.failureMessage ?? 'Simulated failure';
@@ -334,6 +348,7 @@ function buildFinalReportContent(response: FinalReportStep): LanguageModelV2Cont
       status: response.status ?? 'success',
       report_format: response.reportFormat,
       report_content: response.reportContent,
+      content_json: response.reportContentJson,
     }),
   });
   return items;

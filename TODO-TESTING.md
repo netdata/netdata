@@ -30,12 +30,13 @@
 ### Running Phase 1
 - Build the project (`npm run build`).
 - Execute the deterministic harness: `node dist/tests/phase1-harness.js` or `npm run test:phase1` (build step is included in the script).
-- The harness now executes 24 scripted scenarios:
+- The harness now executes 42 scripted scenarios:
   - Baseline + MCP failure/retry (`run-test-1` … `run-test-3`).
   - Provider fallback, timeouts, retry exhaustion (`run-test-4` … `run-test-7`).
   - Tool truncation, unknown tool handling, progress reports, final-report schema guards (`run-test-8` … `run-test-12`).
   - Batch tooling paths, pricing accounting, persistence snapshots (`run-test-13` … `run-test-16`).
   - Model overrides, abort/stop flows, sub-agent failure/success, persistence error handling (`run-test-17` … `run-test-24`).
+  - Tool concurrency, batch validation/errors, streaming reasoning, provider throw/retry, LLM error matrix (`run-test-25` … `run-test-42`).
 - Persistence error scenario (`run-test-20`) intentionally emits warnings when directories are blocked; no action required.
 - Enable coverage when needed: `NODE_V8_COVERAGE=coverage node dist/tests/phase1-harness.js` or wrap with `npx c8`.
 
@@ -68,26 +69,15 @@ Once Phase 1 is delivered, we will enumerate additional scenarios to drive cover
 - Additional accounting edge cases (e.g., partial final report status, mixed success/failure batches).
 - Coverage reporting playbook (documented steps + thresholds) once concurrency + recursion scenarios are in place.
 
-### Phase 2 Coverage Objectives (New)
-- Achieve 100% statements/branches/functions/lines for:
-  - `src/ai-agent.ts` (batch tool orchestration, retry flows, thinking stream side effects).
-  - `src/llm-client.ts` (provider selection, traced fetch instrumentation, pricing/cost enrichment, error mapping).
-  - Tool providers (`src/tools/internal-provider.ts`, `src/tools/mcp-provider.ts`, OpenAPI/REST importers) covering happy/error paths.
+### Phase 2 Coverage Objectives (Updated)
+- Drive `src/ai-agent.ts`, `src/llm-client.ts`, and `src/tools/internal-provider.ts` toward 100% statements/branches/functions/lines using deterministic scenarios only.
+- Stretch goals: surface provider-specific adapters (`src/llm-providers/openai.ts`, `anthropic.ts`, `google.ts`, etc.) via scripted harness flows where feasible.
 
-### Planned Additions
-- **New deterministic scenarios** exercising `agent__batch`, invalid batch inputs, progress propagation, and retry flows.
-- **Unit-style tests** for `LLMClient` with mocked providers/fetch to cover routing, pricing, and error-handling branches.
-- **Provider-focused tests** covering internal tool validation, MCP edge cases, and OpenAPI/REST import behaviors.
-- **Harness improvements** to log per-scenario results with pass/fail markers and failure diagnostics to simplify debugging.
-
-### Phase 2 Execution Plan
-- Scenario `run-test-25` (happy batch): scripted final turn invokes `agent__batch` with multiple sub-calls; assertions cover successful tool orchestration, progress propagation, and response caps in `executeBatchCalls` (`ai-agent.ts:2092-2189`).
-- Scenario `run-test-26` (batch invalid input): triggers missing `id/tool` fields to validate error logging + failed accounting path for batches (same method lines 2126-2142).
-- Scenario `run-test-27` (retry flow): forces a deliberate failure then invokes `session.retry()` within harness to ensure state reset (lines 2194-2206).
-- Scenario `run-test-28` (streaming reasoning): wire `stream: true` to assert thinking callbacks + opTree updates (lines 2040-2054).
-- Create `src/tests/unit/llm-client.test.ts` covering provider lookup errors, traced fetch routing/cost enrichment, cache write augmentation, and pricing logs (`llm-client.ts` entire file).
-- Add provider unit tests under `src/tests/unit/tools/` for internal + MCP providers, plus OpenAPI/REST import coverage (error + success paths).
-- Update harness + fixtures incrementally while monitoring `npx c8 npm run test:phase1` progress toward 100% coverage.
+### Next Additions (In Progress)
+- **LLM client error matrix** (`llm-client.ts`): deterministic scenarios that script rate-limit, auth, quota, timeout, network, and raw throws to exercise every branch of `mapError` and traced-fetch enrichment.
+- **AI Agent orchestration branches** (`ai-agent.ts`): scenarios covering concurrency limiter logs, persistence fallback, final-turn tool filtering/max-turn adjustments, and thinking-stream toggles.
+- **Internal provider advanced paths** (`internal-provider.ts`): scenarios hitting Slack metadata merge, JSON schema validation failures, trace logging, and REST fallback/child tool accounting.
+- Continue running `npx c8 npm run test:phase1` after each batch of scenarios to verify coverage progress.
 
 ### Implementation Notes
 - Scenario definitions live in `src/tests/fixtures/test-llm-scenarios.ts`; harness configuration hooks in `src/tests/phase1-harness.ts` set per-scenario overrides.

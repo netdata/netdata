@@ -22,6 +22,7 @@ export type ScenarioStepResponse =
       reportContent: string;
       reportFormat: string;
       status?: 'success' | 'failure' | 'partial';
+      reportContentJson?: Record<string, unknown>;
       tokenUsage?: TokenUsage;
       reasoning?: string[];
     }
@@ -41,6 +42,8 @@ export interface ScenarioTurn {
   failureStatus?: 'model_error' | 'network_error' | 'timeout' | 'invalid_response' | 'rate_limit';
   failureRetryable?: boolean;
   failureMessage?: string;
+  failureError?: Record<string, unknown>;
+  failureThrows?: boolean;
   allowMissingTools?: boolean;
   expectedTemperature?: number;
   expectedTopP?: number;
@@ -81,6 +84,14 @@ const STREAM_REASONING_STEPS = [
   'Deliberating over deterministic harness state.',
   'Confirming reasoning stream emission.',
 ] as const;
+const THROW_FAILURE_MESSAGE = 'Simulated provider throw for coverage.';
+const FINAL_REPORT_JSON_ATTEMPT = 'Attempting JSON final report without structured payload.';
+const FINAL_REPORT_SUCCESS_SUMMARY = 'Final report emitted after retry.';
+const TEXT_ONLY_RESPONSE = 'Providing plain text without invoking final report tool.';
+const BATCH_PROGRESS_STATUS = 'Batch progress update for coverage.';
+const BATCH_PROGRESS_RESPONSE = 'batch-progress-follow-up';
+const BATCH_STRING_PROGRESS = 'Batch progress conveyed via string payload.';
+const BATCH_STRING_RESULT = 'batch-string-mode';
 
 const SCENARIOS: ScenarioDefinition[] = [
   {
@@ -1276,6 +1287,476 @@ const SCENARIOS: ScenarioDefinition[] = [
           status: STATUS_SUCCESS,
           tokenUsage: DEFAULT_TOKEN_USAGE,
           reasoning: [...STREAM_REASONING_STEPS],
+        },
+      },
+    ],
+  },
+  {
+    id: 'run-test-31',
+    description: 'Provider throws before retry succeeds.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        expectedTools: [TOOL_NAME],
+        failuresBeforeSuccess: 1,
+        failureThrows: true,
+        failureMessage: THROW_FAILURE_MESSAGE,
+        response: {
+          kind: 'tool-call',
+          assistantText: 'Retry after thrown provider failure.',
+          toolCalls: [
+            {
+              toolName: TOOL_NAME,
+              callId: 'call-throw-retry-1',
+              assistantText: 'Executing after provider throw.',
+              arguments: {
+                text: 'throw-retry-success',
+              },
+            },
+          ],
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+          finishReason: TOOL_FINISH_REASON,
+        },
+      },
+      {
+        turn: 2,
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Final report after thrown failure recovery.',
+          reportContent: `${RESULT_HEADING}Thrown failure path recovered successfully.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_SUCCESS,
+          tokenUsage: {
+            inputTokens: 80,
+            outputTokens: 28,
+            totalTokens: 108,
+          },
+        },
+      },
+    ],
+  },
+  {
+    id: 'run-test-32',
+    description: 'Invalid JSON final report followed by retry.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        expectedTools: [TOOL_NAME],
+        response: {
+          kind: 'tool-call',
+          assistantText: 'Gathering data before invalid final report.',
+          toolCalls: [
+            {
+              toolName: TOOL_NAME,
+              callId: 'call-final-json-tool',
+              assistantText: 'Collecting details ahead of final report.',
+              arguments: {
+                text: 'final-json-step',
+              },
+            },
+          ],
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+          finishReason: TOOL_FINISH_REASON,
+        },
+      },
+      {
+        turn: 2,
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: FINAL_REPORT_JSON_ATTEMPT,
+          reportContent: `${RESULT_HEADING}Invalid JSON final report attempt.`,
+          reportFormat: 'json',
+          status: STATUS_SUCCESS,
+          tokenUsage: {
+            inputTokens: 70,
+            outputTokens: 24,
+            totalTokens: 94,
+          },
+        },
+      },
+      {
+        turn: 3,
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: FINAL_REPORT_SUCCESS_SUMMARY,
+          reportContent: `${RESULT_HEADING}Final report succeeded after retry.`,
+          reportFormat: 'json',
+          status: STATUS_SUCCESS,
+          reportContentJson: {
+            outcome: 'success',
+            summary: 'Final report succeeded after retry.',
+          },
+          tokenUsage: {
+            inputTokens: 72,
+            outputTokens: 26,
+            totalTokens: 98,
+          },
+        },
+      },
+    ],
+  },
+  {
+    id: 'run-test-33',
+    description: 'Plain text response triggers synthetic retry.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        allowMissingTools: true,
+        response: {
+          kind: 'text',
+          assistantText: TEXT_ONLY_RESPONSE,
+          finishReason: 'stop',
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+        },
+      },
+    ],
+  },
+  {
+    id: 'run-test-34',
+    description: 'Batch call with progress report entry.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        expectedTools: ['agent__batch'],
+        response: {
+          kind: 'tool-call',
+          assistantText: 'Executing batch with progress report.',
+          toolCalls: [
+            {
+              toolName: 'agent__batch',
+              callId: 'call-batch-progress',
+              assistantText: 'Batch includes progress entry and tool call.',
+              arguments: {
+                calls: [
+                  {
+                    id: 'p-1',
+                    tool: 'agent__progress_report',
+                    args: { progress: BATCH_PROGRESS_STATUS },
+                  },
+                  {
+                    id: 'p-2',
+                    tool: TOOL_NAME,
+                    args: { text: BATCH_PROGRESS_RESPONSE },
+                  },
+                ],
+              },
+            },
+          ],
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+          finishReason: TOOL_FINISH_REASON,
+        },
+      },
+      {
+        turn: 2,
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Reporting batch progress outcome.',
+          reportContent: `${RESULT_HEADING}Batch progress update processed successfully.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_SUCCESS,
+          tokenUsage: {
+            inputTokens: 82,
+            outputTokens: 30,
+            totalTokens: 112,
+          },
+        },
+      },
+    ],
+  },
+  {
+    id: 'run-test-35',
+    description: 'Batch calls provided as JSON string.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        expectedTools: ['agent__batch'],
+        response: {
+          kind: 'tool-call',
+          assistantText: 'Submitting batch payload as string.',
+          toolCalls: [
+            {
+              toolName: 'agent__batch',
+              callId: 'call-batch-string',
+              assistantText: 'String payload contains progress and tool work.',
+              arguments: {
+                calls: `[{"id":"s-1","tool":"agent__progress_report","args":{"progress":"${BATCH_STRING_PROGRESS}"}},{"id":"s-2","tool":"${TOOL_NAME}","args":{"text":"${BATCH_STRING_RESULT}"}}]`,
+              },
+            },
+          ],
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+          finishReason: TOOL_FINISH_REASON,
+        },
+      },
+      {
+        turn: 2,
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Summarising string batch execution.',
+          reportContent: `${RESULT_HEADING}Batch string payload executed successfully.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_SUCCESS,
+          tokenUsage: {
+            inputTokens: 84,
+            outputTokens: 32,
+            totalTokens: 116,
+          },
+        },
+      },
+    ],
+  },
+  {
+    id: 'run-test-36',
+    description: 'Empty batch payload triggers failure.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        expectedTools: ['agent__batch'],
+        response: {
+          kind: 'tool-call',
+          assistantText: 'Submitting empty batch payload.',
+          toolCalls: [
+            {
+              toolName: 'agent__batch',
+              callId: 'call-batch-empty',
+              assistantText: 'Empty batch should fail immediately.',
+              arguments: {
+                calls: '',
+              },
+            },
+          ],
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+          finishReason: TOOL_FINISH_REASON,
+        },
+      },
+      {
+        turn: 2,
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Summarising empty batch failure.',
+          reportContent: `${RESULT_HEADING}Empty batch payload rejected successfully.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_FAILURE,
+          tokenUsage: {
+            inputTokens: 74,
+            outputTokens: 28,
+            totalTokens: 102,
+          },
+        },
+      },
+    ],
+  },
+  {
+    id: 'run-test-37',
+    description: 'Rate limit error triggers retry.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        expectedTools: [TOOL_NAME],
+        failuresBeforeSuccess: 1,
+        failureThrows: true,
+        failureMessage: 'Rate limit simulated.',
+        failureError: {
+          name: 'RateLimitError',
+          status: 429,
+          headers: { 'retry-after': '2' },
+          retryAfter: 2,
+          responseBody: JSON.stringify({ error: { message: 'Rate limited', metadata: { raw: JSON.stringify({ error: { status: 'rate_limit' } }) } } }),
+        },
+        failureStatus: 'rate_limit',
+        response: {
+          kind: 'tool-call',
+          assistantText: 'Executing after rate limit retry.',
+          toolCalls: [
+            {
+              toolName: TOOL_NAME,
+              callId: 'call-rate-limit-retry',
+              assistantText: 'Collecting data after rate limit.',
+              arguments: {
+                text: 'rate-limit-success',
+              },
+            },
+          ],
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+          finishReason: TOOL_FINISH_REASON,
+        },
+      },
+      {
+        turn: 2,
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Final report after rate limit retry.',
+          reportContent: `${RESULT_HEADING}Rate limit recovery completed successfully.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_SUCCESS,
+          tokenUsage: {
+            inputTokens: 80,
+            outputTokens: 28,
+            totalTokens: 108,
+          },
+        },
+      },
+    ],
+  },
+  {
+    id: 'run-test-38',
+    description: 'Auth error fails fast.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        expectedTools: [TOOL_NAME],
+        failuresBeforeSuccess: 999,
+        failureThrows: true,
+        failureMessage: 'Authentication failed.',
+        failureError: {
+          name: 'AuthError',
+          status: 401,
+          responseBody: JSON.stringify({ error: { message: 'Auth failed' } }),
+        },
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Auth failure fallback (unreachable).',
+          reportContent: `${RESULT_HEADING}Auth failure.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_FAILURE,
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+        },
+      },
+    ],
+  },
+  {
+    id: 'run-test-39',
+    description: 'Quota exceeded error handling.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        expectedTools: [TOOL_NAME],
+        failuresBeforeSuccess: 999,
+        failureThrows: true,
+        failureMessage: 'Quota exceeded.',
+        failureError: {
+          name: 'QuotaError',
+          status: 402,
+          responseBody: JSON.stringify({ error: { message: 'Quota exceeded' } }),
+        },
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Quota failure fallback (unreachable).',
+          reportContent: `${RESULT_HEADING}Quota failure.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_FAILURE,
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+        },
+      },
+    ],
+  },
+  {
+    id: 'run-test-40',
+    description: 'Timeout error handling.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        expectedTools: [TOOL_NAME],
+        failuresBeforeSuccess: 999,
+        failureThrows: true,
+        failureMessage: 'Request timed out.',
+        failureError: {
+          name: 'TimeoutError',
+          statusText: 'Gateway Timeout',
+          message: 'Request timed out.',
+        },
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Timeout fallback (unreachable).',
+          reportContent: `${RESULT_HEADING}Timeout failure.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_FAILURE,
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+        },
+      },
+    ],
+  },
+  {
+    id: 'run-test-41',
+    description: 'Network error handling.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        expectedTools: [TOOL_NAME],
+        failuresBeforeSuccess: 999,
+        failureThrows: true,
+        failureMessage: 'Network connection lost.',
+        failureError: {
+          name: 'NetworkError',
+          code: 'ECONNRESET',
+          message: 'Network connection lost.',
+        },
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Network failure fallback (unreachable).',
+          reportContent: `${RESULT_HEADING}Network failure.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_FAILURE,
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+        },
+      },
+    ],
+  },
+  {
+    id: 'run-test-42',
+    description: 'Model error with retryable path.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        expectedTools: [TOOL_NAME],
+        failuresBeforeSuccess: 1,
+        failureThrows: true,
+        failureMessage: 'Invalid model request.',
+        failureError: {
+          status: 400,
+          message: 'Invalid model request.',
+        },
+        response: {
+          kind: 'tool-call',
+          assistantText: 'Retrying after model error.',
+          toolCalls: [
+            {
+              toolName: TOOL_NAME,
+              callId: 'call-model-error-retry',
+              assistantText: 'Collecting data after model error.',
+              arguments: {
+                text: 'model-error-success',
+              },
+            },
+          ],
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+          finishReason: TOOL_FINISH_REASON,
+        },
+      },
+      {
+        turn: 2,
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Final report after model error retry.',
+          reportContent: `${RESULT_HEADING}Model error retry succeeded.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_SUCCESS,
+          tokenUsage: {
+            inputTokens: 78,
+            outputTokens: 30,
+            totalTokens: 108,
+          },
         },
       },
     ],

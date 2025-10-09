@@ -28,6 +28,9 @@ const SUBAGENT_PRICING_SUCCESS_PROMPT = path.resolve(process.cwd(), 'src/tests/f
 const SUBAGENT_SUCCESS_TOOL = 'agent__pricing-subagent-success';
 const CONCURRENCY_TIMEOUT_ARGUMENT = 'trigger-timeout';
 const CONCURRENCY_SECOND_ARGUMENT = 'concurrency-second';
+const THROW_FAILURE_MESSAGE = 'Simulated provider throw for coverage.';
+const BATCH_PROGRESS_RESPONSE = 'batch-progress-follow-up';
+const BATCH_STRING_RESULT = 'batch-string-mode';
 
 function makeTempDir(label: string): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), `${TMP_PREFIX}${label}-`));
@@ -595,6 +598,149 @@ const TEST_SCENARIOS: HarnessTest[] = [
       invariant(finalReport !== undefined && finalReport.status === 'success', 'Final report should indicate success for run-test-30.');
       const thinkingLog = result.logs.find((entry) => entry.severity === 'THK' && entry.remoteIdentifier === 'thinking');
       invariant(thinkingLog !== undefined, 'Thinking log expected for run-test-30.');
+    },
+  },
+  {
+    id: 'run-test-31',
+    expect: (result) => {
+      invariant(result.success, 'Scenario run-test-31 expected success after provider throw.');
+      const finalReport = result.finalReport;
+      invariant(finalReport !== undefined && finalReport.status === 'success', 'Final report should indicate success for run-test-31.');
+      const thrownLog = result.logs.find((entry) => typeof entry.message === 'string' && entry.message.includes(THROW_FAILURE_MESSAGE));
+      invariant(thrownLog !== undefined, 'Thrown failure log expected for run-test-31.');
+      const failedAttempt = result.accounting.filter(isLlmAccounting).find((entry) => entry.status === 'failed');
+      invariant(failedAttempt !== undefined, 'LLM accounting failure expected for run-test-31.');
+    },
+  },
+  {
+    id: 'run-test-32',
+    configure: (_configuration, sessionConfig) => {
+      sessionConfig.outputFormat = 'json';
+    },
+    expect: (result) => {
+      invariant(result.success, 'Scenario run-test-32 expected success after retry.');
+      const finalReport = result.finalReport;
+      invariant(finalReport !== undefined && finalReport.status === 'success' && finalReport.format === 'json', 'Final report should indicate JSON success for run-test-32.');
+      const toolFailureMessage = result.conversation.find((message) => message.role === 'tool' && typeof message.content === 'string' && message.content.includes('final_report(json) requires'));
+      invariant(toolFailureMessage !== undefined, 'Final report failure message expected for run-test-32.');
+      const retryLog = result.logs.find((entry) => entry.remoteIdentifier === 'agent:orchestrator' && typeof entry.message === 'string' && entry.message.includes('Final report retry detected'));
+      invariant(retryLog !== undefined, 'Retry log expected for run-test-32.');
+    },
+  },
+  {
+    id: 'run-test-33',
+    expect: (result) => {
+      invariant(!result.success, 'Scenario run-test-33 should fail after exhausting synthetic retries.');
+      invariant(typeof result.error === 'string' && result.error.includes('content_without_tools_or_final'), 'Expected synthetic retry exhaustion error for run-test-33.');
+      const syntheticLog = result.logs.find((entry) => typeof entry.message === 'string' && entry.message.includes('Synthetic retry: assistant returned content without tool calls and without final_report.'));
+      invariant(syntheticLog !== undefined, 'Synthetic retry warning expected for run-test-33.');
+    },
+  },
+  {
+    id: 'run-test-34',
+    configure: (configuration, sessionConfig) => {
+      configuration.defaults = { ...configuration.defaults, parallelToolCalls: true };
+      sessionConfig.parallelToolCalls = true;
+      sessionConfig.tools = ['test', 'batch'];
+    },
+    expect: (result) => {
+      invariant(result.success, 'Scenario run-test-34 expected success.');
+      const finalReport = result.finalReport;
+      invariant(finalReport !== undefined && finalReport.status === 'success', 'Final report should indicate success for run-test-34.');
+      const progressResult = result.conversation.find((message) => message.role === 'tool' && typeof message.content === 'string' && message.content.includes('agent__progress_report'));
+      invariant(progressResult !== undefined, 'Batch progress entry expected for run-test-34.');
+      const toolMessage = result.conversation.find((message) => message.role === 'tool' && typeof message.content === 'string' && message.content.includes(BATCH_PROGRESS_RESPONSE));
+      invariant(toolMessage !== undefined, 'Batch tool output expected for run-test-34.');
+    },
+  },
+  {
+    id: 'run-test-35',
+    configure: (configuration, sessionConfig) => {
+      configuration.defaults = { ...configuration.defaults, parallelToolCalls: true };
+      sessionConfig.parallelToolCalls = true;
+      sessionConfig.tools = ['test', 'batch'];
+    },
+    expect: (result) => {
+      invariant(result.success, 'Scenario run-test-35 expected success.');
+      const finalReport = result.finalReport;
+      invariant(finalReport !== undefined && finalReport.status === 'success', 'Final report should indicate success for run-test-35.');
+      const toolMessage = result.conversation.find((message) => message.role === 'tool' && typeof message.content === 'string' && message.content.includes(BATCH_STRING_RESULT));
+      invariant(toolMessage !== undefined, 'Batch string tool output expected for run-test-35.');
+    },
+  },
+  {
+    id: 'run-test-36',
+    configure: (configuration, sessionConfig) => {
+      configuration.defaults = { ...configuration.defaults, parallelToolCalls: true };
+      sessionConfig.parallelToolCalls = true;
+      sessionConfig.tools = ['test', 'batch'];
+    },
+    expect: (result) => {
+      invariant(result.success, 'Scenario run-test-36 expected session completion.');
+      const finalReport = result.finalReport;
+      invariant(finalReport !== undefined && finalReport.status === 'failure', 'Final report should indicate failure for run-test-36.');
+      const failureMessage = result.conversation.find((message) => message.role === 'tool' && typeof message.content === 'string' && message.content.includes('empty_batch'));
+      invariant(failureMessage !== undefined, 'Empty batch failure message expected for run-test-36.');
+      const batchEntry = result.accounting.filter(isToolAccounting).find((entry) => entry.command === 'agent__batch');
+      invariant(batchEntry !== undefined && batchEntry.status === 'failed' && typeof batchEntry.error === 'string' && batchEntry.error.startsWith('empty_batch'), 'Batch accounting should record empty batch failure for run-test-36.');
+    },
+  },
+  {
+    id: 'run-test-37',
+    configure: (_configuration, sessionConfig) => {
+      sessionConfig.maxRetries = 2;
+    },
+    expect: (result) => {
+      invariant(result.success, 'Scenario run-test-37 expected success after rate limit retry.');
+      const finalReport = result.finalReport;
+      invariant(finalReport !== undefined && finalReport.status === 'success', 'Final report should indicate success for run-test-37.');
+      const rateLimitLog = result.logs.find((entry) => typeof entry.message === 'string' && entry.message.includes('Rate limited; suggested wait'));
+      invariant(rateLimitLog !== undefined, 'Rate limit warning expected for run-test-37.');
+      const retryLog = result.logs.find((entry) => entry.remoteIdentifier === 'agent:retry');
+      invariant(retryLog !== undefined, 'Retry backoff log expected for run-test-37.');
+      const failedAttempt = result.accounting.filter(isLlmAccounting).find((entry) => entry.status === 'failed');
+      invariant(failedAttempt !== undefined, 'Failed LLM accounting entry expected for run-test-37.');
+    },
+  },
+  {
+    id: 'run-test-38',
+    expect: (result) => {
+      invariant(!result.success, 'Scenario run-test-38 should fail on auth error.');
+      invariant(typeof result.error === 'string' && result.error.includes('Authentication failed'), 'Auth failure error expected for run-test-38.');
+    },
+  },
+  {
+    id: 'run-test-39',
+    expect: (result) => {
+      invariant(!result.success, 'Scenario run-test-39 should fail on quota error.');
+      invariant(typeof result.error === 'string' && result.error.toLowerCase().includes('quota'), 'Quota failure error expected for run-test-39.');
+    },
+  },
+  {
+    id: 'run-test-40',
+    expect: (result) => {
+      invariant(!result.success, 'Scenario run-test-40 should fail on timeout error.');
+      invariant(typeof result.error === 'string' && result.error.toLowerCase().includes('timeout'), 'Timeout error expected for run-test-40.');
+    },
+  },
+  {
+    id: 'run-test-41',
+    expect: (result) => {
+      invariant(!result.success, 'Scenario run-test-41 should fail on network error.');
+      invariant(typeof result.error === 'string' && result.error.toLowerCase().includes('network'), 'Network error expected for run-test-41.');
+    },
+  },
+  {
+    id: 'run-test-42',
+    configure: (_configuration, sessionConfig) => {
+      sessionConfig.maxRetries = 2;
+    },
+    expect: (result) => {
+      invariant(result.success, 'Scenario run-test-42 expected success after model error retry.');
+      const finalReport = result.finalReport;
+      invariant(finalReport !== undefined && finalReport.status === 'success', 'Final report should indicate success for run-test-42.');
+      const failedAttempt = result.accounting.filter(isLlmAccounting).find((entry) => entry.status === 'failed');
+      invariant(failedAttempt !== undefined && typeof failedAttempt.error === 'string' && failedAttempt.error.includes('Invalid model request'), 'Model error accounting expected for run-test-42.');
     },
   },
 ];

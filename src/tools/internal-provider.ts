@@ -659,19 +659,7 @@ export class InternalToolProvider extends ToolProvider {
         // Log the error
         this.opts.logError(errorMsg);
 
-        // Return error result for empty batch
-        return {
-          ok: false,
-          result: JSON.stringify({
-            error: {
-              code: 'EMPTY_BATCH',
-              message: errorMsg
-            }
-          }),
-          latencyMs: Date.now() - start,
-          kind: this.kind,
-          providerId: this.id
-        };
+        throw new Error(`empty_batch: ${errorMsg}`);
       }
 
       interface NormalizedCall { id: string; tool: string; args: Record<string, unknown> }
