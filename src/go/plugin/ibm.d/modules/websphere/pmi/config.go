@@ -1,6 +1,7 @@
 package pmi
 
 import (
+	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/web"
 	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/framework"
 )
@@ -40,40 +41,40 @@ type Config struct {
 	CustomLabels map[string]string `yaml:"custom_labels,omitempty" json:"custom_labels" ui:"group:Identity"`
 
 	// CollectJVMMetrics toggles JVM runtime metrics; defaults to enabled when unset.
-	CollectJVMMetrics framework.AutoBool `yaml:"collect_jvm_metrics,omitempty" json:"collect_jvm_metrics" ui:"group:Other Metrics"`
+	CollectJVMMetrics confopt.AutoBool `yaml:"collect_jvm_metrics,omitempty" json:"collect_jvm_metrics" ui:"group:Other Metrics"`
 
 	// CollectThreadPoolMetrics toggles thread-pool metrics; defaults to enabled when unset.
-	CollectThreadPoolMetrics framework.AutoBool `yaml:"collect_threadpool_metrics,omitempty" json:"collect_threadpool_metrics" ui:"group:Thread Pools"`
+	CollectThreadPoolMetrics confopt.AutoBool `yaml:"collect_threadpool_metrics,omitempty" json:"collect_threadpool_metrics" ui:"group:Thread Pools"`
 
 	// CollectJDBCMetrics toggles JDBC connection-pool metrics; defaults to enabled when unset.
-	CollectJDBCMetrics framework.AutoBool `yaml:"collect_jdbc_metrics,omitempty" json:"collect_jdbc_metrics" ui:"group:JDBC"`
+	CollectJDBCMetrics confopt.AutoBool `yaml:"collect_jdbc_metrics,omitempty" json:"collect_jdbc_metrics" ui:"group:JDBC"`
 
 	// CollectJCAMetrics toggles JCA resource-adapter metrics; defaults to enabled when unset.
-	CollectJCAMetrics framework.AutoBool `yaml:"collect_jca_metrics,omitempty" json:"collect_jca_metrics" ui:"group:JCA"`
+	CollectJCAMetrics confopt.AutoBool `yaml:"collect_jca_metrics,omitempty" json:"collect_jca_metrics" ui:"group:JCA"`
 
 	// CollectJMSMetrics toggles JMS destination metrics; defaults to enabled when unset.
-	CollectJMSMetrics framework.AutoBool `yaml:"collect_jms_metrics,omitempty" json:"collect_jms_metrics" ui:"group:JMS"`
+	CollectJMSMetrics confopt.AutoBool `yaml:"collect_jms_metrics,omitempty" json:"collect_jms_metrics" ui:"group:JMS"`
 
 	// CollectWebAppMetrics toggles Web application metrics (includes servlet/session data); defaults to enabled when unset.
-	CollectWebAppMetrics framework.AutoBool `yaml:"collect_webapp_metrics,omitempty" json:"collect_webapp_metrics" ui:"group:Applications"`
+	CollectWebAppMetrics confopt.AutoBool `yaml:"collect_webapp_metrics,omitempty" json:"collect_webapp_metrics" ui:"group:Applications"`
 
 	// CollectSessionMetrics toggles HTTP session manager metrics; defaults to enabled when unset.
-	CollectSessionMetrics framework.AutoBool `yaml:"collect_session_metrics,omitempty" json:"collect_session_metrics" ui:"group:Other Metrics"`
+	CollectSessionMetrics confopt.AutoBool `yaml:"collect_session_metrics,omitempty" json:"collect_session_metrics" ui:"group:Other Metrics"`
 
 	// CollectTransactionMetrics toggles transaction manager metrics; defaults to enabled when unset.
-	CollectTransactionMetrics framework.AutoBool `yaml:"collect_transaction_metrics,omitempty" json:"collect_transaction_metrics" ui:"group:Other Metrics"`
+	CollectTransactionMetrics confopt.AutoBool `yaml:"collect_transaction_metrics,omitempty" json:"collect_transaction_metrics" ui:"group:Other Metrics"`
 
 	// CollectClusterMetrics toggles cluster-level health metrics; defaults to enabled when unset.
-	CollectClusterMetrics framework.AutoBool `yaml:"collect_cluster_metrics,omitempty" json:"collect_cluster_metrics" ui:"group:Other Metrics"`
+	CollectClusterMetrics confopt.AutoBool `yaml:"collect_cluster_metrics,omitempty" json:"collect_cluster_metrics" ui:"group:Other Metrics"`
 
 	// CollectServletMetrics enables servlet response-time metrics; defaults to enabled when unset (may add high-cardinality charts).
-	CollectServletMetrics framework.AutoBool `yaml:"collect_servlet_metrics,omitempty" json:"collect_servlet_metrics" ui:"group:Servlets"`
+	CollectServletMetrics confopt.AutoBool `yaml:"collect_servlet_metrics,omitempty" json:"collect_servlet_metrics" ui:"group:Servlets"`
 
 	// CollectEJBMetrics enables Enterprise Java Bean workload metrics; defaults to enabled when unset.
-	CollectEJBMetrics framework.AutoBool `yaml:"collect_ejb_metrics,omitempty" json:"collect_ejb_metrics" ui:"group:EJBs"`
+	CollectEJBMetrics confopt.AutoBool `yaml:"collect_ejb_metrics,omitempty" json:"collect_ejb_metrics" ui:"group:EJBs"`
 
 	// CollectJDBCAdvanced enables additional JDBC latency/timing statistics; defaults to disabled when unset.
-	CollectJDBCAdvanced framework.AutoBool `yaml:"collect_jdbc_advanced,omitempty" json:"collect_jdbc_advanced" ui:"group:JDBC"`
+	CollectJDBCAdvanced confopt.AutoBool `yaml:"collect_jdbc_advanced,omitempty" json:"collect_jdbc_advanced" ui:"group:JDBC"`
 
 	// MaxThreadPools caps the number of thread pools charted per server (0 disables the limit).
 	MaxThreadPools int `yaml:"max_threadpools,omitempty" json:"max_threadpools" ui:"group:Thread Pools"`

@@ -17,7 +17,7 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/framework"
+	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 )
 
 // parseConfigFromGoFile parses a Go config file to extract configuration fields
@@ -64,14 +64,14 @@ func (g *DocGenerator) parseConfigFromGoFile() ([]ConfigField, map[string]interf
 		field := &fields[i]
 		if field.GoType == "framework.AutoBool" {
 			field.Type = "string"
-			field.Enum = toStringSlice(framework.AutoBoolEnum)
+			field.Enum = toStringSlice(confopt.AutoBoolEnum)
 		}
 
 		if defaultValue, exists := defaults[field.Name]; exists {
 			field.Default = normalizeDefaultValue(*field, defaultValue)
 			field.Required = false
 		} else if field.GoType == "framework.AutoBool" {
-			field.Default = framework.AutoBoolAuto.String()
+			field.Default = confopt.AutoBoolAuto.String()
 			field.Required = false
 		} else if field.Pointer {
 			field.Default = "<auto>"
@@ -508,7 +508,7 @@ func assignDefaultUIGroup(field *ConfigField) {
 	}
 }
 
-func toStringSlice(values []framework.AutoBool) []string {
+func toStringSlice(values []confopt.AutoBool) []string {
 	result := make([]string, 0, len(values))
 	for _, v := range values {
 		result = append(result, v.String())
@@ -525,34 +525,34 @@ func normalizeDefaultValue(field ConfigField, value interface{}) interface{} {
 		return normalizeAutoBoolLiteral(v)
 	case bool:
 		if v {
-			return framework.AutoBoolEnabled.String()
+			return confopt.AutoBoolEnabled.String()
 		}
-		return framework.AutoBoolDisabled.String()
+		return confopt.AutoBoolDisabled.String()
 	case nil:
-		return framework.AutoBoolAuto.String()
+		return confopt.AutoBoolAuto.String()
 	default:
-		return framework.AutoBoolAuto.String()
+		return confopt.AutoBoolAuto.String()
 	}
 }
 
 func normalizeAutoBoolLiteral(value string) string {
 	lower := strings.ToLower(strings.TrimSpace(value))
 	switch lower {
-	case "", framework.AutoBoolAuto.String():
-		return framework.AutoBoolAuto.String()
-	case framework.AutoBoolEnabled.String():
-		return framework.AutoBoolEnabled.String()
-	case framework.AutoBoolDisabled.String():
-		return framework.AutoBoolDisabled.String()
+	case "", confopt.AutoBoolAuto.String():
+		return confopt.AutoBoolAuto.String()
+	case confopt.AutoBoolEnabled.String():
+		return confopt.AutoBoolEnabled.String()
+	case confopt.AutoBoolDisabled.String():
+		return confopt.AutoBoolDisabled.String()
 	}
 
 	if strings.HasSuffix(lower, "autoboolenabled") {
-		return framework.AutoBoolEnabled.String()
+		return confopt.AutoBoolEnabled.String()
 	}
 	if strings.HasSuffix(lower, "autobooldisabled") {
-		return framework.AutoBoolDisabled.String()
+		return confopt.AutoBoolDisabled.String()
 	}
-	return framework.AutoBoolAuto.String()
+	return confopt.AutoBoolAuto.String()
 }
 
 // parseDefaultsFromInitFile parses init.go to find the defaultConfig() function
@@ -714,11 +714,11 @@ func (g *DocGenerator) extractValue(expr ast.Expr) interface{} {
 			if ident.Name == "framework" {
 				switch v.Sel.Name {
 				case "AutoBoolAuto":
-					return framework.AutoBoolAuto.String()
+					return confopt.AutoBoolAuto.String()
 				case "AutoBoolEnabled":
-					return framework.AutoBoolEnabled.String()
+					return confopt.AutoBoolEnabled.String()
 				case "AutoBoolDisabled":
-					return framework.AutoBoolDisabled.String()
+					return confopt.AutoBoolDisabled.String()
 				}
 			}
 		}

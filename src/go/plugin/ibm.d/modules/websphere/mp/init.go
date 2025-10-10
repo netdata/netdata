@@ -28,8 +28,8 @@ func defaultConfig() Config {
 		NodeName:            "",
 		ServerName:          "",
 		MetricsEndpoint:     "/metrics",
-		CollectJVMMetrics:   framework.AutoBoolEnabled,
-		CollectRESTMetrics:  framework.AutoBoolEnabled,
+		CollectJVMMetrics:   confopt.AutoBoolEnabled,
+		CollectRESTMetrics:  confopt.AutoBoolEnabled,
 		MaxRESTEndpoints:    50,
 		CollectRESTMatching: "",
 		HTTPConfig: web.HTTPConfig{

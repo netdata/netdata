@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
-	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/framework"
 	pmiproto "github.com/netdata/netdata/go/plugins/plugin/ibm.d/protocols/websphere/pmi"
 )
 
@@ -25,17 +25,17 @@ func TestPMICollectorCoverageActivatedSamples(t *testing.T) {
 			snapshot := loadPMISnapshot(t, sample)
 
 			agg := newAggregator(Config{
-				CollectJVMMetrics:         framework.AutoBoolEnabled,
-				CollectThreadPoolMetrics:  framework.AutoBoolEnabled,
-				CollectJDBCMetrics:        framework.AutoBoolEnabled,
-				CollectJCAMetrics:         framework.AutoBoolEnabled,
-				CollectJMSMetrics:         framework.AutoBoolEnabled,
-				CollectWebAppMetrics:      framework.AutoBoolEnabled,
-				CollectSessionMetrics:     framework.AutoBoolEnabled,
-				CollectTransactionMetrics: framework.AutoBoolEnabled,
-				CollectServletMetrics:     framework.AutoBoolEnabled,
-				CollectEJBMetrics:         framework.AutoBoolEnabled,
-				CollectJDBCAdvanced:       framework.AutoBoolEnabled,
+				CollectJVMMetrics:         confopt.AutoBoolEnabled,
+				CollectThreadPoolMetrics:  confopt.AutoBoolEnabled,
+				CollectJDBCMetrics:        confopt.AutoBoolEnabled,
+				CollectJCAMetrics:         confopt.AutoBoolEnabled,
+				CollectJMSMetrics:         confopt.AutoBoolEnabled,
+				CollectWebAppMetrics:      confopt.AutoBoolEnabled,
+				CollectSessionMetrics:     confopt.AutoBoolEnabled,
+				CollectTransactionMetrics: confopt.AutoBoolEnabled,
+				CollectServletMetrics:     confopt.AutoBoolEnabled,
+				CollectEJBMetrics:         confopt.AutoBoolEnabled,
+				CollectJDBCAdvanced:       confopt.AutoBoolEnabled,
 				MaxThreadPools:            0,
 				MaxJDBCPools:              0,
 				MaxJCAPools:               0,

@@ -52,28 +52,28 @@ type Config struct {
 	ResetStatistics bool `yaml:"reset_statistics,omitempty" json:"reset_statistics" ui:"group:Advanced"`
 
 	// CollectDiskMetrics toggles collection of disk unit statistics.
-	CollectDiskMetrics framework.AutoBool `yaml:"collect_disk_metrics,omitempty" json:"collect_disk_metrics" ui:"group:Disks"`
+	CollectDiskMetrics confopt.AutoBool `yaml:"collect_disk_metrics,omitempty" json:"collect_disk_metrics" ui:"group:Disks"`
 
 	// CollectSubsystemMetrics toggles collection of subsystem activity metrics.
-	CollectSubsystemMetrics framework.AutoBool `yaml:"collect_subsystem_metrics,omitempty" json:"collect_subsystem_metrics" ui:"group:Subsystems"`
+	CollectSubsystemMetrics confopt.AutoBool `yaml:"collect_subsystem_metrics,omitempty" json:"collect_subsystem_metrics" ui:"group:Subsystems"`
 
 	// CollectJobQueueMetrics toggles collection of job queue backlog metrics.
-	CollectJobQueueMetrics framework.AutoBool `yaml:"collect_job_queue_metrics,omitempty" json:"collect_job_queue_metrics" ui:"group:Job Queues"`
+	CollectJobQueueMetrics confopt.AutoBool `yaml:"collect_job_queue_metrics,omitempty" json:"collect_job_queue_metrics" ui:"group:Job Queues"`
 
 	// CollectActiveJobs toggles collection of detailed per-job metrics.
-	CollectActiveJobs framework.AutoBool `yaml:"collect_active_jobs,omitempty" json:"collect_active_jobs" ui:"group:Active Jobs"`
+	CollectActiveJobs confopt.AutoBool `yaml:"collect_active_jobs,omitempty" json:"collect_active_jobs" ui:"group:Active Jobs"`
 
 	// CollectHTTPServerMetrics toggles collection of IBM HTTP Server statistics.
-	CollectHTTPServerMetrics framework.AutoBool `yaml:"collect_http_server_metrics,omitempty" json:"collect_http_server_metrics" ui:"group:Other Metrics"`
+	CollectHTTPServerMetrics confopt.AutoBool `yaml:"collect_http_server_metrics,omitempty" json:"collect_http_server_metrics" ui:"group:Other Metrics"`
 
 	// CollectMessageQueueMetrics toggles collection of IBM i message queue metrics.
-	CollectMessageQueueMetrics framework.AutoBool `yaml:"collect_message_queue_metrics,omitempty" json:"collect_message_queue_metrics" ui:"group:Message Queues"`
+	CollectMessageQueueMetrics confopt.AutoBool `yaml:"collect_message_queue_metrics,omitempty" json:"collect_message_queue_metrics" ui:"group:Message Queues"`
 
 	// CollectOutputQueueMetrics toggles collection of IBM i output queue metrics.
-	CollectOutputQueueMetrics framework.AutoBool `yaml:"collect_output_queue_metrics,omitempty" json:"collect_output_queue_metrics" ui:"group:Output Queues"`
+	CollectOutputQueueMetrics confopt.AutoBool `yaml:"collect_output_queue_metrics,omitempty" json:"collect_output_queue_metrics" ui:"group:Output Queues"`
 
 	// CollectPlanCacheMetrics toggles collection of plan cache analysis metrics.
-	CollectPlanCacheMetrics framework.AutoBool `yaml:"collect_plan_cache_metrics,omitempty" json:"collect_plan_cache_metrics" ui:"group:Other Metrics"`
+	CollectPlanCacheMetrics confopt.AutoBool `yaml:"collect_plan_cache_metrics,omitempty" json:"collect_plan_cache_metrics" ui:"group:Other Metrics"`
 
 	// MaxDisks caps how many disk units may be charted.
 	MaxDisks int `yaml:"max_disks,omitempty" json:"max_disks" ui:"group:Disks"`

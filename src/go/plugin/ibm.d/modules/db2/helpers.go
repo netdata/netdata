@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/framework"
+	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 )
 
 func safeDSN(dsn string) string {
@@ -203,43 +203,43 @@ func (c *Collector) parseDB2Version() {
 func (c *Collector) setConfigurationDefaults() {
 	if c.CollectDatabaseMetrics.IsAuto() {
 		defaultValue := c.edition == "LUW" || c.edition == "Cloud"
-		c.CollectDatabaseMetrics = framework.AutoBoolFromBool(defaultValue)
+		c.CollectDatabaseMetrics = confopt.AutoBoolFromBool(defaultValue)
 		c.Debugf("CollectDatabaseMetrics not configured, defaulting to %v (edition: %s)", defaultValue, c.edition)
 	}
 
 	if c.CollectBufferpoolMetrics.IsAuto() {
 		defaultValue := c.edition != "i"
-		c.CollectBufferpoolMetrics = framework.AutoBoolFromBool(defaultValue)
+		c.CollectBufferpoolMetrics = confopt.AutoBoolFromBool(defaultValue)
 		c.Debugf("CollectBufferpoolMetrics not configured, defaulting to %v (edition: %s)", defaultValue, c.edition)
 	}
 
 	if c.CollectTablespaceMetrics.IsAuto() {
 		defaultValue := true
-		c.CollectTablespaceMetrics = framework.AutoBoolFromBool(defaultValue)
+		c.CollectTablespaceMetrics = confopt.AutoBoolFromBool(defaultValue)
 		c.Debugf("CollectTablespaceMetrics not configured, defaulting to %v", defaultValue)
 	}
 
 	if c.CollectConnectionMetrics.IsAuto() {
 		defaultValue := c.edition == "LUW" || (c.edition == "Cloud" && !c.isDisabled("connection_instances"))
-		c.CollectConnectionMetrics = framework.AutoBoolFromBool(defaultValue)
+		c.CollectConnectionMetrics = confopt.AutoBoolFromBool(defaultValue)
 		c.Debugf("CollectConnectionMetrics not configured, defaulting to %v (edition: %s)", defaultValue, c.edition)
 	}
 
 	if c.CollectLockMetrics.IsAuto() {
 		defaultValue := true
-		c.CollectLockMetrics = framework.AutoBoolFromBool(defaultValue)
+		c.CollectLockMetrics = confopt.AutoBoolFromBool(defaultValue)
 		c.Debugf("CollectLockMetrics not configured, defaulting to %v", defaultValue)
 	}
 
 	if c.CollectTableMetrics.IsAuto() {
 		defaultValue := false
-		c.CollectTableMetrics = framework.AutoBoolFromBool(defaultValue)
+		c.CollectTableMetrics = confopt.AutoBoolFromBool(defaultValue)
 		c.Debugf("CollectTableMetrics not configured, defaulting to %v", defaultValue)
 	}
 
 	if c.CollectIndexMetrics.IsAuto() {
 		defaultValue := false
-		c.CollectIndexMetrics = framework.AutoBoolFromBool(defaultValue)
+		c.CollectIndexMetrics = confopt.AutoBoolFromBool(defaultValue)
 		c.Debugf("CollectIndexMetrics not configured, defaulting to %v", defaultValue)
 	}
 

@@ -1,4 +1,4 @@
-package framework
+package confopt
 
 import (
 	"encoding/json"

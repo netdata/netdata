@@ -40,18 +40,18 @@ type Config struct {
 	CustomLabels map[string]string `yaml:"custom_labels,omitempty" json:"custom_labels" ui:"group:Identity"`
 
 	// Metric toggles
-	CollectJVMMetrics         framework.AutoBool `yaml:"collect_jvm_metrics" json:"collect_jvm_metrics" ui:"group:Other Metrics"`
-	CollectThreadPoolMetrics  framework.AutoBool `yaml:"collect_threadpool_metrics" json:"collect_threadpool_metrics" ui:"group:Thread Pools"`
-	CollectJDBCMetrics        framework.AutoBool `yaml:"collect_jdbc_metrics" json:"collect_jdbc_metrics" ui:"group:JDBC"`
-	CollectJCAMetrics         framework.AutoBool `yaml:"collect_jca_metrics" json:"collect_jca_metrics" ui:"group:JCA"`
-	CollectJMSMetrics         framework.AutoBool `yaml:"collect_jms_metrics" json:"collect_jms_metrics" ui:"group:JMS"`
-	CollectWebAppMetrics      framework.AutoBool `yaml:"collect_webapp_metrics" json:"collect_webapp_metrics" ui:"group:Applications"`
-	CollectSessionMetrics     framework.AutoBool `yaml:"collect_session_metrics" json:"collect_session_metrics" ui:"group:Other Metrics"`
-	CollectTransactionMetrics framework.AutoBool `yaml:"collect_transaction_metrics" json:"collect_transaction_metrics" ui:"group:Other Metrics"`
-	CollectClusterMetrics     framework.AutoBool `yaml:"collect_cluster_metrics" json:"collect_cluster_metrics" ui:"group:Other Metrics"`
-	CollectServletMetrics     framework.AutoBool `yaml:"collect_servlet_metrics" json:"collect_servlet_metrics" ui:"group:Servlets"`
-	CollectEJBMetrics         framework.AutoBool `yaml:"collect_ejb_metrics" json:"collect_ejb_metrics" ui:"group:EJBs"`
-	CollectJDBCAdvanced       framework.AutoBool `yaml:"collect_jdbc_advanced" json:"collect_jdbc_advanced" ui:"group:JDBC"`
+	CollectJVMMetrics         confopt.AutoBool `yaml:"collect_jvm_metrics" json:"collect_jvm_metrics" ui:"group:Other Metrics"`
+	CollectThreadPoolMetrics  confopt.AutoBool `yaml:"collect_threadpool_metrics" json:"collect_threadpool_metrics" ui:"group:Thread Pools"`
+	CollectJDBCMetrics        confopt.AutoBool `yaml:"collect_jdbc_metrics" json:"collect_jdbc_metrics" ui:"group:JDBC"`
+	CollectJCAMetrics         confopt.AutoBool `yaml:"collect_jca_metrics" json:"collect_jca_metrics" ui:"group:JCA"`
+	CollectJMSMetrics         confopt.AutoBool `yaml:"collect_jms_metrics" json:"collect_jms_metrics" ui:"group:JMS"`
+	CollectWebAppMetrics      confopt.AutoBool `yaml:"collect_webapp_metrics" json:"collect_webapp_metrics" ui:"group:Applications"`
+	CollectSessionMetrics     confopt.AutoBool `yaml:"collect_session_metrics" json:"collect_session_metrics" ui:"group:Other Metrics"`
+	CollectTransactionMetrics confopt.AutoBool `yaml:"collect_transaction_metrics" json:"collect_transaction_metrics" ui:"group:Other Metrics"`
+	CollectClusterMetrics     confopt.AutoBool `yaml:"collect_cluster_metrics" json:"collect_cluster_metrics" ui:"group:Other Metrics"`
+	CollectServletMetrics     confopt.AutoBool `yaml:"collect_servlet_metrics" json:"collect_servlet_metrics" ui:"group:Servlets"`
+	CollectEJBMetrics         confopt.AutoBool `yaml:"collect_ejb_metrics" json:"collect_ejb_metrics" ui:"group:EJBs"`
+	CollectJDBCAdvanced       confopt.AutoBool `yaml:"collect_jdbc_advanced" json:"collect_jdbc_advanced" ui:"group:JDBC"`
 
 	// Cardinality guards
 	MaxThreadPools     int `yaml:"max_threadpools,omitempty" json:"max_threadpools" ui:"group:Thread Pools"`
