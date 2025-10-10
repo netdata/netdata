@@ -98,7 +98,6 @@ func main() {
 		DumpMode:                  dumpMode,
 		DumpSummary:               opts.DumpSummary,
 		DumpDataDir:               dumpDataDir,
-		DynamicConfigPrefix:       "ibm.d:collector:",
 		DisableServiceDiscovery:   true,
 	})
 
