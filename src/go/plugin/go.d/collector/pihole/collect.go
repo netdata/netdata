@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/stm"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
+	"github.com/netdata/netdata/go/plugins/pkg/stm"
+	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
 
 const (

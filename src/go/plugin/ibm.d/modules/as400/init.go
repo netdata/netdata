@@ -10,8 +10,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/framework"
 	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/modules/as400/contexts"
 	as400proto "github.com/netdata/netdata/go/plugins/plugin/ibm.d/protocols/as400"
@@ -38,14 +38,14 @@ func defaultConfig() Config {
 		UseSSL:          false,
 		ResetStatistics: false,
 
-		CollectDiskMetrics:         framework.AutoBoolAuto,
-		CollectSubsystemMetrics:    framework.AutoBoolAuto,
-		CollectJobQueueMetrics:     framework.AutoBoolAuto,
-		CollectActiveJobs:          framework.AutoBoolAuto,
-		CollectHTTPServerMetrics:   framework.AutoBoolAuto,
-		CollectMessageQueueMetrics: framework.AutoBoolAuto,
-		CollectOutputQueueMetrics:  framework.AutoBoolAuto,
-		CollectPlanCacheMetrics:    framework.AutoBoolAuto,
+		CollectDiskMetrics:         confopt.AutoBoolAuto,
+		CollectSubsystemMetrics:    confopt.AutoBoolAuto,
+		CollectJobQueueMetrics:     confopt.AutoBoolAuto,
+		CollectActiveJobs:          confopt.AutoBoolAuto,
+		CollectHTTPServerMetrics:   confopt.AutoBoolAuto,
+		CollectMessageQueueMetrics: confopt.AutoBoolAuto,
+		CollectOutputQueueMetrics:  confopt.AutoBoolAuto,
+		CollectPlanCacheMetrics:    confopt.AutoBoolAuto,
 
 		MaxDisks:         100,
 		MaxSubsystems:    100,

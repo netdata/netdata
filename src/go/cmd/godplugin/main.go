@@ -9,16 +9,15 @@ import (
 	"os/user"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/logger"
-	"github.com/netdata/netdata/go/plugins/pkg/buildinfo"
-	"github.com/netdata/netdata/go/plugins/pkg/executable"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/cli"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/pluginconfig"
-
 	"go.uber.org/automaxprocs/maxprocs"
 	"golang.org/x/net/http/httpproxy"
 
+	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/pkg/buildinfo"
+	"github.com/netdata/netdata/go/plugins/pkg/cli"
+	"github.com/netdata/netdata/go/plugins/pkg/executable"
+	"github.com/netdata/netdata/go/plugins/pkg/pluginconfig"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector"
 )
 

@@ -13,7 +13,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/tlscfg"
+	"github.com/netdata/netdata/go/plugins/pkg/tlscfg"
 )
 
 type provider interface {

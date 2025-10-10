@@ -4,12 +4,12 @@ package consul
 
 import (
 	"fmt"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
 	"math"
 	"strconv"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/prometheus"
+	"github.com/netdata/netdata/go/plugins/pkg/prometheus"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
 )
 
 func (c *Collector) collectMetricsPrometheus(mx map[string]int64) error {

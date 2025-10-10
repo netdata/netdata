@@ -8,7 +8,7 @@ package as400
 import (
 	"context"
 
-	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/framework"
+	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 )
 
 type collectionGroup interface {
@@ -148,7 +148,7 @@ func (g *messageQueueGroup) Collect(ctx context.Context) error {
 	if err := g.c.collectMessageQueues(ctx); err != nil {
 		if isSQLFeatureError(err) {
 			g.c.Warningf("message queue metrics not available on this IBM i version: %v", err)
-			g.c.CollectMessageQueueMetrics = framework.AutoBoolDisabled
+			g.c.CollectMessageQueueMetrics = confopt.AutoBoolDisabled
 			return nil
 		}
 		if isSQLTemporaryError(err) {
@@ -176,7 +176,7 @@ func (g *outputQueueGroup) Collect(ctx context.Context) error {
 	if err := g.c.collectOutputQueues(ctx); err != nil {
 		if isSQLFeatureError(err) {
 			g.c.Warningf("output queue metrics not available on this IBM i version: %v", err)
-			g.c.CollectOutputQueueMetrics = framework.AutoBoolDisabled
+			g.c.CollectOutputQueueMetrics = confopt.AutoBoolDisabled
 			return nil
 		}
 		if isSQLTemporaryError(err) {
@@ -230,7 +230,7 @@ func (g *activeJobGroup) Collect(ctx context.Context) error {
 	if err := g.c.collectActiveJobs(ctx); err != nil {
 		if isSQLFeatureError(err) {
 			g.c.Warningf("active job metrics not available on this IBM i version: %v", err)
-			g.c.CollectActiveJobs = framework.AutoBoolDisabled
+			g.c.CollectActiveJobs = confopt.AutoBoolDisabled
 			return nil
 		}
 		g.c.Errorf("failed to collect active jobs: %v", err)
@@ -294,7 +294,7 @@ func (g *httpServerGroup) Collect(ctx context.Context) error {
 	if err := g.c.collectHTTPServerInfo(ctx); err != nil {
 		if isSQLFeatureError(err) {
 			g.c.Warningf("HTTP server metrics not available on this IBM i version: %v", err)
-			g.c.CollectHTTPServerMetrics = framework.AutoBoolDisabled
+			g.c.CollectHTTPServerMetrics = confopt.AutoBoolDisabled
 			return nil
 		}
 		if isSQLTemporaryError(err) {
@@ -322,7 +322,7 @@ func (g *planCacheGroup) Collect(ctx context.Context) error {
 	if err := g.c.collectPlanCache(ctx); err != nil {
 		if isSQLFeatureError(err) {
 			g.c.Warningf("plan cache analysis not available or requires additional authority: %v", err)
-			g.c.CollectPlanCacheMetrics = framework.AutoBoolDisabled
+			g.c.CollectPlanCacheMetrics = confopt.AutoBoolDisabled
 			return nil
 		}
 		if isSQLTemporaryError(err) {

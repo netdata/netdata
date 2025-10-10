@@ -3,7 +3,8 @@ package mp
 import (
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
+	"github.com/netdata/netdata/go/plugins/pkg/confopt"
+	"github.com/netdata/netdata/go/plugins/pkg/web"
 	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/framework"
 )
 
@@ -28,9 +29,9 @@ type Config struct {
 	MetricsEndpoint string `yaml:"metrics_endpoint,omitempty" json:"metrics_endpoint" ui:"group:Connection"`
 
 	// CollectJVMMetrics toggles JVM/base scope metrics scraped from the MicroProfile endpoint.
-	CollectJVMMetrics framework.AutoBool `yaml:"collect_jvm_metrics" json:"collect_jvm_metrics" ui:"group:Other Metrics"`
+	CollectJVMMetrics confopt.AutoBool `yaml:"collect_jvm_metrics" json:"collect_jvm_metrics" ui:"group:Other Metrics"`
 	// CollectRESTMetrics toggles per-endpoint REST/JAX-RS metrics (may introduce cardinality).
-	CollectRESTMetrics framework.AutoBool `yaml:"collect_rest_metrics" json:"collect_rest_metrics" ui:"group:REST Endpoints"`
+	CollectRESTMetrics confopt.AutoBool `yaml:"collect_rest_metrics" json:"collect_rest_metrics" ui:"group:REST Endpoints"`
 
 	// MaxRESTEndpoints limits how many REST endpoints are exported when REST metrics are enabled (0 disables the limit).
 	MaxRESTEndpoints int `yaml:"max_rest_endpoints,omitempty" json:"max_rest_endpoints" ui:"group:REST Endpoints"`

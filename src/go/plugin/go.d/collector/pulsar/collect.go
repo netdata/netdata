@@ -6,8 +6,8 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/prometheus"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/stm"
+	"github.com/netdata/netdata/go/plugins/pkg/prometheus"
+	"github.com/netdata/netdata/go/plugins/pkg/stm"
 )
 
 func isValidPulsarMetrics(pms prometheus.Series) bool {
