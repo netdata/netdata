@@ -1,7 +1,7 @@
 package db2
 
 import (
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
+	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/framework"
 )
 

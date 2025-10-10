@@ -5,7 +5,7 @@ package metrix
 import (
 	"errors"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/stm"
+	"github.com/netdata/netdata/go/plugins/pkg/stm"
 )
 
 type (

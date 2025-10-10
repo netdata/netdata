@@ -18,8 +18,8 @@ import (
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/executable"
 	"github.com/netdata/netdata/go/plugins/pkg/multipath"
+	"github.com/netdata/netdata/go/plugins/pkg/pluginconfig"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/pluginconfig"
 )
 
 var log = logger.New().With("component", "snmp/ddsnmp")

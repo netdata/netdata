@@ -7,12 +7,12 @@ import (
 	"os"
 	"strings"
 
+	hostinfo2 "github.com/netdata/netdata/go/plugins/pkg/hostinfo"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/dummy"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/file"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/sd"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/hostinfo"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/vnodes"
 
@@ -58,7 +58,7 @@ func (a *Agent) loadEnabledModules(cfg config) module.Registry {
 		}
 		if all {
 			// Known issue: go.d/logind high CPU usage on Alma Linux8 (https://github.com/netdata/netdata/issues/15930)
-			if !cfg.isExplicitlyEnabled(name) && (creator.Disabled || name == "logind" && hostinfo.SystemdVersion == 239) {
+			if !cfg.isExplicitlyEnabled(name) && (creator.Disabled || name == "logind" && hostinfo2.SystemdVersion == 239) {
 				a.Infof("'%s' module disabled by default, should be explicitly enabled in the config", name)
 				continue
 			}
@@ -91,7 +91,7 @@ func (a *Agent) buildDiscoveryConf(enabled module.Registry) discovery.Config {
 	var readPaths, dummyPaths []string
 
 	if len(a.CollectorsConfDir) == 0 {
-		if hostinfo.IsInsideK8sCluster() {
+		if hostinfo2.IsInsideK8sCluster() {
 			return discovery.Config{Registry: reg}
 		}
 		a.Info("modules conf dir not provided, will use default config for all enabled modules")
@@ -109,7 +109,7 @@ func (a *Agent) buildDiscoveryConf(enabled module.Registry) discovery.Config {
 		a.Debugf("looking for '%s' in %v", cfgName, a.CollectorsConfDir)
 
 		path, err := a.CollectorsConfDir.Find(cfgName)
-		if hostinfo.IsInsideK8sCluster() {
+		if hostinfo2.IsInsideK8sCluster() {
 			if err != nil {
 				a.Infof("not found '%s', won't use default (reading stock configs is disabled in k8s)", cfgName)
 				continue

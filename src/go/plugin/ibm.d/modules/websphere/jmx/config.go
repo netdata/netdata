@@ -3,7 +3,7 @@ package jmx
 import (
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
+	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/framework"
 )
 

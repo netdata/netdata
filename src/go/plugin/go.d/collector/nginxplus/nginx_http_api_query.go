@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
+	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
 
 const (

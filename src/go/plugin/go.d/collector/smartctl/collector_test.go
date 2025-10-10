@@ -9,12 +9,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/tidwall/gjson"
+
+	"github.com/netdata/netdata/go/plugins/pkg/confopt"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 )
 
 var (

@@ -8,11 +8,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/prometheus/selector"
-
 	"github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/model/labels"
 	"github.com/prometheus/prometheus/model/textparse"
+
+	"github.com/netdata/netdata/go/plugins/pkg/prometheus/selector"
 )
 
 const (

@@ -10,13 +10,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/netdata/netdata/go/plugins/pkg/matcher"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/tlscfg"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/netdata/netdata/go/plugins/pkg/matcher"
+	"github.com/netdata/netdata/go/plugins/pkg/tlscfg"
+	"github.com/netdata/netdata/go/plugins/pkg/web"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 )
 
 var (
