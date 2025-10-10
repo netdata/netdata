@@ -87,11 +87,14 @@ export interface LoadAgentOptions {
   parallelToolCalls?: boolean;
   maxRetries?: number;
   maxToolTurns?: number;
+  maxToolCallsPerTurn?: number;
   maxConcurrentTools?: number;
   llmTimeout?: number;
   toolTimeout?: number;
   temperature?: number;
   topP?: number;
+  maxOutputTokens?: number;
+  repeatPenalty?: number;
   toolResponseMaxBytes?: number;
   mcpInitConcurrency?: number;
   traceLLM?: boolean;
@@ -238,11 +241,14 @@ export function loadAgent(aiPath: string, registry?: LoadedAgentCache, options?:
       parallelToolCalls: options?.parallelToolCalls,
       maxRetries: options?.maxRetries,
       maxToolTurns: options?.maxToolTurns,
+      maxToolCallsPerTurn: options?.maxToolCallsPerTurn,
       maxConcurrentTools: options?.maxConcurrentTools,
       llmTimeout: options?.llmTimeout,
       toolTimeout: options?.toolTimeout,
       temperature: options?.temperature,
       topP: options?.topP,
+      maxOutputTokens: options?.maxOutputTokens,
+      repeatPenalty: options?.repeatPenalty,
       toolResponseMaxBytes: options?.toolResponseMaxBytes,
       mcpInitConcurrency: options?.mcpInitConcurrency,
       traceLLM: options?.traceLLM,
@@ -527,11 +533,14 @@ export function loadAgentFromContent(id: string, content: string, options?: Load
       parallelToolCalls: options?.parallelToolCalls,
       maxRetries: options?.maxRetries,
       maxToolTurns: options?.maxToolTurns,
+      maxToolCallsPerTurn: options?.maxToolCallsPerTurn,
       maxConcurrentTools: options?.maxConcurrentTools,
       llmTimeout: options?.llmTimeout,
       toolTimeout: options?.toolTimeout,
       temperature: options?.temperature,
       topP: options?.topP,
+      maxOutputTokens: options?.maxOutputTokens,
+      repeatPenalty: options?.repeatPenalty,
       toolResponseMaxBytes: options?.toolResponseMaxBytes,
       mcpInitConcurrency: options?.mcpInitConcurrency,
       traceLLM: options?.traceLLM,

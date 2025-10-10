@@ -2497,6 +2497,29 @@ const SCENARIOS: ScenarioDefinition[] = [
     ],
   },
   {
+    id: 'run-test-68',
+    description: 'Cache write enrichment passthrough.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Returning final response without cache info.',
+          reportContent: `${RESULT_HEADING}Cache write enrichment scenario.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_SUCCESS,
+          tokenUsage: {
+            inputTokens: 50,
+            outputTokens: 20,
+            totalTokens: 70,
+          },
+        },
+      },
+    ],
+  },
+
+  {
     id: 'run-test-24-subagent',
     description: 'Sub-agent internal success path.',
     turns: [

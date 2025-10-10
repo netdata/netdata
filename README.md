@@ -136,7 +136,7 @@ The framework uses a **multi-level configuration system** with clear precedence 
 
 #### Complete Precedence Order (highest → lowest)
 
-1. **Command-line parameters**: Direct CLI options like `--temperature 0.5`, `--max-tool-turns 20`, `--llm-timeout 300000`
+1. **Command-line parameters**: Direct CLI options like `--temperature 0.5`, `--top-p 0.8`, `--max-output-tokens 8192`, `--repeat-penalty 1.2`, `--max-tool-turns 20`, `--max-tool-calls-per-turn 8`, `--llm-timeout 300000`
    - These always override all other settings
    - Perfect for testing and debugging
 

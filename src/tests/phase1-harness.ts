@@ -5,13 +5,15 @@ import { fileURLToPath } from 'node:url';
 
 import { WebSocketServer } from 'ws';
 
-import type { AIAgentResult, AIAgentSessionConfig, AccountingEntry, Configuration, LogEntry, MCPServerConfig, TurnRequest, TurnResult } from '../types.js';
+import type { AIAgentCallbacks, AIAgentResult, AIAgentSessionConfig, AccountingEntry, AgentFinishedEvent, Configuration, ConversationMessage, LogEntry, MCPServerConfig, MCPTool, ProviderConfig, TurnRequest, TurnResult } from '../types.js';
 import type { JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js';
 import type { ChildProcess } from 'node:child_process';
 import type { AddressInfo } from 'node:net';
 
+import { loadAgentFromContent } from '../agent-loader.js';
 import { AIAgentSession } from '../ai-agent.js';
 import { LLMClient } from '../llm-client.js';
+import { TestLLMProvider } from '../llm-providers/test-llm.js';
 import { MCPProvider } from '../tools/mcp-provider.js';
 import { sanitizeToolName } from '../utils.js';
 import { createWebSocketTransport } from '../websocket-transport.js';
@@ -24,6 +26,7 @@ const MODEL_NAME = 'deterministic-model';
 const PRIMARY_PROVIDER = 'primary';
 const SECONDARY_PROVIDER = 'secondary';
 const SUBAGENT_TOOL = 'agent__pricing-subagent';
+const DEFAULT_PROMPT_SCENARIO = 'run-test-1' as const;
 const BASE_DEFAULTS = {
   stream: false,
   maxToolTurns: 3,
@@ -149,7 +152,7 @@ interface HarnessTest {
 
 const TEST_SCENARIOS: HarnessTest[] = [
   {
-    id: 'run-test-1',
+    id: DEFAULT_PROMPT_SCENARIO,
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-1 expected success.');
       const finalReport = result.finalReport;
@@ -1615,6 +1618,640 @@ const TEST_SCENARIOS: HarnessTest[] = [
         invariant(traceLog !== undefined, 'Trace log expected for run-test-63.');
         const finalReport = result.finalReport;
         invariant(finalReport !== undefined && finalReport.status === 'success', 'Final report should indicate success for run-test-63.');
+      },
+    };
+  })(),
+  (() => {
+    return {
+      id: 'run-test-64',
+      description: 'Base LLM provider error mapping coverage.',
+      execute: () => {
+        const providerConfig: ProviderConfig = { type: 'test-llm' };
+        const provider = new TestLLMProvider(providerConfig);
+        const statuses = {
+          auth: provider.mapError({ status: 401, message: 'invalid api key', name: 'AuthError' }),
+          quota: provider.mapError({ status: 402, message: 'quota exceeded', name: 'BillingError' }),
+          timeout: provider.mapError({ name: 'TimeoutError', message: 'Request timeout occurred' }),
+          network: provider.mapError({ status: 503, message: 'connection reset', name: 'NetworkError' }),
+          model: provider.mapError({ status: 400, message: 'model unsupported', name: 'BadRequestError' }),
+          nested: provider.mapError({ lastError: { response: { status: 429, data: { error: { message: 'Rate limit reached' } } }, message: 'Too Many Requests' } }),
+          responseBody: provider.mapError({ status: 500, responseBody: '{"error":{"message":"Upstream invalid","code":"quota"}}', message: 'Server error' }),
+        };
+        return Promise.resolve({
+          success: true,
+          conversation: [],
+          logs: [],
+          accounting: [],
+          finalReport: { status: 'success', format: 'json', content_json: {
+            auth: statuses.auth.type,
+            quota: statuses.quota.type,
+            timeout: statuses.timeout.type,
+            network: statuses.network.type,
+            model: statuses.model.type,
+            nested: statuses.nested.type,
+            responseBody: statuses.responseBody.type,
+          }, ts: Date.now() },
+        } as AIAgentResult);
+      },
+      expect: (result: AIAgentResult) => {
+        invariant(result.success, 'Scenario run-test-64 expected success.');
+        const data = result.finalReport?.content_json as Record<string, string> | undefined;
+        invariant(data !== undefined, 'Final report data expected for run-test-64.');
+        invariant(data.auth === 'auth_error', 'Auth error mapping mismatch for run-test-64.');
+        invariant(data.quota === 'quota_exceeded', 'Quota error mapping mismatch for run-test-64.');
+        invariant(data.timeout === 'timeout', 'Timeout mapping mismatch for run-test-64.');
+        invariant(data.network === 'network_error', 'Network mapping mismatch for run-test-64.');
+        invariant(data.model === 'model_error', 'Model error mapping mismatch for run-test-64.');
+        invariant(data.nested === 'rate_limit', 'Nested error mapping mismatch for run-test-64.');
+        invariant(data.responseBody === 'network_error', 'Response body mapping mismatch for run-test-64.');
+      },
+    };
+  })(),
+  (() => {
+    const captured: { namespace: string; filtered: string[]; stdioError?: string; combined?: string } = { namespace: '', filtered: [] };
+    return {
+      id: 'run-test-65',
+      description: 'MCP provider filtering and logging coverage.',
+      execute: () => {
+        const logs: LogEntry[] = [];
+        const provider = new MCPProvider('deterministic', {}, { trace: true, verbose: true, onLog: (entry) => { logs.push(entry); } });
+        const exposed = provider as unknown as {
+          sanitizeNamespace: (name: string) => string;
+          filterToolsForServer: (name: string, config: MCPServerConfig, tools: MCPTool[]) => MCPTool[];
+          createStdioTransport: (name: string, config: MCPServerConfig) => unknown;
+          log: (severity: 'VRB' | 'WRN' | 'ERR' | 'TRC', message: string, remoteIdentifier: string, fatal?: boolean) => void;
+        };
+        captured.namespace = exposed.sanitizeNamespace('Alpha-Server!!');
+        const toolList: MCPTool[] = [
+          { name: 'alphaTool', description: 'primary', inputSchema: {} },
+          { name: 'betaTool', description: 'secondary', inputSchema: {} },
+          { name: 'gammaTool', description: 'third', inputSchema: {} },
+        ];
+        const filtered = exposed.filterToolsForServer(
+          'alpha',
+          { type: 'stdio', command: 'node', toolsAllowed: ['alphaTool', 'GammaTool'], toolsDenied: ['betaTool'] } as MCPServerConfig,
+          toolList
+        );
+        captured.filtered = filtered.map((tool) => tool.name);
+        try {
+          exposed.createStdioTransport('broken', { type: 'stdio' } as MCPServerConfig);
+        } catch (error: unknown) {
+          captured.stdioError = error instanceof Error ? error.message : String(error);
+        }
+        exposed.log('TRC', 'synthetic trace', 'mcp:test');
+        const serversField = provider as unknown as {
+          servers: Map<string, { name: string; config: MCPServerConfig; tools: MCPTool[]; instructions?: string }>;
+        };
+        serversField.servers = new Map<string, { name: string; config: MCPServerConfig; tools: MCPTool[]; instructions?: string }>([
+          [
+            'alpha',
+            {
+              name: 'alpha',
+              config: { type: 'stdio', command: 'node' } as MCPServerConfig,
+              tools: [{ name: 'alphaTool', description: 'Alpha', inputSchema: {}, instructions: 'Alpha instruction' }],
+              instructions: 'Server instructions',
+            },
+          ],
+        ]);
+        captured.combined = provider.getCombinedInstructions();
+        return Promise.resolve({
+          success: true,
+          conversation: [],
+          logs,
+          accounting: [],
+          finalReport: { status: 'success', format: 'json', content_json: captured, ts: Date.now() },
+        } as AIAgentResult);
+      },
+      expect: (result: AIAgentResult) => {
+        invariant(result.success, 'Scenario run-test-65 expected success.');
+        const data = result.finalReport?.content_json as
+          | { namespace: string; filtered: string[]; stdioError?: string; combined?: string }
+          | undefined;
+        invariant(data !== undefined, 'Combined data expected for run-test-65.');
+        invariant(data.namespace === 'alpha_server', 'Namespace sanitization mismatch for run-test-65.');
+        invariant(
+          data.filtered.length === 2 && data.filtered.includes('alphaTool') && data.filtered.includes('gammaTool'),
+          'Tool filtering mismatch for run-test-65.'
+        );
+        invariant(
+          typeof data.stdioError === 'string' && data.stdioError.includes('requires a string'),
+          'Expected stdio transport error for run-test-65.'
+        );
+        invariant(
+          typeof data.combined === 'string' && data.combined.includes('TOOL alpha__alphaTool INSTRUCTIONS'),
+          'Combined instructions mismatch for run-test-65.'
+        );
+        invariant(
+          result.logs.some((entry) => entry.remoteIdentifier === 'mcp:test' && entry.severity === 'TRC'),
+          'Trace log expected for run-test-65.'
+        );
+      },
+    };
+  })(),
+  (() => {
+    return {
+      id: 'run-test-66',
+      description: 'Sub-agent recursion prevented by ancestors list.',
+      configure: (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+        const canonicalPath = fs.realpathSync(SUBAGENT_PRICING_PROMPT);
+        sessionConfig.subAgentPaths = [canonicalPath];
+        sessionConfig.ancestors = [canonicalPath];
+      },
+      expect: (result: AIAgentResult) => {
+        invariant(!result.success, 'Scenario run-test-66 should fail while creating session.');
+        invariant(typeof result.error === 'string' && result.error.includes('Recursion detected'), 'Recursion detection message expected for run-test-66.');
+        invariant(result.conversation.length === 0, 'No conversation messages expected for run-test-66.');
+      },
+    };
+  })(),
+  (() => {
+    return {
+      id: 'run-test-67',
+      description: 'LLM client reports unknown provider errors.',
+      execute: async () => {
+        let caught: string | undefined;
+        const client = new LLMClient({});
+        try {
+          await client.executeTurn({
+            provider: 'missing-provider',
+            model: 'unused',
+            messages: [{ role: 'user', content: 'noop' }],
+            tools: [],
+            toolExecutor: () => Promise.resolve(''),
+            temperature: 0,
+            topP: 1,
+            maxOutputTokens: 32,
+            stream: false,
+            isFinalTurn: true,
+            llmTimeout: 1_000,
+          });
+        } catch (error: unknown) {
+          caught = error instanceof Error ? error.message : String(error);
+        }
+        return {
+          success: true,
+          conversation: [],
+          logs: [],
+          accounting: [],
+          finalReport: {
+            status: 'success',
+            format: 'json',
+            content_json: { error: caught },
+            ts: Date.now(),
+          },
+        };
+      },
+      expect: (result: AIAgentResult) => {
+        invariant(result.success, 'Scenario run-test-67 should complete successfully.');
+        const data = result.finalReport?.content_json as { error?: string } | undefined;
+        invariant(data !== undefined && typeof data.error === 'string', 'Captured error expected for run-test-67.');
+        invariant(data.error.includes('Unknown provider: missing-provider'), 'Unknown provider message mismatch for run-test-67.');
+      },
+    };
+  })(),
+  (() => {
+    const ANTHROPIC_URL = 'https://anthropic.mock/v1/messages';
+    return {
+      id: 'run-test-68',
+      description: 'LLM client enriches cache write tokens from traced fetch.',
+      execute: async () => {
+        const originalFetch = globalThis.fetch;
+        const logs: LogEntry[] = [];
+        globalThis.fetch = (_input?: RequestInfo | URL, _init?: RequestInit): Promise<Response> => {
+          const body = JSON.stringify({
+            usage: {
+              cacheCreationInputTokens: 321,
+            },
+          });
+          return Promise.resolve(new Response(body, {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          }));
+        };
+        try {
+          const client = new LLMClient(
+            {
+              [PRIMARY_PROVIDER]: { type: 'test-llm' },
+            },
+            {
+              traceLLM: true,
+              onLog: (entry) => { logs.push(entry); },
+            }
+          );
+          const tracedFetch = (client as unknown as { createTracedFetch: () => typeof fetch }).createTracedFetch();
+          await tracedFetch(ANTHROPIC_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt: 'cache-enrich' }),
+          });
+          const clientInternals = client as unknown as { logRequest?: (req: TurnRequest) => void; lastCacheWriteInputTokens?: number };
+          const originalLogRequest = typeof clientInternals.logRequest === 'function' ? clientInternals.logRequest : undefined;
+          const cachedValue = clientInternals.lastCacheWriteInputTokens;
+          if (originalLogRequest !== undefined) {
+            clientInternals.logRequest = function(request: TurnRequest): void {
+              originalLogRequest.call(this, request);
+              if (typeof cachedValue === 'number') {
+                clientInternals.lastCacheWriteInputTokens = cachedValue;
+              }
+            };
+          }
+          try {
+            const request: TurnRequest = {
+              provider: PRIMARY_PROVIDER,
+              model: MODEL_NAME,
+              messages: [
+                { role: 'system', content: 'Phase 1 deterministic harness: respond using scripted outputs.' },
+                { role: 'user', content: 'run-test-68' },
+              ],
+              tools: [],
+              toolExecutor: () => Promise.resolve(''),
+              temperature: 0,
+              topP: 1,
+              maxOutputTokens: 64,
+              stream: false,
+              isFinalTurn: true,
+              llmTimeout: 5_000,
+            };
+            const turnResult = await client.executeTurn(request);
+            const routing = client.getLastActualRouting();
+            const costs = client.getLastCostInfo();
+            return {
+              success: true,
+              conversation: [],
+              logs,
+              accounting: [],
+              finalReport: {
+                status: 'success',
+                format: 'json',
+                content_json: {
+                  tokens: turnResult.tokens ?? null,
+                  routing,
+                  costs,
+                },
+                ts: Date.now(),
+              },
+            };
+          } finally {
+            if (originalLogRequest !== undefined) {
+              clientInternals.logRequest = originalLogRequest;
+            }
+          }
+        } finally {
+          globalThis.fetch = originalFetch;
+        }
+      },
+      expect: (result: AIAgentResult) => {
+        invariant(result.success, 'Scenario run-test-68 expected success.');
+        const data = result.finalReport?.content_json as
+          | { tokens?: { cacheWriteInputTokens?: number; inputTokens?: number; outputTokens?: number; totalTokens?: number }; routing?: { provider?: string; model?: string }; costs?: { costUsd?: number; upstreamInferenceCostUsd?: number } }
+          | undefined;
+        invariant(data !== undefined, 'Final report data expected for run-test-68.');
+        invariant(data.tokens !== undefined && data.tokens.cacheWriteInputTokens === 321, 'Cache write enrichment expected for run-test-68.');
+        invariant(data.routing !== undefined && data.routing.provider === undefined && data.routing.model === undefined, 'Routing should remain empty for run-test-68.');
+        invariant(data.costs !== undefined && data.costs.costUsd === undefined && data.costs.upstreamInferenceCostUsd === undefined, 'Cost info should remain empty for run-test-68.');
+        invariant(result.logs.some((entry) => entry.severity === 'TRC' && typeof entry.remoteIdentifier === 'string' && entry.remoteIdentifier.startsWith('trace:')), 'Trace log expected for run-test-68.');
+      },
+    };
+  })(),
+  (() => {
+    let capturedTopP: number | undefined;
+    return {
+      id: 'run-test-69',
+      description: 'Model override snake-case top_p propagation.',
+      configure: (configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+        configuration.providers[PRIMARY_PROVIDER] = {
+          type: 'test-llm',
+          models: {
+            [MODEL_NAME]: {
+              overrides: { top_p: 0.66 },
+            },
+          },
+        };
+        sessionConfig.targets = [{ provider: PRIMARY_PROVIDER, model: MODEL_NAME }];
+        sessionConfig.userPrompt = 'run-test-17';
+      },
+      execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+        capturedTopP = undefined;
+        // eslint-disable-next-line @typescript-eslint/unbound-method -- capture method for restoration after interception
+        const originalExecute = LLMClient.prototype.executeTurn;
+        LLMClient.prototype.executeTurn = async function(request: TurnRequest): Promise<TurnResult> {
+          capturedTopP = request.topP;
+          return await originalExecute.call(this, request);
+        };
+        try {
+          const session = AIAgentSession.create(sessionConfig);
+          return await session.run();
+        } finally {
+          LLMClient.prototype.executeTurn = originalExecute;
+        }
+      },
+      expect: (result: AIAgentResult) => {
+        invariant(result.success, 'Scenario run-test-69 expected success.');
+        invariant(typeof capturedTopP === 'number' && Math.abs(capturedTopP - 0.66) < 1e-6, 'top_p override propagation failed for run-test-69.');
+      },
+    };
+  })(),
+  (() => {
+    let capturedEvents: AgentFinishedEvent[] = [];
+    return {
+      id: 'run-test-70',
+      description: 'Default callPath and agent labels when agentId is unset.',
+      configure: (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+        capturedEvents = [];
+        sessionConfig.agentId = undefined;
+        sessionConfig.userPrompt = DEFAULT_PROMPT_SCENARIO;
+        const existingCallbacks = sessionConfig.callbacks ?? {};
+        sessionConfig.callbacks = {
+          ...existingCallbacks,
+          onProgress: (event) => {
+            if (event.type === 'agent_finished') {
+              capturedEvents.push(event);
+            }
+            existingCallbacks.onProgress?.(event);
+          },
+        };
+      },
+      execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+        const session = AIAgentSession.create(sessionConfig);
+        return await session.run();
+      },
+      expect: (result: AIAgentResult) => {
+        invariant(result.success, 'Scenario run-test-70 expected success.');
+        const finishedEvent = capturedEvents.at(-1);
+        invariant(finishedEvent !== undefined, 'Agent finished event expected for run-test-70.');
+        invariant(finishedEvent.callPath === 'agent', 'Default callPath should be "agent" for run-test-70.');
+        invariant(finishedEvent.agentId === 'agent', 'Default agentId should be "agent" for run-test-70.');
+        invariant(finishedEvent.agentName === 'agent', 'Default agentName should be "agent" for run-test-70.');
+      },
+    };
+  })(),
+  (() => {
+    let capturedEvents: AgentFinishedEvent[] = [];
+    return {
+      id: 'run-test-71',
+      description: 'Agent display name fallback when identifier is whitespace.',
+      configure: (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+        capturedEvents = [];
+        sessionConfig.agentId = '  ';
+        sessionConfig.userPrompt = DEFAULT_PROMPT_SCENARIO;
+        const existingCallbacks = sessionConfig.callbacks ?? {};
+        sessionConfig.callbacks = {
+          ...existingCallbacks,
+          onProgress: (event) => {
+            if (event.type === 'agent_finished') {
+              capturedEvents.push(event);
+            }
+            existingCallbacks.onProgress?.(event);
+          },
+        };
+      },
+      execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+        const session = AIAgentSession.create(sessionConfig);
+        return await session.run();
+      },
+      expect: (result: AIAgentResult) => {
+        invariant(result.success, 'Scenario run-test-71 expected success.');
+        const finishedEvent = capturedEvents.at(-1);
+        invariant(finishedEvent !== undefined, 'Agent finished event expected for run-test-71.');
+        invariant(finishedEvent.callPath === '  ', 'Whitespace agentId should propagate to callPath for run-test-71.');
+        invariant(finishedEvent.agentId === '  ', 'Whitespace agentId should remain unchanged for run-test-71.');
+        invariant(finishedEvent.agentName === '  ', 'Whitespace agentId should yield same agentName for run-test-71.');
+      },
+    };
+  })(),
+  (() => {
+    let capturedEvent: AgentFinishedEvent | undefined;
+    let expectedAgentId = '';
+    return {
+      id: 'run-test-72',
+      description: 'Trace callPath fallback to agentId when callPath is empty.',
+      configure: (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+        capturedEvent = undefined;
+        expectedAgentId = sessionConfig.agentId ?? '';
+        sessionConfig.trace = { ...(sessionConfig.trace ?? {}), callPath: '' };
+        sessionConfig.userPrompt = DEFAULT_PROMPT_SCENARIO;
+        const existingCallbacks = sessionConfig.callbacks ?? {};
+        sessionConfig.callbacks = {
+          ...existingCallbacks,
+          onProgress: (event) => {
+            if (event.type === 'agent_finished') {
+              capturedEvent = event;
+            }
+            existingCallbacks.onProgress?.(event);
+          },
+        };
+      },
+      execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+        const session = AIAgentSession.create(sessionConfig);
+        return await session.run();
+      },
+      expect: (result: AIAgentResult) => {
+        invariant(result.success, 'Scenario run-test-72 expected success.');
+        const event = capturedEvent;
+        invariant(event !== undefined, 'Agent finished event expected for run-test-72.');
+        invariant(event.callPath === expectedAgentId, 'CallPath should fallback to agentId when trace callPath is empty (run-test-72).');
+        invariant(event.agentId === expectedAgentId, 'AgentId should remain unchanged for run-test-72.');
+      },
+    };
+  })(),
+  (() => {
+    let capturedSessionConfig: AIAgentSessionConfig | undefined;
+    const historyMessages: ConversationMessage[] = [
+      { role: 'system', content: 'Historical system guidance.' },
+      { role: 'assistant', content: 'Historical assistant output.' },
+    ];
+    const loaderCallbacks: AIAgentCallbacks = {
+      onLog: () => undefined,
+      onOutput: () => undefined,
+      onThinking: () => undefined,
+      onAccounting: () => undefined,
+      onProgress: () => undefined,
+      onOpTree: () => undefined,
+    };
+    const traceContext = { originId: 'origin-trace', parentId: 'parent-trace', callPath: 'loader/session' };
+    const stopReference = { stopping: false };
+    const ancestorsList = ['ancestor-alpha', 'ancestor-beta'];
+    let loaderAbortSignal: AbortSignal | undefined;
+    return {
+      id: 'run-test-73',
+      description: 'Agent loader propagates session configuration overrides.',
+      execute: async () => {
+        capturedSessionConfig = undefined;
+        const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'phase1-loader-'));
+        const configPath = path.join(tempDir, 'ai-agent.json');
+        const configData = {
+          providers: {
+            [PRIMARY_PROVIDER]: { type: 'test-llm' },
+          },
+          mcpServers: {
+            test: {
+              type: 'stdio',
+              command: process.execPath,
+              args: ['-e', 'process.exit(0)'],
+            },
+          },
+          defaults: {
+            llmTimeout: 1_111,
+            toolTimeout: 2_222,
+            temperature: 0.11,
+            topP: 0.21,
+            maxOutputTokens: 999,
+            repeatPenalty: 1.01,
+            maxRetries: 2,
+            maxToolTurns: 3,
+            maxToolCallsPerTurn: 4,
+            parallelToolCalls: false,
+            maxConcurrentTools: 5,
+            toolResponseMaxBytes: 5_555,
+            stream: false,
+            mcpInitConcurrency: 6,
+          },
+        };
+        fs.writeFileSync(configPath, JSON.stringify(configData, null, 2), 'utf-8');
+        const promptContent = [
+          '---',
+          'description: Loader harness coverage',
+          `models:`,
+          `  - ${PRIMARY_PROVIDER}/${MODEL_NAME}`,
+          'tools:',
+          '  - test',
+          'llmTimeout: 3333',
+          'toolTimeout: 4444',
+          'maxRetries: 7',
+          'maxToolTurns: 8',
+          'maxToolCallsPerTurn: 9',
+          'maxConcurrentTools: 10',
+          'parallelToolCalls: true',
+          'temperature: 0.31',
+          'topP: 0.41',
+          'maxOutputTokens: 1234',
+          'repeatPenalty: 1.07',
+          'toolResponseMaxBytes: 6666',
+          'output:',
+          '  format: json',
+          '  schema:',
+          '    type: object',
+          '    properties:',
+          '      ok:',
+          '        type: boolean',
+          '    required:',
+          '      - ok',
+          '---',
+          'Loader scenario prompt body.',
+        ].join('\n');
+        const options = {
+          baseDir: tempDir,
+          configPath,
+          stream: true,
+          parallelToolCalls: false,
+          maxRetries: 11,
+          maxToolTurns: 12,
+          maxToolCallsPerTurn: 16,
+          maxConcurrentTools: 13,
+          llmTimeout: 5_555,
+          toolTimeout: 6_666,
+          temperature: 0.51,
+          topP: 0.61,
+          maxOutputTokens: 7_777,
+          repeatPenalty: 1.2,
+          toolResponseMaxBytes: 8_888,
+          mcpInitConcurrency: 14,
+          traceLLM: true,
+          traceMCP: true,
+          verbose: true,
+        };
+        const controller = new AbortController();
+        loaderAbortSignal = controller.signal;
+        const originalCreate = AIAgentSession.create.bind(AIAgentSession);
+        (AIAgentSession as unknown as { create: (sessionConfig: AIAgentSessionConfig) => AIAgentSession }).create = (sessionConfig: AIAgentSessionConfig) => {
+          capturedSessionConfig = sessionConfig;
+          return originalCreate(sessionConfig);
+        };
+        try {
+          const loaded = loadAgentFromContent(path.join(tempDir, 'loader.ai'), promptContent, options);
+          await loaded.createSession(
+            'Loader System Prompt',
+            'Loader User Prompt',
+            {
+              history: historyMessages,
+              callbacks: loaderCallbacks,
+              trace: traceContext,
+              renderTarget: 'web',
+              outputFormat: 'json',
+              abortSignal: controller.signal,
+              stopRef: stopReference,
+              initialTitle: 'Loader Session Title',
+              ancestors: ancestorsList,
+            }
+          );
+        } finally {
+          (AIAgentSession as unknown as { create: (sessionConfig: AIAgentSessionConfig) => AIAgentSession }).create = originalCreate;
+          fs.rmSync(tempDir, { recursive: true, force: true });
+        }
+        return {
+          success: true,
+          conversation: [],
+          logs: [],
+          accounting: [],
+          finalReport: {
+            status: 'success',
+            format: 'text',
+            content: 'loader-session-config',
+            ts: Date.now(),
+          },
+        };
+      },
+      expect: () => {
+        invariant(capturedSessionConfig !== undefined, 'Session config capture expected for run-test-73.');
+        const cfg = capturedSessionConfig;
+        invariant(Object.prototype.hasOwnProperty.call(cfg.config.providers, PRIMARY_PROVIDER), 'Provider config missing for run-test-73.');
+        const providerConfig = cfg.config.providers[PRIMARY_PROVIDER];
+        invariant(providerConfig.type === 'test-llm', 'Provider type mismatch for run-test-73.');
+        const hasPrimaryTarget = cfg.targets.some((entry) => entry.provider === PRIMARY_PROVIDER && entry.model === MODEL_NAME);
+        invariant(hasPrimaryTarget, 'Targets mismatch for run-test-73.');
+        invariant(cfg.tools.includes('test'), 'Tool selection mismatch for run-test-73.');
+        invariant(cfg.agentId === 'loader', 'Agent identifier mismatch for run-test-73.');
+        invariant(Array.isArray(cfg.subAgentPaths), 'Sub-agent paths expected array for run-test-73.');
+        invariant(cfg.subAgentPaths.length === 0, 'Sub-agent paths expected empty for run-test-73.');
+        invariant(cfg.systemPrompt === 'Loader System Prompt', 'System prompt mismatch for run-test-73.');
+        invariant(cfg.userPrompt === 'Loader User Prompt', 'User prompt mismatch for run-test-73.');
+        invariant(cfg.outputFormat === 'json', 'Output format mismatch for run-test-73.');
+        invariant(cfg.renderTarget === 'web', 'Render target mismatch for run-test-73.');
+        invariant(cfg.conversationHistory === historyMessages, 'Conversation history reference mismatch for run-test-73.');
+        invariant(cfg.expectedOutput !== undefined, 'Expected output missing for run-test-73.');
+        invariant(cfg.expectedOutput.format === 'json', 'Expected output format mismatch for run-test-73.');
+        const callbacks = cfg.callbacks;
+        invariant(callbacks !== undefined, 'Callbacks missing for run-test-73.');
+        invariant(callbacks === loaderCallbacks, 'Callbacks reference mismatch for run-test-73.');
+        invariant(cfg.trace === traceContext, 'Trace context mismatch for run-test-73.');
+        invariant(cfg.stopRef === stopReference, 'Stop reference mismatch for run-test-73.');
+        invariant(cfg.initialTitle === 'Loader Session Title', 'Initial title mismatch for run-test-73.');
+        invariant(loaderAbortSignal !== undefined && cfg.abortSignal === loaderAbortSignal && !cfg.abortSignal.aborted, 'Abort signal mismatch for run-test-73.');
+        invariant(cfg.ancestors === ancestorsList, 'Ancestors propagation mismatch for run-test-73.');
+        invariant(cfg.temperature !== undefined, 'Temperature undefined for run-test-73.');
+        invariant(Math.abs(cfg.temperature - 0.51) < 1e-6, 'Temperature override mismatch for run-test-73.');
+        invariant(cfg.topP !== undefined, 'topP undefined for run-test-73.');
+        invariant(Math.abs(cfg.topP - 0.61) < 1e-6, 'topP override mismatch for run-test-73.');
+        invariant(cfg.maxOutputTokens === 7_777, `maxOutputTokens mismatch for run-test-73 (actual=${String(cfg.maxOutputTokens)})`);
+        invariant(cfg.repeatPenalty !== undefined && Math.abs(cfg.repeatPenalty - 1.2) < 1e-6, 'repeatPenalty mismatch for run-test-73.');
+        invariant(cfg.maxRetries === 11, 'maxRetries override mismatch for run-test-73.');
+        invariant(cfg.maxTurns === 12, 'maxTurns override mismatch for run-test-73.');
+        invariant(cfg.maxToolCallsPerTurn === 16, 'maxToolCallsPerTurn mismatch for run-test-73.');
+        invariant(cfg.maxConcurrentTools === 13, 'maxConcurrentTools override mismatch for run-test-73.');
+        invariant(cfg.llmTimeout === 5_555, 'llmTimeout override mismatch for run-test-73.');
+        invariant(cfg.toolTimeout === 6_666, 'toolTimeout override mismatch for run-test-73.');
+        invariant(cfg.parallelToolCalls !== undefined, 'parallelToolCalls undefined for run-test-73.');
+        invariant(!cfg.parallelToolCalls, 'parallelToolCalls override mismatch for run-test-73.');
+        invariant(cfg.stream !== undefined, 'stream undefined for run-test-73.');
+        invariant(cfg.stream, 'stream override mismatch for run-test-73.');
+        invariant(cfg.traceLLM !== undefined, 'traceLLM undefined for run-test-73.');
+        invariant(cfg.traceLLM, 'traceLLM override mismatch for run-test-73.');
+        invariant(cfg.traceMCP !== undefined, 'traceMCP undefined for run-test-73.');
+        invariant(cfg.traceMCP, 'traceMCP override mismatch for run-test-73.');
+        invariant(cfg.verbose !== undefined, 'verbose undefined for run-test-73.');
+        invariant(cfg.verbose, 'verbose override mismatch for run-test-73.');
+        invariant(cfg.toolResponseMaxBytes === 8_888, 'toolResponseMaxBytes override mismatch for run-test-73.');
+        invariant(cfg.mcpInitConcurrency === 14, 'mcpInitConcurrency override mismatch for run-test-73.');
       },
     };
   })(),
