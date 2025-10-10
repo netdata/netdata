@@ -2519,6 +2519,47 @@ const SCENARIOS: ScenarioDefinition[] = [
     ],
   },
 
+
+  {
+    id: 'run-test-74',
+    description: 'Final report validation error surfaced to LLM.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        response: {
+          kind: 'tool-call',
+          assistantText: 'Submitting final report without content to trigger validation.',
+          toolCalls: [
+            {
+              toolName: 'agent__final_report',
+              callId: 'call-invalid-final-report',
+              assistantText: 'Attempted final report with missing content.',
+              arguments: {
+                status: STATUS_SUCCESS,
+                report_format: MARKDOWN_FORMAT,
+                report_content: '   ',
+              },
+            },
+          ],
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+          finishReason: TOOL_FINISH_REASON,
+        },
+      },
+      {
+        turn: 2,
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Retrying with a valid final report.',
+          reportContent: `${RESULT_HEADING}Final report accepted after retry.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_SUCCESS,
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+        },
+      },
+    ],
+  },
+
   {
     id: 'run-test-24-subagent',
     description: 'Sub-agent internal success path.',

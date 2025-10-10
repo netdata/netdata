@@ -2255,6 +2255,27 @@ const TEST_SCENARIOS: HarnessTest[] = [
       },
     };
   })(),
+
+  (() => {
+    return {
+      id: 'run-test-74',
+      description: 'Final report tool error is surfaced to the model.',
+      expect: (result: AIAgentResult) => {
+        invariant(result.success, 'Scenario run-test-74 expected success.');
+        const toolMessage = result.conversation.find((message) => {
+          return message.role === 'tool' && message.toolCallId === 'call-invalid-final-report';
+        });
+        invariant(toolMessage !== undefined, 'Final report tool response missing for run-test-74.');
+        const content = typeof toolMessage.content === 'string' ? toolMessage.content : '';
+        invariant(
+          content.toLowerCase().includes('requires non-empty report_content'),
+          'Final report validation error should be surfaced in tool response for run-test-74.'
+        );
+        const finalReport = result.finalReport;
+        invariant(finalReport !== undefined && finalReport.status === 'success', 'Final report should succeed after retry for run-test-74.');
+      },
+    };
+  })(),
   {
     id: 'run-test-43',
     configure: (_configuration, sessionConfig) => {
@@ -2491,18 +2512,16 @@ async function runPhaseOne(): Promise<void> {
       if (typeof maybePid === 'number') {
         const child = handle as ChildProcess;
         const exitPromise = new Promise<void>((resolve) => {
-          const finish = () => resolve();
+          const finish = (): void => { resolve(); };
           child.once('exit', finish);
           child.once('error', finish);
-          setTimeout(finish, 1000);
+          setTimeout(() => { resolve(); }, 1000);
         });
         childCleanup.push(exitPromise);
         try {
-          if (typeof child.kill === 'function' && !child.killed) {
-            child.kill('SIGTERM');
-            if (!child.killed) {
-              try { child.kill('SIGKILL'); } catch { /* ignore */ }
-            }
+          if (typeof child.kill === 'function') {
+            try { child.kill('SIGTERM'); } catch { /* ignore */ }
+            try { child.kill('SIGKILL'); } catch { /* ignore */ }
           }
         } catch { /* ignore */ }
         try { child.disconnect(); } catch { /* ignore */ }
