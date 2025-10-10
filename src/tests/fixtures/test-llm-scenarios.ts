@@ -2128,6 +2128,180 @@ const SCENARIOS: ScenarioDefinition[] = [
     ],
   },
   {
+    id: 'run-test-56',
+    description: 'Provider retry paths across multiple failure types.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        failuresBeforeSuccess: 1,
+        failureStatus: 'model_error',
+        failureRetryable: true,
+        failureMessage: 'Model failure during first attempt.',
+        expectedTools: [TOOL_NAME],
+        response: {
+          kind: 'tool-call',
+          assistantText: 'Attempting primary tool call after transient model error.',
+          toolCalls: [
+            {
+              toolName: TOOL_NAME,
+              callId: 'call-run-test-56-1',
+              assistantText: 'Retrying test tool after model error.',
+              arguments: {
+                text: 'retry-after-model-error',
+              },
+            },
+          ],
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+          finishReason: TOOL_FINISH_REASON,
+        },
+      },
+      {
+        turn: 2,
+        failuresBeforeSuccess: 1,
+        failureStatus: 'rate_limit',
+        failureRetryAfterMs: 200,
+        failureMessage: 'Rate limit encountered.',
+        expectedTools: [TOOL_NAME],
+        response: {
+          kind: 'tool-call',
+          assistantText: 'Retrying after rate limit.',
+          toolCalls: [
+            {
+              toolName: TOOL_NAME,
+              callId: 'call-run-test-56-2',
+              assistantText: 'Collecting data following rate limit.',
+              arguments: {
+                text: 'retry-after-rate-limit',
+              },
+            },
+          ],
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+          finishReason: TOOL_FINISH_REASON,
+        },
+      },
+      {
+        turn: 3,
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Concluding after retries.',
+          reportContent: `${RESULT_HEADING}Retries completed successfully after handling model and rate limit errors.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_SUCCESS,
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+        },
+      },
+    ],
+  },
+  {
+    id: 'run-test-57',
+    description: 'Progress updates and Slack final report via tool calls.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        expectedTools: ['agent__progress_report', 'agent__final_report'],
+        response: {
+          kind: 'tool-call',
+          assistantText: 'Issuing progress update and Slack final report.',
+          toolCalls: [
+            {
+              toolName: 'agent__progress_report',
+              callId: 'call-progress-run-test-57',
+              assistantText: 'Reporting current progress.',
+              arguments: {
+                progress: 'Analyzing deterministic harness outputs.',
+              },
+            },
+            {
+              toolName: 'agent__final_report',
+              callId: 'call-slack-run-test-57',
+              assistantText: 'Submitting Slack styled final report.',
+              arguments: {
+                status: 'success',
+                report_format: SLACK_BLOCK_KIT_FORMAT,
+                messages: [
+                  'Primary summary with _structured_ content.',
+                  {
+                    blocks: [
+                      {
+                        type: 'section',
+                        text: { type: 'mrkdwn', text: '*Detailed* findings and next actions.' },
+                        fields: [{ type: 'mrkdwn', text: 'Next: Validate coverage.' }],
+                      },
+                      { type: 'divider' },
+                      { type: 'context', elements: ['Context item 1', { type: 'mrkdwn', text: 'Context item 2' }] },
+                    ],
+                  },
+                ],
+                metadata: { slack: { footer: 'Existing footer' } },
+              },
+            },
+          ],
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+          finishReason: TOOL_FINISH_REASON,
+        },
+      },
+      {
+        turn: 2,
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Slack final report delivered.',
+          reportContent: `${RESULT_HEADING}Slack report dispatched successfully.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_SUCCESS,
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+        },
+      },
+    ],
+  },
+  {
+    id: 'run-test-58',
+    description: 'Progress metrics, summaries, and accounting aggregation.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        expectedTools: ['agent__progress_report', TOOL_NAME],
+        response: {
+          kind: 'tool-call',
+          assistantText: 'Publishing progress and querying MCP tool.',
+          toolCalls: [
+            {
+              toolName: 'agent__progress_report',
+              callId: 'call-progress-run-test-58',
+              assistantText: 'Progress update before invoking MCP tool.',
+              arguments: {
+                progress: 'Collecting metrics via test MCP tool.',
+              },
+            },
+            {
+              toolName: TOOL_NAME,
+              callId: 'call-tool-run-test-58',
+              assistantText: 'Retrieving MCP data for metrics.',
+              arguments: {
+                text: 'metrics-request-payload',
+              },
+            },
+          ],
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+          finishReason: TOOL_FINISH_REASON,
+        },
+      },
+      {
+        turn: 2,
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Summarizing collected metrics.',
+          reportContent: `${RESULT_HEADING}Metrics collected from MCP tool and progress updates noted.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_SUCCESS,
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+        },
+      },
+    ],
+  },
+  {
     id: 'run-test-24-subagent',
     description: 'Sub-agent internal success path.',
     turns: [

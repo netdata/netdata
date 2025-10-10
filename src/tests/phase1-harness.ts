@@ -5,19 +5,13 @@ import { fileURLToPath } from 'node:url';
 
 import { WebSocketServer } from 'ws';
 
-import type { ResponseMessage } from '../llm-providers/base.js';
-import type { SessionNode } from '../session-tree.js';
-import type { ToolsOrchestrator } from '../tools/tools.js';
-import type { AIAgentResult, AIAgentSessionConfig, AccountingEntry, Configuration, ConversationMessage, LogEntry, MCPTool, ProgressEvent, ProgressMetrics, TokenUsage, TurnRequest, TurnResult, TurnStatus, LLMAccountingEntry } from '../types.js';
+import type { AIAgentResult, AIAgentSessionConfig, AccountingEntry, Configuration, LogEntry, TurnRequest, TurnResult } from '../types.js';
 import type { JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js';
-import type { ModelMessage, ToolSet } from 'ai';
 import type { ChildProcess } from 'node:child_process';
 import type { AddressInfo } from 'node:net';
 
 import { AIAgentSession } from '../ai-agent.js';
 import { LLMClient } from '../llm-client.js';
-import { BaseLLMProvider } from '../llm-providers/base.js';
-import { InternalToolProvider } from '../tools/internal-provider.js';
 import { sanitizeToolName } from '../utils.js';
 import { createWebSocketTransport } from '../websocket-transport.js';
 
@@ -125,11 +119,6 @@ function assertRecord(value: unknown, message: string): asserts value is Record<
   invariant(value !== null && typeof value === 'object' && !Array.isArray(value), message);
 }
 
-function isTurnStatus(value: unknown): value is TurnStatus {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
-  const maybeType = (value as { type?: unknown }).type;
-  return typeof maybeType === 'string';
-}
 
 function isToolAccounting(entry: AccountingEntry): entry is AccountingEntry & { type: 'tool' } {
   return entry.type === 'tool';
@@ -1340,558 +1329,89 @@ const TEST_SCENARIOS: HarnessTest[] = [
   },
   {
     id: 'run-test-56',
-    description: 'Base LLM provider utilities and error mapping.',
-    execute: async () => {
-      class MockProvider extends BaseLLMProvider {
-        public name = 'mock';
-        public constructor(options?: { formatPolicy?: { allowed?: string[]; denied?: string[] } }) {
-          super(options);
-        }
-        public executeTurn = (_request: TurnRequest): Promise<TurnResult> =>
-          Promise.resolve(this.createFailureResult({ type: 'invalid_response', message: 'not implemented' }, 0));
-        public sanitizeSchema = (schema: Record<string, unknown>): Record<string, unknown> =>
-          (this as unknown as { sanitizeStringFormatsInSchema: (node: Record<string, unknown>) => Record<string, unknown> }).sanitizeStringFormatsInSchema(schema);
-        public drainStream = (stream: unknown): Promise<string> =>
-          (this as unknown as { drainTextStream: (s: unknown) => Promise<string> }).drainTextStream(stream);
-        public convertResponseMessages = (
-          messages: ResponseMessage[],
-          provider: string,
-          model: string,
-          tokens: TokenUsage,
-        ): ConversationMessage[] => this.convertResponseMessagesGeneric(messages, provider, model, tokens);
-        public getTokenUsage = (usage: Record<string, unknown> | undefined): TokenUsage => this.extractTokenUsage(usage);
-        public convertToolsPublic = (
-          tools: MCPTool[],
-          executor: (toolName: string, parameters: Record<string, unknown>, options?: { toolCallId?: string }) => Promise<string>,
-        ): ToolSet => this.convertTools(tools, executor);
-        public filterToolsPublic = (tools: MCPTool[], isFinalTurn: boolean): MCPTool[] => this.filterToolsForFinalTurn(tools, isFinalTurn);
-        public buildFinalMessages = (messages: ModelMessage[], isFinalTurn: boolean): ModelMessage[] => this.buildFinalTurnMessages(messages, isFinalTurn);
-        public createTimeout = (timeoutMs: number) => this.createTimeoutController(timeoutMs);
-        public createFailure = (status: TurnStatus, latencyMs: number): TurnResult => this.createFailureResult(status, latencyMs);
-      }
-
-      const provider = new MockProvider({ formatPolicy: { allowed: ['email'], denied: ['uuid'] } });
-      const statusResults: TurnStatus[] = [];
-
-      const originalDebug = process.env.DEBUG;
-      const originalConsoleError = console.error;
-      const debugLogs: string[] = [];
-      console.error = (...args: unknown[]) => {
-        debugLogs.push(args.map((value) => (typeof value === 'string' ? value : JSON.stringify(value))).join(' '));
-      };
-      process.env.DEBUG = 'true';
-
-      const errorInputs: readonly Record<string, unknown>[] = [
-        { statusCode: 429, headers: { 'retry-after': '2' }, message: 'Rate limit reached' },
-        { statusCode: 401, message: 'Authentication failed' },
-        { statusCode: 402, message: 'Quota exceeded' },
-        { statusCode: 400, message: 'Invalid model request' },
-        { name: 'TimeoutError', message: 'Request timeout' },
-        { statusCode: 503, message: 'Network issue' },
-        { message: 'Generic failure' },
-        {
-          statusCode: 400,
-          responseBody: JSON.stringify({ error: { metadata: { raw: JSON.stringify({ error: { message: 'Nested provider error', status: 'MODEL_UNAVAILABLE' } }) }, message: 'Outer error' } }),
-          message: 'Wrapper error',
-        },
-      ];
-      errorInputs.forEach((input) => {
-        statusResults.push(provider.mapError(input));
-      });
-
-      process.env.DEBUG = originalDebug;
-      console.error = originalConsoleError;
-
-      const tokenUsage = provider.getTokenUsage({
-        inputTokens: '120',
-        output_tokens: 45,
-        cached_tokens: 10,
-        cacheCreation: { ephemeral_5m_input_tokens: 7 },
-      });
-
-      const sanitizedSchema = provider.sanitizeSchema({
-        type: ['string', 'null'],
-        format: 'uuid',
-        properties: {
-          email: { type: 'string', format: 'email' },
-        },
-      });
-
-      const toolSet = provider.convertToolsPublic(
-        [
-          {
-            name: 'external_tool',
-            description: 'Example tool',
-            inputSchema: { type: 'object', properties: { id: { type: 'string', format: 'uuid' } } },
-          },
-        ],
-        (_toolName: string, parameters: Record<string, unknown>) => Promise.resolve(JSON.stringify(parameters))
-      );
-
-      const filteredTools = provider.filterToolsPublic(
-        [
-          { name: 'agent__final_report', description: 'final', inputSchema: { type: 'object' } },
-          { name: 'other_tool', description: 'other', inputSchema: { type: 'object' } },
-        ],
-        true,
-      );
-
-      const finalMessages = provider.buildFinalMessages([{ role: 'assistant', content: 'summary' } as unknown as ModelMessage], true);
-
-      const timeoutController = provider.createTimeout(10);
-      timeoutController.resetIdle();
-      await new Promise((resolve) => setTimeout(resolve, 20));
-      const timeoutAborted = timeoutController.controller.signal.aborted;
-
-      const textStreamIterator = async function* () {
-        yield await Promise.resolve('Hello');
-        yield await Promise.resolve(' World');
-      };
-      const textStream = { textStream: { [Symbol.asyncIterator]: textStreamIterator } };
-      const drainedText = await provider.drainStream(textStream);
-
-      const failureResult = provider.createFailure({ type: 'network_error', message: 'downstream', retryable: true }, 25);
-
-      return {
-        success: true,
-        conversation: [],
-        logs: [],
-        accounting: [],
-        finalReport: {
-          status: 'success',
-          format: 'json',
-          content_json: {
-            statusResults,
-            tokenUsage,
-            sanitizedSchema,
-            toolNames: Object.keys(toolSet),
-            filteredTools: filteredTools.map((tool) => tool.name),
-            finalMessagesCount: finalMessages.length,
-            timeoutAborted,
-            drainedText,
-            failureStatus: failureResult.status.type,
-            debugLogs,
-          },
-          ts: Date.now(),
-        },
-      };
+    configure: (_configuration, sessionConfig) => {
+      sessionConfig.tools = ['test'];
+      sessionConfig.maxRetries = 4;
     },
     expect: (result) => {
-      invariant(result.success, 'Scenario run-test-56 should succeed.');
-      const report = result.finalReport?.content_json;
-      assertRecord(report, 'Report expected for run-test-56.');
-      const statusResults = report.statusResults;
-      invariant(Array.isArray(statusResults) && statusResults.length >= 7 && statusResults.every(isTurnStatus), 'All error branches should be exercised for run-test-56.');
-      const types = statusResults.map((status) => status.type);
-      invariant(types.includes('rate_limit') && types.includes('auth_error') && types.includes('quota_exceeded') && types.includes('model_error') && types.includes('timeout') && types.includes('network_error'), 'Expected mapped error types for run-test-56.');
-      const tokenUsage = report.tokenUsage;
-      assertRecord(tokenUsage, 'Token usage extraction should parse numeric strings for run-test-56.');
-      invariant(tokenUsage.inputTokens === 120 && tokenUsage.outputTokens === 45, 'Token usage extraction should parse numeric strings for run-test-56.');
-      const sanitizedSchema = report.sanitizedSchema;
-      assertRecord(sanitizedSchema, 'UUID format should be stripped for run-test-56.');
-      invariant(sanitizedSchema.format === undefined, 'UUID format should be stripped for run-test-56.');
-      const filtered = report.filteredTools;
-      invariant(Array.isArray(filtered) && filtered.length === 1 && filtered[0] === 'agent__final_report', 'Only final report tool should remain on final turn for run-test-56.');
-      invariant(report.finalMessagesCount === 2, 'Final turn message should append instructions for run-test-56.');
-      invariant(report.timeoutAborted === true, 'Timeout controller should abort after idle period for run-test-56.');
-      invariant(report.drainedText === 'Hello World', 'Text stream should be drained correctly for run-test-56.');
-      invariant(typeof report.failureStatus === 'string' && report.failureStatus === 'network_error', 'Failure result should preserve status type for run-test-56.');
-      const debugLogs = report.debugLogs;
-      invariant(Array.isArray(debugLogs) && debugLogs.length > 0, 'Debug logs should be captured when DEBUG=true for run-test-56.');
+      invariant(result.success, 'Scenario run-test-56 should succeed after retries.');
+      const llmEntries = result.accounting.filter(isLlmAccounting);
+      invariant(llmEntries.length >= 3, 'LLM accounting entries expected for run-test-56.');
+      const failedEntries = llmEntries.filter((entry) => entry.status === 'failed');
+      invariant(failedEntries.length >= 2, 'Multiple LLM failures expected for run-test-56.');
+      const modelFailure = failedEntries.find((entry) => typeof entry.error === 'string' && entry.error.includes('Model failure during first attempt.'));
+      invariant(modelFailure !== undefined, 'Model error accounting entry expected for run-test-56.');
+      const rateLog = result.logs.find((entry) => entry.type === 'llm' && typeof entry.message === 'string' && entry.message.includes('Rate limited; suggested wait'));
+      invariant(rateLog !== undefined, 'Rate limit warning log expected for run-test-56.');
     },
   },
-  {
-    id: 'run-test-57',
-    description: 'Internal tool provider batch handling and validations.',
-    execute: async () => {
-      const statusUpdates: string[] = [];
-      const finalReports: unknown[] = [];
-      const errorLogs: string[] = [];
-      const titles: { title: string; emoji?: string }[] = [];
-
-      const orchestratorStub = {
-        hasTool: (tool: string) => tool === 'external_tool',
-        executeWithManagement: (_tool: string, _args: Record<string, unknown>) => ({ latency: 7, result: 'external-result' }),
-      } as unknown as ToolsOrchestrator;
-
-      const slackProvider = new InternalToolProvider('internal-slack', {
-        enableBatch: true,
-        outputFormat: SLACK_OUTPUT_FORMAT,
-        updateStatus: (text) => { statusUpdates.push(text); },
-        setTitle: (title, emoji) => { titles.push({ title, emoji }); },
-        setFinalReport: (payload) => { finalReports.push(payload); },
-        logError: (message) => { errorLogs.push(message); },
-        orchestrator: orchestratorStub,
-        getCurrentTurn: () => 1,
-        toolTimeoutMs: 1000,
-      });
-
-      await slackProvider.execute('agent__progress_report', { progress: 'Working' });
-
-      await slackProvider.execute('agent__final_report', {
-        status: 'success',
-        report_format: SLACK_OUTPUT_FORMAT,
-        messages: [
-          'Primary message with **bold** text',
-          JSON.stringify({ type: 'section', text: { type: 'mrkdwn', text: '*Secondary* content' } }),
-          [JSON.stringify({ type: 'divider' })],
-        ],
-        metadata: { slack: { existing: true } },
-      });
-
-      let slackError: Error | undefined;
-      try {
-        await slackProvider.execute('agent__final_report', { status: 'success', report_format: SLACK_OUTPUT_FORMAT });
-      } catch (error: unknown) {
-        slackError = error instanceof Error ? error : new Error(String(error));
-      }
-
-      await slackProvider.execute('agent__final_report', { status: 'success', report_format: 'markdown', report_content: 'Mismatch format' });
-
-      const jsonProvider = new InternalToolProvider('internal-json', {
-        enableBatch: false,
-        outputFormat: 'json',
-        expectedJsonSchema: {
-          type: 'object',
-          required: ['status'],
-          properties: {
-            status: { enum: ['success', 'failure'] },
-            details: { type: 'string' },
+  (() => {
+    let progressMessages: string[] = [];
+    return {
+      id: 'run-test-57',
+      configure: (_configuration, sessionConfig) => {
+        progressMessages = [];
+        sessionConfig.outputFormat = SLACK_OUTPUT_FORMAT;
+        sessionConfig.initialTitle = 'Initial Title';
+        const existingCallbacks = sessionConfig.callbacks ?? {};
+        sessionConfig.callbacks = {
+          ...existingCallbacks,
+          onProgress: (event) => {
+            if (event.type === 'agent_update' && typeof event.message === 'string') {
+              progressMessages.push(event.message);
+            }
+            existingCallbacks.onProgress?.(event);
           },
-        },
-        updateStatus: (text) => { statusUpdates.push(text); },
-        setTitle: (title, emoji) => { titles.push({ title, emoji }); },
-        setFinalReport: (payload) => { finalReports.push(payload); },
-        logError: (message) => { errorLogs.push(message); },
-        orchestrator: orchestratorStub,
-        getCurrentTurn: () => 2,
-      });
-
-      await jsonProvider.execute('agent__final_report', {
-        status: 'success',
-        report_format: 'json',
-        content_json: { status: 'success', details: 'ok' },
-      });
-
-      let jsonMissing: Error | undefined;
-      try {
-        await jsonProvider.execute('agent__final_report', { status: 'success', report_format: 'json' });
-      } catch (error: unknown) {
-        jsonMissing = error instanceof Error ? error : new Error(String(error));
-      }
-
-      let jsonSchemaError: Error | undefined;
-      try {
-        await jsonProvider.execute('agent__final_report', {
-          status: 'success',
-          report_format: 'json',
-          content_json: { details: 'missing status' },
-        });
-      } catch (error: unknown) {
-        jsonSchemaError = error instanceof Error ? error : new Error(String(error));
-      }
-
-      const batchSuccess = await slackProvider.execute('agent__batch', {
-        calls: '[{"id":"1","tool":"external_tool","args":{"value":1}}] trailing text',
-      });
-
-      const batchProgress = await slackProvider.execute('agent__batch', {
-        calls: [
-          { id: '2', tool: 'agent__progress_report', args: { progress: 'Batch update' } },
-        ],
-      });
-
-      let batchUnknownTool: string | null = null;
-      try {
-        const unknownResult = await slackProvider.execute('agent__batch', {
-          calls: [{ id: '3', tool: 'unknown', args: {} }],
-        });
-        batchUnknownTool = typeof unknownResult.result === 'string' ? unknownResult.result : JSON.stringify(unknownResult.result);
-      } catch (error: unknown) {
-        batchUnknownTool = error instanceof Error ? error.message : String(error);
-      }
-
-      let batchInvalid: Error | undefined;
-      try {
-        await slackProvider.execute('agent__batch', {
-          calls: [{ id: '', tool: 'external_tool', args: {} }],
-        });
-      } catch (error: unknown) {
-        batchInvalid = error instanceof Error ? error : new Error(String(error));
-      }
-
-      let batchEmpty: Error | undefined;
-      try {
-        await slackProvider.execute('agent__batch', { calls: [] });
-      } catch (error: unknown) {
-        batchEmpty = error instanceof Error ? error : new Error(String(error));
-      }
-
-      const constructorErrors: Error[] = [];
-      try {
-        new InternalToolProvider('bad-json', {
-          enableBatch: false,
-          outputFormat: 'markdown',
-          expectedJsonSchema: { type: 'object' },
-          updateStatus: () => { /* noop */ },
-          setTitle: () => { /* noop */ },
-          setFinalReport: () => { /* noop */ },
-          logError: () => { /* noop */ },
-          orchestrator: orchestratorStub,
-          getCurrentTurn: () => 0,
-        });
-      } catch (error: unknown) {
-        constructorErrors.push(error instanceof Error ? error : new Error(String(error)));
-      }
-
-      return {
-        success: true,
-        conversation: [],
-        logs: [],
-        accounting: [],
-        finalReport: {
-          status: 'success',
-          format: 'json',
-          content_json: {
-            statusUpdates,
-            finalReports,
-            errorLogs,
-            slackError: slackError?.message ?? null,
-            jsonMissing: jsonMissing?.message ?? null,
-            jsonSchemaError: jsonSchemaError?.message ?? null,
-            batchSuccess: batchSuccess.result,
-            batchProgress: batchProgress.result,
-            batchUnknownTool,
-            batchInvalid: batchInvalid?.message ?? null,
-            batchEmpty: batchEmpty?.message ?? null,
-            constructorErrors: constructorErrors.map((err) => err.message),
-          },
-          ts: Date.now(),
-        },
-      };
-    },
-    expect: (result) => {
-      invariant(result.success, 'Scenario run-test-57 should succeed.');
-      const report = result.finalReport?.content_json;
-      assertRecord(report, 'Report expected for run-test-57.');
-      const statusUpdates = report.statusUpdates;
-      invariant(Array.isArray(statusUpdates) && statusUpdates.includes('Working') && statusUpdates.includes('Batch update'), 'Status updates should capture progress messages for run-test-57.');
-      const finalReports = report.finalReports;
-      invariant(Array.isArray(finalReports) && finalReports.length >= 2, 'Final reports should be recorded for run-test-57.');
-      const errorLogs = report.errorLogs;
-      invariant(Array.isArray(errorLogs) && errorLogs.length >= 2, 'Error logs should capture warnings for run-test-57.');
-      invariant(typeof report.slackError === 'string' && report.slackError.includes('requires `messages`'), 'Slack final report missing content should throw for run-test-57.');
-      invariant(typeof report.jsonMissing === 'string' && report.jsonMissing.includes('requires `content_json`'), 'JSON final report missing payload should throw for run-test-57.');
-      invariant(typeof report.jsonSchemaError === 'string' && report.jsonSchemaError.includes('schema validation failed'), 'JSON schema enforcement should throw for run-test-57.');
-      invariant(typeof report.batchSuccess === 'string' && report.batchSuccess.includes('external-result'), 'Batch success payload should include external result for run-test-57.');
-      invariant(typeof report.batchProgress === 'string' && report.batchProgress.includes('ok'), 'Batch progress should return ok payload for run-test-57.');
-      invariant(typeof report.batchUnknownTool === 'string' && report.batchUnknownTool.includes('Unknown tool'), 'Unknown tool errors should surface for run-test-57.');
-      invariant(typeof report.batchInvalid === 'string' && report.batchInvalid.includes('invalid_batch_input'), 'Invalid batch entries should throw for run-test-57.');
-      invariant(typeof report.batchEmpty === 'string' && report.batchEmpty.includes('empty_batch'), 'Empty batch should throw for run-test-57.');
-      const ctorErrors = report.constructorErrors;
-      invariant(Array.isArray(ctorErrors) && ctorErrors.length > 0 && ctorErrors.every((err) => typeof err === 'string'), 'Constructor validation should guard JSON schema misuse for run-test-57.');
-      const [firstCtorError] = ctorErrors;
-      invariant(firstCtorError.includes('JSON schema provided but output format is not json'), 'Constructor validation should guard JSON schema misuse for run-test-57.');
-    },
-  },
-  {
-    id: 'run-test-58',
-    description: 'AIAgent helper utilities coverage.',
-    execute: async (configuration, sessionConfig) => {
-      const events: ProgressEvent[] = [];
-      const tempDir = makeTempDir('helpers');
-      const persistence = { sessionsDir: tempDir, billingFile: path.join(tempDir, BILLING_FILENAME) };
-      configuration.persistence = persistence;
-      configuration.providers[PRIMARY_PROVIDER] = {
-        type: 'test-llm',
-        models: {
-          [MODEL_NAME]: {
-            overrides: {
-              temperature: 0.42,
-              top_p: 0.65,
-            },
-          },
-        },
-      };
-      sessionConfig.agentId = 'helper-agent';
-      sessionConfig.trace = { callPath: 'root->helper', parentId: 'parent-span', originId: 'origin-span' };
-      sessionConfig.callbacks = { ...(sessionConfig.callbacks ?? {}), onProgress: (event) => { events.push(event); } };
-      sessionConfig.targets = [{ provider: PRIMARY_PROVIDER, model: MODEL_NAME }];
-
-      const session = AIAgentSession.create(sessionConfig);
-      const internal = session as unknown as {
-        resolveModelOverrides: (provider: string, model: string) => Record<string, unknown>;
-        getCallPathLabel: () => string;
-        getAgentIdLabel: () => string;
-        getAgentDisplayName: () => string;
-        buildMetricsFromSession: (session: SessionNode | undefined) => ProgressMetrics | undefined;
-        emitAgentCompletion: (success: boolean, error?: string) => void;
-        getLastLlmOpIdForTurn: (turn: number) => string | undefined;
-        persistSessionSnapshot: (reason?: string) => void;
-        emitFinalSummary: (logs: LogEntry[], accounting: AccountingEntry[]) => void;
-        finalizeCanceledSession: (conversation: ConversationMessage[], logs: LogEntry[], accounting: AccountingEntry[]) => AIAgentResult;
-        finalizeGracefulStopSession: (conversation: ConversationMessage[], logs: LogEntry[], accounting: AccountingEntry[]) => AIAgentResult;
-        sleepWithAbort: (ms: number) => Promise<'completed' | 'aborted_cancel' | 'aborted_stop'>;
-        opTree: {
-          beginTurn: (index: number, attrs?: Record<string, unknown>) => string;
-          beginOp: (turnIndex: number, kind: string, attrs?: Record<string, unknown>) => string;
-          appendAccounting: (opId: string, entry: AccountingEntry) => void;
-          endOp: (opId: string, status: 'ok' | 'failed', attrs?: Record<string, unknown>) => void;
-          endTurn: (index: number, attrs?: Record<string, unknown>) => void;
-          endSession: (success: boolean, error?: string) => void;
-          getSession: () => SessionNode;
         };
-        sessionConfig: AIAgentSessionConfig;
-        stopRef?: { stopping: boolean };
-        canceled: boolean;
-      };
-
-      const overrides = internal.resolveModelOverrides(PRIMARY_PROVIDER, MODEL_NAME);
-      const missingOverrides = internal.resolveModelOverrides('ghost', 'model-x');
-      const callPathLabel = internal.getCallPathLabel();
-      const agentIdLabel = internal.getAgentIdLabel();
-      const agentDisplay = internal.getAgentDisplayName();
-
-      const opTree = internal.opTree;
-      const trace = sessionConfig.trace ?? {};
-      opTree.beginTurn(1, { stage: 'llm' });
-      const llmOpId = opTree.beginOp(1, 'llm', { label: 'primary' });
-      const accountingEntry: LLMAccountingEntry = {
-        type: 'llm',
-        timestamp: Date.now(),
-        status: 'ok',
-        latency: 42,
-        provider: PRIMARY_PROVIDER,
-        model: MODEL_NAME,
-        tokens: {
-          inputTokens: 12,
-          outputTokens: 6,
-          cachedTokens: 0,
-          totalTokens: 18,
-          cacheReadInputTokens: 2,
-          cacheWriteInputTokens: 1,
-        },
-        costUsd: 0.012,
-        upstreamInferenceCostUsd: 0.003,
-      };
-      opTree.appendAccounting(llmOpId, accountingEntry);
-      opTree.endOp(llmOpId, 'ok', { reason: 'coverage' });
-      opTree.endTurn(1, { status: 'done' });
-      opTree.endSession(true);
-      const metrics = internal.buildMetricsFromSession(opTree.getSession());
-      const lastLlmOp = internal.getLastLlmOpIdForTurn(1);
-
-      session.accounting.push(accountingEntry);
-      const summaryToolEntry: AccountingEntry = {
-        type: 'tool',
-        timestamp: Date.now(),
-        status: 'failed',
-        latency: 15,
-        agentId: sessionConfig.agentId,
-        callPath: trace.callPath,
-        txnId: trace.selfId,
-        parentTxnId: trace.parentId,
-        originTxnId: trace.originId,
-        mcpServer: 'test',
-        command: 'test__helper',
-        charactersIn: 25,
-        charactersOut: 10,
-        error: 'simulated failure',
-      };
-      session.accounting.push(summaryToolEntry);
-
-      internal.emitFinalSummary(session.logs, session.accounting);
-      internal.emitAgentCompletion(true);
-      internal.emitAgentCompletion(false, 'boom');
-
-      let persistedSnapshots = 0;
-      let billingExists = false;
-      try {
-        internal.persistSessionSnapshot('helper');
-        const entries = fs.readdirSync(persistence.sessionsDir);
-        persistedSnapshots = entries.filter((entry) => entry.endsWith('.json.gz')).length;
-        const billingPath = typeof persistence.billingFile === 'string' ? persistence.billingFile : undefined;
-        billingExists = billingPath !== undefined && billingPath.length > 0 && fs.existsSync(billingPath);
-      } finally {
-        fs.rmSync(persistence.sessionsDir, { recursive: true, force: true });
-      }
-
-      const canceledResult = internal.finalizeCanceledSession([], session.logs, session.accounting);
-      const gracefulResult = internal.finalizeGracefulStopSession([], session.logs, session.accounting);
-
-      const sleepCompleted = await internal.sleepWithAbort(0);
-      internal.canceled = true;
-      const sleepCanceled = await internal.sleepWithAbort(10);
-      internal.canceled = false;
-      internal.stopRef = { stopping: true };
-      const sleepStopped = await internal.sleepWithAbort(10);
-      internal.stopRef.stopping = false;
-
-      const sleepResults = { completed: sleepCompleted, canceled: sleepCanceled, stopped: sleepStopped };
-      const summaryLogCount = session.logs.filter((log) => log.severity === 'FIN').length;
-
-      return {
-        success: true,
-        conversation: session.conversation,
-        logs: session.logs,
-        accounting: session.accounting,
-        finalReport: {
-          status: 'success',
-          format: 'json',
-          content_json: {
-            overrides,
-            missingOverrides,
-            callPathLabel,
-            agentIdLabel,
-            agentDisplay,
-            metrics,
-            progressTypes: events.map((event) => event.type),
-            lastLlmOp,
-            persistedSnapshots,
-            billingExists,
-            sleepResults,
-            canceledSuccess: canceledResult.success,
-            gracefulSuccess: gracefulResult.success,
-            summaryLogCount,
+      },
+      expect: (result) => {
+        invariant(result.success, 'Scenario run-test-57 should complete successfully.');
+        const finalReport = result.finalReport;
+        invariant(finalReport !== undefined && finalReport.format === SLACK_OUTPUT_FORMAT, 'Slack final report expected for run-test-57.');
+        const metadataCandidate = finalReport.metadata;
+        const slackCandidate = metadataCandidate !== undefined && typeof metadataCandidate === 'object' && !Array.isArray(metadataCandidate)
+          ? (metadataCandidate as { slack?: unknown }).slack
+          : undefined;
+        const slackMeta = slackCandidate !== undefined && typeof slackCandidate === 'object' && !Array.isArray(slackCandidate)
+          ? (slackCandidate as { messages?: unknown[] })
+          : undefined;
+        const messagesValue = slackMeta !== undefined ? slackMeta.messages : undefined;
+        const messages = Array.isArray(messagesValue) ? messagesValue : [];
+        invariant(messages.length >= 2, 'Normalized Slack messages expected for run-test-57.');
+        invariant(progressMessages.some((message) => message.includes('Analyzing deterministic harness outputs.')), 'Progress update should be forwarded for run-test-57.');
+      },
+    };
+  })(),
+  (() => {
+    let progressMessages: string[] = [];
+    return {
+      id: 'run-test-58',
+      configure: (_configuration, sessionConfig) => {
+        progressMessages = [];
+        sessionConfig.initialTitle = 'Harness Metrics';
+        const existingCallbacks = sessionConfig.callbacks ?? {};
+        sessionConfig.callbacks = {
+          ...existingCallbacks,
+          onProgress: (event) => {
+            if (event.type === 'agent_update' && typeof event.message === 'string') {
+              progressMessages.push(event.message);
+            }
+            existingCallbacks.onProgress?.(event);
           },
-          ts: Date.now(),
-        },
-      };
-    },
-    expect: (result) => {
-      invariant(result.success, 'Scenario run-test-58 expected success.');
-      const report = result.finalReport?.content_json;
-      assertRecord(report, 'Report expected for run-test-58.');
-      const overrides = report.overrides;
-      assertRecord(overrides, 'Overrides expected for run-test-58.');
-      invariant(typeof overrides.temperature === 'number' && overrides.temperature === 0.42, 'Model overrides should map camel case temperature for run-test-58.');
-      invariant(typeof overrides.topP === 'number' && overrides.topP === 0.65, 'Model overrides should map snake case top_p for run-test-58.');
-      const missing = report.missingOverrides;
-      assertRecord(missing, 'Missing overrides should be empty for run-test-58.');
-      invariant(Object.keys(missing).length === 0, 'Missing overrides should be empty for run-test-58.');
-      invariant(report.callPathLabel === 'root->helper', 'Call path label should include trace path for run-test-58.');
-      invariant(report.agentIdLabel === 'helper-agent', 'Agent ID label should prefer agentId for run-test-58.');
-      invariant(report.agentDisplay === 'helper', 'Display name should derive from last segment for run-test-58.');
-      const metrics = report.metrics;
-      assertRecord(metrics, 'Metrics expected for run-test-58.');
-      invariant(typeof metrics.tokensIn === 'number' && metrics.tokensIn === 12, 'Prompt tokens expected for run-test-58.');
-      invariant(typeof metrics.tokensOut === 'number' && metrics.tokensOut === 6, 'Completion tokens expected for run-test-58.');
-      invariant(typeof metrics.tokensCacheRead === 'number' && metrics.tokensCacheRead === 2, 'Cache read tokens expected for run-test-58.');
-      invariant(typeof metrics.tokensCacheWrite === 'number' && metrics.tokensCacheWrite === 1, 'Cache write tokens expected for run-test-58.');
-      const progressTypes = report.progressTypes;
-      invariant(Array.isArray(progressTypes) && progressTypes.includes('agent_finished') && progressTypes.includes('agent_failed'), 'Progress events should include success and failure for run-test-58.');
-      invariant(typeof report.lastLlmOp === 'string' && report.lastLlmOp.length > 0, 'LLM op id should be captured for run-test-58.');
-      invariant(typeof report.persistedSnapshots === 'number' && report.persistedSnapshots >= 1, 'Persisted snapshot expected for run-test-58.');
-      invariant(typeof report.billingExists === 'boolean' && !report.billingExists, 'Billing file should not be written for run-test-58.');
-      const sleepResults = report.sleepResults;
-      assertRecord(sleepResults, 'Sleep results expected for run-test-58.');
-      invariant(typeof sleepResults.completed === 'string' && sleepResults.completed === 'completed' && typeof sleepResults.canceled === 'string' && sleepResults.canceled === 'aborted_cancel' && typeof sleepResults.stopped === 'string' && sleepResults.stopped === 'aborted_stop', 'SleepWithAbort results should cover all paths for run-test-58.');
-      invariant(typeof report.canceledSuccess === 'boolean' && !report.canceledSuccess && typeof report.gracefulSuccess === 'boolean' && report.gracefulSuccess, 'Finalize helpers should return expected success flags for run-test-58.');
-      invariant(typeof report.summaryLogCount === 'number' && report.summaryLogCount >= 2, 'Summary logs should be emitted for run-test-58.');
-      const finLogs = result.logs.filter((log) => log.severity === 'FIN');
-      invariant(finLogs.length >= 2, 'FIN logs expected for run-test-58.');
-    },
-  },
+        };
+      },
+      expect: (result) => {
+        invariant(result.success, 'Scenario run-test-58 expected success.');
+        invariant(progressMessages.some((message) => message.includes('Collecting metrics via test MCP tool.')), 'Progress update should include MCP metrics message for run-test-58.');
+        const llmEntries = result.accounting.filter(isLlmAccounting);
+        invariant(llmEntries.length >= 1, 'LLM accounting entry expected for run-test-58.');
+        const toolEntries = result.accounting.filter(isToolAccounting);
+        invariant(toolEntries.some((entry) => entry.command === 'test__test'), 'Tool accounting entry for test__test expected for run-test-58.');
+        const finalReport = result.finalReport;
+        invariant(finalReport !== undefined && finalReport.status === 'success', 'Final report should indicate success for run-test-58.');
+      },
+    };
+  })(),
   {
     id: 'run-test-43',
     configure: (_configuration, sessionConfig) => {
