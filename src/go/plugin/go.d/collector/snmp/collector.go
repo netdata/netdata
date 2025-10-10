@@ -99,6 +99,8 @@ type (
 		snmpProfiles []*ddsnmp.Profile
 
 		adjMaxRepetitions uint32
+
+		disableBulkWalk bool
 	}
 	ddCollector interface {
 		Collect() ([]*ddsnmp.ProfileMetrics, error)

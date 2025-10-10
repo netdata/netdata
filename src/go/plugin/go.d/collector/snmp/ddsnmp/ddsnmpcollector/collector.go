@@ -19,10 +19,11 @@ import (
 )
 
 type Config struct {
-	SnmpClient  gosnmp.Handler
-	Profiles    []*ddsnmp.Profile
-	Log         *logger.Logger
-	SysObjectID string
+	SnmpClient      gosnmp.Handler
+	Profiles        []*ddsnmp.Profile
+	Log             *logger.Logger
+	SysObjectID     string
+	DisableBulkWalk bool
 }
 
 func New(cfg Config) *Collector {
@@ -42,7 +43,7 @@ func New(cfg Config) *Collector {
 	coll.globalTagsCollector = newGlobalTagsCollector(cfg.SnmpClient, coll.missingOIDs, coll.log)
 	coll.deviceMetadataCollector = newDeviceMetadataCollector(cfg.SnmpClient, coll.missingOIDs, coll.log, cfg.SysObjectID)
 	coll.scalarCollector = newScalarCollector(cfg.SnmpClient, coll.missingOIDs, coll.log)
-	coll.tableCollector = newTableCollector(cfg.SnmpClient, coll.missingOIDs, coll.tableCache, coll.log)
+	coll.tableCollector = newTableCollector(cfg.SnmpClient, coll.missingOIDs, coll.tableCache, coll.log, cfg.DisableBulkWalk)
 	coll.vmetricsCollector = newVirtualMetricsCollector(coll.log)
 
 	return coll
