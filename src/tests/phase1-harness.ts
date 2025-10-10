@@ -6,10 +6,12 @@ import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
 
 import type { ResponseMessage } from '../llm-providers/base.js';
+import type { SessionNode } from '../session-tree.js';
 import type { ToolsOrchestrator } from '../tools/tools.js';
-import type { AIAgentResult, AIAgentSessionConfig, AccountingEntry, Configuration, ConversationMessage, LogEntry, MCPTool, TokenUsage, TurnRequest, TurnResult, TurnStatus } from '../types.js';
+import type { AIAgentResult, AIAgentSessionConfig, AccountingEntry, Configuration, ConversationMessage, LogEntry, MCPTool, ProgressEvent, ProgressMetrics, TokenUsage, TurnRequest, TurnResult, TurnStatus, LLMAccountingEntry } from '../types.js';
 import type { JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js';
 import type { ModelMessage, ToolSet } from 'ai';
+import type { ChildProcess } from 'node:child_process';
 import type { AddressInfo } from 'node:net';
 
 import { AIAgentSession } from '../ai-agent.js';
@@ -35,6 +37,8 @@ const BASE_DEFAULTS = {
   toolTimeout: 10_000,
 } as const;
 const TMP_PREFIX = 'ai-agent-phase1-';
+const SESSIONS_SUBDIR = 'sessions';
+const BILLING_FILENAME = 'billing.jsonl';
 
 function resolveScenarioDescription(id: string, provided?: string): string | undefined {
   if (provided !== undefined && provided.trim().length > 0) return provided;
@@ -384,8 +388,8 @@ const TEST_SCENARIOS: HarnessTest[] = [
     id: 'run-test-16',
     configure: (configuration) => {
       const baseDir = makeTempDir('persistence');
-      const sessionsDir = path.join(baseDir, 'sessions');
-      const billingFile = path.join(baseDir, 'billing.jsonl');
+      const sessionsDir = path.join(baseDir, SESSIONS_SUBDIR);
+      const billingFile = path.join(baseDir, BILLING_FILENAME);
       configuration.persistence = { sessionsDir, billingFile };
       runTest16Paths = { sessionsDir, billingFile };
     },
@@ -464,7 +468,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
       const baseDir = makeTempDir('persistence-error');
       const blockerFile = path.join(baseDir, 'sessions-blocker');
       fs.writeFileSync(blockerFile, 'block');
-      const billingFile = path.join(blockerFile, 'billing.jsonl');
+      const billingFile = path.join(blockerFile, BILLING_FILENAME);
       configuration.persistence = { sessionsDir: blockerFile, billingFile };
       runTest20Paths = { baseDir, blockerFile, billingFile };
     },
@@ -991,11 +995,16 @@ const TEST_SCENARIOS: HarnessTest[] = [
       runTest54State = undefined;
       const server = new WebSocketServer({ port: 0 });
       const address = server.address();
-      if (address === null || typeof address === 'string' || typeof (address as AddressInfo).port !== 'number') {
+      if (address === null || typeof address === 'string') {
         await new Promise<void>((resolve) => { server.close(() => { resolve(); }); });
         throw new Error('Unable to determine WebSocket server port for run-test-54.');
       }
-      const port = (address as AddressInfo).port;
+      const netAddress = address as AddressInfo;
+      if (typeof netAddress.port !== 'number') {
+        await new Promise<void>((resolve) => { server.close(() => { resolve(); }); });
+        throw new Error('Unable to determine WebSocket server port for run-test-54.');
+      }
+      const port = netAddress.port;
       const serverPayloads: string[] = [];
       server.on('connection', (socket) => {
         setTimeout(() => {
@@ -1686,6 +1695,204 @@ const TEST_SCENARIOS: HarnessTest[] = [
     },
   },
   {
+    id: 'run-test-58',
+    description: 'AIAgent helper utilities coverage.',
+    execute: async (configuration, sessionConfig) => {
+      const events: ProgressEvent[] = [];
+      const tempDir = makeTempDir('helpers');
+      const persistence = { sessionsDir: tempDir, billingFile: path.join(tempDir, BILLING_FILENAME) };
+      configuration.persistence = persistence;
+      configuration.providers[PRIMARY_PROVIDER] = {
+        type: 'test-llm',
+        models: {
+          [MODEL_NAME]: {
+            overrides: {
+              temperature: 0.42,
+              top_p: 0.65,
+            },
+          },
+        },
+      };
+      sessionConfig.agentId = 'helper-agent';
+      sessionConfig.trace = { callPath: 'root->helper', parentId: 'parent-span', originId: 'origin-span' };
+      sessionConfig.callbacks = { ...(sessionConfig.callbacks ?? {}), onProgress: (event) => { events.push(event); } };
+      sessionConfig.targets = [{ provider: PRIMARY_PROVIDER, model: MODEL_NAME }];
+
+      const session = AIAgentSession.create(sessionConfig);
+      const internal = session as unknown as {
+        resolveModelOverrides: (provider: string, model: string) => Record<string, unknown>;
+        getCallPathLabel: () => string;
+        getAgentIdLabel: () => string;
+        getAgentDisplayName: () => string;
+        buildMetricsFromSession: (session: SessionNode | undefined) => ProgressMetrics | undefined;
+        emitAgentCompletion: (success: boolean, error?: string) => void;
+        getLastLlmOpIdForTurn: (turn: number) => string | undefined;
+        persistSessionSnapshot: (reason?: string) => void;
+        emitFinalSummary: (logs: LogEntry[], accounting: AccountingEntry[]) => void;
+        finalizeCanceledSession: (conversation: ConversationMessage[], logs: LogEntry[], accounting: AccountingEntry[]) => AIAgentResult;
+        finalizeGracefulStopSession: (conversation: ConversationMessage[], logs: LogEntry[], accounting: AccountingEntry[]) => AIAgentResult;
+        sleepWithAbort: (ms: number) => Promise<'completed' | 'aborted_cancel' | 'aborted_stop'>;
+        opTree: {
+          beginTurn: (index: number, attrs?: Record<string, unknown>) => string;
+          beginOp: (turnIndex: number, kind: string, attrs?: Record<string, unknown>) => string;
+          appendAccounting: (opId: string, entry: AccountingEntry) => void;
+          endOp: (opId: string, status: 'ok' | 'failed', attrs?: Record<string, unknown>) => void;
+          endTurn: (index: number, attrs?: Record<string, unknown>) => void;
+          endSession: (success: boolean, error?: string) => void;
+          getSession: () => SessionNode;
+        };
+        sessionConfig: AIAgentSessionConfig;
+        stopRef?: { stopping: boolean };
+        canceled: boolean;
+      };
+
+      const overrides = internal.resolveModelOverrides(PRIMARY_PROVIDER, MODEL_NAME);
+      const missingOverrides = internal.resolveModelOverrides('ghost', 'model-x');
+      const callPathLabel = internal.getCallPathLabel();
+      const agentIdLabel = internal.getAgentIdLabel();
+      const agentDisplay = internal.getAgentDisplayName();
+
+      const opTree = internal.opTree;
+      const trace = sessionConfig.trace ?? {};
+      opTree.beginTurn(1, { stage: 'llm' });
+      const llmOpId = opTree.beginOp(1, 'llm', { label: 'primary' });
+      const accountingEntry: LLMAccountingEntry = {
+        type: 'llm',
+        timestamp: Date.now(),
+        status: 'ok',
+        latency: 42,
+        provider: PRIMARY_PROVIDER,
+        model: MODEL_NAME,
+        tokens: {
+          inputTokens: 12,
+          outputTokens: 6,
+          cachedTokens: 0,
+          totalTokens: 18,
+          cacheReadInputTokens: 2,
+          cacheWriteInputTokens: 1,
+        },
+        costUsd: 0.012,
+        upstreamInferenceCostUsd: 0.003,
+      };
+      opTree.appendAccounting(llmOpId, accountingEntry);
+      opTree.endOp(llmOpId, 'ok', { reason: 'coverage' });
+      opTree.endTurn(1, { status: 'done' });
+      opTree.endSession(true);
+      const metrics = internal.buildMetricsFromSession(opTree.getSession());
+      const lastLlmOp = internal.getLastLlmOpIdForTurn(1);
+
+      session.accounting.push(accountingEntry);
+      const summaryToolEntry: AccountingEntry = {
+        type: 'tool',
+        timestamp: Date.now(),
+        status: 'failed',
+        latency: 15,
+        agentId: sessionConfig.agentId,
+        callPath: trace.callPath,
+        txnId: trace.selfId,
+        parentTxnId: trace.parentId,
+        originTxnId: trace.originId,
+        mcpServer: 'test',
+        command: 'test__helper',
+        charactersIn: 25,
+        charactersOut: 10,
+        error: 'simulated failure',
+      };
+      session.accounting.push(summaryToolEntry);
+
+      internal.emitFinalSummary(session.logs, session.accounting);
+      internal.emitAgentCompletion(true);
+      internal.emitAgentCompletion(false, 'boom');
+
+      let persistedSnapshots = 0;
+      let billingExists = false;
+      try {
+        internal.persistSessionSnapshot('helper');
+        const entries = fs.readdirSync(persistence.sessionsDir);
+        persistedSnapshots = entries.filter((entry) => entry.endsWith('.json.gz')).length;
+        const billingPath = typeof persistence.billingFile === 'string' ? persistence.billingFile : undefined;
+        billingExists = billingPath !== undefined && billingPath.length > 0 && fs.existsSync(billingPath);
+      } finally {
+        fs.rmSync(persistence.sessionsDir, { recursive: true, force: true });
+      }
+
+      const canceledResult = internal.finalizeCanceledSession([], session.logs, session.accounting);
+      const gracefulResult = internal.finalizeGracefulStopSession([], session.logs, session.accounting);
+
+      const sleepCompleted = await internal.sleepWithAbort(0);
+      internal.canceled = true;
+      const sleepCanceled = await internal.sleepWithAbort(10);
+      internal.canceled = false;
+      internal.stopRef = { stopping: true };
+      const sleepStopped = await internal.sleepWithAbort(10);
+      internal.stopRef.stopping = false;
+
+      const sleepResults = { completed: sleepCompleted, canceled: sleepCanceled, stopped: sleepStopped };
+      const summaryLogCount = session.logs.filter((log) => log.severity === 'FIN').length;
+
+      return {
+        success: true,
+        conversation: session.conversation,
+        logs: session.logs,
+        accounting: session.accounting,
+        finalReport: {
+          status: 'success',
+          format: 'json',
+          content_json: {
+            overrides,
+            missingOverrides,
+            callPathLabel,
+            agentIdLabel,
+            agentDisplay,
+            metrics,
+            progressTypes: events.map((event) => event.type),
+            lastLlmOp,
+            persistedSnapshots,
+            billingExists,
+            sleepResults,
+            canceledSuccess: canceledResult.success,
+            gracefulSuccess: gracefulResult.success,
+            summaryLogCount,
+          },
+          ts: Date.now(),
+        },
+      };
+    },
+    expect: (result) => {
+      invariant(result.success, 'Scenario run-test-58 expected success.');
+      const report = result.finalReport?.content_json;
+      assertRecord(report, 'Report expected for run-test-58.');
+      const overrides = report.overrides;
+      assertRecord(overrides, 'Overrides expected for run-test-58.');
+      invariant(typeof overrides.temperature === 'number' && overrides.temperature === 0.42, 'Model overrides should map camel case temperature for run-test-58.');
+      invariant(typeof overrides.topP === 'number' && overrides.topP === 0.65, 'Model overrides should map snake case top_p for run-test-58.');
+      const missing = report.missingOverrides;
+      assertRecord(missing, 'Missing overrides should be empty for run-test-58.');
+      invariant(Object.keys(missing).length === 0, 'Missing overrides should be empty for run-test-58.');
+      invariant(report.callPathLabel === 'root->helper', 'Call path label should include trace path for run-test-58.');
+      invariant(report.agentIdLabel === 'helper-agent', 'Agent ID label should prefer agentId for run-test-58.');
+      invariant(report.agentDisplay === 'helper', 'Display name should derive from last segment for run-test-58.');
+      const metrics = report.metrics;
+      assertRecord(metrics, 'Metrics expected for run-test-58.');
+      invariant(typeof metrics.tokensIn === 'number' && metrics.tokensIn === 12, 'Prompt tokens expected for run-test-58.');
+      invariant(typeof metrics.tokensOut === 'number' && metrics.tokensOut === 6, 'Completion tokens expected for run-test-58.');
+      invariant(typeof metrics.tokensCacheRead === 'number' && metrics.tokensCacheRead === 2, 'Cache read tokens expected for run-test-58.');
+      invariant(typeof metrics.tokensCacheWrite === 'number' && metrics.tokensCacheWrite === 1, 'Cache write tokens expected for run-test-58.');
+      const progressTypes = report.progressTypes;
+      invariant(Array.isArray(progressTypes) && progressTypes.includes('agent_finished') && progressTypes.includes('agent_failed'), 'Progress events should include success and failure for run-test-58.');
+      invariant(typeof report.lastLlmOp === 'string' && report.lastLlmOp.length > 0, 'LLM op id should be captured for run-test-58.');
+      invariant(typeof report.persistedSnapshots === 'number' && report.persistedSnapshots >= 1, 'Persisted snapshot expected for run-test-58.');
+      invariant(typeof report.billingExists === 'boolean' && !report.billingExists, 'Billing file should not be written for run-test-58.');
+      const sleepResults = report.sleepResults;
+      assertRecord(sleepResults, 'Sleep results expected for run-test-58.');
+      invariant(typeof sleepResults.completed === 'string' && sleepResults.completed === 'completed' && typeof sleepResults.canceled === 'string' && sleepResults.canceled === 'aborted_cancel' && typeof sleepResults.stopped === 'string' && sleepResults.stopped === 'aborted_stop', 'SleepWithAbort results should cover all paths for run-test-58.');
+      invariant(typeof report.canceledSuccess === 'boolean' && !report.canceledSuccess && typeof report.gracefulSuccess === 'boolean' && report.gracefulSuccess, 'Finalize helpers should return expected success flags for run-test-58.');
+      invariant(typeof report.summaryLogCount === 'number' && report.summaryLogCount >= 2, 'Summary logs should be emitted for run-test-58.');
+      const finLogs = result.logs.filter((log) => log.severity === 'FIN');
+      invariant(finLogs.length >= 2, 'FIN logs expected for run-test-58.');
+    },
+  },
+  {
     id: 'run-test-43',
     configure: (_configuration, sessionConfig) => {
       sessionConfig.stopRef = { stopping: true };
@@ -1875,6 +2082,102 @@ async function runPhaseOne(): Promise<void> {
       // eslint-disable-next-line no-console
       console.error(`${header} [FAIL] ${duration} - ${message}${hint}`);
       throw error;
+    }
+  }
+  const diagnosticProcess = process as typeof process & { _getActiveHandles?: () => unknown[] };
+  const activeHandles = typeof diagnosticProcess._getActiveHandles === 'function'
+    ? diagnosticProcess._getActiveHandles()
+    : [];
+  if (activeHandles.length > 0) {
+    const shouldIgnore = (handle: unknown): boolean => {
+      if (handle === null || typeof handle !== 'object') return false;
+      const fd = (handle as { fd?: unknown }).fd;
+      if (typeof fd === 'number' && (fd === 0 || fd === 1 || fd === 2)) return true;
+      const ctorName = (handle as { constructor?: { name?: string } }).constructor?.name;
+      if (ctorName === 'Socket') {
+        const maybeLocal = (handle as { localAddress?: unknown; remoteAddress?: unknown });
+        const local = typeof maybeLocal.localAddress === 'string' ? maybeLocal.localAddress : undefined;
+        const remote = typeof maybeLocal.remoteAddress === 'string' ? maybeLocal.remoteAddress : undefined;
+        if (local === undefined && remote === undefined) {
+          return true;
+        }
+      }
+      return false;
+    };
+    const formatHandle = (handle: unknown): string => {
+      if (handle === null) return 'null';
+      if (typeof handle !== 'object') return typeof handle;
+      const name = (handle as { constructor?: { name?: string } }).constructor?.name ?? 'object';
+      const parts: string[] = [];
+      const pid = (handle as { pid?: unknown }).pid;
+      if (typeof pid === 'number') { parts.push(`pid=${String(pid)}`); }
+      const fd = (handle as { fd?: unknown }).fd;
+      if (typeof fd === 'number') { parts.push(`fd=${String(fd)}`); }
+      const maybeLocal = (handle as { localAddress?: unknown; remoteAddress?: unknown });
+      const local = typeof maybeLocal.localAddress === 'string' ? maybeLocal.localAddress : undefined;
+      const remote = typeof maybeLocal.remoteAddress === 'string' ? maybeLocal.remoteAddress : undefined;
+      if (local !== undefined || remote !== undefined) {
+        parts.push(`socket=${local ?? ''}->${remote ?? ''}`);
+      }
+      return parts.length > 0 ? `${name}(${parts.join(';')})` : name;
+    };
+    activeHandles.forEach((handle) => {
+      if (handle === null || typeof handle !== 'object') return;
+      const maybePid = (handle as { pid?: unknown }).pid;
+      if (typeof maybePid === 'number') {
+        const child = handle as ChildProcess;
+        try {
+          if (typeof child.kill === 'function' && !child.killed) { child.kill('SIGTERM'); }
+        } catch { /* ignore */ }
+        try { child.disconnect(); } catch { /* ignore */ }
+        try { child.unref(); } catch { /* ignore */ }
+        const stdioStreams = Array.isArray(child.stdio) ? child.stdio : [];
+        stdioStreams.forEach((stream) => {
+          if (stream === null || stream === undefined) return;
+          const destroyStream = (stream as { destroy?: () => void }).destroy;
+          if (typeof destroyStream === 'function') {
+            try { destroyStream.call(stream); } catch { /* ignore */ }
+          }
+          const endStream = (stream as { end?: () => void }).end;
+          if (typeof endStream === 'function') {
+            try { endStream.call(stream); } catch { /* ignore */ }
+          }
+          const unrefStream = (stream as { unref?: () => void }).unref;
+          if (typeof unrefStream === 'function') {
+            try { unrefStream.call(stream); } catch { /* ignore */ }
+          }
+        });
+        return;
+      }
+      const fd = (handle as { fd?: unknown }).fd;
+      if (typeof fd === 'number' && (fd === 0 || fd === 1 || fd === 2)) {
+        return;
+      }
+      const destroy = (handle as { destroy?: () => void }).destroy;
+      if (typeof destroy === 'function') {
+        try { destroy.call(handle); } catch { /* ignore */ }
+      }
+      const end = (handle as { end?: () => void }).end;
+      if (typeof end === 'function') {
+        try { end.call(handle); } catch { /* ignore */ }
+      }
+      const close = (handle as { close?: () => void }).close;
+      if (typeof close === 'function') {
+        try { close.call(handle); } catch { /* ignore */ }
+      }
+      const unref = (handle as { unref?: () => void }).unref;
+      if (typeof unref === 'function') {
+        try { unref.call(handle); } catch { /* ignore */ }
+      }
+    });
+    const remaining = typeof diagnosticProcess._getActiveHandles === 'function'
+      ? diagnosticProcess._getActiveHandles()
+      : [];
+    const blockingHandles = remaining.filter((handle) => !shouldIgnore(handle));
+    if (blockingHandles.length > 0) {
+      const labels = blockingHandles.map(formatHandle);
+      // eslint-disable-next-line no-console
+      console.error(`[warn] lingering handles after cleanup: ${labels.join(', ')}`);
     }
   }
   // eslint-disable-next-line no-console
