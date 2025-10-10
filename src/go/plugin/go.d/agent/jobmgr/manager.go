@@ -52,8 +52,6 @@ func New() *Manager {
 		dyncfgCh: make(chan functions.Function),
 	}
 
-	mgr.SetDyncfgCollectorPrefix(DefaultDyncfgCollectorPrefix)
-
 	return mgr
 }
 
@@ -90,16 +88,6 @@ type Manager struct {
 	dyncfgCh chan functions.Function
 
 	waitCfgOnOff string // block processing of discovered configs until "enable"/"disable" is received from Netdata
-
-	dyncfgCollectorPrefix string
-}
-
-func (m *Manager) SetDyncfgCollectorPrefix(prefix string) {
-	if strings.TrimSpace(prefix) == "" {
-		m.dyncfgCollectorPrefix = DefaultDyncfgCollectorPrefix
-		return
-	}
-	m.dyncfgCollectorPrefix = prefix
 }
 
 func (m *Manager) Run(ctx context.Context, in chan []*confgroup.Group) {
@@ -183,7 +171,7 @@ func (m *Manager) run() {
 				switch id := fn.Args[0]; true {
 				case strings.HasPrefix(id, m.dyncfgCollectorPrefixValue()):
 					m.dyncfgCollectorSeqExec(fn)
-				case strings.HasPrefix(id, dyncfgVnodeID):
+				case strings.HasPrefix(id, m.dyncfgVnodePrefixValue()):
 					m.dyncfgVnodeSeqExec(fn)
 				default:
 					m.dyncfgRespf(fn, 503, "unknown function '%s' (%s).", fn.Name, id)
