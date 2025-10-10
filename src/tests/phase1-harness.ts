@@ -2452,6 +2452,7 @@ async function runPhaseOne(): Promise<void> {
     ? diagnosticProcess._getActiveHandles()
     : [];
   if (activeHandles.length > 0) {
+    const childCleanup: Promise<void>[] = [];
     const shouldIgnore = (handle: unknown): boolean => {
       if (handle === null || typeof handle !== 'object') return false;
       const fd = (handle as { fd?: unknown }).fd;
@@ -2489,8 +2490,20 @@ async function runPhaseOne(): Promise<void> {
       const maybePid = (handle as { pid?: unknown }).pid;
       if (typeof maybePid === 'number') {
         const child = handle as ChildProcess;
+        const exitPromise = new Promise<void>((resolve) => {
+          const finish = () => resolve();
+          child.once('exit', finish);
+          child.once('error', finish);
+          setTimeout(finish, 1000);
+        });
+        childCleanup.push(exitPromise);
         try {
-          if (typeof child.kill === 'function' && !child.killed) { child.kill('SIGTERM'); }
+          if (typeof child.kill === 'function' && !child.killed) {
+            child.kill('SIGTERM');
+            if (!child.killed) {
+              try { child.kill('SIGKILL'); } catch { /* ignore */ }
+            }
+          }
         } catch { /* ignore */ }
         try { child.disconnect(); } catch { /* ignore */ }
         try { child.unref(); } catch { /* ignore */ }
@@ -2533,6 +2546,7 @@ async function runPhaseOne(): Promise<void> {
         try { unref.call(handle); } catch { /* ignore */ }
       }
     });
+    await Promise.all(childCleanup);
     const remaining = typeof diagnosticProcess._getActiveHandles === 'function'
       ? diagnosticProcess._getActiveHandles()
       : [];
@@ -2547,9 +2561,13 @@ async function runPhaseOne(): Promise<void> {
   console.log('phase1 scenario: ok');
 }
 
-runPhaseOne().catch((error: unknown) => {
-  const message = error instanceof Error ? error.message : String(error);
-  // eslint-disable-next-line no-console
-  console.error(`phase1 scenario failed: ${message}`);
-  process.exitCode = 1;
-});
+runPhaseOne()
+  .then(() => {
+    process.exit(0);
+  })
+  .catch((error: unknown) => {
+    const message = error instanceof Error ? error.message : String(error);
+    // eslint-disable-next-line no-console
+    console.error(`phase1 scenario failed: ${message}`);
+    process.exit(1);
+  });
