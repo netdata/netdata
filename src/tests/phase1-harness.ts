@@ -5,11 +5,17 @@ import { fileURLToPath } from 'node:url';
 
 import { WebSocketServer } from 'ws';
 
-import type { AIAgentResult, AIAgentSessionConfig, AccountingEntry, Configuration } from '../types.js';
+import type { ResponseMessage } from '../llm-providers/base.js';
+import type { ToolsOrchestrator } from '../tools/tools.js';
+import type { AIAgentResult, AIAgentSessionConfig, AccountingEntry, Configuration, ConversationMessage, LogEntry, MCPTool, TokenUsage, TurnRequest, TurnResult, TurnStatus } from '../types.js';
 import type { JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js';
+import type { ModelMessage, ToolSet } from 'ai';
 import type { AddressInfo } from 'node:net';
 
 import { AIAgentSession } from '../ai-agent.js';
+import { LLMClient } from '../llm-client.js';
+import { BaseLLMProvider } from '../llm-providers/base.js';
+import { InternalToolProvider } from '../tools/internal-provider.js';
 import { sanitizeToolName } from '../utils.js';
 import { createWebSocketTransport } from '../websocket-transport.js';
 
@@ -109,6 +115,16 @@ let runTest54State: { received: JSONRPCMessage[]; serverPayloads: string[]; erro
 
 function invariant(condition: boolean, message: string): asserts condition {
   if (!condition) throw new Error(message);
+}
+
+function assertRecord(value: unknown, message: string): asserts value is Record<string, unknown> {
+  invariant(value !== null && typeof value === 'object' && !Array.isArray(value), message);
+}
+
+function isTurnStatus(value: unknown): value is TurnStatus {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
+  const maybeType = (value as { type?: unknown }).type;
+  return typeof maybeType === 'string';
 }
 
 function isToolAccounting(entry: AccountingEntry): entry is AccountingEntry & { type: 'tool' } {
@@ -1061,6 +1077,612 @@ const TEST_SCENARIOS: HarnessTest[] = [
       invariant(serverHello !== undefined || ackMessage !== undefined, 'WebSocket response expected for run-test-54.');
       const clientPayload = serverPayloads.find((payload) => payload.includes('clientPing'));
       invariant(clientPayload !== undefined, 'Client ping payload expected for run-test-54.');
+    },
+  },
+  {
+    id: 'run-test-55',
+    description: 'LLM traced fetch logging and error handling.',
+    timeoutMs: 5000,
+    execute: async () => {
+      const logs: LogEntry[] = [];
+      const fetchCalls: { url: string; method: string }[] = [];
+      const finalData: { afterJson?: { provider?: string; model?: string }; afterSse?: { provider?: string; model?: string }; costs?: { costUsd?: number; upstreamInferenceCostUsd?: number }; fetchError?: string } = {};
+      const OPENROUTER_RESPONSES_URL = 'https://openrouter.ai/api/v1/responses';
+      const OPENROUTER_DEBUG_SSE_URL = 'https://openrouter.ai/api/v1/debug-sse';
+      const OPENROUTER_BINARY_URL = 'https://openrouter.ai/api/v1/binary';
+      const CONTENT_TYPE_JSON = 'application/json';
+      const CONTENT_TYPE_EVENT_STREAM = 'text/event-stream';
+      const CONTENT_TYPE_OCTET = 'application/octet-stream';
+      const pricing = {
+        fireworks: {
+          'gpt-fireworks': { unit: 'per_1k', prompt: 0.002, completion: 0.003 },
+        },
+        openrouter: {
+          'gpt-mock': { unit: 'per_1k', prompt: 0.001, completion: 0.002, cacheRead: 0.0004, cacheWrite: 0.0005 },
+        },
+      } satisfies Partial<Record<string, Partial<Record<string, { unit?: 'per_1k' | 'per_1m'; currency?: 'USD'; prompt?: number; completion?: number; cacheRead?: number; cacheWrite?: number }>>>>;
+      const client = new LLMClient(
+        {
+          openrouter: { type: 'openrouter' },
+        },
+        {
+          traceLLM: true,
+          onLog: (entry) => { logs.push(entry); },
+          pricing,
+        }
+      );
+      client.setTurn(1, 0);
+      const plans: ({ type: 'success'; status: number; headers: Record<string, string>; body: string; cloneFails?: boolean } | { type: 'error'; error: Error })[] = [
+        {
+          type: 'success',
+          status: 200,
+          headers: { 'content-type': CONTENT_TYPE_JSON },
+          body: JSON.stringify({
+            provider: 'fireworks',
+            model: 'gpt-fireworks',
+            usage: { cost: 0.01234, cost_details: { upstream_inference_cost: 0.00456 } },
+          }),
+        },
+        {
+          type: 'success',
+          status: 200,
+          headers: { 'content-type': CONTENT_TYPE_EVENT_STREAM },
+          body: 'data: {"provider":"mistral","model":"mixtral","usage":{"cost":0.015}}\n\ndata: {"usage":{"cost_details":{"upstream_inference_cost":0.006}}}\n\n',
+        },
+        {
+          type: 'success',
+          status: 200,
+          headers: { 'content-type': CONTENT_TYPE_JSON },
+          body: JSON.stringify({
+            usage: { cache_creation: { ephemeral_5m_input_tokens: 42 } },
+          }),
+        },
+        {
+          type: 'success',
+          status: 200,
+          headers: { 'content-type': CONTENT_TYPE_EVENT_STREAM, authorization: 'Bearer SECRET12345', 'x-api-key': 'super-secret-key' },
+          body: 'data: {"partial":true}\n\n',
+          cloneFails: true,
+        },
+        {
+          type: 'success',
+          status: 200,
+          headers: { 'content-type': CONTENT_TYPE_OCTET, authorization: 'Bearer ABC', 'x-goog-api-key': 'api-key-123' },
+          body: '',
+        },
+        {
+          type: 'success',
+          status: 200,
+          headers: { 'content-type': CONTENT_TYPE_JSON, authorization: 'Bearer SECRET1234567890', 'x-api-key': 'micro-key' },
+          body: JSON.stringify({ hello: 'world' }),
+          cloneFails: true,
+        },
+        {
+          type: 'error',
+          error: new Error('network down'),
+        },
+      ];
+      const originalFetch = globalThis.fetch;
+      globalThis.fetch = (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+        const plan = plans.shift();
+        if (plan === undefined) {
+          return Promise.reject(new Error('Unexpected fetch call'));
+        }
+        const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+        const method = init?.method ?? 'GET';
+        fetchCalls.push({ url, method });
+        if (plan.type === 'success') {
+          const headers = new Headers(plan.headers);
+          const response = new Response(plan.body, { status: plan.status, headers });
+          if (plan.cloneFails === true) {
+            response.clone = () => { throw new Error('clone failed'); };
+          }
+          return Promise.resolve(response);
+        }
+        return Promise.reject(plan.error);
+      };
+      const request: TurnRequest = {
+        provider: 'openrouter',
+        model: 'gpt-mock',
+        messages: [{ role: 'user', content: 'final' }],
+        tools: [],
+        toolExecutor: () => Promise.resolve(''),
+        isFinalTurn: true,
+        temperature: 0.5,
+        topP: 0.8,
+        maxOutputTokens: 150,
+        stream: false,
+        llmTimeout: 10_000,
+      };
+
+      const requestBody = JSON.stringify({ messages: [{ role: 'user', content: 'Hello' }] });
+
+      let fetchError: Error | undefined;
+      try {
+        (client as unknown as { logRequest: (req: TurnRequest) => void }).logRequest(request);
+        const tracedFetch = (client as unknown as { createTracedFetch: () => typeof fetch }).createTracedFetch();
+        await tracedFetch(OPENROUTER_RESPONSES_URL, {
+          method: 'POST',
+          headers: { Authorization: 'Bearer TESTTOKEN', 'Content-Type': CONTENT_TYPE_JSON },
+          body: requestBody,
+        });
+        finalData.afterJson = client.getLastActualRouting();
+        finalData.costs = client.getLastCostInfo();
+        await tracedFetch(OPENROUTER_RESPONSES_URL, {
+          method: 'POST',
+          headers: { Authorization: 'Bearer SSE', 'Content-Type': CONTENT_TYPE_JSON },
+          body: requestBody,
+        });
+        finalData.afterSse = client.getLastActualRouting();
+        finalData.costs = client.getLastCostInfo();
+        await tracedFetch('https://anthropic.mock/v1/messages', {
+          method: 'POST',
+          headers: { 'Content-Type': CONTENT_TYPE_JSON },
+          body: JSON.stringify({ prompt: 'cache' }),
+        });
+        const coverageClient = new LLMClient(
+          { openrouter: { type: 'openrouter' } },
+          { traceLLM: true, onLog: (entry) => { logs.push(entry); } }
+        );
+        coverageClient.setTurn(1, 1);
+        const coverageFetch = (coverageClient as unknown as { createTracedFetch: () => typeof fetch }).createTracedFetch();
+        await coverageFetch(OPENROUTER_DEBUG_SSE_URL, {
+          method: 'POST',
+          headers: { Authorization: 'Bearer SSEFAIL', 'Content-Type': CONTENT_TYPE_JSON },
+          body: requestBody,
+        });
+        await coverageFetch(OPENROUTER_BINARY_URL, {
+          method: 'POST',
+          headers: { Authorization: 'Bearer BINARY', 'Content-Type': CONTENT_TYPE_JSON },
+          body: requestBody,
+        });
+        await coverageFetch(OPENROUTER_RESPONSES_URL, {
+          method: 'POST',
+          headers: { Authorization: 'Bearer JSONFAIL', 'Content-Type': CONTENT_TYPE_JSON },
+          body: requestBody,
+        });
+        try {
+          await tracedFetch(OPENROUTER_RESPONSES_URL, {
+            method: 'POST',
+            headers: { Authorization: 'Bearer FAIL', 'Content-Type': CONTENT_TYPE_JSON },
+            body: requestBody,
+          });
+        } catch (error: unknown) {
+          fetchError = error instanceof Error ? error : new Error(String(error));
+        }
+
+
+        const successResult: TurnResult = {
+          status: { type: 'success', hasToolCalls: false, finalAnswer: false },
+          response: 'ack',
+          tokens: { inputTokens: 200, outputTokens: 50, cacheReadInputTokens: 0, cacheWriteInputTokens: 42, totalTokens: 250 },
+          latencyMs: 64,
+          messages: [],
+        };
+        const clientState = client as unknown as { lastCostUsd?: number; lastUpstreamCostUsd?: number };
+        clientState.lastCostUsd = 0.01234;
+        clientState.lastUpstreamCostUsd = 0.006;
+        client.setTurn(2, 0);
+        (client as unknown as { logResponse: (req: TurnRequest, res: TurnResult, latencyMs: number) => void }).logResponse(request, successResult, 64);
+        client.setTurn(2, 1);
+        const errorResult: TurnResult = {
+          status: { type: 'auth_error', message: 'bad credentials' },
+          latencyMs: 10,
+          messages: [],
+        };
+        (client as unknown as { logResponse: (req: TurnRequest, res: TurnResult, latencyMs: number) => void }).logResponse(request, errorResult, 10);
+        const quotaResult: TurnResult = {
+          status: { type: 'quota_exceeded', message: 'quota hit' },
+          latencyMs: 12,
+          messages: [],
+        };
+        client.setTurn(2, 2);
+        (client as unknown as { logResponse: (req: TurnRequest, res: TurnResult, latencyMs: number) => void }).logResponse(request, quotaResult, 12);
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
+      return {
+        success: true,
+        conversation: [],
+        logs,
+        accounting: [],
+        finalReport: {
+          status: 'success',
+          format: 'json',
+          content_json: {
+            fetchCalls,
+            routingAfterJson: finalData.afterJson,
+            routingAfterSse: finalData.afterSse,
+            costSnapshot: finalData.costs,
+            fetchError: fetchError?.message ?? null,
+          },
+          ts: Date.now(),
+        },
+      };
+    },
+    expect: (result) => {
+      invariant(result.success, 'Scenario run-test-55 should succeed.');
+      const trcRequestLog = result.logs.find((entry) => entry.severity === 'TRC' && entry.message.includes('LLM request'));
+      invariant(trcRequestLog !== undefined, 'TRC request log expected for run-test-55.');
+      const trcResponseLog = result.logs.find((entry) => entry.severity === 'TRC' && entry.message.includes('LLM response') && (entry.message.includes('raw-sse') || entry.message.includes('text/event-stream')));
+      if (trcResponseLog === undefined) {
+        // eslint-disable-next-line no-console
+        console.error(JSON.stringify(result.logs, null, 2));
+        invariant(false, 'TRC response log with SSE expected for run-test-55.');
+      }
+      const errorTrace = result.logs.find((entry) => entry.severity === 'TRC' && entry.message.includes('HTTP Error: network down'));
+      invariant(errorTrace !== undefined, 'HTTP error trace expected for run-test-55.');
+      const successLog = result.logs.find((entry) => entry.severity === 'VRB' && entry.message.includes('cacheW 42'));
+      if (successLog === undefined) {
+        // eslint-disable-next-line no-console
+        console.error(JSON.stringify(result.logs, null, 2));
+      }
+      invariant(successLog !== undefined && successLog.message.includes('cost $') && successLog.message.includes('upstream'), 'Cost log expected for run-test-55.');
+      const failureLog = result.logs.find((entry) => entry.severity === 'ERR' && entry.message.includes('AUTH_ERROR'));
+      invariant(failureLog !== undefined, 'Failure log expected for run-test-55.');
+      const report = result.finalReport?.content_json;
+      assertRecord(report, 'Final data snapshot expected for run-test-55.');
+      const fetchErrorMsg = typeof report.fetchError === 'string' ? report.fetchError : undefined;
+      invariant(fetchErrorMsg === 'network down', 'Fetch error message expected for run-test-55.');
+      const routingAfterSse = report.routingAfterSse;
+      assertRecord(routingAfterSse, 'Routing metadata expected for run-test-55.');
+      invariant(routingAfterSse.provider === 'mistral', 'Routing metadata expected for run-test-55.');
+    },
+  },
+  {
+    id: 'run-test-56',
+    description: 'Base LLM provider utilities and error mapping.',
+    execute: async () => {
+      class MockProvider extends BaseLLMProvider {
+        public name = 'mock';
+        public constructor(options?: { formatPolicy?: { allowed?: string[]; denied?: string[] } }) {
+          super(options);
+        }
+        public executeTurn = (_request: TurnRequest): Promise<TurnResult> =>
+          Promise.resolve(this.createFailureResult({ type: 'invalid_response', message: 'not implemented' }, 0));
+        public sanitizeSchema = (schema: Record<string, unknown>): Record<string, unknown> =>
+          (this as unknown as { sanitizeStringFormatsInSchema: (node: Record<string, unknown>) => Record<string, unknown> }).sanitizeStringFormatsInSchema(schema);
+        public drainStream = (stream: unknown): Promise<string> =>
+          (this as unknown as { drainTextStream: (s: unknown) => Promise<string> }).drainTextStream(stream);
+        public convertResponseMessages = (
+          messages: ResponseMessage[],
+          provider: string,
+          model: string,
+          tokens: TokenUsage,
+        ): ConversationMessage[] => this.convertResponseMessagesGeneric(messages, provider, model, tokens);
+        public getTokenUsage = (usage: Record<string, unknown> | undefined): TokenUsage => this.extractTokenUsage(usage);
+        public convertToolsPublic = (
+          tools: MCPTool[],
+          executor: (toolName: string, parameters: Record<string, unknown>, options?: { toolCallId?: string }) => Promise<string>,
+        ): ToolSet => this.convertTools(tools, executor);
+        public filterToolsPublic = (tools: MCPTool[], isFinalTurn: boolean): MCPTool[] => this.filterToolsForFinalTurn(tools, isFinalTurn);
+        public buildFinalMessages = (messages: ModelMessage[], isFinalTurn: boolean): ModelMessage[] => this.buildFinalTurnMessages(messages, isFinalTurn);
+        public createTimeout = (timeoutMs: number) => this.createTimeoutController(timeoutMs);
+        public createFailure = (status: TurnStatus, latencyMs: number): TurnResult => this.createFailureResult(status, latencyMs);
+      }
+
+      const provider = new MockProvider({ formatPolicy: { allowed: ['email'], denied: ['uuid'] } });
+      const statusResults: TurnStatus[] = [];
+
+      const originalDebug = process.env.DEBUG;
+      const originalConsoleError = console.error;
+      const debugLogs: string[] = [];
+      console.error = (...args: unknown[]) => {
+        debugLogs.push(args.map((value) => (typeof value === 'string' ? value : JSON.stringify(value))).join(' '));
+      };
+      process.env.DEBUG = 'true';
+
+      const errorInputs: readonly Record<string, unknown>[] = [
+        { statusCode: 429, headers: { 'retry-after': '2' }, message: 'Rate limit reached' },
+        { statusCode: 401, message: 'Authentication failed' },
+        { statusCode: 402, message: 'Quota exceeded' },
+        { statusCode: 400, message: 'Invalid model request' },
+        { name: 'TimeoutError', message: 'Request timeout' },
+        { statusCode: 503, message: 'Network issue' },
+        { message: 'Generic failure' },
+        {
+          statusCode: 400,
+          responseBody: JSON.stringify({ error: { metadata: { raw: JSON.stringify({ error: { message: 'Nested provider error', status: 'MODEL_UNAVAILABLE' } }) }, message: 'Outer error' } }),
+          message: 'Wrapper error',
+        },
+      ];
+      errorInputs.forEach((input) => {
+        statusResults.push(provider.mapError(input));
+      });
+
+      process.env.DEBUG = originalDebug;
+      console.error = originalConsoleError;
+
+      const tokenUsage = provider.getTokenUsage({
+        inputTokens: '120',
+        output_tokens: 45,
+        cached_tokens: 10,
+        cacheCreation: { ephemeral_5m_input_tokens: 7 },
+      });
+
+      const sanitizedSchema = provider.sanitizeSchema({
+        type: ['string', 'null'],
+        format: 'uuid',
+        properties: {
+          email: { type: 'string', format: 'email' },
+        },
+      });
+
+      const toolSet = provider.convertToolsPublic(
+        [
+          {
+            name: 'external_tool',
+            description: 'Example tool',
+            inputSchema: { type: 'object', properties: { id: { type: 'string', format: 'uuid' } } },
+          },
+        ],
+        (_toolName: string, parameters: Record<string, unknown>) => Promise.resolve(JSON.stringify(parameters))
+      );
+
+      const filteredTools = provider.filterToolsPublic(
+        [
+          { name: 'agent__final_report', description: 'final', inputSchema: { type: 'object' } },
+          { name: 'other_tool', description: 'other', inputSchema: { type: 'object' } },
+        ],
+        true,
+      );
+
+      const finalMessages = provider.buildFinalMessages([{ role: 'assistant', content: 'summary' } as unknown as ModelMessage], true);
+
+      const timeoutController = provider.createTimeout(10);
+      timeoutController.resetIdle();
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      const timeoutAborted = timeoutController.controller.signal.aborted;
+
+      const textStreamIterator = async function* () {
+        yield await Promise.resolve('Hello');
+        yield await Promise.resolve(' World');
+      };
+      const textStream = { textStream: { [Symbol.asyncIterator]: textStreamIterator } };
+      const drainedText = await provider.drainStream(textStream);
+
+      const failureResult = provider.createFailure({ type: 'network_error', message: 'downstream', retryable: true }, 25);
+
+      return {
+        success: true,
+        conversation: [],
+        logs: [],
+        accounting: [],
+        finalReport: {
+          status: 'success',
+          format: 'json',
+          content_json: {
+            statusResults,
+            tokenUsage,
+            sanitizedSchema,
+            toolNames: Object.keys(toolSet),
+            filteredTools: filteredTools.map((tool) => tool.name),
+            finalMessagesCount: finalMessages.length,
+            timeoutAborted,
+            drainedText,
+            failureStatus: failureResult.status.type,
+            debugLogs,
+          },
+          ts: Date.now(),
+        },
+      };
+    },
+    expect: (result) => {
+      invariant(result.success, 'Scenario run-test-56 should succeed.');
+      const report = result.finalReport?.content_json;
+      assertRecord(report, 'Report expected for run-test-56.');
+      const statusResults = report.statusResults;
+      invariant(Array.isArray(statusResults) && statusResults.length >= 7 && statusResults.every(isTurnStatus), 'All error branches should be exercised for run-test-56.');
+      const types = statusResults.map((status) => status.type);
+      invariant(types.includes('rate_limit') && types.includes('auth_error') && types.includes('quota_exceeded') && types.includes('model_error') && types.includes('timeout') && types.includes('network_error'), 'Expected mapped error types for run-test-56.');
+      const tokenUsage = report.tokenUsage;
+      assertRecord(tokenUsage, 'Token usage extraction should parse numeric strings for run-test-56.');
+      invariant(tokenUsage.inputTokens === 120 && tokenUsage.outputTokens === 45, 'Token usage extraction should parse numeric strings for run-test-56.');
+      const sanitizedSchema = report.sanitizedSchema;
+      assertRecord(sanitizedSchema, 'UUID format should be stripped for run-test-56.');
+      invariant(sanitizedSchema.format === undefined, 'UUID format should be stripped for run-test-56.');
+      const filtered = report.filteredTools;
+      invariant(Array.isArray(filtered) && filtered.length === 1 && filtered[0] === 'agent__final_report', 'Only final report tool should remain on final turn for run-test-56.');
+      invariant(report.finalMessagesCount === 2, 'Final turn message should append instructions for run-test-56.');
+      invariant(report.timeoutAborted === true, 'Timeout controller should abort after idle period for run-test-56.');
+      invariant(report.drainedText === 'Hello World', 'Text stream should be drained correctly for run-test-56.');
+      invariant(typeof report.failureStatus === 'string' && report.failureStatus === 'network_error', 'Failure result should preserve status type for run-test-56.');
+      const debugLogs = report.debugLogs;
+      invariant(Array.isArray(debugLogs) && debugLogs.length > 0, 'Debug logs should be captured when DEBUG=true for run-test-56.');
+    },
+  },
+  {
+    id: 'run-test-57',
+    description: 'Internal tool provider batch handling and validations.',
+    execute: async () => {
+      const statusUpdates: string[] = [];
+      const finalReports: unknown[] = [];
+      const errorLogs: string[] = [];
+      const titles: { title: string; emoji?: string }[] = [];
+
+      const orchestratorStub = {
+        hasTool: (tool: string) => tool === 'external_tool',
+        executeWithManagement: (_tool: string, _args: Record<string, unknown>) => ({ latency: 7, result: 'external-result' }),
+      } as unknown as ToolsOrchestrator;
+
+      const slackProvider = new InternalToolProvider('internal-slack', {
+        enableBatch: true,
+        outputFormat: SLACK_OUTPUT_FORMAT,
+        updateStatus: (text) => { statusUpdates.push(text); },
+        setTitle: (title, emoji) => { titles.push({ title, emoji }); },
+        setFinalReport: (payload) => { finalReports.push(payload); },
+        logError: (message) => { errorLogs.push(message); },
+        orchestrator: orchestratorStub,
+        getCurrentTurn: () => 1,
+        toolTimeoutMs: 1000,
+      });
+
+      await slackProvider.execute('agent__progress_report', { progress: 'Working' });
+
+      await slackProvider.execute('agent__final_report', {
+        status: 'success',
+        report_format: SLACK_OUTPUT_FORMAT,
+        messages: [
+          'Primary message with **bold** text',
+          JSON.stringify({ type: 'section', text: { type: 'mrkdwn', text: '*Secondary* content' } }),
+          [JSON.stringify({ type: 'divider' })],
+        ],
+        metadata: { slack: { existing: true } },
+      });
+
+      let slackError: Error | undefined;
+      try {
+        await slackProvider.execute('agent__final_report', { status: 'success', report_format: SLACK_OUTPUT_FORMAT });
+      } catch (error: unknown) {
+        slackError = error instanceof Error ? error : new Error(String(error));
+      }
+
+      await slackProvider.execute('agent__final_report', { status: 'success', report_format: 'markdown', report_content: 'Mismatch format' });
+
+      const jsonProvider = new InternalToolProvider('internal-json', {
+        enableBatch: false,
+        outputFormat: 'json',
+        expectedJsonSchema: {
+          type: 'object',
+          required: ['status'],
+          properties: {
+            status: { enum: ['success', 'failure'] },
+            details: { type: 'string' },
+          },
+        },
+        updateStatus: (text) => { statusUpdates.push(text); },
+        setTitle: (title, emoji) => { titles.push({ title, emoji }); },
+        setFinalReport: (payload) => { finalReports.push(payload); },
+        logError: (message) => { errorLogs.push(message); },
+        orchestrator: orchestratorStub,
+        getCurrentTurn: () => 2,
+      });
+
+      await jsonProvider.execute('agent__final_report', {
+        status: 'success',
+        report_format: 'json',
+        content_json: { status: 'success', details: 'ok' },
+      });
+
+      let jsonMissing: Error | undefined;
+      try {
+        await jsonProvider.execute('agent__final_report', { status: 'success', report_format: 'json' });
+      } catch (error: unknown) {
+        jsonMissing = error instanceof Error ? error : new Error(String(error));
+      }
+
+      let jsonSchemaError: Error | undefined;
+      try {
+        await jsonProvider.execute('agent__final_report', {
+          status: 'success',
+          report_format: 'json',
+          content_json: { details: 'missing status' },
+        });
+      } catch (error: unknown) {
+        jsonSchemaError = error instanceof Error ? error : new Error(String(error));
+      }
+
+      const batchSuccess = await slackProvider.execute('agent__batch', {
+        calls: '[{"id":"1","tool":"external_tool","args":{"value":1}}] trailing text',
+      });
+
+      const batchProgress = await slackProvider.execute('agent__batch', {
+        calls: [
+          { id: '2', tool: 'agent__progress_report', args: { progress: 'Batch update' } },
+        ],
+      });
+
+      let batchUnknownTool: string | null = null;
+      try {
+        const unknownResult = await slackProvider.execute('agent__batch', {
+          calls: [{ id: '3', tool: 'unknown', args: {} }],
+        });
+        batchUnknownTool = typeof unknownResult.result === 'string' ? unknownResult.result : JSON.stringify(unknownResult.result);
+      } catch (error: unknown) {
+        batchUnknownTool = error instanceof Error ? error.message : String(error);
+      }
+
+      let batchInvalid: Error | undefined;
+      try {
+        await slackProvider.execute('agent__batch', {
+          calls: [{ id: '', tool: 'external_tool', args: {} }],
+        });
+      } catch (error: unknown) {
+        batchInvalid = error instanceof Error ? error : new Error(String(error));
+      }
+
+      let batchEmpty: Error | undefined;
+      try {
+        await slackProvider.execute('agent__batch', { calls: [] });
+      } catch (error: unknown) {
+        batchEmpty = error instanceof Error ? error : new Error(String(error));
+      }
+
+      const constructorErrors: Error[] = [];
+      try {
+        new InternalToolProvider('bad-json', {
+          enableBatch: false,
+          outputFormat: 'markdown',
+          expectedJsonSchema: { type: 'object' },
+          updateStatus: () => { /* noop */ },
+          setTitle: () => { /* noop */ },
+          setFinalReport: () => { /* noop */ },
+          logError: () => { /* noop */ },
+          orchestrator: orchestratorStub,
+          getCurrentTurn: () => 0,
+        });
+      } catch (error: unknown) {
+        constructorErrors.push(error instanceof Error ? error : new Error(String(error)));
+      }
+
+      return {
+        success: true,
+        conversation: [],
+        logs: [],
+        accounting: [],
+        finalReport: {
+          status: 'success',
+          format: 'json',
+          content_json: {
+            statusUpdates,
+            finalReports,
+            errorLogs,
+            slackError: slackError?.message ?? null,
+            jsonMissing: jsonMissing?.message ?? null,
+            jsonSchemaError: jsonSchemaError?.message ?? null,
+            batchSuccess: batchSuccess.result,
+            batchProgress: batchProgress.result,
+            batchUnknownTool,
+            batchInvalid: batchInvalid?.message ?? null,
+            batchEmpty: batchEmpty?.message ?? null,
+            constructorErrors: constructorErrors.map((err) => err.message),
+          },
+          ts: Date.now(),
+        },
+      };
+    },
+    expect: (result) => {
+      invariant(result.success, 'Scenario run-test-57 should succeed.');
+      const report = result.finalReport?.content_json;
+      assertRecord(report, 'Report expected for run-test-57.');
+      const statusUpdates = report.statusUpdates;
+      invariant(Array.isArray(statusUpdates) && statusUpdates.includes('Working') && statusUpdates.includes('Batch update'), 'Status updates should capture progress messages for run-test-57.');
+      const finalReports = report.finalReports;
+      invariant(Array.isArray(finalReports) && finalReports.length >= 2, 'Final reports should be recorded for run-test-57.');
+      const errorLogs = report.errorLogs;
+      invariant(Array.isArray(errorLogs) && errorLogs.length >= 2, 'Error logs should capture warnings for run-test-57.');
+      invariant(typeof report.slackError === 'string' && report.slackError.includes('requires `messages`'), 'Slack final report missing content should throw for run-test-57.');
+      invariant(typeof report.jsonMissing === 'string' && report.jsonMissing.includes('requires `content_json`'), 'JSON final report missing payload should throw for run-test-57.');
+      invariant(typeof report.jsonSchemaError === 'string' && report.jsonSchemaError.includes('schema validation failed'), 'JSON schema enforcement should throw for run-test-57.');
+      invariant(typeof report.batchSuccess === 'string' && report.batchSuccess.includes('external-result'), 'Batch success payload should include external result for run-test-57.');
+      invariant(typeof report.batchProgress === 'string' && report.batchProgress.includes('ok'), 'Batch progress should return ok payload for run-test-57.');
+      invariant(typeof report.batchUnknownTool === 'string' && report.batchUnknownTool.includes('Unknown tool'), 'Unknown tool errors should surface for run-test-57.');
+      invariant(typeof report.batchInvalid === 'string' && report.batchInvalid.includes('invalid_batch_input'), 'Invalid batch entries should throw for run-test-57.');
+      invariant(typeof report.batchEmpty === 'string' && report.batchEmpty.includes('empty_batch'), 'Empty batch should throw for run-test-57.');
+      const ctorErrors = report.constructorErrors;
+      invariant(Array.isArray(ctorErrors) && ctorErrors.length > 0 && ctorErrors.every((err) => typeof err === 'string'), 'Constructor validation should guard JSON schema misuse for run-test-57.');
+      const [firstCtorError] = ctorErrors;
+      invariant(firstCtorError.includes('JSON schema provided but output format is not json'), 'Constructor validation should guard JSON schema misuse for run-test-57.');
     },
   },
   {
