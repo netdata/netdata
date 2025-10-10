@@ -2302,6 +2302,47 @@ const SCENARIOS: ScenarioDefinition[] = [
     ],
   },
   {
+    id: 'run-test-59',
+    description: 'Tool response size cap and truncation.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        expectedTools: ['agent__batch'],
+        response: {
+          kind: 'tool-call',
+          assistantText: 'Executing batch with oversized tool output.',
+          toolCalls: [
+            {
+              toolName: 'agent__batch',
+              callId: 'call-batch-cap',
+              assistantText: 'Batch includes progress and large MCP output.',
+              arguments: {
+                calls: [
+                  { id: 'p-1', tool: 'agent__progress_report', args: { progress: 'Starting large data export.' } },
+                  { id: 'p-2', tool: TOOL_NAME, args: { text: 'X'.repeat(5000) } }
+                ],
+              },
+            },
+          ],
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+          finishReason: TOOL_FINISH_REASON,
+        },
+      },
+      {
+        turn: 2,
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Large tool output processed with size cap.',
+          reportContent: `${RESULT_HEADING}Tool response was truncated to respect size limits.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_SUCCESS,
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+        },
+      },
+    ],
+  },
+  {
     id: 'run-test-24-subagent',
     description: 'Sub-agent internal success path.',
     turns: [

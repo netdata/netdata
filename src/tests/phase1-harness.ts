@@ -1413,6 +1413,22 @@ const TEST_SCENARIOS: HarnessTest[] = [
     };
   })(),
   {
+    id: 'run-test-59',
+    configure: (configuration, sessionConfig) => {
+      configuration.defaults = { ...configuration.defaults, parallelToolCalls: true };
+      sessionConfig.parallelToolCalls = true;
+      sessionConfig.tools = ['test', 'batch'];
+      sessionConfig.toolResponseMaxBytes = 120;
+    },
+    expect: (result) => {
+      invariant(result.success, 'Scenario run-test-59 expected success.');
+      const truncLog = result.logs.find((entry) => entry.severity === 'WRN' && typeof entry.message === 'string' && entry.message.includes('response exceeded max size'));
+      invariant(truncLog !== undefined, 'Truncation warning expected for run-test-59.');
+      const batchTool = result.conversation.find((message) => message.role === 'tool' && typeof message.content === 'string' && message.content.includes('[TRUNCATED]'));
+      invariant(batchTool !== undefined, 'Truncated tool response expected for run-test-59.');
+    },
+  },
+  {
     id: 'run-test-43',
     configure: (_configuration, sessionConfig) => {
       sessionConfig.stopRef = { stopping: true };
