@@ -5,13 +5,14 @@ import { fileURLToPath } from 'node:url';
 
 import { WebSocketServer } from 'ws';
 
-import type { AIAgentResult, AIAgentSessionConfig, AccountingEntry, Configuration, LogEntry, TurnRequest, TurnResult } from '../types.js';
+import type { AIAgentResult, AIAgentSessionConfig, AccountingEntry, Configuration, LogEntry, MCPServerConfig, TurnRequest, TurnResult } from '../types.js';
 import type { JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js';
 import type { ChildProcess } from 'node:child_process';
 import type { AddressInfo } from 'node:net';
 
 import { AIAgentSession } from '../ai-agent.js';
 import { LLMClient } from '../llm-client.js';
+import { MCPProvider } from '../tools/mcp-provider.js';
 import { sanitizeToolName } from '../utils.js';
 import { createWebSocketTransport } from '../websocket-transport.js';
 
@@ -50,7 +51,7 @@ function runWithTimeout<T>(promise: Promise<T>, timeoutMs: number, scenarioId: s
       settled = true;
       clearTimeout(timer);
       action();
-    };
+    }
     timer = setTimeout(() => {
       finalize(() => {
         try { onTimeout?.(); } catch { /* ignore */ }
@@ -89,6 +90,7 @@ const THROW_FAILURE_MESSAGE = 'Simulated provider throw for coverage.';
 const BATCH_PROGRESS_RESPONSE = 'batch-progress-follow-up';
 const BATCH_STRING_RESULT = 'batch-string-mode';
 const TRACEABLE_PROVIDER_URL = 'https://openrouter.ai/api/v1';
+const RATE_LIMIT_WARNING_MESSAGE = 'Rate limited; suggested wait';
 
 const GITHUB_SERVER_PATH = path.resolve(__dirname, 'mcp/github-stdio-server.js');
 
@@ -773,7 +775,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
       invariant(result.success, 'Scenario run-test-37 expected success after rate limit retry.');
       const finalReport = result.finalReport;
       invariant(finalReport !== undefined && finalReport.status === 'success', 'Final report should indicate success for run-test-37.');
-      const rateLimitLog = result.logs.find((entry) => typeof entry.message === 'string' && entry.message.includes('Rate limited; suggested wait'));
+      const rateLimitLog = result.logs.find((entry) => typeof entry.message === 'string' && entry.message.includes(RATE_LIMIT_WARNING_MESSAGE));
       invariant(rateLimitLog !== undefined, 'Rate limit warning expected for run-test-37.');
       const retryLog = result.logs.find((entry) => entry.remoteIdentifier === 'agent:retry');
       invariant(retryLog !== undefined, 'Retry backoff log expected for run-test-37.');
@@ -1341,7 +1343,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
       invariant(failedEntries.length >= 2, 'Multiple LLM failures expected for run-test-56.');
       const modelFailure = failedEntries.find((entry) => typeof entry.error === 'string' && entry.error.includes('Model failure during first attempt.'));
       invariant(modelFailure !== undefined, 'Model error accounting entry expected for run-test-56.');
-      const rateLog = result.logs.find((entry) => entry.type === 'llm' && typeof entry.message === 'string' && entry.message.includes('Rate limited; suggested wait'));
+      const rateLog = result.logs.find((entry) => entry.type === 'llm' && typeof entry.message === 'string' && entry.message.includes(RATE_LIMIT_WARNING_MESSAGE));
       invariant(rateLog !== undefined, 'Rate limit warning log expected for run-test-56.');
     },
   },
@@ -1428,6 +1430,194 @@ const TEST_SCENARIOS: HarnessTest[] = [
       invariant(batchTool !== undefined, 'Truncated tool response expected for run-test-59.');
     },
   },
+
+  (() => {
+    interface CapturedRequestSnapshot {
+      temperature?: number;
+      topP?: number;
+      maxOutputTokens?: number;
+      repeatPenalty?: number;
+      messages: { role: string; content: string }[];
+    };
+    const HISTORY_SYSTEM = 'Legacy advisory instructions.';
+    const HISTORY_ASSISTANT = 'Historical assistant answer.';
+    const TRACE_CONTEXT = { selfId: 'txn-session', originId: 'txn-origin', parentId: 'txn-parent', callPath: 'call/path' } as const;
+    let capturedRequests: CapturedRequestSnapshot[] = [];
+    return {
+      id: 'run-test-60',
+      configure: (configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+        configuration.providers[PRIMARY_PROVIDER] = configuration.providers[PRIMARY_PROVIDER] ?? { type: 'test-llm' };
+        sessionConfig.targets = [{ provider: PRIMARY_PROVIDER, model: MODEL_NAME }];
+        sessionConfig.tools = ['test'];
+        sessionConfig.temperature = 0.21;
+        sessionConfig.topP = 0.77;
+        sessionConfig.maxOutputTokens = 123;
+        sessionConfig.repeatPenalty = 1.1;
+        sessionConfig.renderTarget = 'cli';
+        sessionConfig.initialTitle = 'Session Config Coverage';
+        sessionConfig.agentId = 'session-config-agent';
+        sessionConfig.trace = { ...TRACE_CONTEXT };
+        sessionConfig.traceLLM = true;
+        sessionConfig.conversationHistory = [
+          { role: 'system', content: HISTORY_SYSTEM },
+          { role: 'assistant', content: HISTORY_ASSISTANT },
+        ];
+      },
+      execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+        capturedRequests = [];
+        // eslint-disable-next-line @typescript-eslint/unbound-method -- capture original method for restoration after interception
+        const originalExecuteTurn = LLMClient.prototype.executeTurn;
+        LLMClient.prototype.executeTurn = async function(request: TurnRequest): Promise<TurnResult> {
+          const snapshot: CapturedRequestSnapshot = {
+            temperature: request.temperature,
+            topP: request.topP,
+            maxOutputTokens: request.maxOutputTokens,
+            repeatPenalty: request.repeatPenalty,
+            messages: request.messages.map((message) => ({
+              role: message.role,
+              content: typeof message.content === 'string' ? message.content : JSON.stringify(message.content),
+            })),
+          };
+          capturedRequests.push(snapshot);
+          return await originalExecuteTurn.call(this, request);
+        };
+        try {
+          const session = AIAgentSession.create(sessionConfig);
+          return await session.run();
+        } finally {
+          LLMClient.prototype.executeTurn = originalExecuteTurn;
+        }
+      },
+      expect: (result: AIAgentResult) => {
+        invariant(result.success, 'Scenario run-test-60 expected success.');
+        invariant(capturedRequests.length >= 1, 'Captured request snapshot missing for run-test-60.');
+        const first = capturedRequests[0];
+        const systemMessage = first.messages.find((message) => message.role === 'system');
+        invariant(systemMessage?.content.includes('TOOLS') === true, 'System message should be enhanced with tool instructions in run-test-60.');
+        invariant(first.messages.some((message) => message.role === 'assistant' && message.content.includes(HISTORY_ASSISTANT)), 'Conversation history assistant message missing in request for run-test-60.');
+        invariant(first.temperature !== undefined && Math.abs(first.temperature - 0.21) < 1e-6, 'Temperature propagation failed for run-test-60.');
+        invariant(first.topP !== undefined && Math.abs(first.topP - 0.77) < 1e-6, 'topP propagation failed for run-test-60.');
+        invariant(first.maxOutputTokens === 123, 'maxOutputTokens propagation failed for run-test-60.');
+        invariant(first.repeatPenalty !== undefined && Math.abs(first.repeatPenalty - 1.1) < 1e-6, 'repeatPenalty propagation failed for run-test-60.');
+        const hasHistoryInResult = result.conversation.some((message) => message.role === 'assistant' && message.content.includes(HISTORY_ASSISTANT));
+        invariant(hasHistoryInResult, 'Historical assistant message should be present in result conversation for run-test-60.');
+        const llmEntry = result.accounting.find(isLlmAccounting);
+        invariant(llmEntry !== undefined, 'LLM accounting entry expected for run-test-60.');
+        invariant(typeof llmEntry.txnId === 'string' && llmEntry.txnId.length > 0, 'LLM accounting should include txnId for run-test-60.');
+        invariant(llmEntry.callPath === TRACE_CONTEXT.callPath, 'Trace context should set callPath on LLM accounting entry for run-test-60.');
+        invariant(llmEntry.originTxnId === TRACE_CONTEXT.originId, 'Trace context should preserve originTxnId on LLM accounting entry for run-test-60.');
+        invariant(llmEntry.parentTxnId === TRACE_CONTEXT.parentId, 'Trace context should preserve parentTxnId on LLM accounting entry for run-test-60.');
+        const finalReport = result.finalReport;
+        invariant(finalReport !== undefined && finalReport.status === 'success', 'Final report should indicate success for run-test-60.');
+      },
+    };
+  })(),
+  (() => {
+    let capturedLogs: LogEntry[] = [];
+    const TOOL_LIMIT_WARNING_MESSAGE = 'Tool calls per turn exceeded';
+    return {
+      id: 'run-test-61',
+      configure: (_configuration: Configuration, sessionConfig: AIAgentSessionConfig, defaults) => {
+        defaults.maxToolCallsPerTurn = 1;
+        sessionConfig.maxToolCallsPerTurn = 1;
+        sessionConfig.tools = ['test'];
+      },
+      execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+        capturedLogs = [];
+        const existingCallbacks = sessionConfig.callbacks ?? {};
+        sessionConfig.callbacks = {
+          ...existingCallbacks,
+          onLog: (entry) => {
+            capturedLogs.push(entry);
+            existingCallbacks.onLog?.(entry);
+          },
+        };
+        const session = AIAgentSession.create(sessionConfig);
+        return await session.run();
+      },
+      expect: (result: AIAgentResult) => {
+        invariant(result.success, 'Scenario run-test-61 expected session completion.');
+        const limitLog = capturedLogs.find((entry) => entry.remoteIdentifier === 'agent:limits' && typeof entry.message === 'string' && entry.message.includes(TOOL_LIMIT_WARNING_MESSAGE));
+        invariant(limitLog !== undefined, 'Limit enforcement log expected for run-test-61.');
+        const finalReport = result.finalReport;
+        invariant(finalReport !== undefined && finalReport.status === 'failure', 'Final report should indicate failure for run-test-61.');
+      },
+    };
+  })(),
+  (() => {
+    let abortController: AbortController | undefined;
+    return {
+      id: 'run-test-62',
+      configure: (_configuration: Configuration, sessionConfig: AIAgentSessionConfig, defaults) => {
+        abortController = new AbortController();
+        sessionConfig.abortSignal = abortController.signal;
+        defaults.maxRetries = 3;
+        sessionConfig.maxRetries = 3;
+      },
+      execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+        const controller = abortController;
+        invariant(controller !== undefined, 'Abort controller should be initialized for run-test-62.');
+        const session = AIAgentSession.create(sessionConfig);
+        setTimeout(() => { controller.abort(); }, 25);
+        return await session.run();
+      },
+      expect: (result: AIAgentResult) => {
+        invariant(!result.success, 'Scenario run-test-62 should cancel.');
+        invariant(result.error === 'canceled', 'Canceled error expected for run-test-62.');
+        invariant(result.finalReport === undefined, 'No final report expected for run-test-62.');
+      },
+    };
+  })(),
+  (() => {
+    interface InitRecord { name: string; start: number; end: number }
+    const initRecords: InitRecord[] = [];
+    return {
+      id: 'run-test-63',
+      configure: (configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+        const serverScript = path.resolve(__dirname, 'mcp/test-stdio-server.js');
+        configuration.mcpServers = {
+          ...configuration.mcpServers,
+          alpha: { type: 'stdio', command: process.execPath, args: [serverScript] },
+          beta: { type: 'stdio', command: process.execPath, args: [serverScript] },
+        };
+        sessionConfig.verbose = true;
+        sessionConfig.traceMCP = true;
+        sessionConfig.mcpInitConcurrency = 1;
+        sessionConfig.tools = ['test'];
+      },
+      execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+        initRecords.length = 0;
+        const providerProto = MCPProvider.prototype as unknown as { initializeServer: (this: MCPProvider, name: string, config: MCPServerConfig) => Promise<unknown> };
+        // eslint-disable-next-line @typescript-eslint/unbound-method -- capture original method for restoration after interception
+        const originalInitialize = providerProto.initializeServer;
+        providerProto.initializeServer = async function(this: MCPProvider, name: string, config: MCPServerConfig) {
+          const start = Date.now();
+          initRecords.push({ name, start, end: start });
+          const index = initRecords.length - 1;
+          await new Promise((resolve) => { setTimeout(resolve, 15); });
+          const result = await originalInitialize.call(this, name, config);
+          initRecords[index].end = Date.now();
+          return result;
+        };
+        try {
+          const session = AIAgentSession.create(sessionConfig);
+          return await session.run();
+        } finally {
+          providerProto.initializeServer = originalInitialize;
+        }
+      },
+      expect: (result: AIAgentResult) => {
+        invariant(result.success, 'Scenario run-test-63 expected success.');
+        invariant(initRecords.length >= 2, 'Initialization records expected for run-test-63.');
+        const sequential = initRecords.slice(1).every((record, index) => record.start >= initRecords[index].end);
+        invariant(sequential, 'MCP warmup should honor init concurrency limit for run-test-63.');
+        const traceLog = result.logs.find((entry) => entry.remoteIdentifier === 'trace:agent:agent');
+        invariant(traceLog !== undefined, 'Trace log expected for run-test-63.');
+        const finalReport = result.finalReport;
+        invariant(finalReport !== undefined && finalReport.status === 'success', 'Final report should indicate success for run-test-63.');
+      },
+    };
+  })(),
   {
     id: 'run-test-43',
     configure: (_configuration, sessionConfig) => {

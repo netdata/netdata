@@ -2343,6 +2343,160 @@ const SCENARIOS: ScenarioDefinition[] = [
     ],
   },
   {
+    id: 'run-test-60',
+    description: 'Conversation history and sampling parameter propagation.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        expectedTools: [TOOL_NAME],
+        expectedTemperature: 0.21,
+        expectedTopP: 0.77,
+        response: {
+          kind: 'tool-call',
+          assistantText: 'Referencing prior conversation before invoking tool.',
+          toolCalls: [
+            {
+              toolName: TOOL_NAME,
+              callId: 'call-history-prop',
+              assistantText: 'Replaying historical context.',
+              arguments: {
+                text: 'history-propagation',
+              },
+            },
+          ],
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+          finishReason: TOOL_FINISH_REASON,
+        },
+      },
+      {
+        turn: 2,
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Summarizing with propagated parameters.',
+          reportContent: `${RESULT_HEADING}Conversation history respected and parameters applied.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_SUCCESS,
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+        },
+      },
+    ],
+  },
+  {
+    id: 'run-test-61',
+    description: 'Tool calls per turn limit enforcement.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        expectedTools: [TOOL_NAME],
+        response: {
+          kind: 'tool-call',
+          assistantText: 'Attempting multiple tool calls within a single turn.',
+          toolCalls: [
+            {
+              toolName: TOOL_NAME,
+              callId: 'call-limit-first',
+              assistantText: 'First call within limit.',
+              arguments: {
+                text: 'first-tool-call',
+              },
+            },
+            {
+              toolName: TOOL_NAME,
+              callId: 'call-limit-second',
+              assistantText: 'Second call exceeding limit.',
+              arguments: {
+                text: 'second-tool-call',
+              },
+            },
+          ],
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+          finishReason: TOOL_FINISH_REASON,
+        },
+      },
+      {
+        turn: 2,
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Reporting enforcement of per-turn tool call limits.',
+          reportContent: `${RESULT_HEADING}Tool call limit enforced; adjust strategy before retrying.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_FAILURE,
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+        },
+      },
+    ],
+  },
+  {
+    id: 'run-test-62',
+    description: 'Rate limit waits interrupted by abort signal.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        failuresBeforeSuccess: 3,
+        failureStatus: 'rate_limit',
+        failureRetryable: true,
+        failureRetryAfterMs: 2000,
+        response: {
+          kind: 'tool-call',
+          assistantText: 'Would proceed after rate limit backoff if not aborted.',
+          toolCalls: [
+            {
+              toolName: TOOL_NAME,
+              callId: 'call-rate-limit-abort',
+              assistantText: 'Placeholder call after rate limit.',
+              arguments: {
+                text: 'rate-limit-abort',
+              },
+            },
+          ],
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+          finishReason: TOOL_FINISH_REASON,
+        },
+      },
+    ],
+  },
+  {
+    id: 'run-test-63',
+    description: 'Verbose configuration summary and MCP warmup concurrency.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        expectedTools: [TOOL_NAME],
+        response: {
+          kind: 'tool-call',
+          assistantText: 'Collecting data after verbose configuration summary.',
+          toolCalls: [
+            {
+              toolName: TOOL_NAME,
+              callId: 'call-verbose-concurrency',
+              assistantText: 'Executing after MCP warmup.',
+              arguments: {
+                text: 'verbose-concurrency',
+              },
+            },
+          ],
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+          finishReason: TOOL_FINISH_REASON,
+        },
+      },
+      {
+        turn: 2,
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Summarizing verbose configuration and concurrency checks.',
+          reportContent: `${RESULT_HEADING}Verbose settings logged and MCP warmup sequential as configured.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_SUCCESS,
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+        },
+      },
+    ],
+  },
+  {
     id: 'run-test-24-subagent',
     description: 'Sub-agent internal success path.',
     turns: [
