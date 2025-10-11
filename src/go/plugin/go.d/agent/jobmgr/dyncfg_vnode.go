@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"gopkg.in/yaml.v2"
 
+	"github.com/netdata/netdata/go/plugins/pkg/executable"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/functions"
@@ -19,16 +20,20 @@ import (
 )
 
 const (
-	dyncfgVnodeID   = "go.d:vnode"
-	dyncfgVnodePath = "/collectors/vnodes"
+	dyncfgVnodeIDf  = "%s:vnode"
+	dyncfgVnodePath = "/collectors/%s/vnodes"
 )
+
+func (m *Manager) dyncfgVnodePrefixValue() string {
+	return fmt.Sprintf(dyncfgVnodeIDf, executable.Name)
+}
 
 func (m *Manager) dyncfgVnodeModuleCreate() {
 	m.api.CONFIGCREATE(netdataapi.ConfigOpts{
-		ID:                dyncfgVnodeID,
+		ID:                m.dyncfgVnodePrefixValue(),
 		Status:            dyncfgAccepted.String(),
 		ConfigType:        "template",
-		Path:              dyncfgVnodePath,
+		Path:              fmt.Sprintf(dyncfgVnodePath, executable.Name),
 		SourceType:        "internal",
 		Source:            "internal",
 		SupportedCommands: "add schema userconfig test",
@@ -41,10 +46,10 @@ func (m *Manager) dyncfgVnodeJobCreate(cfg *vnodes.VirtualNode, status dyncfgSta
 		cmds += " remove"
 	}
 	m.api.CONFIGCREATE(netdataapi.ConfigOpts{
-		ID:                fmt.Sprintf("%s:%s", dyncfgVnodeID, cfg.Name),
+		ID:                fmt.Sprintf("%s:%s", m.dyncfgVnodePrefixValue(), cfg.Name),
 		Status:            status.String(),
 		ConfigType:        "job",
-		Path:              dyncfgVnodePath,
+		Path:              fmt.Sprintf(dyncfgVnodePath, executable.Name),
 		SourceType:        cfg.SourceType,
 		Source:            cfg.Source,
 		SupportedCommands: cmds,
@@ -92,7 +97,7 @@ func (m *Manager) dyncfgVnodeSeqExec(fn functions.Function) {
 
 func (m *Manager) dyncfgVnodeGet(fn functions.Function) {
 	id := fn.Args[0]
-	name := strings.TrimPrefix(id, dyncfgVnodeID+":")
+	name := strings.TrimPrefix(id, m.dyncfgVnodePrefixValue()+":")
 
 	cfg, ok := m.Vnodes[name]
 	if !ok {
@@ -166,7 +171,7 @@ func (m *Manager) dyncfgVnodeAdd(fn functions.Function) {
 
 func (m *Manager) dyncfgVnodeRemove(fn functions.Function) {
 	id := fn.Args[0]
-	name := strings.TrimPrefix(id, dyncfgVnodeID+":")
+	name := strings.TrimPrefix(id, m.dyncfgVnodePrefixValue()+":")
 
 	vnode, ok := m.Vnodes[name]
 	if !ok {
@@ -230,7 +235,7 @@ func (m *Manager) dyncfgVnodeTest(fn functions.Function) {
 
 func (m *Manager) dyncfgVnodeUpdate(fn functions.Function) {
 	id := fn.Args[0]
-	name := strings.TrimPrefix(id, dyncfgVnodeID+":")
+	name := strings.TrimPrefix(id, m.dyncfgVnodePrefixValue()+":")
 
 	orig, ok := m.Vnodes[name]
 	if !ok {

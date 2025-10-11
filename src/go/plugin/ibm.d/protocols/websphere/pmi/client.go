@@ -14,8 +14,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
+	"github.com/netdata/netdata/go/plugins/pkg/confopt"
+	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
 
 // Config captures the options required to communicate with the PerfServlet endpoint.

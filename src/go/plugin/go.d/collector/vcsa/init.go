@@ -5,8 +5,8 @@ package vcsa
 import (
 	"errors"
 
+	"github.com/netdata/netdata/go/plugins/pkg/web"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/vcsa/client"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
 func (c *Collector) validateConfig() error {

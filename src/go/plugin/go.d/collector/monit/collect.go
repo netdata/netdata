@@ -8,9 +8,9 @@ import (
 	"fmt"
 	"net/url"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
-
 	"golang.org/x/net/html/charset"
+
+	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
 
 var (

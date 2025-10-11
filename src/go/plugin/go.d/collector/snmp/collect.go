@@ -104,10 +104,11 @@ func (c *Collector) ensureInitialized() error {
 
 	if c.ddSnmpColl == nil && len(c.snmpProfiles) > 0 {
 		c.ddSnmpColl = c.newDdSnmpColl(ddsnmpcollector.Config{
-			SnmpClient:  c.snmpClient,
-			Profiles:    c.snmpProfiles,
-			Log:         c.Logger,
-			SysObjectID: si.SysObjectID,
+			SnmpClient:      c.snmpClient,
+			Profiles:        c.snmpProfiles,
+			Log:             c.Logger,
+			SysObjectID:     si.SysObjectID,
+			DisableBulkWalk: c.disableBulkWalk,
 		})
 	}
 
@@ -214,6 +215,10 @@ func (c *Collector) initAndConnectSNMPClient() (gosnmp.Handler, error) {
 		return nil, fmt.Errorf("connect: %w", err)
 	}
 
+	if snmpClient.Version() == gosnmp.Version1 {
+		return snmpClient, nil
+	}
+
 	if c.adjMaxRepetitions != 0 {
 		snmpClient.SetMaxRepetitions(c.adjMaxRepetitions)
 	} else {
@@ -222,7 +227,8 @@ func (c *Collector) initAndConnectSNMPClient() (gosnmp.Handler, error) {
 			return nil, fmt.Errorf("re-adjust max repetitions SNMP client: %w", err)
 		}
 		if !ok {
-			c.Warningf("SNMP bulk walk disabled: table metrics collection unavailable (device may not support GETBULK or max-repetitions adjustment failed)")
+			c.Warningf("SNMP bulk walk disabled (device may not support GETBULK or max-repetitions adjustment failed)")
+			c.disableBulkWalk = true
 		}
 		c.adjMaxRepetitions = snmpClient.MaxRepetitions()
 	}
@@ -231,6 +237,15 @@ func (c *Collector) initAndConnectSNMPClient() (gosnmp.Handler, error) {
 }
 
 func (c *Collector) adjustMaxRepetitions(snmpClient gosnmp.Handler) (bool, error) {
+	ok, err := c.detectBulkWalkSupport(snmpClient)
+	if err != nil {
+		c.Warningf("bulk support probe error: %v", err)
+		return false, nil
+	}
+	if !ok {
+		return false, nil
+	}
+
 	orig := c.Config.Options.MaxRepetitions
 	maxReps := c.Config.Options.MaxRepetitions
 	attempts := 0
@@ -239,7 +254,7 @@ func (c *Collector) adjustMaxRepetitions(snmpClient gosnmp.Handler) (bool, error
 	for maxReps > 0 && attempts < maxAttempts {
 		attempts++
 
-		v, err := walkAll(snmpClient, snmputils.RootOidMibSystem)
+		v, err := snmpClient.BulkWalkAll(snmputils.RootOidMibSystem)
 		if err != nil {
 			return false, err
 		}
@@ -276,14 +291,24 @@ func (c *Collector) adjustMaxRepetitions(snmpClient gosnmp.Handler) (bool, error
 	return false, nil
 }
 
-func walkAll(snmpClient gosnmp.Handler, rootOid string) ([]gosnmp.SnmpPDU, error) {
-	if snmpClient.Version() == gosnmp.Version1 {
-		return snmpClient.WalkAll(rootOid)
-	}
-	return snmpClient.BulkWalkAll(rootOid)
-}
-
 func isPingUnrecoverableError(err error) bool {
 	var errno syscall.Errno
 	return errors.As(err, &errno) && (errors.Is(errno, syscall.EPERM) || errors.Is(errno, syscall.EACCES))
+}
+
+func (c *Collector) detectBulkWalkSupport(snmpClient gosnmp.Handler) (bool, error) {
+	if snmpClient.Version() == gosnmp.Version1 {
+		return false, nil
+	}
+
+	// Use a very small max-reps for the probe to be gentle
+	orig := snmpClient.MaxRepetitions()
+	defer snmpClient.SetMaxRepetitions(orig)
+	snmpClient.SetMaxRepetitions(5)
+
+	oids, err := snmpClient.BulkWalkAll(snmputils.RootOidMibSystem)
+	if err != nil {
+		return false, err
+	}
+	return len(oids) > 0, nil
 }

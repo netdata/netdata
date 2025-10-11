@@ -8,12 +8,12 @@ import (
 	"os"
 	"testing"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/tlscfg"
-
 	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/netdata/netdata/go/plugins/pkg/tlscfg"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 )
 
 var (

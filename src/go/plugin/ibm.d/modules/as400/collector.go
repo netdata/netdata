@@ -13,7 +13,7 @@ import (
 	"sync"
 
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/stm"
+	"github.com/netdata/netdata/go/plugins/pkg/stm"
 	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/framework"
 	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/modules/as400/contexts"
 	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/pkg/dbdriver"

@@ -5,8 +5,8 @@ package docker_engine
 import (
 	"fmt"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/prometheus"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/stm"
+	"github.com/netdata/netdata/go/plugins/pkg/prometheus"
+	"github.com/netdata/netdata/go/plugins/pkg/stm"
 )
 
 func isDockerEngineMetrics(pms prometheus.Series) bool {

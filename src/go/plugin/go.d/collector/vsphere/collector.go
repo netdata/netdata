@@ -9,13 +9,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/vmware/govmomi/performance"
+
+	"github.com/netdata/netdata/go/plugins/pkg/confopt"
+	"github.com/netdata/netdata/go/plugins/pkg/web"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/vsphere/match"
 	rs "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/vsphere/resources"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
-
-	"github.com/vmware/govmomi/performance"
 )
 
 //go:embed "config_schema.json"

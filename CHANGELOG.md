@@ -6,6 +6,14 @@
 
 **Merged pull requests:**
 
+- improve\(go.d/snmp\): automatically disable SNMP bulkwalk when not supported [\#21139](https://github.com/netdata/netdata/pull/21139) ([ilyam8](https://github.com/ilyam8))
+- build\(deps\): bump github.com/gohugoio/hashstructure from 0.5.0 to 0.6.0 in /src/go [\#21138](https://github.com/netdata/netdata/pull/21138) ([dependabot[bot]](https://github.com/apps/dependabot))
+- build\(deps\): bump golang.org/x/net from 0.44.0 to 0.46.0 in /src/go [\#21137](https://github.com/netdata/netdata/pull/21137) ([dependabot[bot]](https://github.com/apps/dependabot))
+- build\(deps\): bump github.com/docker/docker from 28.5.0+incompatible to 28.5.1+incompatible in /src/go [\#21135](https://github.com/netdata/netdata/pull/21135) ([dependabot[bot]](https://github.com/apps/dependabot))
+- build\(deps\): bump github.com/gofrs/flock from 0.12.1 to 0.13.0 in /src/go [\#21134](https://github.com/netdata/netdata/pull/21134) ([dependabot[bot]](https://github.com/apps/dependabot))
+- chore: move go.d/ibm.d shared pkgs out of go.d [\#21132](https://github.com/netdata/netdata/pull/21132) ([ilyam8](https://github.com/ilyam8))
+- build: update go otel deps [\#21129](https://github.com/netdata/netdata/pull/21129) ([ilyam8](https://github.com/ilyam8))
+- chore: go.d/ibm.d various fixes [\#21128](https://github.com/netdata/netdata/pull/21128) ([ilyam8](https://github.com/ilyam8))
 - fix\(ibm.d/mq\): change default ExponentialBackoff attempts to 2 [\#21124](https://github.com/netdata/netdata/pull/21124) ([ilyam8](https://github.com/ilyam8))
 - fix\(ibm.d\): various fixes [\#21123](https://github.com/netdata/netdata/pull/21123) ([ilyam8](https://github.com/ilyam8))
 - Update IBM plugin documentation. [\#21122](https://github.com/netdata/netdata/pull/21122) ([Ferroin](https://github.com/Ferroin))
@@ -440,16 +448,6 @@
 - update generic snmp profiles [\#20599](https://github.com/netdata/netdata/pull/20599) ([ilyam8](https://github.com/ilyam8))
 - Metadata worker should respect shutdown request [\#20598](https://github.com/netdata/netdata/pull/20598) ([stelfrag](https://github.com/stelfrag))
 - docs: fix 404 link in README.md [\#20597](https://github.com/netdata/netdata/pull/20597) ([ilyam8](https://github.com/ilyam8))
-- build\(deps\): bump github.com/docker/docker from 28.2.2+incompatible to 28.3.0+incompatible in /src/go [\#20595](https://github.com/netdata/netdata/pull/20595) ([dependabot[bot]](https://github.com/apps/dependabot))
-- improve\(go.d/snmp-profiles\): extend transformEntitySensorValue [\#20594](https://github.com/netdata/netdata/pull/20594) ([ilyam8](https://github.com/ilyam8))
-- Add Screen to Windows installer [\#20593](https://github.com/netdata/netdata/pull/20593) ([thiagoftsm](https://github.com/thiagoftsm))
-- build\(deps\): bump github.com/go-viper/mapstructure/v2 from 2.2.1 to 2.3.0 in /src/go/otel-collector/exporter/journaldexporter [\#20592](https://github.com/netdata/netdata/pull/20592) ([dependabot[bot]](https://github.com/apps/dependabot))
-- build\(deps\): bump github.com/go-viper/mapstructure/v2 from 2.2.1 to 2.3.0 in /src/go/otel-collector/exporter/netdataexporter [\#20591](https://github.com/netdata/netdata/pull/20591) ([dependabot[bot]](https://github.com/apps/dependabot))
-- Regenerate integrations docs [\#20589](https://github.com/netdata/netdata/pull/20589) ([netdatabot](https://github.com/netdatabot))
-- doc: update SCIM doc [\#20588](https://github.com/netdata/netdata/pull/20588) ([juacker](https://github.com/juacker))
-- ddsnmp add pow transform func and allow mapping duplicate values [\#20587](https://github.com/netdata/netdata/pull/20587) ([ilyam8](https://github.com/ilyam8))
-- fix\(go.d/ddsnmp\): correct matching same profile multiple times [\#20586](https://github.com/netdata/netdata/pull/20586) ([ilyam8](https://github.com/ilyam8))
-- remove devType/Vendor/ from ddsnmp metric families [\#20585](https://github.com/netdata/netdata/pull/20585) ([ilyam8](https://github.com/ilyam8))
 
 ## [v2.5.4](https://github.com/netdata/netdata/tree/v2.5.4) (2025-06-24)
 

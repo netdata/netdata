@@ -7,7 +7,7 @@ import (
 
 	"github.com/gosnmp/gosnmp"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
+	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/iprange"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
 )

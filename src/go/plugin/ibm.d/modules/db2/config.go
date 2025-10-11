@@ -1,7 +1,7 @@
 package db2
 
 import (
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
+	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/framework"
 )
 
@@ -25,25 +25,25 @@ type Config struct {
 	MaxDbLifeTime confopt.Duration `yaml:"max_db_life_time,omitempty" json:"max_db_life_time" ui:"group:Advanced"`
 
 	// CollectDatabaseMetrics toggles high-level database status metrics.
-	CollectDatabaseMetrics framework.AutoBool `yaml:"collect_database_metrics,omitempty" json:"collect_database_metrics" ui:"group:Databases"`
+	CollectDatabaseMetrics confopt.AutoBool `yaml:"collect_database_metrics,omitempty" json:"collect_database_metrics" ui:"group:Databases"`
 
 	// CollectBufferpoolMetrics toggles buffer pool efficiency metrics.
-	CollectBufferpoolMetrics framework.AutoBool `yaml:"collect_bufferpool_metrics,omitempty" json:"collect_bufferpool_metrics" ui:"group:Buffer Pools"`
+	CollectBufferpoolMetrics confopt.AutoBool `yaml:"collect_bufferpool_metrics,omitempty" json:"collect_bufferpool_metrics" ui:"group:Buffer Pools"`
 
 	// CollectTablespaceMetrics toggles tablespace capacity metrics.
-	CollectTablespaceMetrics framework.AutoBool `yaml:"collect_tablespace_metrics,omitempty" json:"collect_tablespace_metrics" ui:"group:Tablespaces"`
+	CollectTablespaceMetrics confopt.AutoBool `yaml:"collect_tablespace_metrics,omitempty" json:"collect_tablespace_metrics" ui:"group:Tablespaces"`
 
 	// CollectConnectionMetrics toggles per-connection activity metrics.
-	CollectConnectionMetrics framework.AutoBool `yaml:"collect_connection_metrics,omitempty" json:"collect_connection_metrics" ui:"group:Connections Monitoring"`
+	CollectConnectionMetrics confopt.AutoBool `yaml:"collect_connection_metrics,omitempty" json:"collect_connection_metrics" ui:"group:Connections Monitoring"`
 
 	// CollectLockMetrics toggles lock contention metrics.
-	CollectLockMetrics framework.AutoBool `yaml:"collect_lock_metrics,omitempty" json:"collect_lock_metrics" ui:"group:Other Metrics"`
+	CollectLockMetrics confopt.AutoBool `yaml:"collect_lock_metrics,omitempty" json:"collect_lock_metrics" ui:"group:Other Metrics"`
 
 	// CollectTableMetrics toggles table-level size and row metrics.
-	CollectTableMetrics framework.AutoBool `yaml:"collect_table_metrics,omitempty" json:"collect_table_metrics" ui:"group:Tables"`
+	CollectTableMetrics confopt.AutoBool `yaml:"collect_table_metrics,omitempty" json:"collect_table_metrics" ui:"group:Tables"`
 
 	// CollectIndexMetrics toggles index usage metrics.
-	CollectIndexMetrics framework.AutoBool `yaml:"collect_index_metrics,omitempty" json:"collect_index_metrics" ui:"group:Indexes"`
+	CollectIndexMetrics confopt.AutoBool `yaml:"collect_index_metrics,omitempty" json:"collect_index_metrics" ui:"group:Indexes"`
 
 	// MaxDatabases caps the number of databases charted.
 	MaxDatabases int `yaml:"max_databases,omitempty" json:"max_databases" ui:"group:Databases"`

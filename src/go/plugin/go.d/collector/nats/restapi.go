@@ -5,7 +5,7 @@ package nats
 import (
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
+	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
 
 // https://docs.nats.io/running-a-nats-service/nats_admin/monitoring

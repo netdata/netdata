@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
+	"github.com/netdata/netdata/go/plugins/pkg/web"
 	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/framework"
 	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/modules/websphere/common"
 	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/modules/websphere/pmi/contexts"
@@ -38,18 +38,18 @@ func defaultConfig() Config {
 		NodeName:                  "",
 		ServerType:                "",
 		CustomLabels:              map[string]string{},
-		CollectJVMMetrics:         framework.AutoBoolAuto,
-		CollectThreadPoolMetrics:  framework.AutoBoolAuto,
-		CollectJDBCMetrics:        framework.AutoBoolAuto,
-		CollectJCAMetrics:         framework.AutoBoolAuto,
-		CollectJMSMetrics:         framework.AutoBoolAuto,
-		CollectWebAppMetrics:      framework.AutoBoolAuto,
-		CollectSessionMetrics:     framework.AutoBoolAuto,
-		CollectTransactionMetrics: framework.AutoBoolAuto,
-		CollectClusterMetrics:     framework.AutoBoolAuto,
-		CollectServletMetrics:     framework.AutoBoolAuto,
-		CollectEJBMetrics:         framework.AutoBoolAuto,
-		CollectJDBCAdvanced:       framework.AutoBoolAuto,
+		CollectJVMMetrics:         confopt.AutoBoolAuto,
+		CollectThreadPoolMetrics:  confopt.AutoBoolAuto,
+		CollectJDBCMetrics:        confopt.AutoBoolAuto,
+		CollectJCAMetrics:         confopt.AutoBoolAuto,
+		CollectJMSMetrics:         confopt.AutoBoolAuto,
+		CollectWebAppMetrics:      confopt.AutoBoolAuto,
+		CollectSessionMetrics:     confopt.AutoBoolAuto,
+		CollectTransactionMetrics: confopt.AutoBoolAuto,
+		CollectClusterMetrics:     confopt.AutoBoolAuto,
+		CollectServletMetrics:     confopt.AutoBoolAuto,
+		CollectEJBMetrics:         confopt.AutoBoolAuto,
+		CollectJDBCAdvanced:       confopt.AutoBoolAuto,
 		MaxThreadPools:            50,
 		MaxJDBCPools:              50,
 		MaxJCAPools:               50,

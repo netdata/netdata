@@ -10,8 +10,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/framework"
 	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/modules/db2/contexts"
 	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/pkg/dbdriver"
@@ -29,13 +29,13 @@ func defaultConfig() Config {
 		MaxDbConns:    1,
 		MaxDbLifeTime: confopt.Duration(10 * time.Minute),
 
-		CollectDatabaseMetrics:   framework.AutoBoolAuto,
-		CollectBufferpoolMetrics: framework.AutoBoolAuto,
-		CollectTablespaceMetrics: framework.AutoBoolAuto,
-		CollectConnectionMetrics: framework.AutoBoolAuto,
-		CollectLockMetrics:       framework.AutoBoolAuto,
-		CollectTableMetrics:      framework.AutoBoolAuto,
-		CollectIndexMetrics:      framework.AutoBoolAuto,
+		CollectDatabaseMetrics:   confopt.AutoBoolAuto,
+		CollectBufferpoolMetrics: confopt.AutoBoolAuto,
+		CollectTablespaceMetrics: confopt.AutoBoolAuto,
+		CollectConnectionMetrics: confopt.AutoBoolAuto,
+		CollectLockMetrics:       confopt.AutoBoolAuto,
+		CollectTableMetrics:      confopt.AutoBoolAuto,
+		CollectIndexMetrics:      confopt.AutoBoolAuto,
 
 		CollectMemoryMetrics:  true,
 		CollectWaitMetrics:    true,
