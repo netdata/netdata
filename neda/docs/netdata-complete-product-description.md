@@ -93,7 +93,7 @@ This real-time capability is critical because:
 - **Metrics**: Native per-second collection across hosts, containers, services, hardware, and custom workloads; exported via REST API v3, streaming, and integrations.
 - **Logs & Events**: systemd-journal ingestion on Linux, Windows Event Logs/ETW/TL, Kubernetes events, Netdata health events, and cloud alert streams; correlated directly with metrics.
 - **Alerts**: Edge-evaluated health checks with state transitions streamed to Parents and Cloud; anomaly ribbons embedded in each metric sample.
-- **Traces (working theory)**: Netdata does not yet ship distributed tracing; OpenTelemetry traces supported via external pipelines with correlation through labels.
+- **Traces**: Netdata does not yet ship distributed tracing.
 - **Metadata**: Node inventory, topology (Parent/Child), ML model statistics, configuration state, RBAC assignments, and audit logs exposed through Cloud and REST APIs.
 
 ### 2.2 Collector Frameworks & Execution Model
