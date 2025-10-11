@@ -1,0 +1,8 @@
+NGINX_MESSAGE=connect() failed (111: Connection refused) while connecting to upstream, client: 192.168.1.100, server: example.com, request: "GET /api/data HTTP/1.1", upstream: "http://backend:8080/api/data", host: "example.com"
+NGINX_NGINX_CONNECTION_ID=5678
+NGINX_NGINX_LOG_LEVEL=error
+NGINX_NGINX_PID=1234
+NGINX_NGINX_TID=0
+NGINX_NGINX_TIME_LOCAL=2024/01/15 10:30:25
+SYSLOG_IDENTIFIER=nginx-error
+
