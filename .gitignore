@@ -2,6 +2,8 @@
 
 dist/
 
+src/version.generated.ts
+
 tmp/
 node_modules/
 .channels_cache_v2.json

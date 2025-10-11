@@ -137,7 +137,8 @@ export class InternalToolProvider extends ToolProvider {
     lines.push('');
     lines.push(`- Use tool \`${PROGRESS_TOOL}\` to provide real-time progress updates and next steps.`);
     lines.push('  - Real-time updates keep users informed about ongoing actions and plans.');
-    lines.push(`  - **CRITICAL**: Call \`${PROGRESS_TOOL}\` on EVERY turn, in PARALLEL with other tools.`);
+    lines.push(`  - **CRITICAL**: When calling tools, you MUST call \`${PROGRESS_TOOL}\` in PARALLEL (same batch/turn).`);
+    lines.push(`  - **CRITICAL**: You MUST NEVER call \`${PROGRESS_TOOL}\` alone.`);
     lines.push('  - Keep progress brief: max 20 words.');
     lines.push('  - Examples of good parallel usage:');
     lines.push('    When using batch:');
@@ -150,7 +151,6 @@ export class InternalToolProvider extends ToolProvider {
     lines.push('    When calling multiple tools:');
     lines.push(`    - Call \`${PROGRESS_TOOL}\` with "Analyzing config files for ABC"`);
     lines.push('    - AND call your actual analysis tools in the same turn');
-    lines.push(`  - BAD usage (wastes turns): Calling \`${PROGRESS_TOOL}\` alone.`);
     if (this.opts.enableBatch) {
       lines.push('');
       lines.push(`- Use tool \`${BATCH_TOOL}\` to call multiple tools in one go.`);

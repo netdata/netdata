@@ -32,6 +32,7 @@ import { makeTTYLogCallbacks } from './log-sink-tty.js';
 import { getOptionsByGroup, formatCliNames, OPTIONS_REGISTRY } from './options-registry.js';
 import { MCPProvider } from './tools/mcp-provider.js';
 import { formatAgentResultHumanReadable } from './utils.js';
+import { VERSION } from './version.generated.js';
 
 // FrontmatterOptions is sourced from frontmatter.ts (single definition)
 
@@ -270,6 +271,8 @@ function buildResolvedDefaultsHelp(): string {
 
     // Add ASCII banner
     lines.push(buildAsciiBanner());
+    lines.push('');
+    lines.push(`${white}Version:${reset} ${VERSION}`);
     lines.push('');
 
     const args = process.argv.slice(2);
@@ -538,7 +541,7 @@ program.helpInformation = function() {
 program
   .name('ai-agent')
   .description('Universal LLM Tool Calling Interface with MCP support')
-  .version('1.0.0')
+  .version(VERSION, '-V, --version', 'Output the current version')
   .configureHelp({
     // Suppress only Commander's default option formatting
     // We provide complete help via addHelpText('before') and addHelpText('after')

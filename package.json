@@ -10,11 +10,15 @@
     "ai-agent": "dist/cli.js"
   },
   "scripts": {
+    "prebuild": "npm run update-version --silent",
     "build": "tsc",
+    "predev": "npm run update-version --silent",
     "dev": "tsc --watch",
+    "prelint": "npm run update-version --silent",
     "start": "node dist/cli.js",
     "lint": "eslint . --max-warnings 0",
-    "test:phase1": "npm run build --silent && node dist/tests/phase1-harness.js"
+    "test:phase1": "npm run build --silent && node dist/tests/phase1-harness.js",
+    "update-version": "node scripts/update-version.mjs"
   },
   "engines": {
     "node": ">=20"

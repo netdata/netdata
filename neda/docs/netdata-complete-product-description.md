@@ -110,7 +110,7 @@ Netdata ships purpose-built collector frameworks that share a unified lifecycle:
 | `otel-plugin` | Rust | OTel intake that writes systemd-journal files | Rust journald writer preserving native format |
 | `python.d` | Python | Long-tail integrations & IoT sensors | Ideal for quick custom collectors |
 | `charts.d` | Bash | Lightweight shell-based collectors | Legacy but still maintained |
-| `ebpf.plugin` | C/eBPF | Kernel instrumentation (syscalls, I/O, networking) | Requires kernel ≥4.11 |
+| `ebpf.plugin` | C/eBPF | Kernel instrumentation (syscalls, I/O, networking - does not in containers or kubernetes) | Requires kernel ≥4.11 |
 | `statsd` | C | Ingest StatsD metrics over UDP | Supports tagging via labels |
 | `log2journal` | C | Log transformation into journald | Provides structured fields |
 | `systemd-journal` | C | Journald reader & indexer | Zero pipeline logging |
@@ -173,7 +173,7 @@ Netdata's auto-discovery eliminates manual configuration:
 
 ### 2.6 Application Observability & APM Scope
 
-- **Zero-code application insights**: `apps.plugin` (process/resource aggregation) and `ebpf.plugin` (kernel-level per-process telemetry) deliver per-second CPU, memory, I/O, networking, OOM, and syscall visibility without touching application code.
+- **Zero-code application insights**: `apps.plugin` (process/resource aggregation) and `ebpf.plugin` (kernel-level per-process telemetry - does not run in containers or kubernetes) deliver per-second CPU, memory, I/O, networking, OOM, and syscall visibility without touching application code.
 - **Logs as first-class signals**: systemd-journal, `log2journal`, `weblog`, `otelcol.plugin`, and `otel-plugin` provide raw log search and logs-to-metrics conversion for web services, applications, and cloud-native sources.
 - **Custom metrics ingestion**: Prometheus/OpenMetrics scraping, StatsD, and OTLP metrics via `otel-plugin` let instrumented code feed business or application KPIs into Netdata dashboards.
 - **Synthetic monitoring**: go.d collectors like `httpcheck`, `ping`, `portcheck`, `dnsquery`, and `testrandom` run uptime/performance probes against services, APIs, and endpoints, feeding directly into alerts and dashboards.
