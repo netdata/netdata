@@ -4,7 +4,7 @@ import path from 'node:path';
 import type { AIAgentSession } from './ai-agent.js';
 // keep type imports grouped at top
 import type { OutputFormatId } from './formats.js';
-import type { AIAgentCallbacks, AIAgentResult, AIAgentSessionConfig, Configuration, ConversationMessage, OpenAPISpecConfig } from './types.js';
+import type { AIAgentCallbacks, AIAgentResult, AIAgentSessionConfig, Configuration, ConversationMessage, RestToolConfig } from './types.js';
 // no runtime format validation here; caller must pass a valid OutputFormatId
 
 import { AIAgent as Agent } from './ai-agent.js';
@@ -15,6 +15,7 @@ import { isReservedAgentName } from './internal-tools.js';
 import { resolveEffectiveOptions } from './options-resolver.js';
 import { buildEffectiveOptionsSchema } from './options-schema.js';
 import { openApiToRestTools, parseOpenAPISpec } from './tools/openapi-importer.js';
+
 
 export interface LoadedAgent {
   id: string; // canonical path (or synthetic when no file)
@@ -74,7 +75,28 @@ function canonical(p: string): string {
   try { return fs.realpathSync(p); } catch { return p; }
 }
 
+const INCLUDE_DIRECTIVE_PATTERN = /\$\{include:[^}]+\}|\{\{include:[^}]+\}\}/;
+
 function readFileText(p: string): string { return fs.readFileSync(p, 'utf-8'); }
+
+function loadFlattenedPrompt(promptPath: string): { content: string; systemTemplate: string } {
+  const raw = readFileText(promptPath);
+  const baseDir = path.dirname(promptPath);
+  const content = resolveIncludes(raw, baseDir);
+  if (INCLUDE_DIRECTIVE_PATTERN.test(content)) {
+    throw new Error(`Prompt '${promptPath}' still contains include directives after expansion. Check for circular includes or malformed syntax.`);
+  }
+  return { content, systemTemplate: extractBodyWithoutFrontmatter(content) };
+}
+
+function flattenPromptContent(content: string, baseDir?: string): { content: string; systemTemplate: string } {
+  const resolved = resolveIncludes(content, baseDir);
+  if (INCLUDE_DIRECTIVE_PATTERN.test(resolved)) {
+    throw new Error('Provided prompt content still contains include directives after expansion.');
+  }
+  return { content: resolved, systemTemplate: extractBodyWithoutFrontmatter(resolved) };
+}
+
 
 export interface LoadAgentOptions {
   configPath?: string;
@@ -149,6 +171,7 @@ const resolveInputContract = (
   return { format: 'json', schema: cloneSchemaStrict(FALLBACK_INPUT_SCHEMA) };
 };
 
+
 function containsPlaceholder(val: unknown): boolean {
   if (typeof val === 'string') return /\$\{[^}]+\}/.test(val);
   if (Array.isArray(val)) return val.some((v) => containsPlaceholder(v));
@@ -176,10 +199,13 @@ export function loadAgent(aiPath: string, registry?: LoadedAgentCache, options?:
   const cached = reg.get(id);
   if (cached !== undefined) return cached;
 
-  const baseDir = path.dirname(aiPath);
-  const content = resolveIncludes(readFileText(aiPath), baseDir);
-  const fm = parseFrontmatter(content, { baseDir: path.dirname(aiPath) });
-  const systemTemplate = extractBodyWithoutFrontmatter(content);
+  const layers = discoverLayers({ configPath: options?.configPath, promptPath: aiPath });
+
+  const baseDir = path.dirname(id);
+  const flattened = loadFlattenedPrompt(id);
+  const promptContent = flattened.content;
+  const systemTemplate = flattened.systemTemplate;
+  const fm = parseFrontmatter(promptContent, { baseDir });
 
   // Determine needed targets/tools: CLI/opts > frontmatter
   const fmModels = parsePairs(fm?.options?.models);
@@ -188,16 +214,15 @@ export function loadAgent(aiPath: string, registry?: LoadedAgentCache, options?:
   const optTargets = options?.targets;
   const selectedTargets = Array.isArray(optTargets) && optTargets.length > 0 ? optTargets : fmModels;
   const optTools = options?.tools;
-  const selectedTools = Array.isArray(optTools) && optTools.length > 0 ? optTools : fmTools;
+  let selectedTools = Array.isArray(optTools) && optTools.length > 0 ? optTools : fmTools;
   const effAgents = Array.isArray(options?.agents) && options.agents.length > 0 ? options.agents : fmAgents;
-  const selectedAgents = effAgents.map((rel) => path.resolve(path.dirname(aiPath), rel));
+  const selectedAgents = effAgents.map((rel) => path.resolve(baseDir, rel));
   const needProviders = Array.from(new Set(selectedTargets.map((t) => t.provider)));
   const externalToolNames = Array.from(new Set(
     selectedTools.filter((tool) => !tool.includes(':') && !isReservedAgentName(tool))
   ));
 
-  const layers = discoverLayers({ configPath: options?.configPath, promptPath: aiPath });
-  const config = buildUnifiedConfiguration({ providers: needProviders, mcpServers: externalToolNames, restTools: externalToolNames }, layers, { verbose: options?.verbose });
+  let config = buildUnifiedConfiguration({ providers: needProviders, mcpServers: externalToolNames, restTools: externalToolNames }, layers, { verbose: options?.verbose });
   const dfl = resolveDefaults(layers);
   validateNoPlaceholders(config);
   // Apply persistence overrides from CLI
@@ -229,10 +254,12 @@ export function loadAgent(aiPath: string, registry?: LoadedAgentCache, options?:
   // Merge env files to enable ${VAR} expansion for OpenAPI defaults
   const mergedEnv: Record<string, string> = {};
   layers.forEach((ly) => {
-    const e = ly.env ?? {};
-    Object.keys(e).forEach((k) => { mergedEnv[k] = e[k]; });
+    const env = ly.env ?? {};
+    Object.entries(env).forEach(([key, value]) => { mergedEnv[key] = value; });
   });
-  Object.keys(process.env).forEach((k) => { const v = process.env[k]; if (typeof v === 'string') mergedEnv[k] = v; });
+  Object.entries(process.env).forEach(([key, value]) => {
+    if (typeof value === 'string') mergedEnv[key] = value;
+  });
   const expandVars = (s: string): string => s.replace(/\$\{([^}]+)\}/g, (_m, name: string) => mergedEnv[name] ?? '');
 
   const eff = resolveEffectiveOptions({
@@ -277,6 +304,68 @@ export function loadAgent(aiPath: string, registry?: LoadedAgentCache, options?:
   const resolvedExpectedOutput = fm?.expectedOutput !== undefined
     ? { ...fm.expectedOutput, schema: cloneSchemaOptional(fm.expectedOutput.schema) }
     : undefined;
+  const selectedOpenAPIProviders = new Set<string>();
+  selectedTools.forEach((toolName) => {
+    if (typeof toolName === 'string' && toolName.startsWith('openapi:')) {
+      const providerName = toolName.slice(8);
+      selectedOpenAPIProviders.add(providerName);
+    }
+  });
+  if (config.openapiSpecs !== undefined && selectedOpenAPIProviders.size > 0) {
+    const configLayer = layers.find((ly) => {
+      const json = ly.json as { openapiSpecs?: Record<string, unknown> } | undefined;
+      return json?.openapiSpecs !== undefined;
+    });
+    const configDir = configLayer !== undefined ? path.dirname(configLayer.jsonPath) : baseDir;
+    const generatedRestTools: Record<string, RestToolConfig> = {};
+    const generatedNames: string[] = [];
+    selectedOpenAPIProviders.forEach((providerName) => {
+      const specCfg = config.openapiSpecs?.[providerName];
+      if (specCfg === undefined) {
+        throw new Error(`OpenAPI provider '${providerName}' not found in configuration.`);
+      }
+      const loc = specCfg.spec;
+      if (typeof loc !== 'string' || loc.length === 0) {
+        throw new Error(`OpenAPI provider '${providerName}' is missing a spec path.`);
+      }
+      if (loc.startsWith('http://') || loc.startsWith('https://')) {
+        throw new Error(`Remote OpenAPI specs violate PR-001 (provider '${providerName}'). Use local cached files instead.`);
+      }
+      const specPath = path.isAbsolute(loc) ? loc : path.resolve(configDir, loc);
+      const raw = readFileText(specPath);
+      const spec = parseOpenAPISpec(raw);
+      const toolsMap = openApiToRestTools(spec, {
+        toolNamePrefix: providerName,
+        baseUrlOverride: specCfg.baseUrl,
+        includeMethods: specCfg.includeMethods,
+        tagFilter: specCfg.tagFilter,
+      });
+      const defaultHeadersRaw = specCfg.headers ?? {};
+      const defaultHeaders: Record<string, string> = {};
+      Object.entries(defaultHeadersRaw).forEach(([key, value]) => {
+        defaultHeaders[key] = expandVars(value);
+      });
+      Object.entries(toolsMap).forEach(([name, tool]) => {
+        const mergedHeaders = { ...(defaultHeaders), ...(tool.headers ?? {}) };
+        tool.headers = Object.keys(mergedHeaders).length > 0 ? mergedHeaders : undefined;
+        if (Object.prototype.hasOwnProperty.call(generatedRestTools, name)) {
+          throw new Error(`Duplicate OpenAPI tool name '${name}' generated for provider '${providerName}'.`);
+        }
+        generatedRestTools[name] = tool;
+        generatedNames.push(name);
+      });
+    });
+    if (Object.keys(generatedRestTools).length > 0) {
+      const mergedRestTools = { ...(config.restTools ?? {}), ...generatedRestTools };
+      config = { ...config, restTools: mergedRestTools };
+    }
+    if (generatedNames.length > 0) {
+      selectedTools = selectedTools
+        .filter((toolName) => !(typeof toolName === 'string' && toolName.startsWith('openapi:')))
+        .concat(generatedNames);
+    }
+  }
+
   const resolvedOutputSchema = resolvedExpectedOutput?.format === 'json'
     ? cloneSchemaOptional(resolvedExpectedOutput.schema)
     : undefined;
@@ -291,97 +380,6 @@ export function loadAgent(aiPath: string, registry?: LoadedAgentCache, options?:
 
     let dynamicConfig = config;
     let dynamicTools = [...selectedTools];
-
-    const selectedOpenAPIProviders = new Set<string>();
-    selectedTools.forEach((toolName) => {
-      if (typeof toolName === 'string' && toolName.startsWith('openapi:')) {
-        const providerName = toolName.slice(8);
-        selectedOpenAPIProviders.add(providerName);
-      }
-    });
-
-    const openapiSpecs = (dynamicConfig as unknown as { openapiSpecs?: Record<string, OpenAPISpecConfig> }).openapiSpecs;
-    if (o.callbacks?.onLog !== undefined && openapiSpecs !== undefined) {
-      o.callbacks.onLog({
-        timestamp: Date.now(),
-        severity: 'VRB',
-        turn: 0,
-        subturn: 0,
-        direction: 'request',
-        type: 'tool',
-        remoteIdentifier: 'openapi',
-        fatal: false,
-        message: `Found OpenAPI specs in config: ${JSON.stringify(Object.keys(openapiSpecs))}, selected providers: ${JSON.stringify(Array.from(selectedOpenAPIProviders))}`
-      });
-    }
-    if (openapiSpecs !== undefined && selectedOpenAPIProviders.size > 0) {
-      const configLayer = layers.find((ly) => {
-        const json = ly.json;
-        return json !== undefined && typeof json === 'object' && 'openapiSpecs' in json;
-      });
-      const configDir = configLayer !== undefined ? path.dirname(configLayer.jsonPath) : baseDir;
-      const entries = Object.entries(openapiSpecs);
-      // eslint-disable-next-line functional/no-loop-statements
-      for (const [name, specCfg] of entries) {
-        if (!selectedOpenAPIProviders.has(name)) continue;
-        try {
-          const loc = specCfg.spec;
-          let text: string;
-          if (loc.startsWith('http://') || loc.startsWith('https://')) {
-            throw new Error('Remote OpenAPI specs violate PR-001. Use local cached files instead.');
-          } else {
-            const p = path.isAbsolute(loc) ? loc : path.resolve(configDir, loc);
-            if (o.callbacks?.onLog !== undefined) {
-              o.callbacks.onLog({
-                timestamp: Date.now(),
-                severity: 'VRB',
-                turn: 0,
-                subturn: 0,
-                direction: 'request',
-                type: 'tool',
-                remoteIdentifier: `openapi:${name}`,
-                fatal: false,
-                message: `Loading OpenAPI spec from: ${p} (loc=${loc}, configDir=${configDir})`
-              });
-            }
-            text = readFileText(p);
-          }
-          const spec = parseOpenAPISpec(text);
-          const toolsMap = openApiToRestTools(spec, {
-            toolNamePrefix: name,
-            baseUrlOverride: specCfg.baseUrl,
-            includeMethods: specCfg.includeMethods,
-            tagFilter: specCfg.tagFilter
-          });
-          const defaultHeadersRaw = specCfg.headers ?? {};
-          const defaultHeaders: Record<string, string> = {};
-          Object.entries(defaultHeadersRaw).forEach(([k, v]) => { defaultHeaders[k] = expandVars(v); });
-          Object.values(toolsMap).forEach((t) => {
-            const merged = { ...(defaultHeaders), ...(t.headers ?? {}) };
-            t.headers = Object.keys(merged).length > 0 ? merged : undefined;
-          });
-          const mergedRest = { ...(dynamicConfig.restTools ?? {}), ...toolsMap };
-          dynamicConfig = { ...dynamicConfig, restTools: mergedRest };
-          const newTools = Object.keys(toolsMap);
-          dynamicTools = dynamicTools.filter((t) => t !== `openapi:${name}`).concat(newTools);
-          if (o.callbacks?.onLog !== undefined) {
-            o.callbacks.onLog({
-              timestamp: Date.now(),
-              severity: 'VRB',
-              turn: 0,
-              subturn: 0,
-              direction: 'response',
-              type: 'tool',
-              remoteIdentifier: `openapi:${name}`,
-              fatal: false,
-              message: `Loaded ${String(newTools.length)} tools from OpenAPI provider: ${name}`
-            });
-          }
-        } catch (e) {
-          throw new Error(`Failed to import OpenAPI spec '${name}': ${e instanceof Error ? e.message : String(e)}`);
-        }
-      }
-    }
 
     const sessionConfig: AIAgentSessionConfig = {
       config: dynamicConfig,
@@ -476,16 +474,19 @@ export function loadAgentFromContent(id: string, content: string, options?: Load
   const cached = reg.get(id);
   if (cached !== undefined) return cached;
 
-  const contentWithIncludes = resolveIncludes(content, options?.baseDir);
+  const layers = discoverLayers({ configPath: options?.configPath, promptPath: id });
+  const baseDir = options?.baseDir ?? process.cwd();
+  const flattened = flattenPromptContent(content, options?.baseDir);
+  const contentWithIncludes = flattened.content;
+  const systemTemplate = flattened.systemTemplate;
   const fm = parseFrontmatter(contentWithIncludes, { baseDir: options?.baseDir });
-  const systemTemplate = extractBodyWithoutFrontmatter(contentWithIncludes);
   const fmModels = parsePairs(fm?.options?.models);
   const fmTools = parseList(fm?.options?.tools);
   const fmAgents = parseList(fm?.options?.agents);
   const optTargets2 = options?.targets;
   const selectedTargets = Array.isArray(optTargets2) && optTargets2.length > 0 ? optTargets2 : fmModels;
   const optTools2 = options?.tools;
-  const selectedTools = Array.isArray(optTools2) && optTools2.length > 0 ? optTools2 : fmTools;
+  let selectedTools = Array.isArray(optTools2) && optTools2.length > 0 ? optTools2 : fmTools;
   const effAgents2 = Array.isArray(options?.agents) && options.agents.length > 0 ? options.agents : fmAgents;
   const selectedAgents = effAgents2.map((rel) => path.resolve(options?.baseDir ?? process.cwd(), rel));
   const needProviders = Array.from(new Set(selectedTargets.map((t) => t.provider)));
@@ -493,19 +494,17 @@ export function loadAgentFromContent(id: string, content: string, options?: Load
     selectedTools.filter((tool) => !tool.includes(':') && !isReservedAgentName(tool))
   ));
 
-  const layers = discoverLayers({ configPath: options?.configPath, promptPath: id });
-  const config = buildUnifiedConfiguration({ providers: needProviders, mcpServers: externalToolNames, restTools: externalToolNames }, layers, { verbose: options?.verbose });
+  let config = buildUnifiedConfiguration({ providers: needProviders, mcpServers: externalToolNames, restTools: externalToolNames }, layers, { verbose: options?.verbose });
   const dfl = resolveDefaults(layers);
   validateNoPlaceholders(config);
 
   const mergedEnvForContent: Record<string, string> = {};
   layers.forEach((ly) => {
     const env = ly.env ?? {};
-    Object.keys(env).forEach((k) => { mergedEnvForContent[k] = env[k]; });
+    Object.entries(env).forEach(([key, value]) => { mergedEnvForContent[key] = value; });
   });
-  Object.keys(process.env).forEach((k) => {
-    const val = process.env[k];
-    if (typeof val === 'string') mergedEnvForContent[k] = val;
+  Object.entries(process.env).forEach(([key, value]) => {
+    if (typeof value === 'string') mergedEnvForContent[key] = value;
   });
   const expandVarsLocal = (s: string): string => s.replace(/\$\{([^}]+)\}/g, (_m, name: string) => mergedEnvForContent[name] ?? '');
   
@@ -572,6 +571,68 @@ export function loadAgentFromContent(id: string, content: string, options?: Load
     ? cloneSchemaOptional(resolvedExpectedOutput.schema)
     : undefined;
 
+  const selectedOpenAPIProviders = new Set<string>();
+  selectedTools.forEach((toolName) => {
+    if (typeof toolName === 'string' && toolName.startsWith('openapi:')) {
+      const providerName = toolName.slice(8);
+      selectedOpenAPIProviders.add(providerName);
+    }
+  });
+  if (config.openapiSpecs !== undefined && selectedOpenAPIProviders.size > 0) {
+    const configLayer = layers.find((ly) => {
+      const json = ly.json as { openapiSpecs?: Record<string, unknown> } | undefined;
+      return json?.openapiSpecs !== undefined;
+    });
+    const configDir = configLayer !== undefined ? path.dirname(configLayer.jsonPath) : baseDir;
+    const generatedRestTools: Record<string, RestToolConfig> = {};
+    const generatedNames: string[] = [];
+    selectedOpenAPIProviders.forEach((providerName) => {
+      const specCfg = config.openapiSpecs?.[providerName];
+      if (specCfg === undefined) {
+        throw new Error(`OpenAPI provider '${providerName}' not found in configuration.`);
+      }
+      const loc = specCfg.spec;
+      if (typeof loc !== 'string' || loc.length === 0) {
+        throw new Error(`OpenAPI provider '${providerName}' is missing a spec path.`);
+      }
+      if (loc.startsWith('http://') || loc.startsWith('https://')) {
+        throw new Error(`Remote OpenAPI specs violate PR-001 (provider '${providerName}'). Use local cached files instead.`);
+      }
+      const specPath = path.isAbsolute(loc) ? loc : path.resolve(configDir, loc);
+      const raw = readFileText(specPath);
+      const spec = parseOpenAPISpec(raw);
+      const toolsMap = openApiToRestTools(spec, {
+        toolNamePrefix: providerName,
+        baseUrlOverride: specCfg.baseUrl,
+        includeMethods: specCfg.includeMethods,
+        tagFilter: specCfg.tagFilter,
+      });
+      const defaultHeadersRaw = specCfg.headers ?? {};
+      const defaultHeaders: Record<string, string> = {};
+      Object.entries(defaultHeadersRaw).forEach(([key, value]) => {
+        defaultHeaders[key] = expandVarsLocal(value);
+      });
+      Object.entries(toolsMap).forEach(([name, tool]) => {
+        const mergedHeaders = { ...(defaultHeaders), ...(tool.headers ?? {}) };
+        tool.headers = Object.keys(mergedHeaders).length > 0 ? mergedHeaders : undefined;
+        if (Object.prototype.hasOwnProperty.call(generatedRestTools, name)) {
+          throw new Error(`Duplicate OpenAPI tool name '${name}' generated for provider '${providerName}'.`);
+        }
+        generatedRestTools[name] = tool;
+        generatedNames.push(name);
+      });
+    });
+    if (Object.keys(generatedRestTools).length > 0) {
+      const mergedRestTools = { ...(config.restTools ?? {}), ...generatedRestTools };
+      config = { ...config, restTools: mergedRestTools };
+    }
+    if (generatedNames.length > 0) {
+      selectedTools = selectedTools
+        .filter((toolName) => !(typeof toolName === 'string' && toolName.startsWith('openapi:')))
+        .concat(generatedNames);
+    }
+  }
+
   const createSession = (
     systemPrompt: string,
     userPrompt: string,
@@ -582,58 +643,6 @@ export function loadAgentFromContent(id: string, content: string, options?: Load
 
     let dynamicConfig = config;
     let dynamicTools = [...selectedTools];
-
-    const selectedOpenAPIProviders = new Set<string>();
-    selectedTools.forEach((toolName) => {
-      if (typeof toolName === 'string' && toolName.startsWith('openapi:')) {
-        const providerName = toolName.slice(8);
-        selectedOpenAPIProviders.add(providerName);
-      }
-    });
-
-    const openapiSpecs = (dynamicConfig as unknown as { openapiSpecs?: Record<string, OpenAPISpecConfig> }).openapiSpecs;
-    if (openapiSpecs !== undefined && selectedOpenAPIProviders.size > 0) {
-      const configLayer = layers.find((ly) => {
-        const json = ly.json;
-        return json !== undefined && typeof json === 'object' && 'openapiSpecs' in json;
-      });
-      const configDir = configLayer !== undefined ? path.dirname(configLayer.jsonPath) : (options?.baseDir ?? process.cwd());
-      const entries = Object.entries(openapiSpecs);
-      // eslint-disable-next-line functional/no-loop-statements
-      for (const [name, specCfg] of entries) {
-        if (!selectedOpenAPIProviders.has(name)) continue;
-        try {
-          const loc = specCfg.spec;
-          let text: string;
-          if (loc.startsWith('http://') || loc.startsWith('https://')) {
-            throw new Error('Remote OpenAPI specs violate PR-001. Use local cached files instead.');
-          } else {
-            const p = path.isAbsolute(loc) ? loc : path.resolve(configDir, loc);
-            text = readFileText(p);
-          }
-          const spec = parseOpenAPISpec(text);
-          const toolsMap = openApiToRestTools(spec, {
-            toolNamePrefix: name,
-            baseUrlOverride: specCfg.baseUrl,
-            includeMethods: specCfg.includeMethods,
-            tagFilter: specCfg.tagFilter,
-          });
-          const defaultHeadersRaw = specCfg.headers ?? {};
-          const defaultHeaders: Record<string, string> = {};
-          Object.entries(defaultHeadersRaw).forEach(([k, v]) => { defaultHeaders[k] = expandVarsLocal(v); });
-          Object.values(toolsMap).forEach((t) => {
-            const merged = { ...(defaultHeaders), ...(t.headers ?? {}) };
-            t.headers = Object.keys(merged).length > 0 ? merged : undefined;
-          });
-          const mergedRest = { ...(dynamicConfig.restTools ?? {}), ...toolsMap };
-          dynamicConfig = { ...dynamicConfig, restTools: mergedRest };
-          const newTools = Object.keys(toolsMap);
-          dynamicTools = dynamicTools.filter((t) => t !== `openapi:${name}`).concat(newTools);
-        } catch (e) {
-          throw new Error(`Failed to import OpenAPI spec '${name}': ${e instanceof Error ? e.message : String(e)}`);
-        }
-      }
-    }
 
     const sessionConfig: AIAgentSessionConfig = {
       config: dynamicConfig,

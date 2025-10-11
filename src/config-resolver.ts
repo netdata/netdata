@@ -71,13 +71,14 @@ function parseEnvFile(content: string): Record<string, string> {
 }
 
 function readEnvIfExists(p: string): Record<string, string> | undefined {
+  if (!fs.existsSync(p)) return undefined;
   try {
-    if (fs.existsSync(p)) {
-      const raw = fs.readFileSync(p, 'utf-8');
-      return parseEnvFile(raw);
-    }
-  } catch (e) { warn(`failed to read env file: ${p}: ${e instanceof Error ? e.message : String(e)}`); }
-  return undefined;
+    const raw = fs.readFileSync(p, 'utf-8');
+    return parseEnvFile(raw);
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    throw new Error(`failed to read env file '${p}': ${message}`);
+  }
 }
 
 export function discoverLayers(opts?: { configPath?: string; promptPath?: string }): ConfigLayer[] {

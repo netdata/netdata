@@ -16,7 +16,8 @@ import type {
 } from './types.js';
 
 import { loadAgentFromContent } from './agent-loader.js';
-import { parseFrontmatter, stripFrontmatter, parsePairs } from './frontmatter.js';
+import { parseFrontmatter, parsePairs, extractBodyWithoutFrontmatter } from './frontmatter.js';
+import { resolveIncludes } from './include-resolver.js';
 import { isReservedAgentName } from './internal-tools.js';
 import { clampToolName, sanitizeToolName as coreSanitizeToolName } from './utils.js';
 
@@ -31,6 +32,8 @@ interface ChildInfo {
   // A loader-produced runner will be resolved lazily when executed
   loaded?: LoadedAgent; // Static snapshot runner (no hot-reload within a session)
 }
+
+const INCLUDE_DIRECTIVE_PATTERN = /\$\{include:[^}]+\}|\{\{include:[^}]+\}\}/;
 
 function canonical(p: string): string {
   try { return fs.realpathSync(p); } catch { return p; }
@@ -55,10 +58,15 @@ export class SubAgentRegistry {
     if (this.ancestors.includes(id)) {
       throw new Error(`Recursion detected while loading sub-agent: ${id}`);
     }
-    const content = fs.readFileSync(id, 'utf-8');
+    const raw = fs.readFileSync(id, 'utf-8');
+    const baseDir = path.dirname(id);
+    const flattened = resolveIncludes(raw, baseDir);
+    if (INCLUDE_DIRECTIVE_PATTERN.test(flattened)) {
+      throw new Error(`Sub-agent '${id}' contains include directives after expansion`);
+    }
     let fm;
     try {
-      fm = parseFrontmatter(content, { baseDir: path.dirname(id) });
+      fm = parseFrontmatter(flattened, { baseDir });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       throw new Error(`Sub-agent '${id}' frontmatter error: ${msg}`);
@@ -96,7 +104,7 @@ export class SubAgentRegistry {
     const inputFmt = fm.inputSpec?.format ?? 'text';
     const inputSchema = fm.inputSpec?.schema;
     // Keep template unmodified; ai-agent will centrally handle ${FORMAT} and variables
-    const systemTemplate = stripFrontmatter(content);
+    const systemTemplate = extractBodyWithoutFrontmatter(flattened);
     // Enforce models presence in frontmatter; sub-agents must declare their own targets
     try {
       const models = parsePairs((fm.options as { models?: unknown } | undefined)?.models);
@@ -118,7 +126,7 @@ export class SubAgentRegistry {
     };
     // Build a static snapshot runner now (no dynamic reload during session)
     try {
-      const loaded = loadAgentFromContent(id, content, { baseDir: path.dirname(id), traceLLM: this.opts.traceLLM, traceMCP: this.opts.traceMCP, verbose: this.opts.verbose });
+      const loaded = loadAgentFromContent(id, flattened, { baseDir, traceLLM: this.opts.traceLLM, traceMCP: this.opts.traceMCP, verbose: this.opts.verbose });
       info.loaded = loaded;
       // Prefer the fully resolved system template from the snapshot (includes resolved statically)
       info.systemTemplate = loaded.systemTemplate;
