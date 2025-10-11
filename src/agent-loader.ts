@@ -4,17 +4,19 @@ import path from 'node:path';
 import type { AIAgentSession } from './ai-agent.js';
 // keep type imports grouped at top
 import type { OutputFormatId } from './formats.js';
+import type { PreloadedSubAgent } from './subagent-registry.js';
 import type { AIAgentCallbacks, AIAgentResult, AIAgentSessionConfig, Configuration, ConversationMessage, RestToolConfig } from './types.js';
 // no runtime format validation here; caller must pass a valid OutputFormatId
 
 import { AIAgent as Agent } from './ai-agent.js';
-import { buildUnifiedConfiguration, discoverLayers, resolveDefaults } from './config-resolver.js';
+import { buildUnifiedConfiguration, discoverLayers, resolveDefaults, type ResolvedConfigLayer } from './config-resolver.js';
 import { parseFrontmatter, parseList, parsePairs, extractBodyWithoutFrontmatter } from './frontmatter.js';
 import { resolveIncludes } from './include-resolver.js';
 import { isReservedAgentName } from './internal-tools.js';
 import { resolveEffectiveOptions } from './options-resolver.js';
 import { buildEffectiveOptionsSchema } from './options-schema.js';
 import { openApiToRestTools, parseOpenAPISpec } from './tools/openapi-importer.js';
+import { clampToolName, sanitizeToolName } from './utils.js';
 
 
 export interface LoadedAgent {
@@ -31,7 +33,7 @@ export interface LoadedAgent {
   targets: { provider: string; model: string }[];
   tools: string[];
   accountingFile?: string;
-  subAgentPaths: string[];
+  subAgents: PreloadedSubAgent[];
   effective: {
     temperature: number;
     topP: number;
@@ -79,6 +81,13 @@ const INCLUDE_DIRECTIVE_PATTERN = /\$\{include:[^}]+\}|\{\{include:[^}]+\}\}/;
 
 function readFileText(p: string): string { return fs.readFileSync(p, 'utf-8'); }
 
+function deriveToolNameFromPath(p: string): string {
+  const base = path.basename(p).replace(/\.[^.]+$/, '');
+  const sanitized = sanitizeToolName(base);
+  const normalized = sanitized.length > 0 ? sanitized.toLowerCase() : sanitized;
+  return clampToolName(normalized).name;
+}
+
 function loadFlattenedPrompt(promptPath: string): { content: string; systemTemplate: string } {
   const raw = readFileText(promptPath);
   const baseDir = path.dirname(promptPath);
@@ -100,6 +109,7 @@ function flattenPromptContent(content: string, baseDir?: string): { content: str
 
 export interface LoadAgentOptions {
   configPath?: string;
+  configLayers?: ResolvedConfigLayer[];
   verbose?: boolean;
   targets?: { provider: string; model: string }[];
   tools?: string[];
@@ -139,6 +149,7 @@ export interface LoadAgentOptions {
     parallelToolCalls?: boolean;
     maxToolCallsPerTurn?: number;
   };
+  ancestors?: string[];
 }
 
 const FALLBACK_INPUT_SCHEMA: Record<string, unknown> = Object.freeze({
@@ -199,7 +210,12 @@ export function loadAgent(aiPath: string, registry?: LoadedAgentCache, options?:
   const cached = reg.get(id);
   if (cached !== undefined) return cached;
 
-  const layers = discoverLayers({ configPath: options?.configPath, promptPath: aiPath });
+  const ancestorChain = Array.isArray(options?.ancestors) ? options.ancestors : [];
+  if (ancestorChain.includes(id)) {
+    throw new Error(`Recursion detected while loading agent: ${id}`);
+  }
+
+  const layers: ResolvedConfigLayer[] = options?.configLayers ?? discoverLayers({ configPath: options?.configPath, promptPath: aiPath });
 
   const baseDir = path.dirname(id);
   const flattened = loadFlattenedPrompt(id);
@@ -217,6 +233,46 @@ export function loadAgent(aiPath: string, registry?: LoadedAgentCache, options?:
   let selectedTools = Array.isArray(optTools) && optTools.length > 0 ? optTools : fmTools;
   const effAgents = Array.isArray(options?.agents) && options.agents.length > 0 ? options.agents : fmAgents;
   const selectedAgents = effAgents.map((rel) => path.resolve(baseDir, rel));
+  const subAgentInfos: PreloadedSubAgent[] = [];
+  const seenToolNames = new Set<string>();
+  selectedAgents.forEach((agentPath) => {
+    const absPath = canonical(agentPath);
+    if (ancestorChain.includes(absPath)) {
+      throw new Error(`Recursion detected while loading sub-agent: ${absPath}`);
+    }
+    const childLoaded = loadAgent(absPath, reg, {
+      configLayers: layers,
+      verbose: options?.verbose,
+      defaultsForUndefined: options?.defaultsForUndefined,
+      ancestors: [...ancestorChain, id],
+    });
+    const derivedToolName = childLoaded.toolName ?? deriveToolNameFromPath(childLoaded.promptPath);
+    if (isReservedAgentName(derivedToolName)) {
+      throw new Error(`Sub-agent '${childLoaded.promptPath}' uses a reserved tool name '${derivedToolName}'`);
+    }
+    if (seenToolNames.has(derivedToolName)) {
+      throw new Error(`Duplicate sub-agent tool name '${derivedToolName}' detected while loading '${childLoaded.promptPath}'`);
+    }
+    seenToolNames.add(derivedToolName);
+    if (typeof childLoaded.description !== 'string' || childLoaded.description.trim().length === 0) {
+      throw new Error(`Sub-agent '${childLoaded.promptPath}' missing 'description' in frontmatter`);
+    }
+    const inputFormat = childLoaded.input.format === 'json' ? 'json' : 'text';
+    const childInfo: PreloadedSubAgent = {
+      toolName: derivedToolName,
+      description: childLoaded.description,
+      usage: childLoaded.usage,
+      inputFormat,
+      inputSchema: childLoaded.input.schema,
+      promptPath: childLoaded.promptPath,
+      systemTemplate: childLoaded.systemTemplate,
+      loaded: childLoaded,
+    };
+    if (childLoaded.toolName === undefined) {
+      (childLoaded as { toolName?: string }).toolName = derivedToolName;
+    }
+    subAgentInfos.push(childInfo);
+  });
   const needProviders = Array.from(new Set(selectedTargets.map((t) => t.provider)));
   const externalToolNames = Array.from(new Set(
     selectedTools.filter((tool) => !tool.includes(':') && !isReservedAgentName(tool))
@@ -386,7 +442,7 @@ export function loadAgent(aiPath: string, registry?: LoadedAgentCache, options?:
       targets: selectedTargets,
       tools: dynamicTools,
       agentId: agentName,
-      subAgentPaths: selectedAgents,
+      subAgents: subAgentInfos,
       systemPrompt,
       userPrompt,
       outputFormat: o.outputFormat,
@@ -440,7 +496,7 @@ export function loadAgent(aiPath: string, registry?: LoadedAgentCache, options?:
     config,
     targets: selectedTargets,
     tools: selectedTools,
-    subAgentPaths: [...selectedAgents],
+    subAgents: subAgentInfos,
     accountingFile,
   effective: {
       temperature: eff.temperature,
@@ -474,7 +530,12 @@ export function loadAgentFromContent(id: string, content: string, options?: Load
   const cached = reg.get(id);
   if (cached !== undefined) return cached;
 
-  const layers = discoverLayers({ configPath: options?.configPath, promptPath: id });
+  const ancestorChain = Array.isArray(options?.ancestors) ? options.ancestors : [];
+  if (ancestorChain.includes(id)) {
+    throw new Error(`Recursion detected while loading agent content: ${id}`);
+  }
+
+  const layers: ResolvedConfigLayer[] = options?.configLayers ?? discoverLayers({ configPath: options?.configPath, promptPath: id });
   const baseDir = options?.baseDir ?? process.cwd();
   const flattened = flattenPromptContent(content, options?.baseDir);
   const contentWithIncludes = flattened.content;
@@ -489,6 +550,43 @@ export function loadAgentFromContent(id: string, content: string, options?: Load
   let selectedTools = Array.isArray(optTools2) && optTools2.length > 0 ? optTools2 : fmTools;
   const effAgents2 = Array.isArray(options?.agents) && options.agents.length > 0 ? options.agents : fmAgents;
   const selectedAgents = effAgents2.map((rel) => path.resolve(options?.baseDir ?? process.cwd(), rel));
+  const subAgentInfos: PreloadedSubAgent[] = [];
+  const seenToolNames = new Set<string>();
+  selectedAgents.forEach((agentPath) => {
+    const absPath = canonical(agentPath);
+    const childLoaded = loadAgent(absPath, reg, {
+      configLayers: layers,
+      verbose: options?.verbose,
+      defaultsForUndefined: options?.defaultsForUndefined,
+      ancestors: [...ancestorChain, id],
+    });
+    const derivedToolName = childLoaded.toolName ?? deriveToolNameFromPath(childLoaded.promptPath);
+    if (isReservedAgentName(derivedToolName)) {
+      throw new Error(`Sub-agent '${childLoaded.promptPath}' uses a reserved tool name '${derivedToolName}'`);
+    }
+    if (seenToolNames.has(derivedToolName)) {
+      throw new Error(`Duplicate sub-agent tool name '${derivedToolName}' detected while loading '${childLoaded.promptPath}'`);
+    }
+    seenToolNames.add(derivedToolName);
+    if (typeof childLoaded.description !== 'string' || childLoaded.description.trim().length === 0) {
+      throw new Error(`Sub-agent '${childLoaded.promptPath}' missing 'description' in frontmatter`);
+    }
+    const inputFormat = childLoaded.input.format === 'json' ? 'json' : 'text';
+    const childInfo: PreloadedSubAgent = {
+      toolName: derivedToolName,
+      description: childLoaded.description,
+      usage: childLoaded.usage,
+      inputFormat,
+      inputSchema: childLoaded.input.schema,
+      promptPath: childLoaded.promptPath,
+      systemTemplate: childLoaded.systemTemplate,
+      loaded: childLoaded,
+    };
+    if (childLoaded.toolName === undefined) {
+      (childLoaded as { toolName?: string }).toolName = derivedToolName;
+    }
+    subAgentInfos.push(childInfo);
+  });
   const needProviders = Array.from(new Set(selectedTargets.map((t) => t.provider)));
   const externalToolNames = Array.from(new Set(
     selectedTools.filter((tool) => !tool.includes(':') && !isReservedAgentName(tool))
@@ -649,7 +747,7 @@ export function loadAgentFromContent(id: string, content: string, options?: Load
       targets: selectedTargets,
       tools: dynamicTools,
       agentId: path.basename(id).replace(/\.[^.]+$/, ''),
-      subAgentPaths: selectedAgents,
+      subAgents: subAgentInfos,
       systemPrompt,
       userPrompt,
       outputFormat: o.outputFormat,
@@ -705,7 +803,7 @@ export function loadAgentFromContent(id: string, content: string, options?: Load
     config,
     targets: selectedTargets,
     tools: selectedTools,
-    subAgentPaths: [...selectedAgents],
+    subAgents: subAgentInfos,
     accountingFile,
     subTools: [],
     effective: {

@@ -387,8 +387,8 @@ export interface AIAgentSessionConfig {
   config: Configuration;
   targets: { provider: string; model: string }[];
   tools: string[];
-  // Optional sub-agent prompt file paths (relative or absolute)
-  subAgentPaths?: string[];
+  // Optional preloaded sub-agent definitions (fully resolved at bootstrap)
+  subAgents?: PreloadedSubAgent[];
   // Agent identity (prompt path or synthetic id)
   agentId?: string;
   systemPrompt: string;
@@ -569,3 +569,4 @@ export interface AIAgentRunOptions {
 }
 import type { OutputFormatId } from './formats.js';
 import type { SessionNode } from './session-tree.js';
+import type { PreloadedSubAgent } from './subagent-registry.js';

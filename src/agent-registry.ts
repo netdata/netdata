@@ -169,7 +169,9 @@ export class AgentRegistry {
       this.agents.set(loaded.id, loaded);
     }
     this.registerAliases(loaded, resolvedPath);
-    const subAgents = Array.isArray(loaded.subAgentPaths) ? loaded.subAgentPaths : [];
+    const subAgents = Array.isArray(loaded.subAgents)
+      ? loaded.subAgents.map((child) => child.promptPath)
+      : [];
     const nextQueue = rest.concat(subAgents);
     this.loadAgentsRecursive(nextQueue, loadOptions, visited);
   }

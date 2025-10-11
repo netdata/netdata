@@ -296,9 +296,11 @@ export class AIAgentSession {
     }
     } catch (e) { warn(`abortSignal wiring failed: ${e instanceof Error ? e.message : String(e)}`); }
     // Initialize sub-agents registry if provided
-    if (Array.isArray(sessionConfig.subAgentPaths) && sessionConfig.subAgentPaths.length > 0) {
-      const reg = new SubAgentRegistry(undefined, Array.isArray(sessionConfig.ancestors) ? sessionConfig.ancestors : [], { traceLLM: sessionConfig.traceLLM, traceMCP: sessionConfig.traceMCP, verbose: sessionConfig.verbose });
-      reg.load(sessionConfig.subAgentPaths);
+    if (Array.isArray(sessionConfig.subAgents) && sessionConfig.subAgents.length > 0) {
+      const reg = new SubAgentRegistry(
+        sessionConfig.subAgents,
+        Array.isArray(sessionConfig.ancestors) ? sessionConfig.ancestors : []
+      );
       this.subAgents = reg;
     }
     // REST tools handled by RestProvider; no local registry here

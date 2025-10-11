@@ -1,6 +1,4 @@
 import crypto from 'node:crypto';
-import fs from 'node:fs';
-import path from 'node:path';
 
 import Ajv from 'ajv';
 
@@ -15,13 +13,7 @@ import type {
   MCPTool,
 } from './types.js';
 
-import { loadAgentFromContent } from './agent-loader.js';
-import { parseFrontmatter, parsePairs, extractBodyWithoutFrontmatter } from './frontmatter.js';
-import { resolveIncludes } from './include-resolver.js';
-import { isReservedAgentName } from './internal-tools.js';
-import { clampToolName, sanitizeToolName as coreSanitizeToolName } from './utils.js';
-
-interface ChildInfo {
+export interface PreloadedSubAgent {
   toolName: string;
   description?: string;
   usage?: string;
@@ -29,112 +21,24 @@ interface ChildInfo {
   inputSchema?: Record<string, unknown>;
   promptPath: string; // canonical path
   systemTemplate: string; // stripped frontmatter contents (unexpanded, no FORMAT replacement)
-  // A loader-produced runner will be resolved lazily when executed
-  loaded?: LoadedAgent; // Static snapshot runner (no hot-reload within a session)
+  loaded: LoadedAgent; // Static snapshot runner (no hot-reload within a session)
 }
 
-const INCLUDE_DIRECTIVE_PATTERN = /\$\{include:[^}]+\}|\{\{include:[^}]+\}\}/;
-
-function canonical(p: string): string {
-  try { return fs.realpathSync(p); } catch { return p; }
-}
+type ChildInfo = PreloadedSubAgent;
 
 export class SubAgentRegistry {
   private readonly children = new Map<string, ChildInfo>(); // toolName -> info
-  private readonly opts: { traceLLM?: boolean; traceMCP?: boolean; verbose?: boolean };
 
-  constructor(private readonly baseDir?: string, private readonly ancestors: string[] = [], opts?: { traceLLM?: boolean; traceMCP?: boolean; verbose?: boolean }) {
-    this.opts = opts ?? {};
-  }
-
-  load(paths: string[]): void {
-    paths.forEach((p) => { this.loadOne(p); });
-  }
-
-  private loadOne(p: string): void {
-    const resolved = path.resolve(this.baseDir ?? process.cwd(), p);
-    const id = canonical(resolved);
-    // Recursion prevention: cannot attach an agent that's already in ancestors
-    if (this.ancestors.includes(id)) {
-      throw new Error(`Recursion detected while loading sub-agent: ${id}`);
-    }
-    const raw = fs.readFileSync(id, 'utf-8');
-    const baseDir = path.dirname(id);
-    const flattened = resolveIncludes(raw, baseDir);
-    if (INCLUDE_DIRECTIVE_PATTERN.test(flattened)) {
-      throw new Error(`Sub-agent '${id}' contains include directives after expansion`);
-    }
-    let fm;
-    try {
-      fm = parseFrontmatter(flattened, { baseDir });
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      throw new Error(`Sub-agent '${id}' frontmatter error: ${msg}`);
-    }
-    // Refuse to load without description (usage is optional)
-    if (fm === undefined || typeof fm.description !== 'string' || fm.description.trim().length === 0) {
-      throw new Error(`Sub-agent '${id}' missing 'description' in frontmatter`);
-    }
-    // Determine tool name
-    const fileBase = path.basename(id, path.extname(id));
-    const baseName = fileBase;
-    const toolName = (() => {
-      const sanitized = coreSanitizeToolName(baseName);
-      const normalized = sanitized.length > 0 ? sanitized.toLowerCase() : sanitized;
-      return clampToolName(normalized).name;
-    })();
-    if (isReservedAgentName(toolName)) {
-      throw new Error(`Sub-agent '${id}' uses a reserved tool name '${toolName}'`);
-    }
-    if (this.children.has(toolName)) {
-      throw new Error(`Duplicate sub-agent tool name '${toolName}' from '${id}' conflicts with an existing sub-agent`);
-    }
-    // Max recursion = 0: sub-agents cannot declare further sub-agents
-    // const childAgents: string[] = (() => {
-    //   const anyOpts = fm.options as Record<string, unknown> | undefined;
-    //   if (anyOpts !== undefined) {
-    //     const a = anyOpts.agents;
-    //     if (Array.isArray(a)) return (a as unknown[]).map((x) => String(x));
-    //     if (typeof a === 'string' && a.length > 0) return [a];
-    //   }
-    //   return [];
-    // })();
-    // Allow nested sub-agents; recursion cycles will be prevented by ancestors at load-time of child sessions.
-    // Determine input format/schema
-    const inputFmt = fm.inputSpec?.format ?? 'text';
-    const inputSchema = fm.inputSpec?.schema;
-    // Keep template unmodified; ai-agent will centrally handle ${FORMAT} and variables
-    const systemTemplate = extractBodyWithoutFrontmatter(flattened);
-    // Enforce models presence in frontmatter; sub-agents must declare their own targets
-    try {
-      const models = parsePairs((fm.options as { models?: unknown } | undefined)?.models);
-      if (!Array.isArray(models) || models.length === 0) {
-        throw new Error('missing models');
+  constructor(children: readonly ChildInfo[], private readonly ancestors: string[] = []) {
+    children.forEach((child) => {
+      if (this.ancestors.includes(child.promptPath)) {
+        throw new Error(`Recursion detected while loading sub-agent: ${child.promptPath}`);
       }
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      throw new Error(`Sub-agent '${id}' missing or invalid models: ${msg}`);
-    }
-    const info: ChildInfo = {
-      toolName,
-      description: fm.description,
-      usage: fm.usage,
-      inputFormat: inputFmt,
-      inputSchema,
-      promptPath: id,
-      systemTemplate,
-    };
-    // Build a static snapshot runner now (no dynamic reload during session)
-    try {
-      const loaded = loadAgentFromContent(id, flattened, { baseDir, traceLLM: this.opts.traceLLM, traceMCP: this.opts.traceMCP, verbose: this.opts.verbose });
-      info.loaded = loaded;
-      // Prefer the fully resolved system template from the snapshot (includes resolved statically)
-      info.systemTemplate = loaded.systemTemplate;
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      throw new Error(`Failed to load sub-agent '${id}' at registry time: ${msg}`);
-    }
-    this.children.set(toolName, info);
+      if (this.children.has(child.toolName)) {
+        throw new Error(`Duplicate sub-agent tool name '${child.toolName}' detected during preload.`);
+      }
+      this.children.set(child.toolName, child);
+    });
   }
 
   getTools(): MCPTool[] {
@@ -231,7 +135,6 @@ export class SubAgentRegistry {
     let result: AIAgentResult;
     try {
       const loaded = info.loaded;
-      if (loaded === undefined) throw new Error('sub-agent snapshot not available');
       // Build callbacks wrapper to prefix child logs
       const orig = parentSession.callbacks;
       const childPrefix = `child:${info.toolName}`;

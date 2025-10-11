@@ -1,7 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { extractBodyWithoutFrontmatter } from './frontmatter.js';
 
 // Resolve ${include:filename} or {{include:filename}} placeholders recursively.
 // - baseDir: directory used for resolving relative include paths
@@ -38,10 +37,9 @@ export function resolveIncludes(raw: string, baseDir?: string, maxDepth = 8): st
       const p = path.resolve(base, rel);
       if (isForbiddenInclude(p)) throw new Error(`including this file is forbidden: ${rel}`);
       try {
-        // Read include file, strip its frontmatter body, then resolve nested includes relative to it
+        // Read include file and resolve nested includes relative to it
         const raw = readTextSafe(p);
-        const bodyOnly = extractBodyWithoutFrontmatter(raw);
-        const nested = resolveIncludes(bodyOnly, path.dirname(p), Math.max(0, maxDepth - 1));
+        const nested = resolveIncludes(raw, path.dirname(p), Math.max(0, maxDepth - 1));
         return nested;
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);

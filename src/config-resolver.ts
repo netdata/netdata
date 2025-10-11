@@ -7,7 +7,7 @@ import { warn } from './utils.js';
 
 type LayerOrigin = '--config' | 'cwd' | 'prompt' | 'binary' | 'home' | 'system';
 
-interface ConfigLayer {
+export interface ResolvedConfigLayer {
   origin: LayerOrigin;
   jsonPath: string; // may not exist
   envPath: string;  // may not exist
@@ -82,8 +82,8 @@ function readEnvIfExists(p: string): Record<string, string> | undefined {
   }
 }
 
-export function discoverLayers(opts?: { configPath?: string; promptPath?: string }): ConfigLayer[] {
-  const layers: ConfigLayer[] = [];
+export function discoverLayers(opts?: { configPath?: string; promptPath?: string }): ResolvedConfigLayer[] {
+  const layers: ResolvedConfigLayer[] = [];
 
   const cwd = process.cwd();
   const binDir = path.dirname(fs.realpathSync(process.execPath));
@@ -118,7 +118,7 @@ export function discoverLayers(opts?: { configPath?: string; promptPath?: string
 
   // Highest priority first (as constructed)
   list.forEach((it) => {
-    const layer: ConfigLayer = {
+    const layer: ResolvedConfigLayer = {
       origin: it.origin,
       jsonPath: it.json,
       envPath: it.env,
@@ -150,7 +150,7 @@ function buildMissingVarError(scope: 'provider'|'mcp'|'defaults'|'accounting', i
   return new MissingVariableError(scope, id, origin, name, message);
 }
 
-function resolveProvider(id: string, layers: ConfigLayer[], _opts?: ResolverOptions): ProviderConfig | undefined {
+function resolveProvider(id: string, layers: ResolvedConfigLayer[], _opts?: ResolverOptions): ProviderConfig | undefined {
   let missingVarError: MissingVariableError | undefined;
   // eslint-disable-next-line functional/no-loop-statements -- Early exit once a valid provider configuration is resolved
   for (const layer of layers) {
@@ -178,7 +178,7 @@ function resolveProvider(id: string, layers: ConfigLayer[], _opts?: ResolverOpti
   return undefined;
 }
 
-function resolveMCPServer(id: string, layers: ConfigLayer[], opts?: ResolverOptions): MCPServerConfig | undefined {
+function resolveMCPServer(id: string, layers: ResolvedConfigLayer[], opts?: ResolverOptions): MCPServerConfig | undefined {
   let missingVarError: MissingVariableError | undefined;
   // eslint-disable-next-line functional/no-loop-statements -- Early exit once a valid MCP server configuration is resolved
   for (const layer of layers) {
@@ -220,7 +220,7 @@ function resolveMCPServer(id: string, layers: ConfigLayer[], opts?: ResolverOpti
   return undefined;
 }
 
-function resolveRestTool(id: string, layers: ConfigLayer[]): RestToolConfig | undefined {
+function resolveRestTool(id: string, layers: ResolvedConfigLayer[]): RestToolConfig | undefined {
   let missingVarError: MissingVariableError | undefined;
   // eslint-disable-next-line functional/no-loop-statements -- Early exit once a valid REST tool configuration is resolved
   for (const layer of layers) {
@@ -249,7 +249,7 @@ function resolveRestTool(id: string, layers: ConfigLayer[]): RestToolConfig | un
   return undefined;
 }
 
-export function resolveDefaults(layers: ConfigLayer[]): NonNullable<Configuration['defaults']> {
+export function resolveDefaults(layers: ResolvedConfigLayer[]): NonNullable<Configuration['defaults']> {
   const out: NonNullable<Configuration['defaults']> = {};
   const keys = [
     'llmTimeout',
@@ -280,7 +280,7 @@ export function resolveDefaults(layers: ConfigLayer[]): NonNullable<Configuratio
   return out;
 }
 
-function resolveAccounting(layers: ConfigLayer[], _opts?: ResolverOptions): Configuration['accounting'] {
+function resolveAccounting(layers: ResolvedConfigLayer[], _opts?: ResolverOptions): Configuration['accounting'] {
   const found = layers.find((layer) => {
     const j = layer.json as { accounting?: { file?: string } } | undefined;
     return typeof j?.accounting?.file === 'string';
@@ -299,7 +299,7 @@ function resolveAccounting(layers: ConfigLayer[], _opts?: ResolverOptions): Conf
   return { file: expandedFile };
 }
 
-function resolvePricing(layers: ConfigLayer[]): Configuration['pricing'] {
+function resolvePricing(layers: ResolvedConfigLayer[]): Configuration['pricing'] {
   const found = layers.find((layer) => {
     const j = layer.json as { pricing?: Record<string, unknown> } | undefined;
     return j?.pricing !== undefined;
@@ -312,7 +312,7 @@ function resolvePricing(layers: ConfigLayer[]): Configuration['pricing'] {
 
 export function buildUnifiedConfiguration(
   needs: { providers: string[]; mcpServers: string[]; restTools: string[] },
-  layers: ConfigLayer[],
+  layers: ResolvedConfigLayer[],
   opts?: ResolverOptions
 ): Configuration {
   const providers: Record<string, ProviderConfig> = {};

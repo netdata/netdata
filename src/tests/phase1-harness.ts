@@ -5,6 +5,8 @@ import { fileURLToPath } from 'node:url';
 
 import { WebSocketServer } from 'ws';
 
+import type { ResolvedConfigLayer } from '../config-resolver.js';
+import type { PreloadedSubAgent } from '../subagent-registry.js';
 import type { AIAgentCallbacks, AIAgentResult, AIAgentSessionConfig, AccountingEntry, AgentFinishedEvent, Configuration, ConversationMessage, LogEntry, MCPServerConfig, MCPTool, ProviderConfig, TurnRequest, TurnResult } from '../types.js';
 import type { JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js';
 import type { ChildProcess } from 'node:child_process';
@@ -16,7 +18,7 @@ import { LLMClient } from '../llm-client.js';
 import { TestLLMProvider } from '../llm-providers/test-llm.js';
 import { SubAgentRegistry } from '../subagent-registry.js';
 import { MCPProvider } from '../tools/mcp-provider.js';
-import { sanitizeToolName } from '../utils.js';
+import { clampToolName, sanitizeToolName } from '../utils.js';
 import { createWebSocketTransport } from '../websocket-transport.js';
 
 import { getScenario } from './fixtures/test-llm-scenarios.js';
@@ -38,6 +40,46 @@ const BASE_DEFAULTS = {
 const TMP_PREFIX = 'ai-agent-phase1-';
 const SESSIONS_SUBDIR = 'sessions';
 const BILLING_FILENAME = 'billing.jsonl';
+
+function buildInMemoryConfigLayers(configuration: Configuration): ResolvedConfigLayer[] {
+  const jsonClone = JSON.parse(JSON.stringify(configuration)) as Record<string, unknown>;
+  return [{
+    origin: '--config',
+    jsonPath: '__in-memory-config__',
+    envPath: '__in-memory-env__',
+    json: jsonClone,
+    env: {},
+  }];
+}
+
+function deriveToolName(promptPath: string): string {
+  const base = path.basename(promptPath, path.extname(promptPath));
+  const sanitized = sanitizeToolName(base);
+  const normalized = sanitized.length > 0 ? sanitized.toLowerCase() : sanitized;
+  return clampToolName(normalized).name;
+}
+
+function preloadSubAgentFromPath(promptPath: string, configuration: Configuration): PreloadedSubAgent {
+  const layers = buildInMemoryConfigLayers(configuration);
+  const loaded = loadAgent(promptPath, undefined, { configLayers: layers });
+  const toolName = loaded.toolName ?? deriveToolName(loaded.promptPath);
+  if (typeof loaded.description !== 'string' || loaded.description.trim().length === 0) {
+    throw new Error(`Preloaded sub-agent '${loaded.promptPath}' missing description.`);
+  }
+  if (loaded.toolName === undefined) {
+    (loaded as { toolName?: string }).toolName = toolName;
+  }
+  return {
+    toolName,
+    description: loaded.description,
+    usage: loaded.usage,
+    inputFormat: loaded.input.format === 'json' ? 'json' : 'text',
+    inputSchema: loaded.input.schema,
+    promptPath: loaded.promptPath,
+    systemTemplate: loaded.systemTemplate,
+    loaded,
+  };
+}
 
 function resolveScenarioDescription(id: string, provided?: string): string | undefined {
   if (provided !== undefined && provided.trim().length > 0) return provided;
@@ -95,6 +137,11 @@ const BATCH_PROGRESS_RESPONSE = 'batch-progress-follow-up';
 const BATCH_STRING_RESULT = 'batch-string-mode';
 const TRACEABLE_PROVIDER_URL = 'https://openrouter.ai/api/v1';
 const RATE_LIMIT_WARNING_MESSAGE = 'Rate limited; suggested wait';
+const CONFIG_FILENAME = '.ai-agent.json';
+const FRONTMATTER_BODY_PREFIX = 'System body start.';
+const FRONTMATTER_BODY_SUFFIX = 'System body end.';
+const FRONTMATTER_INCLUDE_MARKER = 'INCLUDED RAW BLOCK';
+const FRONTMATTER_INCLUDE_FLAG = 'includeFrontmatter: true';
 
 const GITHUB_SERVER_PATH = path.resolve(__dirname, 'mcp/github-stdio-server.js');
 
@@ -448,7 +495,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
     configure: (configuration, sessionConfig) => {
       configuration.providers[SECONDARY_PROVIDER] = { type: 'test-llm' };
       configuration.pricing = configuration.pricing ?? {};
-      sessionConfig.subAgentPaths = [SUBAGENT_PRICING_PROMPT];
+      sessionConfig.subAgents = [preloadSubAgentFromPath(SUBAGENT_PRICING_PROMPT, configuration)];
     },
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-19 expected success.');
@@ -521,7 +568,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
   {
     id: 'run-test-24',
     configure: (configuration, sessionConfig) => {
-      sessionConfig.subAgentPaths = [SUBAGENT_PRICING_SUCCESS_PROMPT];
+      sessionConfig.subAgents = [preloadSubAgentFromPath(SUBAGENT_PRICING_SUCCESS_PROMPT, configuration)];
     },
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-24 expected success.');
@@ -1458,7 +1505,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
           '',
         ].join('\n'));
 
-        const configPath = path.join(tempDir, '.ai-agent.json');
+        const configPath = path.join(tempDir, CONFIG_FILENAME);
         const config = {
           providers: {
             primary: {
@@ -1483,7 +1530,8 @@ const TEST_SCENARIOS: HarnessTest[] = [
           },
         };
         fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
-        fs.writeFileSync(path.join(tempDir, '.ai-agent.env'), [
+        const envPath = path.join(tempDir, '.ai-agent.env');
+        fs.writeFileSync(envPath, [
           'TEST_API_KEY=env-secret-key',
           'MCP_COMMAND=env-command',
           'MCP_ARG=env-arg',
@@ -1512,10 +1560,25 @@ const TEST_SCENARIOS: HarnessTest[] = [
         const mcpArgs = Array.isArray(mcpConfig.args) ? mcpConfig.args : [];
         invariant(mcpArgs.includes('env-arg'), 'MCP args should include substituted env argument.');
 
-        invariant(loaded.subAgentPaths.some((p) => p.endsWith('sub-agent.ai')), 'Sub-agent path should be registered after load.');
+        invariant(loaded.subAgents.some((agent) => agent.promptPath.endsWith('sub-agent.ai')), 'Sub-agent should be registered after load.');
 
-        const registry = new SubAgentRegistry(path.dirname(mainPromptPath));
-        registry.load([path.relative(path.dirname(mainPromptPath), subAgentPath)]);
+        const registry = new SubAgentRegistry(
+          loaded.subAgents,
+          []
+        );
+        const observedReads: string[] = [];
+        const originalReadFileSync = fs.readFileSync;
+        try {
+          fs.readFileSync = ((...args: Parameters<typeof fs.readFileSync>) => {
+            const [target] = args;
+            if (typeof target === 'string') observedReads.push(target);
+            return originalReadFileSync.apply(fs, args);
+          }) as typeof fs.readFileSync;
+          // Registry constructed with preloaded data; no runtime loading expected.
+        } finally {
+          fs.readFileSync = originalReadFileSync;
+        }
+        invariant(!observedReads.includes(envPath), 'Sub-agent load should not read env files at runtime.');
         const internalChildren = (registry as unknown as { children: Map<string, { systemTemplate: string }> }).children;
         invariant(internalChildren instanceof Map, 'Sub-agent registry children map missing.');
         const subAgentInfo = internalChildren.get('sub-agent');
@@ -1580,7 +1643,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
             '',
           ].join('\n'));
 
-          const configPath = path.join(tempDir, '.ai-agent.json');
+          const configPath = path.join(tempDir, CONFIG_FILENAME);
           fs.writeFileSync(configPath, JSON.stringify({
             providers: {
               primary: {
@@ -1632,6 +1695,72 @@ const TEST_SCENARIOS: HarnessTest[] = [
       },
     };
   })(),
+  {
+    id: 'run-test-77',
+    description: 'Agent frontmatter stripped while include content preserved.',
+    execute: (): Promise<AIAgentResult> => {
+      const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), `${TMP_PREFIX}frontmatter-include-`));
+      const cleanup = () => {
+        try { fs.rmSync(tempDir, { recursive: true, force: true }); } catch { /* ignore */ }
+      };
+      try {
+        const includePath = path.join(tempDir, 'include.md');
+        fs.writeFileSync(includePath, [
+          '---',
+          FRONTMATTER_INCLUDE_FLAG,
+          '---',
+          FRONTMATTER_INCLUDE_MARKER,
+          '',
+        ].join('\n'));
+
+        const promptPath = path.join(tempDir, 'frontmatter-test.ai');
+        fs.writeFileSync(promptPath, [
+          '---',
+          'description: Frontmatter strip test',
+          `models:`,
+          `  - ${PRIMARY_PROVIDER}/${MODEL_NAME}`,
+          '---',
+          FRONTMATTER_BODY_PREFIX,
+          '${include:include.md}',
+          FRONTMATTER_BODY_SUFFIX,
+          '',
+        ].join('\n'));
+
+        const configPath = path.join(tempDir, CONFIG_FILENAME);
+        fs.writeFileSync(configPath, JSON.stringify({
+          providers: {
+            [PRIMARY_PROVIDER]: { type: 'test-llm' },
+          },
+        }, null, 2));
+
+        const loaded = loadAgent(promptPath, undefined, { configPath });
+        const systemTemplate = loaded.systemTemplate;
+        invariant(!systemTemplate.trimStart().startsWith('---'), 'System template must not start with frontmatter.');
+        invariant(systemTemplate.includes(FRONTMATTER_BODY_PREFIX), 'System body prefix missing.');
+        invariant(systemTemplate.includes(FRONTMATTER_BODY_SUFFIX), 'System body suffix missing.');
+        invariant(systemTemplate.includes(FRONTMATTER_INCLUDE_FLAG), 'Included frontmatter content missing.');
+        invariant(systemTemplate.includes(FRONTMATTER_INCLUDE_MARKER), 'Included raw block missing.');
+
+        return Promise.resolve({
+          success: true,
+          conversation: [],
+          logs: [],
+          accounting: [],
+          finalReport: {
+            status: 'success',
+            format: 'text',
+            content: 'frontmatter-include-validated',
+            ts: Date.now(),
+          },
+        });
+      } finally {
+        cleanup();
+      }
+    },
+    expect: (result) => {
+      invariant(result.success, 'Scenario run-test-77 expected success.');
+    },
+  },
   (() => {
     let progressMessages: string[] = [];
     return {
@@ -1997,9 +2126,9 @@ const TEST_SCENARIOS: HarnessTest[] = [
     return {
       id: 'run-test-66',
       description: 'Sub-agent recursion prevented by ancestors list.',
-      configure: (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+      configure: (configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
         const canonicalPath = fs.realpathSync(SUBAGENT_PRICING_PROMPT);
-        sessionConfig.subAgentPaths = [canonicalPath];
+        sessionConfig.subAgents = [preloadSubAgentFromPath(canonicalPath, configuration)];
         sessionConfig.ancestors = [canonicalPath];
       },
       expect: (result: AIAgentResult) => {
@@ -2456,8 +2585,8 @@ const TEST_SCENARIOS: HarnessTest[] = [
         invariant(hasPrimaryTarget, 'Targets mismatch for run-test-73.');
         invariant(cfg.tools.includes('test'), 'Tool selection mismatch for run-test-73.');
         invariant(cfg.agentId === 'loader', 'Agent identifier mismatch for run-test-73.');
-        invariant(Array.isArray(cfg.subAgentPaths), 'Sub-agent paths expected array for run-test-73.');
-        invariant(cfg.subAgentPaths.length === 0, 'Sub-agent paths expected empty for run-test-73.');
+        invariant(Array.isArray(cfg.subAgents), 'Sub-agent list expected array for run-test-73.');
+        invariant(cfg.subAgents.length === 0, 'Sub-agent list expected empty for run-test-73.');
         invariant(cfg.systemPrompt === 'Loader System Prompt', 'System prompt mismatch for run-test-73.');
         invariant(cfg.userPrompt === 'Loader User Prompt', 'User prompt mismatch for run-test-73.');
         invariant(cfg.outputFormat === 'json', 'Output format mismatch for run-test-73.');
