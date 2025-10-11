@@ -10,10 +10,11 @@ import type { JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js';
 import type { ChildProcess } from 'node:child_process';
 import type { AddressInfo } from 'node:net';
 
-import { loadAgentFromContent } from '../agent-loader.js';
+import { loadAgent, loadAgentFromContent } from '../agent-loader.js';
 import { AIAgentSession } from '../ai-agent.js';
 import { LLMClient } from '../llm-client.js';
 import { TestLLMProvider } from '../llm-providers/test-llm.js';
+import { SubAgentRegistry } from '../subagent-registry.js';
 import { MCPProvider } from '../tools/mcp-provider.js';
 import { sanitizeToolName } from '../utils.js';
 import { createWebSocketTransport } from '../websocket-transport.js';
@@ -1384,6 +1385,246 @@ const TEST_SCENARIOS: HarnessTest[] = [
         const messages = Array.isArray(messagesValue) ? messagesValue : [];
         invariant(messages.length >= 2, 'Normalized Slack messages expected for run-test-57.');
         invariant(progressMessages.some((message) => message.includes('Analyzing deterministic harness outputs.')), 'Progress update should be forwarded for run-test-57.');
+      },
+    };
+  })(),
+  {
+    id: 'run-test-75',
+    description: 'Flatten prompts, expand OpenAPI specs, and resolve env placeholders at load-time.',
+    execute: (): Promise<AIAgentResult> => {
+      const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), `${TMP_PREFIX}preload-`));
+      const cleanup = () => {
+        try { fs.rmSync(tempDir, { recursive: true, force: true }); } catch { /* ignore cleanup errors */ }
+      };
+      try {
+        const partialDir = path.join(tempDir, 'partials');
+        const specsDir = path.join(tempDir, 'specs');
+        fs.mkdirSync(partialDir, { recursive: true });
+        fs.mkdirSync(specsDir, { recursive: true });
+
+        const nestedIncludeMarker = 'Nested include content.';
+        const nestedIncludePath = path.join(partialDir, 'nested.md');
+        fs.writeFileSync(nestedIncludePath, nestedIncludeMarker);
+        const mainIncludePath = path.join(partialDir, 'main.md');
+        fs.writeFileSync(mainIncludePath, ['Part1 include content.', '${include:nested.md}', ''].join('\n'));
+
+        const subAgentPath = path.join(tempDir, 'sub-agent.ai');
+        fs.writeFileSync(subAgentPath, [
+          '---',
+          'description: Sub-agent with includes',
+          'models:',
+          `  - primary/${MODEL_NAME}`,
+          '---',
+          'Sub-agent body start.',
+          '${include:partials/nested.md}',
+          '',
+        ].join('\n'));
+
+        const specPath = path.join(specsDir, 'catalog.json');
+        const openApiSpec = {
+          openapi: '3.0.0',
+          info: { title: 'Catalog', version: '1.0.0' },
+          servers: [{ url: 'https://example.com' }],
+          paths: {
+            '/items': {
+              get: {
+                operationId: 'listItems',
+                summary: 'List items',
+                responses: { '200': { description: 'OK' } },
+              },
+            },
+          },
+        };
+        fs.writeFileSync(specPath, JSON.stringify(openApiSpec, null, 2));
+
+        const mainPromptPath = path.join(tempDir, 'preload-main.ai');
+        fs.writeFileSync(mainPromptPath, [
+          '---',
+          'description: Preload flatten agent',
+          'models:',
+          `  - primary/${MODEL_NAME}`,
+          'tools:',
+          '  - openapi:catalog',
+          '  - test',
+          'agents:',
+          '  - sub-agent.ai',
+          '---',
+          'Main body start.',
+          '${include:partials/main.md}',
+          '',
+        ].join('\n'));
+
+        const configPath = path.join(tempDir, '.ai-agent.json');
+        const config = {
+          providers: {
+            primary: {
+              type: 'test-llm',
+              apiKey: '${TEST_API_KEY}',
+            },
+          },
+          mcpServers: {
+            test: {
+              type: 'stdio',
+              command: '${MCP_COMMAND}',
+              args: ['${MCP_ARG}'],
+            },
+          },
+          openapiSpecs: {
+            catalog: {
+              spec: './specs/catalog.json',
+            },
+          },
+          defaults: {
+            temperature: 0.25,
+          },
+        };
+        fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+        fs.writeFileSync(path.join(tempDir, '.ai-agent.env'), [
+          'TEST_API_KEY=env-secret-key',
+          'MCP_COMMAND=env-command',
+          'MCP_ARG=env-arg',
+          '',
+        ].join('\n'));
+
+        const loaded = loadAgent(mainPromptPath, undefined, { configPath });
+        invariant(!loaded.systemTemplate.includes('${include:'), 'System prompt should not contain include directives post-flatten.');
+        invariant(loaded.systemTemplate.includes('Main body start.'), 'System prompt missing main body content.');
+        invariant(loaded.systemTemplate.includes('Part1 include content.'), 'System prompt missing included content.');
+        invariant(loaded.systemTemplate.includes(nestedIncludeMarker), 'System prompt missing nested include content.');
+
+        const toolSet = new Set(loaded.tools);
+        invariant(toolSet.has('test'), 'Expected MCP test tool to remain after preload.');
+        invariant(toolSet.has('catalog_listItems'), 'OpenAPI-generated tool should be injected after preload.');
+        invariant(!Array.from(toolSet.values()).some((tool) => tool.startsWith('openapi:')), 'openapi:* selectors must be removed after expansion.');
+
+        const restTools = loaded.config.restTools ?? {};
+        invariant(Object.prototype.hasOwnProperty.call(restTools, 'catalog_listItems'), 'Expanded REST tool catalog_listItems missing from configuration.');
+
+        const providerConfig = loaded.config.providers.primary as { apiKey?: string };
+        invariant(providerConfig.apiKey === 'env-secret-key', 'Provider API key should respect env substitution.');
+
+        const mcpConfig = loaded.config.mcpServers.test;
+        invariant(mcpConfig.command === 'env-command', 'MCP command should respect env substitution.');
+        const mcpArgs = Array.isArray(mcpConfig.args) ? mcpConfig.args : [];
+        invariant(mcpArgs.includes('env-arg'), 'MCP args should include substituted env argument.');
+
+        invariant(loaded.subAgentPaths.some((p) => p.endsWith('sub-agent.ai')), 'Sub-agent path should be registered after load.');
+
+        const registry = new SubAgentRegistry(path.dirname(mainPromptPath));
+        registry.load([path.relative(path.dirname(mainPromptPath), subAgentPath)]);
+        const internalChildren = (registry as unknown as { children: Map<string, { systemTemplate: string }> }).children;
+        invariant(internalChildren instanceof Map, 'Sub-agent registry children map missing.');
+        const subAgentInfo = internalChildren.get('sub-agent');
+        invariant(subAgentInfo !== undefined, 'Sub-agent child info missing.');
+        invariant(!subAgentInfo.systemTemplate.includes('${include:'), 'Sub-agent system prompt should not contain include directives post-flatten.');
+        invariant(subAgentInfo.systemTemplate.includes('Sub-agent body start.'), 'Sub-agent system prompt missing body content.');
+        invariant(subAgentInfo.systemTemplate.includes(nestedIncludeMarker), 'Sub-agent system prompt missing nested include content.');
+
+        return Promise.resolve({
+          success: true,
+          conversation: [],
+          logs: [],
+          accounting: [],
+          finalReport: {
+            status: 'success',
+            format: 'text',
+            content: 'preload-validated',
+            ts: Date.now(),
+          },
+        });
+      } finally {
+        cleanup();
+      }
+    },
+    expect: (result) => {
+      invariant(result.success, 'Scenario run-test-75 expected successful preload validation.');
+    },
+  },
+  (() => {
+    return {
+      id: 'run-test-76',
+      description: 'Env fallback when high-priority env file is unreadable.',
+      execute: (): Promise<AIAgentResult> => {
+        const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), `${TMP_PREFIX}env-layer-`));
+        const homeDir = fs.mkdtempSync(path.join(os.tmpdir(), `${TMP_PREFIX}env-home-`));
+        const originalCwd = process.cwd();
+        const originalHome = process.env.HOME;
+        const originalUserProfile = process.env.USERPROFILE;
+        let blockedEnvPath: string | undefined;
+        const cleanup = () => {
+          try {
+            if (blockedEnvPath !== undefined) {
+              try { fs.chmodSync(blockedEnvPath, 0o600); } catch { /* ignore chmod errors */ }
+            }
+            process.chdir(originalCwd);
+            if (originalHome !== undefined) process.env.HOME = originalHome; else delete process.env.HOME;
+            if (originalUserProfile !== undefined) process.env.USERPROFILE = originalUserProfile; else delete process.env.USERPROFILE;
+          } finally {
+            try { fs.rmSync(tempDir, { recursive: true, force: true }); } catch { /* ignore */ }
+            try { fs.rmSync(homeDir, { recursive: true, force: true }); } catch { /* ignore */ }
+          }
+        };
+        try {
+          const promptPath = path.join(tempDir, 'env-fallback.ai');
+          fs.writeFileSync(promptPath, [
+            '---',
+            'description: Env fallback agent',
+            'models:',
+            `  - primary/${MODEL_NAME}`,
+            '---',
+            'Env fallback body.',
+            '',
+          ].join('\n'));
+
+          const configPath = path.join(tempDir, '.ai-agent.json');
+          fs.writeFileSync(configPath, JSON.stringify({
+            providers: {
+              primary: {
+                type: 'test-llm',
+                apiKey: '${SPECIAL_TOKEN}',
+              },
+            },
+          }, null, 2));
+
+          blockedEnvPath = path.join(tempDir, '.ai-agent.env');
+          fs.writeFileSync(blockedEnvPath, 'SPECIAL_TOKEN=blocked-secret');
+          fs.chmodSync(blockedEnvPath, 0o000);
+
+          const homeConfigDir = path.join(homeDir, '.ai-agent');
+          fs.mkdirSync(homeConfigDir, { recursive: true });
+          fs.writeFileSync(path.join(homeConfigDir, 'ai-agent.json'), JSON.stringify({
+            providers: {
+              primary: { type: 'test-llm', apiKey: '${SPECIAL_TOKEN}' }
+            }
+          }, null, 2));
+          fs.writeFileSync(path.join(homeConfigDir, 'ai-agent.env'), 'SPECIAL_TOKEN=home-secret');
+
+          process.env.HOME = homeDir;
+          process.env.USERPROFILE = homeDir;
+          process.chdir(tempDir);
+
+          const loaded = loadAgent(promptPath);
+          const providerConfig = loaded.config.providers.primary as { apiKey?: string };
+          invariant(providerConfig.apiKey === 'home-secret', 'Env fallback should use readable lower-priority env file.');
+
+          return Promise.resolve({
+            success: true,
+            conversation: [],
+            logs: [],
+            accounting: [],
+            finalReport: {
+              status: 'success',
+              format: 'text',
+              content: 'env-fallback-valid',
+              ts: Date.now(),
+            },
+          });
+        } finally {
+          cleanup();
+        }
+      },
+      expect: (result) => {
+        invariant(result.success, 'Scenario run-test-76 expected success.');
       },
     };
   })(),

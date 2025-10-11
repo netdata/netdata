@@ -77,7 +77,8 @@ function readEnvIfExists(p: string): Record<string, string> | undefined {
     return parseEnvFile(raw);
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
-    throw new Error(`failed to read env file '${p}': ${message}`);
+    warn(`failed to read env file: ${p}: ${message}`);
+    return undefined;
   }
 }
 
