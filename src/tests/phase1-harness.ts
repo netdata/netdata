@@ -176,6 +176,10 @@ const TEST_SCENARIOS: HarnessTest[] = [
       const testEntry = toolEntries.find((entry) => entry.mcpServer === 'test' && entry.command === 'test__test');
       invariant(testEntry !== undefined, 'Expected accounting entry for test MCP server in run-test-1.');
       invariant(testEntry.status === 'ok', 'Test MCP tool accounting should be ok for run-test-1.');
+      const llmLogs = result.logs.filter((entry) => entry.type === 'llm' && entry.direction === 'response');
+      invariant(llmLogs.length > 0, 'LLM response log missing for run-test-1.');
+      const hasStopReason = llmLogs.some((log) => log.message.includes('stop='));
+      invariant(hasStopReason, 'LLM log should include stop reason for run-test-1.');
     },
   },
   {

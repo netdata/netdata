@@ -396,6 +396,9 @@ export class LLMClient {
       const responseBytes = result.response !== undefined ? new TextEncoder().encode(result.response).length : 0;
       // Do not include routed provider/model details here; keep log concise up to bytes
       let message = `input ${String(inputTokens)}, output ${String(outputTokens)}, cacheR ${String(cacheRead)}, cacheW ${String(cacheWrite)}, cached ${String(cachedTokens)} tokens, ${String(latencyMs)}ms, ${String(responseBytes)} bytes`;
+      if (typeof result.stopReason === 'string' && result.stopReason.length > 0) {
+        message += `, stop=${result.stopReason}`;
+      }
       // Compute cost from pricing for all providers (5 decimals); prefer router-reported when present
       const computeCost = (): number | undefined => {
         try {

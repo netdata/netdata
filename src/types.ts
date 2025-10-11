@@ -29,6 +29,7 @@ export interface TurnResult {
   messages: ConversationMessage[];
   hasReasoning?: boolean;
   hasContent?: boolean;
+  stopReason?: string;
 }
 
 export type ToolStatus =

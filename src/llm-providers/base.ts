@@ -31,6 +31,7 @@ interface FormatPolicyInput {
 
 export abstract class BaseLLMProvider implements LLMProviderInterface {
   private readonly stringFormatPolicy: FormatPolicyNormalized;
+  private static readonly STOP_REASON_KEYS = ['stopReason', 'stop_reason', 'finishReason', 'finish_reason'] as const;
 
   protected constructor(options?: { formatPolicy?: FormatPolicyInput }) {
     this.stringFormatPolicy = this.normalizeFormatPolicy(options?.formatPolicy);
@@ -312,7 +313,7 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
     hasToolCalls: boolean,
     finalAnswer: boolean,
     response?: string,
-    extras?: { hasReasoning?: boolean; hasContent?: boolean }
+    extras?: { hasReasoning?: boolean; hasContent?: boolean; stopReason?: string }
   ): TurnResult {
     return {
       status: { type: 'success', hasToolCalls, finalAnswer },
@@ -323,7 +324,43 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
       messages,
       hasReasoning: extras?.hasReasoning,
       hasContent: extras?.hasContent,
+      stopReason: extras?.stopReason,
     };
+  }
+
+  protected extractStopReason(value: unknown): string | undefined {
+    const visited = new Set<unknown>();
+    const helper = (val: unknown): string | undefined => {
+      if (val === null || val === undefined) return undefined;
+      if (typeof val === 'string' || typeof val === 'number' || typeof val === 'boolean') return undefined;
+      if (visited.has(val)) return undefined;
+      if (Array.isArray(val)) {
+        visited.add(val);
+        // eslint-disable-next-line functional/no-loop-statements
+        for (const item of val) {
+          const found = helper(item);
+          if (found !== undefined) return found;
+        }
+        return undefined;
+      }
+      if (typeof val !== 'object') return undefined;
+      visited.add(val);
+      const record = val as Record<string, unknown>;
+      // Direct keys first
+      // eslint-disable-next-line functional/no-loop-statements
+      for (const key of BaseLLMProvider.STOP_REASON_KEYS) {
+        const candidate = record[key];
+        if (typeof candidate === 'string' && candidate.length > 0) return candidate;
+      }
+      // Recurse into nested values
+      // eslint-disable-next-line functional/no-loop-statements
+      for (const entry of Object.values(record)) {
+        const found = helper(entry);
+        if (found !== undefined) return found;
+      }
+      return undefined;
+    };
+    return helper(value);
   }
 
   protected extractToolCalls(messages: ConversationMessage[]) {
@@ -534,6 +571,7 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
     
     try {
       resetIdle();
+      let stopReason: string | undefined;
       
       const result = streamText({
         model,
@@ -568,6 +606,11 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
           if (request.onChunk !== undefined) {
             request.onChunk(part.text, 'thinking');
           }
+        } else if (part.type === 'finish') {
+          const fin = part as { finishReason?: string };
+          if (typeof fin.finishReason === 'string' && fin.finishReason.length > 0) {
+            stopReason = stopReason ?? fin.finishReason;
+          }
         }
         
         resetIdle();
@@ -578,6 +621,7 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
 
       const usage = await result.usage;
       const resp = await result.response;
+      stopReason = stopReason ?? this.extractStopReason(resp) ?? this.extractStopReason(result);
       if (process.env.DEBUG === 'true') {
         try {
           const msgs = (resp as { messages?: unknown[] } | undefined)?.messages ?? [];
@@ -746,7 +790,7 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
         hasNewToolCalls,
         finalAnswer,
         response,
-        { hasReasoning, hasContent: hasAssistantText }
+        { hasReasoning, hasContent: hasAssistantText, stopReason }
       );
     } catch (error) {
       clearIdle();
@@ -786,6 +830,7 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
         abortSignal: controller.signal,
       });
 
+      let stopReason = this.extractStopReason(result) ?? this.extractStopReason((result as { response?: unknown }).response);
       const tokens = this.extractTokenUsage(result.usage);
       const latencyMs = Date.now() - startTime;
       let response = result.text;
@@ -797,6 +842,7 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
       }
 
       const respObj = (result.response as { messages?: unknown[]; providerMetadata?: Record<string, unknown> } | undefined) ?? {};
+      stopReason = stopReason ?? this.extractStopReason(respObj);
       // Enrich with provider metadata (e.g., Anthropic cache creation tokens)
       try {
         const provMeta = respObj.providerMetadata;
@@ -1017,7 +1063,7 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
         hasNewToolCalls,
         finalAnswer,
         response,
-        { hasReasoning, hasContent: hasAssistantText }
+        { hasReasoning, hasContent: hasAssistantText, stopReason }
       );
     } catch (error) {
       return this.createFailureResult(this.mapError(error), Date.now() - startTime);
