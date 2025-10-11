@@ -1495,6 +1495,11 @@ bool daemon_status_file_deadly_signal_received(EXIT_REASON reason, SIGNAL_CODE c
     }
 
 #ifdef HAVE_LIBBACKTRACE
+#if defined(OS_WINDOWS)
+    // THE FOLLOWING CODE IS NOT ASYNC-SIGNAL-SAFE on MSYS2 due to internal locking in the runtime.
+    // This can cause a deadlock when a signal is received while the lock is held.
+    // The code is commented out to prevent the deadlock, at the cost of not saving the status file on a crash.
+#else
     bool safe_to_get_stack_trace = reason != EXIT_REASON_SIGABRT || stacktrace_capture_is_async_signal_safe();
     bool get_stack_trace = stacktrace_available() && safe_to_get_stack_trace && stack_trace_is_empty(&session_status);
 
@@ -1509,7 +1514,8 @@ bool daemon_status_file_deadly_signal_received(EXIT_REASON reason, SIGNAL_CODE c
 
         daemon_status_file_save(static_save_buffer, &session_status, false);
     }
-#endif
+#endif // defined(OS_WINDOWS)
+#endif // HAVE_LIBBACKTRACE
 
     return duplicate;
 }
