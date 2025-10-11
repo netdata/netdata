@@ -1,10 +1,7 @@
 #!/usr/bin/env ai-agent
 ---
-description: |-
-  CRM Slack Bot for Netdata,
-  Everything we know about customers and prospects.
-usage: |
-  ask me anything you  need
+description: Netdata CRM AI-Agent: everything we know about customers and prospects.
+usage: Ask me anything you need
 models:
   - anthropic/claude-sonnet-4-5
   - openai/gpt-5

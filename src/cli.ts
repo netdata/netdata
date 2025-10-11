@@ -118,6 +118,47 @@ const indentMultiline = (text: string, spaces: number): string => {
   return text.split('\n').map((line) => `${pad}${line}`).join('\n');
 };
 
+// ASCII art banner with color support for TTY
+function buildAsciiBanner(): string {
+  const isTTY = process.stdout.isTTY;
+  const lightGray = isTTY ? '\x1b[38;5;245m' : '';  // 256-color light gray for letters (█ ░)
+  const darkGray = isTTY ? '\x1b[38;5;240m' : '';   // 256-color medium gray for ghosts
+  const reset = isTTY ? '\x1b[0m' : '';
+
+  // Ghost characters: ( ) . \ _ O o ' - /
+  // Letter characters: █ ▀ ▄
+  const colorLine = (line: string): string => {
+    if (!isTTY) return line;
+    let result = '';
+    // eslint-disable-next-line functional/no-loop-statements, @typescript-eslint/prefer-for-of
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '█' || ch === '▀' || ch === '▄' || ch === '░') {
+        result += lightGray + ch + reset;
+      } else if ('().\\_Oo\'-/'.includes(ch)) {
+        result += darkGray + ch + reset;
+      } else {
+        result += ch;
+      }
+    }
+    return result;
+  };
+
+  const banner = `
+     ('-.    ░██                     ('-.             .-')     ('-.    ░██
+    ( OO )         .-')             ( OO )__       __(  OO) __( OO )__ ░██
+   ░██████)  ░██  (  OO) ░██████   (░████████) ░███████. ░████████  ░████████
+    .   ░██  ░██░(██████      ░██  ░██\\  .░██ ░██  . ░██ ░██   \\░██.   ░██
+   ░███████  ░██  .    ..░███████  ░██    ░██ ░█████████ ░██    ░██    ░██
+  ░██   ░██  ░██        ░██   ░██  ░██   ░███ ░██ oo )   ░██    ░██    ░██
+   ░█████░██ ░██         ░█████░██  ░█████░██  ░███████  ░██    ░██     ░████
+                                          ░██
+                                    ░███████
+`;
+
+  return banner.split('\n').map((line) => colorLine(line)).join('\n');
+}
+
 async function listMcpTools(targets: string[], options: Record<string, unknown>): Promise<void> {
   const configPathValue = typeof options.config === 'string' && options.config.length > 0
     ? options.config
@@ -218,16 +259,42 @@ async function listMcpTools(targets: string[], options: Record<string, unknown>)
 // Build a Resolved Defaults section using frontmatter + config (if available)
 function buildResolvedDefaultsHelp(): string {
   try {
+    const isTTY = process.stdout.isTTY;
+    const green = isTTY ? '\x1b[92m' : '';
+    const yellow = isTTY ? '\x1b[93m' : '';
+    const gray = isTTY ? '\x1b[90m' : '';
+    const white = isTTY ? '\x1b[97m' : '';
+    const reset = isTTY ? '\x1b[0m' : '';
+
+    const lines: string[] = [];
+
+    // Add ASCII banner
+    lines.push(buildAsciiBanner());
+    lines.push('');
+
     const args = process.argv.slice(2);
-    // Find system prompt file: first non-option, or fallback to argv[1] (shebang use)
+    // Find system prompt file: first non-option argument, or fallback to argv[1] (shebang use)
+    // When called as "./neda/neda.ai --help", the .ai file is args[0]
     let candidate: string | undefined = args.find((a) => (typeof a === 'string' && a.length > 0 && !a.startsWith('-')));
+
+    // Fallback: if running via shebang (node dist/cli.js), argv[1] is the script being executed
     if (candidate === undefined && typeof process.argv[1] === 'string') {
       candidate = process.argv[1];
     }
+
     let promptPath: string | undefined = undefined;
     if (typeof candidate === 'string' && candidate.length > 0) {
       const p = candidate.startsWith('@') ? candidate.slice(1) : candidate;
-      if (p.length > 0 && fs.existsSync(p) && fs.statSync(p).isFile()) promptPath = p;
+      // Check if it's a valid .ai file
+      if (p.length > 0) {
+        try {
+          if (fs.existsSync(p) && fs.statSync(p).isFile()) {
+            promptPath = p;
+          }
+        } catch {
+          // ignore stat errors
+        }
+      }
     }
 
     // Read frontmatter from promptPath (if present)
@@ -235,23 +302,24 @@ function buildResolvedDefaultsHelp(): string {
     let fmDesc = '';
     let fmDescOnly = '';
     let fmUsage = '';
+    const isAgentMode = promptPath?.endsWith('.ai') ?? false;
+
     if (promptPath !== undefined) {
-      let content = fs.readFileSync(promptPath, 'utf8');
-      if (content.startsWith('#!')) {
-        const nl = content.indexOf('\n');
-        content = nl >= 0 ? content.slice(nl + 1) : '';
-      }
-      const fm = parseFrontmatter(content);
-      if (fm?.options !== undefined) fmOptions = fm.options;
-      if (typeof fm?.description === 'string') { fmDesc = fm.description.trim(); fmDescOnly = fmDesc; }
-      const fmUse = fm?.usage;
-      if (typeof fmUse === 'string' && fmUse.trim().length > 0) {
-        fmUsage = fmUse.trim();
-        const inv = typeof candidate === 'string' && candidate.length > 0 ? candidate : 'ai-agent';
-        // Add usage headline before defaults
-        const usageLine = `Usage: ${inv} "${fmUsage}"`;
-        // Temporarily stash in description prefix for printing
-        fmDesc = (fmDesc.length > 0 ? `${fmDesc}\n` : '') + usageLine;
+      try {
+        let content = fs.readFileSync(promptPath, 'utf8');
+        if (content.startsWith('#!')) {
+          const nl = content.indexOf('\n');
+          content = nl >= 0 ? content.slice(nl + 1) : '';
+        }
+        const fm = parseFrontmatter(content);
+        if (fm?.options !== undefined) fmOptions = fm.options;
+        if (typeof fm?.description === 'string') { fmDesc = fm.description.trim(); fmDescOnly = fmDesc; }
+        const fmUse = fm?.usage;
+        if (typeof fmUse === 'string' && fmUse.trim().length > 0) {
+          fmUsage = fmUse.trim();
+        }
+      } catch {
+        // Frontmatter parsing failed - continue without agent-specific info
       }
     }
 
@@ -295,27 +363,47 @@ function buildResolvedDefaultsHelp(): string {
     const parallelToolCalls = readBool('parallelToolCalls', 'parallelToolCalls', defaultOf('parallelToolCalls') as boolean);
 
     const inv = (typeof candidate === 'string' && candidate.length > 0) ? candidate : 'ai-agent';
-    const usageText = (() => {
-      if (fmUsage.length > 0) return `${inv} "${fmUsage}"`;
-      return `${inv} "<user prompt>"`;
-    })();
+
+    // Build description section
+    if (isAgentMode) {
+      lines.push(`${green}AGENT${reset}`);
+      if (fmDesc.length > 0) {
+        lines.push(fmDesc);
+      }
+      lines.push('');
+      lines.push(`${green}USAGE${reset}`);
+      if (fmUsage.length > 0) {
+        lines.push(`  ${white}${inv}${reset} ${yellow}"${fmUsage}"${reset}`);
+      } else {
+        lines.push(`  ${white}${inv}${reset} ${yellow}"<user prompt>"${reset}`);
+      }
+    } else {
+      lines.push(`${green}USAGE${reset}`);
+      lines.push(`  ${white}ai-agent${reset} ${yellow}<system-prompt> <user-prompt>${reset}`);
+      lines.push('');
+      lines.push('  Create a new agent by adding frontmatter to a .ai file:');
+      lines.push('');
+    }
 
     // runtime toggles are CLI-only and not shown in template
     // Include output if present in frontmatter
     let outputBlock: { format: 'json'|'markdown'|'text'; schema?: Record<string, unknown> } | undefined;
-    try {
-      const contentForOutput = promptPath !== undefined ? fs.readFileSync(promptPath, 'utf8') : undefined;
-      if (contentForOutput !== undefined) {
-        let c = contentForOutput;
-        if (c.startsWith('#!')) { const nl = c.indexOf('\n'); c = nl >= 0 ? c.slice(nl + 1) : ''; }
-        const parsed = parseFrontmatter(c);
-        if (parsed?.expectedOutput !== undefined) {
-          const out: Record<string, unknown> = { format: parsed.expectedOutput.format };
-          if (parsed.expectedOutput.schema !== undefined) out.schema = parsed.expectedOutput.schema;
-          outputBlock = out as { format: 'json'|'markdown'|'text'; schema?: Record<string, unknown> };
+    // Skip this if frontmatter parsing already failed above
+    if (fmOptions !== undefined) {
+      try {
+        const contentForOutput = promptPath !== undefined ? fs.readFileSync(promptPath, 'utf8') : undefined;
+        if (contentForOutput !== undefined) {
+          let c = contentForOutput;
+          if (c.startsWith('#!')) { const nl = c.indexOf('\n'); c = nl >= 0 ? c.slice(nl + 1) : ''; }
+          const parsed = parseFrontmatter(c);
+          if (parsed?.expectedOutput !== undefined) {
+            const out: Record<string, unknown> = { format: parsed.expectedOutput.format };
+            if (parsed.expectedOutput.schema !== undefined) out.schema = parsed.expectedOutput.schema;
+            outputBlock = out as { format: 'json'|'markdown'|'text'; schema?: Record<string, unknown> };
+          }
         }
-      }
-    } catch { /* ignore */ }
+      } catch { /* ignore */ }
+    }
 
     const fmTemplate = buildFrontmatterTemplate({
       fmOptions,
@@ -342,71 +430,126 @@ function buildResolvedDefaultsHelp(): string {
       output: outputBlock,
     });
 
-    const lines: string[] = [];
-    lines.push('DESCRIPTION');
-    if (fmDesc.length > 0) lines.push(fmDesc);
     lines.push('');
-    lines.push('Usage:');
-    lines.push(`   ${usageText}`);
-    lines.push('');
-    lines.push('Frontmatter Template:');
+    lines.push(`${green}${isAgentMode ? 'FLATTENED FRONTMATTER' : 'FRONTMATTER TEMPLATE'}${reset} ${gray}(copy & paste into your .ai file)${reset}`);
     lines.push('---');
     const dumpedUnknown = (yaml as unknown as { dump: (o: unknown, opts?: Record<string, unknown>) => unknown }).dump(fmTemplate, { lineWidth: 120 });
     const yamlText = typeof dumpedUnknown === 'string' ? dumpedUnknown : JSON.stringify(dumpedUnknown);
-    lines.push(yamlText.trimEnd());
+    yamlText.split('\n').forEach((line) => {
+      if (line.trim().length > 0) {
+        lines.push(line);
+      }
+    });
     lines.push('---');
-    // Also show prompt/config locations for context
-    if (promptPath !== undefined) lines.push('', `Prompt: ${promptPath}`);
+
+    // Show config resolution in gray
+    lines.push('');
+    lines.push(`${green}CONFIGURATION${reset}`);
+    if (promptPath !== undefined) lines.push(`${gray}  Prompt: ${promptPath}${reset}`);
     try {
       const layers = discoverLayers({ configPath: undefined, promptPath });
-      lines.push('Config Files Resolution Order:');
+      lines.push(`${gray}  Config Files Resolution Order:${reset}`);
       layers.forEach((ly, idx) => {
         const jExists = fs.existsSync(ly.jsonPath);
         const eExists = fs.existsSync(ly.envPath);
-        lines.push(` ${String(idx + 1)}. ${ly.jsonPath} ${jExists ? '(found)' : '(missing)'} | ${ly.envPath} ${eExists ? '(found)' : '(missing)'}`);
+        lines.push(`${gray}    ${String(idx + 1)}. ${ly.jsonPath} ${jExists ? '(found)' : '(missing)'} | ${ly.envPath} ${eExists ? '(found)' : '(missing)'}${reset}`);
       });
       lines.push('');
     } catch { /* ignore */ }
+
     return `\n${lines.join('\n')}\n`;
   } catch {
     return '';
   }
 }
 
-// Inject description and resolved defaults before the standard help
-program.addHelpText('before', buildResolvedDefaultsHelp);
+// Completely replace help command to ensure our formatting always appears
+program.helpInformation = function() {
+  const before = buildResolvedDefaultsHelp();
+  const after = (() => {
+  const isTTY = process.stdout.isTTY;
+  const cyan = isTTY ? '\x1b[96m' : '';
+  const green = isTTY ? '\x1b[92m' : '';
+  const yellow = isTTY ? '\x1b[93m' : '';
+  const gray = isTTY ? '\x1b[90m' : '';
+  const white = isTTY ? '\x1b[97m' : '';
+  const reset = isTTY ? '\x1b[0m' : '';
 
-// Grouped CLI options legend for clarity
-program.addHelpText('after', () => {
+  const lines: string[] = [];
+
   const byGroup = getOptionsByGroup();
   const order = ['Master Agent Overrides', 'Master Defaults', 'All Models Overrides', 'Global Controls'];
-  const makeTitle = (group: string): string => (
-    group === 'Master Defaults' ? `${group} (used by sub-agents when unset)`
-    : group === 'Master Agent Overrides' ? `${group} (strict)`
-    : group === 'Global Controls' ? 'Global Application Controls'
-    : group
-  );
-  const body = order
-    .map((group) => {
-      const list = byGroup.get(group);
-      if (list === undefined || list.length === 0) return undefined;
-      const lines = [makeTitle(group)];
-      list
-        .filter((opt) => opt.cli?.showInHelp === true)
-        .map((opt) => formatCliNames(opt))
-        .filter((s) => typeof s === 'string' && s.length > 0)
-        .forEach((s) => lines.push(`  ${s}`));
-      lines.push('');
-      return lines.join('\n');
-    })
-    .filter((s): s is string => typeof s === 'string');
-  return `\n${['', ...body].join('\n')}`;
-});
+
+  lines.push('');
+  lines.push(`${green}OPTIONS${reset}`);
+  lines.push('');
+
+  order.forEach((group) => {
+    const list = byGroup.get(group);
+    if (list === undefined || list.length === 0) return;
+
+    const groupTitle = (
+      group === 'Master Defaults' ? `${group} ${gray}(inherited by sub-agents when unset)${reset}`
+      : group === 'Master Agent Overrides' ? `${group} ${gray}(strict - cannot be overridden)${reset}`
+      : group === 'Global Controls' ? 'Global Application Controls'
+      : group
+    );
+
+    lines.push(`  ${cyan}${groupTitle}${reset}`);
+    list
+      .filter((opt) => opt.cli?.showInHelp === true)
+      .forEach((opt) => {
+        const names = formatCliNames(opt);
+        if (typeof names === 'string' && names.length > 0) {
+          const def = opt.default;
+          const defStr = typeof def === 'number' || typeof def === 'boolean' || (typeof def === 'string' && def.length > 0)
+            ? ` ${gray}(default: ${String(def)})${reset}`
+            : '';
+          lines.push(`    ${green}${names}${reset}${defStr}`);
+          lines.push(`      ${gray}${opt.description}${reset}`);
+        }
+      });
+    lines.push('');
+  });
+
+  // Add examples section
+  lines.push(`${green}EXAMPLES${reset}`);
+  lines.push('');
+  lines.push(`  ${white}Direct invocation with an agent file:${reset}`);
+  lines.push(`    ${yellow}$ ./neda/neda.ai "research Acme Corp"${reset}`);
+  lines.push('');
+  lines.push(`  ${white}Direct invocation with inline prompts:${reset}`);
+  lines.push(`    ${yellow}$ ai-agent "You are a helpful assistant" "List current directory"${reset}`);
+  lines.push('');
+  lines.push(`  ${white}Headend mode (multi-agent server):${reset}`);
+  lines.push(`    ${yellow}$ ai-agent --agent neda/*.ai --api 8080 --mcp stdio${reset}`);
+  lines.push('');
+  lines.push(`  ${white}List available MCP tools:${reset}`);
+  lines.push(`    ${yellow}$ ai-agent --list-tools all${reset}`);
+  lines.push('');
+  lines.push(`${gray}For more information: https://github.com/netdata/ai-agent${reset}`);
+  lines.push('');
+
+  return lines.join('\n');
+  })();
+  return before + after;
+};
 
 program
   .name('ai-agent')
   .description('Universal LLM Tool Calling Interface with MCP support')
-  .version('1.0.0');
+  .version('1.0.0')
+  .configureHelp({
+    // Suppress only Commander's default option formatting
+    // We provide complete help via addHelpText('before') and addHelpText('after')
+    formatHelp: (_cmd, _helper) => {
+      // Return empty string to suppress Commander's default sections
+      // Our custom help text in before/after hooks will provide everything
+      return '';
+    },
+    // Ensure help command and --help are always recognized
+    helpWidth: process.stdout.columns
+  });
 
 const agentOption = new Option('--agent <path>', 'Register an agent (.ai) file; repeat to add multiple agents')
   .argParser((value: string, previous: string[]) => appendValue(value, previous))
