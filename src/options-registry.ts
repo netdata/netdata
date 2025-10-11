@@ -51,7 +51,7 @@ export const OPTIONS_REGISTRY: OptionDef[] = [
   strArrDef({
     key: 'models',
     default: [],
-    description: 'Provider/model targets',
+    description: 'Which LLM models to use for the master agent (e.g., "openai/gpt-4o,anthropic/claude-3.5-sonnet"); tries each in order if one fails',
     cli: { names: ['--models'], showInHelp: true },
     fm: { allowed: true, key: 'models' },
     scope: 'masterOnly',
@@ -60,7 +60,7 @@ export const OPTIONS_REGISTRY: OptionDef[] = [
   strArrDef({
     key: 'tools',
     default: [],
-    description: 'MCP tools list',
+    description: 'Which tools the master agent can use (MCP servers, sub-agents, etc.); comma-separated list',
     cli: { names: ['--tools', '--tool', '--mcp', '--mcp-tool', '--mcp-tools'], showInHelp: true },
     fm: { allowed: true, key: 'tools' },
     scope: 'masterOnly',
@@ -69,7 +69,7 @@ export const OPTIONS_REGISTRY: OptionDef[] = [
   strArrDef({
     key: 'agents',
     default: [],
-    description: 'Sub-agent .ai files',
+    description: 'Sub-agent .ai files to load as tools for the master agent; enables multi-agent composition',
     cli: { names: ['--agents'], showInHelp: true },
     fm: { allowed: true, key: 'agents' },
     scope: 'masterOnly',
@@ -80,7 +80,7 @@ export const OPTIONS_REGISTRY: OptionDef[] = [
   numDef({
     key: 'llmTimeout',
     default: 120000,
-    description: 'Timeout for LLM responses (ms)',
+    description: 'How long to wait (ms) for the LLM to respond before giving up (resets each time a token arrives); default 2 minutes',
     cli: { names: ['--llm-timeout-ms', '--llmTimeoutMs'], showInHelp: true },
     fm: { allowed: true, key: 'llmTimeout' },
     config: { path: 'defaults.llmTimeout' },
@@ -91,7 +91,7 @@ export const OPTIONS_REGISTRY: OptionDef[] = [
   numDef({
     key: 'toolTimeout',
     default: 60000,
-    description: 'Timeout for tool execution (ms)',
+    description: 'How long to wait (ms) for each tool call to complete before aborting it; default 1 minute',
     cli: { names: ['--tool-timeout-ms', '--toolTimeoutMs'], showInHelp: true },
     fm: { allowed: true, key: 'toolTimeout' },
     config: { path: 'defaults.toolTimeout' },
@@ -102,7 +102,7 @@ export const OPTIONS_REGISTRY: OptionDef[] = [
   numDef({
     key: 'toolResponseMaxBytes',
     default: 12288,
-    description: 'Maximum MCP tool response size (bytes)',
+    description: 'Maximum size of tool output to keep; longer outputs get truncated to avoid overwhelming the LLM context',
     cli: { names: ['--tool-response-max-bytes', '--toolResponseMaxBytes'], showInHelp: true },
     fm: { allowed: true, key: 'toolResponseMaxBytes' },
     config: { path: 'defaults.toolResponseMaxBytes' },
@@ -113,7 +113,7 @@ export const OPTIONS_REGISTRY: OptionDef[] = [
   numDef({
     key: 'maxConcurrentTools',
     default: 3,
-    description: 'Maximum concurrent tool executions per agent/session',
+    description: 'How many tools can run at the same time; limits parallel execution to avoid overwhelming your system',
     cli: { names: ['--max-concurrent-tools', '--maxConcurrentTools'], showInHelp: true },
     fm: { allowed: true, key: 'maxConcurrentTools' },
     config: { path: 'defaults.maxConcurrentTools' },
@@ -124,7 +124,7 @@ export const OPTIONS_REGISTRY: OptionDef[] = [
   numDef({
     key: 'temperature',
     default: 0.7,
-    description: 'LLM temperature (0.0-2.0)',
+    description: 'Response creativity/variance (0=focused, 1=balanced, 2=wild); higher values produce more unexpected outputs',
     cli: { names: ['--temperature'], showInHelp: true },
     fm: { allowed: true, key: 'temperature' },
     config: { path: 'defaults.temperature' },
@@ -135,7 +135,7 @@ export const OPTIONS_REGISTRY: OptionDef[] = [
   numDef({
     key: 'topP',
     default: 1.0,
-    description: 'LLM top-p sampling (0.0-1.0)',
+    description: 'Token selection diversity (0.0-1.0); lower values use only top choices, higher values consider more alternatives',
     cli: { names: ['--top-p', '--topP'], showInHelp: true },
     fm: { allowed: true, key: 'topP' },
     config: { path: 'defaults.topP' },
@@ -146,7 +146,7 @@ export const OPTIONS_REGISTRY: OptionDef[] = [
   numDef({
     key: 'maxOutputTokens',
     default: 4096,
-    description: 'Max output tokens (model-specific mapping)',
+    description: 'Maximum response length per turn; controls how long the agent\'s answers can be',
     cli: { names: ['--max-output-tokens'], showInHelp: true },
     fm: { allowed: true, key: 'maxOutputTokens' },
     config: { path: 'defaults.maxOutputTokens' },
@@ -157,7 +157,7 @@ export const OPTIONS_REGISTRY: OptionDef[] = [
   numDef({
     key: 'repeatPenalty',
     default: 1.1,
-    description: 'Repeat penalty (mapped per provider)',
+    description: 'Reduces repetitive text (1.0=off, higher=stronger); helps agent avoid repeating the same phrases',
     cli: { names: ['--repeat-penalty'], showInHelp: true },
     fm: { allowed: true, key: 'repeatPenalty' },
     config: { path: 'defaults.repeatPenalty' },
@@ -168,7 +168,7 @@ export const OPTIONS_REGISTRY: OptionDef[] = [
   numDef({
     key: 'maxRetries',
     default: 3,
-    description: 'Max retry rounds over provider/model list',
+    description: 'How many times to retry when LLM calls fail; goes through all fallback models before giving up',
     cli: { names: ['--max-retries'], showInHelp: true },
     fm: { allowed: true, key: 'maxRetries' },
     config: { path: 'defaults.maxRetries' },
@@ -179,7 +179,7 @@ export const OPTIONS_REGISTRY: OptionDef[] = [
   numDef({
     key: 'maxToolTurns',
     default: 10,
-    description: 'Maximum tool turns (agent loop cap)',
+    description: 'Maximum number of tool-using turns before forcing the agent to give a final answer; prevents infinite loops',
     cli: { names: ['--max-tool-turns'], showInHelp: true },
     fm: { allowed: true, key: 'maxToolTurns' },
     config: { path: 'defaults.maxToolTurns' },
@@ -190,7 +190,7 @@ export const OPTIONS_REGISTRY: OptionDef[] = [
   numDef({
     key: 'maxToolCallsPerTurn',
     default: 10,
-    description: 'Maximum tool calls allowed within a single LLM turn',
+    description: 'Maximum number of tools the agent can call in a single turn; caps parallel tool usage',
     cli: { names: ['--max-tool-calls-per-turn'], showInHelp: true },
     fm: { allowed: true, key: 'maxToolCallsPerTurn' },
     config: { path: 'defaults.maxToolCallsPerTurn' },
@@ -200,7 +200,7 @@ export const OPTIONS_REGISTRY: OptionDef[] = [
   }),
   boolDef({
     key: 'parallelToolCalls',
-    description: 'Allow LLM to plan multiple tool calls per turn',
+    description: 'Allow agent to call multiple tools at once; disable to run tools one at a time',
     default: false,
     cli: { names: ['--parallel-tool-calls', '--no-parallel-tool-calls'], showInHelp: true },
     fm: { allowed: true, key: 'parallelToolCalls' },
@@ -214,7 +214,7 @@ export const OPTIONS_REGISTRY: OptionDef[] = [
   // All Models Overrides
   boolDef({
     key: 'stream',
-    description: 'Enable streaming LLM responses',
+    description: 'Show response as it\'s generated (streaming) instead of waiting for complete answer',
     default: false,
     cli: { names: ['--stream', '--no-stream'], showInHelp: true },
     fm: { allowed: false },
@@ -225,7 +225,7 @@ export const OPTIONS_REGISTRY: OptionDef[] = [
   }),
   boolDef({
     key: 'traceLLM',
-    description: 'Log LLM HTTP requests/responses (redacted)',
+    description: 'Show detailed logs of all LLM API calls for debugging (verbose)',
     default: false,
     cli: { names: ['--trace-llm'], showInHelp: true },
     fm: { allowed: false },
@@ -234,7 +234,7 @@ export const OPTIONS_REGISTRY: OptionDef[] = [
   }),
   boolDef({
     key: 'traceMCP',
-    description: 'Log MCP requests/responses and server stderr',
+    description: 'Show detailed logs of all tool calls (MCP protocol) for debugging (verbose)',
     default: false,
     cli: { names: ['--trace-mcp'], showInHelp: true },
     fm: { allowed: false },
@@ -243,7 +243,7 @@ export const OPTIONS_REGISTRY: OptionDef[] = [
   }),
   boolDef({
     key: 'traceSlack',
-    description: 'Log Slack Bolt SDK WebSocket messages and API calls',
+    description: 'Show detailed logs of Slack bot communication for debugging (verbose)',
     default: false,
     cli: { names: ['--trace-slack'], showInHelp: true },
     fm: { allowed: false },
@@ -252,7 +252,7 @@ export const OPTIONS_REGISTRY: OptionDef[] = [
   }),
   boolDef({
     key: 'verbose',
-    description: 'Enable debug logging to stderr',
+    description: 'Show detailed execution logs including timing, tokens used, and internal state',
     default: false,
     cli: { names: ['--verbose'], showInHelp: true },
     fm: { allowed: false },
@@ -262,7 +262,7 @@ export const OPTIONS_REGISTRY: OptionDef[] = [
   strDef({
     key: 'format',
     default: '',
-    description: 'Output format hint (markdown, markdown+mermaid, slack-block-kit, tty, pipe, json, sub-agent)',
+    description: 'Output format (markdown, json, slack-block-kit, etc.); controls how the agent formats its response',
     cli: { names: ['--format'], showInHelp: true },
     fm: { allowed: false },
     scope: 'allAgents',
@@ -272,7 +272,7 @@ export const OPTIONS_REGISTRY: OptionDef[] = [
   // Global Application Controls
   boolDef({
     key: 'dryRun',
-    description: 'Validate config and MCP only, no LLM requests',
+    description: 'Check configuration and setup without actually running the agent; useful for testing config',
     default: false,
     cli: { names: ['--dry-run'], showInHelp: true },
     fm: { allowed: false },
@@ -282,7 +282,7 @@ export const OPTIONS_REGISTRY: OptionDef[] = [
   numDef({
     key: 'mcpInitConcurrency',
     default: Number.NaN, // resolved elsewhere if provided
-    description: 'Max concurrent MCP server initializations',
+    description: 'How many MCP tool servers to initialize in parallel; lower values reduce system load during startup',
     cli: { names: ['--mcp-init-concurrency'], showInHelp: true },
     fm: { allowed: false },
     config: { path: 'defaults.mcpInitConcurrency' },
@@ -292,7 +292,7 @@ export const OPTIONS_REGISTRY: OptionDef[] = [
   }),
   boolDef({
     key: 'quiet',
-    description: 'Only print errors to stderr',
+    description: 'Suppress all log output except critical errors; makes output cleaner',
     default: false,
     cli: { names: ['--quiet'], showInHelp: true },
     fm: { allowed: false },
@@ -302,7 +302,7 @@ export const OPTIONS_REGISTRY: OptionDef[] = [
   strDef({
     key: 'config',
     default: undefined,
-    description: 'Configuration file path',
+    description: 'Path to configuration file; overrides all auto-discovered config files',
     cli: { names: ['--config'], showInHelp: true },
     fm: { allowed: false },
     scope: 'global',
@@ -311,7 +311,7 @@ export const OPTIONS_REGISTRY: OptionDef[] = [
   strDef({
     key: 'sessionsDir',
     default: undefined,
-    description: 'Directory to save sessions (opTree JSON.gz files)',
+    description: 'Where to save session data for resuming interrupted conversations',
     cli: { names: ['--sessions-dir'], showInHelp: true },
     fm: { allowed: false },
     scope: 'global',
@@ -320,7 +320,7 @@ export const OPTIONS_REGISTRY: OptionDef[] = [
   strDef({
     key: 'billingFile',
     default: undefined,
-    description: 'Path to billing/accounting JSONL ledger',
+    description: 'Where to log token usage and costs; useful for tracking LLM API expenses',
     cli: { names: ['--billing-file'], showInHelp: true },
     fm: { allowed: false },
     scope: 'global',
@@ -329,7 +329,7 @@ export const OPTIONS_REGISTRY: OptionDef[] = [
   strDef({
     key: 'resume',
     default: undefined,
-    description: 'Resume a saved session by origin txn id',
+    description: 'Resume a previously interrupted session by providing its session ID',
     cli: { names: ['--resume'], showInHelp: true },
     fm: { allowed: false },
     scope: 'global',
