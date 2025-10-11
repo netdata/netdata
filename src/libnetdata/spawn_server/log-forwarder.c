@@ -21,6 +21,7 @@ typedef struct LOG_FORWARDER {
     SPINLOCK spinlock;
     int pipe_fds[2]; // Pipe for notifications
     bool running;
+    volatile bool initialized; // Thread has fully initialized (atomic)
 } LOG_FORWARDER;
 
 static void log_forwarder_thread_func(void *arg);
@@ -71,9 +72,27 @@ LOG_FORWARDER *log_forwarder_start(void) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "Log forwarder: Failed to set non-blocking mode");
 
     lf->running = true;
+    __atomic_store_n(&lf->initialized, false, __ATOMIC_RELEASE);
+
     lf->thread = nd_thread_create("log-fw", NETDATA_THREAD_OPTION_DEFAULT, log_forwarder_thread_func, lf);
 
-    nd_log(NDLS_COLLECTORS, NDLP_INFO, "Log forwarder: created thread pointer: %p", lf->thread);
+    if(!lf->thread) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Log forwarder: nd_thread_create() failed!");
+        close(lf->pipe_fds[PIPE_READ]);
+        close(lf->pipe_fds[PIPE_WRITE]);
+        freez(lf);
+        return NULL;
+    }
+
+    // Wait for the thread to signal it's initialized
+    size_t retries = 0;
+    while (!__atomic_load_n(&lf->initialized, __ATOMIC_ACQUIRE) && retries < 100) { // 100 * 10ms = 1 second max
+        usleep(10000); // 10ms
+        retries++;
+    }
+
+    if (!__atomic_load_n(&lf->initialized, __ATOMIC_ACQUIRE))
+        nd_log(NDLS_COLLECTORS, NDLP_WARNING, "Log forwarder: thread initialization timeout");
 
     return lf;
 }
@@ -84,7 +103,8 @@ static inline void mark_all_entries_for_deletion_unsafe(LOG_FORWARDER *lf) {
 }
 
 void log_forwarder_stop(LOG_FORWARDER *lf) {
-    if(!lf || !lf->running) return;
+    if(!lf || !lf->running)
+        return;
 
     // Signal the thread to stop
     spinlock_lock(&lf->spinlock);
@@ -96,21 +116,25 @@ void log_forwarder_stop(LOG_FORWARDER *lf) {
 
     lf->running = false;
     mark_all_entries_for_deletion_unsafe(lf);
-
-    // Send a byte to the pipe to wake up the thread
-//    char ch = 0;
-//    if(write(lf->pipe_fds[PIPE_WRITE], &ch, 1) <= 0) { ; }
-    close(lf->pipe_fds[PIPE_WRITE]); // force it to quit
     spinlock_unlock(&lf->spinlock);
 
+    // Wake up the thread by writing to the pipe (don't close it yet - let the thread clean up)
+    char ch = 0;
+    ssize_t written = write(lf->pipe_fds[PIPE_WRITE], &ch, 1);
+    (void)written;
+
     // Wait for the thread to finish
-    nd_log(NDLS_COLLECTORS, NDLP_INFO, "Log forwarder: stopping thread pointer: %p", lf->thread);
-    if(nd_thread_join(lf->thread) == 0) {
-        lf->thread = NULL;
-        freez(lf);
+    // Note: nd_thread_join() handles the Windows/MSYS2 EINVAL case internally
+    int join_result = nd_thread_join(lf->thread);
+    if(join_result != 0) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "Log forwarder: nd_thread_join() failed with error %d", join_result);
     }
-    else
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Log forwarder: not freeing lf due to nd_thread_join() error.");
+
+    // Always clean up - if join failed, the thread has still exited
+    lf->thread = NULL;
+    close(lf->pipe_fds[PIPE_WRITE]);
+    freez(lf);
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -235,6 +259,13 @@ static void log_forwarder_thread_func(void *arg) {
 
     while (1) {
         spinlock_lock(&lf->spinlock);
+
+        // Signal initialization on first iteration after acquiring spinlock
+        // This ensures the thread is truly ready and in its main loop
+        if(!__atomic_load_n(&lf->initialized, __ATOMIC_ACQUIRE)) {
+            __atomic_store_n(&lf->initialized, true, __ATOMIC_RELEASE);
+        }
+
         if (!lf->running) {
             spinlock_unlock(&lf->spinlock);
             break;
@@ -263,16 +294,34 @@ static void log_forwarder_thread_func(void *arg) {
 
         if (ret > 0) {
             // Check the notification pipe
-            if (pfds[0].revents & POLLIN) {
-                // Read and discard the data
-                char buf[256];
-                ssize_t bytes_read = read(lf->pipe_fds[PIPE_READ], buf, sizeof(buf));
-                // Ignore the data; proceed regardless of the result
-                if (bytes_read == -1) {
-                    if (errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR) {
-                        // Handle read error if necessary
-                        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Log forwarder: Failed to read from notification pipe");
+            if (pfds[0].revents & (POLLIN | POLLERR | POLLHUP | POLLNVAL)) {
+                if (pfds[0].revents & (POLLERR | POLLHUP | POLLNVAL)) {
+                    // Pipe error - check if we should exit
+                    spinlock_lock(&lf->spinlock);
+                    bool should_exit = !lf->running;
+                    spinlock_unlock(&lf->spinlock);
+
+                    if (should_exit) {
+                        // Expected during shutdown
                         break;
+                    }
+
+                    nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                           "Log forwarder: pipe error (revents=0x%x) but still running",
+                           pfds[0].revents);
+                }
+
+                if (pfds[0].revents & POLLIN) {
+                    // Read and discard the data
+                    char buf[256];
+                    ssize_t bytes_read = read(lf->pipe_fds[PIPE_READ], buf, sizeof(buf));
+                    // Ignore the data; proceed regardless of the result
+                    if (bytes_read == -1) {
+                        if (errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR) {
+                            // Handle read error if necessary
+                            nd_log(NDLS_COLLECTORS, NDLP_ERR, "Log forwarder: Failed to read from notification pipe");
+                            break;
+                        }
                     }
                 }
             }
@@ -325,8 +374,6 @@ static void log_forwarder_thread_func(void *arg) {
         else
             nd_log(NDLS_COLLECTORS, NDLP_ERR, "Log forwarder: poll() error");
     }
-
-    nd_log(NDLS_COLLECTORS, NDLP_ERR, "Log forwarder: exiting...");
 
     spinlock_lock(&lf->spinlock);
     mark_all_entries_for_deletion_unsafe(lf);

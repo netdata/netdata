@@ -859,7 +859,6 @@ int netdata_main(int argc, char **argv) {
 
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("temp spawn server");
-
     netdata_main_spawn_server_init("init", argc, (const char **)argv);
 
     // ----------------------------------------------------------------------------------------------------------------
@@ -982,7 +981,6 @@ int netdata_main(int argc, char **argv) {
 
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("stop temporary spawn server");
-
     // stop the old server and later start a new one under the new permissions
     netdata_main_spawn_server_cleanup();
 

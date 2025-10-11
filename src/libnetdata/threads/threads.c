@@ -462,15 +462,39 @@ int nd_thread_join(ND_THREAD *nti) {
         return 0;
 
     int ret;
+
     if((ret = uv_thread_join(&nti->thread))) {
         // we can't join the thread
 
         nd_log(NDLS_DAEMON, NDLP_WARNING,
                "cannot join thread. uv_thread_join() failed with code %d. (tag=%s)",
                ret, nti->tag);
+
+        // On Windows/MSYS2, if the thread exited very quickly, uv_thread_join() can fail with EINVAL (-22)
+        // because the thread handle becomes invalid before the join executes. However, the thread may
+        // still be finishing its cleanup. Wait for it to reach FINISHED state before cleaning up.
+        if(ret == -22) { // UV_EINVAL
+            nd_log(NDLS_DAEMON, NDLP_INFO,
+                   "thread '%s' join returned EINVAL, waiting for thread to finish...", nti->tag);
+
+            // Spin-wait for the thread to mark itself as finished
+            size_t retries = 0;
+            while(!nd_thread_status_check(nti, NETDATA_THREAD_STATUS_FINISHED) && retries < 1000) {
+                sleep_usec(1 * USEC_PER_MS); // 1ms
+                retries++;
+            }
+
+            if (nd_thread_status_check(nti, NETDATA_THREAD_STATUS_FINISHED)) {
+                nd_log(NDLS_DAEMON, NDLP_INFO, "thread '%s' confirmed finished, cleaning up structure", nti->tag);
+                ret = 0;
+            } else {
+                nd_log(NDLS_DAEMON, NDLP_ERR, "thread '%s' did not reach FINISHED state after 1 second", nti->tag);
+            }
+        }
     }
-    else {
-        // we successfully joined the thread
+
+    if(ret == 0) {
+        // we successfully joined the thread (or cleaned up after Windows fast-exit)
        nd_thread_status_set(nti, NETDATA_THREAD_STATUS_JOINED);
 
         spinlock_lock(&threads_globals.running.spinlock);
