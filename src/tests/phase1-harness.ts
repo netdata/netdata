@@ -3114,6 +3114,131 @@ const TEST_SCENARIOS: HarnessTest[] = [
     },
   },
   {
+    id: 'run-test-86',
+    description: 'Final turn tool filtering retains only agent__final_report.',
+    configure: (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+      sessionConfig.userPrompt = DEFAULT_PROMPT_SCENARIO;
+      sessionConfig.maxTurns = 2;
+    },
+    execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+      const observed: { isFinalTurn: boolean; input: string[]; output: string[] }[] = [];
+      const proto = TestLLMProvider.prototype as unknown as {
+        filterToolsForFinalTurn: (tools: MCPTool[], isFinalTurn?: boolean) => MCPTool[];
+      };
+      const originalFilter = proto.filterToolsForFinalTurn;
+      proto.filterToolsForFinalTurn = function(this: TestLLMProvider, tools: MCPTool[], isFinalTurn?: boolean): MCPTool[] {
+        const result = originalFilter.call(this, tools, isFinalTurn);
+        observed.push({
+          isFinalTurn: isFinalTurn === true,
+          input: tools.map((tool) => tool.name),
+          output: result.map((tool) => tool.name),
+        });
+        return result;
+      };
+      try {
+        const session = AIAgentSession.create(sessionConfig);
+        const result = await session.run();
+        (result as { __observedTools?: { isFinalTurn: boolean; input: string[]; output: string[] }[] }).__observedTools = observed;
+        return result;
+      } finally {
+        proto.filterToolsForFinalTurn = originalFilter;
+      }
+    },
+    expect: (result: AIAgentResult & { __observedTools?: { isFinalTurn: boolean; input: string[]; output: string[] }[] }) => {
+      invariant(result.success, 'Scenario run-test-86 expected success.');
+      const observed = Array.isArray(result.__observedTools) ? result.__observedTools : [];
+      const finalTurnObservation = observed.find((entry) => entry.isFinalTurn);
+      invariant(finalTurnObservation !== undefined, 'Final turn observation missing for run-test-86.');
+      invariant(finalTurnObservation.output.length === 1 && finalTurnObservation.output[0] === 'agent__final_report', 'Final turn tools not filtered to agent__final_report.');
+      invariant(finalTurnObservation.input.some((tool) => tool !== 'agent__final_report'), 'Final turn input should include additional tools prior to filtering.');
+      const nonFinalObservation = observed.find((entry) => !entry.isFinalTurn);
+      invariant(nonFinalObservation !== undefined, 'Non-final turn observation missing for run-test-86.');
+      invariant(nonFinalObservation.output.length > 1, 'Non-final turn should retain multiple tools.');
+      const finalReport = result.finalReport;
+      invariant(finalReport !== undefined && finalReport.status === 'success', 'Final report should succeed for run-test-86.');
+    },
+  },
+  {
+    id: 'run-test-87',
+    description: 'Final report failure status is propagated.',
+    configure: (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+      sessionConfig.maxTurns = 1;
+    },
+    execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+      // eslint-disable-next-line @typescript-eslint/unbound-method
+      const originalExecuteTurn = LLMClient.prototype.executeTurn;
+      let invocation = 0;
+      let activeSession: AIAgentSession | undefined;
+      LLMClient.prototype.executeTurn = async function(this: LLMClient, request: TurnRequest): Promise<TurnResult> {
+        invocation += 1;
+        if (invocation === 1) {
+          return {
+            status: { type: 'success', hasToolCalls: false, finalAnswer: false },
+            latencyMs: 5,
+            messages: [
+              { role: 'assistant', content: 'Assessing data reliability...' },
+            ],
+            tokens: { inputTokens: 7, outputTokens: 3, totalTokens: 10 },
+          };
+        }
+        if (invocation === 2) {
+          if (activeSession !== undefined) {
+            (activeSession as unknown as { finalReport?: { status: string; format: 'markdown'; content: string } }).finalReport = {
+              status: 'failure',
+              format: 'markdown',
+              content: 'Investigation failed: upstream service unavailable.',
+            };
+          }
+          const failureContent = 'Investigation failed: upstream service unavailable.';
+          const assistantMessage = {
+            role: 'assistant',
+            content: '',
+            toolCalls: [
+              {
+                name: 'agent__final_report',
+                id: FINAL_REPORT_CALL_ID,
+                parameters: {
+                  status: 'failure',
+                  report_format: 'markdown',
+                  report_content: failureContent,
+                },
+              },
+            ],
+          };
+          const toolMessage = {
+            role: 'tool',
+            toolCallId: FINAL_REPORT_CALL_ID,
+            content: failureContent,
+          };
+          return {
+            status: { type: 'success', hasToolCalls: true, finalAnswer: true },
+            latencyMs: 5,
+            messages: [assistantMessage as ConversationMessage, toolMessage as ConversationMessage],
+            tokens: { inputTokens: 9, outputTokens: 6, totalTokens: 15 },
+          };
+        }
+        return await originalExecuteTurn.call(this, request);
+      };
+      try {
+        activeSession = AIAgentSession.create(sessionConfig);
+        return await activeSession.run();
+      } finally {
+        LLMClient.prototype.executeTurn = originalExecuteTurn;
+      }
+    },
+    expect: (result: AIAgentResult) => {
+      invariant(result.success, 'Scenario run-test-87 expected success.');
+      const finalReport = result.finalReport;
+      invariant(finalReport !== undefined, 'Final report missing for run-test-87.');
+      invariant(finalReport.status === 'failure', 'Final report status should be failure for run-test-87.');
+      invariant(typeof finalReport.content === 'string' && finalReport.content.includes('upstream service unavailable'), 'Final report content mismatch for run-test-87.');
+      const exitLog = result.logs.find((entry) => entry.remoteIdentifier === 'agent:EXIT-FINAL-ANSWER');
+      invariant(exitLog !== undefined, 'EXIT-FINAL-ANSWER log missing for run-test-87.');
+      const toolMessage = result.conversation.find((message) => message.role === 'tool' && message.toolCallId === FINAL_REPORT_CALL_ID);
+      invariant(toolMessage !== undefined, 'Tool response missing for run-test-87.');
+    },
+  },
+  {
     id: 'run-test-43',
     configure: (_configuration, sessionConfig) => {
       sessionConfig.stopRef = { stopping: true };
