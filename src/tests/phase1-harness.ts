@@ -7,7 +7,7 @@ import { WebSocketServer } from 'ws';
 
 import type { ResolvedConfigLayer } from '../config-resolver.js';
 import type { PreloadedSubAgent } from '../subagent-registry.js';
-import type { AIAgentCallbacks, AIAgentResult, AIAgentSessionConfig, AccountingEntry, AgentFinishedEvent, Configuration, ConversationMessage, LogEntry, MCPServerConfig, MCPTool, ProviderConfig, TurnRequest, TurnResult } from '../types.js';
+import type { AIAgentCallbacks, AIAgentResult, AIAgentSessionConfig, AccountingEntry, AgentFinishedEvent, Configuration, ConversationMessage, LogEntry, MCPServerConfig, MCPTool, ProviderConfig, TurnRequest, TurnResult, TurnStatus } from '../types.js';
 import type { JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js';
 import type { ChildProcess } from 'node:child_process';
 import type { AddressInfo } from 'node:net';
@@ -2872,6 +2872,68 @@ const TEST_SCENARIOS: HarnessTest[] = [
     },
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-82 expected success.');
+    },
+  },
+  {
+    id: 'run-test-83',
+    description: 'LLM client error mapping via executeTurn.',
+    execute: async (): Promise<AIAgentResult> => {
+      const scenarioCases = [
+        { key: 'auth', scenario: 'run-test-83-auth' },
+        { key: 'quota', scenario: 'run-test-83-quota' },
+        { key: 'rate', scenario: 'run-test-83-rate' },
+        { key: 'timeout', scenario: 'run-test-83-timeout' },
+        { key: 'network', scenario: 'run-test-83-network' },
+        { key: 'model', scenario: 'run-test-83-model' },
+      ] as const;
+      const statusSummary: Record<string, TurnStatus> = {};
+      // eslint-disable-next-line functional/no-loop-statements
+      for (const { key, scenario } of scenarioCases) {
+        const client = new LLMClient({ [PRIMARY_PROVIDER]: { type: 'test-llm' } });
+        client.setTurn(1, 0);
+        const result = await client.executeTurn({
+          provider: PRIMARY_PROVIDER,
+          model: MODEL_NAME,
+          messages: [
+            { role: 'system', content: 'Phase 1 deterministic harness' },
+            { role: 'user', content: scenario },
+          ],
+          tools: [],
+          toolExecutor: () => Promise.resolve(''),
+        });
+        statusSummary[key] = result.status;
+      }
+      return {
+        success: true,
+        conversation: [],
+        logs: [],
+        accounting: [],
+        finalReport: {
+          status: 'success',
+          format: 'json',
+          content_json: statusSummary,
+          ts: Date.now(),
+        },
+      };
+    },
+    expect: (result: AIAgentResult) => {
+      invariant(result.success, 'Scenario run-test-83 expected success.');
+      const data = result.finalReport?.content_json as Record<string, TurnStatus> | undefined;
+      invariant(data !== undefined, 'Status summary expected for run-test-83.');
+      const auth = data.auth as TurnStatus | undefined;
+      invariant(auth !== undefined && auth.type === 'auth_error' && typeof auth.message === 'string' && auth.message.toLowerCase().includes('invalid api key'), 'Auth error mapping mismatch for run-test-83.');
+      const quota = data.quota as TurnStatus | undefined;
+      invariant(quota !== undefined && quota.type === 'quota_exceeded' && typeof quota.message === 'string' && quota.message.toLowerCase().includes('quota'), 'Quota error mapping mismatch for run-test-83.');
+      const rate = data.rate as TurnStatus | undefined;
+      invariant(rate !== undefined && rate.type === 'rate_limit', 'Rate limit mapping mismatch for run-test-83.');
+      invariant(rate.retryAfterMs === 3000, 'Rate limit retryAfterMs mismatch for run-test-83.');
+      const timeout = data.timeout as TurnStatus | undefined;
+      invariant(timeout !== undefined && timeout.type === 'timeout' && typeof timeout.message === 'string', 'Timeout mapping mismatch for run-test-83.');
+      const network = data.network as TurnStatus | undefined;
+      const networkRetryable = (network as { retryable?: boolean } | undefined)?.retryable ?? true;
+      invariant(network !== undefined && network.type === 'network_error' && networkRetryable, 'Network mapping mismatch for run-test-83.');
+      const model = data.model as TurnStatus | undefined;
+      invariant(model !== undefined && model.type === 'model_error' && typeof model.message === 'string', 'Model error mapping mismatch for run-test-83.');
     },
   },
   {

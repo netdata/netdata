@@ -2548,6 +2548,134 @@ const SCENARIOS: ScenarioDefinition[] = [
 
 
   {
+    id: 'run-test-83-auth',
+    description: 'LLM client mapError auth error.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        failuresBeforeSuccess: 1,
+        failureThrows: true,
+        failureError: { status: 401, message: 'Invalid API key', name: 'AuthError' },
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Authentication issue resolved.',
+          reportContent: `${RESULT_HEADING}Auth error scenario resolved.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_SUCCESS,
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+        },
+      },
+    ],
+  },
+  {
+    id: 'run-test-83-quota',
+    description: 'LLM client mapError quota exceeded.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        failuresBeforeSuccess: 1,
+        failureThrows: true,
+        failureError: { status: 402, message: 'Quota exceeded', name: 'BillingError' },
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Quota issue acknowledged.',
+          reportContent: `${RESULT_HEADING}Quota error scenario resolved.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_SUCCESS,
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+        },
+      },
+    ],
+  },
+  {
+    id: 'run-test-83-rate',
+    description: 'LLM client mapError rate limit.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        failuresBeforeSuccess: 1,
+        failureThrows: true,
+        failureError: { status: 429, message: 'Rate limit hit', name: 'RateLimitError', headers: { 'retry-after': '3' } },
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Rate limit cleared.',
+          reportContent: `${RESULT_HEADING}Rate limit scenario resolved.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_SUCCESS,
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+        },
+      },
+    ],
+  },
+  {
+    id: 'run-test-83-timeout',
+    description: 'LLM client mapError timeout.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        failuresBeforeSuccess: 1,
+        failureThrows: true,
+        failureError: { name: 'TimeoutError', message: 'Request timed out' },
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Timeout scenario complete.',
+          reportContent: `${RESULT_HEADING}Timeout scenario resolved.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_SUCCESS,
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+        },
+      },
+    ],
+  },
+  {
+    id: 'run-test-83-network',
+    description: 'LLM client mapError network error.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        failuresBeforeSuccess: 1,
+        failureThrows: true,
+        failureError: { name: 'NetworkError', message: 'Network connection lost' },
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Network issue resolved.',
+          reportContent: `${RESULT_HEADING}Network error scenario resolved.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_SUCCESS,
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+        },
+      },
+    ],
+  },
+  {
+    id: 'run-test-83-model',
+    description: 'LLM client mapError model error.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        failuresBeforeSuccess: 1,
+        failureThrows: true,
+        failureError: { status: 400, message: 'Invalid request payload', name: 'BadRequestError' },
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Model error handled.',
+          reportContent: `${RESULT_HEADING}Model error scenario resolved.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_SUCCESS,
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+        },
+      },
+    ],
+  },
+
+
+  {
     id: 'run-test-74',
     description: 'Final report validation error surfaced to LLM.',
     systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
