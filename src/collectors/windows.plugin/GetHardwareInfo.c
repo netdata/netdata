@@ -24,7 +24,7 @@ static void netdata_stop_driver()
         nd_log(
                 NDLS_COLLECTORS,
                 NDLP_ERR,
-                "Cannot open Service Manager. GetLastError= %lu \n", GetLastError());
+                "Cannot open Service Manager. Error= %lu \n", GetLastError());
         return;
     }
 
@@ -33,7 +33,7 @@ static void netdata_stop_driver()
         nd_log(
                 NDLS_COLLECTORS,
                 NDLP_ERR,
-                "Cannot open the service. GetLastError= %lu \n", GetLastError());
+                "Cannot open the service. Error= %lu \n", GetLastError());
         CloseServiceHandle(scm);
         return;
     }
@@ -64,7 +64,7 @@ int netdata_install_driver()
         nd_log(
                 NDLS_COLLECTORS,
                 NDLP_ERR,
-                "Cannot open Service Manager. GetLastError= %lu \n", GetLastError());
+                "Cannot open Service Manager. Error= %lu \n", GetLastError());
         return -1;
     }
 
@@ -95,7 +95,7 @@ int netdata_install_driver()
         nd_log(
                 NDLS_COLLECTORS,
                 NDLP_ERR,
-                "Cannot create Service. GetLastError= %lu \n", GetLastError());
+                "Cannot create Service. Error= %lu \n", GetLastError());
         CloseServiceHandle(scm);
         return -1;
     }
@@ -113,7 +113,7 @@ int netdata_start_driver()
         nd_log(
                 NDLS_COLLECTORS,
                 NDLP_ERR,
-                "Cannot open Service Manager. GetLastError= %lu \n", GetLastError());
+                "Cannot open Service Manager. Error= %lu \n", GetLastError());
         return -1;
     }
 
@@ -123,13 +123,20 @@ int netdata_start_driver()
         nd_log(
                 NDLS_COLLECTORS,
                 NDLP_ERR,
-                "Cannot open Service. GetLastError= %lu \n", GetLastError());
+                "Cannot open Service. Error= %lu \n", GetLastError());
         return -1;
     }
 
     int ret = 0;
     if (!StartServiceA(service, 0, NULL)) {
-        ret = (GetLastError() == ERROR_SERVICE_EXISTS)? 0 : -1;
+        DWORD err = GetLastError();
+        if (err != ERROR_SERVICE_EXISTS) {
+            nd_log(
+                    NDLS_COLLECTORS,
+                    NDLP_ERR,
+                    "Cannot start Service. Error= %lu \n", err);
+            ret = -1;
+        }
     }
 
     CloseServiceHandle(service);
