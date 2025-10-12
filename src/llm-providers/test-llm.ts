@@ -297,7 +297,7 @@ function buildResponse(response: ScenarioStepResponse) {
     appendReasoningParts(content, response);
     return {
       content,
-      finishReason: 'stop' as LanguageModelV2FinishReason,
+      finishReason: (response.finishReason ?? 'stop') as LanguageModelV2FinishReason,
       usage,
       warnings: [],
     };

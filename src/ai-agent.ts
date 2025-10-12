@@ -1234,6 +1234,7 @@ export class AIAgentSession {
                 actualModel: provider === 'openrouter' ? this.llmClient.getLastActualRouting().model : undefined,
                 costUsd: provider === 'openrouter' ? (this.llmClient.getLastCostInfo().costUsd ?? computed.costUsd) : computed.costUsd,
                 upstreamInferenceCostUsd: provider === 'openrouter' ? this.llmClient.getLastCostInfo().upstreamInferenceCostUsd : undefined,
+                stopReason: turnResult.stopReason,
                 tokens,
                 error: turnResult.status.type !== 'success' ?
                   ('message' in turnResult.status ? turnResult.status.message : turnResult.status.type) : undefined,
@@ -1377,6 +1378,7 @@ export class AIAgentSession {
                 const hasContentStr = String(hasContent);
                 const responseLenStr = String(turnResult.response?.length ?? 0);
                 const messagesLenStr = String(turnResult.messages.length);
+                const stopReasonStr = turnResult.stopReason ?? 'none';
                 const debugEntry: LogEntry = {
                   timestamp: Date.now(),
                   severity: 'VRB',
@@ -1386,7 +1388,7 @@ export class AIAgentSession {
                   type: 'llm',
                   remoteIdentifier: 'debug',
                   fatal: false,
-                  message: `Turn result: hasToolCalls=${hasToolCallsStr}, hasToolResults=${hasToolResultsStr}, finalAnswer=${finalAnswerStr}, hasReasoning=${hasReasoningStr}, hasContent=${hasContentStr}, response length=${responseLenStr}, messages=${messagesLenStr}`
+                  message: `Turn result: hasToolCalls=${hasToolCallsStr}, hasToolResults=${hasToolResultsStr}, finalAnswer=${finalAnswerStr}, hasReasoning=${hasReasoningStr}, hasContent=${hasContentStr}, response length=${responseLenStr}, messages=${messagesLenStr}, stopReason=${stopReasonStr}`
                 };
                 this.log(debugEntry);
                 
@@ -1808,7 +1810,21 @@ export class AIAgentSession {
         .map(([key, s]) => `${String(s.total)}x [${String(s.ok)}+${String(s.failed)}] ${key}`)
         .join(', ');
 
-      const msg = `requests=${String(llmRequests)} failed=${String(llmFailures)}, tokens prompt=${String(tokIn)} output=${String(tokOut)} cacheR=${String(tokCacheRead)} cacheW=${String(tokCacheWrite)} total=${String(tokTotal)}, cost total=$${totalCost.toFixed(5)} upstream=$${totalUpstreamCost.toFixed(5)}, latency sum=${String(llmLatencySum)}ms avg=${String(llmLatencyAvg)}ms, providers/models: ${pairsStr.length > 0 ? pairsStr : 'none'}`;
+      const stopReasonStats = new Map<string, number>();
+      llmEntries.forEach((entry) => {
+        const reason = entry.stopReason;
+        if (typeof reason === 'string' && reason.length > 0) {
+          stopReasonStats.set(reason, (stopReasonStats.get(reason) ?? 0) + 1);
+        }
+      });
+      const stopReasonStr = [...stopReasonStats.entries()]
+        .map(([reason, count]) => `${reason}(${String(count)})`)
+        .join(', ');
+
+      let msg = `requests=${String(llmRequests)} failed=${String(llmFailures)}, tokens prompt=${String(tokIn)} output=${String(tokOut)} cacheR=${String(tokCacheRead)} cacheW=${String(tokCacheWrite)} total=${String(tokTotal)}, cost total=$${totalCost.toFixed(5)} upstream=$${totalUpstreamCost.toFixed(5)}, latency sum=${String(llmLatencySum)}ms avg=${String(llmLatencyAvg)}ms, providers/models: ${pairsStr.length > 0 ? pairsStr : 'none'}`;
+      if (stopReasonStr.length > 0) {
+        msg += `, stop reasons: ${stopReasonStr}`;
+      }
       const fin: LogEntry = {
         timestamp: Date.now(),
         severity: 'FIN',

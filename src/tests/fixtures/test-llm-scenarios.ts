@@ -25,6 +25,7 @@ export type ScenarioStepResponse =
       reportContentJson?: Record<string, unknown>;
       tokenUsage?: TokenUsage;
       reasoning?: string[];
+      finishReason?: string;
     }
   | {
       kind: 'text';
@@ -2513,6 +2514,30 @@ const SCENARIOS: ScenarioDefinition[] = [
             inputTokens: 50,
             outputTokens: 20,
             totalTokens: 70,
+          },
+        },
+      },
+    ],
+  },
+
+  {
+    id: 'run-test-78',
+    description: 'Stop reason emitted as max_tokens.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Token limit reached while finalizing the report.',
+          reportContent: `${RESULT_HEADING}Max tokens stop triggered.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_SUCCESS,
+          finishReason: 'max_tokens',
+          tokenUsage: {
+            inputTokens: 120,
+            outputTokens: 540,
+            totalTokens: 660,
           },
         },
       },

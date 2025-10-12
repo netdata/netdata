@@ -437,7 +437,10 @@ export class LLMClient {
     } else {
       const fatal = result.status.type === 'auth_error' || result.status.type === 'quota_exceeded';
       const statusMessage = 'message' in result.status ? result.status.message : result.status.type;
-      const message = `error [${result.status.type.toUpperCase()}] ${statusMessage} (waited ${String(latencyMs)} ms)`;
+      let message = `error [${result.status.type.toUpperCase()}] ${statusMessage} (waited ${String(latencyMs)} ms)`;
+      if (typeof result.stopReason === 'string' && result.stopReason.length > 0) {
+        message += `, stop=${result.stopReason}`;
+      }
       
       this.log(fatal ? 'ERR' : 'WRN', 'response', 'llm', remoteId, message, fatal);
     }

@@ -2651,6 +2651,16 @@ const TEST_SCENARIOS: HarnessTest[] = [
     };
   })(),
   {
+    id: 'run-test-78',
+    description: 'Stop reason aggregated into summary logs.',
+    expect: (result) => {
+      invariant(result.success, 'Scenario run-test-78 should complete successfully.');
+      const summaryLog = result.logs.find((entry) => entry.severity === 'FIN' && entry.type === 'llm' && entry.remoteIdentifier === 'summary');
+      invariant(summaryLog !== undefined, 'LLM summary log missing for run-test-78.');
+      invariant(summaryLog.message.includes('stop reasons: max_tokens'), 'Summary log should include max_tokens stop reason for run-test-78.');
+    },
+  },
+  {
     id: 'run-test-43',
     configure: (_configuration, sessionConfig) => {
       sessionConfig.stopRef = { stopping: true };

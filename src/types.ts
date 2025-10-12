@@ -491,6 +491,7 @@ export interface LLMAccountingEntry extends BaseAccountingEntry {
   // Optional: cost as reported by provider (e.g., OpenRouter)
   costUsd?: number;
   upstreamInferenceCostUsd?: number;
+  stopReason?: string;
   tokens: TokenUsage;
   error?: string;
 }
