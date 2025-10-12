@@ -3239,6 +3239,84 @@ const TEST_SCENARIOS: HarnessTest[] = [
     },
   },
   {
+    id: 'run-test-88',
+    description: 'Final report partial status is propagated.',
+    configure: (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+      sessionConfig.maxTurns = 1;
+    },
+    execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+      // eslint-disable-next-line @typescript-eslint/unbound-method
+      const originalExecuteTurn = LLMClient.prototype.executeTurn;
+      let invocation = 0;
+      let activeSession: AIAgentSession | undefined;
+      LLMClient.prototype.executeTurn = async function(this: LLMClient, request: TurnRequest): Promise<TurnResult> {
+        invocation += 1;
+        if (invocation === 1) {
+          return {
+            status: { type: 'success', hasToolCalls: false, finalAnswer: false },
+            latencyMs: 5,
+            messages: [
+              { role: 'assistant', content: 'Summarizing current findings...' },
+            ],
+            tokens: { inputTokens: 6, outputTokens: 3, totalTokens: 9 },
+          };
+        }
+        if (invocation === 2) {
+          const partialContent = 'Partial success: gathered overview, missing detailed metrics.';
+          if (activeSession !== undefined) {
+            (activeSession as unknown as { finalReport?: { status: string; format: 'markdown'; content: string } }).finalReport = {
+              status: 'partial',
+              format: 'markdown',
+              content: partialContent,
+            };
+          }
+          const assistantMessage = {
+            role: 'assistant',
+            content: '',
+            toolCalls: [
+              {
+                name: 'agent__final_report',
+                id: FINAL_REPORT_CALL_ID,
+                parameters: {
+                  status: 'partial',
+                  report_format: 'markdown',
+                  report_content: partialContent,
+                },
+              },
+            ],
+          };
+          const toolMessage = {
+            role: 'tool',
+            toolCallId: FINAL_REPORT_CALL_ID,
+            content: partialContent,
+          };
+          return {
+            status: { type: 'success', hasToolCalls: true, finalAnswer: true },
+            latencyMs: 5,
+            messages: [assistantMessage as ConversationMessage, toolMessage as ConversationMessage],
+            tokens: { inputTokens: 8, outputTokens: 5, totalTokens: 13 },
+          };
+        }
+        return await originalExecuteTurn.call(this, request);
+      };
+      try {
+        activeSession = AIAgentSession.create(sessionConfig);
+        return await activeSession.run();
+      } finally {
+        LLMClient.prototype.executeTurn = originalExecuteTurn;
+      }
+    },
+    expect: (result: AIAgentResult) => {
+      invariant(result.success, 'Scenario run-test-88 expected success.');
+      const finalReport = result.finalReport;
+      invariant(finalReport !== undefined, 'Final report missing for run-test-88.');
+      invariant(finalReport.status === 'partial', 'Final report status should be partial for run-test-88.');
+      invariant(typeof finalReport.content === 'string' && finalReport.content.includes('Partial success'), 'Final report content mismatch for run-test-88.');
+      const exitLog = result.logs.find((entry) => entry.remoteIdentifier === 'agent:EXIT-FINAL-ANSWER');
+      invariant(exitLog !== undefined, 'EXIT-FINAL-ANSWER log missing for run-test-88.');
+    },
+  },
+  {
     id: 'run-test-43',
     configure: (_configuration, sessionConfig) => {
       sessionConfig.stopRef = { stopping: true };
