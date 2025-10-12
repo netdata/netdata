@@ -13,18 +13,98 @@ import type {
   MCPTool,
 } from './types.js';
 
+import { DEFAULT_TOOL_INPUT_SCHEMA, cloneJsonSchema } from './input-contract.js';
+
 export interface PreloadedSubAgent {
   toolName: string;
   description?: string;
   usage?: string;
   inputFormat: 'text' | 'json';
   inputSchema?: Record<string, unknown>;
+  hasExplicitInputSchema: boolean;
   promptPath: string; // canonical path
   systemTemplate: string; // stripped frontmatter contents (unexpanded, no FORMAT replacement)
   loaded: LoadedAgent; // Static snapshot runner (no hot-reload within a session)
 }
 
 type ChildInfo = PreloadedSubAgent;
+
+function augmentSchemaWithReason(
+  source: Record<string, unknown> | undefined,
+  reasonProp: Record<string, unknown>
+): Record<string, unknown> {
+  const schema = cloneJsonSchema(source ?? {});
+  const props = (() => {
+    const container = (schema as { properties?: unknown }).properties;
+    if (container !== undefined && container !== null && typeof container === 'object' && !Array.isArray(container)) {
+      return container as Record<string, unknown>;
+    }
+    const created: Record<string, unknown> = {};
+    (schema as { properties?: Record<string, unknown> }).properties = created;
+    return created;
+  })();
+  if (props.reason === undefined || typeof props.reason !== 'object' || Array.isArray(props.reason)) {
+    props.reason = reasonProp;
+  }
+  const requiredRaw = (schema as { required?: unknown }).required;
+  const required = new Set<string>(
+    Array.isArray(requiredRaw)
+      ? requiredRaw.filter((value): value is string => typeof value === 'string')
+      : [],
+  );
+  required.add('reason');
+  (schema as { required?: string[] }).required = Array.from(required);
+  return schema;
+}
+
+function buildFallbackSchema(
+  reasonProp: Record<string, unknown>,
+  usage?: string
+): Record<string, unknown> {
+  const schema = cloneJsonSchema(DEFAULT_TOOL_INPUT_SCHEMA);
+  const props = (() => {
+    const container = (schema as { properties?: unknown }).properties;
+    if (container !== undefined && container !== null && typeof container === 'object' && !Array.isArray(container)) {
+      return container as Record<string, unknown>;
+    }
+    const created: Record<string, unknown> = {};
+    (schema as { properties?: Record<string, unknown> }).properties = created;
+    return created;
+  })();
+  props.prompt = (() => {
+    const original = props.prompt;
+    if (original !== undefined && original !== null && typeof original === 'object' && !Array.isArray(original)) {
+      if (typeof usage === 'string' && usage.trim().length > 0) {
+        (original as { description?: string }).description = usage;
+      }
+      return original;
+    }
+    const created: Record<string, unknown> = { type: 'string' };
+    if (typeof usage === 'string' && usage.trim().length > 0) {
+      created.description = usage;
+    }
+    return created;
+  })();
+  props.reason = reasonProp;
+  props.format = {
+    type: 'string',
+    enum: ['sub-agent'],
+    default: 'sub-agent',
+    description: 'Fixed format identifier; must be set to sub-agent.',
+  };
+  (schema as { additionalProperties?: boolean }).additionalProperties = false;
+  const requiredRaw = (schema as { required?: unknown }).required;
+  const required = new Set<string>(
+    Array.isArray(requiredRaw)
+      ? requiredRaw.filter((value): value is string => typeof value === 'string')
+      : [],
+  );
+  required.add('prompt');
+  required.add('reason');
+  required.add('format');
+  (schema as { required?: string[] }).required = Array.from(required);
+  return schema;
+}
 
 export class SubAgentRegistry {
   private readonly children = new Map<string, ChildInfo>(); // toolName -> info
@@ -45,26 +125,10 @@ export class SubAgentRegistry {
     return Array.from(this.children.values()).map((c) => {
       const inputSchema = (() => {
         const reasonProp = { type: 'string', minLength: 1, description: '3-7 words about the reason of running this tool' };
-        if (c.inputFormat === 'json') {
-          const base = (c.inputSchema ?? { type: 'object' });
-          const baseProperties = (base as { properties?: Record<string, unknown> }).properties ?? {};
-          const baseRequired = Array.isArray((base as { required?: unknown[] }).required)
-            ? ([...(base as { required: unknown[] }).required] as string[])
-            : [];
-          const mergedRequired = Array.from(new Set<string>([...baseRequired, 'reason']));
-          const mergedProperties = {
-            ...baseProperties,
-            reason: reasonProp,
-          };
-          const mergedSchema: Record<string, unknown> = {
-            ...base,
-            type: 'object',
-            properties: mergedProperties,
-            required: mergedRequired,
-          };
-          return mergedSchema;
+        if (c.hasExplicitInputSchema) {
+          return augmentSchemaWithReason(c.inputSchema, reasonProp);
         }
-        return { type: 'object', additionalProperties: false, required: ['input', 'reason'], properties: { input: { type: 'string', minLength: 1, description: (typeof c.usage === 'string' && c.usage.length > 0) ? c.usage : 'User prompt for the sub-agent' }, reason: reasonProp } };
+        return buildFallbackSchema(reasonProp, c.usage);
       })();
       return {
         name: `agent__${c.toolName}`,
@@ -105,11 +169,14 @@ export class SubAgentRegistry {
     // Validate and build user prompt from parameters
     const userPrompt: string = (() => {
       if (info.inputFormat === 'json') {
-        // Validate JSON params when schema provided
         if (info.inputSchema !== undefined) {
+          const reasonProp = { type: 'string', minLength: 1, description: '3-7 words about the reason of running this tool' };
+          const schemaForValidation = info.hasExplicitInputSchema
+            ? augmentSchemaWithReason(info.inputSchema, reasonProp)
+            : buildFallbackSchema(reasonProp, info.usage);
           try {
             const ajv = new Ajv({ allErrors: true, strict: false });
-            const validate = ajv.compile(info.inputSchema);
+            const validate = ajv.compile(schemaForValidation);
             const ok = validate(parameters);
             if (!ok) {
               const errs = (validate.errors ?? []).map((e) => `${e.instancePath} ${e.message ?? ''}`.trim()).join('; ');
@@ -122,13 +189,23 @@ export class SubAgentRegistry {
         }
         try { return JSON.stringify(parameters); } catch { return '[unserializable-parameters]'; }
       }
-      const v = (parameters as { input?: unknown; reason?: unknown }).input;
-      if (typeof v !== 'string' || v.length === 0) {
-        throw new Error('invalid_parameters: input (string) is required');
+      const formatParam = (parameters as { format?: unknown }).format;
+      if (formatParam !== 'sub-agent') {
+        throw new Error('invalid_parameters: format must be "sub-agent"');
       }
-      return v;
+      const promptParam = (parameters as { prompt?: unknown }).prompt;
+      if (typeof promptParam !== 'string' || promptParam.trim().length === 0) {
+        throw new Error('invalid_parameters: prompt (string) is required');
+      }
+      return promptParam;
     })();
-    const reason: string | undefined = (() => { const r = (parameters as { reason?: unknown }).reason; return typeof r === 'string' ? r : undefined; })();
+    const reason: string | undefined = (() => {
+      const r = (parameters as { reason?: unknown }).reason;
+      if (typeof r !== 'string' || r.trim().length === 0) {
+        throw new Error('invalid_parameters: reason (string) is required');
+      }
+      return r;
+    })();
 
     // Load child agent with layered configuration using the file path
     // CD to agent directory for proper layered config resolution

@@ -819,8 +819,9 @@ const SCENARIOS: ScenarioDefinition[] = [
               callId: 'call-subagent-1',
               assistantText: 'Delegating pricing analysis to sub-agent.',
               arguments: {
-                input: 'Need supporting pricing analysis.',
+                prompt: 'Need supporting pricing analysis.',
                 reason: 'Augment pricing context',
+                format: 'sub-agent',
               },
             },
             {
@@ -995,8 +996,9 @@ const SCENARIOS: ScenarioDefinition[] = [
               callId: 'call-subagent-success',
               assistantText: 'Delegating to pricing sub-agent.',
               arguments: {
-                input: 'run-test-24-subagent',
+                prompt: 'run-test-24-subagent',
                 reason: 'Gather detailed pricing insights',
+                format: 'sub-agent',
               },
             },
             {

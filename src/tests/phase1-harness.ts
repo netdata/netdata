@@ -14,6 +14,8 @@ import type { AddressInfo } from 'node:net';
 
 import { loadAgent, loadAgentFromContent } from '../agent-loader.js';
 import { AIAgentSession } from '../ai-agent.js';
+import { parseFrontmatter } from '../frontmatter.js';
+import { DEFAULT_TOOL_INPUT_SCHEMA } from '../input-contract.js';
 import { LLMClient } from '../llm-client.js';
 import { TestLLMProvider } from '../llm-providers/test-llm.js';
 import { SubAgentRegistry } from '../subagent-registry.js';
@@ -60,6 +62,8 @@ function deriveToolName(promptPath: string): string {
 }
 
 function preloadSubAgentFromPath(promptPath: string, configuration: Configuration): PreloadedSubAgent {
+  const raw = fs.readFileSync(promptPath, 'utf-8');
+  const fm = parseFrontmatter(raw, { baseDir: path.dirname(promptPath) });
   const layers = buildInMemoryConfigLayers(configuration);
   const loaded = loadAgent(promptPath, undefined, { configLayers: layers });
   const toolName = loaded.toolName ?? deriveToolName(loaded.promptPath);
@@ -75,6 +79,7 @@ function preloadSubAgentFromPath(promptPath: string, configuration: Configuratio
     usage: loaded.usage,
     inputFormat: loaded.input.format === 'json' ? 'json' : 'text',
     inputSchema: loaded.input.schema,
+    hasExplicitInputSchema: fm?.inputSpec !== undefined,
     promptPath: loaded.promptPath,
     systemTemplate: loaded.systemTemplate,
     loaded,
@@ -130,6 +135,10 @@ function getEffectiveTimeoutMs(test: HarnessTest): number {
 const SUBAGENT_PRICING_PROMPT = path.resolve(process.cwd(), 'src/tests/fixtures/subagents/pricing-subagent.ai');
 const SUBAGENT_PRICING_SUCCESS_PROMPT = path.resolve(process.cwd(), 'src/tests/fixtures/subagents-success/pricing-subagent-success.ai');
 const SUBAGENT_SUCCESS_TOOL = 'agent__pricing-subagent-success';
+const SUBAGENT_SCHEMA_FALLBACK_PROMPT = path.resolve(process.cwd(), 'src/tests/fixtures/subagents/schema-fallback.ai');
+const SUBAGENT_SCHEMA_JSON_PROMPT = path.resolve(process.cwd(), 'src/tests/fixtures/subagents/schema-json.ai');
+const AGENT_SCHEMA_DEFAULT_PROMPT = path.resolve(process.cwd(), 'src/tests/fixtures/agents/schema-default.ai');
+const AGENT_SCHEMA_JSON_PROMPT = path.resolve(process.cwd(), 'src/tests/fixtures/agents/schema-json.ai');
 const CONCURRENCY_TIMEOUT_ARGUMENT = 'trigger-timeout';
 const CONCURRENCY_SECOND_ARGUMENT = 'concurrency-second';
 const THROW_FAILURE_MESSAGE = 'Simulated provider throw for coverage.';
@@ -168,8 +177,62 @@ function invariant(condition: boolean, message: string): asserts condition {
   if (!condition) throw new Error(message);
 }
 
+function makeSuccessResult(content: string): AIAgentResult {
+  return {
+    success: true,
+    conversation: [],
+    logs: [],
+    accounting: [],
+    finalReport: {
+      status: 'success',
+      format: 'text',
+      content,
+      ts: Date.now(),
+    },
+  };
+}
+
+function createParentSessionStub(configuration: Configuration): Pick<AIAgentSessionConfig, 'config' | 'callbacks' | 'stream' | 'traceLLM' | 'traceMCP' | 'verbose' | 'temperature' | 'topP' | 'llmTimeout' | 'toolTimeout' | 'maxRetries' | 'maxTurns' | 'toolResponseMaxBytes' | 'parallelToolCalls' | 'targets'> {
+  return {
+    config: configuration,
+    callbacks: undefined,
+    stream: false,
+    traceLLM: false,
+    traceMCP: false,
+    verbose: false,
+    temperature: 0.7,
+    topP: 1,
+    llmTimeout: 10_000,
+    toolTimeout: 10_000,
+    maxRetries: 2,
+    maxTurns: 10,
+    toolResponseMaxBytes: 65_536,
+    parallelToolCalls: false,
+    targets: [{ provider: PRIMARY_PROVIDER, model: MODEL_NAME }],
+  };
+}
+
+function makeBasicConfiguration(): Configuration {
+  return {
+    providers: {
+      [PRIMARY_PROVIDER]: {
+        type: 'test-llm',
+        models: {
+          [MODEL_NAME]: {},
+        },
+      },
+    },
+    mcpServers: {},
+  };
+}
+
 function assertRecord(value: unknown, message: string): asserts value is Record<string, unknown> {
   invariant(value !== null && typeof value === 'object' && !Array.isArray(value), message);
+}
+
+function expectRecord(value: unknown, message: string): Record<string, unknown> {
+  assertRecord(value, message);
+  return value;
 }
 
 
@@ -2658,6 +2721,157 @@ const TEST_SCENARIOS: HarnessTest[] = [
       const summaryLog = result.logs.find((entry) => entry.severity === 'FIN' && entry.type === 'llm' && entry.remoteIdentifier === 'summary');
       invariant(summaryLog !== undefined, 'LLM summary log missing for run-test-78.');
       invariant(summaryLog.message.includes('stop reasons: max_tokens'), 'Summary log should include max_tokens stop reason for run-test-78.');
+    },
+  },
+  {
+    id: 'run-test-79',
+    description: 'Agent without input spec uses fallback schema.',
+    execute: () => {
+      const configuration: Configuration = makeBasicConfiguration();
+      const layers = buildInMemoryConfigLayers(configuration);
+      const loaded = loadAgent(AGENT_SCHEMA_DEFAULT_PROMPT, undefined, { configLayers: layers });
+      invariant(loaded.expectedOutput === undefined, 'Default agent should not define expected output.');
+      const schemaJson = JSON.stringify(loaded.input.schema);
+      invariant(schemaJson === JSON.stringify(DEFAULT_TOOL_INPUT_SCHEMA), 'Default agent input schema mismatch.');
+      return Promise.resolve(makeSuccessResult('agent-default-schema'));
+    },
+    expect: (result) => {
+      invariant(result.success, 'Scenario run-test-79 expected success.');
+    },
+  },
+  {
+    id: 'run-test-80',
+    description: 'Agent explicit JSON schema and output are preserved and cloned.',
+    execute: () => {
+      const configuration: Configuration = makeBasicConfiguration();
+      const layers = buildInMemoryConfigLayers(configuration);
+      const raw = fs.readFileSync(AGENT_SCHEMA_JSON_PROMPT, 'utf-8');
+      const fm = parseFrontmatter(raw, { baseDir: path.dirname(AGENT_SCHEMA_JSON_PROMPT) });
+      const inputSchemaOriginal = expectRecord(fm?.inputSpec?.schema, 'Explicit agent input schema missing.');
+      const outputSchemaOriginal = expectRecord(fm?.expectedOutput?.schema, 'Explicit agent expected output schema missing.');
+      const expectedInputSchemaJson = JSON.stringify(inputSchemaOriginal);
+      const expectedOutputSchemaJson = JSON.stringify(outputSchemaOriginal);
+      const loaded = loadAgent(AGENT_SCHEMA_JSON_PROMPT, undefined, { configLayers: layers });
+      invariant(loaded.input.format === 'json', 'Explicit agent input format should be json.');
+      invariant(JSON.stringify(loaded.input.schema) === expectedInputSchemaJson, 'Explicit agent input schema altered during load.');
+      const explicitOutput = loaded.expectedOutput;
+      invariant(explicitOutput !== undefined, 'Explicit agent should define expected output schema.');
+      invariant(JSON.stringify(explicitOutput.schema) === expectedOutputSchemaJson, 'Explicit agent output schema altered during load.');
+      inputSchemaOriginal.properties = {};
+      outputSchemaOriginal.properties = {};
+      invariant(JSON.stringify(loaded.input.schema) === expectedInputSchemaJson, 'Loaded input schema should remain isolated from frontmatter mutations.');
+      invariant(JSON.stringify(explicitOutput.schema) === expectedOutputSchemaJson, 'Loaded output schema should remain isolated from frontmatter mutations.');
+      return Promise.resolve(makeSuccessResult('agent-explicit-json-schema'));
+    },
+    expect: (result) => {
+      invariant(result.success, 'Scenario run-test-80 expected success.');
+    },
+  },
+  {
+    id: 'run-test-81',
+    description: 'Fallback sub-agent schema enforces prompt, reason, and sub-agent format.',
+    execute: async (): Promise<AIAgentResult> => {
+      const configuration: Configuration = makeBasicConfiguration();
+      const subAgent = preloadSubAgentFromPath(SUBAGENT_SCHEMA_FALLBACK_PROMPT, configuration);
+      invariant(!subAgent.hasExplicitInputSchema, 'Fallback sub-agent should not report explicit schema.');
+      const registry = new SubAgentRegistry([subAgent], []);
+      const tools = registry.getTools();
+      invariant(tools.length > 0, 'Fallback sub-agent tool missing.');
+      const [tool] = tools;
+      const schema = expectRecord(tool.inputSchema, 'Fallback sub-agent schema missing.');
+      const propsContainer = expectRecord((schema as { properties?: unknown }).properties ?? {}, 'Fallback schema properties missing.');
+      const formatDetails = expectRecord((propsContainer as { format?: unknown }).format, 'Fallback schema should expose format property.');
+      const enumValues = formatDetails.enum;
+      invariant(Array.isArray(enumValues) && enumValues.length === 1 && enumValues[0] === 'sub-agent', 'Fallback schema format enum should only contain sub-agent.');
+      invariant(formatDetails.default === 'sub-agent', 'Fallback schema format default must be sub-agent.');
+      const reasonDetails = expectRecord((propsContainer as { reason?: unknown }).reason, 'Fallback schema reason property missing.');
+      invariant(reasonDetails.minLength === 1, 'Fallback schema reason must enforce minLength.');
+      const requiredRaw = (schema as { required?: unknown }).required;
+      const required = new Set<string>(Array.isArray(requiredRaw) ? requiredRaw.filter((value): value is string => typeof value === 'string') : []);
+      invariant(required.has('prompt'), 'Fallback schema should require prompt.');
+      invariant(required.has('reason'), 'Fallback schema should require reason.');
+      invariant(required.has('format'), 'Fallback schema should require format.');
+      const parentSession = createParentSessionStub(configuration);
+      const ok = await registry.execute(tool.name, { prompt: 'Fallback prompt', reason: 'Fallback title', format: 'sub-agent' }, parentSession);
+      invariant(typeof ok.result === 'string', 'Fallback sub-agent execution should return string result.');
+
+      const expectFailure = async (args: Record<string, unknown>, fragment: string): Promise<void> => {
+        let failed = false;
+        try {
+          await registry.execute(tool.name, args, parentSession);
+        } catch (error) {
+          failed = true;
+          invariant(String(error).includes(fragment), `Failure message should mention ${fragment}`);
+        }
+        invariant(failed, 'Execution should have failed.');
+      };
+
+      await expectFailure({ reason: 'Missing prompt', format: 'sub-agent' }, 'prompt');
+      await expectFailure({ prompt: 'Missing reason', format: 'sub-agent' }, 'reason');
+      await expectFailure({ prompt: 'Wrong format', reason: 'Bad format', format: 'markdown' }, 'format');
+
+      return makeSuccessResult('subagent-fallback-schema');
+    },
+    expect: (result) => {
+      invariant(result.success, 'Scenario run-test-81 expected success.');
+    },
+  },
+  {
+    id: 'run-test-82',
+    description: 'Explicit JSON sub-agent schema injects reason and enforces provided structure.',
+    execute: async (): Promise<AIAgentResult> => {
+      const configuration: Configuration = makeBasicConfiguration();
+      const raw = fs.readFileSync(SUBAGENT_SCHEMA_JSON_PROMPT, 'utf-8');
+      const fm = parseFrontmatter(raw, { baseDir: path.dirname(SUBAGENT_SCHEMA_JSON_PROMPT) });
+      const explicitInputSchema = expectRecord(fm?.inputSpec?.schema, 'Explicit sub-agent input schema missing.');
+      const expectedOutputOriginal = expectRecord(fm?.expectedOutput?.schema, 'Explicit sub-agent expected output schema missing.');
+      const expectedOutputSchemaJson = JSON.stringify(expectedOutputOriginal);
+      const subAgent = preloadSubAgentFromPath(SUBAGENT_SCHEMA_JSON_PROMPT, configuration);
+      invariant(subAgent.hasExplicitInputSchema, 'Explicit sub-agent should report explicit schema.');
+      const registry = new SubAgentRegistry([subAgent], []);
+      const tools = registry.getTools();
+      invariant(tools.length > 0, 'Explicit sub-agent tool missing.');
+      const [tool] = tools;
+      const schema = expectRecord(tool.inputSchema, 'Explicit sub-agent schema missing.');
+      const propsContainer = expectRecord((schema as { properties?: unknown }).properties ?? {}, 'Explicit sub-agent properties missing.');
+      const reasonDetails = expectRecord((propsContainer as { reason?: unknown }).reason, 'Explicit sub-agent schema should include reason property.');
+      invariant(reasonDetails.minLength === 1, 'Explicit sub-agent reason must enforce minLength.');
+      const requiredRaw = (schema as { required?: unknown }).required;
+      const required = new Set<string>(Array.isArray(requiredRaw) ? requiredRaw.filter((value): value is string => typeof value === 'string') : []);
+      invariant(required.has('reason'), 'Explicit sub-agent schema should require reason.');
+      invariant(propsContainer.query !== undefined, 'Explicit sub-agent schema should preserve query property.');
+      const schemaJsonBeforeMutation = JSON.stringify(schema);
+
+      const parentSession = createParentSessionStub(configuration);
+      const ok = await registry.execute(tool.name, { query: 'topic', limit: 2, reason: 'Explicit title' }, parentSession);
+      invariant(typeof ok.result === 'string', 'Explicit sub-agent execution should succeed.');
+
+      const expectFailure = async (args: Record<string, unknown>, fragment: string): Promise<void> => {
+        let failed = false;
+        try {
+          await registry.execute(tool.name, args, parentSession);
+        } catch (error) {
+          failed = true;
+          invariant(String(error).includes(fragment), `Failure message should mention ${fragment}`);
+        }
+        invariant(failed, 'Execution should have failed.');
+      };
+
+      await expectFailure({ query: 'missing reason' }, 'reason');
+      await expectFailure({ reason: 'missing query' }, 'query');
+
+      const explicitOutput = subAgent.loaded.expectedOutput;
+      invariant(explicitOutput !== undefined, 'Explicit sub-agent should define expected output schema.');
+      invariant(JSON.stringify(explicitOutput.schema) === expectedOutputSchemaJson, 'Explicit sub-agent output schema mismatch.');
+      expectedOutputOriginal.properties = {};
+      explicitInputSchema.properties = {};
+      invariant(JSON.stringify(schema) === schemaJsonBeforeMutation, 'Explicit sub-agent input schema should remain isolated from frontmatter mutations.');
+      invariant(JSON.stringify(explicitOutput.schema) === expectedOutputSchemaJson, 'Explicit sub-agent output schema should remain isolated from frontmatter mutations.');
+
+      return makeSuccessResult('subagent-explicit-json-schema');
+    },
+    expect: (result) => {
+      invariant(result.success, 'Scenario run-test-82 expected success.');
     },
   },
   {

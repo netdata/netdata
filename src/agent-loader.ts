@@ -12,6 +12,7 @@ import { AIAgent as Agent } from './ai-agent.js';
 import { buildUnifiedConfiguration, discoverLayers, resolveDefaults, type ResolvedConfigLayer } from './config-resolver.js';
 import { parseFrontmatter, parseList, parsePairs, extractBodyWithoutFrontmatter } from './frontmatter.js';
 import { resolveIncludes } from './include-resolver.js';
+import { DEFAULT_TOOL_INPUT_SCHEMA, DEFAULT_TOOL_INPUT_SCHEMA_JSON, cloneJsonSchema, cloneOptionalJsonSchema } from './input-contract.js';
 import { isReservedAgentName } from './internal-tools.js';
 import { resolveEffectiveOptions } from './options-resolver.js';
 import { buildEffectiveOptionsSchema } from './options-schema.js';
@@ -152,34 +153,17 @@ export interface LoadAgentOptions {
   ancestors?: string[];
 }
 
-const FALLBACK_INPUT_SCHEMA: Record<string, unknown> = Object.freeze({
-  type: 'object',
-  properties: {
-    prompt: { type: 'string' },
-    format: {
-      type: 'string',
-      enum: ['markdown', 'markdown+mermaid', 'slack-block-kit', 'tty', 'pipe', 'json', 'sub-agent'],
-      default: 'markdown',
-    },
-  },
-  required: ['prompt'],
-  additionalProperties: false,
-});
-
-const cloneSchemaStrict = (schema: Record<string, unknown>): Record<string, unknown> => JSON.parse(JSON.stringify(schema)) as Record<string, unknown>;
-const cloneSchemaOptional = (schema?: Record<string, unknown>): Record<string, unknown> | undefined => (schema === undefined ? undefined : cloneSchemaStrict(schema));
-
 const resolveInputContract = (
   spec?: { format: 'text' | 'json'; schema?: Record<string, unknown> }
 ): { format: 'json' | 'text'; schema: Record<string, unknown> } => {
   if (spec?.format === 'json') {
-    const schema = spec.schema !== undefined ? cloneSchemaStrict(spec.schema) : cloneSchemaStrict(FALLBACK_INPUT_SCHEMA);
+    const schema = spec.schema !== undefined ? cloneJsonSchema(spec.schema) : cloneJsonSchema(DEFAULT_TOOL_INPUT_SCHEMA);
     return { format: 'json', schema };
   }
   if (spec?.format === 'text') {
-    return { format: 'text', schema: cloneSchemaStrict(FALLBACK_INPUT_SCHEMA) };
+    return { format: 'text', schema: cloneJsonSchema(DEFAULT_TOOL_INPUT_SCHEMA) };
   }
-  return { format: 'json', schema: cloneSchemaStrict(FALLBACK_INPUT_SCHEMA) };
+  return { format: 'json', schema: cloneJsonSchema(DEFAULT_TOOL_INPUT_SCHEMA) };
 };
 
 
@@ -258,12 +242,14 @@ export function loadAgent(aiPath: string, registry?: LoadedAgentCache, options?:
       throw new Error(`Sub-agent '${childLoaded.promptPath}' missing 'description' in frontmatter`);
     }
     const inputFormat = childLoaded.input.format === 'json' ? 'json' : 'text';
+    const hasExplicitInputSchema = inputFormat === 'json' && JSON.stringify(childLoaded.input.schema) !== DEFAULT_TOOL_INPUT_SCHEMA_JSON;
     const childInfo: PreloadedSubAgent = {
       toolName: derivedToolName,
       description: childLoaded.description,
       usage: childLoaded.usage,
       inputFormat,
       inputSchema: childLoaded.input.schema,
+      hasExplicitInputSchema,
       promptPath: childLoaded.promptPath,
       systemTemplate: childLoaded.systemTemplate,
       loaded: childLoaded,
@@ -358,7 +344,7 @@ export function loadAgent(aiPath: string, registry?: LoadedAgentCache, options?:
   const agentName = path.basename(id).replace(/\.[^.]+$/, '');
   const resolvedInput = resolveInputContract(fm?.inputSpec);
   const resolvedExpectedOutput = fm?.expectedOutput !== undefined
-    ? { ...fm.expectedOutput, schema: cloneSchemaOptional(fm.expectedOutput.schema) }
+    ? { ...fm.expectedOutput, schema: cloneOptionalJsonSchema(fm.expectedOutput.schema) }
     : undefined;
   const selectedOpenAPIProviders = new Set<string>();
   selectedTools.forEach((toolName) => {
@@ -423,7 +409,7 @@ export function loadAgent(aiPath: string, registry?: LoadedAgentCache, options?:
   }
 
   const resolvedOutputSchema = resolvedExpectedOutput?.format === 'json'
-    ? cloneSchemaOptional(resolvedExpectedOutput.schema)
+    ? cloneOptionalJsonSchema(resolvedExpectedOutput.schema)
     : undefined;
 
   const createSession = (
@@ -572,12 +558,14 @@ export function loadAgentFromContent(id: string, content: string, options?: Load
       throw new Error(`Sub-agent '${childLoaded.promptPath}' missing 'description' in frontmatter`);
     }
     const inputFormat = childLoaded.input.format === 'json' ? 'json' : 'text';
+    const hasExplicitInputSchema = inputFormat === 'json' && JSON.stringify(childLoaded.input.schema) !== DEFAULT_TOOL_INPUT_SCHEMA_JSON;
     const childInfo: PreloadedSubAgent = {
       toolName: derivedToolName,
       description: childLoaded.description,
       usage: childLoaded.usage,
       inputFormat,
       inputSchema: childLoaded.input.schema,
+      hasExplicitInputSchema,
       promptPath: childLoaded.promptPath,
       systemTemplate: childLoaded.systemTemplate,
       loaded: childLoaded,
@@ -663,10 +651,10 @@ export function loadAgentFromContent(id: string, content: string, options?: Load
 
   const resolvedInput = resolveInputContract(fm?.inputSpec);
   const resolvedExpectedOutput = fm?.expectedOutput !== undefined
-    ? { ...fm.expectedOutput, schema: cloneSchemaOptional(fm.expectedOutput.schema) }
+    ? { ...fm.expectedOutput, schema: cloneOptionalJsonSchema(fm.expectedOutput.schema) }
     : undefined;
   const resolvedOutputSchema = resolvedExpectedOutput?.format === 'json'
-    ? cloneSchemaOptional(resolvedExpectedOutput.schema)
+    ? cloneOptionalJsonSchema(resolvedExpectedOutput.schema)
     : undefined;
 
   const selectedOpenAPIProviders = new Set<string>();
