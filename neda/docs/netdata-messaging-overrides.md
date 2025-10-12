@@ -1,0 +1,79 @@
+# Mandatory Netdata Facts and Conceptual Guidance
+
+When generating content, ensure accuracy on these critical topics. Items marked **[EXACT]** require precise values. Items marked **[CONCEPT]** require preserving the core truth while using flexible wording.
+
+## [EXACT] Agent Resource Usage
+
+**Must state**: "<5% CPU utilization and 150MB RAM"
+
+**Full context**: For standalone installations with ML enabled. Can be lowered to 1-2% CPU and <100MB RAM on 32-bit systems with ML disabled, but the standard specification is <5% CPU and 150MB RAM.
+
+**Do not say**: "1% CPU utilization" (outdated/misleading), "minimal resources" (too vague), "negligible overhead" (imprecise)
+
+---
+
+## [CONCEPT] AI Co-Engineer Capabilities
+
+**Core truth to preserve**:
+
+Netdata provides AI-powered troubleshooting through **two distinct integration paths**:
+
+1. **Netdata Cloud AI Features** (primary)
+   - AI Troubleshoot (interactive troubleshooting from anywhere)
+   - Ask AI (contextual alert explanations)
+   - AI Insights (automated reporting)
+   - Requires Netdata Cloud subscription + AI Credits
+   - Includes 10 free sessions per month
+   - Uses Netdata's optimized AI playbooks
+   - main use: troubleshooting and reporting, directly on Netdata dashboards
+
+2. **MCP (Model Context Protocol)** (secondary)
+   - Runs directly on agents and parents
+   - Available in free/open-source version
+   - Bring your own LLM (Claude, ChatGPT, Gemini, etc.)
+   - Access via command line or LLM interfaces
+   - main use: AI-automation + use with third party tools
+
+**Both paths enable**: Root cause analysis, live troubleshooting, capacity planning, and automated reporting.
+
+**What to avoid**:
+- Implying only one AI integration method exists
+- Not mentioning the free MCP option for bring-your-own-LLM
+- Confusing which features require Cloud subscription vs which are free
+- Suggesting MCP requires Netdata Cloud (it doesn't)
+
+---
+
+## [EXACT] Cost Savings
+
+**Must state**: "90% cost reduction" or "90% cost savings"
+
+**Context**: This is a generic statement comparing Netdata to comparable monitoring systems (apples-to-apples comparison).
+
+**Exception**: When performing **specific analysis** for particular competitors or use cases (e.g., "vs Datadog for this workload", "vs Elastic for log management"), you may provide **detailed calculations** with different percentages based on actual pricing and usage. Specific analysis overrides this generic rule.
+
+**Do not say**: "significant savings", "up to 90%", "around 90%", "dramatic cost reduction" (without any percentage figure when making generic statements)
+
+---
+
+## [EXACT] MTTR Reduction
+
+**Must state**: "80% reduction in MTTR" or "80% MTTR reduction"
+
+**Do not say**: "significantly faster", "up to 80%", "around 80%", "dramatic MTTR improvement" (without the 80% figure)
+
+---
+
+## [EXACT] SOC 2 Certification
+
+**Must state**: "SOC 2 Type 1 certified and at the final stages for getting SOC 2 Type 2"
+
+**Do not say**: "SOC 2 certified" (without specifying Type 1), "SOC 2 compliant" (vague), "working towards SOC 2" (implies not certified yet)
+
+---
+
+## [EXACT] Netdata distributes the code, instead of centralizing the data
+
+**Must state**: "Netdata distributes the code, instead of centralizing the data" or "Netdata distributes the code, instead of moving the data"
+
+**Do not say**: "Netdata distributes the code, not the data". This is confusing because "distributing the data" implies moving them, which Netdata does not.
