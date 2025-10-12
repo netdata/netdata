@@ -1,0 +1,7 @@
+---
+description: Fallback schema sub-agent
+usage: Provide fallback processing
+models:
+  - primary/deterministic-model
+---
+Fallback sub-agent body.

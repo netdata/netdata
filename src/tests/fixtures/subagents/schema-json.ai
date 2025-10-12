@@ -1,0 +1,30 @@
+---
+description: JSON schema sub-agent
+usage: Provide JSON-validated processing
+models:
+  - primary/deterministic-model
+input:
+  format: json
+  schema:
+    type: object
+    additionalProperties: false
+    properties:
+      query:
+        type: string
+      limit:
+        type: integer
+        minimum: 1
+    required:
+      - query
+output:
+  format: json
+  schema:
+    type: object
+    additionalProperties: false
+    properties:
+      result:
+        type: string
+    required:
+      - result
+---
+JSON schema sub-agent body.

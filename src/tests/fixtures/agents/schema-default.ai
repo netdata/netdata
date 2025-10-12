@@ -1,0 +1,7 @@
+#!/usr/bin/env ai-agent
+---
+description: Agent with default input schema
+models:
+  - primary/deterministic-model
+---
+Default schema agent body.

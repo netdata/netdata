@@ -1,0 +1,34 @@
+#!/usr/bin/env ai-agent
+---
+description: Agent with explicit JSON schema
+models:
+  - primary/deterministic-model
+input:
+  format: json
+  schema:
+    type: object
+    additionalProperties: false
+    properties:
+      query:
+        type: string
+      depth:
+        type: integer
+        minimum: 0
+    required:
+      - query
+output:
+  format: json
+  schema:
+    type: object
+    additionalProperties: false
+    properties:
+      summary:
+        type: string
+      sources:
+        type: array
+        items:
+          type: string
+    required:
+      - summary
+---
+Agent with explicit JSON schema body.
