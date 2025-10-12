@@ -1215,7 +1215,23 @@ helm install netdata netdata/netdata
 - Improved user experience
 - Advanced security features
 
-## 19. Summary
+## 19. Billing
+
+Customers are billed for sustained node usage, not temporary spikes. Netdata automatically excludes the highest usage periods each day (P90) and the highest 3 days each month (P90).
+
+We calculate your billable nodes using a 90th percentile (P90) method at two levels:
+
+1. Daily: We determine the node count at the 90th percentile of your time-weighted usage distribution. If you briefly spike to 100 nodes for 1 hour but run 10 nodes for 23 hours, your daily P90 is 10 nodes—the spike doesn't inflate your bill.
+
+2. Monthly: We take the P90 of all your daily values. In a 30-day month, this excludes your top 3 daily values, protecting you from occasional high-usage days.
+
+Or simpler:
+
+We use double 90th percentile billing: brief spikes during the day don't affect your bill, and your top 3 days each month are excluded too. You're billed for sustained usage, not peaks.
+
+Example: If you run 10 nodes for 23 hours and spike to 100 nodes for 1 hour, the spike is excluded, we account 10 nodes for that day. And if you have 3 days of load testing at 50 nodes in a 30-day month, those 3 days won't inflate your monthly bill.
+
+## 20. Summary
 
 Netdata represents a fundamental rethink of observability architecture. By processing data at the edge, automating configuration, maintaining real-time resolution, applying ML universally, and making data accessible to everyone, it solves core monitoring challenges that have persisted for decades.
 

@@ -31,6 +31,7 @@ const MODEL_NAME = 'deterministic-model';
 const PRIMARY_PROVIDER = 'primary';
 const SECONDARY_PROVIDER = 'secondary';
 const SUBAGENT_TOOL = 'agent__pricing-subagent';
+const FINAL_REPORT_CALL_ID = 'call-final-report';
 const DEFAULT_PROMPT_SCENARIO = 'run-test-1' as const;
 const BASE_DEFAULTS = {
   stream: false,
@@ -2982,7 +2983,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
             toolCalls: [
               {
                 name: 'agent__final_report',
-                id: 'call-final-report',
+                id: FINAL_REPORT_CALL_ID,
                 parameters: {
                   status: 'success',
                   report_format: 'markdown',
@@ -2993,7 +2994,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
           };
           const toolMessage = {
             role: 'tool',
-            toolCallId: 'call-final-report',
+            toolCallId: FINAL_REPORT_CALL_ID,
             content: FINAL_ANSWER_DELIVERED,
           };
           return {
@@ -3022,6 +3023,94 @@ const TEST_SCENARIOS: HarnessTest[] = [
       invariant(finalTurnLog !== undefined, 'Final-turn warning log expected for run-test-84.');
       const finalReport = result.finalReport;
       invariant(finalReport !== undefined && finalReport.status === 'success', 'Final report should succeed for run-test-84.');
+    },
+  },
+  {
+    id: 'run-test-85',
+    description: 'Final report JSON schema mismatch surfaces payload preview.',
+    configure: (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+      sessionConfig.expectedOutput = {
+        format: 'json',
+        schema: {
+          type: 'object',
+          required: ['extracted_info'],
+          additionalProperties: false,
+          properties: {
+            extracted_info: { type: 'string' },
+          },
+        },
+      };
+      sessionConfig.maxTurns = 1;
+      sessionConfig.outputFormat = 'json';
+    },
+    execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+      // eslint-disable-next-line @typescript-eslint/unbound-method
+      const originalExecuteTurn = LLMClient.prototype.executeTurn;
+      let invocation = 0;
+      let activeSession: AIAgentSession | undefined;
+      LLMClient.prototype.executeTurn = async function(this: LLMClient, request: TurnRequest): Promise<TurnResult> {
+        invocation += 1;
+        if (invocation === 1) {
+          return {
+            status: { type: 'success', hasToolCalls: false, finalAnswer: false },
+            latencyMs: 5,
+            messages: [
+              { role: 'assistant', content: 'Gathering data...' },
+            ],
+            tokens: { inputTokens: 8, outputTokens: 4, totalTokens: 12 },
+          };
+        }
+        if (invocation === 2) {
+          if (activeSession !== undefined) {
+            (activeSession as unknown as { finalReport?: { status: string; format: 'json'; content_json: Record<string, unknown> } }).finalReport = {
+              status: 'success',
+              format: 'json',
+              content_json: { extracted_info: { quote: 'answer' } },
+            };
+          }
+          const assistantMessage = {
+            role: 'assistant',
+            content: '',
+            toolCalls: [
+              {
+                name: 'agent__final_report',
+                id: FINAL_REPORT_CALL_ID,
+                parameters: {
+                  status: 'success',
+                  report_format: 'json',
+                  report_content: JSON.stringify({ extracted_info: { quote: 'answer' } }),
+                },
+              },
+            ],
+          };
+          const toolMessage = {
+            role: 'tool',
+            toolCallId: FINAL_REPORT_CALL_ID,
+            content: JSON.stringify({ extracted_info: { quote: 'answer' } }),
+          };
+          return {
+            status: { type: 'success', hasToolCalls: true, finalAnswer: true },
+            latencyMs: 5,
+            messages: [assistantMessage as ConversationMessage, toolMessage as ConversationMessage],
+            tokens: { inputTokens: 9, outputTokens: 6, totalTokens: 15 },
+          };
+        }
+        return await originalExecuteTurn.call(this, request);
+      };
+      try {
+        activeSession = AIAgentSession.create(sessionConfig);
+        return await activeSession.run();
+      } finally {
+        LLMClient.prototype.executeTurn = originalExecuteTurn;
+      }
+    },
+    expect: (result: AIAgentResult) => {
+      invariant(result.success, 'Scenario run-test-85 expected success.');
+      const ajvLog = result.logs.find((entry) => entry.remoteIdentifier === 'agent:ajv');
+      invariant(ajvLog !== undefined, 'AJV warning expected for run-test-85.');
+      invariant(typeof ajvLog.message === 'string' && ajvLog.message.includes('payload preview='), 'Payload preview missing in AJV warning for run-test-85.');
+      const finalReport = result.finalReport;
+      invariant(finalReport !== undefined && finalReport.format === 'json', 'Final report should be json for run-test-85.');
     },
   },
   {
