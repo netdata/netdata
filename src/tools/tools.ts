@@ -94,7 +94,7 @@ export class ToolsOrchestrator {
     return this.mapping.has(effective);
   }
 
-  async execute(name: string, args: Record<string, unknown>, opts?: ToolExecuteOptions): Promise<ToolExecuteResult> {
+  async execute(name: string, parameters: Record<string, unknown>, opts?: ToolExecuteOptions): Promise<ToolExecuteResult> {
     if (this.canceled) throw new Error('canceled');
     if (this.mapping.size === 0) this.listTools();
     const effective = this.resolveName(name);
@@ -112,16 +112,16 @@ export class ToolsOrchestrator {
       }
       throw new Error(`Unknown tool: ${name}`);
     }
-    return await entry.provider.execute(effective, args, opts);
+    return await entry.provider.execute(effective, parameters, opts);
   }
 
   // Management wrapper: applies timeout, size cap, logging, and accounting for all providers
   async executeWithManagement(
     name: string,
-    args: Record<string, unknown>,
+    parameters: Record<string, unknown>,
     ctx: ToolExecutionContext,
     opts?: ToolExecuteOptions
-  ): Promise<{ result: string; providerLabel: string; latency: number }>{
+  ): Promise<{ result: string; providerLabel: string; latency: number }> {
     if (this.canceled) throw new Error('canceled');
     const bypass = opts?.bypassConcurrency === true;
     if (!bypass) await this.acquireSlot();
@@ -165,7 +165,7 @@ export class ToolsOrchestrator {
         this.onOpTreeSnapshot(this.opTree.getSession());
       }
     } catch (e) { warn(`unknown tool '${name}' after refresh: ${e instanceof Error ? e.message : String(e)}`); }
-    const requestMsg = formatToolRequestCompact(effective, args);
+    const requestMsg = formatToolRequestCompact(effective, parameters);
     // Log request (compact)
     const reqLog: LogEntry = {
       timestamp: Date.now(),
@@ -191,13 +191,13 @@ export class ToolsOrchestrator {
     }
     try {
       if (opId !== undefined) {
-        const argSize = (() => { try { return JSON.stringify(args).length; } catch { return undefined; } })();
-        this.opTree.setRequest(opId, { kind: 'tool', payload: args, size: argSize });
+        const paramSize = (() => { try { return JSON.stringify(parameters).length; } catch { return undefined; } })();
+        this.opTree.setRequest(opId, { kind: 'tool', payload: parameters, size: paramSize });
       }
     } catch (e) { warn(`setRequest failed: ${e instanceof Error ? e.message : String(e)}`); }
-    // Optional full request trace (args JSON)
+    // Optional full request trace (parameters JSON)
     if (this.opts.traceTools === true) {
-      const fullArgs = (() => { try { return JSON.stringify(args, null, 2); } catch { return '[unserializable-args]'; } })();
+      const fullParams = (() => { try { return JSON.stringify(parameters, null, 2); } catch { return '[unserializable-parameters]'; } })();
       const traceReq: LogEntry = {
         timestamp: Date.now(),
         severity: 'TRC',
@@ -208,7 +208,7 @@ export class ToolsOrchestrator {
         toolKind: kind,
         remoteIdentifier: `trace:${kind}:${provider.id}`,
         fatal: false,
-        message: `REQUEST ${effective}\n${fullArgs}`,
+        message: `REQUEST ${effective}\n${fullParams}`,
       };
       this.onLog(traceReq, { opId });
     }
@@ -230,7 +230,7 @@ export class ToolsOrchestrator {
     };
 
     // Normalize arguments for known tools to reduce model fragility
-    const normalizeArgs = (toolName: string, a: Record<string, unknown>): Record<string, unknown> => {
+    const normalizeParameters = (toolName: string, a: Record<string, unknown>): Record<string, unknown> => {
       // GitHub MCP 'search_code' expects 'q' (string). Models often provide separate fields.
       if (toolName === 'github__search_code') {
         const getStr = (obj: unknown, k: string): string | undefined => {
@@ -280,7 +280,7 @@ export class ToolsOrchestrator {
     let exec: ToolExecuteResult | undefined;
     let errorMessage: string | undefined;
     try {
-      const preparedArgs = normalizeArgs(effective, args);
+      const preparedParameters = normalizeParameters(effective, parameters);
       // Do not apply parent-level withTimeout to sub-agents; they manage their own timing
       const isSubAgent = (kind === 'agent' && provider.id === 'subagent');
       if (isSubAgent) {
@@ -293,12 +293,12 @@ export class ToolsOrchestrator {
             }
           } catch (e) { warn(`onChildOpTree snapshot failed: ${e instanceof Error ? e.message : String(e)}`); }
         };
-        exec = await provider.execute(effective, preparedArgs, { ...opts, timeoutMs: undefined, trace: this.opts.traceTools, onChildOpTree, parentOpPath });
+        exec = await provider.execute(effective, preparedParameters, { ...opts, timeoutMs: undefined, trace: this.opts.traceTools, onChildOpTree, parentOpPath });
       } else {
         const providerTimeout = opts?.timeoutMs ?? this.opts.toolTimeout;
         const execPromise = provider.execute(
           effective,
-          preparedArgs,
+          preparedParameters,
           { ...opts, timeoutMs: providerTimeout, trace: this.opts.traceTools }
         );
         if (opts?.disableGlobalTimeout === true) {
@@ -312,7 +312,7 @@ export class ToolsOrchestrator {
     }
 
     const latency = Date.now() - start;
-    const charactersIn = (() => { try { return JSON.stringify(args).length; } catch { return 0; } })();
+    const charactersIn = (() => { try { return JSON.stringify(parameters).length; } catch { return 0; } })();
 
     const isFailed = (() => {
       if (exec === undefined) return true;

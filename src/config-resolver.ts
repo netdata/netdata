@@ -230,7 +230,7 @@ function resolveRestTool(id: string, layers: ResolvedConfigLayer[]): RestToolCon
     const env = layer.env ?? {};
     try {
       const expanded = expandPlaceholders(raw, (name: string) => {
-        if (name.startsWith('args.')) return `\${${name}}`;
+        if (name.startsWith('parameters.')) return `\${${name}}`;
         const envVal = Object.prototype.hasOwnProperty.call(env, name) ? env[name] : undefined;
         const v = envVal ?? process.env[name];
         if (v === undefined) throw buildMissingVarError('defaults', id, layer.origin, name);

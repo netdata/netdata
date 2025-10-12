@@ -113,10 +113,10 @@ export function openApiToRestTools(specIn: string | UnknownRecord, opts?: OpenAP
       const queryParams = allParams.filter((prm) => prm.in === 'query');
       const headerParams = allParams.filter((prm) => prm.in === 'header');
 
-      // Build args schema
-      const argsSchema: UnknownRecord = { type: 'object', properties: {}, required: [] as string[] };
-      const props = argsSchema.properties as UnknownRecord;
-      const req = argsSchema.required as string[];
+      // Build parameters schema
+      const parametersSchema: UnknownRecord = { type: 'object', properties: {}, required: [] as string[] };
+      const props = parametersSchema.properties as UnknownRecord;
+      const req = parametersSchema.required as string[];
 
       // Path params (required by definition)
       pathParams.forEach((prm) => {
@@ -158,7 +158,7 @@ export function openApiToRestTools(specIn: string | UnknownRecord, opts?: OpenAP
         if (required) req.push(nm);
       });
 
-      // Header params (allow templating via ${args.*})
+      // Header params (allow templating via ${parameters.*})
       headerParams.forEach((prm) => {
         const nm = asString(prm.name) ?? '';
         if (nm.length === 0) return;
@@ -180,18 +180,18 @@ export function openApiToRestTools(specIn: string | UnknownRecord, opts?: OpenAP
         // Provide a raw body arg to maximize compatibility
         props.body = isRecord(bodySchema) ? { type: 'object' } : {};
         if (Boolean(requestBody.required)) req.push('body');
-        bodyTemplate = '${args.body}';
+        bodyTemplate = '${parameters.body}';
         hasBodyTemplate = true;
       }
 
-      // URL: replace {param} => ${args.param}
-      const url = (baseUrl + p).replace(/\{([^}]+)\}/g, (_m, x: string) => '${args.' + x + '}');
+      // URL: replace {param} => ${parameters.param}
+      const url = (baseUrl + p).replace(/\{([^}]+)\}/g, (_m, x: string) => '${parameters.' + x + '}');
 
       const headers: Record<string, string> = {};
       headerParams.forEach((prm) => {
         const nm = asString(prm.name) ?? '';
         if (nm.length === 0) return;
-        headers[nm] = '${args.' + nm + '}';
+        headers[nm] = '${parameters.' + nm + '}';
       });
 
       const tool: RestToolConfig = {
@@ -199,7 +199,7 @@ export function openApiToRestTools(specIn: string | UnknownRecord, opts?: OpenAP
         method: m.toUpperCase() as RestToolConfig['method'],
         url,
         headers: Object.keys(headers).length > 0 ? headers : undefined,
-        argsSchema,
+        parametersSchema,
       };
       
       // Mark tools with complex query params for special handling
@@ -221,4 +221,3 @@ export function openApiToRestTools(specIn: string | UnknownRecord, opts?: OpenAP
 
   return out;
 }
-

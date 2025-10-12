@@ -346,7 +346,7 @@ export class MCPProvider extends ToolProvider {
     return this.toolNameMap.has(name);
   }
 
-  async execute(name: string, args: Record<string, unknown>, _opts?: ToolExecuteOptions): Promise<ToolExecuteResult> {
+  async execute(name: string, parameters: Record<string, unknown>, _opts?: ToolExecuteOptions): Promise<ToolExecuteResult> {
     await this.ensureInitialized();
     const mapping = this.toolNameMap.get(name);
     if (mapping === undefined) throw new Error(`No server found for tool: ${name}`);
@@ -361,7 +361,7 @@ export class MCPProvider extends ToolProvider {
       return has ? { timeout: Math.trunc(t), resetTimeoutOnProgress: true, maxTotalTimeout: Math.trunc(t) } : {};
     })();
     // Pass per-call timeout options so we don't hit the SDK's 60s default
-    const res = await client.callTool({ name: originalName, arguments: args }, undefined as unknown as never, requestOptions as never);
+    const res = await client.callTool({ name: originalName, arguments: parameters }, undefined as unknown as never, requestOptions as never);
     const latency = Date.now() - start;
     // Try to normalize the result to a string for downstream handling
     const isRecord = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -380,7 +380,7 @@ export class MCPProvider extends ToolProvider {
       try { return JSON.stringify(res); } catch { return ''; }
     })();
     const rawJson = (() => { try { return JSON.stringify(res, null, 2); } catch { return undefined; } })();
-    const rawReq = (() => { try { return JSON.stringify(args, null, 2); } catch { return undefined; } })();
+    const rawReq = (() => { try { return JSON.stringify(parameters, null, 2); } catch { return undefined; } })();
     return { ok: true, result: text, latencyMs: latency, kind: this.kind, providerId: serverName, extras: { rawResponse: rawJson, rawRequest: rawReq } };
   }
 

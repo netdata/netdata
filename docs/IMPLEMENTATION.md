@@ -60,7 +60,7 @@ Architecture
 
 - For each MCP tool we construct an AI SDK tool with a matching input schema and an execute function:
   - `inputSchema`: created by `jsonSchema(mcpTool.inputSchema)` from `@ai-sdk/provider-utils`.
-  - `execute(args, options)`: calls `client.callTool({ name, arguments: args })` and returns a string (concatenated text parts from MCP result). The AI SDK will convert the return value into a model tool result.
+  - `execute(parameters, options)`: calls `client.callTool({ name, arguments: parameters })` and returns a string (concatenated text parts from MCP result). The AI SDK will convert the return value into a model tool result.
   - We mark them as dynamic tools implicitly by using `jsonSchema(...)` and providing `execute` at runtime.
 
 - Rationale:
@@ -156,7 +156,7 @@ AI SDK (provider + stream)
 
 - Tools
   - `jsonSchema(schema)` converts JSON Schema (from MCP) into AI SDK `FlexibleSchema` for tool input.
-  - Tool shape provided to `streamText`: `{ description?: string, inputSchema, execute(args, options) }`.
+  - Tool shape provided to `streamText`: `{ description?: string, inputSchema, execute(parameters, options) }`.
 
 - `streamText({ model, tools, system, messages, temperature, topP, providerOptions })`
   - Returns `{ textStream, usage, response }`.

@@ -341,9 +341,9 @@ export interface RestToolConfig {
   method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
   url: string;
   headers?: Record<string, string>;
-  // JSON Schema for arguments (Ajv-compatible)
-  argsSchema: Record<string, unknown>;
-  // Templated JSON body for POST/PUT/PATCH (substitute ${args.*})
+  // JSON Schema for parameters (Ajv-compatible)
+  parametersSchema: Record<string, unknown>;
+  // Templated JSON body for POST/PUT/PATCH (substitute ${parameters.*})
   bodyTemplate?: unknown;
   // Optional streaming config for SSE/JSON-lines
   streaming?: {

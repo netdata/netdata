@@ -42,7 +42,7 @@ This document proposes and specifies an in‑memory, preloaded, multi‑agent sy
 - Parses child frontmatter (description, usage, input/output schemas, optional toolName, limits).
 - Resolves a per‑agent env overlay from `.ai-agent.json` + `.ai-agent.env` + runtime env, **without mutating `process.env`**.
 - Validates providers and MCP servers; optionally preconnect or lazy connect.
-- Produces AI‑SDK tool definitions and a callable `run(childName, args)` method that launches a new `AIAgentSession` for each execution.
+- Produces AI‑SDK tool definitions and a callable `run(childName, parameters)` method that launches a new `AIAgentSession` for each execution.
 
 ### Child Agent Execution (In‑Process)
 - For each call:
@@ -103,7 +103,7 @@ To keep concerns separated and the library manageable, the library should be foc
     - `description?: string`
     - `instructions?: string` (optional system‑prompt append)
     - `inputSchema: object` (JSON Schema; AI‑SDK compatible)
-    - `execute(args: Record<string, unknown>, ctx?: { signal?: AbortSignal }): Promise<string | { type: 'json'|'text', value: unknown }>`
+    - `execute(parameters: Record<string, unknown>, ctx?: { signal?: AbortSignal }): Promise<string | { type: 'json'|'text', value: unknown }>`
   - `ToolSource` (optional): `list(): Promise<ToolDefinition[]>` for lazy sources
 - `llm/*`: provider adapters (OpenAI, OpenRouter, Anthropic, Google, Ollama)
 - `mcp/*`: adapter layer to turn MCP tools into `ToolDefinition`s

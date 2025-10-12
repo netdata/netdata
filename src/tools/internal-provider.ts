@@ -28,13 +28,15 @@ const FINAL_REPORT_TOOL = 'agent__final_report';
 const BATCH_TOOL = 'agent__batch';
 const SLACK_BLOCK_KIT_FORMAT: OutputFormatId = 'slack-block-kit';
 const REPORT_FORMAT_LABEL = '`report_format`';
+const DEFAULT_PARAMETERS_DESCRIPTION = 'Parameters for selected tool';
 
 export class InternalToolProvider extends ToolProvider {
   readonly kind = 'agent' as const;
   private readonly ajv = new Ajv({ allErrors: true, strict: false });
   private readonly formatId: OutputFormatId;
   private readonly formatDescription: string;
-  private readonly instructions: string;
+  private instructions: string;
+  private cachedBatchSchemas?: { schemas: Record<string, unknown>[]; summaries: { name: string; required: string[] }[] };
 
   constructor(
     public readonly id: string,
@@ -73,9 +75,25 @@ export class InternalToolProvider extends ToolProvider {
       this.buildFinalReportTool()
     ];
     if (this.opts.enableBatch) {
+      const { schemas } = this.ensureBatchSchemas();
+      const fallbackItemSchema: Record<string, unknown> = {
+        type: 'object',
+        additionalProperties: true,
+        required: ['id', 'tool', 'parameters'],
+        properties: {
+          id: { oneOf: [ { type: 'string', minLength: 1 }, { type: 'number' } ] },
+          tool: { type: 'string', minLength: 1 },
+          parameters: {
+            type: 'object',
+            additionalProperties: true,
+            description: DEFAULT_PARAMETERS_DESCRIPTION
+          }
+        }
+      };
+      const itemsSchema = schemas.length > 0 ? { anyOf: schemas } : fallbackItemSchema;
       tools.push({
         name: BATCH_TOOL,
-        description: 'Execute multiple tools in one call (always parallel). Use exposed tool names.',
+        description: 'Execute multiple tools in one call, reusing the schemas of all available tools.',
         inputSchema: {
           type: 'object',
           additionalProperties: false,
@@ -83,16 +101,8 @@ export class InternalToolProvider extends ToolProvider {
           properties: {
             calls: {
               type: 'array',
-              items: {
-                type: 'object',
-                additionalProperties: true,
-                required: ['id', 'tool', 'args'],
-                properties: {
-                  id: { oneOf: [ { type: 'string', minLength: 1 }, { type: 'number' } ] },
-                  tool: { type: 'string', minLength: 1, description: 'Exposed tool name (e.g., brave__brave_web_search)' },
-                  args: { type: 'object', additionalProperties: true }
-                }
-              }
+              minItems: 1,
+              items: itemsSchema
             }
           }
         }
@@ -144,8 +154,9 @@ export class InternalToolProvider extends ToolProvider {
     lines.push('    When using batch:');
     lines.push('    {');
     lines.push('      "calls": [');
-    lines.push(`        { "id": 1, "tool": "${PROGRESS_TOOL}", "args": { "progress": "Searching documentation for XYZ" } },`);
-    lines.push('        { "id": 2, "tool": "jina__jina_search_web", "args": { "query": "..." } }');
+    lines.push(`        { "id": 1, "tool": "${PROGRESS_TOOL}", "parameters": { "progress": "Searching documentation for XYZ" } },`);
+    lines.push('        { "id": 2, "tool": "tool_name_here", "parameters": { "required_field": "value", ... } }');
+    lines.push('        (Provide the exact exposed tool name and every required parameter.)');
     lines.push('      ]');
     lines.push('    }');
     lines.push('    When calling multiple tools:');
@@ -153,21 +164,19 @@ export class InternalToolProvider extends ToolProvider {
     lines.push('    - AND call your actual analysis tools in the same turn');
     if (this.opts.enableBatch) {
       lines.push('');
-      lines.push(`- Use tool \`${BATCH_TOOL}\` to call multiple tools in one go.`);
-      lines.push('  - `calls[]`: items with `id`, `tool` (exposed name), `args`. Execution is parallel.');
-      lines.push('  - Keep `args` minimal; they are validated against real schemas.');
+      lines.push(`- Use tool \`${BATCH_TOOL}\` to call multiple tools at once.`);
+      lines.push('  - `calls[]`: items with `id`, `tool` (any of your real tool names), `parameters`.');
+      lines.push('  - `parameters` are validated against real tool schemas.');
       lines.push('  - Example with progress_report + searches:');
       lines.push('    {');
       lines.push('      "calls": [');
-      lines.push(`        { "id": 1, "tool": "${PROGRESS_TOOL}", "args": { "progress": "Researching Netdata and eBPF" } },`);
-      lines.push('        { "id": 2, "tool": "jina__jina_search_web", "args": { "query": "Netdata real-time monitoring features", "num": 10 } },');
-      lines.push('        { "id": 3, "tool": "jina__jina_search_arxiv", "args": { "query": "eBPF monitoring 2024", "num": 20 } },');
-      lines.push('        { "id": 4, "tool": "brave__brave_web_search", "args": { "query": "Netdata Cloud pricing", "count": 8, "offset": 0 } },');
-      lines.push('        { "id": 5, "tool": "brave__brave_local_search", "args": { "query": "coffee near Athens", "count": 5 } },');
-      lines.push('        { "id": 6, "tool": "fetcher__fetch_url", "args": { "url": "https://www.netdata.cloud" } },');
-      lines.push('        { "id": 7, "tool": "fetcher__fetch_url", "args": { "url": "https://learn.netdata.cloud/" } }');
+      lines.push(`        { "id": 1, "tool": "${PROGRESS_TOOL}", "parameters": { "progress": "Researching Netdata and eBPF" } },`);
+      lines.push('        { "id": 2, "tool": "tool1", "parameters": { "param1": "value1", "param2": "value2" } },');
+      lines.push('        { "id": 3, "tool": "tool2", "parameters": { "param1": "value1" } }');
+      lines.push('        (Tool names must match exactly and all required parameters must be included.)');
       lines.push('      ]');
       lines.push('    }');
+      lines.push('  **CRITICAL**: each `parameters` object MUST match the documented schema for that tool.');
     }
     return lines.join('\n');
   }
@@ -328,23 +337,23 @@ export class InternalToolProvider extends ToolProvider {
     };
   }
 
-  async execute(name: string, args: Record<string, unknown>, _opts?: ToolExecuteOptions): Promise<ToolExecuteResult> {
+  async execute(name: string, parameters: Record<string, unknown>, _opts?: ToolExecuteOptions): Promise<ToolExecuteResult> {
     const start = Date.now();
     if (name === 'agent__progress_report') {
-      const progress = typeof (args.progress) === 'string' ? args.progress : '';
+      const progress = typeof (parameters.progress) === 'string' ? parameters.progress : '';
       this.opts.updateStatus(progress);
       return { ok: true, result: JSON.stringify({ ok: true }), latencyMs: Date.now() - start, kind: this.kind, providerId: this.id };
     }
     if (name === 'agent__final_report') {
-      const status = (typeof args.status === 'string' ? args.status : 'success') as 'success'|'failure'|'partial';
-      const requestedFormat = typeof args.report_format === 'string' ? args.report_format : (typeof args.format === 'string' ? args.format : undefined);
+      const status = (typeof parameters.status === 'string' ? parameters.status : 'success') as 'success'|'failure'|'partial';
+      const requestedFormat = typeof parameters.report_format === 'string' ? parameters.report_format : (typeof parameters.format === 'string' ? parameters.format : undefined);
       if (requestedFormat !== undefined && requestedFormat !== this.formatId) {
         this.opts.logError(`agent__final_report: received report_format='${requestedFormat}', expected '${this.formatId}'. Proceeding with expected format.`);
       }
-      const content = typeof args.report_content === 'string' ? args.report_content : (typeof args.content === 'string' ? args.content : undefined);
-      const contentJson = (args.content_json !== null && typeof args.content_json === 'object' && !Array.isArray(args.content_json)) ? (args.content_json as Record<string, unknown>) : undefined;
-      const metadata = (args.metadata !== null && typeof args.metadata === 'object' && !Array.isArray(args.metadata)) ? (args.metadata as Record<string, unknown>) : undefined;
-      const rawMessages = Object.prototype.hasOwnProperty.call(args, 'messages') ? args.messages : undefined;
+      const content = typeof parameters.report_content === 'string' ? parameters.report_content : (typeof parameters.content === 'string' ? parameters.content : undefined);
+      const contentJson = (parameters.content_json !== null && typeof parameters.content_json === 'object' && !Array.isArray(parameters.content_json)) ? (parameters.content_json as Record<string, unknown>) : undefined;
+      const metadata = (parameters.metadata !== null && typeof parameters.metadata === 'object' && !Array.isArray(parameters.metadata)) ? (parameters.metadata as Record<string, unknown>) : undefined;
+      const rawMessages = Object.prototype.hasOwnProperty.call(parameters, 'messages') ? parameters.messages : undefined;
 
       if (this.formatId === SLACK_BLOCK_KIT_FORMAT) {
         const asString = (value: unknown): string | undefined => {
@@ -588,7 +597,7 @@ export class InternalToolProvider extends ToolProvider {
     }
     if (this.opts.enableBatch && name === 'agent__batch') {
       // Minimal batch: always use orchestrator for inner calls
-      const rawCalls = (args as { calls?: unknown }).calls;
+      const rawCalls = (parameters as { calls?: unknown }).calls;
       let calls: unknown[] = [];
       const batchTurn = (() => {
         try {
@@ -662,13 +671,13 @@ export class InternalToolProvider extends ToolProvider {
         throw new Error(`empty_batch: ${errorMsg}`);
       }
 
-      interface NormalizedCall { id: string; tool: string; args: Record<string, unknown> }
+      interface NormalizedCall { id: string; tool: string; parameters: Record<string, unknown> }
       const normalizedCalls: NormalizedCall[] = calls.map((cUnknown) => {
         const c = (cUnknown !== null && typeof cUnknown === 'object') ? (cUnknown as Record<string, unknown>) : {};
         const id = typeof c.id === 'string' ? c.id : (typeof c.id === 'number' ? String(c.id) : '');
         const tool = typeof c.tool === 'string' ? c.tool : '';
-        const a = (c.args !== null && typeof c.args === 'object') ? (c.args as Record<string, unknown>) : {};
-        return { id, tool, args: a };
+        const provided = (c.parameters !== null && typeof c.parameters === 'object') ? (c.parameters as Record<string, unknown>) : {};
+        return { id, tool, parameters: provided };
       });
 
       const invalidEntry = normalizedCalls.find((entry) => entry.id.trim().length === 0 || entry.tool.trim().length === 0);
@@ -679,19 +688,19 @@ export class InternalToolProvider extends ToolProvider {
       }
 
       interface R { id: string; tool: string; ok: boolean; elapsedMs: number; output?: string; error?: { code: string; message: string } }
-      const results: R[] = await Promise.all(normalizedCalls.map(async ({ id, tool, args: a }) => {
+      const results: R[] = await Promise.all(normalizedCalls.map(async ({ id, tool, parameters: callParameters }) => {
         const t0 = Date.now();
         // Allow progress_report in batch, but not final_report or nested batch
         if (tool === 'agent__final_report' || tool === 'agent__batch') return { id, tool, ok: false, elapsedMs: 0, error: { code: 'INTERNAL_NOT_ALLOWED', message: 'Internal tools are not allowed in batch' } };
         // Handle progress_report directly in batch
         if (tool === 'agent__progress_report') {
-          const progress = typeof (a.progress) === 'string' ? a.progress : '';
+          const progress = typeof (callParameters.progress) === 'string' ? callParameters.progress : '';
           this.opts.updateStatus(progress);
           return { id, tool, ok: true, elapsedMs: Date.now() - t0, output: JSON.stringify({ ok: true }) };
         }
         try {
           if (!(this.opts.orchestrator.hasTool(tool))) return { id, tool, ok: false, elapsedMs: 0, error: { code: 'UNKNOWN_TOOL', message: `Unknown tool: ${tool}` } };
-          const managed = await this.opts.orchestrator.executeWithManagement(tool, a, { turn: batchTurn, subturn: 0 }, { timeoutMs: this.opts.toolTimeoutMs });
+          const managed = await this.opts.orchestrator.executeWithManagement(tool, callParameters, { turn: batchTurn, subturn: 0 }, { timeoutMs: this.opts.toolTimeoutMs });
           return { id, tool, ok: true, elapsedMs: managed.latency, output: managed.result };
         } catch (e) {
           const msg = e instanceof Error ? e.message : String(e);
@@ -702,5 +711,87 @@ export class InternalToolProvider extends ToolProvider {
       return { ok: true, result: payload, latencyMs: Date.now() - start, kind: this.kind, providerId: this.id };
     }
     throw new Error(`Unknown internal tool: ${name}`);
+  }
+
+  private ensureBatchSchemas(): { schemas: Record<string, unknown>[]; summaries: { name: string; required: string[] }[] } {
+    if (this.cachedBatchSchemas !== undefined) return this.cachedBatchSchemas;
+    const schemas: Record<string, unknown>[] = [];
+    const summaries: { name: string; required: string[] }[] = [];
+    const idSchema: Record<string, unknown> = { oneOf: [ { type: 'string', minLength: 1 }, { type: 'number' } ] };
+
+    const pushSchema = (toolName: string, rawSchema: unknown) => {
+      const parametersSchema = this.cloneJsonSchema(rawSchema);
+      const required = (() => {
+        const rawRequired = Object.prototype.hasOwnProperty.call(parametersSchema, 'required')
+          ? parametersSchema.required
+          : undefined;
+        if (!Array.isArray(rawRequired)) return [];
+        return rawRequired.filter((item): item is string => typeof item === 'string');
+      })();
+      summaries.push({ name: toolName, required });
+      schemas.push({
+        type: 'object',
+        additionalProperties: false,
+        required: ['id', 'tool', 'parameters'],
+        properties: {
+          id: idSchema,
+          tool: { type: 'string', const: toolName },
+          parameters: parametersSchema
+        }
+      });
+    };
+
+    try {
+      const available = this.opts.orchestrator.listTools();
+      available.forEach((tool) => {
+        const name = tool.name;
+        if (!name || name === FINAL_REPORT_TOOL || name === BATCH_TOOL) return;
+        pushSchema(name, tool.inputSchema);
+      });
+    } catch {
+      // Ignore orchestrator failures; callers will use fallback schema
+    }
+
+    if (!summaries.some((summary) => summary.name === PROGRESS_TOOL)) {
+      pushSchema(PROGRESS_TOOL, {
+        type: 'object',
+        additionalProperties: false,
+        required: ['progress'],
+        properties: { progress: { type: 'string' } }
+      });
+    }
+
+    this.cachedBatchSchemas = { schemas, summaries };
+    return this.cachedBatchSchemas;
+  }
+
+  private cloneJsonSchema(schema: unknown): Record<string, unknown> {
+    if (schema === null || typeof schema !== 'object') {
+      return {
+        type: 'object',
+        additionalProperties: true,
+        description: DEFAULT_PARAMETERS_DESCRIPTION
+      };
+    }
+    try {
+      const cloned = JSON.parse(JSON.stringify(schema)) as Record<string, unknown>;
+      if (typeof cloned.type !== 'string') cloned.type = 'object';
+      if (cloned.additionalProperties === undefined) cloned.additionalProperties = true;
+      if (cloned.description === undefined) cloned.description = DEFAULT_PARAMETERS_DESCRIPTION;
+      return cloned;
+    } catch {
+      return {
+        type: 'object',
+        additionalProperties: true,
+        description: DEFAULT_PARAMETERS_DESCRIPTION
+      };
+    }
+  }
+
+  warmupWithOrchestrator(): void {
+    if (!this.opts.enableBatch) return;
+    this.cachedBatchSchemas = undefined;
+    this.ensureBatchSchemas();
+    this.instructions = this.buildInstructions();
   }
 }

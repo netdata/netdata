@@ -452,8 +452,8 @@ export class AIAgentSession {
     }
     if (this.subAgents !== undefined) {
       const subAgents = this.subAgents;
-      const execFn = async (name: string, args: Record<string, unknown>, opts?: { onChildOpTree?: (tree: SessionNode) => void; parentOpPath?: string }) => {
-        const exec = await subAgents.execute(name, args, {
+      const execFn = async (name: string, parameters: Record<string, unknown>, opts?: { onChildOpTree?: (tree: SessionNode) => void; parentOpPath?: string }) => {
+        const exec = await subAgents.execute(name, parameters, {
           config: this.sessionConfig.config,
           callbacks: this.sessionConfig.callbacks,
           targets: this.sessionConfig.targets,
@@ -2160,7 +2160,7 @@ export class AIAgentSession {
     accounting: AccountingEntry[],
     toolName: string
   ): Promise<string> {
-    interface BatchCall { id: string; tool: string; args: Record<string, unknown> }
+    interface BatchCall { id: string; tool: string; parameters: Record<string, unknown> }
     interface BatchInput { calls: BatchCall[] }
 
     const isPlainObject = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -2181,8 +2181,8 @@ export class AIAgentSession {
         const c = isPlainObject(cUnknown) ? cUnknown : {};
         const id = asId(c.id) ?? '';
         const tool = asString(c.tool) ?? '';
-        const args = (isPlainObject(c.args) ? c.args : {});
-        return { id, tool, args };
+        const parameters = (isPlainObject(c.parameters) ? c.parameters : {});
+        return { id, tool, parameters };
       });
       return { calls };
     })();
@@ -2190,7 +2190,7 @@ export class AIAgentSession {
     if (bi === undefined || bi.calls.some((c) => c.id.length === 0 || c.tool.length === 0)) {
       // Warn once for invalid batch input
       try {
-        const warn: LogEntry = { timestamp: Date.now(), severity: 'WRN', turn: currentTurn, subturn: 0, direction: RESP_DIR, type: LLM_TYPE, remoteIdentifier: BATCH_REMOTE_ID, fatal: false, message: 'Invalid batch input: each call requires id, tool, args' };
+        const warn: LogEntry = { timestamp: Date.now(), severity: 'WRN', turn: currentTurn, subturn: 0, direction: RESP_DIR, type: LLM_TYPE, remoteIdentifier: BATCH_REMOTE_ID, fatal: false, message: 'Invalid batch input: each call requires id, tool, parameters' };
         this.log(warn);
       } catch (e) { warn(`LLM error log failed: ${e instanceof Error ? e.message : String(e)}`); }
       const latency = Date.now() - startTime;
@@ -2203,7 +2203,7 @@ export class AIAgentSession {
       };
       accounting.push(accountingEntry);
       this.sessionConfig.callbacks?.onAccounting?.(accountingEntry);
-      throw new Error('invalid_batch_input: calls[] requires id, tool, args');
+      throw new Error('invalid_batch_input: calls[] requires id, tool, parameters');
     }
 
     // Batch execution: orchestrator-only inner calls; record a span for the batch
@@ -2216,7 +2216,7 @@ export class AIAgentSession {
       }
       // Handle progress_report directly in batch
       if (c.tool === 'agent__progress_report') {
-        const progress = typeof (c.args.progress) === 'string' ? c.args.progress : '';
+        const progress = typeof (c.parameters.progress) === 'string' ? c.parameters.progress : '';
         if (progress.trim().length > 0) {
           this.opTree.setLatestStatus(progress);
           // Trigger callback to notify listeners (like Slack progress updates)
@@ -2242,7 +2242,7 @@ export class AIAgentSession {
           return { id: c.id, tool: c.tool, ok: false, elapsedMs: 0, error: { code: 'UNKNOWN_TOOL', message: `Unknown tool: ${c.tool}` } };
         }
         const orchestrator = (this.toolsOrchestrator as unknown) as { executeWithManagement: (t: string, a: Record<string, unknown>, ctx: { turn: number; subturn: number }, opts?: { timeoutMs?: number }) => Promise<{ result: string; latency: number }> };
-        const managed = await orchestrator.executeWithManagement(c.tool, c.args, { turn: currentTurn, subturn: 0 }, { timeoutMs: this.sessionConfig.toolTimeout });
+        const managed = await orchestrator.executeWithManagement(c.tool, c.parameters, { turn: currentTurn, subturn: 0 }, { timeoutMs: this.sessionConfig.toolTimeout });
         return { id: c.id, tool: c.tool, ok: true, elapsedMs: managed.latency, output: managed.result };
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);

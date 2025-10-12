@@ -107,7 +107,7 @@
         "content-type": "application/json",
         "Authorization": "Bearer ${POSTHOG_QUERY_API_KEY}"
       },
-      "argsSchema": {
+      "parametersSchema": {
         "type": "object",
         "properties": {
           "hogql": { "type": "string", "minLength": 1 }
@@ -116,7 +116,7 @@
         "additionalProperties": false
       },
       "bodyTemplate": {
-        "query": { "kind": "HogQLQuery", "query": "${args.hogql}" }
+        "query": { "kind": "HogQLQuery", "query": "${parameters.hogql}" }
       }
     },
     "ask-netdata": {
@@ -128,7 +128,7 @@
         "accept": "text/event-stream",
         "Referer": "https://learn.netdata.cloud/"
       },
-      "argsSchema": {
+      "parametersSchema": {
         "type": "object",
         "properties": {
           "question": { "type": "string", "minLength": 1 }
@@ -138,7 +138,7 @@
       },
       "bodyTemplate": {
         "messages": [
-          { "role": "user", "content": "${args.question}" }
+          { "role": "user", "content": "${parameters.question}" }
         ]
       },
       "streaming": {

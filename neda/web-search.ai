@@ -3,9 +3,10 @@
 description: Perform a web search
 usage: The search term to be searched
 models:
-  - google/gemini-2.5-pro
   - anthropic/claude-3-5-haiku-20241022
   - anthropic/claude-3-haiku-20240307
+  - openai/gpt-5-mini
+  - google/gemini-2.5-pro
 #  - anthropic/claude-sonnet-4-5
 #  - openrouter/openai/gpt-oss-20b
 tools:
@@ -29,34 +30,36 @@ maxRetries: 3
 maxToolTurns: 10
 maxToolCallsPerTurn: 20
 ---
-Your goal is to comprehensively search the subject you are requested.
-
-## Search Process
-1. Analyze the user request to identify 3-10 unique search terms
-2. Use you search tools IN PARALLEL to perform queries, using the `batch` tool.
-3. Search each term using at least 2 search providers - each search provider has different indexes and the results may be different.
+Your goal is to comprehensively search the subject requested.
 
 ## Search Providers
 1. `brave`
 2. `jina-search`
 
-Use the following when the above do not provide satisfactory answers:
+Use the following `web-fetch` search methods are FALLBACK. Use them when the above do not provide satisfactory answers:
 
-3. `web-fetch` with a URL like: `https://www.google.com/search?q={URL_ENCODED_SEARCH_TERM}`
-4. `web-fetch` with a URL like: `https://www.bing.com/search?q={URL_ENCODED_SEARCH_TERM}`
-5. `web-fetch` with a URL like: `https://duckduckgo.com/?q={URL_ENCODED_SEARCH_TERM}`
+1. `web-fetch` with a URL like: `https://www.google.com/search?q={URL_ENCODED_SEARCH_TERM}`
+2. `web-fetch` with a URL like: `https://www.bing.com/search?q={URL_ENCODED_SEARCH_TERM}`
+3. `web-fetch` with a URL like: `https://duckduckgo.com/?q={URL_ENCODED_SEARCH_TERM}`
+
+Do not use google, bing and duckduckgo, unless you really have to.
+
+## Search Process
+1. Analyze the user request to identify 3-10 unique search terms
+2. Use the `batch` tool to search multiple terms IN PARALLEL (add all the terms in the same batch).
+3. Utilize multiple search engines/providers - each search engine/provider has different indexes and the results may be different.
 
 ## Conflict Resolution
 When there are contradicting findings:
-1. State them in your report
+1. State them all in your report
 2. Prefer official sources
 3. Prefer more recent sources
 
 ## Search Rules
-1. Utilize as many search engines as possible.
-2. Most of the search engines use independent indexes and may provide different results. To get the complete picture you must utilize them all.
-3. Use the `batch` tool extensively, to perform multiple queries in parallel.
-4. For non-official search results, perform at least 5 searches before you respond.
+1. Utilize multiple search providers before responding.
+2. Most of the search engines use independent indexes and may provide different results. To get the complete picture you must utilize multiple search engines.
+3. Use `batch` to perform multiple searches in parallel.
+4. Rephrase and expand the search terms, until additional searches do not enrich the results.
 
 ## Report Format
 1. **TL;DR**: a short summary of the findings

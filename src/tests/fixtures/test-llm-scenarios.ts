@@ -580,12 +580,12 @@ const SCENARIOS: ScenarioDefinition[] = [
                   {
                     id: '1',
                     tool: 'agent__progress_report',
-                    args: { progress: 'Batch step started' },
+                    parameters: { progress: 'Batch step started' },
                   },
                   {
                     id: '2',
                     tool: TOOL_NAME,
-                    args: { text: 'batch-success' },
+                    parameters: { text: 'batch-success' },
                   },
                 ],
               },
@@ -1101,7 +1101,7 @@ const SCENARIOS: ScenarioDefinition[] = [
                 calls: [
                   {
                     tool: TOOL_NAME,
-                    args: {
+                    parameters: {
                       text: BATCH_INVALID_INPUT_ARGUMENT,
                     },
                   },
@@ -1151,7 +1151,7 @@ const SCENARIOS: ScenarioDefinition[] = [
                   {
                     id: 'u-1',
                     tool: BATCH_UNKNOWN_TOOL,
-                    args: {
+                    parameters: {
                       note: 'unknown-tool',
                     },
                   },
@@ -1201,7 +1201,7 @@ const SCENARIOS: ScenarioDefinition[] = [
                   {
                     id: 'e-1',
                     tool: TOOL_NAME,
-                    args: {
+                    parameters: {
                       text: BATCH_EXECUTION_ERROR_ARGUMENT,
                     },
                   },
@@ -1440,12 +1440,12 @@ const SCENARIOS: ScenarioDefinition[] = [
                   {
                     id: 'p-1',
                     tool: 'agent__progress_report',
-                    args: { progress: BATCH_PROGRESS_STATUS },
+                    parameters: { progress: BATCH_PROGRESS_STATUS },
                   },
                   {
                     id: 'p-2',
                     tool: TOOL_NAME,
-                    args: { text: BATCH_PROGRESS_RESPONSE },
+                    parameters: { text: BATCH_PROGRESS_RESPONSE },
                   },
                 ],
               },
@@ -1489,7 +1489,7 @@ const SCENARIOS: ScenarioDefinition[] = [
               callId: 'call-batch-string',
               assistantText: 'String payload contains progress and tool work.',
               arguments: {
-                calls: `[{"id":"s-1","tool":"agent__progress_report","args":{"progress":"${BATCH_STRING_PROGRESS}"}},{"id":"s-2","tool":"${TOOL_NAME}","args":{"text":"${BATCH_STRING_RESULT}"}}]`,
+                calls: `[{"id":"s-1","tool":"agent__progress_report","parameters":{"progress":"${BATCH_STRING_PROGRESS}"}},{"id":"s-2","tool":"${TOOL_NAME}","parameters":{"text":"${BATCH_STRING_RESULT}"}}]`,
               },
             },
           ],
@@ -2322,8 +2322,8 @@ const SCENARIOS: ScenarioDefinition[] = [
               assistantText: 'Batch includes progress and large MCP output.',
               arguments: {
                 calls: [
-                  { id: 'p-1', tool: 'agent__progress_report', args: { progress: 'Starting large data export.' } },
-                  { id: 'p-2', tool: TOOL_NAME, args: { text: 'X'.repeat(5000) } }
+                  { id: 'p-1', tool: 'agent__progress_report', parameters: { progress: 'Starting large data export.' } },
+                  { id: 'p-2', tool: TOOL_NAME, parameters: { text: 'X'.repeat(5000) } }
                 ],
               },
             },

@@ -12,10 +12,10 @@ class FakeRestProvider extends ToolProvider {
   readonly id = 'rest';
   listTools(): MCPTool[] { return [ { name: TOOL, description: 'echo', inputSchema: {} } ]; }
   hasTool(name: string): boolean { return name === TOOL; }
-  execute(_name: string, args: Record<string, unknown>, _opts?: ToolExecuteOptions): Promise<ToolExecuteResult> {
-    const fail = (args as { fail?: boolean }).fail === true;
+  execute(_name: string, parameters: Record<string, unknown>, _opts?: ToolExecuteOptions): Promise<ToolExecuteResult> {
+    const fail = (parameters as { fail?: boolean }).fail === true;
     if (fail) return Promise.resolve({ ok: false, error: 'fail requested', latencyMs: 5, kind: this.kind, providerId: this.id });
-    const maybeText = (args as { text?: unknown }).text;
+    const maybeText = (parameters as { text?: unknown }).text;
     const payload = typeof maybeText === 'string' ? maybeText : 'ok';
     return Promise.resolve({ ok: true, result: payload, latencyMs: 5, kind: this.kind, providerId: this.id, extras: { rawResponse: payload } });
   }

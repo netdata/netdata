@@ -68,23 +68,23 @@ export class RestProvider extends ToolProvider {
   listTools(): MCPTool[] {
     const out: MCPTool[] = [];
     this.tools.forEach((cfg, name) => {
-      out.push({ name: this.exposedName(name), description: cfg.description, inputSchema: cfg.argsSchema });
+      out.push({ name: this.exposedName(name), description: cfg.description, inputSchema: cfg.parametersSchema });
     });
     return out;
   }
 
   hasTool(exposed: string): boolean { return this.tools.has(this.internalName(exposed)); }
 
-  async execute(exposed: string, args: Record<string, unknown>, opts?: ToolExecuteOptions): Promise<ToolExecuteResult> {
+  async execute(exposed: string, parameters: Record<string, unknown>, opts?: ToolExecuteOptions): Promise<ToolExecuteResult> {
     const start = Date.now();
     const id = this.internalName(exposed);
     const cfg = this.tools.get(id);
     if (cfg === undefined) throw new Error(`REST tool not found: ${exposed}`);
 
-    // Validate args
+    // Validate parameters
     try {
-      const validate = this.ajv.compile(cfg.argsSchema);
-      const ok = validate(args);
+      const validate = this.ajv.compile(cfg.parametersSchema);
+      const ok = validate(parameters);
       if (!ok) {
       const list = Array.isArray(validate.errors) ? validate.errors : [];
       const errs = list.map((e) => {
@@ -100,19 +100,19 @@ export class RestProvider extends ToolProvider {
     }
 
     const method = cfg.method.toUpperCase();
-    let url = this.substituteUrl(cfg.url, args);
+    let url = this.substituteUrl(cfg.url, parameters);
     
     // Handle complex query parameters if marked
     const hasComplexQueryParams = (cfg as { hasComplexQueryParams?: boolean }).hasComplexQueryParams;
     const queryParamNames = (cfg as { queryParamNames?: string[] }).queryParamNames;
     
     if (hasComplexQueryParams === true && Array.isArray(queryParamNames)) {
-      // Extract query params from args that should be serialized in complex format
+      // Extract query params from parameters that should be serialized in complex format
       const queryParams: string[] = [];
       
       queryParamNames.forEach((paramName) => {
-        if (Object.prototype.hasOwnProperty.call(args, paramName)) {
-          let value = args[paramName];
+        if (Object.prototype.hasOwnProperty.call(parameters, paramName)) {
+          let value = parameters[paramName];
           
           // Special case: if value is a plain object (not an array), wrap it in an array
           // This handles cases like Encharge API where objects need array notation
@@ -133,11 +133,11 @@ export class RestProvider extends ToolProvider {
       }
     }
     
-    // Apply header templating from args
+    // Apply header templating from parameters
     const headers = new Headers();
     const rawHeaders = cfg.headers ?? {};
     Object.entries(rawHeaders).forEach(([k, v]) => {
-      const vv = typeof v === 'string' ? this.substituteString(v, args) : String(v);
+      const vv = typeof v === 'string' ? this.substituteString(v, parameters) : String(v);
       headers.set(k, vv);
     });
 
@@ -163,7 +163,7 @@ export class RestProvider extends ToolProvider {
     // Prepare body if templated
     let body: string | undefined;
     if (cfg.bodyTemplate !== undefined) {
-      const built = this.buildBody(cfg.bodyTemplate as unknown, args);
+      const built = this.buildBody(cfg.bodyTemplate as unknown, parameters);
       body = built;
       if (!headers.has('content-type')) headers.set('content-type', 'application/json');
       
@@ -272,54 +272,54 @@ export class RestProvider extends ToolProvider {
     return tokens;
   }
 
-  private substitute(template: unknown, args: Record<string, unknown>): unknown {
+  private substitute(template: unknown, parameters: Record<string, unknown>): unknown {
     if (typeof template === 'string') {
-      return template.replace(/\$\{args\.([^}]+)\}/g, (_m, name: string) => {
-        const has = Object.prototype.hasOwnProperty.call(args, name);
-        const v = has ? args[name] : undefined;
+      return template.replace(/\$\{parameters\.([^}]+)\}/g, (_m, name: string) => {
+        const has = Object.prototype.hasOwnProperty.call(parameters, name);
+        const v = has ? parameters[name] : undefined;
         return typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean' ? String(v) : '';
       });
     }
-    if (Array.isArray(template)) return template.map((v) => this.substitute(v, args));
+    if (Array.isArray(template)) return template.map((v) => this.substitute(v, parameters));
     if (template !== null && typeof template === 'object') {
       const out: Record<string, unknown> = {};
-      Object.entries(template as Record<string, unknown>).forEach(([k, v]) => { out[k] = this.substitute(v, args); });
+      Object.entries(template as Record<string, unknown>).forEach(([k, v]) => { out[k] = this.substitute(v, parameters); });
       return out;
     }
     return template;
   }
 
-  private substituteString(template: string, args: Record<string, unknown>): string {
-    return template.replace(/\$\{args\.([^}]+)\}/g, (_m, name: string) => {
-      const has = Object.prototype.hasOwnProperty.call(args, name);
-      const v = has ? args[name] : undefined;
+  private substituteString(template: string, parameters: Record<string, unknown>): string {
+    return template.replace(/\$\{parameters\.([^}]+)\}/g, (_m, name: string) => {
+      const has = Object.prototype.hasOwnProperty.call(parameters, name);
+      const v = has ? parameters[name] : undefined;
       return typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean' ? String(v) : '';
     });
   }
 
-  private substituteUrl(template: string, args: Record<string, unknown>): string {
-    return template.replace(/\$\{args\.([^}]+)\}/g, (_m, name: string) => {
-      const has = Object.prototype.hasOwnProperty.call(args, name);
-      const v = has ? args[name] : undefined;
+  private substituteUrl(template: string, parameters: Record<string, unknown>): string {
+    return template.replace(/\$\{parameters\.([^}]+)\}/g, (_m, name: string) => {
+      const has = Object.prototype.hasOwnProperty.call(parameters, name);
+      const v = has ? parameters[name] : undefined;
       const s = (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') ? String(v) : '';
       try { return encodeURIComponent(s); } catch { return s; }
     });
   }
 
-  private buildBody(template: unknown, args: Record<string, unknown>): string {
+  private buildBody(template: unknown, parameters: Record<string, unknown>): string {
     if (typeof template === 'string') {
-      // If the template is a single placeholder like ${args.body}, pass the raw value
-      const m = /^\$\{args\.([^}]+)\}$/.exec(template);
+      // If the template is a single placeholder like ${parameters.body}, pass the raw value
+      const m = /^\$\{parameters\.([^}]+)\}$/.exec(template);
       if (m !== null) {
         const key = m[1];
-        const hasKey = Object.prototype.hasOwnProperty.call(args, key);
-        const v = hasKey ? args[key] : undefined;
+        const hasKey = Object.prototype.hasOwnProperty.call(parameters, key);
+        const v = hasKey ? parameters[key] : undefined;
         return JSON.stringify(v);
       }
-      const substituted = this.substituteString(template, args);
+      const substituted = this.substituteString(template, parameters);
       return substituted;
     }
-    const resolved = this.substitute(template, args);
+    const resolved = this.substitute(template, parameters);
     return JSON.stringify(resolved);
   }
 

@@ -95,8 +95,8 @@ const scenario = {
   tools: ['internal-unittest', 'rest-unittest', 'mcp-stdio-unittest'],
   plan: [
     { turn: 1, toolCalls: [
-      { name: 'internal-unittest.echo', args: { text: 'hello' } },
-      { name: 'rest-unittest.search', args: { query: 'abc', page: 1 } },
+      { name: 'internal-unittest.echo', parameters: { text: 'hello' } },
+      { name: 'rest-unittest.search', parameters: { query: 'abc', page: 1 } },
     ], reasoning: ["Thinking step 1", "Thinking step 2"] },
     { turn: 2, final: 'All done.' },
   ],
@@ -104,7 +104,7 @@ const scenario = {
     'agent__child': {
       file: 'src/tests/assets/child.ai',
       plan: [
-        { turn: 1, toolCalls: [ { name: 'internal-unittest.child', args: { n: 3 } } ] },
+        { turn: 1, toolCalls: [ { name: 'internal-unittest.child', parameters: { n: 3 } } ] },
         { turn: 2, final: 'Child done.' },
       ]
     }
