@@ -144,6 +144,7 @@ const CONCURRENCY_SECOND_ARGUMENT = 'concurrency-second';
 const THROW_FAILURE_MESSAGE = 'Simulated provider throw for coverage.';
 const BATCH_PROGRESS_RESPONSE = 'batch-progress-follow-up';
 const BATCH_STRING_RESULT = 'batch-string-mode';
+const FINAL_ANSWER_DELIVERED = 'Final answer delivered.';
 const TRACEABLE_PROVIDER_URL = 'https://openrouter.ai/api/v1';
 const RATE_LIMIT_WARNING_MESSAGE = 'Rate limited; suggested wait';
 const CONFIG_FILENAME = '.ai-agent.json';
@@ -2934,6 +2935,93 @@ const TEST_SCENARIOS: HarnessTest[] = [
       invariant(network !== undefined && network.type === 'network_error' && networkRetryable, 'Network mapping mismatch for run-test-83.');
       const model = data.model as TurnStatus | undefined;
       invariant(model !== undefined && model.type === 'model_error' && typeof model.message === 'string', 'Model error mapping mismatch for run-test-83.');
+    },
+  },
+  {
+    id: 'run-test-84',
+    description: 'Final turn without final report retries next provider.',
+    configure: (configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+      configuration.providers = {
+        ...configuration.providers,
+        [SECONDARY_PROVIDER]: { type: 'test-llm' },
+      };
+      sessionConfig.targets = [
+        { provider: PRIMARY_PROVIDER, model: `${MODEL_NAME}-primary` },
+        { provider: SECONDARY_PROVIDER, model: `${MODEL_NAME}-secondary` },
+      ];
+      sessionConfig.maxTurns = 1;
+    },
+    execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+      // eslint-disable-next-line @typescript-eslint/unbound-method
+      const originalExecuteTurn = LLMClient.prototype.executeTurn;
+      let invocation = 0;
+      let activeSession: AIAgentSession | undefined;
+      LLMClient.prototype.executeTurn = async function(this: LLMClient, request: TurnRequest): Promise<TurnResult> {
+        invocation += 1;
+        if (invocation === 1) {
+          return {
+            status: { type: 'success', hasToolCalls: false, finalAnswer: false },
+            latencyMs: 5,
+            messages: [
+              { role: 'assistant', content: 'Continuing work...' },
+            ],
+            tokens: { inputTokens: 10, outputTokens: 5, totalTokens: 15 },
+          };
+        }
+        if (invocation === 2) {
+          if (activeSession !== undefined) {
+            (activeSession as unknown as { finalReport?: { status: string; format: 'markdown'; content: string } }).finalReport = {
+              status: 'success',
+              format: 'markdown',
+              content: FINAL_ANSWER_DELIVERED,
+            };
+          }
+          const assistantMessage = {
+            role: 'assistant',
+            content: '',
+            toolCalls: [
+              {
+                name: 'agent__final_report',
+                id: 'call-final-report',
+                parameters: {
+                  status: 'success',
+                  report_format: 'markdown',
+                  report_content: FINAL_ANSWER_DELIVERED,
+                },
+              },
+            ],
+          };
+          const toolMessage = {
+            role: 'tool',
+            toolCallId: 'call-final-report',
+            content: FINAL_ANSWER_DELIVERED,
+          };
+          return {
+            status: { type: 'success', hasToolCalls: true, finalAnswer: true },
+            latencyMs: 5,
+            messages: [assistantMessage as ConversationMessage, toolMessage as ConversationMessage],
+            tokens: { inputTokens: 12, outputTokens: 8, totalTokens: 20 },
+          };
+        }
+        return await originalExecuteTurn.call(this, request);
+      };
+      try {
+          activeSession = AIAgentSession.create(sessionConfig);
+          return await activeSession.run();
+      } finally {
+        LLMClient.prototype.executeTurn = originalExecuteTurn;
+      }
+    },
+    expect: (result: AIAgentResult) => {
+      invariant(result.success, 'Scenario run-test-84 expected success.');
+      const finalTurnLog = result.logs.find((entry) => entry.remoteIdentifier === 'agent:final-turn');
+      if (finalTurnLog === undefined) {
+        // eslint-disable-next-line no-console
+        console.error('run-test-84 logs:', result.logs.map((entry) => ({ id: entry.remoteIdentifier, severity: entry.severity, message: entry.message })));
+      }
+      invariant(finalTurnLog !== undefined, 'Final-turn warning log expected for run-test-84.');
+      const finalReport = result.finalReport;
+      invariant(finalReport !== undefined && finalReport.status === 'success', 'Final report should succeed for run-test-84.');
     },
   },
   {

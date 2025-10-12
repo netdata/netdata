@@ -63,6 +63,7 @@ export class AIAgentSession {
   private static readonly REMOTE_CONC_SLOT = 'agent:concurrency-slot';
   private static readonly REMOTE_CONC_HINT = 'agent:concurrency-hint';
   private static readonly REMOTE_AGENT_TOOLS = 'agent:tools';
+  private static readonly REMOTE_FINAL_TURN = 'agent:final-turn';
   private static readonly FINAL_REPORT_TOOL = 'agent__final_report';
   private static readonly FINAL_REPORT_SHORT = 'final_report';
   readonly config: Configuration;
@@ -1036,6 +1037,7 @@ export class AIAgentSession {
     // Track the last turn where we showed thinking header
     let lastShownThinkingHeaderTurn = -1;
 
+    const finalTurnRetryMessage = 'Final turn did not produce final_report; retrying with next provider/model in this turn.';
     let maxTurns = this.sessionConfig.maxTurns ?? 10;
     const maxRetries = this.sessionConfig.maxRetries ?? 3; // GLOBAL attempts cap per turn
     const pairs = this.sessionConfig.targets;
@@ -1067,6 +1069,7 @@ export class AIAgentSession {
       let lastError: string | undefined;
       let turnSuccessful = false;
       let finalTurnWarnLogged = false;
+      let finalTurnRetryWarnLogged = false;
 
       // Global attempts across all provider/model pairs for this turn
       let attempts = 0;
@@ -1124,7 +1127,7 @@ export class AIAgentSession {
                 subturn: 0,
                 direction: 'request',
                 type: 'llm',
-                remoteIdentifier: 'agent:final-turn',
+                remoteIdentifier: AIAgentSession.REMOTE_FINAL_TURN,
                 fatal: false,
                 message: `Final turn detected: restricting tools to \`${AIAgentSession.FINAL_REPORT_TOOL}\` and injecting finalization instruction.`
               };
@@ -1281,6 +1284,21 @@ export class AIAgentSession {
                   message: 'Synthetic retry: assistant returned content without tool calls and without final_report.'
                 };
                 this.log(warnEntry);
+                if (isFinalTurn && !finalTurnRetryWarnLogged) {
+                  const agentWarn: LogEntry = {
+                    timestamp: Date.now(),
+                    severity: 'WRN',
+                    turn: currentTurn,
+                    subturn: 0,
+                    direction: 'response',
+                    type: 'llm',
+                    remoteIdentifier: AIAgentSession.REMOTE_FINAL_TURN,
+                    fatal: false,
+                    message: finalTurnRetryMessage
+                  };
+                  this.log(agentWarn);
+                  finalTurnRetryWarnLogged = true;
+                }
                 lastError = 'invalid_response: content_without_tools_or_final';
                 if (cycleComplete) {
                   rateLimitedInCycle = 0;
@@ -1513,17 +1531,32 @@ export class AIAgentSession {
                     subturn: 0,
                     direction: 'response',
                     type: 'llm',
-                  remoteIdentifier: remoteId,
-                  fatal: false,
-                  message: 'Final turn did not produce final_report; retrying with next provider/model in this turn.'
-                };
-                this.log(warnEntry);
-                // Continue attempts loop (do not mark successful)
-                if (cycleComplete) {
-                  rateLimitedInCycle = 0;
-                  maxRateLimitWaitMs = 0;
-                }
-                continue;
+                    remoteIdentifier: remoteId,
+                    fatal: false,
+                    message: finalTurnRetryMessage
+                  };
+                  this.log(warnEntry);
+                  if (!finalTurnRetryWarnLogged) {
+                    const agentWarn: LogEntry = {
+                      timestamp: Date.now(),
+                      severity: 'WRN',
+                      turn: currentTurn,
+                      subturn: 0,
+                      direction: 'response',
+                      type: 'llm',
+                      remoteIdentifier: AIAgentSession.REMOTE_FINAL_TURN,
+                      fatal: false,
+                      message: finalTurnRetryMessage
+                    };
+                    this.log(agentWarn);
+                    finalTurnRetryWarnLogged = true;
+                  }
+                  // Continue attempts loop (do not mark successful)
+                  if (cycleComplete) {
+                    rateLimitedInCycle = 0;
+                    maxRateLimitWaitMs = 0;
+                  }
+                  continue;
               }
               // Non-final turns: proceed to next turn; tools already executed if present
               turnSuccessful = true;
