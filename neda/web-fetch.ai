@@ -3,7 +3,9 @@
 description: Fetch any URL to extract some information
 usage: JSON input 
 models:
+  - google/gemini-2.5-pro
   - anthropic/claude-3-5-haiku-20241022
+  - anthropic/claude-3-haiku-20240307
 #  - anthropic/claude-sonnet-4-5
 #  - openrouter/openai/gpt-oss-120b
 #  - openrouter/openai/gpt-oss-20b
@@ -50,7 +52,7 @@ maxToolCallsPerTurn: 2
 parallelToolCalls: false
 temperature: 0.3
 topP: 1
-maxOutputTokens: 8192
+maxOutputTokens: 4096
 repeatPenalty: 1
 maxRetries: 5
 maxToolTurns: 5

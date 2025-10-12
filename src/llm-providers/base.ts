@@ -199,11 +199,11 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
       const toRecord = (val: unknown): Record<string, unknown> | undefined => (val !== null && typeof val === 'object' && !Array.isArray(val)) ? val as Record<string, unknown> : undefined;
       const hasGetter = (val: unknown): val is { get: (key: string) => unknown } => val !== null && typeof val === 'object' && typeof (val as { get?: unknown }).get === 'function';
 
-      interface RetryCandidate { value: unknown; hint?: 'seconds' | 'milliseconds' | 'date'; origin: string }
+      interface RetryCandidate { value: unknown; hint?: 'seconds' | 'milliseconds' | 'date'; origin: string; rawValue: unknown }
       const candidates: RetryCandidate[] = [];
       const addCandidate = (value: unknown, hint: RetryCandidate['hint'], origin: string) => {
         if (value !== undefined && value !== null) {
-          candidates.push({ value, hint, origin });
+          candidates.push({ value, hint, origin, rawValue: value });
         }
       };
 
@@ -225,11 +225,11 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
         return entry?.[1];
       };
 
-      const headerSources: unknown[] = [
-        err.headers,
-        (primary as { headers?: unknown }).headers,
-        (primary as { responseHeaders?: unknown }).responseHeaders,
-        (primary as { response?: { headers?: unknown } }).response?.headers,
+      const headerSources: { headers: unknown; label: string }[] = [
+        { headers: err.headers, label: 'error.headers' },
+        { headers: (primary as { headers?: unknown }).headers, label: 'headers' },
+        { headers: (primary as { responseHeaders?: unknown }).responseHeaders, label: 'responseHeaders' },
+        { headers: (primary as { response?: { headers?: unknown } }).response?.headers, label: 'response.headers' },
       ];
       const headerKeys: { key: string; hint?: RetryCandidate['hint'] }[] = [
         { key: 'retry-after', hint: 'seconds' },
@@ -241,10 +241,10 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
         { key: 'anthropic-ratelimit-requests-reset', hint: 'date' },
         { key: 'anthropic-ratelimit-tokens-reset', hint: 'date' },
       ];
-      headerSources.forEach((source, idx) => {
+      headerSources.forEach(({ headers, label }) => {
         headerKeys.forEach(({ key, hint }) => {
-          const value = getHeaderValue(source, key);
-          addCandidate(value, hint ?? (key.includes('ms') ? 'milliseconds' : undefined), `header[${String(idx)}].${key}`);
+          const value = getHeaderValue(headers, key);
+          addCandidate(value, hint ?? (key.includes('ms') ? 'milliseconds' : undefined), `${label}.${key}`);
         });
       });
 
@@ -319,11 +319,21 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
 
       const evaluated = candidates.map((candidate) => ({
         origin: candidate.origin,
+        rawValue: candidate.rawValue,
         ms: parseCandidate(candidate),
       }));
-      const winner = evaluated.find((entry) => typeof entry.ms === 'number' && Number.isFinite(entry.ms) && entry.ms > 0);
+      // Find the maximum retry delay to be conservative (longer wait = safer)
+      const validEntries = evaluated.filter((entry) => typeof entry.ms === 'number' && Number.isFinite(entry.ms) && entry.ms > 0);
+      const winner = validEntries.length > 0
+        ? validEntries.reduce((max, entry) => (entry.ms !== undefined && entry.ms > (max.ms ?? 0) ? entry : max))
+        : undefined;
       const retryAfterMs = winner?.ms;
-      const sources = winner !== undefined ? [winner.origin] : undefined;
+      // Format source with value for clarity
+      const formatSource = (origin: string, rawValue: unknown): string => {
+        const valueStr = typeof rawValue === 'string' ? rawValue : JSON.stringify(rawValue);
+        return `${origin}=${valueStr}`;
+      };
+      const sources = winner !== undefined ? [formatSource(winner.origin, winner.rawValue)] : undefined;
       return { type: 'rate_limit', retryAfterMs, sources };
     }
 
@@ -350,7 +360,7 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
     }
 
     // Network errors
-    if (status >= 500 || name.includes('Network') || name.includes('ECONNRESET') || name.includes('ENOTFOUND') || providerMessage.toLowerCase().includes('network') || providerMessage.toLowerCase().includes('connection')) {
+    if (status >= 500 || name.includes('Network') || name.includes('ECONNRESET') || name.includes('ENOTFOUND') || name.includes('ENETUNREACH') || name.includes('EHOSTUNREACH') || name.includes('ECONNREFUSED') || providerMessage.toLowerCase().includes('network') || providerMessage.toLowerCase().includes('connection')) {
       return { type: 'network_error', message: composedMessage, retryable: true };
     }
 

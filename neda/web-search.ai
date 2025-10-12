@@ -3,9 +3,10 @@
 description: Perform a web search
 usage: The search term to be searched
 models:
+  - google/gemini-2.5-pro
   - anthropic/claude-3-5-haiku-20241022
+  - anthropic/claude-3-haiku-20240307
 #  - anthropic/claude-sonnet-4-5
-#  - openrouter/openai/gpt-oss-120b
 #  - openrouter/openai/gpt-oss-20b
 tools:
   - jina-search
@@ -22,7 +23,7 @@ maxConcurrentTools: 1
 parallelToolCalls: false
 temperature: 0.7
 topP: 1
-maxOutputTokens: 8192
+maxOutputTokens: 4096
 repeatPenalty: 1.2
 maxRetries: 3
 maxToolTurns: 10
@@ -55,7 +56,7 @@ When there are contradicting findings:
 1. Utilize as many search engines as possible.
 2. Most of the search engines use independent indexes and may provide different results. To get the complete picture you must utilize them all.
 3. Use the `batch` tool extensively, to perform multiple queries in parallel.
-4. Perform at least 10 searches before you respond.
+4. For non-official search results, perform at least 5 searches before you respond.
 
 ## Report Format
 1. **TL;DR**: a short summary of the findings

@@ -64,10 +64,16 @@ Once Phase 1 is delivered, we will enumerate additional scenarios to drive cover
 - `run-test-24`: Runs successful sub-agent execution with accounting + logs.
 
 ### Remaining Backlog / Next Scenarios
-- Expand provider-specific adapters (Anthropic/OpenAI/Google) with deterministic fixtures that cover provider-normalised error mapping and streaming deltas.
-- Cover REST/MCP edge cases not yet scripted (e.g., mixed success/failure batches with partial accounting, REST fallback headers).
-- Add scenario asserting AI-agent final report status propagation (success/partial/failure) through `agent__final_report` to improve `internal-provider.ts` coverage.
-- Follow up with coverage snapshot + gating (document thresholds and wire into CI) once the above scenarios land.
+- **Anthropic Adapter Coverage** *(pending)*  
+  Design deterministic scenario that exercises `AnthropicProvider` error mapping by stubbing `LanguageModel` responses. Verify rate-limit retry parsing (`retryAfterMs`, `sources`) and stop reasons without hitting the network.
+- **OpenAI Adapter Coverage** *(pending)*  
+  Similar harness case targeting `OpenAIProvider`, ensuring snake-case option propagation and error normalization are tested deterministically.
+- **Google Adapter Coverage** *(pending)*  
+  Add scenario validating `GoogleProvider` format filtering and retry handling.
+- **REST/MCP Mixed Batch Paths** *(pending)*  
+  Build deterministic scenarios for mixed success/failure batches to cover REST fallback headers, accounting aggregation, and metadata merge logic.
+- **Coverage Snapshot & Gating** *(pending)*  
+  After adapter scenarios land, capture coverage snapshot and document thresholds to enable future gating.
 
 ### Phase 2 Coverage Objectives (Updated)
 - Drive `src/ai-agent.ts`, `src/llm-client.ts`, and `src/tools/internal-provider.ts` toward 100% statements/branches/functions/lines using deterministic scenarios only.
