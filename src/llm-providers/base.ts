@@ -196,12 +196,127 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
 
     // Rate limit errors
     if (status === 429 || name.includes('RateLimit') || providerMessage.toLowerCase().includes('rate limit')) {
-      const RETRY_AFTER_HEADER = 'retry-after';
-      const headers = err.headers as Record<string, unknown> | undefined;
-      const retryAfter = (typeof headers?.[RETRY_AFTER_HEADER] === 'string' || typeof headers?.[RETRY_AFTER_HEADER] === 'number') 
-        ? headers[RETRY_AFTER_HEADER] 
-        : typeof err.retryAfter === 'string' || typeof err.retryAfter === 'number' ? err.retryAfter : undefined;
-      const retryAfterMs = retryAfter !== undefined ? Number(retryAfter) * 1000 : undefined;
+      const toRecord = (val: unknown): Record<string, unknown> | undefined => (val !== null && typeof val === 'object' && !Array.isArray(val)) ? val as Record<string, unknown> : undefined;
+      const hasGetter = (val: unknown): val is { get: (key: string) => unknown } => val !== null && typeof val === 'object' && typeof (val as { get?: unknown }).get === 'function';
+
+      interface RetryCandidate { value: unknown; hint?: 'seconds' | 'milliseconds' | 'date' }
+      const candidates: RetryCandidate[] = [];
+      const addCandidate = (value: unknown, hint?: RetryCandidate['hint']) => {
+        if (value !== undefined && value !== null) {
+          candidates.push({ value, hint });
+        }
+      };
+
+      const lowerKey = (key: string) => key.toLowerCase();
+      const getHeaderValue = (headers: unknown, key: string): unknown => {
+        if (headers === undefined || headers === null) return undefined;
+        if (hasGetter(headers)) {
+          try {
+            const result = headers.get(key);
+            if (result !== null && result !== undefined) return result;
+          } catch {
+            // Ignore getter failures
+          }
+        }
+        const record = toRecord(headers);
+        if (record === undefined) return undefined;
+        const sought = lowerKey(key);
+        const entry = Object.entries(record).find(([k]) => lowerKey(k) === sought);
+        return entry?.[1];
+      };
+
+      const headerSources: unknown[] = [
+        err.headers,
+        (primary as { headers?: unknown }).headers,
+        (primary as { responseHeaders?: unknown }).responseHeaders,
+        (primary as { response?: { headers?: unknown } }).response?.headers,
+      ];
+      const headerKeys: { key: string; hint?: RetryCandidate['hint'] }[] = [
+        { key: 'retry-after', hint: 'seconds' },
+        { key: 'retry_after', hint: 'seconds' },
+        { key: 'retry-after-ms', hint: 'milliseconds' },
+        { key: 'retry_after_ms', hint: 'milliseconds' },
+        { key: 'x-ratelimit-reset' },
+        { key: 'x-ratelimit-retry-after', hint: 'seconds' },
+        { key: 'anthropic-ratelimit-retry-after-ms', hint: 'milliseconds' },
+      ];
+      headerSources.forEach((source) => {
+        headerKeys.forEach(({ key, hint }) => {
+          const value = getHeaderValue(source, key);
+          addCandidate(value, hint);
+        });
+      });
+
+      const nestedMetadataPaths: string[][] = [
+        ['data', 'error', 'metadata', 'retry_after_ms'],
+        ['data', 'error', 'metadata', 'retry_after'],
+        ['data', 'error', 'metadata', 'retry_after_seconds'],
+        ['error', 'metadata', 'retry_after_ms'],
+        ['error', 'metadata', 'retry_after'],
+        ['error', 'metadata', 'retry_after_seconds'],
+        ['metadata', 'retry_after_ms'],
+        ['metadata', 'retry_after'],
+        ['metadata', 'retry_after_seconds'],
+      ];
+      nestedMetadataPaths.forEach((path) => {
+        const value = nested(primary, path);
+        if (value !== undefined) {
+          const hint = path[path.length - 1].includes('ms') ? 'milliseconds' : (path[path.length - 1].includes('seconds') ? 'seconds' : undefined);
+          addCandidate(value, hint);
+        }
+      });
+
+      const retryAfterFields: { value: unknown; hint?: RetryCandidate['hint'] }[] = [
+        { value: (primary as { retryAfterMs?: unknown }).retryAfterMs, hint: 'milliseconds' },
+        { value: (primary as { retryAfter?: unknown }).retryAfter, hint: 'seconds' },
+        { value: (err as { retryAfterMs?: unknown }).retryAfterMs, hint: 'milliseconds' },
+        { value: (err as { retryAfter?: unknown }).retryAfter, hint: 'seconds' },
+      ];
+      retryAfterFields.forEach(({ value, hint }) => { addCandidate(value, hint); });
+
+      const parseCandidate = (candidate: RetryCandidate): number | undefined => {
+        const { value, hint } = candidate;
+        const coerceNumber = (num: number, unitHint?: RetryCandidate['hint']): number => {
+          if (!Number.isFinite(num)) return NaN;
+          if (unitHint === 'milliseconds') return num;
+          if (unitHint === 'seconds') return num * 1000;
+          if (num >= 1_000_000) return num; // assume already milliseconds
+          return num * 1000;
+        };
+        if (typeof value === 'number') {
+          return coerceNumber(value, hint);
+        }
+        if (typeof value === 'string') {
+          const trimmed = value.trim();
+          if (trimmed.length === 0) return undefined;
+          if (hint === 'date') {
+            const dateTs = Date.parse(trimmed);
+            if (!Number.isNaN(dateTs)) {
+              const delta = dateTs - Date.now();
+              return delta > 0 ? delta : 0;
+            }
+          }
+          const numeric = Number(trimmed);
+          if (!Number.isNaN(numeric)) {
+            return coerceNumber(numeric, hint);
+          }
+          const parsedDate = Date.parse(trimmed);
+          if (!Number.isNaN(parsedDate)) {
+            const delta = parsedDate - Date.now();
+            return delta > 0 ? delta : 0;
+          }
+          return undefined;
+        }
+        if (value instanceof Date) {
+          const delta = value.getTime() - Date.now();
+          return delta > 0 ? delta : 0;
+        }
+        return undefined;
+      };
+
+      const retryAfterMs = candidates
+        .map(parseCandidate)
+        .find((val) => typeof val === 'number' && Number.isFinite(val) && val > 0);
       return { type: 'rate_limit', retryAfterMs };
     }
 
