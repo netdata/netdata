@@ -4816,40 +4816,6 @@ paths:
             maximum: 3600
             default: 60
           example: 30
-      requestBody:
-        description: |
-          Optional request body for functions that accept parameters or configuration.
-          The format and content depend on the specific function being executed.
-
-          **When to Use Request Body:**
-          - Functions that accept filtering parameters
-          - Functions that need configuration data
-          - Functions with complex input requirements
-
-          **Common Patterns:**
-          - JSON object with function-specific parameters
-          - Plain text for simple commands
-          - Format specified by function documentation
-
-          **Example for logs-query function:**
-          ```json
-          {
-            "after": -3600,
-            "before": 0,
-            "filter": "error",
-            "limit": 100
-          }
-          ```
-        required: false
-        content:
-          application/json:
-            schema:
-              type: object
-              description: Function-specific parameters (varies by function)
-          text/plain:
-            schema:
-              type: string
-              description: Plain text parameters for simple functions
       responses:
         "200":
           description: |
@@ -4927,6 +4893,100 @@ paths:
             Service unavailable. Netdata agent is not ready or function execution system is overloaded.
         "504":
           description: Function execution timeout - operation took longer than specified timeout.
+    post:
+      operationId: function3_post
+      tags:
+        - functions
+      summary: Execute a Netdata function with request body parameters
+      description: |
+        Same as GET /api/v3/function, but allows passing parameters via request body for functions
+        that require complex input or configuration data.
+
+        Use this method when:
+        - Function requires complex parameters that don't fit in query string
+        - Passing sensitive data that shouldn't be in URL
+        - Function accepts JSON configuration or structured data
+
+        See GET /api/v3/function for complete documentation on functions, timeouts, and responses.
+      security:
+        - {}
+        - bearerAuth: []
+      parameters:
+        - name: function
+          in: query
+          required: true
+          description: Name of the function to execute (see GET method for details)
+          schema:
+            type: string
+          example: "processes"
+        - name: timeout
+          in: query
+          required: false
+          description: Maximum time in seconds to wait for function execution (see GET method for details)
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 3600
+            default: 60
+          example: 30
+      requestBody:
+        description: |
+          Optional request body for functions that accept parameters or configuration.
+          The format and content depend on the specific function being executed.
+
+          **When to Use Request Body:**
+          - Functions that accept filtering parameters
+          - Functions that need configuration data
+          - Functions with complex input requirements
+
+          **Common Patterns:**
+          - JSON object with function-specific parameters
+          - Plain text for simple commands
+          - Format specified by function documentation
+
+          **Example for logs-query function:**
+          ```json
+          {
+            "after": -3600,
+            "before": 0,
+            "filter": "error",
+            "limit": 100
+          }
+          ```
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Function-specific parameters (varies by function)
+          text/plain:
+            schema:
+              type: string
+              description: Plain text parameters for simple functions
+      responses:
+        "200":
+          description: Function executed successfully (see GET method for response details)
+          content:
+            application/json:
+              schema:
+                type: object
+            text/plain:
+              schema:
+                type: string
+        "202":
+          description: Function execution started asynchronously (see GET method for details)
+        "400":
+          description: Bad request (see GET method for details)
+        "403":
+          description: Forbidden (see GET method for details)
+        "404":
+          description: Function not found (see GET method for details)
+        "500":
+          description: Internal server error (see GET method for details)
+        "503":
+          description: Service unavailable (see GET method for details)
+        "504":
+          description: Function execution timeout (see GET method for details)
   /api/v3/functions:
     get:
       operationId: functions3
@@ -5440,37 +5500,6 @@ paths:
             maximum: 3600
             default: 120
           example: 60
-      requestBody:
-        description: |
-          Configuration data for `update`, `add`, and `test` actions.
-
-          **Format:**
-          - Content-Type: application/json
-          - Structure depends on the specific configuration component
-          - Use `action=schema` to get the expected structure
-
-          **Example for adding Prometheus job:**
-          ```json
-          {
-            "url": "http://localhost:9090/metrics",
-            "update_every": 10,
-            "autodetection_retry": 0
-          }
-          ```
-
-          **Example for updating existing config:**
-          ```json
-          {
-            "update_every": 5,
-            "timeout": 30
-          }
-          ```
-        required: false
-        content:
-          application/json:
-            schema:
-              type: object
-              description: Configuration-specific data structure
       responses:
         "200":
           description: |
@@ -5504,6 +5533,114 @@ paths:
           description: Internal server error during configuration operation.
         "504":
           description: Configuration operation timeout.
+    post:
+      operationId: config3_post
+      tags:
+        - config
+      summary: Manage Netdata configuration with request body data
+      description: |
+        Same as GET /api/v3/config, but allows passing configuration data via request body
+        for actions like `update`, `add`, and `test`.
+
+        Use this method when:
+        - Updating existing configuration (`action=update`)
+        - Adding new jobs/instances (`action=add`)
+        - Testing configuration before applying (`action=test`)
+
+        See GET /api/v3/config for complete documentation on actions, parameters, and responses.
+      security:
+        - {}
+        - bearerAuth: []
+      parameters:
+        - name: action
+          in: query
+          required: false
+          description: Configuration action to perform (see GET method for details)
+          schema:
+            type: string
+            enum: [tree, get, schema, update, add, remove, enable, disable, test, restart, userconfig]
+            default: "tree"
+          example: "update"
+        - name: path
+          in: query
+          required: false
+          description: Path in configuration tree (see GET method for details)
+          schema:
+            type: string
+            default: "/"
+          example: "/collectors"
+        - name: id
+          in: query
+          required: false
+          description: Configuration component ID (see GET method for details)
+          schema:
+            type: string
+          example: "collectors:go.d:prometheus"
+        - name: name
+          in: query
+          required: false
+          description: Name for new job/instance (see GET method for details)
+          schema:
+            type: string
+          example: "my-app"
+        - name: timeout
+          in: query
+          required: false
+          description: Maximum timeout in seconds (see GET method for details)
+          schema:
+            type: integer
+            minimum: 10
+            maximum: 3600
+            default: 120
+          example: 60
+      requestBody:
+        description: |
+          Configuration data for `update`, `add`, and `test` actions.
+
+          **Format:**
+          - Content-Type: application/json
+          - Structure depends on the specific configuration component
+          - Use `action=schema` to get the expected structure
+
+          **Example for adding Prometheus job:**
+          ```json
+          {
+            "url": "http://localhost:9090/metrics",
+            "update_every": 10,
+            "autodetection_retry": 0
+          }
+          ```
+
+          **Example for updating existing config:**
+          ```json
+          {
+            "update_every": 5,
+            "timeout": 30
+          }
+          ```
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Configuration-specific data structure
+      responses:
+        "200":
+          description: Configuration operation completed successfully (see GET method for response details)
+          content:
+            application/json:
+              schema:
+                type: object
+        "400":
+          description: Bad request (see GET method for details)
+        "403":
+          description: Forbidden (see GET method for details)
+        "404":
+          description: Configuration component not found (see GET method for details)
+        "500":
+          description: Internal server error (see GET method for details)
+        "504":
+          description: Configuration operation timeout (see GET method for details)
   /api/v3/settings:
     get:
       operationId: settings_get
