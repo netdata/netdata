@@ -236,9 +236,10 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
         { key: 'retry_after', hint: 'seconds' },
         { key: 'retry-after-ms', hint: 'milliseconds' },
         { key: 'retry_after_ms', hint: 'milliseconds' },
-        { key: 'x-ratelimit-reset' },
+        { key: 'x-ratelimit-reset', hint: 'date' },
         { key: 'x-ratelimit-retry-after', hint: 'seconds' },
-        { key: 'anthropic-ratelimit-retry-after-ms', hint: 'milliseconds' },
+        { key: 'anthropic-ratelimit-requests-reset', hint: 'date' },
+        { key: 'anthropic-ratelimit-tokens-reset', hint: 'date' },
       ];
       headerSources.forEach((source) => {
         headerKeys.forEach(({ key, hint }) => {
