@@ -1333,6 +1333,16 @@ export class AIAgentSession {
                     const msg = typeof e.message === 'string' ? e.message : '';
                     return `${path} ${msg}`.trim();
                   }).join('; ');
+                  const payloadPreview = (() => {
+                    try {
+                      const raw = JSON.stringify(fr.content_json);
+                      return typeof raw === 'string'
+                        ? (raw.length > 200 ? `${raw.slice(0, 200)}…` : raw)
+                        : undefined;
+                    } catch {
+                      return undefined;
+                    }
+                  })();
                   const warn: LogEntry = {
                     timestamp: Date.now(),
                     severity: 'WRN',
@@ -1342,7 +1352,7 @@ export class AIAgentSession {
                     type: 'llm',
                     remoteIdentifier: 'agent:ajv',
                     fatal: false,
-                    message: `final_report JSON does not match schema: ${errs}`
+                    message: `final_report JSON does not match schema: ${errs}${payloadPreview !== undefined ? `; payload preview=${payloadPreview}` : ''}`
                   };
                   this.log(warn);
                 }

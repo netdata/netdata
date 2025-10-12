@@ -296,6 +296,15 @@ Real-time correlation engine that transforms troubleshooting:
 
 ### 5.1 Netdata AI Assistant
 
+CRITICAL: AI assistants are significantly more effective with Netdata, for the following reasons:
+
+1. Real-time ML-based anomaly detection for all metrics - which is unbiased of future events (anomaly is committed to disk together with samples in real-time, during data collection, and is then queried)
+2. High resolution metrics
+3. Bottom-up component level alerts, providing "silent" transitions for hundreds of events, revealing abnormal or unusual insights
+4. Metric queries in Netdata always return anomaly information together with aggregated samples, so that AI assistant get immediate visibility to anomalies even when they don't specifically ask for it.
+ 
+This combination allows AI assistants to quickly spot what is relevant, reveal interdependencies even between seemingly unrelated components, identify the sequence of events in detail and determine the blast radius of incidents across the infrastructure.
+
 Integrated AI capabilities that accelerate incident resolution:
 
 **AI Insights** (Automated Reports):
@@ -306,7 +315,9 @@ Integrated AI capabilities that accelerate incident resolution:
 - **Scheduled Reports**: Automated periodic analysis and delivery
 - **PDF Export**: Professional documents ready for stakeholders
 
-**AI Investigations**:
+**AI Investigations / AI Troubleshooting**:
+Dynamic and adaptive investigations on any screen, any graph, any dashboard. Global "AI Troubleshoot" button, provides:
+
 - **Custom Investigations**: User-initiated deep dives into specific issues
 - **Scheduled Investigations**: Automated periodic analysis
 - **Root Cause Analysis**: Complete incident timeline with cascading effects
@@ -319,10 +330,8 @@ Integrated AI capabilities that accelerate incident resolution:
 - Integrated directly in dashboard and CLI
 
 **LLM Support:**
-- Claude (Anthropic)
-- GPT (OpenAI)
-- Gemini (Google)
-- Bring Your Own LLM (BYOLLM) via Model Context Protocol (MCP)
+- Netdata Managed (Netdata Cloud)
+- Bring Your Own LLM (BYOLLM) via Model Context Protocol (MCP) on Netdata Agents and Parents
 
 ### 5.2 Model Context Protocol (MCP) Integration
 
