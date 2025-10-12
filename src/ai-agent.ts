@@ -8,7 +8,7 @@ import Ajv from 'ajv';
 
 import type { OutputFormatId } from './formats.js';
 import type { SessionNode } from './session-tree.js';
-import type { AIAgentSessionConfig, AIAgentResult, ConversationMessage, LogEntry, AccountingEntry, Configuration, TurnRequest, LLMAccountingEntry, MCPTool, ToolAccountingEntry, RestToolConfig, ProgressMetrics } from './types.js';
+import type { AIAgentSessionConfig, AIAgentResult, ConversationMessage, LogEntry, AccountingEntry, Configuration, TurnRequest, LLMAccountingEntry, MCPTool, ToolAccountingEntry, RestToolConfig, ProgressMetrics, ToolCall } from './types.js';
 
 // Exit codes according to DESIGN.md
 type ExitCode = 
@@ -1157,6 +1157,10 @@ export class AIAgentSession {
               accounting,
               lastShownThinkingHeaderTurn
             );
+            const { messages: sanitizedMessages, dropped: droppedInvalidToolCalls } = this.sanitizeTurnMessages(
+              turnResult.messages,
+              { turn: currentTurn, provider, model }
+            );
             
             // Update tracking if thinking was shown
             if (turnResult.shownThinking) {
@@ -1167,11 +1171,11 @@ export class AIAgentSession {
             try {
               // Consider only internal tool set as always known
               // Internal tools always available; include optional batch tool if enabled for this session
-        const internal = new Set<string>(['agent__progress_report', AIAgentSession.FINAL_REPORT_TOOL]);
+              const internal = new Set<string>(['agent__progress_report', AIAgentSession.FINAL_REPORT_TOOL]);
               if (this.sessionConfig.tools.includes('batch')) internal.add('agent__batch');
               const normalizeTool = (n: string) => n.replace(/^<\|[^|]+\|>/, '').trim();
-              const lastAssistant = turnResult.messages.filter((m) => m.role === 'assistant');
-              const assistantMsg = lastAssistant.length > 0 ? lastAssistant[lastAssistant.length - 1] : undefined;
+              const assistantMessages = sanitizedMessages.filter((m) => m.role === 'assistant');
+              const assistantMsg = assistantMessages.length > 0 ? assistantMessages[assistantMessages.length - 1] : undefined;
               if (assistantMsg?.toolCalls !== undefined && assistantMsg.toolCalls.length > 0) {
                 (assistantMsg.toolCalls).forEach((tc) => {
                   const n = normalizeTool(tc.name);
@@ -1254,7 +1258,7 @@ export class AIAgentSession {
             // Close hierarchical LLM op and attach response summary
             try {
               if (llmOpId !== undefined) {
-                const lastAssistant = [...turnResult.messages].filter((m) => m.role === 'assistant').pop();
+                const lastAssistant = [...sanitizedMessages].filter((m) => m.role === 'assistant').pop();
                 const respText = typeof lastAssistant?.content === 'string' ? lastAssistant.content : (turnResult.response ?? '');
                 const sz = respText.length > 0 ? Buffer.byteLength(respText, 'utf8') : 0;
                 this.opTree.setResponse(llmOpId, { payload: { textPreview: respText.slice(0, 4096) }, size: sz, truncated: respText.length > 4096 });
@@ -1266,12 +1270,34 @@ export class AIAgentSession {
 
       // Handle turn result based on status
             if (turnResult.status.type === 'success') {
+              const assistantMessagesSanitized = sanitizedMessages.filter((m) => m.role === 'assistant');
+              const lastAssistantSanitized = assistantMessagesSanitized.length > 0 ? assistantMessagesSanitized[assistantMessagesSanitized.length - 1] : undefined;
+              const sanitizedHasToolCalls = Array.isArray(lastAssistantSanitized?.toolCalls) && lastAssistantSanitized.toolCalls.length > 0;
+              const sanitizedHasText = typeof lastAssistantSanitized?.content === 'string' && lastAssistantSanitized.content.trim().length > 0;
+
+              if (droppedInvalidToolCalls > 0 && !sanitizedHasToolCalls) {
+                const warnEntry: LogEntry = {
+                  timestamp: Date.now(),
+                  severity: 'WRN',
+                  turn: currentTurn,
+                  subturn: 0,
+                  direction: 'response',
+                  type: 'llm',
+                  remoteIdentifier: `${provider}:${model}`,
+                  fatal: false,
+                  message: 'Invalid tool call dropped due to malformed payload. Requesting retry without updating conversation history.',
+                };
+                this.log(warnEntry);
+                lastError = 'invalid_response: malformed_tool_call';
+                if (cycleComplete) {
+                  rateLimitedInCycle = 0;
+                  maxRateLimitWaitMs = 0;
+                }
+                continue;
+              }
               // Synthetic error: success with content but no tools and no final_report → retry this turn
               if (this.finalReport === undefined) {
-          const lastAssistant = [...turnResult.messages].filter(m => m.role === 'assistant').pop();
-          const hasTools = (lastAssistant?.toolCalls?.length ?? 0) > 0;
-          const hasText = (lastAssistant?.content.trim().length ?? 0) > 0;
-          if (!hasTools && hasText) {
+                if (!sanitizedHasToolCalls && sanitizedHasText) {
                 const warnEntry: LogEntry = {
                   timestamp: Date.now(),
                   severity: 'WRN',
@@ -1312,7 +1338,7 @@ export class AIAgentSession {
         // (removed misplaced orchestrator path; correct handling is below in toolExecutor)
 
         // Add new messages to conversation
-        conversation.push(...turnResult.messages);
+        conversation.push(...sanitizedMessages);
         // Deterministic finalization: if final_report has been set, finish now
         if (this.finalReport !== undefined) {
           const fr = this.finalReport;
@@ -1393,19 +1419,19 @@ export class AIAgentSession {
               
               // Debug logging
               if (this.sessionConfig.verbose === true) {
-                const hasToolResults = turnResult.messages.some((m: ConversationMessage) => m.role === 'tool');
+                const hasToolResults = sanitizedMessages.some((m: ConversationMessage) => m.role === 'tool');
                 const hasContent = turnResult.hasContent ?? (() => {
-                  const lastAssistant = [...turnResult.messages].filter(m => m.role === 'assistant').pop();
+                  const lastAssistant = [...sanitizedMessages].filter(m => m.role === 'assistant').pop();
                   return (lastAssistant?.content.trim().length ?? 0) > 0;
                 })();
                 const hasReasoning = turnResult.hasReasoning ?? false;
-                const hasToolCallsStr = String(turnResult.status.hasToolCalls);
+                const hasToolCallsStr = String(sanitizedHasToolCalls);
                 const hasToolResultsStr = String(hasToolResults);
                 const finalAnswerStr = String(turnResult.status.finalAnswer);
                 const hasReasoningStr = String(hasReasoning);
                 const hasContentStr = String(hasContent);
                 const responseLenStr = String(turnResult.response?.length ?? 0);
-                const messagesLenStr = String(turnResult.messages.length);
+                const messagesLenStr = String(sanitizedMessages.length);
                 const stopReasonStr = turnResult.stopReason ?? 'none';
                 const debugEntry: LogEntry = {
                   timestamp: Date.now(),
@@ -1423,7 +1449,7 @@ export class AIAgentSession {
                 // Debug: show the actual messages content
                 if (process.env.DEBUG === 'true') {
                   // eslint-disable-next-line functional/no-loop-statements
-                  for (const msg of turnResult.messages) {
+                  for (const msg of sanitizedMessages) {
                     console.error(`[DEBUG] Message role=${msg.role}, content length=${String(msg.content.length)}, hasToolCalls=${String(msg.toolCalls !== undefined)}`);
                     if (msg.content.length > 0) {
                       console.error(`[DEBUG] Content: ${msg.content.substring(0, 200)}`);
@@ -1433,7 +1459,7 @@ export class AIAgentSession {
               }
               // Capture planned subturns for this turn (enriches subsequent logs)
               try {
-                const lastAssistant = [...turnResult.messages].filter((m: ConversationMessage) => m.role === 'assistant').pop();
+                const lastAssistant = [...sanitizedMessages].filter((m: ConversationMessage) => m.role === 'assistant').pop();
                 if (lastAssistant !== undefined && Array.isArray(lastAssistant.toolCalls)) {
                   const toolCalls = lastAssistant.toolCalls;
                   // Count only MCP tools (exclude internal agent__* and sub-agent tools)
@@ -1916,6 +1942,84 @@ export class AIAgentSession {
       };
       this.log(finMcp);
     } catch { /* swallow summary errors */ }
+  }
+  
+  private sanitizeTurnMessages(
+    messages: ConversationMessage[],
+    context: { turn: number; provider: string; model: string }
+  ): { messages: ConversationMessage[]; dropped: number } {
+    let dropped = 0;
+    const isRecord = (value: unknown): value is Record<string, unknown> =>
+      value !== null && typeof value === 'object' && !Array.isArray(value);
+    const sanitized = messages.map((msg, msgIndex) => {
+      const rawToolCalls = (msg as { toolCalls?: unknown }).toolCalls;
+      if (msg.role !== 'assistant' || !Array.isArray(rawToolCalls) || rawToolCalls.length === 0) {
+        return msg;
+      }
+      const validCalls: ToolCall[] = [];
+      const droppedReasons: string[] = [];
+      rawToolCalls.forEach((tcRaw, callIndex) => {
+        const callIndexStr = callIndex.toString();
+        if (!isRecord(tcRaw)) {
+          droppedReasons.push(`call ${callIndexStr}: invalid structure`);
+          return;
+        }
+        const rawIdValue = tcRaw.id;
+        const rawId = typeof rawIdValue === 'number' && Number.isFinite(rawIdValue)
+          ? rawIdValue.toString()
+          : (typeof rawIdValue === 'string' ? rawIdValue.trim() : '');
+        if (rawId.length === 0) {
+          droppedReasons.push(`call ${callIndexStr}: missing id`);
+          return;
+        }
+        const rawNameValue = tcRaw.name;
+        const rawName = typeof rawNameValue === 'string' ? sanitizeToolName(rawNameValue) : '';
+        if (rawName.length === 0) {
+          droppedReasons.push(`call ${callIndexStr}: missing name`);
+          return;
+        }
+        const params = tcRaw.parameters;
+        if (!isRecord(params)) {
+          droppedReasons.push(`call ${callIndexStr}: parameters not object`);
+          return;
+        }
+        validCalls.push({
+          id: rawId,
+          name: rawName,
+          parameters: params,
+        });
+      });
+
+      if (droppedReasons.length > 0) {
+        dropped += droppedReasons.length;
+        const countStr = droppedReasons.length.toString();
+        const msgIndexStr = msgIndex.toString();
+        const warnEntry: LogEntry = {
+          timestamp: Date.now(),
+          severity: 'WRN',
+          turn: context.turn,
+          subturn: 0,
+          direction: 'response',
+          type: 'llm',
+          remoteIdentifier: 'agent:sanitizer',
+          fatal: false,
+          message: `Dropped ${countStr} invalid tool call(s) from assistant message index ${msgIndexStr} (provider=${context.provider}:${context.model}): ${droppedReasons.join(', ')}`,
+        };
+        this.log(warnEntry);
+      }
+
+      if (validCalls.length === rawToolCalls.length) {
+        return { ...msg, toolCalls: validCalls };
+      }
+
+      if (validCalls.length === 0) {
+        const sanitizedMsg: ConversationMessage = { ...msg, toolCalls: undefined };
+        return sanitizedMsg;
+      }
+
+      return { ...msg, toolCalls: validCalls };
+    });
+    return { messages: sanitized, dropped };
   }
 
   

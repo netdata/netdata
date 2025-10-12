@@ -153,6 +153,9 @@ const FRONTMATTER_BODY_PREFIX = 'System body start.';
 const FRONTMATTER_BODY_SUFFIX = 'System body end.';
 const FRONTMATTER_INCLUDE_MARKER = 'INCLUDED RAW BLOCK';
 const FRONTMATTER_INCLUDE_FLAG = 'includeFrontmatter: true';
+const LONG_TOOL_NAME = `tool-${'x'.repeat(140)}`;
+const FINAL_REPORT_RETRY_MESSAGE = 'Final report completed after mixed tools.';
+const SANITIZER_VALID_ARGUMENT = 'sanitizer-valid-call';
 
 const GITHUB_SERVER_PATH = path.resolve(__dirname, 'mcp/github-stdio-server.js');
 
@@ -3314,6 +3317,177 @@ const TEST_SCENARIOS: HarnessTest[] = [
       invariant(typeof finalReport.content === 'string' && finalReport.content.includes('Partial success'), 'Final report content mismatch for run-test-88.');
       const exitLog = result.logs.find((entry) => entry.remoteIdentifier === 'agent:EXIT-FINAL-ANSWER');
       invariant(exitLog !== undefined, 'EXIT-FINAL-ANSWER log missing for run-test-88.');
+    },
+  },
+  {
+    id: 'run-test-89',
+    expect: (result) => {
+      invariant(result.success, 'Scenario run-test-89 expected success.');
+      const sanitizerLog = result.logs.find((entry) => entry.remoteIdentifier === 'agent:sanitizer');
+      invariant(sanitizerLog !== undefined, 'Sanitizer log expected for run-test-89.');
+      invariant(
+        typeof sanitizerLog.message === 'string' && sanitizerLog.message.includes('Dropped 1 invalid tool call'),
+        'Sanitizer log should report dropped tool call for run-test-89.'
+      );
+
+      const assistantMessages = result.conversation.filter((message) => message.role === 'assistant');
+      const firstAssistant = assistantMessages.at(0);
+      invariant(firstAssistant !== undefined, 'Missing assistant message for run-test-89.');
+      const sanitizedCalls = firstAssistant.toolCalls ?? [];
+      invariant(sanitizedCalls.length === 1, 'Exactly one tool call should remain after sanitization for run-test-89.');
+      const retainedCall = sanitizedCalls[0];
+      invariant(retainedCall.name === 'test__test', 'Retained tool call name mismatch for run-test-89.');
+      const params = retainedCall.parameters;
+      const textValue = (params as { text?: unknown }).text;
+      invariant(typeof textValue === 'string', 'Retained tool call should include text field for run-test-89.');
+      invariant(textValue === SANITIZER_VALID_ARGUMENT, 'Sanitized tool call payload mismatch for run-test-89.');
+    },
+  },
+  {
+    id: 'run-test-90',
+    execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+      // eslint-disable-next-line @typescript-eslint/unbound-method -- capture original method for restoration after interception
+      const originalExecuteTurn = LLMClient.prototype.executeTurn;
+      let invocation = 0;
+      let activeSession: AIAgentSession | undefined;
+      LLMClient.prototype.executeTurn = async function(this: LLMClient, request: TurnRequest): Promise<TurnResult> {
+        invocation += 1;
+        if (invocation === 1) {
+          const assistantMessage: ConversationMessage = {
+            role: 'assistant',
+            content: '',
+            toolCalls: [
+              {
+                name: 'test__test',
+                id: 'call-invalid-only',
+                parameters: 'malformed' as unknown as Record<string, unknown>,
+              },
+            ],
+          };
+          return {
+            status: { type: 'success', hasToolCalls: true, finalAnswer: false },
+            latencyMs: 5,
+            messages: [assistantMessage],
+            tokens: { inputTokens: 10, outputTokens: 4, totalTokens: 14 },
+          };
+        }
+        if (invocation === 2) {
+          const assistantMessage: ConversationMessage = {
+            role: 'assistant',
+            content: '',
+            toolCalls: [
+              {
+                name: 'test__test',
+                id: 'call-valid-after-sanitizer',
+                parameters: { text: SANITIZER_VALID_ARGUMENT },
+              },
+            ],
+          };
+          return {
+            status: { type: 'success', hasToolCalls: true, finalAnswer: false },
+            latencyMs: 5,
+            messages: [assistantMessage],
+            tokens: { inputTokens: 12, outputTokens: 6, totalTokens: 18 },
+          };
+        }
+        if (invocation === 3) {
+          const finalContent = 'Final report produced after sanitizer retry.';
+          const assistantMessage: ConversationMessage = {
+            role: 'assistant',
+            content: '',
+            toolCalls: [
+              {
+                name: 'agent__final_report',
+                id: FINAL_REPORT_CALL_ID,
+                parameters: {
+                  status: 'success',
+                  report_format: 'markdown',
+                  report_content: finalContent,
+                },
+              },
+            ],
+          };
+          const toolMessage: ConversationMessage = {
+            role: 'tool',
+            toolCallId: FINAL_REPORT_CALL_ID,
+            content: finalContent,
+          };
+          if (activeSession !== undefined) {
+            (activeSession as unknown as { finalReport?: { status: string; format: 'markdown'; content: string } }).finalReport = {
+              status: 'success',
+              format: 'markdown',
+              content: finalContent,
+            };
+          }
+          return {
+            status: { type: 'success', hasToolCalls: true, finalAnswer: true },
+            latencyMs: 5,
+            messages: [assistantMessage, toolMessage],
+            tokens: { inputTokens: 14, outputTokens: 8, totalTokens: 22 },
+          };
+        }
+        return await originalExecuteTurn.call(this, request);
+      };
+      try {
+        activeSession = AIAgentSession.create(sessionConfig);
+        return await activeSession.run();
+      } finally {
+        LLMClient.prototype.executeTurn = originalExecuteTurn;
+      }
+    },
+    expect: (result) => {
+      invariant(result.success, 'Scenario run-test-90 expected success.');
+      const sanitizerLog = result.logs.find((entry) => entry.remoteIdentifier === 'agent:sanitizer');
+      invariant(sanitizerLog !== undefined, 'Sanitizer log expected for run-test-90.');
+      invariant(
+        typeof sanitizerLog.message === 'string' && (
+          sanitizerLog.message.includes('Invalid tool call dropped') ||
+          sanitizerLog.message.includes('Dropped 1 invalid tool call')
+        ),
+        'Sanitizer message mismatch for run-test-90.',
+      );
+      const assistantMessages = result.conversation.filter((message) => message.role === 'assistant');
+      invariant(assistantMessages.length === 2, 'Two assistant messages expected after retry for run-test-90.');
+      const firstAssistant = assistantMessages[0];
+      invariant(firstAssistant.toolCalls !== undefined && firstAssistant.toolCalls.length === 1, 'Single sanitized tool call expected for run-test-90.');
+      const retainedCall = firstAssistant.toolCalls[0];
+      invariant(retainedCall.name === 'test__test', 'Retained tool call name mismatch for run-test-90.');
+      const textValue = (retainedCall.parameters as { text?: unknown }).text;
+      invariant(textValue === SANITIZER_VALID_ARGUMENT, 'Retained tool call arguments mismatch for run-test-90.');
+      const llmAttempts = result.accounting.filter(isLlmAccounting).length;
+      invariant(llmAttempts === 3, 'Three LLM attempts expected for run-test-90.');
+      const finalReport = result.finalReport;
+      invariant(finalReport !== undefined && finalReport.status === 'success', 'Final report should succeed after sanitizer retry (run-test-90).');
+    },
+  },
+  {
+    id: 'run-test-91',
+    configure: (configuration, sessionConfig) => {
+      sessionConfig.tools = ['test', 'batch'];
+      configuration.defaults = { ...configuration.defaults, parallelToolCalls: true };
+      sessionConfig.parallelToolCalls = true;
+    },
+    expect: (result) => {
+      invariant(result.success, 'Scenario run-test-91 expected success.');
+      const batchAccountingEntries = result.accounting.filter(isToolAccounting).filter((entry) => entry.command === 'agent__batch');
+      const hasInvalidBatchAccounting = batchAccountingEntries.some((entry) => typeof entry.error === 'string' && entry.error.includes('invalid_batch_input'));
+      invariant(hasInvalidBatchAccounting, 'Invalid batch handling signal expected for run-test-91.');
+      const unknownToolLog = result.logs.find((entry) => entry.remoteIdentifier === 'assistant:tool' && typeof entry.message === 'string' && entry.message.includes('Unknown tool requested'));
+      invariant(unknownToolLog !== undefined, 'Unknown tool warning expected for run-test-91.');
+      const finalReportErrorLog = result.logs.find((entry) => typeof entry.message === 'string' && entry.message.includes('agent__final_report requires non-empty report_content'));
+      invariant(finalReportErrorLog !== undefined, 'Final report validation log expected for run-test-91.');
+      const assistantMessages = result.conversation.filter((message) => message.role === 'assistant');
+      const firstAssistant = assistantMessages.at(0);
+      invariant(firstAssistant !== undefined, 'Assistant message missing for run-test-91.');
+      const toolCalls = firstAssistant.toolCalls ?? [];
+      invariant(toolCalls.length === 4, 'Four tool calls expected in mixed scenario for run-test-91.');
+      const longNameCall = toolCalls.find((call) => call.id === 'call-long-tool-name');
+      invariant(longNameCall !== undefined, 'Long name tool call missing for run-test-91.');
+      const expectedSanitized = sanitizeToolName(LONG_TOOL_NAME);
+      invariant(longNameCall.name === expectedSanitized, 'Sanitized tool name mismatch for run-test-91.');
+      const finalReport = result.finalReport;
+      invariant(finalReport !== undefined && finalReport.status === 'success', 'Final report should succeed after mixed tools for run-test-91.');
+      invariant(typeof finalReport.content === 'string' && finalReport.content.includes(FINAL_REPORT_RETRY_MESSAGE), 'Final report content mismatch for run-test-91.');
     },
   },
   {

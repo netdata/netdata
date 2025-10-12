@@ -95,6 +95,9 @@ const BATCH_STRING_PROGRESS = 'Batch progress conveyed via string payload.';
 const BATCH_STRING_RESULT = 'batch-string-mode';
 const SLACK_BLOCK_KIT_FORMAT = 'slack-block-kit' as const;
 const RATE_LIMIT_FAILURE_MESSAGE = 'Rate limit simulated.' as const;
+const SANITIZER_VALID_ARGUMENT = 'sanitizer-valid-call';
+const LONG_TOOL_NAME = `tool-${'x'.repeat(140)}`;
+const FINAL_REPORT_RETRY_MESSAGE = 'Final report completed after mixed tools.';
 
 const SCENARIOS: ScenarioDefinition[] = [
   {
@@ -2728,6 +2731,143 @@ const SCENARIOS: ScenarioDefinition[] = [
           reportFormat: MARKDOWN_FORMAT,
           status: STATUS_SUCCESS,
           tokenUsage: DEFAULT_TOKEN_USAGE,
+        },
+      },
+    ],
+  },
+  {
+    id: 'run-test-89',
+    description: 'Sanitize invalid tool calls before persisting conversation history.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        expectedTools: [TOOL_NAME],
+        response: {
+          kind: 'tool-call',
+          assistantText: '',
+          toolCalls: [
+            {
+              toolName: TOOL_NAME,
+              callId: 'call-invalid-1',
+              assistantText: '',
+              // Intentionally broken: arguments encoded as string to trigger sanitizer drop.
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              arguments: 'not-an-object' as unknown as Record<string, unknown>,
+            },
+            {
+              toolName: TOOL_NAME,
+              callId: 'call-valid-1',
+              assistantText: 'Providing well-formed arguments after malformed entry.',
+              arguments: {
+                text: SANITIZER_VALID_ARGUMENT,
+              },
+            },
+          ],
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+          finishReason: TOOL_FINISH_REASON,
+        },
+      },
+      {
+        turn: 2,
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Reporting sanitized tool call completion.',
+          reportContent: `${RESULT_HEADING}Sanitizer scenario completed successfully.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_SUCCESS,
+          tokenUsage: {
+            inputTokens: 70,
+            outputTokens: 24,
+            totalTokens: 94,
+          },
+        },
+      },
+    ],
+  },
+  {
+    id: 'run-test-91',
+    description: 'Mixed tool calls with batch successes and failures.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        expectedTools: ['agent__batch', LONG_TOOL_NAME, 'agent__final_report'],
+        allowMissingTools: true,
+        response: {
+          kind: 'tool-call',
+          assistantText: 'Issuing mixed tool calls including batch, oversized name, and invalid final report.',
+          toolCalls: [
+            {
+              toolName: 'agent__batch',
+              callId: 'call-batch-valid-mixed',
+              assistantText: 'Valid batch entry should succeed.',
+              arguments: {
+                calls: [
+                  {
+                    id: 'm-1',
+                    tool: 'agent__progress_report',
+                    parameters: { progress: 'Valid batch progress entry.' },
+                  },
+                  {
+                    id: 'm-2',
+                    tool: TOOL_NAME,
+                    parameters: { text: 'batch-mixed-success' },
+                  },
+                ],
+              },
+            },
+            {
+              toolName: 'agent__batch',
+              callId: 'call-batch-invalid-mixed',
+              assistantText: 'Invalid batch entry should trigger validation failure.',
+              arguments: {
+                calls: [
+                  {
+                    id: '',
+                    tool: TOOL_NAME,
+                    parameters: {
+                      text: 'invalid-batch-entry',
+                    },
+                  },
+                ],
+              },
+            },
+            {
+              toolName: LONG_TOOL_NAME,
+              callId: 'call-long-tool-name',
+              assistantText: 'Tool name exceeds clamp limit to trigger truncation.',
+              arguments: {
+                text: 'sanitizer-valid-call',
+              },
+            },
+            {
+              toolName: 'agent__final_report',
+              callId: 'call-final-invalid',
+              assistantText: 'Final report missing content should fail and require retry.',
+              arguments: {
+                status: STATUS_SUCCESS,
+                report_format: MARKDOWN_FORMAT,
+              },
+            },
+          ],
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+          finishReason: TOOL_FINISH_REASON,
+        },
+      },
+      {
+        turn: 2,
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Completing final report after resolving mixed tool outcomes.',
+          reportContent: `${RESULT_HEADING}${FINAL_REPORT_RETRY_MESSAGE}`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_SUCCESS,
+          tokenUsage: {
+            inputTokens: 88,
+            outputTokens: 32,
+            totalTokens: 120,
+          },
         },
       },
     ],
