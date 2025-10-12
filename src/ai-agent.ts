@@ -1598,6 +1598,9 @@ export class AIAgentSession {
                 RATE_LIMIT_MAX_WAIT_MS
               );
               maxRateLimitWaitMs = Math.max(maxRateLimitWaitMs, effectiveWaitMs);
+              const sourceDetails = Array.isArray(turnResult.status.sources) && turnResult.status.sources.length > 0
+                ? ` Sources: ${turnResult.status.sources.join(' | ')}`
+                : '';
               const warnEntry: LogEntry = {
                 timestamp: Date.now(),
                 severity: 'WRN',
@@ -1607,7 +1610,7 @@ export class AIAgentSession {
                 type: 'llm',
                 remoteIdentifier: remoteId,
                 fatal: false,
-                message: `Rate limited; suggested wait ${String(effectiveWaitMs)}ms before retry.`
+                message: `Rate limited; suggested wait ${String(effectiveWaitMs)}ms before retry.${sourceDetails}`
               };
               this.log(warnEntry);
 

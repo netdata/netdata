@@ -199,11 +199,11 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
       const toRecord = (val: unknown): Record<string, unknown> | undefined => (val !== null && typeof val === 'object' && !Array.isArray(val)) ? val as Record<string, unknown> : undefined;
       const hasGetter = (val: unknown): val is { get: (key: string) => unknown } => val !== null && typeof val === 'object' && typeof (val as { get?: unknown }).get === 'function';
 
-      interface RetryCandidate { value: unknown; hint?: 'seconds' | 'milliseconds' | 'date' }
+      interface RetryCandidate { value: unknown; hint?: 'seconds' | 'milliseconds' | 'date'; origin: string }
       const candidates: RetryCandidate[] = [];
-      const addCandidate = (value: unknown, hint?: RetryCandidate['hint']) => {
+      const addCandidate = (value: unknown, hint: RetryCandidate['hint'], origin: string) => {
         if (value !== undefined && value !== null) {
-          candidates.push({ value, hint });
+          candidates.push({ value, hint, origin });
         }
       };
 
@@ -241,10 +241,10 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
         { key: 'anthropic-ratelimit-requests-reset', hint: 'date' },
         { key: 'anthropic-ratelimit-tokens-reset', hint: 'date' },
       ];
-      headerSources.forEach((source) => {
+      headerSources.forEach((source, idx) => {
         headerKeys.forEach(({ key, hint }) => {
           const value = getHeaderValue(source, key);
-          addCandidate(value, hint);
+          addCandidate(value, hint ?? (key.includes('ms') ? 'milliseconds' : undefined), `header[${String(idx)}].${key}`);
         });
       });
 
@@ -263,7 +263,7 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
         const value = nested(primary, path);
         if (value !== undefined) {
           const hint = path[path.length - 1].includes('ms') ? 'milliseconds' : (path[path.length - 1].includes('seconds') ? 'seconds' : undefined);
-          addCandidate(value, hint);
+          addCandidate(value, hint, `metadata.${path.join('.')}`);
         }
       });
 
@@ -273,7 +273,9 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
         { value: (err as { retryAfterMs?: unknown }).retryAfterMs, hint: 'milliseconds' },
         { value: (err as { retryAfter?: unknown }).retryAfter, hint: 'seconds' },
       ];
-      retryAfterFields.forEach(({ value, hint }) => { addCandidate(value, hint); });
+      retryAfterFields.forEach(({ value, hint }, index) => {
+        addCandidate(value, hint, `field[${String(index)}]`);
+      });
 
       const parseCandidate = (candidate: RetryCandidate): number | undefined => {
         const { value, hint } = candidate;
@@ -315,10 +317,14 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
         return undefined;
       };
 
-      const retryAfterMs = candidates
-        .map(parseCandidate)
-        .find((val) => typeof val === 'number' && Number.isFinite(val) && val > 0);
-      return { type: 'rate_limit', retryAfterMs };
+      const evaluated = candidates.map((candidate) => ({
+        origin: candidate.origin,
+        ms: parseCandidate(candidate),
+      }));
+      const winner = evaluated.find((entry) => typeof entry.ms === 'number' && Number.isFinite(entry.ms) && entry.ms > 0);
+      const retryAfterMs = winner?.ms;
+      const sources = winner !== undefined ? [winner.origin] : undefined;
+      return { type: 'rate_limit', retryAfterMs, sources };
     }
 
     // Authentication errors

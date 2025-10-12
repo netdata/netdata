@@ -1,7 +1,7 @@
 // Core status interfaces for clear decision making
 export type TurnStatus = 
   | { type: 'success'; hasToolCalls: boolean; finalAnswer: boolean }
-  | { type: 'rate_limit'; retryAfterMs?: number }
+  | { type: 'rate_limit'; retryAfterMs?: number; sources?: string[] }
   | { type: 'auth_error'; message: string }
   | { type: 'model_error'; message: string; retryable: boolean }
   | { type: 'network_error'; message: string; retryable: boolean }
