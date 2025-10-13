@@ -74,6 +74,8 @@ Unlike switching between install types on Linux, Windows channel switching does 
    - Grant Administrator privileges when prompted
    - Follow the installation wizard
 
+![Windows Installer GUI](https://raw.githubusercontent.com/netdata/docs-images/refs/heads/master/windows/release/windows-installer-gui.png)
+
 3. **Verify the installation:**
    - The installer will automatically detect your existing installation
    - Upgrade to the Stable channel
@@ -95,6 +97,8 @@ Unlike switching between install types on Linux, Windows channel switching does 
    - Double-click the downloaded `.msi` file
    - Grant Administrator privileges when prompted
    - Follow the installation wizard
+
+![Windows Installer GUI](https://raw.githubusercontent.com/netdata/docs-images/refs/heads/master/windows/release/windows-installer-gui.png)
 
 3. **Verify the installation:**
    - The installer will automatically detect your existing installation
@@ -235,6 +239,12 @@ Publisher      : Netdata Inc.
 <details>
 <summary><strong>Check Netdata Service Status</strong></summary><br/>
 
+You can also verify the Netdata service is running through the Windows Services manager:
+
+![Windows Services - Netdata](https://raw.githubusercontent.com/netdata/docs-images/refs/heads/master/windows/release/windows-services-netdata.png)
+
+Or check via PowerShell:
+
 ```powershell
 # Check Netdata service status
 Get-Service netdata | Select-Object Name, Status, DisplayName
@@ -252,13 +262,17 @@ Get-WmiObject win32_service | Where-Object {$_.Name -eq 'netdata'} | Select-Obje
 
 **Symptoms**: MSI installer shows error about existing installation
 
-**Solution**: Use the `REINSTALL=ALL` parameter explicitly:
+**Solution 1**: Use the `REINSTALL=ALL` parameter explicitly:
 
 ```powershell
 msiexec /qn /i netdata-x64.msi REINSTALL=ALL
 ```
 
-Alternatively, uninstall first, then reinstall:
+**Solution 2**: Uninstall first via Windows Add/Remove Programs, then reinstall:
+
+![Windows Add/Remove Programs](https://raw.githubusercontent.com/netdata/docs-images/refs/heads/master/windows/release/windows-add-remove-programs.png)
+
+Or uninstall via PowerShell:
 
 ```powershell
 # Uninstall existing installation
@@ -296,6 +310,10 @@ msiexec /qn /i netdata-x64.msi TOKEN="<YOUR_TOKEN>" ROOMS="<YOUR_ROOMS>" REINSTA
 Start-Service netdata
 ```
 
+You can also verify the service status in Windows Services:
+
+![Windows Services - Netdata](https://raw.githubusercontent.com/netdata/docs-images/refs/heads/master/windows/release/windows-services-netdata.png)
+
 </details>
 
 <br/>
@@ -321,4 +339,28 @@ Remove-Item "$env:PROGRAMDATA\Netdata" -Recurse -Force -ErrorAction SilentlyCont
 msiexec /qn /i netdata-x64.msi TOKEN="<YOUR_TOKEN>" ROOMS="<YOUR_ROOMS>"
 ```
 
+If the service still won't start, check the Windows Services manager to ensure the Netdata service is present and configured correctly:
+
+![Windows Services - Netdata](https://raw.githubusercontent.com/netdata/docs-images/refs/heads/master/windows/release/windows-services-netdata.png)
+
 </details>
+
+## Alternative: Using Windows Add/Remove Programs
+
+For users who prefer the traditional Windows approach, you can also manage Netdata installations through the Windows Control Panel:
+
+1. **Access Add/Remove Programs:**
+   - Open Windows Settings → Apps & features
+   - Or search for "Add or remove programs" in the Start menu
+
+2. **Locate Netdata:**
+   - Find "Netdata" in the installed programs list
+   - Note the current version number
+
+![Windows Add/Remove Programs](https://raw.githubusercontent.com/netdata/docs-images/refs/heads/master/windows/release/windows-add-remove-programs.png)
+
+3. **Uninstall if needed:**
+   - Click "Uninstall" to remove the current installation
+   - Then install the new channel using the MSI installer
+
+This method provides a familiar Windows experience but requires manual download and installation of the new channel.
