@@ -17,6 +17,7 @@ project(netdata
         HOMEPAGE_URL "https://www.netdata.cloud"
         LANGUAGES C CXX)
 include(CMakeDependentOption)
+include(CMakePushCheckState)
 include(NetdataUtil)
 netdata_fixup_system_processor()
 
@@ -255,6 +256,7 @@ if(ENABLE_JEMALLOC)
     pkg_check_modules(JEMALLOC QUIET jemalloc)
     if(JEMALLOC_FOUND)
         # Check if jemalloc has arena API
+        cmake_push_check_state()
         set(CMAKE_REQUIRED_INCLUDES ${JEMALLOC_INCLUDE_DIRS})
         set(CMAKE_REQUIRED_LIBRARIES ${JEMALLOC_LIBRARIES})
         check_c_source_compiles("
@@ -266,6 +268,7 @@ if(ENABLE_JEMALLOC)
                 return 0;
             }
         " HAVE_JEMALLOC_ARENA_API)
+        cmake_pop_check_state()
 
         if(HAVE_JEMALLOC_ARENA_API)
             set(ENABLE_JEMALLOC ON CACHE BOOL "Enable jemalloc allocator" FORCE)
@@ -503,6 +506,7 @@ int main(void) {
 }
 " HAVE_TM_GMTOFF)
 
+cmake_push_check_state()
 set(CMAKE_REQUIRED_LIBRARIES pthread)
 check_c_source_compiles("
 #define _GNU_SOURCE
@@ -513,6 +517,7 @@ int main() {
         return pthread_getname_np(thread, name, sizeof(name));
 }
 " HAVE_PTHREAD_GETNAME_NP)
+cmake_pop_check_state()
 
 check_c_source_compiles("
 #include <stdio.h>
