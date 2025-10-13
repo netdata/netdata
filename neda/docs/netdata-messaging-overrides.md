@@ -77,3 +77,35 @@ Netdata provides AI-powered troubleshooting through **two distinct integration p
 **Must state**: "Netdata distributes the code, instead of centralizing the data" or "Netdata distributes the code, instead of moving the data"
 
 **Do not say**: "Netdata distributes the code, not the data". This is confusing because "distributing the data" implies moving them, which Netdata does not.
+
+---
+
+## [CONCEPT] No False Promises - No Overpromises
+
+**Core truths to preserve**:
+
+- **alert fatigue exists** - it cannot be completely eliminated - our ML helps significantly but does not entirely solve alert fatigue
+- **zero configuration** = we have automated every configuration that can be automated, but there are still some configurations that require human action (e.g. passwords to access protected endpoints - dbs, message brokers, etc). The configuration Netdata requires is significantly less, to practically ignorable, mainly because of:
+  - extensive autodiscovery without manual configuration
+  - automated/algorithmic dashboards that adapt automatically to the collected data - true for all kinds of dashboards: single-node, multi-node, multi-component, infrastructure-level
+  - component-level alerts that automatically get attached to newly discovered components
+  - unsupervised machine learning that does not require manual tuning
+  - zero maintenance operations (WORM files, no compaction, no tuning needed, nothing to keep an eye on)
+
+We need the strongest possible messaging, without giving false promises.
+
+Especially regarding configuration and maintenance, users MUST:
+- configure retention based on their preference
+- configure collectors that need credentials, or discovery did not detect
+- keep an eye on resources to scale up/out Netdata Parents as the infrastructure changes
+
+---
+
+## [CONCEPT] Community and Homelab Plans are for Personal Use
+
+**Core truths to preserve**:
+
+It is against our terms of service for freelancers and professionals to use our Community and Homelab plans.
+All professionals MUST use the Business plan.
+
+---

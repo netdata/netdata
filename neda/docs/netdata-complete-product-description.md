@@ -917,6 +917,22 @@ helm install netdata netdata/netdata
 
 **14-Day Free Trial**: Unlimited nodes, no restrictions
 
+**P90 Usage Explained**
+
+Customers are billed for sustained node usage, not temporary spikes. Netdata automatically excludes the highest usage periods each day (P90) and the highest 3 days each month (P90).
+
+We calculate your billable nodes using a 90th percentile (P90) method at two levels:
+
+1. Daily: We determine the node count at the 90th percentile of your time-weighted usage distribution. If you briefly spike to 100 nodes for 1 hour but run 10 nodes for 23 hours, your daily P90 is 10 nodes—the spike doesn't inflate your bill.
+
+2. Monthly: We take the P90 of all your daily values. In a 30-day month, this excludes your top 3 daily values, protecting you from occasional high-usage days.
+
+Or simpler:
+
+We use double 90th percentile billing: brief spikes during the day don't affect your bill, and your top 3 days each month are excluded too. You're billed for sustained usage, not peaks.
+
+Example: If you run 10 nodes for 23 hours and spike to 100 nodes for 1 hour, the spike is excluded, we account 10 nodes for that day. And if you have 3 days of load testing at 50 nodes in a 30-day month, those 3 days won't inflate your monthly bill.
+
 ### 12.3 Universal Features (All Plans)
 
 Regardless of tier, all users benefit from:
@@ -1215,21 +1231,26 @@ helm install netdata netdata/netdata
 - Improved user experience
 - Advanced security features
 
-## 19. Billing
+## 19. Multi-Tenacy
 
-Customers are billed for sustained node usage, not temporary spikes. Netdata automatically excludes the highest usage periods each day (P90) and the highest 3 days each month (P90).
+Netdata Cloud Spaces are totally isolated at the infrastructure-level.
+- Nodes cannot be shared across multiple spaces (each node belongs to a single space)
+- Nodes can be added to multiple rooms of the same space
+- Dashboard settings are not shared between spaces (each space has its own set of settings)
+- Users can be members/admins of multiple spaces, with a single login (login once, access all your spaces)
+- Each space has its own set of users and permissions
+- Billing is applied per space
 
-We calculate your billable nodes using a 90th percentile (P90) method at two levels:
+Think of Spaces like Slack organizations, or GitHub organizations.
 
-1. Daily: We determine the node count at the 90th percentile of your time-weighted usage distribution. If you briefly spike to 100 nodes for 1 hour but run 10 nodes for 23 hours, your daily P90 is 10 nodes—the spike doesn't inflate your bill.
+1. Each space has its own infrastructure (equivalent to GitHub repos)
+2. Each space has its own users (equivalent to GitHub organization members/admins)
+3. Each space has its own rooms (equivalent to Slack Channels)
+4. Each user may be a member of multiple spaces (exactly like GitHub and Slack)
+5. Each user may have a different role per space (exactly like GitHub and Slack)
+6. Each user may be limited to some specific rooms per space (exactly like GitHub and Slack)
 
-2. Monthly: We take the P90 of all your daily values. In a 30-day month, this excludes your top 3 daily values, protecting you from occasional high-usage days.
-
-Or simpler:
-
-We use double 90th percentile billing: brief spikes during the day don't affect your bill, and your top 3 days each month are excluded too. You're billed for sustained usage, not peaks.
-
-Example: If you run 10 nodes for 23 hours and spike to 100 nodes for 1 hour, the spike is excluded, we account 10 nodes for that day. And if you have 3 days of load testing at 50 nodes in a 30-day month, those 3 days won't inflate your monthly bill.
+Freelancers and MSP may have multiple spaces, and on each space they may have invited their customers and subcontractors, possibly restrict to certain rooms so that they can have limited visibility on the underlying infrastructure.
 
 ## 20. Summary
 
