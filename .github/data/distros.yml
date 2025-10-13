@@ -216,7 +216,7 @@ include:
 
   - &fedora
     distro: fedora
-    version: "42"
+    version: "43"
     support_type: Core
     notes: ''
     eol_check: true
@@ -225,11 +225,18 @@ include:
       dnf remove -y json-c-devel
     packages: &fedora_packages
       type: rpm
-      repo_distro: fedora/42
+      repo_distro: fedora/43
       builder_rev: *def_builder_rev
       arches:
         - x86_64
         - aarch64
+    test:
+      ebpf-core: true
+  - <<: *fedora
+    version: "42"
+    packages:
+      <<: *fedora_packages
+      repo_distro: fedora/42
     test:
       ebpf-core: true
   - <<: *fedora
