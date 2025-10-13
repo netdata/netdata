@@ -7,7 +7,7 @@ import (
 
 	"github.com/go-ldap/ldap/v3"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/tlscfg"
+	"github.com/netdata/netdata/go/plugins/pkg/tlscfg"
 )
 
 type ldapConn interface {

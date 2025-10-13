@@ -7,9 +7,9 @@ import (
 	"errors"
 	"net"
 
+	"github.com/netdata/netdata/go/plugins/pkg/tlscfg"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/unbound/config"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/socket"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/tlscfg"
 )
 
 func (c *Collector) initConfig() (enabled bool) {

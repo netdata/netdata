@@ -219,7 +219,7 @@ BuildRequires: systemd
 Requires(pre): /usr/sbin/groupadd
 Requires(pre): /usr/sbin/useradd
 
-%if 0%{?suse_version}
+%if 0%{?suse_version} || 0%{?fedora}
 Provides: user(netdata)
 Provides: group(netdata)
 %endif
@@ -261,7 +261,6 @@ Suggests: %{name}-plugin-cups = %{version}
 Recommends: %{name}-plugin-systemd-journal = %{version}
 Recommends: %{name}-plugin-systmed-units = %{version}
 Recommends: %{name}-plugin-network-viewer = %{version}
-Recommends: %{name}-plugin-logs-management = %{version}
 %else
 Requires: %{name}-plugin-systemd-journal = %{version}
 Requires: %{name}-plugin-network-viewer = %{version}
@@ -950,6 +949,8 @@ fi
 %{_libdir}/%{name}/ibm-mqclient/bin/amqcgskv32
 %{_libdir}/%{name}/ibm-mqclient/bin/amqcgskv64
 %{_libdir}/%{name}/ibm-mqclient/bin/amqjrever
+%{_libdir}/%{name}/ibm-mqclient/bin/amqltmcc
+%{_libdir}/%{name}/ibm-mqclient/bin/amqltmcc64
 %{_libdir}/%{name}/ibm-mqclient/bin/crtmqenv
 %{_libdir}/%{name}/ibm-mqclient/bin/dmpmqcfg
 %{_libdir}/%{name}/ibm-mqclient/bin/dmpmqmsg
@@ -971,6 +972,7 @@ fi
 %{_libdir}/%{name}/ibm-mqclient/bin/runmqicred
 %{_libdir}/%{name}/ibm-mqclient/bin/runmqras
 %{_libdir}/%{name}/ibm-mqclient/bin/runmqsc
+%{_libdir}/%{name}/ibm-mqclient/bin/runmqtmc
 %{_libdir}/%{name}/ibm-mqclient/bin/runp11cred
 %{_libdir}/%{name}/ibm-mqclient/bin/setmqenv
 %{_libdir}/%{name}/ibm-mqclient/bin/strmqtrc
@@ -981,7 +983,23 @@ fi
 %{_libdir}/%{name}/ibm-mqclient/gskit8/bin/gsk8ver_64
 %{_libdir}/%{name}/ibm-mqclient/gskit8/bin/private_verifyinstall
 %{_libdir}/%{name}/ibm-mqclient/gskit8/bin/private_verifyinstall_64
+%{_libdir}/%{name}/ibm-mqclient/gskit8/lib/C/icc/icclib/libicclib084.so
+%{_libdir}/%{name}/ibm-mqclient/gskit8/lib/N/icc/icclib/libicclib085.so
+%{_libdir}/%{name}/ibm-mqclient/gskit8/lib/libgsk8acmeidup.so
+%{_libdir}/%{name}/ibm-mqclient/gskit8/lib/libgsk8cms.so
+%{_libdir}/%{name}/ibm-mqclient/gskit8/lib/libgsk8dbfl.so
+%{_libdir}/%{name}/ibm-mqclient/gskit8/lib/libgsk8drld.so
+%{_libdir}/%{name}/ibm-mqclient/gskit8/lib/libgsk8iccs.so
+%{_libdir}/%{name}/ibm-mqclient/gskit8/lib/libgsk8kicc.so
+%{_libdir}/%{name}/ibm-mqclient/gskit8/lib/libgsk8km.so
+%{_libdir}/%{name}/ibm-mqclient/gskit8/lib/libgsk8km2.so
+%{_libdir}/%{name}/ibm-mqclient/gskit8/lib/libgsk8ldap.so
+%{_libdir}/%{name}/ibm-mqclient/gskit8/lib/libgsk8p11.so
+%{_libdir}/%{name}/ibm-mqclient/gskit8/lib/libgsk8ssl.so
+%{_libdir}/%{name}/ibm-mqclient/gskit8/lib/libgsk8sys.so
+%{_libdir}/%{name}/ibm-mqclient/gskit8/lib/libgsk8valn.so
 %{_libdir}/%{name}/ibm-mqclient/gskit8/lib64/C/icc/icclib/libicclib084.so
+%{_libdir}/%{name}/ibm-mqclient/gskit8/lib64/N/icc/icclib/libicclib085.so
 %{_libdir}/%{name}/ibm-mqclient/gskit8/lib64/libgsk8acmeidup_64.so
 %{_libdir}/%{name}/ibm-mqclient/gskit8/lib64/libgsk8cms_64.so
 %{_libdir}/%{name}/ibm-mqclient/gskit8/lib64/libgsk8dbfl_64.so
@@ -995,22 +1013,6 @@ fi
 %{_libdir}/%{name}/ibm-mqclient/gskit8/lib64/libgsk8ssl_64.so
 %{_libdir}/%{name}/ibm-mqclient/gskit8/lib64/libgsk8sys_64.so
 %{_libdir}/%{name}/ibm-mqclient/gskit8/lib64/libgsk8valn_64.so
-%{_libdir}/%{name}/ibm-mqclient/gskit8/lib64/N/icc/icclib/libicclib085.so
-%{_libdir}/%{name}/ibm-mqclient/gskit8/lib/C/icc/icclib/libicclib084.so
-%{_libdir}/%{name}/ibm-mqclient/gskit8/lib/libgsk8acmeidup.so
-%{_libdir}/%{name}/ibm-mqclient/gskit8/lib/libgsk8cms.so
-%{_libdir}/%{name}/ibm-mqclient/gskit8/lib/libgsk8dbfl.so
-%{_libdir}/%{name}/ibm-mqclient/gskit8/lib/libgsk8drld.so
-%{_libdir}/%{name}/ibm-mqclient/gskit8/lib/libgsk8iccs.so
-%{_libdir}/%{name}/ibm-mqclient/gskit8/lib/libgsk8kicc.so
-%{_libdir}/%{name}/ibm-mqclient/gskit8/lib/libgsk8km2.so
-%{_libdir}/%{name}/ibm-mqclient/gskit8/lib/libgsk8km.so
-%{_libdir}/%{name}/ibm-mqclient/gskit8/lib/libgsk8ldap.so
-%{_libdir}/%{name}/ibm-mqclient/gskit8/lib/libgsk8p11.so
-%{_libdir}/%{name}/ibm-mqclient/gskit8/lib/libgsk8ssl.so
-%{_libdir}/%{name}/ibm-mqclient/gskit8/lib/libgsk8sys.so
-%{_libdir}/%{name}/ibm-mqclient/gskit8/lib/libgsk8valn.so
-%{_libdir}/%{name}/ibm-mqclient/gskit8/lib/N/icc/icclib/libicclib085.so
 %{_libdir}/%{name}/ibm-mqclient/gskit8/private_checkinstall
 %{_libdir}/%{name}/ibm-mqclient/gskit8/private_postinstall
 %defattr(0640,root,netdata,0640)
@@ -1026,7 +1028,6 @@ fi
 %{_libdir}/%{name}/ibm-mqclient/gskit8/ReadMe.txt
 %{_libdir}/%{name}/ibm-mqclient/java/lib/com.ibm.mq.tools.ras.jar
 %{_libdir}/%{name}/ibm-mqclient/lap/LAPApp.jar
-%{_libdir}/%{name}/ibm-mqclient/lap/licenses/icon.gif
 %{_libdir}/%{name}/ibm-mqclient/lap/licenses/LA_cs
 %{_libdir}/%{name}/ibm-mqclient/lap/licenses/LA_de
 %{_libdir}/%{name}/ibm-mqclient/lap/licenses/LA_el
@@ -1065,38 +1066,16 @@ fi
 %{_libdir}/%{name}/ibm-mqclient/lap/licenses/LI_tr
 %{_libdir}/%{name}/ibm-mqclient/lap/licenses/LI_zh
 %{_libdir}/%{name}/ibm-mqclient/lap/licenses/LI_zh_TW
+%{_libdir}/%{name}/ibm-mqclient/lap/licenses/icon.gif
 %{_libdir}/%{name}/ibm-mqclient/lap/licenses/logo.gif
 %{_libdir}/%{name}/ibm-mqclient/lap/licenses/non_ibm_license
 %{_libdir}/%{name}/ibm-mqclient/lap/licenses/notices
-%defattr(0750,root,netdata,0750)
-%{_libdir}/%{name}/ibm-mqclient/lib64/libcurl.so
-%{_libdir}/%{name}/ibm-mqclient/lib64/libedit.so
-%{_libdir}/%{name}/ibm-mqclient/lib64/libimqb23gl_r.so
-%{_libdir}/%{name}/ibm-mqclient/lib64/libimqb23gl_r.so.4.1
-%{_libdir}/%{name}/ibm-mqclient/lib64/libimqb23gl.so
-%{_libdir}/%{name}/ibm-mqclient/lib64/libimqb23gl.so.4.1
-%{_libdir}/%{name}/ibm-mqclient/lib64/libmqecs_r.so
-%{_libdir}/%{name}/ibm-mqclient/lib64/libmqecs.so
-%{_libdir}/%{name}/ibm-mqclient/lib64/libmqe_r.so
-%{_libdir}/%{name}/ibm-mqclient/lib64/libmqe.so
-%{_libdir}/%{name}/ibm-mqclient/lib64/libmqjx_r.so
-%{_libdir}/%{name}/ibm-mqclient/lib64/libmqjxx_r.so
-%{_libdir}/%{name}/ibm-mqclient/lib64/libmqmcs_r.so
-%{_libdir}/%{name}/ibm-mqclient/lib64/libmqmcs.so
-%{_libdir}/%{name}/ibm-mqclient/lib64/libmqm_r.so
-%{_libdir}/%{name}/ibm-mqclient/lib64/libmqm.so
-%{_libdir}/%{name}/ibm-mqclient/lib64/libmqmzse.so
-%{_libdir}/%{name}/ibm-mqclient/lib64/libmqxzu_r.so
-%{_libdir}/%{name}/ibm-mqclient/lib64/libmqxzu.so
-%{_libdir}/%{name}/ibm-mqclient/lib64/libmqz_r.so
-%{_libdir}/%{name}/ibm-mqclient/lib64/libmqzsd_r.so
-%{_libdir}/%{name}/ibm-mqclient/lib64/libmqzsd.so
-%{_libdir}/%{name}/ibm-mqclient/lib64/libmqz.so
-%defattr(0640,root,netdata,0640)
+%{_libdir}/%{name}/ibm-mqclient/lib/amqczsc
+%{_libdir}/%{name}/ibm-mqclient/lib/amqczscg
 %{_libdir}/%{name}/ibm-mqclient/lib/amqtrc.fmt
 %{_libdir}/%{name}/ibm-mqclient/lib/ccdt_schema.json
-%{_libdir}/%{name}/ibm-mqclient/lib/ccsid_part2.tbl
 %{_libdir}/%{name}/ibm-mqclient/lib/ccsid.tbl
+%{_libdir}/%{name}/ibm-mqclient/lib/ccsid_part2.tbl
 %{_libdir}/%{name}/ibm-mqclient/lib/iconv/002501B5.tbl
 %{_libdir}/%{name}/ibm-mqclient/lib/iconv/002501F4.tbl
 %{_libdir}/%{name}/ibm-mqclient/lib/iconv/00250333.tbl
@@ -2955,30 +2934,81 @@ fi
 %{_libdir}/%{name}/ibm-mqclient/lib/iconv/F20424E4.tbl
 %defattr(0750,root,netdata,0750)
 %{_libdir}/%{name}/ibm-mqclient/lib/libcurl.so
-%{_libdir}/%{name}/ibm-mqclient/lib/libimqb23gl_r.so
-%{_libdir}/%{name}/ibm-mqclient/lib/libimqb23gl_r.so.4.1
-%{_libdir}/%{name}/ibm-mqclient/lib/libimqb23gl.so
 %{_libdir}/%{name}/ibm-mqclient/lib/libimqb23gl.so.4.1
-%{_libdir}/%{name}/ibm-mqclient/lib/libmqecs_r.so
-%{_libdir}/%{name}/ibm-mqclient/lib/libmqecs.so
-%{_libdir}/%{name}/ibm-mqclient/lib/libmqe_r.so
+%{_libdir}/%{name}/ibm-mqclient/lib/libimqb23gl_r.so.4.1
+%{_libdir}/%{name}/ibm-mqclient/lib/libimqc23gl.so.4.1
+%{_libdir}/%{name}/ibm-mqclient/lib/libimqc23gl_r.so.4.1
+%{_libdir}/%{name}/ibm-mqclient/lib/libmqccics_r.a
+%{_libdir}/%{name}/ibm-mqclient/lib/libmqcxa.so
+%{_libdir}/%{name}/ibm-mqclient/lib/libmqcxa_r.so
+%{_libdir}/%{name}/ibm-mqclient/lib/libmqdc.so
+%{_libdir}/%{name}/ibm-mqclient/lib/libmqdc_r.so
 %{_libdir}/%{name}/ibm-mqclient/lib/libmqe.so
+%{_libdir}/%{name}/ibm-mqclient/lib/libmqe_r.so
+%{_libdir}/%{name}/ibm-mqclient/lib/libmqecs.so
+%{_libdir}/%{name}/ibm-mqclient/lib/libmqecs_r.so
+%{_libdir}/%{name}/ibm-mqclient/lib/libmqic.so
+%{_libdir}/%{name}/ibm-mqclient/lib/libmqic_r.so
+%{_libdir}/%{name}/ibm-mqclient/lib/libmqicb.so
+%{_libdir}/%{name}/ibm-mqclient/lib/libmqicb_r.so
+%{_libdir}/%{name}/ibm-mqclient/lib/libmqiz.so
+%{_libdir}/%{name}/ibm-mqclient/lib/libmqiz_r.so
 %{_libdir}/%{name}/ibm-mqclient/lib/libmqjx_r.so
 %{_libdir}/%{name}/ibm-mqclient/lib/libmqjxx_r.so
-%{_libdir}/%{name}/ibm-mqclient/lib/libmqmcs_r.so
-%{_libdir}/%{name}/ibm-mqclient/lib/libmqmcs.so
-%{_libdir}/%{name}/ibm-mqclient/lib/libmqm_r.so
 %{_libdir}/%{name}/ibm-mqclient/lib/libmqm.so
+%{_libdir}/%{name}/ibm-mqclient/lib/libmqm_r.so
+%{_libdir}/%{name}/ibm-mqclient/lib/libmqmcs.so
+%{_libdir}/%{name}/ibm-mqclient/lib/libmqmcs_r.so
 %{_libdir}/%{name}/ibm-mqclient/lib/libmqmzse.so
-%{_libdir}/%{name}/ibm-mqclient/lib/libmqxzu_r.so
 %{_libdir}/%{name}/ibm-mqclient/lib/libmqxzu.so
-%{_libdir}/%{name}/ibm-mqclient/lib/libmqz_r.so
-%{_libdir}/%{name}/ibm-mqclient/lib/libmqzsd_r.so
-%{_libdir}/%{name}/ibm-mqclient/lib/libmqzsd.so
+%{_libdir}/%{name}/ibm-mqclient/lib/libmqxzu_r.so
 %{_libdir}/%{name}/ibm-mqclient/lib/libmqz.so
+%{_libdir}/%{name}/ibm-mqclient/lib/libmqz_r.so
+%{_libdir}/%{name}/ibm-mqclient/lib/libmqzsd.so
+%{_libdir}/%{name}/ibm-mqclient/lib/libmqzsd_r.so
+%{_libdir}/%{name}/ibm-mqclient/lib64/amqczsc
+%{_libdir}/%{name}/ibm-mqclient/lib64/amqczscg
+%{_libdir}/%{name}/ibm-mqclient/lib64/amqmdnetstd.dll
+%{_libdir}/%{name}/ibm-mqclient/lib64/amqmxmsstd.dll
+%{_libdir}/%{name}/ibm-mqclient/lib64/libcurl.so
+%{_libdir}/%{name}/ibm-mqclient/lib64/libedit.so
+%{_libdir}/%{name}/ibm-mqclient/lib64/libimqb23gl.so.4.1
+%{_libdir}/%{name}/ibm-mqclient/lib64/libimqb23gl_r.so.4.1
+%{_libdir}/%{name}/ibm-mqclient/lib64/libimqc23gl.so.4.1
+%{_libdir}/%{name}/ibm-mqclient/lib64/libimqc23gl_r.so.4.1
+%{_libdir}/%{name}/ibm-mqclient/lib64/libmqccics_r.a
+%{_libdir}/%{name}/ibm-mqclient/lib64/libmqcxa.so
+%{_libdir}/%{name}/ibm-mqclient/lib64/libmqcxa64.so
+%{_libdir}/%{name}/ibm-mqclient/lib64/libmqcxa64_r.so
+%{_libdir}/%{name}/ibm-mqclient/lib64/libmqcxa_r.so
+%{_libdir}/%{name}/ibm-mqclient/lib64/libmqdc.so
+%{_libdir}/%{name}/ibm-mqclient/lib64/libmqdc_r.so
+%{_libdir}/%{name}/ibm-mqclient/lib64/libmqe.so
+%{_libdir}/%{name}/ibm-mqclient/lib64/libmqe_r.so
+%{_libdir}/%{name}/ibm-mqclient/lib64/libmqecs.so
+%{_libdir}/%{name}/ibm-mqclient/lib64/libmqecs_r.so
+%{_libdir}/%{name}/ibm-mqclient/lib64/libmqic.so
+%{_libdir}/%{name}/ibm-mqclient/lib64/libmqic_r.so
+%{_libdir}/%{name}/ibm-mqclient/lib64/libmqicb.so
+%{_libdir}/%{name}/ibm-mqclient/lib64/libmqicb_r.so
+%{_libdir}/%{name}/ibm-mqclient/lib64/libmqiz.so
+%{_libdir}/%{name}/ibm-mqclient/lib64/libmqiz_r.so
+%{_libdir}/%{name}/ibm-mqclient/lib64/libmqjx_r.so
+%{_libdir}/%{name}/ibm-mqclient/lib64/libmqjxx_r.so
+%{_libdir}/%{name}/ibm-mqclient/lib64/libmqm.so
+%{_libdir}/%{name}/ibm-mqclient/lib64/libmqm_r.so
+%{_libdir}/%{name}/ibm-mqclient/lib64/libmqmcs.so
+%{_libdir}/%{name}/ibm-mqclient/lib64/libmqmcs_r.so
+%{_libdir}/%{name}/ibm-mqclient/lib64/libmqmzse.so
+%{_libdir}/%{name}/ibm-mqclient/lib64/libmqxzu.so
+%{_libdir}/%{name}/ibm-mqclient/lib64/libmqxzu_r.so
+%{_libdir}/%{name}/ibm-mqclient/lib64/libmqz.so
+%{_libdir}/%{name}/ibm-mqclient/lib64/libmqz_r.so
+%{_libdir}/%{name}/ibm-mqclient/lib64/libmqzsd.so
+%{_libdir}/%{name}/ibm-mqclient/lib64/libmqzsd_r.so
 %defattr(0640,root,netdata,0640)
-%{_libdir}/%{name}/ibm-mqclient/licenses/Chinese_TW.txt
 %{_libdir}/%{name}/ibm-mqclient/licenses/Chinese.txt
+%{_libdir}/%{name}/ibm-mqclient/licenses/Chinese_TW.txt
 %{_libdir}/%{name}/ibm-mqclient/licenses/Czech.txt
 %{_libdir}/%{name}/ibm-mqclient/licenses/English.txt
 %{_libdir}/%{name}/ibm-mqclient/licenses/French.txt
@@ -2989,22 +3019,24 @@ fi
 %{_libdir}/%{name}/ibm-mqclient/licenses/Japanese.txt
 %{_libdir}/%{name}/ibm-mqclient/licenses/Korean.txt
 %{_libdir}/%{name}/ibm-mqclient/licenses/Lithuanian.txt
-%{_libdir}/%{name}/ibm-mqclient/licenses/non_ibm_license.txt
-%{_libdir}/%{name}/ibm-mqclient/licenses/notices.txt
 %{_libdir}/%{name}/ibm-mqclient/licenses/Polish.txt
 %{_libdir}/%{name}/ibm-mqclient/licenses/Portuguese.txt
 %{_libdir}/%{name}/ibm-mqclient/licenses/Russian.txt
 %{_libdir}/%{name}/ibm-mqclient/licenses/Slovenian.txt
 %{_libdir}/%{name}/ibm-mqclient/licenses/Spanish.txt
 %{_libdir}/%{name}/ibm-mqclient/licenses/Turkish.txt
-%{_libdir}/%{name}/ibm-mqclient/MANIFEST
-%{_libdir}/%{name}/ibm-mqclient/MANIFEST.Redist
+%{_libdir}/%{name}/ibm-mqclient/licenses/non_ibm_license.txt
+%{_libdir}/%{name}/ibm-mqclient/licenses/notices.txt
 %{_libdir}/%{name}/ibm-mqclient/msg/en_US/amq.cat
-%{_libdir}/%{name}/ibm-mqclient/README.Redist
 %{_libdir}/%{name}/ibm-mqclient/swidtag/IBM_MQ-9.4.3.mqtag
 %{_libdir}/%{name}/ibm-mqclient/swidtag/IBM_MQ_GSKit-8.0.60.mqtag
 %{_libdir}/%{name}/ibm-mqclient/swidtag/IBM_MQ_Redistributable_Client-9.4.3.mqtag
 %{_libdir}/%{name}/ibm-mqclient/swidtag/IBM_MQ_Runtime-9.4.3.mqtag
+%{_libdir}/%{name}/ibm-mqclient/swidtag/ibm.com_IBM_MQ_Advanced_for_Developers_Non-Warranted-9.4.3.1.swidtag
+%{_libdir}/%{name}/ibm-mqclient/swidtag/ibm.com_IBM_MQ_Client-9.4.3.1.swidtag
+%{_libdir}/%{name}/ibm-mqclient/swidtag/ibm.com_IBM_MQ_Client-9.4.3.swidtag
+%{_libdir}/%{name}/ibm-mqclient/MANIFEST.Redist
+%{_libdir}/%{name}/ibm-mqclient/README.Redist
 %endif
 
 %package plugin-apps

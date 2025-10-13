@@ -6,9 +6,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/prometheus"
-
 	"github.com/prometheus/prometheus/model/labels"
+
+	"github.com/netdata/netdata/go/plugins/pkg/prometheus"
 )
 
 // Server stats: https://www.envoyproxy.io/docs/envoy/latest/configuration/observability/statistics#

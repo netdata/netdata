@@ -15,7 +15,7 @@ import (
 	"gopkg.in/yaml.v2"
 
 	"github.com/netdata/netdata/go/plugins/pkg/executable"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/pluginconfig"
+	"github.com/netdata/netdata/go/plugins/pkg/pluginconfig"
 )
 
 var (

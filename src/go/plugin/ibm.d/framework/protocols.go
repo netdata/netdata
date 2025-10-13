@@ -203,7 +203,7 @@ func (b *ExponentialBackoff) Reset() {
 // ShouldRetry determines if we should retry based on attempt count
 func (b *ExponentialBackoff) ShouldRetry() bool {
 	// Retry up to 10 times (reaches max interval after ~8 attempts)
-	return b.attempt < 10
+	return b.attempt < 2
 }
 
 // Retry executes a function with exponential backoff

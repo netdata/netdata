@@ -11,11 +11,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/prometheus/selector"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/netdata/netdata/go/plugins/pkg/prometheus/selector"
+	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
 
 var (

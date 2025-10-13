@@ -16,11 +16,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/logger"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/sd/model"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
-
 	"github.com/gohugoio/hashstructure"
+
+	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/pkg/confopt"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/discovery/sd/model"
 )
 
 var (

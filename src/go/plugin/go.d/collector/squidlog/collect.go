@@ -8,10 +8,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/logs"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/stm"
-
+	"github.com/netdata/netdata/go/plugins/pkg/stm"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/logs"
 )
 
 func (c *Collector) logPanicStackIfAny() {
