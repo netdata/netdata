@@ -87,7 +87,7 @@ LOG_FORWARDER *log_forwarder_start(void) {
     // Wait for the thread to signal it's initialized
     size_t retries = 0;
     while (!__atomic_load_n(&lf->initialized, __ATOMIC_ACQUIRE) && retries < 100) { // 100 * 10ms = 1 second max
-        usleep(10000); // 10ms
+        sleep_usec(10 * USEC_PER_MS); // 1ms
         retries++;
     }
 
