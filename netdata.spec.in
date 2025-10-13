@@ -219,7 +219,7 @@ BuildRequires: systemd
 Requires(pre): /usr/sbin/groupadd
 Requires(pre): /usr/sbin/useradd
 
-%if 0%{?suse_version}
+%if 0%{?suse_version} || 0%{?fedora}
 Provides: user(netdata)
 Provides: group(netdata)
 %endif
