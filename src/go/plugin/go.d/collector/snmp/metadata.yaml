@@ -36,7 +36,7 @@ modules:
 
           Because profiles vary per vendor/model/OS, there is **no fixed list of metrics** in this page. Netdata renders the charts that each matched profile defines (interfaces, optics, CPU/mem, environment, VLANs, etc., depending on the device).
 
-          The collector optionally runs **ICMP round-trip (ping)** alongside SNMP for availability and latency. A `ping_only` mode is available to skip periodic SNMP polling.
+          The collector optionally runs **ICMP round-trip (ping)** alongside SNMP for availability and latency.
 
           SNMP versions v1, v2c, and v3 are supported, implemented via the [gosnmp](https://github.com/gosnmp/gosnmp) library.
         method_description: ""
@@ -55,7 +55,7 @@ modules:
             - Supports single IPs, ranges, and CIDR blocks (up to 512 IPs per subnet).
             - Uses the provided SNMP credentials (v1/v2c/v3) to probe devices.
             - Caches discovery results (configurable) to reduce network load.
-            - At collection time, each discovered device is matched to the appropriate profile based on its `sysObjectID`, `sysDescr`, and the profile’s selector rules.
+            - At collection time, each discovered device is matched to the appropriate profile based on its `sysObjectID`, `sysDescr`, and the profile's selector rules.
 
             The configuration file name is [go.d/sd/snmp.conf](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/sd/snmp.conf).
 
@@ -81,6 +81,46 @@ modules:
               - Enable the SNMP service on the target device (via its management interface).
               - Ensure the device is reachable from the Netdata node on UDP/161.
               - Gather connection details: IP/DNS, SNMP version, and either a community (v1/v2c) or v3 credentials (user, auth/priv).
+          - title: "Supported Devices & Vendors"
+            description: |
+              Netdata includes **220+ pre-built device profiles** covering all major network vendors and equipment types:
+
+              **Network Equipment:**
+              - **Cisco**: ASA firewalls, Catalyst switches, ISR routers, Nexus switches, Wireless LAN Controllers
+              - **Arista**: Switches and routers running Arista EOS
+              - **Juniper**: JunOS devices, firewalls, virtual chassis configurations
+              - **HP/HPE**: ProCurve switches, server management (iLO)
+              - **Aruba**: Access Points, switches, mobility controllers, ClearPass
+              - **Fortinet**: FortiGate firewalls and VPN appliances
+              - **Palo Alto**: Next-generation firewalls
+              - **F5**: BIG-IP load balancers and application delivery controllers
+              - **Dell**: PowerConnect switches, Remote Access Controllers (RAC)
+              - **Huawei, 3Com, Ubiquiti UniFi**: Various network equipment
+
+              **Power & Environmental:**
+              - **APC**: UPS systems, Power Distribution Units (PDU), NetBotz environmental sensors
+              - **Vertiv**: Power management and environmental monitoring
+              - **AVTECH**: RoomAlert temperature and environmental sensors
+
+              **Telecom Equipment:**
+              - **Avaya**: Media servers, gateways, ERS switches
+              - **AudioCodes**: Mediant Session Border Controllers
+
+              **Standard MIBs Supported:**
+              - IF-MIB (interface statistics), HOST-RESOURCES-MIB (system resources)
+              - UCD-SNMP-MIB (Unix system monitoring), ENTITY-SENSOR-MIB (hardware sensors)
+              - BGP4-MIB (BGP routing), OSPF-MIB (OSPF routing)
+              - TCP/UDP/IP-MIB (network stack), UPS-MIB (uninterruptible power supplies)
+
+              **To check if your device is supported:**
+              ```bash
+              # List all available profiles
+              ls /etc/netdata/go.d/snmp.profiles/default/
+              # or
+              ls /opt/netdata/etc/netdata/go.d/snmp.profiles/default/
+              ```
+
+              Don't see your device? You can create custom profiles - see the Custom Profile Creation section below.
       configuration:
         file:
           name: go.d/snmp.conf
@@ -208,11 +248,6 @@ modules:
               default_value: 60
               required: false
 
-            - name: ping_only
-              group: Ping
-              description: Collect only ICMP round-trip metrics and skip periodic SNMP polling. A minimal SNMP sysInfo probe still runs at setup for naming/labels/metadata.
-              default_value: false
-              required: false
             - name: ping.enabled
               group: Ping
               description: Enable ICMP round-trip measurements (runs alongside SNMP). When disabled, no ping metrics are collected.
@@ -308,17 +343,844 @@ modules:
                       auth_key: auth_protocol_passphrase
                       priv_proto: aes256
                       priv_key: priv_protocol_passphrase
+            - name: Manual Profile Selection
+              description: |
+                Force-apply specific profiles when auto-detection doesn't work:
+              config: |
+                jobs:
+                  - name: firewall
+                    hostname: 192.0.2.1
+                    community: public
+                    manual_profiles:
+                      - cisco-asa
+                      - if-mib
+            - name: Data Center Monitoring
+              description: |
+                Monitor multiple device types in a data center environment:
+              config: |
+                jobs:
+                  - name: core_switch
+                    hostname: 192.0.2.10
+                    community: datacenter_ro
+                    update_every: 30
+                  - name: ups_primary
+                    hostname: 192.0.2.20
+                    community: power_ro
+                    update_every: 60
+                  - name: pdu_rack1
+                    hostname: 192.0.2.21
+                    community: power_ro
+            - name: Multi-Vendor Network
+              description: |
+                Monitor mixed vendor environment with different credentials:
+              config: |
+                jobs:
+                  - name: cisco_router
+                    hostname: router1.example.com
+                    community: cisco_community
+                  - name: juniper_firewall
+                    hostname: fw1.example.com
+                    options:
+                      version: 3
+                    user:
+                      name: monitoring
+                      level: authPriv
+                      auth_proto: sha256
+                      auth_key: juniper_auth_pass
+                      priv_proto: aes256
+                      priv_key: juniper_priv_pass
+    advanced_features:
+      description: |
+        ## Advanced Features
+
+        ### Custom Profile Creation
+
+        Netdata's SNMP collector uses YAML-based profiles for device detection and metric collection. You can create custom profiles for unsupported devices or extend existing ones.
+
+        **Profile Structure:**
+        ```yaml
+        # custom-device.yaml
+        selector:
+          - sysobjectid:
+              include:
+                - "1.3.6.1.4.1.9999.*"
+            sysdescr:
+              include:
+                - "MyDevice"
+
+        extends:
+          - _system-base.yaml
+          - _std-if-mib.yaml
+
+        metrics:
+          - symbol:
+              OID: "1.3.6.1.4.1.9999.1.1.0"
+              name: "customMetric"
+              unit: "bytes"
+          - table:
+              OID: "1.3.6.1.4.1.9999.2.1"
+              name: "customTable"
+              index_range: [1, 64]
+              columns:
+                - symbol:
+                    OID: "1"
+                    name: "port"
+                - symbol:
+                    OID: "2"
+                    name: "status"
+        ```
+
+        **Profile Inheritance:**
+        Profiles support multi-level inheritance via the `extends` directive:
+        ```yaml
+        extends:
+          - _cisco-base.yaml        # Common Cisco metrics
+          - _cisco-cpu-memory.yaml  # CPU/memory monitoring
+          - _std-if-mib.yaml        # Standard interface MIB
+        ```
+
+        **Virtual Metrics:**
+        Create aggregated metrics by combining sources from multiple SNMP tables:
+        ```yaml
+        virtual_metrics:
+          - name: "total_interface_traffic"
+            sources:
+              - { metric: ifInOctets, table: ifTable, as: in }
+              - { metric: ifOutOctets, table: ifTable, as: out }
+          - name: "high_capacity_counters"
+            alternatives:
+              - sources:
+                  - { metric: _ifHCInOctets, table: ifXTable, as: in }
+                  - { metric: _ifHCOutOctets, table: ifXTable, as: out }
+              - sources:
+                  - { metric: ifInOctets, table: ifTable, as: in }
+                  - { metric: ifOutOctets, table: ifTable, as: out }
+        ```
+
+        **Where to Place Custom Profiles:**
+        - System-wide: `/etc/netdata/go.d/snmp.profiles/custom/`
+        - User profiles: `~/.netdata/go.d/snmp.profiles/`
+
+        ### Performance Optimization
+
+        **Intelligent Table Caching:**
+        The collector implements a 30-minute TTL cache for table structures. After the initial WALK operation, subsequent collections use GET requests for known OIDs, significantly reducing load on devices and network traffic.
+
+        **Bulk Operations:**
+        - **GETBULK** (SNMPv2c/v3): Retrieves multiple variables per request
+        - **Batched GET** requests: Groups scalar OIDs efficiently
+        - **Configurable parameters**:
+          - `max_repetitions`: Variables per GETBULK (default: 25)
+          - `max_request_size`: OIDs per GET request (default: 60)
+
+        **Performance Tuning Guidelines:**
+
+        | Scenario | Recommended Settings | Rationale |
+        |----------|---------------------|-----------|
+        | **Small deployment** (< 10 devices) | Default settings | Standard polling works well |
+        | **Medium deployment** (10-50 devices) | `update_every: 30`, `max_repetitions: 15` | Reduce device load |
+        | **Large deployment** (50+ devices) | `update_every: 60`, `max_repetitions: 10` | Stagger polling times |
+        | **Low-power devices** (IoT, embedded) | `update_every: 300`, `max_repetitions: 5` | Minimize device impact |
+        | **High-speed links** | `update_every: 10`, `max_repetitions: 30` | Capture rapid changes |
+
+        **Device Metadata Collection:**
+        The collector automatically gathers device information:
+        - Vendor, model, serial number from ENTITY-MIB
+        - System description, uptime, contact information
+        - Hardware inventory (modules, fans, power supplies)
+        - This metadata appears in Virtual Node labels and charts
+
+        ### Cross-Table Tag Resolution
+
+        Advanced profiles can resolve tags across multiple SNMP tables:
+        ```yaml
+        metrics:
+          - table:
+              name: "interface_stats"
+              index_tag: "ifIndex"
+              columns:
+                - symbol:
+                    name: "ifInOctets"
+                    tag: "interface_name"
+                    tag_resolve:
+                      table: "ifName"
+                      column: "name"
+        ```
+
+        This allows meaningful interface names instead of numeric indices on charts.
+
+    common_use_cases:
+      description: |
+        ## Common Use Cases
+
+        ### Data Center Infrastructure Monitoring
+
+        **Complete Configuration Example:**
+        ```yaml
+        # Monitor core network infrastructure
+        jobs:
+          # Core switches
+          - name: spine_switch_1
+            hostname: spine1.dc.example.com
+            community: datacenter_ro
+            update_every: 30
+            
+          - name: spine_switch_2
+            hostname: spine2.dc.example.com  
+            community: datacenter_ro
+            update_every: 30
+
+          # Top-of-rack switches
+          - name: tor_switch_rack1
+            hostname: tor1.dc.example.com
+            community: datacenter_ro
+            update_every: 60
+
+          # Power infrastructure
+          - name: primary_ups
+            hostname: ups1.power.example.com
+            community: power_ro
+            update_every: 60
+            manual_profiles: ["apc-ups"]
+            
+          - name: pdu_rack1
+            hostname: pdu1.power.example.com
+            community: power_ro
+            update_every: 120
+
+          # Environmental monitoring
+          - name: environmental_sensors
+            hostname: sensors.dc.example.com
+            community: environmental_ro
+            update_every: 300
+        ```
+
+        **Expected Metrics:**
+        - Interface utilization and errors
+        - Power consumption and efficiency
+        - Temperature and humidity
+        - UPS battery status and runtime
+        - Device CPU and memory usage
+
+        ### Multi-Vendor Network Monitoring
+
+        **Configuration for Mixed Environment:**
+        ```yaml
+        jobs:
+          # Cisco equipment
+          - name: cisco_core_router
+            hostname: core-rtr.example.com
+            community: cisco_readonly
+            
+          - name: cisco_firewall
+            hostname: firewall.example.com
+            options:
+              version: 3
+            user:
+              name: netdata_user
+              level: authPriv
+              auth_proto: sha256
+              auth_key: "cisco_auth_password"
+              priv_proto: aes256
+              priv_key: "cisco_priv_password"
+
+          # Juniper equipment
+          - name: juniper_edge_router
+            hostname: edge-rtr.example.com
+            options:
+              version: 3
+            user:
+              name: monitoring
+              level: authNoPriv
+              auth_proto: sha512
+              auth_key: "juniper_auth_password"
+
+          # HP switches
+          - name: hp_access_switch
+            hostname: access-sw.example.com
+            community: hp_community
+            
+          # Aruba wireless controllers
+          - name: aruba_wlc
+            hostname: wlc.example.com
+            community: wireless_ro
+            manual_profiles: ["aruba-mobility-controller"]
+        ```
+
+        ### Environmental Monitoring Setup
+
+        **Power and Environmental Monitoring:**
+        ```yaml
+        jobs:
+          # UPS monitoring
+          - name: datacenter_ups_1
+            hostname: ups1.facility.example.com
+            community: ups_readonly
+            update_every: 60
+            manual_profiles: ["apc-ups"]
+            
+          - name: datacenter_ups_2  
+            hostname: ups2.facility.example.com
+            community: ups_readonly
+            update_every: 60
+            manual_profiles: ["vertiv-ups"]
+
+          # PDU monitoring
+          - name: rack1_pdu_a
+            hostname: pdu1a.facility.example.com
+            community: power_readonly
+            update_every: 120
+            
+          - name: rack1_pdu_b
+            hostname: pdu1b.facility.example.com
+            community: power_readonly  
+            update_every: 120
+
+          # Environmental sensors
+          - name: server_room_sensors
+            hostname: sensors.facility.example.com
+            community: environmental_ro
+            update_every: 300
+            manual_profiles: ["avtech-roomalert"]
+
+          # HVAC monitoring
+          - name: cooling_system
+            hostname: hvac.facility.example.com
+            community: hvac_readonly
+            update_every: 600
+        ```
+
+        **Key Metrics Monitored:**
+        - UPS: Battery charge, runtime, load percentage, input/output voltage
+        - PDU: Per-outlet power consumption, total power, current draw
+        - Environmental: Temperature, humidity, airflow
+        - HVAC: Supply/return air temperature, compressor status
+
     troubleshooting:
       problems:
-        list: []
+        list:
+          - name: "Device Not Detected"
+            description: |
+              **Symptoms:** No charts appear for SNMP device, debug shows "no matching profile"
+              
+              **Diagnosis:**
+              ```bash
+              # Check what sysObjectID your device reports
+              snmpget -v2c -c public device_ip 1.3.6.1.2.1.1.2.0
+              
+              # Check device description  
+              snmpget -v2c -c public device_ip 1.3.6.1.2.1.1.1.0
+              
+              # Enable debug mode to see profile matching
+              ./go.d.plugin -d -m snmp -j your_job_name
+              ```
+              
+              **Solutions:**
+              1. **Check if profiles exist for your device:**
+                 ```bash
+                 ls /etc/netdata/go.d/snmp.profiles/default/ | grep -i vendor_name
+                 ```
+              
+              2. **Force apply a profile manually:**
+                 ```yaml
+                 manual_profiles:
+                   - "cisco-generic"
+                   - "if-mib"
+                 ```
+              
+              3. **Create a custom profile** if your device isn't supported
+
+          - name: "SNMP Timeouts"
+            description: |
+              **Symptoms:** Gaps in charts, timeout errors in logs
+              
+              **Diagnosis:**
+              ```bash
+              # Test SNMP connectivity manually
+              snmpwalk -v2c -c public device_ip 1.3.6.1.2.1.1
+              
+              # Check network latency
+              ping device_ip
+              
+              # Review timeout settings in debug mode
+              ./go.d.plugin -d -m snmp -j your_job_name
+              ```
+              
+              **Solutions:**
+              1. **Increase timeout values:**
+                 ```yaml
+                 options:
+                   timeout: 10        # Increase from default 5 seconds
+                   retries: 3         # Increase retry attempts
+                 ```
+              
+              2. **Reduce polling frequency:**
+                 ```yaml
+                 update_every: 60     # Reduce from default 10 seconds
+                 ```
+              
+              3. **Lower bulk request size:**
+                 ```yaml
+                 options:
+                   max_repetitions: 10  # Reduce from default 25
+                   max_request_size: 30 # Reduce from default 60
+                 ```
+              
+              4. **Check device SNMP agent limits** - some devices can't handle many concurrent requests
+
+          - name: "Authentication Failed (SNMPv3)"
+            description: |
+              **Symptoms:** "authentication failed" or "unknown user name" errors
+              
+              **Diagnosis:**
+              ```bash
+              # Test SNMPv3 credentials manually
+              snmpget -v3 -u username -l authPriv -a SHA256 -A "auth_pass" -x AES256 -X "priv_pass" device_ip 1.3.6.1.2.1.1.2.0
+              
+              # Check user configuration on device
+              snmpwalk -v3 -u username -l noAuthNoPriv device_ip 1.3.6.1.6.3.15.1.2.2.1.3
+              ```
+              
+              **Solutions:**
+              1. **Verify user configuration on device:**
+                 - User exists in SNMP user table
+                 - Authentication/privacy protocols match
+                 - Passwords meet minimum length requirements
+              
+              2. **Check protocol compatibility:**
+                 ```yaml
+                 user:
+                   auth_proto: sha256    # Some devices only support md5/sha
+                   priv_proto: aes256    # Some devices only support des/aes128
+                 ```
+              
+              3. **Verify case sensitivity** - usernames and passwords are case-sensitive
+
+          - name: "Missing Metrics/Empty Charts"  
+            description: |
+              **Symptoms:** Device detected but some expected metrics missing
+              
+              **Diagnosis:**
+              ```bash
+              # Check if device supports expected OIDs
+              snmpwalk -v2c -c public device_ip 1.3.6.1.2.1.2.2.1.10  # ifInOctets
+              
+              # Review profile matching in debug mode
+              ./go.d.plugin -d -m snmp -j your_job_name 2>&1 | grep -i "profile\|metric"
+              ```
+              
+              **Solutions:**
+              1. **Device may not support all MIBs** - check device documentation
+              
+              2. **Profile may be too generic** - try more specific profiles:
+                 ```yaml
+                 manual_profiles:
+                   - "cisco-catalyst"  # Instead of "cisco-generic"
+                 ```
+              
+              3. **Create custom profile** for device-specific OIDs
+
+          - name: "High CPU/Memory Usage"
+            description: |
+              **Symptoms:** Netdata agent using excessive resources during SNMP collection
+              
+              **Solutions:**
+              1. **Reduce collection frequency:**
+                 ```yaml
+                 update_every: 60    # Default is 10 seconds
+                 ```
+              
+              2. **Stagger device polling:**
+                 ```yaml
+                 jobs:
+                   - name: device1
+                     update_every: 60
+                   - name: device2  
+                     update_every: 60
+                     autodetection_retry: 30  # Offset by 30 seconds
+                 ```
+              
+              3. **Optimize bulk operations:**
+                 ```yaml
+                 options:
+                   max_repetitions: 15    # Reduce GETBULK size
+                   max_request_size: 40   # Reduce batch size
+                 ```
+
+          - name: "Profile Matching Issues"
+            description: |
+              **Symptoms:** Wrong profile selected, unexpected metrics
+              
+              **Diagnosis:**
+              ```bash
+              # See which profile was selected
+              ./go.d.plugin -d -m snmp -j your_job_name 2>&1 | grep -i "profile.*selected"
+              
+              # Check device identification
+              snmpget -v2c -c public device_ip 1.3.6.1.2.1.1.1.0  # sysDescr
+              snmpget -v2c -c public device_ip 1.3.6.1.2.1.1.2.0  # sysObjectID
+              ```
+              
+              **Solutions:**
+              1. **Force specific profile:**
+                 ```yaml
+                 manual_profiles:
+                   - "your-preferred-profile"
+                 ```
+              
+              2. **Check profile selector rules** in profile files to understand matching logic
+              
+              3. **Create custom profile** with more specific selectors
+    migration_guides:
+      description: |
+        ## Migration Guides
+
+        ### Migrating from Zabbix
+
+        **Key Differences:**
+        - **Zabbix**: Templates with item prototypes → **Netdata**: YAML profiles with auto-detection  
+        - **Zabbix**: Manual host configuration → **Netdata**: Automatic discovery and profiling
+        - **Zabbix**: Database storage → **Netdata**: Real-time with retention policies
+
+        **Migration Steps:**
+
+        1. **Identify Zabbix SNMP templates** used for your devices
+        2. **Map to Netdata profiles:**
+           ```bash
+           # Find equivalent Netdata profiles
+           ls /etc/netdata/go.d/snmp.profiles/default/ | grep -i cisco
+           ```
+        3. **Convert Zabbix host groups to Netdata jobs:**
+           ```yaml
+           # Instead of Zabbix host configuration
+           jobs:
+             - name: network_switches
+               hostname: switch1.example.com
+               community: monitoring
+               # Profile auto-detected
+           ```
+
+        **OID Mapping Examples:**
+        | Zabbix Item | Netdata Equivalent | Profile |
+        |-------------|-------------------|---------|
+        | `ifInOctets[{#SNMPINDEX}]` | Automatic via IF-MIB | `if-mib` |
+        | `1.3.6.1.4.1.9.9.109.1.1.1.1.3.{#SNMPINDEX}` | `cpmCPUTotal5minRev` | `cisco-generic` |
+
+        ### Migrating from PRTG
+
+        **Key Differences:**
+        - **PRTG**: Sensor-based → **Netdata**: Metric-based with charts
+        - **PRTG**: License per sensor → **Netdata**: Unlimited metrics
+        - **PRTG**: Windows-centric → **Netdata**: Cross-platform
+
+        **Sensor Mapping:**
+        | PRTG Sensor Type | Netdata Equivalent |
+        |------------------|-------------------|
+        | SNMP Traffic | IF-MIB interface metrics |
+        | SNMP CPU | HOST-RESOURCES or vendor CPU metrics |
+        | SNMP Memory | HOST-RESOURCES memory metrics |
+        | SNMP Custom | Custom profile with specific OIDs |
+
+        **Migration Configuration:**
+        ```yaml
+        jobs:
+          # Replace PRTG device groups with jobs
+          - name: core_infrastructure
+            hostname: device.example.com
+            community: prtg_community
+            update_every: 60  # Match PRTG scanning interval
+        ```
+
+        ### Migrating from LibreNMS
+
+        **Key Differences:**
+        - **LibreNMS**: OS detection + discovery → **Netdata**: Profile-based auto-detection
+        - **LibreNMS**: MySQL storage → **Netdata**: Time-series database
+        - **LibreNMS**: PHP-based → **Netdata**: Go-based collector
+
+        **Migration Steps:**
+        1. **Export LibreNMS device list:**
+           ```sql
+           SELECT hostname, community, snmpver FROM devices WHERE status = 1;
+           ```
+
+        2. **Convert to Netdata configuration:**
+           ```yaml
+           jobs:
+             - name: migrated_device
+               hostname: device_hostname
+               community: device_community
+               options:
+                 version: 2  # Based on LibreNMS snmpver
+           ```
+
+        **OS to Profile Mapping:**
+        | LibreNMS OS | Netdata Profile |
+        |-------------|----------------|
+        | `ios` | `cisco-ios` |
+        | `junos` | `juniper-junos` |
+        | `linux` | `host-resources` |
+        | `apc` | `apc-ups` |
+
+    alert_configuration:
+      description: |
+        ## Alert Configuration
+
+        ### Why No Default Alerts?
+
+        SNMP devices vary significantly in their capabilities and operational thresholds. A "high CPU" alert threshold that's appropriate for a router (>80%) might be too low for a firewall (>95%) or too high for an access switch (>60%). Rather than provide potentially incorrect default alerts, Netdata requires you to configure SNMP alerts based on your specific devices and operational requirements.
+
+        ### Creating SNMP-Based Alerts
+
+        **Basic Interface Alert Example:**
+        ```yaml
+        # /etc/netdata/health.d/snmp_interface.conf
+        template: snmp_interface_down
+              on: snmp.if_admin_status
+          lookup: max -1m unaligned of *
+           units: status  
+           every: 30s
+            warn: $this != 1
+           delay: down 5m multiplier 1.5 max 1h
+            info: SNMP interface ${label:interface_name} is administratively down
+              to: sysadmin
+        ```
+
+        **Device-Specific CPU Alert:**
+        ```yaml
+        # /etc/netdata/health.d/snmp_cpu.conf  
+        template: cisco_cpu_high
+              on: snmp.cisco_cpu_utilization
+          lookup: average -5m unaligned of *
+           units: %
+           every: 1m
+            warn: $this > 75
+            crit: $this > 90
+           delay: up 2m down 5m multiplier 1.5 max 1h
+            info: Cisco device ${label:device_name} CPU utilization is high
+              to: netops
+
+        template: ups_battery_low
+              on: snmp.ups_battery_charge
+          lookup: min -3m unaligned of *
+           units: %
+           every: 1m
+            warn: $this < 50
+            crit: $this < 20
+           delay: up 1m down 10m multiplier 1.5 max 2h
+            info: UPS ${label:ups_name} battery charge is low
+              to: facilities
+        ```
+
+        **Environmental Monitoring Alerts:**
+        ```yaml
+        # /etc/netdata/health.d/snmp_environmental.conf
+        template: datacenter_temperature_high
+              on: snmp.temperature_sensors
+          lookup: max -5m unaligned of temperature
+           units: °C
+           every: 2m
+            warn: $this > 25
+            crit: $this > 30
+           delay: up 5m down 10m multiplier 1.5 max 1h
+            info: Data center temperature is high: ${value}°C
+              to: facilities
+
+        template: ups_runtime_low
+              on: snmp.ups_battery_runtime
+          lookup: min -2m unaligned of *
+           units: minutes
+           every: 1m
+            warn: $this < 30
+            crit: $this < 10
+           delay: up 1m down 15m multiplier 1.5 max 1h
+            info: UPS ${label:ups_name} runtime remaining: ${value} minutes
+              to: critical
+        ```
+
+        ### Common Alert Patterns by Device Type
+
+        <details>
+        <summary><strong>Network Switches</strong></summary><br/>
+
+        - Interface utilization > 80%
+        - Interface errors increasing
+        - STP topology changes
+        - Power supply failures
+
+        </details>
+
+        <br/>
+
+        <details>
+        <summary><strong>Firewalls</strong></summary><br/>
+
+        - CPU utilization > 90%
+        - Memory utilization > 85%
+        - Session table > 90% full
+        - VPN tunnel down
+
+        </details>
+
+        <br/>
+
+        <details>
+        <summary><strong>UPS Systems</strong></summary><br/>
+
+        - Battery charge < 50%
+        - Runtime < 30 minutes  
+        - On battery power
+        - Temperature > 40°C
+
+        </details>
+
+        <br/>
+
+        <details>
+        <summary><strong>Environmental Sensors</strong></summary><br/>
+
+        - Temperature outside range (18-27°C)
+        - Humidity outside range (45-65%)
+        - Water leak detected
+        - Airflow below threshold
+
+        </details>
+
+        ### Alert Testing and Validation
+
+        **Test Alert Configuration:**
+        ```bash
+        # Reload health configuration
+        netdatacli reload-health
+
+        # Test specific alert
+        curl "http://localhost:19999/api/v1/alarms?chart=snmp.interface_status"
+
+        # Monitor alert log
+        tail -f /var/log/netdata/access.log | grep ALARM
+        ```
+
+        ### Integration with Notification Methods
+
+        Configure alert destinations in `/etc/netdata/health_alarm_notify.conf`:
+        ```bash
+        # Slack integration
+        SLACK_WEBHOOK_URL="https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK"
+        DEFAULT_RECIPIENT_SLACK="alerts"
+
+        # Email notifications  
+        DEFAULT_RECIPIENT_EMAIL="netops@example.com"
+        SEND_EMAIL="YES"
+
+        # PagerDuty for critical alerts
+        PAGERDUTY_SERVICE_KEY="your-pagerduty-service-key"
+        DEFAULT_RECIPIENT_PAGERDUTY="critical"
+        ```
+
     alerts: []
     metrics:
       folding:
         title: Metrics
         enabled: false
       description: |
-        Metrics and charts are **defined by the matched SNMP profile(s)** at runtime. They differ by vendor/model/OS and may include, for example, interface counters, optics, CPU/memory, temperature, VLANs, and more. Use the **Metrics** tab on the device’s dashboard to see exactly what is collected for that device.
+        Metrics and charts are **defined by the matched SNMP profile(s)** at runtime. They differ by vendor/model/OS and may include, for example, interface counters, optics, CPU/memory, temperature, VLANs, and more. Use the **Metrics** tab on the device's dashboard to see exactly what is collected for that device.
 
-        If `ping.enabled` is true, ICMP latency/packet-loss charts are also provided (or exclusively, when `ping_only: true`).
+        If `ping.enabled` is true, ICMP latency/packet-loss charts are also provided alongside SNMP metrics.
+
+        ### Common Metric Categories by Device Type
+
+        <details>
+        <summary><strong>Network Switches/Routers</strong></summary><br/>
+
+        - Interface statistics (octets, packets, errors, discards)
+        - Interface operational status and admin status  
+        - CPU utilization and memory usage
+        - Hardware health (fans, power supplies, temperature)
+        - Routing table sizes (for routers)
+        - VLAN information
+        - STP/RSTP status
+
+        </details>
+
+        <br/>
+
+        <details>
+        <summary><strong>Firewalls</strong></summary><br/>
+
+        - Session table utilization
+        - Threat detection counters
+        - VPN tunnel status and throughput
+        - CPU and memory utilization
+        - Interface statistics
+        - Hardware health sensors
+
+        </details>
+
+        <br/>
+
+        <details>
+        <summary><strong>UPS Systems</strong></summary><br/>
+
+        - Battery charge percentage and runtime
+        - Input/output voltage and frequency  
+        - Load percentage and power consumption
+        - Battery temperature
+        - Bypass/inverter status
+        - Alarm conditions
+
+        </details>
+
+        <br/>
+
+        <details>
+        <summary><strong>Environmental Sensors</strong></summary><br/>
+
+        - Temperature readings (ambient, rack, device)
+        - Humidity levels
+        - Airflow measurements
+        - Water leak detection
+        - Power consumption
+        - Contact closures (door sensors, etc.)
+
+        </details>
+
+        <br/>
+
+        <details>
+        <summary><strong>Wireless Controllers</strong></summary><br/>
+
+        - Access Point status and client counts
+        - Radio utilization and interference
+        - Client association/disassociation rates
+        - SSID statistics
+        - Controller CPU/memory usage
+        - Channel utilization
+
+        </details>
+
+        <br/>
+
+        <details>
+        <summary><strong>Storage Devices</strong></summary><br/>
+
+        - Disk status and SMART attributes
+        - Storage pool utilization
+        - I/O statistics (reads/writes, IOPS)
+        - Cache hit ratios
+        - Temperature sensors
+        - RAID status
+
+        </details>
+
+        ### Virtual Metrics Examples
+
+        Many profiles include aggregated metrics that provide additional insights by combining data from multiple sources:
+
+        - **Total interface traffic**: Combines `in_octets` + `out_octets` from interface tables
+        - **High-capacity counter fallbacks**: Uses 64-bit counters when available, falls back to 32-bit
+        - **Multi-table correlations**: Links interface names from one table with statistics from another
+        - **Alternative metric sources**: Provides redundancy when devices support different MIBs
+
+        These virtual metrics appear alongside raw SNMP data and are updated in real-time through source aggregation.
       availability: []
       scopes: []
