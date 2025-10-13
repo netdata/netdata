@@ -44,7 +44,7 @@ static void netdata_stop_driver()
             nd_log(
                     NDLS_COLLECTORS,
                     NDLP_ERR,
-                    "Cannot stop the service. GetLastError= %lu \n", GetLastError());
+                    "Cannot stop the service. Error= %lu \n", GetLastError());
         }
     }
 
@@ -87,7 +87,6 @@ int netdata_install_driver()
 
     if (unlikely(!service)) {
         if (GetLastError() == ERROR_SERVICE_EXISTS) {
-            service = OpenService(scm, srv_name, SERVICE_ALL_ACCESS);
             CloseServiceHandle(scm);
             return 0;
         }
