@@ -1,6 +1,6 @@
 #!/usr/bin/env ai-agent
 ---
-description: Netdata CRM AI-Agent: everything we know about customers and prospects.
+description: "Netdata CRM AI-Agent: everything we know about customers and prospects."
 usage: Ask me anything you need
 models:
   - anthropic/claude-sonnet-4-5
