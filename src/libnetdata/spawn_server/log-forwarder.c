@@ -308,7 +308,7 @@ static void log_forwarder_thread_func(void *arg) {
 
                     nd_log(NDLS_COLLECTORS, NDLP_ERR,
                            "Log forwarder: pipe error (revents=0x%x) but still running",
-                           pfds[0].revents);
+                           (unsigned int) pfds[0].revents);
                 }
 
                 if (pfds[0].revents & POLLIN) {
