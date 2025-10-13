@@ -22,7 +22,7 @@
 #  - TMPDIR (set to a usable temporary directory)
 #  - NETDATA_NIGHTLIES_BASEURL (set the base url for downloading the dist tarball)
 
-# Next unused error code: U001D
+# Next unused error code: U001E
 
 set -e
 
@@ -758,12 +758,16 @@ parse_version() {
   printf "%03d%03d%03d%05d" "${maj}" "${min}" "${patch}" "${b}"
 }
 
-get_latest_version() {
-  if [ "${RELEASE_CHANNEL}" = "stable" ]; then
-    get_netdata_latest_tag "${NETDATA_STABLE_BASE_URL}"
-  else
-    get_netdata_latest_tag "${NETDATA_NIGHTLY_BASE_URL}"
+get_latest_tag() {
+  if [ -z "${_latest_tag}" ]; then
+    if [ "${RELEASE_CHANNEL}" = "stable" ]; then
+        _latest_tag="$(get_netdata_latest_tag "${NETDATA_STABLE_BASE_URL}")"
+    else
+        _latest_tag="$(get_netdata_latest_tag "${NETDATA_NIGHTLY_BASE_URL}")"
+    fi
   fi
+
+  echo "${_latest_tag}"
 }
 
 validate_environment_file() {
@@ -774,32 +778,33 @@ validate_environment_file() {
   fi
 }
 
-update_available() {
-  if [ "$NETDATA_FORCE_UPDATE" = "1" ]; then
-     info "Force update requested"
-     return 0
-  fi
-
+get_current_version() {
   basepath="$(dirname "$(dirname "$(dirname "${NETDATA_LIB_DIR}")")")"
   searchpath="${basepath}/bin:${basepath}/sbin:${basepath}/usr/bin:${basepath}/usr/sbin:${PATH}"
   searchpath="${basepath}/netdata/bin:${basepath}/netdata/sbin:${basepath}/netdata/usr/bin:${basepath}/netdata/usr/sbin:${searchpath}"
   ndbinary="$(PATH="${searchpath}" command -v netdata 2>/dev/null)"
 
   if [ -z "${ndbinary}" ]; then
-    current_version=0
+    _current_version=0
   else
-    current_version="$(parse_version "$(${ndbinary} -v | cut -f 2 -d ' ')")"
+    _current_version="$(parse_version "$(${ndbinary} -v | cut -f 2 -d ' ')")"
   fi
 
-  latest_tag="$(get_latest_version)"
-  latest_version="$(parse_version "${latest_tag}")"
-  path_version="$(echo "${latest_tag}" | cut -f 1 -d "-")"
+  echo "${_current_version:-0}"
+}
 
-  # If we can't get the current version for some reason assume `0`
-  current_version="${current_version:-0}"
+get_latest_version() {
+  parse_version "$(get_latest_tag)"
+}
 
-  # If we can't get the latest version for some reason assume `0`
-  latest_version="${latest_version:-0}"
+update_available() {
+  if [ "$NETDATA_FORCE_UPDATE" = "1" ]; then
+     info "Force update requested"
+     return 0
+  fi
+
+  current_version="$(get_current_version)"
+  latest_version="$(get_latest_version)"
 
   info "Current Version: ${current_version}"
   info "Latest Version: ${latest_version}"
@@ -887,7 +892,7 @@ update_build() {
       tar -xf netdata-latest.tar.gz >&3 2>&3
       rm netdata-latest.tar.gz >&3 2>&3
       if [ -z "$path_version" ]; then
-        latest_tag="$(get_latest_version)"
+        latest_tag="$(get_latest_tag)"
         path_version="$(echo "${latest_tag}" | cut -f 1 -d "-")"
       fi
       cd "$(find . -maxdepth 1 -type d -name "netdata-${path_version}*" | head -n 1)" || fatal "Failed to switch to build directory" U0017
@@ -1162,6 +1167,24 @@ update_binpkg() {
           env ${env} ${mark_auto_cmd} netdata-plugin-systemd-journal >&3 2>&3
         fi
       fi
+    fi
+  fi
+
+  current_version="$(get_current_version)"
+  latest_version="$(get_latest_version)"
+
+  if [ "${current_version}" -ne 0 ] && [ "${latest_version}" -ne 0 ]; then
+    if [ "${current_version}" -lt "${latest_version}" ]; then
+      error ""
+      error "NETDATA WAS NOT UPDATED!"
+      error ""
+      error "A newer version of Netdata is available, but the system package manager does not appear to have updated to that version."
+      error ""
+      error "Most likely, your system is not up to date, and you have it configured in a way that prevents updating Netdata from updating any of Netdata's dependencies."
+      error "Please try updating your system manually and then re-running the Netdata updater before reporting an issue with the update process."
+      error ""
+      fatal "Package manager did not actually update Netdata despite not reporting a failure." U001D
+      exit 1
     fi
   fi
 
