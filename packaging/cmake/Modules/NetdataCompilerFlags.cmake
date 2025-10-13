@@ -4,16 +4,6 @@
 include(CheckCCompilerFlag)
 include(CheckCXXCompilerFlag)
 
-# Construct a pre-processor safe name
-#
-# This takes a specified value, and assigns the generated name to the
-# specified target.
-function(make_cpp_safe_name value target)
-  string(REPLACE "-" "_" tmp "${value}")
-  string(REPLACE "=" "_" tmp "${tmp}")
-  set(${target} "${tmp}" PARENT_SCOPE)
-endfunction()
-
 # Conditionally add an extra compiler flag to C and C++ flags.
 #
 # If the language flags already match the `match` argument, skip this flag.
@@ -23,7 +13,7 @@ endfunction()
 function(add_extra_compiler_flag match flag result)
   set(CMAKE_REQUIRED_FLAGS "-Werror")
 
-  make_cpp_safe_name("${flag}" flag_name)
+  string(MAKE_C_IDENTIFIER "${flag}" flag_name)
 
   if(NOT ${CMAKE_C_FLAGS} MATCHES ${match})
     check_c_compiler_flag("${flag}" HAVE_C_${flag_name})
@@ -68,7 +58,7 @@ endfunction()
 function(add_required_compiler_flag flag)
   set(CMAKE_REQUIRED_FLAGS "-Werror")
 
-  make_cpp_safe_name("${flag}" flag_name)
+  string(MAKE_C_IDENTIFIER "${flag}" flag_name)
 
   check_c_compiler_flag("${flag}" HAVE_C_${flag_name})
   check_cxx_compiler_flag("${flag}" HAVE_CXX_${flag_name})
