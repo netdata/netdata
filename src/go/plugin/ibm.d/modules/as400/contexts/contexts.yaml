@@ -71,7 +71,7 @@ System:
       context: as400.main_storage_size
       title: Main Storage Size
       family: memory/overview
-      units: KiB
+      units: bytes
       type: line
       priority: 201
       dimensions:

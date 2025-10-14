@@ -16,10 +16,11 @@ import (
 
 const precision = 1000 // Precision multiplier for floating-point values
 
-func parseNumericValue(value string, multiplier int64) (int64, bool) {
+// cleanNumericString removes all non-numeric characters except digits, minus, and decimal point
+func cleanNumericString(value string) string {
 	trimmed := strings.TrimSpace(value)
 	if trimmed == "" || strings.EqualFold(trimmed, "NULL") || strings.EqualFold(trimmed, "N/A") {
-		return 0, false
+		return ""
 	}
 	cleaned := strings.Map(func(r rune) rune {
 		switch {
@@ -31,31 +32,72 @@ func parseNumericValue(value string, multiplier int64) (int64, bool) {
 			return -1
 		}
 	}, trimmed)
+	return cleaned
+}
+
+// parseInt64Value parses a value as int64 with optional multiplier, returns (result, ok)
+// Automatically handles both integers and floats from IBM i
+// Logs all parse attempts in debug mode
+func (a *Collector) parseInt64Value(value string, multiplier int64) (int64, bool) {
+	cleaned := cleanNumericString(value)
 	if cleaned == "" || cleaned == "-" || cleaned == "." {
+		a.Debugf("parseInt64Value: empty/invalid value='%s', cleaned='%s'", value, cleaned)
 		return 0, false
 	}
 	if strings.Count(cleaned, ".") > 1 {
-		// Too many decimal separators, treat as invalid
+		a.Debugf("parseInt64Value: too many decimal points, value='%s', cleaned='%s'", value, cleaned)
 		return 0, false
 	}
 	if multiplier <= 0 {
 		multiplier = 1
 	}
+
+	// Handle floats from IBM i (like memory sizes in MB: "8192.00")
 	if strings.Contains(cleaned, ".") {
 		f, err := strconv.ParseFloat(cleaned, 64)
 		if err != nil {
+			a.Debugf("parseInt64Value: ParseFloat failed, value='%s', cleaned='%s', error=%v", value, cleaned, err)
 			return 0, false
 		}
-		return int64(math.Round(f * float64(multiplier))), true
+		result := int64(math.Round(f * float64(multiplier)))
+		a.Debugf("parseInt64Value: float parsed, value='%s', float=%f, multiplier=%d, result=%d", value, f, multiplier, result)
+		return result, true
 	}
+
+	// Handle integers
 	v, err := strconv.ParseInt(cleaned, 10, 64)
 	if err != nil {
+		a.Debugf("parseInt64Value: ParseInt failed, value='%s', cleaned='%s', error=%v", value, cleaned, err)
 		return 0, false
 	}
-	if multiplier == 1 {
-		return v, true
+	result := v
+	if multiplier != 1 {
+		result = v * multiplier
 	}
-	return v * multiplier, true
+	a.Debugf("parseInt64Value: int parsed, value='%s', int=%d, multiplier=%d, result=%d", value, v, multiplier, result)
+	return result, true
+}
+
+// parseFloat64Value parses a value as float64, returns (result, ok)
+// Logs all parse attempts in debug mode
+func (a *Collector) parseFloat64Value(value string) (float64, bool) {
+	cleaned := cleanNumericString(value)
+	if cleaned == "" || cleaned == "-" || cleaned == "." {
+		a.Debugf("parseFloat64Value: empty/invalid value='%s', cleaned='%s'", value, cleaned)
+		return 0, false
+	}
+	if strings.Count(cleaned, ".") > 1 {
+		a.Debugf("parseFloat64Value: too many decimal points, value='%s', cleaned='%s'", value, cleaned)
+		return 0, false
+	}
+
+	f, err := strconv.ParseFloat(cleaned, 64)
+	if err != nil {
+		a.Debugf("parseFloat64Value: ParseFloat failed, value='%s', cleaned='%s', error=%v", value, cleaned, err)
+		return 0, false
+	}
+	a.Debugf("parseFloat64Value: parsed, value='%s', result=%f", value, f)
+	return f, true
 }
 
 func planCacheMetricKey(heading string) string {
@@ -99,8 +141,26 @@ func normalizeValue(value string) string {
 	return trimmed
 }
 
+// parseInt64OrZero parses value as int64, returns 0 on any error (no logging)
 func parseInt64OrZero(value string) int64 {
-	if v, err := strconv.ParseInt(strings.TrimSpace(value), 10, 64); err == nil {
+	cleaned := cleanNumericString(value)
+	if cleaned == "" || cleaned == "-" || cleaned == "." {
+		return 0
+	}
+	if strings.Count(cleaned, ".") > 1 {
+		return 0
+	}
+
+	// Handle floats
+	if strings.Contains(cleaned, ".") {
+		if f, err := strconv.ParseFloat(cleaned, 64); err == nil {
+			return int64(math.Round(f))
+		}
+		return 0
+	}
+
+	// Handle integers
+	if v, err := strconv.ParseInt(cleaned, 10, 64); err == nil {
 		return v
 	}
 	return 0
@@ -138,6 +198,11 @@ func (a *Collector) collect(ctx context.Context) error {
 func (a *Collector) collectSystemStatus(ctx context.Context) error {
 	// Use comprehensive query to get all system status metrics at once
 	err := a.doQuery(ctx, a.systemStatusQuery(), func(column, value string, lineEnd bool) {
+		// Debug log all columns to see what we're receiving
+		if strings.Contains(column, "STORAGE") || strings.Contains(column, "MEMORY") {
+			a.Debugf("collectSystemStatus: column='%s', value='%s'", column, value)
+		}
+
 		// Skip empty values
 		if value == "" {
 			return
@@ -147,73 +212,73 @@ func (a *Collector) collectSystemStatus(ctx context.Context) error {
 		// CPU metrics
 		case "AVERAGE_CPU_UTILIZATION":
 			// AVERAGE_CPU_UTILIZATION is system-wide 0-100% (deprecated in IBM i 7.4+)
-			if v, err := strconv.ParseFloat(value, 64); err == nil {
-				a.mx.CPUPercentage = int64(v * precision)
+			if v, ok := a.parseInt64Value(value, precision); ok {
+				a.mx.CPUPercentage = v
 			}
 		case "CURRENT_CPU_CAPACITY":
 			// CURRENT_CPU_CAPACITY comes from IBM as decimal fraction (0.0-1.0)
 			// Convert to percentage by multiplying by 100
-			if v, err := strconv.ParseFloat(value, 64); err == nil {
-				a.mx.CurrentCPUCapacity = int64(v * 100.0 * precision)
+			if v, ok := a.parseInt64Value(value, precision); ok {
+				a.mx.CurrentCPUCapacity = v
 			}
 		case "CONFIGURED_CPUS":
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			if v, ok := a.parseInt64Value(value, 1); ok {
 				a.mx.ConfiguredCPUs = v
 			}
 
 		// Memory metrics
 		case "MAIN_STORAGE_SIZE":
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-				a.mx.MainStorageSize = v // KB
+			if v, ok := a.parseInt64Value(value, 1024); ok { // Convert KB to bytes
+				a.mx.MainStorageSize = v
 			}
 		case "CURRENT_TEMPORARY_STORAGE":
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			if v, ok := a.parseInt64Value(value, 1); ok {
 				a.mx.CurrentTemporaryStorage = v // MB
 			}
 		case "MAXIMUM_TEMPORARY_STORAGE_USED":
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			if v, ok := a.parseInt64Value(value, 1); ok {
 				a.mx.MaximumTemporaryStorageUsed = v // MB
 			}
 
 		// Job metrics
 		case "TOTAL_JOBS_IN_SYSTEM":
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			if v, ok := a.parseInt64Value(value, 1); ok {
 				a.mx.TotalJobsInSystem = v
 			}
 		case "ACTIVE_JOBS_IN_SYSTEM":
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			if v, ok := a.parseInt64Value(value, 1); ok {
 				a.mx.ActiveJobsInSystem = v
 			}
 		case "INTERACTIVE_JOBS_IN_SYSTEM":
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			if v, ok := a.parseInt64Value(value, 1); ok {
 				a.mx.InteractiveJobsInSystem = v
 			}
 		case "BATCH_RUNNING":
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			if v, ok := a.parseInt64Value(value, 1); ok {
 				a.mx.BatchJobsRunning = v
 			}
 
 		// Storage metrics
 		case "SYSTEM_ASP_USED":
-			if v, err := strconv.ParseFloat(value, 64); err == nil {
-				a.mx.SystemASPUsed = int64(v * precision)
+			if v, ok := a.parseInt64Value(value, precision); ok {
+				a.mx.SystemASPUsed = v
 			}
 		case "SYSTEM_ASP_STORAGE":
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			if v, ok := a.parseInt64Value(value, 1); ok {
 				a.mx.SystemASPStorage = v // MB
 			}
 		case "TOTAL_AUXILIARY_STORAGE":
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			if v, ok := a.parseInt64Value(value, 1); ok {
 				a.mx.TotalAuxiliaryStorage = v // MB
 			}
 
 		// Thread metrics
 		case "ACTIVE_THREADS_IN_SYSTEM":
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			if v, ok := a.parseInt64Value(value, 1); ok {
 				a.mx.ActiveThreadsInSystem = v
 			}
 		case "THREADS_PER_PROCESSOR":
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			if v, ok := a.parseInt64Value(value, 1); ok {
 				a.mx.ThreadsPerProcessor = v
 			}
 		}
@@ -233,7 +298,7 @@ func (a *Collector) collectMemoryPools(ctx context.Context) error {
 		case "POOL_NAME":
 			currentPoolName = value
 		case "CURRENT_SIZE":
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			if v, ok := a.parseInt64Value(value, 1024*1024); ok { // Convert MB to bytes
 				switch currentPoolName {
 				case "*MACHINE":
 					a.mx.MachinePoolSize = v
@@ -246,7 +311,7 @@ func (a *Collector) collectMemoryPools(ctx context.Context) error {
 				}
 			}
 		case "DEFINED_SIZE":
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			if v, ok := a.parseInt64Value(value, 1024*1024); ok { // Convert MB to bytes
 				switch currentPoolName {
 				case "*MACHINE":
 					a.mx.MachinePoolDefinedSize = v
@@ -255,7 +320,7 @@ func (a *Collector) collectMemoryPools(ctx context.Context) error {
 				}
 			}
 		case "RESERVED_SIZE":
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			if v, ok := a.parseInt64Value(value, 1024*1024); ok { // Convert MB to bytes
 				switch currentPoolName {
 				case "*MACHINE":
 					a.mx.MachinePoolReservedSize = v
@@ -264,7 +329,7 @@ func (a *Collector) collectMemoryPools(ctx context.Context) error {
 				}
 			}
 		case "CURRENT_THREADS":
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			if v, ok := a.parseInt64Value(value, 1); ok {
 				switch currentPoolName {
 				case "*MACHINE":
 					a.mx.MachinePoolThreads = v
@@ -273,7 +338,7 @@ func (a *Collector) collectMemoryPools(ctx context.Context) error {
 				}
 			}
 		case "MAXIMUM_ACTIVE_THREADS":
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			if v, ok := a.parseInt64Value(value, 1); ok {
 				switch currentPoolName {
 				case "*MACHINE":
 					a.mx.MachinePoolMaxThreads = v
@@ -289,8 +354,8 @@ func (a *Collector) collectDiskStatus(ctx context.Context) error {
 	// Try modern query first
 	err := a.doQuery(ctx, queryDiskStatus, func(column, value string, lineEnd bool) {
 		if column == "AVG_DISK_BUSY" {
-			if v, err := strconv.ParseFloat(value, 64); err == nil {
-				a.mx.DiskBusyPercentage = int64(v * precision)
+			if v, ok := a.parseInt64Value(value, precision); ok {
+				a.mx.DiskBusyPercentage = v
 			}
 		}
 	})
@@ -302,7 +367,7 @@ func (a *Collector) collectJobInfo(ctx context.Context) error {
 	// Try modern query first
 	err := a.doQuery(ctx, queryJobInfo, func(column, value string, lineEnd bool) {
 		if column == "JOB_QUEUE_LENGTH" {
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			if v, ok := a.parseInt64Value(value, 1); ok {
 				a.mx.JobQueueLength = v
 			}
 		}
@@ -570,8 +635,8 @@ func (a *Collector) collectDiskInstances(ctx context.Context) error {
 		case "PERCENT_BUSY":
 			if currentUnit != "" && a.disks[currentUnit] != nil {
 				disk := a.disks[currentUnit]
-				if v, err := strconv.ParseFloat(value, 64); err == nil {
-					disk.busyPercent = int64(v * precision)
+				if v, ok := a.parseInt64Value(value, precision); ok {
+					disk.busyPercent = v
 					if m, ok := a.mx.disks[currentUnit]; ok {
 						m.BusyPercent = disk.busyPercent
 						a.mx.disks[currentUnit] = m
@@ -585,7 +650,7 @@ func (a *Collector) collectDiskInstances(ctx context.Context) error {
 		case "READ_REQUESTS":
 			if currentUnit != "" && a.disks[currentUnit] != nil {
 				disk := a.disks[currentUnit]
-				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				if v, ok := a.parseInt64Value(value, 1); ok {
 					disk.readRequests = v
 					if m, ok := a.mx.disks[currentUnit]; ok {
 						m.ReadRequests = v
@@ -596,7 +661,7 @@ func (a *Collector) collectDiskInstances(ctx context.Context) error {
 		case "WRITE_REQUESTS":
 			if currentUnit != "" && a.disks[currentUnit] != nil {
 				disk := a.disks[currentUnit]
-				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				if v, ok := a.parseInt64Value(value, 1); ok {
 					disk.writeRequests = v
 					if m, ok := a.mx.disks[currentUnit]; ok {
 						m.WriteRequests = v
@@ -606,46 +671,46 @@ func (a *Collector) collectDiskInstances(ctx context.Context) error {
 			}
 		case "PERCENT_USED":
 			if currentUnit != "" && a.disks[currentUnit] != nil {
-				if v, err := strconv.ParseFloat(value, 64); err == nil {
+				if v, ok := a.parseInt64Value(value, precision); ok {
 					if m, ok := a.mx.disks[currentUnit]; ok {
-						m.PercentUsed = int64(v * precision)
+						m.PercentUsed = v
 						a.mx.disks[currentUnit] = m
 					} else {
 						a.mx.disks[currentUnit] = diskInstanceMetrics{
-							PercentUsed: int64(v * precision),
+							PercentUsed: v,
 						}
 					}
 				}
 			}
 		case "UNIT_SPACE_AVAILABLE_GB":
 			if currentUnit != "" && a.disks[currentUnit] != nil {
-				if v, err := strconv.ParseFloat(value, 64); err == nil {
+				if v, ok := a.parseInt64Value(value, precision); ok {
 					if m, ok := a.mx.disks[currentUnit]; ok {
-						m.AvailableGB = int64(v * precision)
+						m.AvailableGB = v
 						a.mx.disks[currentUnit] = m
 					} else {
 						a.mx.disks[currentUnit] = diskInstanceMetrics{
-							AvailableGB: int64(v * precision),
+							AvailableGB: v,
 						}
 					}
 				}
 			}
 		case "UNIT_STORAGE_CAPACITY":
 			if currentUnit != "" && a.disks[currentUnit] != nil {
-				if v, err := strconv.ParseFloat(value, 64); err == nil {
+				if v, ok := a.parseInt64Value(value, precision); ok {
 					if m, ok := a.mx.disks[currentUnit]; ok {
-						m.CapacityGB = int64(v * precision)
+						m.CapacityGB = v
 						a.mx.disks[currentUnit] = m
 					} else {
 						a.mx.disks[currentUnit] = diskInstanceMetrics{
-							CapacityGB: int64(v * precision),
+							CapacityGB: v,
 						}
 					}
 				}
 			}
 		case "TOTAL_BLOCKS_READ":
 			if currentUnit != "" && a.disks[currentUnit] != nil {
-				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				if v, ok := a.parseInt64Value(value, 1); ok {
 					if m, ok := a.mx.disks[currentUnit]; ok {
 						m.BlocksRead = v
 						a.mx.disks[currentUnit] = m
@@ -658,7 +723,7 @@ func (a *Collector) collectDiskInstances(ctx context.Context) error {
 			}
 		case "TOTAL_BLOCKS_WRITTEN":
 			if currentUnit != "" && a.disks[currentUnit] != nil {
-				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				if v, ok := a.parseInt64Value(value, 1); ok {
 					if m, ok := a.mx.disks[currentUnit]; ok {
 						m.BlocksWritten = v
 						a.mx.disks[currentUnit] = m
@@ -671,7 +736,7 @@ func (a *Collector) collectDiskInstances(ctx context.Context) error {
 			}
 		case "SSD_LIFE_REMAINING":
 			if currentUnit != "" && a.disks[currentUnit] != nil {
-				if v, err := strconv.ParseInt(value, 10, 64); err == nil && v > 0 {
+				if v := parseInt64OrZero(value); v > 0 {
 					disk := a.disks[currentUnit]
 					disk.ssdLifeRemaining = v
 					if m, ok := a.mx.disks[currentUnit]; ok {
@@ -686,7 +751,7 @@ func (a *Collector) collectDiskInstances(ctx context.Context) error {
 			}
 		case "SSD_POWER_ON_DAYS":
 			if currentUnit != "" && a.disks[currentUnit] != nil {
-				if v, err := strconv.ParseInt(value, 10, 64); err == nil && v > 0 {
+				if v := parseInt64OrZero(value); v > 0 {
 					disk := a.disks[currentUnit]
 					disk.ssdPowerOnDays = v
 					if m, ok := a.mx.disks[currentUnit]; ok {
@@ -763,9 +828,7 @@ func (a *Collector) countDisks(ctx context.Context) (int, error) {
 	var count int
 	err := a.doQuery(ctx, queryCountDisks, func(column, value string, lineEnd bool) {
 		if column == "COUNT" {
-			if v, err := strconv.Atoi(value); err == nil {
-				count = v
-			}
+			count = int(parseInt64OrZero(value))
 		}
 	})
 	return count, err
@@ -776,19 +839,19 @@ func (a *Collector) collectNetworkConnections(ctx context.Context) error {
 	return a.doQuery(ctx, queryNetworkConnections, func(column, value string, lineEnd bool) {
 		switch column {
 		case "REMOTE_CONNECTIONS":
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			if v, ok := a.parseInt64Value(value, 1); ok {
 				a.mx.RemoteConnections = v
 			}
 		case "TOTAL_CONNECTIONS":
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			if v, ok := a.parseInt64Value(value, 1); ok {
 				a.mx.TotalConnections = v
 			}
 		case "LISTEN_CONNECTIONS":
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			if v, ok := a.parseInt64Value(value, 1); ok {
 				a.mx.ListenConnections = v
 			}
 		case "CLOSEWAIT_CONNECTIONS":
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			if v, ok := a.parseInt64Value(value, 1); ok {
 				a.mx.CloseWaitConnections = v
 			}
 		}
@@ -799,7 +862,7 @@ func (a *Collector) countNetworkInterfaces(ctx context.Context) (int, error) {
 	var count int
 	err := a.doQueryRow(ctx, queryCountNetworkInterfaces, func(column, value string) {
 		if column == "COUNT" {
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			if v, ok := a.parseInt64Value(value, 1); ok {
 				count = int(v)
 			}
 		}
@@ -811,7 +874,7 @@ func (a *Collector) countMessageQueues(ctx context.Context) (int, error) {
 	var count int
 	err := a.doQueryRow(ctx, queryCountMessageQueues, func(column, value string) {
 		if column == "COUNT" {
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			if v, ok := a.parseInt64Value(value, 1); ok {
 				count = int(v)
 			}
 		}
@@ -823,7 +886,7 @@ func (a *Collector) countOutputQueues(ctx context.Context) (int, error) {
 	var count int
 	err := a.doQueryRow(ctx, queryCountOutputQueues, func(column, value string) {
 		if column == "COUNT" {
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			if v, ok := a.parseInt64Value(value, 1); ok {
 				count = int(v)
 			}
 		}
@@ -835,7 +898,7 @@ func (a *Collector) countHTTPServers(ctx context.Context) (int, error) {
 	var count int64
 	err := a.doQueryRow(ctx, queryCountHTTPServers, func(column, value string) {
 		if column == "COUNT" {
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			if v, ok := a.parseInt64Value(value, 1); ok {
 				count = v
 			}
 		}
@@ -859,7 +922,7 @@ func (a *Collector) countSubsystems(ctx context.Context) (int, error) {
 	var count int64
 	err := a.doQueryRow(ctx, queryCountSubsystems, func(column, value string) {
 		if column == "COUNT" {
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			if v, ok := a.parseInt64Value(value, 1); ok {
 				count = v
 			}
 		}
@@ -871,7 +934,7 @@ func (a *Collector) countJobQueues(ctx context.Context) (int, error) {
 	var count int64
 	err := a.doQueryRow(ctx, queryCountJobQueues, func(column, value string) {
 		if column == "COUNT" {
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			if v, ok := a.parseInt64Value(value, 1); ok {
 				count = v
 			}
 		}
@@ -885,11 +948,11 @@ func (a *Collector) collectTempStorage(ctx context.Context) error {
 	err := a.doQuery(ctx, queryTempStorageTotal, func(column, value string, lineEnd bool) {
 		switch column {
 		case "CURRENT_SIZE":
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			if v, ok := a.parseInt64Value(value, 1); ok {
 				a.mx.TempStorageCurrentTotal = v
 			}
 		case "PEAK_SIZE":
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			if v, ok := a.parseInt64Value(value, 1); ok {
 				a.mx.TempStoragePeakTotal = v
 			}
 		}
@@ -908,7 +971,7 @@ func (a *Collector) collectTempStorage(ctx context.Context) error {
 
 		case "CURRENT_SIZE":
 			if currentBucket != "" && a.tempStorageNamed[currentBucket] != nil {
-				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				if v, ok := a.parseInt64Value(value, 1); ok {
 					if m, ok := a.mx.tempStorageNamed[currentBucket]; ok {
 						m.CurrentSize = v
 						a.mx.tempStorageNamed[currentBucket] = m
@@ -921,7 +984,7 @@ func (a *Collector) collectTempStorage(ctx context.Context) error {
 			}
 		case "PEAK_SIZE":
 			if currentBucket != "" && a.tempStorageNamed[currentBucket] != nil {
-				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				if v, ok := a.parseInt64Value(value, 1); ok {
 					if m, ok := a.mx.tempStorageNamed[currentBucket]; ok {
 						m.PeakSize = v
 						a.mx.tempStorageNamed[currentBucket] = m
@@ -971,7 +1034,7 @@ func (a *Collector) collectSubsystems(ctx context.Context) error {
 
 		case "CURRENT_ACTIVE_JOBS":
 			if currentSubsystem != "" && a.subsystems[currentSubsystem] != nil {
-				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				if v, ok := a.parseInt64Value(value, 1); ok {
 					if m, ok := a.mx.subsystems[currentSubsystem]; ok {
 						m.CurrentActiveJobs = v
 						a.mx.subsystems[currentSubsystem] = m
@@ -984,7 +1047,7 @@ func (a *Collector) collectSubsystems(ctx context.Context) error {
 			}
 		case "MAXIMUM_ACTIVE_JOBS":
 			if currentSubsystem != "" && a.subsystems[currentSubsystem] != nil {
-				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				if v, ok := a.parseInt64Value(value, 1); ok {
 					if m, ok := a.mx.subsystems[currentSubsystem]; ok {
 						m.MaximumActiveJobs = v
 						a.mx.subsystems[currentSubsystem] = m
@@ -1039,7 +1102,7 @@ func (a *Collector) collectJobQueues(ctx context.Context) error {
 
 		case "NUMBER_OF_JOBS":
 			if currentQueue != "" && a.jobQueues[currentQueue] != nil {
-				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				if v, ok := a.parseInt64Value(value, 1); ok {
 					if m, ok := a.mx.jobQueues[currentQueue]; ok {
 						m.NumberOfJobs = v
 						a.mx.jobQueues[currentQueue] = m
@@ -1102,38 +1165,38 @@ func (a *Collector) collectDiskInstancesEnhanced(ctx context.Context) error {
 			}
 		case "PERCENT_USED":
 			if currentUnit != "" && a.disks[currentUnit] != nil {
-				if v, err := strconv.ParseFloat(value, 64); err == nil {
+				if v, ok := a.parseInt64Value(value, precision); ok {
 					if m, ok := a.mx.disks[currentUnit]; ok {
-						m.PercentUsed = int64(v * precision)
+						m.PercentUsed = v
 						a.mx.disks[currentUnit] = m
 					} else {
 						a.mx.disks[currentUnit] = diskInstanceMetrics{
-							PercentUsed: int64(v * precision),
+							PercentUsed: v,
 						}
 					}
 				}
 			}
 		case "UNIT_SPACE_AVAILABLE_GB":
 			if currentUnit != "" && a.disks[currentUnit] != nil {
-				if v, err := strconv.ParseFloat(value, 64); err == nil {
+				if v, ok := a.parseInt64Value(value, precision); ok {
 					if m, ok := a.mx.disks[currentUnit]; ok {
-						m.AvailableGB = int64(v * precision)
+						m.AvailableGB = v
 						a.mx.disks[currentUnit] = m
 					}
 				}
 			}
 		case "UNIT_STORAGE_CAPACITY":
 			if currentUnit != "" && a.disks[currentUnit] != nil {
-				if v, err := strconv.ParseFloat(value, 64); err == nil {
+				if v, ok := a.parseInt64Value(value, precision); ok {
 					if m, ok := a.mx.disks[currentUnit]; ok {
-						m.CapacityGB = int64(v * precision)
+						m.CapacityGB = v
 						a.mx.disks[currentUnit] = m
 					}
 				}
 			}
 		case "TOTAL_READ_REQUESTS":
 			if currentUnit != "" && a.disks[currentUnit] != nil {
-				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				if v, ok := a.parseInt64Value(value, 1); ok {
 					if m, ok := a.mx.disks[currentUnit]; ok {
 						m.ReadRequests = v
 						a.mx.disks[currentUnit] = m
@@ -1142,7 +1205,7 @@ func (a *Collector) collectDiskInstancesEnhanced(ctx context.Context) error {
 			}
 		case "TOTAL_WRITE_REQUESTS":
 			if currentUnit != "" && a.disks[currentUnit] != nil {
-				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				if v, ok := a.parseInt64Value(value, 1); ok {
 					if m, ok := a.mx.disks[currentUnit]; ok {
 						m.WriteRequests = v
 						a.mx.disks[currentUnit] = m
@@ -1151,7 +1214,7 @@ func (a *Collector) collectDiskInstancesEnhanced(ctx context.Context) error {
 			}
 		case "TOTAL_BLOCKS_READ":
 			if currentUnit != "" && a.disks[currentUnit] != nil {
-				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				if v, ok := a.parseInt64Value(value, 1); ok {
 					if m, ok := a.mx.disks[currentUnit]; ok {
 						m.BlocksRead = v
 						a.mx.disks[currentUnit] = m
@@ -1160,7 +1223,7 @@ func (a *Collector) collectDiskInstancesEnhanced(ctx context.Context) error {
 			}
 		case "TOTAL_BLOCKS_WRITTEN":
 			if currentUnit != "" && a.disks[currentUnit] != nil {
-				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				if v, ok := a.parseInt64Value(value, 1); ok {
 					if m, ok := a.mx.disks[currentUnit]; ok {
 						m.BlocksWritten = v
 						a.mx.disks[currentUnit] = m
@@ -1169,16 +1232,16 @@ func (a *Collector) collectDiskInstancesEnhanced(ctx context.Context) error {
 			}
 		case "ELAPSED_PERCENT_BUSY":
 			if currentUnit != "" && a.disks[currentUnit] != nil {
-				if v, err := strconv.ParseFloat(value, 64); err == nil {
+				if v, ok := a.parseInt64Value(value, precision); ok {
 					if m, ok := a.mx.disks[currentUnit]; ok {
-						m.BusyPercent = int64(v * precision)
+						m.BusyPercent = v
 						a.mx.disks[currentUnit] = m
 					}
 				}
 			}
 		case "SSD_LIFE_REMAINING":
 			if currentUnit != "" && a.disks[currentUnit] != nil {
-				if v, err := strconv.ParseInt(value, 10, 64); err == nil && v > 0 {
+				if v := parseInt64OrZero(value); v > 0 {
 					disk := a.disks[currentUnit]
 					disk.ssdLifeRemaining = v
 					if m, ok := a.mx.disks[currentUnit]; ok {
@@ -1189,7 +1252,7 @@ func (a *Collector) collectDiskInstancesEnhanced(ctx context.Context) error {
 			}
 		case "SSD_POWER_ON_DAYS":
 			if currentUnit != "" && a.disks[currentUnit] != nil {
-				if v, err := strconv.ParseInt(value, 10, 64); err == nil && v > 0 {
+				if v := parseInt64OrZero(value); v > 0 {
 					disk := a.disks[currentUnit]
 					disk.ssdPowerOnDays = v
 					if m, ok := a.mx.disks[currentUnit]; ok {
@@ -1313,7 +1376,7 @@ func (a *Collector) collectNetworkInterfaces(ctx context.Context) error {
 				return
 			}
 			intf := a.getNetworkInterfaceMetrics(currentInterface)
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			if v, ok := a.parseInt64Value(value, 1); ok {
 				intf.mtu = v
 				clean := cleanName(currentInterface)
 				entry := a.mx.networkInterfaces[clean]
@@ -1369,7 +1432,7 @@ func (a *Collector) collectHTTPServerInfo(ctx context.Context) error {
 			if currentKey == "" {
 				return
 			}
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			if v, ok := a.parseInt64Value(value, 1); ok {
 				entry := a.mx.httpServers[currentKey]
 				entry.NormalConnections = v
 				a.mx.httpServers[currentKey] = entry
@@ -1378,7 +1441,7 @@ func (a *Collector) collectHTTPServerInfo(ctx context.Context) error {
 			if currentKey == "" {
 				return
 			}
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			if v, ok := a.parseInt64Value(value, 1); ok {
 				entry := a.mx.httpServers[currentKey]
 				entry.SSLConnections = v
 				a.mx.httpServers[currentKey] = entry
@@ -1387,7 +1450,7 @@ func (a *Collector) collectHTTPServerInfo(ctx context.Context) error {
 			if currentKey == "" {
 				return
 			}
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			if v, ok := a.parseInt64Value(value, 1); ok {
 				entry := a.mx.httpServers[currentKey]
 				entry.ActiveThreads = v
 				a.mx.httpServers[currentKey] = entry
@@ -1396,7 +1459,7 @@ func (a *Collector) collectHTTPServerInfo(ctx context.Context) error {
 			if currentKey == "" {
 				return
 			}
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			if v, ok := a.parseInt64Value(value, 1); ok {
 				entry := a.mx.httpServers[currentKey]
 				entry.IdleThreads = v
 				a.mx.httpServers[currentKey] = entry
@@ -1405,7 +1468,7 @@ func (a *Collector) collectHTTPServerInfo(ctx context.Context) error {
 			if currentKey == "" {
 				return
 			}
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			if v, ok := a.parseInt64Value(value, 1); ok {
 				entry := a.mx.httpServers[currentKey]
 				entry.TotalRequests = v
 				a.mx.httpServers[currentKey] = entry
@@ -1414,7 +1477,7 @@ func (a *Collector) collectHTTPServerInfo(ctx context.Context) error {
 			if currentKey == "" {
 				return
 			}
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			if v, ok := a.parseInt64Value(value, 1); ok {
 				entry := a.mx.httpServers[currentKey]
 				entry.TotalResponses = v
 				a.mx.httpServers[currentKey] = entry
@@ -1423,7 +1486,7 @@ func (a *Collector) collectHTTPServerInfo(ctx context.Context) error {
 			if currentKey == "" {
 				return
 			}
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			if v, ok := a.parseInt64Value(value, 1); ok {
 				entry := a.mx.httpServers[currentKey]
 				entry.TotalRequestsRejected = v
 				a.mx.httpServers[currentKey] = entry
@@ -1432,7 +1495,7 @@ func (a *Collector) collectHTTPServerInfo(ctx context.Context) error {
 			if currentKey == "" {
 				return
 			}
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			if v, ok := a.parseInt64Value(value, 1); ok {
 				entry := a.mx.httpServers[currentKey]
 				entry.BytesReceived = v
 				a.mx.httpServers[currentKey] = entry
@@ -1441,7 +1504,7 @@ func (a *Collector) collectHTTPServerInfo(ctx context.Context) error {
 			if currentKey == "" {
 				return
 			}
-			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+			if v, ok := a.parseInt64Value(value, 1); ok {
 				entry := a.mx.httpServers[currentKey]
 				entry.BytesSent = v
 				a.mx.httpServers[currentKey] = entry
@@ -1480,7 +1543,7 @@ func (a *Collector) collectPlanCache(ctx context.Context) error {
 			if key == "" {
 				return
 			}
-			if parsed, ok := parseNumericValue(value, precision); ok {
+			if parsed, ok := a.parseInt64Value(value, precision); ok {
 				if meta := a.getPlanCacheMetrics(key, currentHeading); meta != nil {
 					meta.heading = currentHeading
 				}
@@ -1516,21 +1579,21 @@ func (a *Collector) collectSystemActivity(ctx context.Context) error {
 		case "TOTAL_CPU_TIME":
 			// This will be NULL if user doesn't have *JOBCTL authority
 			if value != "" && !strings.EqualFold(value, "NULL") {
-				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				if v, ok := a.parseInt64Value(value, 1); ok {
 					totalCPUTime = v
 					hasTotalCPUTime = true
 				}
 			}
 		case "ELAPSED_TIME":
 			if value != "" && !strings.EqualFold(value, "NULL") {
-				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+				if v, ok := a.parseInt64Value(value, 1); ok {
 					elapsedTime = v
 					hasElapsedData = true
 				}
 			}
 		case "ELAPSED_CPU_USED":
 			if value != "" && !strings.EqualFold(value, "NULL") {
-				if v, err := strconv.ParseFloat(value, 64); err == nil {
+				if v, ok := a.parseFloat64Value(value); ok {
 					elapsedCPUUsed = v
 				}
 			}

@@ -346,16 +346,13 @@ func convertValue(cValue *C.odbc_value_t) driver.Value {
 
 	switch DataType(cValue._type) {
 	case TypeInt64:
-		return int64(cValue.data[0])
+		return int64(C.odbc_value_get_int64(cValue))
 	case TypeDouble:
-		// Handle double properly
-		doublePtr := (*float64)(unsafe.Pointer(&cValue.data[0]))
-		return *doublePtr
+		return float64(C.odbc_value_get_double(cValue))
 	case TypeString:
-		// String is stored as a pointer in the union
-		strPtr := (*unsafe.Pointer)(unsafe.Pointer(&cValue.data[0]))
-		if *strPtr != nil {
-			return C.GoString((*C.char)(*strPtr))
+		str := C.odbc_value_get_string(cValue)
+		if str != nil {
+			return C.GoString(str)
 		}
 		return ""
 	default:

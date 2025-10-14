@@ -84,7 +84,7 @@ Metrics:
 | as400.total_jobs | total | jobs |
 | as400.active_jobs_by_type | batch, interactive, active | jobs |
 | as400.job_queue_length | waiting | jobs |
-| as400.main_storage_size | total | KiB |
+| as400.main_storage_size | total | bytes |
 | as400.temporary_storage | current, maximum | MiB |
 | as400.memory_pool_usage | machine, base, interactive, spool | bytes |
 | as400.memory_pool_defined | machine, base | bytes |

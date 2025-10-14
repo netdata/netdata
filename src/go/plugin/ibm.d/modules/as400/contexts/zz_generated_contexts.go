@@ -2345,7 +2345,7 @@ var System = struct {
 			Name:        "as400.main_storage_size",
 			Family:      "memory/overview",
 			Title:       "Main Storage Size",
-			Units:       "KiB",
+			Units:       "bytes",
 			Type:        module.Line,
 			Priority:    201,
 			UpdateEvery: 1,

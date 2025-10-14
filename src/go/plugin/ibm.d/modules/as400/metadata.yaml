@@ -442,7 +442,7 @@ modules:
                 - name: waiting
             - name: as400.main_storage_size
               description: Main Storage Size
-              unit: KiB
+              unit: bytes
               chart_type: line
               dimensions:
                 - name: total
