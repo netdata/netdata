@@ -6,7 +6,7 @@ _Last updated: 2025-10-14_
 - Streaming is broken by our traced fetch wrapper; fix it first to restore realtime output.
 - Core library violates the “silent core” contract (sync FS + stderr writes) and the agent loop can no longer finish without calling `agent__final_report`.
 - `AIAgentSession` and `BaseLLMProvider` are monolithic and need to be split; we also duplicate loader/concurrency logic.
-- Reliability gaps: no transport-level retries/circuit breakers, limited observability, and automated coverage stops at the phase1 harness (no provider/rest e2e tests or CI gating).
+- Reliability gaps: no transport-level retries/circuit breakers, limited observability, and automated coverage stops at the phase1 harness (no provider/rest e2e tests or CI gating). Expanded coverage remains an active workstream.
 
 ## P0 — Critical (breaks core behavior or architecture)
 - **Streaming regression** — `src/llm-client.ts:199-338` eagerly reads cloned JSON/SSE bodies inside `createTracedFetch`. Streaming stalls until the full response downloads and doubles bandwidth. _Fix_: capture routing/cost metadata without consuming the live body (inspect headers, wrap the stream, or buffer _after_ the provider completes).

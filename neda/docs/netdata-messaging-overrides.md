@@ -106,6 +106,7 @@ Especially regarding configuration and maintenance, users MUST:
 **Core truths to preserve**:
 
 It is against our terms of service for freelancers and professionals to use our Community and Homelab plans.
-All professionals MUST use the Business plan.
+
+**CRITICAL:** All freelancers and professionals MUST use Netdata CLoud **Business plan**.
 
 ---

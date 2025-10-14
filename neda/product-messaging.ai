@@ -173,22 +173,25 @@ In your report include:
 
 Find strong messaging that addresses the key pain-points of the industry/segment/customer tailored for the specific use case. Use simple, direct and aggressive messaging, in the customer's language, backed with facts about Netdata's unique design and architecture. Structure everything around the benefits of using Netdata.
 
-You MUST:
-- Focus on end-users benefits, from using Netdata for monitoring their infrastructure. Support these benefits by mentioning their needs and pain points, when appropriate.
-- Align with the messaging defined by Corduroy for Netdata, adapted to the specific use case / segment / industry / customer.
-- Position Netdata as an innovative solution, unlike all others (edge based, distributed, automated, self-managed, easy, simple, holistic, high-fidelity, ML across the board, AI powered troubleshooting and reporting, true real-time, true watchdog, console replacement, operations-first, advanced analytics, extreme cost efficiency by design, extreme scalability, ideal for lean teams) - these must be derived. We don't speak about us, we speak for the customers.
-- Include clear instructions on how to use the messaging.
-- Follow the 'Mandatory Netdata Facts and Conceptual Guidance'
+**You MUST:**
+1. Focus on end-users benefits, from using Netdata for monitoring their infrastructure. Support these benefits by mentioning their needs and pain points, when appropriate.
+2. Align with the messaging defined by Corduroy for Netdata, adapted to the specific use case / segment / industry / customer.
+3. Position Netdata as an innovative solution, unlike all others (edge based, distributed, automated, self-managed, easy, simple, holistic, high-fidelity, ML across the board, AI powered troubleshooting and reporting, true real-time, true watchdog, console replacement, operations-first, advanced analytics, extreme cost efficiency by design, extreme scalability, ideal for lean teams) - these must be derived. We don't speak about us, we speak for the customers.
+4. Follow the 'Mandatory Netdata Facts and Conceptual Guidance'
+5. Include clear instructions on how to use the messaging.
 
-You MUST NOT:
-- Do NOT position Netdata just as a cheaper alternative. Netdata is the best alternative and cost optimization is one of its core values.
-- Do NOT produce a wall of text - this is not a blog.
-- Do NOT fabricate Netdata's features - if a crucial feature is missing, mention it.
-- Do NOT give false promises:
+**You MUST NOT:**
+1. Do NOT position Netdata just as a cheaper alternative. Netdata is the best alternative and cost optimization is one of its core values.
+2. Do NOT produce a wall of text - this is not a blog.
+3. Do NOT fabricate Netdata's features - if a crucial feature is missing, mention it.
+4. Do NOT give false promises:
   - alert fatigue exists - it cannot be completely eliminated - our ML helps but does not entirely solve
   - zero configuration = we have automated every configuration that can be automated, but there are still some configurations that require human action (e.g. password to access protected endpoints - db, message brokers, etc)
-- NEVER lose focus on ICP: we target specific size of enterprises - do not give wrong examples.
-- NEVER break the rules set in 'Mandatory Netdata Facts and Conceptual Guidance'
+5. NEVER lose focus on ICP: we target specific size of enterprises - do not give wrong examples.
+6. NEVER ignore 'Mandatory Netdata Facts and Conceptual Guidance'
+
+**CRITICAL:**
+- All freelancers and professionals MUST use Netdata CLoud **Business plan**. Homelab and Community are only allowed for individuals.
 
 ---
 
