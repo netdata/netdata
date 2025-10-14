@@ -62,7 +62,7 @@ func (g *DocGenerator) parseConfigFromGoFile() ([]ConfigField, map[string]interf
 	var missingDefaults []string
 	for i := range fields {
 		field := &fields[i]
-		if field.GoType == "framework.AutoBool" {
+		if isAutoBoolType(field.GoType) {
 			field.Type = "string"
 			field.Enum = toStringSlice(confopt.AutoBoolEnum)
 		}
@@ -70,7 +70,7 @@ func (g *DocGenerator) parseConfigFromGoFile() ([]ConfigField, map[string]interf
 		if defaultValue, exists := defaults[field.Name]; exists {
 			field.Default = normalizeDefaultValue(*field, defaultValue)
 			field.Required = false
-		} else if field.GoType == "framework.AutoBool" {
+		} else if isAutoBoolType(field.GoType) {
 			field.Default = confopt.AutoBoolAuto.String()
 			field.Required = false
 		} else if field.Pointer {
@@ -517,7 +517,7 @@ func toStringSlice(values []confopt.AutoBool) []string {
 }
 
 func normalizeDefaultValue(field ConfigField, value interface{}) interface{} {
-	if field.GoType != "framework.AutoBool" {
+	if !isAutoBoolType(field.GoType) {
 		return value
 	}
 	switch v := value.(type) {
@@ -711,7 +711,7 @@ func (g *DocGenerator) extractValue(expr ast.Expr) interface{} {
 					return duration
 				}
 			}
-			if ident.Name == "framework" {
+			if ident.Name == "framework" || ident.Name == "confopt" {
 				switch v.Sel.Name {
 				case "AutoBoolAuto":
 					return confopt.AutoBoolAuto.String()
@@ -915,4 +915,8 @@ func timeConstant(name string) (int64, bool) {
 		return int64(time.Hour), true
 	}
 	return 0, false
+}
+
+func isAutoBoolType(goType string) bool {
+	return goType == "framework.AutoBool" || goType == "confopt.AutoBool"
 }

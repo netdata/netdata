@@ -72,6 +72,13 @@ type Collector struct {
 	dump   *dumpContext
 	groups []collectionGroup
 
+	// CPU collection state for delta-based calculation
+	cpuCollectionMethod   string // "total_cpu_time" or "elapsed_cpu_used"
+	prevTotalCPUTime      int64  // Previous TOTAL_CPU_TIME value (nanoseconds)
+	prevElapsedTime       int64  // Previous ELAPSED_TIME value (seconds)
+	prevElapsedCPUProduct int64  // Previous ELAPSED_CPU_USED * ELAPSED_TIME product
+	hasCPUBaseline        bool   // Whether we have a previous measurement
+
 	once sync.Once
 }
 
@@ -385,8 +392,27 @@ func (c *Collector) exportSystemMetrics() {
 		Base:    c.mx.BasePoolMaxThreads,
 	})
 
+	avgDiskBusy := c.mx.DiskBusyPercentage
+	if avgDiskBusy == 0 {
+		var (
+			sum   int64
+			count int64
+		)
+		for _, values := range c.mx.disks {
+			sum += values.BusyPercent
+			count++
+		}
+		if count > 0 {
+			avgDiskBusy = sum / count
+		}
+	}
+
+	if avgDiskBusy != c.mx.DiskBusyPercentage {
+		c.mx.DiskBusyPercentage = avgDiskBusy
+	}
+
 	contexts.System.DiskBusyAverage.Set(c.State, labels, contexts.SystemDiskBusyAverageValues{
-		Busy: c.mx.DiskBusyPercentage,
+		Busy: avgDiskBusy,
 	})
 
 	contexts.System.SystemASPUsage.Set(c.State, labels, contexts.SystemSystemASPUsageValues{

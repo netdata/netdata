@@ -277,7 +277,7 @@ var ActiveJob = struct {
 				{
 					Name:      "interactive_transactions",
 					Algorithm: module.Incremental,
-					Mul:       -1,
+					Mul:       1,
 					Div:       1,
 					Precision: 1,
 				},
@@ -552,7 +552,7 @@ var Disk = struct {
 				{
 					Name:      "write",
 					Algorithm: module.Incremental,
-					Mul:       -1,
+					Mul:       1,
 					Div:       1,
 					Precision: 1,
 				},
@@ -647,7 +647,7 @@ var Disk = struct {
 				{
 					Name:      "write",
 					Algorithm: module.Incremental,
-					Mul:       -1,
+					Mul:       1,
 					Div:       1,
 					Precision: 1,
 				},
@@ -2204,7 +2204,7 @@ var System = struct {
 		Context: framework.Context[EmptyLabels]{
 			Name:        "as400.cpu_utilization",
 			Family:      "compute/cpu",
-			Title:       "CPU Utilization",
+			Title:       "CPU Utilization (100% = 1 CPU core)",
 			Units:       "percentage",
 			Type:        module.Line,
 			Priority:    101,
@@ -2345,7 +2345,7 @@ var System = struct {
 			Name:        "as400.main_storage_size",
 			Family:      "memory/overview",
 			Title:       "Main Storage Size",
-			Units:       "KiB",
+			Units:       "bytes",
 			Type:        module.Line,
 			Priority:    201,
 			UpdateEvery: 1,

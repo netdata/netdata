@@ -294,3 +294,10 @@ func (c *Collector) memoryPoolQuery() string {
 	}
 	return queryMemoryPoolsNoReset
 }
+
+func (c *Collector) systemActivityQuery() string {
+	if c.ResetStatistics {
+		return querySystemActivityReset
+	}
+	return querySystemActivityNoReset
+}

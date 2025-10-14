@@ -3,7 +3,7 @@ System:
   contexts:
     - name: CPUUtilization
       context: as400.cpu_utilization
-      title: CPU Utilization
+      title: CPU Utilization (100% = 1 CPU core)
       family: compute/cpu
       units: percentage
       type: line
@@ -71,7 +71,7 @@ System:
       context: as400.main_storage_size
       title: Main Storage Size
       family: memory/overview
-      units: KiB
+      units: bytes
       type: line
       priority: 201
       dimensions:
@@ -302,7 +302,6 @@ Disk:
           algo: incremental
         - name: write
           algo: incremental
-          mul: -1
     - name: SpaceUsage
       context: as400.disk_space_usage
       title: Disk Space Usage
@@ -340,7 +339,6 @@ Disk:
           algo: incremental
         - name: write
           algo: incremental
-          mul: -1
     - name: SSDHealth
       context: as400.disk_ssd_health
       title: Disk SSD Health
@@ -463,7 +461,6 @@ ActiveJob:
           algo: incremental
         - name: interactive_transactions
           algo: incremental
-          mul: -1
     - name: Threads
       context: as400.activejob_threads
       title: Active Job Thread Count
