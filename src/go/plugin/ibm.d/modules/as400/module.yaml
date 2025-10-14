@@ -11,6 +11,51 @@ description: |
   **Required Libraries:**
   - libodbc.so (provided by unixODBC)
   - IBM i Access Client Solutions
+
+  **CPU Collection Methods:**
+
+  The collector uses a hybrid approach for CPU utilization metrics to handle IBM i 7.4+ where
+  `AVERAGE_CPU_*` columns were deprecated:
+
+  1. **Primary Method - TOTAL_CPU_TIME**: Uses the monotonic `TOTAL_CPU_TIME` counter from
+     `QSYS2.SYSTEM_STATUS()` to calculate CPU utilization via delta-based calculation. This is
+     the most accurate method but requires `*JOBCTL` special authority. TOTAL_CPU_TIME is a
+     cumulative counter in nanoseconds representing CPU-seconds consumed, naturally in per-core
+     scale.
+
+  2. **Fallback Method - ELAPSED_CPU_USED**: If `*JOBCTL` authority is not available, falls back
+     to `ELAPSED_CPU_USED` with automatic reset detection. This method tracks when IBM i statistics
+     are reset (either manually or via `reset_statistics` configuration) and re-establishes a
+     baseline after detecting resets. The values are already in per-core scale.
+
+  3. **Legacy Method - AVERAGE_CPU_UTILIZATION**: For IBM i versions before 7.4, uses the now-
+     deprecated `AVERAGE_CPU_UTILIZATION` column, which IBM reports in the same per-core scale.
+
+  The collector automatically selects the appropriate method based on available permissions and
+  logs which method is being used.
+
+  **CPU Metric Scale:**
+
+  CPU utilization is reported using the "100% = 1 CPU core" semantic. This means:
+  - 100% indicates one CPU core is fully utilized
+  - 400% indicates four CPU cores are fully utilized
+  - Values are limited to 100% × ConfiguredCPUs, matching the partition's configured capacity
+
+  For shared LPARs, the metrics show absolute CPU consumption in per-core scale, not relative to
+  entitled capacity. For example, a shared LPAR entitled to 0.20 cores can show 150% utilization
+  when bursting above entitlement.
+
+  **Statistics Reset Behavior:**
+
+  The `reset_statistics` configuration option controls whether the collector resets IBM i system
+  statistics on each query via `SYSTEM_STATUS(RESET_STATISTICS=>'YES')`. When enabled:
+
+  - System-level statistics (CPU, memory pools, etc.) are reset after each collection cycle
+  - Matches legacy behavior but clears global statistics that other tools may rely on
+  - The ELAPSED_CPU_USED fallback method will detect and handle these resets automatically
+  - **Caution**: Enabling this affects all users and applications on the IBM i system
+
+  Default: `false` (statistics are not reset, using `RESET_STATISTICS=>'NO'`)
 icon: ibm-i.svg
 categories:
   - data-collection.infrastructure

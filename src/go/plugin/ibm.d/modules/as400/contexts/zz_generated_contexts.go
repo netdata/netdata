@@ -2204,7 +2204,7 @@ var System = struct {
 		Context: framework.Context[EmptyLabels]{
 			Name:        "as400.cpu_utilization",
 			Family:      "compute/cpu",
-			Title:       "CPU Utilization",
+			Title:       "CPU Utilization (100% = 1 CPU core)",
 			Units:       "percentage",
 			Type:        module.Line,
 			Priority:    101,

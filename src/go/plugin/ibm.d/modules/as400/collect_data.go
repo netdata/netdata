@@ -146,12 +146,15 @@ func (a *Collector) collectSystemStatus(ctx context.Context) error {
 		switch column {
 		// CPU metrics
 		case "AVERAGE_CPU_UTILIZATION":
+			// AVERAGE_CPU_UTILIZATION is system-wide 0-100% (deprecated in IBM i 7.4+)
 			if v, err := strconv.ParseFloat(value, 64); err == nil {
 				a.mx.CPUPercentage = int64(v * precision)
 			}
 		case "CURRENT_CPU_CAPACITY":
+			// CURRENT_CPU_CAPACITY comes from IBM as decimal fraction (0.0-1.0)
+			// Convert to percentage by multiplying by 100
 			if v, err := strconv.ParseFloat(value, 64); err == nil {
-				a.mx.CurrentCPUCapacity = int64(v * precision)
+				a.mx.CurrentCPUCapacity = int64(v * 100.0 * precision)
 			}
 		case "CONFIGURED_CPUS":
 			if v, err := strconv.ParseInt(value, 10, 64); err == nil {
@@ -1493,42 +1496,156 @@ func (a *Collector) collectPlanCache(ctx context.Context) error {
 }
 
 func (a *Collector) collectSystemActivity(ctx context.Context) error {
-	// Query SYSTEM_STATUS_INFO view for CPU utilization metrics
-	// This is more reliable than SYSTEM_ACTIVITY_INFO() table function
-	query := `SELECT 
-		AVERAGE_CPU_RATE,
-		AVERAGE_CPU_UTILIZATION,
-		MINIMUM_CPU_UTILIZATION,
-		MAXIMUM_CPU_UTILIZATION
-	FROM QSYS2.SYSTEM_STATUS_INFO`
+	// IBM deprecated AVERAGE_CPU_* columns in 7.4, so we use a hybrid approach:
+	// 1. Try TOTAL_CPU_TIME (requires *JOBCTL authority) - monotonic counter, most accurate
+	// 2. Fall back to ELAPSED_CPU_USED with reset detection if *JOBCTL unavailable
+
+	// Query both potential data sources in one query
+	query := a.systemActivityQuery()
+
+	var (
+		totalCPUTime    int64   // Nanoseconds since IPL (NULL if no *JOBCTL)
+		elapsedTime     int64   // Seconds since last reset
+		elapsedCPUUsed  float64 // Average CPU% since last reset
+		hasTotalCPUTime bool
+		hasElapsedData  bool
+	)
 
 	err := a.doQuery(ctx, query, func(column, value string, lineEnd bool) {
-		if value == "" {
-			return
-		}
-
 		switch column {
-		case "AVERAGE_CPU_RATE":
-			if v, err := strconv.ParseFloat(value, 64); err == nil {
-				a.mx.systemActivity.AverageCPURate = int64(v * precision)
+		case "TOTAL_CPU_TIME":
+			// This will be NULL if user doesn't have *JOBCTL authority
+			if value != "" && !strings.EqualFold(value, "NULL") {
+				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+					totalCPUTime = v
+					hasTotalCPUTime = true
+				}
 			}
-		case "AVERAGE_CPU_UTILIZATION":
-			if v, err := strconv.ParseFloat(value, 64); err == nil {
-				a.mx.systemActivity.AverageCPUUtilization = int64(v * precision)
+		case "ELAPSED_TIME":
+			if value != "" && !strings.EqualFold(value, "NULL") {
+				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+					elapsedTime = v
+					hasElapsedData = true
+				}
 			}
-		case "MINIMUM_CPU_UTILIZATION":
-			if v, err := strconv.ParseFloat(value, 64); err == nil {
-				a.mx.systemActivity.MinimumCPUUtilization = int64(v * precision)
-			}
-		case "MAXIMUM_CPU_UTILIZATION":
-			if v, err := strconv.ParseFloat(value, 64); err == nil {
-				a.mx.systemActivity.MaximumCPUUtilization = int64(v * precision)
+		case "ELAPSED_CPU_USED":
+			if value != "" && !strings.EqualFold(value, "NULL") {
+				if v, err := strconv.ParseFloat(value, 64); err == nil {
+					elapsedCPUUsed = v
+				}
 			}
 		}
 	})
 
 	if err != nil {
 		return fmt.Errorf("failed to collect system activity: %w", err)
+	}
+
+	// Determine which method to use
+	if hasTotalCPUTime {
+		// Primary method: Use TOTAL_CPU_TIME (requires *JOBCTL)
+		if a.cpuCollectionMethod == "" {
+			a.cpuCollectionMethod = "total_cpu_time"
+			a.Debugf("CPU collection: using TOTAL_CPU_TIME method (*JOBCTL authority available)")
+		}
+
+		if a.hasCPUBaseline {
+			// Calculate CPU utilization from delta
+			deltaNanos := totalCPUTime - a.prevTotalCPUTime
+
+			// Convert to per-core percentage based on update_every interval
+			// TOTAL_CPU_TIME is cumulative CPU-seconds across all processors in nanoseconds
+			// The delta/interval ratio directly gives us cores consumed (already in per-core scale)
+			// Formula: (delta_nanoseconds / 1e9) / update_every_seconds * 100
+			// Example: 2.0 CPU-seconds consumed in 1 second = 200% (2 cores fully utilized)
+			if a.UpdateEvery > 0 {
+				deltaSeconds := float64(deltaNanos) / 1e9
+				intervalSeconds := float64(a.UpdateEvery)
+
+				// TOTAL_CPU_TIME is naturally in per-core scale - do NOT divide by ConfiguredCPUs
+				cpuUtilization := (deltaSeconds / intervalSeconds) * 100.0 * precision
+				maxAllowed := float64(a.mx.ConfiguredCPUs) * 100.0 * precision
+				if cpuUtilization >= 0 && (a.mx.ConfiguredCPUs <= 0 || cpuUtilization <= maxAllowed) {
+					a.mx.systemActivity.AverageCPUUtilization = int64(cpuUtilization)
+					a.mx.systemActivity.AverageCPURate = int64(cpuUtilization)
+					a.mx.CPUPercentage = int64(cpuUtilization)
+				} else {
+					if cpuUtilization < 0 {
+						a.Warningf("CPU collection: calculated utilization negative (%.2f%%), skipping this sample", cpuUtilization/precision)
+					} else {
+						a.Warningf("CPU collection: calculated utilization (%.2f%%) exceeds configured capacity (%d CPUs), skipping this sample",
+							cpuUtilization/precision, a.mx.ConfiguredCPUs)
+					}
+				}
+			}
+		} else {
+			a.Debugf("CPU collection: establishing baseline for TOTAL_CPU_TIME method")
+		}
+
+		// Save current values for next iteration
+		a.prevTotalCPUTime = totalCPUTime
+		a.hasCPUBaseline = true
+
+	} else if hasElapsedData {
+		// Fallback method: Use ELAPSED_CPU_USED with reset detection
+		if a.cpuCollectionMethod == "" {
+			a.cpuCollectionMethod = "elapsed_cpu_used"
+			a.Warningf("CPU collection: *JOBCTL authority not available, using ELAPSED_CPU_USED fallback method")
+			a.Warningf("CPU collection: This method is affected by SYSTEM_STATUS(RESET_STATISTICS=>'YES') calls")
+		}
+
+		// Calculate product for reset detection
+		cpuProduct := int64(elapsedCPUUsed * float64(elapsedTime) * precision)
+
+		if a.hasCPUBaseline {
+			// Detect if statistics were reset
+			resetDetected := false
+			if elapsedTime < a.prevElapsedTime {
+				resetDetected = true
+				a.Warningf("CPU collection: statistics reset detected (ELAPSED_TIME decreased from %d to %d)", a.prevElapsedTime, elapsedTime)
+			} else if cpuProduct < a.prevElapsedCPUProduct {
+				resetDetected = true
+				a.Warningf("CPU collection: statistics reset detected (CPU product decreased from %d to %d)", a.prevElapsedCPUProduct, cpuProduct)
+			}
+
+			if !resetDetected {
+				// Calculate delta-based CPU utilization
+				deltaProduct := cpuProduct - a.prevElapsedCPUProduct
+				deltaTime := elapsedTime - a.prevElapsedTime
+
+				if deltaTime > 0 {
+					// ELAPSED_CPU_USED is already in per-core scaling
+					intervalCPU := float64(deltaProduct) / float64(deltaTime)
+					cpuUtilization := intervalCPU
+					maxAllowed := float64(a.mx.ConfiguredCPUs) * 100.0 * precision
+					if cpuUtilization >= 0 && (a.mx.ConfiguredCPUs <= 0 || cpuUtilization <= maxAllowed) {
+						a.mx.systemActivity.AverageCPUUtilization = int64(cpuUtilization)
+						a.mx.systemActivity.AverageCPURate = int64(cpuUtilization)
+						a.mx.CPUPercentage = int64(cpuUtilization)
+					} else {
+						if cpuUtilization < 0 {
+							a.Warningf("CPU collection: interval utilization negative (%.2f%%), skipping this sample", cpuUtilization/precision)
+						} else {
+							a.Warningf("CPU collection: interval utilization (%.2f%%) exceeds configured capacity (%d CPUs), skipping this sample",
+								cpuUtilization/precision, a.mx.ConfiguredCPUs)
+						}
+					}
+				}
+			} else {
+				a.Debugf("CPU collection: re-establishing baseline after reset")
+				a.hasCPUBaseline = false
+			}
+		} else {
+			a.Debugf("CPU collection: establishing baseline for ELAPSED_CPU_USED method")
+		}
+
+		// Save current values for next iteration
+		a.prevElapsedTime = elapsedTime
+		a.prevElapsedCPUProduct = cpuProduct
+		a.hasCPUBaseline = true
+
+	} else {
+		return fmt.Errorf("failed to collect CPU data: no usable CPU metrics available")
 	}
 
 	return nil

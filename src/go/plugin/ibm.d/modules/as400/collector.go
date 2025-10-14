@@ -72,6 +72,13 @@ type Collector struct {
 	dump   *dumpContext
 	groups []collectionGroup
 
+	// CPU collection state for delta-based calculation
+	cpuCollectionMethod   string // "total_cpu_time" or "elapsed_cpu_used"
+	prevTotalCPUTime      int64  // Previous TOTAL_CPU_TIME value (nanoseconds)
+	prevElapsedTime       int64  // Previous ELAPSED_TIME value (seconds)
+	prevElapsedCPUProduct int64  // Previous ELAPSED_CPU_USED * ELAPSED_TIME product
+	hasCPUBaseline        bool   // Whether we have a previous measurement
+
 	once sync.Once
 }
 

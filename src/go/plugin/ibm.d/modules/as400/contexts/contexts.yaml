@@ -3,7 +3,7 @@ System:
   contexts:
     - name: CPUUtilization
       context: as400.cpu_utilization
-      title: CPU Utilization
+      title: CPU Utilization (100% = 1 CPU core)
       family: compute/cpu
       units: percentage
       type: line

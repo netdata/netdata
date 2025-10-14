@@ -11,6 +11,21 @@ const (
 	querySystemStatusReset   = `SELECT * FROM TABLE(QSYS2.SYSTEM_STATUS(RESET_STATISTICS=>'YES',DETAILED_INFO=>'ALL')) X`
 	querySystemStatusNoReset = `SELECT * FROM TABLE(QSYS2.SYSTEM_STATUS(RESET_STATISTICS=>'NO',DETAILED_INFO=>'ALL')) X`
 
+	// CPU collection using SYSTEM_STATUS with specific columns for hybrid method
+	// TOTAL_CPU_TIME: Monotonic counter in nanoseconds (requires *JOBCTL authority)
+	// ELAPSED_CPU_USED: Average CPU percentage since last statistics reset
+	// ELAPSED_TIME: Seconds since last statistics reset
+	querySystemActivityReset = `SELECT
+	TOTAL_CPU_TIME,
+	ELAPSED_TIME,
+	ELAPSED_CPU_USED
+FROM TABLE(QSYS2.SYSTEM_STATUS('YES','ALL'))`
+	querySystemActivityNoReset = `SELECT
+	TOTAL_CPU_TIME,
+	ELAPSED_TIME,
+	ELAPSED_CPU_USED
+FROM TABLE(QSYS2.SYSTEM_STATUS('NO','ALL'))`
+
 	// VERIFIED: Memory pool monitoring using MEMORY_POOL() function
 	// The reset variant matches legacy behaviour; NO leaves system statistics intact.
 	queryMemoryPoolsReset = `
