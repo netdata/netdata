@@ -214,7 +214,8 @@ func (a *Collector) collectSystemStatus(ctx context.Context) error {
 			// CURRENT_CPU_CAPACITY comes from IBM as decimal fraction (0.0-1.0)
 			// Convert to percentage by multiplying by 100
 			if v, ok := a.parseInt64Value(value, precision); ok {
-				a.mx.CurrentCPUCapacity = v
+				// Convert decimal fraction (e.g., 0.20) to percentage scale
+				a.mx.CurrentCPUCapacity = v * 100
 			}
 		case "CONFIGURED_CPUS":
 			if v, ok := a.parseInt64Value(value, 1); ok {
@@ -291,7 +292,7 @@ func (a *Collector) collectMemoryPools(ctx context.Context) error {
 	return a.doQuery(ctx, a.memoryPoolQuery(), func(column, value string, lineEnd bool) {
 		switch column {
 		case "POOL_NAME":
-			currentPoolName = value
+			currentPoolName = strings.TrimSpace(value)
 		case "CURRENT_SIZE":
 			if v, ok := a.parseInt64Value(value, 1024*1024); ok { // Convert MB to bytes
 				switch currentPoolName {
@@ -650,6 +651,10 @@ func (a *Collector) collectDiskInstances(ctx context.Context) error {
 					if m, ok := a.mx.disks[currentUnit]; ok {
 						m.ReadRequests = v
 						a.mx.disks[currentUnit] = m
+					} else {
+						a.mx.disks[currentUnit] = diskInstanceMetrics{
+							ReadRequests: v,
+						}
 					}
 				}
 			}
@@ -661,6 +666,10 @@ func (a *Collector) collectDiskInstances(ctx context.Context) error {
 					if m, ok := a.mx.disks[currentUnit]; ok {
 						m.WriteRequests = v
 						a.mx.disks[currentUnit] = m
+					} else {
+						a.mx.disks[currentUnit] = diskInstanceMetrics{
+							WriteRequests: v,
+						}
 					}
 				}
 			}
@@ -943,11 +952,11 @@ func (a *Collector) collectTempStorage(ctx context.Context) error {
 	err := a.doQuery(ctx, queryTempStorageTotal, func(column, value string, lineEnd bool) {
 		switch column {
 		case "CURRENT_SIZE":
-			if v, ok := a.parseInt64Value(value, 1); ok {
+			if v, ok := a.parseInt64Value(value, 1024*1024); ok {
 				a.mx.TempStorageCurrentTotal = v
 			}
 		case "PEAK_SIZE":
-			if v, ok := a.parseInt64Value(value, 1); ok {
+			if v, ok := a.parseInt64Value(value, 1024*1024); ok {
 				a.mx.TempStoragePeakTotal = v
 			}
 		}
@@ -966,7 +975,7 @@ func (a *Collector) collectTempStorage(ctx context.Context) error {
 
 		case "CURRENT_SIZE":
 			if currentBucket != "" && a.tempStorageNamed[currentBucket] != nil {
-				if v, ok := a.parseInt64Value(value, 1); ok {
+				if v, ok := a.parseInt64Value(value, 1024*1024); ok {
 					if m, ok := a.mx.tempStorageNamed[currentBucket]; ok {
 						m.CurrentSize = v
 						a.mx.tempStorageNamed[currentBucket] = m
@@ -979,7 +988,7 @@ func (a *Collector) collectTempStorage(ctx context.Context) error {
 			}
 		case "PEAK_SIZE":
 			if currentBucket != "" && a.tempStorageNamed[currentBucket] != nil {
-				if v, ok := a.parseInt64Value(value, 1); ok {
+				if v, ok := a.parseInt64Value(value, 1024*1024); ok {
 					if m, ok := a.mx.tempStorageNamed[currentBucket]; ok {
 						m.PeakSize = v
 						a.mx.tempStorageNamed[currentBucket] = m
@@ -1195,6 +1204,10 @@ func (a *Collector) collectDiskInstancesEnhanced(ctx context.Context) error {
 					if m, ok := a.mx.disks[currentUnit]; ok {
 						m.ReadRequests = v
 						a.mx.disks[currentUnit] = m
+					} else {
+						a.mx.disks[currentUnit] = diskInstanceMetrics{
+							ReadRequests: v,
+						}
 					}
 				}
 			}
@@ -1204,6 +1217,10 @@ func (a *Collector) collectDiskInstancesEnhanced(ctx context.Context) error {
 					if m, ok := a.mx.disks[currentUnit]; ok {
 						m.WriteRequests = v
 						a.mx.disks[currentUnit] = m
+					} else {
+						a.mx.disks[currentUnit] = diskInstanceMetrics{
+							WriteRequests: v,
+						}
 					}
 				}
 			}
@@ -1213,6 +1230,10 @@ func (a *Collector) collectDiskInstancesEnhanced(ctx context.Context) error {
 					if m, ok := a.mx.disks[currentUnit]; ok {
 						m.BlocksRead = v
 						a.mx.disks[currentUnit] = m
+					} else {
+						a.mx.disks[currentUnit] = diskInstanceMetrics{
+							BlocksRead: v,
+						}
 					}
 				}
 			}
@@ -1222,6 +1243,10 @@ func (a *Collector) collectDiskInstancesEnhanced(ctx context.Context) error {
 					if m, ok := a.mx.disks[currentUnit]; ok {
 						m.BlocksWritten = v
 						a.mx.disks[currentUnit] = m
+					} else {
+						a.mx.disks[currentUnit] = diskInstanceMetrics{
+							BlocksWritten: v,
+						}
 					}
 				}
 			}

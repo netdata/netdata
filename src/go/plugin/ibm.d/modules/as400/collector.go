@@ -392,8 +392,27 @@ func (c *Collector) exportSystemMetrics() {
 		Base:    c.mx.BasePoolMaxThreads,
 	})
 
+	avgDiskBusy := c.mx.DiskBusyPercentage
+	if avgDiskBusy == 0 {
+		var (
+			sum   int64
+			count int64
+		)
+		for _, values := range c.mx.disks {
+			sum += values.BusyPercent
+			count++
+		}
+		if count > 0 {
+			avgDiskBusy = sum / count
+		}
+	}
+
+	if avgDiskBusy != c.mx.DiskBusyPercentage {
+		c.mx.DiskBusyPercentage = avgDiskBusy
+	}
+
 	contexts.System.DiskBusyAverage.Set(c.State, labels, contexts.SystemDiskBusyAverageValues{
-		Busy: c.mx.DiskBusyPercentage,
+		Busy: avgDiskBusy,
 	})
 
 	contexts.System.SystemASPUsage.Set(c.State, labels, contexts.SystemSystemASPUsageValues{
