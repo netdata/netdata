@@ -6,6 +6,8 @@
 
 **Merged pull requests:**
 
+- Add Fedora 43 to CI and package builds. [\#21142](https://github.com/netdata/netdata/pull/21142) ([Ferroin](https://github.com/Ferroin))
+- Skip status file on windows on crash [\#21140](https://github.com/netdata/netdata/pull/21140) ([stelfrag](https://github.com/stelfrag))
 - improve\(go.d/snmp\): automatically disable SNMP bulkwalk when not supported [\#21139](https://github.com/netdata/netdata/pull/21139) ([ilyam8](https://github.com/ilyam8))
 - build\(deps\): bump github.com/gohugoio/hashstructure from 0.5.0 to 0.6.0 in /src/go [\#21138](https://github.com/netdata/netdata/pull/21138) ([dependabot[bot]](https://github.com/apps/dependabot))
 - build\(deps\): bump golang.org/x/net from 0.44.0 to 0.46.0 in /src/go [\#21137](https://github.com/netdata/netdata/pull/21137) ([dependabot[bot]](https://github.com/apps/dependabot))
@@ -14,6 +16,7 @@
 - chore: move go.d/ibm.d shared pkgs out of go.d [\#21132](https://github.com/netdata/netdata/pull/21132) ([ilyam8](https://github.com/ilyam8))
 - build: update go otel deps [\#21129](https://github.com/netdata/netdata/pull/21129) ([ilyam8](https://github.com/ilyam8))
 - chore: go.d/ibm.d various fixes [\#21128](https://github.com/netdata/netdata/pull/21128) ([ilyam8](https://github.com/ilyam8))
+- Improve agent startup on windows [\#21125](https://github.com/netdata/netdata/pull/21125) ([stelfrag](https://github.com/stelfrag))
 - fix\(ibm.d/mq\): change default ExponentialBackoff attempts to 2 [\#21124](https://github.com/netdata/netdata/pull/21124) ([ilyam8](https://github.com/ilyam8))
 - fix\(ibm.d\): various fixes [\#21123](https://github.com/netdata/netdata/pull/21123) ([ilyam8](https://github.com/ilyam8))
 - Update IBM plugin documentation. [\#21122](https://github.com/netdata/netdata/pull/21122) ([Ferroin](https://github.com/Ferroin))
@@ -445,9 +448,6 @@
 - Fix compilation on windows [\#20602](https://github.com/netdata/netdata/pull/20602) ([stelfrag](https://github.com/stelfrag))
 - Update sqlite version to 3.50.2 [\#20601](https://github.com/netdata/netdata/pull/20601) ([stelfrag](https://github.com/stelfrag))
 - transfer Learn PR 2473 [\#20600](https://github.com/netdata/netdata/pull/20600) ([Ancairon](https://github.com/Ancairon))
-- update generic snmp profiles [\#20599](https://github.com/netdata/netdata/pull/20599) ([ilyam8](https://github.com/ilyam8))
-- Metadata worker should respect shutdown request [\#20598](https://github.com/netdata/netdata/pull/20598) ([stelfrag](https://github.com/stelfrag))
-- docs: fix 404 link in README.md [\#20597](https://github.com/netdata/netdata/pull/20597) ([ilyam8](https://github.com/ilyam8))
 
 ## [v2.5.4](https://github.com/netdata/netdata/tree/v2.5.4) (2025-06-24)
 
