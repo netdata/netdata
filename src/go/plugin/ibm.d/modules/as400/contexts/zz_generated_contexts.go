@@ -277,7 +277,7 @@ var ActiveJob = struct {
 				{
 					Name:      "interactive_transactions",
 					Algorithm: module.Incremental,
-					Mul:       -1,
+					Mul:       1,
 					Div:       1,
 					Precision: 1,
 				},
@@ -552,7 +552,7 @@ var Disk = struct {
 				{
 					Name:      "write",
 					Algorithm: module.Incremental,
-					Mul:       -1,
+					Mul:       1,
 					Div:       1,
 					Precision: 1,
 				},
@@ -647,7 +647,7 @@ var Disk = struct {
 				{
 					Name:      "write",
 					Algorithm: module.Incremental,
-					Mul:       -1,
+					Mul:       1,
 					Div:       1,
 					Precision: 1,
 				},
