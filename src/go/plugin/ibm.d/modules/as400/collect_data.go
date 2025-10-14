@@ -28,6 +28,8 @@ func cleanNumericString(value string) string {
 			return r
 		case r == '-' || r == '.':
 			return r
+		case r == 'e' || r == 'E' || r == '+':
+			return r
 		default:
 			return -1
 		}
@@ -40,7 +42,7 @@ func cleanNumericString(value string) string {
 // Logs all parse attempts in debug mode
 func (a *Collector) parseInt64Value(value string, multiplier int64) (int64, bool) {
 	cleaned := cleanNumericString(value)
-	if cleaned == "" || cleaned == "-" || cleaned == "." {
+	if cleaned == "" || cleaned == "-" || cleaned == "." || cleaned == "+" {
 		a.Debugf("parseInt64Value: empty/invalid value='%s', cleaned='%s'", value, cleaned)
 		return 0, false
 	}
@@ -48,12 +50,16 @@ func (a *Collector) parseInt64Value(value string, multiplier int64) (int64, bool
 		a.Debugf("parseInt64Value: too many decimal points, value='%s', cleaned='%s'", value, cleaned)
 		return 0, false
 	}
+	if strings.Count(cleaned, "e")+strings.Count(cleaned, "E") > 1 {
+		a.Debugf("parseInt64Value: too many exponents, value='%s', cleaned='%s'", value, cleaned)
+		return 0, false
+	}
 	if multiplier <= 0 {
 		multiplier = 1
 	}
 
-	// Handle floats from IBM i (like memory sizes in MB: "8192.00")
-	if strings.Contains(cleaned, ".") {
+	// Handle floats/exponentials from IBM i (like memory sizes: "8192.00" or "7.8e+09")
+	if strings.Contains(cleaned, ".") || strings.ContainsAny(cleaned, "eE") {
 		f, err := strconv.ParseFloat(cleaned, 64)
 		if err != nil {
 			a.Debugf("parseInt64Value: ParseFloat failed, value='%s', cleaned='%s', error=%v", value, cleaned, err)
@@ -78,12 +84,16 @@ func (a *Collector) parseInt64Value(value string, multiplier int64) (int64, bool
 // Logs all parse attempts in debug mode
 func (a *Collector) parseFloat64Value(value string) (float64, bool) {
 	cleaned := cleanNumericString(value)
-	if cleaned == "" || cleaned == "-" || cleaned == "." {
+	if cleaned == "" || cleaned == "-" || cleaned == "." || cleaned == "+" {
 		a.Debugf("parseFloat64Value: empty/invalid value='%s', cleaned='%s'", value, cleaned)
 		return 0, false
 	}
 	if strings.Count(cleaned, ".") > 1 {
 		a.Debugf("parseFloat64Value: too many decimal points, value='%s', cleaned='%s'", value, cleaned)
+		return 0, false
+	}
+	if strings.Count(cleaned, "e")+strings.Count(cleaned, "E") > 1 {
+		a.Debugf("parseFloat64Value: too many exponents, value='%s', cleaned='%s'", value, cleaned)
 		return 0, false
 	}
 
@@ -139,15 +149,18 @@ func normalizeValue(value string) string {
 // parseInt64OrZero parses value as int64, returns 0 on any error (no logging)
 func parseInt64OrZero(value string) int64 {
 	cleaned := cleanNumericString(value)
-	if cleaned == "" || cleaned == "-" || cleaned == "." {
+	if cleaned == "" || cleaned == "-" || cleaned == "." || cleaned == "+" {
 		return 0
 	}
 	if strings.Count(cleaned, ".") > 1 {
 		return 0
 	}
+	if strings.Count(cleaned, "e")+strings.Count(cleaned, "E") > 1 {
+		return 0
+	}
 
-	// Handle floats
-	if strings.Contains(cleaned, ".") {
+	// Handle floats/exponentials
+	if strings.Contains(cleaned, ".") || strings.ContainsAny(cleaned, "eE") {
 		if f, err := strconv.ParseFloat(cleaned, 64); err == nil {
 			return int64(math.Round(f))
 		}
@@ -952,11 +965,11 @@ func (a *Collector) collectTempStorage(ctx context.Context) error {
 	err := a.doQuery(ctx, queryTempStorageTotal, func(column, value string, lineEnd bool) {
 		switch column {
 		case "CURRENT_SIZE":
-			if v, ok := a.parseInt64Value(value, 1024*1024); ok {
+			if v, ok := a.parseInt64Value(value, 1); ok {
 				a.mx.TempStorageCurrentTotal = v
 			}
 		case "PEAK_SIZE":
-			if v, ok := a.parseInt64Value(value, 1024*1024); ok {
+			if v, ok := a.parseInt64Value(value, 1); ok {
 				a.mx.TempStoragePeakTotal = v
 			}
 		}
@@ -975,7 +988,7 @@ func (a *Collector) collectTempStorage(ctx context.Context) error {
 
 		case "CURRENT_SIZE":
 			if currentBucket != "" && a.tempStorageNamed[currentBucket] != nil {
-				if v, ok := a.parseInt64Value(value, 1024*1024); ok {
+				if v, ok := a.parseInt64Value(value, 1); ok {
 					if m, ok := a.mx.tempStorageNamed[currentBucket]; ok {
 						m.CurrentSize = v
 						a.mx.tempStorageNamed[currentBucket] = m
@@ -988,7 +1001,7 @@ func (a *Collector) collectTempStorage(ctx context.Context) error {
 			}
 		case "PEAK_SIZE":
 			if currentBucket != "" && a.tempStorageNamed[currentBucket] != nil {
-				if v, ok := a.parseInt64Value(value, 1024*1024); ok {
+				if v, ok := a.parseInt64Value(value, 1); ok {
 					if m, ok := a.mx.tempStorageNamed[currentBucket]; ok {
 						m.PeakSize = v
 						a.mx.tempStorageNamed[currentBucket] = m
