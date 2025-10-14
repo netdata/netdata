@@ -1120,6 +1120,8 @@ update_binpkg() {
       ;;
   esac
 
+  initial_version="$(get_current_version)"
+
   if [ -n "${repo_subcmd}" ]; then
     # shellcheck disable=SC2086
     env ${env} ${pm_cmd} ${repo_subcmd} ${repo_update_opts} >&3 2>&3 || fatal "Failed to update repository metadata." U000C
@@ -1174,7 +1176,7 @@ update_binpkg() {
   latest_version="$(get_latest_version)"
 
   if [ "${current_version}" -ne 0 ] && [ "${latest_version}" -ne 0 ]; then
-    if [ "${current_version}" -lt "${latest_version}" ]; then
+    if [ "${current_version}" -lt "${latest_version}" ] && [ "${initial_version}" -eq "${current_version}" ]; then
       error ""
       error "NETDATA WAS NOT UPDATED!"
       error ""
@@ -1183,7 +1185,7 @@ update_binpkg() {
       error "Most likely, your system is not up to date, and you have it configured in a way that prevents updating Netdata from updating any of Netdata's dependencies."
       error "Please try updating your system manually and then re-running the Netdata updater before reporting an issue with the update process."
       error ""
-      fatal "Package manager did not actually update Netdata despite not reporting a failure." U001D
+      fatal "Package manager did not fully update Netdata despite not reporting a failure." U001D
       exit 1
     fi
   fi
