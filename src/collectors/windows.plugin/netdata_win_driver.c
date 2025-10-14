@@ -74,6 +74,8 @@ NTSTATUS NetdataMsrDeviceControl(_In_ PDEVICE_OBJECT DeviceObject, _Inout_ PIRP 
 NTSTATUS DriverEntry(_In_ PDRIVER_OBJECT DriverObject, _In_ PUNICODE_STRING RegistryPath)
 {
     UNREFERENCED_PARAMETER(RegistryPath);
+    UNICODE_STRING driverName;
+    RtlInitUnicodeString(&driverName, L"\\Driver\\NetdataDriver");
 
     PDEVICE_OBJECT deviceObject = NULL;
     NTSTATUS status = IoCreateDevice(
@@ -100,6 +102,7 @@ NTSTATUS DriverEntry(_In_ PDRIVER_OBJECT DriverObject, _In_ PUNICODE_STRING Regi
     DriverObject->MajorFunction[IRP_MJ_CLOSE]          = NetdataMsrCreateClose;
     DriverObject->MajorFunction[IRP_MJ_DEVICE_CONTROL] = NetdataMsrDeviceControl;
     DriverObject->DriverUnload                         = NetdataMsrUnload;
+    DriverObject->DriverName                           = driverName;
 
     deviceObject->Flags &= ~DO_DEVICE_INITIALIZING;
     return STATUS_SUCCESS;

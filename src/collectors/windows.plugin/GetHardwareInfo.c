@@ -5,8 +5,8 @@
 
 #include "netdata_win_driver.h"
 
-static const char *srv_name = "NetdataDriverV1";
-const char *drv_path = "C:\\Windows\\System32\\netdata_driver.sys";
+static const char *srv_name = "NetdataDriver";
+const char *drv_path = "%SystemRoot%\\system32\\netdata_driver.sys";
 
 struct cpu_data {
     RRDDIM *rd_cpu_temp;

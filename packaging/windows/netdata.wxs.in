@@ -133,7 +133,7 @@
 
             <SetProperty
                 Id="NDRemoveDriverSrv"
-                Value="&quot;[WindowsFolder]System32\sc.exe&quot; delete &quot;NetdataDriverV1&quot;"
+                Value="&quot;[WindowsFolder]System32\sc.exe&quot; delete &quot;NetdataDriver&quot;"
                 Before="NDConfigureServiceRecovery"
                 Sequence="execute"
             />
