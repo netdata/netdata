@@ -59,9 +59,7 @@ func (a *Collector) parseInt64Value(value string, multiplier int64) (int64, bool
 			a.Debugf("parseInt64Value: ParseFloat failed, value='%s', cleaned='%s', error=%v", value, cleaned, err)
 			return 0, false
 		}
-		result := int64(math.Round(f * float64(multiplier)))
-		a.Debugf("parseInt64Value: float parsed, value='%s', float=%f, multiplier=%d, result=%d", value, f, multiplier, result)
-		return result, true
+		return int64(math.Round(f * float64(multiplier))), true
 	}
 
 	// Handle integers
@@ -70,12 +68,10 @@ func (a *Collector) parseInt64Value(value string, multiplier int64) (int64, bool
 		a.Debugf("parseInt64Value: ParseInt failed, value='%s', cleaned='%s', error=%v", value, cleaned, err)
 		return 0, false
 	}
-	result := v
 	if multiplier != 1 {
-		result = v * multiplier
+		return v * multiplier, true
 	}
-	a.Debugf("parseInt64Value: int parsed, value='%s', int=%d, multiplier=%d, result=%d", value, v, multiplier, result)
-	return result, true
+	return v, true
 }
 
 // parseFloat64Value parses a value as float64, returns (result, ok)
@@ -96,7 +92,6 @@ func (a *Collector) parseFloat64Value(value string) (float64, bool) {
 		a.Debugf("parseFloat64Value: ParseFloat failed, value='%s', cleaned='%s', error=%v", value, cleaned, err)
 		return 0, false
 	}
-	a.Debugf("parseFloat64Value: parsed, value='%s', result=%f", value, f)
 	return f, true
 }
 
