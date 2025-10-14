@@ -169,6 +169,18 @@ const DEFAULT_SCENARIO_TIMEOUT_MS = (() => {
 })();
 
 const RUN_LOG_DECIMAL_PRECISION = 2;
+const CONTENT_TYPE_JSON = 'application/json';
+const CONTENT_TYPE_EVENT_STREAM = 'text/event-stream';
+const COVERAGE_OPENROUTER_JSON_ID = 'coverage-openrouter-json';
+const COVERAGE_OPENROUTER_SSE_ID = 'coverage-openrouter-sse';
+const COVERAGE_GENERIC_JSON_ID = 'coverage-generic-json';
+const COVERAGE_SESSION_ID = 'coverage-session-snapshot';
+const COVERAGE_ROUTER_PROVIDER = 'router-provider';
+const COVERAGE_ROUTER_MODEL = 'router-model';
+const COVERAGE_ROUTER_SSE_PROVIDER = 'router-sse';
+const COVERAGE_ROUTER_SSE_MODEL = 'router-sse-model';
+const COVERAGE_PROMPT = 'coverage';
+const COVERAGE_WARN_SUBSTRING = 'persistSessionSnapshot failed';
 
 function makeTempDir(label: string): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), `${TMP_PREFIX}${label}-`));
@@ -177,9 +189,43 @@ function makeTempDir(label: string): string {
 let runTest16Paths: { sessionsDir: string; billingFile: string } | undefined;
 let runTest20Paths: { baseDir: string; blockerFile: string; billingFile: string } | undefined;
 let runTest54State: { received: JSONRPCMessage[]; serverPayloads: string[]; errors: string[] } | undefined;
+let coverageOpenrouterJson: {
+  accept?: string;
+  referer?: string;
+  title?: string;
+  userAgent?: string;
+  logs: LogEntry[];
+  routed: { provider?: string; model?: string };
+  cost: { costUsd?: number; upstreamInferenceCostUsd?: number };
+  response: unknown;
+} | undefined;
+let coverageOpenrouterSse: {
+  accept?: string;
+  logs: LogEntry[];
+  routed: { provider?: string; model?: string };
+  cost: { costUsd?: number; upstreamInferenceCostUsd?: number };
+  rawStream: string;
+} | undefined;
+let coverageGenericJson: {
+  accept?: string;
+  cacheWrite?: number;
+  logs: LogEntry[];
+} | undefined;
+let coverageSessionSnapshot: {
+  tempDir: string;
+  filesAfterSuccess: string[];
+  filesAfterFailure: string[];
+  warnOutput: string;
+} | undefined;
 
 function invariant(condition: boolean, message: string): asserts condition {
   if (!condition) throw new Error(message);
+}
+
+function getPrivateMethod(instance: object, key: string): (...args: unknown[]) => unknown {
+  const value = Reflect.get(instance as Record<string, unknown>, key);
+  invariant(typeof value === 'function', `Private method '${key}' missing.`);
+  return value as (...args: unknown[]) => unknown;
 }
 
 function makeSuccessResult(content: string): AIAgentResult {
@@ -833,11 +879,16 @@ const TEST_SCENARIOS: HarnessTest[] = [
   },
   {
     id: 'run-test-33',
+    configure: (_configuration, sessionConfig) => {
+      sessionConfig.maxTurns = 1;
+    },
     expect: (result) => {
       invariant(!result.success, 'Scenario run-test-33 should fail after exhausting synthetic retries.');
       invariant(typeof result.error === 'string' && result.error.includes('content_without_tools_or_final'), 'Expected synthetic retry exhaustion error for run-test-33.');
       const syntheticLog = result.logs.find((entry) => typeof entry.message === 'string' && entry.message.includes('Synthetic retry: assistant returned content without tool calls and without final_report.'));
       invariant(syntheticLog !== undefined, 'Synthetic retry warning expected for run-test-33.');
+      const finalTurnLog = result.logs.find((entry) => entry.remoteIdentifier === 'agent:final-turn');
+      invariant(finalTurnLog !== undefined, 'Final-turn retry warning expected for run-test-33.');
     },
   },
   {
@@ -1213,8 +1264,6 @@ const TEST_SCENARIOS: HarnessTest[] = [
       const OPENROUTER_RESPONSES_URL = 'https://openrouter.ai/api/v1/responses';
       const OPENROUTER_DEBUG_SSE_URL = 'https://openrouter.ai/api/v1/debug-sse';
       const OPENROUTER_BINARY_URL = 'https://openrouter.ai/api/v1/binary';
-      const CONTENT_TYPE_JSON = 'application/json';
-      const CONTENT_TYPE_EVENT_STREAM = 'text/event-stream';
       const CONTENT_TYPE_OCTET = 'application/octet-stream';
       const pricing = {
         fireworks: {
@@ -3526,6 +3575,246 @@ const TEST_SCENARIOS: HarnessTest[] = [
       invariant(result.finalReport === undefined, 'No final report expected for run-test-49.');
       const finLog = result.logs.find((entry) => entry.remoteIdentifier === 'agent:fin');
       invariant(finLog !== undefined, 'Finalization log expected for run-test-49.');
+    },
+  },
+  {
+    id: COVERAGE_OPENROUTER_JSON_ID,
+    description: 'Coverage: traced fetch metadata for OpenRouter JSON responses.',
+    execute: async () => {
+      coverageOpenrouterJson = undefined;
+      const logs: LogEntry[] = [];
+      const client = new LLMClient({}, { traceLLM: true, onLog: (entry) => { logs.push(entry); } });
+      const tracedFetchFactory = getPrivateMethod(client, 'createTracedFetch');
+      const tracedFetch = tracedFetchFactory.call(client) as typeof fetch;
+      const originalFetch = globalThis.fetch;
+      let capturedHeaderValues: Record<string, string | null> | undefined;
+      let bodyJson: unknown;
+      try {
+        globalThis.fetch = ((_input, init) => {
+          const headers = new Headers(init?.headers);
+          capturedHeaderValues = {
+            accept: headers.get('Accept'),
+            referer: headers.get('HTTP-Referer'),
+            title: headers.get('X-OpenRouter-Title'),
+            userAgent: headers.get('User-Agent'),
+          };
+          return Promise.resolve(new Response(JSON.stringify({
+            provider: COVERAGE_ROUTER_PROVIDER,
+            model: COVERAGE_ROUTER_MODEL,
+            usage: {
+              cost: 1.23,
+              cost_details: { upstream_inference_cost: 0.45 },
+            },
+          }), {
+            status: 200,
+            headers: { 'content-type': CONTENT_TYPE_JSON },
+          }));
+        }) as typeof fetch;
+        const response = await tracedFetch('https://openrouter.ai/api/v1/responses', {
+          method: 'POST',
+          headers: {
+            Authorization: 'Bearer TOKEN1234567890',
+          },
+          body: JSON.stringify({ prompt: COVERAGE_PROMPT }),
+        });
+        bodyJson = await response.json();
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
+      coverageOpenrouterJson = {
+        accept: capturedHeaderValues?.accept ?? undefined,
+        referer: capturedHeaderValues?.referer ?? undefined,
+        title: capturedHeaderValues?.title ?? undefined,
+        userAgent: capturedHeaderValues?.userAgent ?? undefined,
+        logs: [...logs],
+        routed: client.getLastActualRouting(),
+        cost: client.getLastCostInfo(),
+        response: bodyJson,
+      };
+      return makeSuccessResult(COVERAGE_OPENROUTER_JSON_ID);
+    },
+    expect: (result) => {
+      invariant(result.success, `Coverage ${COVERAGE_OPENROUTER_JSON_ID} should succeed.`);
+      invariant(coverageOpenrouterJson !== undefined, 'Coverage data missing for openrouter json.');
+      invariant(coverageOpenrouterJson.accept === CONTENT_TYPE_JSON, 'Accept header should default to application/json.');
+      invariant(typeof coverageOpenrouterJson.referer === 'string' && coverageOpenrouterJson.referer.length > 0, 'Referer header missing for openrouter json.');
+      invariant(typeof coverageOpenrouterJson.title === 'string' && coverageOpenrouterJson.title.length > 0, 'Title header missing for openrouter json.');
+      invariant(typeof coverageOpenrouterJson.userAgent === 'string' && coverageOpenrouterJson.userAgent.length > 0, 'User-Agent header missing for openrouter json.');
+      invariant(coverageOpenrouterJson.logs.some((log) => log.severity === 'TRC' && log.direction === 'request'), 'Trace request log expected for openrouter json.');
+      invariant(coverageOpenrouterJson.logs.some((log) => log.severity === 'TRC' && log.direction === 'response'), 'Trace response log expected for openrouter json.');
+      invariant(coverageOpenrouterJson.routed.provider === COVERAGE_ROUTER_PROVIDER, 'Actual provider mismatch for openrouter json.');
+      invariant(coverageOpenrouterJson.routed.model === COVERAGE_ROUTER_MODEL, 'Actual model mismatch for openrouter json.');
+      invariant(coverageOpenrouterJson.cost.costUsd === 1.23, 'Cost extraction mismatch for openrouter json.');
+      invariant(coverageOpenrouterJson.cost.upstreamInferenceCostUsd === 0.45, 'Upstream cost mismatch for openrouter json.');
+      const response = coverageOpenrouterJson.response as Record<string, unknown> | undefined;
+      const responseModel = typeof response?.model === 'string' ? response.model : undefined;
+      invariant(responseModel === COVERAGE_ROUTER_MODEL, 'Response body not preserved for openrouter json.');
+    },
+  },
+  {
+    id: COVERAGE_OPENROUTER_SSE_ID,
+    description: 'Coverage: streaming SSE parser for traced fetch metadata.',
+    execute: async () => {
+      coverageOpenrouterSse = undefined;
+      const logs: LogEntry[] = [];
+      const client = new LLMClient({}, { traceLLM: true, onLog: (entry) => { logs.push(entry); } });
+      const tracedFetchFactory = getPrivateMethod(client, 'createTracedFetch');
+      const tracedFetch = tracedFetchFactory.call(client) as typeof fetch;
+      const originalFetch = globalThis.fetch;
+      let capturedHeaderValues: Record<string, string | null> | undefined;
+      let rawStream = '';
+      try {
+        globalThis.fetch = ((_input, init) => {
+          const headers = new Headers(init?.headers);
+          capturedHeaderValues = {
+            accept: headers.get('Accept'),
+          };
+          rawStream = `data: {"provider":"${COVERAGE_ROUTER_SSE_PROVIDER}","model":"${COVERAGE_ROUTER_SSE_MODEL}","usage":{"cost":0.4,"cost_details":{"upstream_inference_cost":0.2}}}\n\ndata: [DONE]\n`;
+          return Promise.resolve(new Response(rawStream, {
+            status: 200,
+            headers: { 'content-type': CONTENT_TYPE_EVENT_STREAM },
+          }));
+        }) as typeof fetch;
+        const response = await tracedFetch('https://openrouter.ai/api/v1/stream', {
+          method: 'POST',
+          headers: {
+            Accept: CONTENT_TYPE_JSON,
+          },
+        });
+        await response.text();
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
+      coverageOpenrouterSse = {
+        accept: capturedHeaderValues?.accept ?? undefined,
+        logs: [...logs],
+        routed: client.getLastActualRouting(),
+        cost: client.getLastCostInfo(),
+        rawStream,
+      };
+      return makeSuccessResult(COVERAGE_OPENROUTER_SSE_ID);
+    },
+    expect: (result) => {
+      invariant(result.success, `Coverage ${COVERAGE_OPENROUTER_SSE_ID} should succeed.`);
+      invariant(coverageOpenrouterSse !== undefined, 'Coverage data missing for openrouter sse.');
+      invariant(coverageOpenrouterSse.accept === CONTENT_TYPE_JSON, 'Accept header should remain unchanged when preset.');
+      invariant(coverageOpenrouterSse.logs.some((log) => typeof log.message === 'string' && log.message.includes('raw-sse')), 'Trace response should capture raw SSE content.');
+      invariant(coverageOpenrouterSse.routed.provider === COVERAGE_ROUTER_SSE_PROVIDER, 'Actual provider mismatch for openrouter sse.');
+      invariant(coverageOpenrouterSse.routed.model === COVERAGE_ROUTER_SSE_MODEL, 'Actual model mismatch for openrouter sse.');
+      invariant(coverageOpenrouterSse.cost.costUsd === 0.4, 'Cost extraction mismatch for openrouter sse.');
+      invariant(coverageOpenrouterSse.cost.upstreamInferenceCostUsd === 0.2, 'Upstream cost mismatch for openrouter sse.');
+      invariant(coverageOpenrouterSse.rawStream.includes('[DONE]'), 'SSE payload missing sentinel.');
+    },
+  },
+  {
+    id: COVERAGE_GENERIC_JSON_ID,
+    description: 'Coverage: generic JSON cache-write token enrichment via traced fetch.',
+    execute: async () => {
+      coverageGenericJson = undefined;
+      const logs: LogEntry[] = [];
+      const client = new LLMClient({}, { traceLLM: true, onLog: (entry) => { logs.push(entry); } });
+      const tracedFetchFactory = getPrivateMethod(client, 'createTracedFetch');
+      const tracedFetch = tracedFetchFactory.call(client) as typeof fetch;
+      const originalFetch = globalThis.fetch;
+      let capturedHeaderValues: Record<string, string | null> | undefined;
+      try {
+        globalThis.fetch = ((_input, init) => {
+          const headers = new Headers(init?.headers);
+          capturedHeaderValues = {
+            accept: headers.get('Accept'),
+          };
+          return Promise.resolve(new Response(JSON.stringify({
+            usage: {
+              cache_creation: { ephemeral_5m_input_tokens: 42 },
+            },
+          }), {
+            status: 200,
+            headers: { 'content-type': CONTENT_TYPE_JSON },
+          }));
+        }) as typeof fetch;
+        const response = await tracedFetch('https://api.anthropic.com/v1/messages', {});
+        await response.json();
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
+      const cacheWrite = Reflect.get(client as unknown as Record<string, unknown>, 'lastCacheWriteInputTokens') as (number | undefined);
+      coverageGenericJson = {
+        accept: capturedHeaderValues?.accept ?? undefined,
+        cacheWrite,
+        logs: [...logs],
+      };
+      return makeSuccessResult(COVERAGE_GENERIC_JSON_ID);
+    },
+    expect: (result) => {
+      invariant(result.success, `Coverage ${COVERAGE_GENERIC_JSON_ID} should succeed.`);
+      invariant(coverageGenericJson !== undefined, 'Coverage data missing for generic json.');
+      invariant(coverageGenericJson.accept === CONTENT_TYPE_JSON, 'Accept header should default to application/json for generic json.');
+      invariant(coverageGenericJson.cacheWrite === 42, 'Cache write tokens not extracted from generic json.');
+      invariant(coverageGenericJson.logs.some((log) => log.direction === 'response' && log.severity === 'TRC'), 'Trace response log expected for generic json.');
+    },
+  },
+  {
+    id: COVERAGE_SESSION_ID,
+    description: 'Coverage: session snapshot persistence success and failure paths.',
+    execute: async () => {
+      coverageSessionSnapshot = undefined;
+      const configuration = makeBasicConfiguration();
+      configuration.defaults = { ...BASE_DEFAULTS };
+      const defaults = configuration.defaults ?? BASE_DEFAULTS;
+      const tempDir = makeTempDir(COVERAGE_SESSION_ID);
+      configuration.persistence = { sessionsDir: tempDir };
+      const sessionConfig: AIAgentSessionConfig = {
+        config: configuration,
+        targets: [{ provider: PRIMARY_PROVIDER, model: MODEL_NAME }],
+        tools: [],
+        systemPrompt: 'Phase 1 deterministic harness: coverage snapshot.',
+        userPrompt: DEFAULT_PROMPT_SCENARIO,
+        outputFormat: 'markdown',
+        stream: false,
+        parallelToolCalls: false,
+        maxTurns: 1,
+        toolTimeout: defaults.toolTimeout,
+        llmTimeout: defaults.llmTimeout,
+        maxRetries: defaults.maxRetries,
+        agentId: COVERAGE_SESSION_ID,
+        abortSignal: new AbortController().signal,
+      };
+      const session = AIAgentSession.create(sessionConfig);
+      const persistSessionSnapshot = getPrivateMethod(session, 'persistSessionSnapshot').bind(session) as (reason?: string) => unknown;
+      persistSessionSnapshot('coverage-success');
+      const filesAfterSuccess = await fs.promises.readdir(tempDir);
+      const originalWriteFile = fs.writeFileSync;
+      const originalStderrWrite: typeof process.stderr.write = process.stderr.write.bind(process.stderr);
+      let warnOutput = '';
+      fs.writeFileSync = ((..._args: Parameters<typeof fs.writeFileSync>) => {
+        throw new Error('snapshot-write-failure');
+      }) as typeof fs.writeFileSync;
+      process.stderr.write = ((chunk: string | Uint8Array, encoding?: BufferEncoding) => {
+        warnOutput += typeof chunk === 'string' ? chunk : Buffer.from(chunk).toString(encoding ?? 'utf8');
+        return true;
+      }) as typeof process.stderr.write;
+      try {
+        persistSessionSnapshot('coverage-failure');
+      } finally {
+        fs.writeFileSync = originalWriteFile;
+        process.stderr.write = originalStderrWrite;
+      }
+      const filesAfterFailure = await fs.promises.readdir(tempDir);
+      coverageSessionSnapshot = {
+        tempDir,
+        filesAfterSuccess,
+        filesAfterFailure,
+        warnOutput,
+      };
+      return makeSuccessResult(COVERAGE_SESSION_ID);
+    },
+    expect: (result) => {
+      invariant(result.success, `Coverage ${COVERAGE_SESSION_ID} should succeed.`);
+      invariant(coverageSessionSnapshot !== undefined, 'Coverage data missing for session snapshot.');
+      invariant(coverageSessionSnapshot.filesAfterSuccess.length > 0, 'Snapshot file not created in success path.');
+      invariant(coverageSessionSnapshot.warnOutput.includes(COVERAGE_WARN_SUBSTRING), 'Warning output missing for snapshot failure.');
+      invariant(coverageSessionSnapshot.filesAfterFailure.length === coverageSessionSnapshot.filesAfterSuccess.length, 'Failure path should not create additional snapshot files.');
+      try { fs.rmSync(coverageSessionSnapshot.tempDir, { recursive: true, force: true }); } catch { /* ignore cleanup failure */ }
     },
   },
   {

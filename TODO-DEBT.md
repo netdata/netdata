@@ -1,12 +1,12 @@
 # Technical Debt Backlog (Unified)
 
-_Last updated: $(date +%Y-%m-%d)_
+_Last updated: 2025-10-14_
 
 ## TL;DR
 - Streaming is broken by our traced fetch wrapper; fix it first to restore realtime output.
 - Core library violates the “silent core” contract (sync FS + stderr writes) and the agent loop can no longer finish without calling `agent__final_report`.
 - `AIAgentSession` and `BaseLLMProvider` are monolithic and need to be split; we also duplicate loader/concurrency logic.
-- Reliability gaps: no transport-level retries/circuit breakers, limited observability, and zero automated tests.
+- Reliability gaps: no transport-level retries/circuit breakers, limited observability, and automated coverage stops at the phase1 harness (no provider/rest e2e tests or CI gating).
 
 ## P0 — Critical (breaks core behavior or architecture)
 - **Streaming regression** — `src/llm-client.ts:199-338` eagerly reads cloned JSON/SSE bodies inside `createTracedFetch`. Streaming stalls until the full response downloads and doubles bandwidth. _Fix_: capture routing/cost metadata without consuming the live body (inspect headers, wrap the stream, or buffer _after_ the provider completes).
@@ -18,7 +18,7 @@ _Last updated: $(date +%Y-%m-%d)_
 ## P1 — High Priority (unblocks resilience & maintainability)
 - **Lack of transport retries/circuit breakers** — MCP servers and LLM transports have no retry/backoff beyond the high-level loop. Add provider/tool-level retry policies with exponential backoff, jitter, and circuit breakers for flaky endpoints.
 - **Observability gaps** — Structured logs exist but we lack correlation IDs, metrics, or traces. Add OpenTelemetry spans, Prometheus counters (tokens, latency, tool failures), and enrich logs with consistent identifiers.
-- **No automated tests** — There is no unit/integration test infrastructure. Stand up Vitest (or Jest) with coverage, seed critical tests (agent loop happy path, tool execution, provider fallback) and wire into CI before major refactors.
+- **Limited automated coverage** — The deterministic phase1 harness (including the new streaming/persistence/final_report scenarios) exists, but we still lack provider-specific unit tests, rest-provider coverage, and CI gating for regressions. Stand up Vitest (or Jest) with broader suites, add mocks for adapters, and enforce coverage in CI before major refactors.
 - **Concurrency limiter duplication** — Tool execution throttling logic lives in both `AIAgentSession` and `ToolsOrchestrator`; a similar limiter exists in `src/headends/concurrency.ts`. Centralize into a reusable semaphore.
 - **Loader duplication** — `loadAgent` vs `loadAgentFromContent` in `src/agent-loader.ts` repeat the same resolution/validation logic. Extract shared helpers to reduce churn and bug risk.
 - **Noisy diagnostics** — `src/llm-client.ts:220-253` prints warnings via `console.error` even with tracing disabled. Route through structured logging and guard behind trace flags.
