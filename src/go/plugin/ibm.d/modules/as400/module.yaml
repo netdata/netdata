@@ -56,6 +56,49 @@ description: |
   - **Caution**: Enabling this affects all users and applications on the IBM i system
 
   Default: `false` (statistics are not reset, using `RESET_STATISTICS=>'NO'`)
+
+  **Cardinality Management:**
+
+  To prevent performance issues from excessive metric creation, the collector enforces cardinality
+  limits on per-instance metrics (disks, subsystems, job queues, message queues, output queues,
+  active jobs, network interfaces, HTTP servers).
+
+  **How Limits Work:**
+  - The collector counts instances before collecting metrics
+  - If count exceeds the configured `max_*` limit, **collection is skipped entirely** for that category
+  - The collector logs a warning: `"[category] count (X) exceeds limit (Y), skipping collection"`
+  - No metrics are collected for that category until you adjust the configuration
+
+  **Configuration Options:**
+
+  Use **both** limit and selector options together to manage high-cardinality environments:
+
+  | Option | Purpose | Default |
+  |--------|---------|---------|
+  | `max_disks` | Maximum disk units to monitor | 100 |
+  | `max_subsystems` | Maximum subsystems to monitor | 100 |
+  | `max_job_queues` | Maximum job queues to monitor | 100 |
+  | `max_message_queues` | Maximum message queues to monitor | 100 |
+  | `max_output_queues` | Maximum output queues to monitor | 100 |
+  | `max_active_jobs` | Maximum active jobs to monitor | 100 |
+  | `collect_disks_matching` | Glob pattern to filter disks (e.g., `"001* 002*"`) | `""` (match all) |
+  | `collect_subsystems_matching` | Glob pattern to filter subsystems (e.g., `"QINTER QBATCH"`) | `""` (match all) |
+  | `collect_job_queues_matching` | Glob pattern to filter job queues (e.g., `"QSYS/*"`) | `""` (match all) |
+
+  **Example Workflow:**
+
+  1. System has 500 disks, collector skips disk metrics (exceeds default limit of 100)
+  2. Check logs: `"disk count (500) exceeds limit (100), skipping per-disk metrics"`
+  3. Two options:
+     - **Option A**: Increase limit: `max_disks: 500` (collects all 500 disks)
+     - **Option B**: Use selector: `collect_disks_matching: "00[1-5]*"` (cherry-pick specific disks)
+
+  **Best Practices:**
+  - Use selectors to monitor only business-critical objects in large environments
+  - Set limits based on your Netdata server's capacity (each instance = multiple charts)
+  - Start with defaults and adjust based on actual usage patterns
+
+  Network interface metrics have a fixed internal limit of 50 instances, and HTTP server metrics are capped at 200 instances; these limits are currently not configurable.
 icon: ibm-i.svg
 categories:
   - data-collection.infrastructure
