@@ -260,7 +260,7 @@ Query Resolution Strategy
    - Mobile Apps → Mobile & Desktop Apps section
 
 2) Specific mappings:
-   - Collectors/Plugins → netdata/src/collectors or /src/go
+   - Collectors/Plugins → netdata/src/collectors or netdata/src/go
    - eBPF/Kernel → kernel-collector or ebpf-co-re
    - ACLK/Agent-Cloud → netdata/src/aclk or aclk-schemas
    - Health/Alerts → netdata/src/health
@@ -278,7 +278,7 @@ Query Resolution Strategy
 
 ---
 
-The following is high-level overview of what is and what it can do:
+The following is high-level overview of what Netdata is and what it can do:
 
 ${include:docs/netdata-complete-product-description.md}
 

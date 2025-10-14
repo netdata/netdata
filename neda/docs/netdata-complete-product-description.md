@@ -882,13 +882,14 @@ helm install netdata netdata/netdata
 
 | Plan | Price | Target Audience | Key Features |
 |------|-------|-----------------|--------------|
-| **Community** | Free | Individual users, evaluation | 5 nodes, 1 custom dashboard, 4hr alert retention |
-| **Homelab** | $90/year or $10/month | Home users, students | Unlimited nodes*, unlimited dashboards, 60-day alerts |
-| **Business** | $6/node/month | Businesses | Unlimited everything, AI (10 sessions/mo), SSO, SCIM, Windows |
+| **Community** | Free | individuals | 5 nodes, 1 custom dashboard, 4hr alert retention |
+| **Homelab** | $90/year or $10/month | individuals | Unlimited nodes*, unlimited dashboards, 60-day alerts |
+| **Business** | $6/node/month | freelancers, professionals, businesses | Unlimited everything, AI (10 sessions/mo), SSO, SCIM, Windows |
 | **Enterprise On-Premise** | Custom (starts at 200 nodes) | Air-gapped, critical infra | Everything + on-premise hosting, priority support |
-| **Open Source Agent** | Free (GPL v3) | Self-hosted | Complete agent, unlimited metrics, community support |
+| **Open Source Agent** | Free (backend: GPL v3+, dashboard: NCUL1*) | Self-hosted | Complete agent, unlimited metrics, community support |
 
 *Subject to Fair Usage Policy
+*NCUL1 = Netdata Cloud UI License, free to use with Netdata Agents, Parents, not open-source - this is the same dashboard Netdata Cloud uses, with the ability to connect to Netdata Agents and Parents directly, optionally using Netdata Cloud as SSO provider, providing similar experience to community users as Netdata Cloud.
 
 ### 12.2 Business Plan Details
 
