@@ -36,6 +36,10 @@ func (c *Collector) collect() (map[string]int64, error) {
 		return nil, fmt.Errorf("error on collecting global status: %v", err)
 	}
 
+	if err := c.collectEngineInnoDBStatus(mx); err != nil {
+		return nil, fmt.Errorf("error on collecting engine innodb status: %v", err)
+	}
+
 	if hasInnodbOSLog(mx) {
 		c.addInnoDBOSLogOnce.Do(c.addInnoDBOSLogCharts)
 	} else if hasInnodbOSLogIO(mx) {
