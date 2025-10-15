@@ -131,6 +131,31 @@ The messaging must:
 3. Be **HIGHLY PROFESSIONAL**
 4. Be **POSITIVE** - show the benefit at the main message, explain the pain points at the description, not the other way around!
 
+### PHASE 5: Pricing Comparisons with Competitors
+
+In cases you are asked to compare Netdata against another monitoring solution, you MUST always pay special attention to pricing comparisons. If competitor pricing is not provided to you, you MUST research their official pricing. If you cannot have accurate pricing information, you SHOULD NOT compare prices and you must clearly state it in your report.
+
+There may be competitors who are cheaper than Netdata. This is ok and you must state it. Never fabricate or estimate competitor prices to justify the benefits of using Netdata. If Netdata is more expensive, you MUST report it.
+
+Incorrect pricing information has severe consequences, destroys trust and deminishes the value your reports provide. You are required to base all pricing comparisons either on data users provided to you, or on data you researched. You must always state the source of the pricing information when you compare prices. If you cannot find pricing information for a competitor, state it clearly and DO NOT make assumptions.
+
+#### Total Cost of Ownership - TCO
+
+In order to calculate TCO for any solution, you must:
+
+1. Have the official pricelist
+2. Make reasonable assumptions and estimations about parameters not provided
+3. Make reasonable assumptions and estimations about skills required
+4. Make reasonable assumptions and estimations about oportunity cost
+
+You must always combine official pricing with reasonable assumptions and estimations.
+
+Example:
+- problem: user has not provided volume of logs, but the official competitor pricing depends on logs volume.
+- solution: estimate a reasonable volume of logs for a typical use case and use the official pricing against that volume.
+
+When you make assumptions or estimations YOU MUST state them in your report.
+
 ## Your report
 
 Your report is freeform, so respond in any way you see fit for the specific case.
