@@ -882,26 +882,49 @@ helm install netdata netdata/netdata
 
 | Plan | Price | Target Audience | Key Features |
 |------|-------|-----------------|--------------|
-| **Community** | Free | individuals | 5 nodes, 1 custom dashboard, 4hr alert retention |
-| **Homelab** | $90/year or $10/month | individuals | Unlimited nodes*, unlimited dashboards, 60-day alerts |
+| **Community** | Free | personal, non-commercial use only | 5 nodes, 1 custom dashboard, 4hr alert retention |
+| **Homelab** | $90/year or $10/month | personal, non-commercial use only | Unlimited nodes*, unlimited dashboards, 60-day alerts |
 | **Business** | $6/node/month | freelancers, professionals, businesses | Unlimited everything, AI (10 sessions/mo), SSO, SCIM, Windows |
 | **Enterprise On-Premise** | Custom (starts at 200 nodes) | Air-gapped, critical infra | Everything + on-premise hosting, priority support |
 | **Open Source Agent** | Free (backend: GPL v3+, dashboard: NCUL1*) | Self-hosted | Complete agent, unlimited metrics, community support |
 
 *Subject to Fair Usage Policy
+
 *NCUL1 = Netdata Cloud UI License, free to use with Netdata Agents, Parents, not open-source - this is the same dashboard Netdata Cloud uses, with the ability to connect to Netdata Agents and Parents directly, optionally using Netdata Cloud as SSO provider, providing similar experience to community users as Netdata Cloud.
+
+| Target | Open Source | Community | Homelab | Business | Enterprise |
+|--------|-------------|-----------|---------|----------|------------|
+| personal, non-commercial use only | ✅ | ✅ | ✅ | - | - |
+| freelancers | ✅ | - | - | ✅ | - |
+| professionals | ✅ | - | - | ✅ | - |
+| businesses | ✅ | - | - | ✅ | - |
+| Air-gapped facilities | ✅ | - | - | - | ✅ |
+| Critical infrastructure | ✅ | - | - | - | ✅ |
+
+Based on Netdata's Terms of Service, Community and Homelab plans are exclusively for personal non-commercial use. Freelancers, Professionals and Businesses can either use Open Source or the Business Plan.
 
 ### 12.2 Business Plan Details
 
-**Pricing:**
-- Monthly: $6/node/month (pay-as-you-go)
-- Yearly: 25% discount (~$4.50/node/month)
+**Pricing:** $4.5/node/month (billed yearly), or $6/node/month (billed monthly)
+
+Volume discounts on yearly commitment:
+
+| Commitment | $/node/month | Total Yearly |
+|------------|------------------|---------------|
+| 50 | $4.5 | $2,700 |
+| 100 | $4.39 | $5,268 |
+| 200 | $4.22 | $10,128 |
+| 300 | $4.01 | $14,436 |
+| 400 | $3.91 | $18,768 |
+| 500 | $3.85 | $23,100 |
+| 501+ | contact us | contact us |
 
 **Billing:**
 - Based on **active nodes only** (offline/stale excluded)
-- Charged on **P90 usage** (90th percentile)
+- Charged on **P90 usage** (90th percentile, excludes daily spikes and the top 3 days per month)
 - No charges for containers (one agent monitors all containers on host)
 - No charges for metrics volume
+- No charges for logs volume
 - No charges for users
 
 **What's Included:**
@@ -922,9 +945,9 @@ helm install netdata netdata/netdata
 
 Customers are billed for sustained node usage, not temporary spikes. Netdata automatically excludes the highest usage periods each day (P90) and the highest 3 days each month (P90).
 
-We calculate your billable nodes using a 90th percentile (P90) method at two levels:
+We calculate billable nodes using a 90th percentile (P90) method at two levels:
 
-1. Daily: We determine the node count at the 90th percentile of your time-weighted usage distribution. If you briefly spike to 100 nodes for 1 hour but run 10 nodes for 23 hours, your daily P90 is 10 nodes—the spike doesn't inflate your bill.
+1. Daily: We determine the node count at the 90th percentile of time-weighted usage distribution. If you briefly spike to 100 nodes for 1 hour but run 10 nodes for 23 hours, your daily P90 is 10 nodes—the spike doesn't inflate your bill.
 
 2. Monthly: We take the P90 of all your daily values. In a 30-day month, this excludes your top 3 daily values, protecting you from occasional high-usage days.
 
@@ -1234,24 +1257,28 @@ helm install netdata netdata/netdata
 
 ## 19. Multi-Tenacy
 
-Netdata Cloud Spaces are totally isolated at the infrastructure-level.
-- Nodes cannot be shared across multiple spaces (each node belongs to a single space)
-- Nodes can be added to multiple rooms of the same space
+Netdata Cloud supports Spaces (organizations) and Rooms.
+
+- Spaces provide physical isolation (e.g. different customers of an MSP)
+- Rooms provide logical isolation (e.g. different teams, services, roles, incidents)
+
+Physical isolation: each space has its own infrastructure
+- Each node belongs to single space
+- Each space has its own rooms
 - Dashboard settings are not shared between spaces (each space has its own set of settings)
-- Users can be members/admins of multiple spaces, with a single login (login once, access all your spaces)
 - Each space has its own set of users and permissions
 - Billing is applied per space
 
-Think of Spaces like Slack organizations, or GitHub organizations.
+Logical isolation:
+- Nodes can be added to multiple rooms of the same space
+- Rooms can be private or public (within a space)
 
-1. Each space has its own infrastructure (equivalent to GitHub repos)
-2. Each space has its own users (equivalent to GitHub organization members/admins)
-3. Each space has its own rooms (equivalent to Slack Channels)
-4. Each user may be a member of multiple spaces (exactly like GitHub and Slack)
-5. Each user may have a different role per space (exactly like GitHub and Slack)
-6. Each user may be limited to some specific rooms per space (exactly like GitHub and Slack)
+Users: each space has its own users, but a single session provides access to all spaces
+- Each user may be a member of multiple spaces
+- Each user may have a different role per space
+- Each user may be limited to some specific rooms per space
 
-Freelancers and MSP may have multiple spaces, and on each space they may have invited their customers and subcontractors, possibly restrict to certain rooms so that they can have limited visibility on the underlying infrastructure.
+Freelancers and MSP may have multiple spaces, and on each space they may have invited their customers and subcontractors. True multi-tenacy is supported via space-level (physical) isolation.
 
 ## 20. Summary
 

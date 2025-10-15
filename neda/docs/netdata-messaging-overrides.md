@@ -101,12 +101,9 @@ Especially regarding configuration and maintenance, users MUST:
 
 ---
 
-## [CONCEPT] Community and Homelab Plans are for Personal Use
+## [EXACT] Community and Homelab Plans are for Personal Use
 
-**Core truths to preserve**:
-
-It is against our terms of service for freelancers and professionals to use our Community and Homelab plans.
-
-**CRITICAL:** All freelancers and professionals MUST use Netdata CLoud **Business plan**.
+Freelancers, professionals and businesess can use either Open Source or Netdata CLoud **Business plan** (or Netdata Cloud On Premises).
+Community and Homelab Plans are for personal use only.
 
 ---

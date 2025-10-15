@@ -138,19 +138,15 @@ Your report is freeform, so respond in any way you see fit for the specific case
 In your report include:
 
 1. **Hero Messages and subheadings**
-   Use clear, simple, direct and agggressive messaging, revealing the overall customer benefit from using Netdata, in the language of the target customer.
-   Hero messages must be highly tailored to the specific use case. Think like the customer, consider all the benfits and come up with the strongest overal message for them. What is the most impressive overall benefit they will get?
-   Provide 3 versions of them, to choose from.
+   - Identify the strongest overal customer benefit from using Netdata, in their language.
+   - Think like the customer, consider all the benfits and provide the strongest overal message. What is the most impressive overall benefit they will get?
+   - Provide 3 versions of them, to choose from.
 
-2. **Segment Variations**
-   Especially for large industry segments we need to know how the key messaging can differentiate across sub-segments.
-   Provide alternative hero-subheading pairs for any sub-segments identified.
-
-3. **Key Value Propositions**
-   Provide 6-10 of them. Each tailored to addressing the key pain-points of the target AND uniquely satisfied by Netdata's design, architecture, features and capabilities.
+2. **Key Value Propositions**
+   Provide 7-12 of them. Each tailored to addressing the key pain-points of the customer AND aligned to Netdata's design, architecture, features and capabilities.
    Provide:
    - **Heading**
-     A provocative, imperative, strong message for the given value proposition ("Get...", "Reduce...", "Brake...", "Eliminate...", "Gain...", "See...", "Advance...", etc - like there is an invisible prefix "With Netdata you can..." and then the heading). The messaging statement must be HIHGLY customized for the specific use case - in the language of the customers.
+     A provocative message for the given value proposition ("Get...", "Reduce...", "Brake...", "Eliminate...", "Gain...", "See...", "Advance...", etc - like there is an invisible prefix "With Netdata you can..."). It MUST be tailored for the specific customer or use case - in their language.
    - **Alternative Headings**
      Provide a list of 2-3 alternative headings for the same value proposition, all tailored to the specific use case.
    - **Netdata Advantages**
@@ -158,13 +154,13 @@ In your report include:
    - **Why it matters**
      Provide a list of 3-7 reasons on why this value proposition matters for the specific use case.
 
-4. **Key supporting claims to use**
-   Pprovide 10-20 unique Netdata features relative to the messaging, group them by category.
+3. **Key supporting claims to use**
+   Pprovide 10-20 unique Netdata features and capabilities relative to the messaging, group them by category.
 
-5. **Instructions**
+4. **Instructions**
    Provide clear instructions on how to use this messaging in our website, sales conversations, blogs, customer success stories, competitive positioning, calls to action.
 
-6. **FAQ**
+5. **FAQ**
    Provide 10-15 FAQ items
 
 ## Mandatory Rules
@@ -189,9 +185,6 @@ Find strong messaging that addresses the key pain-points of the industry/segment
   - zero configuration = we have automated every configuration that can be automated, but there are still some configurations that require human action (e.g. password to access protected endpoints - db, message brokers, etc)
 5. NEVER lose focus on ICP: we target specific size of enterprises - do not give wrong examples.
 6. NEVER ignore 'Mandatory Netdata Facts and Conceptual Guidance'
-
-**CRITICAL:**
-- All freelancers and professionals MUST use Netdata CLoud **Business plan**. Homelab and Community are only allowed for individuals.
 
 ---
 
