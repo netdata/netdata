@@ -38,7 +38,7 @@ var (
 	dataPerconaVer8029GlobalStatus, _       = os.ReadFile("testdata/percona/v8.0.29/global_status.txt")
 	dataPerconaVer8029GlobalVariables, _    = os.ReadFile("testdata/percona/v8.0.29/global_variables.txt")
 	dataPerconaVer8029UserStatistics, _     = os.ReadFile("testdata/percona/v8.0.29/user_statistics.txt")
-	dataPerconaV8029ProcessList, _          = os.ReadFile("testdata/percona/v8.0.29/process_list.txt")
+	dataPerconaVer8029ProcessList, _        = os.ReadFile("testdata/percona/v8.0.29/process_list.txt")
 	dataPerconaVer8029EngineInnoDBStatus, _ = os.ReadFile("testdata/percona/v8.0.29/engine_innodb_status.txt")
 
 	dataMariaVer5564Version, _            = os.ReadFile("testdata/mariadb/v5.5.64/version.txt")
@@ -82,7 +82,7 @@ func Test_testDataIsValid(t *testing.T) {
 		"dataPerconaVer8029GlobalStatus":                  dataPerconaVer8029GlobalStatus,
 		"dataPerconaVer8029GlobalVariables":               dataPerconaVer8029GlobalVariables,
 		"dataPerconaVer8029UserStatistics":                dataPerconaVer8029UserStatistics,
-		"dataPerconaV8029ProcessList":                     dataPerconaV8029ProcessList,
+		"dataPerconaVer8029ProcessList":                   dataPerconaVer8029ProcessList,
 		"dataPerconaVer8029EngineInnoDBStatus":            dataPerconaVer8029EngineInnoDBStatus,
 		"dataMariaVer5564Version":                         dataMariaVer5564Version,
 		"dataMariaVer5564GlobalStatus":                    dataMariaVer5564GlobalStatus,
@@ -1757,7 +1757,7 @@ func TestCollector_Collect(t *testing.T) {
 					mockExpect(t, m, queryShowGlobalVariables, dataPerconaVer8029GlobalVariables)
 					mockExpect(t, m, queryShowReplicaStatus, nil)
 					mockExpect(t, m, queryShowUserStatistics, dataPerconaVer8029UserStatistics)
-					mockExpect(t, m, queryShowProcessListPS, dataPerconaV8029ProcessList)
+					mockExpect(t, m, queryShowProcessListPS, dataPerconaVer8029ProcessList)
 				},
 				check: func(t *testing.T, collr *Collector) {
 					mx := collr.Collect(context.Background())
