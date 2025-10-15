@@ -43,6 +43,29 @@ After you modify `netdata.conf`, you need to [restart Netdata](/docs/netdata-age
 
 :::
 
+## Customizing Your Node Name
+
+You can change the display name of your Netdata node by customizing the hostname setting:
+
+1. Edit your `netdata.conf` file:
+   ```bash
+   cd /etc/netdata 2>/dev/null || cd /opt/netdata/etc/netdata
+   sudo ./edit-config netdata.conf
+   ```
+
+2. Add or modify the hostname in the `[global]` section:
+   ```ini
+   [global]
+       hostname = YOUR_CUSTOM_NODE_NAME
+   ```
+
+3. Restart Netdata to apply the changes:
+   ```bash
+   sudo systemctl restart netdata
+   ```
+
+The custom hostname will appear in dashboards, alerts, and when streaming to parent nodes.
+
 ## Configuration Section Details
 
 <details>
