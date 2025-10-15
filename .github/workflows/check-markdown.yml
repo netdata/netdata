@@ -1,0 +1,42 @@
+name: Dry-run Ingest Check
+
+"on":
+  pull_request:
+    paths:
+      - '**.md'
+      - '**.mdx'
+      - 'docs/**'
+
+jobs:
+  check-documentation:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+          path: netdata
+
+      - name: Checkout netdata/learn repository
+        uses: actions/checkout@v3
+        with:
+          repository: netdata/learn
+          token: ${{ secrets.GITHUB_TOKEN }}
+          path: learn
+
+      - name: Init python env
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.9"
+
+      - name: Setup python env
+        run: |
+          pip install -r learn/.learn_environment/ingest-requirements.txt
+
+      - name: Run Ingest
+        run: |
+          cd learn
+          python ingest/ingest.py
+          # Note: Any files created during this check will be discarded
+          # when the ephemeral runner is destroyed
