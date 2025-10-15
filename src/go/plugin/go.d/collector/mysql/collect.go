@@ -63,6 +63,9 @@ func (c *Collector) collect() (map[string]int64, error) {
 		}
 		c.recheckGlobalVarsTime = now
 	}
+	mx["innodb_log_file_size"] = c.varInnoDBLogFileSize
+	mx["innodb_log_files_in_group"] = c.varInnoDBLogFilesInGroup
+	mx["innodb_log_group_capacity"] = c.varInnoDBLogFileSize * c.varInnoDBLogFilesInGroup
 	mx["max_connections"] = c.varMaxConns
 	mx["table_open_cache"] = c.varTableOpenCache
 
