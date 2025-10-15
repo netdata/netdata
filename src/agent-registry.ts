@@ -5,7 +5,7 @@ import type { AIAgentSession } from './ai-agent.js';
 import type { OutputFormatId } from './formats.js';
 import type { AIAgentCallbacks, ConversationMessage } from './types.js';
 
-import { loadAgent, LoadedAgentCache } from './agent-loader.js';
+import { loadAgent, loadAgentFromContent, LoadedAgentCache } from './agent-loader.js';
 import { formatPromptValue } from './formats.js';
 import { applyFormat, buildPromptVars, expandVars } from './prompt-builder.js';
 
@@ -135,6 +135,17 @@ export class AgentRegistry {
   public resolveAgentId(alias: string): string | undefined {
     if (this.agents.has(alias)) return alias;
     return this.aliasToId.get(alias);
+  }
+
+  public loadFromContent(
+    id: string,
+    content: string,
+    options?: LoadAgentOptions & { baseDir?: string }
+  ): LoadedAgent {
+    const loaded = loadAgentFromContent(id, content, options, this.cache);
+    this.agents.set(loaded.id, loaded);
+    this.registerAliases(loaded, id);
+    return loaded;
   }
 
   private registerAliases(agent: LoadedAgent, originalPath: string): void {

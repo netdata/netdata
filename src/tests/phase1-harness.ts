@@ -12,7 +12,8 @@ import type { JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js';
 import type { ChildProcess } from 'node:child_process';
 import type { AddressInfo } from 'node:net';
 
-import { loadAgent, loadAgentFromContent } from '../agent-loader.js';
+import { loadAgent } from '../agent-loader.js';
+import { AgentRegistry } from '../agent-registry.js';
 import { AIAgentSession } from '../ai-agent.js';
 import { parseFrontmatter } from '../frontmatter.js';
 import { DEFAULT_TOOL_INPUT_SCHEMA } from '../input-contract.js';
@@ -2659,7 +2660,8 @@ const TEST_SCENARIOS: HarnessTest[] = [
           return originalCreate(sessionConfig);
         };
         try {
-          const loaded = loadAgentFromContent(path.join(tempDir, 'loader.ai'), promptContent, options);
+          const registry = new AgentRegistry([], { configPath, verbose: true });
+          const loaded = registry.loadFromContent(path.join(tempDir, 'loader.ai'), promptContent, options);
           await loaded.createSession(
             'Loader System Prompt',
             'Loader User Prompt',

@@ -15,7 +15,6 @@ import type { Headend, HeadendLogSink } from './headends/types.js';
 import type { LogEntry, AccountingEntry, AIAgentCallbacks, ConversationMessage, Configuration, MCPTool } from './types.js';
 import type { CommanderError } from 'commander';
 
-import { loadAgentFromContent } from './agent-loader.js';
 import { AgentRegistry } from './agent-registry.js';
 import { buildUnifiedConfiguration, discoverLayers, resolveDefaults } from './config-resolver.js';
 import { formatPromptValue, resolveFormatIdForCli } from './formats.js';
@@ -977,7 +976,8 @@ program
         return 'cli-main';
       })();
 
-      const loaded = loadAgentFromContent(fileAgentId, fmSource, {
+      const registry = new AgentRegistry([], { configPath: cfgPath, verbose: options.verbose === true });
+      const loaded = registry.loadFromContent(fileAgentId, fmSource, {
         configPath: cfgPath,
         verbose: options.verbose === true,
         targets,
