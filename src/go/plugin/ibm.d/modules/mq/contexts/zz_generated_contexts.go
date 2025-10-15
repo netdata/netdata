@@ -542,7 +542,7 @@ var Channel = struct {
 	Status: ChannelStatusContext{
 		Context: framework.Context[ChannelLabels]{
 			Name:        "mq.channel.status",
-			Family:      "channels",
+			Family:      "channels/overview",
 			Title:       "Channel Status",
 			Units:       "status",
 			Type:        module.Stacked,
@@ -643,7 +643,7 @@ var Channel = struct {
 	Messages: ChannelMessagesContext{
 		Context: framework.Context[ChannelLabels]{
 			Name:        "mq.channel.messages",
-			Family:      "channels",
+			Family:      "channels/overview",
 			Title:       "Channel Message Rate",
 			Units:       "messages/s",
 			Type:        module.Line,
@@ -667,7 +667,7 @@ var Channel = struct {
 	Bytes: ChannelBytesContext{
 		Context: framework.Context[ChannelLabels]{
 			Name:        "mq.channel.bytes",
-			Family:      "channels",
+			Family:      "channels/overview",
 			Title:       "Channel Data Transfer Rate",
 			Units:       "bytes/s",
 			Type:        module.Line,
@@ -691,7 +691,7 @@ var Channel = struct {
 	Batches: ChannelBatchesContext{
 		Context: framework.Context[ChannelLabels]{
 			Name:        "mq.channel.batches",
-			Family:      "channels",
+			Family:      "channels/overview",
 			Title:       "Channel Batch Rate",
 			Units:       "batches/s",
 			Type:        module.Line,
@@ -715,7 +715,7 @@ var Channel = struct {
 	BatchSize: ChannelBatchSizeContext{
 		Context: framework.Context[ChannelLabels]{
 			Name:        "mq.channel.batch_size",
-			Family:      "channels",
+			Family:      "channels/overview",
 			Title:       "Channel Batch Size",
 			Units:       "messages",
 			Type:        module.Line,
@@ -739,7 +739,7 @@ var Channel = struct {
 	BatchInterval: ChannelBatchIntervalContext{
 		Context: framework.Context[ChannelLabels]{
 			Name:        "mq.channel.batch_interval",
-			Family:      "channels",
+			Family:      "channels/overview",
 			Title:       "Channel Batch Interval",
 			Units:       "milliseconds",
 			Type:        module.Line,
@@ -763,7 +763,7 @@ var Channel = struct {
 	Intervals: ChannelIntervalsContext{
 		Context: framework.Context[ChannelLabels]{
 			Name:        "mq.channel.intervals",
-			Family:      "channels",
+			Family:      "channels/overview",
 			Title:       "Channel Intervals",
 			Units:       "seconds",
 			Type:        module.Line,
@@ -801,7 +801,7 @@ var Channel = struct {
 	ShortRetryCount: ChannelShortRetryCountContext{
 		Context: framework.Context[ChannelLabels]{
 			Name:        "mq.channel.short_retry_count",
-			Family:      "channels",
+			Family:      "channels/overview",
 			Title:       "Channel Short Retry Count",
 			Units:       "retries",
 			Type:        module.Line,
@@ -825,7 +825,7 @@ var Channel = struct {
 	LongRetryInterval: ChannelLongRetryIntervalContext{
 		Context: framework.Context[ChannelLabels]{
 			Name:        "mq.channel.long_retry_interval",
-			Family:      "channels",
+			Family:      "channels/overview",
 			Title:       "Channel Long Retry Interval",
 			Units:       "seconds",
 			Type:        module.Line,
@@ -849,7 +849,7 @@ var Channel = struct {
 	MaxMessageLength: ChannelMaxMessageLengthContext{
 		Context: framework.Context[ChannelLabels]{
 			Name:        "mq.channel.max_msg_length",
-			Family:      "channels",
+			Family:      "channels/overview",
 			Title:       "Channel Max Message Length",
 			Units:       "bytes",
 			Type:        module.Line,
@@ -873,7 +873,7 @@ var Channel = struct {
 	SharingConversations: ChannelSharingConversationsContext{
 		Context: framework.Context[ChannelLabels]{
 			Name:        "mq.channel.sharing_conversations",
-			Family:      "channels",
+			Family:      "channels/overview",
 			Title:       "Channel Sharing Conversations",
 			Units:       "conversations",
 			Type:        module.Line,
@@ -897,7 +897,7 @@ var Channel = struct {
 	NetworkPriority: ChannelNetworkPriorityContext{
 		Context: framework.Context[ChannelLabels]{
 			Name:        "mq.channel.network_priority",
-			Family:      "channels",
+			Family:      "channels/overview",
 			Title:       "Channel Network Priority",
 			Units:       "priority",
 			Type:        module.Line,
@@ -921,7 +921,7 @@ var Channel = struct {
 	BufferCounts: ChannelBufferCountsContext{
 		Context: framework.Context[ChannelLabels]{
 			Name:        "mq.channel.buffer_counts",
-			Family:      "channels",
+			Family:      "channels/overview",
 			Title:       "Channel Buffer Counts",
 			Units:       "buffers",
 			Type:        module.Line,
@@ -952,7 +952,7 @@ var Channel = struct {
 	CurrentMessages: ChannelCurrentMessagesContext{
 		Context: framework.Context[ChannelLabels]{
 			Name:        "mq.channel.current_messages",
-			Family:      "channels",
+			Family:      "channels/overview",
 			Title:       "Channel Current Messages",
 			Units:       "messages",
 			Type:        module.Line,
@@ -976,7 +976,7 @@ var Channel = struct {
 	XmitQueueTime: ChannelXmitQueueTimeContext{
 		Context: framework.Context[ChannelLabels]{
 			Name:        "mq.channel.xmitq_time",
-			Family:      "channels",
+			Family:      "channels/overview",
 			Title:       "Channel Transmission Queue Time",
 			Units:       "milliseconds",
 			Type:        module.Line,
@@ -1000,7 +1000,7 @@ var Channel = struct {
 	MCAStatus: ChannelMCAStatusContext{
 		Context: framework.Context[ChannelLabels]{
 			Name:        "mq.channel.mca_status",
-			Family:      "channels",
+			Family:      "channels/overview",
 			Title:       "Channel MCA Status",
 			Units:       "status",
 			Type:        module.Line,
@@ -1024,7 +1024,7 @@ var Channel = struct {
 	InDoubtStatus: ChannelInDoubtStatusContext{
 		Context: framework.Context[ChannelLabels]{
 			Name:        "mq.channel.indoubt_status",
-			Family:      "channels",
+			Family:      "channels/overview",
 			Title:       "Channel In-Doubt Status",
 			Units:       "status",
 			Type:        module.Line,
@@ -1048,7 +1048,7 @@ var Channel = struct {
 	SSLKeyResets: ChannelSSLKeyResetsContext{
 		Context: framework.Context[ChannelLabels]{
 			Name:        "mq.channel.ssl_key_resets",
-			Family:      "channels",
+			Family:      "channels/overview",
 			Title:       "Channel SSL Key Resets",
 			Units:       "resets",
 			Type:        module.Line,
@@ -1072,7 +1072,7 @@ var Channel = struct {
 	NPMSpeed: ChannelNPMSpeedContext{
 		Context: framework.Context[ChannelLabels]{
 			Name:        "mq.channel.npm_speed",
-			Family:      "channels",
+			Family:      "channels/overview",
 			Title:       "Channel Non-Persistent Message Speed",
 			Units:       "speed",
 			Type:        module.Line,
@@ -1096,7 +1096,7 @@ var Channel = struct {
 	CurrentSharingConversations: ChannelCurrentSharingConversationsContext{
 		Context: framework.Context[ChannelLabels]{
 			Name:        "mq.channel.current_sharing_convs",
-			Family:      "channels",
+			Family:      "channels/overview",
 			Title:       "Channel Current Sharing Conversations",
 			Units:       "conversations",
 			Type:        module.Line,

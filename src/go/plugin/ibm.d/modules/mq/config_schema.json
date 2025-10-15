@@ -169,5 +169,80 @@
     },
     "title": "mq collector configuration",
     "type": "object"
+  },
+  "uiSchema": {
+    "password": {
+      "ui:widget": "password"
+    },
+    "ui:flavour": "tabs",
+    "ui:options": {
+      "tabs": [
+        {
+          "fields": [
+            "update_every"
+          ],
+          "title": "Connection"
+        },
+        {
+          "fields": [
+            "queue_manager",
+            "channel",
+            "host",
+            "port",
+            "user",
+            "statistics_interval,omitempty",
+            "sys_topic_interval,omitempty"
+          ],
+          "title": "Advanced"
+        },
+        {
+          "fields": [
+            "password"
+          ],
+          "title": "Auth"
+        },
+        {
+          "fields": [
+            "collect_queues",
+            "collect_channels",
+            "collect_topics",
+            "collect_listeners",
+            "collect_subscriptions",
+            "collect_system_queues",
+            "collect_system_channels",
+            "collect_system_topics",
+            "collect_system_listeners",
+            "collect_channel_config",
+            "collect_queue_config",
+            "collect_reset_queue_stats",
+            "collect_statistics_queue",
+            "collect_sys_topics"
+          ],
+          "title": "Collection"
+        },
+        {
+          "fields": [
+            "queue_selector",
+            "channel_selector",
+            "topic_selector",
+            "listener_selector",
+            "subscription_selector"
+          ],
+          "title": "Filters"
+        },
+        {
+          "fields": [
+            "max_queues",
+            "max_channels",
+            "max_topics",
+            "max_listeners"
+          ],
+          "title": "Limits"
+        }
+      ]
+    },
+    "uiOptions": {
+      "fullPage": true
+    }
   }
 }

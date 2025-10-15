@@ -21,7 +21,7 @@ import (
 
 const (
 	dyncfgVnodeIDf  = "%s:vnode"
-	dyncfgVnodePath = "/collectors/%s/vnodes"
+	dyncfgVnodePath = "/collectors/%s/Vnodes"
 )
 
 func (m *Manager) dyncfgVnodePrefixValue() string {

@@ -26,7 +26,7 @@ import (
 
 const (
 	dyncfgCollectorPrefixf = "%s:collector:"
-	dyncfgCollectorPath    = "/collectors/%s/jobs"
+	dyncfgCollectorPath    = "/collectors/%s/Jobs"
 )
 
 func (m *Manager) dyncfgCollectorPrefixValue() string {
