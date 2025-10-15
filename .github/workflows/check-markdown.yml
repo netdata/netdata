@@ -26,7 +26,7 @@ jobs:
           path: learn
 
       - name: Init python env
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@6
         with:
           python-version: "3.9"
 
