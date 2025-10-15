@@ -34,6 +34,11 @@ jobs:
         run: |
           pip install -r learn/.learn_environment/ingest-requirements.txt
 
+      - name: Configure Git to use HTTPS instead of SSH
+        run: |
+          git config --global url."https://github.com/".insteadOf git@github.com:
+          git config --global url."https://".insteadOf git://
+
       - name: Run Ingest
         run: |
           cd learn
