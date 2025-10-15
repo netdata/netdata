@@ -42,6 +42,8 @@ jobs:
       - name: Run Ingest
         run: |
           cd learn
-          python ingest/ingest.py
-          # Note: Any files created during this check will be discarded
-          # when the ephemeral runner is destroyed
+          # Pass the PR's repository and branch to ingest
+          REPO="${{ github.event.pull_request.head.repo.full_name }}"
+          BRANCH="${{ github.event.pull_request.head.ref }}"
+          echo "Running ingest for $REPO:$BRANCH"
+          python ingest/ingest.py --repos "$REPO:$BRANCH"
