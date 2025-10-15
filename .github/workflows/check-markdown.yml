@@ -19,7 +19,7 @@ jobs:
           path: netdata
 
       - name: Checkout netdata/learn repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v5
         with:
           repository: netdata/learn
           token: ${{ secrets.GITHUB_TOKEN }}
