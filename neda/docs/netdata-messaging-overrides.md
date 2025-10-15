@@ -46,13 +46,13 @@ Netdata provides AI-powered troubleshooting through **two distinct integration p
 
 ## [EXACT] Cost Savings
 
-**Must state**: "90% cost reduction" or "90% cost savings"
+**Exception**: When performing **specific analysis** for particular competitors or use cases (e.g., "vs Datadog", "vs Elastic", etc), you MUST provide **detailed calculations** with different percentages based on actual pricing and usage. Specific analysis overrides this generic rule.
 
-**Context**: This is a generic statement comparing Netdata to comparable monitoring systems (apples-to-apples comparison).
-
-**Exception**: When performing **specific analysis** for particular competitors or use cases (e.g., "vs Datadog for this workload", "vs Elastic for log management"), you may provide **detailed calculations** with different percentages based on actual pricing and usage. Specific analysis overrides this generic rule.
+When however we compare Netdata generally against the industry, we MUST state: "90% cost reduction" or "90% cost savings"
 
 **Do not say**: "significant savings", "up to 90%", "around 90%", "dramatic cost reduction" (without any percentage figure when making generic statements)
+
+**Context**: This is a generic statement comparing Netdata to comparable monitoring systems (same amount of metrics and logs, same scale). It does not apply to ALL competitors, especially when the technologies used are completely different (e.g. they do tracing - which Netdata does not, they don't collect the same amount of metrics, etc).
 
 ---
 
