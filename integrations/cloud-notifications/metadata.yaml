@@ -742,9 +742,9 @@
       4. Add the ServiceNow Integration
       5. A modal will be presented to you to enter the required details to enable the integration:
           - **Notification settings**
-            - Configuration name (optional): A name for your configuration in order to easily refer to it
+            - Configuration name (optional): A name for your configuration to easily refer to it
             - Rooms: A list of Rooms for which you want to be notified
-            - Notifications: The notifications which you want to be notified
+            - Notifications: Event types for which you want to receive notifications.
           - **Integration configuration**
             - Instance URL: The base URL of your ServiceNow instance (for example, `https://my-instance.service-now.com/`).
             - Username: The username of the ServiceNow integration user you created.
