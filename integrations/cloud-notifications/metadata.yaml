@@ -708,3 +708,44 @@
             - Notifications: The notifications which you want to be notified
           - **Integration configuration**
             - Alert Source API key: The key you copied in the ilert configuration step.
+
+- id: "notify-cloud-servicenow"
+  meta:
+    name: "ServiceNow"
+    link: "https://www.servicenow.com/"
+    categories:
+      - notify.cloud
+    icon_filename: "servicenow.png"
+  keywords:
+    - servicenow
+  setup:
+    description: |
+      ### Prerequisites
+
+      - Netdata Cloud account
+      - Access to the Space as an **Admin**
+      - The Space needs to be on a paid plan
+      - The ServiceNow **Event Management** plugin enabled on your instance
+      - A ServiceNow user with the `evt_mgmt_admin` role and a password for API access
+
+      ### ServiceNow Configuration
+
+      1. Verify that the **Event Management** plugin is activated on your ServiceNow instance.
+      2. Navigate to **System Security** --> **Users** and create a dedicated integration user if one does not already exist.
+      3. Assign the `evt_mgmt_admin` role to this user and set a strong password. Keep the username and password available for the Netdata configuration step.
+
+      ### Netdata Configuration
+
+      1. Click on the **Space settings** cog (located above your profile icon)
+      2. Click on the **Alerts & Notifications** tab
+      3. Click on the **+ Add configuration** button
+      4. Add the ServiceNow Integration
+      5. A modal will be presented to you to enter the required details to enable the integration:
+          - **Notification settings**
+            - Configuration name (optional): A descriptive name to identify this notification configuration
+            - Rooms: A list of Rooms for which you want to be notified
+            - Notifications: Event types for which you want to receive notifications.
+          - **Integration configuration**
+            - Instance URL: The base URL of your ServiceNow instance (for example, `https://my-instance.service-now.com/`).
+            - Username: The username of the ServiceNow integration user you created.
+            - Password: The password of the ServiceNow integration user you created.
