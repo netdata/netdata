@@ -800,7 +800,7 @@ ml_dimension_predict(ml_dimension_t *dim, calculated_number_t value, bool exists
         models_consulted++;
 
         calculated_number_t anomaly_score = ml_kmeans_anomaly_score(&km_ctx, features.preprocessed_features[0]);
-        if (anomaly_score == std::numeric_limits<calculated_number_t>::quiet_NaN())
+        if (std::isnan(anomaly_score))
             continue;
 
         if (anomaly_score < (100 * Cfg.dimension_anomaly_score_threshold)) {

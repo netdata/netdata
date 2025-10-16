@@ -540,6 +540,27 @@ void odbc_disconnect(odbc_conn_t conn_handle) {
     free(conn);
 }
 
+int64_t odbc_value_get_int64(const odbc_value_t* value) {
+    if (!value || value->is_null || value->type != ODBC_TYPE_INT64) {
+        return 0;
+    }
+    return value->data.int_val;
+}
+
+double odbc_value_get_double(const odbc_value_t* value) {
+    if (!value || value->is_null || value->type != ODBC_TYPE_DOUBLE) {
+        return 0.0;
+    }
+    return value->data.double_val;
+}
+
+const char* odbc_value_get_string(const odbc_value_t* value) {
+    if (!value || value->is_null || value->type != ODBC_TYPE_STRING) {
+        return NULL;
+    }
+    return value->data.string_val;
+}
+
 // Check connection status
 int odbc_is_connected(odbc_conn_t conn_handle) {
     if (!conn_handle) return 0;

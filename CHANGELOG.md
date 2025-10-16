@@ -2,11 +2,17 @@
 
 ## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v2.7.1...HEAD)
+[Full Changelog](https://github.com/netdata/netdata/compare/v2.7.2...HEAD)
 
 **Merged pull requests:**
 
+- Customize node name addition [\#21151](https://github.com/netdata/netdata/pull/21151) ([kanelatechnical](https://github.com/kanelatechnical))
+- Skip adding Sentry breadcrumb during shutdown timeout [\#21150](https://github.com/netdata/netdata/pull/21150) ([stelfrag](https://github.com/stelfrag))
+- Fix NaN check in anomaly score calculation [\#21149](https://github.com/netdata/netdata/pull/21149) ([stelfrag](https://github.com/stelfrag))
+- Additional checks during cgroup discovery [\#21148](https://github.com/netdata/netdata/pull/21148) ([stelfrag](https://github.com/stelfrag))
+- Fix AS400 metrics [\#21147](https://github.com/netdata/netdata/pull/21147) ([ktsaou](https://github.com/ktsaou))
 - Add Fedora 43 to CI and package builds. [\#21142](https://github.com/netdata/netdata/pull/21142) ([Ferroin](https://github.com/Ferroin))
+- chore\(go.d\): update dyncfg path [\#21141](https://github.com/netdata/netdata/pull/21141) ([ilyam8](https://github.com/ilyam8))
 - Skip status file on windows on crash [\#21140](https://github.com/netdata/netdata/pull/21140) ([stelfrag](https://github.com/stelfrag))
 - improve\(go.d/snmp\): automatically disable SNMP bulkwalk when not supported [\#21139](https://github.com/netdata/netdata/pull/21139) ([ilyam8](https://github.com/ilyam8))
 - build\(deps\): bump github.com/gohugoio/hashstructure from 0.5.0 to 0.6.0 in /src/go [\#21138](https://github.com/netdata/netdata/pull/21138) ([dependabot[bot]](https://github.com/apps/dependabot))
@@ -14,6 +20,7 @@
 - build\(deps\): bump github.com/docker/docker from 28.5.0+incompatible to 28.5.1+incompatible in /src/go [\#21135](https://github.com/netdata/netdata/pull/21135) ([dependabot[bot]](https://github.com/apps/dependabot))
 - build\(deps\): bump github.com/gofrs/flock from 0.12.1 to 0.13.0 in /src/go [\#21134](https://github.com/netdata/netdata/pull/21134) ([dependabot[bot]](https://github.com/apps/dependabot))
 - chore: move go.d/ibm.d shared pkgs out of go.d [\#21132](https://github.com/netdata/netdata/pull/21132) ([ilyam8](https://github.com/ilyam8))
+- Switch to using a relative RUNPATH for IBM plugin library lookup. [\#21131](https://github.com/netdata/netdata/pull/21131) ([Ferroin](https://github.com/Ferroin))
 - build: update go otel deps [\#21129](https://github.com/netdata/netdata/pull/21129) ([ilyam8](https://github.com/ilyam8))
 - chore: go.d/ibm.d various fixes [\#21128](https://github.com/netdata/netdata/pull/21128) ([ilyam8](https://github.com/ilyam8))
 - Improve agent startup on windows [\#21125](https://github.com/netdata/netdata/pull/21125) ([stelfrag](https://github.com/stelfrag))
@@ -58,6 +65,7 @@
 - Make `nd-run` silent unless exiting with an error [\#21076](https://github.com/netdata/netdata/pull/21076) ([ilyam8](https://github.com/ilyam8))
 - docs: add note about using ``--init` when not running with `pid: host` [\#21075](https://github.com/netdata/netdata/pull/21075) ([ilyam8](https://github.com/ilyam8))
 - build\(deps\): bump openssl version in static build [\#21074](https://github.com/netdata/netdata/pull/21074) ([ilyam8](https://github.com/ilyam8))
+- Updated child node behaviour change [\#21073](https://github.com/netdata/netdata/pull/21073) ([kanelatechnical](https://github.com/kanelatechnical))
 - Declare flatten-serde-json at the workspace. [\#21072](https://github.com/netdata/netdata/pull/21072) ([vkalintiris](https://github.com/vkalintiris))
 - Add missing extension go.d \(Windows\) [\#21070](https://github.com/netdata/netdata/pull/21070) ([thiagoftsm](https://github.com/thiagoftsm))
 - Win plugin files with .plugin extension [\#21068](https://github.com/netdata/netdata/pull/21068) ([stelfrag](https://github.com/stelfrag))
@@ -80,6 +88,10 @@
 - Remote MCP support \(streamable http and sse\) [\#21036](https://github.com/netdata/netdata/pull/21036) ([ktsaou](https://github.com/ktsaou))
 - Add helper to run external commands without additional privileges. [\#20990](https://github.com/netdata/netdata/pull/20990) ([Ferroin](https://github.com/Ferroin))
 - Clean up handling of compiler flags in our build code. [\#20821](https://github.com/netdata/netdata/pull/20821) ([Ferroin](https://github.com/Ferroin))
+
+## [v2.7.2](https://github.com/netdata/netdata/tree/v2.7.2) (2025-10-15)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v2.7.1...v2.7.2)
 
 ## [v2.7.1](https://github.com/netdata/netdata/tree/v2.7.1) (2025-09-29)
 
@@ -439,15 +451,6 @@
 - update tripplite snmp profiles [\#20613](https://github.com/netdata/netdata/pull/20613) ([ilyam8](https://github.com/ilyam8))
 - Fix coverity issues [\#20612](https://github.com/netdata/netdata/pull/20612) ([stelfrag](https://github.com/stelfrag))
 - SNMP Mikrotik profile make units in transform ucum [\#20611](https://github.com/netdata/netdata/pull/20611) ([Ancairon](https://github.com/Ancairon))
-- update fortinet snmp profiles [\#20609](https://github.com/netdata/netdata/pull/20609) ([ilyam8](https://github.com/ilyam8))
-- improve netapp snmp profile [\#20608](https://github.com/netdata/netdata/pull/20608) ([ilyam8](https://github.com/ilyam8))
-- Improve datafile indexing [\#20607](https://github.com/netdata/netdata/pull/20607) ([stelfrag](https://github.com/stelfrag))
-- chore\(go.d/snmp\): add disable\_legacy\_collection option [\#20606](https://github.com/netdata/netdata/pull/20606) ([ilyam8](https://github.com/ilyam8))
-- improve mikrotik-router snmp profile [\#20605](https://github.com/netdata/netdata/pull/20605) ([ilyam8](https://github.com/ilyam8))
-- small snmp-related changes [\#20603](https://github.com/netdata/netdata/pull/20603) ([ilyam8](https://github.com/ilyam8))
-- Fix compilation on windows [\#20602](https://github.com/netdata/netdata/pull/20602) ([stelfrag](https://github.com/stelfrag))
-- Update sqlite version to 3.50.2 [\#20601](https://github.com/netdata/netdata/pull/20601) ([stelfrag](https://github.com/stelfrag))
-- transfer Learn PR 2473 [\#20600](https://github.com/netdata/netdata/pull/20600) ([Ancairon](https://github.com/Ancairon))
 
 ## [v2.5.4](https://github.com/netdata/netdata/tree/v2.5.4) (2025-06-24)
 

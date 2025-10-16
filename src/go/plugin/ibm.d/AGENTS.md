@@ -23,6 +23,75 @@ This guide is for developers contributing to the IBM.d plugin. For end-user docu
 | `docgen/` | Tooling to generate docs/config metadata straight from module sources. |
 | `metricgen/` | Experimental helper for generating boilerplate metric exports. |
 
+## Auto-Generated Files
+
+The IBM.D plugin uses code generation to keep contexts, documentation, and metadata in sync. Understanding which files are generated vs. editable is crucial for development.
+
+### Generated Files (DO NOT EDIT)
+
+Each module generates these files automatically:
+
+| File | Generator | Source | Purpose |
+|------|-----------|--------|---------|
+| `zz_generated_contexts.go` | `metricgen` | `contexts.yaml` | Type-safe Go structs for metric contexts |
+| `README.md` | `docgen` | `contexts.yaml` + `config.go` + `module.yaml` | Module documentation |
+| `metadata.yaml` | `docgen` | `contexts.yaml` + `config.go` + `module.yaml` | Netdata integrations metadata |
+
+**⚠️ Warning:** Direct edits to these files will be overwritten on the next `go generate` run.
+
+### Source Files (EDITABLE)
+
+| File | Purpose |
+|------|---------|
+| `contexts/contexts.yaml` | **Source of truth** for all metrics, charts, dimensions, families, priorities |
+| `config.go` | Collector configuration structure (exported to JSON schema by docgen) |
+| `module.yaml` | Module metadata (name, description, categories) |
+| All other `.go` files | Module implementation code |
+
+### Regenerating Code
+
+#### Regenerate a Single Module
+
+From the module directory:
+```bash
+cd modules/as400
+go generate ./...
+```
+
+This runs both generators:
+1. **metricgen** (via `contexts/doc.go`) → regenerates `zz_generated_contexts.go`
+2. **docgen** (via `generate.go`) → regenerates `README.md` and `metadata.yaml`
+
+#### Regenerate All Modules
+
+From the plugin root:
+```bash
+cd src/go/plugin/ibm.d
+go generate ./modules/...
+```
+
+#### After Regeneration
+
+Always run `gofmt` on generated Go code:
+```bash
+gofmt -w modules/*/contexts/zz_generated_contexts.go
+```
+
+### When to Regenerate
+
+Regenerate after modifying:
+- ✅ `contexts/contexts.yaml` (metrics definitions)
+- ✅ `config.go` (configuration structure)
+- ✅ `module.yaml` (module metadata)
+- ❌ Implementation `.go` files (no regeneration needed)
+
+### Verifying Generated Code
+
+After regeneration, verify the module works:
+```bash
+sudo script -c '/usr/libexec/netdata/plugins.d/ibm.d.plugin -d -m MODULE --dump=3s --dump-summary 2>&1' /dev/null
+```
+
 ## Building the Plugin
 
 The plugin is built automatically by Netdata's CMake tree when `ENABLE_PLUGIN_IBM=On` and the IBM CLI driver is available:
@@ -37,10 +106,11 @@ The build target downloads the driver if it is not already present; see the pack
 
 ## Module Development Workflow
 
-1. Update `contexts/contexts.yaml` and `config.go`.
-2. Run `go generate` in the module directory (invokes docgen/metricgen).
-3. Sync metadata, config schema, README, and health alerts.
+1. Update `contexts/contexts.yaml` and `config.go` (see [Source Files](#source-files-editable)).
+2. Run `go generate ./...` in the module directory (see [Regenerating Code](#regenerating-code)).
+3. Run `gofmt -w contexts/zz_generated_contexts.go` to format generated code.
 4. Validate with `script -c 'sudo /usr/libexec/netdata/plugins.d/ibm.d.plugin -d -m MODULE --dump=3s --dump-summary 2>&1' /dev/null`.
+5. Commit **both** source files and generated files together.
 
 ## Testing & Debugging
 
@@ -61,9 +131,11 @@ The flag implicitly enables dump mode and exits once every job has produced at l
 
 1. Review [`framework/README.md`](framework/README.md) for IBM.D framework details.
 2. Follow [General collector best practices](../BEST-PRACTICES.md).
-3. Use `go generate` to refresh contexts, metadata, and schemas whenever `contexts.yaml` or config structs change.
-4. Keep documentation in `modules/<name>/README.md`, metadata.yaml, config schemas, and health alerts in sync – docgen simplifies this.
-5. Each module directory (`modules/<name>/`) contains its own README with module-specific notes.
+3. **Never edit auto-generated files** – see [Auto-Generated Files](#auto-generated-files) section.
+4. Always regenerate code after modifying `contexts.yaml`, `config.go`, or `module.yaml`.
+5. Run `gofmt` on generated Go files before committing.
+6. Commit **both** source and generated files together to keep them in sync.
+7. Each module directory (`modules/<name>/`) contains its own README with module-specific notes.
 
 ## Runtime Internals
 
