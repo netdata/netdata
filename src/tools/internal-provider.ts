@@ -128,10 +128,42 @@ export class InternalToolProvider extends ToolProvider {
   }
 
   private buildInstructions(): string {
-    const lines: string[] = ['## INTERNAL TOOLS', ''];
-    lines.push(`- Finish ONLY by calling \`${FINAL_REPORT_TOOL}\` exactly once.`);
-    lines.push(`- Do NOT end with plain text. The session ends only after \`${FINAL_REPORT_TOOL}\`.`);
-    lines.push('- Arguments:');
+    const lines: string[] = ['### Internal Tools', ''];
+
+    lines.push(`#### ${PROGRESS_TOOL} — Progress Updates`);
+    lines.push('- Call this tool whenever you invoke any other tool; include it in the same turn or batch.');
+    lines.push('- Never call this tool by itself.');
+    lines.push('- Keep the `progress` message concise (≤20 words).');
+    lines.push('- Example (batch call):');
+    lines.push('  {');
+    lines.push('    "calls": [');
+    lines.push(`      { "id": 1, "tool": "${PROGRESS_TOOL}", "parameters": { "progress": "Searching documentation for XYZ" } },`);
+    lines.push('      { "id": 2, "tool": "tool_name_here", "parameters": { "required_field": "value", ... } }');
+    lines.push('      (Provide the exact exposed tool name and every required parameter.)');
+    lines.push('    ]');
+    lines.push('  }');
+    lines.push('  When calling multiple tools without the batch helper, include this tool in the same turn.');
+
+    if (this.opts.enableBatch) {
+      lines.push('');
+      lines.push(`#### ${BATCH_TOOL} — Parallel Tooling`);
+      lines.push('- Use this helper to execute multiple tools in one request.');
+      lines.push("- Each `calls[]` entry needs an `id`, the real tool name, and a `parameters` object that matches that tool's schema.");
+      lines.push('- Example:');
+      lines.push('  {');
+      lines.push('    "calls": [');
+      lines.push(`      { "id": 1, "tool": "${PROGRESS_TOOL}", "parameters": { "progress": "Researching Netdata and eBPF" } },`);
+      lines.push('      { "id": 2, "tool": "tool1", "parameters": { "param1": "value1", "param2": "value2" } },');
+      lines.push('      { "id": 3, "tool": "tool2", "parameters": { "param1": "value1" } }');
+      lines.push('      (Tool names must match exactly and every required parameter must be present.)');
+      lines.push('    ]');
+      lines.push('  }');
+    }
+
+    lines.push('');
+    lines.push(`#### ${FINAL_REPORT_TOOL} - Deliver Your Final Answer`);
+    lines.push(`- You MUST call '${FINAL_REPORT_TOOL}' to provide your final answer to the user.`);
+    lines.push('- Required fields:');
     lines.push('  - `status`: one of `success`, `failure`, `partial`.');
     if (this.formatId === 'json') {
       lines.push(`  - ${REPORT_FORMAT_LABEL}: "json".`);
@@ -144,40 +176,19 @@ export class InternalToolProvider extends ToolProvider {
       lines.push(`  - ${REPORT_FORMAT_LABEL}: "${this.formatId}".`);
       lines.push('  - `report_content`: complete deliverable in the requested format.');
     }
+    lines.push('- Include optional `metadata` only when explicitly relevant.');
+    lines.push('- After this tool succeeds, do not send additional assistant messages.');
+
     lines.push('');
-    lines.push(`- Use tool \`${PROGRESS_TOOL}\` to provide real-time progress updates and next steps.`);
-    lines.push('  - Real-time updates keep users informed about ongoing actions and plans.');
-    lines.push(`  - **CRITICAL**: When calling tools, you MUST call \`${PROGRESS_TOOL}\` in PARALLEL (same batch/turn).`);
-    lines.push(`  - **CRITICAL**: You MUST NEVER call \`${PROGRESS_TOOL}\` alone.`);
-    lines.push('  - Keep progress brief: max 20 words.');
-    lines.push('  - Examples of good parallel usage:');
-    lines.push('    When using batch:');
-    lines.push('    {');
-    lines.push('      "calls": [');
-    lines.push(`        { "id": 1, "tool": "${PROGRESS_TOOL}", "parameters": { "progress": "Searching documentation for XYZ" } },`);
-    lines.push('        { "id": 2, "tool": "tool_name_here", "parameters": { "required_field": "value", ... } }');
-    lines.push('        (Provide the exact exposed tool name and every required parameter.)');
-    lines.push('      ]');
-    lines.push('    }');
-    lines.push('    When calling multiple tools:');
-    lines.push(`    - Call \`${PROGRESS_TOOL}\` with "Analyzing config files for ABC"`);
-    lines.push('    - AND call your actual analysis tools in the same turn');
-    if (this.opts.enableBatch) {
-      lines.push('');
-      lines.push(`- Use tool \`${BATCH_TOOL}\` to call multiple tools at once.`);
-      lines.push('  - `calls[]`: items with `id`, `tool` (any of your real tool names), `parameters`.');
-      lines.push('  - `parameters` are validated against real tool schemas.');
-      lines.push('  - Example with progress_report + searches:');
-      lines.push('    {');
-      lines.push('      "calls": [');
-      lines.push(`        { "id": 1, "tool": "${PROGRESS_TOOL}", "parameters": { "progress": "Researching Netdata and eBPF" } },`);
-      lines.push('        { "id": 2, "tool": "tool1", "parameters": { "param1": "value1", "param2": "value2" } },');
-      lines.push('        { "id": 3, "tool": "tool2", "parameters": { "param1": "value1" } }');
-      lines.push('        (Tool names must match exactly and all required parameters must be included.)');
-      lines.push('      ]');
-      lines.push('    }');
-      lines.push('  **CRITICAL**: each `parameters` object MUST match the documented schema for that tool.');
-    }
+    lines.push('*You run in agentic mode, interfacing with software tools.*');
+    lines.push('');
+    lines.push('**YOU MUST:**');
+    lines.push('- **ALWAYS** respond with valid tool calls, even for your final answer.');
+    lines.push(`- **ALWAYS** provide your final report to the user using the ${FINAL_REPORT_TOOL} tool, with the correct format.`);
+
+    lines.push('**YOU MUST NOT:**');
+    lines.push('- Do not provide any other output except calling your tools. Any other output you provide is ignored.');
+
     return lines.join('\n');
   }
 

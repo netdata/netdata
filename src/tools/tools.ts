@@ -516,15 +516,34 @@ export class ToolsOrchestrator {
 
   // Aggregate instructions across providers
   getCombinedInstructions(): string {
-    const parts: string[] = [];
+    const external: string[] = [];
+    let internal: string | undefined;
     // eslint-disable-next-line functional/no-loop-statements
-    for (const p of this.providers) {
+    for (const provider of this.providers) {
       try {
-        const instr = p.getInstructions();
-        if (typeof instr === 'string' && instr.trim().length > 0) parts.push(instr.trim());
+        const instr = provider.getInstructions();
+        if (typeof instr !== 'string') continue;
+        const trimmed = instr.trim();
+        if (trimmed.length === 0) continue;
+        if (provider.kind === 'agent') {
+          internal = trimmed;
+        } else {
+          external.push(trimmed);
+        }
       } catch (e) { warn(`getCombinedInstructions failed: ${e instanceof Error ? e.message : String(e)}`); }
     }
-    return parts.join('\n\n');
+    if (external.length === 0 && internal === undefined) {
+      return '';
+    }
+    const sections: string[] = ['## Available Tools'];
+    if (external.length > 0) {
+      sections.push('### External Tools');
+      sections.push(external.join('\n\n'));
+    }
+    if (internal !== undefined) {
+      sections.push(internal);
+    }
+    return sections.join('\n\n');
   }
 
   async cleanup(): Promise<void> {

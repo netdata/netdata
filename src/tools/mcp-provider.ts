@@ -385,20 +385,32 @@ export class MCPProvider extends ToolProvider {
   }
 
   getCombinedInstructions(): string {
-    const parts: string[] = [];
-    this.servers.forEach((s, serverName) => {
-      if (typeof s.instructions === 'string' && s.instructions.length > 0) {
-        parts.push(`## TOOL ${s.name} INSTRUCTIONS\n${s.instructions}`);
-      }
-      const ns = this.sanitizeNamespace(serverName);
-      s.tools.forEach((t) => {
-        if (typeof t.instructions === 'string' && t.instructions.length > 0) {
-          const exposed = `${ns}__${t.name}`;
-          parts.push(`## TOOL ${exposed} INSTRUCTIONS\n${t.instructions}`);
+    const segments: string[] = [];
+    this.servers.forEach((server, serverKey) => {
+      const ns = this.sanitizeNamespace(serverKey);
+      const blocks: string[] = [];
+      const displayName = server.name || serverKey;
+      blocks.push(`#### MCP Server: ${displayName}`);
+      if (typeof server.instructions === 'string') {
+        const trimmedServer = server.instructions.trim();
+        if (trimmedServer.length > 0) {
+          blocks.push(trimmedServer);
         }
+      }
+      server.tools.forEach((tool) => {
+        if (typeof tool.instructions !== 'string') return;
+        const trimmedTool = tool.instructions.trim();
+        if (trimmedTool.length === 0) return;
+        const exposed = `${ns}__${tool.name}`;
+        blocks.push(`##### Tool: ${exposed}
+${trimmedTool}`);
       });
+      const nonEmpty = blocks.filter((block) => block.trim().length > 0);
+      if (nonEmpty.length > 0) {
+        segments.push(nonEmpty.join('\n\n'));
+      }
     });
-    return parts.join('\n\n');
+    return segments.join('\n\n');
   }
 
   async cleanup(): Promise<void> {
