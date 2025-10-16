@@ -330,6 +330,8 @@ let registryCoverageSummary: { listCount: number; aliasId?: string; toolName?: s
 let utilsCoverageSummary: { sanitized: string; clamped: { name: string; truncated: boolean }; formatted: string; truncated: string } | undefined;
 let configLoadSummary: { providerKey?: string; localType?: string; remoteType?: string; localEnvToken?: string; defaultsStream?: boolean } | undefined;
 let includeSummary: { resolved: string; forbiddenError?: string; depthError?: string } | undefined;
+let configErrorSummary: { readError?: string; jsonError?: string; schemaError?: string; localLoadedKey?: string } | undefined;
+let frontmatterErrorSummary: { strictError?: string; relaxedParsed?: boolean } | undefined;
 let frontmatterSummary: { toolName?: string; outputFormat?: string; inputFormat?: string; description?: string; models?: string[] } | undefined;
 let humanReadableSummaries: { json: string; text: string; successNoOutput: string; failure: string; truncatedZero: string } | undefined;
 let overrideTargetsRef: { provider: string; model: string }[] | undefined;
@@ -3257,6 +3259,75 @@ const TEST_SCENARIOS: HarnessTest[] = [
       invariant(Array.isArray(frontmatterSummary.models) && frontmatterSummary.models[0] === 'demo/model', 'Frontmatter models should parse via parsePairs.');
     },
   },
+
+{
+  id: 'run-test-99',
+  description: 'Configuration error handling and strict frontmatter validation.',
+  execute: async () => {
+    configErrorSummary = undefined;
+    await Promise.resolve();
+    frontmatterErrorSummary = undefined;
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), `${TMP_PREFIX}config-errors-`));
+    const prevApi = process.env.TEST_CONFIG_API_KEY;
+    try {
+      const missingPath = path.join(tempDir, 'missing-config.json');
+      let readError: string | undefined;
+      try { loadConfiguration(missingPath); } catch (e) { readError = e instanceof Error ? e.message : String(e); }
+      const invalidPath = path.join(tempDir, 'invalid.json');
+      fs.writeFileSync(invalidPath, '{ invalid', 'utf-8');
+      let jsonError: string | undefined;
+      try { loadConfiguration(invalidPath); } catch (e) { jsonError = e instanceof Error ? e.message : String(e); }
+      const schemaPath = path.join(tempDir, 'schema-invalid.json');
+      fs.writeFileSync(schemaPath, JSON.stringify({ providers: { demo: { apiKey: 123 } }, mcpServers: {} }, null, 2), 'utf-8');
+      let schemaError: string | undefined;
+      try { loadConfiguration(schemaPath); } catch (e) { schemaError = e instanceof Error ? e.message : String(e); }
+      process.env.TEST_CONFIG_API_KEY = 'local-secret';
+      const localDir = fs.mkdtempSync(path.join(os.tmpdir(), `${TMP_PREFIX}local-config-`));
+      const localConfig = {
+        providers: { demo: { apiKey: '${TEST_CONFIG_API_KEY}' } },
+        mcpServers: {},
+      } as unknown as Configuration;
+      fs.writeFileSync(path.join(localDir, '.ai-agent.json'), JSON.stringify(localConfig, null, 2));
+      const prevCwd = process.cwd();
+      let localLoadedKey: string | undefined;
+      try {
+        process.chdir(localDir);
+        localLoadedKey = loadConfiguration().providers.demo.apiKey;
+      } finally {
+        process.chdir(prevCwd);
+      }
+      configErrorSummary = { readError, jsonError, schemaError, localLoadedKey };
+    } finally {
+      process.env.TEST_CONFIG_API_KEY = prevApi;
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+    const strictFrontmatter = ['---', 'traceLLM: true', '---', 'body'].join('\n');
+    let strictError: string | undefined;
+    try { parseFrontmatter(strictFrontmatter); } catch (e) { strictError = e instanceof Error ? e.message : String(e); }
+    let relaxedParsed = false;
+    const relaxed = parseFrontmatter(strictFrontmatter, { strict: false });
+    relaxedParsed = relaxed !== undefined;
+    frontmatterErrorSummary = { strictError, relaxedParsed };
+    return {
+      success: true,
+      conversation: [],
+      logs: [],
+      accounting: [],
+      finalReport: { status: 'success', format: 'text', content: 'config-errors-frontmatter', ts: Date.now() },
+    };
+  },
+  expect: () => {
+    invariant(configErrorSummary !== undefined, 'Config errors summary missing for run-test-99.');
+    invariant(typeof configErrorSummary.readError === 'string' && configErrorSummary.readError.includes('not found'), 'Read error should report missing file.');
+    invariant(typeof configErrorSummary.jsonError === 'string' && configErrorSummary.jsonError.includes('Invalid JSON'), 'JSON error expected.');
+    invariant(typeof configErrorSummary.schemaError === 'string' && configErrorSummary.schemaError.includes('Configuration validation failed'), 'Schema validation error expected.');
+    invariant(configErrorSummary.localLoadedKey === 'local-secret', 'Local fallback config should load expanded key.');
+    invariant(frontmatterErrorSummary !== undefined, 'Frontmatter error summary missing for run-test-99.');
+    const fmSummary = frontmatterErrorSummary;
+    invariant(typeof fmSummary.strictError === 'string' && fmSummary.strictError.includes('Unsupported frontmatter key'), 'Strict mode should reject forbidden keys.');
+    invariant(fmSummary.relaxedParsed === true, 'Relaxed parsing should not throw.');
+  },
+},
   (() => {
     return {
       id: 'run-test-74',
