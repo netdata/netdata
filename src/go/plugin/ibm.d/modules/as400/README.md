@@ -122,6 +122,7 @@ Metrics:
 | Metric | Dimensions | Unit |
 |:-------|:-----------|:-----|
 | as400.cpu_utilization | utilization | percentage |
+| as400.cpu_utilization_entitled | utilization | percentage |
 | as400.cpu_configuration | configured | cpus |
 | as400.cpu_capacity | capacity | percentage |
 | as400.total_jobs | total | jobs |

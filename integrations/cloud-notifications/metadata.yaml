@@ -65,7 +65,7 @@
           - **Notification settings**
             - Configuration name (optional): A name for your configuration in order to easily refer to it
             - Rooms: A list of Rooms for which you want to be notified
-            - Notifications: The notifications which you want to be notified
+            - Notifications: The notification types you want to receive
           - **Integration configuration**
             - Webhook URL: The URL you copied from the previous section
             - Channel Parameters: Select the channel type which the notifications will be sent to, if it is a Forum channel, you need to specify a thread name
@@ -104,7 +104,7 @@
           - **Notification settings**
             - Configuration name (optional): A name for your configuration in order to easily refer to it
             - Rooms: A list of Rooms for which you want to be notified
-            - Notifications: The notifications which you want to be notified
+            - Notifications: The notification types you want to receive
           - **Integration configuration**
             - Integration Key: A 32 character key provided by PagerDuty to receive events on your service.
             - Integration URL (Alert Events): The URL provided by PagerDuty where Netdata Cloud will send notifications.
@@ -149,7 +149,7 @@
           - **Notification settings**
             - Configuration name (optional): A name for your configuration in order to easily refer to it
             - Rooms: A list of Rooms for which you want to be notified
-            - Notifications: The notifications which you want to be notified
+            - Notifications: The notification types you want to receive
           - **Integration configuration**
             - Webhook URL: URL provided on Slack for the channel you want to receive your notifications
 
@@ -187,7 +187,7 @@
           - **Notification settings**
             - Configuration name (optional): A name for your configuration in order to easily refer to it
             - Rooms: A list of Rooms for which you want to be notified
-            - Notifications: The notifications which you want to be notified
+            - Notifications: The notification types you want to receive
           - **Integration configuration**
             - API Key: The key provided on Opsgenie for the channel you want to receive your notifications
 
@@ -229,7 +229,7 @@
           - **Notification settings**
             - Configuration name (optional): A name for your configuration in order to easily refer to it
             - Rooms: A list of Rooms for which you want to be notified
-            - Notifications: The notifications which you want to be notified
+            - Notifications: The notification types you want to receive
           - **Integration configuration**
             - Webhook URL: URL provided on Mattermost for the channel you want to receive your notifications
 
@@ -272,7 +272,7 @@
           - **Notification settings**
             - Configuration name (optional): A name for your configuration in order to easily refer to it
             - Rooms: A list of Rooms for which you want to be notified
-            - Notifications: The notifications which you want to be notified
+            - Notifications: The notification types you want to receive
           - **Integration configuration**
             - Webhook URL: URL provided on RocketChat for the channel you want to receive your notifications
 
@@ -313,7 +313,7 @@
           - **Notification settings**
             - Configuration name (optional): A name for your configuration in order to easily refer to it
             - Rooms: A list of Rooms for which you want to be notified
-            - Notifications: The notifications which you want to be notified
+            - Notifications: The notification types you want to receive
           - **Integration configuration**
             - Topic ARN: The topic provided on AWS SNS (with region) for where to publish your notifications.
 
@@ -356,7 +356,7 @@
           - **Notification settings**
             - Configuration name (optional): A name for your configuration in order to easily refer to it
             - Rooms: A list of Rooms for which you want to be notified
-            - Notifications: The notifications which you want to be notified
+            - Notifications: The notification types you want to receive
           - **Integration configuration**
             - Microsoft Teams Incoming Webhook URL: The Incoming Webhook URL that you copied earlier.
 
@@ -396,7 +396,7 @@
           - **Notification settings**
             - Configuration name (optional): A name for your configuration in order to easily refer to it
             - Rooms: A list of Rooms for which you want to be notified
-            - Notifications: The notifications which you want to be notified
+            - Notifications: The notification types you want to receive
           - **Integration configuration**
             - Bot Token: The token of your bot
             - Chat ID: The chat id where your bot will deliver messages to
@@ -430,7 +430,7 @@
           - **Notification settings**
             - Configuration name (optional): A name for your configuration in order to easily refer to it
             - Rooms: A list of Rooms for which you want to be notified
-            - Notifications: The notifications which you want to be notified
+            - Notifications: The notification types you want to receive
           - **Integration configuration**
             - HTTP Event Collector URI: The URI of your HTTP event collector in Splunk
             - HTTP Event Collector Token: The token that Splunk provided to you when you created the HTTP Event Collector
@@ -465,7 +465,7 @@
           - **Notification settings**
             - Configuration name (optional): A name for your configuration in order to easily refer to it
             - Rooms: A list of Rooms for which you want to be notified
-            - Notifications: The notifications which you want to be notified
+            - Notifications: The notification types you want to receive
           - **Integration configuration**
             - Destination URL - The URL provided by VictorOps of your REST endpoint.
 
@@ -498,7 +498,7 @@
           - **Notification settings**
             - Configuration name (optional): A name for your configuration in order to easily refer to it
             - Rooms: A list of Rooms for which you want to be notified
-            - Notifications: The notifications which you want to be notified
+            - Notifications: The notification types you want to receive
           - **Integration configuration**
             - Webhook URL: The url of the service that Netdata will send notifications to. In order to keep the communication secured, Netdata only accepts HTTPS urls.
             - Extra headers: Optional key-value pairs that you can set to be included in the HTTP requests sent to the webhook URL.
@@ -705,6 +705,47 @@
           - **Notification settings**
             - Configuration name (optional): A name for your configuration in order to easily refer to it
             - Rooms: A list of Rooms for which you want to be notified
-            - Notifications: The notifications which you want to be notified
+            - Notifications: The notification types you want to receive
           - **Integration configuration**
             - Alert Source API key: The key you copied in the ilert configuration step.
+
+- id: "notify-cloud-servicenow"
+  meta:
+    name: "ServiceNow"
+    link: "https://www.servicenow.com/"
+    categories:
+      - notify.cloud
+    icon_filename: "servicenow.png"
+  keywords:
+    - servicenow
+  setup:
+    description: |
+      ### Prerequisites
+
+      - Netdata Cloud account
+      - Access to the Space as an **Admin**
+      - The Space needs to be on a paid plan
+      - The ServiceNow **Event Management** plugin enabled on your instance
+      - A ServiceNow user with the `evt_mgmt_admin` role and a password for API access
+
+      ### ServiceNow Configuration
+
+      1. Verify that the **Event Management** plugin is activated on your ServiceNow instance.
+      2. Navigate to **System Security** --> **Users** and create a dedicated integration user if one does not already exist.
+      3. Assign the `evt_mgmt_admin` role to this user and set a strong password. Keep the username and password available for the Netdata configuration step.
+
+      ### Netdata Configuration
+
+      1. Click on the **Space settings** cog (located above your profile icon)
+      2. Click on the **Alerts & Notifications** tab
+      3. Click on the **+ Add configuration** button
+      4. Add the ServiceNow Integration
+      5. A modal will be presented to you to enter the required details to enable the integration:
+          - **Notification settings**
+            - Configuration name (optional): A descriptive name to identify this notification configuration
+            - Rooms: A list of Rooms for which you want to be notified
+            - Notifications: The notification types you want to receive
+          - **Integration configuration**
+            - Instance URL: The base URL of your ServiceNow instance (for example, `https://my-instance.service-now.com/`).
+            - Username: The username of the ServiceNow integration user you created.
+            - Password: The password of the ServiceNow integration user you created.

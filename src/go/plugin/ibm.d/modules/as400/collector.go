@@ -112,6 +112,7 @@ func (c *Collector) resetInstanceCaches() {
 	c.mx.networkInterfaces = make(map[string]networkInterfaceInstanceMetrics)
 	c.mx.httpServers = make(map[string]httpServerInstanceMetrics)
 	c.mx.planCache = make(map[string]planCacheInstanceMetrics)
+	c.mx.queryLatencies = make(map[string]int64)
 }
 
 func (c *Collector) prepareIterationState() {
@@ -184,6 +185,7 @@ func (c *Collector) CollectOnce() error {
 	c.exportSystemActivityMetrics()
 	c.exportHTTPServerMetrics()
 	c.exportPlanCacheMetrics()
+	c.exportQueryLatencyMetrics()
 	c.applyGlobalLabels()
 
 	return nil
@@ -332,6 +334,10 @@ func (c *Collector) exportSystemMetrics() {
 
 	contexts.System.CPUUtilization.Set(c.State, labels, contexts.SystemCPUUtilizationValues{
 		Utilization: c.mx.CPUPercentage,
+	})
+
+	contexts.System.CPUEntitledUtilization.Set(c.State, labels, contexts.SystemCPUEntitledUtilizationValues{
+		Utilization: c.mx.EntitledCPUPercentage,
 	})
 
 	contexts.System.CPUDetails.Set(c.State, labels, contexts.SystemCPUDetailsValues{
@@ -770,6 +776,78 @@ func (c *Collector) exportPlanCacheMetrics() {
 			Value: values.Value,
 		})
 	}
+}
+
+func (c *Collector) exportQueryLatencyMetrics() {
+	if c.mx == nil || len(c.mx.queryLatencies) == 0 {
+		return
+	}
+
+	values := contexts.ObservabilityQueryLatencyValues{}
+	fieldMap := map[string]*int64{
+		"analyze_plan_cache":           &values.Analyze_plan_cache,
+		"count_active_jobs":            &values.Count_active_jobs,
+		"count_disks":                  &values.Count_disks,
+		"count_http_servers":           &values.Count_http_servers,
+		"count_job_queues":             &values.Count_job_queues,
+		"count_message_queues":         &values.Count_message_queues,
+		"count_network_interfaces":     &values.Count_network_interfaces,
+		"count_output_queues":          &values.Count_output_queues,
+		"count_subsystems":             &values.Count_subsystems,
+		"detect_ibmi_version_primary":  &values.Detect_ibmi_version_primary,
+		"detect_ibmi_version_fallback": &values.Detect_ibmi_version_fallback,
+		"disk_instances":               &values.Disk_instances,
+		"disk_instances_enhanced":      &values.Disk_instances_enhanced,
+		"disk_status":                  &values.Disk_status,
+		"http_server_info":             &values.Http_server_info,
+		"job_info":                     &values.Job_info,
+		"job_queues":                   &values.Job_queues,
+		"memory_pools":                 &values.Memory_pools,
+		"message_queue_aggregates":     &values.Message_queue_aggregates,
+		"network_connections":          &values.Network_connections,
+		"network_interfaces":           &values.Network_interfaces,
+		"output_queue_info":            &values.Output_queue_info,
+		"plan_cache_summary":           &values.Plan_cache_summary,
+		"serial_number":                &values.Serial_number,
+		"system_activity":              &values.System_activity,
+		"system_model":                 &values.System_model,
+		"system_status":                &values.System_status,
+		"temp_storage_named":           &values.Temp_storage_named,
+		"temp_storage_total":           &values.Temp_storage_total,
+		"technology_refresh_level":     &values.Technology_refresh_level,
+		"top_active_jobs":              &values.Top_active_jobs,
+	}
+
+	var otherTotal int64
+
+	for name, latency := range c.mx.queryLatencies {
+		if latency == 0 {
+			continue
+		}
+		if target, ok := fieldMap[name]; ok {
+			*target += latency
+		} else {
+			otherTotal += latency
+		}
+	}
+
+	if otherTotal > 0 {
+		values.Other = otherTotal
+	}
+
+	var total int64
+	for _, ptr := range fieldMap {
+		if ptr != nil {
+			total += *ptr
+		}
+	}
+	total += values.Other
+
+	if total == 0 {
+		return
+	}
+
+	contexts.Observability.QueryLatency.Set(c.State, contexts.EmptyLabels{}, values)
 }
 
 func (c *Collector) exportSystemActivityMetrics() {
