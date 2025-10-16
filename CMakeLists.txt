@@ -3487,7 +3487,7 @@ if(BUILD_FOR_PACKAGING)
                 DESTINATION lib/systemd/system)
         install(FILES
                 ${CMAKE_BINARY_DIR}/system/systemd/sysusers/netdata.conf
-                COMPONENT netdata
+                COMPONENT user
                 DESTINATION usr/lib/sysusers.d)
         install(DIRECTORY
                 COMPONENT netdata
