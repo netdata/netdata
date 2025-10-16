@@ -212,6 +212,15 @@ export const OPTIONS_REGISTRY: OptionDef[] = [
   }),
 
   // All Models Overrides
+  strArrDef({
+    key: 'override',
+    default: [],
+    description: 'Override settings for every agent/sub-agent (key=value). Supports models/tools/agents plus LLM knobs like temperature, topP, maxOutputTokens, llmTimeout, retries, stream, parallelToolCalls.',
+    cli: { names: ['--override'], showInHelp: true },
+    fm: { allowed: false },
+    scope: 'allAgents',
+    groups: [G_ALL_MODELS],
+  }),
   boolDef({
     key: 'stream',
     description: 'Show response as it\'s generated (streaming) instead of waiting for complete answer',

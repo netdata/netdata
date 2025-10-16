@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 import { WebSocketServer } from 'ws';
 
+import type { LoadAgentOptions, LoadedAgent } from '../agent-loader.js';
 import type { ResolvedConfigLayer } from '../config-resolver.js';
 import type { PreloadedSubAgent } from '../subagent-registry.js';
 import type { AIAgentCallbacks, AIAgentResult, AIAgentSessionConfig, AccountingEntry, AgentFinishedEvent, Configuration, ConversationMessage, LogEntry, MCPServerConfig, MCPTool, ProviderConfig, TurnRequest, TurnResult, TurnStatus } from '../types.js';
@@ -312,6 +313,20 @@ interface HarnessTest {
   ) => Promise<AIAgentResult>;
   expect: (result: AIAgentResult) => void;
 }
+
+let overrideParentLoaded: LoadedAgent | undefined;
+let overrideChildLoaded: LoadedAgent | undefined;
+let overrideTargetsRef: { provider: string; model: string }[] | undefined;
+const overrideLLMExpected = {
+  temperature: 0.27,
+  topP: 0.52,
+  maxOutputTokens: 321,
+  repeatPenalty: 1.9,
+  llmTimeout: 7_654,
+  maxRetries: 5,
+  stream: true,
+  parallelToolCalls: true,
+};
 
 const TEST_SCENARIOS: HarnessTest[] = [
   {
@@ -1223,12 +1238,12 @@ const TEST_SCENARIOS: HarnessTest[] = [
         }
         await transport.close();
         transportClosed = true;
-        return {
-          success: true,
-          conversation: [],
-          logs: [],
-          accounting: [],
-        };
+          return {
+            success: true,
+            conversation: [],
+            logs: [],
+            accounting: [],
+          };
       } finally {
         if (transport !== undefined && !transportClosed) {
           try { await transport.close(); } catch { /* ignore */ }
@@ -2748,6 +2763,115 @@ const TEST_SCENARIOS: HarnessTest[] = [
       },
     };
   })(),
+
+  {
+    id: 'run-test-94',
+    description: 'Global model overrides propagate to parent and sub-agents.',
+    execute: async () => {
+      overrideParentLoaded = undefined;
+      overrideChildLoaded = undefined;
+      overrideTargetsRef = undefined;
+
+      const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), `${TMP_PREFIX}override-models-`));
+      try {
+        const configPath = path.join(tempDir, 'override-config.json');
+        const configData = {
+          providers: {
+            [PRIMARY_PROVIDER]: { type: 'test-llm' },
+          },
+          mcpServers: {},
+        } satisfies Configuration;
+        fs.writeFileSync(configPath, JSON.stringify(configData, null, 2), 'utf-8');
+
+        const childPath = path.join(tempDir, 'child.ai');
+        const childContent = [
+          '---',
+          'description: Override child agent',
+          'models:',
+          '  - other-provider/child-model',
+          '---',
+          'Child body.',
+        ].join('\n');
+        fs.writeFileSync(childPath, childContent, 'utf-8');
+
+        const parentPath = path.join(tempDir, 'parent.ai');
+        const parentContent = [
+          '---',
+          'description: Override parent agent',
+          'models:',
+          '  - fallback/parent-model',
+          'agents:',
+          `  - ${path.basename(childPath)}`,
+          '---',
+          'Parent body.',
+        ].join('\n');
+        fs.writeFileSync(parentPath, parentContent, 'utf-8');
+
+        const overrideTargets = [{ provider: PRIMARY_PROVIDER, model: MODEL_NAME }];
+        overrideTargetsRef = overrideTargets;
+        const overrides: NonNullable<LoadAgentOptions['globalOverrides']> = {
+          models: overrideTargets,
+          temperature: overrideLLMExpected.temperature,
+          topP: overrideLLMExpected.topP,
+          maxOutputTokens: overrideLLMExpected.maxOutputTokens,
+          repeatPenalty: overrideLLMExpected.repeatPenalty,
+          llmTimeout: overrideLLMExpected.llmTimeout,
+          maxRetries: overrideLLMExpected.maxRetries,
+          stream: overrideLLMExpected.stream,
+          parallelToolCalls: overrideLLMExpected.parallelToolCalls,
+        };
+
+        const registry = new AgentRegistry([], { configPath, globalOverrides: overrides });
+        overrideParentLoaded = registry.loadFromContent(parentPath, parentContent, {
+          configPath,
+          baseDir: tempDir,
+          globalOverrides: overrides,
+        });
+        invariant(overrideParentLoaded.subAgents.length === 1, 'Override scenario should preload exactly one sub-agent.');
+        overrideChildLoaded = overrideParentLoaded.subAgents[0]?.loaded;
+      } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+
+      return Promise.resolve({
+        success: true,
+        conversation: [],
+        logs: [],
+        accounting: [],
+        finalReport: {
+          status: 'success',
+          format: 'text',
+          content: 'override-models',
+          ts: Date.now(),
+        },
+      } satisfies AIAgentResult);
+    },
+    expect: () => {
+      invariant(overrideTargetsRef !== undefined, 'Override targets reference missing for global override test.');
+      invariant(overrideParentLoaded !== undefined, 'Parent loaded agent missing for global override test.');
+      invariant(overrideParentLoaded.targets === overrideTargetsRef, 'Parent targets reference mismatch for global override test.');
+      invariant(overrideParentLoaded.targets.every((entry) => entry.provider === PRIMARY_PROVIDER && entry.model === MODEL_NAME), 'Parent targets should align with override values.');
+      invariant(Math.abs(overrideParentLoaded.effective.temperature - overrideLLMExpected.temperature) < 1e-6, 'Parent temperature should follow overrides.');
+      invariant(Math.abs(overrideParentLoaded.effective.topP - overrideLLMExpected.topP) < 1e-6, 'Parent topP should follow overrides.');
+      invariant(overrideParentLoaded.effective.maxOutputTokens === overrideLLMExpected.maxOutputTokens, 'Parent maxOutputTokens should follow overrides.');
+      invariant(overrideParentLoaded.effective.repeatPenalty !== undefined && Math.abs(overrideParentLoaded.effective.repeatPenalty - overrideLLMExpected.repeatPenalty) < 1e-6, 'Parent repeatPenalty should follow overrides.');
+      invariant(overrideParentLoaded.effective.llmTimeout === overrideLLMExpected.llmTimeout, 'Parent llmTimeout should follow overrides.');
+      invariant(overrideParentLoaded.effective.maxRetries === overrideLLMExpected.maxRetries, 'Parent maxRetries should follow overrides.');
+      invariant(overrideParentLoaded.effective.stream === overrideLLMExpected.stream, 'Parent stream flag should follow overrides.');
+      invariant(overrideParentLoaded.effective.parallelToolCalls === overrideLLMExpected.parallelToolCalls, 'Parent parallelToolCalls should follow overrides.');
+      invariant(overrideChildLoaded !== undefined, 'Child loaded agent missing for global override test.');
+      invariant(overrideChildLoaded.targets === overrideTargetsRef, 'Child targets reference mismatch for global override test.');
+      invariant(overrideChildLoaded.targets.every((entry) => entry.provider === PRIMARY_PROVIDER && entry.model === MODEL_NAME), 'Child targets should be overridden to primary provider/model.');
+      invariant(Math.abs(overrideChildLoaded.effective.temperature - overrideLLMExpected.temperature) < 1e-6, 'Child temperature should follow overrides.');
+      invariant(Math.abs(overrideChildLoaded.effective.topP - overrideLLMExpected.topP) < 1e-6, 'Child topP should follow overrides.');
+      invariant(overrideChildLoaded.effective.maxOutputTokens === overrideLLMExpected.maxOutputTokens, 'Child maxOutputTokens should follow overrides.');
+      invariant(overrideChildLoaded.effective.repeatPenalty !== undefined && Math.abs(overrideChildLoaded.effective.repeatPenalty - overrideLLMExpected.repeatPenalty) < 1e-6, 'Child repeatPenalty should follow overrides.');
+      invariant(overrideChildLoaded.effective.llmTimeout === overrideLLMExpected.llmTimeout, 'Child llmTimeout should follow overrides.');
+      invariant(overrideChildLoaded.effective.maxRetries === overrideLLMExpected.maxRetries, 'Child maxRetries should follow overrides.');
+      invariant(overrideChildLoaded.effective.stream === overrideLLMExpected.stream, 'Child stream flag should follow overrides.');
+      invariant(overrideChildLoaded.effective.parallelToolCalls === overrideLLMExpected.parallelToolCalls, 'Child parallelToolCalls should follow overrides.');
+    },
+  },
 
   (() => {
     return {

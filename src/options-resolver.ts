@@ -22,6 +22,23 @@ interface CLIOverrides {
   verbose?: boolean;
 }
 
+interface GlobalLLMOverrides {
+  stream?: boolean;
+  parallelToolCalls?: boolean;
+  maxRetries?: number;
+  maxToolTurns?: number;
+  maxToolCallsPerTurn?: number;
+  maxConcurrentTools?: number;
+  llmTimeout?: number;
+  toolTimeout?: number;
+  temperature?: number;
+  topP?: number;
+  maxOutputTokens?: number;
+  repeatPenalty?: number;
+  toolResponseMaxBytes?: number;
+  mcpInitConcurrency?: number;
+}
+
 interface DefaultsForUndefined {
   temperature?: number;
   topP?: number;
@@ -60,17 +77,21 @@ interface ResolvedEffectiveOptions {
 
 export function resolveEffectiveOptions(args: {
   cli: CLIOverrides | undefined;
+  global?: GlobalLLMOverrides;
   fm: FrontmatterOptions | undefined;
   configDefaults: NonNullable<Configuration['defaults']>;
   defaultsForUndefined?: DefaultsForUndefined;
 }): ResolvedEffectiveOptions {
-  const { cli, fm, configDefaults, defaultsForUndefined } = args;
+  const { cli, global, fm, configDefaults, defaultsForUndefined } = args;
 
   const getCliVal = (name: string): unknown => (cli !== undefined ? (cli as Record<string, unknown>)[name] : undefined);
+  const getGlobalVal = (name: string): unknown => (global !== undefined ? (global as Record<string, unknown>)[name] : undefined);
   const getDefUndef = (name: string): unknown => (defaultsForUndefined !== undefined ? (defaultsForUndefined as Record<string, unknown>)[name] : undefined);
   const getCfgDefault = (name: string): unknown => (configDefaults as Record<string, unknown>)[name];
 
   const readNum = (name: string, fmVal: unknown, fallback: number): number => {
+    const globalVal = getGlobalVal(name);
+    if (typeof globalVal === 'number' && Number.isFinite(globalVal)) return globalVal;
     const cliVal = getCliVal(name);
     if (typeof cliVal === 'number' && Number.isFinite(cliVal)) return cliVal;
     const n = Number(fmVal);
@@ -83,6 +104,8 @@ export function resolveEffectiveOptions(args: {
   };
 
   const readBool = (name: string, fmVal: unknown, fallback: boolean): boolean => {
+    const globalVal = getGlobalVal(name);
+    if (typeof globalVal === 'boolean') return globalVal;
     const cliVal = getCliVal(name);
     if (typeof cliVal === 'boolean') return cliVal;
     if (typeof fmVal === 'boolean') return fmVal;
@@ -111,6 +134,8 @@ export function resolveEffectiveOptions(args: {
     maxToolCallsPerTurn: readNum('maxToolCallsPerTurn', (fm as { maxToolCallsPerTurn?: number } | undefined)?.maxToolCallsPerTurn, 10),
     toolResponseMaxBytes: readNum('toolResponseMaxBytes', fm?.toolResponseMaxBytes, 12288),
     stream: ((): boolean => {
+      const globalStream = getGlobalVal('stream');
+      if (typeof globalStream === 'boolean') return globalStream;
       if (typeof cli?.stream === 'boolean') return cli.stream;
       const dv = configDefaults.stream;
       if (typeof dv === 'boolean') return dv;
@@ -123,6 +148,8 @@ export function resolveEffectiveOptions(args: {
     traceSlack: cli?.traceSlack === true,
     verbose: cli?.verbose === true,
     mcpInitConcurrency: ((): number | undefined => {
+      const globalConcurrency = getGlobalVal('mcpInitConcurrency');
+      if (typeof globalConcurrency === 'number' && Number.isFinite(globalConcurrency)) return Math.trunc(globalConcurrency);
       if (typeof cli?.mcpInitConcurrency === 'number' && Number.isFinite(cli.mcpInitConcurrency)) return Math.trunc(cli.mcpInitConcurrency);
       const dv = configDefaults.mcpInitConcurrency;
       if (typeof dv === 'number' && Number.isFinite(dv)) return Math.trunc(dv);

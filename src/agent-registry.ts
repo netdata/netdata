@@ -175,6 +175,7 @@ export class AgentRegistry {
     }
     visited.add(resolvedPath);
     const sanitizedOptions: LoadAgentOptions | undefined = loadOptions === undefined ? undefined : { ...loadOptions };
+    // Do not mutate arrays inside sanitizedOptions (e.g., globalOverrides.models); loaders rely on shared references.
     const loaded = loadAgent(resolvedPath, this.cache, sanitizedOptions);
     if (!this.agents.has(loaded.id)) {
       this.agents.set(loaded.id, loaded);

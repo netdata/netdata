@@ -107,6 +107,26 @@ function flattenPromptContent(content: string, baseDir?: string): { content: str
   return { content: resolved, systemTemplate: extractBodyWithoutFrontmatter(resolved) };
 }
 
+export interface GlobalOverrides {
+  // Arrays provided here are treated as immutable snapshots; do not mutate them after invoking load.
+  models?: { provider: string; model: string }[];
+  tools?: string[];
+  agents?: string[];
+  temperature?: number;
+  topP?: number;
+  maxOutputTokens?: number;
+  repeatPenalty?: number;
+  llmTimeout?: number;
+  toolTimeout?: number;
+  maxRetries?: number;
+  maxToolTurns?: number;
+  maxToolCallsPerTurn?: number;
+  maxConcurrentTools?: number;
+  toolResponseMaxBytes?: number;
+  stream?: boolean;
+  parallelToolCalls?: boolean;
+  mcpInitConcurrency?: number;
+}
 
 export interface LoadAgentOptions {
   configPath?: string;
@@ -115,6 +135,8 @@ export interface LoadAgentOptions {
   targets?: { provider: string; model: string }[];
   tools?: string[];
   agents?: string[];
+  // Overrides applied to every agent/sub-agent. Override values take precedence over CLI/frontmatter/defaults.
+  globalOverrides?: GlobalOverrides;
   // Optional overrides (CLI precedence) for runtime knobs
   stream?: boolean;
   parallelToolCalls?: boolean;
@@ -221,7 +243,12 @@ function constructLoadedAgent(args: ConstructAgentArgs): LoadedAgent {
   const fmModels = parsePairs(fm?.options?.models);
   const fmTools = parseList(fm?.options?.tools);
   const fmAgents = parseList(fm?.options?.agents);
-  const selectedTargets = Array.isArray(options?.targets) && options.targets.length > 0 ? options.targets : fmModels;
+  // Only models overrides are active today; this structure accommodates future keys.
+  const overrideTargets = Array.isArray(options?.globalOverrides?.models) && options.globalOverrides.models.length > 0
+    ? options.globalOverrides.models
+    : undefined;
+  const selectedTargets = overrideTargets
+    ?? (Array.isArray(options?.targets) && options.targets.length > 0 ? options.targets : fmModels);
   let selectedTools = Array.isArray(options?.tools) && options.tools.length > 0 ? [...options.tools] : [...fmTools];
   const effAgents = Array.isArray(options?.agents) && options.agents.length > 0 ? options.agents : fmAgents;
   const selectedAgents = effAgents.map((rel) => path.resolve(baseDir, rel));
@@ -238,6 +265,8 @@ function constructLoadedAgent(args: ConstructAgentArgs): LoadedAgent {
       verbose: options?.verbose,
       defaultsForUndefined: options?.defaultsForUndefined,
       ancestors: [...ancestorChain, id],
+      // Pass through overrides intact; downstream loaders treat arrays as immutable.
+      globalOverrides: options?.globalOverrides,
     });
     const derivedToolName = childLoaded.toolName ?? deriveToolNameFromPath(childLoaded.promptPath);
     if (isReservedAgentName(derivedToolName)) {
@@ -331,6 +360,7 @@ function constructLoadedAgent(args: ConstructAgentArgs): LoadedAgent {
       traceMCP: options?.traceMCP,
       verbose: options?.verbose,
     },
+    global: options?.globalOverrides,
     fm: fm?.options,
     configDefaults: defaults,
     defaultsForUndefined: options?.defaultsForUndefined,

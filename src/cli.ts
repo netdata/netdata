@@ -616,6 +616,149 @@ const readCliTools = (opts: Record<string, unknown>): string | undefined => {
   return candidate;
 };
 
+const readOverrideValues = (opts: Record<string, unknown>): string[] => {
+  const raw = opts.override;
+  if (Array.isArray(raw)) {
+    return raw.filter((value): value is string => typeof value === 'string' && value.length > 0);
+  }
+  if (typeof raw === 'string' && raw.length > 0) return [raw];
+  return [];
+};
+
+const buildGlobalOverrides = (entries: readonly string[]): LoadAgentOptions['globalOverrides'] => {
+  if (entries.length === 0) return undefined;
+  // Downstream loaders assume the arrays here stay immutable; do not mutate after construction.
+  const overrides: LoadAgentOptions['globalOverrides'] = {};
+  const normalizeKey = (raw: string): string => {
+    const lower = raw.trim();
+    const canonicalMap: Record<string, string> = {
+      models: 'models',
+      tools: 'tools',
+      agents: 'agents',
+      temperature: 'temperature',
+      topP: 'topP',
+      'top-p': 'topP',
+      maxOutputTokens: 'maxOutputTokens',
+      'max-output-tokens': 'maxOutputTokens',
+      repeatPenalty: 'repeatPenalty',
+      'repeat-penalty': 'repeatPenalty',
+      llmTimeout: 'llmTimeout',
+      'llm-timeout': 'llmTimeout',
+      'llm-timeout-ms': 'llmTimeout',
+      toolTimeout: 'toolTimeout',
+      'tool-timeout': 'toolTimeout',
+      'tool-timeout-ms': 'toolTimeout',
+      maxRetries: 'maxRetries',
+      'max-retries': 'maxRetries',
+      maxToolTurns: 'maxToolTurns',
+      'max-tool-turns': 'maxToolTurns',
+      maxToolCallsPerTurn: 'maxToolCallsPerTurn',
+      'max-tool-calls-per-turn': 'maxToolCallsPerTurn',
+      maxConcurrentTools: 'maxConcurrentTools',
+      'max-concurrent-tools': 'maxConcurrentTools',
+      toolResponseMaxBytes: 'toolResponseMaxBytes',
+      'tool-response-max-bytes': 'toolResponseMaxBytes',
+      stream: 'stream',
+      parallelToolCalls: 'parallelToolCalls',
+      'parallel-tool-calls': 'parallelToolCalls',
+      mcpInitConcurrency: 'mcpInitConcurrency',
+      'mcp-init-concurrency': 'mcpInitConcurrency',
+    };
+    return canonicalMap[lower] ?? lower;
+  };
+  const parseNumber = (key: string, raw: string, allowZero = true): number => {
+    const num = Number(raw);
+    if (!Number.isFinite(num)) throw new Error(`${key} override requires a numeric value`);
+    if (!allowZero && num === 0) throw new Error(`${key} override cannot be zero`);
+    return num;
+  };
+  const parseInteger = (key: string, raw: string): number => Math.trunc(parseNumber(key, raw));
+  const parseBoolean = (key: string, raw: string): boolean => {
+    const normalized = raw.trim().toLowerCase();
+    if (normalized === 'true' || normalized === '1') return true;
+    if (normalized === 'false' || normalized === '0') return false;
+    throw new Error(`${key} override requires a boolean value (true|false)`);
+  };
+
+  entries.forEach((entry) => {
+    const idx = entry.indexOf('=');
+    if (idx <= 0 || idx === entry.length - 1) {
+      throw new Error(`invalid override '${entry}': use key=value with keys like models`);
+    }
+    const rawKey = entry.slice(0, idx).trim();
+    const value = entry.slice(idx + 1).trim();
+    if (rawKey.length === 0 || value.length === 0) {
+      throw new Error(`invalid override '${entry}': key and value must be non-empty`);
+    }
+    const key = normalizeKey(rawKey);
+    switch (key) {
+      case 'models': {
+        const parsed = parsePairs(value);
+        if (parsed.length === 0) throw new Error('models override requires at least one provider/model pair');
+        overrides.models = parsed;
+        break;
+      }
+      case 'tools': {
+        const parsed = parseList(value);
+        if (parsed.length === 0) throw new Error('tools override requires at least one tool');
+        overrides.tools = parsed;
+        break;
+      }
+      case 'agents': {
+        const parsed = parseList(value);
+        if (parsed.length === 0) throw new Error('agents override requires at least one agent');
+        overrides.agents = parsed;
+        break;
+      }
+      case 'temperature':
+        overrides.temperature = parseNumber('temperature', value);
+        break;
+      case 'topP':
+        overrides.topP = parseNumber('topP', value);
+        break;
+      case 'maxOutputTokens':
+        overrides.maxOutputTokens = parseInteger('maxOutputTokens', value);
+        break;
+      case 'repeatPenalty':
+        overrides.repeatPenalty = parseNumber('repeatPenalty', value);
+        break;
+      case 'llmTimeout':
+        overrides.llmTimeout = parseInteger('llmTimeout', value);
+        break;
+      case 'toolTimeout':
+        overrides.toolTimeout = parseInteger('toolTimeout', value);
+        break;
+      case 'maxRetries':
+        overrides.maxRetries = parseInteger('maxRetries', value);
+        break;
+      case 'maxToolTurns':
+        overrides.maxToolTurns = parseInteger('maxToolTurns', value);
+        break;
+      case 'maxToolCallsPerTurn':
+        overrides.maxToolCallsPerTurn = parseInteger('maxToolCallsPerTurn', value);
+        break;
+      case 'maxConcurrentTools':
+        overrides.maxConcurrentTools = parseInteger('maxConcurrentTools', value);
+        break;
+      case 'toolResponseMaxBytes':
+        overrides.toolResponseMaxBytes = parseInteger('toolResponseMaxBytes', value);
+        break;
+      case 'mcpInitConcurrency':
+        overrides.mcpInitConcurrency = parseInteger('mcpInitConcurrency', value);
+        break;
+      case 'stream':
+        overrides.stream = parseBoolean('stream', value);
+        break;
+      case 'parallelToolCalls':
+        overrides.parallelToolCalls = parseBoolean('parallelToolCalls', value);
+        break;
+      default:
+        throw new Error(`unsupported override key '${rawKey}'; expected keys like models, maxOutputTokens, temperature`);
+    }
+  });
+  return overrides;
+};
+
 async function runHeadendMode(config: HeadendModeConfig): Promise<void> {
   const uniqueAgents = Array.from(new Set(config.agentPaths.map((p) => path.resolve(p))));
   if (uniqueAgents.length === 0) {
@@ -643,6 +786,17 @@ async function runHeadendMode(config: HeadendModeConfig): Promise<void> {
   const traceLLMFlag = config.options.traceLlm === true;
   const traceMCPFlag = config.options.traceMcp === true;
   const traceSlackFlag = config.options.traceSlack === true;
+
+  const overrideValues = readOverrideValues(config.options);
+  let globalOverrides: LoadAgentOptions['globalOverrides'] = undefined;
+  if (overrideValues.length > 0) {
+    try {
+      globalOverrides = buildGlobalOverrides(overrideValues);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      exitWith(4, message, 'EXIT-HEADEND-BAD-OVERRIDE');
+    }
+  }
 
   let parsedTargets: LoadAgentOptions['targets'];
   const cliModels = typeof config.options.models === 'string' && config.options.models.length > 0
@@ -674,6 +828,10 @@ async function runHeadendMode(config: HeadendModeConfig): Promise<void> {
     traceLLM: traceLLMFlag,
     traceMCP: traceMCPFlag,
   };
+  if (globalOverrides !== undefined) {
+    // Share the same object so nested loads observe identical override identity.
+    loadOptions.globalOverrides = globalOverrides;
+  }
   if (parsedTargets !== undefined) {
     loadOptions.targets = parsedTargets;
   }
@@ -898,6 +1056,17 @@ program
         : (typeof options.mcpTools === 'string' && options.mcpTools.length > 0) ? options.mcpTools
         : undefined;
 
+      const overrideValuesDirect = readOverrideValues(options);
+      let globalOverrides: LoadAgentOptions['globalOverrides'] = undefined;
+      if (overrideValuesDirect.length > 0) {
+        try {
+          globalOverrides = buildGlobalOverrides(overrideValuesDirect);
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          exitWith(4, message, 'EXIT-CLI-BAD-OVERRIDE');
+        }
+      }
+
       const isPlainObject = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);
       const hasKey = <K extends string>(obj: Record<string, unknown>, key: K): obj is Record<K, unknown> => Object.prototype.hasOwnProperty.call(obj, key);
       const cliAgentsRaw: string | undefined = ((): string | undefined => {
@@ -930,7 +1099,7 @@ program
       const toolList = parseList(cliToolsRaw ?? fmToolsRaw);
       const agentsList = parseList(cliAgentsRaw ?? fmAgentsRaw);
 
-      if (targets.length === 0) {
+      if (targets.length === 0 && !(Array.isArray(globalOverrides?.models) && globalOverrides.models.length > 0)) {
         console.error('Error: No provider/model targets specified. Use --models or frontmatter models.');
         process.exit(4);
       }
@@ -976,7 +1145,12 @@ program
         return 'cli-main';
       })();
 
-      const registry = new AgentRegistry([], { configPath: cfgPath, verbose: options.verbose === true });
+      const registry = new AgentRegistry([], {
+        configPath: cfgPath,
+        verbose: options.verbose === true,
+        // Pass through the same overrides reference for registry + nested loads.
+        globalOverrides,
+      });
       const loaded = registry.loadFromContent(fileAgentId, fmSource, {
         configPath: cfgPath,
         verbose: options.verbose === true,
@@ -984,6 +1158,8 @@ program
         tools: toolList,
         agents: agentsList,
         baseDir: fmBaseDir,
+        // Keep overrides pointer intact for downstream recursion checks.
+        globalOverrides,
         // CLI overrides take precedence
         temperature: optSrc('temperature') === 'cli' ? Number(options.temperature) : undefined,
         topP: (optSrc('topP') === 'cli' || optSrc('top-p') === 'cli') ? Number(options.topP ?? options['top-p']) : undefined,
