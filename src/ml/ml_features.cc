@@ -56,7 +56,7 @@ static void ml_features_lag(ml_features_t *features)
 
     for (size_t idx = 0; idx != n; idx++) {
         DSample &DS = features->preprocessed_features[sample_idx++];
-        DS.set_size(features->lag_n);
+        DS.set_size(features->lag_n + 1);
 
         if (Cfg.random_nums[idx] > cutoff) {
             sample_idx--;
