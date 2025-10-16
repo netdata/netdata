@@ -680,25 +680,9 @@ fi
 # -----------------------------------------------------------------------------
 progress "Creating standard user and groups for netdata"
 
-NETDATA_WANTED_GROUPS="docker nginx varnish haproxy adm nsd proxy squid ceph nobody"
 NETDATA_ADDED_TO_GROUPS=""
 if [ "$(id -u)" -eq 0 ]; then
-  progress "Adding group 'netdata'"
-  portable_add_group netdata || :
-
-  progress "Adding user 'netdata'"
-  portable_add_user netdata "${NETDATA_PREFIX}/var/lib/netdata" || :
-
-  progress "Assign user 'netdata' to required groups"
-  for g in ${NETDATA_WANTED_GROUPS}; do
-    # shellcheck disable=SC2086
-    portable_add_user_to_group ${g} netdata && NETDATA_ADDED_TO_GROUPS="${NETDATA_ADDED_TO_GROUPS} ${g}"
-  done
-  # Netdata must be able to read /etc/pve/qemu-server/* and /etc/pve/lxc/*
-  # for reading VMs/containers names, CPU and memory limits on Proxmox.
-  if [ -d "/etc/pve" ]; then
-    portable_add_user_to_group "www-data" netdata && NETDATA_ADDED_TO_GROUPS="${NETDATA_ADDED_TO_GROUPS} www-data"
-  fi
+  create_netdata_accounts
 else
   run_failed "The installer does not run as root. Nothing to do for user and groups"
 fi

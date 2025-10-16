@@ -1036,6 +1036,30 @@ EOF
 
 }
 
+# -----------------------------------------------------------------------------
+# user handling functions
+
+create_netdata_accounts() {
+  NETDATA_WANTED_GROUPS="docker nginx varnish haproxy adm nsd proxy squid ceph nobody I2C"
+
+  if [ -d "/etc/pve" ]; then
+    NETDATA_WANTED_GROUPS="${NETDATA_WANTED_GROUPS} www-data"
+  fi
+
+  if command -v systemd-sysusers >/dev/null 2>&1; then
+    install -m 644 -o root -g root "${NETDATA_PREFIX}/usr/lib/netdata/system/systemd/sysusers/netdata.conf" /usr/lib/sysusers.d/netdata.conf
+    systemd-sysusers /usr/lib/sysusers.d/netdata.conf
+  else
+    portable_add_group netdata || :
+    portable_add_user netdata "${NETDATA_PREFIX}/var/lib/netdata" || :
+  fi
+
+  for g in ${NETDATA_WANTED_GROUPS}; do
+    # shellcheck disable=SC2086
+    portable_add_user_to_group ${g} netdata && NETDATA_ADDED_TO_GROUPS="${NETDATA_ADDED_TO_GROUPS} ${g}"
+  done
+}
+
 portable_add_user() {
   username="${1}"
   homedir="${2}"
