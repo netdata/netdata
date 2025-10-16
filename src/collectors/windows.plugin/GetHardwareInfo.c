@@ -16,10 +16,11 @@ struct cpu_data {
 
 struct cpu_data *cpus = NULL;
 size_t ncpus = 0 ;
+static ND_THREAD *hardware_info_thread = NULL;
 
 static void netdata_stop_driver()
 {
-    SC_HANDLE scm = OpenSCManager(NULL, NULL, SC_MANAGER_ALL_ACCESS);
+    SC_HANDLE scm = OpenSCManager(NULL, NULL, SC_MANAGER_CONNECT);
     if (scm == NULL) {
         nd_log(
                 NDLS_COLLECTORS,
@@ -129,7 +130,7 @@ int netdata_start_driver()
     int ret = 0;
     if (!StartServiceA(service, 0, NULL)) {
         DWORD err = GetLastError();
-        if (err != ERROR_SERVICE_EXISTS) {
+        if (err != ERROR_SERVICE_EXISTS && err != ERROR_SERVICE_ALREADY_RUNNING) {
             nd_log(
                     NDLS_COLLECTORS,
                     NDLP_ERR,
@@ -156,6 +157,42 @@ static inline HANDLE netdata_open_device()
     return msr_h;
 }
 
+void netdata_collect_cpu_chart()
+{
+    HANDLE device = netdata_open_device();
+    if (device == INVALID_HANDLE_VALUE) {
+        return;
+    }
+
+    const uint32_t MSR_THERM_STATUS = 0x19C;
+    const ULONG TJMAX = 100;
+
+    for (size_t cpu = 0; cpu < ncpus; cpu++) {
+        DWORD bytes = 0;
+        MSR_REQUEST req = { MSR_THERM_STATUS, (ULONG)cpu, 0, 0 };
+
+        if (DeviceIoControl(device, IOCTL_MSR_READ, &req, sizeof(req), &req, sizeof(req), &bytes, NULL)) {
+            ULONG digital_readout = (req.low >> 16) & 0x7F;  // bits [22:16]
+            cpus[cpu].cpu_temp = (collected_number)(TJMAX - digital_readout);
+        }
+    }
+
+    CloseHandle(device);
+}
+
+static void get_hardware_info_thread(void *ptr __maybe_unused)
+{
+    heartbeat_t hb;
+    heartbeat_init(&hb, USEC_PER_SEC);
+    int update_every = UPDATE_EVERY_MIN;
+
+    while (service_running(SERVICE_COLLECTORS)) {
+        (void)heartbeat_next(&hb);
+
+        netdata_collect_cpu_chart();
+    }
+}
+
 static int initialize(int update_every)
 {
     if (netdata_install_driver()) {
@@ -169,30 +206,9 @@ static int initialize(int update_every)
     ncpus = os_get_system_cpus();
     cpus = callocz(ncpus, sizeof(struct cpu_data));
 
+    hardware_info_thread = nd_thread_create("hi_threads", NETDATA_THREAD_OPTION_DEFAULT, get_hardware_info_thread, &update_every);
+
     return 0;
-}
-
-void netdata_collect_cpu_chart()
-{
-    HANDLE device = netdata_open_device();
-    if (device == INVALID_HANDLE_VALUE) {
-        return;
-    }
-
-    const uint32_t MSR_THERM_STATUS = 0x19C;
-    const ULONG TJMAX = 100;
-    DWORD bytes;
-
-    for (size_t cpu = 0; cpu < ncpus; cpu++) {
-        MSR_REQUEST req = { MSR_THERM_STATUS, (ULONG)cpu, 0, 0 };
-
-        if (DeviceIoControl(device, IOCTL_MSR_READ, &req, sizeof(req), &req, sizeof(req), &bytes, NULL)) {
-            ULONG digital_readout = (req.low >> 16) & 0x7F;  // bits [22:16]
-            cpus[cpu].cpu_temp = (collected_number)(TJMAX - digital_readout);
-        }
-    }
-
-    CloseHandle(device);
 }
 
 static RRDSET *netdata_publish_cpu_chart(int update_every)
@@ -242,12 +258,6 @@ int do_GetHardwareInfo(int update_every, usec_t dt __maybe_unused)
         }
     }
 
-    if (!ncpus) {
-        return -1;
-    }
-
-    netdata_collect_cpu_chart();
-
     netdata_loop_cpu_chart(update_every);
 
     return 0;
@@ -255,5 +265,8 @@ int do_GetHardwareInfo(int update_every, usec_t dt __maybe_unused)
 
 void do_GetHardwareInfo_cleanup()
 {
+    if (nd_thread_join(hardware_info_thread))
+        nd_log_daemon(NDLP_ERR, "Failed to join mssql queries thread");
+
     netdata_stop_driver();
 }
