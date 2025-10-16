@@ -38,7 +38,7 @@ endmeta-->
     - **Notification settings**
       - Configuration name (optional): A name for your configuration in order to easily refer to it
       - Rooms: A list of Rooms for which you want to be notified
-      - Notifications: The notifications which you want to be notified
+      - Notifications: The notification types you want to receive
     - **Integration configuration**
       - Webhook URL: The URL you copied from the previous section
       - Channel Parameters: Select the channel type which the notifications will be sent to, if it is a Forum channel, you need to specify a thread name
