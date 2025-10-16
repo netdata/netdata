@@ -14,7 +14,7 @@
 
 :::info
 
-Netdata achieves [SOC 2 Type 1 attestation](https://www.netdata.cloud/blog/soc2-type1/), reinforcing its dedication to robust security practices for user data.
+Netdata achieves [SOC 2 Type 1](https://www.netdata.cloud/blog/soc2-type1/) & Type 2 attestations, reinforcing its dedication to robust security practices for user data.
 
 :::
 
