@@ -2,10 +2,14 @@
 
 ## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v2.7.1...HEAD)
+[Full Changelog](https://github.com/netdata/netdata/compare/v2.7.2...HEAD)
 
 **Merged pull requests:**
 
+- Customize node name addition [\#21151](https://github.com/netdata/netdata/pull/21151) ([kanelatechnical](https://github.com/kanelatechnical))
+- Skip adding Sentry breadcrumb during shutdown timeout [\#21150](https://github.com/netdata/netdata/pull/21150) ([stelfrag](https://github.com/stelfrag))
+- Fix NaN check in anomaly score calculation [\#21149](https://github.com/netdata/netdata/pull/21149) ([stelfrag](https://github.com/stelfrag))
+- Additional checks during cgroup discovery [\#21148](https://github.com/netdata/netdata/pull/21148) ([stelfrag](https://github.com/stelfrag))
 - Fix AS400 metrics [\#21147](https://github.com/netdata/netdata/pull/21147) ([ktsaou](https://github.com/ktsaou))
 - Add Fedora 43 to CI and package builds. [\#21142](https://github.com/netdata/netdata/pull/21142) ([Ferroin](https://github.com/Ferroin))
 - chore\(go.d\): update dyncfg path [\#21141](https://github.com/netdata/netdata/pull/21141) ([ilyam8](https://github.com/ilyam8))
@@ -84,6 +88,10 @@
 - Remote MCP support \(streamable http and sse\) [\#21036](https://github.com/netdata/netdata/pull/21036) ([ktsaou](https://github.com/ktsaou))
 - Add helper to run external commands without additional privileges. [\#20990](https://github.com/netdata/netdata/pull/20990) ([Ferroin](https://github.com/Ferroin))
 - Clean up handling of compiler flags in our build code. [\#20821](https://github.com/netdata/netdata/pull/20821) ([Ferroin](https://github.com/Ferroin))
+
+## [v2.7.2](https://github.com/netdata/netdata/tree/v2.7.2) (2025-10-15)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v2.7.1...v2.7.2)
 
 ## [v2.7.1](https://github.com/netdata/netdata/tree/v2.7.1) (2025-09-29)
 
@@ -443,10 +451,6 @@
 - update tripplite snmp profiles [\#20613](https://github.com/netdata/netdata/pull/20613) ([ilyam8](https://github.com/ilyam8))
 - Fix coverity issues [\#20612](https://github.com/netdata/netdata/pull/20612) ([stelfrag](https://github.com/stelfrag))
 - SNMP Mikrotik profile make units in transform ucum [\#20611](https://github.com/netdata/netdata/pull/20611) ([Ancairon](https://github.com/Ancairon))
-- update fortinet snmp profiles [\#20609](https://github.com/netdata/netdata/pull/20609) ([ilyam8](https://github.com/ilyam8))
-- improve netapp snmp profile [\#20608](https://github.com/netdata/netdata/pull/20608) ([ilyam8](https://github.com/ilyam8))
-- Improve datafile indexing [\#20607](https://github.com/netdata/netdata/pull/20607) ([stelfrag](https://github.com/stelfrag))
-- chore\(go.d/snmp\): add disable\_legacy\_collection option [\#20606](https://github.com/netdata/netdata/pull/20606) ([ilyam8](https://github.com/ilyam8))
 
 ## [v2.5.4](https://github.com/netdata/netdata/tree/v2.5.4) (2025-06-24)
 
