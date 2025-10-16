@@ -40,7 +40,7 @@ endmeta-->
     - **Notification settings**
       - Configuration name (optional): A descriptive name to identify this notification configuration
       - Rooms: A list of Rooms for which you want to be notified
-      - Notifications: Event types for which you want to receive notifications.
+      - Notifications: The notification types you want to receive
     - **Integration configuration**
       - Instance URL: The base URL of your ServiceNow instance (for example, `https://my-instance.service-now.com/`).
       - Username: The username of the ServiceNow integration user you created.

@@ -41,7 +41,7 @@ endmeta-->
     - **Notification settings**
       - Configuration name (optional): A name for your configuration in order to easily refer to it
       - Rooms: A list of Rooms for which you want to be notified
-      - Notifications: The notifications which you want to be notified
+      - Notifications: The notification types you want to receive
     - **Integration configuration**
       - Bot Token: The token of your bot
       - Chat ID: The chat id where your bot will deliver messages to
