@@ -16,13 +16,15 @@ import type { AddressInfo } from 'node:net';
 import { loadAgent } from '../agent-loader.js';
 import { AgentRegistry } from '../agent-registry.js';
 import { AIAgentSession } from '../ai-agent.js';
-import { parseFrontmatter } from '../frontmatter.js';
+import { loadConfiguration } from '../config.js';
+import { parseFrontmatter, parseList, parsePairs } from '../frontmatter.js';
+import { resolveIncludes } from '../include-resolver.js';
 import { DEFAULT_TOOL_INPUT_SCHEMA } from '../input-contract.js';
 import { LLMClient } from '../llm-client.js';
 import { TestLLMProvider } from '../llm-providers/test-llm.js';
 import { SubAgentRegistry } from '../subagent-registry.js';
 import { MCPProvider } from '../tools/mcp-provider.js';
-import { clampToolName, sanitizeToolName, formatToolRequestCompact, truncateUtf8WithNotice } from '../utils.js';
+import { clampToolName, sanitizeToolName, formatToolRequestCompact, truncateUtf8WithNotice, formatAgentResultHumanReadable } from '../utils.js';
 import { createWebSocketTransport } from '../websocket-transport.js';
 
 import { getScenario } from './fixtures/test-llm-scenarios.js';
@@ -38,6 +40,8 @@ const COVERAGE_PARENT_BODY = 'Parent body.';
 const COVERAGE_CHILD_BODY = 'Child body.';
 const COVERAGE_ALIAS_BASENAME = 'parent.ai';
 const TRUNCATION_NOTICE = '[TRUNCATED]';
+const CONFIG_FILE_NAME = 'config.json';
+const INCLUDE_DIRECTIVE_TOKEN = '${include:';
 const FINAL_REPORT_CALL_ID = 'call-final-report';
 const DEFAULT_PROMPT_SCENARIO = 'run-test-1' as const;
 const BASE_DEFAULTS = {
@@ -324,6 +328,10 @@ let overrideChildLoaded: LoadedAgent | undefined;
 let registrySpawnSessionConfig: AIAgentSessionConfig | undefined;
 let registryCoverageSummary: { listCount: number; aliasId?: string; toolName?: string; hasParent: boolean; hasToolAlias: boolean } | undefined;
 let utilsCoverageSummary: { sanitized: string; clamped: { name: string; truncated: boolean }; formatted: string; truncated: string } | undefined;
+let configLoadSummary: { providerKey?: string; localType?: string; remoteType?: string; localEnvToken?: string; defaultsStream?: boolean } | undefined;
+let includeSummary: { resolved: string; forbiddenError?: string; depthError?: string } | undefined;
+let frontmatterSummary: { toolName?: string; outputFormat?: string; inputFormat?: string; description?: string; models?: string[] } | undefined;
+let humanReadableSummaries: { json: string; text: string; successNoOutput: string; failure: string; truncatedZero: string } | undefined;
 let overrideTargetsRef: { provider: string; model: string }[] | undefined;
 const overrideLLMExpected = {
   temperature: 0.27,
@@ -1686,7 +1694,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
         ].join('\n'));
 
         const loaded = loadAgent(mainPromptPath, undefined, { configPath });
-        invariant(!loaded.systemTemplate.includes('${include:'), 'System prompt should not contain include directives post-flatten.');
+        invariant(!loaded.systemTemplate.includes(INCLUDE_DIRECTIVE_TOKEN), 'System prompt should not contain include directives post-flatten.');
         invariant(loaded.systemTemplate.includes('Main body start.'), 'System prompt missing main body content.');
         invariant(loaded.systemTemplate.includes('Part1 include content.'), 'System prompt missing included content.');
         invariant(loaded.systemTemplate.includes(nestedIncludeMarker), 'System prompt missing nested include content.');
@@ -2912,10 +2920,11 @@ const TEST_SCENARIOS: HarnessTest[] = [
     description: 'Agent registry spawnSession resolves aliases and produces sessions.',
     execute: async () => {
       registrySpawnSessionConfig = undefined;
+      await Promise.resolve();
       const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), `${TMP_PREFIX}spawn-session-`));
       const originalCreate = AIAgentSession.create.bind(AIAgentSession);
       try {
-        const configPath = path.join(tempDir, 'config.json');
+        const configPath = path.join(tempDir, CONFIG_FILE_NAME);
         const configData = {
           providers: { [PRIMARY_PROVIDER]: { type: 'test-llm' } },
           mcpServers: {},
@@ -2969,7 +2978,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
       await Promise.resolve();
       const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), `${TMP_PREFIX}registry-utils-`));
       try {
-        const configPath = path.join(tempDir, 'config.json');
+        const configPath = path.join(tempDir, CONFIG_FILE_NAME);
         const configData = {
           providers: { [PRIMARY_PROVIDER]: { type: 'test-llm' } },
           mcpServers: {},
@@ -3044,6 +3053,208 @@ const TEST_SCENARIOS: HarnessTest[] = [
       invariant(utilsCoverageSummary.formatted.includes('alpha:value with spaces'), 'formatToolRequestCompact should include trimmed string values.');
       invariant(utilsCoverageSummary.formatted.includes('gamma:[3]'), 'formatToolRequestCompact should summarize arrays.');
       invariant(utilsCoverageSummary.truncated.startsWith(TRUNCATION_NOTICE), 'truncateUtf8WithNotice should prepend notice.');
+    },
+  },
+
+  {
+    id: 'run-test-97',
+    description: 'formatAgentResultHumanReadable renders core output branches.',
+    execute: async () => {
+      humanReadableSummaries = undefined;
+      await Promise.resolve();
+      const baseResult: AIAgentResult = {
+        success: true,
+        conversation: [],
+        logs: [],
+        accounting: [],
+        finalReport: undefined,
+      };
+      const successJson: AIAgentResult = {
+        ...baseResult,
+        finalReport: { status: 'success', format: 'json', content_json: { foo: 'bar' }, ts: Date.now() },
+      };
+      const successText: AIAgentResult = {
+        ...baseResult,
+        finalReport: { status: 'success', format: 'markdown', content: 'Text body', ts: Date.now() },
+      };
+      const successNoOutput: AIAgentResult = {
+        ...baseResult,
+        conversation: [
+          { role: 'assistant', content: '', toolCalls: [{ id: 'call-1', name: 'demoTool', parameters: {} }] },
+          { role: 'tool', toolCallId: 'call-1', content: 'tool output' },
+        ],
+        accounting: [
+          {
+            type: 'llm',
+            provider: PRIMARY_PROVIDER,
+            model: MODEL_NAME,
+            tokens: { inputTokens: 10, outputTokens: 5, totalTokens: 15 },
+            latency: 12,
+            status: 'ok',
+            timestamp: Date.now(),
+          },
+        ],
+        finalReport: undefined,
+      };
+      const failure: AIAgentResult = {
+        ...baseResult,
+        success: false,
+        error: 'Failure reason',
+        finalReport: undefined,
+      };
+      humanReadableSummaries = {
+        json: formatAgentResultHumanReadable(successJson),
+        text: formatAgentResultHumanReadable(successText),
+        successNoOutput: formatAgentResultHumanReadable(successNoOutput),
+        failure: formatAgentResultHumanReadable(failure),
+        truncatedZero: truncateUtf8WithNotice('ignored', 0),
+      };
+      return {
+        success: true,
+        conversation: [],
+        logs: [],
+        accounting: [],
+        finalReport: { status: 'success', format: 'text', content: 'format-agent-result', ts: Date.now() },
+      };
+    },
+    expect: () => {
+      invariant(humanReadableSummaries !== undefined, 'Human readable summaries missing for run-test-97.');
+      invariant(humanReadableSummaries.json === '{\n  "foo": "bar"\n}', 'JSON final report should be pretty printed.');
+      invariant(humanReadableSummaries.text === 'Text body', 'Text final report should return raw content.');
+      invariant(humanReadableSummaries.successNoOutput.startsWith('AGENT COMPLETED WITHOUT OUTPUT'), 'Success without output should include completion banner.');
+      invariant(humanReadableSummaries.failure.includes('AGENT FAILED') && humanReadableSummaries.failure.includes('Failure reason'), 'Failure output should include banner and reason.');
+      invariant(humanReadableSummaries.truncatedZero === '', 'truncateUtf8WithNotice should return empty string when limit is zero.');
+    },
+  },
+
+  {
+    id: 'run-test-98',
+    description: 'Configuration loading, includes, and frontmatter parsing.',
+    execute: async () => {
+      configLoadSummary = undefined;
+      await Promise.resolve();
+      includeSummary = undefined;
+      frontmatterSummary = undefined;
+      const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), `${TMP_PREFIX}config-utils-`));
+      const prevApiKey = process.env.TEST_CONFIG_API_KEY;
+      const prevShould = process.env.SHOULD_NOT_EXPAND;
+      process.env.TEST_CONFIG_API_KEY = 'secret-123';
+      process.env.SHOULD_NOT_EXPAND = 'nope';
+      try {
+        const configPath = path.join(tempDir, CONFIG_FILE_NAME);
+        const configData = {
+          providers: {
+            demo: {
+              apiKey: '${TEST_CONFIG_API_KEY}',
+              custom: { dir: '${HOME}' },
+            },
+          },
+          mcpServers: {
+            local: { type: 'local', env: { TOKEN: '${SHOULD_NOT_EXPAND}' } },
+            remote: { type: 'remote', url: 'https://example.com/sse' },
+          },
+        } as unknown as Configuration;
+        fs.writeFileSync(configPath, JSON.stringify(configData, null, 2), 'utf-8');
+        const loaded = loadConfiguration(configPath);
+        const demoProvider = loaded.providers.demo;
+        const localServer = loaded.mcpServers.local;
+        const remoteServer = loaded.mcpServers.remote;
+        configLoadSummary = {
+          providerKey: demoProvider.apiKey,
+          localType: localServer.type,
+          remoteType: remoteServer.type,
+          localEnvToken: localServer.env?.TOKEN,
+          defaultsStream: loaded.defaults?.stream ?? false,
+        };
+        // Include resolution
+        const includeBaseDir = tempDir;
+        const subPath = path.join(includeBaseDir, 'sub.txt');
+        const nestedPath = path.join(includeBaseDir, 'nested.txt');
+        fs.writeFileSync(nestedPath, 'Nested content', 'utf-8');
+        fs.writeFileSync(subPath, `Sub before {{include:${path.basename(nestedPath)}}} after`, 'utf-8');
+        const baseContent = `Start ${INCLUDE_DIRECTIVE_TOKEN}${path.basename(subPath)}} End`;
+        const resolved = resolveIncludes(baseContent, includeBaseDir);
+        let forbiddenError: string | undefined;
+        let depthError: string | undefined;
+        try {
+          resolveIncludes(`${INCLUDE_DIRECTIVE_TOKEN}.env}`, includeBaseDir);
+        } catch (e) {
+          forbiddenError = e instanceof Error ? e.message : String(e);
+        }
+        const depthPathA = path.join(includeBaseDir, 'a.txt');
+        const depthPathB = path.join(includeBaseDir, 'b.txt');
+        fs.writeFileSync(depthPathA, `${INCLUDE_DIRECTIVE_TOKEN}b.txt}`, 'utf-8');
+        fs.writeFileSync(depthPathB, `${INCLUDE_DIRECTIVE_TOKEN}a.txt}`, 'utf-8');
+        try {
+          resolveIncludes(`${INCLUDE_DIRECTIVE_TOKEN}a.txt}`, includeBaseDir, 2);
+        } catch (e) {
+          depthError = e instanceof Error ? e.message : String(e);
+        }
+        includeSummary = {
+          resolved,
+          forbiddenError,
+          depthError,
+        };
+        // Frontmatter parsing
+        const schemaPath = path.join(tempDir, 'schema.json');
+        fs.writeFileSync(schemaPath, JSON.stringify({ type: 'object', properties: { ok: { type: 'boolean' } } }, null, 2), 'utf-8');
+        const prompt = [
+          '#!/usr/bin/env ai-agent',
+          '---',
+          'description: Demo',
+          'usage: Test usage',
+          'models: demo/model',
+          'output:',
+          `  format: json`,
+          `  schemaRef: ${path.basename(schemaPath)}`,
+          'input:',
+          '  format: json',
+          '  schema: {"type":"object"}',
+          '---',
+          'Body here.',
+        ].join('\n');
+        const parsed = parseFrontmatter(prompt, { baseDir: tempDir });
+        frontmatterSummary = {
+          toolName: parsed?.toolName,
+          outputFormat: parsed?.expectedOutput?.format,
+          inputFormat: parsed?.inputSpec?.format,
+          description: parsed?.description,
+          models: parsePairs(parsed?.options?.models ?? []).map((t) => `${t.provider}/${t.model}`),
+        };
+        // Additional parse helpers coverage
+        parseList(['one', ' two ']);
+        try {
+          parsePairs('bad');
+        } catch {
+          /* expected */
+        }
+      } finally {
+        process.env.TEST_CONFIG_API_KEY = prevApiKey;
+        process.env.SHOULD_NOT_EXPAND = prevShould;
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+      return {
+        success: true,
+        conversation: [],
+        logs: [],
+        accounting: [],
+        finalReport: { status: 'success', format: 'text', content: 'config-include-frontmatter', ts: Date.now() },
+      };
+    },
+    expect: () => {
+      invariant(configLoadSummary !== undefined, 'Config summary missing for run-test-98.');
+      invariant(configLoadSummary.providerKey === 'secret-123', 'Env placeholder should expand in config.');
+      invariant(configLoadSummary.localType === 'stdio', 'Local type should normalize to stdio.');
+      invariant(configLoadSummary.remoteType === 'sse', 'Remote type should infer from URL.');
+      invariant(configLoadSummary.localEnvToken === '${SHOULD_NOT_EXPAND}', 'Env placeholders inside MCP env should not expand.');
+      invariant(includeSummary !== undefined, 'Include summary missing for run-test-98.');
+      invariant(includeSummary.resolved.includes('Nested content'), 'Include resolution should inline nested content.');
+      invariant(typeof includeSummary.forbiddenError === 'string' && includeSummary.forbiddenError.includes('forbidden'), 'Forbidden include error expected.');
+      invariant(typeof includeSummary.depthError === 'string' && includeSummary.depthError.includes('Maximum include depth'), 'Depth limit error expected.');
+      invariant(frontmatterSummary !== undefined, 'Frontmatter summary missing for run-test-98.');
+      invariant(frontmatterSummary.outputFormat === 'json', 'Frontmatter output format should be json.');
+      invariant(frontmatterSummary.inputFormat === 'json', 'Frontmatter input format should be json.');
+      invariant(Array.isArray(frontmatterSummary.models) && frontmatterSummary.models[0] === 'demo/model', 'Frontmatter models should parse via parsePairs.');
     },
   },
   (() => {
