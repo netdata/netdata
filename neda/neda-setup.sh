@@ -404,6 +404,10 @@ run sudo -u "$NEDA_USER" env HOME="$NEDA_HOME" npm install --prefix "$NEDA_HOME"
 # Install all Playwright browsers that fetcher might need
 run sudo -u "$NEDA_USER" env HOME="$NEDA_HOME" PLAYWRIGHT_BROWSERS_PATH="$NEDA_HOME/.cache/ms-playwright" npx --prefix "$NEDA_HOME" playwright install
 
+# Install system dependencies required by Playwright browsers
+log_info "Installing Playwright system dependencies..."
+run npx --prefix "$NEDA_HOME" playwright install-deps
+
 # Create compatibility copies for common version mismatches
 # This handles version differences between fetcher-mcp and installed Playwright
 for source_dir in "$NEDA_HOME/.cache/ms-playwright"/chromium_headless_shell-*; do
