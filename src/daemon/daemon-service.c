@@ -96,14 +96,10 @@ void service_signal_exit(SERVICE_TYPE service) {
 }
 
 static void service_to_buffer(BUFFER *wb, SERVICE_TYPE service) {
-    if(service & SERVICE_MAINTENANCE)
-        buffer_strcat(wb, "MAINTENANCE ");
     if(service & SERVICE_COLLECTORS)
         buffer_strcat(wb, "COLLECTORS ");
     if(service & SERVICE_REPLICATION)
         buffer_strcat(wb, "REPLICATION ");
-    if(service & ABILITY_DATA_QUERIES)
-        buffer_strcat(wb, "DATA_QUERIES ");
     if(service & ABILITY_WEB_REQUESTS)
         buffer_strcat(wb, "WEB_REQUESTS ");
     if(service & SERVICE_WEB_SERVER)
