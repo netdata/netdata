@@ -25,6 +25,7 @@ export class LLMClient {
   private lastUpstreamCostUsd?: number;
   // Tracks last parsed cache creation input tokens from upstream (e.g., Anthropic raw JSON)
   private lastCacheWriteInputTokens?: number;
+  private lastMetadataTask?: Promise<void>;
 
   constructor(
     providerConfigs: Record<string, ProviderConfig>,
@@ -61,6 +62,7 @@ export class LLMClient {
     const startTime = Date.now();
     try {
       const result = await provider.executeTurn(request);
+      await this.awaitLastMetadataTask();
       // Enrich tokens with cache write info parsed at HTTP layer when providers/SDKs omit it
       try {
         if (result.status.type === 'success') {
@@ -74,12 +76,11 @@ export class LLMClient {
           }
         }
       } catch { /* ignore enrichment errors */ }
-      
       // Log response
       this.logResponse(request, result, Date.now() - startTime);
-      
       return result;
     } catch (error) {
+      await this.awaitLastMetadataTask();
       const latencyMs = Date.now() - startTime;
       const errorResult: TurnResult = {
         status: provider.mapError(error),
@@ -89,7 +90,6 @@ export class LLMClient {
 
       // Log error response
       this.logResponse(request, errorResult, latencyMs);
-      
       return errorResult;
     }
   }
@@ -134,13 +134,6 @@ export class LLMClient {
     return async (input: RequestInfo | URL, init?: RequestInit) => {
       let url = '';
       let method = 'GET';
-      // Per-request routing/cost locals to avoid stale shared state
-      let reqActualProvider: string | undefined;
-      let reqActualModel: string | undefined;
-      let reqCostUsd: number | undefined;
-      let reqUpstreamCostUsd: number | undefined;
-      let reqCacheWriteInputTokens: number | undefined;
-      
       try {
         if (typeof input === 'string') url = input;
         else if (input instanceof URL) url = input.toString();
@@ -201,153 +194,28 @@ export class LLMClient {
 
         const response = await fetch(input, requestInit);
 
-        // Parse routing metadata (OpenRouter actual provider/model) and cost regardless of trace flag
+        let metadataTask: Promise<void> = Promise.resolve();
         try {
-          const contentType = response.headers.get('content-type') ?? '';
-          if (url.includes(LLMClient.OPENROUTER_HOST) && contentType.includes('application/json')) {
-            const clone = response.clone();
-            const raw = await clone.text();
-            try {
-              const parsed = JSON.parse(raw) as { provider?: string; model?: string; choices?: { provider?: string; model?: string }[]; error?: { metadata?: { provider_name?: string } } };
-              const actualProv = parsed.provider ?? parsed.choices?.[0]?.provider ?? parsed.error?.metadata?.provider_name;
-              const actualModel = parsed.model ?? parsed.choices?.[0]?.model;
-              reqActualProvider = typeof actualProv === 'string' && actualProv.length > 0 ? actualProv : undefined;
-              reqActualModel = typeof actualModel === 'string' && actualModel.length > 0 ? actualModel : undefined;
-              // Try to extract usage cost if present
-              try {
-                const pr2 = JSON.parse(raw) as { usage?: { cost?: number; cost_details?: { upstream_inference_cost?: number } } };
-                const c = pr2.usage?.cost;
-                const u = pr2.usage?.cost_details?.upstream_inference_cost;
-                reqCostUsd = typeof c === 'number' ? c : undefined;
-                reqUpstreamCostUsd = typeof u === 'number' ? u : undefined;
-              } catch (e) { try { console.error(`[warn] openrouter extract usage cost failed: ${e instanceof Error ? e.message : String(e)}`); } catch {} }
-            } catch {
-              // ignore parse errors
-            }
-          } else if (url.includes(LLMClient.OPENROUTER_HOST) && contentType.includes('text/event-stream')) {
-            // Streaming: parse SSE for final usage/cost and provider info
-            try {
-              const clone = response.clone();
-              const raw = await clone.text();
-              // Extract last JSON payload from lines beginning with 'data: '
-              const lines = raw.split(/\r?\n/).filter((l) => l.startsWith('data:'));
-              // Iterate from end to find a JSON with usage or provider
-              [...lines].reverse().some((line) => {
-                const payload = line.slice(5).trim();
-                if (!payload || payload === '[DONE]') return false;
-                try {
-                  const obj = JSON.parse(payload) as {
-                    provider?: string;
-                    model?: string;
-                    choices?: { provider?: string; model?: string }[];
-                    usage?: { cost?: number; cost_details?: { upstream_inference_cost?: number } };
-                  };
-                  const aProv = obj.provider ?? obj.choices?.[0]?.provider;
-                  const aModel = obj.model ?? obj.choices?.[0]?.model;
-                  if (typeof aProv === 'string' && aProv.length > 0 && reqActualProvider === undefined) reqActualProvider = aProv;
-                  if (typeof aModel === 'string' && aModel.length > 0 && reqActualModel === undefined) reqActualModel = aModel;
-                  const c = obj.usage?.cost;
-                  const u = obj.usage?.cost_details?.upstream_inference_cost;
-                  if (typeof c === 'number' && reqCostUsd === undefined) reqCostUsd = c;
-                  if (typeof u === 'number' && reqUpstreamCostUsd === undefined) reqUpstreamCostUsd = u;
-                } catch { /* skip non-JSON lines */ }
-                return (reqActualProvider !== undefined && reqActualModel !== undefined && reqCostUsd !== undefined);
-              });
-            } catch (e) { try { console.error(`[warn] openrouter SSE parse failed: ${e instanceof Error ? e.message : String(e)}`); } catch {} }
-          } else {
-            // Clear for non-openrouter URLs
-            if (!url.includes(LLMClient.OPENROUTER_HOST)) {
-              reqActualProvider = undefined;
-              reqActualModel = undefined;
-            }
-            // For generic JSON responses, try to extract provider-agnostic usage signals we care about (e.g., Anthropic cache creation tokens)
-            if (contentType.includes('application/json')) {
-              try {
-                const clone = response.clone();
-                const raw = await clone.text();
-                const isRecord = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object';
-                const parsedUnknown: unknown = JSON.parse(raw);
-                const parsedObj = isRecord(parsedUnknown) ? parsedUnknown : undefined;
-                // eslint-disable-next-line @typescript-eslint/dot-notation
-                const usageVal = parsedObj !== undefined ? parsedObj['usage'] : undefined;
-                const u: Record<string, unknown> = isRecord(usageVal) ? usageVal : {};
-                const asNum = (v: unknown): number | undefined => (typeof v === 'number' && Number.isFinite(v) && v > 0) ? v : undefined;
-                const getNested = (obj: Record<string, unknown>, k: string): unknown => (Object.prototype.hasOwnProperty.call(obj, k) ? obj[k] : undefined);
-                // Try common variants
-                let w: unknown = getNested(u, 'cacheWriteInputTokens')
-                  ?? getNested(u, 'cacheCreationInputTokens')
-                  ?? getNested(u, 'cache_creation_input_tokens')
-                  ?? getNested(u, 'cache_write_input_tokens');
-                if (w === undefined) {
-                  const cc = getNested(u, 'cacheCreation');
-                  if (isRecord(cc)) { w = cc.ephemeral_5m_input_tokens; }
-                }
-                if (w === undefined) {
-                  const cc2 = getNested(u, 'cache_creation');
-                  if (isRecord(cc2)) { w = cc2.ephemeral_5m_input_tokens; }
-                }
-                const n = asNum(w);
-                if (typeof n === 'number') reqCacheWriteInputTokens = n;
-              } catch (e) { try { console.error(`[warn] generic JSON usage parse failed: ${e instanceof Error ? e.message : String(e)}`); } catch {} }
-            }
-          }
-        } catch (e) { try { console.error(`[warn] traced fetch post-response processing failed: ${e instanceof Error ? e.message : String(e)}`); } catch {} }
+          const metadataClone = response.clone();
+          metadataTask = this.captureResponseMetadata(url, metadataClone);
+        } catch (cloneError) {
+          this.handleCloneFailure('metadata', cloneError);
+        }
+        this.lastMetadataTask = metadataTask;
 
-        // Commit per-request routing/cost to instance state for retrieval after this call
-        this.lastActualProvider = reqActualProvider;
-        this.lastActualModel = reqActualModel;
-        this.lastCostUsd = reqCostUsd;
-        this.lastUpstreamCostUsd = reqUpstreamCostUsd;
-        this.lastCacheWriteInputTokens = reqCacheWriteInputTokens;
-
-        // Log response details when trace is enabled
         if (this.traceLLM) {
-          const respHeaders: Record<string, string> = {};
-          response.headers.forEach((value, key) => {
-            const k = key.toLowerCase();
-            if (k === 'authorization' || k === 'x-api-key' || k === 'api-key' || k === 'x-goog-api-key') {
-              if (value.startsWith('Bearer ')) {
-                const token = value.substring(7);
-                if (token.length > 8) {
-                  respHeaders[k] = `Bearer ${token.substring(0, 4)}...REDACTED...${token.substring(token.length - 4)}`;
-                } else {
-                  respHeaders[k] = `Bearer [SHORT_TOKEN]`;
-                }
-              } else {
-                respHeaders[k] = '[REDACTED]';
-              }
-            } else {
-              respHeaders[k] = value;
-            }
-          });
-
-          let traceMessage = `LLM response: ${String(response.status)} ${response.statusText}\nheaders: ${JSON.stringify(respHeaders, null, 2)}`;
-
-          const contentType = response.headers.get('content-type') ?? '';
-          if (contentType.includes('application/json')) {
-            try {
-              const clone = response.clone();
-              let text = await clone.text();
-              try {
-                text = JSON.stringify(JSON.parse(text), null, 2);
-              } catch { /* keep original */ }
-              traceMessage += `\nbody: ${text}`;
-            } catch {
-              traceMessage += `\ncontent-type: ${contentType}`;
-            }
-          } else if (contentType.includes('text/event-stream')) {
-            try {
-              const clone = response.clone();
-              const raw = await clone.text();
-              traceMessage += `\nraw-sse: ${raw}`;
-            } catch {
-              traceMessage += `\ncontent-type: ${contentType}`;
-            }
-          } else {
-            traceMessage += `\ncontent-type: ${contentType}`;
+          try {
+            const traceClone = response.clone();
+            this.logResponseTraceAsync(method, url, traceClone);
+          } catch (cloneError) {
+            this.handleCloneFailure('trace', cloneError);
           }
+        }
 
-          this.log('TRC', 'response', 'llm', `trace:${method}`, traceMessage);
+        try {
+          await metadataTask;
+        } catch {
+          /* ignore metadata errors for superseded requests */
         }
 
         return response;
@@ -359,6 +227,431 @@ export class LLMClient {
         throw error;
       }
     };
+  }
+
+  private async awaitLastMetadataTask(): Promise<void> {
+    const pending = this.lastMetadataTask;
+    if (pending === undefined) {
+      return;
+    }
+    try {
+      await pending;
+    } catch (error) {
+      try {
+        console.error(`[warn] traced fetch metadata capture failed: ${error instanceof Error ? error.message : String(error)}`);
+      } catch {
+        /* ignore logging failures */
+      }
+    } finally {
+      if (this.lastMetadataTask === pending) {
+        this.lastMetadataTask = undefined;
+      }
+    }
+  }
+
+  private captureResponseMetadata(url: string, response: Response): Promise<void> {
+    return (async () => {
+      const isOpenRouter = url.includes(LLMClient.OPENROUTER_HOST);
+      const contentTypeHeader = response.headers.get('content-type') ?? '';
+      const contentType = contentTypeHeader.toLowerCase();
+
+      let actualProvider: string | undefined;
+      let actualModel: string | undefined;
+      let costUsd: number | undefined;
+      let upstreamCostUsd: number | undefined;
+      let cacheWriteInputTokens: number | undefined;
+
+      const applyUsage = (usage: Record<string, unknown> | undefined): void => {
+        if (usage === undefined) {
+          return;
+        }
+        const tokens = this.extractCacheWriteTokens(usage);
+        if (tokens !== undefined) {
+          cacheWriteInputTokens = tokens;
+        }
+        const costs = this.extractUsageCosts(usage);
+        if (costs.costUsd !== undefined) {
+          costUsd = costs.costUsd;
+        }
+        if (costs.upstreamCostUsd !== undefined) {
+          upstreamCostUsd = costs.upstreamCostUsd;
+        }
+      };
+
+      try {
+        if (isOpenRouter && contentType.includes('application/json')) {
+          const parsed = await this.parseJsonResponse(response.clone(), 'openrouter extract usage cost failed');
+          if (parsed !== undefined) {
+            const routing = this.extractOpenRouterRouting(parsed.data);
+            actualProvider = routing.provider ?? actualProvider;
+            actualModel = routing.model ?? actualModel;
+            applyUsage(this.extractUsageRecord(parsed.data));
+          }
+        } else if (isOpenRouter && contentType.includes('text/event-stream')) {
+          try {
+            const meta = await this.parseOpenRouterSseStream(response.clone(), (partial) => {
+              if (partial.provider !== undefined) {
+                actualProvider = partial.provider;
+                this.lastActualProvider = partial.provider;
+              }
+              if (partial.model !== undefined) {
+                actualModel = partial.model;
+                this.lastActualModel = partial.model;
+              }
+              if (partial.costUsd !== undefined) {
+                costUsd = partial.costUsd;
+                this.lastCostUsd = partial.costUsd;
+              }
+              if (partial.upstreamCostUsd !== undefined) {
+                upstreamCostUsd = partial.upstreamCostUsd;
+                this.lastUpstreamCostUsd = partial.upstreamCostUsd;
+              }
+              if (partial.cacheWriteInputTokens !== undefined) {
+                cacheWriteInputTokens = partial.cacheWriteInputTokens;
+                this.lastCacheWriteInputTokens = partial.cacheWriteInputTokens;
+              }
+            });
+            actualProvider = meta.provider ?? actualProvider;
+            actualModel = meta.model ?? actualModel;
+            if (meta.costUsd !== undefined) {
+              costUsd = meta.costUsd;
+            }
+            if (meta.upstreamCostUsd !== undefined) {
+              upstreamCostUsd = meta.upstreamCostUsd;
+            }
+            if (meta.cacheWriteInputTokens !== undefined) {
+              cacheWriteInputTokens = meta.cacheWriteInputTokens;
+            }
+          } catch (error) {
+            try {
+              console.error(`[warn] openrouter streaming metadata parse failed: ${error instanceof Error ? error.message : String(error)}`);
+            } catch {
+              /* ignore logging failures */
+            }
+          }
+        } else if (contentType.includes('application/json')) {
+          const parsed = await this.parseJsonResponse(response.clone(), 'generic JSON usage parse failed');
+          if (parsed !== undefined) {
+            applyUsage(this.extractUsageRecord(parsed.data));
+          }
+        }
+      } catch (error) {
+        try {
+          console.error(`[warn] traced fetch post-response processing failed: ${error instanceof Error ? error.message : String(error)}`);
+        } catch {
+          /* ignore logging failures */
+        }
+      }
+
+      this.lastActualProvider = actualProvider;
+      this.lastActualModel = actualModel;
+      this.lastCostUsd = costUsd;
+      this.lastUpstreamCostUsd = upstreamCostUsd;
+      this.lastCacheWriteInputTokens = cacheWriteInputTokens;
+    })();
+  }
+
+  private handleCloneFailure(context: 'metadata' | 'trace', error: unknown): void {
+    try {
+      console.error(`[warn] traced fetch ${context} clone failed: ${error instanceof Error ? error.message : String(error)}`);
+    } catch {
+      /* ignore logging failures */
+    }
+  }
+
+  private logResponseTraceAsync(method: string, _url: string, response: Response): void {
+    const task = (async () => {
+      const respHeaders: Record<string, string> = {};
+      response.headers.forEach((value, key) => {
+        const lower = key.toLowerCase();
+        if (lower === 'authorization' || lower === 'x-api-key' || lower === 'api-key' || lower === 'x-goog-api-key') {
+          if (value.startsWith('Bearer ')) {
+            const token = value.substring(7);
+            respHeaders[lower] = token.length > 8
+              ? `Bearer ${token.substring(0, 4)}...REDACTED...${token.substring(token.length - 4)}`
+              : 'Bearer [SHORT_TOKEN]';
+          } else {
+            respHeaders[lower] = '[REDACTED]';
+          }
+        } else {
+          respHeaders[lower] = value;
+        }
+      });
+
+      let traceMessage = `LLM response: ${String(response.status)} ${response.statusText}\nheaders: ${JSON.stringify(respHeaders, null, 2)}`;
+      const contentType = response.headers.get('content-type') ?? '';
+      const lowered = contentType.toLowerCase();
+      if (lowered.includes('application/json')) {
+        try {
+          const text = await response.text();
+          let body = text;
+          try {
+            body = JSON.stringify(JSON.parse(text), null, 2);
+          } catch {
+            /* leave body as raw text */
+          }
+          traceMessage += `\nbody: ${body}`;
+        } catch {
+          traceMessage += `\ncontent-type: ${contentType}`;
+        }
+      } else if (lowered.includes('text/event-stream')) {
+        try {
+          const raw = await response.text();
+          traceMessage += `\nraw-sse: ${raw}`;
+        } catch {
+          traceMessage += `\ncontent-type: ${contentType}`;
+        }
+      } else {
+        traceMessage += `\ncontent-type: ${contentType}`;
+      }
+
+      this.log('TRC', 'response', 'llm', `trace:${method}`, traceMessage);
+    })();
+
+    void (async () => {
+      try {
+        await task;
+      } catch (error: unknown) {
+        try {
+          console.error(`[warn] traced fetch response trace failed: ${error instanceof Error ? error.message : String(error)}`);
+        } catch {
+          /* ignore logging failures */
+        }
+      }
+    })();
+  }
+
+  private isPlainObject(value: unknown): value is Record<string, unknown> {
+    return value !== null && typeof value === 'object' && !Array.isArray(value);
+  }
+
+  private toPositiveInteger(value: unknown): number | undefined {
+    if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
+      return undefined;
+    }
+    return Math.trunc(value);
+  }
+
+  private toNonNegativeNumber(value: unknown): number | undefined {
+    if (typeof value !== 'number' || !Number.isFinite(value)) {
+      return undefined;
+    }
+    return value;
+  }
+
+  private extractUsageRecord(record: Record<string, unknown>): Record<string, unknown> | undefined {
+    const candidate = (record as { usage?: unknown }).usage;
+    return this.isPlainObject(candidate) ? candidate : undefined;
+  }
+
+  private extractCacheWriteTokens(usage?: Record<string, unknown>): number | undefined {
+    if (usage === undefined) {
+      return undefined;
+    }
+    const directKeys = [
+      'cacheWriteInputTokens',
+      'cacheCreationInputTokens',
+      'cache_creation_input_tokens',
+      'cache_write_input_tokens'
+    ];
+    const direct = directKeys
+      .map((key) => this.toPositiveInteger(usage[key]))
+      .find((value) => value !== undefined);
+    if (direct !== undefined) {
+      return direct;
+    }
+    const nestedKeys = ['cacheCreation', 'cache_creation'];
+    return nestedKeys
+      .map((key) => {
+        const nested = usage[key];
+        if (!this.isPlainObject(nested)) {
+          return undefined;
+        }
+        return this.toPositiveInteger((nested as { ephemeral_5m_input_tokens?: unknown }).ephemeral_5m_input_tokens);
+      })
+      .find((value) => value !== undefined);
+  }
+
+  private extractUsageCosts(usage?: Record<string, unknown>): { costUsd?: number; upstreamCostUsd?: number } {
+    if (usage === undefined) {
+      return {};
+    }
+    const cost = this.toNonNegativeNumber((usage as { cost?: unknown }).cost);
+    const details = this.getNestedRecord(usage, 'cost_details');
+    const upstream = details !== undefined
+      ? this.toNonNegativeNumber((details as { upstream_inference_cost?: unknown }).upstream_inference_cost)
+      : undefined;
+    return { costUsd: cost, upstreamCostUsd: upstream };
+  }
+
+  private extractOpenRouterRouting(record: Record<string, unknown>): { provider?: string; model?: string } {
+    const provider = this.getString(record, 'provider');
+    const model = this.getString(record, 'model');
+    const choice = this.getFirstRecord((record as { choices?: unknown }).choices);
+    const choiceProvider = choice !== undefined ? this.getString(choice, 'provider') : undefined;
+    const choiceModel = choice !== undefined ? this.getString(choice, 'model') : undefined;
+    const errorRecord = this.getNestedRecord(record, 'error');
+    const errorMetadata = errorRecord !== undefined ? this.getNestedRecord(errorRecord, 'metadata') : undefined;
+    const errorProvider = errorMetadata !== undefined ? this.getString(errorMetadata, 'provider_name') : undefined;
+    return {
+      provider: provider ?? choiceProvider ?? errorProvider ?? undefined,
+      model: model ?? choiceModel ?? undefined
+    };
+  }
+
+  private getString(record: Record<string, unknown>, key: string): string | undefined {
+    const value = record[key];
+    return typeof value === 'string' && value.length > 0 ? value : undefined;
+  }
+
+  private getNestedRecord(record: Record<string, unknown>, key: string): Record<string, unknown> | undefined {
+    const value = record[key];
+    return this.isPlainObject(value) ? value : undefined;
+  }
+
+  private getFirstRecord(value: unknown): Record<string, unknown> | undefined {
+    if (!Array.isArray(value)) {
+      return undefined;
+    }
+    return value.find((item): item is Record<string, unknown> => this.isPlainObject(item));
+  }
+
+  private async parseOpenRouterSseStream(
+    response: Response,
+    onPartial: (partial: { provider?: string; model?: string; costUsd?: number; upstreamCostUsd?: number; cacheWriteInputTokens?: number }) => void
+  ): Promise<{ provider?: string; model?: string; costUsd?: number; upstreamCostUsd?: number; cacheWriteInputTokens?: number }> {
+    const body = response.body;
+    if (body === null) {
+      return {};
+    }
+    const reader = body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    const aggregate: { provider?: string; model?: string; costUsd?: number; upstreamCostUsd?: number; cacheWriteInputTokens?: number } = {};
+
+    const applyPartial = (partial: { provider?: string; model?: string; costUsd?: number; upstreamCostUsd?: number; cacheWriteInputTokens?: number }): void => {
+      if (partial.provider !== undefined) {
+        aggregate.provider = partial.provider;
+      }
+      if (partial.model !== undefined) {
+        aggregate.model = partial.model;
+      }
+      if (partial.costUsd !== undefined) {
+        aggregate.costUsd = partial.costUsd;
+      }
+      if (partial.upstreamCostUsd !== undefined) {
+        aggregate.upstreamCostUsd = partial.upstreamCostUsd;
+      }
+      if (partial.cacheWriteInputTokens !== undefined) {
+        aggregate.cacheWriteInputTokens = partial.cacheWriteInputTokens;
+      }
+      onPartial(partial);
+    };
+
+    const processLine = (line: string): void => {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith('data:')) {
+        return;
+      }
+      const payload = trimmed.slice(5).trim();
+      if (payload.length === 0 || payload === '[DONE]') {
+        return;
+      }
+      const parsed = this.parseJsonString(payload);
+      if (parsed === undefined) {
+        return;
+      }
+      const partial: { provider?: string; model?: string; costUsd?: number; upstreamCostUsd?: number; cacheWriteInputTokens?: number } = {};
+      const routing = this.extractOpenRouterRouting(parsed);
+      if (routing.provider !== undefined) {
+        partial.provider = routing.provider;
+      }
+      if (routing.model !== undefined) {
+        partial.model = routing.model;
+      }
+      const usage = this.extractUsageRecord(parsed);
+      const costs = this.extractUsageCosts(usage);
+      if (costs.costUsd !== undefined) {
+        partial.costUsd = costs.costUsd;
+      }
+      if (costs.upstreamCostUsd !== undefined) {
+        partial.upstreamCostUsd = costs.upstreamCostUsd;
+      }
+      const tokens = this.extractCacheWriteTokens(usage);
+      if (tokens !== undefined) {
+        partial.cacheWriteInputTokens = tokens;
+      }
+      if (partial.provider !== undefined || partial.model !== undefined || partial.costUsd !== undefined || partial.upstreamCostUsd !== undefined || partial.cacheWriteInputTokens !== undefined) {
+        applyPartial(partial);
+      }
+    };
+
+    try {
+      let done = false;
+      // eslint-disable-next-line functional/no-loop-statements -- streaming parser requires manual iteration
+      while (!done) {
+        const { value, done: readerDone } = await reader.read();
+        done = readerDone;
+        if (value !== undefined) {
+          buffer += decoder.decode(value, { stream: !done });
+          const segments = buffer.split(/\r?\n/);
+          buffer = segments.pop() ?? '';
+          segments.forEach((segment) => { processLine(segment); });
+        }
+        const hasRouting = aggregate.provider !== undefined && aggregate.model !== undefined;
+        const hasCostInfo = aggregate.costUsd !== undefined || aggregate.upstreamCostUsd !== undefined;
+        if (hasRouting && hasCostInfo) {
+          void (async () => {
+            try {
+              await reader.cancel();
+            } catch {
+              /* ignore cancel failure */
+            }
+          })();
+          break;
+        }
+      }
+      if (buffer.trim().length > 0) {
+        processLine(buffer);
+      }
+    } finally {
+      try {
+        reader.releaseLock();
+      } catch {
+        /* ignore release errors */
+      }
+    }
+
+    return aggregate;
+  }
+
+  private async parseJsonResponse(response: Response, warnLabel?: string): Promise<{ raw: string; data: Record<string, unknown> } | undefined> {
+    try {
+      const raw = await response.text();
+      const parsed = JSON.parse(raw) as unknown;
+      if (!this.isPlainObject(parsed)) {
+        return undefined;
+      }
+      return { raw, data: parsed };
+    } catch (error) {
+      if (warnLabel !== undefined) {
+        try {
+          console.error(`[warn] ${warnLabel}: ${error instanceof Error ? error.message : String(error)}`);
+        } catch {
+          /* ignore logging failures */
+        }
+      }
+      return undefined;
+    }
+  }
+
+  private parseJsonString(payload: string): Record<string, unknown> | undefined {
+    try {
+      const parsed = JSON.parse(payload) as unknown;
+      return this.isPlainObject(parsed) ? parsed : undefined;
+    } catch {
+      return undefined;
+    }
   }
 
   private logRequest(request: TurnRequest): void {
@@ -392,7 +685,6 @@ export class LLMClient {
       const cachedTokens = tokens?.cachedTokens ?? 0;
       const cacheRead = tokens?.cacheReadInputTokens ?? cachedTokens;
       const cacheWrite = tokens?.cacheWriteInputTokens ?? 0;
-      
       const responseBytes = result.response !== undefined ? new TextEncoder().encode(result.response).length : 0;
       // Do not include routed provider/model details here; keep log concise up to bytes
       let message = `input ${String(inputTokens)}, output ${String(outputTokens)}, cacheR ${String(cacheRead)}, cacheW ${String(cacheWrite)}, cached ${String(cachedTokens)} tokens, ${String(latencyMs)}ms, ${String(responseBytes)} bytes`;
@@ -432,7 +724,6 @@ export class LLMClient {
           message += `, upstream $${upstream.toFixed(5)}`;
         }
       }
-      
       this.log('VRB', 'response', 'llm', remoteId, message);
     } else {
       const fatal = result.status.type === 'auth_error' || result.status.type === 'quota_exceeded';
@@ -441,7 +732,6 @@ export class LLMClient {
       if (typeof result.stopReason === 'string' && result.stopReason.length > 0) {
         message += `, stop=${result.stopReason}`;
       }
-      
       this.log(fatal ? 'ERR' : 'WRN', 'response', 'llm', remoteId, message, fatal);
     }
   }

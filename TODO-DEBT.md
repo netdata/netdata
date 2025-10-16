@@ -3,19 +3,16 @@
 _Last updated: 2025-10-14_
 
 ## TL;DR
-- Streaming is broken by our traced fetch wrapper; fix it first to restore realtime output.
+- Streaming remains buffered by traced fetch; fixing this restores real-time tokens and prevents double bandwidth usage.
 - Core library violates the “silent core” contract (sync FS + stderr writes) and the agent loop can no longer finish without calling `agent__final_report`.
-- `AIAgentSession` and `BaseLLMProvider` are monolithic and need to be split; we also duplicate loader/concurrency logic.
 - Reliability gaps: no transport-level retries/circuit breakers, limited observability, and automated coverage stops at the phase1 harness (no provider/rest e2e tests or CI gating). Expanded coverage remains an active workstream.
 
 ## P0 — Critical (breaks core behavior or architecture)
-- **Streaming regression** — `src/llm-client.ts:199-338` eagerly reads cloned JSON/SSE bodies inside `createTracedFetch`. Streaming stalls until the full response downloads and doubles bandwidth. _Fix_: capture routing/cost metadata without consuming the live body (inspect headers, wrap the stream, or buffer _after_ the provider completes).
-- **Library side-effects** — `src/ai-agent.ts:245-263` persists snapshots via sync fs writes; `src/ai-agent.ts:963-977` appends accounting JSONL; `src/utils.ts:249-258` writes warnings to stderr. Violates DESIGN.md’s silent-core principle and blocks the event loop. _Fix_: move persistence/logging behind CLI callbacks and make storage async/optional.
-- **Mandatory `agent__final_report`** — `src/ai-agent.ts:1261-1288` treats plain assistant answers as invalid unless the internal tool fires. Vanilla prompts now fail. _Fix_: accept text completions unless prompts opt into the stricter contract.
-- **`AIAgentSession` god object** — `src/ai-agent.ts` (~2.2 k LOC) mixes session orchestration, persistence, progress, logging, tool management. Break into dedicated modules (`SessionRunner`, `SessionStore`, `ToolManager`, `ProgressReporter`, etc.) per DESIGN.md.
-- **`BaseLLMProvider` monolith** — `src/llm-providers/base.ts` (~1.3 k LOC) blends streaming, error mapping, format policy, token extraction. Split into focused components (stream handler, error mapper, message converter, token usage extractor) to reduce risk and enable targeted tests.
+- **Streaming regression** — `src/llm-client.ts:199-338` eagerly reads cloned JSON/SSE bodies inside `createTracedFetch`, stalling tokens and doubling bandwidth. _Fix_: capture routing/cost metadata without draining the live stream (inspect headers, tee the body). _Impact_: restores real-time streaming for CLI/headend users. _Status_: scheduled next iteration.
+- **Library side-effects** — `src/ai-agent.ts:245-263` persists snapshots via sync fs writes; `src/ai-agent.ts:963-977` appends accounting JSONL; `src/utils.ts:249-258` writes warnings to stderr. Violates DESIGN.md’s silent-core principle and blocks the event loop. _Fix_: move persistence/logging behind CLI callbacks, make storage async/optional, and ensure the core never touches stdio/files directly. _Status_: slated with streaming fix.
 
 ## P1 — High Priority (unblocks resilience & maintainability)
+- **Session + provider decomposition** — `AIAgentSession` (~2.2 k LOC) and `BaseLLMProvider` (~1.3 k LOC) remain monolithic, making localized fixes risky. _Fix_: split session orchestration, persistence, tool management, and provider streaming/error mapping into focused modules (e.g., `SessionRunner`, `ToolManager`, `StreamHandler`).
 - **Lack of transport retries/circuit breakers** — MCP servers and LLM transports have no retry/backoff beyond the high-level loop. Add provider/tool-level retry policies with exponential backoff, jitter, and circuit breakers for flaky endpoints.
 - **Observability gaps** — Structured logs exist but we lack correlation IDs, metrics, or traces. Add OpenTelemetry spans, Prometheus counters (tokens, latency, tool failures), and enrich logs with consistent identifiers.
 - **Limited automated coverage** — The deterministic phase1 harness (including the new streaming/persistence/final_report scenarios) exists, but we still lack provider-specific unit tests, rest-provider coverage, and CI gating for regressions. Stand up Vitest (or Jest) with broader suites, add mocks for adapters, and enforce coverage in CI before major refactors.
