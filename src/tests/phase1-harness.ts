@@ -120,6 +120,11 @@ const TRUNCATION_NOTICE = '[TRUNCATED]';
 const CONFIG_FILE_NAME = 'config.json';
 const INCLUDE_DIRECTIVE_TOKEN = '${include:';
 const FINAL_REPORT_CALL_ID = 'call-final-report';
+const RATE_LIMIT_FINAL_CONTENT = 'Final report after rate limit.';
+const ADOPTED_FINAL_CONTENT = 'Adopted final report content.';
+const ADOPTION_METADATA_ORIGIN = 'text-adoption';
+const ADOPTION_CONTENT_VALUE = 'value';
+const FINAL_REPORT_SANITIZED_CONTENT = 'Final report without sanitized tool calls.';
 const DEFAULT_PROMPT_SCENARIO = 'run-test-1' as const;
 const BASE_DEFAULTS = {
   stream: false,
@@ -244,6 +249,7 @@ const FRONTMATTER_INCLUDE_FLAG = 'includeFrontmatter: true';
 const LONG_TOOL_NAME = `tool-${'x'.repeat(140)}`;
 const FINAL_REPORT_RETRY_MESSAGE = 'Final report completed after mixed tools.';
 const SANITIZER_VALID_ARGUMENT = 'sanitizer-valid-call';
+const SANITIZER_REMOTE_IDENTIFIER = 'agent:sanitizer';
 
 const GITHUB_SERVER_PATH = path.resolve(__dirname, 'mcp/github-stdio-server.js');
 
@@ -995,8 +1001,8 @@ const TEST_SCENARIOS: HarnessTest[] = [
       invariant(finalReport !== undefined && finalReport.status === 'success' && finalReport.format === 'json', 'Final report should indicate JSON success for run-test-32.');
       const toolFailureMessage = result.conversation.find((message) => message.role === 'tool' && typeof message.content === 'string' && message.content.includes('final_report(json) requires'));
       invariant(toolFailureMessage !== undefined, 'Final report failure message expected for run-test-32.');
-      const retryLog = result.logs.find((entry) => entry.remoteIdentifier === 'agent:orchestrator' && typeof entry.message === 'string' && entry.message.includes('Final report retry detected'));
-      invariant(retryLog !== undefined, 'Retry log expected for run-test-32.');
+      const llmAttempts = result.accounting.filter(isLlmAccounting).length;
+      invariant(llmAttempts >= 2, 'Retry attempt expected for run-test-32.');
     },
   },
   {
@@ -2351,7 +2357,9 @@ const TEST_SCENARIOS: HarnessTest[] = [
           'Expected stdio transport error for run-test-65.'
         );
         invariant(
-          typeof data.combined === 'string' && data.combined.includes('TOOL alpha__alphaTool INSTRUCTIONS'),
+          typeof data.combined === 'string' &&
+            data.combined.includes('#### MCP Server: alpha') &&
+            data.combined.includes('##### Tool: alpha__alphaTool'),
           'Combined instructions mismatch for run-test-65.'
         );
         invariant(
@@ -4076,7 +4084,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
     id: 'run-test-89',
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-89 expected success.');
-      const sanitizerLog = result.logs.find((entry) => entry.remoteIdentifier === 'agent:sanitizer');
+      const sanitizerLog = result.logs.find((entry) => entry.remoteIdentifier === SANITIZER_REMOTE_IDENTIFIER);
       invariant(sanitizerLog !== undefined, 'Sanitizer log expected for run-test-89.');
       invariant(
         typeof sanitizerLog.message === 'string' && sanitizerLog.message.includes('Dropped 1 invalid tool call'),
@@ -4190,7 +4198,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
     },
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-90 expected success.');
-      const sanitizerLog = result.logs.find((entry) => entry.remoteIdentifier === 'agent:sanitizer');
+      const sanitizerLog = result.logs.find((entry) => entry.remoteIdentifier === SANITIZER_REMOTE_IDENTIFIER);
       invariant(sanitizerLog !== undefined, 'Sanitizer log expected for run-test-90.');
       invariant(
         typeof sanitizerLog.message === 'string' && (
@@ -4207,10 +4215,290 @@ const TEST_SCENARIOS: HarnessTest[] = [
       invariant(retainedCall.name === 'test__test', 'Retained tool call name mismatch for run-test-90.');
       const textValue = (retainedCall.parameters as { text?: unknown }).text;
       invariant(textValue === SANITIZER_VALID_ARGUMENT, 'Retained tool call arguments mismatch for run-test-90.');
+      const systemMessages = result.conversation.filter((message) => message.role === 'system');
+      invariant(
+        systemMessages.some((message) => typeof message.content === 'string' && message.content.includes('invalid tool-call arguments')),
+        'Retry system notice missing for run-test-90.'
+      );
       const llmAttempts = result.accounting.filter(isLlmAccounting).length;
       invariant(llmAttempts === 3, 'Three LLM attempts expected for run-test-90.');
       const finalReport = result.finalReport;
       invariant(finalReport !== undefined && finalReport.status === 'success', 'Final report should succeed after sanitizer retry (run-test-90).');
+    },
+  },
+  {
+    id: 'run-test-90-string',
+    execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+      // eslint-disable-next-line @typescript-eslint/unbound-method -- capture original method for restoration after interception
+      const originalExecuteTurn = LLMClient.prototype.executeTurn;
+      let invocation = 0;
+      let activeSession: AIAgentSession | undefined;
+      LLMClient.prototype.executeTurn = async function(this: LLMClient, request: TurnRequest): Promise<TurnResult> {
+        invocation += 1;
+        if (invocation === 1) {
+          const assistantMessage: ConversationMessage = {
+            role: 'assistant',
+            content: '',
+            toolCalls: [
+              {
+                name: 'test__test',
+                id: 'call-json-string',
+                parameters: JSON.stringify({ text: SANITIZER_VALID_ARGUMENT }) as unknown as Record<string, unknown>,
+              },
+            ],
+          };
+          return {
+            status: { type: 'success', hasToolCalls: true, finalAnswer: false },
+            latencyMs: 5,
+            messages: [assistantMessage],
+            tokens: { inputTokens: 9, outputTokens: 4, totalTokens: 13 },
+          };
+        }
+        if (invocation === 2) {
+          const finalContent = 'Final report after string arguments.';
+          const assistantMessage: ConversationMessage = {
+            role: 'assistant',
+            content: '',
+            toolCalls: [
+              {
+                name: 'agent__final_report',
+                id: FINAL_REPORT_CALL_ID,
+                parameters: {
+                  status: 'success',
+                  report_format: 'markdown',
+                  report_content: finalContent,
+                },
+              },
+            ],
+          };
+          const toolMessage: ConversationMessage = {
+            role: 'tool',
+            toolCallId: FINAL_REPORT_CALL_ID,
+            content: finalContent,
+          };
+          if (activeSession !== undefined) {
+            (activeSession as unknown as { finalReport?: { status: string; format: 'markdown'; content: string } }).finalReport = {
+              status: 'success',
+              format: 'markdown',
+              content: finalContent,
+            };
+          }
+          return {
+            status: { type: 'success', hasToolCalls: true, finalAnswer: true },
+            latencyMs: 5,
+            messages: [assistantMessage, toolMessage],
+            tokens: { inputTokens: 12, outputTokens: 6, totalTokens: 18 },
+          };
+        }
+        return await originalExecuteTurn.call(this, request);
+      };
+      try {
+        activeSession = AIAgentSession.create(sessionConfig);
+        return await activeSession.run();
+      } finally {
+        LLMClient.prototype.executeTurn = originalExecuteTurn;
+      }
+    },
+    expect: (result: AIAgentResult) => {
+      invariant(result.success, 'Scenario run-test-90-string expected success.');
+      const sanitizerLog = result.logs.find((entry) => entry.remoteIdentifier === SANITIZER_REMOTE_IDENTIFIER);
+      invariant(sanitizerLog === undefined, 'No sanitizer warning expected for run-test-90-string.');
+      const assistantMessages = result.conversation.filter((message) => message.role === 'assistant');
+      invariant(assistantMessages.length >= 1, 'Assistant message expected for run-test-90-string.');
+      const firstAssistant = assistantMessages[0];
+      invariant(firstAssistant.toolCalls !== undefined && firstAssistant.toolCalls.length === 1, 'Single tool call expected for run-test-90-string.');
+      const firstCall = firstAssistant.toolCalls[0];
+      invariant(firstCall.name === 'test__test', 'Tool call name mismatch for run-test-90-string.');
+      const textValue = (firstCall.parameters as { text?: unknown }).text;
+      invariant(textValue === SANITIZER_VALID_ARGUMENT, 'Parsed tool call arguments mismatch for run-test-90-string.');
+      const llmAttempts = result.accounting.filter(isLlmAccounting).length;
+      invariant(llmAttempts === 2, 'Two LLM attempts expected for run-test-90-string.');
+      const finalReport = result.finalReport;
+      invariant(finalReport !== undefined && finalReport.status === 'success', 'Final report should succeed for run-test-90-string.');
+    },
+  },
+  {
+    id: 'run-test-90-rate-limit',
+    execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+      // eslint-disable-next-line @typescript-eslint/unbound-method -- capture original method for restoration after interception
+      const originalExecuteTurn = LLMClient.prototype.executeTurn;
+      let invocation = 0;
+      let activeSession: AIAgentSession | undefined;
+      LLMClient.prototype.executeTurn = async function(this: LLMClient, request: TurnRequest): Promise<TurnResult> {
+        invocation += 1;
+        if (invocation === 1) {
+          return {
+            status: { type: 'rate_limit', retryAfterMs: 1500 },
+            latencyMs: 5,
+            messages: [],
+            tokens: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+          };
+        }
+        if (invocation === 2) {
+          const finalContent = RATE_LIMIT_FINAL_CONTENT;
+          const assistantMessage: ConversationMessage = {
+            role: 'assistant',
+            content: '',
+            toolCalls: [
+              {
+                name: 'agent__final_report',
+                id: FINAL_REPORT_CALL_ID,
+                parameters: {
+                  status: 'success',
+                  report_format: 'markdown',
+                  report_content: finalContent,
+                },
+              },
+            ],
+          };
+          const toolMessage: ConversationMessage = {
+            role: 'tool',
+            toolCallId: FINAL_REPORT_CALL_ID,
+            content: finalContent,
+          };
+          if (activeSession !== undefined) {
+            (activeSession as unknown as { finalReport?: { status: string; format: 'markdown'; content: string } }).finalReport = {
+              status: 'success',
+              format: 'markdown',
+              content: finalContent,
+            };
+          }
+          return {
+            status: { type: 'success', hasToolCalls: true, finalAnswer: true },
+            latencyMs: 5,
+            messages: [assistantMessage, toolMessage],
+            tokens: { inputTokens: 12, outputTokens: 6, totalTokens: 18 },
+          };
+        }
+        return await originalExecuteTurn.call(this, request);
+      };
+      try {
+        activeSession = AIAgentSession.create(sessionConfig);
+        return await activeSession.run();
+      } finally {
+        LLMClient.prototype.executeTurn = originalExecuteTurn;
+      }
+    },
+    expect: (result: AIAgentResult) => {
+      invariant(result.success, 'Scenario run-test-90-rate-limit expected success.');
+      const systemMessages = result.conversation.filter((message) => message.role === 'system');
+      invariant(
+        systemMessages.some((message) => typeof message.content === 'string' && message.content.includes('rate-limited the previous request')),
+        'Rate-limit system notice missing for run-test-90-rate-limit.'
+      );
+      const attempts = result.accounting.filter(isLlmAccounting).length;
+      invariant(attempts === 2, 'Two LLM attempts expected for run-test-90-rate-limit.');
+      const finalReport = result.finalReport;
+      invariant(finalReport !== undefined && finalReport.status === 'success', 'Final report should succeed for run-test-90-rate-limit.');
+    },
+  },
+  {
+    id: 'run-test-90-adopt-text',
+    execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+      // eslint-disable-next-line @typescript-eslint/unbound-method -- capture original method for restoration after interception
+      const originalExecuteTurn = LLMClient.prototype.executeTurn;
+      let invocation = 0;
+      LLMClient.prototype.executeTurn = async function(this: LLMClient, request: TurnRequest): Promise<TurnResult> {
+        invocation += 1;
+        if (invocation === 1) {
+          const finalContent = ADOPTED_FINAL_CONTENT;
+          const payload = {
+            status: 'success',
+            report_format: 'markdown',
+            report_content: finalContent,
+            metadata: { origin: ADOPTION_METADATA_ORIGIN },
+            content_json: { key: ADOPTION_CONTENT_VALUE },
+          };
+          const assistantMessage: ConversationMessage = {
+            role: 'assistant',
+            content: `Here is the summary:\n${JSON.stringify(payload)}`,
+          };
+          return {
+            status: { type: 'success', hasToolCalls: false, finalAnswer: true },
+            latencyMs: 5,
+            messages: [assistantMessage],
+            tokens: { inputTokens: 10, outputTokens: 6, totalTokens: 16 },
+          };
+        }
+        return await originalExecuteTurn.call(this, request);
+      };
+      try {
+        return await AIAgentSession.create(sessionConfig).run();
+      } finally {
+        LLMClient.prototype.executeTurn = originalExecuteTurn;
+      }
+    },
+    expect: (result: AIAgentResult) => {
+      invariant(result.success, 'Scenario run-test-90-adopt-text expected success.');
+      const finalReport = result.finalReport;
+      invariant(finalReport !== undefined, 'Final report missing for run-test-90-adopt-text.');
+      invariant(finalReport.status === 'success', 'Final report status mismatch for run-test-90-adopt-text.');
+      invariant(finalReport.format === 'markdown', 'Final report format mismatch for run-test-90-adopt-text.');
+      invariant(finalReport.content === ADOPTED_FINAL_CONTENT, 'Final report content mismatch for run-test-90-adopt-text.');
+      invariant(finalReport.metadata !== undefined && finalReport.metadata.origin === ADOPTION_METADATA_ORIGIN, 'Final report metadata missing for run-test-90-adopt-text.');
+      invariant(finalReport.content_json !== undefined && finalReport.content_json.key === ADOPTION_CONTENT_VALUE, 'Final report content_json missing for run-test-90-adopt-text.');
+      const assistantMessages = result.conversation.filter((message) => message.role === 'assistant');
+      invariant(assistantMessages.length === 1, 'Single assistant message expected for run-test-90-adopt-text.');
+      const adoptedCall = assistantMessages[0].toolCalls;
+      invariant(adoptedCall !== undefined && adoptedCall.length === 1, 'Synthetic final report tool call missing for run-test-90-adopt-text.');
+      invariant(adoptedCall[0].name === 'agent__final_report', 'Synthetic tool call name mismatch for run-test-90-adopt-text.');
+      const adoptedParams = adoptedCall[0].parameters as { report_format?: unknown; metadata?: { origin?: string }; content_json?: { key?: string } };
+      invariant(adoptedParams.report_format === 'markdown', 'Synthetic call report_format mismatch for run-test-90-adopt-text.');
+      invariant(adoptedParams.metadata !== undefined && adoptedParams.metadata.origin === ADOPTION_METADATA_ORIGIN, 'Synthetic call metadata mismatch for run-test-90-adopt-text.');
+      invariant(adoptedParams.content_json !== undefined && adoptedParams.content_json.key === ADOPTION_CONTENT_VALUE, 'Synthetic call content_json mismatch for run-test-90-adopt-text.');
+    },
+  },
+  {
+    id: 'run-test-90-no-retry',
+    execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+      // eslint-disable-next-line @typescript-eslint/unbound-method -- capture original method for restoration after interception
+      const originalExecuteTurn = LLMClient.prototype.executeTurn;
+      LLMClient.prototype.executeTurn = async function(this: LLMClient, request: TurnRequest): Promise<TurnResult> {
+        void request;
+        await Promise.resolve();
+        return {
+          status: { type: 'success', hasToolCalls: true, finalAnswer: true },
+          latencyMs: 5,
+          messages: [
+            {
+              role: 'assistant',
+              content: '',
+              toolCalls: [
+                {
+                  name: 'agent__final_report',
+                  id: FINAL_REPORT_CALL_ID,
+                  parameters: {
+                    status: 'success',
+                    report_format: 'markdown',
+                    report_content: FINAL_REPORT_SANITIZED_CONTENT,
+                  },
+                },
+              ],
+            },
+            { role: 'tool', toolCallId: FINAL_REPORT_CALL_ID, content: FINAL_REPORT_SANITIZED_CONTENT },
+          ],
+          tokens: { inputTokens: 11, outputTokens: 7, totalTokens: 18 },
+        };
+      };
+      try {
+        return await AIAgentSession.create(sessionConfig).run();
+      } finally {
+        LLMClient.prototype.executeTurn = originalExecuteTurn;
+      }
+    },
+    expect: (result: AIAgentResult) => {
+      invariant(result.success, 'Scenario run-test-90-no-retry expected success.');
+      const finalReport = result.finalReport;
+      invariant(finalReport !== undefined && finalReport.status === 'success', 'Final report missing for run-test-90-no-retry.');
+      invariant(finalReport.content === FINAL_REPORT_SANITIZED_CONTENT, 'Final report content mismatch for run-test-90-no-retry.');
+      invariant(finalReport.format === 'markdown', 'Final report format mismatch for run-test-90-no-retry.');
+      const systemNotices = result.conversation
+        .filter((message) => message.role === 'system' && typeof message.content === 'string' && message.content.includes('plain text responses are ignored'));
+      invariant(systemNotices.length === 0, 'No retry system notice expected for run-test-90-no-retry.');
+      const llmAttempts = result.accounting.filter(isLlmAccounting).length;
+      invariant(llmAttempts === 1, 'Single LLM attempt expected for run-test-90-no-retry.');
+      const warnLog = result.logs.find((entry) => typeof entry.message === 'string' && entry.message.includes('plain text responses are ignored'));
+      invariant(warnLog === undefined, 'No retry warning log expected for run-test-90-no-retry.');
     },
   },
   {

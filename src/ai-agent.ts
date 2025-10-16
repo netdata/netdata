@@ -41,6 +41,8 @@ type ExitCode =
   | 'EXIT-UNKNOWN';
 
 
+const FINAL_REPORT_FORMAT_VALUES = ['json', 'markdown', 'markdown+mermaid', 'slack-block-kit', 'tty', 'pipe', 'sub-agent', 'text'] as const satisfies readonly NonNullable<AIAgentResult['finalReport']>['format'][];
+
 // empty line between import groups enforced by linter
 import { validateProviders, validateMCPServers, validatePrompts } from './config.js';
 import { parseFrontmatter, parsePairs, extractBodyWithoutFrontmatter } from './frontmatter.js';
@@ -1251,10 +1253,79 @@ export class AIAgentSession {
             if (turnResult.status.type === 'success') {
               const assistantMessagesSanitized = sanitizedMessages.filter((m) => m.role === 'assistant');
               const lastAssistantSanitized = assistantMessagesSanitized.length > 0 ? assistantMessagesSanitized[assistantMessagesSanitized.length - 1] : undefined;
-              const sanitizedHasToolCalls = Array.isArray(lastAssistantSanitized?.toolCalls) && lastAssistantSanitized.toolCalls.length > 0;
-              const sanitizedHasText = typeof lastAssistantSanitized?.content === 'string' && lastAssistantSanitized.content.trim().length > 0;
+              const assistantForAdoption = lastAssistantSanitized;
+              let sanitizedHasToolCalls = assistantForAdoption !== undefined && Array.isArray(assistantForAdoption.toolCalls) && assistantForAdoption.toolCalls.length > 0;
+              const textContent = assistantForAdoption !== undefined && typeof assistantForAdoption.content === 'string' ? assistantForAdoption.content : undefined;
+              const sanitizedHasText = textContent !== undefined && textContent.trim().length > 0;
 
-              if (droppedInvalidToolCalls > 0 && !sanitizedHasToolCalls) {
+              // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+              if (this.finalReport === undefined && !sanitizedHasToolCalls && sanitizedHasText) {
+                if (this.tryAdoptFinalReportFromText(assistantForAdoption, textContent)) {
+                  sanitizedHasToolCalls = true;
+                }
+              }
+
+              if (turnResult.status.finalAnswer && this.finalReport === undefined) {
+        const toolFailureDetected = sanitizedMessages.some((msg) => msg.role === 'tool' && typeof msg.content === 'string' && msg.content.trim().toLowerCase().startsWith('(tool failed:'))
+          ;
+        const adoptFromToolCall = () => {
+          if (toolFailureDetected) return false;
+          const assistantWithCall = sanitizedMessages.find((msg): msg is ConversationMessage & { toolCalls: ToolCall[] } =>
+            msg.role === 'assistant' && Array.isArray((msg as { toolCalls?: unknown }).toolCalls) && (msg as { toolCalls?: unknown }).toolCalls !== undefined
+          );
+          if (assistantWithCall === undefined) return false;
+          const finalReportCall = assistantWithCall.toolCalls.find((call) => sanitizeToolName(call.name) === AIAgentSession.FINAL_REPORT_TOOL);
+          if (finalReportCall === undefined) return false;
+          const params = finalReportCall.parameters;
+          const statusValue = (params as { status?: unknown }).status;
+          const status = typeof statusValue === 'string' && statusValue.trim().length > 0 ? statusValue.trim() : undefined;
+          const formatParamRaw = (params as { report_format?: unknown }).report_format;
+          const formatParam = typeof formatParamRaw === 'string' && formatParamRaw.trim().length > 0 ? formatParamRaw.trim() : undefined;
+          const contentValue = (params as { report_content?: unknown }).report_content;
+          const contentParam = typeof contentValue === 'string' && contentValue.trim().length > 0 ? contentValue.trim() : undefined;
+          if (status === undefined || contentParam === undefined) return false;
+          const metadataCandidate = (params as { metadata?: unknown }).metadata;
+          const metadata = (metadataCandidate !== null && typeof metadataCandidate === 'object' && !Array.isArray(metadataCandidate)) ? metadataCandidate as Record<string, unknown> : undefined;
+          const contentJsonCandidate = (params as { content_json?: unknown }).content_json;
+          const contentJson = (contentJsonCandidate !== null && typeof contentJsonCandidate === 'object' && !Array.isArray(contentJsonCandidate)) ? contentJsonCandidate as Record<string, unknown> : undefined;
+          const normalizedStatus = status === 'success' || status === 'failure' || status === 'partial' ? status : undefined;
+          if (normalizedStatus === undefined) return false;
+          const formatCandidate = formatParam ?? this.resolvedFormat ?? 'text';
+          const finalFormat = FINAL_REPORT_FORMAT_VALUES.find((value) => value === formatCandidate) ?? 'text';
+          this.finalReport = {
+            status: normalizedStatus,
+            format: finalFormat,
+            content: contentParam,
+            content_json: contentJson,
+            metadata,
+            ts: Date.now(),
+          };
+          sanitizedHasToolCalls = true;
+          return true;
+        };
+        const adoptFromToolMessage = () => {
+          if (toolFailureDetected) return false;
+          const toolMessage = sanitizedMessages.find((msg) => msg.role === 'tool' && typeof msg.content === 'string' && msg.content.trim().length > 0);
+          if (toolMessage === undefined || typeof toolMessage.content !== 'string') return false;
+          const normalizedContent = toolMessage.content.trim();
+          if (normalizedContent.length === 0) return false;
+          const finalFormat = this.resolvedFormat ?? 'text';
+          this.finalReport = {
+            status: 'success',
+            format: (FINAL_REPORT_FORMAT_VALUES.find((value) => value === finalFormat) ?? 'text'),
+            content: normalizedContent,
+            ts: Date.now(),
+          };
+          sanitizedHasToolCalls = true;
+          return true;
+        };
+        if (!adoptFromToolCall()) {
+          adoptFromToolMessage();
+        }
+      }
+
+
+      if (droppedInvalidToolCalls > 0 && !sanitizedHasToolCalls) {
                 const warnEntry: LogEntry = {
                   timestamp: Date.now(),
                   severity: 'WRN',
@@ -1267,6 +1338,7 @@ export class AIAgentSession {
                   message: 'Invalid tool call dropped due to malformed payload. Requesting retry without updating conversation history.',
                 };
                 this.log(warnEntry);
+                this.pushSystemRetryMessage(conversation, `System notice: the previous response had invalid tool-call arguments. Provide a JSON object when invoking tools and retry the required call.`);
                 lastError = 'invalid_response: malformed_tool_call';
                 if (cycleComplete) {
                   rateLimitedInCycle = 0;
@@ -1276,7 +1348,7 @@ export class AIAgentSession {
               }
               // Synthetic error: success with content but no tools and no final_report → retry this turn
               if (this.finalReport === undefined) {
-                if (!sanitizedHasToolCalls && sanitizedHasText) {
+                if (!turnResult.status.finalAnswer && !sanitizedHasToolCalls && sanitizedHasText) {
                 const warnEntry: LogEntry = {
                   timestamp: Date.now(),
                   severity: 'WRN',
@@ -1309,6 +1381,7 @@ export class AIAgentSession {
                   rateLimitedInCycle = 0;
                   maxRateLimitWaitMs = 0;
                 }
+                this.pushSystemRetryMessage(conversation, `System notice: plain text responses are ignored. Call ${AIAgentSession.FINAL_REPORT_TOOL} with JSON arguments to deliver the final report.`);
                 // do not append these messages; try next provider/model in same turn
                 continue;
               }
@@ -1508,6 +1581,7 @@ export class AIAgentSession {
                   rateLimitedInCycle = 0;
                   maxRateLimitWaitMs = 0;
                 }
+                this.pushSystemRetryMessage(conversation, `System notice: the previous response was empty and no tools were invoked. Provide a tool call such as ${AIAgentSession.FINAL_REPORT_TOOL} with valid arguments.`);
                 // do not mark turnSuccessful; continue retry loop
                 continue;
               }
@@ -1571,6 +1645,7 @@ export class AIAgentSession {
                     rateLimitedInCycle = 0;
                     maxRateLimitWaitMs = 0;
                   }
+                  this.pushSystemRetryMessage(conversation, `System notice: this is the final turn. Call ${AIAgentSession.FINAL_REPORT_TOOL} with the required JSON payload to finish.`);
                   continue;
               }
               // Non-final turns: proceed to next turn; tools already executed if present
@@ -1618,6 +1693,11 @@ export class AIAgentSession {
                 message: `Rate limited; suggested wait ${String(effectiveWaitMs)}ms before retry.${sourceDetails}`
               };
               this.log(warnEntry);
+              const retryNotice = (() => {
+                const waitText = effectiveWaitMs > 0 ? `${String(effectiveWaitMs)}ms` : 'a short delay';
+                return `System notice: upstream provider ${remoteId} rate-limited the previous request. Retrying after ${waitText}; no changes required unless rate limits persist.`;
+              })();
+              this.pushSystemRetryMessage(conversation, retryNotice);
 
               if (cycleComplete) {
                 const allRateLimited = rateLimitedInCycle >= pairs.length;
@@ -1654,10 +1734,42 @@ export class AIAgentSession {
               rateLimitedInCycle = 0;
               maxRateLimitWaitMs = 0;
             }
+            const retryableStatus = turnResult.status;
+            const rawDetail = 'message' in retryableStatus && typeof retryableStatus.message === 'string'
+              ? retryableStatus.message.trim()
+              : '';
+            const detail = rawDetail.length > 0 ? rawDetail : undefined;
+            const detailSuffixParen = detail !== undefined ? ` (${detail})` : '';
+            const detailSuffixColon = detail !== undefined ? `: ${detail}` : '';
+            const upstreamId = (() => {
+              const routed = this.llmClient.getLastActualRouting();
+              const actualProvider = provider === 'openrouter' && routed.provider !== undefined
+                ? `${provider}/${routed.provider}`
+                : provider;
+              return `${actualProvider}:${model}`;
+            })();
+            const retryNotice = (() => {
+              switch (retryableStatus.type) {
+                case 'invalid_response':
+                  return `System notice: upstream rejected the previous response as invalid${detailSuffixParen}. Provide a valid JSON tool call and retry.`;
+                case 'model_error':
+                  return `System notice: model error reported by ${upstreamId}${detailSuffixColon}. Verify tool arguments before retrying.`;
+                case 'network_error':
+                  return `System notice: network error from ${upstreamId}${detailSuffixColon}. Retrying automatically; the model may proceed once connectivity stabilizes.`;
+                case 'timeout':
+                  return `System notice: upstream timeout${detailSuffixParen}. Provide a shorter response or reduce tool usage before retrying.`;
+                default:
+                  return undefined;
+              }
+            })();
+            if (retryNotice !== undefined) {
+              this.pushSystemRetryMessage(conversation, retryNotice);
+            }
             continue;
           }
-        } catch (error) {
-          lastError = error instanceof Error ? error.message : String(error);
+        } catch (error: unknown) {
+          const errorMessage: string = error instanceof Error ? error.message : String(error);
+          lastError = errorMessage;
           // Ensure accounting entry even if an unexpected error occurred before turnResult
             const accountingEntry: AccountingEntry = {
               type: 'llm',
@@ -1677,6 +1789,7 @@ export class AIAgentSession {
               rateLimitedInCycle = 0;
               maxRateLimitWaitMs = 0;
             }
+            this.pushSystemRetryMessage(conversation, `System notice: an internal error prevented tool execution. Retry the required tool call with valid JSON arguments.`);
             continue;
         }
       }
@@ -1923,6 +2036,148 @@ export class AIAgentSession {
     } catch { /* swallow summary errors */ }
   }
   
+  private parseJsonRecord(raw: string): Record<string, unknown> | undefined {
+    const trimmed = raw.trim();
+    if (trimmed.length === 0) return undefined;
+    const tryParse = (value: string): Record<string, unknown> | undefined => {
+      try {
+        const parsed: unknown = JSON.parse(value);
+        return (parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed))
+          ? (parsed as Record<string, unknown>)
+          : undefined;
+      } catch {
+        return undefined;
+      }
+    };
+    const direct = tryParse(trimmed);
+    if (direct !== undefined) return direct;
+    const repaired = trimmed.replace(/\\x([0-9a-fA-F]{2})/g, (_match, hex) => '\\u00' + String(hex).toUpperCase());
+    if (repaired === trimmed) return undefined;
+    return tryParse(repaired);
+  }
+
+  private extractJsonRecordFromText(text: string): Record<string, unknown> | undefined {
+    const length = text.length;
+    let index = 0;
+    // eslint-disable-next-line functional/no-loop-statements
+    while (index < length) {
+      const startIdx = text.indexOf('{', index);
+      if (startIdx === -1) break;
+      let depth = 0;
+      let inString = false;
+      let escape = false;
+      // eslint-disable-next-line functional/no-loop-statements
+      for (let cursor = startIdx; cursor < length; cursor += 1) {
+        const ch = text[cursor];
+        if (inString) {
+          if (escape) {
+            escape = false;
+          } else if (ch === '\\') {
+            escape = true;
+          } else if (ch === '"') {
+            inString = false;
+          }
+          continue;
+        }
+        if (ch === '"') {
+          inString = true;
+          continue;
+        }
+        if (ch === '{') {
+          depth += 1;
+          continue;
+        }
+        if (ch === '}') {
+          depth -= 1;
+          if (depth === 0) {
+            const candidate = text.slice(startIdx, cursor + 1);
+            const parsed = this.parseJsonRecord(candidate);
+            if (parsed !== undefined) {
+              return parsed;
+            }
+            break;
+          }
+          continue;
+        }
+      }
+      index = startIdx + 1;
+    }
+    return undefined;
+  }
+
+  private pushSystemRetryMessage(conversation: ConversationMessage[], message: string): void {
+    const trimmed = message.trim();
+    if (trimmed.length === 0) return;
+    if (conversation.length > 0) {
+      const last = conversation[conversation.length - 1];
+      if (last.role === 'system' && last.content === trimmed) {
+        return;
+      }
+    }
+    conversation.push({ role: 'system', content: trimmed });
+  }
+
+  private tryAdoptFinalReportFromText(
+    assistantMessage: ConversationMessage | undefined,
+    text: string
+  ): boolean {
+    if (typeof text !== 'string') return false;
+    const trimmedText = text.trim();
+    if (trimmedText.length === 0) return false;
+    const json = this.extractJsonRecordFromText(trimmedText);
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    if (json === undefined) return false;
+    const isRecord = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value);
+    const pickString = (value: unknown): string | undefined => (typeof value === 'string' ? value : undefined);
+    const statusRaw = json.status;
+    const formatRaw = pickString(json.report_format) ?? pickString(json.format);
+    const contentCandidate = pickString(json.report_content) ?? pickString(json.content);
+    if (typeof statusRaw !== 'string') return false;
+    const formatCandidate = (formatRaw ?? '').trim();
+    const formatMatch = FINAL_REPORT_FORMAT_VALUES.find((value) => value === formatCandidate);
+    if (formatMatch === undefined) return false;
+    const finalFormat = formatMatch;
+    const normalizedStatus = statusRaw === 'success' || statusRaw === 'failure' || statusRaw === 'partial'
+      ? statusRaw
+      : undefined;
+    if (normalizedStatus === undefined) return false;
+    const finalStatus: 'success' | 'failure' | 'partial' = normalizedStatus;
+    if (contentCandidate === undefined) return false;
+    const finalContent: string = contentCandidate;
+    if (finalContent.trim().length === 0) return false;
+    const metadata = isRecord(json.metadata) ? json.metadata : undefined;
+    const contentJson = isRecord(json.content_json) ? json.content_json : undefined;
+    const parameters: Record<string, unknown> = {
+      status: finalStatus,
+      report_format: finalFormat,
+      report_content: finalContent,
+    };
+    if (contentJson !== undefined) parameters.content_json = contentJson;
+    if (metadata !== undefined) parameters.metadata = metadata;
+    if (assistantMessage !== undefined) {
+      const syntheticCall: ToolCall = {
+        id: 'synthetic-final-report-' + Date.now().toString(),
+        name: AIAgentSession.FINAL_REPORT_TOOL,
+        parameters,
+      };
+      assistantMessage.toolCalls = [syntheticCall];
+    }
+    const finalReportPayload: NonNullable<AIAgentResult['finalReport']> = {
+      status: finalStatus,
+      format: finalFormat,
+      ts: Date.now(),
+    };
+    finalReportPayload.content = finalContent;
+    if (contentJson !== undefined) {
+      finalReportPayload.content_json = contentJson;
+    }
+    if (metadata !== undefined) {
+      finalReportPayload.metadata = metadata;
+    }
+    this.finalReport = finalReportPayload;
+    return true;
+  }
+
   private sanitizeTurnMessages(
     messages: ConversationMessage[],
     context: { turn: number; provider: string; model: string }
@@ -1957,15 +2212,21 @@ export class AIAgentSession {
           droppedReasons.push(`call ${callIndexStr}: missing name`);
           return;
         }
-        const params = tcRaw.parameters;
-        if (!isRecord(params)) {
+        let paramsCandidate: unknown = tcRaw.parameters;
+        if (!isRecord(paramsCandidate) && typeof paramsCandidate === 'string') {
+          const parsed = this.parseJsonRecord(paramsCandidate);
+          if (parsed !== undefined) {
+            paramsCandidate = parsed;
+          }
+        }
+        if (!isRecord(paramsCandidate)) {
           droppedReasons.push(`call ${callIndexStr}: parameters not object`);
           return;
         }
         validCalls.push({
           id: rawId,
           name: rawName,
-          parameters: params,
+          parameters: paramsCandidate,
         });
       });
 
