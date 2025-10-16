@@ -334,6 +334,10 @@ func (c *Collector) exportSystemMetrics() {
 		Utilization: c.mx.CPUPercentage,
 	})
 
+	contexts.System.CPUEntitledUtilization.Set(c.State, labels, contexts.SystemCPUEntitledUtilizationValues{
+		Utilization: c.mx.EntitledCPUPercentage,
+	})
+
 	contexts.System.CPUDetails.Set(c.State, labels, contexts.SystemCPUDetailsValues{
 		Configured: c.mx.ConfiguredCPUs,
 	})

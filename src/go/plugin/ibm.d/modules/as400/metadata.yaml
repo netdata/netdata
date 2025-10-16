@@ -451,6 +451,12 @@ modules:
               chart_type: line
               dimensions:
                 - name: utilization
+            - name: as400.cpu_utilization_entitled
+              description: CPU Utilization (as % of entitlement)
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: utilization
             - name: as400.cpu_configuration
               description: CPU Configuration
               unit: cpus

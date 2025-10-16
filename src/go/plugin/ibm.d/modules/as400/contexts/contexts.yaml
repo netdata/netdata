@@ -12,6 +12,17 @@ System:
         - name: utilization
           algo: absolute
           div: 1000
+    - name: CPUEntitledUtilization
+      context: as400.cpu_utilization_entitled
+      title: CPU Utilization (as % of entitlement)
+      family: compute/cpu
+      units: percentage
+      type: line
+      priority: 102
+      dimensions:
+        - name: utilization
+          algo: absolute
+          div: 1000
     - name: CPUDetails
       context: as400.cpu_configuration
       title: CPU Configuration

@@ -1658,6 +1658,28 @@ func (c SystemCPUUtilizationContext) SetUpdateEvery(state *framework.CollectorSt
 	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, nil, updateEvery)
 }
 
+// SystemCPUEntitledUtilizationValues defines the type-safe values for System.CPUEntitledUtilization context
+type SystemCPUEntitledUtilizationValues struct {
+	Utilization int64
+}
+
+// SystemCPUEntitledUtilizationContext provides type-safe operations for System.CPUEntitledUtilization context
+type SystemCPUEntitledUtilizationContext struct {
+	framework.Context[EmptyLabels]
+}
+
+// Set provides type-safe dimension setting for System.CPUEntitledUtilization context
+func (c SystemCPUEntitledUtilizationContext) Set(state *framework.CollectorState, labels EmptyLabels, values SystemCPUEntitledUtilizationValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, nil, map[string]int64{
+		"utilization": values.Utilization,
+	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c SystemCPUEntitledUtilizationContext) SetUpdateEvery(state *framework.CollectorState, labels EmptyLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, nil, updateEvery)
+}
+
 // SystemCPUDetailsValues defines the type-safe values for System.CPUDetails context
 type SystemCPUDetailsValues struct {
 	Configured int64
@@ -2177,6 +2199,7 @@ func (c SystemSystemActivityCPUUtilizationContext) SetUpdateEvery(state *framewo
 // System contains all metric contexts for System
 var System = struct {
 	CPUUtilization               SystemCPUUtilizationContext
+	CPUEntitledUtilization       SystemCPUEntitledUtilizationContext
 	CPUDetails                   SystemCPUDetailsContext
 	CPUCapacity                  SystemCPUCapacityContext
 	TotalJobs                    SystemTotalJobsContext
@@ -2208,6 +2231,27 @@ var System = struct {
 			Units:       "percentage",
 			Type:        module.Line,
 			Priority:    101,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "utilization",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1000,
+					Precision: 1,
+				},
+			},
+			LabelKeys: []string{},
+		},
+	},
+	CPUEntitledUtilization: SystemCPUEntitledUtilizationContext{
+		Context: framework.Context[EmptyLabels]{
+			Name:        "as400.cpu_utilization_entitled",
+			Family:      "compute/cpu",
+			Title:       "CPU Utilization (as % of entitlement)",
+			Units:       "percentage",
+			Type:        module.Line,
+			Priority:    102,
 			UpdateEvery: 1,
 			Dimensions: []framework.Dimension{
 				{
@@ -2900,6 +2944,7 @@ func GetAllContexts() []interface{} {
 		&PlanCache.Summary.Context,
 		&Subsystem.Jobs.Context,
 		&System.CPUUtilization.Context,
+		&System.CPUEntitledUtilization.Context,
 		&System.CPUDetails.Context,
 		&System.CPUCapacity.Context,
 		&System.TotalJobs.Context,

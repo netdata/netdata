@@ -82,6 +82,22 @@ func (a *Collector) parseInt64Value(value string, multiplier int64) (int64, bool
 
 // parseFloat64Value parses a value as float64, returns (result, ok)
 // Logs all parse attempts in debug mode
+func (a *Collector) computeEntitledCPUPercentage(cpuUtilization float64) int64 {
+	if a.mx.CurrentCPUCapacity <= 0 {
+		return 0
+	}
+	capacityPercent := float64(a.mx.CurrentCPUCapacity) / float64(precision)
+	if capacityPercent <= 0 {
+		return 0
+	}
+	perCorePercent := cpuUtilization / float64(precision)
+	entitled := (perCorePercent / capacityPercent) * 100.0
+	if entitled < 0 {
+		entitled = 0
+	}
+	return int64(math.Round(entitled * float64(precision)))
+}
+
 func (a *Collector) parseFloat64Value(value string) (float64, bool) {
 	cleaned := cleanNumericString(value)
 	if cleaned == "" || cleaned == "-" || cleaned == "." || cleaned == "+" {
@@ -222,6 +238,7 @@ func (a *Collector) collectSystemStatus(ctx context.Context) error {
 			// AVERAGE_CPU_UTILIZATION is system-wide 0-100% (deprecated in IBM i 7.4+)
 			if v, ok := a.parseInt64Value(value, precision); ok {
 				a.mx.CPUPercentage = v
+				a.mx.EntitledCPUPercentage = a.computeEntitledCPUPercentage(float64(v))
 			}
 		case "CURRENT_CPU_CAPACITY":
 			// CURRENT_CPU_CAPACITY comes from IBM as decimal fraction (0.0-1.0)
@@ -1599,6 +1616,8 @@ func (a *Collector) collectSystemActivity(ctx context.Context) error {
 	// Query both potential data sources in one query
 	query := a.systemActivityQuery()
 
+	a.mx.EntitledCPUPercentage = 0
+
 	var (
 		totalCPUTime    int64   // Nanoseconds since IPL (NULL if no *JOBCTL)
 		elapsedTime     int64   // Seconds since last reset
@@ -1665,6 +1684,7 @@ func (a *Collector) collectSystemActivity(ctx context.Context) error {
 					a.mx.systemActivity.AverageCPUUtilization = int64(cpuUtilization)
 					a.mx.systemActivity.AverageCPURate = int64(cpuUtilization)
 					a.mx.CPUPercentage = int64(cpuUtilization)
+					a.mx.EntitledCPUPercentage = a.computeEntitledCPUPercentage(cpuUtilization)
 				} else {
 					if cpuUtilization < 0 {
 						a.Warningf("CPU collection: calculated utilization negative (%.2f%%), skipping this sample", cpuUtilization/precision)
@@ -1718,6 +1738,7 @@ func (a *Collector) collectSystemActivity(ctx context.Context) error {
 						a.mx.systemActivity.AverageCPUUtilization = int64(cpuUtilization)
 						a.mx.systemActivity.AverageCPURate = int64(cpuUtilization)
 						a.mx.CPUPercentage = int64(cpuUtilization)
+						a.mx.EntitledCPUPercentage = a.computeEntitledCPUPercentage(cpuUtilization)
 					} else {
 						if cpuUtilization < 0 {
 							a.Warningf("CPU collection: interval utilization negative (%.2f%%), skipping this sample", cpuUtilization/precision)
