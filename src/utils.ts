@@ -246,13 +246,25 @@ export function truncateUtf8WithNotice(s: string, limitBytes: number, originalSi
   return prefix + truncated;
 }
 
-// Consistent warning logger for stderr
+let warningSink: ((message: string) => void) | undefined;
+
+export function setWarningSink(handler?: (message: string) => void): void {
+  warningSink = handler;
+}
+
+export function getWarningSink(): ((message: string) => void) | undefined {
+  return warningSink;
+}
+
+// Consistent warning logger routed through injectable sink to keep core silent
 export function warn(message: string): void {
+  const sink = warningSink;
+  if (sink === undefined) {
+    return;
+  }
   try {
-    const prefix = '[warn] ';
-    const out = process.stderr.isTTY ? `\x1b[33m${prefix}${message}\x1b[0m` : `${prefix}${message}`;
-    process.stderr.write(out + '\n');
+    sink(message);
   } catch {
-    try { console.error(`[warn] ${message}`); } catch { /* noop */ }
+    /* ignore sink failures to keep core resilient */
   }
 }

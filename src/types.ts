@@ -372,12 +372,30 @@ export interface OpenAPISpecConfig {
   tagFilter?: string[];
 }
 
+// Session persistence payloads
+export interface SessionSnapshotPayload {
+  reason?: string;
+  sessionId: string;
+  originId: string;
+  timestamp: number;
+  snapshot: { version: number; opTree: unknown };
+}
+
+export interface AccountingFlushPayload {
+  sessionId: string;
+  originId: string;
+  timestamp: number;
+  entries: AccountingEntry[];
+}
+
 // Session configuration and callbacks
 export interface AIAgentCallbacks {
   onLog?: (entry: LogEntry) => void;
   onOutput?: (text: string) => void;
   onThinking?: (text: string) => void;
   onAccounting?: (entry: AccountingEntry) => void;
+  onSessionSnapshot?: (payload: SessionSnapshotPayload) => void | Promise<void>;
+  onAccountingFlush?: (payload: AccountingFlushPayload) => void | Promise<void>;
   onProgress?: (event: ProgressEvent) => void;
   // Live snapshot of the hierarchical operation tree (Option C)
   onOpTree?: (tree: unknown) => void;

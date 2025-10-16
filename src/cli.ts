@@ -1,6 +1,8 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { promisify } from 'node:util';
+import { gzip as gzipCallback } from 'node:zlib';
 
 import { Command, Option } from 'commander';
 import * as yaml from 'js-yaml';
@@ -30,7 +32,7 @@ import { formatLog } from './log-formatter.js';
 import { makeTTYLogCallbacks } from './log-sink-tty.js';
 import { getOptionsByGroup, formatCliNames, OPTIONS_REGISTRY } from './options-registry.js';
 import { MCPProvider } from './tools/mcp-provider.js';
-import { formatAgentResultHumanReadable } from './utils.js';
+import { formatAgentResultHumanReadable, setWarningSink, warn } from './utils.js';
 import { VERSION } from './version.generated.js';
 
 // FrontmatterOptions is sourced from frontmatter.ts (single definition)
@@ -55,7 +57,17 @@ function exitWith(code: number, reason: string, tag = 'EXIT-CLI'): never {
   throw new Error('unreachable');
 }
 
+const gzip = promisify(gzipCallback);
+
 const program = new Command();
+const defaultWarningSink = (message: string): void => {
+  const prefix = '[warn] ';
+  const colored = process.stderr.isTTY ? `\x1b[33m${prefix}${message}\x1b[0m` : `${prefix}${message}`;
+  try { process.stderr.write(`${colored}\n`); } catch { /* ignore */ }
+};
+
+setWarningSink(defaultWarningSink);
+
 // Force commander to route exits through our single exit path
 program.exitOverride((err: CommanderError) => {
   const code = err.exitCode;
@@ -1214,7 +1226,7 @@ program
       const effectiveTraceLLM = options.traceLlm === true;
       const effectiveTraceMCP = options.traceMcp === true;
       const effectiveVerbose = options.verbose === true;
-      const callbacks = createCallbacks({ traceLlm: effectiveTraceLLM, traceMcp: effectiveTraceMCP, verbose: effectiveVerbose }, accountingFile);
+      const callbacks = createCallbacks({ traceLlm: effectiveTraceLLM, traceMcp: effectiveTraceMCP, verbose: effectiveVerbose }, loaded.config.persistence, accountingFile);
 
       if (options.dryRun === true) {
         exitWith(0, 'dry run complete: configuration and MCP servers validated', 'EXIT-DRY-RUN');
@@ -1314,7 +1326,7 @@ program
       }
       // Agent already logged EXIT-FINAL-ANSWER or similar
       exitWith(0, 'success', 'EXIT-SUCCESS');
-    } catch (error) {
+    } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : 'Unknown error';
       const code = msg.includes('config') ? 1
         : msg.includes('argument') ? 4
@@ -1421,62 +1433,111 @@ function expandPrompt(str: string, vars: Record<string, string>): string {
 
 // Frontmatter helpers are imported from frontmatter.ts
 
-function createCallbacks(options: Record<string, unknown>, _accountingFile?: string): AIAgentCallbacks {
-
-  // Helper for consistent coloring - MANDATORY in TTY according to DESIGN.md
+function createCallbacks(
+  options: Record<string, unknown>,
+  persistence?: { sessionsDir?: string; billingFile?: string },
+  accountingFile?: string
+): AIAgentCallbacks {
   const colorize = (text: string, colorCode: string): string => {
-    return process.stderr.isTTY ? `${colorCode}${text}\x1b[0m` : text;
+    return process.stderr.isTTY ? `${colorCode}${text}[0m` : text;
   };
-  
 
-  // Track thinking stream state to ensure proper newlines between logs
   let thinkingOpen = false;
   let lastCharWasNewline = true;
 
-      const ttyLog = makeTTYLogCallbacks({ color: true, verbose: options.verbose === true, traceLlm: options.traceLlm === true, traceMcp: options.traceMcp === true });
-      return {
-        onLog: (entry: LogEntry) => {
-          // Ensure newline separation after thinking stream if needed
-          if (entry.severity !== 'THK' && thinkingOpen && !lastCharWasNewline) {
-            try { process.stderr.write('\n'); } catch {}
-            lastCharWasNewline = true;
-            thinkingOpen = false;
-          }
-      // Delegate all non-THK logs to the shared TTY sink
+  const ttyLog = makeTTYLogCallbacks({
+    color: true,
+    verbose: options.verbose === true,
+    traceLlm: options.traceLlm === true,
+    traceMcp: options.traceMcp === true,
+  });
+
+  const home = process.env.HOME ?? process.env.USERPROFILE ?? '';
+  const defaultBase = home.length > 0 ? path.join(home, '.ai-agent') : undefined;
+  const resolvedSessionsDir = persistence?.sessionsDir ?? (defaultBase !== undefined ? path.join(defaultBase, 'sessions') : undefined);
+  const resolvedLedgerFile = accountingFile ?? persistence?.billingFile ?? (defaultBase !== undefined ? path.join(defaultBase, 'accounting.jsonl') : undefined);
+
+  const snapshotHandler: NonNullable<AIAgentCallbacks['onSessionSnapshot']> = async (payload) => {
+    if (resolvedSessionsDir === undefined) {
+      return;
+    }
+    try {
+      await fs.promises.mkdir(resolvedSessionsDir, { recursive: true });
+      const json = JSON.stringify({
+        version: payload.snapshot.version,
+        reason: payload.reason,
+        opTree: payload.snapshot.opTree,
+      });
+      const gz = await gzip(Buffer.from(json, 'utf8'));
+      const filePath = path.join(resolvedSessionsDir, `${payload.originId}.json.gz`);
+      const tmp = `${filePath}.tmp-${String(process.pid)}-${String(Date.now())}`;
+      await fs.promises.writeFile(tmp, gz);
+      await fs.promises.rename(tmp, filePath);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      warn(`cli snapshot persistence failed: ${message}`);
+    }
+  };
+
+  const ledgerHandler: NonNullable<AIAgentCallbacks['onAccountingFlush']> = async (payload) => {
+    if (resolvedLedgerFile === undefined) {
+      return;
+    }
+    try {
+      const dir = path.dirname(resolvedLedgerFile);
+      await fs.promises.mkdir(dir, { recursive: true });
+      if (payload.entries.length === 0) {
+        return;
+      }
+      const lines = payload.entries.map((entry) => JSON.stringify(entry));
+      await fs.promises.appendFile(resolvedLedgerFile, `${lines.join('\n')}\n`, 'utf8');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      warn(`cli accounting persistence failed: ${message}`);
+    }
+  };
+
+  return {
+    onLog: (entry: LogEntry) => {
+      if (entry.severity !== 'THK' && thinkingOpen && !lastCharWasNewline) {
+        try { process.stderr.write('\n'); } catch { /* ignore */ }
+        lastCharWasNewline = true;
+        thinkingOpen = false;
+      }
       ttyLog.onLog?.(entry);
-      
-      // Show thinking header, including txn and stable path via formatter; then stream text via onThinking
       if (entry.severity === 'THK') {
-        const header = formatLog(entry, { color: true, verbose: options.verbose === true, traceLlm: options.traceLlm === true, traceMcp: options.traceMcp === true });
-        // formatLog already applies dim color for THK; do not add newline so streamed text follows
-        try { process.stderr.write(`${header} `); } catch {}
+        const header = formatLog(entry, {
+          color: true,
+          verbose: options.verbose === true,
+          traceLlm: options.traceLlm === true,
+          traceMcp: options.traceMcp === true,
+        });
+        try { process.stderr.write(`${header} `); } catch { /* ignore */ }
         thinkingOpen = true;
         lastCharWasNewline = false;
-        // The actual thinking text will follow via onThinking
       }
     },
-    
     onOutput: (text: string) => {
-      // Only mirror streamed output to stderr when verbose; keep stdout clean
       if (options.verbose === true) {
-        try { process.stderr.write(text); } catch {}
+        try { process.stderr.write(text); } catch { /* ignore */ }
       }
     },
-    
-    onThinking: (text: string) => { 
-      const colored = colorize(text, '\x1b[2;37m'); // Light gray (dim white) for thinking
+    onThinking: (text: string) => {
+      const colored = colorize(text, '\x1b[2;37m');
       process.stderr.write(colored);
       if (text.length > 0) {
         lastCharWasNewline = text.endsWith('\n');
         thinkingOpen = true;
       }
     },
-    
     onAccounting: (_entry: AccountingEntry) => {
-      // No per-entry file writes from CLI; final ledger is written by ai-agent at session end.
+      // No per-entry file writes from CLI; consolidated flush occurs via onAccountingFlush.
     },
+    onSessionSnapshot: snapshotHandler,
+    onAccountingFlush: ledgerHandler,
   };
 }
+
 
 process.on('uncaughtException', (e) => {
   const msg = e instanceof Error ? `${e.name}: ${e.message}` : String(e);

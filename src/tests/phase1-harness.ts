@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { gzipSync } from 'node:zlib';
 
 import { WebSocketServer } from 'ws';
 
@@ -24,7 +25,7 @@ import { LLMClient } from '../llm-client.js';
 import { TestLLMProvider } from '../llm-providers/test-llm.js';
 import { SubAgentRegistry } from '../subagent-registry.js';
 import { MCPProvider } from '../tools/mcp-provider.js';
-import { clampToolName, sanitizeToolName, formatToolRequestCompact, truncateUtf8WithNotice, formatAgentResultHumanReadable } from '../utils.js';
+import { clampToolName, sanitizeToolName, formatToolRequestCompact, truncateUtf8WithNotice, formatAgentResultHumanReadable, setWarningSink, getWarningSink, warn } from '../utils.js';
 import { createWebSocketTransport } from '../websocket-transport.js';
 
 import { getScenario } from './fixtures/test-llm-scenarios.js';
@@ -38,6 +39,82 @@ const SUBAGENT_TOOL = 'agent__pricing-subagent';
 const COVERAGE_CHILD_TOOL = 'coverage.child';
 const COVERAGE_PARENT_BODY = 'Parent body.';
 const COVERAGE_CHILD_BODY = 'Child body.';
+
+const defaultHarnessWarningSink = (message: string): void => {
+  const prefix = '[warn] ';
+  const output = process.stderr.isTTY ? `\x1b[33m${prefix}${message}\x1b[0m` : `${prefix}${message}`;
+  try { process.stderr.write(`${output}\n`); } catch { /* ignore */ }
+};
+
+setWarningSink(defaultHarnessWarningSink);
+
+const defaultPersistenceCallbacks = (configuration: Configuration, existing?: AIAgentCallbacks): AIAgentCallbacks => {
+  const callbacks = existing ?? {};
+  const persistence = configuration.persistence ?? {};
+  const home = process.env.HOME ?? process.env.USERPROFILE ?? '';
+  const defaultBase = home.length > 0 ? path.join(home, '.ai-agent') : undefined;
+  const sessionsDir = typeof persistence.sessionsDir === 'string' && persistence.sessionsDir.length > 0
+    ? persistence.sessionsDir
+    : defaultBase !== undefined ? path.join(defaultBase, 'sessions') : undefined;
+  const ledgerFile = typeof persistence.billingFile === 'string' && persistence.billingFile.length > 0
+    ? persistence.billingFile
+    : configuration.accounting?.file ?? (defaultBase !== undefined ? path.join(defaultBase, 'accounting.jsonl') : undefined);
+
+  const snapshotHandler = callbacks.onSessionSnapshot ?? (sessionsDir !== undefined ? async (payload) => {
+    try {
+      await fs.promises.mkdir(sessionsDir, { recursive: true });
+      const json = JSON.stringify({
+        version: payload.snapshot.version,
+        reason: payload.reason,
+        opTree: payload.snapshot.opTree,
+      });
+      const gz = gzipSync(Buffer.from(json, 'utf8'));
+      const filePath = path.join(sessionsDir, `${payload.originId}.json.gz`);
+      const tmp = `${filePath}.tmp-${String(process.pid)}-${String(Date.now())}`;
+      await fs.promises.writeFile(tmp, gz);
+      await fs.promises.rename(tmp, filePath);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      const reason = payload.reason ?? 'unspecified';
+      warn(`persistSessionSnapshot(${reason}) failed: ${message}`);
+    }
+  } : undefined);
+
+  const ledgerHandler = callbacks.onAccountingFlush ?? (ledgerFile !== undefined ? async (payload) => {
+    try {
+      const dir = path.dirname(ledgerFile);
+      await fs.promises.mkdir(dir, { recursive: true });
+      if (payload.entries.length === 0) {
+        return;
+      }
+      const lines = payload.entries.map((entry) => JSON.stringify(entry));
+      await fs.promises.appendFile(ledgerFile, `${lines.join('\n')}\n`, 'utf8');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      warn(`final persistence failed: ${message}`);
+    }
+  } : undefined);
+
+  const needsSnapshot = snapshotHandler !== callbacks.onSessionSnapshot;
+  const needsLedger = ledgerHandler !== callbacks.onAccountingFlush;
+  if (!needsSnapshot && !needsLedger) {
+    return callbacks;
+  }
+  return {
+    ...callbacks,
+    ...(needsSnapshot && snapshotHandler !== undefined ? { onSessionSnapshot: snapshotHandler } : {}),
+    ...(needsLedger && ledgerHandler !== undefined ? { onAccountingFlush: ledgerHandler } : {}),
+  };
+};
+
+const baseCreate = AIAgentSession.create.bind(AIAgentSession);
+(AIAgentSession as unknown as { create: (sessionConfig: AIAgentSessionConfig) => AIAgentSession }).create = (sessionConfig: AIAgentSessionConfig) => {
+  const originalCallbacks = sessionConfig.callbacks;
+  const callbacks = defaultPersistenceCallbacks(sessionConfig.config, originalCallbacks);
+  const patchedConfig = callbacks === originalCallbacks ? sessionConfig : { ...sessionConfig, callbacks };
+  return baseCreate(patchedConfig);
+};
+
 const COVERAGE_ALIAS_BASENAME = 'parent.ai';
 const TRUNCATION_NOTICE = '[TRUNCATED]';
 const CONFIG_FILE_NAME = 'config.json';
@@ -191,7 +268,7 @@ const COVERAGE_ROUTER_MODEL = 'router-model';
 const COVERAGE_ROUTER_SSE_PROVIDER = 'router-sse';
 const COVERAGE_ROUTER_SSE_MODEL = 'router-sse-model';
 const COVERAGE_PROMPT = 'coverage';
-const COVERAGE_WARN_SUBSTRING = 'persistSessionSnapshot failed';
+const COVERAGE_WARN_SUBSTRING = 'persistSessionSnapshot(coverage-failure) failed';
 
 function makeTempDir(label: string): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), `${TMP_PREFIX}${label}-`));
@@ -237,6 +314,10 @@ function getPrivateMethod(instance: object, key: string): (...args: unknown[]) =
   const value = Reflect.get(instance as Record<string, unknown>, key);
   invariant(typeof value === 'function', `Private method '${key}' missing.`);
   return value as (...args: unknown[]) => unknown;
+}
+
+function getPrivateField(instance: object, key: string): unknown {
+  return Reflect.get(instance as Record<string, unknown>, key);
 }
 
 function makeSuccessResult(content: string): AIAgentResult {
@@ -4360,7 +4441,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
       } finally {
         globalThis.fetch = originalFetch;
       }
-      const cacheWrite = Reflect.get(client as unknown as Record<string, unknown>, 'lastCacheWriteInputTokens') as (number | undefined);
+      const cacheWrite = getPrivateField(client, 'lastCacheWriteInputTokens') as (number | undefined);
       coverageGenericJson = {
         accept: capturedHeaderValues?.accept ?? undefined,
         cacheWrite,
@@ -4386,49 +4467,71 @@ const TEST_SCENARIOS: HarnessTest[] = [
       const defaults = configuration.defaults ?? BASE_DEFAULTS;
       const tempDir = makeTempDir(COVERAGE_SESSION_ID);
       configuration.persistence = { sessionsDir: tempDir };
-      const sessionConfig: AIAgentSessionConfig = {
-        config: configuration,
-        targets: [{ provider: PRIMARY_PROVIDER, model: MODEL_NAME }],
-        tools: [],
-        systemPrompt: 'Phase 1 deterministic harness: coverage snapshot.',
-        userPrompt: DEFAULT_PROMPT_SCENARIO,
-        outputFormat: 'markdown',
-        stream: false,
-        parallelToolCalls: false,
-        maxTurns: 1,
-        toolTimeout: defaults.toolTimeout,
-        llmTimeout: defaults.llmTimeout,
-        maxRetries: defaults.maxRetries,
-        agentId: COVERAGE_SESSION_ID,
-        abortSignal: new AbortController().signal,
-      };
-      const session = AIAgentSession.create(sessionConfig);
-      const persistSessionSnapshot = getPrivateMethod(session, 'persistSessionSnapshot').bind(session) as (reason?: string) => unknown;
-      persistSessionSnapshot('coverage-success');
-      const filesAfterSuccess = await fs.promises.readdir(tempDir);
-      const originalWriteFile = fs.writeFileSync;
-      const originalStderrWrite: typeof process.stderr.write = process.stderr.write.bind(process.stderr);
-      let warnOutput = '';
-      fs.writeFileSync = ((..._args: Parameters<typeof fs.writeFileSync>) => {
-        throw new Error('snapshot-write-failure');
-      }) as typeof fs.writeFileSync;
-      process.stderr.write = ((chunk: string | Uint8Array, encoding?: BufferEncoding) => {
-        warnOutput += typeof chunk === 'string' ? chunk : Buffer.from(chunk).toString(encoding ?? 'utf8');
-        return true;
-      }) as typeof process.stderr.write;
+      const snapshotWarnings: string[] = [];
+      const previousWarningSink = getWarningSink();
+      setWarningSink((message) => { snapshotWarnings.push(message); });
+
       try {
-        persistSessionSnapshot('coverage-failure');
+        const snapshotWriter = async (payload: Parameters<NonNullable<AIAgentCallbacks['onSessionSnapshot']>>[0]): Promise<void> => {
+          const json = JSON.stringify({
+            version: payload.snapshot.version,
+            reason: payload.reason,
+            opTree: payload.snapshot.opTree,
+          });
+          const gz = gzipSync(Buffer.from(json, 'utf8'));
+          const filePath = path.join(tempDir, `${payload.originId}.json.gz`);
+          await fs.promises.mkdir(tempDir, { recursive: true });
+          await fs.promises.writeFile(filePath, gz);
+        };
+
+        const sessionConfig: AIAgentSessionConfig = {
+          config: configuration,
+          targets: [{ provider: PRIMARY_PROVIDER, model: MODEL_NAME }],
+          tools: [],
+          systemPrompt: 'Phase 1 deterministic harness: coverage snapshot.',
+          userPrompt: DEFAULT_PROMPT_SCENARIO,
+          outputFormat: 'markdown',
+          stream: false,
+          parallelToolCalls: false,
+          maxTurns: 1,
+          toolTimeout: defaults.toolTimeout,
+          llmTimeout: defaults.llmTimeout,
+          maxRetries: defaults.maxRetries,
+          agentId: COVERAGE_SESSION_ID,
+          abortSignal: new AbortController().signal,
+          callbacks: { onSessionSnapshot: snapshotWriter },
+        };
+
+        const session = AIAgentSession.create(sessionConfig);
+        const persistSessionSnapshot = getPrivateMethod(session, 'persistSessionSnapshot').bind(session) as (reason?: string) => Promise<unknown>;
+
+        await persistSessionSnapshot('coverage-success');
+        const filesAfterSuccess = await fs.promises.readdir(tempDir);
+
+        const liveSessionConfig = getPrivateField(session, 'sessionConfig') as (AIAgentSessionConfig | undefined);
+        const originalSnapshotHandler = liveSessionConfig?.callbacks?.onSessionSnapshot;
+        if (liveSessionConfig?.callbacks !== undefined) {
+          liveSessionConfig.callbacks.onSessionSnapshot = () => { throw new Error('snapshot-write-failure'); };
+        }
+
+        try {
+          await persistSessionSnapshot('coverage-failure');
+        } finally {
+          if (liveSessionConfig?.callbacks !== undefined) {
+            liveSessionConfig.callbacks.onSessionSnapshot = originalSnapshotHandler;
+          }
+        }
+
+        const filesAfterFailure = await fs.promises.readdir(tempDir);
+        coverageSessionSnapshot = {
+          tempDir,
+          filesAfterSuccess,
+          filesAfterFailure,
+          warnOutput: snapshotWarnings.join('\n'),
+        };
       } finally {
-        fs.writeFileSync = originalWriteFile;
-        process.stderr.write = originalStderrWrite;
+        setWarningSink(previousWarningSink ?? defaultHarnessWarningSink);
       }
-      const filesAfterFailure = await fs.promises.readdir(tempDir);
-      coverageSessionSnapshot = {
-        tempDir,
-        filesAfterSuccess,
-        filesAfterFailure,
-        warnOutput,
-      };
       return makeSuccessResult(COVERAGE_SESSION_ID);
     },
     expect: (result) => {

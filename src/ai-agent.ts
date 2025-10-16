@@ -2,13 +2,12 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 // import os from 'node:os';
 import path from 'node:path';
-import zlib from 'node:zlib';
 
 import Ajv from 'ajv';
 
 import type { OutputFormatId } from './formats.js';
 import type { SessionNode } from './session-tree.js';
-import type { AIAgentSessionConfig, AIAgentResult, ConversationMessage, LogEntry, AccountingEntry, Configuration, TurnRequest, LLMAccountingEntry, MCPTool, ToolAccountingEntry, RestToolConfig, ProgressMetrics, ToolCall } from './types.js';
+import type { AIAgentSessionConfig, AIAgentResult, ConversationMessage, LogEntry, AccountingEntry, Configuration, TurnRequest, LLMAccountingEntry, MCPTool, ToolAccountingEntry, RestToolConfig, ProgressMetrics, ToolCall, SessionSnapshotPayload, AccountingFlushPayload } from './types.js';
 
 // Exit codes according to DESIGN.md
 type ExitCode = 
@@ -243,25 +242,46 @@ export class AIAgentSession {
     return undefined;
   }
   
-  private persistSessionSnapshot(reason?: string): void {
+  private async persistSessionSnapshot(reason?: string): Promise<void> {
+    const sink = this.sessionConfig.callbacks?.onSessionSnapshot;
+    if (sink === undefined) {
+      return;
+    }
     try {
-      const sess = this.opTree.getSession();
-      const originId = this.originTxnId ?? this.txnId;
-      // Resolve sessions dir from config or fallback to ~/.ai-agent/sessions
-      const overrideDir = this.sessionConfig.config.persistence?.sessionsDir;
-      const home = process.env.HOME ?? process.env.USERPROFILE ?? '';
-      const defaultBase = home ? path.join(home, '.ai-agent') : process.cwd();
-      const sessDir = typeof overrideDir === 'string' && overrideDir.length > 0
-        ? overrideDir
-        : path.join(defaultBase, 'sessions');
-      try { fs.mkdirSync(sessDir, { recursive: true }); } catch (e) { warn(`failed to create sessions dir '${sessDir}': ${e instanceof Error ? e.message : String(e)}`); }
-      const json = JSON.stringify({ version: 1, reason, opTree: sess });
-      const gz = zlib.gzipSync(Buffer.from(json, 'utf8'));
-      const filePath = path.join(sessDir, `${originId}.json.gz`);
-      const tmp = `${filePath}.tmp-${String(process.pid)}-${String(Date.now())}`;
-      fs.writeFileSync(tmp, gz);
-      fs.renameSync(tmp, filePath);
-    } catch (e) { warn(`persistSessionSnapshot failed: ${e instanceof Error ? e.message : String(e)}`); }
+      const payload: SessionSnapshotPayload = {
+        reason,
+        sessionId: this.txnId,
+        originId: this.originTxnId ?? this.txnId,
+        timestamp: Date.now(),
+        snapshot: { version: 1, opTree: this.opTree.getSession() },
+      };
+      await sink(payload);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      warn(`persistSessionSnapshot(${reason ?? 'unspecified'}) failed: ${message}`);
+    }
+  }
+
+  private async flushAccounting(entries: AccountingEntry[]): Promise<void> {
+    if (entries.length === 0) {
+      return;
+    }
+    const sink = this.sessionConfig.callbacks?.onAccountingFlush;
+    if (sink === undefined) {
+      return;
+    }
+    try {
+      const payload: AccountingFlushPayload = {
+        sessionId: this.txnId,
+        originId: this.originTxnId ?? this.txnId,
+        timestamp: Date.now(),
+        entries: entries.map((entry) => ({ ...entry })),
+      };
+      await sink(payload);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      warn(`flushAccounting failed: ${message}`);
+    }
   }
 
   private constructor(
@@ -477,7 +497,7 @@ export class AIAgentSession {
         }, opts);
         // Keep child conversation list (may be reported in results for compatibility)
         this.childConversations.push({ agentId: exec.child.toolName, toolName: exec.child.toolName, promptPath: exec.child.promptPath, conversation: exec.conversation, trace: exec.trace });
-        try { this.persistSessionSnapshot('subagent_finish'); } catch (e) { warn(`persist subagent snapshot failed: ${e instanceof Error ? e.message : String(e)}`); }
+        await this.persistSessionSnapshot('subagent_finish');
         return { result: exec.result, childAccounting: exec.accounting, childOpTree: exec.opTree };
       };
       // Register AgentProvider synchronously so sub-agent tools are known before first turn
@@ -486,37 +506,6 @@ export class AIAgentSession {
     // Populate mapping now (before warmup) so hasTool() sees all registered providers
     void orch.listTools();
     this.toolsOrchestrator = orch;
-    // Preflight: billing ledger writability check (if configured)
-    try {
-      const configuredLedger = this.sessionConfig.config.persistence?.billingFile
-        ?? ((): string | undefined => {
-          const home = process.env.HOME ?? process.env.USERPROFILE ?? '';
-          if (!home) return undefined;
-          const baseDir = path.join(home, '.ai-agent');
-          try { fs.mkdirSync(baseDir, { recursive: true }); } catch (e) { warn(`failed to create base dir '${baseDir}': ${e instanceof Error ? e.message : String(e)}`); }
-          return path.join(baseDir, 'accounting.jsonl');
-        })();
-      if (typeof configuredLedger === 'string' && configuredLedger.length > 0) {
-        const dir = path.dirname(configuredLedger);
-        let ok = false;
-        try {
-          fs.mkdirSync(dir, { recursive: true });
-          const tmp = path.join(dir, `.wcheck-${String(process.pid)}-${String(Date.now())}`);
-          fs.writeFileSync(tmp, 'x');
-          fs.unlinkSync(tmp);
-          ok = true;
-        } catch {
-          ok = false;
-        }
-        if (!ok) {
-          const op = this.opTree.beginOp(0, 'system', { label: 'preflight' });
-          this.log({ timestamp: Date.now(), severity: 'WRN', turn: 0, subturn: 0, direction: 'response', type: 'tool', remoteIdentifier: 'agent:billing', fatal: false, message: `billing ledger not writable: ${configuredLedger}` }, { opId: op });
-          this.opTree.endOp(op, 'ok');
-          this.sessionConfig.callbacks?.onOpTree?.(this.opTree.getSession());
-        }
-      }
-    } catch (e) { warn(`preflight billing check failed: ${e instanceof Error ? e.message : String(e)}`); }
-
 
     // Apply an initial session title without consuming a tool turn (side-channel)
     try {
@@ -579,7 +568,6 @@ export class AIAgentSession {
       try { externalLogRelay(enriched); } catch (e) { warn(`external log relay failed: ${e instanceof Error ? e.message : String(e)}`); }
     };
 
-    // Create session-owned MCP client
     // Create session-owned LLM client
     const llmClient = new LLMClient(enrichedSessionConfig.config.providers, {
       traceLLM: enrichedSessionConfig.traceLLM,
@@ -964,20 +952,11 @@ export class AIAgentSession {
       this.emitAgentCompletion(result.success, result.error);
       // Phase B/C: persist final session and accounting ledger
       try {
-        this.persistSessionSnapshot('final');
-        const configuredLedger = this.sessionConfig.config.persistence?.billingFile
-          ?? ((): string | undefined => {
-            const home = process.env.HOME ?? process.env.USERPROFILE ?? '';
-            if (!home) return undefined;
-            const baseDir = path.join(home, '.ai-agent');
-            try { fs.mkdirSync(baseDir, { recursive: true }); } catch (e) { warn(`failed to create base dir '${baseDir}': ${e instanceof Error ? e.message : String(e)}`); }
-            return path.join(baseDir, 'accounting.jsonl');
-          })();
-        if (typeof configuredLedger === 'string' && configuredLedger.length > 0) {
-          const lines = (resultShape.accounting).map((a) => JSON.stringify(a));
-          if (lines.length > 0) fs.appendFileSync(configuredLedger, lines.join('\n') + '\n');
-        }
-      } catch (e) { warn(`final persistence failed: ${e instanceof Error ? e.message : String(e)}`); }
+        await this.persistSessionSnapshot('final');
+        await this.flushAccounting(resultShape.accounting);
+      } catch (e) {
+        warn(`final persistence failed: ${e instanceof Error ? e.message : String(e)}`);
+      }
       return resultShape;
 
     } catch (error) {
