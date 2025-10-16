@@ -14,7 +14,7 @@ import (
 // countActiveJobs returns the number of active jobs for cardinality check
 func (a *Collector) countActiveJobs(ctx context.Context) (int, error) {
 	var count int
-	err := a.doQueryRow(ctx, queryCountActiveJobs, func(column, value string) {
+	err := a.doQueryRow(ctx, "count_active_jobs", queryCountActiveJobs, func(column, value string) {
 		if column == "COUNT" {
 			if v, err := strconv.Atoi(value); err == nil {
 				count = v
@@ -48,7 +48,7 @@ func (a *Collector) collectActiveJobs(ctx context.Context) error {
 		currentJobName string
 		currentJob     *activeJobMetrics
 	)
-	err = a.doQuery(ctx, query, func(column, value string, lineEnd bool) {
+	err = a.doQuery(ctx, "top_active_jobs", query, func(column, value string, lineEnd bool) {
 		switch column {
 		case "JOB_NAME":
 			currentJobName = value
