@@ -605,6 +605,43 @@ modules:
                 - name: average
                 - name: minimum
                 - name: maximum
+            - name: netdata.plugin_ibm.as400_query_latency
+              description: Query Collection Latency
+              unit: ms
+              chart_type: stacked
+              dimensions:
+                - name: analyze_plan_cache
+                - name: count_active_jobs
+                - name: count_disks
+                - name: count_http_servers
+                - name: count_job_queues
+                - name: count_message_queues
+                - name: count_network_interfaces
+                - name: count_output_queues
+                - name: count_subsystems
+                - name: detect_ibmi_version_primary
+                - name: detect_ibmi_version_fallback
+                - name: disk_instances
+                - name: disk_instances_enhanced
+                - name: disk_status
+                - name: http_server_info
+                - name: job_info
+                - name: job_queues
+                - name: memory_pools
+                - name: message_queue_aggregates
+                - name: network_connections
+                - name: network_interfaces
+                - name: output_queue_info
+                - name: plan_cache_summary
+                - name: serial_number
+                - name: system_activity
+                - name: system_model
+                - name: system_status
+                - name: temp_storage_named
+                - name: temp_storage_total
+                - name: technology_refresh_level
+                - name: top_active_jobs
+                - name: other
         - name: tempstoragebucket
           description: These metrics refer to tempstoragebucket instances.
           labels:

@@ -219,9 +219,34 @@ func (a *Collector) collect(ctx context.Context) error {
 	return nil
 }
 
+func (a *Collector) recordQueryLatency(queryName string, duration time.Duration) {
+	if a.mx == nil {
+		return
+	}
+	if queryName == "" {
+		queryName = "unknown_query"
+	}
+
+	sanitized := cleanName(queryName)
+	if sanitized == "" {
+		sanitized = "unknown_query"
+	}
+
+	if a.mx.queryLatencies == nil {
+		a.mx.queryLatencies = make(map[string]int64)
+	}
+
+	latency := duration.Microseconds()
+	if latency == 0 && duration > 0 {
+		latency = 1
+	}
+
+	a.mx.queryLatencies[sanitized] += latency
+}
+
 func (a *Collector) collectSystemStatus(ctx context.Context) error {
 	// Use comprehensive query to get all system status metrics at once
-	err := a.doQuery(ctx, a.systemStatusQuery(), func(column, value string, lineEnd bool) {
+	err := a.doQuery(ctx, "system_status", a.systemStatusQuery(), func(column, value string, lineEnd bool) {
 		// Debug log all columns to see what we're receiving
 		if strings.Contains(column, "STORAGE") || strings.Contains(column, "MEMORY") {
 			a.Debugf("collectSystemStatus: column='%s', value='%s'", column, value)
@@ -319,7 +344,7 @@ func (a *Collector) collectSystemStatus(ctx context.Context) error {
 
 func (a *Collector) collectMemoryPools(ctx context.Context) error {
 	var currentPoolName string
-	return a.doQuery(ctx, a.memoryPoolQuery(), func(column, value string, lineEnd bool) {
+	return a.doQuery(ctx, "memory_pools", a.memoryPoolQuery(), func(column, value string, lineEnd bool) {
 		switch column {
 		case "POOL_NAME":
 			currentPoolName = strings.TrimSpace(value)
@@ -378,7 +403,7 @@ func (a *Collector) collectMemoryPools(ctx context.Context) error {
 
 func (a *Collector) collectDiskStatus(ctx context.Context) error {
 	// Try modern query first
-	err := a.doQuery(ctx, queryDiskStatus, func(column, value string, lineEnd bool) {
+	err := a.doQuery(ctx, "disk_status", queryDiskStatus, func(column, value string, lineEnd bool) {
 		if column == "AVG_DISK_BUSY" {
 			if v, ok := a.parseInt64Value(value, precision); ok {
 				a.mx.DiskBusyPercentage = v
@@ -391,7 +416,7 @@ func (a *Collector) collectDiskStatus(ctx context.Context) error {
 
 func (a *Collector) collectJobInfo(ctx context.Context) error {
 	// Try modern query first
-	err := a.doQuery(ctx, queryJobInfo, func(column, value string, lineEnd bool) {
+	err := a.doQuery(ctx, "job_info", queryJobInfo, func(column, value string, lineEnd bool) {
 		if column == "JOB_QUEUE_LENGTH" {
 			if v, ok := a.parseInt64Value(value, 1); ok {
 				a.mx.JobQueueLength = v
@@ -432,7 +457,7 @@ func (a *Collector) collectMessageQueues(ctx context.Context) error {
 		metrics messageQueueInstanceMetrics
 	)
 
-	return a.doQuery(ctx, query, func(column, value string, lineEnd bool) {
+	return a.doQuery(ctx, "message_queue_aggregates", query, func(column, value string, lineEnd bool) {
 		switch column {
 		case "MESSAGE_QUEUE_LIBRARY":
 			library = normalizeValue(value)
@@ -503,7 +528,7 @@ func (a *Collector) collectOutputQueues(ctx context.Context) error {
 		metrics outputQueueInstanceMetrics
 	)
 
-	return a.doQuery(ctx, query, func(column, value string, lineEnd bool) {
+	return a.doQuery(ctx, "output_queue_info", query, func(column, value string, lineEnd bool) {
 		switch column {
 		case "OUTPUT_QUEUE_LIBRARY_NAME":
 			library = normalizeValue(value)
@@ -536,7 +561,7 @@ func (a *Collector) collectOutputQueues(ctx context.Context) error {
 	})
 }
 
-func (a *Collector) doQuery(ctx context.Context, query string, assign func(column, value string, lineEnd bool)) error {
+func (a *Collector) doQuery(ctx context.Context, queryName, query string, assign func(column, value string, lineEnd bool)) error {
 	var (
 		capture      bool
 		columnsSaved []string
@@ -545,6 +570,12 @@ func (a *Collector) doQuery(ctx context.Context, query string, assign func(colum
 	if a.dump != nil {
 		capture = true
 	}
+
+	start := time.Now()
+	defer func() {
+		a.recordQueryLatency(queryName, time.Since(start))
+	}()
+
 	err := a.client.Query(ctx, query, func(columns []string, values []string) error {
 		for i, col := range columns {
 			assign(col, values[i], i == len(columns)-1)
@@ -576,7 +607,7 @@ func (a *Collector) doQuery(ctx context.Context, query string, assign func(colum
 }
 
 // doQueryRow executes a query that returns a single row
-func (a *Collector) doQueryRow(ctx context.Context, query string, assign func(column, value string)) error {
+func (a *Collector) doQueryRow(ctx context.Context, queryName, query string, assign func(column, value string)) error {
 	var (
 		capture      bool
 		columnsSaved []string
@@ -585,6 +616,12 @@ func (a *Collector) doQueryRow(ctx context.Context, query string, assign func(co
 	if a.dump != nil {
 		capture = true
 	}
+
+	start := time.Now()
+	defer func() {
+		a.recordQueryLatency(queryName, time.Since(start))
+	}()
+
 	err := a.client.QueryWithLimit(ctx, query, 1, func(columns []string, values []string) error {
 		for i, col := range columns {
 			assign(col, values[i])
@@ -626,7 +663,7 @@ func (a *Collector) collectDiskInstances(ctx context.Context) error {
 	}
 
 	var currentUnit string
-	return a.doQuery(ctx, queryDiskInstances, func(column, value string, lineEnd bool) {
+	return a.doQuery(ctx, "disk_instances", queryDiskInstances, func(column, value string, lineEnd bool) {
 
 		switch column {
 		case "UNIT_NUMBER":
@@ -860,7 +897,7 @@ func (a *Collector) collectDiskInstances(ctx context.Context) error {
 
 func (a *Collector) countDisks(ctx context.Context) (int, error) {
 	var count int
-	err := a.doQuery(ctx, queryCountDisks, func(column, value string, lineEnd bool) {
+	err := a.doQuery(ctx, "count_disks", queryCountDisks, func(column, value string, lineEnd bool) {
 		if column == "COUNT" {
 			count = int(parseInt64OrZero(value))
 		}
@@ -870,7 +907,7 @@ func (a *Collector) countDisks(ctx context.Context) (int, error) {
 
 // Network connections collection
 func (a *Collector) collectNetworkConnections(ctx context.Context) error {
-	return a.doQuery(ctx, queryNetworkConnections, func(column, value string, lineEnd bool) {
+	return a.doQuery(ctx, "network_connections", queryNetworkConnections, func(column, value string, lineEnd bool) {
 		switch column {
 		case "REMOTE_CONNECTIONS":
 			if v, ok := a.parseInt64Value(value, 1); ok {
@@ -894,7 +931,7 @@ func (a *Collector) collectNetworkConnections(ctx context.Context) error {
 
 func (a *Collector) countNetworkInterfaces(ctx context.Context) (int, error) {
 	var count int
-	err := a.doQueryRow(ctx, queryCountNetworkInterfaces, func(column, value string) {
+	err := a.doQueryRow(ctx, "count_network_interfaces", queryCountNetworkInterfaces, func(column, value string) {
 		if column == "COUNT" {
 			if v, ok := a.parseInt64Value(value, 1); ok {
 				count = int(v)
@@ -906,7 +943,7 @@ func (a *Collector) countNetworkInterfaces(ctx context.Context) (int, error) {
 
 func (a *Collector) countMessageQueues(ctx context.Context) (int, error) {
 	var count int
-	err := a.doQueryRow(ctx, queryCountMessageQueues, func(column, value string) {
+	err := a.doQueryRow(ctx, "count_message_queues", queryCountMessageQueues, func(column, value string) {
 		if column == "COUNT" {
 			if v, ok := a.parseInt64Value(value, 1); ok {
 				count = int(v)
@@ -918,7 +955,7 @@ func (a *Collector) countMessageQueues(ctx context.Context) (int, error) {
 
 func (a *Collector) countOutputQueues(ctx context.Context) (int, error) {
 	var count int
-	err := a.doQueryRow(ctx, queryCountOutputQueues, func(column, value string) {
+	err := a.doQueryRow(ctx, "count_output_queues", queryCountOutputQueues, func(column, value string) {
 		if column == "COUNT" {
 			if v, ok := a.parseInt64Value(value, 1); ok {
 				count = int(v)
@@ -930,7 +967,7 @@ func (a *Collector) countOutputQueues(ctx context.Context) (int, error) {
 
 func (a *Collector) countHTTPServers(ctx context.Context) (int, error) {
 	var count int64
-	err := a.doQueryRow(ctx, queryCountHTTPServers, func(column, value string) {
+	err := a.doQueryRow(ctx, "count_http_servers", queryCountHTTPServers, func(column, value string) {
 		if column == "COUNT" {
 			if v, ok := a.parseInt64Value(value, 1); ok {
 				count = v
@@ -954,7 +991,7 @@ func withFetchLimit(query string, limit int) string {
 
 func (a *Collector) countSubsystems(ctx context.Context) (int, error) {
 	var count int64
-	err := a.doQueryRow(ctx, queryCountSubsystems, func(column, value string) {
+	err := a.doQueryRow(ctx, "count_subsystems", queryCountSubsystems, func(column, value string) {
 		if column == "COUNT" {
 			if v, ok := a.parseInt64Value(value, 1); ok {
 				count = v
@@ -966,7 +1003,7 @@ func (a *Collector) countSubsystems(ctx context.Context) (int, error) {
 
 func (a *Collector) countJobQueues(ctx context.Context) (int, error) {
 	var count int64
-	err := a.doQueryRow(ctx, queryCountJobQueues, func(column, value string) {
+	err := a.doQueryRow(ctx, "count_job_queues", queryCountJobQueues, func(column, value string) {
 		if column == "COUNT" {
 			if v, ok := a.parseInt64Value(value, 1); ok {
 				count = v
@@ -979,7 +1016,7 @@ func (a *Collector) countJobQueues(ctx context.Context) (int, error) {
 // Temporary storage collection
 func (a *Collector) collectTempStorage(ctx context.Context) error {
 	// Collect total temp storage
-	err := a.doQuery(ctx, queryTempStorageTotal, func(column, value string, lineEnd bool) {
+	err := a.doQuery(ctx, "temp_storage_total", queryTempStorageTotal, func(column, value string, lineEnd bool) {
 		switch column {
 		case "CURRENT_SIZE":
 			if v, ok := a.parseInt64Value(value, 1); ok {
@@ -997,7 +1034,7 @@ func (a *Collector) collectTempStorage(ctx context.Context) error {
 
 	// Collect named temp storage buckets
 	var currentBucket string
-	return a.doQuery(ctx, queryTempStorageNamed, func(column, value string, lineEnd bool) {
+	return a.doQuery(ctx, "temp_storage_named", queryTempStorageNamed, func(column, value string, lineEnd bool) {
 		switch column {
 		case "NAME":
 			currentBucket = value
@@ -1042,7 +1079,7 @@ func (a *Collector) collectSubsystems(ctx context.Context) error {
 	}
 
 	var currentSubsystem string
-	return a.doQuery(ctx, query, func(column, value string, lineEnd bool) {
+	return a.doQuery(ctx, "subsystems", query, func(column, value string, lineEnd bool) {
 		switch column {
 		case "SUBSYSTEM_NAME":
 			name := strings.TrimSpace(value)
@@ -1110,7 +1147,7 @@ func (a *Collector) collectJobQueues(ctx context.Context) error {
 	}
 
 	var currentQueue string
-	return a.doQuery(ctx, query, func(column, value string, lineEnd bool) {
+	return a.doQuery(ctx, "job_queues", query, func(column, value string, lineEnd bool) {
 		switch column {
 		case "QUEUE_NAME":
 			name := strings.TrimSpace(value)
@@ -1170,7 +1207,7 @@ func (a *Collector) collectDiskInstancesEnhanced(ctx context.Context) error {
 	}
 
 	var currentUnit string
-	return a.doQuery(ctx, queryDiskInstancesEnhanced, func(column, value string, lineEnd bool) {
+	return a.doQuery(ctx, "disk_instances_enhanced", queryDiskInstancesEnhanced, func(column, value string, lineEnd bool) {
 		switch column {
 		case "UNIT_NUMBER":
 			currentUnit = value
@@ -1350,7 +1387,7 @@ func (a *Collector) collectNetworkInterfaces(ctx context.Context) error {
 	}
 
 	var currentInterface string
-	return a.doQuery(ctx, queryNetworkInterfaces, func(column, value string, lineEnd bool) {
+	return a.doQuery(ctx, "network_interfaces", queryNetworkInterfaces, func(column, value string, lineEnd bool) {
 		switch column {
 		case "LINE_DESCRIPTION":
 			iface := strings.TrimSpace(value)
@@ -1461,7 +1498,7 @@ func (a *Collector) collectHTTPServerInfo(ctx context.Context) error {
 		currentKey   string
 	)
 
-	return a.doQuery(ctx, queryHTTPServerInfo, func(column, value string, lineEnd bool) {
+	return a.doQuery(ctx, "http_server_info", queryHTTPServerInfo, func(column, value string, lineEnd bool) {
 		switch column {
 		case "SERVER_NAME":
 			serverName = strings.TrimSpace(value)
@@ -1578,10 +1615,12 @@ func (a *Collector) collectPlanCache(ctx context.Context) error {
 	if err := a.client.Exec(ctx, callAnalyzePlanCache); err != nil {
 		return fmt.Errorf("failed to analyze plan cache: %w", err)
 	}
-	a.Debugf("plan cache analysis completed in %v", time.Since(start))
+	elapsed := time.Since(start)
+	a.Debugf("plan cache analysis completed in %v", elapsed)
+	a.recordQueryLatency("analyze_plan_cache", elapsed)
 
 	var currentHeading string
-	return a.doQuery(ctx, queryPlanCacheSummary, func(column, value string, lineEnd bool) {
+	return a.doQuery(ctx, "plan_cache_summary", queryPlanCacheSummary, func(column, value string, lineEnd bool) {
 		switch column {
 		case "HEADING":
 			currentHeading = strings.TrimSpace(value)
@@ -1626,7 +1665,7 @@ func (a *Collector) collectSystemActivity(ctx context.Context) error {
 		hasElapsedData  bool
 	)
 
-	err := a.doQuery(ctx, query, func(column, value string, lineEnd bool) {
+	err := a.doQuery(ctx, "system_activity", query, func(column, value string, lineEnd bool) {
 		switch column {
 		case "TOTAL_CPU_TIME":
 			// This will be NULL if user doesn't have *JOBCTL authority

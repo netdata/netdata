@@ -77,6 +77,8 @@ type metricsData struct {
 	httpServers       map[string]httpServerInstanceMetrics
 	planCache         map[string]planCacheInstanceMetrics
 	systemActivity    systemActivityMetrics
+
+	queryLatencies map[string]int64 `stm:"-"`
 }
 
 // Per-instance metric structures for stm conversion
