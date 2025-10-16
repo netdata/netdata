@@ -331,6 +331,7 @@ let utilsCoverageSummary: { sanitized: string; clamped: { name: string; truncate
 let configLoadSummary: { providerKey?: string; localType?: string; remoteType?: string; localEnvToken?: string; defaultsStream?: boolean } | undefined;
 let includeSummary: { resolved: string; forbiddenError?: string; depthError?: string } | undefined;
 let configErrorSummary: { readError?: string; jsonError?: string; schemaError?: string; localLoadedKey?: string } | undefined;
+let includeAsyncSummary: { staged: string; depth: number } | undefined;
 let frontmatterErrorSummary: { strictError?: string; relaxedParsed?: boolean } | undefined;
 let frontmatterSummary: { toolName?: string; outputFormat?: string; inputFormat?: string; description?: string; models?: string[] } | undefined;
 let humanReadableSummaries: { json: string; text: string; successNoOutput: string; failure: string; truncatedZero: string } | undefined;
@@ -3326,6 +3327,47 @@ const TEST_SCENARIOS: HarnessTest[] = [
     const fmSummary = frontmatterErrorSummary;
     invariant(typeof fmSummary.strictError === 'string' && fmSummary.strictError.includes('Unsupported frontmatter key'), 'Strict mode should reject forbidden keys.');
     invariant(fmSummary.relaxedParsed === true, 'Relaxed parsing should not throw.');
+  },
+},
+
+{
+  id: 'run-test-100',
+  description: 'Async include staging and repeated normalize coverage.',
+  execute: async () => {
+    includeAsyncSummary = undefined;
+    await Promise.resolve();
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), `${TMP_PREFIX}include-async-`));
+    try {
+      const stage1 = path.join(tempDir, 'stage1.txt');
+      const stage2 = path.join(tempDir, 'stage2.txt');
+      const stage3 = path.join(tempDir, 'stage3.txt');
+      const stage3Name = path.basename(stage3);
+      const stage2Name = path.basename(stage2);
+      const stage1Name = path.basename(stage1);
+      fs.writeFileSync(stage3, 'Stage3 final', 'utf-8');
+      fs.writeFileSync(stage2, `Mid ${INCLUDE_DIRECTIVE_TOKEN}${stage3Name}}`, 'utf-8');
+      fs.writeFileSync(stage1, `Top ${INCLUDE_DIRECTIVE_TOKEN}${stage2Name}}`, 'utf-8');
+      const resolved = resolveIncludes(`${INCLUDE_DIRECTIVE_TOKEN}${stage1Name}}`, tempDir);
+      includeAsyncSummary = { staged: resolved, depth: 3 };
+      const configPath = path.join(tempDir, CONFIG_FILE_NAME);
+      fs.writeFileSync(configPath, JSON.stringify({ providers: {}, mcpServers: {} }), 'utf-8');
+      loadConfiguration(configPath);
+      loadConfiguration(configPath);
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+    return {
+      success: true,
+      conversation: [],
+      logs: [],
+      accounting: [],
+      finalReport: { status: 'success', format: 'text', content: 'include-async', ts: Date.now() },
+    };
+  },
+  expect: () => {
+    invariant(includeAsyncSummary !== undefined, 'Include async summary missing for run-test-100.');
+    invariant(includeAsyncSummary.staged.includes('Stage3 final'), 'Include resolution should stage deepest content.');
+    invariant(includeAsyncSummary.depth === 3, 'Include depth should reflect nested stages.');
   },
 },
   (() => {
