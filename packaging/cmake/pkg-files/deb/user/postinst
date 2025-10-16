@@ -16,7 +16,7 @@ case "${1}" in
       fi
     fi
 
-    groups="docker nginx varnish haproxy adm nsd proxy squid ceph nobody I2C"
+    groups="docker ceph I2C"
 
     if [ -d "/etc/pve" ]; then
       groups="${groups} www-data"

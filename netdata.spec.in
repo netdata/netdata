@@ -3239,7 +3239,7 @@ else
 fi
 %endif
 
-for item in docker nginx varnish haproxy adm nsd proxy squid ceph nobody I2C; do
+for item in docker ceph I2C; do
   if getent group $item > /dev/null 2>&1; then
     usermod -a -G ${item} %{name}
   fi

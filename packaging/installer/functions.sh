@@ -1040,7 +1040,7 @@ EOF
 # user handling functions
 
 create_netdata_accounts() {
-  NETDATA_WANTED_GROUPS="docker nginx varnish haproxy adm nsd proxy squid ceph nobody I2C"
+  NETDATA_WANTED_GROUPS="docker ceph I2C"
 
   if [ -d "/etc/pve" ]; then
     NETDATA_WANTED_GROUPS="${NETDATA_WANTED_GROUPS} www-data"
