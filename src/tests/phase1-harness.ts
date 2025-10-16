@@ -22,7 +22,7 @@ import { LLMClient } from '../llm-client.js';
 import { TestLLMProvider } from '../llm-providers/test-llm.js';
 import { SubAgentRegistry } from '../subagent-registry.js';
 import { MCPProvider } from '../tools/mcp-provider.js';
-import { clampToolName, sanitizeToolName } from '../utils.js';
+import { clampToolName, sanitizeToolName, formatToolRequestCompact, truncateUtf8WithNotice } from '../utils.js';
 import { createWebSocketTransport } from '../websocket-transport.js';
 
 import { getScenario } from './fixtures/test-llm-scenarios.js';
@@ -33,6 +33,11 @@ const MODEL_NAME = 'deterministic-model';
 const PRIMARY_PROVIDER = 'primary';
 const SECONDARY_PROVIDER = 'secondary';
 const SUBAGENT_TOOL = 'agent__pricing-subagent';
+const COVERAGE_CHILD_TOOL = 'coverage.child';
+const COVERAGE_PARENT_BODY = 'Parent body.';
+const COVERAGE_CHILD_BODY = 'Child body.';
+const COVERAGE_ALIAS_BASENAME = 'parent.ai';
+const TRUNCATION_NOTICE = '[TRUNCATED]';
 const FINAL_REPORT_CALL_ID = 'call-final-report';
 const DEFAULT_PROMPT_SCENARIO = 'run-test-1' as const;
 const BASE_DEFAULTS = {
@@ -316,6 +321,9 @@ interface HarnessTest {
 
 let overrideParentLoaded: LoadedAgent | undefined;
 let overrideChildLoaded: LoadedAgent | undefined;
+let registrySpawnSessionConfig: AIAgentSessionConfig | undefined;
+let registryCoverageSummary: { listCount: number; aliasId?: string; toolName?: string; hasParent: boolean; hasToolAlias: boolean } | undefined;
+let utilsCoverageSummary: { sanitized: string; clamped: { name: string; truncated: boolean }; formatted: string; truncated: string } | undefined;
 let overrideTargetsRef: { provider: string; model: string }[] | undefined;
 const overrideLLMExpected = {
   temperature: 0.27,
@@ -323,7 +331,13 @@ const overrideLLMExpected = {
   maxOutputTokens: 321,
   repeatPenalty: 1.9,
   llmTimeout: 7_654,
+  toolTimeout: 4_321,
   maxRetries: 5,
+  maxToolTurns: 11,
+  maxToolCallsPerTurn: 4,
+  maxConcurrentTools: 2,
+  toolResponseMaxBytes: 777,
+  mcpInitConcurrency: 6,
   stream: true,
   parallelToolCalls: true,
 };
@@ -455,7 +469,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-8 expected success.');
       const toolMessages = result.conversation.filter((message) => message.role === 'tool');
-      invariant(toolMessages.some((message) => message.content.includes('[TRUNCATED]')), 'Truncation notice expected in run-test-8.');
+      invariant(toolMessages.some((message) => message.content.includes(TRUNCATION_NOTICE)), 'Truncation notice expected in run-test-8.');
     },
   },
   {
@@ -1936,7 +1950,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
       invariant(result.success, 'Scenario run-test-59 expected success.');
       const truncLog = result.logs.find((entry) => entry.severity === 'WRN' && typeof entry.message === 'string' && entry.message.includes('response exceeded max size'));
       invariant(truncLog !== undefined, 'Truncation warning expected for run-test-59.');
-      const batchTool = result.conversation.find((message) => message.role === 'tool' && typeof message.content === 'string' && message.content.includes('[TRUNCATED]'));
+      const batchTool = result.conversation.find((message) => message.role === 'tool' && typeof message.content === 'string' && message.content.includes(TRUNCATION_NOTICE));
       invariant(batchTool !== undefined, 'Truncated tool response expected for run-test-59.');
     },
   },
@@ -2790,7 +2804,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
           'models:',
           '  - other-provider/child-model',
           '---',
-          'Child body.',
+          COVERAGE_CHILD_BODY,
         ].join('\n');
         fs.writeFileSync(childPath, childContent, 'utf-8');
 
@@ -2803,7 +2817,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
           'agents:',
           `  - ${path.basename(childPath)}`,
           '---',
-          'Parent body.',
+          COVERAGE_PARENT_BODY,
         ].join('\n');
         fs.writeFileSync(parentPath, parentContent, 'utf-8');
 
@@ -2816,7 +2830,13 @@ const TEST_SCENARIOS: HarnessTest[] = [
           maxOutputTokens: overrideLLMExpected.maxOutputTokens,
           repeatPenalty: overrideLLMExpected.repeatPenalty,
           llmTimeout: overrideLLMExpected.llmTimeout,
+          toolTimeout: overrideLLMExpected.toolTimeout,
           maxRetries: overrideLLMExpected.maxRetries,
+          maxToolTurns: overrideLLMExpected.maxToolTurns,
+          maxToolCallsPerTurn: overrideLLMExpected.maxToolCallsPerTurn,
+          maxConcurrentTools: overrideLLMExpected.maxConcurrentTools,
+          toolResponseMaxBytes: overrideLLMExpected.toolResponseMaxBytes,
+          mcpInitConcurrency: overrideLLMExpected.mcpInitConcurrency,
           stream: overrideLLMExpected.stream,
           parallelToolCalls: overrideLLMExpected.parallelToolCalls,
         };
@@ -2857,6 +2877,12 @@ const TEST_SCENARIOS: HarnessTest[] = [
       invariant(overrideParentLoaded.effective.repeatPenalty !== undefined && Math.abs(overrideParentLoaded.effective.repeatPenalty - overrideLLMExpected.repeatPenalty) < 1e-6, 'Parent repeatPenalty should follow overrides.');
       invariant(overrideParentLoaded.effective.llmTimeout === overrideLLMExpected.llmTimeout, 'Parent llmTimeout should follow overrides.');
       invariant(overrideParentLoaded.effective.maxRetries === overrideLLMExpected.maxRetries, 'Parent maxRetries should follow overrides.');
+      invariant(overrideParentLoaded.effective.toolTimeout === overrideLLMExpected.toolTimeout, 'Parent toolTimeout should follow overrides.');
+      invariant(overrideParentLoaded.effective.maxToolTurns === overrideLLMExpected.maxToolTurns, 'Parent maxToolTurns should follow overrides.');
+      invariant(overrideParentLoaded.effective.maxToolCallsPerTurn === overrideLLMExpected.maxToolCallsPerTurn, 'Parent maxToolCallsPerTurn should follow overrides.');
+      invariant(overrideParentLoaded.effective.maxConcurrentTools === overrideLLMExpected.maxConcurrentTools, 'Parent maxConcurrentTools should follow overrides.');
+      invariant(overrideParentLoaded.effective.toolResponseMaxBytes === overrideLLMExpected.toolResponseMaxBytes, 'Parent toolResponseMaxBytes should follow overrides.');
+      invariant(overrideParentLoaded.effective.mcpInitConcurrency === overrideLLMExpected.mcpInitConcurrency, 'Parent mcpInitConcurrency should follow overrides.');
       invariant(overrideParentLoaded.effective.stream === overrideLLMExpected.stream, 'Parent stream flag should follow overrides.');
       invariant(overrideParentLoaded.effective.parallelToolCalls === overrideLLMExpected.parallelToolCalls, 'Parent parallelToolCalls should follow overrides.');
       invariant(overrideChildLoaded !== undefined, 'Child loaded agent missing for global override test.');
@@ -2868,11 +2894,158 @@ const TEST_SCENARIOS: HarnessTest[] = [
       invariant(overrideChildLoaded.effective.repeatPenalty !== undefined && Math.abs(overrideChildLoaded.effective.repeatPenalty - overrideLLMExpected.repeatPenalty) < 1e-6, 'Child repeatPenalty should follow overrides.');
       invariant(overrideChildLoaded.effective.llmTimeout === overrideLLMExpected.llmTimeout, 'Child llmTimeout should follow overrides.');
       invariant(overrideChildLoaded.effective.maxRetries === overrideLLMExpected.maxRetries, 'Child maxRetries should follow overrides.');
+      invariant(overrideChildLoaded.effective.toolTimeout === overrideLLMExpected.toolTimeout, 'Child toolTimeout should follow overrides.');
+      invariant(overrideChildLoaded.effective.maxToolTurns === overrideLLMExpected.maxToolTurns, 'Child maxToolTurns should follow overrides.');
+      invariant(overrideChildLoaded.effective.maxToolCallsPerTurn === overrideLLMExpected.maxToolCallsPerTurn, 'Child maxToolCallsPerTurn should follow overrides.');
+      invariant(overrideChildLoaded.effective.maxConcurrentTools === overrideLLMExpected.maxConcurrentTools, 'Child maxConcurrentTools should follow overrides.');
+      invariant(overrideChildLoaded.effective.toolResponseMaxBytes === overrideLLMExpected.toolResponseMaxBytes, 'Child toolResponseMaxBytes should follow overrides.');
+      invariant(overrideChildLoaded.effective.mcpInitConcurrency === overrideLLMExpected.mcpInitConcurrency, 'Child mcpInitConcurrency should follow overrides.');
       invariant(overrideChildLoaded.effective.stream === overrideLLMExpected.stream, 'Child stream flag should follow overrides.');
       invariant(overrideChildLoaded.effective.parallelToolCalls === overrideLLMExpected.parallelToolCalls, 'Child parallelToolCalls should follow overrides.');
     },
   },
 
+
+
+  {
+    id: 'run-test-96',
+    description: 'Agent registry spawnSession resolves aliases and produces sessions.',
+    execute: async () => {
+      registrySpawnSessionConfig = undefined;
+      const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), `${TMP_PREFIX}spawn-session-`));
+      const originalCreate = AIAgentSession.create.bind(AIAgentSession);
+      try {
+        const configPath = path.join(tempDir, 'config.json');
+        const configData = {
+          providers: { [PRIMARY_PROVIDER]: { type: 'test-llm' } },
+          mcpServers: {},
+        } satisfies Configuration;
+        fs.writeFileSync(configPath, JSON.stringify(configData, null, 2), 'utf-8');
+        const agentPath = path.join(tempDir, 'spawn-parent.ai');
+        const agentContent = [
+          '---',
+          'description: Spawn session coverage agent',
+          `models:`,
+          `  - ${PRIMARY_PROVIDER}/${MODEL_NAME}`,
+          '---',
+          'Spawn body.',
+        ].join('\n');
+        fs.writeFileSync(agentPath, agentContent, 'utf-8');
+        const registry = new AgentRegistry([agentPath], { configPath });
+        (AIAgentSession as unknown as { create: (cfg: AIAgentSessionConfig) => AIAgentSession }).create = (cfg: AIAgentSessionConfig) => {
+          registrySpawnSessionConfig = cfg;
+          return originalCreate(cfg);
+        };
+        const session = await registry.spawnSession({
+          agentId: path.basename(agentPath),
+          userPrompt: 'Spawn session test',
+          format: 'markdown',
+        });
+        void session;
+      } finally {
+        (AIAgentSession as unknown as { create: (cfg: AIAgentSessionConfig) => AIAgentSession }).create = originalCreate;
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+      return {
+        success: true,
+        conversation: [],
+        logs: [],
+        accounting: [],
+        finalReport: { status: 'success', format: 'text', content: 'registry-spawn-session', ts: Date.now() },
+      };
+    },
+    expect: () => {
+      invariant(registrySpawnSessionConfig !== undefined, 'Spawn session config missing for run-test-96.');
+      invariant(registrySpawnSessionConfig.agentId === 'spawn-parent', 'Spawn session agentId should derive from filename.');
+      invariant(registrySpawnSessionConfig.outputFormat === 'markdown', 'Spawn session output format should match request.');
+    },
+  },
+  {
+    id: 'run-test-95',
+    description: 'Agent registry metadata helpers and utils coverage.',
+    execute: async () => {
+      registryCoverageSummary = undefined;
+      utilsCoverageSummary = undefined;
+      await Promise.resolve();
+      const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), `${TMP_PREFIX}registry-utils-`));
+      try {
+        const configPath = path.join(tempDir, 'config.json');
+        const configData = {
+          providers: { [PRIMARY_PROVIDER]: { type: 'test-llm' } },
+          mcpServers: {},
+        } satisfies Configuration;
+        fs.writeFileSync(configPath, JSON.stringify(configData, null, 2), 'utf-8');
+        const childPath = path.join(tempDir, 'child.ai');
+        const childContent = [
+          '---',
+          'description: Registry child agent',
+          `toolName: ${COVERAGE_CHILD_TOOL}`,
+          `models:`,
+          `  - ${PRIMARY_PROVIDER}/${MODEL_NAME}`,
+          '---',
+          COVERAGE_CHILD_BODY,
+        ].join('\n');
+        fs.writeFileSync(childPath, childContent, 'utf-8');
+        const parentPath = path.join(tempDir, 'parent.ai');
+        const parentContent = [
+          '---',
+          'description: Registry parent agent',
+          `models:`,
+          `  - ${PRIMARY_PROVIDER}/${MODEL_NAME}`,
+          'agents:',
+          `  - ${path.basename(childPath)}`,
+          '---',
+          COVERAGE_PARENT_BODY,
+        ].join('\n');
+        fs.writeFileSync(parentPath, parentContent, 'utf-8');
+        const registry = new AgentRegistry([parentPath], { configPath });
+        registry.loadFromContent(path.join(tempDir, 'inline.ai'), parentContent, { configPath, baseDir: tempDir });
+        const listed = registry.list();
+        const aliasMetadata = registry.getMetadata(COVERAGE_ALIAS_BASENAME);
+        const toolMetadata = registry.getMetadata(COVERAGE_CHILD_TOOL);
+        registryCoverageSummary = {
+          listCount: listed.length,
+          aliasId: aliasMetadata?.id,
+          toolName: toolMetadata?.toolName,
+          hasParent: registry.has(parentPath),
+          hasToolAlias: registry.has(COVERAGE_CHILD_TOOL),
+        };
+      } finally {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+      const sanitized = sanitizeToolName('  <|pref|>Bad Name!!!  ');
+      const clamped = clampToolName('truncate-me', 5);
+      const formatted = formatToolRequestCompact('demoTool', { alpha: ' value with spaces ', beta: 42, gamma: [1, 2, 3], delta: { nested: true } });
+      const truncated = truncateUtf8WithNotice('x'.repeat(200), 40);
+      utilsCoverageSummary = {
+        sanitized,
+        clamped,
+        formatted,
+        truncated,
+      };
+      return {
+        success: true,
+        conversation: [],
+        logs: [],
+        accounting: [],
+        finalReport: { status: 'success', format: 'text', content: 'registry-utils-coverage', ts: Date.now() },
+      };
+    },
+    expect: () => {
+      invariant(registryCoverageSummary !== undefined, 'Registry summary missing for run-test-95.');
+      invariant(registryCoverageSummary.listCount >= 2, 'Registry list should include parent and inline agents.');
+      invariant(typeof registryCoverageSummary.aliasId === 'string' && registryCoverageSummary.aliasId.includes('parent'), 'Alias should resolve to parent id.');
+      invariant(registryCoverageSummary.toolName === COVERAGE_CHILD_TOOL, 'Tool metadata should expose child tool name.');
+      invariant(registryCoverageSummary.hasParent, 'Registry should report parent agent present.');
+      invariant(registryCoverageSummary.hasToolAlias, 'Registry should report tool alias present.');
+      invariant(utilsCoverageSummary !== undefined, 'Utils summary missing for run-test-95.');
+      invariant(utilsCoverageSummary.sanitized === 'Bad', 'sanitizeToolName should normalize input.');
+      invariant(utilsCoverageSummary.clamped.truncated && utilsCoverageSummary.clamped.name === 'trunc', 'clampToolName should truncate and report flag.');
+      invariant(utilsCoverageSummary.formatted.includes('alpha:value with spaces'), 'formatToolRequestCompact should include trimmed string values.');
+      invariant(utilsCoverageSummary.formatted.includes('gamma:[3]'), 'formatToolRequestCompact should summarize arrays.');
+      invariant(utilsCoverageSummary.truncated.startsWith(TRUNCATION_NOTICE), 'truncateUtf8WithNotice should prepend notice.');
+    },
+  },
   (() => {
     return {
       id: 'run-test-74',
