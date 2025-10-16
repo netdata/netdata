@@ -722,7 +722,7 @@
     description: |
       ### Prerequisites
 
-      - A Netdata Cloud account
+      - Netdata Cloud account
       - Access to the Space as an **Admin**
       - The Space needs to be on a paid plan
       - The ServiceNow **Event Management** plugin enabled on your instance
