@@ -7,21 +7,23 @@ You can switch between different Netdata release channels on Windows based on yo
 Unlike Linux systems where Netdata has multiple install types (native packages, static builds, Docker, etc.), **Windows only has one install type**: the **MSI installer**.
 
 This simplifies the switching process significantly:
+
 - No need to determine your "install type" (it's always MSI)
 - No complex switching procedures between different installation methods
 - MSI handles upgrades automatically
 
 ### Release Channels Available
 
-| Channel | Download URL | Update Frequency | Recommended For |
-|---------|-------------|------------------|-----------------|
-| **Stable** | `https://github.com/netdata/netdata/releases/latest/download/netdata-x64.msi` | Major and patch releases | Production systems, most users |
-| **Nightly** | `https://github.com/netdata/netdata-nightlies/releases/latest/download/netdata-x64.msi` | Daily builds | Testing, early adopters, bleeding-edge features |
+| Channel     | Download URL                                                                            | Update Frequency         | Recommended For                                 |
+|-------------|-----------------------------------------------------------------------------------------|--------------------------|-------------------------------------------------|
+| **Stable**  | `https://github.com/netdata/netdata/releases/latest/download/netdata-x64.msi`           | Major and patch releases | Production systems, most users                  |
+| **Nightly** | `https://github.com/netdata/netdata-nightlies/releases/latest/download/netdata-x64.msi` | Daily builds             | Testing, early adopters, bleeding-edge features |
 
 <details>
-<summary><strong>When to Choose Each Channel</strong></summary><br/>
+<summary>When to Choose Each Channel</summary>
 
 **Choose Stable Channel If:**
+
 - You're running production systems
 - You need predictable, well-tested releases
 - You prefer less frequent updates (major releases only)
@@ -29,6 +31,7 @@ This simplifies the switching process significantly:
 - You have strict change management processes
 
 **Choose Nightly Channel If:**
+
 - You're testing new features before production deployment
 - You want immediate bug fixes without waiting for releases
 - You're contributing to Netdata development and need latest code
@@ -43,12 +46,14 @@ This simplifies the switching process significantly:
 When switching between release channels on Windows, the MSI installer automatically preserves your important data and configuration.
 
 **Preserved during channel switches:**
+
 - Configuration files (`netdata.conf`, collector configs) in `C:\Program Files\Netdata\etc\netdata`
 - Historical metrics data
-- Alert configurations  
+- Alert configurations
 - Cloud connection settings (claim token, room assignments)
 
 **Not preserved (by design):**
+
 - Temporary cache files
 - Log files older than retention period
 
@@ -63,48 +68,48 @@ Unlike switching between install types on Linux, Windows channel switching does 
 ### Method 1: GUI Installation (Recommended)
 
 <details>
-<summary><strong>Switch to Stable Channel</strong></summary><br/>
+<summary>Switch to Stable Channel</summary>
 
 1. **Download the Stable MSI:**
-   - Go to: `https://github.com/netdata/netdata/releases/latest/download/netdata-x64.msi`
-   - Save the file to your Downloads folder
+    - Go to: `https://github.com/netdata/netdata/releases/latest/download/netdata-x64.msi`
+    - Save the file to your Downloads folder
 
 2. **Run the installer:**
-   - Double-click the downloaded `.msi` file
-   - Grant Administrator privileges when prompted
-   - Follow the installation wizard
+    - Double-click the downloaded `.msi` file
+    - Grant Administrator privileges when prompted
+    - Follow the installation wizard
 
-![Windows Installer GUI](https://raw.githubusercontent.com/netdata/docs-images/refs/heads/master/windows/release/windows-installer-gui.png)
+   ![Windows Installer GUI](https://raw.githubusercontent.com/netdata/docs-images/refs/heads/master/windows/release/windows-installer-gui.png)
 
 3. **Verify the installation:**
-   - The installer will automatically detect your existing installation
-   - Upgrade to the Stable channel
-   - Preserve your configuration and data
-   - Restart the Netdata service
+    - The installer will automatically detect your existing installation
+    - Upgrade to the Stable channel
+    - Preserve your configuration and data
+    - Restart the Netdata service
 
 </details>
 
 <br/>
 
 <details>
-<summary><strong>Switch to Nightly Channel</strong></summary><br/>
+<summary>Switch to Nightly Channel</summary>
 
 1. **Download the Nightly MSI:**
-   - Go to: `https://github.com/netdata/netdata-nightlies/releases/latest/download/netdata-x64.msi`
-   - Save the file to your Downloads folder
+    - Go to: `https://github.com/netdata/netdata-nightlies/releases/latest/download/netdata-x64.msi`
+    - Save the file to your Downloads folder
 
 2. **Run the installer:**
-   - Double-click the downloaded `.msi` file
-   - Grant Administrator privileges when prompted
-   - Follow the installation wizard
+    - Double-click the downloaded `.msi` file
+    - Grant Administrator privileges when prompted
+    - Follow the installation wizard
 
-![Windows Installer GUI](https://raw.githubusercontent.com/netdata/docs-images/refs/heads/master/windows/release/windows-installer-gui.png)
+   ![Windows Installer GUI](https://raw.githubusercontent.com/netdata/docs-images/refs/heads/master/windows/release/windows-installer-gui.png)
 
 3. **Verify the installation:**
-   - The installer will automatically detect your existing installation
-   - Upgrade to the Nightly channel
-   - Preserve your configuration and data
-   - Restart the Netdata service
+    - The installer will automatically detect your existing installation
+    - Upgrade to the Nightly channel
+    - Preserve your configuration and data
+    - Restart the Netdata service
 
 </details>
 
@@ -116,7 +121,7 @@ Use the [GUI installer](#method-1-gui-installation-recommended) instead.
 :::
 
 <details>
-<summary><strong>Switch to Stable Channel via PowerShell</strong></summary><br/>
+<summary>Switch to Stable Channel via PowerShell</summary>
 
 ```powershell
 # Run PowerShell as Administrator
@@ -130,7 +135,7 @@ msiexec /qn /i "$env:TEMP\netdata-x64.msi" REINSTALL=ALL
 <br/>
 
 <details>
-<summary><strong>Switch to Nightly Channel via PowerShell</strong></summary><br/>
+<summary>Switch to Nightly Channel via PowerShell</summary>
 
 ```powershell
 # Run PowerShell as Administrator
@@ -144,7 +149,7 @@ msiexec /qn /i "$env:TEMP\netdata-x64.msi" REINSTALL=ALL
 ### Method 3: PowerShell with Cloud Connection Preserved
 
 <details>
-<summary><strong>Switch Channels with Explicit Cloud Settings</strong></summary><br/>
+<summary>Switch Channels with Explicit Cloud Settings</summary>
 
 If you want to ensure your Netdata Cloud connection is maintained during the switch, you can provide your claim token and room IDs explicitly.
 
@@ -166,6 +171,7 @@ $ROOMS = "<YOUR_ROOM_IDS>"         # <-- Replace with your comma-separated Room 
 $ProgressPreference = 'SilentlyContinue'
 Invoke-WebRequest https://github.com/netdata/netdata/releases/latest/download/netdata-x64.msi -OutFile "$env:TEMP\netdata-x64.msi"
 msiexec /qn /i "$env:TEMP\netdata-x64.msi" TOKEN="$TOKEN" ROOMS="$ROOMS"
+```
 
 </details>
 
@@ -174,17 +180,19 @@ msiexec /qn /i "$env:TEMP\netdata-x64.msi" TOKEN="$TOKEN" ROOMS="$ROOMS"
 The `REINSTALL=ALL` parameter is a Windows Installer (MSI) standard option that forces reinstallation of all Netdata components, ensuring a clean upgrade path.
 
 **When to use REINSTALL=ALL:**
+
 - **Switching channels** (Stable ↔ Nightly) - Recommended
 - **Troubleshooting broken installation** - Essential
 - **Upgrading within same channel** - Optional
 
-**When not to use REINSTALL=ALL:**
+**When not to use REINSTALL = ALL: **
+
 - Fresh installations (no existing Netdata)
 - When you want minimal disruption (standard MSI upgrade is sufficient)
 
 :::warning
 
-The `REINSTALL=ALL` parameter ensures complete replacement of binaries but is not required for normal channel switches. The MSI installer handles upgrades automatically.
+The `REINSTALL = ALL` parameter ensures complete replacement of binaries but is not required for normal channel switches. The MSI installer handles upgrades automatically.
 
 :::
 
@@ -193,29 +201,33 @@ The `REINSTALL=ALL` parameter ensures complete replacement of binaries but is no
 After switching channels, verify which version you're running:
 
 <details>
-<summary><strong>Check via Netdata Dashboard</strong></summary><br/>
+<summary>Check via Netdata Dashboard</summary>
 
-1. Open your browser to `http://localhost:19999`
+1. Open your browser to `http: //localhost:19999`
 2. Click the **Netdata logo** in the top-left corner
 3. Look for the version number:
-   - **Stable**: `v2.1.0` (clean version number)
-   - **Nightly**: `v2.1.0-123-nightly` (includes commit hash)
+
+- **Stable**: `v2.1.0` (clean version number)
+- **Nightly**: `v2.1.0-123-nightly` (includes commit hash)
 
 </details>
 
 <br/>
 
 <details>
-<summary><strong>Check via PowerShell</strong></summary><br/>
+<summary>Check via PowerShell</summary>
 
 ```powershell
 # Get installed Netdata version
-Get-ItemProperty "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*" | 
-  Where-Object { $_.DisplayName -like "*Netdata*" } | 
-  Select-Object DisplayName, DisplayVersion, Publisher
+Get-ItemProperty "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*" |
+        Where-Object {
+            $_.DisplayName -like "*Netdata*"
+        } |
+        Select-Object DisplayName, DisplayVersion, Publisher
 ```
 
 **Example output:**
+
 ```
 DisplayName    : Netdata
 DisplayVersion : 2.1.0
@@ -227,7 +239,7 @@ Publisher      : Netdata Inc.
 <br/>
 
 <details>
-<summary><strong>Check Netdata Service Status</strong></summary><br/>
+<summary>Check Netdata Service Status</summary>
 
 You can also verify the Netdata service is running through the Windows Services manager:
 
@@ -240,7 +252,7 @@ Or check via PowerShell:
 Get-Service netdata | Select-Object Name, Status, DisplayName
 
 # Check service executable path
-Get-WmiObject win32_service | Where-Object {$_.Name -eq 'netdata'} | Select-Object PathName
+Get-WmiObject win32_service | Where-Object { $_.Name -eq 'netdata' } | Select-Object PathName
 ```
 
 </details>
@@ -248,7 +260,7 @@ Get-WmiObject win32_service | Where-Object {$_.Name -eq 'netdata'} | Select-Obje
 ## Troubleshooting Common Issues
 
 <details>
-<summary><strong>Issue: "Another version is already installed"</strong></summary><br/>
+<summary>Issue: "Another version is already installed"</summary>
 
 **Symptoms**: MSI installer shows error about existing installation
 
@@ -280,7 +292,7 @@ msiexec /qn /i netdata-x64.msi TOKEN="<YOUR_TOKEN>" ROOMS="<YOUR_ROOMS>"
 <br/>
 
 <details>
-<summary><strong>Issue: Cloud Connection Lost After Switch</strong></summary><br/>
+<summary>Issue: Cloud Connection Lost After Switch</summary>
 
 **Symptoms**: After switching channels, node doesn't appear in Netdata Cloud
 
@@ -309,7 +321,7 @@ You can also verify the service status in Windows Services:
 <br/>
 
 <details>
-<summary><strong>Issue: Service Won't Start After Switch</strong></summary><br/>
+<summary>Issue: Service Won't Start After Switch</summary>
 
 **Symptoms**: Netdata service fails to start after channel switch
 
@@ -340,17 +352,17 @@ If the service still won't start, check the Windows Services manager to ensure t
 For users who prefer the traditional Windows approach, you can also manage Netdata installations through the Windows Control Panel:
 
 1. **Access Add/Remove Programs:**
-   - Open Windows Settings → Apps & features
-   - Or search for "Add or remove programs" in the Start menu
+    - Open Windows Settings → Apps & features
+    - Or search for "Add or remove programs" in the Start menu
 
 2. **Locate Netdata:**
-   - Find "Netdata" in the installed programs list
-   - Note the current version number
+    - Find "Netdata" in the installed programs list
+    - Note the current version number
 
-![Windows Add/Remove Programs](https://raw.githubusercontent.com/netdata/docs-images/refs/heads/master/windows/release/windows-add-remove-programs.png)
+   ![Windows Add/Remove Programs](https://raw.githubusercontent.com/netdata/docs-images/refs/heads/master/windows/release/windows-add-remove-programs.png)
 
 3. **Uninstall if needed:**
-   - Click "Uninstall" to remove the current installation
-   - Then install the new channel using the MSI installer
+    - Click "Uninstall" to remove the current installation
+    - Then install the new channel using the MSI installer
 
 This method provides a familiar Windows experience but requires manual download and installation of the new channel.
