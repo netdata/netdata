@@ -183,9 +183,9 @@ The `REINSTALL=ALL` parameter is a Windows Installer (MSI) standard option that 
 
 - **Switching channels** (Stable ↔ Nightly) - Recommended
 - **Troubleshooting broken installation** - Essential
-- **Upgrading within same channel** - Optional
+- **Upgrading within the same channel** - Optional
 
-**When not to use REINSTALL = ALL: **
+**When not to use REINSTALL = ALL:**
 
 - Fresh installations (no existing Netdata)
 - When you want minimal disruption (standard MSI upgrade is sufficient)
