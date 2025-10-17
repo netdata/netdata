@@ -10,6 +10,9 @@ import { TestLLMProvider } from './llm-providers/test-llm.js';
 
 export class LLMClient {
   private static readonly OPENROUTER_HOST = 'openrouter.ai';
+  private static readonly CONTENT_TYPE_EVENT_STREAM = 'text/event-stream';
+  private static readonly CONTENT_TYPE_JSON = 'application/json';
+  private static readonly CONTENT_TYPE_HEADER = 'content-type';
   private providers = new Map<string, BaseLLMProvider>();
   private onLog?: (entry: LogEntry) => void;
   private traceLLM: boolean;
@@ -26,6 +29,7 @@ export class LLMClient {
   // Tracks last parsed cache creation input tokens from upstream (e.g., Anthropic raw JSON)
   private lastCacheWriteInputTokens?: number;
   private lastMetadataTask?: Promise<void>;
+  private lastTraceTask?: Promise<void>;
 
   constructor(
     providerConfigs: Record<string, ProviderConfig>,
@@ -99,6 +103,11 @@ export class LLMClient {
     this.currentSubturn = subturn;
   }
 
+  async waitForMetadataCapture(): Promise<void> {
+    await this.awaitLastMetadataTask();
+    await this.awaitLastTraceTask();
+  }
+
   // Expose last routed provider/model for accounting/logging
   getLastActualRouting(): { provider?: string; model?: string } {
     return { provider: this.lastActualProvider, model: this.lastActualModel };
@@ -143,7 +152,7 @@ export class LLMClient {
         // Add default headers
         const headers = new Headers(init?.headers);
         if (!headers.has('Accept')) {
-          headers.set('Accept', 'application/json');
+          headers.set('Accept', LLMClient.CONTENT_TYPE_JSON);
         }
 
         // Add OpenRouter attribution headers if needed
@@ -206,16 +215,25 @@ export class LLMClient {
         if (this.traceLLM) {
           try {
             const traceClone = response.clone();
-            this.logResponseTraceAsync(method, url, traceClone);
+            this.lastTraceTask = this.logResponseTraceAsync(method, url, traceClone);
           } catch (cloneError) {
             this.handleCloneFailure('trace', cloneError);
           }
         }
 
-        try {
-          await metadataTask;
-        } catch {
-          /* ignore metadata errors for superseded requests */
+        const contentTypeHeader = response.headers.get(LLMClient.CONTENT_TYPE_HEADER);
+        const contentType = typeof contentTypeHeader === 'string' ? contentTypeHeader.toLowerCase() : '';
+        const shouldAwaitMetadata = !contentType.includes(LLMClient.CONTENT_TYPE_EVENT_STREAM);
+        if (shouldAwaitMetadata) {
+          try {
+            await metadataTask;
+          } catch {
+            /* ignore metadata errors for superseded requests */
+          } finally {
+            if (this.lastMetadataTask === metadataTask) {
+              this.lastMetadataTask = undefined;
+            }
+          }
         }
 
         return response;
@@ -249,10 +267,26 @@ export class LLMClient {
     }
   }
 
+  private async awaitLastTraceTask(): Promise<void> {
+    const pending = this.lastTraceTask;
+    if (pending === undefined) {
+      return;
+    }
+    try {
+      await pending;
+    } catch {
+      /* ignore trace errors */
+    } finally {
+      if (this.lastTraceTask === pending) {
+        this.lastTraceTask = undefined;
+      }
+    }
+  }
+
   private captureResponseMetadata(url: string, response: Response): Promise<void> {
     return (async () => {
       const isOpenRouter = url.includes(LLMClient.OPENROUTER_HOST);
-      const contentTypeHeader = response.headers.get('content-type') ?? '';
+        const contentTypeHeader = response.headers.get(LLMClient.CONTENT_TYPE_HEADER) ?? '';
       const contentType = contentTypeHeader.toLowerCase();
 
       let actualProvider: string | undefined;
@@ -279,7 +313,7 @@ export class LLMClient {
       };
 
       try {
-        if (isOpenRouter && contentType.includes('application/json')) {
+        if (isOpenRouter && contentType.includes(LLMClient.CONTENT_TYPE_JSON)) {
           const parsed = await this.parseJsonResponse(response.clone(), 'openrouter extract usage cost failed');
           if (parsed !== undefined) {
             const routing = this.extractOpenRouterRouting(parsed.data);
@@ -287,7 +321,7 @@ export class LLMClient {
             actualModel = routing.model ?? actualModel;
             applyUsage(this.extractUsageRecord(parsed.data));
           }
-        } else if (isOpenRouter && contentType.includes('text/event-stream')) {
+        } else if (isOpenRouter && contentType.includes(LLMClient.CONTENT_TYPE_EVENT_STREAM)) {
           try {
             const meta = await this.parseOpenRouterSseStream(response.clone(), (partial) => {
               if (partial.provider !== undefined) {
@@ -329,7 +363,7 @@ export class LLMClient {
               /* ignore logging failures */
             }
           }
-        } else if (contentType.includes('application/json')) {
+        } else if (contentType.includes(LLMClient.CONTENT_TYPE_JSON)) {
           const parsed = await this.parseJsonResponse(response.clone(), 'generic JSON usage parse failed');
           if (parsed !== undefined) {
             applyUsage(this.extractUsageRecord(parsed.data));
@@ -359,7 +393,7 @@ export class LLMClient {
     }
   }
 
-  private logResponseTraceAsync(method: string, _url: string, response: Response): void {
+  private logResponseTraceAsync(method: string, _url: string, response: Response): Promise<void> {
     const task = (async () => {
       const respHeaders: Record<string, string> = {};
       response.headers.forEach((value, key) => {
@@ -379,9 +413,9 @@ export class LLMClient {
       });
 
       let traceMessage = `LLM response: ${String(response.status)} ${response.statusText}\nheaders: ${JSON.stringify(respHeaders, null, 2)}`;
-      const contentType = response.headers.get('content-type') ?? '';
+      const contentType = response.headers.get(LLMClient.CONTENT_TYPE_HEADER) ?? '';
       const lowered = contentType.toLowerCase();
-      if (lowered.includes('application/json')) {
+      if (lowered.includes(LLMClient.CONTENT_TYPE_JSON)) {
         try {
           const text = await response.text();
           let body = text;
@@ -394,7 +428,7 @@ export class LLMClient {
         } catch {
           traceMessage += `\ncontent-type: ${contentType}`;
         }
-      } else if (lowered.includes('text/event-stream')) {
+      } else if (lowered.includes(LLMClient.CONTENT_TYPE_EVENT_STREAM)) {
         try {
           const raw = await response.text();
           traceMessage += `\nraw-sse: ${raw}`;
@@ -419,6 +453,7 @@ export class LLMClient {
         }
       }
     })();
+    return task;
   }
 
   private isPlainObject(value: unknown): value is Record<string, unknown> {

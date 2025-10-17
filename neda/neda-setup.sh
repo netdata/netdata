@@ -408,6 +408,16 @@ run sudo -u "$NEDA_USER" env HOME="$NEDA_HOME" PLAYWRIGHT_BROWSERS_PATH="$NEDA_H
 log_info "Installing Playwright system dependencies..."
 run npx --prefix "$NEDA_HOME" playwright install-deps
 
+# NOTE: For Arch/Manjaro users, the above command will fail because playwright install-deps
+# only supports Debian/Ubuntu. On Arch/Manjaro, manually run this command instead:
+#
+# yay -S --needed nss nspr at-spi2-core libcups libdrm dbus libxcb libxkbcommon \
+#     libx11 libxcomposite libxdamage libxext libxfixes libxrandr mesa pango cairo \
+#     alsa-lib xorg-server-xvfb libxml2-legacy icu66-bin libffi7 libwebp0.5
+#
+# This installs both official repo packages and AUR packages (icu66-bin, libffi7, libwebp0.5)
+# required for Playwright's bundled browsers.
+
 # Create compatibility copies for common version mismatches
 # This handles version differences between fetcher-mcp and installed Playwright
 for source_dir in "$NEDA_HOME/.cache/ms-playwright"/chromium_headless_shell-*; do

@@ -1506,6 +1506,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
           headers: { Authorization: 'Bearer TESTTOKEN', 'Content-Type': CONTENT_TYPE_JSON },
           body: requestBody,
         });
+        await client.waitForMetadataCapture();
         finalData.afterJson = client.getLastActualRouting();
         finalData.costs = client.getLastCostInfo();
         await tracedFetch(OPENROUTER_RESPONSES_URL, {
@@ -1513,6 +1514,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
           headers: { Authorization: 'Bearer SSE', 'Content-Type': CONTENT_TYPE_JSON },
           body: requestBody,
         });
+        await client.waitForMetadataCapture();
         finalData.afterSse = client.getLastActualRouting();
         finalData.costs = client.getLastCostInfo();
         await tracedFetch('https://anthropic.mock/v1/messages', {
@@ -1520,6 +1522,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
           headers: { 'Content-Type': CONTENT_TYPE_JSON },
           body: JSON.stringify({ prompt: 'cache' }),
         });
+        await client.waitForMetadataCapture();
         const coverageClient = new LLMClient(
           { openrouter: { type: 'openrouter' } },
           { traceLLM: true, onLog: (entry) => { logs.push(entry); } }
@@ -1531,16 +1534,19 @@ const TEST_SCENARIOS: HarnessTest[] = [
           headers: { Authorization: 'Bearer SSEFAIL', 'Content-Type': CONTENT_TYPE_JSON },
           body: requestBody,
         });
+        await coverageClient.waitForMetadataCapture();
         await coverageFetch(OPENROUTER_BINARY_URL, {
           method: 'POST',
           headers: { Authorization: 'Bearer BINARY', 'Content-Type': CONTENT_TYPE_JSON },
           body: requestBody,
         });
+        await coverageClient.waitForMetadataCapture();
         await coverageFetch(OPENROUTER_RESPONSES_URL, {
           method: 'POST',
           headers: { Authorization: 'Bearer JSONFAIL', 'Content-Type': CONTENT_TYPE_JSON },
           body: requestBody,
         });
+        await coverageClient.waitForMetadataCapture();
         try {
           await tracedFetch(OPENROUTER_RESPONSES_URL, {
             method: 'POST',
@@ -1550,6 +1556,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
         } catch (error: unknown) {
           fetchError = error instanceof Error ? error : new Error(String(error));
         }
+        await client.waitForMetadataCapture();
 
 
         const successResult: TurnResult = {
@@ -1624,9 +1631,18 @@ const TEST_SCENARIOS: HarnessTest[] = [
       assertRecord(report, 'Final data snapshot expected for run-test-55.');
       const fetchErrorMsg = typeof report.fetchError === 'string' ? report.fetchError : undefined;
       invariant(fetchErrorMsg === 'network down', 'Fetch error message expected for run-test-55.');
+      const routingAfterJson = report.routingAfterJson;
+      assertRecord(routingAfterJson, 'JSON routing metadata expected for run-test-55.');
+      invariant(routingAfterJson.provider === 'fireworks', 'JSON routing provider expected for run-test-55.');
+      invariant(routingAfterJson.model === 'gpt-fireworks', 'JSON routing model expected for run-test-55.');
       const routingAfterSse = report.routingAfterSse;
       assertRecord(routingAfterSse, 'Routing metadata expected for run-test-55.');
       invariant(routingAfterSse.provider === 'mistral', 'Routing metadata expected for run-test-55.');
+      invariant(routingAfterSse.model === 'mixtral', 'SSE routing model expected for run-test-55.');
+      const costSnapshot = report.costSnapshot;
+      assertRecord(costSnapshot, 'Cost metadata expected for run-test-55.');
+      invariant(costSnapshot.costUsd === 0.015, 'Final cost expected for run-test-55.');
+      invariant(costSnapshot.upstreamInferenceCostUsd === 0.006, 'Upstream inference cost expected for run-test-55.');
     },
   },
   {
@@ -4674,6 +4690,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
           },
         });
         await response.text();
+        await client.waitForMetadataCapture();
       } finally {
         globalThis.fetch = originalFetch;
       }
