@@ -1034,12 +1034,16 @@ const TEST_SCENARIOS: HarnessTest[] = [
       sessionConfig.maxTurns = 1;
     },
     expect: (result) => {
-      invariant(!result.success, 'Scenario run-test-33 should fail after exhausting synthetic retries.');
-      invariant(typeof result.error === 'string' && result.error.includes('content_without_tools_or_final'), 'Expected synthetic retry exhaustion error for run-test-33.');
+      invariant(result.success, 'Scenario run-test-33 should complete with a synthesized failure final report.');
+      const finalReport = result.finalReport;
+      invariant(finalReport !== undefined && finalReport.status === 'failure', 'Synthesized failure final report expected for run-test-33.');
+      invariant(typeof finalReport.content === 'string' && finalReport.content.includes('did not produce a final report'), 'Synthesized content should mention missing final report for run-test-33.');
       const syntheticLog = result.logs.find((entry) => typeof entry.message === 'string' && entry.message.includes('Synthetic retry: assistant returned content without tool calls and without final_report.'));
       invariant(syntheticLog !== undefined, 'Synthetic retry warning expected for run-test-33.');
       const finalTurnLog = result.logs.find((entry) => entry.remoteIdentifier === 'agent:final-turn');
       invariant(finalTurnLog !== undefined, 'Final-turn retry warning expected for run-test-33.');
+      const exitLog = result.logs.find((entry) => entry.remoteIdentifier === EXIT_FINAL_REPORT_IDENTIFIER);
+      invariant(exitLog !== undefined, 'Synthesized EXIT-FINAL-ANSWER log expected for run-test-33.');
     },
   },
   {
@@ -4617,9 +4621,9 @@ const TEST_SCENARIOS: HarnessTest[] = [
       const finalReport = result.finalReport;
       invariant(finalReport !== undefined, 'Final report expected for run-test-101.');
       invariant(finalReport.status === 'failure', 'Synthesized final report should carry failure status for run-test-101.');
-      invariant(typeof finalReport.content === 'string' && finalReport.content.includes('Connection closed'), 'Failure summary should mention the tool error for run-test-101.');
+      invariant(typeof finalReport.content === 'string' && finalReport.content.includes('did not produce a final report'), 'Failure summary should mention the missing final report for run-test-101.');
       const exitLog = result.logs.find((entry) => entry.remoteIdentifier === EXIT_FINAL_REPORT_IDENTIFIER);
-      invariant(exitLog !== undefined && typeof exitLog.message === 'string' && exitLog.message.includes('Synthesized'), 'Synthesized final report exit log missing for run-test-101.');
+      invariant(exitLog !== undefined && typeof exitLog.message === 'string' && exitLog.message.includes('Synthesized failure final_report'), 'Synthesized final report exit log missing for run-test-101.');
     },
   },
   {

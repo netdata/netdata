@@ -1014,9 +1014,7 @@ export class AIAgentSession {
     let logs = [...initialLogs];
     let accounting = [...initialAccounting];
     let currentTurn = startTurn;
-    let lastToolFailureSummary: string | undefined;
-    let encounteredToolFailure = false;
-    let lastFailedToolName: string | undefined;
+    let finalReportToolFailed = false;
     
     // Track the last turn where we showed thinking header
     let lastShownThinkingHeaderTurn = -1;
@@ -1262,6 +1260,7 @@ export class AIAgentSession {
               const sanitizedHasText = textContent !== undefined && textContent.trim().length > 0;
 
               const toolFailureDetected = sanitizedMessages.some((msg) => msg.role === 'tool' && typeof msg.content === 'string' && msg.content.trim().toLowerCase().startsWith('(tool failed:'));
+              let failureToolNameNormalized: string | undefined;
               if (toolFailureDetected) {
                 const failureToolMessage = sanitizedMessages
                   .filter((msg) => msg.role === 'tool' && typeof msg.content === 'string')
@@ -1269,11 +1268,6 @@ export class AIAgentSession {
                     const trimmed = msg.content.trim().toLowerCase();
                     return trimmed.startsWith('(tool failed:');
                   });
-                const failureMessageCandidate = failureToolMessage?.content.trim();
-                if (typeof failureMessageCandidate === 'string' && failureMessageCandidate.length > 0) {
-                  lastToolFailureSummary = failureMessageCandidate;
-                }
-                encounteredToolFailure = true;
                 if (failureToolMessage !== undefined && typeof (failureToolMessage as { toolCallId?: unknown }).toolCallId === 'string') {
                   const owningAssistant = sanitizedMessages.find(
                     (msg): msg is ConversationMessage & { toolCalls: ToolCall[] } =>
@@ -1282,12 +1276,13 @@ export class AIAgentSession {
                   if (owningAssistant !== undefined) {
                     const relatedCall = owningAssistant.toolCalls.find((tc) => tc.id === (failureToolMessage as { toolCallId?: string }).toolCallId);
                     if (relatedCall !== undefined) {
-                      lastFailedToolName = relatedCall.name;
+                      failureToolNameNormalized = sanitizeToolName(relatedCall.name);
+                      if (failureToolNameNormalized === AIAgentSession.FINAL_REPORT_TOOL) {
+                        finalReportToolFailed = true;
+                      }
                     }
                   }
                 }
-              } else {
-                lastToolFailureSummary = undefined;
               }
 
               // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
@@ -1827,34 +1822,31 @@ export class AIAgentSession {
       }
 
       if (!turnSuccessful) {
-        if (currentTurn === maxTurns && encounteredToolFailure) {
-          const failedToolNormalized = lastFailedToolName !== undefined ? sanitizeToolName(lastFailedToolName) : undefined;
-          if (failedToolNormalized !== AIAgentSession.FINAL_REPORT_TOOL) {
-            const fallbackSummary = (lastToolFailureSummary ?? lastError ?? 'Unable to complete the request after exhausting all retries.').trim();
-            const fallbackFormatCandidate = this.resolvedFormat ?? 'text';
-            const fallbackFormat = FINAL_REPORT_FORMAT_VALUES.find((value) => value === fallbackFormatCandidate) ?? 'text';
-            const metadata: Record<string, unknown> = {};
-            if (lastToolFailureSummary !== undefined) metadata.failure = lastToolFailureSummary;
-            if (lastError !== undefined) metadata.lastError = lastError;
-            const fallbackReport: NonNullable<AIAgentResult['finalReport']> = {
-              status: lastToolFailureSummary !== undefined ? 'failure' : 'partial',
-              format: fallbackFormat,
-              content: fallbackSummary,
-              ...(Object.keys(metadata).length > 0 ? { metadata } : {}),
-              ts: Date.now(),
-            };
-            this.finalReport = fallbackReport;
-            this.logExit('EXIT-FINAL-ANSWER', `Synthesized ${fallbackReport.status} final_report after retries`, currentTurn);
-            this.emitFinalSummary(logs, accounting);
-            return {
-              success: true,
-              conversation,
-              logs,
-              accounting,
-              finalReport: fallbackReport,
-              childConversations: this.childConversations,
-            };
-          }
+        if (currentTurn === maxTurns && this.finalReport === undefined && !finalReportToolFailed) {
+          const attemptLabel = `${String(maxRetries)} attempt${maxRetries === 1 ? '' : 's'}`;
+          const baseSummary = `The model did not produce a final report after ${attemptLabel} on the final turn.`;
+          const detailedSummary = lastError !== undefined ? `${baseSummary} Last error: ${lastError}.` : baseSummary;
+          const fallbackFormatCandidate = this.resolvedFormat ?? 'text';
+          const fallbackFormat = FINAL_REPORT_FORMAT_VALUES.find((value) => value === fallbackFormatCandidate) ?? 'text';
+          const metadata = lastError !== undefined ? { lastError } : undefined;
+          const fallbackReport: NonNullable<AIAgentResult['finalReport']> = {
+            status: 'failure',
+            format: fallbackFormat,
+            content: detailedSummary,
+            ...(metadata !== undefined ? { metadata } : {}),
+            ts: Date.now(),
+          };
+          this.finalReport = fallbackReport;
+          this.logExit('EXIT-FINAL-ANSWER', 'Synthesized failure final_report after retries', currentTurn);
+          this.emitFinalSummary(logs, accounting);
+          return {
+            success: true,
+            conversation,
+            logs,
+            accounting,
+            finalReport: fallbackReport,
+            childConversations: this.childConversations,
+          };
         }
 
         // All attempts failed for this turn

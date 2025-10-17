@@ -1,10 +1,10 @@
 # Technical Debt Backlog (Unified)
 
-_Last updated: 2025-10-14_
+_Last updated: 2025-10-17_
 
 ## TL;DR
-- Streaming remains buffered by traced fetch; fixing this restores real-time tokens and prevents double bandwidth usage.
-- Core library violates the “silent core” contract (sync FS + stderr writes) and the agent loop can no longer finish without calling `agent__final_report`.
+- Streaming is now non-blocking via traced-fetch updates; keep the coverage guard (`coverage-openrouter-sse-nonblocking`) whenever metadata capture changes.
+- The core emits a synthesized final report if the model never produces one; next steps: add a harness case where `agent__final_report` itself fails and evaluate richer diagnostics in the fallback message.
 - Reliability gaps: no transport-level retries/circuit breakers, limited observability, and automated coverage stops at the phase1 harness (no provider/rest e2e tests or CI gating). Expanded coverage remains an active workstream.
 
 ## P0 — Critical (breaks core behavior or architecture)
@@ -16,6 +16,7 @@ _Last updated: 2025-10-14_
 - **Lack of transport retries/circuit breakers** — MCP servers and LLM transports have no retry/backoff beyond the high-level loop. Add provider/tool-level retry policies with exponential backoff, jitter, and circuit breakers for flaky endpoints.
 - **Observability gaps** — Structured logs exist but we lack correlation IDs, metrics, or traces. Add OpenTelemetry spans, Prometheus counters (tokens, latency, tool failures), and enrich logs with consistent identifiers.
 - **Limited automated coverage** — The deterministic phase1 harness (including the new streaming/persistence/final_report scenarios) exists, but we still lack provider-specific unit tests, rest-provider coverage, and CI gating for regressions. Stand up Vitest (or Jest) with broader suites, add mocks for adapters, and enforce coverage in CI before major refactors.
+- **Final-report fallback follow-ups** — The synthesized failure report currently echoes only the final retry error. Add a harness scenario where `agent__final_report` rejects so we keep the hard-fail branch covered, and decide whether the fallback should enumerate attempted providers before declaring failure.
 - **Concurrency limiter duplication** — Tool execution throttling logic lives in both `AIAgentSession` and `ToolsOrchestrator`; a similar limiter exists in `src/headends/concurrency.ts`. Centralize into a reusable semaphore.
 - **Loader duplication** — `loadAgent` vs `loadAgentFromContent` in `src/agent-loader.ts` repeat the same resolution/validation logic. Extract shared helpers to reduce churn and bug risk.
 - **Noisy diagnostics** — `src/llm-client.ts:220-253` prints warnings via `console.error` even with tracing disabled. Route through structured logging and guard behind trace flags.
