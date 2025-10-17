@@ -4627,6 +4627,61 @@ const TEST_SCENARIOS: HarnessTest[] = [
     },
   },
   {
+    id: 'run-test-102',
+    description: 'Fails when agent__final_report tool call itself fails on the final turn.',
+    execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+      sessionConfig.maxTurns = 1;
+      sessionConfig.maxRetries = 1;
+      sessionConfig.targets = [{ provider: PRIMARY_PROVIDER, model: MODEL_NAME }];
+      // eslint-disable-next-line @typescript-eslint/unbound-method
+      const originalExecuteTurn = LLMClient.prototype.executeTurn;
+      LLMClient.prototype.executeTurn = function(this: LLMClient, _request: TurnRequest): Promise<TurnResult> {
+        const failureCallId = 'call-final-report-fail';
+        const assistantMessage: ConversationMessage = {
+          role: 'assistant',
+          content: '',
+          toolCalls: [
+            {
+              id: failureCallId,
+              name: 'agent__final_report',
+              parameters: {
+                status: 'success',
+                report_format: 'markdown',
+                report_content: '# Placeholder\n\nThis should fail.',
+              },
+            },
+          ],
+        };
+        const toolMessage: ConversationMessage = {
+          role: 'tool',
+          toolCallId: failureCallId,
+          content: '(tool failed: Schema validation error: report_content missing required section)',
+        };
+        return Promise.resolve({
+          status: { type: 'success', hasToolCalls: true, finalAnswer: true },
+          latencyMs: 30,
+          messages: [assistantMessage, toolMessage],
+          tokens: { inputTokens: 10, outputTokens: 2, cachedTokens: 0, totalTokens: 12 },
+        });
+      };
+      try {
+        const session = AIAgentSession.create(sessionConfig);
+        return await session.run();
+      } finally {
+        LLMClient.prototype.executeTurn = originalExecuteTurn;
+      }
+    },
+    expect: (result: AIAgentResult) => {
+      invariant(!result.success, 'Scenario run-test-102 should report failure when final_report tool fails.');
+      invariant(result.finalReport === undefined, 'No final report expected when agent__final_report fails in run-test-102.');
+      invariant(result.error === 'final_report_failed', 'Failure error should be final_report_failed for run-test-102.');
+      const exitLog = result.logs.find((entry) => entry.remoteIdentifier === 'agent:EXIT-NO-LLM-RESPONSE');
+      invariant(exitLog !== undefined && typeof exitLog.message === 'string' && exitLog.message.includes('final_report_failed'), 'EXIT-NO-LLM-RESPONSE log with final_report_failed reason expected for run-test-102.');
+      const synthesizedFallbackLog = result.logs.find((entry) => typeof entry.message === 'string' && entry.message.includes('Synthesized failure final_report'));
+      invariant(synthesizedFallbackLog === undefined, 'Synthesized fallback log must not appear for run-test-102.');
+    },
+  },
+  {
     id: 'run-test-43',
     configure: (_configuration, sessionConfig) => {
       sessionConfig.stopRef = { stopping: true };
