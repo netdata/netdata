@@ -7,6 +7,7 @@
 #define UNW_LOCAL_ONLY
 #endif
 #include <libunwind.h>
+#include <dlfcn.h>
 
 const char *stacktrace_capture_backend(void) {
     return "libunwind";
