@@ -342,9 +342,15 @@ WHERE JOB_QUEUE_LIBRARY = '%[1]s'
 `, target.Library, target.Name)
 }
 
-func buildOutputQueueQuery(target queueTarget) string {
+func buildOutputQueueEntriesQuery(target queueTarget) string {
+	return fmt.Sprintf(`SELECT * FROM TABLE(QSYS2.OUTPUT_QUEUE_ENTRIES('%[1]s', '%[2]s', '*NO'))`, target.Library, target.Name)
+}
+
+func buildOutputQueueInfoQuery(target queueTarget) string {
 	return fmt.Sprintf(`
 SELECT
+    OUTPUT_QUEUE_LIBRARY_NAME,
+    OUTPUT_QUEUE_NAME,
     OUTPUT_QUEUE_STATUS,
     COALESCE(NUMBER_OF_FILES, 0) AS NUMBER_OF_FILES,
     COALESCE(NUMBER_OF_WRITERS, 0) AS NUMBER_OF_WRITERS

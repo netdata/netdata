@@ -13,9 +13,9 @@ The following collectors must be reworked first; they combine high latency with 
 
 | Query | Source | Problem | Required Fix |
 | --- | --- | --- | --- |
-| `message_queue_aggregates`, `count_message_queues` | `QSYS2.MESSAGE_QUEUE_INFO` (detail table, full scan) | Full table scan, aggregation, `FETCH FIRST` post-scan | Rewrite around the table function (`TABLE(QSYS2.MESSAGE_QUEUE_INFO(...))` on 7.4+), expand selectors into explicit lists, round-robin per queue, run on slow track |
-| `collectJobQueues` (`queryJobQueues`, `queryCountJobQueues`) | `QSYS2.JOB_QUEUE_INFO` | Fetches all queues, filtering happens in Go after the fact, `FETCH FIRST` post-scan | Convert selector/limits into `WHERE` clauses or per-queue table function calls, use explicit list expansion, move to slow track |
-| `collectOutputQueues` (`queryOutputQueueInfo`, `queryCountOutputQueues`) | `QSYS2.OUTPUT_QUEUE_INFO` | Same pattern as job queues, plus spool file stats | Same treatment as job queues; prefer table function or filtered views if IBM introduces them |
+| `message_queue_aggregates`, `count_message_queues` | `QSYS2.MESSAGE_QUEUE_INFO` (detail table, full scan) | Full table scan, aggregation, `FETCH FIRST` post-scan | ✅ done (table function per queue, documented fallback + defaults) |
+| `collectJobQueues` (`queryJobQueues`) | `QSYS2.JOB_QUEUE_INFO` | Still hitting view per queue; latency high when queue list grows | (Phase 2) keep explicit queue list, consider batching once slow track exists; no scoped table function available |
+| `collectOutputQueues` (`queryOutputQueueInfo`) | `QSYS2.OUTPUT_QUEUE_INFO` | View-based per queue | ✅ done (table function per queue with view fallback; counts derive from entries) |
 | `collectActiveJobs` (`queryTopActiveJobs`, `queryCountActiveJobs`) | `TABLE(QSYS2.ACTIVE_JOB_INFO(...))` with `*ALL` filters | Materializes entire active-job list before `FETCH FIRST` | Pass explicit subsystem/job filters, allow inclusion list expansion, add per-group scheduling |
 | `collectPlanCache` (`CALL QSYS2.ANALYZE_PLAN_CACHE('03', …)`) | Stored procedure | Walks the entire plan cache every cycle, blocking fast loop | Move to slow track, investigate narrower arguments or sampling schedule |
 
@@ -50,11 +50,13 @@ Legend: ✅ (fine), ⚠️ (needs filtering/guardrails), ❗️ (full scan / hea
 2. **Prefer table functions (7.4+):** when available, use IBM’s table functions (`TABLE(QSYS2.MESSAGE_QUEUE_INFO(...))`, `TABLE(QSYS2.ACTIVE_JOB_INFO(...))`, etc.) so the filtering happens via parameters instead of scanning the entire detail view. On older releases fall back to views but construct strict `WHERE library/name IN (...)` clauses from the explicit lists.
 3. **Helper for list expansion:** implement shared helpers that turn config lists into SQL fragments and per-collector worklists. If glob support is introduced, expand to explicit names on a periodic cadence and reuse the list so the optimized SQL always receives concrete values (never `LIKE`).
 4. **Lightweight counts:** reuse the explicit target list for cardinality checks (length of the list) instead of running `COUNT(*)` scans where possible; otherwise cache the last-known count and refresh less frequently.
+5. **Output queues:** ✅ implemented via `OUTPUT_QUEUE_ENTRIES` with view fallback.
 
 ### Phase 2 – Scheduler & Parallelization
 1. Implement multi-track scheduler in the ibm.d framework so slow groups (message/output queues, plan cache, job queues) run in parallel to the 5 s fast loop.
 2. Assign ODBC connections per track (limited pool) and warehouse results via channels to avoid data races.
 3. Ensure dump mode / shutdown handle background goroutines.
+4. **Job queues:** revisit batching/filtering once slow track exists (still view-based; no scoped table function available).
 
 ### Phase 3 – Instrumentation & Validation
 1. Extend query latency tracking to name every query (remove “other” bucket).
@@ -70,8 +72,8 @@ Legend: ✅ (fine), ⚠️ (needs filtering/guardrails), ❗️ (full scan / hea
 ## 6. Action Plan
 
 1. **Message queues:** (✅ done) explicit list + table function (7.4+) / documented behaviour on older releases.
-2. **Job queues:** translate selectors to SQL, add per-group execution, cache lists; move to slow track. Research 7.4+ scoped SQL service (see docs task).
-3. **Output queues:** mirror job queue treatment, including spool file considerations. Research scoped SQL service where available.
+2. **Job queues:** translate selectors to SQL, add per-group execution, cache lists; move to slow track. (Research complete: no scoped table function in 7.4+, stick with `QSYS2.JOB_QUEUE_INFO` view filtered per queue; consider `SYSTOOLS.JOB_QUEUE_ENTRIES` on 7.4 TR9+ if useful.)
+3. **Output queues:** mirror job queue treatment, including spool file considerations. (Research complete: use `QSYS2.OUTPUT_QUEUE_ENTRIES(library, queue, detail)` table function on 7.2+; fall back to view if unavailable.)
 4. **Active jobs:** introduce configuration for subsystem/job inclusion lists, adjust table function parameters, and run on slow track.
 5. **Plan cache:** throttle invocation (e.g., every N iterations) and dispatch on dedicated slow track.
 6. **Selector infrastructure:** build reusable helper that expands globs (if any) into explicit lists and share it across queues/disks/interfaces.

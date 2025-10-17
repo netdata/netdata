@@ -505,33 +505,43 @@ func (a *Collector) collectOutputQueues(ctx context.Context) error {
 		a.outputQueues[key] = meta
 
 		metrics := outputQueueInstanceMetrics{}
-		found := false
+		entriesCount := int64(0)
+		entriesUsed := false
 
 		queryName := fmt.Sprintf("output_queue_%s_%s", target.Library, target.Name)
-		err := a.doQuery(ctx, queryName, buildOutputQueueQuery(target), func(column, value string, lineEnd bool) {
+		err := a.doQuery(ctx, queryName, buildOutputQueueEntriesQuery(target), func(column, value string, lineEnd bool) {
+			if lineEnd {
+				entriesCount++
+			}
+		})
+		if err != nil {
+			if isSQLFeatureError(err) {
+				a.Debugf("output queue entries function unavailable for %s/%s, falling back to view", target.Library, target.Name)
+			} else if firstErr == nil {
+				firstErr = fmt.Errorf("output queue %s (entries): %w", key, err)
+			}
+		} else {
+			entriesUsed = true
+			metrics.Files = entriesCount
+		}
+
+		viewErr := a.doQuery(ctx, queryName+"_view", buildOutputQueueInfoQuery(target), func(column, value string, lineEnd bool) {
 			switch column {
 			case "OUTPUT_QUEUE_STATUS":
 				meta.status = strings.TrimSpace(value)
-			case "NUMBER_OF_FILES":
-				metrics.Files = parseInt64OrZero(value)
 			case "NUMBER_OF_WRITERS":
 				metrics.Writers = parseInt64OrZero(value)
-			}
-
-			if lineEnd {
-				found = true
+			case "NUMBER_OF_FILES":
+				if !entriesUsed {
+					metrics.Files = parseInt64OrZero(value)
+				}
 			}
 		})
-
-		if err != nil {
+		if viewErr != nil {
 			if firstErr == nil {
-				firstErr = fmt.Errorf("output queue %s: %w", key, err)
+				firstErr = fmt.Errorf("output queue %s (info): %w", key, viewErr)
 			}
 			continue
-		}
-
-		if !found {
-			meta.status = "NOT_FOUND"
 		}
 
 		metrics.Released = boolToInt(strings.EqualFold(meta.status, "RELEASED"))

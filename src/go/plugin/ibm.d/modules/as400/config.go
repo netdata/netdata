@@ -81,12 +81,16 @@ type Config struct {
 	// SubsystemSelector filters subsystems by name using glob-style patterns.
 	SubsystemSelector string `yaml:"collect_subsystems_matching,omitempty" json:"collect_subsystems_matching" ui:"group:Subsystems"`
 
-	// MessageQueues enumerates the message queues to monitor as LIBRARY/QUEUE strings.
+	// MessageQueues lists message queues to collect, formatted as LIBRARY/QUEUE strings.
+	// When empty, message queue collection is disabled. The default configuration monitors
+	// QSYS/QSYSOPR, QSYS/QSYSMSG, and QSYS/QHST.
 	MessageQueues []string `yaml:"message_queues,omitempty" json:"message_queues" ui:"group:Message Queues"`
 
-	// JobQueues enumerates the job queues to monitor as LIBRARY/QUEUE strings.
+	// JobQueues lists job queues to collect, formatted as LIBRARY/QUEUE strings.
+	// When empty, job queue collection is disabled.
 	JobQueues []string `yaml:"job_queues,omitempty" json:"job_queues" ui:"group:Job Queues"`
 
-	// OutputQueues enumerates the output queues to monitor as LIBRARY/QUEUE strings.
+	// OutputQueues lists output queues to collect, formatted as LIBRARY/QUEUE strings.
+	// When empty, output queue collection is disabled.
 	OutputQueues []string `yaml:"output_queues,omitempty" json:"output_queues" ui:"group:Output Queues"`
 }

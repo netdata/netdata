@@ -57,6 +57,13 @@ description: |
 
   Default: `false` (statistics are not reset, using `RESET_STATISTICS=>'NO'`)
 
+  **Chart Gaps During Baseline Resets:**
+
+  The `as400.system_activity_cpu_rate` and `as400.system_activity_cpu_utilization` charts rely on
+  delta calculations. When the collector detects that IBM i reset these statistics—or when it is
+  still establishing the initial baseline—it intentionally skips a sample instead of emitting a zero
+  or spike. Netdata renders those skipped samples as small gaps, which is expected behaviour.
+
   **Cardinality Management:**
 
   To prevent performance issues from excessive metric creation, the collector enforces cardinality
