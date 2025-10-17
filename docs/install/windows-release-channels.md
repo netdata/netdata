@@ -161,21 +161,11 @@ Look for your `token` and `rooms` values.
 
 ```powershell
 # Run PowerShell as Administrator
+$TOKEN = "<YOUR_CLOUD_TOKEN>"      # <-- Replace with your Netdata Cloud claim token
+$ROOMS = "<YOUR_ROOM_IDS>"         # <-- Replace with your comma-separated Room IDs
 $ProgressPreference = 'SilentlyContinue'
 Invoke-WebRequest https://github.com/netdata/netdata/releases/latest/download/netdata-x64.msi -OutFile "$env:TEMP\netdata-x64.msi"
-msiexec /qn /i "$env:TEMP\netdata-x64.msi" TOKEN="<YOUR_TOKEN>" ROOMS="<YOUR_ROOMS>"
-```
-
-**Switch to Nightly with Cloud settings:**
-
-```powershell
-# Run PowerShell as Administrator
-$ProgressPreference = 'SilentlyContinue'
-Invoke-WebRequest https://github.com/netdata/netdata-nightlies/releases/latest/download/netdata-x64.msi -OutFile "$env:TEMP\netdata-x64.msi"
-msiexec /qn /i "$env:TEMP\netdata-x64.msi" TOKEN="<YOUR_TOKEN>" ROOMS="<YOUR_ROOMS>"
-```
-
-Replace `<YOUR_TOKEN>` with your Netdata Cloud claim token and `<YOUR_ROOMS>` with your comma-separated Room IDs.
+msiexec /qn /i "$env:TEMP\netdata-x64.msi" TOKEN="$TOKEN" ROOMS="$ROOMS"
 
 </details>
 
