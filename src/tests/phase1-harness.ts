@@ -250,6 +250,7 @@ const LONG_TOOL_NAME = `tool-${'x'.repeat(140)}`;
 const FINAL_REPORT_RETRY_MESSAGE = 'Final report completed after mixed tools.';
 const SANITIZER_VALID_ARGUMENT = 'sanitizer-valid-call';
 const SANITIZER_REMOTE_IDENTIFIER = 'agent:sanitizer';
+const EXIT_FINAL_REPORT_IDENTIFIER = 'agent:EXIT-FINAL-ANSWER';
 
 const GITHUB_SERVER_PATH = path.resolve(__dirname, 'mcp/github-stdio-server.js');
 
@@ -4033,7 +4034,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
       invariant(finalReport !== undefined, 'Final report missing for run-test-87.');
       invariant(finalReport.status === 'failure', 'Final report status should be failure for run-test-87.');
       invariant(typeof finalReport.content === 'string' && finalReport.content.includes('upstream service unavailable'), 'Final report content mismatch for run-test-87.');
-      const exitLog = result.logs.find((entry) => entry.remoteIdentifier === 'agent:EXIT-FINAL-ANSWER');
+      const exitLog = result.logs.find((entry) => entry.remoteIdentifier === EXIT_FINAL_REPORT_IDENTIFIER);
       invariant(exitLog !== undefined, 'EXIT-FINAL-ANSWER log missing for run-test-87.');
       const toolMessage = result.conversation.find((message) => message.role === 'tool' && message.toolCallId === FINAL_REPORT_CALL_ID);
       invariant(toolMessage !== undefined, 'Tool response missing for run-test-87.');
@@ -4113,7 +4114,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
       invariant(finalReport !== undefined, 'Final report missing for run-test-88.');
       invariant(finalReport.status === 'partial', 'Final report status should be partial for run-test-88.');
       invariant(typeof finalReport.content === 'string' && finalReport.content.includes('Partial success'), 'Final report content mismatch for run-test-88.');
-      const exitLog = result.logs.find((entry) => entry.remoteIdentifier === 'agent:EXIT-FINAL-ANSWER');
+      const exitLog = result.logs.find((entry) => entry.remoteIdentifier === EXIT_FINAL_REPORT_IDENTIFIER);
       invariant(exitLog !== undefined, 'EXIT-FINAL-ANSWER log missing for run-test-88.');
     },
   },
@@ -4566,6 +4567,59 @@ const TEST_SCENARIOS: HarnessTest[] = [
       const finalReport = result.finalReport;
       invariant(finalReport !== undefined && finalReport.status === 'success', 'Final report should succeed after mixed tools for run-test-91.');
       invariant(typeof finalReport.content === 'string' && finalReport.content.includes(FINAL_REPORT_RETRY_MESSAGE), 'Final report content mismatch for run-test-91.');
+    },
+  },
+  {
+    id: 'run-test-101',
+    description: 'Synthesizes a failure final report when tools keep failing on the final turn.',
+    execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+      sessionConfig.maxTurns = 1;
+      sessionConfig.maxRetries = 1;
+      sessionConfig.targets = [{ provider: PRIMARY_PROVIDER, model: MODEL_NAME }];
+      // eslint-disable-next-line @typescript-eslint/unbound-method
+      const originalExecuteTurn = LLMClient.prototype.executeTurn;
+      let invocation = 0;
+      LLMClient.prototype.executeTurn = function(this: LLMClient, _request: TurnRequest): Promise<TurnResult> {
+        invocation += 1;
+        const failureCallId = `call-fail-${String(invocation)}`;
+        const assistantMessage: ConversationMessage = {
+          role: 'assistant',
+          content: '',
+          toolCalls: [
+            {
+              name: 'fetcher__fetch_url',
+              id: failureCallId,
+              parameters: { url: 'https://example.com/failure', reason: 'Fetch hiring data' },
+            },
+          ],
+        };
+        const toolMessage: ConversationMessage = {
+          role: 'tool',
+          toolCallId: failureCallId,
+          content: '(tool failed: Connection closed)',
+        };
+        return Promise.resolve({
+          status: { type: 'success', hasToolCalls: true, finalAnswer: false },
+          latencyMs: 25,
+          messages: [assistantMessage, toolMessage],
+          tokens: { inputTokens: 12, outputTokens: 0, cachedTokens: 0, totalTokens: 12 },
+        });
+      };
+      try {
+        const session = AIAgentSession.create(sessionConfig);
+        return await session.run();
+      } finally {
+        LLMClient.prototype.executeTurn = originalExecuteTurn;
+      }
+    },
+    expect: (result: AIAgentResult) => {
+      invariant(result.success, 'Scenario run-test-101 should complete with a synthesized final report.');
+      const finalReport = result.finalReport;
+      invariant(finalReport !== undefined, 'Final report expected for run-test-101.');
+      invariant(finalReport.status === 'failure', 'Synthesized final report should carry failure status for run-test-101.');
+      invariant(typeof finalReport.content === 'string' && finalReport.content.includes('Connection closed'), 'Failure summary should mention the tool error for run-test-101.');
+      const exitLog = result.logs.find((entry) => entry.remoteIdentifier === EXIT_FINAL_REPORT_IDENTIFIER);
+      invariant(exitLog !== undefined && typeof exitLog.message === 'string' && exitLog.message.includes('Synthesized'), 'Synthesized final report exit log missing for run-test-101.');
     },
   },
   {

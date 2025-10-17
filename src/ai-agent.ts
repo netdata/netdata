@@ -1014,6 +1014,9 @@ export class AIAgentSession {
     let logs = [...initialLogs];
     let accounting = [...initialAccounting];
     let currentTurn = startTurn;
+    let lastToolFailureSummary: string | undefined;
+    let encounteredToolFailure = false;
+    let lastFailedToolName: string | undefined;
     
     // Track the last turn where we showed thinking header
     let lastShownThinkingHeaderTurn = -1;
@@ -1258,6 +1261,35 @@ export class AIAgentSession {
               const textContent = assistantForAdoption !== undefined && typeof assistantForAdoption.content === 'string' ? assistantForAdoption.content : undefined;
               const sanitizedHasText = textContent !== undefined && textContent.trim().length > 0;
 
+              const toolFailureDetected = sanitizedMessages.some((msg) => msg.role === 'tool' && typeof msg.content === 'string' && msg.content.trim().toLowerCase().startsWith('(tool failed:'));
+              if (toolFailureDetected) {
+                const failureToolMessage = sanitizedMessages
+                  .filter((msg) => msg.role === 'tool' && typeof msg.content === 'string')
+                  .find((msg) => {
+                    const trimmed = msg.content.trim().toLowerCase();
+                    return trimmed.startsWith('(tool failed:');
+                  });
+                const failureMessageCandidate = failureToolMessage?.content.trim();
+                if (typeof failureMessageCandidate === 'string' && failureMessageCandidate.length > 0) {
+                  lastToolFailureSummary = failureMessageCandidate;
+                }
+                encounteredToolFailure = true;
+                if (failureToolMessage !== undefined && typeof (failureToolMessage as { toolCallId?: unknown }).toolCallId === 'string') {
+                  const owningAssistant = sanitizedMessages.find(
+                    (msg): msg is ConversationMessage & { toolCalls: ToolCall[] } =>
+                      msg.role === 'assistant' && Array.isArray((msg as { toolCalls?: unknown }).toolCalls)
+                  );
+                  if (owningAssistant !== undefined) {
+                    const relatedCall = owningAssistant.toolCalls.find((tc) => tc.id === (failureToolMessage as { toolCallId?: string }).toolCallId);
+                    if (relatedCall !== undefined) {
+                      lastFailedToolName = relatedCall.name;
+                    }
+                  }
+                }
+              } else {
+                lastToolFailureSummary = undefined;
+              }
+
               // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
               if (this.finalReport === undefined && !sanitizedHasToolCalls && sanitizedHasText) {
                 if (this.tryAdoptFinalReportFromText(assistantForAdoption, textContent)) {
@@ -1266,8 +1298,6 @@ export class AIAgentSession {
               }
 
               if (turnResult.status.finalAnswer && this.finalReport === undefined) {
-        const toolFailureDetected = sanitizedMessages.some((msg) => msg.role === 'tool' && typeof msg.content === 'string' && msg.content.trim().toLowerCase().startsWith('(tool failed:'))
-          ;
         const adoptFromToolCall = () => {
           if (toolFailureDetected) return false;
           const assistantWithCall = sanitizedMessages.find((msg): msg is ConversationMessage & { toolCalls: ToolCall[] } =>
@@ -1320,7 +1350,9 @@ export class AIAgentSession {
           return true;
         };
         if (!adoptFromToolCall()) {
-          adoptFromToolMessage();
+          if (!toolFailureDetected) {
+            adoptFromToolMessage();
+          }
         }
       }
 
@@ -1795,6 +1827,36 @@ export class AIAgentSession {
       }
 
       if (!turnSuccessful) {
+        if (currentTurn === maxTurns && encounteredToolFailure) {
+          const failedToolNormalized = lastFailedToolName !== undefined ? sanitizeToolName(lastFailedToolName) : undefined;
+          if (failedToolNormalized !== AIAgentSession.FINAL_REPORT_TOOL) {
+            const fallbackSummary = (lastToolFailureSummary ?? lastError ?? 'Unable to complete the request after exhausting all retries.').trim();
+            const fallbackFormatCandidate = this.resolvedFormat ?? 'text';
+            const fallbackFormat = FINAL_REPORT_FORMAT_VALUES.find((value) => value === fallbackFormatCandidate) ?? 'text';
+            const metadata: Record<string, unknown> = {};
+            if (lastToolFailureSummary !== undefined) metadata.failure = lastToolFailureSummary;
+            if (lastError !== undefined) metadata.lastError = lastError;
+            const fallbackReport: NonNullable<AIAgentResult['finalReport']> = {
+              status: lastToolFailureSummary !== undefined ? 'failure' : 'partial',
+              format: fallbackFormat,
+              content: fallbackSummary,
+              ...(Object.keys(metadata).length > 0 ? { metadata } : {}),
+              ts: Date.now(),
+            };
+            this.finalReport = fallbackReport;
+            this.logExit('EXIT-FINAL-ANSWER', `Synthesized ${fallbackReport.status} final_report after retries`, currentTurn);
+            this.emitFinalSummary(logs, accounting);
+            return {
+              success: true,
+              conversation,
+              logs,
+              accounting,
+              finalReport: fallbackReport,
+              childConversations: this.childConversations,
+            };
+          }
+        }
+
         // All attempts failed for this turn
         const exitCode = (lastError?.includes('auth') === true) ? 'EXIT-AUTH-FAILURE' :
                         (lastError?.includes('quota') === true) ? 'EXIT-QUOTA-EXCEEDED' :
