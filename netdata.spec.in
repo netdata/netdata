@@ -47,7 +47,7 @@ AutoReqProv: yes
 %global _have_sysuser 1
 %global _need_explicit_user_provides 1
 %else
-%if 0%{?centos_ver} == 8
+%if 0%{?centos_ver} == 8 || 0%{?oraclelinux} == 8
 %global _have_sysuser 1
 %global _need_explicit_user_provides 1
 %else
