@@ -7,6 +7,7 @@ import { OllamaProvider } from './llm-providers/ollama.js';
 import { OpenAIProvider } from './llm-providers/openai.js';
 import { OpenRouterProvider } from './llm-providers/openrouter.js';
 import { TestLLMProvider } from './llm-providers/test-llm.js';
+import { warn } from './utils.js';
 
 export class LLMClient {
   private static readonly OPENROUTER_HOST = 'openrouter.ai';
@@ -256,7 +257,7 @@ export class LLMClient {
       await pending;
     } catch (error) {
       try {
-        console.error(`[warn] traced fetch metadata capture failed: ${error instanceof Error ? error.message : String(error)}`);
+        warn(`traced fetch metadata capture failed: ${error instanceof Error ? error.message : String(error)}`);
       } catch {
         /* ignore logging failures */
       }
@@ -358,7 +359,7 @@ export class LLMClient {
             }
           } catch (error) {
             try {
-              console.error(`[warn] openrouter streaming metadata parse failed: ${error instanceof Error ? error.message : String(error)}`);
+              warn(`openrouter streaming metadata parse failed: ${error instanceof Error ? error.message : String(error)}`);
             } catch {
               /* ignore logging failures */
             }
@@ -371,7 +372,7 @@ export class LLMClient {
         }
       } catch (error) {
         try {
-          console.error(`[warn] traced fetch post-response processing failed: ${error instanceof Error ? error.message : String(error)}`);
+          warn(`traced fetch post-response processing failed: ${error instanceof Error ? error.message : String(error)}`);
         } catch {
           /* ignore logging failures */
         }
@@ -387,7 +388,7 @@ export class LLMClient {
 
   private handleCloneFailure(context: 'metadata' | 'trace', error: unknown): void {
     try {
-      console.error(`[warn] traced fetch ${context} clone failed: ${error instanceof Error ? error.message : String(error)}`);
+      warn(`traced fetch ${context} clone failed: ${error instanceof Error ? error.message : String(error)}`);
     } catch {
       /* ignore logging failures */
     }
@@ -447,7 +448,7 @@ export class LLMClient {
         await task;
       } catch (error: unknown) {
         try {
-          console.error(`[warn] traced fetch response trace failed: ${error instanceof Error ? error.message : String(error)}`);
+          warn(`traced fetch response trace failed: ${error instanceof Error ? error.message : String(error)}`);
         } catch {
           /* ignore logging failures */
         }
@@ -671,7 +672,7 @@ export class LLMClient {
     } catch (error) {
       if (warnLabel !== undefined) {
         try {
-          console.error(`[warn] ${warnLabel}: ${error instanceof Error ? error.message : String(error)}`);
+          warn(`${warnLabel}: ${error instanceof Error ? error.message : String(error)}`);
         } catch {
           /* ignore logging failures */
         }

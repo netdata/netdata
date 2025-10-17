@@ -267,12 +267,14 @@ const CONTENT_TYPE_JSON = 'application/json';
 const CONTENT_TYPE_EVENT_STREAM = 'text/event-stream';
 const COVERAGE_OPENROUTER_JSON_ID = 'coverage-openrouter-json';
 const COVERAGE_OPENROUTER_SSE_ID = 'coverage-openrouter-sse';
+const COVERAGE_OPENROUTER_SSE_NONBLOCKING_ID = 'coverage-openrouter-sse-nonblocking';
 const COVERAGE_GENERIC_JSON_ID = 'coverage-generic-json';
 const COVERAGE_SESSION_ID = 'coverage-session-snapshot';
 const COVERAGE_ROUTER_PROVIDER = 'router-provider';
 const COVERAGE_ROUTER_MODEL = 'router-model';
 const COVERAGE_ROUTER_SSE_PROVIDER = 'router-sse';
 const COVERAGE_ROUTER_SSE_MODEL = 'router-sse-model';
+const OPENROUTER_RESPONSES_URL = 'https://openrouter.ai/api/v1/responses';
 const COVERAGE_PROMPT = 'coverage';
 const COVERAGE_WARN_SUBSTRING = 'persistSessionSnapshot(coverage-failure) failed';
 
@@ -299,6 +301,14 @@ let coverageOpenrouterSse: {
   routed: { provider?: string; model?: string };
   cost: { costUsd?: number; upstreamInferenceCostUsd?: number };
   rawStream: string;
+} | undefined;
+let coverageOpenrouterSseNonBlocking: {
+  raceResult: 'response' | 'timeout';
+  elapsedBeforeMetadataMs: number;
+  totalElapsedMs: number;
+  routed: { provider?: string; model?: string };
+  cost: { costUsd?: number; upstreamInferenceCostUsd?: number };
+  logs: LogEntry[];
 } | undefined;
 let coverageGenericJson: {
   accept?: string;
@@ -339,6 +349,18 @@ function makeSuccessResult(content: string): AIAgentResult {
       ts: Date.now(),
     },
   };
+}
+
+function createDeferred<T = void>(): { promise: Promise<T>; resolve: (value: T) => void; reject: (reason?: unknown) => void } {
+  let resolveFn: ((value: T) => void) | undefined;
+  let rejectFn: ((reason?: unknown) => void) | undefined;
+  const promise = new Promise<T>((resolve, reject) => {
+    resolveFn = resolve;
+    rejectFn = reject;
+  });
+  const resolve = (value: T): void => { resolveFn?.(value); };
+  const reject = (reason?: unknown): void => { rejectFn?.(reason); };
+  return { promise, resolve, reject };
 }
 
 function createParentSessionStub(configuration: Configuration): Pick<AIAgentSessionConfig, 'config' | 'callbacks' | 'stream' | 'traceLLM' | 'traceMCP' | 'verbose' | 'temperature' | 'topP' | 'llmTimeout' | 'toolTimeout' | 'maxRetries' | 'maxTurns' | 'toolResponseMaxBytes' | 'parallelToolCalls' | 'targets'> {
@@ -1389,7 +1411,6 @@ const TEST_SCENARIOS: HarnessTest[] = [
       const logs: LogEntry[] = [];
       const fetchCalls: { url: string; method: string }[] = [];
       const finalData: { afterJson?: { provider?: string; model?: string }; afterSse?: { provider?: string; model?: string }; costs?: { costUsd?: number; upstreamInferenceCostUsd?: number }; fetchError?: string } = {};
-      const OPENROUTER_RESPONSES_URL = 'https://openrouter.ai/api/v1/responses';
       const OPENROUTER_DEBUG_SSE_URL = 'https://openrouter.ai/api/v1/debug-sse';
       const OPENROUTER_BINARY_URL = 'https://openrouter.ai/api/v1/binary';
       const CONTENT_TYPE_OCTET = 'application/octet-stream';
@@ -4618,7 +4639,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
             headers: { 'content-type': CONTENT_TYPE_JSON },
           }));
         }) as typeof fetch;
-        const response = await tracedFetch('https://openrouter.ai/api/v1/responses', {
+        const response = await tracedFetch(OPENROUTER_RESPONSES_URL, {
           method: 'POST',
           headers: {
             Authorization: 'Bearer TOKEN1234567890',
@@ -4713,6 +4734,89 @@ const TEST_SCENARIOS: HarnessTest[] = [
       invariant(coverageOpenrouterSse.cost.costUsd === 0.4, 'Cost extraction mismatch for openrouter sse.');
       invariant(coverageOpenrouterSse.cost.upstreamInferenceCostUsd === 0.2, 'Upstream cost mismatch for openrouter sse.');
       invariant(coverageOpenrouterSse.rawStream.includes('[DONE]'), 'SSE payload missing sentinel.');
+    },
+  },
+  {
+    id: COVERAGE_OPENROUTER_SSE_NONBLOCKING_ID,
+    description: 'Coverage: traced fetch returns before SSE metadata capture completes.',
+    execute: async () => {
+      coverageOpenrouterSseNonBlocking = undefined;
+      const logs: LogEntry[] = [];
+      const client = new LLMClient({}, { traceLLM: true, onLog: (entry) => { logs.push(entry); } });
+      const tracedFetchFactory = getPrivateMethod(client, 'createTracedFetch');
+      const tracedFetch = tracedFetchFactory.call(client) as typeof fetch;
+      const originalFetch = globalThis.fetch;
+      const gate = createDeferred();
+      const encoder = new TextEncoder();
+      try {
+        globalThis.fetch = ((_input, init) => {
+          const headers = new Headers(init?.headers);
+          if (!headers.has('Accept')) headers.set('Accept', CONTENT_TYPE_JSON);
+          const bodyStream = new ReadableStream<Uint8Array>({
+            start(controller) {
+              controller.enqueue(encoder.encode('data: {"provider":"mistral","model":"mixtral"}\n\n'));
+              const flush = async (): Promise<void> => {
+                try {
+                  await gate.promise;
+                  controller.enqueue(encoder.encode('data: {"usage":{"cost":0.21,"cost_details":{"upstream_inference_cost":0.09}}}\n\n'));
+                  controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+                  controller.close();
+                } catch (error: unknown) {
+                  controller.error(error);
+                }
+              };
+              void flush();
+            },
+          });
+          return Promise.resolve(new Response(bodyStream, {
+            status: 200,
+            headers: { 'content-type': CONTENT_TYPE_EVENT_STREAM },
+          }));
+        }) as typeof fetch;
+
+        const start = Date.now();
+        const responsePromise = tracedFetch(OPENROUTER_RESPONSES_URL, {
+          method: 'POST',
+          headers: { Accept: CONTENT_TYPE_JSON },
+        });
+        const responseReady = (async () => {
+          await responsePromise;
+          return 'response' as const;
+        })();
+        const timeoutReady = new Promise<'timeout'>((resolve) => { setTimeout(() => { resolve('timeout'); }, 25); });
+        const raceResult = await Promise.race([responseReady, timeoutReady]);
+        const elapsedBeforeMetadata = Date.now() - start;
+        const response = await responsePromise;
+        const textPromise = response.text();
+        coverageOpenrouterSseNonBlocking = {
+          raceResult,
+          elapsedBeforeMetadataMs: elapsedBeforeMetadata,
+          totalElapsedMs: 0,
+          routed: client.getLastActualRouting(),
+          cost: client.getLastCostInfo(),
+          logs: [...logs],
+        };
+        gate.resolve(undefined);
+        await textPromise;
+        await client.waitForMetadataCapture();
+        coverageOpenrouterSseNonBlocking.totalElapsedMs = Date.now() - start;
+        coverageOpenrouterSseNonBlocking.routed = client.getLastActualRouting();
+        coverageOpenrouterSseNonBlocking.cost = client.getLastCostInfo();
+        return makeSuccessResult(COVERAGE_OPENROUTER_SSE_NONBLOCKING_ID);
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
+    },
+    expect: (result) => {
+      invariant(result.success, `Coverage ${COVERAGE_OPENROUTER_SSE_NONBLOCKING_ID} should succeed.`);
+      invariant(coverageOpenrouterSseNonBlocking !== undefined, 'Coverage data missing for openrouter SSE non-blocking path.');
+      invariant(coverageOpenrouterSseNonBlocking.raceResult === 'response', 'Traced fetch should resolve before metadata completion for SSE.');
+      invariant(coverageOpenrouterSseNonBlocking.elapsedBeforeMetadataMs < 25, 'SSE traced fetch waited too long before returning response.');
+      invariant(coverageOpenrouterSseNonBlocking.totalElapsedMs >= coverageOpenrouterSseNonBlocking.elapsedBeforeMetadataMs, 'Total elapsed time should exceed initial wait.');
+      invariant(coverageOpenrouterSseNonBlocking.routed.provider === 'mistral', 'Routing metadata missing after metadata capture for SSE non-blocking coverage.');
+      invariant(coverageOpenrouterSseNonBlocking.routed.model === 'mixtral', 'Routing model missing after metadata capture for SSE non-blocking coverage.');
+      invariant(coverageOpenrouterSseNonBlocking.cost.costUsd === 0.21, 'Cost metadata mismatch for SSE non-blocking coverage.');
+      invariant(coverageOpenrouterSseNonBlocking.cost.upstreamInferenceCostUsd === 0.09, 'Upstream cost metadata mismatch for SSE non-blocking coverage.');
     },
   },
   {

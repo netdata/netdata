@@ -1502,9 +1502,9 @@ export class AIAgentSession {
                 if (process.env.DEBUG === 'true') {
                   // eslint-disable-next-line functional/no-loop-statements
                   for (const msg of sanitizedMessages) {
-                    console.error(`[DEBUG] Message role=${msg.role}, content length=${String(msg.content.length)}, hasToolCalls=${String(msg.toolCalls !== undefined)}`);
+                    warn(`[DEBUG] Message role=${msg.role}, content length=${String(msg.content.length)}, hasToolCalls=${String(msg.toolCalls !== undefined)}`);
                     if (msg.content.length > 0) {
-                      console.error(`[DEBUG] Content: ${msg.content.substring(0, 200)}`);
+                      warn(`[DEBUG] Content: ${msg.content.substring(0, 200)}`);
                     }
                   }
                 }

@@ -154,10 +154,10 @@ export class RestProvider extends ToolProvider {
         }
       });
       
-      console.error(`[TRC] REST API ${exposed}`);
-      console.error(`  Method: ${method}`);
-      console.error(`  URL: ${url}`);
-      console.error(`  Headers: ${JSON.stringify(headersObj, null, 2)}`);
+      warn(`[TRC] REST API ${exposed}`);
+      warn(`  Method: ${method}`);
+      warn(`  URL: ${url}`);
+      warn(`  Headers: ${JSON.stringify(headersObj, null, 2)}`);
     }
 
     // Prepare body if templated
@@ -173,7 +173,7 @@ export class RestProvider extends ToolProvider {
         if (body.length > 500) {
           bodyPreview = body.substring(0, 500) + '...[TRUNCATED]';
         }
-        console.error(`  Body: ${bodyPreview}`);
+        warn(`  Body: ${bodyPreview}`);
       }
     }
 

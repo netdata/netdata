@@ -3,6 +3,8 @@ import { createOllama } from 'ollama-ai-provider-v2';
 import type { TurnRequest, TurnResult, ProviderConfig, ConversationMessage, TokenUsage } from '../types.js';
 import type { LanguageModel } from 'ai';
 
+import { warn } from '../utils.js';
+
 import { BaseLLMProvider, type ResponseMessage } from './base.js';
 
 export class OllamaProvider extends BaseLLMProvider {
@@ -65,7 +67,7 @@ export class OllamaProvider extends BaseLLMProvider {
         if (Object.keys(dyn).length > 0) {
           providerOptions = { ...(providerOptions ?? {}), ...dyn };
         }
-      } catch (e) { try { console.error(`[warn] ollama provider cleanup failed: ${e instanceof Error ? e.message : String(e)}`); } catch {} }
+      } catch (e) { try { warn(`ollama provider cleanup failed: ${e instanceof Error ? e.message : String(e)}`); } catch {} }
 
       if (request.stream === true) {
         return await super.executeStreamingTurn(model, finalMessages, tools, request, startTime, providerOptions);

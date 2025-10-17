@@ -150,9 +150,9 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
             if (typeof innerStatus === 'string' && innerStatus.length > 0) {
               codeStr ??= innerStatus;
             }
-          } catch (e) { try { console.error(`[warn] fetch body text read failed: ${e instanceof Error ? e.message : String(e)}`); } catch {} }
+          } catch (e) { try { warn(`fetch body text read failed: ${e instanceof Error ? e.message : String(e)}`); } catch {} }
         }
-      } catch (e) { try { console.error(`[warn] provider traced fetch failed: ${e instanceof Error ? e.message : String(e)}`); } catch {} }
+      } catch (e) { try { warn(`provider traced fetch failed: ${e instanceof Error ? e.message : String(e)}`); } catch {} }
     }
 
     const nameVal = (primary as { name?: unknown }).name;
@@ -180,8 +180,7 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
       try {
         const body = (primary as { responseBody?: unknown }).responseBody;
         const bodyLen = typeof body === 'string' ? body.length : 0;
-        // eslint-disable-next-line no-console
-        console.error('[DEBUG] mapError:', {
+        const debugPayload = {
           name,
           status,
           statusText: statusText ?? null,
@@ -190,7 +189,8 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
           responseBodyLen: bodyLen,
           hasErrorData: typeof (primary as { data?: unknown }).data === 'object',
           messageComposed: composedMessage,
-        });
+        };
+        warn(`[DEBUG] mapError: ${JSON.stringify(debugPayload)}`);
       } catch { /* ignore debug errors */ }
     }
 
@@ -695,11 +695,11 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
         if (request.abortSignal.aborted) { controller.abort(); }
         else {
           // Tie external abort to our controller
-          const onAbort = () => { try { controller.abort(); } catch (e) { try { console.error(`[warn] controller.abort failed: ${e instanceof Error ? e.message : String(e)}`); } catch {} } };
+          const onAbort = () => { try { controller.abort(); } catch (e) { try { warn(`controller.abort failed: ${e instanceof Error ? e.message : String(e)}`); } catch {} } };
           request.abortSignal.addEventListener('abort', onAbort, { once: true });
         }
       }
-    } catch (e) { try { console.error(`[warn] fetch finalization failed: ${e instanceof Error ? e.message : String(e)}`); } catch {} }
+    } catch (e) { try { warn(`fetch finalization failed: ${e instanceof Error ? e.message : String(e)}`); } catch {} }
     
     try {
       resetIdle();
@@ -781,8 +781,8 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
             }
           });
           const dbgLabel = 'tool-parity(stream)';
-          console.error(`[DEBUG] ${dbgLabel}:`, { toolCalls, callIds, toolResults, resIds });
-        } catch (e) { try { console.error(`[warn] extract usage json failed: ${e instanceof Error ? e.message : String(e)}`); } catch {} }
+          warn(`[DEBUG] ${dbgLabel}: ${JSON.stringify({ toolCalls, callIds, toolResults, resIds })}`);
+        } catch (e) { try { warn(`extract usage json failed: ${e instanceof Error ? e.message : String(e)}`); } catch {} }
       }
       const tokens = this.extractTokenUsage(usage);
       // Try to enrich with provider metadata (e.g., Anthropic cache creation tokens)
@@ -824,7 +824,8 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
 
       // Debug: log the raw response structure
       if (process.env.DEBUG === 'true') {
-        console.error(`[DEBUG] resp.messages structure:`, JSON.stringify(resp.messages, null, 2).substring(0, 2000));
+        const snippet = JSON.stringify(resp.messages, null, 2).substring(0, 2000);
+        warn(`[DEBUG] resp.messages structure: ${snippet}`);
       }
       
       // Backfill: Emit chunks for content that wasn't streamed (common with tool calls)
@@ -872,9 +873,8 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
         try {
           const tMsgs = conversationMessages.filter((m) => m.role === 'tool');
           const ids = tMsgs.map((m) => (m.toolCallId ?? '[none]'));
-          // eslint-disable-next-line no-console
-          console.error('[DEBUG] converted-tool-messages(stream):', { count: tMsgs.length, ids });
-        } catch (e) { try { console.error(`[warn] extract usage json failed: ${e instanceof Error ? e.message : String(e)}`); } catch {} }
+          warn(`[DEBUG] converted-tool-messages(stream): ${JSON.stringify({ count: tMsgs.length, ids })}`);
+        } catch (e) { try { warn(`extract usage json failed: ${e instanceof Error ? e.message : String(e)}`); } catch {} }
       }
       
       // Find the LAST assistant message
@@ -910,9 +910,9 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
       
       // Debug logging
       if (process.env.DEBUG === 'true') {
-        console.error(`[DEBUG] Stream: hasNewToolCalls: ${String(hasNewToolCalls)}, hasAssistantText: ${String(hasAssistantText)}, hasToolResults: ${String(hasToolResults)}, finalAnswer: ${String(finalAnswer)}, response length: ${String(response.length)}`);
-        console.error(`[DEBUG] lastAssistantMessage:`, JSON.stringify(lastAssistantMessage, null, 2));
-        console.error(`[DEBUG] response text:`, response);
+        warn(`[DEBUG] Stream: hasNewToolCalls: ${String(hasNewToolCalls)}, hasAssistantText: ${String(hasAssistantText)}, hasToolResults: ${String(hasToolResults)}, finalAnswer: ${String(finalAnswer)}, response length: ${String(response.length)}`);
+        warn(`[DEBUG] lastAssistantMessage: ${JSON.stringify(lastAssistantMessage, null, 2)}`);
+        warn(`[DEBUG] response text: ${response}`);
       }
 
       return this.createSuccessResult(
@@ -945,11 +945,11 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
         if (request.abortSignal !== undefined) {
           if (request.abortSignal.aborted) { controller.abort(); }
           else {
-            const onAbort = () => { try { controller.abort(); } catch (e) { try { console.error(`[warn] controller.abort failed: ${e instanceof Error ? e.message : String(e)}`); } catch {} } };
+            const onAbort = () => { try { controller.abort(); } catch (e) { try { warn(`controller.abort failed: ${e instanceof Error ? e.message : String(e)}`); } catch {} } };
             request.abortSignal.addEventListener('abort', onAbort, { once: true });
           }
         }
-      } catch (e) { try { console.error(`[warn] streaming read failed: ${e instanceof Error ? e.message : String(e)}`); } catch {} }
+      } catch (e) { try { warn(`streaming read failed: ${e instanceof Error ? e.message : String(e)}`); } catch {} }
       const result = await generateText({
         model,
         messages,
@@ -969,8 +969,8 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
       
       // Debug logging to understand the response structure
       if (process.env.DEBUG === 'true') {
-        console.error(`[DEBUG] Non-stream result.text:`, result.text);
-        console.error(`[DEBUG] Non-stream result.response:`, JSON.stringify(result.response, null, 2).substring(0, 500));
+        warn(`[DEBUG] Non-stream result.text: ${result.text}`);
+        warn(`[DEBUG] Non-stream result.response: ${JSON.stringify(result.response, null, 2).substring(0, 500)}`);
       }
 
       const respObj = (result.response as { messages?: unknown[]; providerMetadata?: Record<string, unknown> } | undefined) ?? {};
@@ -1003,7 +1003,7 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
         if (typeof w === 'number' && Number.isFinite(w)) {
           tokens.cacheWriteInputTokens = Math.trunc(w);
         }
-      } catch (e) { try { console.error(`[warn] json parse failed: ${e instanceof Error ? e.message : String(e)}`); } catch {} }
+      } catch (e) { try { warn(`json parse failed: ${e instanceof Error ? e.message : String(e)}`); } catch {} }
       if (process.env.DEBUG === 'true') {
         try {
           const msgs = Array.isArray(respObj.messages) ? respObj.messages : [];
@@ -1031,8 +1031,8 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
             }
           });
           const dbgLabel = 'tool-parity(nonstream)';
-          console.error(`[DEBUG] ${dbgLabel}:`, { toolCalls, callIds, toolResults, resIds });
-        } catch (e) { try { console.error(`[warn] json parse failed: ${e instanceof Error ? e.message : String(e)}`); } catch {} }
+          warn(`[DEBUG] ${dbgLabel}: ${JSON.stringify({ toolCalls, callIds, toolResults, resIds })}`);
+        } catch (e) { try { warn(`json parse failed: ${e instanceof Error ? e.message : String(e)}`); } catch {} }
       }
 
       // Extract reasoning from AI SDK's normalized messages (for non-streaming mode)
@@ -1062,7 +1062,7 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
       
       // Debug: log the raw response structure for non-streaming
       if (process.env.DEBUG === 'true') {
-        console.error(`[DEBUG] Non-stream respObj.messages:`, JSON.stringify(respObj.messages, null, 2).substring(0, 2000));
+        warn(`[DEBUG] Non-stream respObj.messages: ${JSON.stringify(respObj.messages, null, 2).substring(0, 2000)}`);
       }
       
       const conversationMessages = this.convertResponseMessages(
@@ -1075,9 +1075,8 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
         try {
           const tMsgs = conversationMessages.filter((m) => m.role === 'tool');
           const ids = tMsgs.map((m) => (m.toolCallId ?? '[none]'));
-          // eslint-disable-next-line no-console
-          console.error('[DEBUG] converted-tool-messages(nonstream):', { count: tMsgs.length, ids });
-        } catch (e) { try { console.error(`[warn] json parse failed: ${e instanceof Error ? e.message : String(e)}`); } catch {} }
+          warn(`[DEBUG] converted-tool-messages(nonstream): ${JSON.stringify({ count: tMsgs.length, ids })}`);
+        } catch (e) { try { warn(`json parse failed: ${e instanceof Error ? e.message : String(e)}`); } catch {} }
       }
       
       // Find the LAST assistant message to determine if we need more tool calls

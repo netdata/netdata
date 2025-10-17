@@ -1,7 +1,9 @@
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 
-import type { TurnRequest, TurnResult, ProviderConfig, ConversationMessage } from '../types.js';
 import type { LanguageModel } from 'ai';
+import type { TurnRequest, TurnResult, ProviderConfig, ConversationMessage } from '../types.js';
+
+import { warn } from '../utils.js';
 
 import { BaseLLMProvider, type ResponseMessage } from './base.js';
 
@@ -158,7 +160,7 @@ export class OpenRouterProvider extends BaseLLMProvider {
         const v = (raw as { provider?: unknown }).provider;
         if (this.isPlainObject(v)) return v;
       }
-    } catch (e) { try { console.error(`[warn] openrouter provider cleanup failed: ${e instanceof Error ? e.message : String(e)}`); } catch {} }
+    } catch (e) { try { warn(`openrouter provider cleanup failed: ${e instanceof Error ? e.message : String(e)}`); } catch {} }
     return {};
   }
   
