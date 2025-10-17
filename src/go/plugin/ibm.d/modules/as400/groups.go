@@ -115,7 +115,7 @@ type jobQueueGroup struct {
 
 func (g *jobQueueGroup) Name() string { return "job_queues" }
 func (g *jobQueueGroup) Enabled() bool {
-	return g.c.CollectJobQueueMetrics.IsEnabled()
+	return len(g.c.jobQueueTargets) > 0
 }
 
 func (g *jobQueueGroup) Collect(ctx context.Context) error {
@@ -138,7 +138,7 @@ type messageQueueGroup struct {
 
 func (g *messageQueueGroup) Name() string { return "message_queues" }
 func (g *messageQueueGroup) Enabled() bool {
-	return g.c.CollectMessageQueueMetrics.IsEnabled()
+	return len(g.c.messageQueueTargets) > 0
 }
 
 func (g *messageQueueGroup) Collect(ctx context.Context) error {
@@ -148,7 +148,6 @@ func (g *messageQueueGroup) Collect(ctx context.Context) error {
 	if err := g.c.collectMessageQueues(ctx); err != nil {
 		if isSQLFeatureError(err) {
 			g.c.Warningf("message queue metrics not available on this IBM i version: %v", err)
-			g.c.CollectMessageQueueMetrics = confopt.AutoBoolDisabled
 			return nil
 		}
 		if isSQLTemporaryError(err) {
@@ -166,7 +165,7 @@ type outputQueueGroup struct {
 
 func (g *outputQueueGroup) Name() string { return "output_queues" }
 func (g *outputQueueGroup) Enabled() bool {
-	return g.c.CollectOutputQueueMetrics.IsEnabled()
+	return len(g.c.outputQueueTargets) > 0
 }
 
 func (g *outputQueueGroup) Collect(ctx context.Context) error {
@@ -176,7 +175,6 @@ func (g *outputQueueGroup) Collect(ctx context.Context) error {
 	if err := g.c.collectOutputQueues(ctx); err != nil {
 		if isSQLFeatureError(err) {
 			g.c.Warningf("output queue metrics not available on this IBM i version: %v", err)
-			g.c.CollectOutputQueueMetrics = confopt.AutoBoolDisabled
 			return nil
 		}
 		if isSQLTemporaryError(err) {

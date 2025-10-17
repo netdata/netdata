@@ -46,7 +46,6 @@ type Collector struct {
 	// Selectors
 	diskSelector      matcher.Matcher
 	subsystemSelector matcher.Matcher
-	jobQueueSelector  matcher.Matcher
 
 	// System identity
 	systemName        string
@@ -66,11 +65,13 @@ type Collector struct {
 	activeJobsCardinality        cardinalityGuard
 	networkInterfacesCardinality cardinalityGuard
 	httpServersCardinality       cardinalityGuard
-	messageQueuesCardinality     cardinalityGuard
-	outputQueuesCardinality      cardinalityGuard
 
 	dump   *dumpContext
 	groups []collectionGroup
+
+	messageQueueTargets []queueTarget
+	jobQueueTargets     []queueTarget
+	outputQueueTargets  []queueTarget
 
 	// CPU collection state for delta-based calculation
 	cpuCollectionMethod   string // "total_cpu_time" or "elapsed_cpu_used"
@@ -124,8 +125,6 @@ func (c *Collector) prepareIterationState() {
 	c.activeJobsCardinality.Configure(c.MaxActiveJobs)
 	c.networkInterfacesCardinality.Configure(networkInterfaceLimit)
 	c.httpServersCardinality.Configure(httpServerLimit)
-	c.messageQueuesCardinality.Configure(c.MaxMessageQueues)
-	c.outputQueuesCardinality.Configure(c.MaxOutputQueues)
 }
 
 func (c *Collector) initGroups() {
@@ -789,10 +788,7 @@ func (c *Collector) exportQueryLatencyMetrics() {
 		"count_active_jobs":            &values.Count_active_jobs,
 		"count_disks":                  &values.Count_disks,
 		"count_http_servers":           &values.Count_http_servers,
-		"count_job_queues":             &values.Count_job_queues,
-		"count_message_queues":         &values.Count_message_queues,
 		"count_network_interfaces":     &values.Count_network_interfaces,
-		"count_output_queues":          &values.Count_output_queues,
 		"count_subsystems":             &values.Count_subsystems,
 		"detect_ibmi_version_primary":  &values.Detect_ibmi_version_primary,
 		"detect_ibmi_version_fallback": &values.Detect_ibmi_version_fallback,
@@ -824,6 +820,25 @@ func (c *Collector) exportQueryLatencyMetrics() {
 		if latency == 0 {
 			continue
 		}
+
+		switch {
+		case strings.HasPrefix(name, "message_queue_"):
+			if target, ok := fieldMap["message_queue_aggregates"]; ok {
+				*target += latency
+				continue
+			}
+		case strings.HasPrefix(name, "job_queue_"):
+			if target, ok := fieldMap["job_queues"]; ok {
+				*target += latency
+				continue
+			}
+		case strings.HasPrefix(name, "output_queue_"):
+			if target, ok := fieldMap["output_queue_info"]; ok {
+				*target += latency
+				continue
+			}
+		}
+
 		if target, ok := fieldMap[name]; ok {
 			*target += latency
 		} else {

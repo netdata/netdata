@@ -252,30 +252,19 @@ func (c *Collector) logVersionInformation() {
 }
 
 func (c *Collector) setConfigurationDefaults() {
-	jobQueuesDefault := c.versionMajor >= 7 && c.versionRelease >= 2
 	c.CollectDiskMetrics = c.CollectDiskMetrics.WithDefault(true)
 	c.CollectSubsystemMetrics = c.CollectSubsystemMetrics.WithDefault(true)
-	c.CollectJobQueueMetrics = c.CollectJobQueueMetrics.WithDefault(jobQueuesDefault)
 	c.CollectActiveJobs = c.CollectActiveJobs.WithDefault(false)
-	c.CollectMessageQueueMetrics = c.CollectMessageQueueMetrics.WithDefault(true)
-	c.CollectOutputQueueMetrics = c.CollectOutputQueueMetrics.WithDefault(true)
 	c.CollectHTTPServerMetrics = c.CollectHTTPServerMetrics.WithDefault(true)
 	c.CollectPlanCacheMetrics = c.CollectPlanCacheMetrics.WithDefault(true)
 
-	if c.MaxMessageQueues <= 0 {
-		c.MaxMessageQueues = messageQueueLimit
+	if c.MessageQueues == nil {
+		c.MessageQueues = append([]string{}, "QSYS/QSYSOPR", "QSYS/QSYSMSG", "QSYS/QHST")
 	}
 
-	if c.MaxOutputQueues <= 0 {
-		c.MaxOutputQueues = outputQueueLimit
-	}
-
-	c.Infof("Configuration after defaults: DiskMetrics=%t, SubsystemMetrics=%t, JobQueueMetrics=%t, MessageQueues=%t, OutputQueues=%t, ActiveJobs=%t, HTTPServer=%t, PlanCache=%t",
+	c.Infof("Configuration after defaults: DiskMetrics=%t, SubsystemMetrics=%t, ActiveJobs=%t, HTTPServer=%t, PlanCache=%t",
 		c.CollectDiskMetrics.IsEnabled(),
 		c.CollectSubsystemMetrics.IsEnabled(),
-		c.CollectJobQueueMetrics.IsEnabled(),
-		c.CollectMessageQueueMetrics.IsEnabled(),
-		c.CollectOutputQueueMetrics.IsEnabled(),
 		c.CollectActiveJobs.IsEnabled(),
 		c.CollectHTTPServerMetrics.IsEnabled(),
 		c.CollectPlanCacheMetrics.IsEnabled())
@@ -300,4 +289,14 @@ func (c *Collector) systemActivityQuery() string {
 		return querySystemActivityReset
 	}
 	return querySystemActivityNoReset
+}
+
+func (c *Collector) supportsMessageQueueTableFunction() bool {
+	if c.versionMajor == 0 {
+		return false
+	}
+	if c.versionMajor > 7 {
+		return true
+	}
+	return c.versionMajor == 7 && c.versionRelease >= 4
 }

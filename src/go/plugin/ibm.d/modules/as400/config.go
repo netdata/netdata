@@ -57,20 +57,11 @@ type Config struct {
 	// CollectSubsystemMetrics toggles collection of subsystem activity metrics.
 	CollectSubsystemMetrics confopt.AutoBool `yaml:"collect_subsystem_metrics,omitempty" json:"collect_subsystem_metrics" ui:"group:Subsystems"`
 
-	// CollectJobQueueMetrics toggles collection of job queue backlog metrics.
-	CollectJobQueueMetrics confopt.AutoBool `yaml:"collect_job_queue_metrics,omitempty" json:"collect_job_queue_metrics" ui:"group:Job Queues"`
-
 	// CollectActiveJobs toggles collection of detailed per-job metrics.
 	CollectActiveJobs confopt.AutoBool `yaml:"collect_active_jobs,omitempty" json:"collect_active_jobs" ui:"group:Active Jobs"`
 
 	// CollectHTTPServerMetrics toggles collection of IBM HTTP Server statistics.
 	CollectHTTPServerMetrics confopt.AutoBool `yaml:"collect_http_server_metrics,omitempty" json:"collect_http_server_metrics" ui:"group:Other Metrics"`
-
-	// CollectMessageQueueMetrics toggles collection of IBM i message queue metrics.
-	CollectMessageQueueMetrics confopt.AutoBool `yaml:"collect_message_queue_metrics,omitempty" json:"collect_message_queue_metrics" ui:"group:Message Queues"`
-
-	// CollectOutputQueueMetrics toggles collection of IBM i output queue metrics.
-	CollectOutputQueueMetrics confopt.AutoBool `yaml:"collect_output_queue_metrics,omitempty" json:"collect_output_queue_metrics" ui:"group:Output Queues"`
 
 	// CollectPlanCacheMetrics toggles collection of plan cache analysis metrics.
 	CollectPlanCacheMetrics confopt.AutoBool `yaml:"collect_plan_cache_metrics,omitempty" json:"collect_plan_cache_metrics" ui:"group:Other Metrics"`
@@ -81,15 +72,6 @@ type Config struct {
 	// MaxSubsystems caps how many subsystems may be charted.
 	MaxSubsystems int `yaml:"max_subsystems,omitempty" json:"max_subsystems" ui:"group:Subsystems"`
 
-	// MaxJobQueues caps how many job queues may be charted.
-	MaxJobQueues int `yaml:"max_job_queues,omitempty" json:"max_job_queues" ui:"group:Job Queues"`
-
-	// MaxMessageQueues caps how many message queues may be charted.
-	MaxMessageQueues int `yaml:"max_message_queues,omitempty" json:"max_message_queues" ui:"group:Message Queues"`
-
-	// MaxOutputQueues caps how many output queues may be charted.
-	MaxOutputQueues int `yaml:"max_output_queues,omitempty" json:"max_output_queues" ui:"group:Output Queues"`
-
 	// MaxActiveJobs caps how many active jobs may be charted.
 	MaxActiveJobs int `yaml:"max_active_jobs,omitempty" json:"max_active_jobs" ui:"group:Active Jobs"`
 
@@ -99,6 +81,12 @@ type Config struct {
 	// SubsystemSelector filters subsystems by name using glob-style patterns.
 	SubsystemSelector string `yaml:"collect_subsystems_matching,omitempty" json:"collect_subsystems_matching" ui:"group:Subsystems"`
 
-	// JobQueueSelector filters job queues by name using glob-style patterns.
-	JobQueueSelector string `yaml:"collect_job_queues_matching,omitempty" json:"collect_job_queues_matching" ui:"group:Job Queues"`
+	// MessageQueues enumerates the message queues to monitor as LIBRARY/QUEUE strings.
+	MessageQueues []string `yaml:"message_queues,omitempty" json:"message_queues" ui:"group:Message Queues"`
+
+	// JobQueues enumerates the job queues to monitor as LIBRARY/QUEUE strings.
+	JobQueues []string `yaml:"job_queues,omitempty" json:"job_queues" ui:"group:Job Queues"`
+
+	// OutputQueues enumerates the output queues to monitor as LIBRARY/QUEUE strings.
+	OutputQueues []string `yaml:"output_queues,omitempty" json:"output_queues" ui:"group:Output Queues"`
 }

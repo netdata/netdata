@@ -99,6 +99,15 @@ Use **both** limit and selector options together to manage high-cardinality envi
 - Set limits based on your Netdata server's capacity (each instance = multiple charts)
 - Start with defaults and adjust based on actual usage patterns
 
+**IBM i 7.2–7.3 Behavior Note (Message Queues):**
+
+IBM i 7.4 introduced a message-queue table function that returns only the live backlog. On
+7.2–7.3 systems we fall back to the `QSYS2.MESSAGE_QUEUE_INFO` view, which includes *all*
+recorded messages (even those already processed/cleared from the queue). Aggregations—especially
+`MAX(SEVERITY)`—therefore reflect the historical log, not just the outstanding backlog. This
+behaviour is inherent to the IBM SQL service and can lead to higher-than-expected max severity
+values on pre-7.4 systems.
+
 Network interface metrics have a fixed internal limit of 50 instances, and HTTP server metrics are capped at 200 instances; these limits are currently not configurable.
 
 
@@ -112,6 +121,16 @@ The scope defines the instance that the metric belongs to. An instance is unique
 
 ### Per IBM i (AS/400) instance
 
+
+These metrics refer to the entire monitored IBM i (AS/400) instance.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:-------|:-----------|:-----|
+| netdata.plugin_ibm.as400_query_latency | analyze_plan_cache, count_active_jobs, count_disks, count_http_servers, count_job_queues, count_message_queues, count_network_interfaces, count_output_queues, count_subsystems, detect_ibmi_version_primary, detect_ibmi_version_fallback, disk_instances, disk_instances_enhanced, disk_status, http_server_info, job_info, job_queues, memory_pools, message_queue_aggregates, network_connections, network_interfaces, output_queue_info, plan_cache_summary, serial_number, system_activity, system_model, system_status, temp_storage_named, temp_storage_total, technology_refresh_level, top_active_jobs, other | ms |
 
 These metrics refer to the entire monitored IBM i (AS/400) instance.
 
@@ -383,21 +402,14 @@ The following options can be defined globally or per job.
 | ResetStatistics | ResetStatistics toggles destructive SQL services that reset system statistics on each query. | `false` | no | - | - |
 | CollectDiskMetrics | CollectDiskMetrics toggles collection of disk unit statistics. | `auto` | no | - | - |
 | CollectSubsystemMetrics | CollectSubsystemMetrics toggles collection of subsystem activity metrics. | `auto` | no | - | - |
-| CollectJobQueueMetrics | CollectJobQueueMetrics toggles collection of job queue backlog metrics. | `auto` | no | - | - |
 | CollectActiveJobs | CollectActiveJobs toggles collection of detailed per-job metrics. | `auto` | no | - | - |
 | CollectHTTPServerMetrics | CollectHTTPServerMetrics toggles collection of IBM HTTP Server statistics. | `auto` | no | - | - |
-| CollectMessageQueueMetrics | CollectMessageQueueMetrics toggles collection of IBM i message queue metrics. | `auto` | no | - | - |
-| CollectOutputQueueMetrics | CollectOutputQueueMetrics toggles collection of IBM i output queue metrics. | `auto` | no | - | - |
 | CollectPlanCacheMetrics | CollectPlanCacheMetrics toggles collection of plan cache analysis metrics. | `auto` | no | - | - |
 | MaxDisks | MaxDisks caps how many disk units may be charted. | `100` | no | - | - |
 | MaxSubsystems | MaxSubsystems caps how many subsystems may be charted. | `100` | no | - | - |
-| MaxJobQueues | MaxJobQueues caps how many job queues may be charted. | `100` | no | - | - |
-| MaxMessageQueues | MaxMessageQueues caps how many message queues may be charted. | `100` | no | - | - |
-| MaxOutputQueues | MaxOutputQueues caps how many output queues may be charted. | `100` | no | - | - |
 | MaxActiveJobs | MaxActiveJobs caps how many active jobs may be charted. | `100` | no | - | - |
 | DiskSelector | DiskSelector filters disk units by name using glob-style patterns. | `` | no | - | - |
 | SubsystemSelector | SubsystemSelector filters subsystems by name using glob-style patterns. | `` | no | - | - |
-| JobQueueSelector | JobQueueSelector filters job queues by name using glob-style patterns. | `` | no | - | - |
 
 ### Examples
 

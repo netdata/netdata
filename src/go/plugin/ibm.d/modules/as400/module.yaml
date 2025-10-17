@@ -98,6 +98,15 @@ description: |
   - Set limits based on your Netdata server's capacity (each instance = multiple charts)
   - Start with defaults and adjust based on actual usage patterns
 
+  **IBM i 7.2–7.3 Behavior Note (Message Queues):**
+
+  IBM i 7.4 introduced a message-queue table function that returns only the live backlog. On
+  7.2–7.3 systems we fall back to the `QSYS2.MESSAGE_QUEUE_INFO` view, which includes *all*
+  recorded messages (even those already processed/cleared from the queue). Aggregations—especially
+  `MAX(SEVERITY)`—therefore reflect the historical log, not just the outstanding backlog. This
+  behaviour is inherent to the IBM SQL service and can lead to higher-than-expected max severity
+  values on pre-7.4 systems.
+
   Network interface metrics have a fixed internal limit of 50 instances, and HTTP server metrics are capped at 200 instances; these limits are currently not configurable.
 icon: ibm-i.svg
 categories:

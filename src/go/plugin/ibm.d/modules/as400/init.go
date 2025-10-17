@@ -38,25 +38,25 @@ func defaultConfig() Config {
 		UseSSL:          false,
 		ResetStatistics: false,
 
-		CollectDiskMetrics:         confopt.AutoBoolAuto,
-		CollectSubsystemMetrics:    confopt.AutoBoolAuto,
-		CollectJobQueueMetrics:     confopt.AutoBoolAuto,
-		CollectActiveJobs:          confopt.AutoBoolAuto,
-		CollectHTTPServerMetrics:   confopt.AutoBoolAuto,
-		CollectMessageQueueMetrics: confopt.AutoBoolAuto,
-		CollectOutputQueueMetrics:  confopt.AutoBoolAuto,
-		CollectPlanCacheMetrics:    confopt.AutoBoolAuto,
+		CollectDiskMetrics:       confopt.AutoBoolAuto,
+		CollectSubsystemMetrics:  confopt.AutoBoolAuto,
+		CollectActiveJobs:        confopt.AutoBoolAuto,
+		CollectHTTPServerMetrics: confopt.AutoBoolAuto,
+		CollectPlanCacheMetrics:  confopt.AutoBoolAuto,
 
-		MaxDisks:         100,
-		MaxSubsystems:    100,
-		MaxJobQueues:     100,
-		MaxMessageQueues: 100,
-		MaxOutputQueues:  100,
-		MaxActiveJobs:    100,
+		MaxDisks:      100,
+		MaxSubsystems: 100,
+		MaxActiveJobs: 100,
 
 		DiskSelector:      "",
 		SubsystemSelector: "",
-		JobQueueSelector:  "",
+		MessageQueues: []string{
+			"QSYS/QSYSOPR",
+			"QSYS/QSYSMSG",
+			"QSYS/QHST",
+		},
+		JobQueues:    nil,
+		OutputQueues: nil,
 	}
 }
 
@@ -122,14 +122,6 @@ func (c *Collector) Init(ctx context.Context) error {
 		}
 		c.subsystemSelector = m
 	}
-	if c.JobQueueSelector != "" {
-		m, err := matcher.NewSimplePatternsMatcher(c.JobQueueSelector)
-		if err != nil {
-			return fmt.Errorf("invalid job queue selector pattern '%s': %v", c.JobQueueSelector, err)
-		}
-		c.jobQueueSelector = m
-	}
-
 	// Detect IBM i version on first init to drive feature toggles
 	if err := c.client.Connect(ctx); err == nil {
 		if err := c.detectIBMiVersion(ctx); err != nil {
@@ -143,6 +135,10 @@ func (c *Collector) Init(ctx context.Context) error {
 		c.detectAvailableFeatures(ctx)
 		c.collectSystemInfo(ctx)
 		c.applyGlobalLabels()
+	}
+
+	if err := c.configureQueueTargets(); err != nil {
+		return err
 	}
 
 	return nil

@@ -428,137 +428,118 @@ func (a *Collector) collectJobInfo(ctx context.Context) error {
 }
 
 func (a *Collector) collectMessageQueues(ctx context.Context) error {
-	if !a.CollectMessageQueueMetrics.IsEnabled() {
+	if len(a.messageQueueTargets) == 0 {
 		return nil
 	}
 
-	allowed, count, err := a.messageQueuesCardinality.Allow(ctx, a.countMessageQueues)
-	if err != nil {
-		return fmt.Errorf("failed to count message queues: %w", err)
-	}
-	if !allowed {
-		limit := a.MaxMessageQueues
-		if limit <= 0 {
-			limit = messageQueueLimit
-		}
-		a.logOnce("message_queue_cardinality", "message queue count (%d) exceeds limit (%d), skipping collection", count, limit)
-		return nil
-	}
+	var firstErr error
 
-	limit := a.MaxMessageQueues
-	if limit <= 0 {
-		limit = messageQueueLimit
-	}
-	query := fmt.Sprintf(queryMessageQueueAggregates, limit)
+	for _, target := range a.messageQueueTargets {
+		key := target.ID()
+		meta := a.getMessageQueueMetrics(key)
+		meta.library = target.Library
+		meta.name = target.Name
+		a.messageQueues[key] = meta
 
-	var (
-		library string
-		queue   string
-		metrics messageQueueInstanceMetrics
-	)
+		metrics := messageQueueInstanceMetrics{}
+		found := false
 
-	return a.doQuery(ctx, "message_queue_aggregates", query, func(column, value string, lineEnd bool) {
-		switch column {
-		case "MESSAGE_QUEUE_LIBRARY":
-			library = normalizeValue(value)
-		case "MESSAGE_QUEUE_NAME":
-			queue = normalizeValue(value)
-		case "MESSAGE_COUNT":
-			metrics.Total = parseInt64OrZero(value)
-		case "INFORMATIONAL_MESSAGES":
-			metrics.Informational = parseInt64OrZero(value)
-		case "INQUIRY_MESSAGES":
-			metrics.Inquiry = parseInt64OrZero(value)
-		case "DIAGNOSTIC_MESSAGES":
-			metrics.Diagnostic = parseInt64OrZero(value)
-		case "ESCAPE_MESSAGES":
-			metrics.Escape = parseInt64OrZero(value)
-		case "NOTIFY_MESSAGES":
-			metrics.Notify = parseInt64OrZero(value)
-		case "SENDER_COPY_MESSAGES":
-			metrics.SenderCopy = parseInt64OrZero(value)
-		case "MAX_SEVERITY":
-			metrics.MaxSeverity = parseInt64OrZero(value)
-		}
+		queryName := fmt.Sprintf("message_queue_%s_%s", target.Library, target.Name)
+		query := buildMessageQueueQuery(target, a.supportsMessageQueueTableFunction())
 
-		if lineEnd {
-			if queue != "" {
-				key := library + "/" + queue
-				meta := a.getMessageQueueMetrics(key)
-				meta.library = library
-				meta.name = queue
-				a.messageQueues[key] = meta
-				a.mx.messageQueues[key] = metrics
+		err := a.doQuery(ctx, queryName, query, func(column, value string, lineEnd bool) {
+			switch column {
+			case "MESSAGE_COUNT":
+				metrics.Total = parseInt64OrZero(value)
+			case "INFORMATIONAL_MESSAGES":
+				metrics.Informational = parseInt64OrZero(value)
+			case "INQUIRY_MESSAGES":
+				metrics.Inquiry = parseInt64OrZero(value)
+			case "DIAGNOSTIC_MESSAGES":
+				metrics.Diagnostic = parseInt64OrZero(value)
+			case "ESCAPE_MESSAGES":
+				metrics.Escape = parseInt64OrZero(value)
+			case "NOTIFY_MESSAGES":
+				metrics.Notify = parseInt64OrZero(value)
+			case "SENDER_COPY_MESSAGES":
+				metrics.SenderCopy = parseInt64OrZero(value)
+			case "MAX_SEVERITY":
+				metrics.MaxSeverity = parseInt64OrZero(value)
 			}
-			library = ""
-			queue = ""
+
+			if lineEnd {
+				found = true
+			}
+		})
+
+		if err != nil {
+			if firstErr == nil {
+				firstErr = fmt.Errorf("message queue %s: %w", key, err)
+			}
+			continue
+		}
+
+		if !found {
 			metrics = messageQueueInstanceMetrics{}
 		}
-	})
+
+		a.mx.messageQueues[key] = metrics
+	}
+
+	return firstErr
 }
 
 func (a *Collector) collectOutputQueues(ctx context.Context) error {
-	if !a.CollectOutputQueueMetrics.IsEnabled() {
+	if len(a.outputQueueTargets) == 0 {
 		return nil
 	}
 
-	allowed, count, err := a.outputQueuesCardinality.Allow(ctx, a.countOutputQueues)
-	if err != nil {
-		return fmt.Errorf("failed to count output queues: %w", err)
-	}
-	if !allowed {
-		limit := a.MaxOutputQueues
-		if limit <= 0 {
-			limit = outputQueueLimit
-		}
-		a.logOnce("output_queue_cardinality", "output queue count (%d) exceeds limit (%d), skipping collection", count, limit)
-		return nil
-	}
+	var firstErr error
 
-	limit := a.MaxOutputQueues
-	if limit <= 0 {
-		limit = outputQueueLimit
-	}
-	query := fmt.Sprintf(queryOutputQueueInfo, limit)
+	for _, target := range a.outputQueueTargets {
+		key := target.ID()
+		meta := a.getOutputQueueMetrics(key)
+		meta.library = target.Library
+		meta.name = target.Name
+		meta.status = "UNKNOWN"
+		a.outputQueues[key] = meta
 
-	var (
-		library string
-		queue   string
-		status  string
-		metrics outputQueueInstanceMetrics
-	)
+		metrics := outputQueueInstanceMetrics{}
+		found := false
 
-	return a.doQuery(ctx, "output_queue_info", query, func(column, value string, lineEnd bool) {
-		switch column {
-		case "OUTPUT_QUEUE_LIBRARY_NAME":
-			library = normalizeValue(value)
-		case "OUTPUT_QUEUE_NAME":
-			queue = normalizeValue(value)
-		case "OUTPUT_QUEUE_STATUS":
-			status = normalizeValue(value)
-		case "NUMBER_OF_FILES":
-			metrics.Files = parseInt64OrZero(value)
-		case "NUMBER_OF_WRITERS":
-			metrics.Writers = parseInt64OrZero(value)
-		}
-
-		if lineEnd {
-			if queue != "" {
-				key := library + "/" + queue
-				meta := a.getOutputQueueMetrics(key)
-				meta.library = library
-				meta.name = queue
-				meta.status = status
-				a.outputQueues[key] = meta
-				metrics.Released = boolToInt(strings.EqualFold(status, "RELEASED"))
-				a.mx.outputQueues[key] = metrics
+		queryName := fmt.Sprintf("output_queue_%s_%s", target.Library, target.Name)
+		err := a.doQuery(ctx, queryName, buildOutputQueueQuery(target), func(column, value string, lineEnd bool) {
+			switch column {
+			case "OUTPUT_QUEUE_STATUS":
+				meta.status = strings.TrimSpace(value)
+			case "NUMBER_OF_FILES":
+				metrics.Files = parseInt64OrZero(value)
+			case "NUMBER_OF_WRITERS":
+				metrics.Writers = parseInt64OrZero(value)
 			}
-			library = ""
-			queue = ""
-			status = ""
-			metrics = outputQueueInstanceMetrics{}
+
+			if lineEnd {
+				found = true
+			}
+		})
+
+		if err != nil {
+			if firstErr == nil {
+				firstErr = fmt.Errorf("output queue %s: %w", key, err)
+			}
+			continue
 		}
-	})
+
+		if !found {
+			meta.status = "NOT_FOUND"
+		}
+
+		metrics.Released = boolToInt(strings.EqualFold(meta.status, "RELEASED"))
+		a.outputQueues[key] = meta
+		a.mx.outputQueues[key] = metrics
+	}
+
+	return firstErr
 }
 
 func (a *Collector) doQuery(ctx context.Context, queryName, query string, assign func(column, value string, lineEnd bool)) error {
@@ -941,30 +922,6 @@ func (a *Collector) countNetworkInterfaces(ctx context.Context) (int, error) {
 	return count, err
 }
 
-func (a *Collector) countMessageQueues(ctx context.Context) (int, error) {
-	var count int
-	err := a.doQueryRow(ctx, "count_message_queues", queryCountMessageQueues, func(column, value string) {
-		if column == "COUNT" {
-			if v, ok := a.parseInt64Value(value, 1); ok {
-				count = int(v)
-			}
-		}
-	})
-	return count, err
-}
-
-func (a *Collector) countOutputQueues(ctx context.Context) (int, error) {
-	var count int
-	err := a.doQueryRow(ctx, "count_output_queues", queryCountOutputQueues, func(column, value string) {
-		if column == "COUNT" {
-			if v, ok := a.parseInt64Value(value, 1); ok {
-				count = int(v)
-			}
-		}
-	})
-	return count, err
-}
-
 func (a *Collector) countHTTPServers(ctx context.Context) (int, error) {
 	var count int64
 	err := a.doQueryRow(ctx, "count_http_servers", queryCountHTTPServers, func(column, value string) {
@@ -992,18 +949,6 @@ func withFetchLimit(query string, limit int) string {
 func (a *Collector) countSubsystems(ctx context.Context) (int, error) {
 	var count int64
 	err := a.doQueryRow(ctx, "count_subsystems", queryCountSubsystems, func(column, value string) {
-		if column == "COUNT" {
-			if v, ok := a.parseInt64Value(value, 1); ok {
-				count = v
-			}
-		}
-	})
-	return int(count), err
-}
-
-func (a *Collector) countJobQueues(ctx context.Context) (int, error) {
-	var count int64
-	err := a.doQueryRow(ctx, "count_job_queues", queryCountJobQueues, func(column, value string) {
 		if column == "COUNT" {
 			if v, ok := a.parseInt64Value(value, 1); ok {
 				count = v
@@ -1136,61 +1081,58 @@ func (a *Collector) collectSubsystems(ctx context.Context) error {
 
 // Job queues collection
 func (a *Collector) collectJobQueues(ctx context.Context) error {
-	query := queryJobQueues
-	if a.MaxJobQueues > 0 {
-		if total, err := a.countJobQueues(ctx); err != nil {
-			a.logOnce("job_queue_count_failed", "failed to count job queues before applying limit: %v", err)
-		} else if total > a.MaxJobQueues {
-			a.logOnce("job_queue_limit", "job queue count (%d) exceeds limit (%d); truncating results", total, a.MaxJobQueues)
-		}
-		query = withFetchLimit(query, a.MaxJobQueues)
+	if len(a.jobQueueTargets) == 0 {
+		return nil
 	}
 
-	var currentQueue string
-	return a.doQuery(ctx, "job_queues", query, func(column, value string, lineEnd bool) {
-		switch column {
-		case "QUEUE_NAME":
-			name := strings.TrimSpace(value)
-			if name == "" {
-				currentQueue = ""
-				return
-			}
-			if a.jobQueueSelector != nil && !a.jobQueueSelector.MatchString(name) {
-				currentQueue = ""
-				return
-			}
-			currentQueue = name
-			queue := a.getJobQueueMetrics(currentQueue)
-			parts := strings.SplitN(name, "/", 2)
-			if len(parts) == 2 {
-				queue.library = parts[0]
-				queue.name = parts[1]
-			} else {
-				queue.name = name
-				queue.library = ""
-			}
-			queue.status = "RELEASED"
+	var firstErr error
 
-		case "NUMBER_OF_JOBS":
-			if currentQueue != "" && a.jobQueues[currentQueue] != nil {
-				if v, ok := a.parseInt64Value(value, 1); ok {
-					if m, ok := a.mx.jobQueues[currentQueue]; ok {
-						m.NumberOfJobs = v
-						a.mx.jobQueues[currentQueue] = m
-					} else {
-						a.mx.jobQueues[currentQueue] = jobQueueInstanceMetrics{
-							NumberOfJobs: v,
-						}
-					}
-				}
+	for _, target := range a.jobQueueTargets {
+		key := target.ID()
+		queue := a.getJobQueueMetrics(key)
+		queue.library = target.Library
+		queue.name = target.Name
+		queue.status = "UNKNOWN"
+		a.jobQueues[key] = queue
+
+		metrics := jobQueueInstanceMetrics{}
+		found := false
+
+		queryName := fmt.Sprintf("job_queue_%s_%s", target.Library, target.Name)
+		err := a.doQuery(ctx, queryName, buildJobQueueQuery(target), func(column, value string, lineEnd bool) {
+			switch column {
+			case "JOB_QUEUE_STATUS":
+				queue.status = strings.TrimSpace(value)
+			case "NUMBER_OF_JOBS":
+				metrics.NumberOfJobs = parseInt64OrZero(value)
+			case "RELEASED_JOBS":
+				queue.jobsWaiting = parseInt64OrZero(value)
+			case "SCHEDULED_JOBS":
+				queue.jobsScheduled = parseInt64OrZero(value)
+			case "HELD_JOBS":
+				queue.jobsHeld = parseInt64OrZero(value)
 			}
-			// Note: HELD_JOB_COUNT column removed - it doesn't exist in JOB_QUEUE_INFO table
+
+			if lineEnd {
+				found = true
+			}
+		})
+
+		if err != nil {
+			if firstErr == nil {
+				firstErr = fmt.Errorf("job queue %s: %w", key, err)
+			}
+			continue
 		}
 
-		if lineEnd {
-			currentQueue = ""
+		if !found {
+			queue.status = "NOT_FOUND"
 		}
-	})
+
+		a.mx.jobQueues[key] = metrics
+	}
+
+	return firstErr
 }
 
 // Enhanced disk collection with all metrics

@@ -37,41 +37,6 @@
         "title": "CollectHTTPServerMetrics toggles collection of IBM HTTP Server statistics.",
         "type": "string"
       },
-      "collect_job_queue_metrics": {
-        "default": "auto",
-        "enum": [
-          "auto",
-          "enabled",
-          "disabled"
-        ],
-        "title": "CollectJobQueueMetrics toggles collection of job queue backlog metrics.",
-        "type": "string"
-      },
-      "collect_job_queues_matching": {
-        "default": "",
-        "title": "JobQueueSelector filters job queues by name using glob-style patterns.",
-        "type": "string"
-      },
-      "collect_message_queue_metrics": {
-        "default": "auto",
-        "enum": [
-          "auto",
-          "enabled",
-          "disabled"
-        ],
-        "title": "CollectMessageQueueMetrics toggles collection of IBM i message queue metrics.",
-        "type": "string"
-      },
-      "collect_output_queue_metrics": {
-        "default": "auto",
-        "enum": [
-          "auto",
-          "enabled",
-          "disabled"
-        ],
-        "title": "CollectOutputQueueMetrics toggles collection of IBM i output queue metrics.",
-        "type": "string"
-      },
       "collect_plan_cache_metrics": {
         "default": "auto",
         "enum": [
@@ -135,21 +100,6 @@
       "max_disks": {
         "default": 100,
         "title": "MaxDisks caps how many disk units may be charted.",
-        "type": "integer"
-      },
-      "max_job_queues": {
-        "default": 100,
-        "title": "MaxJobQueues caps how many job queues may be charted.",
-        "type": "integer"
-      },
-      "max_message_queues": {
-        "default": 100,
-        "title": "MaxMessageQueues caps how many message queues may be charted.",
-        "type": "integer"
-      },
-      "max_output_queues": {
-        "default": 100,
-        "title": "MaxOutputQueues caps how many output queues may be charted.",
         "type": "integer"
       },
       "max_subsystems": {
@@ -260,14 +210,6 @@
         },
         {
           "fields": [
-            "collect_job_queue_metrics",
-            "max_job_queues",
-            "collect_job_queues_matching"
-          ],
-          "title": "Job Queues"
-        },
-        {
-          "fields": [
             "collect_active_jobs",
             "max_active_jobs"
           ],
@@ -279,20 +221,6 @@
             "collect_plan_cache_metrics"
           ],
           "title": "Other Metrics"
-        },
-        {
-          "fields": [
-            "collect_message_queue_metrics",
-            "max_message_queues"
-          ],
-          "title": "Message Queues"
-        },
-        {
-          "fields": [
-            "collect_output_queue_metrics",
-            "max_output_queues"
-          ],
-          "title": "Output Queues"
         }
       ]
     },
