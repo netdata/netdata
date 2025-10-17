@@ -6,6 +6,14 @@
 
 **Merged pull requests:**
 
+- Enable Rust-based systemd journal handling code in Docker builds. [\#21161](https://github.com/netdata/netdata/pull/21161) ([Ferroin](https://github.com/Ferroin))
+- Regenerate integrations docs [\#21160](https://github.com/netdata/netdata/pull/21160) ([netdatabot](https://github.com/netdatabot))
+- docs: update Notifications description in cloud-notifications meta [\#21159](https://github.com/netdata/netdata/pull/21159) ([ilyam8](https://github.com/ilyam8))
+- as400 improvements [\#21158](https://github.com/netdata/netdata/pull/21158) ([ktsaou](https://github.com/ktsaou))
+- Type 2 attestation added [\#21157](https://github.com/netdata/netdata/pull/21157) ([kanelatechnical](https://github.com/kanelatechnical))
+- Regenerate integrations docs [\#21156](https://github.com/netdata/netdata/pull/21156) ([netdatabot](https://github.com/netdatabot))
+- Fix feature size calculation and add error handling for KMeans training [\#21155](https://github.com/netdata/netdata/pull/21155) ([stelfrag](https://github.com/stelfrag))
+- Add `ServiceNow` integration [\#21154](https://github.com/netdata/netdata/pull/21154) ([car12o](https://github.com/car12o))
 - Customize node name addition [\#21151](https://github.com/netdata/netdata/pull/21151) ([kanelatechnical](https://github.com/kanelatechnical))
 - Skip adding Sentry breadcrumb during shutdown timeout [\#21150](https://github.com/netdata/netdata/pull/21150) ([stelfrag](https://github.com/stelfrag))
 - Fix NaN check in anomaly score calculation [\#21149](https://github.com/netdata/netdata/pull/21149) ([stelfrag](https://github.com/stelfrag))
@@ -88,6 +96,8 @@
 - Remote MCP support \(streamable http and sse\) [\#21036](https://github.com/netdata/netdata/pull/21036) ([ktsaou](https://github.com/ktsaou))
 - Add helper to run external commands without additional privileges. [\#20990](https://github.com/netdata/netdata/pull/20990) ([Ferroin](https://github.com/Ferroin))
 - Clean up handling of compiler flags in our build code. [\#20821](https://github.com/netdata/netdata/pull/20821) ([Ferroin](https://github.com/Ferroin))
+- Use parallelization for LTO processing to reduce build times. [\#20809](https://github.com/netdata/netdata/pull/20809) ([Ferroin](https://github.com/Ferroin))
+- Rework maintenance thread [\#20694](https://github.com/netdata/netdata/pull/20694) ([stelfrag](https://github.com/stelfrag))
 
 ## [v2.7.2](https://github.com/netdata/netdata/tree/v2.7.2) (2025-10-15)
 
@@ -442,15 +452,6 @@
 - Improve packet ID generation [\#20624](https://github.com/netdata/netdata/pull/20624) ([stelfrag](https://github.com/stelfrag))
 - chore\(go.d/snmp-profiles\): charts meta fixes and fam updates p4 [\#20623](https://github.com/netdata/netdata/pull/20623) ([ilyam8](https://github.com/ilyam8))
 - chore\(go.d/snmp-profiles\): charts meta fixes and fam updates p3 [\#20622](https://github.com/netdata/netdata/pull/20622) ([ilyam8](https://github.com/ilyam8))
-- chore\(go.d/snmp-profiles\): charts meta fixes and fam updates p2 [\#20621](https://github.com/netdata/netdata/pull/20621) ([ilyam8](https://github.com/ilyam8))
-- chore\(go.d/snmp-profiles\): charts meta fixes and fam updates p1 [\#20620](https://github.com/netdata/netdata/pull/20620) ([ilyam8](https://github.com/ilyam8))
-- Improve journal v2 file creation on startup  [\#20619](https://github.com/netdata/netdata/pull/20619) ([stelfrag](https://github.com/stelfrag))
-- chore\(go.d/snmp-profiles\): small cleanup [\#20618](https://github.com/netdata/netdata/pull/20618) ([ilyam8](https://github.com/ilyam8))
-- bump otel-collector components to v0.129.0 [\#20615](https://github.com/netdata/netdata/pull/20615) ([ilyam8](https://github.com/ilyam8))
-- chore\(go.d/snmp-profiles\): move fam desc and unit under chart\_meta [\#20614](https://github.com/netdata/netdata/pull/20614) ([ilyam8](https://github.com/ilyam8))
-- update tripplite snmp profiles [\#20613](https://github.com/netdata/netdata/pull/20613) ([ilyam8](https://github.com/ilyam8))
-- Fix coverity issues [\#20612](https://github.com/netdata/netdata/pull/20612) ([stelfrag](https://github.com/stelfrag))
-- SNMP Mikrotik profile make units in transform ucum [\#20611](https://github.com/netdata/netdata/pull/20611) ([Ancairon](https://github.com/Ancairon))
 
 ## [v2.5.4](https://github.com/netdata/netdata/tree/v2.5.4) (2025-06-24)
 
