@@ -254,18 +254,24 @@ func (c *Collector) logVersionInformation() {
 func (c *Collector) setConfigurationDefaults() {
 	c.CollectDiskMetrics = c.CollectDiskMetrics.WithDefault(true)
 	c.CollectSubsystemMetrics = c.CollectSubsystemMetrics.WithDefault(true)
-	c.CollectActiveJobs = c.CollectActiveJobs.WithDefault(false)
 	c.CollectHTTPServerMetrics = c.CollectHTTPServerMetrics.WithDefault(true)
 	c.CollectPlanCacheMetrics = c.CollectPlanCacheMetrics.WithDefault(true)
+
+	if len(c.ActiveJobs) == 0 {
+		c.CollectActiveJobs = c.CollectActiveJobs.WithDefault(false)
+	} else {
+		c.CollectActiveJobs = c.CollectActiveJobs.WithDefault(true)
+	}
 
 	if c.MessageQueues == nil {
 		c.MessageQueues = append([]string{}, "QSYS/QSYSOPR", "QSYS/QSYSMSG", "QSYS/QHST")
 	}
 
-	c.Infof("Configuration after defaults: DiskMetrics=%t, SubsystemMetrics=%t, ActiveJobs=%t, HTTPServer=%t, PlanCache=%t",
+	c.Infof("Configuration after defaults: DiskMetrics=%t, SubsystemMetrics=%t, ActiveJobs=%t (configured=%d), HTTPServer=%t, PlanCache=%t",
 		c.CollectDiskMetrics.IsEnabled(),
 		c.CollectSubsystemMetrics.IsEnabled(),
 		c.CollectActiveJobs.IsEnabled(),
+		len(c.ActiveJobs),
 		c.CollectHTTPServerMetrics.IsEnabled(),
 		c.CollectPlanCacheMetrics.IsEnabled())
 }

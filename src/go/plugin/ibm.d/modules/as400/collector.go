@@ -62,7 +62,6 @@ type Collector struct {
 
 	// Cardinality guards to avoid repeated expensive counts
 	diskCardinality              cardinalityGuard
-	activeJobsCardinality        cardinalityGuard
 	networkInterfacesCardinality cardinalityGuard
 	httpServersCardinality       cardinalityGuard
 
@@ -72,6 +71,7 @@ type Collector struct {
 	messageQueueTargets []queueTarget
 	jobQueueTargets     []queueTarget
 	outputQueueTargets  []queueTarget
+	activeJobTargets    []activeJobTarget
 
 	// CPU collection state for delta-based calculation
 	cpuCollectionMethod   string // "total_cpu_time" or "elapsed_cpu_used"
@@ -122,7 +122,6 @@ func (c *Collector) prepareIterationState() {
 	}
 	c.resetInstanceCaches()
 	c.diskCardinality.Configure(c.MaxDisks)
-	c.activeJobsCardinality.Configure(c.MaxActiveJobs)
 	c.networkInterfacesCardinality.Configure(networkInterfaceLimit)
 	c.httpServersCardinality.Configure(httpServerLimit)
 }
@@ -658,7 +657,11 @@ func (c *Collector) exportActiveJobMetrics() {
 		subsystem := ""
 		jobType := ""
 		if meta != nil {
-			if meta.jobName != "" {
+			if meta.qualifiedName != "" {
+				jobNameLabel = meta.qualifiedName
+			} else if meta.jobNumber != "" && meta.jobUser != "" && meta.jobName != "" {
+				jobNameLabel = fmt.Sprintf("%s/%s/%s", meta.jobNumber, meta.jobUser, meta.jobName)
+			} else if meta.jobName != "" {
 				jobNameLabel = meta.jobName
 			}
 			jobStatus = meta.jobStatus
@@ -785,10 +788,12 @@ func (c *Collector) exportQueryLatencyMetrics() {
 	values := contexts.ObservabilityQueryLatencyValues{}
 	fieldMap := map[string]*int64{
 		"analyze_plan_cache":           &values.Analyze_plan_cache,
-		"count_active_jobs":            &values.Count_active_jobs,
 		"count_disks":                  &values.Count_disks,
 		"count_http_servers":           &values.Count_http_servers,
+		"count_job_queues":             &values.Count_job_queues,
+		"count_message_queues":         &values.Count_message_queues,
 		"count_network_interfaces":     &values.Count_network_interfaces,
+		"count_output_queues":          &values.Count_output_queues,
 		"count_subsystems":             &values.Count_subsystems,
 		"detect_ibmi_version_primary":  &values.Detect_ibmi_version_primary,
 		"detect_ibmi_version_fallback": &values.Detect_ibmi_version_fallback,
@@ -811,7 +816,7 @@ func (c *Collector) exportQueryLatencyMetrics() {
 		"temp_storage_named":           &values.Temp_storage_named,
 		"temp_storage_total":           &values.Temp_storage_total,
 		"technology_refresh_level":     &values.Technology_refresh_level,
-		"top_active_jobs":              &values.Top_active_jobs,
+		"active_job":                   &values.Active_job,
 	}
 
 	var otherTotal int64
@@ -834,6 +839,11 @@ func (c *Collector) exportQueryLatencyMetrics() {
 			}
 		case strings.HasPrefix(name, "output_queue_"):
 			if target, ok := fieldMap["output_queue_info"]; ok {
+				*target += latency
+				continue
+			}
+		case strings.HasPrefix(name, "active_job_"):
+			if target, ok := fieldMap["active_job"]; ok {
 				*target += latency
 				continue
 			}

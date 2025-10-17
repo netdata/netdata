@@ -2,158 +2,217 @@
   "jsonSchema": {
     "$schema": "http://json-schema.org/draft-07/schema#",
     "properties": {
+      "active_jobs": {
+        "default": "nil",
+        "description": "ActiveJobs lists active jobs to monitor, using fully-qualified job identifiers (JOB_NUMBER/USER/JOB_NAME). When empty, active job collection is disabled.",
+        "items": {
+          "type": "string"
+        },
+        "title": "Active Jobs",
+        "type": "array"
+      },
       "collect_active_jobs": {
         "default": "auto",
+        "description": "CollectActiveJobs toggles collection of detailed per-job metrics.",
         "enum": [
           "auto",
           "enabled",
           "disabled"
         ],
-        "title": "CollectActiveJobs toggles collection of detailed per-job metrics.",
+        "title": "Collect Active Jobs",
         "type": "string"
       },
       "collect_disk_metrics": {
         "default": "auto",
+        "description": "CollectDiskMetrics toggles collection of disk unit statistics.",
         "enum": [
           "auto",
           "enabled",
           "disabled"
         ],
-        "title": "CollectDiskMetrics toggles collection of disk unit statistics.",
+        "title": "Collect Disk Metrics",
         "type": "string"
       },
       "collect_disks_matching": {
         "default": "",
-        "title": "DiskSelector filters disk units by name using glob-style patterns.",
+        "description": "DiskSelector filters disk units by name using glob-style patterns.",
+        "title": "Collect Disks Matching",
         "type": "string"
       },
       "collect_http_server_metrics": {
         "default": "auto",
+        "description": "CollectHTTPServerMetrics toggles collection of IBM HTTP Server statistics.",
         "enum": [
           "auto",
           "enabled",
           "disabled"
         ],
-        "title": "CollectHTTPServerMetrics toggles collection of IBM HTTP Server statistics.",
+        "title": "Collect Http Server Metrics",
         "type": "string"
       },
       "collect_plan_cache_metrics": {
         "default": "auto",
+        "description": "CollectPlanCacheMetrics toggles collection of plan cache analysis metrics.",
         "enum": [
           "auto",
           "enabled",
           "disabled"
         ],
-        "title": "CollectPlanCacheMetrics toggles collection of plan cache analysis metrics.",
+        "title": "Collect Plan Cache Metrics",
         "type": "string"
       },
       "collect_subsystem_metrics": {
         "default": "auto",
+        "description": "CollectSubsystemMetrics toggles collection of subsystem activity metrics.",
         "enum": [
           "auto",
           "enabled",
           "disabled"
         ],
-        "title": "CollectSubsystemMetrics toggles collection of subsystem activity metrics.",
+        "title": "Collect Subsystem Metrics",
         "type": "string"
       },
       "collect_subsystems_matching": {
         "default": "",
-        "title": "SubsystemSelector filters subsystems by name using glob-style patterns.",
+        "description": "SubsystemSelector filters subsystems by name using glob-style patterns.",
+        "title": "Collect Subsystems Matching",
         "type": "string"
       },
       "connection_type": {
         "default": "odbc",
-        "title": "ConnectionType selects how the collector connects (currently only \"odbc\").",
+        "description": "ConnectionType selects how the collector connects (currently only \"odbc\").",
+        "title": "Connection Type",
         "type": "string"
       },
       "database": {
         "default": "*SYSBAS",
-        "title": "Database selects the IBM i database (library) to use when building the DSN.",
+        "description": "Database selects the IBM i database (library) to use when building the DSN.",
+        "title": "Database",
         "type": "string"
       },
       "dsn": {
         "default": "",
-        "title": "DSN provides a full IBM i ODBC connection string if manual override is needed.",
+        "description": "DSN provides a full IBM i ODBC connection string if manual override is needed.",
+        "title": "DSN",
         "type": "string"
       },
       "hostname": {
         "default": "",
-        "title": "Hostname is the remote IBM i host to monitor.",
+        "description": "Hostname is the remote IBM i host to monitor.",
+        "title": "Hostname",
         "type": "string"
       },
-      "max_active_jobs": {
-        "default": 100,
-        "title": "MaxActiveJobs caps how many active jobs may be charted.",
-        "type": "integer"
+      "job_queues": {
+        "default": "nil",
+        "description": "JobQueues lists job queues to collect, formatted as LIBRARY/QUEUE strings. When empty, job queue collection is disabled.",
+        "items": {
+          "type": "string"
+        },
+        "title": "Job Queues",
+        "type": "array"
       },
       "max_db_conns": {
         "default": 1,
-        "title": "MaxDbConns restricts the maximum number of open ODBC connections.",
+        "description": "MaxDbConns restricts the maximum number of open ODBC connections.",
+        "title": "Max Db Conns",
         "type": "integer"
       },
       "max_db_life_time": {
         "default": 600000000000,
-        "title": "MaxDbLifeTime limits how long a pooled connection may live before being recycled.",
+        "description": "MaxDbLifeTime limits how long a pooled connection may live before being recycled.",
+        "title": "Max Db Life Time",
         "type": "integer"
       },
       "max_disks": {
         "default": 100,
-        "title": "MaxDisks caps how many disk units may be charted.",
+        "description": "MaxDisks caps how many disk units may be charted.",
+        "title": "Max Disks",
         "type": "integer"
       },
       "max_subsystems": {
         "default": 100,
-        "title": "MaxSubsystems caps how many subsystems may be charted.",
+        "description": "MaxSubsystems caps how many subsystems may be charted.",
+        "title": "Max Subsystems",
         "type": "integer"
+      },
+      "message_queues": {
+        "default": [
+          "QSYS/QSYSOPR",
+          "QSYS/QSYSMSG",
+          "QSYS/QHST"
+        ],
+        "description": "MessageQueues lists message queues to collect, formatted as LIBRARY/QUEUE strings. When empty, message queue collection is disabled. The default configuration monitors QSYS/QSYSOPR, QSYS/QSYSMSG, and QSYS/QHST.",
+        "items": {
+          "type": "string"
+        },
+        "title": "Message Queues",
+        "type": "array"
       },
       "odbc_driver": {
         "default": "IBM i Access ODBC Driver",
-        "title": "ODBCDriver specifies the driver name registered on the host.",
+        "description": "ODBCDriver specifies the driver name registered on the host.",
+        "title": "ODBC Driver",
         "type": "string"
+      },
+      "output_queues": {
+        "default": "nil",
+        "description": "OutputQueues lists output queues to collect, formatted as LIBRARY/QUEUE strings. When empty, output queue collection is disabled.",
+        "items": {
+          "type": "string"
+        },
+        "title": "Output Queues",
+        "type": "array"
       },
       "password": {
         "default": "",
+        "description": "Password supplies the password used for authentication.",
         "format": "password",
-        "title": "Password supplies the password used for authentication.",
+        "title": "Password",
         "type": "string"
       },
       "port": {
         "default": 8471,
+        "description": "Port is the TCP port for the IBM i Access ODBC server.",
         "maximum": 65535,
         "minimum": 1,
-        "title": "Port is the TCP port for the IBM i Access ODBC server.",
+        "title": "Port",
         "type": "integer"
       },
       "reset_statistics": {
         "default": false,
-        "title": "ResetStatistics toggles destructive SQL services that reset system statistics on each query.",
+        "description": "ResetStatistics toggles destructive SQL services that reset system statistics on each query.",
+        "title": "Reset Statistics",
         "type": "boolean"
       },
       "timeout": {
         "default": 2000000000,
-        "title": "Timeout controls how long to wait for SQL statements and RPCs.",
+        "description": "Timeout controls how long to wait for SQL statements and RPCs.",
+        "title": "Timeout",
         "type": "integer"
       },
       "update_every": {
         "default": 10,
+        "description": "Data collection frequency",
         "minimum": 1,
-        "title": "Data collection frequency",
+        "title": "Update Every",
         "type": "integer"
       },
       "use_ssl": {
         "default": false,
-        "title": "UseSSL enables TLS for the ODBC connection when supported by the driver.",
+        "description": "UseSSL enables TLS for the ODBC connection when supported by the driver.",
+        "title": "Use SSL",
         "type": "boolean"
       },
       "username": {
         "default": "",
-        "title": "Username supplies the credentials used for authentication.",
+        "description": "Username supplies the credentials used for authentication.",
+        "title": "Username",
         "type": "string"
       },
       "vnode": {
         "default": "",
-        "title": "Vnode allows binding the collector to a virtual node.",
+        "description": "Vnode allows binding the collector to a virtual node.",
+        "title": "Vnode",
         "type": "string"
       }
     },
@@ -161,6 +220,18 @@
     "type": "object"
   },
   "uiSchema": {
+    "active_jobs": {
+      "ui:listFlavour": "list"
+    },
+    "job_queues": {
+      "ui:listFlavour": "list"
+    },
+    "message_queues": {
+      "ui:listFlavour": "list"
+    },
+    "output_queues": {
+      "ui:listFlavour": "list"
+    },
     "password": {
       "ui:widget": "password"
     },
@@ -211,7 +282,7 @@
         {
           "fields": [
             "collect_active_jobs",
-            "max_active_jobs"
+            "active_jobs"
           ],
           "title": "Active Jobs"
         },
@@ -221,6 +292,14 @@
             "collect_plan_cache_metrics"
           ],
           "title": "Other Metrics"
+        },
+        {
+          "fields": [
+            "message_queues",
+            "job_queues",
+            "output_queues"
+          ],
+          "title": "Queues"
         }
       ]
     },

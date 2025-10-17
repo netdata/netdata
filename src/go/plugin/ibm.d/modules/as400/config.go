@@ -72,25 +72,26 @@ type Config struct {
 	// MaxSubsystems caps how many subsystems may be charted.
 	MaxSubsystems int `yaml:"max_subsystems,omitempty" json:"max_subsystems" ui:"group:Subsystems"`
 
-	// MaxActiveJobs caps how many active jobs may be charted.
-	MaxActiveJobs int `yaml:"max_active_jobs,omitempty" json:"max_active_jobs" ui:"group:Active Jobs"`
-
 	// DiskSelector filters disk units by name using glob-style patterns.
 	DiskSelector string `yaml:"collect_disks_matching,omitempty" json:"collect_disks_matching" ui:"group:Disks"`
 
 	// SubsystemSelector filters subsystems by name using glob-style patterns.
 	SubsystemSelector string `yaml:"collect_subsystems_matching,omitempty" json:"collect_subsystems_matching" ui:"group:Subsystems"`
 
+	// ActiveJobs lists active jobs to monitor, using fully-qualified job identifiers (JOB_NUMBER/USER/JOB_NAME).
+	// When empty, active job collection is disabled.
+	ActiveJobs []string `yaml:"active_jobs,omitempty" json:"active_jobs" ui:"group:Active Jobs"`
+
 	// MessageQueues lists message queues to collect, formatted as LIBRARY/QUEUE strings.
 	// When empty, message queue collection is disabled. The default configuration monitors
 	// QSYS/QSYSOPR, QSYS/QSYSMSG, and QSYS/QHST.
-	MessageQueues []string `yaml:"message_queues,omitempty" json:"message_queues" ui:"group:Message Queues"`
+	MessageQueues []string `yaml:"message_queues,omitempty" json:"message_queues" ui:"group:Queues"`
 
 	// JobQueues lists job queues to collect, formatted as LIBRARY/QUEUE strings.
 	// When empty, job queue collection is disabled.
-	JobQueues []string `yaml:"job_queues,omitempty" json:"job_queues" ui:"group:Job Queues"`
+	JobQueues []string `yaml:"job_queues,omitempty" json:"job_queues" ui:"group:Queues"`
 
 	// OutputQueues lists output queues to collect, formatted as LIBRARY/QUEUE strings.
 	// When empty, output queue collection is disabled.
-	OutputQueues []string `yaml:"output_queues,omitempty" json:"output_queues" ui:"group:Output Queues"`
+	OutputQueues []string `yaml:"output_queues,omitempty" json:"output_queues" ui:"group:Queues"`
 }

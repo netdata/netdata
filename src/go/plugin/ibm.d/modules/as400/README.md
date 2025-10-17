@@ -88,7 +88,7 @@ Use **both** limit and selector options together to manage high-cardinality envi
 | `max_job_queues` | Maximum job queues to monitor | 100 |
 | `max_message_queues` | Maximum message queues to monitor | 100 |
 | `max_output_queues` | Maximum output queues to monitor | 100 |
-| `max_active_jobs` | Maximum active jobs to monitor | 100 |
+| `active_jobs` | Fully qualified active jobs to monitor (`JOB_NUMBER/USER/JOB_NAME`) | `[]` |
 | `collect_disks_matching` | Glob pattern to filter disks (e.g., `"001* 002*"`) | `""` (match all) |
 | `collect_subsystems_matching` | Glob pattern to filter subsystems (e.g., `"QINTER QBATCH"`) | `""` (match all) |
 | `collect_job_queues_matching` | Glob pattern to filter job queues (e.g., `"QSYS/*"`) | `""` (match all) |
@@ -137,7 +137,7 @@ Metrics:
 
 | Metric | Dimensions | Unit |
 |:-------|:-----------|:-----|
-| netdata.plugin_ibm.as400_query_latency | analyze_plan_cache, count_active_jobs, count_disks, count_http_servers, count_job_queues, count_message_queues, count_network_interfaces, count_output_queues, count_subsystems, detect_ibmi_version_primary, detect_ibmi_version_fallback, disk_instances, disk_instances_enhanced, disk_status, http_server_info, job_info, job_queues, memory_pools, message_queue_aggregates, network_connections, network_interfaces, output_queue_info, plan_cache_summary, serial_number, system_activity, system_model, system_status, temp_storage_named, temp_storage_total, technology_refresh_level, top_active_jobs, other | ms |
+| netdata.plugin_ibm.as400_query_latency | analyze_plan_cache, count_disks, count_http_servers, count_job_queues, count_message_queues, count_network_interfaces, count_output_queues, count_subsystems, detect_ibmi_version_primary, detect_ibmi_version_fallback, disk_instances, disk_instances_enhanced, disk_status, http_server_info, job_info, job_queues, memory_pools, message_queue_aggregates, network_connections, network_interfaces, output_queue_info, plan_cache_summary, serial_number, system_activity, system_model, system_status, temp_storage_named, temp_storage_total, technology_refresh_level, active_job, other | ms |
 
 These metrics refer to the entire monitored IBM i (AS/400) instance.
 
@@ -414,9 +414,12 @@ The following options can be defined globally or per job.
 | CollectPlanCacheMetrics | CollectPlanCacheMetrics toggles collection of plan cache analysis metrics. | `auto` | no | - | - |
 | MaxDisks | MaxDisks caps how many disk units may be charted. | `100` | no | - | - |
 | MaxSubsystems | MaxSubsystems caps how many subsystems may be charted. | `100` | no | - | - |
-| MaxActiveJobs | MaxActiveJobs caps how many active jobs may be charted. | `100` | no | - | - |
 | DiskSelector | DiskSelector filters disk units by name using glob-style patterns. | `` | no | - | - |
 | SubsystemSelector | SubsystemSelector filters subsystems by name using glob-style patterns. | `` | no | - | - |
+| ActiveJobs | ActiveJobs lists active jobs to monitor, using fully-qualified job identifiers (JOB_NUMBER/USER/JOB_NAME). When empty, active job collection is disabled. | `nil` | no | - | - |
+| MessageQueues | MessageQueues lists message queues to collect, formatted as LIBRARY/QUEUE strings. When empty, message queue collection is disabled. The default configuration monitors QSYS/QSYSOPR, QSYS/QSYSMSG, and QSYS/QHST. | `[QSYS/QSYSOPR QSYS/QSYSMSG QSYS/QHST]` | no | - | - |
+| JobQueues | JobQueues lists job queues to collect, formatted as LIBRARY/QUEUE strings. When empty, job queue collection is disabled. | `nil` | no | - | - |
+| OutputQueues | OutputQueues lists output queues to collect, formatted as LIBRARY/QUEUE strings. When empty, output queue collection is disabled. | `nil` | no | - | - |
 
 ### Examples
 

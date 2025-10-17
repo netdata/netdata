@@ -1334,7 +1334,6 @@ var NetworkInterface = struct {
 // ObservabilityQueryLatencyValues defines the type-safe values for Observability.QueryLatency context
 type ObservabilityQueryLatencyValues struct {
 	Analyze_plan_cache           int64
-	Count_active_jobs            int64
 	Count_disks                  int64
 	Count_http_servers           int64
 	Count_job_queues             int64
@@ -1363,7 +1362,7 @@ type ObservabilityQueryLatencyValues struct {
 	Temp_storage_named           int64
 	Temp_storage_total           int64
 	Technology_refresh_level     int64
-	Top_active_jobs              int64
+	Active_job                   int64
 	Other                        int64
 }
 
@@ -1376,7 +1375,6 @@ type ObservabilityQueryLatencyContext struct {
 func (c ObservabilityQueryLatencyContext) Set(state *framework.CollectorState, labels EmptyLabels, values ObservabilityQueryLatencyValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, nil, map[string]int64{
 		"analyze_plan_cache":           values.Analyze_plan_cache,
-		"count_active_jobs":            values.Count_active_jobs,
 		"count_disks":                  values.Count_disks,
 		"count_http_servers":           values.Count_http_servers,
 		"count_job_queues":             values.Count_job_queues,
@@ -1405,7 +1403,7 @@ func (c ObservabilityQueryLatencyContext) Set(state *framework.CollectorState, l
 		"temp_storage_named":           values.Temp_storage_named,
 		"temp_storage_total":           values.Temp_storage_total,
 		"technology_refresh_level":     values.Technology_refresh_level,
-		"top_active_jobs":              values.Top_active_jobs,
+		"active_job":                   values.Active_job,
 		"other":                        values.Other,
 	})
 }
@@ -1431,13 +1429,6 @@ var Observability = struct {
 			Dimensions: []framework.Dimension{
 				{
 					Name:      "analyze_plan_cache",
-					Algorithm: module.Absolute,
-					Mul:       1,
-					Div:       1000,
-					Precision: 1,
-				},
-				{
-					Name:      "count_active_jobs",
 					Algorithm: module.Absolute,
 					Mul:       1,
 					Div:       1000,
@@ -1640,7 +1631,7 @@ var Observability = struct {
 					Precision: 1,
 				},
 				{
-					Name:      "top_active_jobs",
+					Name:      "active_job",
 					Algorithm: module.Absolute,
 					Mul:       1,
 					Div:       1000,

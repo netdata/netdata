@@ -218,7 +218,7 @@ type activeJobGroup struct {
 
 func (g *activeJobGroup) Name() string { return "active_jobs" }
 func (g *activeJobGroup) Enabled() bool {
-	return g.c.CollectActiveJobs.IsEnabled()
+	return g.c.CollectActiveJobs.IsEnabled() && len(g.c.activeJobTargets) > 0
 }
 
 func (g *activeJobGroup) Collect(ctx context.Context) error {

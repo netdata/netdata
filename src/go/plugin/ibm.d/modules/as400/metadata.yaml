@@ -107,7 +107,7 @@ modules:
           | `max_job_queues` | Maximum job queues to monitor | 100 |
           | `max_message_queues` | Maximum message queues to monitor | 100 |
           | `max_output_queues` | Maximum output queues to monitor | 100 |
-          | `max_active_jobs` | Maximum active jobs to monitor | 100 |
+          | `active_jobs` | Fully qualified active jobs to monitor (`JOB_NUMBER/USER/JOB_NAME`) | `[]` |
           | `collect_disks_matching` | Glob pattern to filter disks (e.g., `"001* 002*"`) | `""` (match all) |
           | `collect_subsystems_matching` | Glob pattern to filter subsystems (e.g., `"QINTER QBATCH"`) | `""` (match all) |
           | `collect_job_queues_matching` | Glob pattern to filter job queues (e.g., `"QSYS/*"`) | `""` (match all) |
@@ -410,7 +410,6 @@ modules:
               chart_type: stacked
               dimensions:
                 - name: analyze_plan_cache
-                - name: count_active_jobs
                 - name: count_disks
                 - name: count_http_servers
                 - name: count_job_queues
@@ -439,7 +438,7 @@ modules:
                 - name: temp_storage_named
                 - name: temp_storage_total
                 - name: technology_refresh_level
-                - name: top_active_jobs
+                - name: active_job
                 - name: other
         - name: outputqueue
           description: These metrics refer to outputqueue instances.

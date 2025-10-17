@@ -46,7 +46,6 @@ func defaultConfig() Config {
 
 		MaxDisks:      100,
 		MaxSubsystems: 100,
-		MaxActiveJobs: 100,
 
 		DiskSelector:      "",
 		SubsystemSelector: "",
@@ -57,6 +56,7 @@ func defaultConfig() Config {
 		},
 		JobQueues:    nil,
 		OutputQueues: nil,
+		ActiveJobs:   nil,
 	}
 }
 
@@ -137,7 +137,7 @@ func (c *Collector) Init(ctx context.Context) error {
 		c.applyGlobalLabels()
 	}
 
-	if err := c.configureQueueTargets(); err != nil {
+	if err := c.configureTargets(); err != nil {
 		return err
 	}
 

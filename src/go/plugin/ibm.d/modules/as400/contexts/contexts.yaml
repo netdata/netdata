@@ -668,9 +668,6 @@ Observability:
         - name: analyze_plan_cache
           algo: absolute
           div: 1000
-        - name: count_active_jobs
-          algo: absolute
-          div: 1000
         - name: count_disks
           algo: absolute
           div: 1000
@@ -755,7 +752,7 @@ Observability:
         - name: technology_refresh_level
           algo: absolute
           div: 1000
-        - name: top_active_jobs
+        - name: active_job
           algo: absolute
           div: 1000
         - name: other

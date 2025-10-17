@@ -16,7 +16,7 @@ The following collectors must be reworked first; they combine high latency with 
 | `message_queue_aggregates`, `count_message_queues` | `QSYS2.MESSAGE_QUEUE_INFO` (detail table, full scan) | Full table scan, aggregation, `FETCH FIRST` post-scan | ✅ done (table function per queue, documented fallback + defaults) |
 | `collectJobQueues` (`queryJobQueues`) | `QSYS2.JOB_QUEUE_INFO` | Still hitting view per queue; latency high when queue list grows | (Phase 2) keep explicit queue list, consider batching once slow track exists; no scoped table function available |
 | `collectOutputQueues` (`queryOutputQueueInfo`) | `QSYS2.OUTPUT_QUEUE_INFO` | View-based per queue | ✅ done (table function per queue with view fallback; counts derive from entries) |
-| `collectActiveJobs` (`queryTopActiveJobs`, `queryCountActiveJobs`) | `TABLE(QSYS2.ACTIVE_JOB_INFO(...))` with `*ALL` filters | Materializes entire active-job list before `FETCH FIRST` | Pass explicit subsystem/job filters, allow inclusion list expansion, add per-group scheduling |
+| `collectActiveJobs` (`buildActiveJobQuery`) | `TABLE(QSYS2.ACTIVE_JOB_INFO(...))` per job | ✅ done (requires explicit `active_jobs` list; one table-function call per job with user/job filters, skips when not found) |
 | `collectPlanCache` (`CALL QSYS2.ANALYZE_PLAN_CACHE('03', …)`) | Stored procedure | Walks the entire plan cache every cycle, blocking fast loop | Move to slow track, investigate narrower arguments or sampling schedule |
 
 ## 3. Full Query Inventory & Table Scan Risk
@@ -38,7 +38,7 @@ Legend: ✅ (fine), ⚠️ (needs filtering/guardrails), ❗️ (full scan / hea
 | `queryNetworkInterfaces`, `queryCountNetworkInterfaces` | `QSYS2.NETSTAT_INTERFACE_INFO` | View | `WHERE LINE_DESCRIPTION != '*LOOPBACK'` | ⚠️ | Add optional selector list |
 | `queryTempStorageTotal`, `queryTempStorageNamed` | `QSYS2.SYSTMPSTG` | View | Filters global bucket null/not null | ⚠️ | Acceptable cost today; keep under review |
 | `querySubsystems`, `queryCountSubsystems` | `QSYS2.SUBSYSTEM_INFO` | View | `WHERE STATUS = 'ACTIVE'` | ✅ | Already filtered |
-| `queryTopActiveJobs`, `queryCountActiveJobs` | `TABLE(QSYS2.ACTIVE_JOB_INFO(...))` | Table function | All filters `*ALL` | ❗️ | Needs explicit lists |
+| `buildActiveJobQuery` | `TABLE(QSYS2.ACTIVE_JOB_INFO(...))` | Table function | Filters by job name/user; per-job query | ⚠️ | Executes once per configured job; still tied to number of tracked jobs but avoids full system scan |
 | `queryHTTPServerInfo`, `queryCountHTTPServers` | `QSYS2.HTTP_SERVER_INFO` | View | No filter | ⚠️ | Consider selector per server name |
 | `queryIBMiVersion`, `queryIBMiVersionDataArea`, `queryTechnologyRefresh` | Metadata views | — | — | ✅ | One-off |
 | `callAnalyzePlanCache`, `queryPlanCacheSummary` | Stored proc + temp table | — | None | ❗️ | Run asynchronously with throttling |
@@ -52,11 +52,12 @@ Legend: ✅ (fine), ⚠️ (needs filtering/guardrails), ❗️ (full scan / hea
 4. **Lightweight counts:** reuse the explicit target list for cardinality checks (length of the list) instead of running `COUNT(*)` scans where possible; otherwise cache the last-known count and refresh less frequently.
 5. **Output queues:** ✅ implemented via `OUTPUT_QUEUE_ENTRIES` with view fallback.
 
-### Phase 2 – Scheduler & Parallelization
-1. Implement multi-track scheduler in the ibm.d framework so slow groups (message/output queues, plan cache, job queues) run in parallel to the 5 s fast loop.
-2. Assign ODBC connections per track (limited pool) and warehouse results via channels to avoid data races.
-3. Ensure dump mode / shutdown handle background goroutines.
-4. **Job queues:** revisit batching/filtering once slow track exists (still view-based; no scoped table function available).
+### Phase 2 – Background Producers & Staging
+1. Introduce per-track goroutines (“producers”) that execute the slow query sets on their own cadence (e.g., fast=5 s, slow=30–60 s), writing fresh results plus timestamps into shared caches.
+2. Convert the existing sequential collectors into “consumers” that only read from the caches—if fresh data is available they export it, otherwise they skip gracefully. The main loop stays responsive and never blocks on long SQL.
+3. Allocate dedicated ODBC connections for each producer track (raise `MaxDbConns`) and give slow producers longer timeouts so they can complete 15–30 s workloads without stalling the fast loop.
+4. Handle lifecycle: producers respect shutdown/dump, track last errors/staleness, and update the query-latency observability from the background threads.
+5. Once producers are in place, revisit job queue batching/filters; their heavy queries can now live in the slow track without impacting the fast cadence.
 
 ### Phase 3 – Instrumentation & Validation
 1. Extend query latency tracking to name every query (remove “other” bucket).
@@ -74,10 +75,12 @@ Legend: ✅ (fine), ⚠️ (needs filtering/guardrails), ❗️ (full scan / hea
 1. **Message queues:** (✅ done) explicit list + table function (7.4+) / documented behaviour on older releases.
 2. **Job queues:** translate selectors to SQL, add per-group execution, cache lists; move to slow track. (Research complete: no scoped table function in 7.4+, stick with `QSYS2.JOB_QUEUE_INFO` view filtered per queue; consider `SYSTOOLS.JOB_QUEUE_ENTRIES` on 7.4 TR9+ if useful.)
 3. **Output queues:** mirror job queue treatment, including spool file considerations. (Research complete: use `QSYS2.OUTPUT_QUEUE_ENTRIES(library, queue, detail)` table function on 7.2+; fall back to view if unavailable.)
-4. **Active jobs:** introduce configuration for subsystem/job inclusion lists, adjust table function parameters, and run on slow track.
-5. **Plan cache:** throttle invocation (e.g., every N iterations) and dispatch on dedicated slow track.
-6. **Selector infrastructure:** build reusable helper that expands globs (if any) into explicit lists and share it across queues/disks/interfaces.
-7. **Instrumentation:** name all queries in latency map, add logging for large result sets, and monitor improvements via `netdata.plugin_ibm.as400_query_latency`.
+4. **Active jobs:** ✅ complete — configuration now requires explicit `active_jobs` list; per-job table-function queries replace global scan.
+5. **Plan cache:** migrate to the slow producer (dedicated cadence & timeout); only publish when fresh data arrives.
+6. **Producer/consumer cache:** implement the background fetchers, shared caches (values + timestamps + errors), and consumer-side merge logic so fast loops simply read whichever data is ready.
+7. **SetUpdateEvery plumbing:** after the cache layer exists, wire per-context update intervals so slow charts report their natural cadence.
+8. **Selector infrastructure:** build reusable helper that expands globs (if any) into explicit lists and share it across queues/disks/interfaces.
+9. **Instrumentation:** name all queries in latency map, add logging for large result sets, and monitor improvements via `netdata.plugin_ibm.as400_query_latency`.
 
 ## 7. Outstanding Questions
 - Confirm IBM i versions we must support (table functions require 7.4+). Decide on fallback mechanism for older releases.

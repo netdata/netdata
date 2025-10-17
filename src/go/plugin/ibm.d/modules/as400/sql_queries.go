@@ -230,44 +230,6 @@ FROM TABLE(QSYS2.SYSTEM_STATUS('NO','ALL'))`
 		FROM QSYS2.SYSDISKSTAT
 	`
 
-	// Top active jobs query using ACTIVE_JOB_INFO (requires IBM i 7.3+)
-	queryTopActiveJobs = `
-		SELECT
-			JOB_NAME,
-			JOB_STATUS,
-			SUBSYSTEM,
-			JOB_TYPE,
-			ELAPSED_CPU_TIME,
-			ELAPSED_TIME,
-			TEMPORARY_STORAGE,
-			CPU_PERCENTAGE,
-			ELAPSED_INTERACTIVE_TRANSACTIONS,
-			ELAPSED_TOTAL_DISK_IO_COUNT,
-			THREAD_COUNT,
-			RUN_PRIORITY
-		FROM TABLE(QSYS2.ACTIVE_JOB_INFO(
-			JOB_NAME_FILTER => '*ALL',
-			SUBSYSTEM_LIST_FILTER => '*ALL',
-			CURRENT_USER_LIST_FILTER => '*ALL',
-			DETAILED_INFO => 'BASIC'
-		)) X
-		WHERE JOB_STATUS != '*JOBLOG PENDING'
-		ORDER BY CPU_PERCENTAGE DESC
-		FETCH FIRST %d ROWS ONLY
-	`
-
-	// Count active jobs for cardinality check
-	queryCountActiveJobs = `
-		SELECT COUNT(*) as COUNT
-		FROM TABLE(QSYS2.ACTIVE_JOB_INFO(
-			JOB_NAME_FILTER => '*ALL',
-			SUBSYSTEM_LIST_FILTER => '*ALL',
-			CURRENT_USER_LIST_FILTER => '*ALL',
-			DETAILED_INFO => 'NONE'
-		)) X
-		WHERE JOB_STATUS != '*JOBLOG PENDING'
-	`
-
 	// Remove all queries that reference non-existent tables/columns:
 	// - MESSAGE_QUEUE_INFO (doesn't exist)
 	// - SUBSYSTEM_INFO (columns don't exist)
@@ -326,6 +288,34 @@ FROM QSYS2.MESSAGE_QUEUE_INFO
 WHERE MESSAGE_QUEUE_LIBRARY = '%[1]s'
   AND MESSAGE_QUEUE_NAME = '%[2]s'
 `, target.Library, target.Name)
+}
+
+func buildActiveJobQuery(target activeJobTarget) string {
+	return fmt.Sprintf(`
+SELECT
+    JOB_NAME,
+    JOB_USER,
+    JOB_NUMBER,
+    JOB_STATUS,
+    SUBSYSTEM,
+    JOB_TYPE,
+    ELAPSED_CPU_TIME,
+    ELAPSED_TIME,
+    TEMPORARY_STORAGE,
+    CPU_PERCENTAGE,
+    ELAPSED_INTERACTIVE_TRANSACTIONS,
+    ELAPSED_TOTAL_DISK_IO_COUNT,
+    THREAD_COUNT
+FROM TABLE(QSYS2.ACTIVE_JOB_INFO(
+    JOB_NAME_FILTER => '%[3]s',
+    SUBSYSTEM_LIST_FILTER => '*ALL',
+    CURRENT_USER_LIST_FILTER => '%[2]s',
+    JOB_STATUS_FILTER => '*ALL',
+    JOB_TYPE_LIST_FILTER => '*ALL',
+    DETAILED_INFO => 'BASIC'
+)) X
+WHERE JOB_NUMBER = '%[1]s'
+`, target.Number, target.User, target.Name)
 }
 
 func buildJobQueueQuery(target queueTarget) string {
