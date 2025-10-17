@@ -1171,8 +1171,8 @@ const elog = (msg: string): void => { try { process.stderr.write(`[SRV] ← [0.0
       // Update message
       await args.client.chat.update({ channel, ts, text: '⛔ Aborting…' });
     } catch (e) {
-      // eslint-disable-next-line no-console
-      console.error('cancel_run failed', e);
+      const message = e instanceof Error ? e.message : String(e);
+      warn(`cancel_run failed: ${message}`);
     }
   });
 
@@ -1188,8 +1188,8 @@ const elog = (msg: string): void => { try { process.stderr.write(`[SRV] ← [0.0
       sm.stopRun?.(runId, 'Stopping by user');
       await args.client.chat.update({ channel, ts, text: STOPPING_TEXT });
     } catch (e) {
-      // eslint-disable-next-line no-console
-      console.error('stop_run failed', e);
+      const message = e instanceof Error ? e.message : String(e);
+      warn(`stop_run failed: ${message}`);
     }
   });
 }
