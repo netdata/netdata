@@ -39,7 +39,7 @@ static void netdata_stop_driver()
         return;
     }
 
-    SERVICE_STATUS_PROCESS ss_status;
+    SERVICE_STATUS_PROCESS ss_status = {};
     if (ControlService(service, SERVICE_CONTROL_STOP, (LPSERVICE_STATUS)&ss_status) == 0) {
         if (GetLastError() != ERROR_SERVICE_NOT_ACTIVE) {
             nd_log(
@@ -184,7 +184,6 @@ static void get_hardware_info_thread(void *ptr __maybe_unused)
 {
     heartbeat_t hb;
     heartbeat_init(&hb, USEC_PER_SEC);
-    int update_every = UPDATE_EVERY_MIN;
 
     while (service_running(SERVICE_COLLECTORS)) {
         (void)heartbeat_next(&hb);
