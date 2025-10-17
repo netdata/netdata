@@ -40,6 +40,26 @@ AutoReqProv: yes
 %global __cmake_builddir %{__builddir}
 %endif
 
+# Determine requirements for account handling.
+# openSUSE and RHEL/OEL 8 need Provides for user/group accounts explicitly
+# spelled out, other platforms do not.
+%if 0%{?suse_version}
+%global _have_sysuser 1
+%global _need_explicit_user_provides 1
+%else
+%if 0%{?centos_ver} == 8
+%global _have_sysuser 1
+%global _need_explicit_user_provides 1
+%else
+%global _need_explicit_user_provides 0
+%if 0%{?!add_sysuser}
+%global _have_sysuser 0
+%else
+%global _have_sysuser 1
+%endif
+%endif
+%endif
+
 # Disable eBPF for architectures other than x86
 %ifarch x86_64 i386
 %global _have_ebpf 1
@@ -221,7 +241,9 @@ BuildRequires: systemd
 # to support weak dependencies. Explicitly requiring our default plugins
 # makes it impossible to properly test the packages prior to upload,
 # so we just skip depending on them on CentOS 7.
+%if ! %{_have_sysuser}
 Requires(pre): %{name}-user >= %{version}
+%endif
 Requires: %{name}-dashboard
 %if 0%{?_have_ebpf}
 Requires: %{name}-plugin-ebpf = %{version}
@@ -691,7 +713,9 @@ rm -rf "${RPM_BUILD_ROOT}"
 Summary: The CUPS metrics collection plugin for the Netdata Agent
 Group: Applications/System
 Requires: %{name} = %{version}
+%if ! %{_have_sysuser}
 Requires(pre): %{name}-user >= %{version}
+%endif
 
 %description plugin-cups
  This plugin allows the Netdata Agent to collect metrics from the Common UNIX Printing System.
@@ -706,7 +730,9 @@ Summary: The FreeIPMI metrics collection plugin for the Netdata Agent
 Group: Applications/System
 Requires: freeipmi
 Requires: %{name} = %{version}
+%if ! %{_have_sysuser}
 Requires(pre): %{name}-user >= %{version}
+%endif
 
 %description plugin-freeipmi
  This plugin allows the Netdata Agent to collect metrics from hardware using FreeIPMI.
@@ -721,7 +747,9 @@ Summary: The NFACCT metrics collection plugin for the Netdata Agent
 Group: Applications/System
 Requires: %{name} = %{version}
 Conflicts: %{name} < %{version}
+%if ! %{_have_sysuser}
 Requires(pre): %{name}-user >= %{version}
+%endif
 
 %description plugin-nfacct
  This plugin allows the Netdata Agent to collect metrics from the firewall using NFACCT objects.
@@ -741,7 +769,9 @@ Suggests: apcupsd
 Suggests: iw
 Suggests: sudo
 %endif
+%if ! %{_have_sysuser}
 Requires(pre): %{name}-user >= %{version}
+%endif
 
 %description plugin-chartsd
  This plugin adds a selection of additional collectors written in shell script to the Netdata Agent.
@@ -769,7 +799,9 @@ Recommends: %{name}-ebpf-legacy-code >= %{version}
 Requires: %{name}-plugin-apps = %{version}
 Requires: %{name}-ebpf-legacy-code >= %{version}
 %endif
+%if ! %{_have_sysuser}
 Requires(pre): %{name}-user >= %{version}
+%endif
 
 %description plugin-ebpf
  This plugin allows the Netdata Agent to use eBPF code to collect more detailed kernel-level metrics for the system.
@@ -786,7 +818,9 @@ Summary: Compiled eBPF legacy code for the Netdata eBPF plugin
 Group: Applications/System
 Requires: %{name}-plugin-ebpf = %{version}
 Conflicts: %{name} < %{version}
+%if ! %{_have_sysuser}
 Requires(pre): %{name}-user >= %{version}
+%endif
 
 %description ebpf-legacy-code
  This package provides the pre-compiled eBPF legacy code for use by the Netdata eBPF plugin.
@@ -811,7 +845,9 @@ Requires: python3
 %if 0%{?centos_ver} != 7
 Suggests: sudo
 %endif
+%if ! %{_have_sysuser}
 Requires(pre): %{name}-user >= %{version}
+%endif
 
 %description plugin-pythond
  This plugin adds a selection of additional collectors written in Python to the Netdata Agent.
@@ -835,7 +871,9 @@ Conflicts: %{name} < %{version}
 Suggests: nvme-cli
 Suggests: sudo
 %endif
+%if ! %{_have_sysuser}
 Requires(pre): %{name}-user >= %{version}
+%endif
 
 %description plugin-go
  This plugin adds a selection of additional collectors written in Go to the Netdata Agent
@@ -859,8 +897,10 @@ Requires: %{name} = %{version}
 Requires: %{name}-plugin-ibm-libs = %{version}
 Requires: unixODBC
 Conflicts: %{name} < %{version}
-%if 0%{?!add_sysuser}
+%if ! %{_have_sysuser}
+%if ! %{_have_sysuser}
 Requires(pre): %{name}-user >= %{version}
+%endif
 %else
 Requires(pre): user(%{name})
 Requires(pre): group(%{name})
@@ -883,8 +923,10 @@ Summary: IBM MQ client libraries for the Netdata IBM ecosystem metrics collectio
 Group: Applications/System
 Requires: %{name} = %{version}
 Conflicts: %{name} < %{version}
-%if 0%{?!add_sysuser}
+%if ! %{_have_sysuser}
+%if ! %{_have_sysuser}
 Requires(pre): %{name}-user >= %{version}
+%endif
 %else
 Requires(pre): user(%{name})
 Requires(pre): group(%{name})
@@ -2995,7 +3037,9 @@ Summary: The per-application metrics collection plugin for the Netdata Agent
 Group: Applications/System
 Requires: %{name} = %{version}
 Conflicts: %{name} < %{version}
+%if ! %{_have_sysuser}
 Requires(pre): %{name}-user >= %{version}
+%endif
 
 %description plugin-apps
  This plugin allows the Netdata Agent to collect per-application and per-user metrics without using cgroups.
@@ -3012,7 +3056,9 @@ Summary: The slabinfo metrics collector for the Netdata Agent
 Group: Applications/System
 Requires: %{name} = %{version}
 Conflicts: %{name} < %{version}
+%if ! %{_have_sysuser}
 Requires(pre): %{name}-user >= %{version}
+%endif
 
 %description plugin-slabinfo
  This plugin allows the Netdata Agent to collect perfromance and utilization metrics for the Linux kernel’s SLAB allocator.
@@ -3027,7 +3073,9 @@ Summary: The perf metrics collector for the Netdata Agent
 Group: Applications/System
 Requires: %{name} = %{version}
 Conflicts: %{name} < %{version}
+%if ! %{_have_sysuser}
 Requires(pre): %{name}-user >= %{version}
+%endif
 
 %description plugin-perf
  This plugin allows the Netdata to collect metrics from the Linux perf subsystem.
@@ -3047,7 +3095,9 @@ Summary: The debugfs metrics collector for the Netdata Agent
 Group: Applications/System
 Requires: %{name} = %{version}
 Conflicts: %{name} < %{version}
+%if ! %{_have_sysuser}
 Requires(pre): %{name}-user >= %{version}
+%endif
 
 %description plugin-debugfs
  This plugin allows the Netdata Agent to collect Linux kernel metrics exposed through debugfs.
@@ -3062,7 +3112,9 @@ Summary: The systemd-journal plugin for the Netdata Agent
 Group: Applications/System
 Requires: %{name} = %{version}
 Conflicts: %{name} < %{version}
+%if ! %{_have_sysuser}
 Requires(pre): %{name}-user >= %{version}
+%endif
 
 %description plugin-systemd-journal
  This plugin allows the Netdata Agent to present entries from the systemd
@@ -3079,7 +3131,9 @@ Summary: The systemd units plugin for the Netdata Agent
 Group: Applications/System
 Requires: %{name} = %{version}
 Conflicts: %{name} < %{version}
+%if ! %{_have_sysuser}
 Requires(pre): %{name}-user >= %{version}
+%endif
 
 %description plugin-systemd-units
  This plugin allows Netdata to collect metrics about systemd units.
@@ -3095,7 +3149,9 @@ Summary: The xenstat plugin for the Netdata Agent
 Group: Applications/System
 Requires: %{name} = %{version}
 Conflicts: %{name} < %{version}
+%if ! %{_have_sysuser}
 Requires(pre): %{name}-user >= %{version}
+%endif
 
 %description plugin-xenstat
  This plugin allows Netdata to collect metrics from the Xen Hypervisor.
@@ -3118,7 +3174,9 @@ Recommends: %{name}-plugin-ebpf = %{version}
 Requires: %{name}-plugin-ebpf = %{version}
 %endif
 %endif
+%if ! %{_have_sysuser}
 Requires(pre): %{name}-user >= %{version}
+%endif
 
 %description plugin-network-viewer
  This plugin allows the Netdata Agent to provide network connection
@@ -3134,7 +3192,9 @@ Summary: The local dashboard for the Netdata Agent
 Group: Applications/System
 Requires: %{name} >= %{version}
 Conflicts: %{name} < %{version}
+%if ! %{_have_sysuser}
 Requires(pre): %{name}-user >= %{version}
+%endif
 
 %description dashboard
  This allows access to the dashboard on the local node without internet access.
@@ -3149,7 +3209,9 @@ Summary: The Open Telemetry plugin for the Netdata Agent
 Group: Applications/System
 Requires: %{name} >= %{version}
 Conflicts: %{name} < %{version}
+%if ! %{_have_sysuser}
 Requires(pre): %{name}-user >= %{version}
+%endif
 
 %description plugin-otel
  This plugin allows the Netdata Agent to collect metrics and logs via the
@@ -3164,11 +3226,11 @@ Requires(pre): %{name}-user >= %{version}
 %package user
 Summary: User and group accounts for the Netdata Agent
 Group: Applications/System
-%if 0%{?!add_sysuser}
+%if ! %{_have_sysuser}
 Requires: /usr/sbin/useradd
 Requires: /usr/sbin/groupadd
 %endif
-%if 0%{?suse_version}
+%if %{_need_explicit_user_provides}
 Provides: user(netdata)
 Provides: group(netdata)
 %endif
@@ -3177,7 +3239,7 @@ Provides: group(netdata)
  This package provides the netdata user and group that are used by the Netdata Agent.
 
 %post user
-%if 0%{?!add_sysuser} || 0%{?suse_version}
+%if %{_need_explicit_user_provides} || 0%{?!_have_sysuser:1}
 if command -v systemd-sysusers >/dev/null 2>&1; then
     systemd-sysusers %{_sysusersdir}/%{name}.conf
 else
