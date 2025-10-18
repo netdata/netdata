@@ -34,6 +34,25 @@ func (c *Collector) logOnce(key string, format string, args ...interface{}) {
 	c.disabled[key] = true
 }
 
+func (c *Collector) logErrorOnce(key string, format string, args ...interface{}) {
+	c.muErrorLog.Lock()
+	defer c.muErrorLog.Unlock()
+
+	if c.errorLogged[key] {
+		return
+	}
+	msg := fmt.Sprintf(format, args...)
+	c.Errorf("[%s] %s", key, msg)
+	c.errorLogged[key] = true
+}
+
+func (c *Collector) clearErrorOnce(key string) {
+	c.muErrorLog.Lock()
+	defer c.muErrorLog.Unlock()
+
+	delete(c.errorLogged, key)
+}
+
 func (c *Collector) isDisabled(key string) bool {
 	return c.disabled[key]
 }
@@ -118,12 +137,52 @@ func (c *Collector) detectAvailableFeatures(ctx context.Context) {
 	c.disabled["ifs_object_statistics"] = true
 }
 
+func trimDriverMessage(err error) string {
+	if err == nil {
+		return ""
+	}
+	msg := err.Error()
+	msg = strings.TrimRight(msg, "\x00")
+	msg = strings.TrimSpace(msg)
+	return msg
+}
+
+func sanitizeQuery(q string) string {
+	if q == "" {
+		return ""
+	}
+	q = strings.Join(strings.Fields(q), " ")
+	const limit = 240
+	if len(q) > limit {
+		return q[:limit-3] + "..."
+	}
+	return q
+}
+
+func (c *Collector) logQueryErrorOnce(key, query string, err error) {
+	msg := trimDriverMessage(err)
+	if query != "" {
+		query = sanitizeQuery(query)
+		c.logErrorOnce(key, "query failed (%s): %s", query, msg)
+		return
+	}
+	c.logErrorOnce(key, "%s", msg)
+}
+
 func (c *Collector) collectSystemInfo(ctx context.Context) {
 	c.systemName = "Unknown"
 
 	_ = c.collectSingleMetric(ctx, "serial_number", querySerialNumber, func(value string) {
 		c.serialNumber = strings.TrimSpace(value)
 		c.Debugf("detected serial number: %s", c.serialNumber)
+	})
+
+	_ = c.collectSingleMetric(ctx, "system_name_metric", querySystemName, func(value string) {
+		name := strings.TrimSpace(value)
+		if name != "" {
+			c.systemName = name
+			c.Debugf("detected system name: %s", c.systemName)
+		}
 	})
 
 	_ = c.collectSingleMetric(ctx, "system_model", querySystemModel, func(value string) {

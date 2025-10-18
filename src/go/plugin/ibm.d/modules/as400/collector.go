@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/pkg/stm"
@@ -31,6 +32,8 @@ type Collector struct {
 	// Per-iteration metrics
 	mx *metricsData
 
+	fastQueryLatencyCounters map[string]int64
+
 	// Metadata caches (reset every iteration)
 	disks             map[string]*diskMetrics
 	subsystems        map[string]*subsystemMetrics
@@ -47,6 +50,14 @@ type Collector struct {
 	diskSelector      matcher.Matcher
 	subsystemSelector matcher.Matcher
 
+	slow struct {
+		client *as400proto.Client
+		cancel context.CancelFunc
+		wg     sync.WaitGroup
+		config slowPathConfig
+		cache  slowCache
+	}
+
 	// System identity
 	systemName        string
 	serialNumber      string
@@ -58,7 +69,9 @@ type Collector struct {
 	versionMod        int
 
 	// Feature flags and logging guards
-	disabled map[string]bool
+	disabled    map[string]bool
+	errorLogged map[string]bool
+	muErrorLog  sync.Mutex
 
 	// Cardinality guards to avoid repeated expensive counts
 	diskCardinality              cardinalityGuard
@@ -86,6 +99,7 @@ type Collector struct {
 func (c *Collector) initOnce() {
 	c.once.Do(func() {
 		c.disabled = make(map[string]bool)
+		c.errorLogged = make(map[string]bool)
 		c.mx = &metricsData{}
 		c.resetInstanceCaches()
 		c.initGroups()
@@ -113,7 +127,6 @@ func (c *Collector) resetInstanceCaches() {
 	c.mx.networkInterfaces = make(map[string]networkInterfaceInstanceMetrics)
 	c.mx.httpServers = make(map[string]httpServerInstanceMetrics)
 	c.mx.planCache = make(map[string]planCacheInstanceMetrics)
-	c.mx.queryLatencies = make(map[string]int64)
 }
 
 func (c *Collector) prepareIterationState() {
@@ -546,6 +559,9 @@ func (c *Collector) exportSubsystemMetrics() {
 			Library:   library,
 			Status:    status,
 		}
+		if interval := c.slowPathIntervalSeconds(); interval > 0 {
+			contexts.Subsystem.Jobs.SetUpdateEvery(c.State, labels, interval)
+		}
 		contexts.Subsystem.Jobs.Set(c.State, labels, contexts.SubsystemJobsValues{
 			Active:  values.CurrentActiveJobs,
 			Maximum: values.MaximumActiveJobs,
@@ -572,6 +588,9 @@ func (c *Collector) exportJobQueueMetrics() {
 			Job_queue: queueName,
 			Library:   library,
 			Status:    status,
+		}
+		if interval := c.slowPathIntervalSeconds(); interval > 0 {
+			contexts.JobQueue.Length.SetUpdateEvery(c.State, labels, interval)
 		}
 		contexts.JobQueue.Length.Set(c.State, labels, contexts.JobQueueLengthValues{
 			Jobs: values.NumberOfJobs,
@@ -603,6 +622,10 @@ func (c *Collector) exportMessageQueueMetrics() {
 		labels := contexts.MessageQueueLabels{
 			Library: library,
 			Queue:   queue,
+		}
+		if interval := c.slowPathIntervalSeconds(); interval > 0 {
+			contexts.MessageQueue.Messages.SetUpdateEvery(c.State, labels, interval)
+			contexts.MessageQueue.Severity.SetUpdateEvery(c.State, labels, interval)
 		}
 		contexts.MessageQueue.Messages.Set(c.State, labels, contexts.MessageQueueMessagesValues{
 			Total:         values.Total,
@@ -636,6 +659,11 @@ func (c *Collector) exportOutputQueueMetrics() {
 			Library: library,
 			Queue:   queue,
 			Status:  status,
+		}
+		if interval := c.slowPathIntervalSeconds(); interval > 0 {
+			contexts.OutputQueue.Files.SetUpdateEvery(c.State, labels, interval)
+			contexts.OutputQueue.Writers.SetUpdateEvery(c.State, labels, interval)
+			contexts.OutputQueue.Status.SetUpdateEvery(c.State, labels, interval)
 		}
 		contexts.OutputQueue.Files.Set(c.State, labels, contexts.OutputQueueFilesValues{
 			Files: values.Files,
@@ -774,6 +802,9 @@ func (c *Collector) exportPlanCacheMetrics() {
 			metricLabel = meta.heading
 		}
 		labels := contexts.PlanCacheLabels{Metric: metricLabel}
+		if interval := c.slowPathIntervalSeconds(); interval > 0 {
+			contexts.PlanCache.Summary.SetUpdateEvery(c.State, labels, interval)
+		}
 		contexts.PlanCache.Summary.Set(c.State, labels, contexts.PlanCacheSummaryValues{
 			Value: values.Value,
 		})
@@ -781,98 +812,123 @@ func (c *Collector) exportPlanCacheMetrics() {
 }
 
 func (c *Collector) exportQueryLatencyMetrics() {
-	if c.mx == nil || len(c.mx.queryLatencies) == 0 {
-		return
-	}
-
-	values := contexts.ObservabilityQueryLatencyValues{}
-	fieldMap := map[string]*int64{
-		"analyze_plan_cache":           &values.Analyze_plan_cache,
-		"count_disks":                  &values.Count_disks,
-		"count_http_servers":           &values.Count_http_servers,
-		"count_job_queues":             &values.Count_job_queues,
-		"count_message_queues":         &values.Count_message_queues,
-		"count_network_interfaces":     &values.Count_network_interfaces,
-		"count_output_queues":          &values.Count_output_queues,
-		"count_subsystems":             &values.Count_subsystems,
-		"detect_ibmi_version_primary":  &values.Detect_ibmi_version_primary,
-		"detect_ibmi_version_fallback": &values.Detect_ibmi_version_fallback,
-		"disk_instances":               &values.Disk_instances,
-		"disk_instances_enhanced":      &values.Disk_instances_enhanced,
-		"disk_status":                  &values.Disk_status,
-		"http_server_info":             &values.Http_server_info,
-		"job_info":                     &values.Job_info,
-		"job_queues":                   &values.Job_queues,
-		"memory_pools":                 &values.Memory_pools,
-		"message_queue_aggregates":     &values.Message_queue_aggregates,
-		"network_connections":          &values.Network_connections,
-		"network_interfaces":           &values.Network_interfaces,
-		"output_queue_info":            &values.Output_queue_info,
-		"plan_cache_summary":           &values.Plan_cache_summary,
-		"serial_number":                &values.Serial_number,
-		"system_activity":              &values.System_activity,
-		"system_model":                 &values.System_model,
-		"system_status":                &values.System_status,
-		"temp_storage_named":           &values.Temp_storage_named,
-		"temp_storage_total":           &values.Temp_storage_total,
-		"technology_refresh_level":     &values.Technology_refresh_level,
-		"active_job":                   &values.Active_job,
-	}
-
-	var otherTotal int64
-
-	for name, latency := range c.mx.queryLatencies {
-		if latency == 0 {
-			continue
+	export := func(path string, counters map[string]int64, updateEvery int) {
+		if len(counters) == 0 {
+			return
 		}
 
-		switch {
-		case strings.HasPrefix(name, "message_queue_"):
-			if target, ok := fieldMap["message_queue_aggregates"]; ok {
-				*target += latency
+		dimensionTotals := make(map[string]int64)
+		var otherTotal int64
+
+		mapDirect := map[string]string{
+			"analyze_plan_cache":           "analyze_plan_cache",
+			"count_disks":                  "count_disks",
+			"count_http_servers":           "count_http_servers",
+			"count_network_interfaces":     "count_network_interfaces",
+			"count_subsystems":             "count_subsystems",
+			"detect_ibmi_version_primary":  "detect_ibmi_version_primary",
+			"detect_ibmi_version_fallback": "detect_ibmi_version_fallback",
+			"disk_instances":               "disk_instances",
+			"disk_instances_enhanced":      "disk_instances_enhanced",
+			"disk_status":                  "disk_status",
+			"http_server_info":             "http_server_info",
+			"job_info":                     "job_info",
+			"job_queues":                   "job_queues",
+			"memory_pools":                 "memory_pools",
+			"message_queue_aggregates":     "message_queue_aggregates",
+			"network_connections":          "network_connections",
+			"network_interfaces":           "network_interfaces",
+			"output_queue_info":            "output_queue_info",
+			"plan_cache_summary":           "plan_cache_summary",
+			"serial_number":                "serial_number",
+			"system_activity":              "system_activity",
+			"system_model":                 "system_model",
+			"system_status":                "system_status",
+			"temp_storage_named":           "temp_storage_named",
+			"temp_storage_total":           "temp_storage_total",
+			"technology_refresh_level":     "technology_refresh_level",
+			"active_job":                   "active_job",
+		}
+
+		for name, total := range counters {
+			if total <= 0 {
 				continue
 			}
-		case strings.HasPrefix(name, "job_queue_"):
-			if target, ok := fieldMap["job_queues"]; ok {
-				*target += latency
+
+			switch {
+			case strings.HasPrefix(name, "message_queue_"):
+				dimensionTotals["message_queue_aggregates"] += total
+				continue
+			case strings.HasPrefix(name, "job_queue_"):
+				dimensionTotals["job_queues"] += total
+				continue
+			case strings.HasPrefix(name, "output_queue_"):
+				dimensionTotals["output_queue_info"] += total
+				continue
+			case strings.HasPrefix(name, "active_job_"):
+				dimensionTotals["active_job"] += total
 				continue
 			}
-		case strings.HasPrefix(name, "output_queue_"):
-			if target, ok := fieldMap["output_queue_info"]; ok {
-				*target += latency
-				continue
-			}
-		case strings.HasPrefix(name, "active_job_"):
-			if target, ok := fieldMap["active_job"]; ok {
-				*target += latency
-				continue
+
+			if dim, ok := mapDirect[name]; ok {
+				dimensionTotals[dim] += total
+			} else {
+				otherTotal += total
 			}
 		}
 
-		if target, ok := fieldMap[name]; ok {
-			*target += latency
-		} else {
-			otherTotal += latency
+		if otherTotal > 0 {
+			dimensionTotals["other"] += otherTotal
+		}
+
+		if len(dimensionTotals) == 0 {
+			return
+		}
+
+		labels := contexts.ObservabilityLabels{Path: path}
+		if updateEvery > 0 {
+			contexts.Observability.QueryLatency.SetUpdateEvery(c.State, labels, updateEvery)
+		}
+		c.State.SetMetricsForGeneratedCode(&contexts.Observability.QueryLatency.Context, labels, dimensionTotals)
+	}
+
+	export("fast", c.fastQueryLatencyCounters, c.fastPathIntervalSeconds())
+
+	if c.slowPathActive() {
+		if counters, _ := c.slow.cache.getLatencies(); len(counters) > 0 {
+			export("slow", counters, c.slowPathIntervalSeconds())
 		}
 	}
+}
 
-	if otherTotal > 0 {
-		values.Other = otherTotal
+func (c *Collector) fastPathIntervalSeconds() int {
+	if c == nil {
+		return 0
 	}
+	if c.Collector.Config.UpdateEvery > 0 {
+		return c.Collector.Config.UpdateEvery
+	}
+	if c.Config.UpdateEvery > 0 {
+		return c.Config.UpdateEvery
+	}
+	return 1
+}
 
-	var total int64
-	for _, ptr := range fieldMap {
-		if ptr != nil {
-			total += *ptr
+func (c *Collector) slowPathIntervalSeconds() int {
+	if c == nil {
+		return 0
+	}
+	if !c.slowPathActive() {
+		return 0
+	}
+	interval := int(c.slow.config.interval / time.Second)
+	if interval < 1 {
+		interval = c.fastPathIntervalSeconds()
+		if interval < 1 {
+			interval = 1
 		}
 	}
-	total += values.Other
-
-	if total == 0 {
-		return
-	}
-
-	contexts.Observability.QueryLatency.Set(c.State, contexts.EmptyLabels{}, values)
+	return interval
 }
 
 func (c *Collector) exportSystemActivityMetrics() {
@@ -898,6 +954,7 @@ func (c *Collector) verifyConfig() error {
 }
 
 func (c *Collector) Cleanup(ctx context.Context) {
+	c.stopSlowPath()
 	if c.client != nil {
 		if err := c.client.Close(); err != nil {
 			c.Errorf("cleanup: error closing database: %v", err)

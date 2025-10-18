@@ -20,13 +20,11 @@ import (
 func defaultConfig() Config {
 	return Config{
 		Config: framework.Config{
-			UpdateEvery: 10,
+			UpdateEvery: 5,
 		},
-		Vnode:         "",
-		DSN:           "",
-		Timeout:       confopt.Duration(2 * time.Second),
-		MaxDbConns:    1,
-		MaxDbLifeTime: confopt.Duration(10 * time.Minute),
+		Vnode:   "",
+		DSN:     "",
+		Timeout: confopt.Duration(2 * time.Second),
 
 		Hostname:        "",
 		Port:            8471,
@@ -43,6 +41,10 @@ func defaultConfig() Config {
 		CollectActiveJobs:        confopt.AutoBoolAuto,
 		CollectHTTPServerMetrics: confopt.AutoBoolAuto,
 		CollectPlanCacheMetrics:  confopt.AutoBoolAuto,
+
+		SlowPath:               true,
+		SlowPathUpdateEvery:    confopt.Duration(10 * time.Second),
+		SlowPathMaxConnections: 1,
 
 		MaxDisks:      100,
 		MaxSubsystems: 100,
@@ -98,8 +100,7 @@ func (c *Collector) Init(ctx context.Context) error {
 	clientCfg := as400proto.Config{
 		DSN:          c.DSN,
 		Timeout:      time.Duration(c.Timeout),
-		MaxOpenConns: c.MaxDbConns,
-		ConnMaxLife:  time.Duration(c.MaxDbLifeTime),
+		MaxOpenConns: 1,
 	}
 	c.client = as400proto.NewClient(clientCfg)
 
@@ -138,6 +139,10 @@ func (c *Collector) Init(ctx context.Context) error {
 	}
 
 	if err := c.configureTargets(); err != nil {
+		return err
+	}
+
+	if err := c.startSlowPath(); err != nil {
 		return err
 	}
 

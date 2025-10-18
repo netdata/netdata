@@ -220,9 +220,6 @@ func (a *Collector) collect(ctx context.Context) error {
 }
 
 func (a *Collector) recordQueryLatency(queryName string, duration time.Duration) {
-	if a.mx == nil {
-		return
-	}
 	if queryName == "" {
 		queryName = "unknown_query"
 	}
@@ -232,16 +229,15 @@ func (a *Collector) recordQueryLatency(queryName string, duration time.Duration)
 		sanitized = "unknown_query"
 	}
 
-	if a.mx.queryLatencies == nil {
-		a.mx.queryLatencies = make(map[string]int64)
-	}
-
 	latency := duration.Microseconds()
 	if latency == 0 && duration > 0 {
 		latency = 1
 	}
 
-	a.mx.queryLatencies[sanitized] += latency
+	if a.fastQueryLatencyCounters == nil {
+		a.fastQueryLatencyCounters = make(map[string]int64)
+	}
+	a.fastQueryLatencyCounters[sanitized] += latency
 }
 
 func (a *Collector) collectSystemStatus(ctx context.Context) error {
@@ -432,6 +428,29 @@ func (a *Collector) collectMessageQueues(ctx context.Context) error {
 		return nil
 	}
 
+	if a.slowPathActive() {
+		snapshot := a.slow.cache.getMessageQueues()
+		for _, target := range a.messageQueueTargets {
+			key := target.ID()
+			meta := a.getMessageQueueMetrics(key)
+			*meta = messageQueueMetrics{
+				library: target.Library,
+				name:    target.Name,
+			}
+			if snapshotMeta, ok := snapshot.meta[key]; ok {
+				if snapshotMeta.library != "" {
+					meta.library = snapshotMeta.library
+				}
+				if snapshotMeta.name != "" {
+					meta.name = snapshotMeta.name
+				}
+			}
+			a.messageQueues[key] = meta
+			a.mx.messageQueues[key] = snapshot.metrics[key]
+		}
+		return snapshot.err
+	}
+
 	var firstErr error
 
 	for _, target := range a.messageQueueTargets {
@@ -492,6 +511,27 @@ func (a *Collector) collectMessageQueues(ctx context.Context) error {
 func (a *Collector) collectOutputQueues(ctx context.Context) error {
 	if len(a.outputQueueTargets) == 0 {
 		return nil
+	}
+
+	if a.slowPathActive() {
+		snapshot := a.slow.cache.getOutputQueues()
+		for _, target := range a.outputQueueTargets {
+			key := target.ID()
+			metaPtr := a.getOutputQueueMetrics(key)
+			defaultMeta := outputQueueMetrics{
+				library: target.Library,
+				name:    target.Name,
+				status:  "UNKNOWN",
+			}
+			if snapshotMeta, ok := snapshot.meta[key]; ok {
+				*metaPtr = snapshotMeta
+			} else {
+				*metaPtr = defaultMeta
+			}
+			a.outputQueues[key] = metaPtr
+			a.mx.outputQueues[key] = snapshot.metrics[key]
+		}
+		return snapshot.err
 	}
 
 	var firstErr error
@@ -1023,6 +1063,19 @@ func (a *Collector) collectTempStorage(ctx context.Context) error {
 
 // Subsystems collection
 func (a *Collector) collectSubsystems(ctx context.Context) error {
+	if a.slowPathActive() {
+		snapshot := a.slow.cache.getSubsystems()
+		for key, meta := range snapshot.meta {
+			ptr := a.getSubsystemMetrics(key)
+			*ptr = meta
+			a.subsystems[key] = ptr
+		}
+		for key, metrics := range snapshot.metrics {
+			a.mx.subsystems[key] = metrics
+		}
+		return snapshot.err
+	}
+
 	query := querySubsystems
 	if a.MaxSubsystems > 0 {
 		if total, err := a.countSubsystems(ctx); err != nil {
@@ -1093,6 +1146,27 @@ func (a *Collector) collectSubsystems(ctx context.Context) error {
 func (a *Collector) collectJobQueues(ctx context.Context) error {
 	if len(a.jobQueueTargets) == 0 {
 		return nil
+	}
+
+	if a.slowPathActive() {
+		snapshot := a.slow.cache.getJobQueues()
+		for _, target := range a.jobQueueTargets {
+			key := target.ID()
+			metaPtr := a.getJobQueueMetrics(key)
+			defaultMeta := jobQueueMetrics{
+				library: target.Library,
+				name:    target.Name,
+				status:  "NOT_FOUND",
+			}
+			if snapshotMeta, ok := snapshot.meta[key]; ok {
+				*metaPtr = snapshotMeta
+			} else {
+				*metaPtr = defaultMeta
+			}
+			a.jobQueues[key] = metaPtr
+			a.mx.jobQueues[key] = snapshot.metrics[key]
+		}
+		return snapshot.err
 	}
 
 	var firstErr error
@@ -1563,6 +1637,19 @@ func (a *Collector) collectPlanCache(ctx context.Context) error {
 		return nil
 	}
 
+	if a.slowPathActive() {
+		snapshot := a.slow.cache.getPlanCache()
+		for key, meta := range snapshot.meta {
+			if ptr := a.getPlanCacheMetrics(key, meta.heading); ptr != nil {
+				a.planCache[key] = ptr
+			}
+		}
+		for key, values := range snapshot.values {
+			a.mx.planCache[key] = values
+		}
+		return snapshot.err
+	}
+
 	start := time.Now()
 	if err := a.client.Exec(ctx, callAnalyzePlanCache); err != nil {
 		return fmt.Errorf("failed to analyze plan cache: %w", err)
@@ -1678,9 +1765,9 @@ func (a *Collector) collectSystemActivity(ctx context.Context) error {
 					a.mx.EntitledCPUPercentage = a.computeEntitledCPUPercentage(cpuUtilization)
 				} else {
 					if cpuUtilization < 0 {
-						a.Warningf("CPU collection: calculated utilization negative (%.2f%%), skipping this sample", cpuUtilization/precision)
+						a.Warningf("CPU collection: calculated utilization negative (%.2f%%), keeping this sample", cpuUtilization/precision)
 					} else {
-						a.Warningf("CPU collection: calculated utilization (%.2f%%) exceeds configured capacity (%d CPUs), skipping this sample",
+						a.Warningf("CPU collection: calculated utilization (%.2f%%) exceeds configured capacity (%d CPUs), keeping this sample",
 							cpuUtilization/precision, a.mx.ConfiguredCPUs)
 					}
 				}
@@ -1732,9 +1819,9 @@ func (a *Collector) collectSystemActivity(ctx context.Context) error {
 						a.mx.EntitledCPUPercentage = a.computeEntitledCPUPercentage(cpuUtilization)
 					} else {
 						if cpuUtilization < 0 {
-							a.Warningf("CPU collection: interval utilization negative (%.2f%%), skipping this sample", cpuUtilization/precision)
+							a.Warningf("CPU collection: interval utilization negative (%.2f%%), keeping this sample", cpuUtilization/precision)
 						} else {
-							a.Warningf("CPU collection: interval utilization (%.2f%%) exceeds configured capacity (%d CPUs), skipping this sample",
+							a.Warningf("CPU collection: interval utilization (%.2f%%) exceeds configured capacity (%d CPUs), keeping this sample",
 								cpuUtilization/precision, a.mx.ConfiguredCPUs)
 						}
 					}

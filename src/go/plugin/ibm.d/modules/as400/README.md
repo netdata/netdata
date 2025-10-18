@@ -137,16 +137,6 @@ Metrics:
 
 | Metric | Dimensions | Unit |
 |:-------|:-----------|:-----|
-| netdata.plugin_ibm.as400_query_latency | analyze_plan_cache, count_disks, count_http_servers, count_job_queues, count_message_queues, count_network_interfaces, count_output_queues, count_subsystems, detect_ibmi_version_primary, detect_ibmi_version_fallback, disk_instances, disk_instances_enhanced, disk_status, http_server_info, job_info, job_queues, memory_pools, message_queue_aggregates, network_connections, network_interfaces, output_queue_info, plan_cache_summary, serial_number, system_activity, system_model, system_status, temp_storage_named, temp_storage_total, technology_refresh_level, active_job, other | ms |
-
-These metrics refer to the entire monitored IBM i (AS/400) instance.
-
-This scope has no labels.
-
-Metrics:
-
-| Metric | Dimensions | Unit |
-|:-------|:-----------|:-----|
 | as400.cpu_utilization | utilization | percentage |
 | as400.cpu_utilization_entitled | utilization | percentage |
 | as400.cpu_configuration | configured | cpus |
@@ -301,6 +291,24 @@ Metrics:
 | as400.network_interface_status | active | status |
 | as400.network_interface_mtu | mtu | bytes |
 
+### Per observability
+
+These metrics refer to individual observability instances.
+
+Labels:
+
+| Label | Description |
+|:------|:------------|
+| path | Path identifier |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:-------|:-----------|:-----|
+| netdata.plugin_ibm.as400_query_latency | analyze_plan_cache, count_disks, count_http_servers, count_message_queues, count_network_interfaces, count_subsystems, detect_ibmi_version_primary, detect_ibmi_version_fallback, disk_instances, disk_instances_enhanced, disk_status, http_server_info, job_info, job_queues, memory_pools, message_queue_aggregates, network_connections, network_interfaces, output_queue_info, plan_cache_summary, serial_number, system_activity, system_model, system_status, temp_storage_named, temp_storage_total, technology_refresh_level, active_job, other | ms |
+
+> **Note**: Query latency dimensions are exported as cumulative counters (microseconds). Netdata’s `incremental` algorithm derives per-interval latency automatically, so a non-zero delta indicates the query executed during that flush.
+
 ### Per outputqueue
 
 These metrics refer to individual outputqueue instances.
@@ -392,12 +400,10 @@ The following options can be defined globally or per job.
 
 | Name | Description | Default | Required | Min | Max |
 |:-----|:------------|:--------|:---------|:----|:----|
-| update_every | Data collection frequency | `10` | no | 1 | - |
+| update_every | Data collection frequency | `5` | no | 1 | - |
 | Vnode | Vnode allows binding the collector to a virtual node. | `` | no | - | - |
 | DSN | DSN provides a full IBM i ODBC connection string if manual override is needed. | `` | no | - | - |
 | Timeout | Timeout controls how long to wait for SQL statements and RPCs. | `2000000000` | no | - | - |
-| MaxDbConns | MaxDbConns restricts the maximum number of open ODBC connections. | `1` | no | - | - |
-| MaxDbLifeTime | MaxDbLifeTime limits how long a pooled connection may live before being recycled. | `600000000000` | no | - | - |
 | Hostname | Hostname is the remote IBM i host to monitor. | `` | no | - | - |
 | Port | Port is the TCP port for the IBM i Access ODBC server. | `8471` | no | 1 | 65535 |
 | Username | Username supplies the credentials used for authentication. | `` | no | - | - |
@@ -412,6 +418,9 @@ The following options can be defined globally or per job.
 | CollectActiveJobs | CollectActiveJobs toggles collection of detailed per-job metrics. | `auto` | no | - | - |
 | CollectHTTPServerMetrics | CollectHTTPServerMetrics toggles collection of IBM HTTP Server statistics. | `auto` | no | - | - |
 | CollectPlanCacheMetrics | CollectPlanCacheMetrics toggles collection of plan cache analysis metrics. | `auto` | no | - | - |
+| SlowPath | SlowPath enables the asynchronous slow-path worker for heavy queries. | `true` | no | - | - |
+| SlowPathUpdateEvery | SlowPathUpdateEvery controls the beat interval for the slow-path worker. | `10000000000` | no | - | - |
+| SlowPathMaxConnections | SlowPathMaxConnections caps the number of concurrent queries the slow-path worker may run. | `1` | no | - | - |
 | MaxDisks | MaxDisks caps how many disk units may be charted. | `100` | no | - | - |
 | MaxSubsystems | MaxSubsystems caps how many subsystems may be charted. | `100` | no | - | - |
 | DiskSelector | DiskSelector filters disk units by name using glob-style patterns. | `` | no | - | - |

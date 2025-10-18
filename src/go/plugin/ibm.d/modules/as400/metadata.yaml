@@ -400,9 +400,11 @@ modules:
               chart_type: line
               dimensions:
                 - name: mtu
-        - name: global
-          description: These metrics refer to the entire monitored instance.
-          labels: []
+        - name: observability
+          description: These metrics refer to observability instances.
+          labels:
+            - name: path
+              description: Path identifier
           metrics:
             - name: netdata.plugin_ibm.as400_query_latency
               description: AS400 Query Latency
@@ -412,10 +414,7 @@ modules:
                 - name: analyze_plan_cache
                 - name: count_disks
                 - name: count_http_servers
-                - name: count_job_queues
-                - name: count_message_queues
                 - name: count_network_interfaces
-                - name: count_output_queues
                 - name: count_subsystems
                 - name: detect_ibmi_version_primary
                 - name: detect_ibmi_version_fallback

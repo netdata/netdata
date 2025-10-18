@@ -655,7 +655,8 @@ PlanCache:
           algo: absolute
           div: 1000
 Observability:
-  labels: []
+  labels:
+    - path
   contexts:
     - name: QueryLatency
       context: netdata.plugin_ibm.as400_query_latency
@@ -666,95 +667,86 @@ Observability:
       priority: 146000
       dimensions:
         - name: analyze_plan_cache
-          algo: absolute
+          algo: incremental
           div: 1000
         - name: count_disks
-          algo: absolute
+          algo: incremental
           div: 1000
         - name: count_http_servers
-          algo: absolute
-          div: 1000
-        - name: count_job_queues
-          algo: absolute
-          div: 1000
-        - name: count_message_queues
-          algo: absolute
+          algo: incremental
           div: 1000
         - name: count_network_interfaces
-          algo: absolute
-          div: 1000
-        - name: count_output_queues
-          algo: absolute
+          algo: incremental
           div: 1000
         - name: count_subsystems
-          algo: absolute
+          algo: incremental
           div: 1000
         - name: detect_ibmi_version_primary
-          algo: absolute
+          algo: incremental
           div: 1000
         - name: detect_ibmi_version_fallback
-          algo: absolute
+          algo: incremental
           div: 1000
         - name: disk_instances
-          algo: absolute
+          algo: incremental
           div: 1000
         - name: disk_instances_enhanced
-          algo: absolute
+          algo: incremental
           div: 1000
         - name: disk_status
-          algo: absolute
+          algo: incremental
           div: 1000
         - name: http_server_info
-          algo: absolute
+          algo: incremental
           div: 1000
         - name: job_info
-          algo: absolute
+          algo: incremental
           div: 1000
         - name: job_queues
-          algo: absolute
+          algo: incremental
           div: 1000
         - name: memory_pools
-          algo: absolute
+          algo: incremental
           div: 1000
         - name: message_queue_aggregates
-          algo: absolute
+          algo: incremental
           div: 1000
         - name: network_connections
-          algo: absolute
+          algo: incremental
           div: 1000
         - name: network_interfaces
-          algo: absolute
+          algo: incremental
           div: 1000
         - name: output_queue_info
-          algo: absolute
+          algo: incremental
           div: 1000
         - name: plan_cache_summary
-          algo: absolute
+          algo: incremental
           div: 1000
         - name: serial_number
-          algo: absolute
+          algo: incremental
           div: 1000
         - name: system_activity
-          algo: absolute
+          algo: incremental
           div: 1000
         - name: system_model
-          algo: absolute
+          algo: incremental
           div: 1000
         - name: system_status
-          algo: absolute
+          algo: incremental
           div: 1000
         - name: temp_storage_named
-          algo: absolute
+          algo: incremental
           div: 1000
         - name: temp_storage_total
-          algo: absolute
+          algo: incremental
           div: 1000
         - name: technology_refresh_level
-          algo: absolute
+          algo: incremental
           div: 1000
         - name: active_job
-          algo: absolute
+          algo: incremental
           div: 1000
         - name: other
-          algo: absolute
+          algo: incremental
           div: 1000

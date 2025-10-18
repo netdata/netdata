@@ -1368,12 +1368,12 @@ type ObservabilityQueryLatencyValues struct {
 
 // ObservabilityQueryLatencyContext provides type-safe operations for Observability.QueryLatency context
 type ObservabilityQueryLatencyContext struct {
-	framework.Context[EmptyLabels]
+	framework.Context[ObservabilityLabels]
 }
 
 // Set provides type-safe dimension setting for Observability.QueryLatency context
-func (c ObservabilityQueryLatencyContext) Set(state *framework.CollectorState, labels EmptyLabels, values ObservabilityQueryLatencyValues) {
-	state.SetMetricsForGeneratedCode(&c.Context, nil, map[string]int64{
+func (c ObservabilityQueryLatencyContext) Set(state *framework.CollectorState, labels ObservabilityLabels, values ObservabilityQueryLatencyValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
 		"analyze_plan_cache":           values.Analyze_plan_cache,
 		"count_disks":                  values.Count_disks,
 		"count_http_servers":           values.Count_http_servers,
@@ -1409,8 +1409,19 @@ func (c ObservabilityQueryLatencyContext) Set(state *framework.CollectorState, l
 }
 
 // SetUpdateEvery sets the update interval for this instance
-func (c ObservabilityQueryLatencyContext) SetUpdateEvery(state *framework.CollectorState, labels EmptyLabels, updateEvery int) {
-	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, nil, updateEvery)
+func (c ObservabilityQueryLatencyContext) SetUpdateEvery(state *framework.CollectorState, labels ObservabilityLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
+// ObservabilityLabels defines the required labels for Observability contexts
+type ObservabilityLabels struct {
+	Path string
+}
+
+// InstanceID generates a unique instance ID using the hardcoded label order from YAML
+func (l ObservabilityLabels) InstanceID(contextName string) string {
+	// Label order from YAML: path
+	return contextName + "." + cleanLabelValue(l.Path)
 }
 
 // Observability contains all metric contexts for Observability
@@ -1418,7 +1429,7 @@ var Observability = struct {
 	QueryLatency ObservabilityQueryLatencyContext
 }{
 	QueryLatency: ObservabilityQueryLatencyContext{
-		Context: framework.Context[EmptyLabels]{
+		Context: framework.Context[ObservabilityLabels]{
 			Name:        "netdata.plugin_ibm.as400_query_latency",
 			Family:      "plugins/ibm.d/latency",
 			Title:       "AS400 Query Latency",
@@ -1429,223 +1440,225 @@ var Observability = struct {
 			Dimensions: []framework.Dimension{
 				{
 					Name:      "analyze_plan_cache",
-					Algorithm: module.Absolute,
+					Algorithm: module.Incremental,
 					Mul:       1,
 					Div:       1000,
 					Precision: 1,
 				},
 				{
 					Name:      "count_disks",
-					Algorithm: module.Absolute,
+					Algorithm: module.Incremental,
 					Mul:       1,
 					Div:       1000,
 					Precision: 1,
 				},
 				{
 					Name:      "count_http_servers",
-					Algorithm: module.Absolute,
+					Algorithm: module.Incremental,
 					Mul:       1,
 					Div:       1000,
 					Precision: 1,
 				},
 				{
 					Name:      "count_job_queues",
-					Algorithm: module.Absolute,
+					Algorithm: module.Incremental,
 					Mul:       1,
 					Div:       1000,
 					Precision: 1,
 				},
 				{
 					Name:      "count_message_queues",
-					Algorithm: module.Absolute,
+					Algorithm: module.Incremental,
 					Mul:       1,
 					Div:       1000,
 					Precision: 1,
 				},
 				{
 					Name:      "count_network_interfaces",
-					Algorithm: module.Absolute,
+					Algorithm: module.Incremental,
 					Mul:       1,
 					Div:       1000,
 					Precision: 1,
 				},
 				{
 					Name:      "count_output_queues",
-					Algorithm: module.Absolute,
+					Algorithm: module.Incremental,
 					Mul:       1,
 					Div:       1000,
 					Precision: 1,
 				},
 				{
 					Name:      "count_subsystems",
-					Algorithm: module.Absolute,
+					Algorithm: module.Incremental,
 					Mul:       1,
 					Div:       1000,
 					Precision: 1,
 				},
 				{
 					Name:      "detect_ibmi_version_primary",
-					Algorithm: module.Absolute,
+					Algorithm: module.Incremental,
 					Mul:       1,
 					Div:       1000,
 					Precision: 1,
 				},
 				{
 					Name:      "detect_ibmi_version_fallback",
-					Algorithm: module.Absolute,
+					Algorithm: module.Incremental,
 					Mul:       1,
 					Div:       1000,
 					Precision: 1,
 				},
 				{
 					Name:      "disk_instances",
-					Algorithm: module.Absolute,
+					Algorithm: module.Incremental,
 					Mul:       1,
 					Div:       1000,
 					Precision: 1,
 				},
 				{
 					Name:      "disk_instances_enhanced",
-					Algorithm: module.Absolute,
+					Algorithm: module.Incremental,
 					Mul:       1,
 					Div:       1000,
 					Precision: 1,
 				},
 				{
 					Name:      "disk_status",
-					Algorithm: module.Absolute,
+					Algorithm: module.Incremental,
 					Mul:       1,
 					Div:       1000,
 					Precision: 1,
 				},
 				{
 					Name:      "http_server_info",
-					Algorithm: module.Absolute,
+					Algorithm: module.Incremental,
 					Mul:       1,
 					Div:       1000,
 					Precision: 1,
 				},
 				{
 					Name:      "job_info",
-					Algorithm: module.Absolute,
+					Algorithm: module.Incremental,
 					Mul:       1,
 					Div:       1000,
 					Precision: 1,
 				},
 				{
 					Name:      "job_queues",
-					Algorithm: module.Absolute,
+					Algorithm: module.Incremental,
 					Mul:       1,
 					Div:       1000,
 					Precision: 1,
 				},
 				{
 					Name:      "memory_pools",
-					Algorithm: module.Absolute,
+					Algorithm: module.Incremental,
 					Mul:       1,
 					Div:       1000,
 					Precision: 1,
 				},
 				{
 					Name:      "message_queue_aggregates",
-					Algorithm: module.Absolute,
+					Algorithm: module.Incremental,
 					Mul:       1,
 					Div:       1000,
 					Precision: 1,
 				},
 				{
 					Name:      "network_connections",
-					Algorithm: module.Absolute,
+					Algorithm: module.Incremental,
 					Mul:       1,
 					Div:       1000,
 					Precision: 1,
 				},
 				{
 					Name:      "network_interfaces",
-					Algorithm: module.Absolute,
+					Algorithm: module.Incremental,
 					Mul:       1,
 					Div:       1000,
 					Precision: 1,
 				},
 				{
 					Name:      "output_queue_info",
-					Algorithm: module.Absolute,
+					Algorithm: module.Incremental,
 					Mul:       1,
 					Div:       1000,
 					Precision: 1,
 				},
 				{
 					Name:      "plan_cache_summary",
-					Algorithm: module.Absolute,
+					Algorithm: module.Incremental,
 					Mul:       1,
 					Div:       1000,
 					Precision: 1,
 				},
 				{
 					Name:      "serial_number",
-					Algorithm: module.Absolute,
+					Algorithm: module.Incremental,
 					Mul:       1,
 					Div:       1000,
 					Precision: 1,
 				},
 				{
 					Name:      "system_activity",
-					Algorithm: module.Absolute,
+					Algorithm: module.Incremental,
 					Mul:       1,
 					Div:       1000,
 					Precision: 1,
 				},
 				{
 					Name:      "system_model",
-					Algorithm: module.Absolute,
+					Algorithm: module.Incremental,
 					Mul:       1,
 					Div:       1000,
 					Precision: 1,
 				},
 				{
 					Name:      "system_status",
-					Algorithm: module.Absolute,
+					Algorithm: module.Incremental,
 					Mul:       1,
 					Div:       1000,
 					Precision: 1,
 				},
 				{
 					Name:      "temp_storage_named",
-					Algorithm: module.Absolute,
+					Algorithm: module.Incremental,
 					Mul:       1,
 					Div:       1000,
 					Precision: 1,
 				},
 				{
 					Name:      "temp_storage_total",
-					Algorithm: module.Absolute,
+					Algorithm: module.Incremental,
 					Mul:       1,
 					Div:       1000,
 					Precision: 1,
 				},
 				{
 					Name:      "technology_refresh_level",
-					Algorithm: module.Absolute,
+					Algorithm: module.Incremental,
 					Mul:       1,
 					Div:       1000,
 					Precision: 1,
 				},
 				{
 					Name:      "active_job",
-					Algorithm: module.Absolute,
+					Algorithm: module.Incremental,
 					Mul:       1,
 					Div:       1000,
 					Precision: 1,
 				},
 				{
 					Name:      "other",
-					Algorithm: module.Absolute,
+					Algorithm: module.Incremental,
 					Mul:       1,
 					Div:       1000,
 					Precision: 1,
 				},
 			},
-			LabelKeys: []string{},
+			LabelKeys: []string{
+				"path",
+			},
 		},
 	},
 }
