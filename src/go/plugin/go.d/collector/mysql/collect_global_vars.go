@@ -10,6 +10,8 @@ WHERE
   OR Variable_name LIKE 'table_open_cache' 
   OR Variable_name LIKE 'disabled_storage_engines' 
   OR Variable_name LIKE 'log_bin'
+  OR Variable_name LIKE 'innodb_log_file_size'
+  OR Variable_name LIKE 'innodb_log_files_in_group'
   OR Variable_name LIKE 'performance_schema';`
 )
 
@@ -28,6 +30,10 @@ func (c *Collector) collectGlobalVariables() error {
 			switch name {
 			case "disabled_storage_engines":
 				c.varDisabledStorageEngine = value
+			case "innodb_log_file_size":
+				c.varInnoDBLogFileSize = parseInt(value)
+			case "innodb_log_files_in_group":
+				c.varInnoDBLogFilesInGroup = parseInt(value)
 			case "log_bin":
 				c.varLogBin = value
 			case "max_connections":

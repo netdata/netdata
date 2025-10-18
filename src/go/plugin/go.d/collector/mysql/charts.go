@@ -101,7 +101,10 @@ var baseCharts = module.Charts{
 	chartInnoDBIO.Copy(),
 	chartInnoDBIOOperations.Copy(),
 	chartInnoDBPendingIOOperations.Copy(),
+	chartInnoDBLogOccupancy.Copy(),
 	chartInnoDBLogOperations.Copy(),
+	chartInnoDBLogProgress.Copy(),
+	chartInnoDBCheckpointAge.Copy(),
 	chartInnoDBCurrentRowLocks.Copy(),
 	chartInnoDBRowsOperations.Copy(),
 	chartInnoDBBufferPoolPages.Copy(),
@@ -362,6 +365,42 @@ var (
 			{ID: "innodb_log_waits", Name: "waits", Algo: module.Incremental},
 			{ID: "innodb_log_write_requests", Name: "write requests", Algo: module.Incremental, Mul: -1},
 			{ID: "innodb_log_writes", Name: "writes", Algo: module.Incremental, Mul: -1},
+		},
+	}
+	chartInnoDBLogOccupancy = module.Chart{
+		ID:       "innodb_log_occupancy",
+		Title:    "InnoDB Redo Log Occupancy",
+		Units:    "percentage",
+		Fam:      "innodb",
+		Ctx:      "mysql.innodb_log_occupancy",
+		Type:     module.Area,
+		Priority: prioInnoDBLog,
+		Dims: module.Dims{
+			{ID: "innodb_log_occupancy", Name: "occupancy", Algo: module.Absolute, Div: 1000},
+		},
+	}
+	chartInnoDBLogProgress = module.Chart{
+		ID:       "innodb_log_progress",
+		Title:    "InnoDB Log Sequence Progress",
+		Units:    "MiB/s",
+		Fam:      "innodb",
+		Ctx:      "mysql.innodb_log_progress",
+		Type:     module.Area,
+		Priority: prioInnoDBLog,
+		Dims: module.Dims{
+			{ID: "innodb_log_sequence_number", Name: "sequence number", Algo: module.Incremental, Div: 1024 * 1024},
+			{ID: "innodb_last_checkpoint_at", Name: "last checkpoint", Algo: module.Incremental, Mul: -1, Div: 1024 * 1024},
+		},
+	}
+	chartInnoDBCheckpointAge = module.Chart{
+		ID:       "innodb_checkpoint_age",
+		Title:    "InnoDB Checkpoint Age",
+		Units:    "MiB",
+		Fam:      "innodb",
+		Ctx:      "mysql.innodb_checkpoint_age",
+		Priority: prioInnoDBLog,
+		Dims: module.Dims{
+			{ID: "innodb_checkpoint_age", Name: "age", Algo: module.Absolute, Div: 1024 * 1024},
 		},
 	}
 	chartInnoDBCurrentRowLocks = module.Chart{

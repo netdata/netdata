@@ -1,9 +1,11 @@
-+--------------------------+-------+
-| Variable_name            | Value |
-+--------------------------+-------+
-| disabled_storage_engines |       |
-| log_bin                  | ON    |
-| max_connections          | 151   |
-| performance_schema       | ON    |
-| table_open_cache         | 4000  |
-+--------------------------+-------+
++---------------------------+----------+
+| Variable_name             | Value    |
++---------------------------+----------+
+| disabled_storage_engines  |          |
+| innodb_log_file_size      | 50331648 |
+| innodb_log_files_in_group | 2        |
+| log_bin                   | ON       |
+| max_connections           | 151      |
+| performance_schema        | ON       |
+| table_open_cache          | 4000     |
++---------------------------+----------+
