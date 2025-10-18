@@ -24,7 +24,7 @@
 #define USE_BACKTRACE 1
 #endif
 
-#if !defined(USE_LIBBACKTRACE) && !defined(USE_LIBUNWIND) && !defined(USE_BACKTRACE) && defined(HAVE_BACKTRACE)
+#if !defined(USE_LIBBACKTRACE) && !defined(USE_LIBUNWIND) && !defined(USE_BACKTRACE) && !defined(HAVE_BACKTRACE)
 #define USE_NOTRACE 1
 #endif
 
