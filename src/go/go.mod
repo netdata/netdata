@@ -68,7 +68,7 @@ require (
 
 require (
 	github.com/alexbrainman/odbc v0.0.0-20250601004241-49e6b2bc0cf0
-	github.com/ibm-messaging/mq-golang/v5 v5.6.4
+	github.com/ibm-messaging/mq-golang/v5 v5.6.5
 	gopkg.in/yaml.v3 v3.0.1
 )
 
