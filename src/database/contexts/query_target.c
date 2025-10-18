@@ -792,9 +792,6 @@ static bool query_instance_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_C
     QUERY_TARGET *qt = qtl->qt;
     QUERY_INSTANCE *qi = query_instance_allocate(qt, ria, qn->slot);
 
-    if(qt->db.minimum_latest_update_every_s == 0 || ri->update_every_s < qt->db.minimum_latest_update_every_s)
-        qt->db.minimum_latest_update_every_s = ri->update_every_s;
-
     if(queryable_instance && filter_instances)
         queryable_instance = (SP_MATCHED_POSITIVE == query_instance_matches(
                 qi, ri, qt->instances.pattern, qtl->match_ids, qtl->match_names, qt->request.version, qtl->host_node_id_str));
@@ -836,6 +833,9 @@ static bool query_instance_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_C
     }
     else {
         if(metrics_added) {
+            if(qt->db.minimum_latest_update_every_s == 0 || ri->update_every_s < qt->db.minimum_latest_update_every_s)
+                qt->db.minimum_latest_update_every_s = ri->update_every_s;
+
             qc->instances.selected++;
             qn->instances.selected++;
         }
