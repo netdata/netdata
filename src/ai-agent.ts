@@ -2185,6 +2185,8 @@ export class AIAgentSession {
     const pickString = (value: unknown): string | undefined => (typeof value === 'string' ? value : undefined);
     const statusRaw = json.status;
     const formatRaw = pickString(json.report_format) ?? pickString(json.format);
+    const contentJsonRaw = json.content_json;
+    const contentJson = isRecord(contentJsonRaw) ? contentJsonRaw : undefined;
     const contentCandidate = pickString(json.report_content) ?? pickString(json.content);
     if (typeof statusRaw !== 'string') return false;
     const formatCandidate = (formatRaw ?? '').trim();
@@ -2196,11 +2198,17 @@ export class AIAgentSession {
       : undefined;
     if (normalizedStatus === undefined) return false;
     const finalStatus: 'success' | 'failure' | 'partial' = normalizedStatus;
-    if (contentCandidate === undefined) return false;
-    const finalContent: string = contentCandidate;
+    let finalContent: string | undefined = contentCandidate;
+    if ((finalContent === undefined || finalContent.trim().length === 0) && contentJson !== undefined) {
+      try {
+        finalContent = JSON.stringify(contentJson);
+      } catch {
+        finalContent = undefined;
+      }
+    }
+    if (finalContent === undefined) return false;
     if (finalContent.trim().length === 0) return false;
     const metadata = isRecord(json.metadata) ? json.metadata : undefined;
-    const contentJson = isRecord(json.content_json) ? json.content_json : undefined;
     const parameters: Record<string, unknown> = {
       status: finalStatus,
       report_format: finalFormat,
