@@ -9,10 +9,7 @@ export class ToolsOrchestrator {
   private readonly providers: ToolProvider[] = [];
   private readonly mapping = new Map<string, { provider: ToolProvider; kind: ToolKind }>();
   // Minimal alias support to smooth tool naming mismatches across prompts/providers
-  private readonly aliases = new Map<string, string>([
-    // Common alias: map 'netdata' to the configured REST tool 'rest__ask-netdata'
-    ['netdata', 'rest__ask-netdata'],
-  ]);
+  private readonly aliases = new Map<string, string>();
   private slotsInUse = 0;
   private waiters: (() => void)[] = [];
   private canceled = false;

@@ -4682,6 +4682,49 @@ const TEST_SCENARIOS: HarnessTest[] = [
     },
   },
   {
+    id: 'run-test-103',
+    description: 'REST tools are exposed with rest__ prefix and remain discoverable without hard-coded aliases.',
+    configure: (configuration, sessionConfig) => {
+      configuration.restTools = {
+        'ask-netdata': {
+          description: 'Ask Netdata documentation assistant.',
+          method: 'POST',
+          url: 'https://example.com/ask-netdata',
+          headers: { 'content-type': 'application/json' },
+          parametersSchema: {
+            type: 'object',
+            properties: {
+              question: { type: 'string' },
+            },
+            required: [],
+            additionalProperties: false,
+          },
+          bodyTemplate: {
+            question: '${parameters.question}',
+          },
+        },
+      };
+      sessionConfig.tools = ['ask-netdata'];
+    },
+    execute: async (_configuration, sessionConfig) => {
+      await Promise.resolve();
+      const session = AIAgentSession.create(sessionConfig);
+      const orchestrator = getPrivateField(session, 'toolsOrchestrator') as { listTools: () => MCPTool[]; hasTool: (name: string) => boolean } | undefined;
+      invariant(orchestrator !== undefined, 'Tools orchestrator missing in run-test-103.');
+      const listedNames = orchestrator.listTools().map((tool) => tool.name);
+      invariant(listedNames.includes('rest__ask-netdata'), 'rest__ask-netdata should be exposed in listTools for run-test-103.');
+      invariant(orchestrator.hasTool('rest__ask-netdata'), 'rest__ask-netdata should resolve via hasTool for run-test-103.');
+      invariant(orchestrator.hasTool('ask-netdata'), 'ask-netdata should resolve via rest__ fallback for run-test-103.');
+      return makeSuccessResult('REST tool exposure validated.');
+    },
+    expect: (result: AIAgentResult) => {
+      invariant(result.success, 'Scenario run-test-103 expected success.');
+      const finalReport = result.finalReport;
+      invariant(finalReport !== undefined && finalReport.status === 'success', 'Final report missing for run-test-103.');
+      invariant(typeof finalReport.content === 'string' && finalReport.content.includes('REST tool exposure validated.'), 'Final report content mismatch for run-test-103.');
+    },
+  },
+  {
     id: 'run-test-43',
     configure: (_configuration, sessionConfig) => {
       sessionConfig.stopRef = { stopping: true };
