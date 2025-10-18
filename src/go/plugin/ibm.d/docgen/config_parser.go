@@ -144,17 +144,30 @@ func extractConfigField(fieldName string, field *ast.Field, comments []*ast.Comm
 	// Convert Go type to JSON Schema type
 	isPointer := strings.HasPrefix(fieldType, "*")
 	jsonType := convertToJSONType(fieldType)
+	var itemsType string
+	if sliceElem, ok := getSliceElementGoType(fieldType); ok {
+		itemsType = convertToJSONType(sliceElem)
+		if itemsType == "array" {
+			itemsType = "string"
+		}
+	}
 
 	// Extract documentation from comments
 	description := extractFieldDescription(fieldName, field, comments)
+	title := formatTitleFromJSONName(jsonName)
+	if title == "" {
+		title = camelToWords(fieldName)
+	}
 
 	// Create field
 	configField := &ConfigField{
 		Name:        fieldName,
 		JSONName:    jsonName,
 		Type:        jsonType,
+		Title:       title,
 		Required:    !strings.Contains(yamlName, "omitempty"),
 		Description: description,
+		ItemsType:   itemsType,
 		Pointer:     isPointer,
 		GoType:      fieldType,
 	}
@@ -176,6 +189,12 @@ func extractGoType(expr ast.Expr) string {
 		if ident, ok := t.X.(*ast.Ident); ok {
 			return ident.Name + "." + t.Sel.Name
 		}
+	case *ast.ArrayType:
+		elemType := extractGoType(t.Elt)
+		if elemType == "" {
+			elemType = "interface{}"
+		}
+		return "[]" + elemType
 	case *ast.StarExpr:
 		inner := extractGoType(t.X)
 		if inner == "" {
@@ -217,6 +236,9 @@ func convertToSnakeCase(s string) string {
 }
 
 func convertToJSONType(goType string) string {
+	if strings.HasPrefix(goType, "[]") {
+		return "array"
+	}
 	baseType := strings.TrimPrefix(goType, "*")
 	switch goType {
 	case "string":
@@ -248,33 +270,26 @@ func convertToJSONType(goType string) string {
 }
 
 func extractFieldDescription(fieldName string, field *ast.Field, comments []*ast.CommentGroup) string {
-	// First, try to extract description from field comment
+	extractCommentText := func(list []*ast.Comment) string {
+		lines := make([]string, 0, len(list))
+		for _, c := range list {
+			clean := strings.TrimSpace(strings.TrimPrefix(strings.TrimPrefix(strings.TrimSuffix(c.Text, "*/"), "/*"), "//"))
+			if clean != "" {
+				lines = append(lines, clean)
+			}
+		}
+		return strings.Join(lines, " ")
+	}
+
 	if field.Comment != nil && len(field.Comment.List) > 0 {
-		// Use the first comment line as description
-		comment := field.Comment.List[0].Text
-		// Clean up the comment (remove // or /*)
-		comment = strings.TrimSpace(comment)
-		comment = strings.TrimPrefix(comment, "//")
-		comment = strings.TrimPrefix(comment, "/*")
-		comment = strings.TrimSuffix(comment, "*/")
-		comment = strings.TrimSpace(comment)
-		if comment != "" {
-			return comment
+		if text := extractCommentText(field.Comment.List); text != "" {
+			return text
 		}
 	}
 
-	// If no field comment, try to find comment before the field
 	if field.Doc != nil && len(field.Doc.List) > 0 {
-		// Use the last doc comment line as description
-		comment := field.Doc.List[len(field.Doc.List)-1].Text
-		// Clean up the comment
-		comment = strings.TrimSpace(comment)
-		comment = strings.TrimPrefix(comment, "//")
-		comment = strings.TrimPrefix(comment, "/*")
-		comment = strings.TrimSuffix(comment, "*/")
-		comment = strings.TrimSpace(comment)
-		if comment != "" {
-			return comment
+		if text := extractCommentText(field.Doc.List); text != "" {
+			return text
 		}
 	}
 
@@ -297,58 +312,58 @@ func extractFieldDescription(fieldName string, field *ast.Field, comments []*ast
 
 	// Generic connection-related fields
 	if strings.Contains(fieldLower, "host") {
-		return "Server hostname or IP address"
+		return "Hostname"
 	}
 	if strings.Contains(fieldLower, "port") {
-		return "Server port number"
+		return "Port"
 	}
 	if strings.Contains(fieldLower, "user") || strings.Contains(fieldLower, "username") {
-		return "Username for authentication"
+		return "Username"
 	}
 	if strings.Contains(fieldLower, "password") || strings.Contains(fieldLower, "pass") {
-		return "Password for authentication"
+		return "Password"
 	}
 
 	// Collection control fields
 	if strings.HasPrefix(fieldLower, "collect") {
-		resource := extractResourceFromFieldName(fieldName)
-		return fmt.Sprintf("Enable collection of %s metrics", resource)
+		resource := camelToWords(strings.TrimPrefix(fieldName, "Collect"))
+		return fmt.Sprintf("Collect %s", resource)
 	}
 
 	// Selector fields
 	if strings.HasSuffix(fieldLower, "selector") {
-		resource := extractResourceFromFieldName(fieldName)
-		return fmt.Sprintf("Pattern to filter %s (wildcards supported)", resource)
+		resource := camelToWords(strings.TrimSuffix(fieldName, "Selector"))
+		return fmt.Sprintf("Filter %s", resource)
 	}
 
 	// Timeout fields
 	if strings.Contains(fieldLower, "timeout") {
-		return "Connection timeout duration in seconds"
+		return "Timeout"
 	}
 
 	// SSL/TLS fields
 	if strings.Contains(fieldLower, "ssl") || strings.Contains(fieldLower, "tls") {
-		return "Enable SSL/TLS encrypted connection"
+		return "SSL/TLS"
 	}
 
 	// URL/URI fields
 	if strings.Contains(fieldLower, "url") || strings.Contains(fieldLower, "uri") {
-		return "Connection URL or URI"
+		return "URL"
 	}
 
 	// DSN fields
 	if strings.Contains(fieldLower, "dsn") {
-		return "Data Source Name (DSN) for connection"
+		return "DSN"
 	}
 
 	// Max/limit fields
 	if strings.HasPrefix(fieldLower, "max") {
-		resource := extractResourceFromFieldName(fieldName)
-		return fmt.Sprintf("Maximum number of %s to monitor", resource)
+		resource := camelToWords(strings.TrimPrefix(fieldName, "Max"))
+		return fmt.Sprintf("Max %s", resource)
 	}
 
 	// Default to a more descriptive generic description
-	return fmt.Sprintf("%s", camelToWords(fieldName))
+	return camelToWords(fieldName)
 }
 
 // Helper function to extract resource name from field name
@@ -392,6 +407,33 @@ func camelToWords(s string) string {
 		}
 	}
 	return result.String()
+}
+
+var titleAcronyms = map[string]string{
+	"dsn":  "DSN",
+	"ssl":  "SSL",
+	"tls":  "TLS",
+	"ibm":  "IBM",
+	"odbc": "ODBC",
+}
+
+func formatTitleFromJSONName(name string) string {
+	if name == "" {
+		return ""
+	}
+	parts := strings.Split(name, "_")
+	for i, part := range parts {
+		if part == "" {
+			continue
+		}
+		lower := strings.ToLower(part)
+		if upper, ok := titleAcronyms[lower]; ok {
+			parts[i] = upper
+			continue
+		}
+		parts[i] = strings.ToUpper(lower[:1]) + lower[1:]
+	}
+	return strings.Join(parts, " ")
 }
 
 func setFieldDefaults(field *ConfigField) {
@@ -630,6 +672,16 @@ func (g *DocGenerator) extractDefaultsFromLiteral(lit *ast.CompositeLit, default
 				fieldName := ident.Name
 				switch val := kv.Value.(type) {
 				case *ast.CompositeLit:
+					if isArrayLiteral(val) {
+						values := make([]interface{}, 0, len(val.Elts))
+						for _, elt := range val.Elts {
+							if value := g.extractValue(elt); value != nil {
+								values = append(values, value)
+							}
+						}
+						defaults[fieldName] = values
+						continue
+					}
 					nested := make(map[string]interface{})
 					g.extractDefaultsFromLiteral(val, nested)
 					// Flatten nested composite literals for embedded configs such as framework.Config.
@@ -738,6 +790,24 @@ func exprToString(expr ast.Expr) string {
 		return ""
 	}
 	return strings.TrimSpace(buf.String())
+}
+
+func getSliceElementGoType(goType string) (string, bool) {
+	if !strings.HasPrefix(goType, "[]") {
+		return "", false
+	}
+	elem := strings.TrimPrefix(goType, "[]")
+	return elem, true
+}
+
+func isArrayLiteral(lit *ast.CompositeLit) bool {
+	if lit == nil {
+		return false
+	}
+	if _, ok := lit.Type.(*ast.ArrayType); ok {
+		return true
+	}
+	return false
 }
 
 func (g *DocGenerator) extractConstValues(file *ast.File) map[string]interface{} {

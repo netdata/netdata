@@ -8,165 +8,109 @@ package as400
 import (
 	"context"
 	"fmt"
-	"strconv"
+	"math"
+	"strings"
 )
 
-// countActiveJobs returns the number of active jobs for cardinality check
-func (a *Collector) countActiveJobs(ctx context.Context) (int, error) {
-	var count int
-	err := a.doQueryRow(ctx, "count_active_jobs", queryCountActiveJobs, func(column, value string) {
-		if column == "COUNT" {
-			if v, err := strconv.Atoi(value); err == nil {
-				count = v
-			}
-		}
-	})
-	return count, err
-}
-
-// collectActiveJobs collects metrics for top CPU-consuming active jobs
+// collectActiveJobs collects metrics for explicitly configured active jobs
 func (a *Collector) collectActiveJobs(ctx context.Context) error {
-	// Check if feature is enabled
+	if len(a.activeJobTargets) == 0 {
+		return nil
+	}
 	if !a.CollectActiveJobs.IsEnabled() {
 		return nil
 	}
 
-	allowed, count, err := a.activeJobsCardinality.Allow(ctx, a.countActiveJobs)
-	if err != nil {
-		return fmt.Errorf("failed to count active jobs: %v", err)
-	}
-	if !allowed {
-		a.logOnce("active_jobs_cardinality", "active jobs (%d) exceed configured limit (%d), skipping detailed collection", count, a.MaxActiveJobs)
-		return nil
-	}
-	a.Debugf("Found %d active jobs in system", count)
+	var firstErr error
 
-	// Query for top active jobs by CPU usage
-	query := fmt.Sprintf(queryTopActiveJobs, a.MaxActiveJobs)
+	for _, target := range a.activeJobTargets {
+		key := target.ID()
+		meta := a.getActiveJobMetrics(key)
+		meta.qualifiedName = key
+		meta.jobNumber = target.Number
+		meta.jobUser = target.User
+		meta.jobName = target.Name
 
-	var (
-		currentJobName string
-		currentJob     *activeJobMetrics
-	)
-	err = a.doQuery(ctx, "top_active_jobs", query, func(column, value string, lineEnd bool) {
-		switch column {
-		case "JOB_NAME":
-			currentJobName = value
-			currentJob = a.getActiveJobMetrics(currentJobName)
-			if currentJob != nil {
-				currentJob.jobName = value
-			}
+		metrics := activeJobInstanceMetrics{}
+		found := false
 
-		case "JOB_STATUS":
-			if currentJob != nil {
-				currentJob.jobStatus = value
-			}
+		queryName := fmt.Sprintf("active_job_%s_%s_%s", target.Number, target.User, target.Name)
+		query := buildActiveJobQuery(target)
 
-		case "SUBSYSTEM":
-			if currentJob != nil {
-				currentJob.subsystem = value
-			}
-
-		case "JOB_TYPE":
-			if currentJob != nil {
-				currentJob.jobType = value
-			}
-
-		case "ELAPSED_CPU_TIME":
-			if currentJob != nil {
-				if v, err := strconv.ParseFloat(value, 64); err == nil {
-					currentJob.elapsedCPUTime = int64(v)
-					if m, ok := a.mx.activeJobs[currentJobName]; ok {
-						m.ElapsedCPUTime = int64(v)
-						a.mx.activeJobs[currentJobName] = m
-					} else {
-						a.mx.activeJobs[currentJobName] = activeJobInstanceMetrics{
-							ElapsedCPUTime: int64(v),
-						}
-					}
+		err := a.doQuery(ctx, queryName, query, func(column, value string, lineEnd bool) {
+			switch column {
+			case "JOB_NAME":
+				qualified := strings.TrimSpace(value)
+				if qualified != "" {
+					meta.qualifiedName = qualified
+				}
+			case "JOB_USER":
+				user := strings.TrimSpace(value)
+				if user != "" {
+					meta.jobUser = strings.ToUpper(user)
+				}
+			case "JOB_NUMBER":
+				number := strings.TrimSpace(value)
+				if number != "" {
+					meta.jobNumber = number
+				}
+			case "JOB_STATUS":
+				meta.jobStatus = strings.TrimSpace(value)
+			case "SUBSYSTEM":
+				meta.subsystem = strings.TrimSpace(value)
+			case "JOB_TYPE":
+				meta.jobType = strings.TrimSpace(value)
+			case "ELAPSED_CPU_TIME":
+				if v, ok := a.parseInt64Value(value, 1); ok {
+					metrics.ElapsedCPUTime = v
+				}
+			case "ELAPSED_TIME":
+				if v, ok := a.parseInt64Value(value, 1); ok {
+					metrics.ElapsedTime = v
+				}
+			case "TEMPORARY_STORAGE":
+				if v, ok := a.parseInt64Value(value, 1); ok {
+					metrics.TemporaryStorage = v / 1024 // Convert KB to MB
+				}
+			case "CPU_PERCENTAGE":
+				if f, ok := a.parseFloat64Value(value); ok {
+					metrics.CPUPercentage = int64(math.Round(f * float64(precision)))
+				}
+			case "ELAPSED_INTERACTIVE_TRANSACTIONS":
+				if v, ok := a.parseInt64Value(value, 1); ok {
+					metrics.ElapsedInteractiveTransactions = v
+				}
+			case "ELAPSED_TOTAL_DISK_IO_COUNT":
+				if v, ok := a.parseInt64Value(value, 1); ok {
+					metrics.ElapsedDiskIO = v
+				}
+			case "THREAD_COUNT":
+				if v, ok := a.parseInt64Value(value, 1); ok {
+					metrics.ThreadCount = v
 				}
 			}
 
-		case "ELAPSED_TIME":
-			if currentJob != nil {
-				if v, err := strconv.ParseFloat(value, 64); err == nil {
-					currentJob.elapsedTime = int64(v)
-					if m, ok := a.mx.activeJobs[currentJobName]; ok {
-						m.ElapsedTime = int64(v)
-						a.mx.activeJobs[currentJobName] = m
-					}
-				}
+			if lineEnd {
+				found = true
 			}
+		})
 
-		case "TEMPORARY_STORAGE":
-			if currentJob != nil {
-				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-					// Convert KB to MB
-					vMB := v / 1024
-					currentJob.temporaryStorage = vMB
-					if m, ok := a.mx.activeJobs[currentJobName]; ok {
-						m.TemporaryStorage = vMB
-						a.mx.activeJobs[currentJobName] = m
-					}
-				}
+		if err != nil {
+			if firstErr == nil {
+				firstErr = fmt.Errorf("active job %s: %w", key, err)
 			}
-
-		case "CPU_PERCENTAGE":
-			if currentJob != nil {
-				if v, err := strconv.ParseFloat(value, 64); err == nil {
-					currentJob.cpuPercentage = int64(v * precision)
-					if m, ok := a.mx.activeJobs[currentJobName]; ok {
-						m.CPUPercentage = int64(v * precision)
-						a.mx.activeJobs[currentJobName] = m
-					}
-				}
-			}
-
-		case "ELAPSED_INTERACTIVE_TRANSACTIONS":
-			if currentJob != nil {
-				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-					currentJob.interactiveTransactions = v
-					if m, ok := a.mx.activeJobs[currentJobName]; ok {
-						m.ElapsedInteractiveTransactions = v
-						a.mx.activeJobs[currentJobName] = m
-					}
-				}
-			}
-
-		case "ELAPSED_TOTAL_DISK_IO_COUNT":
-			if currentJob != nil {
-				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-					currentJob.diskIO = v
-					if m, ok := a.mx.activeJobs[currentJobName]; ok {
-						m.ElapsedDiskIO = v
-						a.mx.activeJobs[currentJobName] = m
-					}
-				}
-			}
-
-		case "THREAD_COUNT":
-			if currentJob != nil {
-				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-					currentJob.threadCount = v
-					if m, ok := a.mx.activeJobs[currentJobName]; ok {
-						m.ThreadCount = v
-						a.mx.activeJobs[currentJobName] = m
-					}
-				}
-			}
-
-		case "RUN_PRIORITY":
-			if currentJob != nil {
-				if v, err := strconv.ParseInt(value, 10, 64); err == nil {
-					currentJob.runPriority = v
-				}
-			}
+			continue
 		}
-	})
 
-	if err != nil {
-		return err
+		if !found {
+			meta.jobStatus = "NOT FOUND"
+			meta.subsystem = ""
+			meta.jobType = ""
+			metrics = activeJobInstanceMetrics{}
+		}
+
+		a.mx.activeJobs[key] = metrics
 	}
 
-	return nil
+	return firstErr
 }

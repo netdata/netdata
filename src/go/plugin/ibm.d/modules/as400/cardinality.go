@@ -5,8 +5,6 @@ import "context"
 const (
 	networkInterfaceLimit = 50
 	httpServerLimit       = 200
-	messageQueueLimit     = 200
-	outputQueueLimit      = 200
 )
 
 type cardinalityGuard struct {

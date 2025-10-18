@@ -59,6 +59,8 @@ type ConfigField struct {
 	Name          string
 	JSONName      string
 	Type          string
+	Title         string
+	ItemsType     string
 	Required      bool
 	Default       interface{}
 	Description   string
@@ -237,6 +239,7 @@ func (g *DocGenerator) parseConfig() ([]ConfigField, error) {
 			Name:        name,
 			JSONName:    name,
 			Type:        fieldType,
+			Title:       formatTitleFromJSONName(name),
 			Required:    false,
 			Default:     defaultVal,
 			Description: desc,
@@ -275,6 +278,7 @@ func (g *DocGenerator) getFallbackConfigFields() []ConfigField {
 			Name:        "update_every",
 			JSONName:    "update_every",
 			Type:        "integer",
+			Title:       formatTitleFromJSONName("update_every"),
 			Required:    false,
 			Default:     10,
 			Description: "Data collection frequency",
@@ -284,6 +288,7 @@ func (g *DocGenerator) getFallbackConfigFields() []ConfigField {
 			Name:        "reset_statistics",
 			JSONName:    "reset_statistics",
 			Type:        "boolean",
+			Title:       formatTitleFromJSONName("reset_statistics"),
 			Required:    false,
 			Default:     false,
 			Description: "ResetStatistics enables SQL calls that reset IBM i system statistics on each run.",
@@ -292,6 +297,7 @@ func (g *DocGenerator) getFallbackConfigFields() []ConfigField {
 			Name:        "endpoint",
 			JSONName:    "endpoint",
 			Type:        "string",
+			Title:       formatTitleFromJSONName("endpoint"),
 			Required:    false,
 			Default:     "dummy://localhost",
 			Description: "Connection endpoint",
@@ -301,6 +307,7 @@ func (g *DocGenerator) getFallbackConfigFields() []ConfigField {
 			Name:        "connect_timeout",
 			JSONName:    "connect_timeout",
 			Type:        "integer",
+			Title:       formatTitleFromJSONName("connect_timeout"),
 			Required:    false,
 			Default:     5,
 			Description: "Connection timeout in seconds",
@@ -311,6 +318,7 @@ func (g *DocGenerator) getFallbackConfigFields() []ConfigField {
 			Name:        "collect_items",
 			JSONName:    "collect_items",
 			Type:        "boolean",
+			Title:       formatTitleFromJSONName("collect_items"),
 			Required:    false,
 			Default:     true,
 			Description: "Enable collection of item metrics",
@@ -319,6 +327,7 @@ func (g *DocGenerator) getFallbackConfigFields() []ConfigField {
 			Name:        "max_items",
 			JSONName:    "max_items",
 			Type:        "integer",
+			Title:       formatTitleFromJSONName("max_items"),
 			Required:    false,
 			Default:     10,
 			Description: "Maximum number of items to collect",
@@ -395,8 +404,21 @@ func (g *DocGenerator) generateConfigSchema(fields []ConfigField) error {
 
 	for _, field := range fields {
 		prop := map[string]interface{}{
-			"title": field.Description,
+			"title": field.Title,
 			"type":  field.Type,
+		}
+		if field.Description != "" {
+			prop["description"] = field.Description
+		}
+
+		if field.Type == "array" {
+			itemsType := field.ItemsType
+			if itemsType == "" {
+				itemsType = "string"
+			}
+			prop["items"] = map[string]interface{}{
+				"type": itemsType,
+			}
 		}
 
 		if field.Default != nil {
@@ -438,17 +460,23 @@ func (g *DocGenerator) generateConfigSchema(fields []ConfigField) error {
 		}
 		groupFields[group] = append(groupFields[group], field.JSONName)
 
-		if field.UIWidget != "" || field.UIHelp != "" || field.UIPlaceholder != "" {
-			opts := make(map[string]interface{})
-			if field.UIWidget != "" {
-				opts["ui:widget"] = field.UIWidget
-			}
-			if field.UIHelp != "" {
-				opts["ui:help"] = field.UIHelp
-			}
-			if field.UIPlaceholder != "" {
-				opts["ui:placeholder"] = field.UIPlaceholder
-			}
+		opts, exists := fieldUIOptions[field.JSONName]
+		if !exists {
+			opts = make(map[string]interface{})
+		}
+		if field.UIWidget != "" {
+			opts["ui:widget"] = field.UIWidget
+		}
+		if field.UIHelp != "" {
+			opts["ui:help"] = field.UIHelp
+		}
+		if field.UIPlaceholder != "" {
+			opts["ui:placeholder"] = field.UIPlaceholder
+		}
+		if field.Type == "array" {
+			opts["ui:listFlavour"] = "list"
+		}
+		if len(opts) > 0 {
 			fieldUIOptions[field.JSONName] = opts
 		}
 	}
@@ -463,6 +491,7 @@ func (g *DocGenerator) generateConfigSchema(fields []ConfigField) error {
 			"fullPage": true,
 		},
 	}
+	uiSchema["ui:flavour"] = "tabs"
 
 	if len(groupOrder) > 0 {
 		tabs := make([]map[string]interface{}, 0, len(groupOrder))
@@ -477,7 +506,6 @@ func (g *DocGenerator) generateConfigSchema(fields []ConfigField) error {
 			})
 		}
 		if len(tabs) > 0 {
-			uiSchema["ui:flavour"] = "tabs"
 			uiSchema["ui:options"] = map[string]interface{}{
 				"tabs": tabs,
 			}

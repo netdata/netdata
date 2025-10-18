@@ -58,6 +58,13 @@ statistics on each query via `SYSTEM_STATUS(RESET_STATISTICS=>'YES')`. When enab
 
 Default: `false` (statistics are not reset, using `RESET_STATISTICS=>'NO'`)
 
+**Chart Gaps During Baseline Resets:**
+
+The `as400.system_activity_cpu_rate` and `as400.system_activity_cpu_utilization` charts rely on
+delta calculations. When the collector detects that IBM i reset these statistics—or when it is
+still establishing the initial baseline—it intentionally skips a sample instead of emitting a zero
+or spike. Netdata renders those skipped samples as small gaps, which is expected behaviour.
+
 **Cardinality Management:**
 
 To prevent performance issues from excessive metric creation, the collector enforces cardinality
@@ -81,7 +88,7 @@ Use **both** limit and selector options together to manage high-cardinality envi
 | `max_job_queues` | Maximum job queues to monitor | 100 |
 | `max_message_queues` | Maximum message queues to monitor | 100 |
 | `max_output_queues` | Maximum output queues to monitor | 100 |
-| `max_active_jobs` | Maximum active jobs to monitor | 100 |
+| `active_jobs` | Fully qualified active jobs to monitor (`JOB_NUMBER/USER/JOB_NAME`) | `[]` |
 | `collect_disks_matching` | Glob pattern to filter disks (e.g., `"001* 002*"`) | `""` (match all) |
 | `collect_subsystems_matching` | Glob pattern to filter subsystems (e.g., `"QINTER QBATCH"`) | `""` (match all) |
 | `collect_job_queues_matching` | Glob pattern to filter job queues (e.g., `"QSYS/*"`) | `""` (match all) |
@@ -98,6 +105,15 @@ Use **both** limit and selector options together to manage high-cardinality envi
 - Use selectors to monitor only business-critical objects in large environments
 - Set limits based on your Netdata server's capacity (each instance = multiple charts)
 - Start with defaults and adjust based on actual usage patterns
+
+**IBM i 7.2–7.3 Behavior Note (Message Queues):**
+
+IBM i 7.4 introduced a message-queue table function that returns only the live backlog. On
+7.2–7.3 systems we fall back to the `QSYS2.MESSAGE_QUEUE_INFO` view, which includes *all*
+recorded messages (even those already processed/cleared from the queue). Aggregations—especially
+`MAX(SEVERITY)`—therefore reflect the historical log, not just the outstanding backlog. This
+behaviour is inherent to the IBM SQL service and can lead to higher-than-expected max severity
+values on pre-7.4 systems.
 
 Network interface metrics have a fixed internal limit of 50 instances, and HTTP server metrics are capped at 200 instances; these limits are currently not configurable.
 
@@ -275,6 +291,24 @@ Metrics:
 | as400.network_interface_status | active | status |
 | as400.network_interface_mtu | mtu | bytes |
 
+### Per observability
+
+These metrics refer to individual observability instances.
+
+Labels:
+
+| Label | Description |
+|:------|:------------|
+| path | Path identifier |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:-------|:-----------|:-----|
+| netdata.plugin_ibm.as400_query_latency | analyze_plan_cache, count_disks, count_http_servers, count_message_queues, count_network_interfaces, count_subsystems, detect_ibmi_version_primary, detect_ibmi_version_fallback, disk_instances, disk_instances_enhanced, disk_status, http_server_info, job_info, job_queues, memory_pools, message_queue_aggregates, network_connections, network_interfaces, output_queue_info, plan_cache_summary, serial_number, system_activity, system_model, system_status, temp_storage_named, temp_storage_total, technology_refresh_level, active_job, other | ms |
+
+> **Note**: Query latency dimensions are exported as cumulative counters (microseconds). Netdata’s `incremental` algorithm derives per-interval latency automatically, so a non-zero delta indicates the query executed during that flush.
+
 ### Per outputqueue
 
 These metrics refer to individual outputqueue instances.
@@ -366,12 +400,10 @@ The following options can be defined globally or per job.
 
 | Name | Description | Default | Required | Min | Max |
 |:-----|:------------|:--------|:---------|:----|:----|
-| update_every | Data collection frequency | `10` | no | 1 | - |
+| update_every | Data collection frequency | `5` | no | 1 | - |
 | Vnode | Vnode allows binding the collector to a virtual node. | `` | no | - | - |
 | DSN | DSN provides a full IBM i ODBC connection string if manual override is needed. | `` | no | - | - |
 | Timeout | Timeout controls how long to wait for SQL statements and RPCs. | `2000000000` | no | - | - |
-| MaxDbConns | MaxDbConns restricts the maximum number of open ODBC connections. | `1` | no | - | - |
-| MaxDbLifeTime | MaxDbLifeTime limits how long a pooled connection may live before being recycled. | `600000000000` | no | - | - |
 | Hostname | Hostname is the remote IBM i host to monitor. | `` | no | - | - |
 | Port | Port is the TCP port for the IBM i Access ODBC server. | `8471` | no | 1 | 65535 |
 | Username | Username supplies the credentials used for authentication. | `` | no | - | - |
@@ -383,21 +415,20 @@ The following options can be defined globally or per job.
 | ResetStatistics | ResetStatistics toggles destructive SQL services that reset system statistics on each query. | `false` | no | - | - |
 | CollectDiskMetrics | CollectDiskMetrics toggles collection of disk unit statistics. | `auto` | no | - | - |
 | CollectSubsystemMetrics | CollectSubsystemMetrics toggles collection of subsystem activity metrics. | `auto` | no | - | - |
-| CollectJobQueueMetrics | CollectJobQueueMetrics toggles collection of job queue backlog metrics. | `auto` | no | - | - |
 | CollectActiveJobs | CollectActiveJobs toggles collection of detailed per-job metrics. | `auto` | no | - | - |
 | CollectHTTPServerMetrics | CollectHTTPServerMetrics toggles collection of IBM HTTP Server statistics. | `auto` | no | - | - |
-| CollectMessageQueueMetrics | CollectMessageQueueMetrics toggles collection of IBM i message queue metrics. | `auto` | no | - | - |
-| CollectOutputQueueMetrics | CollectOutputQueueMetrics toggles collection of IBM i output queue metrics. | `auto` | no | - | - |
 | CollectPlanCacheMetrics | CollectPlanCacheMetrics toggles collection of plan cache analysis metrics. | `auto` | no | - | - |
+| SlowPath | SlowPath enables the asynchronous slow-path worker for heavy queries. | `true` | no | - | - |
+| SlowPathUpdateEvery | SlowPathUpdateEvery controls the beat interval for the slow-path worker. | `30000000000` | no | - | - |
+| SlowPathMaxConnections | SlowPathMaxConnections caps the number of concurrent queries the slow-path worker may run. | `1` | no | - | - |
 | MaxDisks | MaxDisks caps how many disk units may be charted. | `100` | no | - | - |
 | MaxSubsystems | MaxSubsystems caps how many subsystems may be charted. | `100` | no | - | - |
-| MaxJobQueues | MaxJobQueues caps how many job queues may be charted. | `100` | no | - | - |
-| MaxMessageQueues | MaxMessageQueues caps how many message queues may be charted. | `100` | no | - | - |
-| MaxOutputQueues | MaxOutputQueues caps how many output queues may be charted. | `100` | no | - | - |
-| MaxActiveJobs | MaxActiveJobs caps how many active jobs may be charted. | `100` | no | - | - |
 | DiskSelector | DiskSelector filters disk units by name using glob-style patterns. | `` | no | - | - |
 | SubsystemSelector | SubsystemSelector filters subsystems by name using glob-style patterns. | `` | no | - | - |
-| JobQueueSelector | JobQueueSelector filters job queues by name using glob-style patterns. | `` | no | - | - |
+| ActiveJobs | ActiveJobs lists active jobs to monitor, using fully-qualified job identifiers (JOB_NUMBER/USER/JOB_NAME). When empty, active job collection is disabled. | `nil` | no | - | - |
+| MessageQueues | MessageQueues lists message queues to collect, formatted as LIBRARY/QUEUE strings. When empty, message queue collection is disabled. The default configuration monitors QSYS/QSYSOPR, QSYS/QSYSMSG, and QSYS/QHST. | `[QSYS/QSYSOPR QSYS/QSYSMSG QSYS/QHST]` | no | - | - |
+| JobQueues | JobQueues lists job queues to collect, formatted as LIBRARY/QUEUE strings. When empty, job queue collection is disabled. | `nil` | no | - | - |
+| OutputQueues | OutputQueues lists output queues to collect, formatted as LIBRARY/QUEUE strings. When empty, output queue collection is disabled. | `nil` | no | - | - |
 
 ### Examples
 

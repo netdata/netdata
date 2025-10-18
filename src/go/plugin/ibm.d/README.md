@@ -146,7 +146,8 @@ jobs:
     dsn: AS400_PROD              # ODBC DSN name from /etc/odbc.ini
     update_every: 10              # Collection frequency in seconds
     collect_active_jobs: yes      # Enable job monitoring
-    max_active_jobs: 100         # Limit number of jobs tracked
+    active_jobs:
+      - 123456/QSYS/QSPCJOB       # Fully qualified JOB_NUMBER/USER/JOB_NAME
     reset_statistics: no         # Reset cumulative counters
 ```
 
@@ -285,7 +286,9 @@ jobs:
   - name: tuned_as400
     dsn: AS400_PROD
     update_every: 30            # Reduce frequency
-    max_active_jobs: 50         # Limit job collection
+    collect_active_jobs: yes    # Enable job metrics
+    active_jobs:
+      - 123456/QSYS/QSPCJOB     # Explicit job list controls collection
     connection_timeout: 30       # Increase timeout
     query_timeout: 25           # Increase query timeout
 ```

@@ -69,6 +69,9 @@ type tempStorageMetrics struct {
 
 // activeJobMetrics holds metrics for an individual active job
 type activeJobMetrics struct {
+	qualifiedName           string
+	jobNumber               string
+	jobUser                 string
 	jobName                 string
 	jobStatus               string
 	subsystem               string
@@ -156,7 +159,10 @@ func (a *Collector) getTempStorageMetrics(name string) *tempStorageMetrics {
 
 func (a *Collector) getActiveJobMetrics(jobName string) *activeJobMetrics {
 	if _, ok := a.activeJobs[jobName]; !ok {
-		a.activeJobs[jobName] = &activeJobMetrics{jobName: jobName}
+		a.activeJobs[jobName] = &activeJobMetrics{
+			qualifiedName: jobName,
+			jobName:       jobName,
+		}
 	}
 	return a.activeJobs[jobName]
 }
