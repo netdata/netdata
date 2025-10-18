@@ -19,8 +19,6 @@ _Last updated: 2025-10-17_
 - **Final-report fallback follow-ups** — Harness scenario `run-test-102` now exercises the branch where `agent__final_report` rejects; still decide whether the synthesized failure summary should enumerate attempted providers/models before declaring failure.
 - **Concurrency limiter duplication** — Tool execution throttling logic lives in both `AIAgentSession` and `ToolsOrchestrator`; a similar limiter exists in `src/headends/concurrency.ts`. Centralize into a reusable semaphore.
 - **Loader duplication** — `loadAgent` vs `loadAgentFromContent` in `src/agent-loader.ts` repeat the same resolution/validation logic. Extract shared helpers to reduce churn and bug risk.
-- **Noisy diagnostics** — `src/llm-client.ts:220-253` prints warnings via `console.error` even with tracing disabled. Route through structured logging and guard behind trace flags.
-
 ## P2 — Medium Priority (nice-to-have but non-blocking)
 - **Token accounting scatter** — Accounting is emitted from multiple layers (`ai-agent`, tool orchestrator, providers). Consolidate via a dedicated accounting service to avoid drift.
 - **Magic strings / enums** — Exit codes and log identifiers are free-form strings. Promote to enums/const maps to avoid typos and ease refactors.
