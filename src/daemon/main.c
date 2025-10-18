@@ -249,7 +249,7 @@ static void fatal_status_file_save(void) {
 
 int netdata_main(int argc, char **argv) {
     libjudy_malloc_init();
-    string_init();
+    libnetdata_init();
     analytics_init();
 
     netdata_start_time = now_realtime_sec();
