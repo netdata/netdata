@@ -94,33 +94,10 @@ progress "Attempt to create user/group netdata/netadata"
 NETDATA_WANTED_GROUPS="docker nginx varnish haproxy adm nsd proxy squid ceph nobody I2C"
 NETDATA_ADDED_TO_GROUPS=""
 # Default user/group
-NETDATA_USER="root"
-NETDATA_GROUP="root"
+NETDATA_USER="netdata"
+NETDATA_GROUP="netdata"
 
-if portable_add_group netdata; then
-  if portable_add_user netdata "/opt/netdata"; then
-    progress "Add user netdata to required user groups"
-    for g in ${NETDATA_WANTED_GROUPS}; do
-      # shellcheck disable=SC2086
-      if portable_add_user_to_group ${g} netdata; then
-        NETDATA_ADDED_TO_GROUPS="${NETDATA_ADDED_TO_GROUPS} ${g}"
-      else
-        run_failed "Failed to add netdata user to secondary groups"
-      fi
-    done
-    # Netdata must be able to read /etc/pve/qemu-server/* and /etc/pve/lxc/*
-    # for reading VMs/containers names, CPU and memory limits on Proxmox.
-    if [ -d "/etc/pve" ]; then
-      portable_add_user_to_group "www-data" netdata && NETDATA_ADDED_TO_GROUPS="${NETDATA_ADDED_TO_GROUPS} www-data"
-    fi
-    NETDATA_USER="netdata"
-    NETDATA_GROUP="netdata"
-  else
-    run_failed "I could not add user netdata, will be using root"
-  fi
-else
-  run_failed "I could not add group netdata, so no user netdata will be created as well. Netdata run as root:root"
-fi
+create_netdata_accounts
 
 # -----------------------------------------------------------------------------
 progress "Install logrotate configuration for netdata"
