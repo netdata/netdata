@@ -12,6 +12,13 @@ description: |
   - libodbc.so (provided by unixODBC)
   - IBM i Access Client Solutions
 
+  **Dual collection paths**
+
+  The collector executes queries in two separate tracks:
+
+  - **Fast path (5s)**: lightweight system status queries remain sequential on the main plugin thread.
+  - **Slow path (30s beat)**: heavier queries (job/message/output queues, subsystems, plan cache, etc.) run in a background worker that wakes every 30 seconds and fans out work with bounded concurrency.
+
   **CPU Collection Methods:**
 
   The collector uses a hybrid approach for CPU utilization metrics to handle IBM i 7.4+ where

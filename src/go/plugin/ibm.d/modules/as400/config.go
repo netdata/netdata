@@ -18,12 +18,6 @@ type Config struct {
 	// Timeout controls how long to wait for SQL statements and RPCs.
 	Timeout confopt.Duration `yaml:"timeout,omitempty" json:"timeout" ui:"group:Connection"`
 
-	// MaxDbConns restricts the maximum number of open ODBC connections.
-	MaxDbConns int `yaml:"max_db_conns,omitempty" json:"max_db_conns" ui:"group:Advanced"`
-
-	// MaxDbLifeTime limits how long a pooled connection may live before being recycled.
-	MaxDbLifeTime confopt.Duration `yaml:"max_db_life_time,omitempty" json:"max_db_life_time" ui:"group:Advanced"`
-
 	// Hostname is the remote IBM i host to monitor.
 	Hostname string `yaml:"hostname,omitempty" json:"hostname" ui:"group:Connection"`
 
@@ -65,6 +59,15 @@ type Config struct {
 
 	// CollectPlanCacheMetrics toggles collection of plan cache analysis metrics.
 	CollectPlanCacheMetrics confopt.AutoBool `yaml:"collect_plan_cache_metrics,omitempty" json:"collect_plan_cache_metrics" ui:"group:Other Metrics"`
+
+	// SlowPath enables the asynchronous slow-path worker for heavy queries.
+	SlowPath bool `yaml:"slow_path,omitempty" json:"slow_path" ui:"group:Advanced"`
+
+	// SlowPathUpdateEvery controls the beat interval for the slow-path worker.
+	SlowPathUpdateEvery confopt.Duration `yaml:"slow_path_update_every,omitempty" json:"slow_path_update_every" ui:"group:Advanced"`
+
+	// SlowPathMaxConnections caps the number of concurrent queries the slow-path worker may run.
+	SlowPathMaxConnections int `yaml:"slow_path_max_connections,omitempty" json:"slow_path_max_connections" ui:"group:Advanced"`
 
 	// MaxDisks caps how many disk units may be charted.
 	MaxDisks int `yaml:"max_disks,omitempty" json:"max_disks" ui:"group:Disks"`
