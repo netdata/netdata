@@ -211,6 +211,7 @@ export function buildFrontmatterTemplate(args: {
   numbers?: Record<string, number>;
   booleans?: Record<string, boolean>;
   strings?: Record<string, string | undefined>;
+  input?: { format: 'text'|'json'; schema?: Record<string, unknown> };
   output?: { format: 'json'|'markdown'|'text'; schema?: Record<string, unknown> };
 }): Record<string, unknown> {
   const toArray = (v: unknown): string[] => {
@@ -264,6 +265,7 @@ export function buildFrontmatterTemplate(args: {
     }
     tpl[key] = val;
   });
+  if (args.input !== undefined) tpl.input = args.input;
   if (args.output !== undefined) tpl.output = args.output;
   return tpl;
 }

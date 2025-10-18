@@ -400,7 +400,8 @@ function buildResolvedDefaultsHelp(): string {
     }
 
     // runtime toggles are CLI-only and not shown in template
-    // Include output if present in frontmatter
+    // Include input/output if present in frontmatter
+    let inputBlock: { format: 'json'|'text'; schema?: Record<string, unknown> } | undefined;
     let outputBlock: { format: 'json'|'markdown'|'text'; schema?: Record<string, unknown> } | undefined;
     // Skip this if frontmatter parsing already failed above
     if (fmOptions !== undefined) {
@@ -414,6 +415,11 @@ function buildResolvedDefaultsHelp(): string {
             const out: Record<string, unknown> = { format: parsed.expectedOutput.format };
             if (parsed.expectedOutput.schema !== undefined) out.schema = parsed.expectedOutput.schema;
             outputBlock = out as { format: 'json'|'markdown'|'text'; schema?: Record<string, unknown> };
+          }
+          if (parsed?.inputSpec !== undefined) {
+            const inp: Record<string, unknown> = { format: parsed.inputSpec.format };
+            if (parsed.inputSpec.schema !== undefined) inp.schema = parsed.inputSpec.schema;
+            inputBlock = inp as { format: 'json'|'text'; schema?: Record<string, unknown> };
           }
         }
       } catch { /* ignore */ }
@@ -441,6 +447,7 @@ function buildResolvedDefaultsHelp(): string {
         verbose: false,
       },
       strings: {},
+      input: inputBlock,
       output: outputBlock,
     });
 
