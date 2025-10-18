@@ -17,6 +17,7 @@ struct cpu_data {
 struct cpu_data *cpus = NULL;
 size_t ncpus = 0 ;
 static ND_THREAD *hardware_info_thread = NULL;
+static collected_number (*temperature_fcnt)(MSR_REQUEST *) = NULL;
 
 static void netdata_stop_driver()
 {
@@ -157,6 +158,19 @@ static inline HANDLE netdata_open_device()
     return msr_h;
 }
 
+static collected_number netdata_intel_cpu_temp(MSR_REQUEST *req)
+{
+    const ULONG TJMAX = 100;
+    ULONG digital_readout = (req->low >> 16) & 0x7F;  // bits [22:16]
+    return (collected_number)(TJMAX - digital_readout);
+}
+
+static collected_number netdata_amd_cpu_temp(MSR_REQUEST *req)
+{
+    ULONG amd_temp = (req->low >> 21) & 0x7FF;
+    return (collected_number) amd_temp/8;
+}
+
 void netdata_collect_cpu_chart()
 {
     HANDLE device = netdata_open_device();
@@ -165,15 +179,13 @@ void netdata_collect_cpu_chart()
     }
 
     const uint32_t MSR_THERM_STATUS = 0x19C;
-    const ULONG TJMAX = 100;
 
     for (size_t cpu = 0; cpu < ncpus; cpu++) {
         DWORD bytes = 0;
         MSR_REQUEST req = { MSR_THERM_STATUS, (ULONG)cpu, 0, 0 };
 
         if (DeviceIoControl(device, IOCTL_MSR_READ, &req, sizeof(req), &req, sizeof(req), &bytes, NULL)) {
-            ULONG digital_readout = (req.low >> 16) & 0x7F;  // bits [22:16]
-            cpus[cpu].cpu_temp = (collected_number)(TJMAX - digital_readout);
+            cpus[cpu].cpu_temp = temperature_fcnt(&req);
         }
     }
 
@@ -192,8 +204,38 @@ static void get_hardware_info_thread(void *ptr __maybe_unused)
     }
 }
 
+static void netdata_detect_cpu()
+{
+    SYSTEM_INFO sysInfo;
+    GetSystemInfo(&sysInfo);
+
+    WORD test = sysInfo.wProcessorArchitecture;
+    if (test != PROCESSOR_ARCHITECTURE_AMD64 && test != PROCESSOR_ARCHITECTURE_IA64) {
+        return;
+    }
+
+    int cpuInfo[4];
+    __cpuid(cpuInfo, 0);
+
+    char vendorID[13];
+    memcpy(vendorID, &cpuInfo[1], 4);
+    memcpy(&vendorID[4], &cpuInfo[3], 4);
+    memcpy(&vendorID[8], &cpuInfo[2], 4);
+    vendorID[12] = '\0';
+
+    if (!strcmp(vendorID, "GenuineIntel"))
+        temperature_fcnt = netdata_intel_cpu_temp;
+    else if (!strcmp(vendorID, "AuthenticAMD"))
+        temperature_fcnt = netdata_amd_cpu_temp;
+}
+
 static int initialize(int update_every)
 {
+    netdata_detect_cpu();
+    if (!temperature_fcnt) {
+        return -1;
+    }
+
     if (netdata_install_driver()) {
         return -1;
     }

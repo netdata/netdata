@@ -6,6 +6,7 @@
 #if defined(OS_WINDOWS)
 
 #include <windows.h>
+#include <intrin.h>
 
 // Device + symbolic link names used by the driver
 #define MSR_USER_PATH        "\\\\.\\NDDrv"
@@ -19,6 +20,12 @@ typedef struct {
     ULONG low;
     ULONG high;
 } MSR_REQUEST;
+
+enum netdata_cpu_detection {
+    NETDATA_CPU_WIN_UNKNOWN,
+    NETDATA_CPU_WIN_INTEL,
+    NETDATA_CPU_WIN_AMD
+};
 
 #endif // OS_WINDOWS
 
