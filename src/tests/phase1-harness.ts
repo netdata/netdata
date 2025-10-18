@@ -125,6 +125,7 @@ const ADOPTED_FINAL_CONTENT = 'Adopted final report content.';
 const ADOPTION_METADATA_ORIGIN = 'text-adoption';
 const ADOPTION_CONTENT_VALUE = 'value';
 const FINAL_REPORT_SANITIZED_CONTENT = 'Final report without sanitized tool calls.';
+const JSON_ONLY_URL = 'https://example.com/resource';
 const DEFAULT_PROMPT_SCENARIO = 'run-test-1' as const;
 const BASE_DEFAULTS = {
   stream: false,
@@ -4488,6 +4489,80 @@ const TEST_SCENARIOS: HarnessTest[] = [
       invariant(adoptedParams.report_format === 'markdown', 'Synthetic call report_format mismatch for run-test-90-adopt-text.');
       invariant(adoptedParams.metadata !== undefined && adoptedParams.metadata.origin === ADOPTION_METADATA_ORIGIN, 'Synthetic call metadata mismatch for run-test-90-adopt-text.');
       invariant(adoptedParams.content_json !== undefined && adoptedParams.content_json.key === ADOPTION_CONTENT_VALUE, 'Synthetic call content_json mismatch for run-test-90-adopt-text.');
+    },
+  },
+  {
+    id: 'run-test-90-json-content',
+    description: 'Adopts final report when assistant returns JSON-only payload in content.',
+    execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+      await Promise.resolve();
+      // eslint-disable-next-line @typescript-eslint/unbound-method
+      const originalExecuteTurn = LLMClient.prototype.executeTurn;
+      LLMClient.prototype.executeTurn = function(this: LLMClient, _request: TurnRequest): Promise<TurnResult> {
+        const payload = {
+          status: 'success',
+          report_format: 'json',
+          content_json: {
+            status: true,
+            url: JSON_ONLY_URL,
+            notes: ['entry-1', 'entry-2'],
+          },
+          metadata: {
+            adopted: true,
+          },
+        };
+        const assistantMessage: ConversationMessage = {
+          role: 'assistant',
+          content: JSON.stringify(payload, null, 2),
+        };
+        return Promise.resolve({
+          status: { type: 'success', hasToolCalls: false, finalAnswer: true },
+          latencyMs: 5,
+          messages: [assistantMessage],
+          tokens: { inputTokens: 9, outputTokens: 9, totalTokens: 18 },
+        });
+      };
+      try {
+        const session = AIAgentSession.create(sessionConfig);
+        return await session.run();
+      } finally {
+        LLMClient.prototype.executeTurn = originalExecuteTurn;
+      }
+    },
+    expect: (result: AIAgentResult) => {
+      invariant(result.success, 'Scenario run-test-90-json-content expected success.');
+      const finalReport = result.finalReport;
+      invariant(finalReport !== undefined, 'Final report missing for run-test-90-json-content.');
+      invariant(finalReport.status === 'success', 'Final report status mismatch for run-test-90-json-content.');
+      invariant(finalReport.format === 'json', 'Final report format mismatch for run-test-90-json-content.');
+      invariant(finalReport.content !== undefined, 'Final report content missing for run-test-90-json-content.');
+      let parsedContent: Record<string, unknown> | undefined;
+      try {
+        parsedContent = JSON.parse(finalReport.content) as Record<string, unknown>;
+      } catch {
+        invariant(false, 'Final report content should be valid JSON for run-test-90-json-content.');
+      }
+      assertRecord(parsedContent, 'Parsed final report content should be an object for run-test-90-json-content.');
+      invariant(parsedContent.status === true, 'Parsed final report content status mismatch for run-test-90-json-content.');
+      invariant(parsedContent.url === JSON_ONLY_URL, 'Parsed final report content url mismatch for run-test-90-json-content.');
+      invariant(Array.isArray(parsedContent.notes) && parsedContent.notes.length === 2, 'Parsed final report notes mismatch for run-test-90-json-content.');
+      const frContentJson = finalReport.content_json;
+      assertRecord(frContentJson, 'Final report content_json should be an object for run-test-90-json-content.');
+      invariant(frContentJson.status === true, 'Final report content_json status mismatch for run-test-90-json-content.');
+      const assistantMessages = result.conversation.filter((message) => message.role === 'assistant');
+      invariant(assistantMessages.length === 1, 'Single assistant message expected for run-test-90-json-content.');
+      const syntheticCall = assistantMessages[0].toolCalls ?? [];
+      invariant(syntheticCall.length === 1, 'Synthetic final report tool call missing for run-test-90-json-content.');
+      const call = syntheticCall[0];
+      invariant(call.name === 'agent__final_report', 'Synthetic tool call name mismatch for run-test-90-json-content.');
+      const paramsUnknown = call.parameters;
+      assertRecord(paramsUnknown, 'Synthetic call parameters missing for run-test-90-json-content.');
+      const params = paramsUnknown;
+      invariant(params.report_format === 'json', 'Synthetic call report_format mismatch for run-test-90-json-content.');
+      invariant(typeof params.report_content === 'string' && params.report_content.includes('"status":true'), 'Synthetic call report_content mismatch for run-test-90-json-content.');
+      const callContentJsonUnknown = params.content_json;
+      assertRecord(callContentJsonUnknown, 'Synthetic call content_json missing for run-test-90-json-content.');
+      invariant(callContentJsonUnknown.url === JSON_ONLY_URL, 'Synthetic call content_json mismatch for run-test-90-json-content.');
     },
   },
   {
