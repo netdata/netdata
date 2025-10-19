@@ -81,6 +81,14 @@ type Client struct {
 	config Config
 }
 
+type ResourceStatus int
+
+const (
+	ResourceStatusDisabled ResourceStatus = 0
+	ResourceStatusEnabled  ResourceStatus = 1
+	ResourceStatusFailed   ResourceStatus = 2
+)
+
 func NewClient(config Config, state *framework.CollectorState) *Client {
 	return &Client{
 		config: config,
@@ -163,6 +171,10 @@ func (c *Client) GetStatisticsInterval() int {
 // Resource Monitor Methods (IBM $SYS topics)
 func (c *Client) IsResourceMonitoringSupported() bool {
 	return false
+}
+
+func (c *Client) GetResourceStatus() ResourceStatus {
+	return ResourceStatusDisabled
 }
 
 func (c *Client) EnableResourceMonitoring() error {
