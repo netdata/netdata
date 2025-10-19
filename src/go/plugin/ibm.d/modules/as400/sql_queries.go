@@ -94,7 +94,7 @@ FROM TABLE(QSYS2.SYSTEM_STATUS('NO','ALL'))`
 
 	// System information queries for labels - only use verified columns
 	querySerialNumber = `SELECT SERIAL_NUMBER FROM TABLE(QSYS2.SYSTEM_STATUS()) X`
-	querySystemName   = `SELECT SYSTEM_NAME FROM TABLE(QSYS2.SYSTEM_STATUS()) X`
+	querySystemName   = `SELECT HOST_NAME FROM QSYS2.SYSTEM_STATUS_INFO`
 	querySystemModel  = `SELECT MACHINE_MODEL FROM TABLE(QSYS2.SYSTEM_STATUS()) X`
 
 	// Query for IBM i version - use SYSIBMADM.ENV_SYS_INFO which works across IBM i versions
