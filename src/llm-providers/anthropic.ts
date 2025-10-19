@@ -3,6 +3,8 @@ import { createAnthropic } from '@ai-sdk/anthropic';
 import type { TurnRequest, TurnResult, ProviderConfig, ConversationMessage, TokenUsage } from '../types.js';
 import type { LanguageModel } from 'ai';
 
+import { warn } from '../utils.js';
+
 import { BaseLLMProvider, type ResponseMessage } from './base.js';
 
 interface OptionsWithAnthropic extends Record<string, unknown> {
@@ -41,6 +43,7 @@ export class AnthropicProvider extends BaseLLMProvider {
       const extendedMessages = finalMessages as unknown as ProviderMessage[];
       const isRecord = (val: unknown): val is Record<string, unknown> => val !== null && typeof val === 'object' && !Array.isArray(val);
       const cloneOptions = (opts: Record<string, unknown>): OptionsWithAnthropic => ({ ...opts });
+      const cachingMode = request.caching ?? 'full';
 
       // eslint-disable-next-line functional/no-loop-statements
       for (const msg of extendedMessages) {
@@ -64,7 +67,7 @@ export class AnthropicProvider extends BaseLLMProvider {
         msg.providerOptions = Object.keys(nextOptions).length > 0 ? nextOptions : undefined;
       }
 
-      if (extendedMessages.length > 0) {
+      if (extendedMessages.length > 0 && cachingMode !== 'none') {
         const lastMessage = extendedMessages[extendedMessages.length - 1];
         const baseOptions: OptionsWithAnthropic = isRecord(lastMessage.providerOptions) ? cloneOptions(lastMessage.providerOptions) : {};
         const existingAnthropic = isRecord(baseOptions.anthropic) ? baseOptions.anthropic : {};
@@ -80,6 +83,20 @@ export class AnthropicProvider extends BaseLLMProvider {
         const a = (base.anthropic as Record<string, unknown>);
         if (typeof request.maxOutputTokens === 'number' && Number.isFinite(request.maxOutputTokens)) a.maxTokens = Math.trunc(request.maxOutputTokens);
         // Anthropic has no generic repeat penalty; ignore if provided
+        if (request.reasoningValue !== undefined) {
+          if (request.reasoningValue === null) {
+            // Explicitly disabled – do not set thinking options
+          } else if (typeof request.reasoningValue === 'number' && Number.isFinite(request.reasoningValue)) {
+            a.thinking = { type: 'enabled', budgetTokens: Math.trunc(request.reasoningValue) };
+          } else if (typeof request.reasoningValue === 'string' && request.reasoningValue.trim().length > 0) {
+            const parsed = Number(request.reasoningValue);
+            if (Number.isFinite(parsed)) {
+              a.thinking = { type: 'enabled', budgetTokens: Math.trunc(parsed) };
+            } else {
+              warn(`anthropic reasoning value '${request.reasoningValue}' is not a number; ignoring`);
+            }
+          }
+        }
         return base;
       })();
 

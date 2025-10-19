@@ -45,6 +45,9 @@ export class OpenAIProvider extends BaseLLMProvider {
         if (request.parallelToolCalls !== undefined) o.parallelToolCalls = request.parallelToolCalls;
         if (typeof request.maxOutputTokens === 'number' && Number.isFinite(request.maxOutputTokens)) o.maxTokens = Math.trunc(request.maxOutputTokens);
         if (typeof request.repeatPenalty === 'number' && Number.isFinite(request.repeatPenalty)) o.frequencyPenalty = request.repeatPenalty;
+        if (request.reasoningValue !== undefined && request.reasoningValue !== null) {
+          o.reasoningEffort = typeof request.reasoningValue === 'string' ? request.reasoningValue : String(request.reasoningValue);
+        }
         return base;
       })();
 

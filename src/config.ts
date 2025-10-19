@@ -12,8 +12,26 @@ const ProviderModelOverridesSchema = z.object({
   top_p: z.number().min(0).max(1).nullable().optional(),
 });
 
+const ReasoningLevelSchema = z.enum(['minimal','low','medium','high']);
+
+const ProviderReasoningEntrySchema = z.union([z.string(), z.number()]);
+
+const ProviderReasoningSchema = z
+  .union([
+    z.null(),
+    ProviderReasoningEntrySchema,
+    z.tuple([
+      ProviderReasoningEntrySchema,
+      ProviderReasoningEntrySchema,
+      ProviderReasoningEntrySchema,
+      ProviderReasoningEntrySchema,
+    ]),
+  ])
+  .optional();
+
 const ProviderModelConfigSchema = z.object({
   overrides: ProviderModelOverridesSchema.optional(),
+  reasoning: ProviderReasoningSchema,
 });
 
 const ProviderConfigSchema = z.object({
@@ -29,6 +47,8 @@ const ProviderConfigSchema = z.object({
   toolsDenied: z.array(z.string()).optional(),
   stringSchemaFormatsAllowed: z.array(z.string()).optional(),
   stringSchemaFormatsDenied: z.array(z.string()).optional(),
+  reasoning: ProviderReasoningSchema,
+  reasoningAutoStreamLevel: ReasoningLevelSchema.optional(),
 });
 
 const MCPServerConfigSchema = z.object({

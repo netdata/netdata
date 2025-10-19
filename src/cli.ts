@@ -644,6 +644,30 @@ const readOverrideValues = (opts: Record<string, unknown>): string[] => {
   return [];
 };
 
+const isReasoningLevel = (value: string): value is 'minimal' | 'low' | 'medium' | 'high' => {
+  const normalized = value.toLowerCase();
+  return normalized === 'minimal' || normalized === 'low' || normalized === 'medium' || normalized === 'high';
+};
+
+const parseReasoningLevelStrict = (value: string): 'minimal' | 'low' | 'medium' | 'high' => {
+  if (!isReasoningLevel(value)) {
+    throw new Error("reasoning override requires one of: minimal, low, medium, high");
+  }
+  return value.toLowerCase() as 'minimal' | 'low' | 'medium' | 'high';
+};
+
+const isCachingMode = (value: string): value is 'none' | 'full' => {
+  const normalized = value.toLowerCase();
+  return normalized === 'none' || normalized === 'full';
+};
+
+const parseCachingModeStrict = (value: string): 'none' | 'full' => {
+  if (!isCachingMode(value)) {
+    throw new Error("caching override requires 'none' or 'full'");
+  }
+  return value.toLowerCase() as 'none' | 'full';
+};
+
 const buildGlobalOverrides = (entries: readonly string[]): LoadAgentOptions['globalOverrides'] => {
   if (entries.length === 0) return undefined;
   // Downstream loaders assume the arrays here stay immutable; do not mutate after construction.
@@ -682,6 +706,8 @@ const buildGlobalOverrides = (entries: readonly string[]): LoadAgentOptions['glo
       'parallel-tool-calls': 'parallelToolCalls',
       mcpInitConcurrency: 'mcpInitConcurrency',
       'mcp-init-concurrency': 'mcpInitConcurrency',
+      reasoning: 'reasoning',
+      caching: 'caching',
     };
     return canonicalMap[lower] ?? lower;
   };
@@ -771,6 +797,14 @@ const buildGlobalOverrides = (entries: readonly string[]): LoadAgentOptions['glo
       case 'parallelToolCalls':
         overrides.parallelToolCalls = parseBoolean('parallelToolCalls', value);
         break;
+      case 'reasoning': {
+        overrides.reasoning = parseReasoningLevelStrict(value);
+        break;
+      }
+      case 'caching': {
+        overrides.caching = parseCachingModeStrict(value);
+        break;
+      }
       default:
         throw new Error(`unsupported override key '${rawKey}'; expected keys like models, maxOutputTokens, temperature`);
     }
@@ -847,6 +881,22 @@ async function runHeadendMode(config: HeadendModeConfig): Promise<void> {
     traceLLM: traceLLMFlag,
     traceMCP: traceMCPFlag,
   };
+  if (typeof config.options.reasoning === 'string' && config.options.reasoning.length > 0) {
+    try {
+      loadOptions.reasoning = parseReasoningLevelStrict(config.options.reasoning);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      exitWith(4, message, 'EXIT-HEADEND-REASONING');
+    }
+  }
+  if (typeof config.options.caching === 'string' && config.options.caching.length > 0) {
+    try {
+      loadOptions.caching = parseCachingModeStrict(config.options.caching);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      exitWith(4, message, 'EXIT-HEADEND-CACHING');
+    }
+  }
   if (globalOverrides !== undefined) {
     // Share the same object so nested loads observe identical override identity.
     loadOptions.globalOverrides = globalOverrides;
@@ -1156,6 +1206,24 @@ program
         }
       };
 
+      let cliReasoning: ('minimal' | 'low' | 'medium' | 'high') | undefined;
+      if (optSrc('reasoning') === 'cli') {
+        if (typeof options.reasoning === 'string' && isReasoningLevel(options.reasoning)) {
+          cliReasoning = options.reasoning.toLowerCase() as 'minimal' | 'low' | 'medium' | 'high';
+        } else {
+          exitWith(4, `invalid --reasoning value '${typeof options.reasoning === 'string' ? options.reasoning : ''}'`, 'EXIT-CLI-REASONING');
+        }
+      }
+
+      let cliCaching: ('none' | 'full') | undefined;
+      if (optSrc('caching') === 'cli') {
+        if (typeof options.caching === 'string' && isCachingMode(options.caching)) {
+          cliCaching = options.caching.toLowerCase() as 'none' | 'full';
+        } else {
+          exitWith(4, `invalid --caching value '${typeof options.caching === 'string' ? options.caching : ''}'`, 'EXIT-CLI-CACHING');
+        }
+      }
+
       // Derive agent id: from prompt filename when available, else 'cli-main'
       const fileAgentId = ((): string => {
         const isFile = (p: string): boolean => { try { return p !== '-' && fs.existsSync(p) && fs.statSync(p).isFile(); } catch { return false; } };
@@ -1199,6 +1267,8 @@ program
         traceLLM: options.traceLlm === true ? true : undefined,
         traceMCP: options.traceMcp === true ? true : undefined,
         mcpInitConcurrency: (typeof options.mcpInitConcurrency === 'string' && options.mcpInitConcurrency.length>0) ? Number(options.mcpInitConcurrency) : undefined,
+        reasoning: cliReasoning,
+        caching: cliCaching,
       });
 
       // Prompt variable substitution using loader-effective max tool turns

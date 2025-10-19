@@ -126,6 +126,8 @@ export interface GlobalOverrides {
   stream?: boolean;
   parallelToolCalls?: boolean;
   mcpInitConcurrency?: number;
+  reasoning?: 'minimal' | 'low' | 'medium' | 'high';
+  caching?: 'none' | 'full';
 }
 
 export interface LoadAgentOptions {
@@ -167,12 +169,16 @@ export interface LoadAgentOptions {
     toolTimeout?: number;
     maxRetries?: number;
     maxToolTurns?: number;
-  maxConcurrentTools?: number;
+    maxConcurrentTools?: number;
     toolResponseMaxBytes?: number;
     parallelToolCalls?: boolean;
     maxToolCallsPerTurn?: number;
+    reasoning?: 'minimal' | 'low' | 'medium' | 'high';
+    caching?: 'none' | 'full';
   };
   ancestors?: string[];
+  reasoning?: 'minimal' | 'low' | 'medium' | 'high';
+  caching?: 'none' | 'full';
 }
 
 const resolveInputContract = (
@@ -299,49 +305,7 @@ function constructLoadedAgent(args: ConstructAgentArgs): LoadedAgent {
   const selectedAgents = effAgents.map((rel) => path.resolve(baseDir, rel));
   const subAgentInfos: PreloadedSubAgent[] = [];
   const seenToolNames = new Set<string>();
-
-  selectedAgents.forEach((agentPath) => {
-    const absPath = canonical(agentPath);
-    if (ancestorChain.includes(absPath)) {
-      throw new Error(`Recursion detected while loading sub-agent: ${absPath}`);
-    }
-    const childLoaded = loadAgent(absPath, registry, {
-      configLayers: layers,
-      verbose: options?.verbose,
-      defaultsForUndefined: options?.defaultsForUndefined,
-      ancestors: [...ancestorChain, id],
-      // Pass through overrides intact; downstream loaders treat arrays as immutable.
-      globalOverrides: options?.globalOverrides,
-    });
-    const derivedToolName = childLoaded.toolName ?? deriveToolNameFromPath(childLoaded.promptPath);
-    if (isReservedAgentName(derivedToolName)) {
-      throw new Error(`Sub-agent '${childLoaded.promptPath}' uses a reserved tool name '${derivedToolName}'`);
-    }
-    if (seenToolNames.has(derivedToolName)) {
-      throw new Error(`Duplicate sub-agent tool name '${derivedToolName}' detected while loading '${childLoaded.promptPath}'`);
-    }
-    seenToolNames.add(derivedToolName);
-    if (typeof childLoaded.description !== 'string' || childLoaded.description.trim().length === 0) {
-      throw new Error(`Sub-agent '${childLoaded.promptPath}' missing 'description' in frontmatter`);
-    }
-    const inputFormat = childLoaded.input.format === 'json' ? 'json' : 'text';
-    const hasExplicitInputSchema = inputFormat === 'json' && JSON.stringify(childLoaded.input.schema) !== DEFAULT_TOOL_INPUT_SCHEMA_JSON;
-    const childInfo: PreloadedSubAgent = {
-      toolName: derivedToolName,
-      description: childLoaded.description,
-      usage: childLoaded.usage,
-      inputFormat,
-      inputSchema: childLoaded.input.schema,
-      hasExplicitInputSchema,
-      promptPath: childLoaded.promptPath,
-      systemTemplate: childLoaded.systemTemplate,
-      loaded: childLoaded,
-    };
-    if (childLoaded.toolName === undefined) {
-      (childLoaded as { toolName?: string }).toolName = derivedToolName;
-    }
-    subAgentInfos.push(childInfo);
-  });
+  let mergedDefaultsForChildren: NonNullable<LoadAgentOptions['defaultsForUndefined']> | undefined;
 
   const needProviders = Array.from(new Set(selectedTargets.map((t) => t.provider)));
   const externalToolNames = Array.from(new Set(
@@ -404,6 +368,8 @@ function constructLoadedAgent(args: ConstructAgentArgs): LoadedAgent {
       traceLLM: options?.traceLLM,
       traceMCP: options?.traceMCP,
       verbose: options?.verbose,
+      reasoning: options?.reasoning,
+      caching: options?.caching,
     },
     global: options?.globalOverrides,
     fm: fm?.options,
@@ -417,6 +383,56 @@ function constructLoadedAgent(args: ConstructAgentArgs): LoadedAgent {
     const msgs = parsed.error.issues.map((issue) => `- ${issue.path.join('.')}: ${issue.message}`).join('\n');
     throw new Error(`Effective options validation failed:\n${msgs}`);
   }
+
+  mergedDefaultsForChildren = (() => {
+    const base = options?.defaultsForUndefined !== undefined ? { ...options.defaultsForUndefined } : {};
+    if (eff.reasoning !== undefined && base.reasoning === undefined) base.reasoning = eff.reasoning;
+    if (eff.caching !== undefined && base.caching === undefined) base.caching = eff.caching;
+    return Object.keys(base).length > 0 ? base : undefined;
+  })();
+
+  selectedAgents.forEach((agentPath) => {
+    const absPath = canonical(agentPath);
+    if (ancestorChain.includes(absPath)) {
+      throw new Error(`Recursion detected while loading sub-agent: ${absPath}`);
+    }
+    const childLoaded = loadAgent(absPath, registry, {
+      configLayers: layers,
+      verbose: options?.verbose,
+      defaultsForUndefined: mergedDefaultsForChildren,
+      ancestors: [...ancestorChain, id],
+      // Pass through overrides intact; downstream loaders treat arrays as immutable.
+      globalOverrides: options?.globalOverrides,
+    });
+    const derivedToolName = childLoaded.toolName ?? deriveToolNameFromPath(childLoaded.promptPath);
+    if (isReservedAgentName(derivedToolName)) {
+      throw new Error(`Sub-agent '${childLoaded.promptPath}' uses a reserved tool name '${derivedToolName}'`);
+    }
+    if (seenToolNames.has(derivedToolName)) {
+      throw new Error(`Duplicate sub-agent tool name '${derivedToolName}' detected while loading '${childLoaded.promptPath}'`);
+    }
+    seenToolNames.add(derivedToolName);
+    if (typeof childLoaded.description !== 'string' || childLoaded.description.trim().length === 0) {
+      throw new Error(`Sub-agent '${childLoaded.promptPath}' missing 'description' in frontmatter`);
+    }
+    const inputFormat = childLoaded.input.format === 'json' ? 'json' : 'text';
+    const hasExplicitInputSchema = inputFormat === 'json' && JSON.stringify(childLoaded.input.schema) !== DEFAULT_TOOL_INPUT_SCHEMA_JSON;
+    const childInfo: PreloadedSubAgent = {
+      toolName: derivedToolName,
+      description: childLoaded.description,
+      usage: childLoaded.usage,
+      inputFormat,
+      inputSchema: childLoaded.input.schema,
+      hasExplicitInputSchema,
+      promptPath: childLoaded.promptPath,
+      systemTemplate: childLoaded.systemTemplate,
+      loaded: childLoaded,
+    };
+    if (childLoaded.toolName === undefined) {
+      (childLoaded as { toolName?: string }).toolName = derivedToolName;
+    }
+    subAgentInfos.push(childInfo);
+  });
 
   const accountingFile: string | undefined = config.persistence?.billingFile ?? config.accounting?.file;
 
@@ -534,6 +550,8 @@ function constructLoadedAgent(args: ConstructAgentArgs): LoadedAgent {
       verbose: eff.verbose,
       toolResponseMaxBytes: eff.toolResponseMaxBytes,
       mcpInitConcurrency: eff.mcpInitConcurrency,
+      reasoning: eff.reasoning,
+      caching: eff.caching,
       // Preserve the original reference (no clone) so recursion guards see identical identity.
       // Harness expectations rely on the session receiving the exact array instance from callers.
       ancestors: Array.isArray(o.ancestors) ? o.ancestors : ancestorChain,

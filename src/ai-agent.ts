@@ -7,7 +7,7 @@ import Ajv from 'ajv';
 
 import type { OutputFormatId } from './formats.js';
 import type { SessionNode } from './session-tree.js';
-import type { AIAgentSessionConfig, AIAgentResult, ConversationMessage, LogEntry, AccountingEntry, Configuration, TurnRequest, LLMAccountingEntry, MCPTool, ToolAccountingEntry, RestToolConfig, ProgressMetrics, ToolCall, SessionSnapshotPayload, AccountingFlushPayload } from './types.js';
+import type { AIAgentSessionConfig, AIAgentResult, ConversationMessage, LogEntry, AccountingEntry, Configuration, TurnRequest, LLMAccountingEntry, MCPTool, ToolAccountingEntry, RestToolConfig, ProgressMetrics, ToolCall, SessionSnapshotPayload, AccountingFlushPayload, ReasoningLevel, ProviderReasoningMapping, ProviderReasoningValue } from './types.js';
 
 // Exit codes according to DESIGN.md
 type ExitCode = 
@@ -67,6 +67,16 @@ export class AIAgentSession {
   private static readonly REMOTE_FINAL_TURN = 'agent:final-turn';
   private static readonly FINAL_REPORT_TOOL = 'agent__final_report';
   private static readonly FINAL_REPORT_SHORT = 'final_report';
+  private static readonly REASONING_LEVELS: ReasoningLevel[] = ['minimal', 'low', 'medium', 'high'];
+  private static readonly DEFAULT_REASONING_MAP: Partial<Record<string, [ProviderReasoningValue, ProviderReasoningValue, ProviderReasoningValue, ProviderReasoningValue]>> = {
+    openai: ['minimal', 'low', 'medium', 'high'],
+    openrouter: ['minimal', 'low', 'medium', 'high'],
+  };
+  private static readonly PROVIDER_REASONING_LIMITS: Partial<Record<string, { min: number; max: number }>> = {
+    anthropic: { min: 1024, max: 128_000 },
+    google: { min: 1024, max: 32_768 },
+    openrouter: { min: 1024, max: 32_000 },
+  };
   readonly config: Configuration;
   readonly conversation: ConversationMessage[];
   readonly logs: LogEntry[];
@@ -2478,6 +2488,14 @@ export class AIAgentSession {
       else effectiveTopP = modelOverrides.topP;
     }
 
+    const reasoningLevel = this.sessionConfig.reasoning;
+    const targetMaxOutputTokens = this.sessionConfig.maxOutputTokens;
+    const reasoningValue = reasoningLevel !== undefined ? this.resolveReasoningValue(provider, model, reasoningLevel, targetMaxOutputTokens) : undefined;
+    let effectiveStream = this.sessionConfig.stream;
+    if (this.shouldAutoEnableReasoningStream(provider, reasoningLevel)) {
+      effectiveStream = true;
+    }
+
     const request: TurnRequest = {
       messages: conversation,
       provider,
@@ -2486,10 +2504,10 @@ export class AIAgentSession {
       toolExecutor,
       temperature: effectiveTemperature,
       topP: effectiveTopP,
-      maxOutputTokens: this.sessionConfig.maxOutputTokens,
+      maxOutputTokens: targetMaxOutputTokens,
       repeatPenalty: this.sessionConfig.repeatPenalty,
       parallelToolCalls: this.sessionConfig.parallelToolCalls,
-      stream: this.sessionConfig.stream,
+      stream: effectiveStream,
       isFinalTurn,
       llmTimeout: this.sessionConfig.llmTimeout,
       abortSignal: this.abortSignal,
@@ -2522,7 +2540,10 @@ export class AIAgentSession {
             if (typeof this.currentLlmOpId === 'string') this.opTree.appendReasoningChunk(this.currentLlmOpId, chunk);
           } catch (e) { warn(`appendReasoningChunk failed: ${e instanceof Error ? e.message : String(e)}`); }
         }
-      }
+      },
+      reasoningLevel,
+      reasoningValue,
+      caching: this.sessionConfig.caching,
     };
 
     try {
@@ -2549,6 +2570,57 @@ export class AIAgentSession {
     }
 
     return { tools: filtered, allowedNames };
+  }
+
+  private static getReasoningLevelIndex(level: ReasoningLevel): number {
+    const idx = AIAgentSession.REASONING_LEVELS.indexOf(level);
+    return idx >= 0 ? idx : 0;
+  }
+
+  private resolveReasoningMapping(provider: string, model: string): ProviderReasoningMapping | null | undefined {
+    const providerConfig = this.sessionConfig.config.providers[provider] as (Configuration['providers'][string] | undefined);
+    if (providerConfig === undefined) return undefined;
+    const modelReasoning = providerConfig.models?.[model]?.reasoning;
+    if (modelReasoning !== undefined) return modelReasoning;
+    if (providerConfig.reasoning !== undefined) return providerConfig.reasoning;
+    return undefined;
+  }
+
+  private resolveReasoningValue(provider: string, model: string, level: ReasoningLevel, maxOutputTokens: number | undefined): ProviderReasoningValue | null | undefined {
+    const mapping = this.resolveReasoningMapping(provider, model);
+    const idx = AIAgentSession.getReasoningLevelIndex(level);
+    if (mapping === undefined) {
+      const defaults = AIAgentSession.DEFAULT_REASONING_MAP[provider];
+      if (defaults !== undefined) return defaults[idx];
+      if (provider === 'anthropic' || provider === 'google') {
+        return this.computeDynamicReasoningBudget(provider, level, maxOutputTokens);
+      }
+      return undefined;
+    }
+    if (mapping === null) return null;
+    if (Array.isArray(mapping)) return mapping[idx];
+    return mapping;
+  }
+
+  private shouldAutoEnableReasoningStream(provider: string, level: ReasoningLevel | undefined): boolean {
+    if (provider !== 'anthropic' || level === undefined) return false;
+    const providerConfig = this.sessionConfig.config.providers[provider] as (Configuration['providers'][string] | undefined);
+    if (providerConfig?.reasoningAutoStreamLevel === undefined) return false;
+    const thresholdIdx = AIAgentSession.getReasoningLevelIndex(providerConfig.reasoningAutoStreamLevel);
+    const levelIdx = AIAgentSession.getReasoningLevelIndex(level);
+    return levelIdx >= thresholdIdx;
+  }
+
+  private computeDynamicReasoningBudget(provider: string, level: ReasoningLevel, maxOutputTokens: number | undefined): number {
+    const limits = AIAgentSession.PROVIDER_REASONING_LIMITS[provider] ?? { min: 0, max: Number.MAX_SAFE_INTEGER };
+    const available = (typeof maxOutputTokens === 'number' && Number.isFinite(maxOutputTokens)) ? Math.max(1, Math.trunc(maxOutputTokens)) : limits.max;
+    const minBudget = Math.min(Math.max(limits.min, 1), available);
+    const cappedAvailable = Math.min(available, limits.max);
+    if (level === 'minimal') return minBudget;
+    const ratio = level === 'high' ? 0.8 : (level === 'medium' ? 0.5 : 0.2);
+    const computed = Math.max(minBudget, Math.floor(cappedAvailable * ratio));
+    const bounded = Math.min(computed, cappedAvailable);
+    return Math.max(1, bounded);
   }
 
   private enhanceSystemPrompt(systemPrompt: string, toolsInstructions: string): string {

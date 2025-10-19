@@ -9,6 +9,16 @@ export type TurnStatus =
   | { type: 'invalid_response'; message: string }
   | { type: 'quota_exceeded'; message: string };
 
+export type ReasoningLevel = 'minimal' | 'low' | 'medium' | 'high';
+
+export type CachingMode = 'none' | 'full';
+
+export type ProviderReasoningValue = string | number;
+
+export type ProviderReasoningMapping =
+  | ProviderReasoningValue
+  | [ProviderReasoningValue, ProviderReasoningValue, ProviderReasoningValue, ProviderReasoningValue];
+
 export interface TokenUsage {
   inputTokens: number;
   outputTokens: number;
@@ -219,6 +229,7 @@ export interface ProviderModelOverrides {
 
 export interface ProviderModelConfig {
   overrides?: ProviderModelOverrides;
+  reasoning?: ProviderReasoningMapping | null;
 }
 
 export interface ProviderConfig {
@@ -234,6 +245,8 @@ export interface ProviderConfig {
   toolsDenied?: string[];
   stringSchemaFormatsAllowed?: string[];
   stringSchemaFormatsDenied?: string[];
+  reasoning?: ProviderReasoningMapping | null;
+  reasoningAutoStreamLevel?: ReasoningLevel;
 }
 
 export interface Configuration {
@@ -434,6 +447,8 @@ export interface AIAgentSessionConfig {
   traceLLM?: boolean;
   traceMCP?: boolean;
   verbose?: boolean;
+  reasoning?: ReasoningLevel;
+  caching?: CachingMode;
   // Optional pre-set session title (does not consume a tool turn)
   initialTitle?: string;
   // Enforced cap for MCP tool response size (bytes)
@@ -549,6 +564,9 @@ export interface TurnRequest {
   // External cancellation signal to immediately abort LLM calls
   abortSignal?: AbortSignal;
   onChunk?: (chunk: string, type: 'content' | 'thinking') => void;
+  reasoningLevel?: ReasoningLevel;
+  reasoningValue?: ProviderReasoningValue | null;
+  caching?: CachingMode;
 }
 
 export interface LLMProvider {

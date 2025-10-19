@@ -143,6 +143,16 @@ export const OPTIONS_REGISTRY: OptionDef[] = [
     groups: [G_MASTER_DEFAULTS],
     numeric: { min: 0, max: 1 },
   }),
+  strDef({
+    key: 'reasoning',
+    description: 'Reasoning effort level: minimal, low, medium, or high; leave unset to use provider defaults',
+    cli: { names: ['--reasoning'], showInHelp: true },
+    fm: { allowed: true, key: 'reasoning' },
+    scope: 'masterDefault',
+    groups: [G_MASTER_DEFAULTS],
+    render: { showInFrontmatterTemplate: true },
+    default: undefined,
+  }),
   numDef({
     key: 'maxOutputTokens',
     default: 4096,
@@ -210,12 +220,22 @@ export const OPTIONS_REGISTRY: OptionDef[] = [
     flags: { allowNegation: true },
     render: { showInFrontmatterTemplate: true },
   }),
+  strDef({
+    key: 'caching',
+    description: 'Anthropic caching mode: full (default behaviour) or none to disable cache reuse',
+    cli: { names: ['--caching'], showInHelp: true },
+    fm: { allowed: true, key: 'caching' },
+    scope: 'masterDefault',
+    groups: [G_MASTER_DEFAULTS],
+    render: { showInFrontmatterTemplate: true },
+    default: undefined,
+  }),
 
   // All Models Overrides
   strArrDef({
     key: 'override',
     default: [],
-    description: 'Override settings for every agent/sub-agent (key=value). Supports models/tools/agents plus LLM knobs like temperature, topP, maxOutputTokens, llmTimeout, retries, stream, parallelToolCalls.',
+    description: 'Override settings for every agent/sub-agent (key=value). Supports models/tools/agents plus LLM knobs like temperature, topP, maxOutputTokens, llmTimeout, retries, stream, parallelToolCalls, reasoning, caching.',
     cli: { names: ['--override'], showInHelp: true },
     fm: { allowed: false },
     scope: 'allAgents',

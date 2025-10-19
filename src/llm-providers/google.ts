@@ -3,6 +3,8 @@ import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import type { TurnRequest, TurnResult, ProviderConfig, ConversationMessage, TokenUsage } from '../types.js';
 import type { LanguageModel } from 'ai';
 
+import { warn } from '../utils.js';
+
 import { BaseLLMProvider, type ResponseMessage } from './base.js';
 
 export class GoogleProvider extends BaseLLMProvider {
@@ -39,6 +41,16 @@ export class GoogleProvider extends BaseLLMProvider {
         const g = (base.google as Record<string, unknown>);
         if (typeof request.maxOutputTokens === 'number' && Number.isFinite(request.maxOutputTokens)) g.maxOutputTokens = Math.trunc(request.maxOutputTokens);
         if (typeof request.repeatPenalty === 'number' && Number.isFinite(request.repeatPenalty)) g.frequencyPenalty = request.repeatPenalty;
+        if (request.reasoningValue !== undefined && request.reasoningValue !== null) {
+          const budget = typeof request.reasoningValue === 'number'
+            ? request.reasoningValue
+            : Number(request.reasoningValue);
+          if (Number.isFinite(budget)) {
+            g.thinkingConfig = { thinkingBudget: Math.trunc(budget), includeThoughts: true };
+          } else {
+            warn(`google reasoning value '${String(request.reasoningValue)}' is not numeric; ignoring`);
+          }
+        }
         return base;
       })();
 

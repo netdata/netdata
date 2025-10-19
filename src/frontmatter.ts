@@ -3,6 +3,8 @@ import path from 'node:path';
 
 import * as yaml from 'js-yaml';
 
+import type { ReasoningLevel, CachingMode } from './types.js';
+
 import { getFrontmatterAllowedKeys, OPTIONS_REGISTRY } from './options-registry.js';
 
 export interface FrontmatterOptions {
@@ -22,6 +24,8 @@ export interface FrontmatterOptions {
   maxOutputTokens?: number;
   repeatPenalty?: number;
   toolResponseMaxBytes?: number;
+  reasoning?: ReasoningLevel;
+  caching?: CachingMode;
 }
 
 export function parseFrontmatter(
@@ -124,6 +128,22 @@ export function parseFrontmatter(
     if (typeof raw.repeatPenalty === 'number') options.repeatPenalty = raw.repeatPenalty;
     if (typeof raw.temperature === 'number') options.temperature = raw.temperature;
     if (typeof raw.topP === 'number') options.topP = raw.topP;
+    if (typeof raw.reasoning === 'string') {
+      const normalized = raw.reasoning.toLowerCase();
+      if (normalized === 'minimal' || normalized === 'low' || normalized === 'medium' || normalized === 'high') {
+        options.reasoning = normalized as ReasoningLevel;
+      } else {
+        throw new Error(`Invalid reasoning level '${raw.reasoning}' in frontmatter. Expected minimal, low, medium, or high.`);
+      }
+    }
+    if (typeof raw.caching === 'string') {
+      const normalizedCaching = raw.caching.toLowerCase();
+      if (normalizedCaching === 'none' || normalizedCaching === 'full') {
+        options.caching = normalizedCaching as CachingMode;
+      } else {
+        throw new Error(`Invalid caching mode '${raw.caching}' in frontmatter. Expected none or full.`);
+      }
+    }
     if (typeof raw.description === 'string') description = raw.description;
     if (typeof raw.usage === 'string') usage = raw.usage;
     return { expectedOutput, inputSpec, toolName, options, description, usage };

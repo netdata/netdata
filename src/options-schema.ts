@@ -22,6 +22,8 @@ const EFFECTIVE_KEYS = [
   'traceSlack',
   'verbose',
   'mcpInitConcurrency',
+  'reasoning',
+  'caching',
 ] as const;
 
 type EffectiveKey = typeof EFFECTIVE_KEYS[number];
@@ -52,6 +54,9 @@ export function buildEffectiveOptionsSchema(): z.ZodObject<Record<EffectiveKey, 
         return [key, s.optional()] as const;
       }
       return [key, s] as const;
+    }
+    if (def.type === 'string') {
+      return [key, z.string().optional()] as const;
     }
     // Non-numeric/string options are not expected in effective shape; fallback to any
     return [key, z.any()] as const;

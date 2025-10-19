@@ -54,6 +54,17 @@ export class OpenRouterProvider extends BaseLLMProvider {
       const curr = (ex !== null && ex !== undefined && typeof ex === 'object' && !Array.isArray(ex)) ? (ex as Record<string, unknown>) : {};
       providerOptions.openrouter = { ...curr, provider: routerProv };
 
+      const routerOptions = providerOptions.openrouter as Record<string, unknown> | undefined;
+      if (routerOptions !== undefined && request.reasoningValue !== undefined) {
+        if (request.reasoningValue === null) {
+          delete routerOptions.reasoning;
+        } else if (typeof request.reasoningValue === 'string') {
+          routerOptions.reasoning = { effort: request.reasoningValue };
+        } else if (typeof request.reasoningValue === 'number' && Number.isFinite(request.reasoningValue)) {
+          routerOptions.reasoning = { max_tokens: Math.trunc(request.reasoningValue) };
+        }
+      }
+
       if (request.stream === true) {
         return await super.executeStreamingTurn(model, finalMessages, tools, request, startTime, providerOptions);
       } else {
