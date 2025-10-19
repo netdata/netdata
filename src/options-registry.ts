@@ -228,7 +228,7 @@ export const OPTIONS_REGISTRY: OptionDef[] = [
     scope: 'masterDefault',
     groups: [G_MASTER_DEFAULTS],
     render: { showInFrontmatterTemplate: true },
-    default: undefined,
+    default: 'full',
   }),
 
   // All Models Overrides

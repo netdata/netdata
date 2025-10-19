@@ -129,7 +129,7 @@ export function resolveEffectiveOptions(args: {
     return undefined;
   };
 
-  const readCaching = (): CachingMode | undefined => {
+  const readCaching = (): CachingMode => {
     const fromGlobal = normalizeCaching(getGlobalVal('caching'));
     if (fromGlobal !== undefined) return fromGlobal;
     const fromCli = normalizeCaching(getCliVal('caching'));
@@ -140,7 +140,7 @@ export function resolveEffectiveOptions(args: {
     if (def !== undefined) return def;
     const cfg = normalizeCaching(getCfgDefault('caching'));
     if (cfg !== undefined) return cfg;
-    return undefined;
+    return 'full';
   };
 
   const readNum = (name: string, fmVal: unknown, fallback: number): number => {
