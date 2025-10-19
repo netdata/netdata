@@ -188,6 +188,51 @@ const resolveInputContract = (
   return { format: 'json', schema: cloneJsonSchema(DEFAULT_TOOL_INPUT_SCHEMA) };
 };
 
+interface LoadAgentCoreArgs {
+  cache: LoadedAgentCache;
+  cacheKey: string;
+  id: string;
+  promptPath: string;
+  promptContent: string;
+  systemTemplate: string;
+  baseDir: string;
+  frontmatterBaseDir?: string;
+  options?: LoadAgentOptions;
+  layers: ResolvedConfigLayer[];
+  ancestorChain: string[];
+}
+
+function loadAgentCore(args: LoadAgentCoreArgs): LoadedAgent {
+  const {
+    cache,
+    cacheKey,
+    id,
+    promptPath,
+    promptContent,
+    systemTemplate,
+    baseDir,
+    frontmatterBaseDir,
+    options,
+    layers,
+    ancestorChain,
+  } = args;
+
+  const loaded = constructLoadedAgent({
+    id,
+    promptPath,
+    promptContent,
+    systemTemplate,
+    baseDir,
+    registry: cache,
+    options,
+    layers,
+    ancestorChain,
+    frontmatterBaseDir,
+  });
+  cache.set(cacheKey, loaded);
+  return loaded;
+}
+
 
 function containsPlaceholder(val: unknown): boolean {
   if (typeof val === 'string') return /\$\{[^}]+\}/.test(val);
@@ -560,20 +605,19 @@ export function loadAgent(aiPath: string, registry?: LoadedAgentCache, options?:
   const baseDir = path.dirname(id);
   const flattened = loadFlattenedPrompt(id);
 
-  const loaded = constructLoadedAgent({
+  return loadAgentCore({
+    cache: reg,
+    cacheKey: id,
     id,
     promptPath: id,
     promptContent: flattened.content,
     systemTemplate: flattened.systemTemplate,
     baseDir,
-    registry: reg,
+    frontmatterBaseDir: baseDir,
     options,
     layers,
     ancestorChain,
-    frontmatterBaseDir: baseDir,
   });
-  reg.set(id, loaded);
-  return loaded;
 }
 
 export function loadAgentFromContent(
@@ -595,18 +639,17 @@ export function loadAgentFromContent(
   const baseDir = options?.baseDir ?? process.cwd();
   const flattened = flattenPromptContent(content, options?.baseDir);
 
-  const loaded = constructLoadedAgent({
+  return loadAgentCore({
+    cache: reg,
+    cacheKey: id,
     id,
     promptPath: id,
     promptContent: flattened.content,
     systemTemplate: flattened.systemTemplate,
     baseDir,
-    registry: reg,
+    frontmatterBaseDir: options?.baseDir,
     options,
     layers,
     ancestorChain,
-    frontmatterBaseDir: options?.baseDir,
   });
-  reg.set(id, loaded);
-  return loaded;
 }
