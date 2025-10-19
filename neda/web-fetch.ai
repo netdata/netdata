@@ -57,6 +57,7 @@ maxOutputTokens: 4096
 repeatPenalty: 1
 maxRetries: 5
 maxToolTurns: 5
+caching: 'none'
 ---
 Your goal is to fetch the URL provided and extract the information requested. When the URL provided is a search engine (www.google.com, www.bing.com, duckduckgo.com, etc), you MUST also extract the URL related to the information you quote.
 
