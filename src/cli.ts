@@ -98,7 +98,11 @@ function addOptionsFromRegistry(prog: Command): void {
       const first = names[0] + placeholderFor(def.key, def.type);
       const rest = names.slice(1);
       const combined = [first, ...rest].join(', ');
-      prog.addOption(new Option(combined, def.description));
+      const optInstance = new Option(combined, def.description);
+      if (def.type === 'string[]') {
+        optInstance.argParser((value: string, previous?: string[]) => appendValue(value, previous)).default(def.default ?? [], undefined);
+      }
+      prog.addOption(optInstance);
     }
   });
 }
