@@ -18,7 +18,6 @@ _Last updated: 2025-10-17_
 - **Limited automated coverage** — The deterministic phase1 harness (including the new streaming/persistence/final_report scenarios) exists, but we still lack provider-specific unit tests, rest-provider coverage, and CI gating for regressions. Stand up Vitest (or Jest) with broader suites, add mocks for adapters, and enforce coverage in CI before major refactors.
 - **Final-report fallback follow-ups** — Harness scenario `run-test-102` now exercises the branch where `agent__final_report` rejects; still decide whether the synthesized failure summary should enumerate attempted providers/models before declaring failure.
 - **Concurrency limiter duplication** — Tool execution throttling logic lives in both `AIAgentSession` and `ToolsOrchestrator`; a similar limiter exists in `src/headends/concurrency.ts`. Centralize into a reusable semaphore.
-- **Loader duplication** — `loadAgent` vs `loadAgentFromContent` in `src/agent-loader.ts` repeat the same resolution/validation logic. Extract shared helpers to reduce churn and bug risk.
 ## P2 — Medium Priority (nice-to-have but non-blocking)
 - **Token accounting scatter** — Accounting is emitted from multiple layers (`ai-agent`, tool orchestrator, providers). Consolidate via a dedicated accounting service to avoid drift.
 - **Magic strings / enums** — Exit codes and log identifiers are free-form strings. Promote to enums/const maps to avoid typos and ease refactors.
