@@ -15,6 +15,7 @@ static ISensorManager *pSensorManager = NULL;
 static ND_THREAD *sensors_thread_update = NULL;
 
 #define NETDATA_WIN_SENSOR_STATES (6)
+#define NETDATA_WIN_VECTOR_POS (3)
 
 enum netdata_win_sensor_monitored {
     NETDATA_WIN_SENSOR_CELSIUS,
@@ -30,10 +31,14 @@ enum netdata_win_sensor_monitored {
     NETDATA_WIN_SENSOR_LONGITUDE_DEGREES,
     NETDATA_WIN_SENSOR_FORCE_NEWTONS,
     NETDATA_WIN_SENSOR_GAUGE_PRESSURE,
+
+    // Add only one vector axis here
     NETDATA_WIN_SENSOR_TYPE_DISTANCE_X,
+    NETDATA_WIN_SENSOR_ACCELERATION_X_G,
+
+    // Remaining axis should be added here
     NETDATA_WIN_SENSOR_TYPE_DISTANCE_Y,
     NETDATA_WIN_SENSOR_TYPE_DISTANCE_Z,
-    NETDATA_WIN_SENSOR_ACCELERATION_X_G,
     NETDATA_WIN_SENSOR_ACCELERATION_Y_G,
     NETDATA_WIN_SENSOR_ACCELERATION_Z_G
 };
@@ -52,14 +57,19 @@ REFPROPERTYKEY sensor_keys[] = {
         &SENSOR_DATA_TYPE_LONGITUDE_DEGREES,
         &SENSOR_DATA_TYPE_FORCE_NEWTONS,
         &SENSOR_DATA_TYPE_GAUGE_PRESSURE_PASCAL,
+
+        // Add only one vector axis here
         &SENSOR_DATA_TYPE_DISTANCE_X_METERS,
+        &SENSOR_DATA_TYPE_ACCELERATION_X_G,
+
+        // Main loop stop
+        NULL,
+
+        // Remaining axis should be added here
         &SENSOR_DATA_TYPE_DISTANCE_Y_METERS,
         &SENSOR_DATA_TYPE_DISTANCE_Z_METERS,
-        &SENSOR_DATA_TYPE_ACCELERATION_X_G,
         &SENSOR_DATA_TYPE_ACCELERATION_Y_G,
-        &SENSOR_DATA_TYPE_ACCELERATION_Z_G,
-
-        NULL};
+        &SENSOR_DATA_TYPE_ACCELERATION_Z_G};
 
 
 static struct win_sensor_config {
@@ -224,9 +234,10 @@ struct sensor_data {
     RRDDIM *rd_sensor_state[NETDATA_WIN_SENSOR_STATES];
 
     RRDSET *st_sensor_data;
-    RRDDIM *rd_sensor_data;
+    RRDDIM *rd_sensor_data_0;
 
-    collected_number current_data_value;
+    // Some sensors are vectors, this means they have three different values (Time is ignored here)
+    collected_number current_data_value[NETDATA_WIN_VECTOR_POS];
     NETDATA_DOUBLE mult_factor;
     NETDATA_DOUBLE div_factor;
     NETDATA_DOUBLE add_factor;
@@ -310,13 +321,13 @@ netdata_collect_sensor_data(struct sensor_data *sd, ISensor *pSensor, REFPROPERT
         if (SUCCEEDED(hr) && (pv.vt == VT_R4 || pv.vt == VT_R8 || pv.vt == VT_UI4)) {
             switch (pv.vt) {
                 case VT_UI4:
-                    sd->current_data_value = (collected_number)(pv.ulVal * 100);
+                    sd->current_data_value[0] = (collected_number)(pv.ulVal * 100);
                     break;
                 case VT_R4:
-                    sd->current_data_value = (collected_number)(pv.fltVal * sd->div_factor);
+                    sd->current_data_value[0] = (collected_number)(pv.fltVal * sd->div_factor);
                     break;
                 case VT_R8:
-                    sd->current_data_value = (collected_number)(pv.dblVal * sd->div_factor);
+                    sd->current_data_value[0] = (collected_number)(pv.dblVal * sd->div_factor);
                     break;
             }
             defined = 1;
@@ -471,7 +482,7 @@ static void sensors_states_chart(struct sensor_data *sd, int update_every)
             "status",
             PLUGIN_WINDOWS_NAME,
             "GetSensors",
-            70010,
+            70000,
             update_every,
             RRDSET_TYPE_LINE);
 
@@ -522,11 +533,11 @@ static void sensors_data_chart(struct sensor_data *sd, int update_every)
         rrdlabels_add(sd->st_sensor_data->rrdlabels, "manufacturer", sd->manufacturer, RRDLABEL_SRC_AUTO);
         rrdlabels_add(sd->st_sensor_data->rrdlabels, "model", sd->model, RRDLABEL_SRC_AUTO);
 
-        sd->rd_sensor_data = rrddim_add(sd->st_sensor_data, "input", NULL, (collected_number )sd->mult_factor, (collected_number )sd->div_factor, RRD_ALGORITHM_ABSOLUTE);
+        sd->rd_sensor_data_0 = rrddim_add(sd->st_sensor_data, "input", NULL, (collected_number )sd->mult_factor, (collected_number )sd->div_factor, RRD_ALGORITHM_ABSOLUTE);
     }
 
-    collected_number value = sd->current_data_value + (collected_number )sd->add_factor;
-    rrddim_set_by_pointer(sd->st_sensor_data, sd->rd_sensor_data, value);
+    collected_number value = sd->current_data_value[0] + (collected_number )sd->add_factor;
+    rrddim_set_by_pointer(sd->st_sensor_data, sd->rd_sensor_data_0, value);
     rrdset_done(sd->st_sensor_data);
 }
 
