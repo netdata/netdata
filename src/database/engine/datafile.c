@@ -1,6 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "rrdengine.h"
 
+#ifdef OS_WINDOWS
+void sync_uv_file_data(uv_file file)
+{
+    uv_fs_t req;
+    (void) uv_fs_fsync(NULL, &req, file, NULL);
+    uv_fs_req_cleanup(&req);
+}
+#endif
+
 void datafile_list_insert(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile)
 {
     netdata_rwlock_wrlock(&ctx->datafiles.rwlock);
@@ -9,6 +18,13 @@ void datafile_list_insert(struct rrdengine_instance *ctx, struct rrdengine_dataf
         fatal("DBENGINE: cannot insert datafile %u of tier %d into the datafiles list",
               datafile->fileno, ctx->config.tier);
     *Pvalue = datafile;
+
+#ifdef OS_WINDOWS
+    sync_uv_file_data(datafile->file);
+    sync_uv_file_data(datafile->journalfile->file);
+    datafile->writers.last_sync_time = now_realtime_sec();
+#endif
+
     netdata_rwlock_wrunlock(&ctx->datafiles.rwlock);
 }
 
