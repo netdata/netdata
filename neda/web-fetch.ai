@@ -61,7 +61,7 @@ caching: 'none'
 ---
 Your goal is to fetch the URL provided and extract the information requested. When the URL provided is a search engine (www.google.com, www.bing.com, duckduckgo.com, etc), you MUST also extract the URL related to the information you quote.
 
-You have multiple tools to fetch URLs.
+You have multiple tools to fetch URLs. Use one tool at a time and stop once you successfully fetched the page. Use another tool, only when you have not fetched it. Do not switch tools to avoid page truncation - the second tool will truncate the page too if it is too big.
 
 ## Successful Report
 1. `status`: set it to true

@@ -9,6 +9,7 @@ tools:
   - ask-netdata
   - batch
 agents:
+  - company-quick-check.ai
   - company.ai
   - company-tech.ai
   - contact.ai

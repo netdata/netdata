@@ -572,7 +572,7 @@
           "agent": "neda.ai",
           "engage": ["channel-posts"],
           "promptTemplates": {
-            "channelPost": "Neda, analyze this support ticket:\n\nChannel: {channel.name} ({channel.id})\nUser: {user.label} ({user.id})\nTime: {ts}\nMessage: {text}\nURL: {message.url}\n\nFollow this process: 1) understand what the customer is saying, 2) consult ask-netdata and source-code to understand how our software works, 3) prepare a response for the customer, 4) if we have bug in our code, provide workarounds, 5) provide instructions for our engineers to solve the bug/issue, 6) mention the relevant code owners (find them from github once you know which source code files are affected) so that they will be notified."
+            "channelPost": "Neda, analyze this support ticket:\n\nChannel: {channel.name} ({channel.id})\nUser: {user.label} ({user.id})\nTime: {ts}\nMessage: {text}\nURL: {message.url}\n\nFollow this process: 1) understand what the customer is saying, 2) consult ask-netdata and source-code to understand how Netdata works, 3) prepare a response for the customer, 4) if we have bug in our code, provide workarounds, 5) provide instructions for our engineers to solve the bug/issue, 6) mention the relevant code owners (find them from github once you know which source code files are affected) so that they will be notified."
           }
         },
         {
@@ -581,7 +581,7 @@
           "agent": "neda.ai",
           "engage": ["channel-posts"],
           "promptTemplates": {
-            "channelPost": "Neda, they have just posted this contact form:\n\nChannel: {channel.name} ({channel.id})\nUser: {user.label} ({user.id})\nTime: {ts}\nMessage: {text}\nURL: {message.url}\n\nResearch the company profile, their technology stack, and calculate IPC and estimate ARR. Check our contact (research its profile). Give us a hint on how they found us (focus on pre and post form submission events on posthog). Check hubspot and fireflies for past engagements and encharge to find if they were in our mailing lists before this form submission (they may have been added now). Do not run the product-messaging agent for this session."
+            "channelPost": "Neda, they have just posted this contact form:\n\nChannel: {channel.name} ({channel.id})\nUser: {user.label} ({user.id})\nTime: {ts}\nMessage: {text}\nURL: {message.url}\n\nUse the company-quick-check agent to determine if this propect potentially fits our ICP. If they don't just mention your findings - do not do anything else. Sometimes we get spam on these public froms. If this looks like a spam, mention it and stop - do not do anything else.\n\nIf however they look legit and they fit our ICP:\n\n- Research the company profile, their technology stack, and calculate IPC and estimate ARR.\n- Check also our contact (research its profile).\n- Give us a hint on how they found us (focus on pre and post form submission events on posthog).\n- Check hubspot and fireflies for past engagements and encharge to find if they were in our mailing lists before this form submission (they may have been added now).\n\nCRITICAL: Do **NOT** run the product-messaging agent for this session - we just need to know who the customer is and how they found us - we will ask for more information when we need it."
           }
         },
         {

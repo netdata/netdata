@@ -96,6 +96,13 @@ Research until new searches do not contribute more data.
 1. Provide enough context to your `web-search` terms. It is an AI agent that executes them and it needs to know a much details are possible.
 2. The `web-search` agent performs multiple searches to bring the requested information. Use its response to understand what it did and do not repeat searches already performed.
 
+### Short Circuit: When to stop researching
+
+Stop your research when:
+
+1. The company is extremely small (a few people, tiny or no infrastructure), without any significance for our sales goals
+3. Additional searches do not provide any additional information - you repeatedly get the same info
+
 ## Your Report
 
 Your report is freeform. Include everything you found about this company.

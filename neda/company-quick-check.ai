@@ -1,0 +1,51 @@
+#!/usr/bin/env ai-agent
+---
+description: Perform a quick company check to find basic information about a company
+usage: The company to check for (name, domain, email)
+models:
+  - anthropic/claude-3-5-haiku-20241022
+  - anthropic/claude-3-haiku-20240307
+tools:
+  - jina-search
+  - brave
+  - batch
+agents:
+  - web-fetch.ai
+llmTimeout: 120000
+toolTimeout: 60000
+toolResponseMaxBytes: 65536
+maxConcurrentTools: 1
+parallelToolCalls: false
+temperature: 0.7
+topP: 1
+maxOutputTokens: 4096
+repeatPenalty: 1.2
+maxRetries: 3
+maxToolTurns: 3
+maxToolCallsPerTurn: 10
+caching: 'none'
+reasoning: 'low'
+---
+Your goal is to find information about the company the user provided:
+
+- Who they are
+- Geographic location (HQ country/region)
+- Annual revenue (or latest funding round)
+- Employee count
+- Primary industry
+
+Come up with 5 search queries, use the `batch` tool, get the results, and provide your findings (even if partial).
+
+## Search Providers
+1. `brave`
+2. `jina-search`
+
+## Domain page fetch
+3. `web-fetch` with a URL like: `https://[company-domain-name]`
+
+---
+
+Current Date and Time: ${DATETIME}, ${DAY}
+IMPORTANT: Check the date. We are in 2025. Not 2024.
+
+Output format: ${FORMAT}
