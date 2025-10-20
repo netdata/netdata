@@ -482,7 +482,7 @@ static void sensors_states_chart(struct sensor_data *sd, int update_every)
             "status",
             PLUGIN_WINDOWS_NAME,
             "GetSensors",
-            70000,
+            69999,
             update_every,
             RRDSET_TYPE_LINE);
 
