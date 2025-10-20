@@ -1442,9 +1442,13 @@ async function readPrompt(value: string): Promise<string> {
     const p = value.slice(1);
     const content = readIfFile(p);
     if (content !== undefined) return content;
+    throw new Error(`Prompt file not found: ${p}`);
   } else {
     const content = readIfFile(value);
     if (content !== undefined) return content;
+    if (path.isAbsolute(value)) {
+      throw new Error(`Prompt file not found: ${value}`);
+    }
   }
   return value;
 }
