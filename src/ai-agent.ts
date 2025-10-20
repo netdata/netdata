@@ -2589,9 +2589,11 @@ export class AIAgentSession {
 
   private resolveReasoningValue(provider: string, model: string, level: ReasoningLevel, maxOutputTokens: number | undefined): ProviderReasoningValue | null | undefined {
     const mapping = this.resolveReasoningMapping(provider, model);
+    const providerConfig = this.sessionConfig.config.providers[provider] as (Configuration['providers'][string] | undefined);
     const idx = AIAgentSession.getReasoningLevelIndex(level);
     if (mapping === undefined) {
-      const defaults = AIAgentSession.DEFAULT_REASONING_MAP[provider];
+      const defaults = AIAgentSession.DEFAULT_REASONING_MAP[provider]
+        ?? (providerConfig?.type !== undefined ? AIAgentSession.DEFAULT_REASONING_MAP[providerConfig.type] : undefined);
       if (defaults !== undefined) return defaults[idx];
       if (provider === 'anthropic' || provider === 'google') {
         return this.computeDynamicReasoningBudget(provider, level, maxOutputTokens);
