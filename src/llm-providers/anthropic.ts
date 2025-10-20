@@ -1,6 +1,6 @@
 import { createAnthropic } from '@ai-sdk/anthropic';
 
-import type { TurnRequest, TurnResult, ProviderConfig, ConversationMessage, TokenUsage } from '../types.js';
+import type { ReasoningLevel, TurnRequest, TurnResult, ProviderConfig, ConversationMessage, TokenUsage, TurnStatus, TurnRetryDirective } from '../types.js';
 import type { LanguageModel } from 'ai';
 
 import { warn } from '../utils.js';
@@ -17,7 +17,10 @@ export class AnthropicProvider extends BaseLLMProvider {
   private config: ProviderConfig;
 
   constructor(config: ProviderConfig, tracedFetch?: typeof fetch) {
-    super({ formatPolicy: { allowed: config.stringSchemaFormatsAllowed, denied: config.stringSchemaFormatsDenied } });
+    super({
+      formatPolicy: { allowed: config.stringSchemaFormatsAllowed, denied: config.stringSchemaFormatsDenied },
+      reasoningLimits: { min: 1024, max: 128_000 },
+    });
     this.config = config;
     const prov = createAnthropic({
       apiKey: config.apiKey,
@@ -106,10 +109,41 @@ export class AnthropicProvider extends BaseLLMProvider {
         return await super.executeNonStreamingTurn(model, finalMessages, tools, request, startTime, providerOptions);
       }
     } catch (error) {
-      return this.createFailureResult(this.mapError(error), Date.now() - startTime);
+      return this.createFailureResult(request, this.mapError(error), Date.now() - startTime);
     }
   }
 
+  public override shouldAutoEnableReasoningStream(level: ReasoningLevel | undefined): boolean {
+    if (level === undefined) return false;
+    const threshold = this.config.reasoningAutoStreamLevel;
+    if (threshold === undefined) return false;
+    const levelIdx = this.getReasoningLevelIndex(level);
+    const thresholdIdx = this.getReasoningLevelIndex(threshold);
+    return levelIdx >= thresholdIdx;
+  }
+
+  protected override shouldForceToolChoice(request: TurnRequest): boolean {
+    if (request.reasoningLevel !== undefined) {
+      return false;
+    }
+    return super.shouldForceToolChoice(request);
+  }
+
+  protected override buildRetryDirective(request: TurnRequest, status: TurnStatus): TurnRetryDirective | undefined {
+    if (status.type === 'rate_limit') {
+      const wait = typeof status.retryAfterMs === 'number' && Number.isFinite(status.retryAfterMs) ? status.retryAfterMs : undefined;
+      const remoteId = `${request.provider}:${request.model}`;
+      const message = `Anthropic rate limit; waiting ${wait !== undefined ? `${String(wait)}ms` : 'briefly'} before retry.`;
+      return {
+        action: 'retry',
+        backoffMs: wait,
+        logMessage: message,
+        systemMessage: `System notice: Anthropic (${remoteId}) rate-limited the prior request. Retrying shortly; no changes required unless limits persist.`,
+        sources: status.sources,
+      };
+    }
+    return super.buildRetryDirective(request, status);
+  }
 
   protected convertResponseMessages(messages: ResponseMessage[], provider: string, model: string, tokens: TokenUsage): ConversationMessage[] {
     // Use base class helper that handles AI SDK's content array format

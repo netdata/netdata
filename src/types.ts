@@ -30,6 +30,22 @@ export interface TokenUsage {
   totalTokens: number;
 }
 
+export interface ProviderTurnMetadata {
+  actualProvider?: string;
+  actualModel?: string;
+  reportedCostUsd?: number;
+  upstreamCostUsd?: number;
+  cacheWriteInputTokens?: number;
+}
+
+export interface TurnRetryDirective {
+  action: 'retry' | 'skip-provider' | 'abort';
+  backoffMs?: number;
+  logMessage?: string;
+  systemMessage?: string;
+  sources?: string[];
+}
+
 export interface TurnResult {
   status: TurnStatus;
   response?: string;
@@ -40,6 +56,8 @@ export interface TurnResult {
   hasReasoning?: boolean;
   hasContent?: boolean;
   stopReason?: string;
+  providerMetadata?: ProviderTurnMetadata;
+  retry?: TurnRetryDirective;
 }
 
 export type ToolStatus =
@@ -238,7 +256,7 @@ export interface ProviderConfig {
   headers?: Record<string, string>;
   custom?: Record<string, unknown>;
   mergeStrategy?: "overlay" | "override" | "deep";
-  type?: 'openai' | 'anthropic' | 'google' | 'openrouter' | 'ollama' | 'test-llm';
+  type: 'openai' | 'anthropic' | 'google' | 'openrouter' | 'ollama' | 'test-llm';
   openaiMode?: 'responses' | 'chat';
   models?: Record<string, ProviderModelConfig>;
   toolsAllowed?: string[];
@@ -558,16 +576,24 @@ export interface TurnRequest {
   repeatPenalty?: number;
   parallelToolCalls?: boolean;
   stream?: boolean;
+  toolChoiceRequired?: boolean;
   maxConcurrentTools?: number;
   isFinalTurn?: boolean;
   llmTimeout?: number;
+  turnMetadata?: {
+    attempt: number;
+    maxAttempts: number;
+    turn: number;
+    isFinalTurn: boolean;
+    reasoningLevel?: ReasoningLevel;
+    reasoningValue?: ProviderReasoningValue | null;
+  };
   // External cancellation signal to immediately abort LLM calls
   abortSignal?: AbortSignal;
   onChunk?: (chunk: string, type: 'content' | 'thinking') => void;
   reasoningLevel?: ReasoningLevel;
   reasoningValue?: ProviderReasoningValue | null;
   caching?: CachingMode;
-  forceToolChoice?: boolean;
 }
 
 export interface LLMProvider {

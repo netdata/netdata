@@ -75,7 +75,7 @@ export class OllamaProvider extends BaseLLMProvider {
         return await super.executeNonStreamingTurn(model, finalMessages, tools, request, startTime, providerOptions);
       }
     } catch (error) {
-      return this.createFailureResult(this.mapError(error), Date.now() - startTime);
+      return this.createFailureResult(request, this.mapError(error), Date.now() - startTime);
     }
   }
 

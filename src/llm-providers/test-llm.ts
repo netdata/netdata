@@ -162,10 +162,19 @@ export class TestLLMProvider extends BaseLLMProvider {
     const finalMessages = this.buildFinalTurnMessages(messages, request.isFinalTurn === true);
 
     const start = Date.now();
+    const metadata = activeStep.response.providerMetadata;
     if (request.stream === true) {
-      return await super.executeStreamingTurn(model, finalMessages, tools, request, start, undefined);
+      const result = await super.executeStreamingTurn(model, finalMessages, tools, request, start, undefined);
+      if (metadata !== undefined) {
+        result.providerMetadata = { ...metadata };
+      }
+      return result;
     }
-    return await super.executeNonStreamingTurn(model, finalMessages, tools, request, start, undefined);
+    const result = await super.executeNonStreamingTurn(model, finalMessages, tools, request, start, undefined);
+    if (metadata !== undefined) {
+      result.providerMetadata = { ...metadata };
+    }
+    return result;
   }
 
   private extractScenarioId(messages: ConversationMessage[]): string | undefined {

@@ -13,7 +13,10 @@ export class GoogleProvider extends BaseLLMProvider {
   private config: ProviderConfig;
 
   constructor(config: ProviderConfig, tracedFetch?: typeof fetch) {
-    super({ formatPolicy: { allowed: config.stringSchemaFormatsAllowed, denied: config.stringSchemaFormatsDenied } });
+    super({
+      formatPolicy: { allowed: config.stringSchemaFormatsAllowed, denied: config.stringSchemaFormatsDenied },
+      reasoningLimits: { min: 1024, max: 32_768 },
+    });
     this.config = config;
     const prov = createGoogleGenerativeAI({ 
       apiKey: config.apiKey, 
@@ -60,7 +63,7 @@ export class GoogleProvider extends BaseLLMProvider {
         return await super.executeNonStreamingTurn(model, finalMessages, tools, request, startTime, providerOptions);
       }
     } catch (error) {
-      return this.createFailureResult(this.mapError(error), Date.now() - startTime);
+      return this.createFailureResult(request, this.mapError(error), Date.now() - startTime);
     }
   }
 

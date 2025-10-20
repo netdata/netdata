@@ -11,7 +11,15 @@ export class OpenAIProvider extends BaseLLMProvider {
   private config: ProviderConfig;
 
   constructor(config: ProviderConfig, tracedFetch?: typeof fetch) {
-    super({ formatPolicy: { allowed: config.stringSchemaFormatsAllowed, denied: config.stringSchemaFormatsDenied } });
+    super({
+      formatPolicy: { allowed: config.stringSchemaFormatsAllowed, denied: config.stringSchemaFormatsDenied },
+      reasoningDefaults: {
+        minimal: 'minimal',
+        low: 'low',
+        medium: 'medium',
+        high: 'high',
+      },
+    });
     this.config = config;
     const prov = createOpenAI({ 
       apiKey: config.apiKey, 
@@ -57,7 +65,7 @@ export class OpenAIProvider extends BaseLLMProvider {
         return await super.executeNonStreamingTurn(model, finalMessages, tools, request, startTime, providerOptions);
       }
     } catch (error) {
-      return this.createFailureResult(this.mapError(error), Date.now() - startTime);
+      return this.createFailureResult(request, this.mapError(error), Date.now() - startTime);
     }
   }
 

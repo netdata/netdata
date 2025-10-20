@@ -7,7 +7,7 @@ import Ajv from 'ajv';
 
 import type { OutputFormatId } from './formats.js';
 import type { SessionNode } from './session-tree.js';
-import type { AIAgentSessionConfig, AIAgentResult, ConversationMessage, LogEntry, AccountingEntry, Configuration, TurnRequest, LLMAccountingEntry, MCPTool, ToolAccountingEntry, RestToolConfig, ProgressMetrics, ToolCall, SessionSnapshotPayload, AccountingFlushPayload, ReasoningLevel, ProviderReasoningMapping, ProviderReasoningValue } from './types.js';
+import type { AIAgentSessionConfig, AIAgentResult, ConversationMessage, LogEntry, AccountingEntry, Configuration, TurnRequest, LLMAccountingEntry, MCPTool, ToolAccountingEntry, RestToolConfig, ProgressMetrics, ToolCall, SessionSnapshotPayload, AccountingFlushPayload, ReasoningLevel, ProviderReasoningMapping, ProviderReasoningValue, TurnRetryDirective, TurnStatus } from './types.js';
 
 // Exit codes according to DESIGN.md
 type ExitCode = 
@@ -67,16 +67,7 @@ export class AIAgentSession {
   private static readonly REMOTE_FINAL_TURN = 'agent:final-turn';
   private static readonly FINAL_REPORT_TOOL = 'agent__final_report';
   private static readonly FINAL_REPORT_SHORT = 'final_report';
-  private static readonly REASONING_LEVELS: ReasoningLevel[] = ['minimal', 'low', 'medium', 'high'];
-  private static readonly DEFAULT_REASONING_MAP: Partial<Record<string, [ProviderReasoningValue, ProviderReasoningValue, ProviderReasoningValue, ProviderReasoningValue]>> = {
-    openai: ['minimal', 'low', 'medium', 'high'],
-    openrouter: ['minimal', 'low', 'medium', 'high'],
-  };
-  private static readonly PROVIDER_REASONING_LIMITS: Partial<Record<string, { min: number; max: number }>> = {
-    anthropic: { min: 1024, max: 128_000 },
-    google: { min: 1024, max: 32_768 },
-    openrouter: { min: 1024, max: 32_000 },
-  };
+  private static readonly RETRY_ACTION_SKIP_PROVIDER = 'skip-provider';
   readonly config: Configuration;
   readonly conversation: ConversationMessage[];
   readonly logs: LogEntry[];
@@ -1031,7 +1022,7 @@ export class AIAgentSession {
 
     const finalTurnRetryMessage = 'Final turn did not produce final_report; retrying with next provider/model in this turn.';
     let maxTurns = this.sessionConfig.maxTurns ?? 10;
-    const maxRetries = this.sessionConfig.maxRetries ?? 3; // GLOBAL attempts cap per turn
+    const maxRetries: number = this.sessionConfig.maxRetries ?? 3; // GLOBAL attempts cap per turn
     const pairs = this.sessionConfig.targets;
 
     // Turn loop - necessary for control flow with early termination
@@ -1139,6 +1130,11 @@ export class AIAgentSession {
               const msgBytes = (() => { try { return new TextEncoder().encode(JSON.stringify(attemptConversation)).length; } catch { return undefined; } })();
               if (llmOpId !== undefined) this.opTree.setRequest(llmOpId, { kind: 'llm', payload: { messages: attemptConversation.length, bytes: msgBytes, isFinalTurn }, size: msgBytes });
             } catch (e) { warn(`final turn warning log failed: ${e instanceof Error ? e.message : String(e)}`); }
+            const sessionReasoningLevel = this.sessionConfig.reasoning;
+            const sessionReasoningValue = sessionReasoningLevel !== undefined
+              ? this.resolveReasoningValue(provider, model, sessionReasoningLevel, this.sessionConfig.maxOutputTokens)
+              : undefined;
+
             const turnResult = await this.executeSingleTurn(
               attemptConversation,
               provider,
@@ -1147,7 +1143,11 @@ export class AIAgentSession {
               currentTurn,
               logs,
               accounting,
-              lastShownThinkingHeaderTurn
+              lastShownThinkingHeaderTurn,
+              attempts,
+              maxRetries,
+              sessionReasoningLevel,
+              sessionReasoningValue ?? undefined
             );
             const { messages: sanitizedMessages, dropped: droppedInvalidToolCalls } = this.sanitizeTurnMessages(
               turnResult.messages,
@@ -1202,15 +1202,16 @@ export class AIAgentSession {
                 if (Number.isFinite(totalWithCache)) tokens.totalTokens = totalWithCache;
               } catch { /* keep provider totalTokens if something goes wrong */ }
               // Compute cost from pricing table when available (prefer provider-reported when using routers like OpenRouter)
+              const metadata = turnResult.providerMetadata;
               const computeCost = (): { costUsd?: number } => {
                 try {
                   const pricing = (this.sessionConfig.config.pricing ?? {}) as Partial<Record<string, Partial<Record<string, { unit?: 'per_1k'|'per_1m'; currency?: 'USD'; prompt?: number; completion?: number; cacheRead?: number; cacheWrite?: number }>>>>;
-                  const effProvider = provider === 'openrouter' ? (this.llmClient.getLastActualRouting().provider ?? provider) : provider;
-                  const effModel = provider === 'openrouter' ? (this.llmClient.getLastActualRouting().model ?? model) : model;
-                  const provTable = pricing[effProvider];
-                  const modelTable = provTable !== undefined ? provTable[effModel] : undefined;
+                  const effectiveProvider = metadata?.actualProvider ?? provider;
+                  const effectiveModel = metadata?.actualModel ?? model;
+                  const provTable = pricing[effectiveProvider];
+                  const modelTable = provTable !== undefined ? provTable[effectiveModel] : undefined;
                   if (modelTable === undefined) return {};
-                  const denom = (modelTable.unit === 'per_1k') ? 1000 : 1_000_000;
+                  const denom = modelTable.unit === 'per_1k' ? 1000 : 1_000_000;
                   const pIn = modelTable.prompt ?? 0;
                   const pOut = modelTable.completion ?? 0;
                   const pRead = modelTable.cacheRead ?? 0;
@@ -1229,10 +1230,10 @@ export class AIAgentSession {
                 latency: turnResult.latencyMs,
                 provider,
                 model,
-                actualProvider: provider === 'openrouter' ? this.llmClient.getLastActualRouting().provider : undefined,
-                actualModel: provider === 'openrouter' ? this.llmClient.getLastActualRouting().model : undefined,
-                costUsd: provider === 'openrouter' ? (this.llmClient.getLastCostInfo().costUsd ?? computed.costUsd) : computed.costUsd,
-                upstreamInferenceCostUsd: provider === 'openrouter' ? this.llmClient.getLastCostInfo().upstreamInferenceCostUsd : undefined,
+                actualProvider: metadata?.actualProvider,
+                actualModel: metadata?.actualModel,
+                costUsd: metadata?.reportedCostUsd ?? computed.costUsd,
+                upstreamInferenceCostUsd: metadata?.upstreamCostUsd,
                 stopReason: turnResult.stopReason,
                 tokens,
                 error: turnResult.status.type !== 'success' ?
@@ -1596,10 +1597,8 @@ export class AIAgentSession {
               if (!turnResult.status.finalAnswer && !turnResult.status.hasToolCalls &&
                   (turnResult.response === undefined || turnResult.response.trim().length === 0)) {
                 // Log warning and retry this turn on another provider/model
-                const routed = this.llmClient.getLastActualRouting();
-                const remoteId = (provider === 'openrouter' && routed.provider !== undefined)
-                  ? `${provider}/${routed.provider}:${model}`
-                  : `${provider}:${model}`;
+                const metadata = turnResult.providerMetadata;
+                const remoteId = this.composeRemoteIdentifier(provider, model, metadata);
                 const warnEntry: LogEntry = {
                   timestamp: Date.now(),
                   severity: 'WRN',
@@ -1646,10 +1645,8 @@ export class AIAgentSession {
                 // If this is the final turn and we still don't have a final answer,
                 // retry within this turn across provider/model pairs up to maxRetries.
                 if (isFinalTurn) {
-                  const routed = this.llmClient.getLastActualRouting();
-                  const remoteId = (provider === 'openrouter' && routed.provider !== undefined)
-                    ? `${provider}/${routed.provider}:${model}`
-                    : `${provider}:${model}`;
+                  const metadata = turnResult.providerMetadata;
+                  const remoteId = this.composeRemoteIdentifier(provider, model, metadata);
                   const warnEntry: LogEntry = {
                     timestamp: Date.now(),
                     severity: 'WRN',
@@ -1692,32 +1689,87 @@ export class AIAgentSession {
           } else {
             // Handle various error types
             lastError = 'message' in turnResult.status ? turnResult.status.message : turnResult.status.type;
-            
-            // Some errors should skip this provider entirely
+
+            const remoteId = this.composeRemoteIdentifier(provider, model, turnResult.providerMetadata);
+            const retryDirective = turnResult.retry ?? this.buildFallbackRetryDirective({
+              status: turnResult.status,
+              remoteId,
+              attempt: attempts,
+            });
+
             if (turnResult.status.type === 'auth_error' || turnResult.status.type === 'quota_exceeded') {
-              break; // Skip to next provider/model pair
+              const directive = retryDirective ?? this.buildFallbackRetryDirective({
+                status: turnResult.status,
+                remoteId,
+                attempt: attempts,
+              });
+              if (directive?.logMessage !== undefined) {
+                const warnEntry: LogEntry = {
+                  timestamp: Date.now(),
+                  severity: 'WRN',
+                  turn: currentTurn,
+                  subturn: 0,
+                  direction: 'response',
+                  type: 'llm',
+                  remoteIdentifier: remoteId,
+                  fatal: false,
+                  message: directive.logMessage,
+                };
+                this.log(warnEntry);
+              }
+              if (directive?.systemMessage !== undefined) {
+                this.pushSystemRetryMessage(conversation, directive.systemMessage);
+              }
+              break;
             }
+
             if (turnResult.status.type === 'rate_limit') {
+              const directive = retryDirective ?? this.buildFallbackRetryDirective({
+                status: turnResult.status,
+                remoteId,
+                attempt: attempts,
+              });
+              const action = directive?.action ?? 'retry';
+              if (action === AIAgentSession.RETRY_ACTION_SKIP_PROVIDER) {
+                if (directive?.logMessage !== undefined) {
+                  const warnEntry: LogEntry = {
+                    timestamp: Date.now(),
+                    severity: 'WRN',
+                    turn: currentTurn,
+                    subturn: 0,
+                    direction: 'response',
+                    type: 'llm',
+                    remoteIdentifier: remoteId,
+                    fatal: false,
+                    message: directive.logMessage,
+                  };
+                  this.log(warnEntry);
+                }
+                if (directive?.systemMessage !== undefined) {
+                  this.pushSystemRetryMessage(conversation, directive.systemMessage);
+                }
+                break;
+              }
+
               rateLimitedInCycle += 1;
-              const routed = this.llmClient.getLastActualRouting();
-              const remoteId = (provider === 'openrouter' && routed.provider !== undefined)
-                ? `${provider}/${routed.provider}:${model}`
-                : `${provider}:${model}`;
               const RATE_LIMIT_MIN_WAIT_MS = 1_000;
               const RATE_LIMIT_MAX_WAIT_MS = 60_000;
               const fallbackWait = Math.min(Math.max(attempts * 1_000, RATE_LIMIT_MIN_WAIT_MS), RATE_LIMIT_MAX_WAIT_MS);
-              const providerWaitRaw = turnResult.status.retryAfterMs;
-              const providerWaitMs = typeof providerWaitRaw === 'number' && Number.isFinite(providerWaitRaw)
-                ? providerWaitRaw
-                : undefined;
+              const recommendedWait = directive?.backoffMs;
+              const waitCandidate = typeof recommendedWait === 'number' && Number.isFinite(recommendedWait)
+                ? recommendedWait
+                : fallbackWait;
               const effectiveWaitMs = Math.min(
-                Math.max(Math.round(providerWaitMs ?? fallbackWait), RATE_LIMIT_MIN_WAIT_MS),
+                Math.max(Math.round(waitCandidate), RATE_LIMIT_MIN_WAIT_MS),
                 RATE_LIMIT_MAX_WAIT_MS
               );
               maxRateLimitWaitMs = Math.max(maxRateLimitWaitMs, effectiveWaitMs);
-              const sourceDetails = Array.isArray(turnResult.status.sources) && turnResult.status.sources.length > 0
-                ? ` Sources: ${turnResult.status.sources.join(' | ')}`
+              const sources = directive?.sources ?? turnResult.status.sources;
+              const sourceDetails = Array.isArray(sources) && sources.length > 0
+                ? ` Sources: ${sources.join(' | ')}`
                 : '';
+              const logMessage = directive?.logMessage
+                ?? `Rate limited; suggested wait ${String(effectiveWaitMs)}ms before retry.${sourceDetails}`;
               const warnEntry: LogEntry = {
                 timestamp: Date.now(),
                 severity: 'WRN',
@@ -1727,13 +1779,12 @@ export class AIAgentSession {
                 type: 'llm',
                 remoteIdentifier: remoteId,
                 fatal: false,
-                message: `Rate limited; suggested wait ${String(effectiveWaitMs)}ms before retry.${sourceDetails}`
+                message: logMessage,
               };
               this.log(warnEntry);
-              const retryNotice = (() => {
-                const waitText = effectiveWaitMs > 0 ? `${String(effectiveWaitMs)}ms` : 'a short delay';
-                return `System notice: upstream provider ${remoteId} rate-limited the previous request. Retrying after ${waitText}; no changes required unless rate limits persist.`;
-              })();
+              const waitText = effectiveWaitMs > 0 ? `${String(effectiveWaitMs)}ms` : 'a short delay';
+              const retryNotice = directive?.systemMessage
+                ?? `System notice: upstream provider ${remoteId} rate-limited the previous request. Retrying after ${waitText}; no changes required unless rate limits persist.`;
               this.pushSystemRetryMessage(conversation, retryNotice);
 
               if (cycleComplete) {
@@ -1765,8 +1816,46 @@ export class AIAgentSession {
 
               continue;
             }
-            
-            // Continue trying other providers
+
+            if (retryDirective !== undefined && retryDirective.action === AIAgentSession.RETRY_ACTION_SKIP_PROVIDER) {
+              if (retryDirective.logMessage !== undefined) {
+                const warnEntry: LogEntry = {
+                  timestamp: Date.now(),
+                  severity: 'WRN',
+                  turn: currentTurn,
+                  subturn: 0,
+                  direction: 'response',
+                  type: 'llm',
+                  remoteIdentifier: remoteId,
+                  fatal: false,
+                  message: retryDirective.logMessage,
+                };
+                this.log(warnEntry);
+              }
+              if (retryDirective.systemMessage !== undefined) {
+                this.pushSystemRetryMessage(conversation, retryDirective.systemMessage);
+              }
+              break;
+            }
+
+            if (retryDirective?.logMessage !== undefined) {
+              const warnEntry: LogEntry = {
+                timestamp: Date.now(),
+                severity: 'WRN',
+                turn: currentTurn,
+                subturn: 0,
+                direction: 'response',
+                type: 'llm',
+                remoteIdentifier: remoteId,
+                fatal: false,
+                message: retryDirective.logMessage,
+              };
+              this.log(warnEntry);
+            }
+            if (retryDirective?.systemMessage !== undefined) {
+              this.pushSystemRetryMessage(conversation, retryDirective.systemMessage);
+            }
+
             if (cycleComplete) {
               rateLimitedInCycle = 0;
               maxRateLimitWaitMs = 0;
@@ -1778,23 +1867,16 @@ export class AIAgentSession {
             const detail = rawDetail.length > 0 ? rawDetail : undefined;
             const detailSuffixParen = detail !== undefined ? ` (${detail})` : '';
             const detailSuffixColon = detail !== undefined ? `: ${detail}` : '';
-            const upstreamId = (() => {
-              const routed = this.llmClient.getLastActualRouting();
-              const actualProvider = provider === 'openrouter' && routed.provider !== undefined
-                ? `${provider}/${routed.provider}`
-                : provider;
-              return `${actualProvider}:${model}`;
-            })();
             const retryNotice = (() => {
               switch (retryableStatus.type) {
                 case 'invalid_response':
-                  return `System notice: upstream rejected the previous response as invalid${detailSuffixParen}. Provide a valid JSON tool call and retry.`;
+                  return retryDirective?.systemMessage ?? `System notice: upstream rejected the previous response as invalid${detailSuffixParen}. Provide a valid JSON tool call and retry.`;
                 case 'model_error':
-                  return `System notice: model error reported by ${upstreamId}${detailSuffixColon}. Verify tool arguments before retrying.`;
+                  return retryDirective?.systemMessage ?? `System notice: model error reported by ${remoteId}${detailSuffixColon}. Verify tool arguments before retrying.`;
                 case 'network_error':
-                  return `System notice: network error from ${upstreamId}${detailSuffixColon}. Retrying automatically; the model may proceed once connectivity stabilizes.`;
+                  return retryDirective?.systemMessage ?? `System notice: network error from ${remoteId}${detailSuffixColon}. Retrying automatically; the model may proceed once connectivity stabilizes.`;
                 case 'timeout':
-                  return `System notice: upstream timeout${detailSuffixParen}. Provide a shorter response or reduce tool usage before retrying.`;
+                  return retryDirective?.systemMessage ?? `System notice: upstream timeout${detailSuffixParen}. Provide a shorter response or reduce tool usage before retrying.`;
                 default:
                   return undefined;
               }
@@ -2181,6 +2263,56 @@ export class AIAgentSession {
     conversation.push({ role: 'system', content: trimmed });
   }
 
+  private composeRemoteIdentifier(provider: string, model: string, metadata?: { actualProvider?: string; actualModel?: string }): string {
+    const providerSegment = metadata?.actualProvider !== undefined && metadata.actualProvider.length > 0 && metadata.actualProvider !== provider
+      ? `${provider}/${metadata.actualProvider}`
+      : provider;
+    const modelSegment = metadata?.actualModel ?? model;
+    return `${providerSegment}:${modelSegment}`;
+  }
+
+  private buildFallbackRetryDirective(input: { status: TurnStatus; remoteId: string; attempt: number }): TurnRetryDirective | undefined {
+    const { status, remoteId, attempt } = input;
+    if (status.type === 'rate_limit') {
+      const wait = typeof status.retryAfterMs === 'number' && Number.isFinite(status.retryAfterMs)
+        ? status.retryAfterMs
+        : undefined;
+      return {
+        action: 'retry',
+        backoffMs: wait,
+        logMessage: `Rate limited; backing off ${wait !== undefined ? `${String(wait)}ms` : 'briefly'} before retry.`,
+        systemMessage: `System notice: upstream provider ${remoteId} rate-limited the previous request. Retrying shortly; no changes required unless rate limits persist.`,
+        sources: status.sources,
+      };
+    }
+    if (status.type === 'auth_error') {
+      return {
+        action: AIAgentSession.RETRY_ACTION_SKIP_PROVIDER,
+        logMessage: `Authentication error: ${status.message}. Skipping provider ${remoteId}.`,
+        systemMessage: `System notice: authentication failed for ${remoteId}. This provider will be skipped; verify credentials before retrying later.`,
+      };
+    }
+    if (status.type === 'quota_exceeded') {
+      return {
+        action: AIAgentSession.RETRY_ACTION_SKIP_PROVIDER,
+        logMessage: `Quota exceeded for ${remoteId}; moving to next provider.`,
+        systemMessage: `System notice: ${remoteId} exhausted its quota. Switching to the next configured provider.`,
+      };
+    }
+    if (status.type === 'timeout' || status.type === 'network_error') {
+      // Provide a gentle retry hint so the loop still emits guidance when providers omit details.
+      const reason = status.message;
+      const prettyType = status.type.replace('_', ' ');
+      return {
+        action: 'retry',
+        backoffMs: Math.min(Math.max((attempt + 1) * 1_000, 1_000), 30_000),
+        logMessage: `Transient ${prettyType} encountered on ${remoteId}: ${reason}; retrying shortly.`,
+        systemMessage: `System notice: ${remoteId} experienced a transient ${prettyType} (${reason}). Retrying shortly.`,
+      };
+    }
+    return undefined;
+  }
+
   private tryAdoptFinalReportFromText(
     assistantMessage: ConversationMessage | undefined,
     text: string
@@ -2364,7 +2496,11 @@ export class AIAgentSession {
     currentTurn: number,
     logs: LogEntry[],
     accounting: AccountingEntry[],
-    lastShownThinkingHeaderTurn: number
+    lastShownThinkingHeaderTurn: number,
+    attempt: number,
+    maxAttempts: number,
+    reasoningLevel?: ReasoningLevel,
+    reasoningValue?: ProviderReasoningValue | null
   ) {
     // no spans; opTree is canonical
     // Expose provider tools (which includes internal tools from InternalToolProvider)
@@ -2488,11 +2624,16 @@ export class AIAgentSession {
       else effectiveTopP = modelOverrides.topP;
     }
 
-    const reasoningLevel = this.sessionConfig.reasoning;
+    const fallbackReasoningLevel = this.sessionConfig.reasoning;
+    const effectiveReasoningLevel = reasoningLevel ?? fallbackReasoningLevel;
     const targetMaxOutputTokens = this.sessionConfig.maxOutputTokens;
-    const reasoningValue = reasoningLevel !== undefined ? this.resolveReasoningValue(provider, model, reasoningLevel, targetMaxOutputTokens) : undefined;
+    const effectiveReasoningValue = reasoningValue ?? (
+      effectiveReasoningLevel !== undefined
+        ? this.resolveReasoningValue(provider, model, effectiveReasoningLevel, targetMaxOutputTokens)
+        : undefined
+    );
     let effectiveStream = this.sessionConfig.stream;
-    if (this.shouldAutoEnableReasoningStream(provider, reasoningLevel)) {
+    if (this.llmClient.shouldAutoEnableReasoningStream(provider, effectiveReasoningLevel)) {
       effectiveStream = true;
     }
 
@@ -2515,9 +2656,7 @@ export class AIAgentSession {
         if (type === 'content' && this.sessionConfig.callbacks?.onOutput !== undefined) {
           this.sessionConfig.callbacks.onOutput(chunk);
         } else if (type === 'thinking') {
-          // Check if we need to show the thinking header for this turn
           if (lastShownThinkingHeaderTurn !== currentTurn) {
-            // Show the THK header (without the chunk content)
             const thinkingHeader: LogEntry = {
               timestamp: Date.now(),
               severity: 'THK',
@@ -2527,24 +2666,29 @@ export class AIAgentSession {
               type: 'llm',
               remoteIdentifier: 'thinking',
               fatal: false,
-              message: ''  // Header only, no content
+              message: ''
             };
             this.log(thinkingHeader);
             shownThinking = true;
-            // Update tracking to prevent duplicate headers
             lastShownThinkingHeaderTurn = currentTurn;
           }
-          // Always stream the thinking text (including the first chunk)
           this.sessionConfig.callbacks?.onThinking?.(chunk);
           try {
             if (typeof this.currentLlmOpId === 'string') this.opTree.appendReasoningChunk(this.currentLlmOpId, chunk);
           } catch (e) { warn(`appendReasoningChunk failed: ${e instanceof Error ? e.message : String(e)}`); }
         }
       },
-      reasoningLevel,
-      reasoningValue,
+      reasoningLevel: effectiveReasoningLevel,
+      reasoningValue: effectiveReasoningValue,
+      turnMetadata: {
+        attempt,
+        maxAttempts,
+        turn: currentTurn,
+        isFinalTurn,
+        ...(effectiveReasoningLevel !== undefined ? { reasoningLevel: effectiveReasoningLevel } : {}),
+        ...(effectiveReasoningValue !== undefined ? { reasoningValue: effectiveReasoningValue } : {}),
+      },
       caching: this.sessionConfig.caching,
-      forceToolChoice: !(provider === 'anthropic' && reasoningLevel !== undefined),
     };
 
     try {
@@ -2573,11 +2717,6 @@ export class AIAgentSession {
     return { tools: filtered, allowedNames };
   }
 
-  private static getReasoningLevelIndex(level: ReasoningLevel): number {
-    const idx = AIAgentSession.REASONING_LEVELS.indexOf(level);
-    return idx >= 0 ? idx : 0;
-  }
-
   private resolveReasoningMapping(provider: string, model: string): ProviderReasoningMapping | null | undefined {
     const providerConfig = this.sessionConfig.config.providers[provider] as (Configuration['providers'][string] | undefined);
     if (providerConfig === undefined) return undefined;
@@ -2589,41 +2728,7 @@ export class AIAgentSession {
 
   private resolveReasoningValue(provider: string, model: string, level: ReasoningLevel, maxOutputTokens: number | undefined): ProviderReasoningValue | null | undefined {
     const mapping = this.resolveReasoningMapping(provider, model);
-    const providerConfig = this.sessionConfig.config.providers[provider] as (Configuration['providers'][string] | undefined);
-    const idx = AIAgentSession.getReasoningLevelIndex(level);
-    if (mapping === undefined) {
-      const defaults = AIAgentSession.DEFAULT_REASONING_MAP[provider]
-        ?? (providerConfig?.type !== undefined ? AIAgentSession.DEFAULT_REASONING_MAP[providerConfig.type] : undefined);
-      if (defaults !== undefined) return defaults[idx];
-      if (provider === 'anthropic' || provider === 'google') {
-        return this.computeDynamicReasoningBudget(provider, level, maxOutputTokens);
-      }
-      return undefined;
-    }
-    if (mapping === null) return null;
-    if (Array.isArray(mapping)) return mapping[idx];
-    return mapping;
-  }
-
-  private shouldAutoEnableReasoningStream(provider: string, level: ReasoningLevel | undefined): boolean {
-    if (provider !== 'anthropic' || level === undefined) return false;
-    const providerConfig = this.sessionConfig.config.providers[provider] as (Configuration['providers'][string] | undefined);
-    if (providerConfig?.reasoningAutoStreamLevel === undefined) return false;
-    const thresholdIdx = AIAgentSession.getReasoningLevelIndex(providerConfig.reasoningAutoStreamLevel);
-    const levelIdx = AIAgentSession.getReasoningLevelIndex(level);
-    return levelIdx >= thresholdIdx;
-  }
-
-  private computeDynamicReasoningBudget(provider: string, level: ReasoningLevel, maxOutputTokens: number | undefined): number {
-    const limits = AIAgentSession.PROVIDER_REASONING_LIMITS[provider] ?? { min: 0, max: Number.MAX_SAFE_INTEGER };
-    const available = (typeof maxOutputTokens === 'number' && Number.isFinite(maxOutputTokens)) ? Math.max(1, Math.trunc(maxOutputTokens)) : limits.max;
-    const minBudget = Math.min(Math.max(limits.min, 1), available);
-    const cappedAvailable = Math.min(available, limits.max);
-    if (level === 'minimal') return minBudget;
-    const ratio = level === 'high' ? 0.8 : (level === 'medium' ? 0.5 : 0.2);
-    const computed = Math.max(minBudget, Math.floor(cappedAvailable * ratio));
-    const bounded = Math.min(computed, cappedAvailable);
-    return Math.max(1, bounded);
+    return this.llmClient.resolveReasoningValue(provider, { level, mapping, maxOutputTokens });
   }
 
   private enhanceSystemPrompt(systemPrompt: string, toolsInstructions: string): string {

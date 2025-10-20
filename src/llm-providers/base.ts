@@ -1,7 +1,19 @@
 import { jsonSchema } from '@ai-sdk/provider-utils';
 import { generateText, streamText } from 'ai';
 
-import type { ConversationMessage, MCPTool, TokenUsage, TurnRequest, TurnResult, TurnStatus } from '../types.js';
+import type {
+  ConversationMessage,
+  MCPTool,
+  ProviderReasoningMapping,
+  ProviderReasoningValue,
+  ProviderTurnMetadata,
+  ReasoningLevel,
+  TokenUsage,
+  TurnRequest,
+  TurnResult,
+  TurnStatus,
+  TurnRetryDirective,
+} from '../types.js';
 import type { LanguageModel, ModelMessage, StreamTextResult, ToolSet } from 'ai';
 
 import { clampToolName, sanitizeToolName, TOOL_NAME_MAX_LENGTH, warn } from '../utils.js';
@@ -31,14 +43,220 @@ interface FormatPolicyInput {
 
 export abstract class BaseLLMProvider implements LLMProviderInterface {
   private readonly stringFormatPolicy: FormatPolicyNormalized;
+  private pendingMetadata?: ProviderTurnMetadata;
   private static readonly STOP_REASON_KEYS = ['stopReason', 'stop_reason', 'finishReason', 'finish_reason'] as const;
+  private static readonly REASONING_LEVELS: ReasoningLevel[] = ['minimal', 'low', 'medium', 'high'];
+  private readonly reasoningDefaults?: Partial<Record<ReasoningLevel, ProviderReasoningValue>>;
+  private readonly reasoningLimits?: { min: number; max: number };
 
-  protected constructor(options?: { formatPolicy?: FormatPolicyInput }) {
+  protected constructor(options?: {
+    formatPolicy?: FormatPolicyInput;
+    reasoningDefaults?: Partial<Record<ReasoningLevel, ProviderReasoningValue>>;
+    reasoningLimits?: { min?: number; max?: number };
+  }) {
     this.stringFormatPolicy = this.normalizeFormatPolicy(options?.formatPolicy);
+    this.reasoningDefaults = options?.reasoningDefaults;
+    const min = options?.reasoningLimits?.min;
+    const max = options?.reasoningLimits?.max;
+    if (min !== undefined || max !== undefined) {
+      const normalizedMin = min !== undefined && Number.isFinite(min) ? Math.max(1, Math.trunc(min)) : 1;
+      const normalizedMax = max !== undefined && Number.isFinite(max) ? Math.max(normalizedMin, Math.trunc(max)) : Number.MAX_SAFE_INTEGER;
+      this.reasoningLimits = { min: normalizedMin, max: normalizedMax };
+    }
   }
 
   abstract name: string;
   abstract executeTurn(request: TurnRequest): Promise<TurnResult>;
+
+  public resolveReasoningValue(context: {
+    level: ReasoningLevel;
+    mapping?: ProviderReasoningMapping | null;
+    maxOutputTokens?: number;
+  }): ProviderReasoningValue | null | undefined {
+    const { mapping } = context;
+    if (mapping === null) {
+      return null;
+    }
+    if (Array.isArray(mapping)) {
+      const index = this.getReasoningLevelIndex(context.level);
+      return mapping[index];
+    }
+    if (mapping !== undefined) {
+      return mapping;
+    }
+    return this.getDefaultReasoningValue(context.level, context.maxOutputTokens);
+  }
+
+  public shouldAutoEnableReasoningStream(level: ReasoningLevel | undefined): boolean {
+    void level;
+    return false;
+  }
+
+  protected shouldForceToolChoice(_request: TurnRequest): boolean {
+    return true;
+  }
+
+  protected extractTurnMetadata(
+    request: TurnRequest,
+    context: { usage?: unknown; response?: unknown; latencyMs: number }
+  ): ProviderTurnMetadata | undefined {
+    const derived = this.deriveContextMetadata(request, context);
+    const queued = this.consumeQueuedProviderMetadata();
+    return this.mergeProviderMetadata(derived, queued);
+  }
+
+  protected deriveContextMetadata(
+    _request: TurnRequest,
+    context: { usage?: unknown; response?: unknown; latencyMs: number }
+  ): ProviderTurnMetadata | undefined {
+    void _request;
+    const usageMetadata = this.extractMetadataFromUsage(context.usage);
+    const responseMetadata = this.extractMetadataFromResponse(context.response);
+    return this.mergeProviderMetadata(usageMetadata, responseMetadata);
+  }
+
+  protected enqueueProviderMetadata(metadata?: ProviderTurnMetadata): void {
+    if (metadata === undefined) return;
+    this.pendingMetadata = this.mergeProviderMetadata(this.pendingMetadata, metadata);
+  }
+
+  protected consumeQueuedProviderMetadata(): ProviderTurnMetadata | undefined {
+    if (this.pendingMetadata === undefined) return undefined;
+    const metadata = this.pendingMetadata;
+    this.pendingMetadata = undefined;
+    return { ...metadata };
+  }
+
+  protected mergeProviderMetadata(
+    target: ProviderTurnMetadata | undefined,
+    source?: ProviderTurnMetadata
+  ): ProviderTurnMetadata | undefined {
+    if (source === undefined) {
+      return target !== undefined ? { ...target } : undefined;
+    }
+    const base: Record<string, unknown> = target !== undefined ? { ...target } : {};
+    Object.entries(source).forEach(([key, value]) => {
+      if (value !== undefined) {
+        base[key] = value;
+      }
+    });
+    return base as ProviderTurnMetadata;
+  }
+
+  protected isPlainObject(value: unknown): value is Record<string, unknown> {
+    return value !== null && typeof value === 'object' && !Array.isArray(value);
+  }
+
+  public prepareFetch(_details: { url: string; init: RequestInit }): { headers?: Record<string, string> } | undefined {
+    return undefined;
+  }
+
+  public getResponseMetadataCollector(): ((payload: { url: string; response: Response }) => Promise<ProviderTurnMetadata | undefined>) | undefined {
+    return undefined;
+  }
+
+  protected buildRetryDirective(_request: TurnRequest, _status: TurnStatus): TurnRetryDirective | undefined {
+    return undefined;
+  }
+
+  private extractMetadataFromUsage(usage: unknown): ProviderTurnMetadata | undefined {
+    if (!this.isPlainObject(usage)) return undefined;
+    let metadata: ProviderTurnMetadata | undefined;
+    const directKeys = [
+      'cacheWriteInputTokens',
+      'cacheCreationInputTokens',
+      'cache_creation_input_tokens',
+      'cache_write_input_tokens'
+    ];
+    // eslint-disable-next-line functional/no-loop-statements
+    for (const key of directKeys) {
+      const value = this.toFiniteNumber(usage[key]);
+      if (value !== undefined && value > 0) {
+        metadata = this.mergeProviderMetadata(metadata, { cacheWriteInputTokens: value });
+        break;
+      }
+    }
+    const nestedKeys = ['cacheCreation', 'cache_creation'];
+    // eslint-disable-next-line functional/no-loop-statements
+    for (const key of nestedKeys) {
+      const nested = usage[key];
+      if (!this.isPlainObject(nested)) continue;
+      const value = this.toFiniteNumber(nested.ephemeral_5m_input_tokens);
+      if (value !== undefined && value > 0) {
+        metadata = this.mergeProviderMetadata(metadata, { cacheWriteInputTokens: value });
+        break;
+      }
+    }
+    return metadata;
+  }
+
+  private extractMetadataFromResponse(response: unknown): ProviderTurnMetadata | undefined {
+    if (!this.isPlainObject(response)) return undefined;
+    let metadata: ProviderTurnMetadata | undefined;
+    const model = typeof response.model === 'string' && response.model.length > 0 ? response.model : undefined;
+    if (model !== undefined) {
+      metadata = this.mergeProviderMetadata(metadata, { actualModel: model });
+    }
+    const provider = typeof response.provider === 'string' && response.provider.length > 0 ? response.provider : undefined;
+    if (provider !== undefined) {
+      metadata = this.mergeProviderMetadata(metadata, { actualProvider: provider });
+    }
+    const data = response.data;
+    if (this.isPlainObject(data)) {
+      const dataProvider = typeof data.provider === 'string' && data.provider.length > 0 ? data.provider : undefined;
+      const dataModel = typeof data.model === 'string' && data.model.length > 0 ? data.model : undefined;
+      if (dataProvider !== undefined) {
+        metadata = this.mergeProviderMetadata(metadata, { actualProvider: dataProvider });
+      }
+      if (dataModel !== undefined) {
+        metadata = this.mergeProviderMetadata(metadata, { actualModel: dataModel });
+      }
+    }
+    return metadata;
+  }
+
+  private toFiniteNumber(value: unknown): number | undefined {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return value;
+    }
+    if (typeof value === 'string' && value.length > 0) {
+      const parsed = Number(value);
+      if (Number.isFinite(parsed)) return parsed;
+    }
+    return undefined;
+  }
+
+  protected getReasoningLevelIndex(level: ReasoningLevel): number {
+    const idx = BaseLLMProvider.REASONING_LEVELS.indexOf(level);
+    return idx >= 0 ? idx : 0;
+  }
+
+  private getDefaultReasoningValue(level: ReasoningLevel, maxOutputTokens?: number): ProviderReasoningValue | null | undefined {
+    if (this.reasoningDefaults !== undefined) {
+      const value = this.reasoningDefaults[level];
+      if (value !== undefined) {
+        return value;
+      }
+    }
+    if (this.reasoningLimits !== undefined) {
+      return this.computeDynamicReasoningBudget(level, maxOutputTokens);
+    }
+    return undefined;
+  }
+
+  private computeDynamicReasoningBudget(level: ReasoningLevel, maxOutputTokens?: number): number {
+    const limits = this.reasoningLimits ?? { min: 1, max: Number.MAX_SAFE_INTEGER };
+    const available = (typeof maxOutputTokens === 'number' && Number.isFinite(maxOutputTokens))
+      ? Math.max(1, Math.trunc(maxOutputTokens))
+      : limits.max;
+    const minBudget = Math.min(Math.max(limits.min, 1), available);
+    const cappedAvailable = Math.min(available, limits.max);
+    if (level === 'minimal') return minBudget;
+    const ratio = level === 'high' ? 0.8 : (level === 'medium' ? 0.5 : 0.2);
+    const computed = Math.max(minBudget, Math.floor(cappedAvailable * ratio));
+    const bounded = Math.min(computed, cappedAvailable);
+    return Math.max(1, bounded);
+  }
 
   public mapError(error: unknown): TurnStatus {
     const UNKNOWN_ERROR_MESSAGE = 'Unknown error';
@@ -445,9 +663,15 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
     hasToolCalls: boolean,
     finalAnswer: boolean,
     response?: string,
-    extras?: { hasReasoning?: boolean; hasContent?: boolean; stopReason?: string }
+    extras?: { hasReasoning?: boolean; hasContent?: boolean; stopReason?: string },
+    metadata?: ProviderTurnMetadata
   ): TurnResult {
-    return {
+    const combinedMetadata = this.mergeProviderMetadata(
+      this.consumeQueuedProviderMetadata(),
+      metadata
+    );
+
+    const result: TurnResult = {
       status: { type: 'success', hasToolCalls, finalAnswer },
       response,
       toolCalls: hasToolCalls ? this.extractToolCalls(messages) : undefined,
@@ -458,6 +682,11 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
       hasContent: extras?.hasContent,
       stopReason: extras?.stopReason,
     };
+
+    if (combinedMetadata !== undefined) {
+      result.providerMetadata = combinedMetadata;
+    };
+    return result;
   }
 
   protected extractStopReason(value: unknown): string | undefined {
@@ -531,12 +760,21 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
     return messages;
   }
 
-  protected createFailureResult(status: TurnStatus, latencyMs: number): TurnResult {
-    return {
+  protected createFailureResult(request: TurnRequest, status: TurnStatus, latencyMs: number): TurnResult {
+    const metadata = this.consumeQueuedProviderMetadata();
+    const result: TurnResult = {
       status,
       latencyMs,
       messages: []
     };
+    if (metadata !== undefined) {
+      result.providerMetadata = metadata;
+    }
+    const retry = this.buildRetryDirective(request, status);
+    if (retry !== undefined) {
+      result.retry = retry;
+    }
+    return result;
   }
 
   protected convertTools(tools: MCPTool[], toolExecutor: (toolName: string, parameters: Record<string, unknown>, options?: { toolCallId?: string }) => Promise<string>): ToolSet {
@@ -705,7 +943,8 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
       resetIdle();
       let stopReason: string | undefined;
       
-      const toolChoice = request.forceToolChoice !== false ? 'required' : undefined;
+      const toolChoiceRequired = request.toolChoiceRequired ?? this.shouldForceToolChoice(request);
+      const toolChoice = toolChoiceRequired ? 'required' : undefined;
       const result = streamText({
         model,
         messages,
@@ -916,6 +1155,8 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
         warn(`[DEBUG] response text: ${response}`);
       }
 
+      const metadata = this.extractTurnMetadata(request, { usage, response: resp, latencyMs });
+
       return this.createSuccessResult(
         conversationMessages,
         tokens,
@@ -923,11 +1164,12 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
         hasNewToolCalls,
         finalAnswer,
         response,
-        { hasReasoning, hasContent: hasAssistantText, stopReason }
+        { hasReasoning, hasContent: hasAssistantText, stopReason },
+        metadata
       );
     } catch (error) {
       clearIdle();
-      return this.createFailureResult(this.mapError(error), Date.now() - startTime);
+      return this.createFailureResult(request, this.mapError(error), Date.now() - startTime);
     }
   }
 
@@ -951,7 +1193,8 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
           }
         }
       } catch (e) { try { warn(`streaming read failed: ${e instanceof Error ? e.message : String(e)}`); } catch {} }
-      const toolChoice = request.forceToolChoice !== false ? 'required' : undefined;
+      const toolChoiceRequired = request.toolChoiceRequired ?? this.shouldForceToolChoice(request);
+      const toolChoice = toolChoiceRequired ? 'required' : undefined;
       const result = await generateText({
         model,
         messages,
@@ -1189,6 +1432,8 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
         }
       }
 
+      const metadata = this.extractTurnMetadata(request, { usage: result.usage, response: respObj, latencyMs });
+
       return this.createSuccessResult(
         conversationMessages,
         tokens,
@@ -1196,10 +1441,11 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
         hasNewToolCalls,
         finalAnswer,
         response,
-        { hasReasoning, hasContent: hasAssistantText, stopReason }
+        { hasReasoning, hasContent: hasAssistantText, stopReason },
+        metadata
       );
     } catch (error) {
-      return this.createFailureResult(this.mapError(error), Date.now() - startTime);
+      return this.createFailureResult(request, this.mapError(error), Date.now() - startTime);
     }
   }
 

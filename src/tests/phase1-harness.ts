@@ -40,6 +40,9 @@ const COVERAGE_CHILD_TOOL = 'coverage.child';
 const COVERAGE_PARENT_BODY = 'Parent body.';
 const COVERAGE_CHILD_BODY = 'Child body.';
 
+const toError = (value: unknown): Error => (value instanceof Error ? value : new Error(String(value)));
+const toErrorMessage = (value: unknown): string => (value instanceof Error ? value.message : String(value));
+
 const defaultHarnessWarningSink = (message: string): void => {
   const prefix = '[warn] ';
   const output = process.stderr.isTTY ? `\x1b[33m${prefix}${message}\x1b[0m` : `${prefix}${message}`;
@@ -74,7 +77,7 @@ const defaultPersistenceCallbacks = (configuration: Configuration, existing?: AI
       await fs.promises.writeFile(tmp, gz);
       await fs.promises.rename(tmp, filePath);
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = toErrorMessage(error);
       const reason = payload.reason ?? 'unspecified';
       warn(`persistSessionSnapshot(${reason}) failed: ${message}`);
     }
@@ -90,7 +93,7 @@ const defaultPersistenceCallbacks = (configuration: Configuration, existing?: AI
       const lines = payload.entries.map((entry) => JSON.stringify(entry));
       await fs.promises.appendFile(ledgerFile, `${lines.join('\n')}\n`, 'utf8');
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = toErrorMessage(error);
       warn(`final persistence failed: ${message}`);
     }
   } : undefined);
@@ -209,7 +212,7 @@ function runWithTimeout<T>(promise: Promise<T>, timeoutMs: number, scenarioId: s
         const value = await promise;
         finalize(() => { resolve(value); });
       } catch (error: unknown) {
-        finalize(() => { reject(error instanceof Error ? error : new Error(String(error))); });
+        finalize(() => { reject(toError(error)); });
       }
     })();
   });
@@ -241,7 +244,7 @@ const BATCH_PROGRESS_RESPONSE = 'batch-progress-follow-up';
 const BATCH_STRING_RESULT = 'batch-string-mode';
 const FINAL_ANSWER_DELIVERED = 'Final answer delivered.';
 const TRACEABLE_PROVIDER_URL = 'https://openrouter.ai/api/v1';
-const RATE_LIMIT_WARNING_MESSAGE = 'Rate limited; suggested wait';
+const RATE_LIMIT_WARNING_TOKEN = 'rate limit';
 const CONFIG_FILENAME = '.ai-agent.json';
 const FRONTMATTER_BODY_PREFIX = 'System body start.';
 const FRONTMATTER_BODY_SUFFIX = 'System body end.';
@@ -802,7 +805,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
     id: 'run-test-21',
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-21 expected success.');
-      const rateLimitLog = result.logs.find((entry) => typeof entry.message === 'string' && entry.message.includes('Rate limited'));
+      const rateLimitLog = result.logs.find((entry) => typeof entry.message === 'string' && entry.message.toLowerCase().includes(RATE_LIMIT_WARNING_TOKEN));
       invariant(rateLimitLog !== undefined, 'Rate limit warning expected for run-test-21.');
       const retryLog = result.logs.find((entry) => entry.remoteIdentifier === 'agent:retry');
       invariant(retryLog !== undefined && typeof retryLog.message === 'string' && retryLog.message.includes('backing off'), 'Backoff log expected for run-test-21.');
@@ -842,6 +845,28 @@ const TEST_SCENARIOS: HarnessTest[] = [
       invariant(subAgentAccounting !== undefined && subAgentAccounting.status === 'ok', 'Successful sub-agent accounting expected for run-test-24.');
       const subAgentLog = result.logs.find((entry) => entry.remoteIdentifier === 'agent:subagent' && typeof entry.message === 'string' && entry.message.includes(SUBAGENT_SUCCESS_TOOL) && !entry.message.includes('error'));
       invariant(subAgentLog !== undefined, 'Sub-agent success log expected for run-test-24.');
+    },
+  },
+  {
+    id: 'run-test-120',
+    expect: (result) => {
+      invariant(result.success, 'Scenario run-test-120 should succeed.');
+      const finalReport = result.finalReport;
+      invariant(finalReport !== undefined, 'Final report missing for run-test-120.');
+      const finalContent = finalReport.content ?? '';
+      invariant(finalContent.includes('Metadata propagation confirmed'), 'Unexpected final report content for run-test-120.');
+
+      const llmEntry = result.accounting.filter(isLlmAccounting).at(-1);
+      invariant(llmEntry !== undefined, 'LLM accounting entry expected for run-test-120.');
+      invariant(llmEntry.actualProvider === 'router/fireworks', 'Actual provider should reflect metadata for run-test-120.');
+      invariant(llmEntry.actualModel === 'fireworks-test', 'Actual model should reflect metadata for run-test-120.');
+      invariant(typeof llmEntry.costUsd === 'number' && Math.abs(llmEntry.costUsd - 0.12345) < 1e-5, 'Reported cost should match metadata for run-test-120.');
+      invariant(typeof llmEntry.upstreamInferenceCostUsd === 'number' && Math.abs(llmEntry.upstreamInferenceCostUsd - 0.06789) < 1e-5, 'Upstream cost should match metadata for run-test-120.');
+      invariant(llmEntry.tokens.cacheWriteInputTokens === 42, 'Cache write tokens should reflect metadata for run-test-120.');
+
+      const responseLogs = result.logs.filter((entry) => entry.type === 'llm' && entry.direction === 'response');
+      const hasMetadataRemoteId = responseLogs.some((entry) => typeof entry.remoteIdentifier === 'string' && entry.remoteIdentifier.includes('router/fireworks'));
+      invariant(hasMetadataRemoteId, 'LLM response log should include routed provider segment for run-test-120.');
     },
   },
   {
@@ -1105,7 +1130,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
       invariant(result.success, 'Scenario run-test-37 expected success after rate limit retry.');
       const finalReport = result.finalReport;
       invariant(finalReport !== undefined && finalReport.status === 'success', 'Final report should indicate success for run-test-37.');
-      const rateLimitLog = result.logs.find((entry) => typeof entry.message === 'string' && entry.message.includes(RATE_LIMIT_WARNING_MESSAGE));
+      const rateLimitLog = result.logs.find((entry) => typeof entry.message === 'string' && entry.message.toLowerCase().includes(RATE_LIMIT_WARNING_TOKEN));
       invariant(rateLimitLog !== undefined, 'Rate limit warning expected for run-test-37.');
       const retryLog = result.logs.find((entry) => entry.remoteIdentifier === 'agent:retry');
       invariant(retryLog !== undefined, 'Retry backoff log expected for run-test-37.');
@@ -1297,7 +1322,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
       try {
         parsed = JSON.parse(toolPayload) as { q?: unknown; language?: unknown; repo?: unknown; path?: unknown };
       } catch (error: unknown) {
-        throw new Error(`Failed to parse GitHub tool response: ${error instanceof Error ? error.message : String(error)}`);
+        throw new Error(`Failed to parse GitHub tool response: ${toErrorMessage(error)}`);
       }
       const q = typeof parsed.q === 'string' ? parsed.q : '';
       invariant(q.includes('md5 helper'), 'Normalized query should include base term for run-test-53.');
@@ -1373,7 +1398,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
             }),
           ]);
         } catch (error: unknown) {
-          errors.push(error instanceof Error ? error.message : String(error));
+          errors.push(toErrorMessage(error));
           throw error;
         }
         await transport.close();
@@ -1534,16 +1559,34 @@ const TEST_SCENARIOS: HarnessTest[] = [
           body: requestBody,
         });
         await client.waitForMetadataCapture();
-        finalData.afterJson = client.getLastActualRouting();
-        finalData.costs = client.getLastCostInfo();
+        const afterJsonRouting = client.getLastActualRouting();
+        if (afterJsonRouting !== undefined) {
+          finalData.afterJson = afterJsonRouting;
+        } else {
+          finalData.afterJson ??= {};
+        }
+        const costAfterJson = client.getLastCostInfo();
+        if (costAfterJson !== undefined) {
+          finalData.costs = costAfterJson;
+        } else {
+          finalData.costs ??= {};
+        }
         await tracedFetch(OPENROUTER_RESPONSES_URL, {
           method: 'POST',
           headers: { Authorization: 'Bearer SSE', 'Content-Type': CONTENT_TYPE_JSON },
           body: requestBody,
         });
         await client.waitForMetadataCapture();
-        finalData.afterSse = client.getLastActualRouting();
-        finalData.costs = client.getLastCostInfo();
+        const afterSseRouting = client.getLastActualRouting();
+        if (afterSseRouting !== undefined) {
+          finalData.afterSse = afterSseRouting;
+        } else {
+          finalData.afterSse ??= {};
+        }
+        const costAfterSse = client.getLastCostInfo();
+        if (costAfterSse !== undefined) {
+          finalData.costs = costAfterSse;
+        }
         await tracedFetch('https://anthropic.mock/v1/messages', {
           method: 'POST',
           headers: { 'Content-Type': CONTENT_TYPE_JSON },
@@ -1581,7 +1624,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
             body: requestBody,
           });
         } catch (error: unknown) {
-          fetchError = error instanceof Error ? error : new Error(String(error));
+          fetchError = toError(error);
         }
         await client.waitForMetadataCapture();
 
@@ -1593,11 +1636,22 @@ const TEST_SCENARIOS: HarnessTest[] = [
           latencyMs: 64,
           messages: [],
         };
-        const clientState = client as unknown as { lastCostUsd?: number; lastUpstreamCostUsd?: number };
-        clientState.lastCostUsd = 0.01234;
-        clientState.lastUpstreamCostUsd = 0.006;
+        successResult.providerMetadata = {
+          actualProvider: 'mistral',
+          actualModel: 'mixtral',
+          reportedCostUsd: 0.015,
+          upstreamCostUsd: 0.006,
+        };
         client.setTurn(2, 0);
         (client as unknown as { logResponse: (req: TurnRequest, res: TurnResult, latencyMs: number) => void }).logResponse(request, successResult, 64);
+        const routingAfterSuccess = client.getLastActualRouting();
+        if (routingAfterSuccess !== undefined) {
+          finalData.afterSse = routingAfterSuccess;
+        }
+        const costsAfterSuccess = client.getLastCostInfo();
+        if (costsAfterSuccess !== undefined) {
+          finalData.costs = costsAfterSuccess;
+        }
         client.setTurn(2, 1);
         const errorResult: TurnResult = {
           status: { type: 'auth_error', message: 'bad credentials' },
@@ -1660,6 +1714,10 @@ const TEST_SCENARIOS: HarnessTest[] = [
       invariant(fetchErrorMsg === 'network down', 'Fetch error message expected for run-test-55.');
       const routingAfterJson = report.routingAfterJson;
       assertRecord(routingAfterJson, 'JSON routing metadata expected for run-test-55.');
+      if (routingAfterJson.provider === undefined || routingAfterJson.model === undefined) {
+        // eslint-disable-next-line no-console
+        console.error('debug run-test-55 routingAfterJson', routingAfterJson, report);
+      }
       invariant(routingAfterJson.provider === 'fireworks', 'JSON routing provider expected for run-test-55.');
       invariant(routingAfterJson.model === 'gpt-fireworks', 'JSON routing model expected for run-test-55.');
       const routingAfterSse = report.routingAfterSse;
@@ -1686,7 +1744,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
       invariant(failedEntries.length >= 2, 'Multiple LLM failures expected for run-test-56.');
       const modelFailure = failedEntries.find((entry) => typeof entry.error === 'string' && entry.error.includes('Model failure during first attempt.'));
       invariant(modelFailure !== undefined, 'Model error accounting entry expected for run-test-56.');
-      const rateLog = result.logs.find((entry) => entry.type === 'llm' && typeof entry.message === 'string' && entry.message.includes(RATE_LIMIT_WARNING_MESSAGE));
+      const rateLog = result.logs.find((entry) => entry.type === 'llm' && typeof entry.message === 'string' && entry.message.toLowerCase().includes(RATE_LIMIT_WARNING_TOKEN));
       invariant(rateLog !== undefined, 'Rate limit warning log expected for run-test-56.');
     },
   },
@@ -2358,7 +2416,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
         try {
           exposed.createStdioTransport('broken', { type: 'stdio' } as MCPServerConfig);
         } catch (error: unknown) {
-          captured.stdioError = error instanceof Error ? error.message : String(error);
+          captured.stdioError = toErrorMessage(error);
         }
         exposed.log('TRC', 'synthetic trace', 'mcp:test');
         const serversField = provider as unknown as {
@@ -2450,7 +2508,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
             llmTimeout: 1_000,
           });
         } catch (error: unknown) {
-          caught = error instanceof Error ? error.message : String(error);
+          caught = toErrorMessage(error);
         }
         return {
           success: true,
@@ -2537,8 +2595,8 @@ const TEST_SCENARIOS: HarnessTest[] = [
               llmTimeout: 5_000,
             };
             const turnResult = await client.executeTurn(request);
-            const routing = client.getLastActualRouting();
-            const costs = client.getLastCostInfo();
+            const routing = client.getLastActualRouting() ?? {};
+            const costs = client.getLastCostInfo() ?? {};
             return {
               success: true,
               conversation: [],
@@ -3280,6 +3338,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
         const configData = {
           providers: {
             demo: {
+              type: 'test-llm',
               apiKey: '${TEST_CONFIG_API_KEY}',
               custom: { dir: '${HOME}' },
             },
@@ -3417,7 +3476,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
       process.env.TEST_CONFIG_API_KEY = 'local-secret';
       const localDir = fs.mkdtempSync(path.join(os.tmpdir(), `${TMP_PREFIX}local-config-`));
       const localConfig = {
-        providers: { demo: { apiKey: '${TEST_CONFIG_API_KEY}' } },
+        providers: { demo: { type: 'test-llm', apiKey: '${TEST_CONFIG_API_KEY}' } },
         mcpServers: {},
       } as unknown as Configuration;
       fs.writeFileSync(path.join(localDir, '.ai-agent.json'), JSON.stringify(localConfig, null, 2));
@@ -4887,8 +4946,8 @@ const TEST_SCENARIOS: HarnessTest[] = [
         title: capturedHeaderValues?.title ?? undefined,
         userAgent: capturedHeaderValues?.userAgent ?? undefined,
         logs: [...logs],
-        routed: client.getLastActualRouting(),
-        cost: client.getLastCostInfo(),
+        routed: client.getLastActualRouting() ?? {},
+        cost: client.getLastCostInfo() ?? {},
         response: bodyJson,
       };
       return makeSuccessResult(COVERAGE_OPENROUTER_JSON_ID);
@@ -4949,8 +5008,8 @@ const TEST_SCENARIOS: HarnessTest[] = [
       coverageOpenrouterSse = {
         accept: capturedHeaderValues?.accept ?? undefined,
         logs: [...logs],
-        routed: client.getLastActualRouting(),
-        cost: client.getLastCostInfo(),
+        routed: client.getLastActualRouting() ?? {},
+        cost: client.getLastCostInfo() ?? {},
         rawStream,
       };
       return makeSuccessResult(COVERAGE_OPENROUTER_SSE_ID);
@@ -5023,16 +5082,16 @@ const TEST_SCENARIOS: HarnessTest[] = [
           raceResult,
           elapsedBeforeMetadataMs: elapsedBeforeMetadata,
           totalElapsedMs: 0,
-          routed: client.getLastActualRouting(),
-          cost: client.getLastCostInfo(),
+          routed: client.getLastActualRouting() ?? {},
+          cost: client.getLastCostInfo() ?? {},
           logs: [...logs],
         };
         gate.resolve(undefined);
         await textPromise;
         await client.waitForMetadataCapture();
         coverageOpenrouterSseNonBlocking.totalElapsedMs = Date.now() - start;
-        coverageOpenrouterSseNonBlocking.routed = client.getLastActualRouting();
-        coverageOpenrouterSseNonBlocking.cost = client.getLastCostInfo();
+        coverageOpenrouterSseNonBlocking.routed = client.getLastActualRouting() ?? {};
+        coverageOpenrouterSseNonBlocking.cost = client.getLastCostInfo() ?? {};
         return makeSuccessResult(COVERAGE_OPENROUTER_SSE_NONBLOCKING_ID);
       } finally {
         globalThis.fetch = originalFetch;
@@ -5263,7 +5322,7 @@ async function runScenario(test: HarnessTest): Promise<AIAgentResult> {
   }
 
   const failureResult = (error: unknown): AIAgentResult => {
-    const message = error instanceof Error ? error.message : String(error);
+    const message = toErrorMessage(error);
     return {
       success: false,
       error: message,
@@ -5330,7 +5389,7 @@ async function runPhaseOne(): Promise<void> {
       console.log(`${header} [PASS] ${duration}`);
     } catch (error: unknown) {
       const duration = formatDurationMs(startMs, Date.now());
-      const message = error instanceof Error ? error.message : String(error);
+      const message = toErrorMessage(error);
       const hint = result !== undefined ? formatFailureHint(result) : '';
       // eslint-disable-next-line no-console
       console.error(`${header} [FAIL] ${duration} - ${message}${hint}`);
@@ -5454,7 +5513,7 @@ runPhaseOne()
     process.exit(0);
   })
   .catch((error: unknown) => {
-    const message = error instanceof Error ? error.message : String(error);
+    const message = toErrorMessage(error);
     // eslint-disable-next-line no-console
     console.error(`phase1 scenario failed: ${message}`);
     process.exit(1);

@@ -1,4 +1,4 @@
-import type { TokenUsage } from '../../types.js';
+import type { ProviderTurnMetadata, TokenUsage } from '../../types.js';
 
 export interface ScenarioToolCall {
   toolName: string;
@@ -15,6 +15,7 @@ export type ScenarioStepResponse =
       finishReason?: 'tool-calls';
       tokenUsage?: TokenUsage;
       reasoning?: string[];
+      providerMetadata?: ProviderTurnMetadata;
     }
   | {
       kind: 'final-report';
@@ -26,6 +27,7 @@ export type ScenarioStepResponse =
       tokenUsage?: TokenUsage;
       reasoning?: string[];
       finishReason?: string;
+      providerMetadata?: ProviderTurnMetadata;
     }
   | {
       kind: 'text';
@@ -33,6 +35,7 @@ export type ScenarioStepResponse =
       finishReason?: 'stop' | 'other';
       tokenUsage?: TokenUsage;
       reasoning?: string[];
+      providerMetadata?: ProviderTurnMetadata;
     };
 
 export interface ScenarioTurn {
@@ -137,6 +140,36 @@ const SCENARIOS: ScenarioDefinition[] = [
             inputTokens: 80,
             outputTokens: 30,
             totalTokens: 110,
+          },
+        },
+      },
+    ],
+  },
+  {
+    id: 'run-test-120',
+    description: 'Provider metadata propagation for accounting and logging.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Reporting router metadata back to caller.',
+          reportContent: `${RESULT_HEADING}Metadata propagation confirmed.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_SUCCESS,
+          tokenUsage: {
+            inputTokens: 60,
+            outputTokens: 28,
+            totalTokens: 88,
+            cacheWriteInputTokens: 42,
+          },
+          providerMetadata: {
+            actualProvider: 'router/fireworks',
+            actualModel: 'fireworks-test',
+            reportedCostUsd: 0.12345,
+            upstreamCostUsd: 0.06789,
+            cacheWriteInputTokens: 42,
           },
         },
       },
