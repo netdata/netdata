@@ -172,46 +172,18 @@ static struct win_sensor_config {
             .priority = 70018,
         },
         {
-            .title = "X Distance",
+            .title = "Distance",
             .units = "m",
-            .context = "system.hw.sensor.xdistance.input",
+            .context = "system.hw.sensor.distance.input",
             .family = "Distance",
             .priority = 70019,
         },
         {
-            .title = "Y Distance",
-            .units = "m",
-            .context = "system.hw.sensor.ydistance.input",
-            .family = "Distance",
-            .priority = 70020,
-        },
-        {
-            .title = "Z Distance",
-            .units = "m",
-            .context = "system.hw.sensor.zdistance.input",
-            .family = "Distance",
-            .priority = 70021,
-        },
-        {
-            .title = "Acceleration on X axis.",
+            .title = "Acceleration.",
             .units = "g",
             .context = "system.hw.sensor.xacceleration.input",
             .family = "Acceleration",
             .priority = 70022,
-        },
-        {
-            .title = "Acceleration on Y axis.",
-            .units = "g",
-            .context = "system.hw.sensor.yacceleration.input",
-            .family = "Acceleration",
-            .priority = 70023,
-        },
-        {
-            .title = "Acceleration on Z axis.",
-            .units = "g",
-            .context = "system.hw.sensor.zacceleration.input",
-            .family = "Acceleration",
-            .priority = 70024,
         }
 };
 
