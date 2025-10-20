@@ -1056,7 +1056,7 @@ create_netdata_accounts() {
 
   for g in ${NETDATA_WANTED_GROUPS}; do
     # shellcheck disable=SC2086
-    portable_add_user_to_group ${g} netdata && NETDATA_ADDED_TO_GROUPS="${NETDATA_ADDED_TO_GROUPS} ${g}"
+    portable_add_user_to_group ${g} netdata && NETDATA_ADDED_TO_GROUPS="${NETDATA_ADDED_TO_GROUPS:-} ${g}"
   done
 }
 
