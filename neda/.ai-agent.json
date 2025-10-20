@@ -17,6 +17,7 @@
       "stringSchemaFormatsDenied": []
     },
     "openai": {
+      "type": "openai",
       "apiKey": "${OPENAI_API_KEY}",
       "baseUrl": "https://api.openai.com/v1",
       "headers": {},
@@ -26,6 +27,7 @@
       "stringSchemaFormatsDenied": []
     },
     "anthropic": {
+      "type": "anthropic",
       "apiKey": "${ANTHROPIC_API_KEY}",
       "baseUrl": "https://api.anthropic.com/v1",
       "headers": {},
@@ -61,6 +63,7 @@
       }
     },
     "google": {
+      "type": "google",
       "apiKey": "${GOOGLE_API_KEY}",
       "baseUrl": "https://generativelanguage.googleapis.com/v1beta",
       "headers": {},
@@ -70,6 +73,7 @@
       "stringSchemaFormatsDenied": []
     },
     "openrouter": {
+      "type": "openrouter",
       "apiKey": "${OPENROUTER_API_KEY}",
       "custom": {
         "provider": {
@@ -84,6 +88,7 @@
       "stringSchemaFormatsDenied": []
     },
     "ollama": {
+      "type": "ollama",
       "baseUrl": "http://nova:11434/v1",
       "custom": {
         "stream": true,
