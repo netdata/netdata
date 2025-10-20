@@ -898,9 +898,7 @@ Requires: %{name}-plugin-ibm-libs = %{version}
 Requires: unixODBC
 Conflicts: %{name} < %{version}
 %if ! %{_have_sysuser}
-%if ! %{_have_sysuser}
 Requires(pre): %{name}-user >= %{version}
-%endif
 %else
 Requires(pre): user(%{name})
 Requires(pre): group(%{name})
