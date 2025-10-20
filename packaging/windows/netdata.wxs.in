@@ -132,8 +132,23 @@
             />
 
             <SetProperty
-                Id="NDRemoveDriverSrv"
+                Id="NDStopDriverSrv"
                 Value="&quot;[WindowsFolder]System32\sc.exe&quot; stop &quot;NetdataDriver&quot;"
+                Before="NDConfigureServiceRecovery"
+                Sequence="execute"
+            />
+            <CustomAction
+                Id="NDStopDriverSrv"
+                BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)"
+                DllEntry="WixQuietExec"
+                Execute="deferred"
+                Return="ignore"
+                Impersonate="no"
+            />
+
+            <SetProperty
+                Id="NDRemoveDriverSrv"
+                Value="&quot;[WindowsFolder]System32\sc.exe&quot; delete &quot;NetdataDriver&quot;"
                 Before="NDConfigureServiceRecovery"
                 Sequence="execute"
             />
@@ -148,8 +163,10 @@
 
             <InstallExecuteSequence>
                 <Custom Action="NDConfigureServiceRecovery" After="InstallServices" Condition="NOT REMOVE" />
+
                 <Custom Action="NDKillProcess" Before="RemoveFiles" />
-                <Custom Action="NDRemoveDriverSrv" Before="RemoveFiles" />
+                <Custom Action="NDStopDriverSrv" After="NDKillProcess" />
+                <Custom Action="NDRemoveDriverSrv" After="RemoveFiles" />
             </InstallExecuteSequence>
     </Package>
 

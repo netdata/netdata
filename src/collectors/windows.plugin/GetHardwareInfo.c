@@ -21,7 +21,7 @@ static collected_number (*temperature_fcnt)(MSR_REQUEST *) = NULL;
 
 static void netdata_stop_driver()
 {
-    SC_HANDLE scm = OpenSCManager(NULL, NULL, SC_MANAGER_CONNECT);
+    SC_HANDLE scm = OpenSCManager(NULL, NULL, SC_MANAGER_ALL_ACCESS);
     if (scm == NULL) {
         nd_log(
                 NDLS_COLLECTORS,
@@ -30,7 +30,7 @@ static void netdata_stop_driver()
         return;
     }
 
-    SC_HANDLE service = OpenService(scm, srv_name, SERVICE_STOP | SERVICE_QUERY_STATUS);
+    SC_HANDLE service = OpenService(scm, srv_name, SERVICE_STOP | SERVICE_QUERY_STATUS | DELETE);
     if (service == NULL) {
         nd_log(
                 NDLS_COLLECTORS,
@@ -47,6 +47,13 @@ static void netdata_stop_driver()
                     NDLS_COLLECTORS,
                     NDLP_ERR,
                     "Cannot stop the service. Error= %lu \n", GetLastError());
+        }
+    } else {
+        if (!DeleteService(service)) {
+            nd_log(
+                    NDLS_COLLECTORS,
+                    NDLP_ERR,
+                    "Cannot delete service. Error= %lu \n", GetLastError());
         }
     }
 
