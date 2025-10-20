@@ -567,6 +567,7 @@ export interface TurnRequest {
   reasoningLevel?: ReasoningLevel;
   reasoningValue?: ProviderReasoningValue | null;
   caching?: CachingMode;
+  forceToolChoice?: boolean;
 }
 
 export interface LLMProvider {

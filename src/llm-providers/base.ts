@@ -705,11 +705,12 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
       resetIdle();
       let stopReason: string | undefined;
       
+      const toolChoice = request.forceToolChoice !== false ? 'required' : undefined;
       const result = streamText({
         model,
         messages,
         tools,
-        toolChoice: 'required',
+        ...(toolChoice !== undefined ? { toolChoice } : {}),
         maxOutputTokens: request.maxOutputTokens,
         temperature: request.temperature,
         topP: request.topP,
@@ -950,11 +951,12 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
           }
         }
       } catch (e) { try { warn(`streaming read failed: ${e instanceof Error ? e.message : String(e)}`); } catch {} }
+      const toolChoice = request.forceToolChoice !== false ? 'required' : undefined;
       const result = await generateText({
         model,
         messages,
         tools,
-        toolChoice: 'required',
+        ...(toolChoice !== undefined ? { toolChoice } : {}),
         maxOutputTokens: request.maxOutputTokens,
         temperature: request.temperature,
         topP: request.topP,

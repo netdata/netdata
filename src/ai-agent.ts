@@ -2544,6 +2544,7 @@ export class AIAgentSession {
       reasoningLevel,
       reasoningValue,
       caching: this.sessionConfig.caching,
+      forceToolChoice: !(provider === 'anthropic' && reasoningLevel !== undefined),
     };
 
     try {

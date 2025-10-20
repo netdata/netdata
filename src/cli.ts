@@ -113,6 +113,21 @@ const appendValue = <T>(value: T, previous?: T[]): T[] => {
   return base;
 };
 
+const normalizeListOption = (value: unknown): string | undefined => {
+  if (Array.isArray(value)) {
+    const filtered = value
+      .map((v) => (typeof v === 'string' ? v : String(v)))
+      .map((v) => v.trim())
+      .filter((v) => v.length > 0);
+    if (filtered.length === 0) return undefined;
+    return filtered.join(',');
+  }
+  if (typeof value === 'string' && value.trim().length > 0) {
+    return value.trim();
+  }
+  return undefined;
+};
+
 const parsePort = (value: string): number => {
   const port = Number.parseInt(value, 10);
   if (!Number.isFinite(port) || port <= 0 || port > 65535) {
@@ -856,9 +871,7 @@ async function runHeadendMode(config: HeadendModeConfig): Promise<void> {
   }
 
   let parsedTargets: LoadAgentOptions['targets'];
-  const cliModels = typeof config.options.models === 'string' && config.options.models.length > 0
-    ? config.options.models
-    : undefined;
+  const cliModels = normalizeListOption(config.options.models);
   if (cliModels !== undefined) {
     try {
       parsedTargets = parsePairs(cliModels);
@@ -869,7 +882,7 @@ async function runHeadendMode(config: HeadendModeConfig): Promise<void> {
   }
 
   let parsedTools: LoadAgentOptions['tools'];
-  const cliTools = readCliTools(config.options);
+  const cliTools = normalizeListOption(readCliTools(config.options));
   if (cliTools !== undefined) {
     try {
       parsedTools = parseList(cliTools);
@@ -1119,15 +1132,10 @@ program
       // Removed local resolution of runtime knobs; agent-loader owns precedence
 
       // Determine effective targets and tools (CLI > FM)
-      const cliTargetsRaw: string | undefined = (typeof options.models === 'string' && options.models.length > 0) ? options.models : undefined;
+      const optsRecord: Record<string, unknown> = options;
+      const cliTargetsRaw: string | undefined = normalizeListOption(optsRecord.models);
 
-      const cliToolsRaw: string | undefined =
-        (typeof options.tools === 'string' && options.tools.length > 0) ? options.tools
-        : (typeof options.tool === 'string' && options.tool.length > 0) ? options.tool
-        : (typeof options.mcp === 'string' && options.mcp.length > 0) ? options.mcp
-        : (typeof options.mcpTool === 'string' && options.mcpTool.length > 0) ? options.mcpTool
-        : (typeof options.mcpTools === 'string' && options.mcpTools.length > 0) ? options.mcpTools
-        : undefined;
+      const cliToolsRaw: string | undefined = normalizeListOption(optsRecord.tools ?? optsRecord.tool ?? optsRecord.mcp ?? optsRecord.mcpTool ?? optsRecord.mcpTools);
 
       const overrideValuesDirect = readOverrideValues(options);
       let globalOverrides: LoadAgentOptions['globalOverrides'] = undefined;
@@ -1140,33 +1148,13 @@ program
         }
       }
 
-      const isPlainObject = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);
-      const hasKey = <K extends string>(obj: Record<string, unknown>, key: K): obj is Record<K, unknown> => Object.prototype.hasOwnProperty.call(obj, key);
-      const cliAgentsRaw: string | undefined = ((): string | undefined => {
-        if (isPlainObject(options) && hasKey(options, 'agents')) {
-          const raw = options.agents;
-          return (typeof raw === 'string' && raw.length > 0) ? raw : undefined;
-        }
-        return undefined;
-      })();
+      const cliAgentsRaw: string | undefined = normalizeListOption(optsRecord.agents);
 
       // fmOptions already computed above
-      const fmTargetsRaw = (fmOptions !== undefined && typeof fmOptions.models === 'string') ? fmOptions.models
-        : (fmOptions !== undefined && Array.isArray(fmOptions.models)) ? fmOptions.models.join(',')
-        : undefined;
+      const fmTargetsRaw = normalizeListOption(fmOptions?.models);
 
-      const fmToolsRaw = (fmOptions !== undefined && typeof fmOptions.tools === 'string') ? fmOptions.tools
-        : (fmOptions !== undefined && Array.isArray(fmOptions.tools)) ? fmOptions.tools.join(',')
-        : undefined;
-      const fmAgentsRaw = ((): string | undefined => {
-        if (fmOptions !== undefined) {
-          const fmAny = fmOptions as Record<string, unknown>;
-          const a = fmAny.agents;
-          if (typeof a === 'string' && a.length > 0) return a;
-          if (Array.isArray(a)) return (a as unknown[]).map((x) => String(x)).join(',');
-        }
-        return undefined;
-      })();
+      const fmToolsRaw = normalizeListOption(fmOptions?.tools);
+      const fmAgentsRaw = normalizeListOption(fmOptions?.agents);
 
       const targets = parsePairs(cliTargetsRaw ?? fmTargetsRaw);
       const toolList = parseList(cliToolsRaw ?? fmToolsRaw);
