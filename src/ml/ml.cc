@@ -643,8 +643,6 @@ static void ml_dimension_update_models(ml_worker_t *worker, ml_dimension_t *dim)
     dim->suppression_anomaly_counter = 0;
     dim->suppression_window_counter = 0;
 
-    dim->last_training_time = rrddim_last_entry_s(dim->rd);
-
     // Add the newly generated model to the list of pending models to flush
     ml_model_info_t model_info;
     nd_uuid_t *rd_uuid = uuidmap_uuid_ptr(dim->rd->uuid);
@@ -653,6 +651,9 @@ static void ml_dimension_update_models(ml_worker_t *worker, ml_dimension_t *dim)
     worker->pending_model_info.push_back(model_info);
 
     ml_dimension_stream_kmeans(dim);
+
+    // Clear the training in progress flag
+    dim->training_in_progress = false;
 
     spinlock_unlock(&dim->slock);
 }
@@ -667,6 +668,16 @@ ml_dimension_train_model(ml_worker_t *worker, ml_dimension_t *dim)
         spinlock_unlock(&dim->slock);
         return ML_WORKER_RESULT_OK;
     }
+
+    // Check if training is already in progress for this dimension
+    // If so, skip this training request to prevent concurrent access to dim->kmeans
+    if (dim->training_in_progress) {
+        spinlock_unlock(&dim->slock);
+        return ML_WORKER_RESULT_OK;
+    }
+
+    // Mark training as in progress
+    dim->training_in_progress = true;
     spinlock_unlock(&dim->slock);
 
     auto P = ml_dimension_calculated_numbers(worker, dim);
@@ -679,7 +690,7 @@ ml_dimension_train_model(ml_worker_t *worker, ml_dimension_t *dim)
         dim->mt = METRIC_TYPE_CONSTANT;
         dim->suppression_anomaly_counter = 0;
         dim->suppression_window_counter = 0;
-        dim->last_training_time = training_response.last_entry_on_response;
+        dim->training_in_progress = false;
 
         spinlock_unlock(&dim->slock);
 
@@ -1106,6 +1117,15 @@ static enum ml_worker_result ml_worker_add_existing_model(ml_worker_t *worker, m
         pulse_ml_models_ignored();
         return ML_WORKER_RESULT_OK;
     }
+
+    // Check if training is in progress and skip if so to avoid race condition
+    spinlock_lock(&Dim->slock);
+    if (Dim->training_in_progress) {
+        spinlock_unlock(&Dim->slock);
+        pulse_ml_models_ignored();
+        return ML_WORKER_RESULT_OK;
+    }
+    spinlock_unlock(&Dim->slock);
 
     Dim->kmeans = req.inlined_km;
     ml_dimension_update_models(worker, Dim);
