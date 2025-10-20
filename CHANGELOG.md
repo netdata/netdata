@@ -6,6 +6,10 @@
 
 **Merged pull requests:**
 
+- docs: fix map.csv for win [\#21168](https://github.com/netdata/netdata/pull/21168) ([ilyam8](https://github.com/ilyam8))
+- build\(deps\): bump github.com/ibmdb/go\_ibm\_db from 0.5.3 to 0.5.4 in /src/go [\#21167](https://github.com/netdata/netdata/pull/21167) ([dependabot[bot]](https://github.com/apps/dependabot))
+- build\(deps\): bump github.com/ibm-messaging/mq-golang/v5 from 5.6.4 to 5.6.5 in /src/go [\#21166](https://github.com/netdata/netdata/pull/21166) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Libunwind [\#21163](https://github.com/netdata/netdata/pull/21163) ([clan](https://github.com/clan))
 - Enable Rust-based systemd journal handling code in Docker builds. [\#21161](https://github.com/netdata/netdata/pull/21161) ([Ferroin](https://github.com/Ferroin))
 - Regenerate integrations docs [\#21160](https://github.com/netdata/netdata/pull/21160) ([netdatabot](https://github.com/netdatabot))
 - docs: update Notifications description in cloud-notifications meta [\#21159](https://github.com/netdata/netdata/pull/21159) ([ilyam8](https://github.com/ilyam8))
@@ -37,6 +41,7 @@
 - Update IBM plugin documentation. [\#21122](https://github.com/netdata/netdata/pull/21122) ([Ferroin](https://github.com/Ferroin))
 - Improve free disk space calculation for Windows [\#21121](https://github.com/netdata/netdata/pull/21121) ([stelfrag](https://github.com/stelfrag))
 - Fix issues with IBM libs plugin. [\#21120](https://github.com/netdata/netdata/pull/21120) ([Ferroin](https://github.com/Ferroin))
+- Add Windows install types and release channels doc + update map.csv [\#21119](https://github.com/netdata/netdata/pull/21119) ([kanelatechnical](https://github.com/kanelatechnical))
 - Make native package dependencies consistent between DEB/RPM packages. [\#21118](https://github.com/netdata/netdata/pull/21118) ([Ferroin](https://github.com/Ferroin))
 - Properly include client compoents for IBM MQ libraries. [\#21117](https://github.com/netdata/netdata/pull/21117) ([Ferroin](https://github.com/Ferroin))
 - Properly check for ODBC for IBM plugin at configuration time. [\#21116](https://github.com/netdata/netdata/pull/21116) ([Ferroin](https://github.com/Ferroin))
@@ -447,11 +452,6 @@
 - Move NIDL-Framework.md from repository root to docs/ directory [\#20630](https://github.com/netdata/netdata/pull/20630) ([Copilot](https://github.com/apps/copilot-swe-agent))
 - Nidl Framework Documentation [\#20629](https://github.com/netdata/netdata/pull/20629) ([ktsaou](https://github.com/ktsaou))
 - Fix syntax error on learn doc [\#20628](https://github.com/netdata/netdata/pull/20628) ([Ancairon](https://github.com/Ancairon))
-- At a glance [\#20627](https://github.com/netdata/netdata/pull/20627) ([kanelatechnical](https://github.com/kanelatechnical))
-- Improve ACLK connection handling [\#20625](https://github.com/netdata/netdata/pull/20625) ([stelfrag](https://github.com/stelfrag))
-- Improve packet ID generation [\#20624](https://github.com/netdata/netdata/pull/20624) ([stelfrag](https://github.com/stelfrag))
-- chore\(go.d/snmp-profiles\): charts meta fixes and fam updates p4 [\#20623](https://github.com/netdata/netdata/pull/20623) ([ilyam8](https://github.com/ilyam8))
-- chore\(go.d/snmp-profiles\): charts meta fixes and fam updates p3 [\#20622](https://github.com/netdata/netdata/pull/20622) ([ilyam8](https://github.com/ilyam8))
 
 ## [v2.5.4](https://github.com/netdata/netdata/tree/v2.5.4) (2025-06-24)
 
