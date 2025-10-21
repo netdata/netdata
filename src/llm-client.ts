@@ -1,3 +1,5 @@
+import './setup-ai-sdk.js';
+
 import type { BaseLLMProvider } from './llm-providers/base.js';
 import type {
   TurnRequest,
