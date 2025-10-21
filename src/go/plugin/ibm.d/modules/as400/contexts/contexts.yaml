@@ -3,11 +3,22 @@ System:
   contexts:
     - name: CPUUtilization
       context: as400.cpu_utilization
-      title: CPU Utilization
+      title: CPU Utilization (100% = 1 CPU core)
       family: compute/cpu
       units: percentage
       type: line
       priority: 101
+      dimensions:
+        - name: utilization
+          algo: absolute
+          div: 1000
+    - name: CPUEntitledUtilization
+      context: as400.cpu_utilization_entitled
+      title: CPU Utilization (as % of entitlement)
+      family: compute/cpu
+      units: percentage
+      type: line
+      priority: 102
       dimensions:
         - name: utilization
           algo: absolute
@@ -71,7 +82,7 @@ System:
       context: as400.main_storage_size
       title: Main Storage Size
       family: memory/overview
-      units: KiB
+      units: bytes
       type: line
       priority: 201
       dimensions:
@@ -302,7 +313,6 @@ Disk:
           algo: incremental
         - name: write
           algo: incremental
-          mul: -1
     - name: SpaceUsage
       context: as400.disk_space_usage
       title: Disk Space Usage
@@ -340,7 +350,6 @@ Disk:
           algo: incremental
         - name: write
           algo: incremental
-          mul: -1
     - name: SSDHealth
       context: as400.disk_ssd_health
       title: Disk SSD Health
@@ -463,7 +472,6 @@ ActiveJob:
           algo: incremental
         - name: interactive_transactions
           algo: incremental
-          mul: -1
     - name: Threads
       context: as400.activejob_threads
       title: Active Job Thread Count
@@ -644,5 +652,112 @@ PlanCache:
       priority: 802
       dimensions:
         - name: value
+          algo: absolute
+          div: 1000
+Observability:
+  labels: []
+  contexts:
+    - name: QueryLatency
+      context: netdata.plugin_ibm.as400_query_latency
+      title: AS400 Query Latency
+      family: plugins/ibm.d/latency
+      units: ms
+      type: stacked
+      priority: 146000
+      dimensions:
+        - name: analyze_plan_cache
+          algo: absolute
+          div: 1000
+        - name: count_active_jobs
+          algo: absolute
+          div: 1000
+        - name: count_disks
+          algo: absolute
+          div: 1000
+        - name: count_http_servers
+          algo: absolute
+          div: 1000
+        - name: count_job_queues
+          algo: absolute
+          div: 1000
+        - name: count_message_queues
+          algo: absolute
+          div: 1000
+        - name: count_network_interfaces
+          algo: absolute
+          div: 1000
+        - name: count_output_queues
+          algo: absolute
+          div: 1000
+        - name: count_subsystems
+          algo: absolute
+          div: 1000
+        - name: detect_ibmi_version_primary
+          algo: absolute
+          div: 1000
+        - name: detect_ibmi_version_fallback
+          algo: absolute
+          div: 1000
+        - name: disk_instances
+          algo: absolute
+          div: 1000
+        - name: disk_instances_enhanced
+          algo: absolute
+          div: 1000
+        - name: disk_status
+          algo: absolute
+          div: 1000
+        - name: http_server_info
+          algo: absolute
+          div: 1000
+        - name: job_info
+          algo: absolute
+          div: 1000
+        - name: job_queues
+          algo: absolute
+          div: 1000
+        - name: memory_pools
+          algo: absolute
+          div: 1000
+        - name: message_queue_aggregates
+          algo: absolute
+          div: 1000
+        - name: network_connections
+          algo: absolute
+          div: 1000
+        - name: network_interfaces
+          algo: absolute
+          div: 1000
+        - name: output_queue_info
+          algo: absolute
+          div: 1000
+        - name: plan_cache_summary
+          algo: absolute
+          div: 1000
+        - name: serial_number
+          algo: absolute
+          div: 1000
+        - name: system_activity
+          algo: absolute
+          div: 1000
+        - name: system_model
+          algo: absolute
+          div: 1000
+        - name: system_status
+          algo: absolute
+          div: 1000
+        - name: temp_storage_named
+          algo: absolute
+          div: 1000
+        - name: temp_storage_total
+          algo: absolute
+          div: 1000
+        - name: technology_refresh_level
+          algo: absolute
+          div: 1000
+        - name: top_active_jobs
+          algo: absolute
+          div: 1000
+        - name: other
           algo: absolute
           div: 1000

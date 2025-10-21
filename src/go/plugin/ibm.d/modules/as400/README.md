@@ -13,6 +13,94 @@ expose CPU, memory, storage, job, and subsystem activity.
 - libodbc.so (provided by unixODBC)
 - IBM i Access Client Solutions
 
+**CPU Collection Methods:**
+
+The collector uses a hybrid approach for CPU utilization metrics to handle IBM i 7.4+ where
+`AVERAGE_CPU_*` columns were deprecated:
+
+1. **Primary Method - TOTAL_CPU_TIME**: Uses the monotonic `TOTAL_CPU_TIME` counter from
+   `QSYS2.SYSTEM_STATUS()` to calculate CPU utilization via delta-based calculation. This is
+   the most accurate method but requires `*JOBCTL` special authority. TOTAL_CPU_TIME is a
+   cumulative counter in nanoseconds representing CPU-seconds consumed, naturally in per-core
+   scale.
+
+2. **Fallback Method - ELAPSED_CPU_USED**: If `*JOBCTL` authority is not available, falls back
+   to `ELAPSED_CPU_USED` with automatic reset detection. This method tracks when IBM i statistics
+   are reset (either manually or via `reset_statistics` configuration) and re-establishes a
+   baseline after detecting resets. The values are already in per-core scale.
+
+3. **Legacy Method - AVERAGE_CPU_UTILIZATION**: For IBM i versions before 7.4, uses the now-
+   deprecated `AVERAGE_CPU_UTILIZATION` column, which IBM reports in the same per-core scale.
+
+The collector automatically selects the appropriate method based on available permissions and
+logs which method is being used.
+
+**CPU Metric Scale:**
+
+CPU utilization is reported using the "100% = 1 CPU core" semantic. This means:
+- 100% indicates one CPU core is fully utilized
+- 400% indicates four CPU cores are fully utilized
+- Values are limited to 100% × ConfiguredCPUs, matching the partition's configured capacity
+
+For shared LPARs, the metrics show absolute CPU consumption in per-core scale, not relative to
+entitled capacity. For example, a shared LPAR entitled to 0.20 cores can show 150% utilization
+when bursting above entitlement.
+
+**Statistics Reset Behavior:**
+
+The `reset_statistics` configuration option controls whether the collector resets IBM i system
+statistics on each query via `SYSTEM_STATUS(RESET_STATISTICS=>'YES')`. When enabled:
+
+- System-level statistics (CPU, memory pools, etc.) are reset after each collection cycle
+- Matches legacy behavior but clears global statistics that other tools may rely on
+- The ELAPSED_CPU_USED fallback method will detect and handle these resets automatically
+- **Caution**: Enabling this affects all users and applications on the IBM i system
+
+Default: `false` (statistics are not reset, using `RESET_STATISTICS=>'NO'`)
+
+**Cardinality Management:**
+
+To prevent performance issues from excessive metric creation, the collector enforces cardinality
+limits on per-instance metrics (disks, subsystems, job queues, message queues, output queues,
+active jobs, network interfaces, HTTP servers).
+
+**How Limits Work:**
+- The collector counts instances before collecting metrics
+- If count exceeds the configured `max_*` limit, **collection is skipped entirely** for that category
+- The collector logs a warning: `"[category] count (X) exceeds limit (Y), skipping collection"`
+- No metrics are collected for that category until you adjust the configuration
+
+**Configuration Options:**
+
+Use **both** limit and selector options together to manage high-cardinality environments:
+
+| Option | Purpose | Default |
+|--------|---------|---------|
+| `max_disks` | Maximum disk units to monitor | 100 |
+| `max_subsystems` | Maximum subsystems to monitor | 100 |
+| `max_job_queues` | Maximum job queues to monitor | 100 |
+| `max_message_queues` | Maximum message queues to monitor | 100 |
+| `max_output_queues` | Maximum output queues to monitor | 100 |
+| `max_active_jobs` | Maximum active jobs to monitor | 100 |
+| `collect_disks_matching` | Glob pattern to filter disks (e.g., `"001* 002*"`) | `""` (match all) |
+| `collect_subsystems_matching` | Glob pattern to filter subsystems (e.g., `"QINTER QBATCH"`) | `""` (match all) |
+| `collect_job_queues_matching` | Glob pattern to filter job queues (e.g., `"QSYS/*"`) | `""` (match all) |
+
+**Example Workflow:**
+
+1. System has 500 disks, collector skips disk metrics (exceeds default limit of 100)
+2. Check logs: `"disk count (500) exceeds limit (100), skipping per-disk metrics"`
+3. Two options:
+   - **Option A**: Increase limit: `max_disks: 500` (collects all 500 disks)
+   - **Option B**: Use selector: `collect_disks_matching: "00[1-5]*"` (cherry-pick specific disks)
+
+**Best Practices:**
+- Use selectors to monitor only business-critical objects in large environments
+- Set limits based on your Netdata server's capacity (each instance = multiple charts)
+- Start with defaults and adjust based on actual usage patterns
+
+Network interface metrics have a fixed internal limit of 50 instances, and HTTP server metrics are capped at 200 instances; these limits are currently not configurable.
+
 
 This collector is part of the [Netdata](https://github.com/netdata/netdata) monitoring solution.
 
@@ -34,12 +122,13 @@ Metrics:
 | Metric | Dimensions | Unit |
 |:-------|:-----------|:-----|
 | as400.cpu_utilization | utilization | percentage |
+| as400.cpu_utilization_entitled | utilization | percentage |
 | as400.cpu_configuration | configured | cpus |
 | as400.cpu_capacity | capacity | percentage |
 | as400.total_jobs | total | jobs |
 | as400.active_jobs_by_type | batch, interactive, active | jobs |
 | as400.job_queue_length | waiting | jobs |
-| as400.main_storage_size | total | KiB |
+| as400.main_storage_size | total | bytes |
 | as400.temporary_storage | current, maximum | MiB |
 | as400.memory_pool_usage | machine, base, interactive, spool | bytes |
 | as400.memory_pool_defined | machine, base | bytes |

@@ -51,7 +51,7 @@ func (c *Collector) collectSingleMetric(ctx context.Context, metricKey string, q
 		return nil
 	}
 
-	err := c.doQuery(ctx, query, func(column, value string, lineEnd bool) {
+	err := c.doQuery(ctx, metricKey, query, func(column, value string, lineEnd bool) {
 		if value != "" {
 			handler(value)
 		}
@@ -70,7 +70,7 @@ func (c *Collector) detectIBMiVersion(ctx context.Context) error {
 	var version, release string
 	versionDetected := false
 
-	err := c.doQuery(ctx, queryIBMiVersion, func(column, value string, lineEnd bool) {
+	err := c.doQuery(ctx, "detect_ibmi_version_primary", queryIBMiVersion, func(column, value string, lineEnd bool) {
 		switch column {
 		case "OS_NAME":
 			// ignore
@@ -88,7 +88,7 @@ func (c *Collector) detectIBMiVersion(ctx context.Context) error {
 	} else if err != nil {
 		c.Debugf("ENV_SYS_INFO query failed: %v, trying fallback method", err)
 
-		err = c.doQuery(ctx, queryIBMiVersionDataArea, func(column, value string, lineEnd bool) {
+		err = c.doQuery(ctx, "detect_ibmi_version_fallback", queryIBMiVersionDataArea, func(column, value string, lineEnd bool) {
 			if column == "VERSION" {
 				dataAreaValue := strings.TrimSpace(value)
 				if len(dataAreaValue) >= 6 {
@@ -131,7 +131,7 @@ func (c *Collector) collectSystemInfo(ctx context.Context) {
 		c.Debugf("detected system model: %s", c.model)
 	})
 
-	err := c.doQuery(ctx, queryTechnologyRefresh, func(column, value string, lineEnd bool) {
+	err := c.doQuery(ctx, "technology_refresh_level", queryTechnologyRefresh, func(column, value string, lineEnd bool) {
 		if column == "TR_LEVEL" && value != "" {
 			trLevel := strings.TrimSpace(value)
 			if trLevel != "" {
@@ -293,4 +293,11 @@ func (c *Collector) memoryPoolQuery() string {
 		return queryMemoryPoolsReset
 	}
 	return queryMemoryPoolsNoReset
+}
+
+func (c *Collector) systemActivityQuery() string {
+	if c.ResetStatistics {
+		return querySystemActivityReset
+	}
+	return querySystemActivityNoReset
 }

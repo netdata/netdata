@@ -56,8 +56,8 @@ type MetricsConfig struct {
 	Symbols []SymbolConfig `yaml:"symbols,omitempty" json:"symbols,omitempty"`
 
 	// `static_tags` is not exposed as json at the moment since we need to evaluate if we want to expose it via UI
-	StaticTags []string            `yaml:"static_tags,omitempty" json:"-"`
-	MetricTags MetricTagConfigList `yaml:"metric_tags,omitempty" json:"metric_tags,omitempty"`
+	StaticTags []StaticMetricTagConfig `yaml:"static_tags,omitempty" json:"-"`
+	MetricTags MetricTagConfigList     `yaml:"metric_tags,omitempty" json:"metric_tags,omitempty"`
 
 	Options MetricsConfigOption `yaml:"options,omitempty" json:"options,omitempty"`
 
@@ -200,6 +200,18 @@ func (m MetricTagConfig) Clone() MetricTagConfig {
 	m2.Mapping = maps.Clone(m.Mapping)
 	m2.Tags = maps.Clone(m.Tags)
 	return m2
+}
+
+type StaticMetricTagConfig struct {
+	Tag   string `yaml:"tag" json:"tag"`
+	Value string `yaml:"value" json:"value"`
+}
+
+func (s StaticMetricTagConfig) Clone() StaticMetricTagConfig {
+	return StaticMetricTagConfig{
+		Tag:   s.Tag,
+		Value: s.Value,
+	}
 }
 
 // MetricTagConfigList holds configs for a list of metric tags

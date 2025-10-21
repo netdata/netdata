@@ -32,6 +32,11 @@ ml_kmeans_train(ml_kmeans_t *kmeans, const ml_features_t *features, unsigned max
 
     kmeans->cluster_centers.clear();
 
+    if (features->preprocessed_features.size() < 2) {
+        netdata_log_error("ml_kmeans_train: not enough features to train kmeans (size=%zu)", features->preprocessed_features.size());
+        return;
+    }
+
     dlib::pick_initial_centers(2, kmeans->cluster_centers, features->preprocessed_features);
     dlib::find_clusters_using_kmeans(features->preprocessed_features, kmeans->cluster_centers, max_iters);
 
