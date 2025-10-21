@@ -29,7 +29,7 @@ func TestGlobalTagsCollector_Collect(t *testing.T) {
 			profile: &ddsnmp.Profile{
 				Definition: &ddprofiledefinition.ProfileDefinition{
 					MetricTags: []ddprofiledefinition.MetricTagConfig{},
-					StaticTags: []string{},
+					StaticTags: []ddprofiledefinition.StaticMetricTagConfig{},
 				},
 			},
 			setupMock:      func(m *snmpmock.MockHandler) {},
@@ -39,10 +39,10 @@ func TestGlobalTagsCollector_Collect(t *testing.T) {
 		"static tags only": {
 			profile: &ddsnmp.Profile{
 				Definition: &ddprofiledefinition.ProfileDefinition{
-					StaticTags: []string{
-						"environment:production",
-						"region:us-east-1",
-						"service:network",
+					StaticTags: []ddprofiledefinition.StaticMetricTagConfig{
+						{Tag: "environment", Value: "production"},
+						{Tag: "region", Value: "us-east-1"},
+						{Tag: "service", Value: "network"},
 					},
 				},
 			},
@@ -106,9 +106,9 @@ func TestGlobalTagsCollector_Collect(t *testing.T) {
 		"mixed static and dynamic tags": {
 			profile: &ddsnmp.Profile{
 				Definition: &ddprofiledefinition.ProfileDefinition{
-					StaticTags: []string{
-						"environment:production",
-						"managed:true",
+					StaticTags: []ddprofiledefinition.StaticMetricTagConfig{
+						{Tag: "environment", Value: "production"},
+						{Tag: "managed", Value: "true"},
 					},
 					MetricTags: []ddprofiledefinition.MetricTagConfig{
 						{

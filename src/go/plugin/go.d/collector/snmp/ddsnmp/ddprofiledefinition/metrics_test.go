@@ -140,9 +140,8 @@ func TestCloneMetricsConfig(t *testing.T) {
 					ExtractValueCompiled: regexp.MustCompile(".*"),
 				},
 			},
-			StaticTags: []string{
-				"foo",
-				"bar",
+			StaticTags: []StaticMetricTagConfig{
+				{Tag: "foo", Value: "bar"},
 			},
 			MetricTags: []MetricTagConfig{
 				{
@@ -161,7 +160,7 @@ func TestCloneMetricsConfig(t *testing.T) {
 
 	conf2 := conf.Clone()
 	assert.Equal(t, conf, conf2)
-	conf2.StaticTags[0] = "baz"
+	conf2.StaticTags[0] = StaticMetricTagConfig{Tag: "bar", Value: "baz"}
 	conf2.MetricTags[0].IndexTransform = []MetricIndexTransform{{5, 7}}
 	conf2.Options.Placement = 2
 	conf2.Options.MetricSuffix = ".bar"
