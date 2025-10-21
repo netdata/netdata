@@ -14,7 +14,7 @@ const bearerAuth = (req: any, allowedKeys: string[]): { ok: boolean; error?: str
   const token = header.slice(BEARER_PREFIX.length).trim();
   if (token.length === 0) return { ok: false, error: 'empty bearer token' };
   const a = Buffer.from(token);
-  // eslint-disable-next-line functional/no-loop-statements
+   
   for (const key of allowedKeys) {
     const b = Buffer.from(key);
     if (a.length !== b.length) continue;
@@ -51,7 +51,7 @@ export function buildApiRouter(sessions: SessionManager, opts: { bearerKeys: str
 
       const started = Date.now();
       const timeoutMs = 60_000;
-      // eslint-disable-next-line functional/no-loop-statements
+       
       while (Date.now() - started < timeoutMs) {
         const meta = sessions.getRun(runId);
         if (meta && meta.status !== 'running') {
@@ -65,7 +65,7 @@ export function buildApiRouter(sessions: SessionManager, opts: { bearerKeys: str
           res.status(200).json(payload);
           return;
         }
-        // eslint-disable-next-line no-promise-executor-return
+         
         await new Promise((r) => setTimeout(r, 250));
       }
 

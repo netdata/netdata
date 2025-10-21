@@ -28,7 +28,7 @@ export function resolveIncludes(raw: string, baseDir?: string, maxDepth = 8): st
   const re1 = /\$\{include:([^}]+)\}/g;
   const re2 = /\{\{include:([^}]+)\}\}/g;
 
-  // eslint-disable-next-line functional/no-let
+   
   let depth = 0;
   const expandOnce = (s: string): string => {
     const replaceOne = (src: string, re: RegExp): string => src.replace(re, (_m, group: string) => {

@@ -271,8 +271,8 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
       for (const key of path) {
         if (cur === null || cur === undefined) return undefined;
         if (typeof cur !== 'object') return undefined;
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+         
+         
         const rec = cur as Record<string, unknown>;
         cur = rec[key];
       }
@@ -1028,9 +1028,9 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
       // Try to enrich with provider metadata (e.g., Anthropic cache creation tokens)
       try {
         const isObj = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object';
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/dot-notation
+         
         const provMeta = isObj(resp) && isObj((resp as Record<string, unknown>).providerMetadata)
-          // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion, @typescript-eslint/dot-notation
+           
           ? ((resp as Record<string, unknown>).providerMetadata as Record<string, unknown>)
           : undefined;
         let w: unknown = undefined;
@@ -1078,7 +1078,7 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
             let hasEmittedReasoning = false;
             let hasEmittedText = false;
             
-            // eslint-disable-next-line functional/no-loop-statements
+             
             // eslint-disable-next-line functional/no-loop-statements
         for (const part of m.content) {
               const p = part as { type?: string; text?: string };
@@ -1287,7 +1287,7 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
         for (const msg of respObj.messages) {
           const m = msg as { role?: string; content?: unknown };
           if (m.role === 'assistant' && Array.isArray(m.content)) {
-            // eslint-disable-next-line functional/no-loop-statements
+             
             // eslint-disable-next-line functional/no-loop-statements
         for (const part of m.content) {
               const p = part as { type?: string; text?: string };
@@ -1606,7 +1606,7 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
     }
 
     const modelMessages: ModelMessage[] = [];
-    // eslint-disable-next-line functional/no-loop-statements
+     
     // eslint-disable-next-line functional/no-loop-statements
     for (const m of messages) {
       if (m.role === 'system') {
@@ -1688,7 +1688,7 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
       const textParts: string[] = [];
       const toolCalls: { id: string; name: string; parameters: Record<string, unknown> }[] = [];
       
-      // eslint-disable-next-line functional/no-loop-statements
+       
       // eslint-disable-next-line functional/no-loop-statements
         for (const part of m.content) {
         if (part.type === 'text' || part.type === undefined) {

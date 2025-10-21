@@ -328,7 +328,7 @@ export class MCPProvider extends ToolProvider {
   }
 
   listTools(): MCPTool[] {
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+     
     if (!this.initialized) { void this.ensureInitialized(); }
     const out: MCPTool[] = [];
     this.servers.forEach((s, serverName) => {
@@ -341,7 +341,7 @@ export class MCPProvider extends ToolProvider {
   }
 
   hasTool(name: string): boolean {
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+     
     if (!this.initialized) { void this.ensureInitialized(); }
     return this.toolNameMap.has(name);
   }

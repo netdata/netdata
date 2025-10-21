@@ -70,7 +70,7 @@ export class SessionManager {
 
   public stopRun(runId: string, reason?: string): void {
     const meta = this.runs.get(runId);
-    if (meta && meta.status === 'running') {
+    if (meta?.status === 'running') {
       meta.status = 'stopping';
       meta.error = reason ?? 'stopping';
       meta.updatedAt = Date.now();

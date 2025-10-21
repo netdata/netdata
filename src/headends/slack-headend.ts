@@ -18,9 +18,9 @@ import { ConcurrencyLimiter } from './concurrency.js';
 type BoltAppCtor = new (...args: unknown[]) => { start: () => Promise<void>; stop: () => Promise<void>; client: unknown };
 type BoltLogLevel = Record<string, unknown>;
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+ 
 const App: BoltAppCtor = (slackBolt as { App: BoltAppCtor }).App;
-// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+ 
 const LogLevel: BoltLogLevel = (slackBolt as { LogLevel: BoltLogLevel }).LogLevel;
 
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-return, @typescript-eslint/strict-boolean-expressions, @typescript-eslint/no-unnecessary-condition, @typescript-eslint/no-confusing-void-expression, promise/prefer-await-to-then, @typescript-eslint/restrict-template-expressions, @typescript-eslint/non-nullable-type-assertion-style, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unnecessary-type-assertion */
@@ -390,7 +390,7 @@ export class SlackHeadend implements Headend {
     while (Date.now() - started < timeoutMs) {
       const meta = sessionManager.getRun(runId);
       if (meta !== undefined && meta.status !== 'running') break;
-      // eslint-disable-next-line no-await-in-loop
+       
       await sleep(500);
     }
     const meta = sessionManager.getRun(runId);

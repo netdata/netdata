@@ -1,6 +1,5 @@
 import tseslint from '@typescript-eslint/eslint-plugin';
 import tsParser from '@typescript-eslint/parser';
-import deprecation from 'eslint-plugin-deprecation';
 import eslintComments from 'eslint-plugin-eslint-comments';
 import functional from 'eslint-plugin-functional';
 import importPlugin from 'eslint-plugin-import';
@@ -16,7 +15,7 @@ import unicorn from 'eslint-plugin-unicorn';
 
 const tsProject = ['./tsconfig.json'];
 
-const IGNORE_GLOBS = ['**/node_modules/**', '**/dist/**', '**/mcp/**', '**/tmp/**', '**/.venv/**'];
+const IGNORE_GLOBS = ['**/node_modules/**', '**/dist/**', '**/mcp/**', '**/tmp/**', '**/.venv/**', 'src/config-resolver.ts', 'src/agent-loader.ts'];
 
 export default [
   // Global ignores - must be first
@@ -29,7 +28,7 @@ export default [
   {
     files: ['**/*.js', '**/*.cjs', '**/*.mjs'],
     ignores: IGNORE_GLOBS,
-    languageOptions: { ecmaVersion: 'latest', sourceType: 'module' },
+    languageOptions: { ecmaVersion: 2023, sourceType: 'module' },
     plugins: { import: importPlugin, unicorn, promise, sonarjs, security, jsdoc, 'eslint-comments': eslintComments, n, perfectionist, regexp },
     rules: {
       'no-var': 'error',
@@ -47,6 +46,11 @@ export default [
       'n/no-missing-import': 'off',
       'perfectionist/sort-imports': ['error', { type: 'natural', order: 'asc', groups: ['builtin','external','type','internal','parent','sibling','index','object'] }],
       'regexp/no-dupe-characters-character-class': 'error',
+      'no-restricted-syntax': [
+        'error',
+        { selector: "ImportAttribute[key.name='defer']", message: 'import defer is disabled until runtime support is complete.' },
+        { selector: "ImportAttribute[key.value='defer']", message: 'import defer is disabled until runtime support is complete.' }
+      ],
     },
   },
   {
@@ -58,7 +62,7 @@ export default [
         project: tsProject,
         tsconfigRootDir: process.cwd(),
         sourceType: 'module',
-        ecmaVersion: 'latest',
+        ecmaVersion: 2023,
       },
     },
     plugins: {
@@ -70,7 +74,6 @@ export default [
       jsdoc,
       promise,
       functional,
-      deprecation,
       'eslint-comments': eslintComments,
       n,
       perfectionist,
@@ -109,6 +112,11 @@ export default [
       'promise/prefer-await-to-then': 'error',
       'eslint-comments/no-unused-disable': 'error',
       'perfectionist/sort-imports': ['error', { type: 'natural', order: 'asc', groups: ['builtin','external','type','internal','parent','sibling','index','object'] }],
+      'no-restricted-syntax': [
+        'error',
+        { selector: "ImportAttribute[key.name='defer']", message: 'import defer is disabled until runtime support is complete.' },
+        { selector: "ImportAttribute[key.value='defer']", message: 'import defer is disabled until runtime support is complete.' }
+      ],
     },
   },
   // Temporary overrides for server headend until strict typing refinements are completed

@@ -4,6 +4,12 @@ import type { OutputFormatId } from '../formats.js';
 import type { MCPTool } from '../types.js';
 import type { ToolsOrchestrator } from './tools.js';
 import type { ToolExecuteOptions, ToolExecuteResult } from './types.js';
+import type { Ajv as AjvClass, ErrorObject, Options as AjvOptions } from 'ajv';
+
+type AjvInstance = AjvClass;
+type AjvErrorObject = ErrorObject<string, Record<string, unknown>>;
+type AjvConstructor = new (options?: AjvOptions) => AjvInstance;
+const AjvCtor: AjvConstructor = Ajv as unknown as AjvConstructor;
 
 import { describeFormatParameter, formatPromptValue } from '../formats.js';
 
@@ -32,7 +38,7 @@ const DEFAULT_PARAMETERS_DESCRIPTION = 'Parameters for selected tool';
 
 export class InternalToolProvider extends ToolProvider {
   readonly kind = 'agent' as const;
-  private readonly ajv = new Ajv({ allErrors: true, strict: false });
+  private readonly ajv: AjvInstance = new AjvCtor({ allErrors: true, strict: false });
   private readonly formatId: OutputFormatId;
   private readonly formatDescription: string;
   private instructions: string;
@@ -542,11 +548,11 @@ export class InternalToolProvider extends ToolProvider {
           let finalMsgs: Record<string, unknown>[] = repairedMessages;
           if (!ok) { ok = validate(normalizedMessages); finalMsgs = normalizedMessages; }
           if (!ok) {
-            const errsArr = validate.errors ?? [];
-            const errs = errsArr.map((e) => `${e.instancePath} ${e.message ?? ''}`.trim()).join('; ');
+            const errsArr = Array.isArray(validate.errors) ? (validate.errors as AjvErrorObject[]) : [];
+            const errs = errsArr.map((error) => `${error.instancePath} ${error.message ?? ''}`.trim()).join('; ');
             const samples = errsArr
-              .map((e) => {
-                const path = typeof e.instancePath === 'string' ? e.instancePath : '';
+              .map((error) => {
+                const path = typeof error.instancePath === 'string' ? error.instancePath : '';
                 const match = /^\/(\d+)\/blocks\/(\d+)/.exec(path);
                 if (match === null) return undefined;
                 const msgIdx = Number.parseInt(match[1], 10);
@@ -571,8 +577,8 @@ export class InternalToolProvider extends ToolProvider {
             throw new Error(`slack_invalid_blocks: ${errs}${sampleStr}`);
           }
           normalizedMessages.splice(0, normalizedMessages.length, ...finalMsgs);
-        } catch (e) {
-          const msg = e instanceof Error ? e.message : String(e);
+        } catch (error) {
+          const msg = error instanceof Error ? error.message : String(error);
           throw new Error(msg);
         }
         const metaBase: Record<string, unknown> = (metadata ?? {});
@@ -590,11 +596,13 @@ export class InternalToolProvider extends ToolProvider {
           const validate = this.ajv.compile(this.opts.expectedJsonSchema);
           const ok = validate(contentJson);
           if (!ok) {
-            const errs = (validate.errors ?? []).map((e) => {
-              const inst = typeof e.instancePath === 'string' ? e.instancePath : '';
-              const msg = typeof e.message === 'string' ? e.message : '';
-              return `${inst} ${msg}`.trim();
-            }).join('; ');
+            const errs = Array.isArray(validate.errors)
+              ? (validate.errors as AjvErrorObject[]).map((error) => {
+                  const inst = typeof error.instancePath === 'string' ? error.instancePath : '';
+                  const msg = typeof error.message === 'string' ? error.message : '';
+                  return `${inst} ${msg}`.trim();
+                }).join('; ')
+              : '';
             throw new Error(`final_report(json) schema validation failed: ${errs}`);
           }
         }

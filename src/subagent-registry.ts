@@ -12,6 +12,12 @@ import type {
   AccountingEntry,
   MCPTool,
 } from './types.js';
+import type { Ajv as AjvClass, ErrorObject, Options as AjvOptions } from 'ajv';
+
+type AjvInstance = AjvClass;
+type AjvErrorObject = ErrorObject<string, Record<string, unknown>>;
+type AjvConstructor = new (options?: AjvOptions) => AjvInstance;
+const AjvCtor: AjvConstructor = Ajv as unknown as AjvConstructor;
 
 import { DEFAULT_TOOL_INPUT_SCHEMA, cloneJsonSchema } from './input-contract.js';
 
@@ -175,15 +181,16 @@ export class SubAgentRegistry {
             ? augmentSchemaWithReason(info.inputSchema, reasonProp)
             : buildFallbackSchema(reasonProp, info.usage);
           try {
-            const ajv = new Ajv({ allErrors: true, strict: false });
+            const ajv: AjvInstance = new AjvCtor({ allErrors: true, strict: false });
             const validate = ajv.compile(schemaForValidation);
             const ok = validate(parameters);
             if (!ok) {
-              const errs = (validate.errors ?? []).map((e) => `${e.instancePath} ${e.message ?? ''}`.trim()).join('; ');
+              const errors = Array.isArray(validate.errors) ? (validate.errors as AjvErrorObject[]) : [];
+              const errs = errors.map((error) => `${error.instancePath} ${error.message ?? ''}`.trim()).join('; ');
               throw new Error(`invalid_parameters: ${errs}`);
             }
-          } catch (e) {
-            if (e instanceof Error && e.message.startsWith('invalid_parameters:')) throw e;
+          } catch (error) {
+            if (error instanceof Error && error.message.startsWith('invalid_parameters:')) throw error;
             throw new Error('invalid_parameters: validation_failed');
           }
         }

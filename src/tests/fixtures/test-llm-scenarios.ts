@@ -2785,7 +2785,7 @@ const SCENARIOS: ScenarioDefinition[] = [
               callId: 'call-invalid-1',
               assistantText: '',
               // Intentionally broken: arguments encoded as string to trigger sanitizer drop.
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+               
               arguments: 'not-an-object' as unknown as Record<string, unknown>,
             },
             {

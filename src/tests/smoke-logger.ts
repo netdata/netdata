@@ -65,4 +65,4 @@ async function run(): Promise<void> {
   if (logs.length < totalOpLogs) throw new Error('missing logs in onLog capture');
 }
 
-void run().then(() => { /* eslint-disable no-console */ console.log('smoke-logger ok'); }).catch((e: unknown) => { /* eslint-disable no-console */ console.error('smoke-logger failed', e instanceof Error ? e.message : String(e)); process.exit(1); });
+void run().then(() => {   console.log('smoke-logger ok'); }).catch((e: unknown) => {   console.error('smoke-logger failed', e instanceof Error ? e.message : String(e)); process.exit(1); });

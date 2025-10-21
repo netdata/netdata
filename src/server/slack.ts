@@ -206,7 +206,7 @@ async function fetchContext(client: SlackClient, event: any, limit: number, char
     const resp = await client.conversations.replies({ channel, ts: threadTs, limit });
     const msgs = (resp.messages ?? []).slice(0, limit);
     // chronological order as-is from replies
-    // eslint-disable-next-line functional/no-loop-statements
+     
     for (const m of msgs) {
       if (m.ts === event.ts) continue; // exclude current request
       if (!(await emit(m))) break;
@@ -214,7 +214,7 @@ async function fetchContext(client: SlackClient, event: any, limit: number, char
   } else {
     const resp = await client.conversations.history({ channel, latest: event.ts, inclusive: false, limit });
     const msgs = (resp.messages ?? []).slice(0, limit).reverse();
-    // eslint-disable-next-line functional/no-loop-statements
+     
     for (const m of msgs) {
       if (!(await emit(m))) break;
     }
@@ -643,7 +643,7 @@ const elog = (msg: string): void => { try { process.stderr.write(`[SRV] ← [0.0
           const eb = repairBlocks(firstBlocks);
           await client.chat.update({ channel, ts, text: fallback, blocks: eb });
         }
-        // eslint-disable-next-line functional/no-loop-statements
+         
         for (const m of rest) {
           const blocksRaw = Array.isArray(m.blocks) ? m.blocks : [];
           const blocks = repairBlocks(blocksRaw.slice(0, MAX_BLOCKS));
@@ -860,7 +860,7 @@ const elog = (msg: string): void => { try { process.stderr.write(`[SRV] ← [0.0
     } catch (e) { warn(`update scheduling failed: ${e instanceof Error ? e.message : String(e)}`); }
     const render = (): { text: string; blocks: any[] } => {
       const meta = activeSessions.getRun(runId);
-      if (meta && meta.status === 'stopping') {
+      if (meta?.status === 'stopping') {
         // Suppress progress details while stopping
         return { text: STOPPING_TEXT, blocks: [ { type: 'section', text: { type: 'mrkdwn', text: STOPPING_TEXT } } ] } as any;
       }
@@ -882,10 +882,10 @@ const elog = (msg: string): void => { try { process.stderr.write(`[SRV] ← [0.0
         // Remove any existing cancel actions to avoid duplicates
         for (let i = blocks.length - 1; i >= 0; i--) {
           const b = blocks[i];
-          if (b && b.type === 'actions') { blocks.splice(i, 1); }
+          if (b?.type === 'actions') { blocks.splice(i, 1); }
         }
         const m2 = activeSessions.getRun(runId);
-        if (m2 && m2.status === 'running') {
+        if (m2?.status === 'running') {
           const footerIdx = (() => {
             for (let i = blocks.length - 1; i >= 0; i--) { if (blocks[i]?.type === 'context') return i; }
             return -1;
@@ -1118,7 +1118,7 @@ const elog = (msg: string): void => { try { process.stderr.write(`[SRV] ← [0.0
       try { await client.chat.update({ channel: targetChannel, ts: liveTs, text: opener, blocks: [ { type: 'section', text: { type: 'mrkdwn', text: opener } } ] }); } catch (e) { warn(`initial slack update failed: ${e instanceof Error ? e.message : String(e)}`); }
       const render = (): { text: string; blocks: any[] } => {
         const meta = activeSessions.getRun(runId);
-        if (meta && meta.status === 'stopping') return { text: STOPPING_TEXT, blocks: [ { type: 'section', text: { type: 'mrkdwn', text: STOPPING_TEXT } } ] } as any;
+        if (meta?.status === 'stopping') return { text: STOPPING_TEXT, blocks: [ { type: 'section', text: { type: 'mrkdwn', text: STOPPING_TEXT } } ] } as any;
         const now = Date.now();
         const maybeTree = activeSessions.getOpTree(runId);
         const snap = (() => {
@@ -1132,9 +1132,9 @@ const elog = (msg: string): void => { try { process.stderr.write(`[SRV] ← [0.0
         const text2 = formatSlackStatus(snap);
         const blocks = buildStatusBlocks(snap, (maybeTree as any)?.agentId, (maybeTree as any)?.startedAt);
         try {
-          for (let i = blocks.length - 1; i >= 0; i--) { const b = blocks[i]; if (b && b.type === 'actions') { blocks.splice(i, 1); } }
+          for (let i = blocks.length - 1; i >= 0; i--) { const b = blocks[i]; if (b?.type === 'actions') { blocks.splice(i, 1); } }
           const m2 = activeSessions.getRun(runId);
-          if (m2 && m2.status === 'running') {
+          if (m2?.status === 'running') {
             const footerIdx = (() => { for (let i = blocks.length - 1; i >= 0; i--) { if (blocks[i]?.type === 'context') return i; } return -1; })();
             const insertIdx = footerIdx >= 0 ? footerIdx : blocks.length;
             blocks.splice(insertIdx, 0, cancelActions);

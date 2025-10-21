@@ -8,6 +8,7 @@ import Ajv from 'ajv';
 import type { OutputFormatId } from './formats.js';
 import type { SessionNode } from './session-tree.js';
 import type { AIAgentSessionConfig, AIAgentResult, ConversationMessage, LogEntry, AccountingEntry, Configuration, TurnRequest, LLMAccountingEntry, MCPTool, ToolAccountingEntry, RestToolConfig, ProgressMetrics, ToolCall, SessionSnapshotPayload, AccountingFlushPayload, ReasoningLevel, ProviderReasoningMapping, ProviderReasoningValue, TurnRetryDirective, TurnStatus } from './types.js';
+import type { Ajv as AjvClass, ErrorObject, Options as AjvOptions } from 'ajv';
 
 // Exit codes according to DESIGN.md
 type ExitCode = 
@@ -59,6 +60,11 @@ import { ToolsOrchestrator } from './tools/tools.js';
 import { formatToolRequestCompact, sanitizeToolName, truncateUtf8WithNotice, warn } from './utils.js';
 
 // Immutable session class according to DESIGN.md
+type AjvInstance = AjvClass;
+type AjvErrorObject = ErrorObject<string, Record<string, unknown>>;
+type AjvConstructor = new (options?: AjvOptions) => AjvInstance;
+const AjvCtor: AjvConstructor = Ajv as unknown as AjvConstructor;
+
 export class AIAgentSession {
   // Log identifiers (avoid duplicate string literals)
   private static readonly REMOTE_CONC_SLOT = 'agent:concurrency-slot';
@@ -82,7 +88,7 @@ export class AIAgentSession {
   private readonly abortSignal?: AbortSignal;
   private canceled = false;
   private readonly stopRef?: { stopping: boolean };
-  private ajv?: Ajv;
+  private ajv?: AjvInstance;
   // Internal housekeeping notes
   private childConversations: { agentId?: string; toolName: string; promptPath: string; conversation: ConversationMessage[]; trace?: { originId?: string; parentId?: string; selfId?: string; callPath?: string } }[] = [];
   private readonly subAgents?: SubAgentRegistry;
@@ -237,7 +243,7 @@ export class AIAgentSession {
       // eslint-disable-next-line functional/no-loop-statements
       for (let i = ops.length - 1; i >= 0; i--) {
         const o = ops[i] as { opId?: string; kind?: string } | undefined;
-        if (o !== undefined && o.kind === 'llm' && typeof o.opId === 'string' && o.opId.length > 0) return o.opId;
+        if (o?.kind === 'llm' && typeof o.opId === 'string' && o.opId.length > 0) return o.opId;
       }
     } catch (e) {
       warn(`getLastLlmOpIdForTurn failed: ${e instanceof Error ? e.message : String(e)}`);
@@ -389,7 +395,7 @@ export class AIAgentSession {
     {
       const enableBatch = this.sessionConfig.tools.includes('batch');
       const eo = this.sessionConfig.expectedOutput;
-      const expectedJsonSchema = (eo !== undefined && eo.format === 'json') ? eo.schema : undefined;
+      const expectedJsonSchema = (eo?.format === 'json') ? eo.schema : undefined;
       const internalProvider = new InternalToolProvider('agent', {
         enableBatch,
         outputFormat: this.sessionConfig.outputFormat,
@@ -1296,7 +1302,7 @@ export class AIAgentSession {
                 }
               }
 
-              // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+               
               if (this.finalReport === undefined && !sanitizedHasToolCalls && sanitizedHasText) {
                 if (this.tryAdoptFinalReportFromText(assistantForAdoption, textContent)) {
                   sanitizedHasToolCalls = true;
@@ -1438,15 +1444,16 @@ export class AIAgentSession {
             const schema = this.sessionConfig.expectedOutput?.schema;
             if (schema !== undefined && fr.content_json !== undefined) {
               try {
-                this.ajv = this.ajv ?? new Ajv({ allErrors: true, strict: false });
+                this.ajv = this.ajv ?? new AjvCtor({ allErrors: true, strict: false });
                 const validate = this.ajv.compile(schema);
                 const valid = validate(fr.content_json);
                 if (!valid) {
-                  const errs = (validate.errors ?? []).map((e) => {
-                    const path = typeof e.instancePath === 'string' && e.instancePath.length > 0
-                      ? e.instancePath
-                      : (typeof e.schemaPath === 'string' ? e.schemaPath : '');
-                    const msg = typeof e.message === 'string' ? e.message : '';
+                  const ajvErrors = Array.isArray(validate.errors) ? (validate.errors as AjvErrorObject[]) : [];
+                  const errs = ajvErrors.map((error) => {
+                    const path = typeof error.instancePath === 'string' && error.instancePath.length > 0
+                      ? error.instancePath
+                      : (typeof error.schemaPath === 'string' ? error.schemaPath : '');
+                    const msg = typeof error.message === 'string' ? error.message : '';
                     return `${path} ${msg}`.trim();
                   }).join('; ');
                   const payloadPreview = (() => {
@@ -2321,7 +2328,7 @@ export class AIAgentSession {
     const trimmedText = text.trim();
     if (trimmedText.length === 0) return false;
     const json = this.extractJsonRecordFromText(trimmedText);
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+     
     if (json === undefined) return false;
     const isRecord = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value);
     const pickString = (value: unknown): string | undefined => (typeof value === 'string' ? value : undefined);

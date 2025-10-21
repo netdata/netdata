@@ -9,7 +9,6 @@ import * as yaml from 'js-yaml';
 
 // Keep import order: builtins, external, type, internal
 // (moved below to maintain import order)
-
 import type { LoadAgentOptions } from './agent-loader.js';
 import type { FrontmatterOptions } from './frontmatter.js';
 import type { McpTransportSpec } from './headends/mcp-headend.js';
@@ -49,11 +48,9 @@ function exitWith(code: number, reason: string, tag = 'EXIT-CLI'): never {
   // Ensure we exit only once
   if (!hasExited) {
     hasExited = true;
-    // eslint-disable-next-line n/no-process-exit
     process.exit(code);
   }
   // TypeScript: inform this never returns
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return
   throw new Error('unreachable');
 }
 

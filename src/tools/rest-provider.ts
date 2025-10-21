@@ -2,15 +2,21 @@ import Ajv from 'ajv';
 
 import type { MCPTool, RestToolConfig } from '../types.js';
 import type { ToolExecuteOptions, ToolExecuteResult } from './types.js';
+import type { Ajv as AjvClass, ErrorObject, Options as AjvOptions } from 'ajv';
 
 import { warn } from '../utils.js';
 
 import { ToolProvider } from './types.js';
 
+type AjvInstance = AjvClass;
+type AjvErrorObject = ErrorObject<string, Record<string, unknown>>;
+type AjvConstructor = new (options?: AjvOptions) => AjvInstance;
+const AjvCtor: AjvConstructor = Ajv as unknown as AjvConstructor;
+
 export class RestProvider extends ToolProvider {
   readonly kind = 'rest' as const;
   private readonly tools = new Map<string, RestToolConfig>();
-  private readonly ajv = new Ajv({ allErrors: true, strict: false });
+  private readonly ajv: AjvInstance = new AjvCtor({ allErrors: true, strict: false });
 
   /**
    * Serialize a value into query parameter format supporting nested structures
@@ -86,12 +92,12 @@ export class RestProvider extends ToolProvider {
       const validate = this.ajv.compile(cfg.parametersSchema);
       const ok = validate(parameters);
       if (!ok) {
-      const list = Array.isArray(validate.errors) ? validate.errors : [];
-      const errs = list.map((e) => {
-        const inst = typeof e.instancePath === 'string' ? e.instancePath : '';
-        const msg = typeof e.message === 'string' ? e.message : '';
-        return `${inst} ${msg}`.trim();
-      }).join('; ');
+        const list = Array.isArray(validate.errors) ? (validate.errors as AjvErrorObject[]) : [];
+        const errs = list.map((error) => {
+          const inst = typeof error.instancePath === 'string' ? error.instancePath : '';
+          const msg = typeof error.message === 'string' ? error.message : '';
+          return `${inst} ${msg}`.trim();
+        }).join('; ');
         throw new Error(`Invalid arguments: ${errs}`);
       }
     } catch (e) {

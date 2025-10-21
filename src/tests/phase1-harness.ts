@@ -602,7 +602,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-9 should complete with failure report.');
       const finalReport = result.finalReport;
-      invariant(finalReport !== undefined && finalReport.status === 'failure', 'Final report should mark failure for run-test-9.');
+      invariant(finalReport?.status === 'failure', 'Final report should mark failure for run-test-9.');
       const log = result.logs.find((entry) => typeof entry.message === 'string' && entry.message.includes('Unknown tool requested'));
       invariant(log !== undefined, 'Unknown tool warning log expected for run-test-9.');
     },
@@ -636,7 +636,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-12 expected success.');
       const finalReport = result.finalReport;
-      invariant(finalReport !== undefined && finalReport.status === 'success', 'Final report should complete successfully for run-test-12.');
+      invariant(finalReport?.status === 'success', 'Final report should complete successfully for run-test-12.');
       const finalTurnLog = result.logs.find((log) => typeof log.remoteIdentifier === 'string' && log.remoteIdentifier.includes('primary:') && typeof log.message === 'string' && log.message.includes('final turn'));
       invariant(finalTurnLog !== undefined, 'LLM request log should reflect final turn for run-test-12.');
     },
@@ -671,11 +671,11 @@ const TEST_SCENARIOS: HarnessTest[] = [
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-14 should conclude with failure report.');
       const finalReport = result.finalReport;
-      invariant(finalReport !== undefined && finalReport.status === 'failure', 'Final report should mark failure for run-test-14.');
+      invariant(finalReport?.status === 'failure', 'Final report should mark failure for run-test-14.');
       const log = result.logs.find((entry) => typeof entry.message === 'string' && entry.message.includes('error agent__batch'));
       invariant(log !== undefined, 'Batch execution failure log expected for run-test-14.');
       const batchAccounting = result.accounting.filter(isToolAccounting).find((entry) => entry.command === 'agent__batch');
-      invariant(batchAccounting !== undefined && batchAccounting.status === 'failed', 'Batch accounting must record failure for run-test-14.');
+      invariant(batchAccounting?.status === 'failed', 'Batch accounting must record failure for run-test-14.');
     },
   },
   {
@@ -742,7 +742,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-17 expected success.');
       const finalReport = result.finalReport;
-      invariant(finalReport !== undefined && finalReport.status === 'success', 'Final report should indicate success for run-test-17.');
+      invariant(finalReport?.status === 'success', 'Final report should indicate success for run-test-17.');
     },
   },
   {
@@ -842,7 +842,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-24 expected success.');
       const subAgentAccounting = result.accounting.filter(isToolAccounting).find((entry) => entry.command === SUBAGENT_SUCCESS_TOOL);
-      invariant(subAgentAccounting !== undefined && subAgentAccounting.status === 'ok', 'Successful sub-agent accounting expected for run-test-24.');
+      invariant(subAgentAccounting?.status === 'ok', 'Successful sub-agent accounting expected for run-test-24.');
       const subAgentLog = result.logs.find((entry) => entry.remoteIdentifier === 'agent:subagent' && typeof entry.message === 'string' && entry.message.includes(SUBAGENT_SUCCESS_TOOL) && !entry.message.includes('error'));
       invariant(subAgentLog !== undefined, 'Sub-agent success log expected for run-test-24.');
     },
@@ -879,7 +879,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-25 expected success.');
       const finalReport = result.finalReport;
-      invariant(finalReport !== undefined && finalReport.status === 'success', 'Final report should indicate success for run-test-25.');
+      invariant(finalReport?.status === 'success', 'Final report should indicate success for run-test-25.');
 
       const toolEntries = result.accounting.filter(isToolAccounting).filter((entry) => entry.command === 'test__test');
       invariant(toolEntries.length === 2, 'Two tool executions expected for run-test-25.');
@@ -931,14 +931,14 @@ const TEST_SCENARIOS: HarnessTest[] = [
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-26 expected session success.');
       const finalReport = result.finalReport;
-      invariant(finalReport !== undefined && finalReport.status === 'failure', 'Final report should indicate failure for run-test-26.');
+      invariant(finalReport?.status === 'failure', 'Final report should indicate failure for run-test-26.');
       const batchMessage = result.conversation.find(
         (message) => message.role === 'tool' && message.toolCallId === 'call-batch-invalid-id'
       );
       const invalidContent = batchMessage?.content ?? '';
       invariant(invalidContent.includes('invalid_batch_input'), 'Batch tool message should include invalid_batch_input for run-test-26.');
       const batchEntry = result.accounting.filter(isToolAccounting).find((entry) => entry.command === 'agent__batch');
-      invariant(batchEntry !== undefined && batchEntry.status === 'failed' && typeof batchEntry.error === 'string' && batchEntry.error.startsWith('invalid_batch_input'), 'Batch accounting should record invalid input failure for run-test-26.');
+      invariant(batchEntry?.status === 'failed' && typeof batchEntry.error === 'string' && batchEntry.error.startsWith('invalid_batch_input'), 'Batch accounting should record invalid input failure for run-test-26.');
     },
   },
   {
@@ -951,14 +951,14 @@ const TEST_SCENARIOS: HarnessTest[] = [
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-27 expected success.');
       const finalReport = result.finalReport;
-      invariant(finalReport !== undefined && finalReport.status === 'success', 'Final report should indicate success for run-test-27.');
+      invariant(finalReport?.status === 'success', 'Final report should indicate success for run-test-27.');
       const batchMessage = result.conversation.find(
         (message) => message.role === 'tool' && message.toolCallId === 'call-batch-unknown-tool'
       );
       const unknownContent = batchMessage?.content ?? '';
       invariant(unknownContent.includes('UNKNOWN_TOOL'), 'Batch tool message should include UNKNOWN_TOOL for run-test-27.');
       const batchEntry = result.accounting.filter(isToolAccounting).find((entry) => entry.command === 'agent__batch');
-      invariant(batchEntry !== undefined && batchEntry.status === 'ok', 'Batch accounting should record success for run-test-27.');
+      invariant(batchEntry?.status === 'ok', 'Batch accounting should record success for run-test-27.');
     },
   },
   {
@@ -971,14 +971,14 @@ const TEST_SCENARIOS: HarnessTest[] = [
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-28 expected success.');
       const finalReport = result.finalReport;
-      invariant(finalReport !== undefined && finalReport.status === 'failure', 'Final report should indicate failure for run-test-28.');
+      invariant(finalReport?.status === 'failure', 'Final report should indicate failure for run-test-28.');
       const batchMessage = result.conversation.find(
         (message) => message.role === 'tool' && message.toolCallId === 'call-batch-exec-error'
       );
       const errorContent = batchMessage?.content ?? '';
       invariant(errorContent.includes('EXECUTION_ERROR'), 'Batch tool message should include EXECUTION_ERROR for run-test-28.');
       const batchEntry = result.accounting.filter(isToolAccounting).find((entry) => entry.command === 'agent__batch');
-      invariant(batchEntry !== undefined && batchEntry.status === 'ok', 'Batch accounting should remain ok for run-test-28.');
+      invariant(batchEntry?.status === 'ok', 'Batch accounting should remain ok for run-test-28.');
     },
   },
   {
@@ -1003,7 +1003,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-29 expected success after retry.');
       const finalReport = result.finalReport;
-      invariant(finalReport !== undefined && finalReport.status === 'success', 'Final report should indicate success for run-test-29.');
+      invariant(finalReport?.status === 'success', 'Final report should indicate success for run-test-29.');
       const augmented = result as AIAgentResult & { _firstAttempt?: AIAgentResult };
       const firstAttempt = augmented._firstAttempt;
       invariant(firstAttempt !== undefined && !firstAttempt.success, 'First attempt should fail before retry for run-test-29.');
@@ -1022,7 +1022,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-30 expected success.');
       const finalReport = result.finalReport;
-      invariant(finalReport !== undefined && finalReport.status === 'success', 'Final report should indicate success for run-test-30.');
+      invariant(finalReport?.status === 'success', 'Final report should indicate success for run-test-30.');
       const thinkingLog = result.logs.find((entry) => entry.severity === 'THK' && entry.remoteIdentifier === 'thinking');
       invariant(thinkingLog !== undefined, 'Thinking log expected for run-test-30.');
     },
@@ -1032,7 +1032,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-31 expected success after provider throw.');
       const finalReport = result.finalReport;
-      invariant(finalReport !== undefined && finalReport.status === 'success', 'Final report should indicate success for run-test-31.');
+      invariant(finalReport?.status === 'success', 'Final report should indicate success for run-test-31.');
       const thrownLog = result.logs.find((entry) => typeof entry.message === 'string' && entry.message.includes(THROW_FAILURE_MESSAGE));
       invariant(thrownLog !== undefined, 'Thrown failure log expected for run-test-31.');
       const failedAttempt = result.accounting.filter(isLlmAccounting).find((entry) => entry.status === 'failed');
@@ -1047,7 +1047,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-32 expected success after retry.');
       const finalReport = result.finalReport;
-      invariant(finalReport !== undefined && finalReport.status === 'success' && finalReport.format === 'json', 'Final report should indicate JSON success for run-test-32.');
+      invariant(finalReport?.status === 'success' && finalReport.format === 'json', 'Final report should indicate JSON success for run-test-32.');
       const toolFailureMessage = result.conversation.find((message) => message.role === 'tool' && typeof message.content === 'string' && message.content.includes('final_report(json) requires'));
       invariant(toolFailureMessage !== undefined, 'Final report failure message expected for run-test-32.');
       const llmAttempts = result.accounting.filter(isLlmAccounting).length;
@@ -1062,7 +1062,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-33 should complete with a synthesized failure final report.');
       const finalReport = result.finalReport;
-      invariant(finalReport !== undefined && finalReport.status === 'failure', 'Synthesized failure final report expected for run-test-33.');
+      invariant(finalReport?.status === 'failure', 'Synthesized failure final report expected for run-test-33.');
       invariant(typeof finalReport.content === 'string' && finalReport.content.includes('did not produce a final report'), 'Synthesized content should mention missing final report for run-test-33.');
       const syntheticLog = result.logs.find((entry) => typeof entry.message === 'string' && entry.message.includes('Synthetic retry: assistant returned content without tool calls and without final_report.'));
       invariant(syntheticLog !== undefined, 'Synthetic retry warning expected for run-test-33.');
@@ -1082,7 +1082,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-34 expected success.');
       const finalReport = result.finalReport;
-      invariant(finalReport !== undefined && finalReport.status === 'success', 'Final report should indicate success for run-test-34.');
+      invariant(finalReport?.status === 'success', 'Final report should indicate success for run-test-34.');
       const progressResult = result.conversation.find((message) => message.role === 'tool' && typeof message.content === 'string' && message.content.includes('agent__progress_report'));
       invariant(progressResult !== undefined, 'Batch progress entry expected for run-test-34.');
       const toolMessage = result.conversation.find((message) => message.role === 'tool' && typeof message.content === 'string' && message.content.includes(BATCH_PROGRESS_RESPONSE));
@@ -1099,7 +1099,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-35 expected success.');
       const finalReport = result.finalReport;
-      invariant(finalReport !== undefined && finalReport.status === 'success', 'Final report should indicate success for run-test-35.');
+      invariant(finalReport?.status === 'success', 'Final report should indicate success for run-test-35.');
       const toolMessage = result.conversation.find((message) => message.role === 'tool' && typeof message.content === 'string' && message.content.includes(BATCH_STRING_RESULT));
       invariant(toolMessage !== undefined, 'Batch string tool output expected for run-test-35.');
     },
@@ -1114,11 +1114,11 @@ const TEST_SCENARIOS: HarnessTest[] = [
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-36 expected session completion.');
       const finalReport = result.finalReport;
-      invariant(finalReport !== undefined && finalReport.status === 'failure', 'Final report should indicate failure for run-test-36.');
+      invariant(finalReport?.status === 'failure', 'Final report should indicate failure for run-test-36.');
       const failureMessage = result.conversation.find((message) => message.role === 'tool' && typeof message.content === 'string' && message.content.includes('empty_batch'));
       invariant(failureMessage !== undefined, 'Empty batch failure message expected for run-test-36.');
       const batchEntry = result.accounting.filter(isToolAccounting).find((entry) => entry.command === 'agent__batch');
-      invariant(batchEntry !== undefined && batchEntry.status === 'failed' && typeof batchEntry.error === 'string' && batchEntry.error.startsWith('empty_batch'), 'Batch accounting should record empty batch failure for run-test-36.');
+      invariant(batchEntry?.status === 'failed' && typeof batchEntry.error === 'string' && batchEntry.error.startsWith('empty_batch'), 'Batch accounting should record empty batch failure for run-test-36.');
     },
   },
   {
@@ -1129,7 +1129,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-37 expected success after rate limit retry.');
       const finalReport = result.finalReport;
-      invariant(finalReport !== undefined && finalReport.status === 'success', 'Final report should indicate success for run-test-37.');
+      invariant(finalReport?.status === 'success', 'Final report should indicate success for run-test-37.');
       const rateLimitLog = result.logs.find((entry) => typeof entry.message === 'string' && entry.message.toLowerCase().includes(RATE_LIMIT_WARNING_TOKEN));
       invariant(rateLimitLog !== undefined, 'Rate limit warning expected for run-test-37.');
       const retryLog = result.logs.find((entry) => entry.remoteIdentifier === 'agent:retry');
@@ -1207,7 +1207,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-42 expected success after model error retry.');
       const finalReport = result.finalReport;
-      invariant(finalReport !== undefined && finalReport.status === 'success', 'Final report should indicate success for run-test-42.');
+      invariant(finalReport?.status === 'success', 'Final report should indicate success for run-test-42.');
       const failedAttempt = result.accounting.filter(isLlmAccounting).find((entry) => entry.status === 'failed');
       invariant(failedAttempt !== undefined && typeof failedAttempt.error === 'string' && failedAttempt.error.includes('Invalid model request'), 'Model error accounting expected for run-test-42.');
     },
@@ -1253,7 +1253,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-50 expected success.');
       const finalReport = result.finalReport;
-      invariant(finalReport !== undefined && finalReport.format === SLACK_OUTPUT_FORMAT, 'Slack final report expected for run-test-50.');
+      invariant(finalReport?.format === SLACK_OUTPUT_FORMAT, 'Slack final report expected for run-test-50.');
       const metadataCandidate = finalReport.metadata;
       const slackCandidate = (metadataCandidate !== undefined && typeof metadataCandidate === 'object' && !Array.isArray(metadataCandidate))
         ? (metadataCandidate as { slack?: unknown }).slack
@@ -1276,7 +1276,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-51 should complete the session.');
       const finalReport = result.finalReport;
-      invariant(finalReport !== undefined && finalReport.status === 'failure', 'Final report should indicate failure for run-test-51.');
+      invariant(finalReport?.status === 'failure', 'Final report should indicate failure for run-test-51.');
       const errorLog = result.logs.find((entry) => entry.severity === 'ERR' && typeof entry.message === 'string' && entry.message.includes('requires `messages` or non-empty `content`'));
       invariant(errorLog !== undefined, 'Slack content error log expected for run-test-51.');
     },
@@ -1289,7 +1289,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-52 expected success.');
       const finalReport = result.finalReport;
-      invariant(finalReport !== undefined && finalReport.format === SLACK_OUTPUT_FORMAT, 'Slack final report expected for run-test-52.');
+      invariant(finalReport?.format === SLACK_OUTPUT_FORMAT, 'Slack final report expected for run-test-52.');
       const metadataCandidate = finalReport.metadata;
       const slackCandidate = (metadataCandidate !== undefined && typeof metadataCandidate === 'object' && !Array.isArray(metadataCandidate))
         ? (metadataCandidate as { slack?: unknown }).slack
@@ -1694,7 +1694,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
       invariant(trcRequestLog !== undefined, 'TRC request log expected for run-test-55.');
       const trcResponseLog = result.logs.find((entry) => entry.severity === 'TRC' && entry.message.includes('LLM response') && (entry.message.includes('raw-sse') || entry.message.includes('text/event-stream')));
       if (trcResponseLog === undefined) {
-        // eslint-disable-next-line no-console
+         
         console.error(JSON.stringify(result.logs, null, 2));
         invariant(false, 'TRC response log with SSE expected for run-test-55.');
       }
@@ -1702,7 +1702,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
       invariant(errorTrace !== undefined, 'HTTP error trace expected for run-test-55.');
       const successLog = result.logs.find((entry) => entry.severity === 'VRB' && entry.message.includes('cacheW 42'));
       if (successLog === undefined) {
-        // eslint-disable-next-line no-console
+         
         console.error(JSON.stringify(result.logs, null, 2));
       }
       invariant(successLog !== undefined && successLog.message.includes('cost $') && successLog.message.includes('upstream'), 'Cost log expected for run-test-55.');
@@ -1715,7 +1715,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
       const routingAfterJson = report.routingAfterJson;
       assertRecord(routingAfterJson, 'JSON routing metadata expected for run-test-55.');
       if (routingAfterJson.provider === undefined || routingAfterJson.model === undefined) {
-        // eslint-disable-next-line no-console
+         
         console.error('debug run-test-55 routingAfterJson', routingAfterJson, report);
       }
       invariant(routingAfterJson.provider === 'fireworks', 'JSON routing provider expected for run-test-55.');
@@ -1770,7 +1770,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
       expect: (result) => {
         invariant(result.success, 'Scenario run-test-57 should complete successfully.');
         const finalReport = result.finalReport;
-        invariant(finalReport !== undefined && finalReport.format === SLACK_OUTPUT_FORMAT, 'Slack final report expected for run-test-57.');
+        invariant(finalReport?.format === SLACK_OUTPUT_FORMAT, 'Slack final report expected for run-test-57.');
         const metadataCandidate = finalReport.metadata;
         const slackCandidate = metadataCandidate !== undefined && typeof metadataCandidate === 'object' && !Array.isArray(metadataCandidate)
           ? (metadataCandidate as { slack?: unknown }).slack
@@ -2133,7 +2133,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
         const toolEntries = result.accounting.filter(isToolAccounting);
         invariant(toolEntries.some((entry) => entry.command === 'test__test'), 'Tool accounting entry for test__test expected for run-test-58.');
         const finalReport = result.finalReport;
-        invariant(finalReport !== undefined && finalReport.status === 'success', 'Final report should indicate success for run-test-58.');
+        invariant(finalReport?.status === 'success', 'Final report should indicate success for run-test-58.');
       },
     };
   })(),
@@ -2231,7 +2231,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
         invariant(llmEntry.originTxnId === TRACE_CONTEXT.originId, 'Trace context should preserve originTxnId on LLM accounting entry for run-test-60.');
         invariant(llmEntry.parentTxnId === TRACE_CONTEXT.parentId, 'Trace context should preserve parentTxnId on LLM accounting entry for run-test-60.');
         const finalReport = result.finalReport;
-        invariant(finalReport !== undefined && finalReport.status === 'success', 'Final report should indicate success for run-test-60.');
+        invariant(finalReport?.status === 'success', 'Final report should indicate success for run-test-60.');
       },
     };
   })(),
@@ -2263,7 +2263,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
         const limitLog = capturedLogs.find((entry) => entry.remoteIdentifier === 'agent:limits' && typeof entry.message === 'string' && entry.message.includes(TOOL_LIMIT_WARNING_MESSAGE));
         invariant(limitLog !== undefined, 'Limit enforcement log expected for run-test-61.');
         const finalReport = result.finalReport;
-        invariant(finalReport !== undefined && finalReport.status === 'failure', 'Final report should indicate failure for run-test-61.');
+        invariant(finalReport?.status === 'failure', 'Final report should indicate failure for run-test-61.');
       },
     };
   })(),
@@ -2311,7 +2311,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
       execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
         initRecords.length = 0;
         const providerProto = MCPProvider.prototype as unknown as { initializeServer: (this: MCPProvider, name: string, config: MCPServerConfig) => Promise<unknown> };
-        // eslint-disable-next-line @typescript-eslint/unbound-method -- capture original method for restoration after interception
+         
         const originalInitialize = providerProto.initializeServer;
         providerProto.initializeServer = async function(this: MCPProvider, name: string, config: MCPServerConfig) {
           const start = Date.now();
@@ -2337,7 +2337,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
         const traceLog = result.logs.find((entry) => entry.remoteIdentifier === 'trace:agent:agent');
         invariant(traceLog !== undefined, 'Trace log expected for run-test-63.');
         const finalReport = result.finalReport;
-        invariant(finalReport !== undefined && finalReport.status === 'success', 'Final report should indicate success for run-test-63.');
+        invariant(finalReport?.status === 'success', 'Final report should indicate success for run-test-63.');
       },
     };
   })(),
@@ -2628,7 +2628,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
           | { tokens?: { cacheWriteInputTokens?: number; inputTokens?: number; outputTokens?: number; totalTokens?: number }; routing?: { provider?: string; model?: string }; costs?: { costUsd?: number; upstreamInferenceCostUsd?: number } }
           | undefined;
         invariant(data !== undefined, 'Final report data expected for run-test-68.');
-        invariant(data.tokens !== undefined && data.tokens.cacheWriteInputTokens === 321, 'Cache write enrichment expected for run-test-68.');
+        invariant(data.tokens?.cacheWriteInputTokens === 321, 'Cache write enrichment expected for run-test-68.');
         invariant(data.routing !== undefined && data.routing.provider === undefined && data.routing.model === undefined, 'Routing should remain empty for run-test-68.');
         invariant(data.costs !== undefined && data.costs.costUsd === undefined && data.costs.upstreamInferenceCostUsd === undefined, 'Cost info should remain empty for run-test-68.');
         invariant(result.logs.some((entry) => entry.severity === 'TRC' && typeof entry.remoteIdentifier === 'string' && entry.remoteIdentifier.startsWith('trace:')), 'Trace log expected for run-test-68.');
@@ -3577,7 +3577,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
           'Final report validation error should be surfaced in tool response for run-test-74.'
         );
         const finalReport = result.finalReport;
-        invariant(finalReport !== undefined && finalReport.status === 'success', 'Final report should succeed after retry for run-test-74.');
+        invariant(finalReport?.status === 'success', 'Final report should succeed after retry for run-test-74.');
       },
     };
   })(),
@@ -3789,19 +3789,19 @@ const TEST_SCENARIOS: HarnessTest[] = [
       const data = result.finalReport?.content_json as Record<string, TurnStatus> | undefined;
       invariant(data !== undefined, 'Status summary expected for run-test-83.');
       const auth = data.auth as TurnStatus | undefined;
-      invariant(auth !== undefined && auth.type === 'auth_error' && typeof auth.message === 'string' && auth.message.toLowerCase().includes('invalid api key'), 'Auth error mapping mismatch for run-test-83.');
+      invariant(auth?.type === 'auth_error' && typeof auth.message === 'string' && auth.message.toLowerCase().includes('invalid api key'), 'Auth error mapping mismatch for run-test-83.');
       const quota = data.quota as TurnStatus | undefined;
-      invariant(quota !== undefined && quota.type === 'quota_exceeded' && typeof quota.message === 'string' && quota.message.toLowerCase().includes('quota'), 'Quota error mapping mismatch for run-test-83.');
+      invariant(quota?.type === 'quota_exceeded' && typeof quota.message === 'string' && quota.message.toLowerCase().includes('quota'), 'Quota error mapping mismatch for run-test-83.');
       const rate = data.rate as TurnStatus | undefined;
-      invariant(rate !== undefined && rate.type === 'rate_limit', 'Rate limit mapping mismatch for run-test-83.');
+      invariant(rate?.type === 'rate_limit', 'Rate limit mapping mismatch for run-test-83.');
       invariant(rate.retryAfterMs === 3000, 'Rate limit retryAfterMs mismatch for run-test-83.');
       const timeout = data.timeout as TurnStatus | undefined;
-      invariant(timeout !== undefined && timeout.type === 'timeout' && typeof timeout.message === 'string', 'Timeout mapping mismatch for run-test-83.');
+      invariant(timeout?.type === 'timeout' && typeof timeout.message === 'string', 'Timeout mapping mismatch for run-test-83.');
       const network = data.network as TurnStatus | undefined;
       const networkRetryable = (network as { retryable?: boolean } | undefined)?.retryable ?? true;
-      invariant(network !== undefined && network.type === 'network_error' && networkRetryable, 'Network mapping mismatch for run-test-83.');
+      invariant(network?.type === 'network_error' && networkRetryable, 'Network mapping mismatch for run-test-83.');
       const model = data.model as TurnStatus | undefined;
-      invariant(model !== undefined && model.type === 'model_error' && typeof model.message === 'string', 'Model error mapping mismatch for run-test-83.');
+      invariant(model?.type === 'model_error' && typeof model.message === 'string', 'Model error mapping mismatch for run-test-83.');
     },
   },
   {
@@ -3883,12 +3883,12 @@ const TEST_SCENARIOS: HarnessTest[] = [
       invariant(result.success, 'Scenario run-test-84 expected success.');
       const finalTurnLog = result.logs.find((entry) => entry.remoteIdentifier === 'agent:final-turn');
       if (finalTurnLog === undefined) {
-        // eslint-disable-next-line no-console
+         
         console.error('run-test-84 logs:', result.logs.map((entry) => ({ id: entry.remoteIdentifier, severity: entry.severity, message: entry.message })));
       }
       invariant(finalTurnLog !== undefined, 'Final-turn warning log expected for run-test-84.');
       const finalReport = result.finalReport;
-      invariant(finalReport !== undefined && finalReport.status === 'success', 'Final report should succeed for run-test-84.');
+      invariant(finalReport?.status === 'success', 'Final report should succeed for run-test-84.');
     },
   },
   {
@@ -3976,7 +3976,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
       invariant(ajvLog !== undefined, 'AJV warning expected for run-test-85.');
       invariant(typeof ajvLog.message === 'string' && ajvLog.message.includes('payload preview='), 'Payload preview missing in AJV warning for run-test-85.');
       const finalReport = result.finalReport;
-      invariant(finalReport !== undefined && finalReport.format === 'json', 'Final report should be json for run-test-85.');
+      invariant(finalReport?.format === 'json', 'Final report should be json for run-test-85.');
     },
   },
   {
@@ -4021,7 +4021,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
       invariant(nonFinalObservation !== undefined, 'Non-final turn observation missing for run-test-86.');
       invariant(nonFinalObservation.output.length > 1, 'Non-final turn should retain multiple tools.');
       const finalReport = result.finalReport;
-      invariant(finalReport !== undefined && finalReport.status === 'success', 'Final report should succeed for run-test-86.');
+      invariant(finalReport?.status === 'success', 'Final report should succeed for run-test-86.');
     },
   },
   {
@@ -4312,7 +4312,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
       const assistantMessages = result.conversation.filter((message) => message.role === 'assistant');
       invariant(assistantMessages.length === 2, 'Two assistant messages expected after retry for run-test-90.');
       const firstAssistant = assistantMessages[0];
-      invariant(firstAssistant.toolCalls !== undefined && firstAssistant.toolCalls.length === 1, 'Single sanitized tool call expected for run-test-90.');
+      invariant(firstAssistant.toolCalls?.length === 1, 'Single sanitized tool call expected for run-test-90.');
       const retainedCall = firstAssistant.toolCalls[0];
       invariant(retainedCall.name === 'test__test', 'Retained tool call name mismatch for run-test-90.');
       const textValue = (retainedCall.parameters as { text?: unknown }).text;
@@ -4325,7 +4325,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
       const llmAttempts = result.accounting.filter(isLlmAccounting).length;
       invariant(llmAttempts === 3, 'Three LLM attempts expected for run-test-90.');
       const finalReport = result.finalReport;
-      invariant(finalReport !== undefined && finalReport.status === 'success', 'Final report should succeed after sanitizer retry (run-test-90).');
+      invariant(finalReport?.status === 'success', 'Final report should succeed after sanitizer retry (run-test-90).');
     },
   },
   {
@@ -4408,7 +4408,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
       const assistantMessages = result.conversation.filter((message) => message.role === 'assistant');
       invariant(assistantMessages.length >= 1, 'Assistant message expected for run-test-90-string.');
       const firstAssistant = assistantMessages[0];
-      invariant(firstAssistant.toolCalls !== undefined && firstAssistant.toolCalls.length === 1, 'Single tool call expected for run-test-90-string.');
+      invariant(firstAssistant.toolCalls?.length === 1, 'Single tool call expected for run-test-90-string.');
       const firstCall = firstAssistant.toolCalls[0];
       invariant(firstCall.name === 'test__test', 'Tool call name mismatch for run-test-90-string.');
       const textValue = (firstCall.parameters as { text?: unknown }).text;
@@ -4416,7 +4416,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
       const llmAttempts = result.accounting.filter(isLlmAccounting).length;
       invariant(llmAttempts === 2, 'Two LLM attempts expected for run-test-90-string.');
       const finalReport = result.finalReport;
-      invariant(finalReport !== undefined && finalReport.status === 'success', 'Final report should succeed for run-test-90-string.');
+      invariant(finalReport?.status === 'success', 'Final report should succeed for run-test-90-string.');
     },
   },
   {
@@ -4491,7 +4491,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
       const attempts = result.accounting.filter(isLlmAccounting).length;
       invariant(attempts === 2, 'Two LLM attempts expected for run-test-90-rate-limit.');
       const finalReport = result.finalReport;
-      invariant(finalReport !== undefined && finalReport.status === 'success', 'Final report should succeed for run-test-90-rate-limit.');
+      invariant(finalReport?.status === 'success', 'Final report should succeed for run-test-90-rate-limit.');
     },
   },
   {
@@ -4537,17 +4537,17 @@ const TEST_SCENARIOS: HarnessTest[] = [
       invariant(finalReport.status === 'success', 'Final report status mismatch for run-test-90-adopt-text.');
       invariant(finalReport.format === 'markdown', 'Final report format mismatch for run-test-90-adopt-text.');
       invariant(finalReport.content === ADOPTED_FINAL_CONTENT, 'Final report content mismatch for run-test-90-adopt-text.');
-      invariant(finalReport.metadata !== undefined && finalReport.metadata.origin === ADOPTION_METADATA_ORIGIN, 'Final report metadata missing for run-test-90-adopt-text.');
-      invariant(finalReport.content_json !== undefined && finalReport.content_json.key === ADOPTION_CONTENT_VALUE, 'Final report content_json missing for run-test-90-adopt-text.');
+      invariant(finalReport.metadata?.origin === ADOPTION_METADATA_ORIGIN, 'Final report metadata missing for run-test-90-adopt-text.');
+      invariant(finalReport.content_json?.key === ADOPTION_CONTENT_VALUE, 'Final report content_json missing for run-test-90-adopt-text.');
       const assistantMessages = result.conversation.filter((message) => message.role === 'assistant');
       invariant(assistantMessages.length === 1, 'Single assistant message expected for run-test-90-adopt-text.');
       const adoptedCall = assistantMessages[0].toolCalls;
-      invariant(adoptedCall !== undefined && adoptedCall.length === 1, 'Synthetic final report tool call missing for run-test-90-adopt-text.');
+      invariant(adoptedCall?.length === 1, 'Synthetic final report tool call missing for run-test-90-adopt-text.');
       invariant(adoptedCall[0].name === 'agent__final_report', 'Synthetic tool call name mismatch for run-test-90-adopt-text.');
       const adoptedParams = adoptedCall[0].parameters as { report_format?: unknown; metadata?: { origin?: string }; content_json?: { key?: string } };
       invariant(adoptedParams.report_format === 'markdown', 'Synthetic call report_format mismatch for run-test-90-adopt-text.');
-      invariant(adoptedParams.metadata !== undefined && adoptedParams.metadata.origin === ADOPTION_METADATA_ORIGIN, 'Synthetic call metadata mismatch for run-test-90-adopt-text.');
-      invariant(adoptedParams.content_json !== undefined && adoptedParams.content_json.key === ADOPTION_CONTENT_VALUE, 'Synthetic call content_json mismatch for run-test-90-adopt-text.');
+      invariant(adoptedParams.metadata?.origin === ADOPTION_METADATA_ORIGIN, 'Synthetic call metadata mismatch for run-test-90-adopt-text.');
+      invariant(adoptedParams.content_json?.key === ADOPTION_CONTENT_VALUE, 'Synthetic call content_json mismatch for run-test-90-adopt-text.');
     },
   },
   {
@@ -4665,7 +4665,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
     expect: (result: AIAgentResult) => {
       invariant(result.success, 'Scenario run-test-90-no-retry expected success.');
       const finalReport = result.finalReport;
-      invariant(finalReport !== undefined && finalReport.status === 'success', 'Final report missing for run-test-90-no-retry.');
+      invariant(finalReport?.status === 'success', 'Final report missing for run-test-90-no-retry.');
       invariant(finalReport.content === FINAL_REPORT_SANITIZED_CONTENT, 'Final report content mismatch for run-test-90-no-retry.');
       invariant(finalReport.format === 'markdown', 'Final report format mismatch for run-test-90-no-retry.');
       const systemNotices = result.conversation
@@ -4703,7 +4703,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
       const expectedSanitized = sanitizeToolName(LONG_TOOL_NAME);
       invariant(longNameCall.name === expectedSanitized, 'Sanitized tool name mismatch for run-test-91.');
       const finalReport = result.finalReport;
-      invariant(finalReport !== undefined && finalReport.status === 'success', 'Final report should succeed after mixed tools for run-test-91.');
+      invariant(finalReport?.status === 'success', 'Final report should succeed after mixed tools for run-test-91.');
       invariant(typeof finalReport.content === 'string' && finalReport.content.includes(FINAL_REPORT_RETRY_MESSAGE), 'Final report content mismatch for run-test-91.');
     },
   },
@@ -4854,7 +4854,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
     expect: (result: AIAgentResult) => {
       invariant(result.success, 'Scenario run-test-103 expected success.');
       const finalReport = result.finalReport;
-      invariant(finalReport !== undefined && finalReport.status === 'success', 'Final report missing for run-test-103.');
+      invariant(finalReport?.status === 'success', 'Final report missing for run-test-103.');
       invariant(typeof finalReport.content === 'string' && finalReport.content.includes('REST tool exposure validated.'), 'Final report content mismatch for run-test-103.');
     },
   },
@@ -5385,13 +5385,13 @@ async function runPhaseOne(): Promise<void> {
       result = await runScenario(scenario);
       scenario.expect(result);
       const duration = formatDurationMs(startMs, Date.now());
-      // eslint-disable-next-line no-console
+       
       console.log(`${header} [PASS] ${duration}`);
     } catch (error: unknown) {
       const duration = formatDurationMs(startMs, Date.now());
       const message = toErrorMessage(error);
       const hint = result !== undefined ? formatFailureHint(result) : '';
-      // eslint-disable-next-line no-console
+       
       console.error(`${header} [FAIL] ${duration} - ${message}${hint}`);
       throw error;
     }
@@ -5500,11 +5500,11 @@ async function runPhaseOne(): Promise<void> {
     const blockingHandles = remaining.filter((handle) => !shouldIgnore(handle));
     if (blockingHandles.length > 0) {
       const labels = blockingHandles.map(formatHandle);
-      // eslint-disable-next-line no-console
+       
       console.error(`[warn] lingering handles after cleanup: ${labels.join(', ')}`);
     }
   }
-  // eslint-disable-next-line no-console
+   
   console.log('phase1 scenario: ok');
 }
 
@@ -5514,7 +5514,7 @@ runPhaseOne()
   })
   .catch((error: unknown) => {
     const message = toErrorMessage(error);
-    // eslint-disable-next-line no-console
+     
     console.error(`phase1 scenario failed: ${message}`);
     process.exit(1);
   });

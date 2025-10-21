@@ -60,10 +60,10 @@ async function run(): Promise<void> {
 }
 
 void run()
-  .then(() => { /* eslint-disable no-console */ console.log('smoke-rest-headend ok'); })
+  .then(() => {   console.log('smoke-rest-headend ok'); })
   .catch((err: unknown) => {
     const message = err instanceof Error ? err.message : String(err);
-    /* eslint-disable no-console */
+     
     console.error('smoke-rest-headend failed', message);
     process.exit(1);
   });
