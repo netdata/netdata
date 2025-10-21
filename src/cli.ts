@@ -1,8 +1,6 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { promisify } from 'node:util';
-import { gzip as gzipCallback } from 'node:zlib';
 
 import { Command, Option } from 'commander';
 import * as yaml from 'js-yaml';
@@ -30,8 +28,9 @@ import { resolveIncludes } from './include-resolver.js';
 import { formatLog } from './log-formatter.js';
 import { makeTTYLogCallbacks } from './log-sink-tty.js';
 import { getOptionsByGroup, formatCliNames, OPTIONS_REGISTRY } from './options-registry.js';
+import { mergeCallbacksWithPersistence } from './persistence.js';
 import { MCPProvider } from './tools/mcp-provider.js';
-import { formatAgentResultHumanReadable, setWarningSink, warn } from './utils.js';
+import { formatAgentResultHumanReadable, setWarningSink } from './utils.js';
 import { VERSION } from './version.generated.js';
 
 // FrontmatterOptions is sourced from frontmatter.ts (single definition)
@@ -53,8 +52,6 @@ function exitWith(code: number, reason: string, tag = 'EXIT-CLI'): never {
   // TypeScript: inform this never returns
   throw new Error('unreachable');
 }
-
-const gzip = promisify(gzipCallback);
 
 const program = new Command();
 const defaultWarningSink = (message: string): void => {
@@ -1527,47 +1524,7 @@ function createCallbacks(
   const resolvedSessionsDir = persistence?.sessionsDir ?? (defaultBase !== undefined ? path.join(defaultBase, 'sessions') : undefined);
   const resolvedLedgerFile = accountingFile ?? persistence?.billingFile ?? (defaultBase !== undefined ? path.join(defaultBase, 'accounting.jsonl') : undefined);
 
-  const snapshotHandler: NonNullable<AIAgentCallbacks['onSessionSnapshot']> = async (payload) => {
-    if (resolvedSessionsDir === undefined) {
-      return;
-    }
-    try {
-      await fs.promises.mkdir(resolvedSessionsDir, { recursive: true });
-      const json = JSON.stringify({
-        version: payload.snapshot.version,
-        reason: payload.reason,
-        opTree: payload.snapshot.opTree,
-      });
-      const gz = await gzip(Buffer.from(json, 'utf8'));
-      const filePath = path.join(resolvedSessionsDir, `${payload.originId}.json.gz`);
-      const tmp = `${filePath}.tmp-${String(process.pid)}-${String(Date.now())}`;
-      await fs.promises.writeFile(tmp, gz);
-      await fs.promises.rename(tmp, filePath);
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : String(error);
-      warn(`cli snapshot persistence failed: ${message}`);
-    }
-  };
-
-  const ledgerHandler: NonNullable<AIAgentCallbacks['onAccountingFlush']> = async (payload) => {
-    if (resolvedLedgerFile === undefined) {
-      return;
-    }
-    try {
-      const dir = path.dirname(resolvedLedgerFile);
-      await fs.promises.mkdir(dir, { recursive: true });
-      if (payload.entries.length === 0) {
-        return;
-      }
-      const lines = payload.entries.map((entry) => JSON.stringify(entry));
-      await fs.promises.appendFile(resolvedLedgerFile, `${lines.join('\n')}\n`, 'utf8');
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : String(error);
-      warn(`cli accounting persistence failed: ${message}`);
-    }
-  };
-
-  return {
+  const baseCallbacks: AIAgentCallbacks = {
     onLog: (entry: LogEntry) => {
       if (entry.severity !== 'THK' && thinkingOpen && !lastCharWasNewline) {
         try { process.stderr.write('\n'); } catch { /* ignore */ }
@@ -1603,9 +1560,14 @@ function createCallbacks(
     onAccounting: (_entry: AccountingEntry) => {
       // No per-entry file writes from CLI; consolidated flush occurs via onAccountingFlush.
     },
-    onSessionSnapshot: snapshotHandler,
-    onAccountingFlush: ledgerHandler,
   };
+
+  const persistenceConfig = {
+    sessionsDir: resolvedSessionsDir,
+    billingFile: resolvedLedgerFile,
+  };
+
+  return mergeCallbacksWithPersistence(baseCallbacks, persistenceConfig) ?? baseCallbacks;
 }
 
 
