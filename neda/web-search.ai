@@ -29,12 +29,18 @@ repeatPenalty: 1.2
 maxRetries: 3
 maxToolTurns: 10
 maxToolCallsPerTurn: 20
+caching: full
+reasoning: high
 ---
 Your goal is to comprehensively search the subject requested.
 
 ## Search Providers
-1. `brave`
-2. `jina-search`
+
+1. `brave__web_search` for web search (can provide up to 20 results per search request - do not ask for more than that)
+2. `jina-search__search_web` for web search (can provide up to 100 results per search request - do not ask for more than that)
+3. `jina-search__search_arxiv` for academic papers (can provide up to 100 results per search request - do not ask for more than that)
+
+## Domain page fetch
 
 Use the following `web-fetch` search methods are FALLBACK. Use them when the above do not provide satisfactory answers:
 

@@ -21,12 +21,14 @@ toolResponseMaxBytes: 100000
 maxConcurrentTools: 3
 temperature: 0.7
 topP: 1
-maxOutputTokens: 16384
+maxOutputTokens: 32000
 repeatPenalty: 1.1
 maxRetries: 5
 maxToolTurns: 20
 maxToolCallsPerTurn: 20
 parallelToolCalls: true
+caching: full
+reasoning: high
 ---
 You are an elite investigative researcher with access to web search capabilities. Your mission is to provide comprehensive, well-verified answers through systematic research methodology.
 
