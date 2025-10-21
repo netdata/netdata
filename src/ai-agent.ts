@@ -1498,6 +1498,20 @@ export class AIAgentSession {
             // For markdown/text, no onOutput; CLI will print via formatter
           }
 
+          const finalOutput = (() => {
+            if (fr.format === 'json' && fr.content_json !== undefined) {
+              try { return JSON.stringify(fr.content_json); } catch { return undefined; }
+            }
+            if (typeof fr.content === 'string' && fr.content.length > 0) return fr.content;
+            return undefined;
+          })();
+          if (finalOutput !== undefined && this.sessionConfig.callbacks?.onOutput !== undefined) {
+            this.sessionConfig.callbacks.onOutput(finalOutput);
+            if (!finalOutput.endsWith('\n')) {
+              this.sessionConfig.callbacks.onOutput('\n');
+            }
+          }
+
           // Log successful exit
         this.logExit('EXIT-FINAL-ANSWER', `Final report received (${AIAgentSession.FINAL_REPORT_TOOL}), session complete`, currentTurn);
 
@@ -1575,10 +1589,9 @@ export class AIAgentSession {
               // Output response text if we have any (even with tool calls)
               // Only in non-streaming mode (streaming already called onOutput per chunk)
               if (this.sessionConfig.stream !== true && turnResult.response !== undefined && turnResult.response.length > 0) {
-                this.sessionConfig.callbacks?.onOutput?.(turnResult.response);
-                // Add newline if response doesn't end with one
+                this.sessionConfig.callbacks?.onThinking?.(turnResult.response);
                 if (!turnResult.response.endsWith('\n')) {
-                  this.sessionConfig.callbacks?.onOutput?.('\n');
+                  this.sessionConfig.callbacks?.onThinking?.('\n');
                 }
               }
 
