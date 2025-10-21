@@ -24,7 +24,7 @@
     "node": ">=20"
   },
   "dependencies": {
-    "@ai-sdk/anthropic": "2.0.34",
+    "@ai-sdk/anthropic": "^2.0.35",
     "@ai-sdk/google": "2.0.23",
     "@ai-sdk/openai": "2.0.53",
     "@ai-sdk/provider-utils": "^3.0.12",
@@ -33,7 +33,7 @@
     "@slack/bolt": "^4.5.0",
     "ai": "5.0.76",
     "ajv": "^8.17.1",
-    "commander": "14.0.0",
+    "commander": "^14.0.1",
     "express": "^5.1.0",
     "js-yaml": "^4.1.0",
     "ollama-ai-provider-v2": "1.5.0",
@@ -42,7 +42,7 @@
   },
   "devDependencies": {
     "@types/express": "^5.0.3",
-    "@types/node": "^24.9.0",
+    "@types/node": "^24.9.1",
     "@types/ws": "^8.5.12",
     "@typescript-eslint/eslint-plugin": "^8.46.2",
     "@typescript-eslint/parser": "^8.46.2",
