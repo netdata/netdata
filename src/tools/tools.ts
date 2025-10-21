@@ -118,7 +118,7 @@ export class ToolsOrchestrator {
     parameters: Record<string, unknown>,
     ctx: ToolExecutionContext,
     opts?: ToolExecuteOptions
-  ): Promise<{ result: string; providerLabel: string; latency: number }> {
+  ): Promise<{ result: string; providerLabel: string; latency: number; charactersIn: number; charactersOut: number }> {
     if (this.canceled) throw new Error('canceled');
     const bypass = opts?.bypassConcurrency === true;
     if (!bypass) await this.acquireSlot();
@@ -464,6 +464,7 @@ export class ToolsOrchestrator {
       type: 'tool', timestamp: start, status: 'ok', latency,
       mcpServer: providerLabel, command: name, charactersIn, charactersOut: result.length,
     };
+    try { this.onAccounting?.(accOk); } catch (e) { warn(`tools accounting dispatch failed: ${e instanceof Error ? e.message : String(e)}`); }
     try { if (opId !== undefined) this.opTree.appendAccounting(opId, accOk); } catch (e) { warn(`tools accounting append failed: ${e instanceof Error ? e.message : String(e)}`); }
     // accounting will be attached under op
     // Optional: child accounting (from sub-agents)
@@ -490,7 +491,7 @@ export class ToolsOrchestrator {
       }
     } catch (e) { warn(`tools finalize failed: ${e instanceof Error ? e.message : String(e)}`); }
     if (!bypass) this.releaseSlot();
-    return { result, providerLabel, latency };
+    return { result, providerLabel, latency, charactersIn, charactersOut: result.length };
   }
 
   private async acquireSlot(): Promise<void> {

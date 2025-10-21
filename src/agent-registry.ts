@@ -87,6 +87,12 @@ export class AgentRegistry {
     return this.resolveAgentId(agentId) !== undefined;
   }
 
+  public getPersistence(agentId: string): { sessionsDir?: string; billingFile?: string } | undefined {
+    const actualId = this.resolveAgentId(agentId);
+    const agent = actualId !== undefined ? this.agents.get(actualId) : undefined;
+    return agent?.config.persistence;
+  }
+
   public async spawnSession(args: SpawnSessionArgs): Promise<AIAgentSession> {
     const actualId = this.resolveAgentId(args.agentId);
     const agent = actualId !== undefined ? this.agents.get(actualId) : undefined;

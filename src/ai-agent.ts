@@ -2578,6 +2578,23 @@ export class AIAgentSession {
               disableGlobalTimeout: isBatchTool
             }
           );
+          const successEntry: AccountingEntry = {
+            type: 'tool',
+            timestamp: startTime,
+            status: 'ok',
+            latency: managed.latency,
+            mcpServer: managed.providerLabel,
+            command: effectiveToolName,
+            charactersIn: managed.charactersIn,
+            charactersOut: managed.charactersOut,
+            agentId: this.sessionConfig.agentId,
+            callPath: this.callPath,
+            txnId: this.txnId,
+            parentTxnId: this.parentTxnId,
+            originTxnId: this.originTxnId
+          };
+          accounting.push(successEntry);
+          try { this.sessionConfig.callbacks?.onAccounting?.(successEntry); } catch (e) { warn(`tool accounting callback failed: ${e instanceof Error ? e.message : String(e)}`); }
           // Ensure we always return a valid string
           return managed.result || '(no output)';
         }
@@ -2834,7 +2851,7 @@ export class AIAgentSession {
         if (!(this.toolsOrchestrator?.hasTool(c.tool) ?? false)) {
           return { id: c.id, tool: c.tool, ok: false, elapsedMs: 0, error: { code: 'UNKNOWN_TOOL', message: `Unknown tool: ${c.tool}` } };
         }
-        const orchestrator = (this.toolsOrchestrator as unknown) as { executeWithManagement: (t: string, a: Record<string, unknown>, ctx: { turn: number; subturn: number }, opts?: { timeoutMs?: number }) => Promise<{ result: string; latency: number }> };
+        const orchestrator = (this.toolsOrchestrator as unknown) as { executeWithManagement: (t: string, a: Record<string, unknown>, ctx: { turn: number; subturn: number }, opts?: { timeoutMs?: number }) => Promise<{ result: string; latency: number; charactersIn: number; charactersOut: number; providerLabel: string }> };
         const managed = await orchestrator.executeWithManagement(c.tool, c.parameters, { turn: currentTurn, subturn: 0 }, { timeoutMs: this.sessionConfig.toolTimeout });
         return { id: c.id, tool: c.tool, ok: true, elapsedMs: managed.latency, output: managed.result };
       } catch (e) {

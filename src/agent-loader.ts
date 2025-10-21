@@ -18,6 +18,7 @@ import { resolveEffectiveOptions } from './options-resolver.js';
 import { buildEffectiveOptionsSchema } from './options-schema.js';
 import { openApiToRestTools, parseOpenAPISpec } from './tools/openapi-importer.js';
 import { clampToolName, sanitizeToolName } from './utils.js';
+import { mergeCallbacksWithPersistence } from './persistence.js';
 
 
 export interface LoadedAgent {
@@ -556,6 +557,7 @@ function constructLoadedAgent(args: ConstructAgentArgs): LoadedAgent {
       // Harness expectations rely on the session receiving the exact array instance from callers.
       ancestors: Array.isArray(o.ancestors) ? o.ancestors : ancestorChain,
     };
+    sessionConfig.callbacks = mergeCallbacksWithPersistence(sessionConfig.callbacks, config.persistence);
     return Promise.resolve(Agent.create(sessionConfig));
   };
 

@@ -7,6 +7,8 @@ import type { AgentMetadata, AgentRegistry } from '../agent-registry.js';
 import type { AccountingEntry, AIAgentCallbacks, LLMAccountingEntry, LogEntry, ProgressEvent, ProgressMetrics } from '../types.js';
 import type { Headend, HeadendClosedEvent, HeadendContext, HeadendDescription } from './types.js';
 
+import { mergeCallbacksWithPersistence } from '../persistence.js';
+
 import { ConcurrencyLimiter } from './concurrency.js';
 import { HttpError, readJson, writeJson, writeSseChunk, writeSseDone } from './http-utils.js';
 import { escapeMarkdown, formatMetricsLine, italicize } from './summary-utils.js';
@@ -14,6 +16,7 @@ import { escapeMarkdown, formatMetricsLine, italicize } from './summary-utils.js
 interface Deferred<T> {
   promise: Promise<T>;
   resolve: (value: T) => void;
+
   reject: (reason?: unknown) => void;
 }
 
@@ -462,7 +465,7 @@ export class OpenAICompletionsHeadend implements Headend {
           emitBullet(`${agentLabel} update: ${italicize('progress event')}`);
       }
     };
-    const callbacks: AIAgentCallbacks = {
+    const baseCallbacks: AIAgentCallbacks = {
       onOutput: (chunk) => {
         output += chunk;
         if (streamed) {
@@ -497,6 +500,7 @@ export class OpenAICompletionsHeadend implements Headend {
       onLog: (entry) => { this.logEntry(entry); },
       onAccounting: (entry) => { accounting.push(entry); },
     };
+    const callbacks = mergeCallbacksWithPersistence(baseCallbacks, this.registry.getPersistence(agent.id)) ?? baseCallbacks;
 
     if (streamed) {
       res.writeHead(200, {
