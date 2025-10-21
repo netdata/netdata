@@ -1618,18 +1618,30 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
         continue;
       }
       if (m.role === 'assistant') {
+        const reasoningSegments = Array.isArray(m.reasoning)
+          ? m.reasoning.filter((segment): segment is string => typeof segment === 'string' && segment.trim().length > 0)
+          : [];
+        const shouldIncludeReasoning = reasoningSegments.length > 0;
         const hasToolCalls = Array.isArray(m.toolCalls) && m.toolCalls.length > 0;
-        if (hasToolCalls) {
+        if (hasToolCalls || shouldIncludeReasoning) {
           const parts: (
+            { type: 'thinking'; text: string } |
             { type: 'text'; text: string } |
             { type: 'tool-call'; toolCallId: string; toolName: string; input: unknown }
           )[] = [];
+          if (shouldIncludeReasoning) {
+            reasoningSegments.forEach((segment) => {
+              parts.push({ type: 'thinking', text: segment });
+            });
+          }
           if (m.content && m.content.trim().length > 0) {
             parts.push({ type: 'text', text: m.content });
           }
-          // eslint-disable-next-line functional/no-loop-statements
-          for (const tc of m.toolCalls ?? []) {
-            parts.push({ type: 'tool-call', toolCallId: tc.id, toolName: tc.name, input: tc.parameters });
+          if (hasToolCalls) {
+            // eslint-disable-next-line functional/no-loop-statements
+            for (const tc of m.toolCalls ?? []) {
+              parts.push({ type: 'tool-call', toolCallId: tc.id, toolName: tc.name, input: tc.parameters });
+            }
           }
           modelMessages.push({ role: 'assistant', content: parts as never });
         } else {
@@ -1684,21 +1696,25 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
       }
       return name;
     };
+    const reasoningSegments: string[] = [];
+
     if (Array.isArray(m.content)) {
       const textParts: string[] = [];
       const toolCalls: { id: string; name: string; parameters: Record<string, unknown> }[] = [];
-      
-       
       // eslint-disable-next-line functional/no-loop-statements
-        for (const part of m.content) {
+      for (const part of m.content) {
         if (part.type === 'text' || part.type === undefined) {
           if (part.text !== undefined && part.text !== '') {
             textParts.push(part.text);
           }
-        } else if (part.type === this.REASONING_TYPE) {
-          // Skip reasoning parts - they should NOT be included in text content
-          // Reasoning is only for thinking/telemetry, not for final answer detection
-          // This prevents the agent from treating reasoning-only responses as final answers
+        } else if (
+          (part.type === this.REASONING_TYPE ||
+            part.type === 'thinking' ||
+            part.type === 'redacted_thinking') &&
+          typeof part.text === 'string' &&
+          part.text.length > 0
+        ) {
+          reasoningSegments.push(part.text);
         } else if (part.type === 'tool-call' && part.toolCallId !== undefined && part.toolName !== undefined) {
           // AI SDK embeds tool calls in content
           toolCalls.push({
@@ -1734,11 +1750,14 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
       };
     }) : undefined);
     
+    const reasoning = reasoningSegments.length > 0 ? reasoningSegments : undefined;
+
     return {
       role: (m.role ?? 'assistant') as ConversationMessage['role'],
       content: textContent,
       toolCalls: finalToolCalls,
       toolCallId: toolCallId ?? ('toolCallId' in m ? (m as { toolCallId?: string }).toolCallId : undefined),
+      reasoning,
       metadata: {
         provider,
         model,

@@ -202,6 +202,7 @@ export interface ConversationMessage {
   content: string;
   toolCalls?: ToolCall[];
   toolCallId?: string;
+  reasoning?: string[];
   metadata?: {
     provider?: string;
     model?: string;

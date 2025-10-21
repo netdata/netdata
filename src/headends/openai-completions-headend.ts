@@ -528,10 +528,18 @@ export class OpenAICompletionsHeadend implements Headend {
         return;
       }
       const finalText = this.resolveContent(output, result.finalReport);
+      const fallbackError = (!result.success && typeof result.error === 'string' && result.error.length > 0)
+        ? result.error
+        : undefined;
+      const effectiveText = result.success
+        ? finalText
+        : (finalText.length > 0
+          ? finalText
+          : (fallbackError ?? 'Agent session failed without details.'));
       const usage = collectUsage(accounting);
       if (streamed) {
         closeThinking();
-        if (streamedChunks === 0 && finalText.length > 0) {
+        if (streamedChunks === 0 && effectiveText.length > 0) {
           emitAssistantRole();
           const contentChunk = {
             id: responseId,
@@ -541,7 +549,7 @@ export class OpenAICompletionsHeadend implements Headend {
             choices: [
               {
                 index: 0,
-                delta: { content: finalText },
+                delta: { content: effectiveText },
                 finish_reason: null,
               },
             ],
@@ -642,7 +650,7 @@ export class OpenAICompletionsHeadend implements Headend {
           choices: [
             {
               index: 0,
-              message: { role: 'assistant', content: finalText },
+              message: { role: 'assistant', content: effectiveText },
               finish_reason: result.success ? 'stop' : 'error',
             },
           ],
