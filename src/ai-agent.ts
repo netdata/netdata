@@ -1505,7 +1505,7 @@ export class AIAgentSession {
             if (typeof fr.content === 'string' && fr.content.length > 0) return fr.content;
             return undefined;
           })();
-          if (finalOutput !== undefined && this.sessionConfig.callbacks?.onOutput !== undefined) {
+          if (this.sessionConfig.renderTarget !== 'sub-agent' && finalOutput !== undefined && this.sessionConfig.callbacks?.onOutput !== undefined) {
             this.sessionConfig.callbacks.onOutput(finalOutput);
             if (!finalOutput.endsWith('\n')) {
               this.sessionConfig.callbacks.onOutput('\n');
