@@ -36,6 +36,8 @@ enum netdata_win_sensor_monitored {
     NETDATA_WIN_SENSOR_TYPE_DISTANCE_X,
     NETDATA_WIN_SENSOR_ACCELERATION_X_G,
 
+    NETDATA_WIN_SENSOR_NEVER_USE_ME,
+
     // Remaining axis should be added here
     NETDATA_WIN_SENSOR_TYPE_DISTANCE_Y,
     NETDATA_WIN_SENSOR_TYPE_DISTANCE_Z,
@@ -181,7 +183,7 @@ static struct win_sensor_config {
         {
             .title = "Acceleration.",
             .units = "g",
-            .context = "system.hw.sensor.xacceleration.input",
+            .context = "system.hw.sensor.acceleration.input",
             .family = "Acceleration",
             .priority = 70022,
         }
@@ -207,6 +209,8 @@ struct sensor_data {
 
     RRDSET *st_sensor_data;
     RRDDIM *rd_sensor_data_0;
+    RRDDIM *rd_sensor_data_1;
+    RRDDIM *rd_sensor_data_2;
 
     // Some sensors are vectors, this means they have three different values (Time is ignored here)
     collected_number current_data_value[NETDATA_WIN_VECTOR_POS];
@@ -279,7 +283,7 @@ static void netdata_initialize_sensor_dict(struct sensor_data *sd, ISensor *pSen
 }
 
 static int
-netdata_collect_sensor_data(struct sensor_data *sd, ISensor *pSensor, REFPROPERTYKEY key)
+netdata_collect_sensor_data(struct sensor_data *sd, ISensor *pSensor, REFPROPERTYKEY key, int vector_idx)
 {
     ISensorDataReport *pReport = NULL;
     PROPVARIANT pv = {};
@@ -293,19 +297,21 @@ netdata_collect_sensor_data(struct sensor_data *sd, ISensor *pSensor, REFPROPERT
         if (SUCCEEDED(hr) && (pv.vt == VT_R4 || pv.vt == VT_R8 || pv.vt == VT_UI4)) {
             switch (pv.vt) {
                 case VT_UI4:
-                    sd->current_data_value[0] = (collected_number)(pv.ulVal * 100);
+                    sd->current_data_value[vector_idx] = (collected_number)(pv.ulVal * 100);
                     break;
                 case VT_R4:
-                    sd->current_data_value[0] = (collected_number)(pv.fltVal * sd->div_factor);
+                    sd->current_data_value[vector_idx] = (collected_number)(pv.fltVal * sd->div_factor);
                     break;
                 case VT_R8:
-                    sd->current_data_value[0] = (collected_number)(pv.dblVal * sd->div_factor);
+                    sd->current_data_value[vector_idx] = (collected_number)(pv.dblVal * sd->div_factor);
                     break;
             }
             defined = 1;
         }
         PropVariantClear(&pv);
         pReport->lpVtbl->Release(pReport);
+    } else {
+        sd->current_data_value[vector_idx] = 0;
     }
 
     return defined;
@@ -314,11 +320,18 @@ netdata_collect_sensor_data(struct sensor_data *sd, ISensor *pSensor, REFPROPERT
 static void netdata_sensors_get_data(struct sensor_data *sd, ISensor *pSensor)
 {
     for (int i = 0; sensor_keys[i]; i++) {
-        if (netdata_collect_sensor_data(sd, pSensor, sensor_keys[i])) {
+        if (netdata_collect_sensor_data(sd, pSensor, sensor_keys[i], 0)) {
             sd->sensor_data_type = i;
             sd->config = &configs[i];
             sd->enabled = true;
-            if (i == NETDATA_WIN_SENSOR_DATA_TYPE_LIGHT_TEMPERATURE) {
+
+            if (i == NETDATA_WIN_SENSOR_TYPE_DISTANCE_X) {
+                netdata_collect_sensor_data(sd, pSensor, sensor_keys[NETDATA_WIN_SENSOR_TYPE_DISTANCE_Y], 1);
+                netdata_collect_sensor_data(sd, pSensor, sensor_keys[NETDATA_WIN_SENSOR_TYPE_DISTANCE_Z], 2);
+            } else if (i == NETDATA_WIN_SENSOR_ACCELERATION_X_G) {
+                netdata_collect_sensor_data(sd, pSensor, sensor_keys[NETDATA_WIN_SENSOR_ACCELERATION_Y_G], 1);
+                netdata_collect_sensor_data(sd, pSensor, sensor_keys[NETDATA_WIN_SENSOR_ACCELERATION_Z_G], 2);
+            } else if (i == NETDATA_WIN_SENSOR_DATA_TYPE_LIGHT_TEMPERATURE) {
                 sd->div_factor = 100.0;
                 sd->add_factor = -27315.0; // 273.15 * 100.0
             }
@@ -369,10 +382,18 @@ static void netdata_get_sensors()
         sd->current_state = SENSOR_STATE_MIN;
         (void)pSensor->lpVtbl->GetState(pSensor, &sd->current_state);
 
-        if (likely(sd->first_time))
+        if (sd->first_time)
             netdata_sensors_get_data(sd, pSensor);
-        else if (likely(sd->enabled))
-            netdata_collect_sensor_data(sd, pSensor, sensor_keys[sd->sensor_data_type]);
+        else if (likely(sd->enabled)) {
+            netdata_collect_sensor_data(sd, pSensor, sensor_keys[sd->sensor_data_type], 0);
+            if (sd->sensor_data_type == NETDATA_WIN_SENSOR_TYPE_DISTANCE_X) {
+                netdata_collect_sensor_data(sd, pSensor, sensor_keys[NETDATA_WIN_SENSOR_TYPE_DISTANCE_Y], 1);
+                netdata_collect_sensor_data(sd, pSensor, sensor_keys[NETDATA_WIN_SENSOR_TYPE_DISTANCE_Z], 2);
+            } else if (sd->sensor_data_type == NETDATA_WIN_SENSOR_ACCELERATION_X_G) {
+                netdata_collect_sensor_data(sd, pSensor, sensor_keys[NETDATA_WIN_SENSOR_ACCELERATION_Y_G], 1);
+                netdata_collect_sensor_data(sd, pSensor, sensor_keys[NETDATA_WIN_SENSOR_ACCELERATION_Z_G], 2);
+            }
+        }
 
         pSensor->lpVtbl->Release(pSensor);
     }
@@ -471,7 +492,7 @@ static void sensors_states_chart(struct sensor_data *sd, int update_every)
     }
 }
 
-static void sensors_state_chart_loop(struct sensor_data *sd, int update_every)
+static inline void sensors_state_chart_loop(struct sensor_data *sd, int update_every)
 {
     sensors_states_chart(sd, update_every);
     collected_number set_value = (collected_number)sd->current_state;
@@ -479,6 +500,22 @@ static void sensors_state_chart_loop(struct sensor_data *sd, int update_every)
         rrddim_set_by_pointer(sd->st_sensor_state, sd->rd_sensor_state[i], i == set_value);
     }
     rrdset_done(sd->st_sensor_state);
+}
+
+static inline RRDDIM *netdata_add_sensor_dimension(struct sensor_data *sd, char *label)
+{
+    return rrddim_add(sd->st_sensor_data,
+                      label,
+                      NULL,
+                      (collected_number )sd->mult_factor,
+                      (collected_number )sd->div_factor,
+                      RRD_ALGORITHM_ABSOLUTE);
+}
+
+static inline void netdata_state_chart_set_value(RRDDIM *dim, struct sensor_data *sd, int value_idx)
+{
+    collected_number value = sd->current_data_value[value_idx] + (collected_number )sd->add_factor;
+    rrddim_set_by_pointer(sd->st_sensor_data, dim, value);
 }
 
 static void sensors_data_chart(struct sensor_data *sd, int update_every)
@@ -505,11 +542,20 @@ static void sensors_data_chart(struct sensor_data *sd, int update_every)
         rrdlabels_add(sd->st_sensor_data->rrdlabels, "manufacturer", sd->manufacturer, RRDLABEL_SRC_AUTO);
         rrdlabels_add(sd->st_sensor_data->rrdlabels, "model", sd->model, RRDLABEL_SRC_AUTO);
 
-        sd->rd_sensor_data_0 = rrddim_add(sd->st_sensor_data, "input", NULL, (collected_number )sd->mult_factor, (collected_number )sd->div_factor, RRD_ALGORITHM_ABSOLUTE);
+        if (sd->sensor_data_type != NETDATA_WIN_SENSOR_TYPE_DISTANCE_X && sd->sensor_data_type != NETDATA_WIN_SENSOR_ACCELERATION_X_G)
+            sd->rd_sensor_data_0 = netdata_add_sensor_dimension(sd, "input");
+        else {
+            sd->rd_sensor_data_0 = netdata_add_sensor_dimension(sd, "inputX");
+            sd->rd_sensor_data_1 = netdata_add_sensor_dimension(sd, "inputY");
+            sd->rd_sensor_data_2 = netdata_add_sensor_dimension(sd, "inputZ");
+        }
     }
 
-    collected_number value = sd->current_data_value[0] + (collected_number )sd->add_factor;
-    rrddim_set_by_pointer(sd->st_sensor_data, sd->rd_sensor_data_0, value);
+    netdata_state_chart_set_value(sd->rd_sensor_data_0, sd, 0);
+    if (sd->sensor_data_type == NETDATA_WIN_SENSOR_TYPE_DISTANCE_X || sd->sensor_data_type == NETDATA_WIN_SENSOR_ACCELERATION_X_G) {
+        netdata_state_chart_set_value(sd->rd_sensor_data_1, sd, 1);
+        netdata_state_chart_set_value(sd->rd_sensor_data_2, sd, 2);
+    }
     rrdset_done(sd->st_sensor_data);
 }
 
