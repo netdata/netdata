@@ -47,16 +47,12 @@ AutoReqProv: yes
 %global _have_sysuser 1
 %global _need_explicit_user_provides 1
 %else
-%if 0%{?centos_ver} == 8 || 0%{?oraclelinux} == 8
+%if 0%{?centos_ver} >= 10 || 0%{?oraclelinux} >= 10 || 0%{?fedora} >= 43
 %global _have_sysuser 1
-%global _need_explicit_user_provides 1
-%else
 %global _need_explicit_user_provides 0
-%if 0%{?!add_sysuser}
-%global _have_sysuser 0
 %else
-%global _have_sysuser 1
-%endif
+%global _have_sysuser 0
+%global _need_explicit_user_provides 0
 %endif
 %endif
 
@@ -3225,8 +3221,9 @@ Requires(pre): %{name}-user >= %{version}
 Summary: User and group accounts for the Netdata Agent
 Group: Applications/System
 %if ! %{_have_sysuser}
-Requires: /usr/sbin/useradd
-Requires: /usr/sbin/groupadd
+Requires: shadow
+%else
+Requires: systemd
 %endif
 %if %{_need_explicit_user_provides}
 Provides: user(netdata)
@@ -3237,7 +3234,7 @@ Provides: group(netdata)
  This package provides the netdata user and group that are used by the Netdata Agent.
 
 %post user
-%if %{_need_explicit_user_provides} || 0%{?!_have_sysuser:1}
+%if %{_need_explicit_user_provides} || ! 0%{?_have_sysuser}
 if command -v systemd-sysusers >/dev/null 2>&1; then
     systemd-sysusers %{_sysusersdir}/%{name}.conf
 else
