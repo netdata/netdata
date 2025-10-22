@@ -59,6 +59,7 @@ enum netdata_mssql_metrics {
     NETDATA_MSSQL_LOCKS,
     NETDATA_MSSQL_WAITS,
     NETDATA_MSSQL_BUFFER_MANAGEMENT,
+    NETDATA_MSSQL_JOBS,
 
     NETDATA_MSSQL_METRICS_END
 };
@@ -166,9 +167,10 @@ struct mssql_lock_instance {
 };
 
 struct mssql_db_jobs {
-    struct mssql_instance *parent;
-
     bool enabled;
+
+    RRDSET *st_status;
+    RRDDIM *rd_status;
 
     COUNTER_DATA MSSQLJOBState;
 };
@@ -840,7 +842,8 @@ void metdata_mssql_fill_job_status(struct mssql_instance *mi)
 {
     char job[SQLSERVER_MAX_NAME_LENGTH + 1];
     BYTE state = 0;
-    SQLLEN col_data_len = 0;
+    SQLLEN col_job_len = 0;
+    SQLLEN col_state_len = 0;
 
     static int next_try = NETDATA_MSSQL_NEXT_TRY - 1;
 
@@ -857,7 +860,13 @@ void metdata_mssql_fill_job_status(struct mssql_instance *mi)
         goto enddbjobs;
     }
 
-    ret = SQLBindCol(mi->conn->dbSQLJobs, 1, SQL_C_TINYINT, &state, sizeof(state), &col_data_len);
+    ret = SQLBindCol(mi->conn->dbWaitsSTMT, 1, SQL_C_CHAR, job, sizeof(job), &col_job_len);
+    if (ret != SQL_SUCCESS) {
+        netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn->dbWaitsSTMT, NETDATA_MSSQL_ODBC_PREPARE, mi->instanceID);
+        goto enddbjobs;
+    }
+
+    ret = SQLBindCol(mi->conn->dbSQLJobs, 1, SQL_C_TINYINT, &state, sizeof(state), &col_state_len);
     if (ret != SQL_SUCCESS) {
         netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn->dbSQLJobs, NETDATA_MSSQL_ODBC_PREPARE, mi->instanceID);
         goto enddbjobs;
@@ -870,7 +879,7 @@ void metdata_mssql_fill_job_status(struct mssql_instance *mi)
             goto enddbjobs;
         }
 
-        struct mssql_db_jobs *mdj = dictionary_set(mi->sysjobs, dbname, NULL, sizeof(*mdj));
+        struct mssql_db_jobs *mdj = dictionary_set(mi->sysjobs, job, NULL, sizeof(*mdj));
         if (!mdj)
             continue;
 
@@ -1076,6 +1085,9 @@ static void initialize_mssql_objects(struct mssql_instance *mi, const char *inst
 
     strncpyz(&name[length], "Buffer Manager", sizeof(name) - length);
     mi->objectName[NETDATA_MSSQL_BUFFER_MANAGEMENT] = strdupz(name);
+
+    strncpyz(&name[length], "SystemJobs", sizeof(name) - length);
+    mi->objectName[NETDATA_MSSQL_JOBS] = strdupz(name);
 
     strncpyz(&name[length], "Memory Manager", sizeof(name) - length);
     mi->objectName[NETDATA_MSSQL_MEMORY] = strdupz(name);
@@ -2279,6 +2291,50 @@ static void do_mssql_bufferman_stats_sql(PERF_DATA_BLOCK *pDataBlock, struct mss
     dictionary_sorted_walkthrough_read(mi->databases, dict_mssql_buffman_stats_charts_cb, mi);
 }
 
+static void netdata_mssql_jobs_status(struct mssql_db_jobs *mdj, struct mssql_instance *mi, const char *job)
+{
+    if (!mdj->st_status) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(id, RRD_ID_LENGTH_MAX, "job_%s_instance_%s_status", job, mi->instanceID);
+        netdata_fix_chart_name(id);
+        mdj->st_status = rrdset_create_localhost(
+                "mssql",
+                id,
+                NULL,
+                "jobs",
+                "mssql.instance_jobs_status",
+                "Jobs running",
+                "status",
+                PLUGIN_WINDOWS_NAME,
+                "PerflibMSSQL",
+                PRIO_MSSQL_DATABASE_JOBS_STATUS,
+                mi->update_every,
+                RRDSET_TYPE_LINE);
+
+        mdj->rd_status =
+                rrddim_add(mdj->st_status, "enabled", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+        rrdlabels_add(mdj->st_status->rrdlabels, "mssql_instance", mi->instanceID, RRDLABEL_SRC_AUTO);
+    }
+
+    rrddim_set_by_pointer(
+            mdj->st_status, mdj->rd_status, (collected_number)mdj->MSSQLJOBState.current.Data);
+    rrdset_done(mdj->st_status);
+}
+
+int dict_mssql_sysjobs_chart_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
+    const char *job = dictionary_acquired_item_name((DICTIONARY_ITEM *)item);
+    struct mssql_db_jobs *mdj = value;
+    struct mssql_instance *mi = data;
+
+    netdata_mssql_jobs_status(mdj, mi, job);
+}
+
+static void do_mssql_job_status_sql(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *mi, int update_every)
+{
+    dictionary_sorted_walkthrough_read(mi->sysjobs, dict_mssql_sysjobs_chart_cb, mi);
+}
+
 static void mssql_database_backup_restore_chart(struct mssql_db_instance *mdi, const char *db, int update_every)
 {
     char id[RRD_ID_LENGTH_MAX + 1];
@@ -2983,12 +3039,13 @@ int dict_mssql_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value
             do_mssql_locks,
             do_mssql_waits,
             do_mssql_bufferman_stats_sql,
+            do_mssql_job_status_sql,
 
             NULL};
 
     DWORD i;
     PERF_DATA_BLOCK *pDataBlock;
-    static bool collect_perflib[NETDATA_MSSQL_METRICS_END] = {true, true, true, true, true, true, true, true, true};
+    static bool collect_perflib[NETDATA_MSSQL_METRICS_END] = {true, true, true, true, true, true, true, true, true, true};
     for (i = 0; i < NETDATA_MSSQL_ACCESS_METHODS; i++) {
         if (!collect_perflib[i])
             continue;
