@@ -27,6 +27,8 @@
 #define NETDATA_DB_STATES (6)
 #define NETDATA_QUERY_DATABASE_STATUS "SELECT name, state, is_read_only FROM sys.databases;"
 
+#define NETDATA_QUERY_JOBS_STATUS "SELECT name, enabled FROM msdb.dbo.sysjobs;"
+
 // https://learn.microsoft.com/en-us/sql/relational-databases/system-dynamic-management-views/sys-dm-os-wait-stats-transact-sql?view=sql-server-ver16
 #define NETDATA_QUERY_CHECK_WAITS                                                                                      \
     "SELECT                                                                                                            \

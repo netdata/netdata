@@ -41,6 +41,7 @@ struct netdata_mssql_conn {
     SQLHSTMT dbWaitsSTMT;
     SQLHSTMT dbLocksSTMT;
     SQLHSTMT dbSQLState;
+    SQLHSTMT dbSQLJobs;
 
     BOOL is_connected;
 };
@@ -120,6 +121,7 @@ struct mssql_instance {
     DICTIONARY *locks_instances;
 
     DICTIONARY *databases;
+    DICTIONARY *sysjobs;
 
     RRDSET *st_conn_memory;
     RRDDIM *rd_conn_memory;
@@ -161,6 +163,13 @@ struct mssql_lock_instance {
 
     RRDSET *st_lockWait;
     RRDDIM *rd_deadLocks;
+};
+
+struct mssql_db_jobs {
+    struct mssql_instance *parent;
+
+    const char *name;
+    bool enabled;
 };
 
 struct mssql_db_instance {
@@ -976,6 +985,12 @@ static bool netdata_MSSQL_initialize_connection(struct netdata_mssql_conn *nmc)
             retConn = FALSE;
             goto endMSSQLInitializationConnection;
         }
+
+        ret = SQLAllocHandle(SQL_HANDLE_STMT, nmc->netdataSQLHDBc, &nmc->dbSQLJobs);
+        if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
+            retConn = FALSE;
+            goto endMSSQLInitializationConnection;
+        }
     }
 
 endMSSQLInitializationConnection:
@@ -1083,6 +1098,11 @@ void dict_mssql_insert_databases_cb(const DICTIONARY_ITEM *item __maybe_unused, 
     struct mssql_db_instance *mdi = value;
 
     mdi->collecting_data = true;
+}
+
+void dict_mssql_insert_jobs_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
+{
+    UNUSED(value);
 }
 
 // Options
@@ -1229,6 +1249,12 @@ void dict_mssql_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *valu
         mi->databases = dictionary_create_advanced(
             DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct mssql_db_instance));
         dictionary_register_insert_callback(mi->databases, dict_mssql_insert_databases_cb, NULL);
+    }
+
+    if (!mi->sysjobs) {
+        mi->sysjobs = dictionary_create_advanced(
+                DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct mssql_db_jobs));
+        dictionary_register_insert_callback(mi->sysjobs, dict_mssql_insert_jobs_cb, NULL);
     }
 
     if (!mi->waits) {
