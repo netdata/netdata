@@ -109,9 +109,6 @@ void ml_host_stop(RRDHOST *rh) {
             dim->mt = METRIC_TYPE_CONSTANT;
             dim->ts = TRAINING_STATUS_UNTRAINED;
 
-            // TODO: Check if we can remove this field.
-            dim->last_training_time = 0;
-
             dim->suppression_anomaly_counter = 0;
             dim->suppression_window_counter = 0;
             dim->cns.clear();
@@ -273,9 +270,9 @@ void ml_dimension_new(RRDDIM *rd)
 
     dim->mt = METRIC_TYPE_CONSTANT;
     dim->ts = TRAINING_STATUS_UNTRAINED;
-    dim->last_training_time = 0;
     dim->suppression_anomaly_counter = 0;
     dim->suppression_window_counter = 0;
+    dim->training_in_progress = false;
 
     ml_kmeans_init(&dim->kmeans);
 
