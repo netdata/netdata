@@ -260,15 +260,19 @@ Netdata supports custom host labels that are exported to Prometheus. Configure l
     datacenter = dc1
 ```
 
-Enable label export in `/etc/netdata/exporting.conf`:
+After defining them, the labels will appear in the `netdata_info` metric, for example:
 
-```ini
-[prometheus:exporter]
-    send configured labels = yes
-    send automatic labels = yes
+```text
+netdata_info{
+    instance="some-server",
+    application="netdata",
+    version="v2.7.2",
+    datacenter="dc1",
+    region="us-east-1",
+    environment="production",
+    _is_ephemeral="false"
+} 1 1761148307085
 ```
-
-For detailed label configuration and best practices, see `/etc/netdata/netdata.conf`.
 
 ## Configure Prometheus to Scrape Netdata Metrics
 
