@@ -1563,7 +1563,7 @@ export class AIAgentSession {
                   for (const msg of sanitizedMessages) {
                     warn(`[DEBUG] Message role=${msg.role}, content length=${String(msg.content.length)}, hasToolCalls=${String(msg.toolCalls !== undefined)}`);
                     if (msg.content.length > 0) {
-                      warn(`[DEBUG] Content: ${msg.content.substring(0, 200)}`);
+                      warn(`[DEBUG] Content: ${msg.content}`);
                     }
                   }
                 }
@@ -2274,13 +2274,77 @@ export class AIAgentSession {
   private pushSystemRetryMessage(conversation: ConversationMessage[], message: string): void {
     const trimmed = message.trim();
     if (trimmed.length === 0) return;
-    if (conversation.length > 0) {
-      const last = conversation[conversation.length - 1];
-      if (last.role === 'system' && last.content === trimmed) {
+    const firstSystemIndex = conversation.findIndex((msg) => msg.role === 'system');
+    if (firstSystemIndex !== -1) {
+      const current = conversation[firstSystemIndex].content;
+      if (current.includes(trimmed)) {
         return;
       }
+      const separator = current.trim().length === 0 ? '' : '\n\n';
+      conversation[firstSystemIndex] = {
+        ...conversation[firstSystemIndex],
+        content: `${current}${separator}${trimmed}`,
+      };
+      return;
     }
-    conversation.push({ role: 'system', content: trimmed });
+    conversation.unshift({ role: 'system', content: trimmed });
+  }
+
+  private normalizeReasoningSegments(
+    messages: ConversationMessage[],
+    requireSignature: boolean
+  ): { normalized: ConversationMessage[]; hasMissingReasoning: boolean } {
+    let hasMissingReasoning = false;
+    const normalized = messages.map((msg) => {
+      if (msg.role !== 'assistant' || !Array.isArray(msg.toolCalls) || msg.toolCalls.length === 0) {
+        return msg;
+      }
+      const segments = Array.isArray(msg.reasoning) ? msg.reasoning : [];
+      if (segments.length === 0) {
+        hasMissingReasoning = true;
+        return msg;
+      }
+      const hasValidSignature = segments.some((segment) => {
+        const providerMetadataRaw = (segment as { providerMetadata?: unknown }).providerMetadata;
+        if (!this.isPlainRecord(providerMetadataRaw)) return false;
+        const anthropicRaw = providerMetadataRaw.anthropic;
+        if (!this.isAnthropicMetadata(anthropicRaw)) return false;
+        const signature = typeof anthropicRaw.signature === 'string' ? anthropicRaw.signature : undefined;
+        const redacted = typeof anthropicRaw.redactedData === 'string' ? anthropicRaw.redactedData : undefined;
+        return (signature !== undefined && signature.trim().length > 0)
+          || (redacted !== undefined && redacted.trim().length > 0);
+      });
+      if (!requireSignature || hasValidSignature) {
+        return msg;
+      }
+      hasMissingReasoning = true;
+      if (process.env.DEBUG === 'true') {
+        try {
+          const preview = segments.map((segment) => ({
+            text: segment.text.slice(0, 80),
+            hasMetadata: segment.providerMetadata !== undefined,
+            metadataKeys: segment.providerMetadata !== undefined ? Object.keys(segment.providerMetadata) : [],
+          }));
+          warn(`[DEBUG] missing reasoning metadata: ${JSON.stringify(preview)}`);
+        } catch (error) {
+          warn(`[DEBUG] missing reasoning metadata logging failed: ${error instanceof Error ? error.message : String(error)}`);
+        }
+      }
+      const cloned: ConversationMessage = { ...msg };
+      delete (cloned as { reasoning?: typeof cloned.reasoning }).reasoning;
+      return cloned;
+    });
+    return { normalized, hasMissingReasoning };
+  }
+
+  private isPlainRecord(value: unknown): value is Record<string, unknown> {
+    return value !== null && typeof value === 'object' && !Array.isArray(value);
+  }
+
+  private isAnthropicMetadata(
+    value: unknown
+  ): value is { signature?: unknown; redactedData?: unknown } & Record<string, unknown> {
+    return this.isPlainRecord(value);
   }
 
   private composeRemoteIdentifier(provider: string, model: string, metadata?: { actualProvider?: string; actualModel?: string }): string {
@@ -2289,6 +2353,18 @@ export class AIAgentSession {
       : provider;
     const modelSegment = metadata?.actualModel ?? model;
     return `${providerSegment}:${modelSegment}`;
+  }
+
+  private debugLogRawConversation(provider: string, model: string, payload: ConversationMessage[]): void {
+    if (process.env.DEBUG !== 'true') {
+      return;
+    }
+    try {
+      warn(`[DEBUG] ${provider}:${model} raw_messages: ${JSON.stringify(payload, null, 2)}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      warn(`[DEBUG] ${provider}:${model} raw_messages: <unserializable: ${message}>`);
+    }
   }
 
   private buildFallbackRetryDirective(input: { status: TurnStatus; remoteId: string; attempt: number }): TurnRetryDirective | undefined {
@@ -2531,6 +2607,16 @@ export class AIAgentSession {
     const filteredSelection = this.filterToolsForProvider(allTools, provider);
     const availableTools = filteredSelection.tools;
     const allowedToolNames = filteredSelection.allowedNames;
+    const providerConfig = this.sessionConfig.config.providers[provider];
+    let disableReasoningForTurn = false;
+
+    if (providerConfig.type === 'anthropic') {
+      const { normalized, hasMissingReasoning } = this.normalizeReasoningSegments(conversation, true);
+      if (hasMissingReasoning) {
+        conversation = normalized;
+        disableReasoningForTurn = true;
+      }
+    }
 
     
     // Track if we've shown thinking for this turn
@@ -2662,13 +2748,32 @@ export class AIAgentSession {
     }
 
     const fallbackReasoningLevel = this.sessionConfig.reasoning;
-    const effectiveReasoningLevel = reasoningLevel ?? fallbackReasoningLevel;
+    let effectiveReasoningLevel = reasoningLevel ?? fallbackReasoningLevel;
     const targetMaxOutputTokens = this.sessionConfig.maxOutputTokens;
-    const effectiveReasoningValue = reasoningValue ?? (
+    let effectiveReasoningValue = reasoningValue ?? (
       effectiveReasoningLevel !== undefined
         ? this.resolveReasoningValue(provider, model, effectiveReasoningLevel, targetMaxOutputTokens)
         : undefined
     );
+    const reasoningActive = effectiveReasoningLevel !== undefined || (effectiveReasoningValue !== undefined && effectiveReasoningValue !== null);
+    if (disableReasoningForTurn) {
+      if (reasoningActive) {
+        const warnEntry: LogEntry = {
+          timestamp: Date.now(),
+          severity: 'WRN',
+          turn: currentTurn,
+          subturn: 0,
+          direction: 'response',
+          type: 'llm',
+          remoteIdentifier: 'agent:reasoning',
+          fatal: false,
+          message: 'Anthropic reasoning disabled for this turn: previous assistant tool call lacked signature metadata.',
+        };
+        this.log(warnEntry);
+      }
+      effectiveReasoningLevel = undefined;
+      effectiveReasoningValue = null;
+    }
     let effectiveStream = this.sessionConfig.stream;
     if (this.llmClient.shouldAutoEnableReasoningStream(provider, effectiveReasoningLevel)) {
       effectiveStream = true;
@@ -2690,9 +2795,14 @@ export class AIAgentSession {
       llmTimeout: this.sessionConfig.llmTimeout,
       abortSignal: this.abortSignal,
       onChunk: (chunk: string, type: 'content' | 'thinking') => {
+        const isRootSession = this.parentTxnId === undefined;
         if (type === 'content' && this.sessionConfig.callbacks?.onOutput !== undefined) {
           this.sessionConfig.callbacks.onOutput(chunk);
         } else if (type === 'thinking') {
+          const trimmedThinking = chunk.trim();
+          if (isRootSession && trimmedThinking.length > 0) {
+            this.opTree.setLatestStatus(trimmedThinking);
+          }
           if (lastShownThinkingHeaderTurn !== currentTurn) {
             const thinkingHeader: LogEntry = {
               timestamp: Date.now(),
@@ -2709,7 +2819,9 @@ export class AIAgentSession {
             shownThinking = true;
             lastShownThinkingHeaderTurn = currentTurn;
           }
-          this.sessionConfig.callbacks?.onThinking?.(chunk);
+          if (isRootSession) {
+            this.sessionConfig.callbacks?.onThinking?.(chunk);
+          }
           try {
             if (typeof this.currentLlmOpId === 'string') this.opTree.appendReasoningChunk(this.currentLlmOpId, chunk);
           } catch (e) { warn(`appendReasoningChunk failed: ${e instanceof Error ? e.message : String(e)}`); }
@@ -2727,6 +2839,8 @@ export class AIAgentSession {
       },
       caching: this.sessionConfig.caching,
     };
+
+    this.debugLogRawConversation(provider, model, conversation);
 
     try {
       const result = await this.llmClient.executeTurn(request);

@@ -271,9 +271,40 @@ export class AnthropicCompletionsHeadend implements Headend {
     const requestId = randomUUID();
     const streamed = body.stream === true;
     let output = '';
+    let reasoning = '';
     const accounting: AccountingEntry[] = [];
     let masterSummary: { text: string; origin?: string } | undefined;
     let rootOriginTxnId: string | undefined;
+    let textBlockOpen = false;
+    let thinkingBlockOpen = false;
+
+    const openTextBlock = (): void => {
+      if (!streamed || textBlockOpen) return;
+      const start = { type: 'content_block_start', content_block: { type: 'text' as const } };
+      writeSseChunk(res, start);
+      textBlockOpen = true;
+    };
+
+    const closeTextBlock = (): void => {
+      if (!streamed || !textBlockOpen) return;
+      const stop = { type: 'content_block_stop' as const };
+      writeSseChunk(res, stop);
+      textBlockOpen = false;
+    };
+
+    const openThinkingBlock = (): void => {
+      if (!streamed || thinkingBlockOpen) return;
+      const start = { type: 'content_block_start', content_block: { type: 'thinking' as const } };
+      writeSseChunk(res, start);
+      thinkingBlockOpen = true;
+    };
+
+    const closeThinkingBlock = (): void => {
+      if (!streamed || !thinkingBlockOpen) return;
+      const stop = { type: 'content_block_stop' as const };
+      writeSseChunk(res, stop);
+      thinkingBlockOpen = false;
+    };
     const resolveOriginFromAccounting = (): string | undefined => {
       const entry = accounting.find((item) => typeof item.originTxnId === 'string' && item.originTxnId.length > 0);
       return entry?.originTxnId;
@@ -301,9 +332,24 @@ export class AnthropicCompletionsHeadend implements Headend {
       onOutput: (chunk) => {
         output += chunk;
         if (streamed) {
+          if (thinkingBlockOpen) closeThinkingBlock();
+          openTextBlock();
           const event = {
             type: 'content_block_delta',
             content_block: { type: 'text', text_delta: chunk },
+          };
+          writeSseChunk(res, event);
+        }
+      },
+      onThinking: (chunk) => {
+        if (chunk.length === 0) return;
+        reasoning += chunk;
+        if (streamed) {
+          if (textBlockOpen) closeTextBlock();
+          openThinkingBlock();
+          const event = {
+            type: 'content_block_delta',
+            content_block: { type: 'thinking', thinking_delta: chunk },
           };
           writeSseChunk(res, event);
         }
@@ -330,8 +376,6 @@ export class AnthropicCompletionsHeadend implements Headend {
         },
       };
       writeSseChunk(res, startEvent);
-      const contentBlockStart = { type: 'content_block_start', content_block: { type: 'text' as const } };
-      writeSseChunk(res, contentBlockStart);
     }
 
     try {
@@ -352,7 +396,16 @@ export class AnthropicCompletionsHeadend implements Headend {
       const finalText = this.resolveContent(output, result.finalReport);
       const usage = collectUsage(accounting);
       if (streamed) {
-        const contentStop = { type: 'content_block_stop' as const };
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+        if (thinkingBlockOpen) closeThinkingBlock();
+        if (finalText.length > 0) {
+          openTextBlock();
+          const textEvent = {
+            type: 'content_block_delta' as const,
+            content_block: { type: 'text' as const, text_delta: finalText },
+          };
+          writeSseChunk(res, textEvent);
+        }
         const fallbackMetrics = masterSummary === undefined
           ? (() => {
             const agentIds = new Set<string>();
@@ -414,22 +467,32 @@ export class AnthropicCompletionsHeadend implements Headend {
         const originSuffix = typeof summaryOrigin === 'string' && summaryOrigin.length > 0
           ? ` | origin ${escapeMarkdown(summaryOrigin)}`
           : '';
+        openTextBlock();
         const summaryEvent = {
           type: 'content_block_delta' as const,
           content_block: { type: 'text' as const, text_delta: `\nTransaction summary: ${summaryText}${originSuffix}\n` },
         };
         writeSseChunk(res, summaryEvent);
-        writeSseChunk(res, contentStop);
+        closeTextBlock();
         const stopEvent = { type: 'message_stop' as const };
         writeSseChunk(res, stopEvent);
         writeSseDone(res);
       } else {
+        const trimmedReasoning = reasoning.trim();
+        const contentBlocks = (() => {
+          const blocks: { type: 'text' | 'thinking'; text?: string; thinking?: string }[] = [];
+          if (trimmedReasoning.length > 0) {
+            blocks.push({ type: 'thinking', thinking: trimmedReasoning });
+          }
+          blocks.push({ type: 'text', text: finalText });
+          return blocks;
+        })();
         const response: AnthropicResponseBody = {
           id: requestId,
           type: 'message',
           role: 'assistant',
           model: body.model,
-          content: [{ type: 'text', text: finalText }],
+          content: contentBlocks as unknown as AnthropicResponseBody['content'],
           stop_reason: result.success ? 'end_turn' : 'error',
           usage: {
             input_tokens: usage.input,
@@ -444,10 +507,12 @@ export class AnthropicCompletionsHeadend implements Headend {
       const message = err instanceof Error ? err.message : String(err);
       this.log(`anthropic completion failed model=${agent.id}: ${message}`, 'ERR');
       if (streamed) {
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+        if (thinkingBlockOpen) closeThinkingBlock();
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+        if (textBlockOpen) closeTextBlock();
         const errorEvent = { type: 'error', message };
         writeSseChunk(res, errorEvent);
-        const contentStop = { type: 'content_block_stop' as const };
-        writeSseChunk(res, contentStop);
         writeSseDone(res);
       } else {
         const status = err instanceof HttpError ? err.statusCode : 500;

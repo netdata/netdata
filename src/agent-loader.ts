@@ -5,7 +5,7 @@ import type { AIAgentSession } from './ai-agent.js';
 // keep type imports grouped at top
 import type { OutputFormatId } from './formats.js';
 import type { PreloadedSubAgent } from './subagent-registry.js';
-import type { AIAgentCallbacks, AIAgentResult, AIAgentSessionConfig, Configuration, ConversationMessage, RestToolConfig } from './types.js';
+import type { AIAgentCallbacks, AIAgentResult, AIAgentSessionConfig, Configuration, ConversationMessage, ProviderReasoningValue, RestToolConfig } from './types.js';
 // no runtime format validation here; caller must pass a valid OutputFormatId
 
 import { AIAgent as Agent } from './ai-agent.js';
@@ -128,6 +128,7 @@ export interface GlobalOverrides {
   parallelToolCalls?: boolean;
   mcpInitConcurrency?: number;
   reasoning?: 'minimal' | 'low' | 'medium' | 'high';
+  reasoningValue?: ProviderReasoningValue | null;
   caching?: 'none' | 'full';
 }
 
@@ -157,6 +158,7 @@ export interface LoadAgentOptions {
   mcpInitConcurrency?: number;
   traceLLM?: boolean;
   traceMCP?: boolean;
+  reasoningValue?: ProviderReasoningValue | null;
   // Persistence overrides (CLI precedence)
   sessionsDir?: string;
   billingFile?: string;
@@ -175,6 +177,7 @@ export interface LoadAgentOptions {
     parallelToolCalls?: boolean;
     maxToolCallsPerTurn?: number;
     reasoning?: 'minimal' | 'low' | 'medium' | 'high';
+    reasoningValue?: ProviderReasoningValue | null;
     caching?: 'none' | 'full';
   };
   ancestors?: string[];
@@ -387,7 +390,12 @@ function constructLoadedAgent(args: ConstructAgentArgs): LoadedAgent {
 
   mergedDefaultsForChildren = (() => {
     const base = options?.defaultsForUndefined !== undefined ? { ...options.defaultsForUndefined } : {};
-    if (eff.reasoning !== undefined && base.reasoning === undefined) base.reasoning = eff.reasoning;
+    if (options?.defaultsForUndefined?.reasoning !== undefined && base.reasoning === undefined) {
+      base.reasoning = options.defaultsForUndefined.reasoning;
+    }
+    if (options?.defaultsForUndefined?.reasoningValue !== undefined && base.reasoningValue === undefined) {
+      base.reasoningValue = options.defaultsForUndefined.reasoningValue;
+    }
     if (eff.caching !== undefined && base.caching === undefined) base.caching = eff.caching;
     return Object.keys(base).length > 0 ? base : undefined;
   })();
@@ -552,6 +560,7 @@ function constructLoadedAgent(args: ConstructAgentArgs): LoadedAgent {
       toolResponseMaxBytes: eff.toolResponseMaxBytes,
       mcpInitConcurrency: eff.mcpInitConcurrency,
       reasoning: eff.reasoning,
+      reasoningValue: eff.reasoningValue,
       caching: eff.caching,
       // Preserve the original reference (no clone) so recursion guards see identical identity.
       // Harness expectations rely on the session receiving the exact array instance from callers.

@@ -1,108 +1,50 @@
-# Reasoning Controls
+# Reasoning / Thinking Blocks – Status Report
 
-This agent exposes a provider-neutral reasoning level that can be driven from
-frontmatter, CLI flags, overrides, or configuration. The internal scale uses
-four symbolic levels:
+## Goal
+Document how Vercel AI SDK (v5.0.76) handles Anthropic "reasoning" blocks so we stop losing the required `signature` metadata when replaying conversation history. This description remains the source-of-truth for understanding the upstream contract.
 
-- `minimal`
-- `low`
-- `medium`
-- `high`
+## Verified Facts (from upstream source)
+- Outgoing Anthropic requests are assembled in `@ai-sdk/anthropic/dist/index.js` (`convertToAnthropicMessagesPrompt`). When it sees an assistant `reasoning` part it **expects** `providerOptions` to include either `signature` or `redactedData` (lines ~1414-1443). Without those keys, the SDK drops the block and records an "unsupported reasoning metadata" warning.
+- The SDK only emits a valid `thinking` block when it can forward both the text and the signature: `anthropicContent.push({ type: "thinking", thinking: part.text, signature })`. Missing signature → no `thinking` entry → another assistant part becomes the first content item.
+- Streaming responses capture reasoning metadata via `reasoning-delta` / `signature_delta` events (same file, lines ~2280-2590). The SDK merges the streamed signature into `providerMetadata.anthropic.signature` so consumers can persist it.
+- Our adapter (`src/llm-providers/base.ts`) collects the signature into `reasoningSegments.push({ text, providerMetadata })`. The in-memory conversation therefore holds `{ providerMetadata: { anthropic: { signature } } }` for every valid reasoning segment.
+- When the conversation is replayed, we rely on those segments to survive. If they are stripped, the SDK serializes the assistant message starting with `tool_use`, which triggers Anthropic's `messages.1.content.0.type` error.
 
-When a reasoning level is selected, the agent looks up the appropriate payload
-per provider/model before each turn. The lookup happens in the following
-order:
+## Current Implementation Status (2025-10-22)
 
-1. Model-specific mapping in `.ai-agent.json` (`providers.<name>.models.<id>.reasoning`)
-2. Provider-wide mapping in `.ai-agent.json` (`providers.<name>.reasoning`)
-3. Built-in defaults for the provider (if any)
+### Persistence & Schema
+- `ConversationMessage.reasoning` now mirrors the AI SDK `ReasoningOutput[]` type so provider metadata is preserved end-to-end. Legacy string entries were removed.
+- `normalizeReasoningSegments` runs before every Anthropic turn. Segments lacking signatures/redacted data are dropped and the turn is flagged to run without reasoning (prevents malformed replays).
+- Session snapshots and REST persistence inherit this richer structure; reasoning metadata is written verbatim and survives compression.
 
-Each mapping entry can be:
+### Runtime Safeguards
+- A turn is only marked “reasoning disabled” if reasoning was actually active (Level or budget was set). Otherwise, no warning is logged.
+- Master-only thinking updates: sub-agent thoughts are still recorded in the op-tree but do not emit status logs or headend updates. This prevents mixed progress streams across agents.
+- CLI/REST logs now include `reasoning=unset|disabled|minimal|low|medium|high` for every LLM request/response, making it obvious when reasoning is enabled and whether it was suppressed.
 
-- `null`: disable reasoning for that scope (models can still override)
-- A single string/number: always send that value regardless of level
-- An array with four strings/numbers: positional mapping for
-  `[minimal, low, medium, high]`
+### Headend Coverage
+- **OpenAI-compatible headend** keeps thinking deltas in the SSE stream; only the master agent’s reasoning is exposed to consumers.
+- **Anthropic-compatible headend** now emits proper `thinking` blocks in SSE mode and includes aggregated reasoning alongside final text in non-streaming mode, satisfying Claude’s new protocol expectations.
+- **CLI output** shows thinking streams (prefixed with `THK`) and respects the master-only guard. REST responses also provide a `reasoning` string when available.
+- **Slack headend** includes the master’s latest thinking in the status block, but not the raw reasoning text yet (Block Kit formatting remains TODO).
 
-### Example configuration
+### Sub-agent Inheritance
+- Front-matter reasoning settings are no longer copied to sub-agents. Only CLI/global overrides (`defaultsForUndefined`) propagate. This stops master prompts such as `neda/web-research.ai` from forcing reasoning onto `neda/web-search.ai`.
 
-```json
-{
-  "providers": {
-    "openai": {
-      "reasoning": ["minimal", "low", "medium", "high"]
-    },
-    "anthropic": {
-      "reasoning": [1024, 8000, 16000, 32000],
-      "reasoningAutoStreamLevel": "medium",
-      "models": {
-        "claude-3-opus-20250514": {
-          "reasoning": null
-        }
-      }
-    },
-    "google": {
-      "models": {
-        "gemini-2.5-pro": {
-          "reasoning": [1024, 4096, 8192, 16384]
-        }
-      }
-    }
-  }
-}
-```
+## Trade-offs & Known Limitations
+- We currently drop reasoning segments that arrive without signatures. This keeps the session healthy but sacrifices visibility into those thoughts.
+- Redacted thinking (`redactedData`) is preserved, yet we have not implemented decryption or special handling for that payload.
+- Reasoning telemetry is limited to text; token budgets and cost attribution are not exposed in headend summaries.
 
-- The `openai` provider uses the provided four-level string mapping for every
-  model.
-- The `anthropic` provider defaults to the numeric mapping, automatically
-  enabling streaming whenever `medium` or `high` is selected. The Opus model
-  is explicitly opted out (`null`).
-- `google` gets a model-specific numeric mapping while leaving other Gemini
-  models on their defaults.
+## Headend Snapshot
+- **CLI / REST / API** – show thinking tags and include `reasoning=` in logs/responses.
+- **OpenAI Chat Compatibility** – forwards thinking as SSE reasoning deltas; runs master-only.
+- **Anthropic Chat Compatibility** – streams `thinking_delta` blocks to Claude clients and appends aggregated reasoning to the final message payload.
+- **Slack** – Displays the master agent’s latest reasoning text in progress updates, but does not yet render the full reasoning stream as Block Kit.
 
-### Selecting a reasoning level
-
-- Frontmatter: `reasoning: minimal | low | medium | high`
-- CLI flags: `--reasoning minimal` (auto-completes through Commander help)
-- Overrides: `--override reasoning=high`
-
-Leaving the option unset preserves provider defaults (no reasoning payload is
-sent). Setting a level that resolves to `null` disables reasoning for the turn.
-
-### Auto-enabling Anthropic streaming
-
-Anthropic models require streaming when large reasoning budgets are used. Set
-`reasoningAutoStreamLevel` on the provider entry to state the minimum level
-that should force streaming. When triggered, the agent flips the request to
-streaming even if the session was configured otherwise.
-
-### Provider defaults
-
-If no configuration is supplied, the agent falls back to inline defaults:
-
-- **OpenAI/OpenRouter** – effort labels are forwarded directly, relying on the
-  provider to translate them.
-- **Anthropic/Google** – numeric budgets are derived dynamically from the
-  effective `maxOutputTokens` using the following ratios:
-  - `minimal`: 1,024 tokens (or the maximum available when the cap is lower)
-  - `low`: 20% of `maxOutputTokens`
-  - `medium`: 50% of `maxOutputTokens`
-  - `high`: 80% of `maxOutputTokens`
-
-All computed budgets are clamped to the provider’s documented bounds (e.g.
-Anthropic 1,024–128,000, Google 1,024–32,768) and never exceed the turn’s
-`maxOutputTokens`.
-
-Providers not listed above ignore the reasoning level unless a mapping is
-provided in configuration.
-
-### Anthropic caching toggle
-
-Anthropic caching can be controlled with the parallel `caching` option:
-
-- Frontmatter: `caching: full | none`
-- CLI: `--caching full` (or `none`)
-- Overrides: `--override caching=none`
-
-`full` retains the existing ephemeral cache control on the final message,
-while `none` removes cache directives entirely.
+## Open TODOs
+- Audit every mutation path (`sanitizeTurnMessages`, persistence reload, retry) to ensure we never drop `providerMetadata` in reasoning segments.
+- Add regression coverage that streams an Anthropic turn, persists it, reloads the session, and verifies the signature survives replay.
+- Extend deterministic harness scenarios to cover redacted thinking, budget exhaustion, and final-report retries with reasoning enabled.
+- Evaluate Block Kit-friendly rendering of reasoning streams in Slack headend.
+- Continue monitoring AI SDK releases for schema changes to reasoning/metadata.

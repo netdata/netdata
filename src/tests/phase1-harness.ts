@@ -9,8 +9,9 @@ import { WebSocketServer } from 'ws';
 import type { LoadAgentOptions, LoadedAgent } from '../agent-loader.js';
 import type { ResolvedConfigLayer } from '../config-resolver.js';
 import type { PreloadedSubAgent } from '../subagent-registry.js';
-import type { AIAgentCallbacks, AIAgentResult, AIAgentSessionConfig, AccountingEntry, AgentFinishedEvent, Configuration, ConversationMessage, LogEntry, MCPServerConfig, MCPTool, ProviderConfig, TurnRequest, TurnResult, TurnStatus } from '../types.js';
+import type { AIAgentCallbacks, AIAgentResult, AIAgentSessionConfig, AccountingEntry, AgentFinishedEvent, Configuration, ConversationMessage, LogEntry, MCPServerConfig, MCPTool, ProviderConfig, TokenUsage, TurnRequest, TurnResult, TurnStatus } from '../types.js';
 import type { JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js';
+import type { ModelMessage } from 'ai';
 import type { ChildProcess } from 'node:child_process';
 import type { AddressInfo } from 'node:net';
 
@@ -22,6 +23,7 @@ import { parseFrontmatter, parseList, parsePairs } from '../frontmatter.js';
 import { resolveIncludes } from '../include-resolver.js';
 import { DEFAULT_TOOL_INPUT_SCHEMA } from '../input-contract.js';
 import { LLMClient } from '../llm-client.js';
+import { BaseLLMProvider, type ResponseMessage } from '../llm-providers/base.js';
 import { TestLLMProvider } from '../llm-providers/test-llm.js';
 import { SubAgentRegistry } from '../subagent-registry.js';
 import { MCPProvider } from '../tools/mcp-provider.js';
@@ -487,6 +489,15 @@ const TEST_SCENARIOS: HarnessTest[] = [
         toolCallNames.includes(expectedTool) || toolCallNames.includes(sanitizedExpectedTool),
         'Expected test__test tool call in first turn for run-test-1.',
       );
+      const reasoningSegments = firstAssistant.reasoning;
+      invariant(Array.isArray(reasoningSegments) && reasoningSegments.length === 1, 'Expected single reasoning segment with metadata for run-test-1.');
+      const segment = reasoningSegments[0] as { type?: string; text?: string; providerMetadata?: Record<string, unknown> };
+      invariant(segment.type === 'reasoning', 'Reasoning segment must be tagged as reasoning for run-test-1.');
+      invariant(typeof segment.text === 'string' && segment.text.includes('Evaluating task'), 'Reasoning text missing for run-test-1.');
+      const reasoningMetadata = segment.providerMetadata;
+      invariant(reasoningMetadata !== undefined && typeof reasoningMetadata === 'object', 'Reasoning metadata missing for run-test-1.');
+      const anthropicMetadata = reasoningMetadata.anthropic as { signature?: unknown } | undefined;
+      invariant(anthropicMetadata !== undefined && typeof anthropicMetadata.signature === 'string' && anthropicMetadata.signature.length > 0, 'Reasoning signature missing for run-test-1.');
 
       const toolEntries = result.accounting.filter(isToolAccounting);
       const testEntry = toolEntries.find((entry) => entry.mcpServer === 'test' && entry.command === 'test__test');
@@ -1337,7 +1348,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
   {
     id: 'run-test-54',
     description: 'WebSocket transport round-trip coverage.',
-    execute: async () => {
+    execute: async (_configuration, _sessionConfig, _defaults) => {
       runTest54State = undefined;
       const server = new WebSocketServer({ port: 0 });
       const address = server.address();
@@ -3594,7 +3605,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
   {
     id: 'run-test-79',
     description: 'Agent without input spec uses fallback schema.',
-    execute: () => {
+    execute: async () => {
       const configuration: Configuration = makeBasicConfiguration();
       const layers = buildInMemoryConfigLayers(configuration);
       const loaded = loadAgent(AGENT_SCHEMA_DEFAULT_PROMPT, undefined, { configLayers: layers });
@@ -3610,7 +3621,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
   {
     id: 'run-test-80',
     description: 'Agent explicit JSON schema and output are preserved and cloned.',
-    execute: () => {
+    execute: async (_configuration, _sessionConfig, _defaults) => {
       const configuration: Configuration = makeBasicConfiguration();
       const layers = buildInMemoryConfigLayers(configuration);
       const raw = fs.readFileSync(AGENT_SCHEMA_JSON_PROMPT, 'utf-8');
@@ -5261,6 +5272,125 @@ const TEST_SCENARIOS: HarnessTest[] = [
       invariant(result.finalReport === undefined, 'No final report expected for run-test-44.');
       const finLog = result.logs.find((entry) => entry.remoteIdentifier === 'agent:fin');
       invariant(finLog !== undefined, 'Finalization log expected for run-test-44.');
+    },
+  },
+  {
+    id: 'reasoning-normalization',
+    execute: async (_configuration, _sessionConfig, _defaults) => {
+      const normalize = getPrivateMethod(AIAgentSession.prototype, 'normalizeReasoningSegments') as (
+        this: { isPlainRecord: (value: unknown) => value is Record<string, unknown>; isAnthropicMetadata: (value: unknown) => value is { signature?: unknown; redactedData?: unknown } & Record<string, unknown> },
+        messages: ConversationMessage[],
+        requireSignature: boolean,
+      ) => { normalized: ConversationMessage[]; hasMissingReasoning: boolean };
+      const stub = {
+        isPlainRecord: (value: unknown): value is Record<string, unknown> =>
+          value !== null && typeof value === 'object' && !Array.isArray(value),
+        isAnthropicMetadata: (value: unknown): value is { signature?: unknown; redactedData?: unknown } & Record<string, unknown> =>
+          value !== null && typeof value === 'object' && !Array.isArray(value),
+      };
+      const conversation: ConversationMessage[] = [
+        {
+          role: 'assistant',
+          content: '',
+          toolCalls: [{ id: 'call-1', name: 'agent__progress_report', parameters: {} }],
+          reasoning: [{ type: 'reasoning', text: 'missing metadata', providerMetadata: { anthropic: {} } }],
+        },
+      ];
+      const requireSignatureResult = normalize.call(stub, conversation, true) as { normalized: ConversationMessage[]; hasMissingReasoning: boolean };
+      invariant(requireSignatureResult.hasMissingReasoning, 'Reasoning without signature should trigger enforcement.');
+      const normalizedMessage = requireSignatureResult.normalized[0];
+      invariant(normalizedMessage.reasoning === undefined, 'Reasoning array should be removed when metadata is missing.');
+      const noSignatureRequirement = normalize.call(stub, conversation, false) as { normalized: ConversationMessage[]; hasMissingReasoning: boolean };
+      invariant(!noSignatureRequirement.hasMissingReasoning, 'Reasoning should be preserved when signature is not required.');
+      const preserved = noSignatureRequirement.normalized[0];
+      invariant(Array.isArray(preserved.reasoning) && preserved.reasoning.length === 1, 'Reasoning segments should remain without signature requirement.');
+      return Promise.resolve(makeSuccessResult('reasoning-normalization'));
+    },
+    expect: (result) => {
+      invariant(result.success, 'Reasoning normalization test expected success.');
+    },
+  },
+  {
+    id: 'reasoning-replay-signature',
+    execute: () => {
+      class ExposureProvider extends BaseLLMProvider {
+        name = 'exposure';
+        // eslint-disable-next-line @typescript-eslint/no-useless-constructor -- Expose protected base constructor for testing.
+        constructor() {
+          super();
+        }
+        executeTurn(_request: TurnRequest): Promise<TurnResult> {
+          return Promise.reject(new Error('not implemented'));
+        }
+        protected convertResponseMessages(messages: ResponseMessage[], provider: string, model: string, tokens: TokenUsage): ConversationMessage[] {
+          return this.convertResponseMessagesGeneric(messages, provider, model, tokens);
+        }
+        convertResponseMessagesExposed(messages: ResponseMessage[], provider: string, model: string, tokens: TokenUsage): ConversationMessage[] {
+          return this.convertResponseMessages(messages, provider, model, tokens);
+        }
+        convertMessagesExposed(messages: ConversationMessage[]): ModelMessage[] {
+          return this.convertMessages(messages);
+        }
+      }
+
+      const provider: ExposureProvider = new ExposureProvider();
+      const signature = 'sig-replay-123';
+      const responseMessages: ResponseMessage[] = [
+        {
+          role: 'assistant',
+          content: [
+            {
+              type: 'reasoning',
+              text: 'Verifying reasoning signature persistence.',
+              providerMetadata: { anthropic: { signature } },
+            },
+            {
+              type: 'tool-call',
+              toolCallId: 'call-1',
+              toolName: 'agent__progress_report',
+              input: { progress: 'Checking replay order' },
+            },
+          ],
+        },
+        {
+          role: 'tool',
+          content: [
+            {
+              type: 'tool_result',
+              toolCallId: 'call-1',
+              toolName: 'agent__progress_report',
+              output: { type: 'text', value: 'ok' },
+            },
+          ],
+        },
+      ];
+      const usage: TokenUsage = { inputTokens: 24, outputTokens: 12, totalTokens: 36 };
+
+      const conversation: ConversationMessage[] = provider.convertResponseMessagesExposed(responseMessages, 'anthropic', 'claude-3-5', usage);
+      invariant(conversation.some((msg) => msg.role === 'assistant'), 'Converted conversation missing assistant message.');
+      const assistantMessage = conversation.find((msg) => msg.role === 'assistant');
+      invariant(assistantMessage !== undefined, 'Assistant message missing from converted conversation.');
+      invariant(Array.isArray(assistantMessage.reasoning) && assistantMessage.reasoning.length > 0, 'Assistant reasoning missing after conversion.');
+      const persistedConversation = JSON.parse(JSON.stringify(conversation)) as ConversationMessage[];
+
+      const modelMessages: { role?: string; content?: unknown }[] = provider.convertMessagesExposed(persistedConversation);
+      const assistantModel = modelMessages.find((msg) => msg.role === 'assistant');
+      const assistantContentCandidate = assistantModel !== undefined ? assistantModel.content : undefined;
+      invariant(Array.isArray(assistantContentCandidate), 'Assistant model message should expose content array.');
+      const assistantContent = assistantContentCandidate as (Record<string, unknown> | undefined)[];
+      const [reasoningPart, toolCallPart] = assistantContent;
+      invariant(reasoningPart !== undefined, 'Reasoning part should be first in model message.');
+      invariant(reasoningPart.type === 'reasoning', 'Reasoning part should be first in model message.');
+      const providerOptions = reasoningPart.providerOptions as Record<string, unknown> | undefined;
+      invariant(providerOptions !== undefined, 'Reasoning providerOptions missing after replay.');
+      const anthropicMeta = providerOptions.anthropic as { signature?: unknown } | undefined;
+      invariant(anthropicMeta?.signature === signature, 'Reasoning signature lost during replay.');
+      invariant(toolCallPart !== undefined, 'Tool call should follow reasoning in model message.');
+      invariant(toolCallPart.type === 'tool-call', 'Tool call should follow reasoning in model message.');
+      return Promise.resolve(makeSuccessResult('reasoning-replay-signature'));
+    },
+    expect: (result) => {
+      invariant(result.success, 'Reasoning replay test expected success.');
     },
   },
 ];

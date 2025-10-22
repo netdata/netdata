@@ -11,7 +11,7 @@ import type { LoadAgentOptions } from './agent-loader.js';
 import type { FrontmatterOptions } from './frontmatter.js';
 import type { McpTransportSpec } from './headends/mcp-headend.js';
 import type { Headend, HeadendLogSink } from './headends/types.js';
-import type { LogEntry, AccountingEntry, AIAgentCallbacks, ConversationMessage, Configuration, MCPTool } from './types.js';
+import type { LogEntry, AccountingEntry, AIAgentCallbacks, ConversationMessage, Configuration, MCPTool, ProviderReasoningValue } from './types.js';
 import type { CommanderError } from 'commander';
 
 import { AgentRegistry } from './agent-registry.js';
@@ -61,6 +61,10 @@ const defaultWarningSink = (message: string): void => {
 };
 
 setWarningSink(defaultWarningSink);
+
+const EXIT_REASONING_TOKENS = 'EXIT-CLI-REASONING-TOKENS';
+const REASONING_TOKENS_OPTION = 'reasoningTokens';
+const REASONING_TOKENS_ALT_OPTION = 'reasoning-tokens';
 
 // Force commander to route exits through our single exit path
 program.exitOverride((err: CommanderError) => {
@@ -720,6 +724,8 @@ const buildGlobalOverrides = (entries: readonly string[]): LoadAgentOptions['glo
       mcpInitConcurrency: 'mcpInitConcurrency',
       'mcp-init-concurrency': 'mcpInitConcurrency',
       reasoning: 'reasoning',
+      [REASONING_TOKENS_OPTION]: 'reasoningTokens',
+      [REASONING_TOKENS_ALT_OPTION]: 'reasoningTokens',
       caching: 'caching',
     };
     return canonicalMap[lower] ?? lower;
@@ -814,6 +820,16 @@ const buildGlobalOverrides = (entries: readonly string[]): LoadAgentOptions['glo
         overrides.reasoning = parseReasoningLevelStrict(value);
         break;
       }
+      case 'reasoningTokens': {
+        const normalized = value.trim().toLowerCase();
+        if (normalized === 'disabled' || normalized === 'off' || normalized === 'none') {
+          overrides.reasoningValue = null;
+        } else {
+          const tokens = parseInteger('reasoningTokens', value);
+          overrides.reasoningValue = tokens <= 0 ? null : tokens;
+        }
+        break;
+      }
       case 'caching': {
         overrides.caching = parseCachingModeStrict(value);
         break;
@@ -898,6 +914,28 @@ async function runHeadendMode(config: HeadendModeConfig): Promise<void> {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       exitWith(4, message, 'EXIT-HEADEND-REASONING');
+    }
+  }
+  const configOptionsRecord: Record<string, unknown> = config.options;
+  const configReasoningTokens = configOptionsRecord[REASONING_TOKENS_OPTION]
+    ?? configOptionsRecord[REASONING_TOKENS_ALT_OPTION]
+    ?? configOptionsRecord.reasoningValue;
+  if (configReasoningTokens !== undefined) {
+    if (typeof configReasoningTokens === 'number' && Number.isFinite(configReasoningTokens)) {
+      loadOptions.reasoningValue = configReasoningTokens <= 0 ? null : Math.trunc(configReasoningTokens);
+    } else if (typeof configReasoningTokens === 'string') {
+      const normalizedTokens = configReasoningTokens.trim().toLowerCase();
+      if (normalizedTokens === 'disabled' || normalizedTokens === 'off' || normalizedTokens === 'none') {
+        loadOptions.reasoningValue = null;
+      } else {
+        const numeric = Number(normalizedTokens);
+        if (!Number.isFinite(numeric)) {
+          exitWith(4, `invalid reasoningTokens value '${configReasoningTokens}' in config`, 'EXIT-HEADEND-REASONING-TOKENS');
+        }
+        loadOptions.reasoningValue = numeric <= 0 ? null : Math.trunc(numeric);
+      }
+    } else {
+      exitWith(4, 'invalid reasoningTokens value in config', 'EXIT-HEADEND-REASONING-TOKENS');
     }
   }
   if (typeof config.options.caching === 'string' && config.options.caching.length > 0) {
@@ -1201,6 +1239,28 @@ program
         }
       }
 
+      let cliReasoningValue: ProviderReasoningValue | null | undefined;
+      if (optSrc(REASONING_TOKENS_OPTION) === 'cli' || optSrc(REASONING_TOKENS_ALT_OPTION) === 'cli') {
+        const raw = options[REASONING_TOKENS_OPTION]
+          ?? options[REASONING_TOKENS_ALT_OPTION];
+        if (typeof raw === 'number' && Number.isFinite(raw)) {
+          cliReasoningValue = raw <= 0 ? null : Math.trunc(raw);
+        } else if (typeof raw === 'string') {
+          const normalizedTokens = raw.trim().toLowerCase();
+          if (normalizedTokens === 'disabled' || normalizedTokens === 'off' || normalizedTokens === 'none') {
+            cliReasoningValue = null;
+          } else {
+            const numeric = Number(normalizedTokens);
+            if (!Number.isFinite(numeric)) {
+              exitWith(4, `invalid --reasoning-tokens value '${raw}'`, EXIT_REASONING_TOKENS);
+            }
+            cliReasoningValue = numeric <= 0 ? null : Math.trunc(numeric);
+          }
+        } else if (raw !== undefined) {
+          exitWith(4, 'invalid --reasoning-tokens value', EXIT_REASONING_TOKENS);
+        }
+      }
+
       let cliCaching: ('none' | 'full') | undefined;
       if (optSrc('caching') === 'cli') {
         if (typeof options.caching === 'string' && isCachingMode(options.caching)) {
@@ -1254,6 +1314,7 @@ program
         traceMCP: options.traceMcp === true ? true : undefined,
         mcpInitConcurrency: (typeof options.mcpInitConcurrency === 'string' && options.mcpInitConcurrency.length>0) ? Number(options.mcpInitConcurrency) : undefined,
         reasoning: cliReasoning,
+        reasoningValue: cliReasoningValue,
         caching: cliCaching,
       });
 

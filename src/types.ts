@@ -1,3 +1,7 @@
+import type { OutputFormatId } from './formats.js';
+import type { SessionNode } from './session-tree.js';
+import type { PreloadedSubAgent } from './subagent-registry.js';
+import type { ReasoningOutput } from 'ai';
 // Core status interfaces for clear decision making
 export type TurnStatus = 
   | { type: 'success'; hasToolCalls: boolean; finalAnswer: boolean }
@@ -202,7 +206,7 @@ export interface ConversationMessage {
   content: string;
   toolCalls?: ToolCall[];
   toolCallId?: string;
-  reasoning?: string[];
+  reasoning?: ReasoningOutput[];
   metadata?: {
     provider?: string;
     model?: string;
@@ -265,6 +269,7 @@ export interface ProviderConfig {
   stringSchemaFormatsAllowed?: string[];
   stringSchemaFormatsDenied?: string[];
   reasoning?: ProviderReasoningMapping | null;
+  reasoningValue?: ProviderReasoningValue | null;
   reasoningAutoStreamLevel?: ReasoningLevel;
 }
 
@@ -314,6 +319,7 @@ export interface Configuration {
       web?: 'markdown' | 'markdown+mermaid' | 'slack-block-kit' | 'tty' | 'pipe' | 'json' | 'sub-agent';
       subAgent?: 'markdown' | 'markdown+mermaid' | 'slack-block-kit' | 'tty' | 'pipe' | 'json' | 'sub-agent';
     };
+    reasoningValue?: ProviderReasoningValue | null;
   };
   // Server headend configuration (optional)
   slack?: {
@@ -467,6 +473,7 @@ export interface AIAgentSessionConfig {
   traceMCP?: boolean;
   verbose?: boolean;
   reasoning?: ReasoningLevel;
+  reasoningValue?: ProviderReasoningValue | null;
   caching?: CachingMode;
   // Optional pre-set session title (does not consume a tool turn)
   initialTitle?: string;
@@ -632,6 +639,3 @@ export interface AIAgentRunOptions {
   loadConversation?: string;
   dryRun?: boolean;
 }
-import type { OutputFormatId } from './formats.js';
-import type { SessionNode } from './session-tree.js';
-import type { PreloadedSubAgent } from './subagent-registry.js';

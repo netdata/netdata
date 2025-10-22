@@ -157,6 +157,8 @@ export class SessionManager {
           },
           onThinking: (chunk: string) => {
             try { this.callbacks.onThinking?.(runId, chunk); } catch (e) { warn(`callbacks.onThinking failed: ${e instanceof Error ? e.message : String(e)}`); }
+            try { this.callbacks.onTreeUpdate?.(runId); } catch (e) { warn(`callbacks.onTreeUpdate failed: ${e instanceof Error ? e.message : String(e)}`); }
+            for (const fn of this.treeUpdateListeners) { try { fn(runId); } catch (e) { warn(`treeUpdate listener failed: ${e instanceof Error ? e.message : String(e)}`); } }
           },
           onProgress: (event: ProgressEvent) => {
             try { this.callbacks.onProgress?.(runId, event); } catch (e) { warn(`callbacks.onProgress failed: ${e instanceof Error ? e.message : String(e)}`); }

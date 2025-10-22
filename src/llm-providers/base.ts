@@ -14,7 +14,8 @@ import type {
   TurnStatus,
   TurnRetryDirective,
 } from '../types.js';
-import type { LanguageModel, ModelMessage, StreamTextResult, ToolSet } from 'ai';
+import type { ProviderOptions } from '@ai-sdk/provider-utils';
+import type { LanguageModel, ModelMessage, ProviderMetadata, ReasoningOutput, StreamTextResult, ToolSet } from 'ai';
 
 import { clampToolName, sanitizeToolName, TOOL_NAME_MAX_LENGTH, warn } from '../utils.js';
 
@@ -145,6 +146,24 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
 
   protected isPlainObject(value: unknown): value is Record<string, unknown> {
     return value !== null && typeof value === 'object' && !Array.isArray(value);
+  }
+
+  protected isProviderMetadata(value: unknown): value is ProviderMetadata {
+    return this.isPlainObject(value);
+  }
+
+  protected toProviderOptions(value: ProviderMetadata): ProviderOptions {
+    return value as unknown as ProviderOptions;
+  }
+
+  private extractProviderMetadata(part: { providerMetadata?: unknown; providerOptions?: unknown }): ProviderMetadata | undefined {
+    const direct = part.providerMetadata;
+    if (this.isProviderMetadata(direct)) return direct;
+    const opts = part.providerOptions;
+    if (this.isPlainObject(opts) && this.isPlainObject(opts.anthropic)) {
+      return { anthropic: opts.anthropic } as ProviderMetadata;
+    }
+    return undefined;
   }
 
   public prepareFetch(_details: { url: string; init: RequestInit }): { headers?: Record<string, string> } | undefined {
@@ -1618,20 +1637,27 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
         continue;
       }
       if (m.role === 'assistant') {
-        const reasoningSegments = Array.isArray(m.reasoning)
-          ? m.reasoning.filter((segment): segment is string => typeof segment === 'string' && segment.trim().length > 0)
-          : [];
-        const shouldIncludeReasoning = reasoningSegments.length > 0;
+        const reasoningSegmentsRaw = Array.isArray(m.reasoning) ? m.reasoning : [];
+      const reasoningSegments = reasoningSegmentsRaw.filter((segment) => segment.text.trim().length > 0);
+        const reasoningSegmentsWithMetadata = reasoningSegments.filter((segment) => segment.providerMetadata !== undefined);
+        const shouldIncludeReasoning = reasoningSegmentsWithMetadata.length > 0;
         const hasToolCalls = Array.isArray(m.toolCalls) && m.toolCalls.length > 0;
         if (hasToolCalls || shouldIncludeReasoning) {
           const parts: (
-            { type: 'thinking'; text: string } |
+            { type: 'reasoning'; text: string; providerOptions?: Record<string, unknown> } |
             { type: 'text'; text: string } |
             { type: 'tool-call'; toolCallId: string; toolName: string; input: unknown }
           )[] = [];
           if (shouldIncludeReasoning) {
-            reasoningSegments.forEach((segment) => {
-              parts.push({ type: 'thinking', text: segment });
+            reasoningSegmentsWithMetadata.forEach((segment) => {
+              const providerOptions = segment.providerMetadata !== undefined
+                ? this.toProviderOptions(segment.providerMetadata)
+                : undefined;
+              parts.push({
+                type: 'reasoning',
+                text: segment.text,
+                ...(providerOptions !== undefined ? { providerOptions } : {}),
+              });
             });
           }
           if (m.content && m.content.trim().length > 0) {
@@ -1696,7 +1722,7 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
       }
       return name;
     };
-    const reasoningSegments: string[] = [];
+    const reasoningSegments: ReasoningOutput[] = [];
 
     if (Array.isArray(m.content)) {
       const textParts: string[] = [];
@@ -1714,7 +1740,12 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
           typeof part.text === 'string' &&
           part.text.length > 0
         ) {
-          reasoningSegments.push(part.text);
+          const providerMetadata = this.extractProviderMetadata(part);
+          reasoningSegments.push({
+            type: BaseLLMProvider.PART_REASONING,
+            text: part.text,
+            ...(providerMetadata !== undefined ? { providerMetadata } : {}),
+          });
         } else if (part.type === 'tool-call' && part.toolCallId !== undefined && part.toolName !== undefined) {
           // AI SDK embeds tool calls in content
           toolCalls.push({
@@ -1779,6 +1810,7 @@ export interface ResponseMessage {
   content?: string | { 
     type?: string; 
     text?: string;
+    providerMetadata?: Record<string, unknown>;
     // AI SDK embeds tool calls and results in content array
     toolCallId?: string;
     toolName?: string;

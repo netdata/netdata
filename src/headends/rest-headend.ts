@@ -55,6 +55,7 @@ interface AgentSuccessResponse {
   success: true;
   output: string;
   finalReport: unknown;
+  reasoning?: string;
   error?: undefined;
 }
 
@@ -63,6 +64,7 @@ interface AgentErrorResponse {
   output: string;
   finalReport: unknown;
   error: unknown;
+  reasoning?: string;
 }
 
 export interface RestExtraRoute {
@@ -252,9 +254,13 @@ export class RestHeadend implements Headend {
     }
 
     let output = '';
+    let reasoningLog = '';
     const callbacks: AIAgentCallbacks = {
       onOutput: (chunk) => {
         output += chunk;
+      },
+      onThinking: (chunk) => {
+        reasoningLog += chunk;
       },
       onLog: (entry) => {
         this.logEntry(entry);
@@ -276,6 +282,7 @@ export class RestHeadend implements Headend {
           success: true,
           output,
           finalReport: result.finalReport,
+          reasoning: reasoningLog.length > 0 ? reasoningLog : undefined,
         };
         writeJson(res, 200, payload);
         this.log(`response ${requestId} status=ok`);
@@ -285,6 +292,7 @@ export class RestHeadend implements Headend {
           output,
           finalReport: result.finalReport,
           error: result.error ?? 'session_failed',
+          reasoning: reasoningLog.length > 0 ? reasoningLog : undefined,
         };
         writeJson(res, 500, payload);
         this.log(`response ${requestId} status=error`, 'WRN');
@@ -298,6 +306,7 @@ export class RestHeadend implements Headend {
         output: '',
         finalReport: undefined,
         error: message,
+        reasoning: reasoningLog.length > 0 ? reasoningLog : undefined,
       };
       writeJson(res, 500, payload);
     } finally {

@@ -153,6 +153,16 @@ export const OPTIONS_REGISTRY: OptionDef[] = [
     render: { showInFrontmatterTemplate: true },
     default: undefined,
   }),
+  strDef({
+    key: 'reasoningTokens',
+    description: 'Reasoning token budget for Anthropics thinking mode (0 disables).',
+    cli: { names: ['--reasoning-tokens'], showInHelp: true },
+    fm: { allowed: true, key: 'reasoningTokens' },
+    config: { path: 'defaults.reasoningValue' },
+    scope: 'masterDefault',
+    groups: [G_MASTER_DEFAULTS],
+    default: undefined,
+  }),
   numDef({
     key: 'maxOutputTokens',
     default: 4096,

@@ -6,6 +6,10 @@ A TypeScript-based command-line tool and library for interacting with Large Lang
 
 The AI Agent provides a unified interface to interact with multiple LLM providers while seamlessly integrating with MCP (Model Context Protocol) tools. It supports streaming responses, parallel tool execution, and comprehensive accounting. Configuration lives in a JSON file; by default the local filename is `.ai-agent.json`.
 
+### Principle: Follow the AI SDK Contract
+
+Our conversation schemas, reasoning payloads, tool definitions, and streaming expectations MUST stay aligned with the current Vercel AI SDK contract. Track SDK releases, update the agent promptly when upstream schemas evolve, and avoid introducing local abstractions that drift from the SDK’s data model.
+
 ## High-Level Operation
 
 1. **Configuration**: All settings are stored in a JSON config (default `.ai-agent.json`) including provider API keys and MCP server definitions

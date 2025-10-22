@@ -30,7 +30,7 @@ maxRetries: 3
 maxToolTurns: 10
 maxToolCallsPerTurn: 20
 caching: full
-reasoning: high
+#reasoning: high
 ---
 Your goal is to comprehensively search the subject requested.
 

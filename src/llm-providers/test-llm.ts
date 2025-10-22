@@ -83,6 +83,16 @@ export class TestLLMProvider extends BaseLLMProvider {
         return await this.createErrorTurn(request, `Expected topP ${expectedTopPStr} but received ${actualTopPStr}.`, scenarioId);
       }
     }
+    const expectedReasoning = activeStep.expectedReasoning;
+    if (expectedReasoning !== undefined) {
+      const reasoningEnabled = request.reasoningValue !== null && request.reasoningValue !== undefined;
+      if (expectedReasoning === 'enabled' && !reasoningEnabled) {
+        return await this.createErrorTurn(request, 'Expected reasoning to remain enabled for this turn.', scenarioId);
+      }
+      if (expectedReasoning === 'disabled' && reasoningEnabled) {
+        return await this.createErrorTurn(request, 'Expected reasoning to be disabled for this turn.', scenarioId);
+      }
+    }
 
     const context: StepContext = {
       scenario,
@@ -366,9 +376,15 @@ function buildFinalReportContent(response: FinalReportStep): LanguageModelV2Cont
 function appendReasoningParts(content: LanguageModelV2Content[], response: ScenarioStepResponse): void {
   if (!Array.isArray(response.reasoning) || response.reasoning.length === 0) return;
   response.reasoning.forEach((entry) => {
-    if (typeof entry === 'string' && entry.trim().length > 0) {
-      content.push({ type: 'reasoning', text: entry });
+    if (entry.text.trim().length === 0) {
+      return;
     }
+    const providerMetadata = entry.providerMetadata;
+    content.push({
+      type: 'reasoning',
+      text: entry.text,
+      ...(providerMetadata !== undefined ? { providerMetadata } : {}),
+    });
   });
 }
 
@@ -394,8 +410,9 @@ function convertContentToStream(
     if (entry.type === 'reasoning') {
       reasoningIndex += 1;
       const id = `reasoning-${String(reasoningIndex)}`;
+      const delta = entry.text;
       parts.push({ type: 'reasoning-start', id });
-      parts.push({ type: 'reasoning-delta', id, delta: entry.text });
+      parts.push({ type: 'reasoning-delta', id, delta });
       parts.push({ type: 'reasoning-end', id });
       return;
     }

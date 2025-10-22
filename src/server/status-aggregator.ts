@@ -155,12 +155,16 @@ export function formatSlackStatus(summary: SnapshotSummary, masterAgentId?: stri
     if (typeof l.turn === 'number' && typeof l.maxTurns === 'number') bits.push(`${l.turn}/${l.maxTurns}`);
     if (typeof l.subturn === 'number' && typeof l.maxSubturns === 'number' && l.maxSubturns > 0) bits.push(`tools ${l.subturn}/${l.maxSubturns}`);
     if (typeof l.elapsedSec === 'number' && l.elapsedSec > 0) bits.push(`(${String(l.elapsedSec)}s)`);
-    const core = bits.join(', ');
+    const statusText = bits.join(', ');
+    const latest = typeof l.latestStatus === 'string' && l.latestStatus.trim().length > 0 ? l.latestStatus.trim() : undefined;
+    const details = latest !== undefined && latest.length > 0
+      ? `${statusText} → ${latest}`
+      : statusText;
     const d = depthOf(l.callPath);
     const indent = d > 0 ? '  '.repeat(d) : '';
     const namePrefix = `${l.agentId}: `; // always show agent name, including master
     const path = l.callPath ? `  ${l.callPath}` : '';
-    return `${indent}${namePrefix}${core}${path}`.trim();
+    return `${indent}${namePrefix}${details}${path}`.trim();
   };
 
   if (master) {

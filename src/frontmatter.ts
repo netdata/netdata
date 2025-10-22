@@ -25,6 +25,7 @@ export interface FrontmatterOptions {
   repeatPenalty?: number;
   toolResponseMaxBytes?: number;
   reasoning?: ReasoningLevel;
+  reasoningTokens?: number | string;
   caching?: CachingMode;
 }
 
@@ -135,6 +136,11 @@ export function parseFrontmatter(
       } else {
         throw new Error(`Invalid reasoning level '${raw.reasoning}' in frontmatter. Expected minimal, low, medium, or high.`);
       }
+    }
+    if (typeof raw.reasoningTokens === 'number') {
+      options.reasoningTokens = raw.reasoningTokens;
+    } else if (typeof raw.reasoningTokens === 'string') {
+      options.reasoningTokens = raw.reasoningTokens;
     }
     if (typeof raw.caching === 'string') {
       const normalizedCaching = raw.caching.toLowerCase();

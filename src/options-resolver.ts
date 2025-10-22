@@ -1,5 +1,5 @@
 import type { FrontmatterOptions } from './frontmatter.js';
-import type { Configuration, ReasoningLevel, CachingMode } from './types.js';
+import type { Configuration, ReasoningLevel, ProviderReasoningValue, CachingMode } from './types.js';
 
 interface CLIOverrides {
   stream?: boolean;
@@ -21,6 +21,7 @@ interface CLIOverrides {
   traceSlack?: boolean;
   verbose?: boolean;
   reasoning?: ReasoningLevel;
+  reasoningValue?: ProviderReasoningValue | null;
   caching?: CachingMode;
 }
 
@@ -40,6 +41,7 @@ interface GlobalLLMOverrides {
   toolResponseMaxBytes?: number;
   mcpInitConcurrency?: number;
   reasoning?: ReasoningLevel;
+  reasoningValue?: ProviderReasoningValue | null;
   caching?: CachingMode;
 }
 
@@ -57,6 +59,7 @@ interface DefaultsForUndefined {
   toolResponseMaxBytes?: number;
   parallelToolCalls?: boolean;
   reasoning?: ReasoningLevel;
+  reasoningValue?: ProviderReasoningValue | null;
   caching?: CachingMode;
 }
 
@@ -80,6 +83,7 @@ interface ResolvedEffectiveOptions {
   verbose: boolean;
   mcpInitConcurrency?: number;
   reasoning?: ReasoningLevel;
+  reasoningValue?: ProviderReasoningValue | null;
   caching?: CachingMode;
 }
 
@@ -115,6 +119,25 @@ export function resolveEffectiveOptions(args: {
     return undefined;
   };
 
+  const normalizeReasoningValue = (value: unknown): ProviderReasoningValue | null | undefined => {
+    if (value === null) return null;
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      if (value <= 0) return null;
+      return Math.trunc(value);
+    }
+    if (typeof value === 'string') {
+      const trimmed = value.trim().toLowerCase();
+      if (trimmed.length === 0) return undefined;
+      if (trimmed === 'disabled' || trimmed === 'off' || trimmed === 'none') return null;
+      const numeric = Number(trimmed);
+      if (Number.isFinite(numeric)) {
+        if (numeric <= 0) return null;
+        return Math.trunc(numeric);
+      }
+    }
+    return undefined;
+  };
+
   const readReasoning = (): ReasoningLevel | undefined => {
     const fromGlobal = normalizeReasoning(getGlobalVal('reasoning'));
     if (fromGlobal !== undefined) return fromGlobal;
@@ -125,6 +148,24 @@ export function resolveEffectiveOptions(args: {
     const def = normalizeReasoning(getDefUndef('reasoning'));
     if (def !== undefined) return def;
     const cfg = normalizeReasoning(getCfgDefault('reasoning'));
+    if (cfg !== undefined) return cfg;
+    return undefined;
+  };
+
+  const readReasoningValue = (): ProviderReasoningValue | null | undefined => {
+    const fromGlobal = normalizeReasoningValue(getGlobalVal('reasoningValue'));
+    if (fromGlobal !== undefined) return fromGlobal;
+    const fromGlobalTokens = normalizeReasoningValue(getGlobalVal('reasoningTokens'));
+    if (fromGlobalTokens !== undefined) return fromGlobalTokens;
+    const fromCli = normalizeReasoningValue(getCliVal('reasoningValue'));
+    if (fromCli !== undefined) return fromCli;
+    const fromCliTokens = normalizeReasoningValue(getCliVal('reasoningTokens'));
+    if (fromCliTokens !== undefined) return fromCliTokens;
+    const fmTokens = normalizeReasoningValue(fm?.reasoningTokens);
+    if (fmTokens !== undefined) return fmTokens;
+    const def = normalizeReasoningValue(getDefUndef('reasoningValue'));
+    if (def !== undefined) return def;
+    const cfg = normalizeReasoningValue(getCfgDefault('reasoningValue'));
     if (cfg !== undefined) return cfg;
     return undefined;
   };
@@ -210,6 +251,7 @@ export function resolveEffectiveOptions(args: {
       return undefined;
     })(),
     reasoning: readReasoning(),
+    reasoningValue: readReasoningValue(),
     caching: readCaching(),
   };
   return out;

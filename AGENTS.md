@@ -150,3 +150,5 @@ PR-002:
 There are no permanent tools available to all agents, except `progress_report` and `final_report`.
 Per agent tools are subject to its configuration (frontmatter, command-line).
 
+PR-003:
+All conversation structures, reasoning payloads, and tool schemas MUST stay aligned with the latest Vercel AI SDK contract. Track SDK releases and update the agent promptly whenever the upstream schema changes.

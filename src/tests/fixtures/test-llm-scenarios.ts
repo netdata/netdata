@@ -1,4 +1,5 @@
 import type { ProviderTurnMetadata, TokenUsage } from '../../types.js';
+import type { ReasoningOutput } from 'ai';
 
 export interface ScenarioToolCall {
   toolName: string;
@@ -14,7 +15,7 @@ export type ScenarioStepResponse =
       assistantText?: string;
       finishReason?: 'tool-calls';
       tokenUsage?: TokenUsage;
-      reasoning?: string[];
+      reasoning?: ReasoningOutput[];
       providerMetadata?: ProviderTurnMetadata;
     }
   | {
@@ -25,7 +26,7 @@ export type ScenarioStepResponse =
       status?: 'success' | 'failure' | 'partial';
       reportContentJson?: Record<string, unknown>;
       tokenUsage?: TokenUsage;
-      reasoning?: string[];
+      reasoning?: ReasoningOutput[];
       finishReason?: string;
       providerMetadata?: ProviderTurnMetadata;
     }
@@ -34,7 +35,7 @@ export type ScenarioStepResponse =
       assistantText: string;
       finishReason?: 'stop' | 'other';
       tokenUsage?: TokenUsage;
-      reasoning?: string[];
+      reasoning?: ReasoningOutput[];
       providerMetadata?: ProviderTurnMetadata;
     };
 
@@ -52,6 +53,7 @@ export interface ScenarioTurn {
   expectedTemperature?: number;
   expectedTopP?: number;
   failureRetryAfterMs?: number;
+  expectedReasoning?: 'enabled' | 'disabled';
 }
 
 export interface ScenarioDefinition {
@@ -84,10 +86,18 @@ const CONCURRENCY_SECOND_ARGUMENT = 'concurrency-second';
 const BATCH_INVALID_INPUT_ARGUMENT = 'batch-missing-id';
 const BATCH_UNKNOWN_TOOL = 'unknown__tool';
 const BATCH_EXECUTION_ERROR_ARGUMENT = 'trigger-mcp-failure';
-const STREAM_REASONING_STEPS = [
-  'Deliberating over deterministic harness state.',
-  'Confirming reasoning stream emission.',
-] as const;
+const STREAM_REASONING_STEPS: readonly ReasoningOutput[] = [
+  {
+    type: 'reasoning',
+    text: 'Deliberating over deterministic harness state.',
+    providerMetadata: { anthropic: { signature: 'stream-step-0' } },
+  },
+  {
+    type: 'reasoning',
+    text: 'Confirming reasoning stream emission.',
+    providerMetadata: { anthropic: { signature: 'stream-step-1' } },
+  },
+];
 const THROW_FAILURE_MESSAGE = 'Simulated provider throw for coverage.';
 const FINAL_REPORT_JSON_ATTEMPT = 'Attempting JSON final report without structured payload.';
 const FINAL_REPORT_SUCCESS_SUMMARY = 'Final report emitted after retry.';
@@ -126,6 +136,13 @@ const SCENARIOS: ScenarioDefinition[] = [
           ],
           tokenUsage: DEFAULT_TOKEN_USAGE,
           finishReason: TOOL_FINISH_REASON,
+          reasoning: [
+            {
+              type: 'reasoning',
+              text: 'Evaluating task before invoking tool.',
+              providerMetadata: { anthropic: { signature: 'scenario-run-test-1-step-0' } },
+            },
+          ],
         },
       },
       {

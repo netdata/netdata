@@ -1,5 +1,3 @@
-import './setup-ai-sdk.js';
-
 import type { BaseLLMProvider } from './llm-providers/base.js';
 import type {
   TurnRequest,
@@ -18,6 +16,7 @@ import { OllamaProvider } from './llm-providers/ollama.js';
 import { OpenAIProvider } from './llm-providers/openai.js';
 import { OpenRouterProvider } from './llm-providers/openrouter.js';
 import { TestLLMProvider } from './llm-providers/test-llm.js';
+import { updateAiSdkWarningPreference } from './setup-ai-sdk.js';
 import { warn } from './utils.js';
 
 export class LLMClient {
@@ -48,6 +47,7 @@ export class LLMClient {
     }
   ) {
     this.traceLLM = options?.traceLLM ?? false;
+    updateAiSdkWarningPreference(this.traceLLM);
     this.onLog = options?.onLog;
     this.pricing = options?.pricing;
 
@@ -519,7 +519,8 @@ export class LLMClient {
     const totalBytes = new TextEncoder().encode(messagesStr).length;
 
     const isFinalTurn = request.isFinalTurn === true ? ' (final turn)' : '';
-    const message = `messages ${String(request.messages.length)}, ${String(totalBytes)} bytes${isFinalTurn}`;
+    const reasoningStatus = this.describeReasoningState(request);
+    const message = `messages ${String(request.messages.length)}, ${String(totalBytes)} bytes${isFinalTurn}, reasoning=${reasoningStatus}`;
 
     this.log('VRB', 'request', 'llm', `${request.provider}:${request.model}`, message);
   }
@@ -554,7 +555,8 @@ export class LLMClient {
       const cacheWrite = tokens?.cacheWriteInputTokens ?? 0;
       const responseBytes = result.response !== undefined ? new TextEncoder().encode(result.response).length : 0;
       // Do not include routed provider/model details here; keep log concise up to bytes
-      let message = `input ${String(inputTokens)}, output ${String(outputTokens)}, cacheR ${String(cacheRead)}, cacheW ${String(cacheWrite)}, cached ${String(cachedTokens)} tokens, ${String(latencyMs)}ms, ${String(responseBytes)} bytes`;
+      const reasoningStatus = this.describeReasoningState(request);
+      let message = `input ${String(inputTokens)}, output ${String(outputTokens)}, cacheR ${String(cacheRead)}, cacheW ${String(cacheWrite)}, cached ${String(cachedTokens)} tokens, ${String(latencyMs)}ms, ${String(responseBytes)} bytes, reasoning=${reasoningStatus}`;
       if (typeof result.stopReason === 'string' && result.stopReason.length > 0) {
         message += `, stop=${result.stopReason}`;
       }
@@ -571,7 +573,8 @@ export class LLMClient {
     } else {
       const fatal = result.status.type === 'auth_error' || result.status.type === 'quota_exceeded';
       const statusMessage = 'message' in result.status ? result.status.message : result.status.type;
-      let message = `error [${result.status.type.toUpperCase()}] ${statusMessage} (waited ${String(latencyMs)} ms)`;
+      const reasoningStatus = this.describeReasoningState(request);
+      let message = `error [${result.status.type.toUpperCase()}] ${statusMessage} (waited ${String(latencyMs)} ms), reasoning=${reasoningStatus}`;
       if (typeof result.stopReason === 'string' && result.stopReason.length > 0) {
         message += `, stop=${result.stopReason}`;
       }
@@ -605,6 +608,19 @@ export class LLMClient {
     };
 
     this.onLog(entry);
+  }
+
+  private describeReasoningState(request: TurnRequest): 'unset' | 'disabled' | ReasoningLevel {
+    if (request.reasoningLevel !== undefined) {
+      return request.reasoningLevel;
+    }
+    if (request.reasoningValue === null) {
+      return 'disabled';
+    }
+    if (request.reasoningValue !== undefined) {
+      return 'minimal';
+    }
+    return 'unset';
   }
 
   resolveReasoningValue(
