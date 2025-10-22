@@ -1238,42 +1238,22 @@ modules:
               chart_type: line
               dimensions:
                 - name: input
-            - name: system.hw.sensor.xdistance.input
-              description: X Distance
+            - name: system.hw.sensor.distance.input
+              description: Distance
               unit: "m"
               chart_type: line
               dimensions:
-                - name: input
-            - name: system.hw.sensor.ydistance.input
-              description: Y Distance
-              unit: "m"
-              chart_type: line
-              dimensions:
-                - name: input
-            - name: system.hw.sensor.zdistance.input
-              description: Z Distance
-              unit: "m"
-              chart_type: line
-              dimensions:
-                - name: input
-            - name: system.hw.sensor.xacceleration.input
-              description: Acceleration on X axis
+                - name: inputX
+                - name: inputY
+                - name: inputZ
+            - name: system.hw.sensor.acceleration.input
+              description: Acceleration
               unit: "g"
               chart_type: line
               dimensions:
-                - name: input
-            - name: system.hw.sensor.yacceleration.input
-              description: Acceleration on Y axis
-              unit: "g"
-              chart_type: line
-              dimensions:
-                - name: input
-            - name: system.hw.sensor.zacceleration.input
-              description: Acceleration on Z axis
-              unit: "g"
-              chart_type: line
-              dimensions:
-                - name: input
+                - name: inputX
+                - name: inputY
+                - name: inputZ
             - name: system.hw.sensor.state.input
               description: Current sensor state.
               unit: "status"
