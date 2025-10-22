@@ -1272,6 +1272,70 @@ modules:
               chart_type: line
               dimensions:
                 - name: input
+            - name: system.hw.sensor.color.input
+              description: Color temperature of light
+              unit: "Cel"
+              chart_type: line
+              dimensions:
+                - name: input
+            - name: system.hw.sensor.voltage.input
+              description: Electrical potential
+              unit: "V"
+              chart_type: line
+              dimensions:
+                - name: input
+            - name: system.hw.sensor.resistence.input
+              description: Electrical resistence.
+              unit: "Ohms"
+              chart_type: line
+              dimensions:
+                - name: input
+            - name: system.hw.sensor.pressure.input
+              description: Ambient atmospheric pressure
+              unit: "Pa"
+              chart_type: line
+              dimensions:
+                - name: input
+            - name: system.hw.sensor.latitude.input
+              description: Geographic latitude
+              unit: "Degrees"
+              chart_type: line
+              dimensions:
+                - name: input
+            - name: system.hw.sensor.longitude.input
+              description: Geographic longitude
+              unit: "Degrees"
+              chart_type: line
+              dimensions:
+                - name: input
+            - name: system.hw.sensor.force.input
+              description: Force
+              unit: "N"
+              chart_type: line
+              dimensions:
+                - name: input
+            - name: system.hw.sensor.gauge_pressure.input
+              description: Gauge Pressure
+              unit: "Pa"
+              chart_type: line
+              dimensions:
+                - name: input
+            - name: system.hw.sensor.distance.input
+              description: Distance
+              unit: "m"
+              chart_type: line
+              dimensions:
+                - name: inputX
+                - name: inputY
+                - name: inputZ
+            - name: system.hw.sensor.acceleration.input
+              description: Acceleration
+              unit: "g"
+              chart_type: line
+              dimensions:
+                - name: inputX
+                - name: inputY
+                - name: inputZ
             - name: system.hw.sensor.state.input
               description: Current sensor state.
               unit: "status"

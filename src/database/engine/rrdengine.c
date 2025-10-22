@@ -726,7 +726,18 @@ extent_flush_to_open(struct rrdengine_instance *ctx, struct extent_io_descriptor
 
 static bool datafile_is_full(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile) {
     bool ret = false;
+
     spinlock_lock(&datafile->writers.spinlock);
+
+#ifdef OS_WINDOWS
+    time_t now = now_realtime_sec();
+    if (now - datafile->writers.last_sync_time > 60) {
+        nd_log_daemon(NDLP_INFO, "DBENGINE: datafile %d, last sync time: %ld, now: %ld", datafile->fileno, datafile->writers.last_sync_time, now);
+        sync_uv_file_data(datafile->file);
+        sync_uv_file_data(datafile->journalfile->file);
+        datafile->writers.last_sync_time = now_realtime_sec();
+    }
+#endif
 
     if(datafile->pos > rrdeng_target_data_file_size(ctx))
         ret = true;
@@ -862,6 +873,12 @@ static struct rrdengine_datafile *get_datafile_to_write_extent(struct rrdengine_
         // release the writers on the old datafile
         spinlock_lock(&old_datafile->writers.spinlock);
         old_datafile->writers.running--;
+#ifdef OS_WINDOWS
+        sync_uv_file_data(old_datafile->file);
+        sync_uv_file_data(old_datafile->journalfile->file);
+        datafile->writers.last_sync_time = now_realtime_sec();
+        old_datafile->writers.last_sync_time = now_realtime_sec();
+#endif
         spinlock_unlock(&old_datafile->writers.spinlock);
     }
 

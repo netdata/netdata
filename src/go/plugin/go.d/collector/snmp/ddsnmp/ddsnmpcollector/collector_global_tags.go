@@ -48,7 +48,7 @@ func (gc *globalTagsCollector) Collect(prof *ddsnmp.Profile) (map[string]string,
 	return tags, nil
 }
 
-func (gc *globalTagsCollector) processStaticTags(staticTags []string, globalTags map[string]string) {
+func (gc *globalTagsCollector) processStaticTags(staticTags []ddprofiledefinition.StaticMetricTagConfig, globalTags map[string]string) {
 	ta := tagAdder{tags: globalTags}
 	ta.addTags(parseStaticTags(staticTags))
 }

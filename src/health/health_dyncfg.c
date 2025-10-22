@@ -493,10 +493,12 @@ int dyncfg_health_prototype_to_conf(BUFFER *wb, RRD_ALERT_PROTOTYPE *ap, const c
             buffer_strcat(wb, "\n");
         }
 
-        if(nap->config.has_custom_repeat_config) {
-            if(!nap->config.crit_repeat_every && !nap->config.warn_repeat_every)
-                buffer_sprintf(wb, "%13s: off\n", "repeat");
-            else {
+        if (nap->config.has_custom_repeat_config) {
+            buffer_sprintf(wb, "%13s:", "repeat");
+
+            if (!nap->config.crit_repeat_every && !nap->config.warn_repeat_every) {
+                buffer_strcat(wb, " off\n");
+            } else {
                 dyncfg_user_config_print_duration(wb, " warning ", (int)nap->config.warn_repeat_every);
                 dyncfg_user_config_print_duration(wb, " critical ", (int)nap->config.crit_repeat_every);
                 buffer_strcat(wb, "\n");
