@@ -78,6 +78,16 @@ Metrics:
 | system.hw.sensor.current.input | input | A |
 | system.hw.sensor.humidity.input | input | % |
 | system.hw.sensor.lux.input | input | lx |
+| system.hw.sensor.color.input | input | Cel |
+| system.hw.sensor.voltage.input | input | V |
+| system.hw.sensor.resistence.input | input | Ohms |
+| system.hw.sensor.pressure.input | input | Pa |
+| system.hw.sensor.latitude.input | input | Degrees |
+| system.hw.sensor.longitude.input | input | Degrees |
+| system.hw.sensor.force.input | input | N |
+| system.hw.sensor.gauge_pressure.input | input | Pa |
+| system.hw.sensor.distance.input | inputX, inputY, inputZ | m |
+| system.hw.sensor.acceleration.input | inputX, inputY, inputZ | g |
 | system.hw.sensor.state.input | ready, not_available, no_data, initializing, access_denied, error | status |
 
 
