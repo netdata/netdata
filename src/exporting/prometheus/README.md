@@ -249,6 +249,27 @@ Server identification:
 | Behind proxy or NAT | Append `&server=NAME` to URL |
 | Multiple servers, same IP | Each uses unique `&server=NAME` |
 
+### Host Labels
+
+Netdata supports custom host labels that are exported to Prometheus. Configure labels in `/etc/netdata/netdata.conf`:
+
+```ini
+[host labels]
+    environment = production
+    region = us-east-1
+    datacenter = dc1
+```
+
+Enable label export in `/etc/netdata/exporting.conf`:
+
+```ini
+[prometheus:exporter]
+    send configured labels = yes
+    send automatic labels = yes
+```
+
+For detailed label configuration and best practices, see `/etc/netdata/netdata.conf`.
+
 ## Configure Prometheus to Scrape Netdata Metrics
 
 The following `prometheus.yml` scrapes all Netdata metrics "as collected":
