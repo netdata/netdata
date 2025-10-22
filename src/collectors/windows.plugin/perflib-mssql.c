@@ -168,8 +168,9 @@ struct mssql_lock_instance {
 struct mssql_db_jobs {
     struct mssql_instance *parent;
 
-    const char *name;
     bool enabled;
+
+    COUNTER_DATA MSSQLJOBState;
 };
 
 struct mssql_db_instance {
@@ -835,6 +836,51 @@ enddbstate:
     netdata_MSSQL_release_results(mi->conn->dbSQLState);
 }
 
+void metdata_mssql_fill_job_status(struct mssql_instance *mi)
+{
+    char job[SQLSERVER_MAX_NAME_LENGTH + 1];
+    BYTE state = 0;
+    SQLLEN col_data_len = 0;
+
+    static int next_try = NETDATA_MSSQL_NEXT_TRY - 1;
+
+    if (++next_try != NETDATA_MSSQL_NEXT_TRY)
+        return;
+
+    next_try = 0;
+
+    SQLRETURN ret;
+
+    ret = SQLExecDirect(mi->conn->dbSQLJobs, (SQLCHAR *)NETDATA_QUERY_DATABASE_STATUS, SQL_NTS);
+    if (ret != SQL_SUCCESS) {
+        netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn->dbSQLJobs, NETDATA_MSSQL_ODBC_QUERY, mi->instanceID);
+        goto enddbjobs;
+    }
+
+    ret = SQLBindCol(mi->conn->dbSQLJobs, 1, SQL_C_TINYINT, &state, sizeof(state), &col_data_len);
+    if (ret != SQL_SUCCESS) {
+        netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn->dbSQLJobs, NETDATA_MSSQL_ODBC_PREPARE, mi->instanceID);
+        goto enddbjobs;
+    }
+
+    int i = 0;
+    do {
+        ret = SQLFetch(mi->conn->dbSQLJobs);
+        if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
+            goto enddbjobs;
+        }
+
+        struct mssql_db_jobs *mdj = dictionary_set(mi->sysjobs, dbname, NULL, sizeof(*mdj));
+        if (!mdj)
+            continue;
+
+        mdj->MSSQLJOBState.current.Data = (ULONGLONG)state;
+    } while (true);
+
+enddbjobs:
+    netdata_MSSQL_release_results(mi->conn->dbSQLJobs);
+}
+
 void metdata_mssql_fill_dictionary_from_db(struct mssql_instance *mi)
 {
     char dbname[SQLSERVER_MAX_NAME_LENGTH + 1];
@@ -1346,6 +1392,7 @@ int dict_mssql_query_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value,
         } else {
             metdata_mssql_fill_dictionary_from_db(mi);
             metdata_mssql_fill_mssql_status(mi);
+            metdata_mssql_fill_job_status(mi);
             dictionary_sorted_walkthrough_read(mi->databases, dict_mssql_databases_run_queries, NULL);
         }
 
