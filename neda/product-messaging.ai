@@ -13,6 +13,8 @@ agents:
   - source-code.ai
 tools:
   - batch
+llmTimeout: 300000
+toolTimeout: 60000
 maxRetries: 5
 maxToolTurns: 10
 maxConcurrentTools: 2

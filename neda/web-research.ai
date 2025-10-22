@@ -15,7 +15,7 @@ agents:
   - web-search.ai
   - web-fetch.ai
   - reddit.ai
-llmTimeout: 120000
+llmTimeout: 300000
 toolTimeout: 60000
 toolResponseMaxBytes: 100000
 maxConcurrentTools: 3
