@@ -2233,6 +2233,12 @@ modules:
               chart_type: line
               dimensions:
                 - name: blocked
+            - name: mssql.instance_jobs_status
+              description: Jobs running
+              unit: jobs
+              chart_type: line
+              dimensions:
+                - name: enabled
         - name: MSSQL Resource Locks
           description: "Monitors SQL Server resource locks by type. SQL Server uses locks to manage concurrent access to database resources during transactions, preventing conflicts when multiple users access the same data simultaneously. This metric tracks locks on different [resource types](https://learn.microsoft.com/en-us/sql/relational-databases/performance-monitor/sql-server-locks-object?view=sql-server-ver17) like rows, pages, tables, and databases."
           labels:
