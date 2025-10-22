@@ -2301,7 +2301,6 @@ export class AIAgentSession {
       }
       const segments = Array.isArray(msg.reasoning) ? msg.reasoning : [];
       if (segments.length === 0) {
-        hasMissingReasoning = true;
         return msg;
       }
       const hasValidSignature = segments.some((segment) => {
@@ -2774,6 +2773,7 @@ export class AIAgentSession {
       effectiveReasoningLevel = undefined;
       effectiveReasoningValue = null;
     }
+    const sendReasoning = disableReasoningForTurn ? false : undefined;
     let effectiveStream = this.sessionConfig.stream;
     if (this.llmClient.shouldAutoEnableReasoningStream(provider, effectiveReasoningLevel)) {
       effectiveStream = true;
@@ -2794,6 +2794,7 @@ export class AIAgentSession {
       isFinalTurn,
       llmTimeout: this.sessionConfig.llmTimeout,
       abortSignal: this.abortSignal,
+      sendReasoning,
       onChunk: (chunk: string, type: 'content' | 'thinking') => {
         const isRootSession = this.parentTxnId === undefined;
         if (type === 'content' && this.sessionConfig.callbacks?.onOutput !== undefined) {

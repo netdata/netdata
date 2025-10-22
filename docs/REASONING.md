@@ -32,9 +32,22 @@ Document how Vercel AI SDK (v5.0.76) handles Anthropic "reasoning" blocks so we 
 - Front-matter reasoning settings are no longer copied to sub-agents. Only CLI/global overrides (`defaultsForUndefined`) propagate. This stops master prompts such as `neda/web-research.ai` from forcing reasoning onto `neda/web-search.ai`.
 
 ## Trade-offs & Known Limitations
-- We currently drop reasoning segments that arrive without signatures. This keeps the session healthy but sacrifices visibility into those thoughts.
+- We currently drop reasoning segments that arrive without signatures. This keeps the session healthy but sacrifices visibility into those thoughts. Anthropic’s extended-thinking contract requires replaying the exact thinking block (with its signature) on subsequent turns; altering or omitting it yields validation errors such as `messages.1.content.0.type`.citeturn0search0turn0search1turn0search6turn0search7
 - Redacted thinking (`redactedData`) is preserved, yet we have not implemented decryption or special handling for that payload.
 - Reasoning telemetry is limited to text; token budgets and cost attribution are not exposed in headend summaries.
+
+## Latest Findings (2025-10-22)
+- Anthropic’s Messages API requires that the final assistant message start with a `thinking` or `redacted_thinking` block whenever reasoning is enabled; tool-only turns are fine, but the previous signed thinking must remain intact or Claude rejects the replay.citeturn0search0turn0search1turn0search2turn0search6
+- When we intentionally disable reasoning, we must also stop forwarding stored thinking blocks (e.g., set `providerOptions.anthropic.sendReasoning=false` and/or strip the reasoning array) or we re-trigger the same validation failure.citeturn0search0turn0search1
+- Empty `reasoning` arrays emitted alongside tool calls should not trigger a session-wide disable; Anthropic notes that some turns may omit thinking as long as signed segments are preserved across turns.citeturn0search2turn0search6
+- Signatures are cryptographic proofs; dropping them prevents Claude from authenticating our replayed thinking and leads to rejection.citeturn0search6turn0search7
+
+## Immediate Action Items
+1. **Refine suppression logic** – only mark `disableReasoningForTurn` when we discard a reasoning segment with invalid metadata; tolerate empty arrays from tool-only turns.
+2. **Align provider options** – when disabling reasoning, set `providerOptions.anthropic.sendReasoning=false` (and strip reasoning parts) so Anthropic does not receive thinking blocks alongside a disabled flag.
+3. **Regression coverage** – add a deterministic harness case that reproduces a “tool-only turn with valid signatures on prior turn” and asserts that the next request keeps reasoning enabled unless signatures were dropped.
+
+We must update this document again after applying the fixes and validating real Anthropic sessions (CLI + headends). If future testing shows additional requirements (e.g., budget adjustments or Bedrock-specific behavior), append them here with dates and citations.
 
 ## Headend Snapshot
 - **CLI / REST / API** – show thinking tags and include `reasoning=` in logs/responses.

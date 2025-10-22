@@ -601,6 +601,7 @@ export interface TurnRequest {
   onChunk?: (chunk: string, type: 'content' | 'thinking') => void;
   reasoningLevel?: ReasoningLevel;
   reasoningValue?: ProviderReasoningValue | null;
+  sendReasoning?: boolean;
   caching?: CachingMode;
 }
 

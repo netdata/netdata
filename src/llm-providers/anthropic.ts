@@ -84,6 +84,8 @@ export class AnthropicProvider extends BaseLLMProvider {
       const providerOptions = (() => {
         const base: Record<string, unknown> = { anthropic: {} };
         const a = (base.anthropic as Record<string, unknown>);
+        const sendReasoning = request.sendReasoning ?? true;
+        a.sendReasoning = sendReasoning;
         if (typeof request.maxOutputTokens === 'number' && Number.isFinite(request.maxOutputTokens)) a.maxTokens = Math.trunc(request.maxOutputTokens);
         // Anthropic has no generic repeat penalty; ignore if provided
         if (request.reasoningValue !== undefined) {
