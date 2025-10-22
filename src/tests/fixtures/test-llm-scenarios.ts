@@ -193,6 +193,78 @@ const SCENARIOS: ScenarioDefinition[] = [
     ],
   },
   {
+    id: 'run-test-121',
+    description: 'Anthropic reasoning stays enabled after a tool-only turn without thinking output.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        expectedReasoning: 'enabled',
+        expectedTools: [TOOL_NAME],
+        response: {
+          kind: 'tool-call',
+          assistantText: 'Gathering initial context before invoking tools.',
+          toolCalls: [
+            {
+              toolName: TOOL_NAME,
+              callId: 'call-test-121-a',
+              assistantText: 'Preparing data requirements.',
+              arguments: {
+                text: 'phase-1-tool-reasoning-initial',
+              },
+            },
+          ],
+          finishReason: TOOL_FINISH_REASON,
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+          reasoning: [
+            {
+              type: 'reasoning',
+              text: 'Planning initial tool usage.',
+              providerMetadata: { anthropic: { signature: 'scenario-run-test-121-initial' } },
+            },
+          ],
+        },
+      },
+      {
+        turn: 2,
+        expectedReasoning: 'enabled',
+        expectedTools: [TOOL_NAME],
+        response: {
+          kind: 'tool-call',
+          assistantText: 'Continuing with additional tool calls.',
+          toolCalls: [
+            {
+              toolName: TOOL_NAME,
+              callId: 'call-test-121-b',
+              assistantText: 'Gathering follow-up data.',
+              arguments: {
+                text: 'phase-1-tool-follow-up',
+              },
+            },
+          ],
+          finishReason: TOOL_FINISH_REASON,
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+        },
+      },
+      {
+        turn: 3,
+        expectedReasoning: 'enabled',
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Summarizing results after mixed tool outputs.',
+          reportContent: `${RESULT_HEADING}Reasoning remained enabled across tool-only turns.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_SUCCESS,
+          tokenUsage: {
+            inputTokens: 90,
+            outputTokens: 32,
+            totalTokens: 122,
+          },
+        },
+      },
+    ],
+  },
+  {
     id: 'run-test-2',
     description: 'LLM ok, MCP tool failure path.',
     systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
