@@ -3221,7 +3221,8 @@ Requires(pre): %{name}-user >= %{version}
 Summary: User and group accounts for the Netdata Agent
 Group: Applications/System
 %if ! %{_have_sysuser}
-Requires: shadow
+Requires: /usr/sbin/useradd
+Requires: /usr/sbin/groupadd
 %else
 Requires: systemd
 %endif
