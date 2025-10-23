@@ -20,7 +20,7 @@ Explore the Agent API using:
 
 ## Cloud API
 
-The Netdata Cloud REST API provides programmatic access to Cloud resources, spaces, war rooms, and nodes across your infrastructure.
+The Netdata Cloud REST API provides programmatic access to Cloud resources, spaces, rooms, and nodes across your infrastructure.
 
 Explore the Cloud API using the live API documentation:
 
