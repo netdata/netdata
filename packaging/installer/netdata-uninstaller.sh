@@ -231,9 +231,43 @@ pkg_installed() {
 
 detect_existing_install
 
+# Function to clean up files that may not be managed by package managers
+cleanup_non_package_files() {
+  info "Cleaning up auto-updater files..."
+  
+  # Try to disable auto-updates if the updater script exists
+  if [ -x "${NETDATA_PREFIX}/usr/libexec/netdata-updater.sh" ]; then
+    "${NETDATA_PREFIX}/usr/libexec/netdata-updater.sh" --disable-auto-updates 2>/dev/null || true
+  fi
+  
+  # Remove cron files/symlinks that may have been created by the updater
+  # These are not managed by package managers
+  if [ -f /etc/periodic/daily/netdata-updater ] || [ -L /etc/periodic/daily/netdata-updater ]; then
+    rm -f /etc/periodic/daily/netdata-updater
+    info "Removed /etc/periodic/daily/netdata-updater"
+  fi
+  
+  if [ -f /etc/cron.daily/netdata-updater ] || [ -L /etc/cron.daily/netdata-updater ]; then
+    rm -f /etc/cron.daily/netdata-updater
+    info "Removed /etc/cron.daily/netdata-updater"
+  fi
+  
+  if [ -f /etc/cron.d/netdata-updater ] || [ -L /etc/cron.d/netdata-updater ]; then
+    rm -f /etc/cron.d/netdata-updater
+    info "Removed /etc/cron.d/netdata-updater"
+  fi
+  
+  if [ -f /etc/cron.d/netdata-updater-daily ] || [ -L /etc/cron.d/netdata-updater-daily ]; then
+    rm -f /etc/cron.d/netdata-updater-daily
+    info "Removed /etc/cron.d/netdata-updater-daily"
+  fi
+}
+
 if [ -x "$(command -v apt-get)" ] && [ "${INSTALL_TYPE}" = "binpkg-deb" ]; then
   if dpkg -s netdata > /dev/null; then
     echo "Found netdata native installation"
+    # Clean up files not managed by package manager before removing packages
+    cleanup_non_package_files
     if user_input "Do you want to remove netdata? "; then
       # shellcheck disable=SC2086
       apt-get remove netdata ${FLAG}
@@ -255,6 +289,8 @@ if [ -x "$(command -v apt-get)" ] && [ "${INSTALL_TYPE}" = "binpkg-deb" ]; then
 elif [ -x "$(command -v dnf)" ] && [ "${INSTALL_TYPE}" = "binpkg-rpm" ]; then
   if rpm -q netdata > /dev/null; then
     echo "Found netdata native installation."
+    # Clean up files not managed by package manager before removing packages
+    cleanup_non_package_files
     if user_input "Do you want to remove netdata? "; then
       # shellcheck disable=SC2086
       dnf remove netdata ${FLAG}
@@ -276,6 +312,8 @@ elif [ -x "$(command -v dnf)" ] && [ "${INSTALL_TYPE}" = "binpkg-rpm" ]; then
 elif [ -x "$(command -v yum)" ] && [ "${INSTALL_TYPE}" = "binpkg-rpm" ]; then
   if rpm -q netdata > /dev/null; then
     echo "Found netdata native installation."
+    # Clean up files not managed by package manager before removing packages
+    cleanup_non_package_files
     if user_input "Do you want to remove netdata? "; then
       # shellcheck disable=SC2086
       yum remove netdata ${FLAG}
@@ -300,6 +338,8 @@ elif [ -x "$(command -v zypper)" ] && [ "${INSTALL_TYPE}" = "binpkg-rpm" ]; then
   fi
   if zypper search -i netdata > /dev/null; then
     echo "Found netdata native installation."
+    # Clean up files not managed by package manager before removing packages
+    cleanup_non_package_files
     if user_input "Do you want to remove netdata? "; then
       # shellcheck disable=SC2086
       zypper ${FLAG} remove netdata
