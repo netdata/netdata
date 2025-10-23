@@ -32,6 +32,7 @@ import { mergeCallbacksWithPersistence } from './persistence.js';
 import { MCPProvider } from './tools/mcp-provider.js';
 import { formatAgentResultHumanReadable, setWarningSink } from './utils.js';
 import { VERSION } from './version.generated.js';
+import './setup-undici.js';
 
 // FrontmatterOptions is sourced from frontmatter.ts (single definition)
 
