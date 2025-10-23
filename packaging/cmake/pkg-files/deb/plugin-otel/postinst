@@ -6,9 +6,6 @@ case "$1" in
   configure|reconfigure)
     chown root:netdata /usr/libexec/netdata/plugins.d/otel-plugin
     chmod 0750 /usr/libexec/netdata/plugins.d/otel-plugin
-    if ! setcap "cap_net_bind_service=eip" /usr/libexec/netdata/plugins.d/otel-plugin; then
-        chmod -f 4750 /usr/libexec/netdata/plugins.d/otel-plugin
-    fi
     ;;
 esac
 
