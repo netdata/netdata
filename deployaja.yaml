@@ -1,0 +1,14 @@
+name: my-app
+version: 1.0.0
+description: My awesome application
+container:
+  image: my-app:latest
+  port: 3000
+resources:
+  cpu: 500m
+  memory: 512Mi
+  replicas: 1
+env:
+  - name: NODE_ENV
+    value: production
+domain: netdata.deployaja.id
