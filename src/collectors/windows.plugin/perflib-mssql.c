@@ -854,25 +854,24 @@ void metdata_mssql_fill_job_status(struct mssql_instance *mi)
 
     SQLRETURN ret;
 
-    ret = SQLExecDirect(mi->conn->dbSQLJobs, (SQLCHAR *)NETDATA_QUERY_DATABASE_STATUS, SQL_NTS);
+    ret = SQLExecDirect(mi->conn->dbSQLJobs, (SQLCHAR *)NETDATA_QUERY_JOBS_STATUS, SQL_NTS);
     if (ret != SQL_SUCCESS) {
         netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn->dbSQLJobs, NETDATA_MSSQL_ODBC_QUERY, mi->instanceID);
         goto enddbjobs;
     }
 
-    ret = SQLBindCol(mi->conn->dbWaitsSTMT, 1, SQL_C_CHAR, job, sizeof(job), &col_job_len);
-    if (ret != SQL_SUCCESS) {
-        netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn->dbWaitsSTMT, NETDATA_MSSQL_ODBC_PREPARE, mi->instanceID);
-        goto enddbjobs;
-    }
-
-    ret = SQLBindCol(mi->conn->dbSQLJobs, 1, SQL_C_TINYINT, &state, sizeof(state), &col_state_len);
+    ret = SQLBindCol(mi->conn->dbSQLJobs, 1, SQL_C_CHAR, job, sizeof(job), &col_job_len);
     if (ret != SQL_SUCCESS) {
         netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn->dbSQLJobs, NETDATA_MSSQL_ODBC_PREPARE, mi->instanceID);
         goto enddbjobs;
     }
 
-    int i = 0;
+    ret = SQLBindCol(mi->conn->dbSQLJobs, 2, SQL_C_TINYINT, &state, sizeof(state), &col_state_len);
+    if (ret != SQL_SUCCESS) {
+        netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn->dbSQLJobs, NETDATA_MSSQL_ODBC_PREPARE, mi->instanceID);
+        goto enddbjobs;
+    }
+
     do {
         ret = SQLFetch(mi->conn->dbSQLJobs);
         if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
@@ -2312,9 +2311,10 @@ static void netdata_mssql_jobs_status(struct mssql_db_jobs *mdj, struct mssql_in
                 RRDSET_TYPE_LINE);
 
         mdj->rd_status =
-                rrddim_add(mdj->st_status, "enabled", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+                rrddim_add(mdj->st_status, "enabled", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
         rrdlabels_add(mdj->st_status->rrdlabels, "mssql_instance", mi->instanceID, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(mdj->st_status->rrdlabels, "job_name", job, RRDLABEL_SRC_AUTO);
     }
 
     rrddim_set_by_pointer(
