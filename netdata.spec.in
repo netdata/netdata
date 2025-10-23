@@ -3252,6 +3252,7 @@ fi
 
 %files plugin-otel
 %defattr(0750,root,netdata,0750)
+%attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/otel-plugin
 %endif
 
 %changelog
