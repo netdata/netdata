@@ -6,6 +6,15 @@
 
 **Merged pull requests:**
 
+- Initialize cli earlier during agent startup [\#21188](https://github.com/netdata/netdata/pull/21188) ([stelfrag](https://github.com/stelfrag))
+- Prometheus - exporting metrics [\#21187](https://github.com/netdata/netdata/pull/21187) ([kanelatechnical](https://github.com/kanelatechnical))
+- Regenerate integrations docs [\#21185](https://github.com/netdata/netdata/pull/21185) ([netdatabot](https://github.com/netdatabot))
+- Calculate weights for multiple nodes in parallel [\#21184](https://github.com/netdata/netdata/pull/21184) ([stelfrag](https://github.com/stelfrag))
+- Fix ML concurrent dimension training  [\#21183](https://github.com/netdata/netdata/pull/21183) ([stelfrag](https://github.com/stelfrag))
+- fix\(health/dyncfg\): add mising "repeat" in userconfig response [\#21181](https://github.com/netdata/netdata/pull/21181) ([ilyam8](https://github.com/ilyam8))
+- chore\(go.d/snmp\): refactor static\_tags to structured key/value format [\#21180](https://github.com/netdata/netdata/pull/21180) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations docs [\#21179](https://github.com/netdata/netdata/pull/21179) ([netdatabot](https://github.com/netdatabot))
+- docs: remove ``` from cloud-notifications meta [\#21178](https://github.com/netdata/netdata/pull/21178) ([ilyam8](https://github.com/ilyam8))
 - Update swagger json from yaml [\#21176](https://github.com/netdata/netdata/pull/21176) ([stelfrag](https://github.com/stelfrag))
 - Periodic sync data on windows [\#21175](https://github.com/netdata/netdata/pull/21175) ([stelfrag](https://github.com/stelfrag))
 - build\(deps\): bump github.com/redis/go-redis/v9 from 9.14.0 to 9.14.1 in /src/go [\#21174](https://github.com/netdata/netdata/pull/21174) ([dependabot[bot]](https://github.com/apps/dependabot))
@@ -106,6 +115,7 @@
 - ai-docs [\#21043](https://github.com/netdata/netdata/pull/21043) ([shyamvalsan](https://github.com/shyamvalsan))
 - Remote MCP support \(streamable http and sse\) [\#21036](https://github.com/netdata/netdata/pull/21036) ([ktsaou](https://github.com/ktsaou))
 - Add helper to run external commands without additional privileges. [\#20990](https://github.com/netdata/netdata/pull/20990) ([Ferroin](https://github.com/Ferroin))
+- Windows Sensors \(Part II\) [\#20988](https://github.com/netdata/netdata/pull/20988) ([thiagoftsm](https://github.com/thiagoftsm))
 - Clean up handling of compiler flags in our build code. [\#20821](https://github.com/netdata/netdata/pull/20821) ([Ferroin](https://github.com/Ferroin))
 - Use parallelization for LTO processing to reduce build times. [\#20809](https://github.com/netdata/netdata/pull/20809) ([Ferroin](https://github.com/Ferroin))
 - Rework maintenance thread [\#20694](https://github.com/netdata/netdata/pull/20694) ([stelfrag](https://github.com/stelfrag))
@@ -386,8 +396,6 @@
 - update otel-collector components deps [\#20693](https://github.com/netdata/netdata/pull/20693) ([ilyam8](https://github.com/ilyam8))
 - Add Oracle Linux 10 to CI and package builds. [\#20684](https://github.com/netdata/netdata/pull/20684) ([Ferroin](https://github.com/Ferroin))
 - Split collection \(Windows.plugin\) [\#20677](https://github.com/netdata/netdata/pull/20677) ([thiagoftsm](https://github.com/thiagoftsm))
-- Add Getting Started Netdata guide [\#20642](https://github.com/netdata/netdata/pull/20642) ([kanelatechnical](https://github.com/kanelatechnical))
-- ml: implement fixed time-based training windows [\#20638](https://github.com/netdata/netdata/pull/20638) ([ktsaou](https://github.com/ktsaou))
 
 ## [v2.6.3](https://github.com/netdata/netdata/tree/v2.6.3) (2025-08-22)
 
@@ -443,15 +451,6 @@
 - SNMP profile edits ep3 [\#20648](https://github.com/netdata/netdata/pull/20648) ([Ancairon](https://github.com/Ancairon))
 - SNMP profiles pass ep2 [\#20647](https://github.com/netdata/netdata/pull/20647) ([Ancairon](https://github.com/Ancairon))
 - chore\(go.d/snmp-profiles\): charts meta fixes and fam updates p7 [\#20646](https://github.com/netdata/netdata/pull/20646) ([ilyam8](https://github.com/ilyam8))
-- chore\(go.d/snmp-profiles\): fix quotes [\#20645](https://github.com/netdata/netdata/pull/20645) ([ilyam8](https://github.com/ilyam8))
-- Regenerate integrations docs [\#20644](https://github.com/netdata/netdata/pull/20644) ([netdatabot](https://github.com/netdatabot))
-- Update Cloud OIDC Authorization Server setup docs [\#20643](https://github.com/netdata/netdata/pull/20643) ([car12o](https://github.com/car12o))
-- SNMP Profiles pass ep1 [\#20641](https://github.com/netdata/netdata/pull/20641) ([Ancairon](https://github.com/Ancairon))
-- chore\(go.d/snmp-profiles\): charts meta fixes and fam updates p6 [\#20640](https://github.com/netdata/netdata/pull/20640) ([ilyam8](https://github.com/ilyam8))
-- Additional checks for ACLK proxy setting [\#20639](https://github.com/netdata/netdata/pull/20639) ([stelfrag](https://github.com/stelfrag))
-- MCP in Netdata Operations Diagram [\#20637](https://github.com/netdata/netdata/pull/20637) ([ktsaou](https://github.com/ktsaou))
-- refactor\(go.d/iprange\): migrate from net to net/netip [\#20636](https://github.com/netdata/netdata/pull/20636) ([ilyam8](https://github.com/ilyam8))
-- chore\(go.d/snmp-profiles\): charts meta fixes and fam updates p5 [\#20635](https://github.com/netdata/netdata/pull/20635) ([ilyam8](https://github.com/ilyam8))
 
 ## [v2.5.4](https://github.com/netdata/netdata/tree/v2.5.4) (2025-06-24)
 
