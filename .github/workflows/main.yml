@@ -9,7 +9,7 @@ on:
 env:
   REGISTRY: ghcr.io/hydardaffa/netdata
   GH_REGISTRY: ghcr.io
-  IMAGE_NAME: your-app-name
+  IMAGE_NAME: netdata
   DOCKER_BUILDKIT: 1
 
 jobs:
