@@ -1,6 +1,6 @@
 # Netdata APIs
 
-Netdata provides multiple APIs for programmatic access to your monitoring infrastructure.
+Netdata Cloud provides APIs for programmatic access to your monitoring infrastructure.
 
 :::note
 
