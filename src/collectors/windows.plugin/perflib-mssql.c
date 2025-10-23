@@ -2247,7 +2247,7 @@ static void netdata_mssql_recompilations(struct mssql_db_instance *mdi, struct m
                 "sql activity",
                 "mssql.instance_sqlstats_sql_recompilations",
                 "SQL re-compilations",
-                "recompiles/",
+                "recompiles/s",
                 PLUGIN_WINDOWS_NAME,
                 "PerflibMSSQL",
                 PRIO_MSSQL_STATS_RECOMPILATIONS,
@@ -2604,7 +2604,7 @@ static void mssql_is_readonly_chart(struct mssql_db_instance *mdi, const char *d
                 "status",
                 PLUGIN_WINDOWS_NAME,
                 "PerflibMSSQL",
-                PRIO_MSSQL_DATABASE_DEADLOCKS_PER_SECOND,
+                PRIO_MSSQL_DATABASE_READONLY,
                 update_every,
                 RRDSET_TYPE_LINE);
 
@@ -2641,7 +2641,7 @@ static void mssql_db_states_chart(struct mssql_db_instance *mdi, const char *db,
                 "status",
                 PLUGIN_WINDOWS_NAME,
                 "PerflibMSSQL",
-                PRIO_MSSQL_DATABASE_DEADLOCKS_PER_SECOND,
+                PRIO_MSSQL_DATABASE_STATE,
                 update_every,
                 RRDSET_TYPE_LINE);
 

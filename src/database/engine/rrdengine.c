@@ -1015,6 +1015,25 @@ datafile_extent_build(struct rrdengine_instance *ctx, struct page_descr_with_dat
     return xt_io_descr;
 }
 
+
+static void after_weights_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* uv_work_req __maybe_unused, int status __maybe_unused)
+{
+    ;
+}
+
+static void *weights_worker(
+    struct rrdengine_instance *ctx __maybe_unused,
+    void *data,
+    struct completion *completion,
+    uv_work_t *req __maybe_unused)
+{
+    worker_is_busy(UV_EVENT_WEIGHTS_CALCULATION);
+    query_weights_worker_thread(data);
+    completion_mark_complete(completion);
+    worker_is_idle();
+    return NULL;
+}
+
 static void after_extent_write(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* uv_work_req __maybe_unused, int status __maybe_unused)
 {
     check_and_schedule_db_rotation(ctx);
@@ -2372,6 +2391,8 @@ void dbengine_event_loop(void* arg) {
     worker_register_job_name(RRDENG_OPCODE_CTX_FLUSH_HOT_DIRTY,                      "ctx flush all");
     worker_register_job_name(RRDENG_OPCODE_CTX_QUIESCE,                              "ctx quiesce");
     worker_register_job_name(RRDENG_OPCODE_SHUTDOWN_EVLOOP,                          "dbengine shutdown");
+    worker_register_job_name(RRDENG_OPCODE_PARALLEL_WEIGHT,                          "parallel weight");
+
 
     worker_register_job_name(RRDENG_OPCODE_MAX,                                      "get opcode");
 
@@ -2385,6 +2406,7 @@ void dbengine_event_loop(void* arg) {
     worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_CTX_SHUTDOWN,         "ctx shutdown cb");
     worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_CTX_FLUSH_DIRTY,      "ctx flush dirty cb");
     worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_CTX_QUIESCE,          "ctx quiesce cb");
+    worker_register_job_name(RRDENG_OPCODE_MAX + RRDENG_OPCODE_PARALLEL_WEIGHT,      "parallel weight cb");
 
     // special jobs
     worker_register_job_name(RRDENG_RETENTION_TIMER_CB,                              "retention timer");
@@ -2430,6 +2452,11 @@ void dbengine_event_loop(void* arg) {
             worker_is_busy(opcode);
 
             switch (opcode) {
+                case RRDENG_OPCODE_PARALLEL_WEIGHT:;
+
+                    work_dispatch(NULL, cmd.data, cmd.completion, cmd.opcode, weights_worker, after_weights_worker);
+                    break;
+
                 case RRDENG_OPCODE_EXTENT_READ:
                     worker_dispatch_extent_read(cmd, false);
                     break;

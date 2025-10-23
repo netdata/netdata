@@ -37,6 +37,12 @@ ml_kmeans_train(ml_kmeans_t *kmeans, const ml_features_t *features, unsigned max
         return;
     }
 
+    // Reserve capacity for cluster centers BEFORE calling dlib functions to prevent
+    // reallocation during lazy evaluation. dlib uses expression templates that hold
+    // references to vector elements, and reallocation would invalidate those references,
+    // causing heap-use-after-free when multiple threads train models concurrently.
+    //kmeans->cluster_centers.reserve(2);
+
     dlib::pick_initial_centers(2, kmeans->cluster_centers, features->preprocessed_features);
     dlib::find_clusters_using_kmeans(features->preprocessed_features, kmeans->cluster_centers, max_iters);
 
