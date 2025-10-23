@@ -1,9 +1,9 @@
-name: my-app
+name: netdata
 version: 1.0.0
 description: My awesome application
 container:
-  image: my-app:latest
-  port: 3000
+  image: netdata/netdata
+  port: 19999 
 resources:
   cpu: 500m
   memory: 512Mi
