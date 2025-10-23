@@ -3252,7 +3252,6 @@ fi
 
 %files plugin-otel
 %defattr(0750,root,netdata,0750)
-%caps(cap_net_bind_service=eip) %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/otel-plugin
 %endif
 
 %changelog
