@@ -34,6 +34,25 @@ func (c *Collector) logOnce(key string, format string, args ...interface{}) {
 	c.disabled[key] = true
 }
 
+func (c *Collector) logErrorOnce(key string, format string, args ...interface{}) {
+	c.muErrorLog.Lock()
+	defer c.muErrorLog.Unlock()
+
+	if c.errorLogged[key] {
+		return
+	}
+	msg := fmt.Sprintf(format, args...)
+	c.Errorf("[%s] %s", key, msg)
+	c.errorLogged[key] = true
+}
+
+func (c *Collector) clearErrorOnce(key string) {
+	c.muErrorLog.Lock()
+	defer c.muErrorLog.Unlock()
+
+	delete(c.errorLogged, key)
+}
+
 func (c *Collector) isDisabled(key string) bool {
 	return c.disabled[key]
 }
@@ -118,12 +137,52 @@ func (c *Collector) detectAvailableFeatures(ctx context.Context) {
 	c.disabled["ifs_object_statistics"] = true
 }
 
+func trimDriverMessage(err error) string {
+	if err == nil {
+		return ""
+	}
+	msg := err.Error()
+	msg = strings.TrimRight(msg, "\x00")
+	msg = strings.TrimSpace(msg)
+	return msg
+}
+
+func sanitizeQuery(q string) string {
+	if q == "" {
+		return ""
+	}
+	q = strings.Join(strings.Fields(q), " ")
+	const limit = 240
+	if len(q) > limit {
+		return q[:limit-3] + "..."
+	}
+	return q
+}
+
+func (c *Collector) logQueryErrorOnce(key, query string, err error) {
+	msg := trimDriverMessage(err)
+	if query != "" {
+		query = sanitizeQuery(query)
+		c.logErrorOnce(key, "query failed (%s): %s", query, msg)
+		return
+	}
+	c.logErrorOnce(key, "%s", msg)
+}
+
 func (c *Collector) collectSystemInfo(ctx context.Context) {
 	c.systemName = "Unknown"
 
 	_ = c.collectSingleMetric(ctx, "serial_number", querySerialNumber, func(value string) {
 		c.serialNumber = strings.TrimSpace(value)
 		c.Debugf("detected serial number: %s", c.serialNumber)
+	})
+
+	_ = c.collectSingleMetric(ctx, "system_name_metric", querySystemName, func(value string) {
+		name := strings.TrimSpace(value)
+		if name != "" {
+			c.systemName = name
+			c.Debugf("detected system name: %s", c.systemName)
+		}
 	})
 
 	_ = c.collectSingleMetric(ctx, "system_model", querySystemModel, func(value string) {
@@ -252,31 +311,26 @@ func (c *Collector) logVersionInformation() {
 }
 
 func (c *Collector) setConfigurationDefaults() {
-	jobQueuesDefault := c.versionMajor >= 7 && c.versionRelease >= 2
 	c.CollectDiskMetrics = c.CollectDiskMetrics.WithDefault(true)
 	c.CollectSubsystemMetrics = c.CollectSubsystemMetrics.WithDefault(true)
-	c.CollectJobQueueMetrics = c.CollectJobQueueMetrics.WithDefault(jobQueuesDefault)
-	c.CollectActiveJobs = c.CollectActiveJobs.WithDefault(false)
-	c.CollectMessageQueueMetrics = c.CollectMessageQueueMetrics.WithDefault(true)
-	c.CollectOutputQueueMetrics = c.CollectOutputQueueMetrics.WithDefault(true)
 	c.CollectHTTPServerMetrics = c.CollectHTTPServerMetrics.WithDefault(true)
 	c.CollectPlanCacheMetrics = c.CollectPlanCacheMetrics.WithDefault(true)
 
-	if c.MaxMessageQueues <= 0 {
-		c.MaxMessageQueues = messageQueueLimit
+	if len(c.ActiveJobs) == 0 {
+		c.CollectActiveJobs = c.CollectActiveJobs.WithDefault(false)
+	} else {
+		c.CollectActiveJobs = c.CollectActiveJobs.WithDefault(true)
 	}
 
-	if c.MaxOutputQueues <= 0 {
-		c.MaxOutputQueues = outputQueueLimit
+	if c.MessageQueues == nil {
+		c.MessageQueues = append([]string{}, "QSYS/QSYSOPR", "QSYS/QSYSMSG", "QSYS/QHST")
 	}
 
-	c.Infof("Configuration after defaults: DiskMetrics=%t, SubsystemMetrics=%t, JobQueueMetrics=%t, MessageQueues=%t, OutputQueues=%t, ActiveJobs=%t, HTTPServer=%t, PlanCache=%t",
+	c.Infof("Configuration after defaults: DiskMetrics=%t, SubsystemMetrics=%t, ActiveJobs=%t (configured=%d), HTTPServer=%t, PlanCache=%t",
 		c.CollectDiskMetrics.IsEnabled(),
 		c.CollectSubsystemMetrics.IsEnabled(),
-		c.CollectJobQueueMetrics.IsEnabled(),
-		c.CollectMessageQueueMetrics.IsEnabled(),
-		c.CollectOutputQueueMetrics.IsEnabled(),
 		c.CollectActiveJobs.IsEnabled(),
+		len(c.ActiveJobs),
 		c.CollectHTTPServerMetrics.IsEnabled(),
 		c.CollectPlanCacheMetrics.IsEnabled())
 }
@@ -300,4 +354,14 @@ func (c *Collector) systemActivityQuery() string {
 		return querySystemActivityReset
 	}
 	return querySystemActivityNoReset
+}
+
+func (c *Collector) supportsMessageQueueTableFunction() bool {
+	if c.versionMajor == 0 {
+		return false
+	}
+	if c.versionMajor > 7 {
+		return true
+	}
+	return c.versionMajor == 7 && c.versionRelease >= 4
 }

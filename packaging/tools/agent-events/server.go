@@ -68,8 +68,8 @@ var (
 	meter         metric.Meter
 
 	// Counters
-	requestsCounter          metric.Int64Counter // Unified counter with status label
-	bytesReceived            metric.Int64Counter
+	requestsCounter metric.Int64Counter // Unified counter with status label
+	bytesReceived   metric.Int64Counter
 
 	// Gauges
 	dedupCacheSize         metric.Int64ObservableGauge
@@ -112,7 +112,7 @@ func initMetrics() (*prometheus.Exporter, error) {
 	// Helper to create counters with status labels for consolidated metrics
 	createLabeledCounter := func(name, desc string) (metric.Int64Counter, error) {
 		counter, err := meter.Int64Counter(
-			name, 
+			name,
 			metric.WithDescription(desc),
 			metric.WithUnit("1"),
 		)
@@ -142,7 +142,7 @@ func initMetrics() (*prometheus.Exporter, error) {
 	// Create unified counters with status label
 	requestsCounter, _ = createLabeledCounter("agent_events_requests", "Number of requests by status")
 	bytesReceived, _ = createLabeledCounter("agent_events_received_bytes", "Number of bytes received in request bodies by status")
-	
+
 	// Pre-initialize counters with all status labels set to zero
 	ctx := context.Background()
 	statusLabels := []string{"success", "duplicate", "invalid_json", "method_not_allowed", "body_too_large", "failed_to_read", "cant_marshal_output"}
@@ -150,17 +150,16 @@ func initMetrics() (*prometheus.Exporter, error) {
 		requestsCounter.Add(ctx, 0, metric.WithAttributes(attribute.String("status", status)))
 		bytesReceived.Add(ctx, 0, metric.WithAttributes(attribute.String("status", status)))
 	}
-	
+
 	dedupCacheSize, _ = createGauge("agent_events_dedup_cache_entries", "Current number of entries in the deduplication cache")
 	activeConnectionsGauge, _ = createGauge("agent_events_active_connections", "Number of currently active connections")
 	uptimeGauge, _ = createGauge("agent_events_uptime_seconds", "How long the server has been running in seconds")
 	requestDuration, _ = createHistogram("agent_events_request_duration_seconds",
 		"Histogram of request processing times in seconds",
-		[]float64{0.00001, 0.000025, 0.00005, 0.0001, 0.00025, 0.0005, 0.001, 0.0025, 0.005, 0.01, 0.025, 0.05, 0.1 },
+		[]float64{0.00001, 0.000025, 0.00005, 0.0001, 0.00025, 0.0005, 0.001, 0.0025, 0.005, 0.01, 0.025, 0.05, 0.1},
 	)
 	// Basic check if any metric failed (optional, depends on how critical individual metrics are)
 	// if requestsTotal == nil || ... { return exporter, fmt.Errorf("one or more metrics failed to initialize") }
-
 
 	// Register callbacks for observable metrics
 	_, err = meter.RegisterCallback(
@@ -233,7 +232,7 @@ func cleanupExpiredEntries(interval time.Duration) {
 		}
 		mapMutex.Unlock()
 
-        // Log hourly summary if any were cleaned in the last hour
+		// Log hourly summary if any were cleaned in the last hour
 		if cleanedCount > 0 && time.Since(lastCleanupLogTime) >= time.Hour {
 			slog.Debug("cleaned up expired entries",
 				"count_past_hour", cleanedCount,
@@ -241,9 +240,9 @@ func cleanupExpiredEntries(interval time.Duration) {
 			cleanedCount = 0 // Reset hourly count
 			lastCleanupLogTime = time.Now()
 		} else if deletedInCycle > 0 {
-             // Optional: Log every cycle if debugging cleanup
-             // slog.Debug("cleanup cycle completed", "deleted", deletedInCycle, "remaining", currentMapSize-deletedInCycle)
-        }
+			// Optional: Log every cycle if debugging cleanup
+			// slog.Debug("cleanup cycle completed", "deleted", deletedInCycle, "remaining", currentMapSize-deletedInCycle)
+		}
 	}
 }
 
@@ -294,34 +293,47 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	var fullData map[string]interface{}
 	if err := json.Unmarshal(body, &fullData); err != nil {
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
-		bodyDetail := ""; if slog.Default().Enabled(context.Background(), slog.LevelDebug) { bodyDetail = fmt.Sprintf(", Body: %s", string(body)) } else { bodyDetail = fmt.Sprintf(", Body snippet: %s", limitString(string(body), 100)) }
+		bodyDetail := ""
+		if slog.Default().Enabled(context.Background(), slog.LevelDebug) {
+			bodyDetail = fmt.Sprintf(", Body: %s", string(body))
+		} else {
+			bodyDetail = fmt.Sprintf(", Body snippet: %s", limitString(string(body), 100))
+		}
 		slog.Warn("request discarded", "reason", "invalid_json", "error", err.Error(), "body_detail", bodyDetail)
 		bytesReceived.Add(ctx, int64(len(body)), metric.WithAttributes(attribute.String("status", "invalid_json")))
 		requestsCounter.Add(ctx, 1, metric.WithAttributes(attribute.String("status", "invalid_json")))
 		return
 	}
-	
+
 	bytesReceived.Add(ctx, int64(len(body)), metric.WithAttributes(attribute.String("status", "success")))
 
 	// Add Cloudflare Headers to all requests, excluding IP addresses for GDPR compliance
 	cfHeaders := make(map[string]string)
 	cfHeaderPrefixes := []string{"CF-IPCountry", "CF-Ray", "CF-IPCity", "CF-IPContinent", "CF-IPRegion", "CF-IPTimeZone", "CF-IPCOLO"}
 	// Explicitly excluding IP-related headers: CF-Connecting-IP, CF-IPLatitude, CF-IPLongitude, CF-Visitor
-	for _, name := range cfHeaderPrefixes { if value := r.Header.Get(name); value != "" { key := strings.TrimPrefix(name, "CF-"); cfHeaders[key] = value } }
-	for name, values := range r.Header { 
-		if strings.HasPrefix(name, "CF-") && len(values) > 0 { 
+	for _, name := range cfHeaderPrefixes {
+		if value := r.Header.Get(name); value != "" {
+			key := strings.TrimPrefix(name, "CF-")
+			cfHeaders[key] = value
+		}
+	}
+	for name, values := range r.Header {
+		if strings.HasPrefix(name, "CF-") && len(values) > 0 {
 			// Skip IP-related headers for GDPR compliance
 			if name == "CF-Connecting-IP" || name == "CF-IPLatitude" || name == "CF-IPLongitude" || name == "CF-Visitor" {
 				continue
 			}
-			key := strings.TrimPrefix(name, "CF-"); 
-			if _, exists := cfHeaders[key]; !exists { 
-				cfHeaders[key] = values[0] 
-			} 
-		} 
+			key := strings.TrimPrefix(name, "CF-")
+			if _, exists := cfHeaders[key]; !exists {
+				cfHeaders[key] = values[0]
+			}
+		}
 	}
-	if len(cfHeaders) > 0 { fullData["cf"] = cfHeaders; slog.Debug("added cloudflare headers", "count", len(cfHeaders)) }
-	
+	if len(cfHeaders) > 0 {
+		fullData["cf"] = cfHeaders
+		slog.Debug("added cloudflare headers", "count", len(cfHeaders))
+	}
+
 	// Deduplication Logic
 	shouldProcess := true
 	var finalKeyString string
@@ -331,15 +343,17 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		for i, path := range keyPaths {
 			result := gjson.GetBytes(body, path)
 			keyBuilder.WriteString(result.String()) // gjson returns "" for non-existent paths
-			if i < len(keyPaths)-1 { keyBuilder.WriteString(dedupSeparator) }
+			if i < len(keyPaths)-1 {
+				keyBuilder.WriteString(dedupSeparator)
+			}
 		}
 		finalKeyString = keyBuilder.String()
 		dedupHash = sha256.Sum256([]byte(finalKeyString))
 		slog.Debug("generated dedup key", "key_string", finalKeyString, "hash", fmt.Sprintf("%x", dedupHash))
-		
+
 		// Add _dedup key to all requests (regardless of duplicate status)
 		fullData["_dedup"] = map[string]interface{}{
-			"key": finalKeyString,
+			"key":  finalKeyString,
 			"hash": fmt.Sprintf("%x", dedupHash),
 		}
 
@@ -383,7 +397,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 			slog.Error("error writing response", "context", "after_duplicate_discard", "error", err)
 		}
 	}
-	
+
 	// For duplicates, return early
 	if !shouldProcess {
 		return
@@ -400,30 +414,37 @@ func healthHandler(w http.ResponseWriter, r *http.Request) {
 		"connections": atomic.LoadInt32(&activeConnections),
 		"version":     "agent-events v1.0",
 	}
-	memStats := &runtime.MemStats{}; runtime.ReadMemStats(memStats); status["memory"] = map[string]interface{}{"alloc": memStats.Alloc, "total_alloc": memStats.TotalAlloc, "sys": memStats.Sys, "heap_alloc": memStats.HeapAlloc, "gc_cycles": memStats.NumGC}
-	mapMutex.Lock(); mapSize := len(seenIDs); mapMutex.Unlock(); 
+	memStats := &runtime.MemStats{}
+	runtime.ReadMemStats(memStats)
+	status["memory"] = map[string]interface{}{"alloc": memStats.Alloc, "total_alloc": memStats.TotalAlloc, "sys": memStats.Sys, "heap_alloc": memStats.HeapAlloc, "gc_cycles": memStats.NumGC}
+	mapMutex.Lock()
+	mapSize := len(seenIDs)
+	mapMutex.Unlock()
 	dedupLogEnabled := dedupLogger != nil
 	dedupLogPath := ""
 	if dedupLogEnabled {
 		dedupLogPath = dedupLogFile
 	}
 	status["deduplication"] = map[string]interface{}{
-		"enabled": len(keyPaths) > 0, 
-		"keys": keyPaths, 
-		"window": dedupWindow.String(), 
-		"map_size": mapSize,
+		"enabled":     len(keyPaths) > 0,
+		"keys":        keyPaths,
+		"window":      dedupWindow.String(),
+		"map_size":    mapSize,
 		"log_enabled": dedupLogEnabled,
-		"log_file": dedupLogPath,
+		"log_file":    dedupLogPath,
 	}
-	w.Header().Set("Content-Type", "application/json"); w.WriteHeader(http.StatusOK);
-	if err := json.NewEncoder(w).Encode(status); err != nil { slog.Error("error encoding health check response", "error", err) }
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	if err := json.NewEncoder(w).Encode(status); err != nil {
+		slog.Error("error encoding health check response", "error", err)
+	}
 }
 
 // main is the entry point of the application
 func main() {
 	// Setup initial logger before flag parsing
 	initialLogLevel := slog.LevelInfo
-	initialLogHandler := slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{ Level: initialLogLevel, AddSource: true })
+	initialLogHandler := slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: initialLogLevel, AddSource: true})
 	slog.SetDefault(slog.New(initialLogHandler))
 
 	startTime = time.Now()
@@ -445,22 +466,30 @@ func main() {
 	// Configure final logger based on flags
 	var level slog.Level
 	switch strings.ToLower(*logLevelFlag) {
-	case "debug": level = slog.LevelDebug
-	case "info":  level = slog.LevelInfo
-	case "warn":  level = slog.LevelWarn
-	case "error": level = slog.LevelError
+	case "debug":
+		level = slog.LevelDebug
+	case "info":
+		level = slog.LevelInfo
+	case "warn":
+		level = slog.LevelWarn
+	case "error":
+		level = slog.LevelError
 	default:
 		slog.Warn("invalid log level specified, defaulting to info", "value", *logLevelFlag)
 		level = slog.LevelInfo
 	}
 	var logHandler slog.Handler
-	if *logFormat == "text" { logHandler = slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{ Level: level, AddSource: true }) } else { logHandler = slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{ Level: level, AddSource: true }) }
+	if *logFormat == "text" {
+		logHandler = slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: level, AddSource: true})
+	} else {
+		logHandler = slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: level, AddSource: true})
+	}
 	slog.SetDefault(slog.New(logHandler))
 
 	// Initialize core components
 	seenIDs = make(map[[32]byte]seenEntry)
 	dedupWindow = time.Duration(*dedupSeconds) * time.Second
-	
+
 	// Open deduplication log file if specified
 	if dedupLogFile != "" {
 		var err error
@@ -471,18 +500,25 @@ func main() {
 		}
 		slog.Info("deduplication log file opened", "path", dedupLogFile)
 	}
-	
-	if _, err := initMetrics(); err != nil { // Handle potential error from initMetrics
-        slog.Error("failed to initialize metrics", "error", err)
-        os.Exit(1)
-    }
 
+	if _, err := initMetrics(); err != nil { // Handle potential error from initMetrics
+		slog.Error("failed to initialize metrics", "error", err)
+		os.Exit(1)
+	}
 
 	// Start background tasks
 	if dedupWindow > 0 && len(keyPaths) > 0 {
-		cleanupInterval := dedupWindow / 10; if cleanupInterval < 1*time.Minute { cleanupInterval = 1 * time.Minute } else if cleanupInterval > 15*time.Minute { cleanupInterval = 15 * time.Minute }
-		slog.Info("cleanup goroutine started", "interval", cleanupInterval); go cleanupExpiredEntries(cleanupInterval)
-	} else if dedupWindow <= 0 && len(keyPaths) > 0 { slog.Warn("deduplication keys provided, but window is zero or negative", "keys", keyPaths, "window", dedupWindow) }
+		cleanupInterval := dedupWindow / 10
+		if cleanupInterval < 1*time.Minute {
+			cleanupInterval = 1 * time.Minute
+		} else if cleanupInterval > 15*time.Minute {
+			cleanupInterval = 15 * time.Minute
+		}
+		slog.Info("cleanup goroutine started", "interval", cleanupInterval)
+		go cleanupExpiredEntries(cleanupInterval)
+	} else if dedupWindow <= 0 && len(keyPaths) > 0 {
+		slog.Warn("deduplication keys provided, but window is zero or negative", "keys", keyPaths, "window", dedupWindow)
+	}
 
 	// Configure HTTP server
 	server := &http.Server{
@@ -494,7 +530,9 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", handler)
 	mux.HandleFunc(*healthPath, healthHandler)
-	if *expvarPath != "" { mux.Handle(*expvarPath, expvar.Handler()) } // Register expvar if path not empty
+	if *expvarPath != "" {
+		mux.Handle(*expvarPath, expvar.Handler())
+	} // Register expvar if path not empty
 	mux.Handle(*metricsPath, promhttp.Handler()) // Use promhttp handler for OTEL metrics
 	// Add pprof handlers to custom mux
 	mux.HandleFunc("/debug/pprof/", http.DefaultServeMux.ServeHTTP)
@@ -518,21 +556,30 @@ func main() {
 
 	select {
 	case err := <-serverErrors:
-		if err != nil && !errors.Is(err, http.ErrServerClosed) { slog.Error("server error", "error", err) }
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
+			slog.Error("server error", "error", err)
+		}
 	case sig := <-stop:
 		slog.Info("shutdown initiated", "signal", sig.String())
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second); defer cancel()
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
 
 		// Shutdown meter provider first
 		if meterProvider != nil {
 			slog.Info("shutting down OpenTelemetry meter provider")
-			if err := meterProvider.Shutdown(shutdownCtx); err != nil { slog.Error("meter provider shutdown failed", "error", err) }
+			if err := meterProvider.Shutdown(shutdownCtx); err != nil {
+				slog.Error("meter provider shutdown failed", "error", err)
+			}
 		}
 
 		// Shutdown HTTP server
 		slog.Info("shutting down HTTP server")
-		if err := server.Shutdown(shutdownCtx); err != nil { slog.Error("server shutdown failed", "error", err) } else { slog.Info("server shutdown completed gracefully") }
-		
+		if err := server.Shutdown(shutdownCtx); err != nil {
+			slog.Error("server shutdown failed", "error", err)
+		} else {
+			slog.Info("server shutdown completed gracefully")
+		}
+
 		// Close deduplication log file if open
 		if dedupLogger != nil {
 			slog.Info("closing deduplication log file")
@@ -547,6 +594,8 @@ func main() {
 
 // --- Helper Functions ---
 func limitString(s string, maxLen int) string {
-	if len(s) <= maxLen { return s }
+	if len(s) <= maxLen {
+		return s
+	}
 	return s[:maxLen] + "..."
 }

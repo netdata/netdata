@@ -1,6 +1,9 @@
 package mq
 
 import (
+	"sync"
+	"time"
+
 	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/framework"
 	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/modules/mq/contexts"
 	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/protocols/pcf"
@@ -15,6 +18,39 @@ type Collector struct {
 	// Resolved effective intervals (auto-detected or user-configured)
 	effectiveStatisticsInterval int
 	effectiveSysTopicInterval   int
+
+	// Warning throttling
+	warnMu sync.Mutex
+	warns  map[string]time.Time
+}
+
+const warnThrottleInterval = 10 * time.Minute
+
+func (c *Collector) warnOnce(key string, format string, args ...interface{}) {
+	c.warnMu.Lock()
+	defer c.warnMu.Unlock()
+
+	if c.warns == nil {
+		c.warns = make(map[string]time.Time)
+	}
+
+	now := time.Now()
+	if last, ok := c.warns[key]; ok && now.Sub(last) < warnThrottleInterval {
+		return
+	}
+
+	c.Warningf(format, args...)
+	c.warns[key] = now
+}
+
+func (c *Collector) clearWarnOnce(key string) {
+	c.warnMu.Lock()
+	defer c.warnMu.Unlock()
+
+	if c.warns == nil {
+		return
+	}
+	delete(c.warns, key)
 }
 
 // CollectOnce is called by the framework to collect metrics.
@@ -39,48 +75,62 @@ func (c *Collector) CollectOnce() error {
 
 	// Collect queue manager metrics
 	if err := c.collectQueueManagerMetrics(); err != nil {
-		return err
+		c.warnOnce("queue_manager_metrics", "failed to collect queue manager metrics: %v", err)
+	} else {
+		c.clearWarnOnce("queue_manager_metrics")
 	}
 
 	// Collect queue metrics
 	if c.Config.CollectQueues {
 		if err := c.collectQueueMetrics(); err != nil {
-			c.Warningf("failed to collect queue metrics: %v", err)
+			c.warnOnce("queue_metrics", "failed to collect queue metrics: %v", err)
+		} else {
+			c.clearWarnOnce("queue_metrics")
 		}
 	}
 
 	// Collect channel metrics
 	if c.Config.CollectChannels {
 		if err := c.collectChannelMetrics(); err != nil {
-			c.Warningf("failed to collect channel metrics: %v", err)
+			c.warnOnce("channel_metrics", "failed to collect channel metrics: %v", err)
+		} else {
+			c.clearWarnOnce("channel_metrics")
 		}
 	}
 
 	// Collect topic metrics
 	if c.Config.CollectTopics {
 		if err := c.collectTopicMetrics(); err != nil {
-			c.Warningf("failed to collect topic metrics: %v", err)
+			c.warnOnce("topic_metrics", "failed to collect topic metrics: %v", err)
+		} else {
+			c.clearWarnOnce("topic_metrics")
 		}
 	}
 
 	// Collect listener metrics
 	if c.Config.CollectListeners {
 		if err := c.collectListenerMetrics(); err != nil {
-			c.Warningf("failed to collect listener metrics: %v", err)
+			c.warnOnce("listener_metrics", "failed to collect listener metrics: %v", err)
+		} else {
+			c.clearWarnOnce("listener_metrics")
 		}
 	}
 
 	// Collect subscription metrics
 	if c.Config.CollectSubscriptions {
 		if err := c.collectSubscriptions(); err != nil {
-			c.Warningf("failed to collect subscription metrics: %v", err)
+			c.warnOnce("subscription_metrics", "failed to collect subscription metrics: %v", err)
+		} else {
+			c.clearWarnOnce("subscription_metrics")
 		}
 	}
 
 	// Collect statistics queue metrics (advanced metrics) - every iteration
 	if c.Config.CollectStatisticsQueue {
 		if err := c.collectStatistics(); err != nil {
-			c.Warningf("failed to collect statistics queue metrics: %v", err)
+			c.warnOnce("statistics_queue", "failed to collect statistics queue metrics: %v", err)
+		} else {
+			c.clearWarnOnce("statistics_queue")
 		}
 	}
 

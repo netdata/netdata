@@ -7,6 +7,8 @@ package pcf
 
 import (
 	"fmt"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/ibm-messaging/mq-golang/v5/ibmmq"
@@ -60,6 +62,10 @@ type Client struct {
 	resourceMonitoringEnabled bool           // Track if resource monitoring should be enabled
 	resourceStatus            ResourceStatus // Global status: disabled(0), enabled(1), failed(2)
 	metricsReady              bool           // Track if metrics connection is ready
+
+	// Warning throttling
+	warnMu   sync.Mutex
+	warnLast map[string]time.Time
 }
 
 // Config is the configuration for the PCF client.
@@ -78,6 +84,7 @@ func NewClient(config Config, state *framework.CollectorState) *Client {
 		config:          config,
 		protocol:        framework.NewProtocolClient("pcf", state),
 		jobCreationTime: time.Now(), // Record job creation time for statistics filtering
+		warnLast:        make(map[string]time.Time),
 	}
 }
 
@@ -146,4 +153,51 @@ func (c *Client) GetResourceStatus() ResourceStatus {
 // IsResourceMonitoringAvailable returns whether resource monitoring is available
 func (c *Client) IsResourceMonitoringAvailable() bool {
 	return c.metricsReady
+}
+
+const warnThrottleInterval = 10 * time.Minute
+
+// warnOnce logs a warning at most once per throttle interval for the given key
+func (c *Client) warnOnce(key string, format string, args ...interface{}) {
+	c.warnMu.Lock()
+	defer c.warnMu.Unlock()
+
+	if c.warnLast == nil {
+		c.warnLast = make(map[string]time.Time)
+	}
+
+	now := time.Now()
+	if last, ok := c.warnLast[key]; ok && now.Sub(last) < warnThrottleInterval {
+		return
+	}
+
+	c.protocol.Warningf(format, args...)
+	c.warnLast[key] = now
+}
+
+// clearWarn removes a previously logged warning key so it can fire again
+func (c *Client) clearWarn(key string) {
+	c.warnMu.Lock()
+	defer c.warnMu.Unlock()
+
+	if c.warnLast == nil {
+		return
+	}
+	delete(c.warnLast, key)
+}
+
+// clearWarnPrefix clears all warning keys that share a common prefix
+func (c *Client) clearWarnPrefix(prefix string) {
+	c.warnMu.Lock()
+	defer c.warnMu.Unlock()
+
+	if c.warnLast == nil {
+		return
+	}
+
+	for key := range c.warnLast {
+		if strings.HasPrefix(key, prefix) {
+			delete(c.warnLast, key)
+		}
+	}
 }

@@ -32,7 +32,7 @@ func (c *Client) GetStatisticsQueue() (*StatisticsCollectionResult, error) {
 		return nil, fmt.Errorf("not connected")
 	}
 
-	c.protocol.Warningf("Statistics queue collection is not yet implemented in the IBM MQ Go library migration")
+	c.warnOnce("statistics_queue_unimplemented", "Statistics queue collection is not yet implemented in the IBM MQ Go library migration")
 	c.protocol.Debugf("GetStatisticsQueue returning empty results - feature needs implementation")
 
 	// Return empty successful result for now

@@ -20,13 +20,11 @@ import (
 func defaultConfig() Config {
 	return Config{
 		Config: framework.Config{
-			UpdateEvery: 10,
+			UpdateEvery: 5,
 		},
-		Vnode:         "",
-		DSN:           "",
-		Timeout:       confopt.Duration(2 * time.Second),
-		MaxDbConns:    1,
-		MaxDbLifeTime: confopt.Duration(10 * time.Minute),
+		Vnode:   "",
+		DSN:     "",
+		Timeout: confopt.Duration(2 * time.Second),
 
 		Hostname:        "",
 		Port:            8471,
@@ -38,25 +36,35 @@ func defaultConfig() Config {
 		UseSSL:          false,
 		ResetStatistics: false,
 
-		CollectDiskMetrics:         confopt.AutoBoolAuto,
-		CollectSubsystemMetrics:    confopt.AutoBoolAuto,
-		CollectJobQueueMetrics:     confopt.AutoBoolAuto,
-		CollectActiveJobs:          confopt.AutoBoolAuto,
-		CollectHTTPServerMetrics:   confopt.AutoBoolAuto,
-		CollectMessageQueueMetrics: confopt.AutoBoolAuto,
-		CollectOutputQueueMetrics:  confopt.AutoBoolAuto,
-		CollectPlanCacheMetrics:    confopt.AutoBoolAuto,
+		CollectDiskMetrics:        confopt.AutoBoolAuto,
+		CollectSubsystemMetrics:   confopt.AutoBoolAuto,
+		CollectActiveJobs:         confopt.AutoBoolAuto,
+		CollectHTTPServerMetrics:  confopt.AutoBoolAuto,
+		CollectPlanCacheMetrics:   confopt.AutoBoolAuto,
+		CollectMessageQueueTotals: confopt.AutoBoolAuto,
+		CollectJobQueueTotals:     confopt.AutoBoolAuto,
+		CollectOutputQueueTotals:  confopt.AutoBoolAuto,
 
-		MaxDisks:         100,
-		MaxSubsystems:    100,
-		MaxJobQueues:     100,
-		MaxMessageQueues: 100,
-		MaxOutputQueues:  100,
-		MaxActiveJobs:    100,
+		SlowPath:                true,
+		SlowPathUpdateEvery:     confopt.Duration(10 * time.Second),
+		SlowPathMaxConnections:  1,
+		BatchPath:               false,
+		BatchPathUpdateEvery:    confopt.Duration(60 * time.Second),
+		BatchPathMaxConnections: 1,
+
+		MaxDisks:      100,
+		MaxSubsystems: 100,
 
 		DiskSelector:      "",
 		SubsystemSelector: "",
-		JobQueueSelector:  "",
+		MessageQueues: []string{
+			"QSYS/QSYSOPR",
+			"QSYS/QSYSMSG",
+			"QSYS/QHST",
+		},
+		JobQueues:    nil,
+		OutputQueues: nil,
+		ActiveJobs:   nil,
 	}
 }
 
@@ -98,8 +106,7 @@ func (c *Collector) Init(ctx context.Context) error {
 	clientCfg := as400proto.Config{
 		DSN:          c.DSN,
 		Timeout:      time.Duration(c.Timeout),
-		MaxOpenConns: c.MaxDbConns,
-		ConnMaxLife:  time.Duration(c.MaxDbLifeTime),
+		MaxOpenConns: 1,
 	}
 	c.client = as400proto.NewClient(clientCfg)
 
@@ -122,14 +129,6 @@ func (c *Collector) Init(ctx context.Context) error {
 		}
 		c.subsystemSelector = m
 	}
-	if c.JobQueueSelector != "" {
-		m, err := matcher.NewSimplePatternsMatcher(c.JobQueueSelector)
-		if err != nil {
-			return fmt.Errorf("invalid job queue selector pattern '%s': %v", c.JobQueueSelector, err)
-		}
-		c.jobQueueSelector = m
-	}
-
 	// Detect IBM i version on first init to drive feature toggles
 	if err := c.client.Connect(ctx); err == nil {
 		if err := c.detectIBMiVersion(ctx); err != nil {
@@ -143,6 +142,18 @@ func (c *Collector) Init(ctx context.Context) error {
 		c.detectAvailableFeatures(ctx)
 		c.collectSystemInfo(ctx)
 		c.applyGlobalLabels()
+	}
+
+	if err := c.configureTargets(); err != nil {
+		return err
+	}
+
+	if err := c.startSlowPath(); err != nil {
+		return err
+	}
+
+	if err := c.startBatchPath(); err != nil {
+		return err
 	}
 
 	return nil

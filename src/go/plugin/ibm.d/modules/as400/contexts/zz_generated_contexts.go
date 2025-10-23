@@ -1013,7 +1013,7 @@ var JobQueue = struct {
 	Length: JobQueueLengthContext{
 		Context: framework.Context[JobQueueLabels]{
 			Name:        "as400.jobqueue_length",
-			Family:      "workloads/job_queues",
+			Family:      "queues/job",
 			Title:       "Job Queue Length",
 			Units:       "jobs",
 			Type:        module.Line,
@@ -1115,7 +1115,7 @@ var MessageQueue = struct {
 	Messages: MessageQueueMessagesContext{
 		Context: framework.Context[MessageQueueLabels]{
 			Name:        "as400.message_queue_messages",
-			Family:      "messaging/message_queues",
+			Family:      "queues/message",
 			Title:       "Message Queue Messages",
 			Units:       "messages",
 			Type:        module.Stacked,
@@ -1181,7 +1181,7 @@ var MessageQueue = struct {
 	Severity: MessageQueueSeverityContext{
 		Context: framework.Context[MessageQueueLabels]{
 			Name:        "as400.message_queue_severity",
-			Family:      "messaging/message_queues",
+			Family:      "queues/message",
 			Title:       "Message Queue Severity",
 			Units:       "severity",
 			Type:        module.Line,
@@ -1331,17 +1331,11 @@ var NetworkInterface = struct {
 
 // --- Observability ---
 
-// ObservabilityQueryLatencyValues defines the type-safe values for Observability.QueryLatency context
-type ObservabilityQueryLatencyValues struct {
-	Analyze_plan_cache           int64
-	Count_active_jobs            int64
+// ObservabilityQueryLatencyFastValues defines the type-safe values for Observability.QueryLatencyFast context
+type ObservabilityQueryLatencyFastValues struct {
 	Count_disks                  int64
 	Count_http_servers           int64
-	Count_job_queues             int64
-	Count_message_queues         int64
 	Count_network_interfaces     int64
-	Count_output_queues          int64
-	Count_subsystems             int64
 	Detect_ibmi_version_primary  int64
 	Detect_ibmi_version_fallback int64
 	Disk_instances               int64
@@ -1349,41 +1343,31 @@ type ObservabilityQueryLatencyValues struct {
 	Disk_status                  int64
 	Http_server_info             int64
 	Job_info                     int64
-	Job_queues                   int64
 	Memory_pools                 int64
-	Message_queue_aggregates     int64
 	Network_connections          int64
 	Network_interfaces           int64
-	Output_queue_info            int64
-	Plan_cache_summary           int64
 	Serial_number                int64
+	System_name                  int64
 	System_activity              int64
 	System_model                 int64
 	System_status                int64
 	Temp_storage_named           int64
 	Temp_storage_total           int64
 	Technology_refresh_level     int64
-	Top_active_jobs              int64
-	Other                        int64
+	Active_job                   int64
 }
 
-// ObservabilityQueryLatencyContext provides type-safe operations for Observability.QueryLatency context
-type ObservabilityQueryLatencyContext struct {
+// ObservabilityQueryLatencyFastContext provides type-safe operations for Observability.QueryLatencyFast context
+type ObservabilityQueryLatencyFastContext struct {
 	framework.Context[EmptyLabels]
 }
 
-// Set provides type-safe dimension setting for Observability.QueryLatency context
-func (c ObservabilityQueryLatencyContext) Set(state *framework.CollectorState, labels EmptyLabels, values ObservabilityQueryLatencyValues) {
+// Set provides type-safe dimension setting for Observability.QueryLatencyFast context
+func (c ObservabilityQueryLatencyFastContext) Set(state *framework.CollectorState, labels EmptyLabels, values ObservabilityQueryLatencyFastValues) {
 	state.SetMetricsForGeneratedCode(&c.Context, nil, map[string]int64{
-		"analyze_plan_cache":           values.Analyze_plan_cache,
-		"count_active_jobs":            values.Count_active_jobs,
 		"count_disks":                  values.Count_disks,
 		"count_http_servers":           values.Count_http_servers,
-		"count_job_queues":             values.Count_job_queues,
-		"count_message_queues":         values.Count_message_queues,
 		"count_network_interfaces":     values.Count_network_interfaces,
-		"count_output_queues":          values.Count_output_queues,
-		"count_subsystems":             values.Count_subsystems,
 		"detect_ibmi_version_primary":  values.Detect_ibmi_version_primary,
 		"detect_ibmi_version_fallback": values.Detect_ibmi_version_fallback,
 		"disk_instances":               values.Disk_instances,
@@ -1391,264 +1375,350 @@ func (c ObservabilityQueryLatencyContext) Set(state *framework.CollectorState, l
 		"disk_status":                  values.Disk_status,
 		"http_server_info":             values.Http_server_info,
 		"job_info":                     values.Job_info,
-		"job_queues":                   values.Job_queues,
 		"memory_pools":                 values.Memory_pools,
-		"message_queue_aggregates":     values.Message_queue_aggregates,
 		"network_connections":          values.Network_connections,
 		"network_interfaces":           values.Network_interfaces,
-		"output_queue_info":            values.Output_queue_info,
-		"plan_cache_summary":           values.Plan_cache_summary,
 		"serial_number":                values.Serial_number,
+		"system_name":                  values.System_name,
 		"system_activity":              values.System_activity,
 		"system_model":                 values.System_model,
 		"system_status":                values.System_status,
 		"temp_storage_named":           values.Temp_storage_named,
 		"temp_storage_total":           values.Temp_storage_total,
 		"technology_refresh_level":     values.Technology_refresh_level,
-		"top_active_jobs":              values.Top_active_jobs,
-		"other":                        values.Other,
+		"active_job":                   values.Active_job,
 	})
 }
 
 // SetUpdateEvery sets the update interval for this instance
-func (c ObservabilityQueryLatencyContext) SetUpdateEvery(state *framework.CollectorState, labels EmptyLabels, updateEvery int) {
+func (c ObservabilityQueryLatencyFastContext) SetUpdateEvery(state *framework.CollectorState, labels EmptyLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, nil, updateEvery)
+}
+
+// ObservabilityQueryLatencySlowValues defines the type-safe values for Observability.QueryLatencySlow context
+type ObservabilityQueryLatencySlowValues struct {
+	Analyze_plan_cache       int64
+	Count_subsystems         int64
+	Subsystems               int64
+	Message_queue_aggregates int64
+	Job_queues               int64
+	Output_queue_info        int64
+	Plan_cache_summary       int64
+}
+
+// ObservabilityQueryLatencySlowContext provides type-safe operations for Observability.QueryLatencySlow context
+type ObservabilityQueryLatencySlowContext struct {
+	framework.Context[EmptyLabels]
+}
+
+// Set provides type-safe dimension setting for Observability.QueryLatencySlow context
+func (c ObservabilityQueryLatencySlowContext) Set(state *framework.CollectorState, labels EmptyLabels, values ObservabilityQueryLatencySlowValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, nil, map[string]int64{
+		"analyze_plan_cache":       values.Analyze_plan_cache,
+		"count_subsystems":         values.Count_subsystems,
+		"subsystems":               values.Subsystems,
+		"message_queue_aggregates": values.Message_queue_aggregates,
+		"job_queues":               values.Job_queues,
+		"output_queue_info":        values.Output_queue_info,
+		"plan_cache_summary":       values.Plan_cache_summary,
+	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c ObservabilityQueryLatencySlowContext) SetUpdateEvery(state *framework.CollectorState, labels EmptyLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, nil, updateEvery)
+}
+
+// ObservabilityQueryLatencyBatchValues defines the type-safe values for Observability.QueryLatencyBatch context
+type ObservabilityQueryLatencyBatchValues struct {
+	Message_queue_totals int64
+	Job_queue_totals     int64
+	Output_queue_totals  int64
+}
+
+// ObservabilityQueryLatencyBatchContext provides type-safe operations for Observability.QueryLatencyBatch context
+type ObservabilityQueryLatencyBatchContext struct {
+	framework.Context[EmptyLabels]
+}
+
+// Set provides type-safe dimension setting for Observability.QueryLatencyBatch context
+func (c ObservabilityQueryLatencyBatchContext) Set(state *framework.CollectorState, labels EmptyLabels, values ObservabilityQueryLatencyBatchValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, nil, map[string]int64{
+		"message_queue_totals": values.Message_queue_totals,
+		"job_queue_totals":     values.Job_queue_totals,
+		"output_queue_totals":  values.Output_queue_totals,
+	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c ObservabilityQueryLatencyBatchContext) SetUpdateEvery(state *framework.CollectorState, labels EmptyLabels, updateEvery int) {
 	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, nil, updateEvery)
 }
 
 // Observability contains all metric contexts for Observability
 var Observability = struct {
-	QueryLatency ObservabilityQueryLatencyContext
+	QueryLatencyFast  ObservabilityQueryLatencyFastContext
+	QueryLatencySlow  ObservabilityQueryLatencySlowContext
+	QueryLatencyBatch ObservabilityQueryLatencyBatchContext
 }{
-	QueryLatency: ObservabilityQueryLatencyContext{
+	QueryLatencyFast: ObservabilityQueryLatencyFastContext{
 		Context: framework.Context[EmptyLabels]{
-			Name:        "netdata.plugin_ibm.as400_query_latency",
+			Name:        "netdata.plugin_ibm.as400_query_latency_fast",
 			Family:      "plugins/ibm.d/latency",
-			Title:       "AS400 Query Latency",
+			Title:       "AS400 Query Latency (Fast Path)",
 			Units:       "ms",
 			Type:        module.Stacked,
 			Priority:    146000,
 			UpdateEvery: 1,
 			Dimensions: []framework.Dimension{
 				{
-					Name:      "analyze_plan_cache",
-					Algorithm: module.Absolute,
-					Mul:       1,
-					Div:       1000,
-					Precision: 1,
-				},
-				{
-					Name:      "count_active_jobs",
-					Algorithm: module.Absolute,
-					Mul:       1,
-					Div:       1000,
-					Precision: 1,
-				},
-				{
 					Name:      "count_disks",
-					Algorithm: module.Absolute,
+					Algorithm: module.Incremental,
 					Mul:       1,
 					Div:       1000,
 					Precision: 1,
 				},
 				{
 					Name:      "count_http_servers",
-					Algorithm: module.Absolute,
-					Mul:       1,
-					Div:       1000,
-					Precision: 1,
-				},
-				{
-					Name:      "count_job_queues",
-					Algorithm: module.Absolute,
-					Mul:       1,
-					Div:       1000,
-					Precision: 1,
-				},
-				{
-					Name:      "count_message_queues",
-					Algorithm: module.Absolute,
+					Algorithm: module.Incremental,
 					Mul:       1,
 					Div:       1000,
 					Precision: 1,
 				},
 				{
 					Name:      "count_network_interfaces",
-					Algorithm: module.Absolute,
-					Mul:       1,
-					Div:       1000,
-					Precision: 1,
-				},
-				{
-					Name:      "count_output_queues",
-					Algorithm: module.Absolute,
-					Mul:       1,
-					Div:       1000,
-					Precision: 1,
-				},
-				{
-					Name:      "count_subsystems",
-					Algorithm: module.Absolute,
+					Algorithm: module.Incremental,
 					Mul:       1,
 					Div:       1000,
 					Precision: 1,
 				},
 				{
 					Name:      "detect_ibmi_version_primary",
-					Algorithm: module.Absolute,
+					Algorithm: module.Incremental,
 					Mul:       1,
 					Div:       1000,
 					Precision: 1,
 				},
 				{
 					Name:      "detect_ibmi_version_fallback",
-					Algorithm: module.Absolute,
+					Algorithm: module.Incremental,
 					Mul:       1,
 					Div:       1000,
 					Precision: 1,
 				},
 				{
 					Name:      "disk_instances",
-					Algorithm: module.Absolute,
+					Algorithm: module.Incremental,
 					Mul:       1,
 					Div:       1000,
 					Precision: 1,
 				},
 				{
 					Name:      "disk_instances_enhanced",
-					Algorithm: module.Absolute,
+					Algorithm: module.Incremental,
 					Mul:       1,
 					Div:       1000,
 					Precision: 1,
 				},
 				{
 					Name:      "disk_status",
-					Algorithm: module.Absolute,
+					Algorithm: module.Incremental,
 					Mul:       1,
 					Div:       1000,
 					Precision: 1,
 				},
 				{
 					Name:      "http_server_info",
-					Algorithm: module.Absolute,
+					Algorithm: module.Incremental,
 					Mul:       1,
 					Div:       1000,
 					Precision: 1,
 				},
 				{
 					Name:      "job_info",
-					Algorithm: module.Absolute,
-					Mul:       1,
-					Div:       1000,
-					Precision: 1,
-				},
-				{
-					Name:      "job_queues",
-					Algorithm: module.Absolute,
+					Algorithm: module.Incremental,
 					Mul:       1,
 					Div:       1000,
 					Precision: 1,
 				},
 				{
 					Name:      "memory_pools",
-					Algorithm: module.Absolute,
-					Mul:       1,
-					Div:       1000,
-					Precision: 1,
-				},
-				{
-					Name:      "message_queue_aggregates",
-					Algorithm: module.Absolute,
+					Algorithm: module.Incremental,
 					Mul:       1,
 					Div:       1000,
 					Precision: 1,
 				},
 				{
 					Name:      "network_connections",
-					Algorithm: module.Absolute,
+					Algorithm: module.Incremental,
 					Mul:       1,
 					Div:       1000,
 					Precision: 1,
 				},
 				{
 					Name:      "network_interfaces",
-					Algorithm: module.Absolute,
-					Mul:       1,
-					Div:       1000,
-					Precision: 1,
-				},
-				{
-					Name:      "output_queue_info",
-					Algorithm: module.Absolute,
-					Mul:       1,
-					Div:       1000,
-					Precision: 1,
-				},
-				{
-					Name:      "plan_cache_summary",
-					Algorithm: module.Absolute,
+					Algorithm: module.Incremental,
 					Mul:       1,
 					Div:       1000,
 					Precision: 1,
 				},
 				{
 					Name:      "serial_number",
-					Algorithm: module.Absolute,
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1000,
+					Precision: 1,
+				},
+				{
+					Name:      "system_name",
+					Algorithm: module.Incremental,
 					Mul:       1,
 					Div:       1000,
 					Precision: 1,
 				},
 				{
 					Name:      "system_activity",
-					Algorithm: module.Absolute,
+					Algorithm: module.Incremental,
 					Mul:       1,
 					Div:       1000,
 					Precision: 1,
 				},
 				{
 					Name:      "system_model",
-					Algorithm: module.Absolute,
+					Algorithm: module.Incremental,
 					Mul:       1,
 					Div:       1000,
 					Precision: 1,
 				},
 				{
 					Name:      "system_status",
-					Algorithm: module.Absolute,
+					Algorithm: module.Incremental,
 					Mul:       1,
 					Div:       1000,
 					Precision: 1,
 				},
 				{
 					Name:      "temp_storage_named",
-					Algorithm: module.Absolute,
+					Algorithm: module.Incremental,
 					Mul:       1,
 					Div:       1000,
 					Precision: 1,
 				},
 				{
 					Name:      "temp_storage_total",
-					Algorithm: module.Absolute,
+					Algorithm: module.Incremental,
 					Mul:       1,
 					Div:       1000,
 					Precision: 1,
 				},
 				{
 					Name:      "technology_refresh_level",
-					Algorithm: module.Absolute,
+					Algorithm: module.Incremental,
 					Mul:       1,
 					Div:       1000,
 					Precision: 1,
 				},
 				{
-					Name:      "top_active_jobs",
-					Algorithm: module.Absolute,
+					Name:      "active_job",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1000,
+					Precision: 1,
+				},
+			},
+			LabelKeys: []string{},
+		},
+	},
+	QueryLatencySlow: ObservabilityQueryLatencySlowContext{
+		Context: framework.Context[EmptyLabels]{
+			Name:        "netdata.plugin_ibm.as400_query_latency_slow",
+			Family:      "plugins/ibm.d/latency",
+			Title:       "AS400 Query Latency (Slow Path)",
+			Units:       "ms",
+			Type:        module.Stacked,
+			Priority:    146010,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "analyze_plan_cache",
+					Algorithm: module.Incremental,
 					Mul:       1,
 					Div:       1000,
 					Precision: 1,
 				},
 				{
-					Name:      "other",
-					Algorithm: module.Absolute,
+					Name:      "count_subsystems",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1000,
+					Precision: 1,
+				},
+				{
+					Name:      "subsystems",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1000,
+					Precision: 1,
+				},
+				{
+					Name:      "message_queue_aggregates",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1000,
+					Precision: 1,
+				},
+				{
+					Name:      "job_queues",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1000,
+					Precision: 1,
+				},
+				{
+					Name:      "output_queue_info",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1000,
+					Precision: 1,
+				},
+				{
+					Name:      "plan_cache_summary",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1000,
+					Precision: 1,
+				},
+			},
+			LabelKeys: []string{},
+		},
+	},
+	QueryLatencyBatch: ObservabilityQueryLatencyBatchContext{
+		Context: framework.Context[EmptyLabels]{
+			Name:        "netdata.plugin_ibm.as400_query_latency_batch",
+			Family:      "plugins/ibm.d/latency",
+			Title:       "AS400 Query Latency (Batch Path)",
+			Units:       "ms",
+			Type:        module.Stacked,
+			Priority:    146020,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "message_queue_totals",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1000,
+					Precision: 1,
+				},
+				{
+					Name:      "job_queue_totals",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1000,
+					Precision: 1,
+				},
+				{
+					Name:      "output_queue_totals",
+					Algorithm: module.Incremental,
 					Mul:       1,
 					Div:       1000,
 					Precision: 1,
@@ -1749,7 +1819,7 @@ var OutputQueue = struct {
 	Files: OutputQueueFilesContext{
 		Context: framework.Context[OutputQueueLabels]{
 			Name:        "as400.output_queue_files",
-			Family:      "messaging/output_queues",
+			Family:      "queues/output",
 			Title:       "Output Queue Files",
 			Units:       "files",
 			Type:        module.Line,
@@ -1774,7 +1844,7 @@ var OutputQueue = struct {
 	Writers: OutputQueueWritersContext{
 		Context: framework.Context[OutputQueueLabels]{
 			Name:        "as400.output_queue_writers",
-			Family:      "messaging/output_queues",
+			Family:      "queues/output",
 			Title:       "Output Queue Writers",
 			Units:       "writers",
 			Type:        module.Line,
@@ -1799,7 +1869,7 @@ var OutputQueue = struct {
 	Status: OutputQueueStatusContext{
 		Context: framework.Context[OutputQueueLabels]{
 			Name:        "as400.output_queue_status",
-			Family:      "messaging/output_queues",
+			Family:      "queues/output",
 			Title:       "Output Queue Status",
 			Units:       "state",
 			Type:        module.Line,
@@ -1882,6 +1952,119 @@ var PlanCache = struct {
 			},
 			LabelKeys: []string{
 				"metric",
+			},
+		},
+	},
+}
+
+// --- QueueOverview ---
+
+// QueueOverviewCountValues defines the type-safe values for QueueOverview.Count context
+type QueueOverviewCountValues struct {
+	Queues int64
+}
+
+// QueueOverviewCountContext provides type-safe operations for QueueOverview.Count context
+type QueueOverviewCountContext struct {
+	framework.Context[QueueOverviewLabels]
+}
+
+// Set provides type-safe dimension setting for QueueOverview.Count context
+func (c QueueOverviewCountContext) Set(state *framework.CollectorState, labels QueueOverviewLabels, values QueueOverviewCountValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"queues": values.Queues,
+	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c QueueOverviewCountContext) SetUpdateEvery(state *framework.CollectorState, labels QueueOverviewLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
+// QueueOverviewItemsValues defines the type-safe values for QueueOverview.Items context
+type QueueOverviewItemsValues struct {
+	Items int64
+}
+
+// QueueOverviewItemsContext provides type-safe operations for QueueOverview.Items context
+type QueueOverviewItemsContext struct {
+	framework.Context[QueueOverviewLabels]
+}
+
+// Set provides type-safe dimension setting for QueueOverview.Items context
+func (c QueueOverviewItemsContext) Set(state *framework.CollectorState, labels QueueOverviewLabels, values QueueOverviewItemsValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"items": values.Items,
+	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c QueueOverviewItemsContext) SetUpdateEvery(state *framework.CollectorState, labels QueueOverviewLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
+// QueueOverviewLabels defines the required labels for QueueOverview contexts
+type QueueOverviewLabels struct {
+	Queue_type string
+	Item_type  string
+}
+
+// InstanceID generates a unique instance ID using the hardcoded label order from YAML
+func (l QueueOverviewLabels) InstanceID(contextName string) string {
+	// Label order from YAML: queue_type, item_type
+	return contextName + "." + cleanLabelValue(l.Queue_type) + "_" + cleanLabelValue(l.Item_type)
+}
+
+// QueueOverview contains all metric contexts for QueueOverview
+var QueueOverview = struct {
+	Count QueueOverviewCountContext
+	Items QueueOverviewItemsContext
+}{
+	Count: QueueOverviewCountContext{
+		Context: framework.Context[QueueOverviewLabels]{
+			Name:        "as400.queues_count",
+			Family:      "queues/overview",
+			Title:       "Queue Counts",
+			Units:       "queues",
+			Type:        module.Line,
+			Priority:    504,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "queues",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+			},
+			LabelKeys: []string{
+				"queue_type",
+				"item_type",
+			},
+		},
+	},
+	Items: QueueOverviewItemsContext{
+		Context: framework.Context[QueueOverviewLabels]{
+			Name:        "as400.queued_items",
+			Family:      "queues/overview",
+			Title:       "Queued Items",
+			Units:       "items",
+			Type:        module.Line,
+			Priority:    505,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "items",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+			},
+			LabelKeys: []string{
+				"queue_type",
+				"item_type",
 			},
 		},
 	},
@@ -3268,11 +3451,15 @@ func GetAllContexts() []interface{} {
 		&MessageQueue.Severity.Context,
 		&NetworkInterface.Status.Context,
 		&NetworkInterface.MTU.Context,
-		&Observability.QueryLatency.Context,
+		&Observability.QueryLatencyFast.Context,
+		&Observability.QueryLatencySlow.Context,
+		&Observability.QueryLatencyBatch.Context,
 		&OutputQueue.Files.Context,
 		&OutputQueue.Writers.Context,
 		&OutputQueue.Status.Context,
 		&PlanCache.Summary.Context,
+		&QueueOverview.Count.Context,
+		&QueueOverview.Items.Context,
 		&Subsystem.Jobs.Context,
 		&System.CPUUtilization.Context,
 		&System.CPUEntitledUtilization.Context,

@@ -4,8 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-
-	"gopkg.in/yaml.v3"
 )
 
 // AutoBool represents a tri-state boolean with explicit auto/enable/disable semantics.
@@ -96,27 +94,59 @@ func (a AutoBool) MarshalYAML() (interface{}, error) {
 	return a.String(), nil
 }
 
-// UnmarshalYAML accepts string scalars (case insensitive) and defaults to auto
-// when empty. Any other value results in an error to ensure early feedback.
-func (a *AutoBool) UnmarshalYAML(node *yaml.Node) error {
-	if node == nil {
+// UnmarshalYAML accepts literal booleans and strings (case insensitive) and
+// defaults to auto when empty. Any other value results in an error to ensure
+// early feedback. The signature matches the yaml.v2 marshaler interface so the
+// same implementation works for both yaml.v2 and yaml.v3 consumers.
+func (a *AutoBool) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	if unmarshal == nil {
 		*a = AutoBoolAuto
 		return nil
 	}
-	if node.Kind != yaml.ScalarNode {
-		return fmt.Errorf("autobool: expected scalar value, got %v", node.Kind)
-	}
-	value := strings.TrimSpace(node.Value)
-	if value == "" {
-		*a = AutoBoolAuto
-		return nil
-	}
-	parsed, err := parseAutoBool(value)
-	if err != nil {
+
+	var raw interface{}
+	if err := unmarshal(&raw); err != nil {
 		return err
 	}
-	*a = parsed
-	return nil
+
+	switch v := raw.(type) {
+	case nil:
+		*a = AutoBoolAuto
+		return nil
+	case bool:
+		if v {
+			*a = AutoBoolEnabled
+		} else {
+			*a = AutoBoolDisabled
+		}
+		return nil
+	case string:
+		value := strings.TrimSpace(v)
+		if value == "" {
+			*a = AutoBoolAuto
+			return nil
+		}
+		parsed, err := parseAutoBool(value)
+		if err != nil {
+			return err
+		}
+		*a = parsed
+		return nil
+	case []byte:
+		value := strings.TrimSpace(string(v))
+		if value == "" {
+			*a = AutoBoolAuto
+			return nil
+		}
+		parsed, err := parseAutoBool(value)
+		if err != nil {
+			return err
+		}
+		*a = parsed
+		return nil
+	default:
+		return fmt.Errorf("autobool: expected boolean or string value, got %T", raw)
+	}
 }
 
 // MarshalJSON writes the canonical string representation.
@@ -126,6 +156,15 @@ func (a AutoBool) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON accepts string values (case insensitive).
 func (a *AutoBool) UnmarshalJSON(data []byte) error {
+	var rawBool bool
+	if err := json.Unmarshal(data, &rawBool); err == nil {
+		if rawBool {
+			*a = AutoBoolEnabled
+		} else {
+			*a = AutoBoolDisabled
+		}
+		return nil
+	}
 	var raw string
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return fmt.Errorf("autobool: expected string value: %w", err)

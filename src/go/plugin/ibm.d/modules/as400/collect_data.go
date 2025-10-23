@@ -98,6 +98,27 @@ func (a *Collector) computeEntitledCPUPercentage(cpuUtilization float64) int64 {
 	return int64(math.Round(entitled * float64(precision)))
 }
 
+func (a *Collector) applyCPUUtilization(method string, cpuUtilization float64) {
+	adjusted := cpuUtilization
+	if adjusted < 0 {
+		a.Warningf("CPU collection (%s): interval utilization negative (%.2f%%), clamping to 0", method, adjusted/float64(precision))
+		adjusted = 0
+	}
+	if cpus := a.mx.ConfiguredCPUs; cpus > 0 {
+		maxAllowed := float64(cpus) * 100.0 * float64(precision)
+		if adjusted > maxAllowed {
+			a.Warningf("CPU collection (%s): interval utilization (%.2f%%) exceeds configured capacity (%d CPUs), clamping to %.2f%%",
+				method, adjusted/float64(precision), cpus, maxAllowed/float64(precision))
+			adjusted = maxAllowed
+		}
+	}
+	value := int64(math.Round(adjusted))
+	a.mx.systemActivity.AverageCPUUtilization = value
+	a.mx.systemActivity.AverageCPURate = value
+	a.mx.CPUPercentage = value
+	a.mx.EntitledCPUPercentage = a.computeEntitledCPUPercentage(adjusted)
+}
+
 func (a *Collector) parseFloat64Value(value string) (float64, bool) {
 	cleaned := cleanNumericString(value)
 	if cleaned == "" || cleaned == "-" || cleaned == "." || cleaned == "+" {
@@ -220,9 +241,6 @@ func (a *Collector) collect(ctx context.Context) error {
 }
 
 func (a *Collector) recordQueryLatency(queryName string, duration time.Duration) {
-	if a.mx == nil {
-		return
-	}
 	if queryName == "" {
 		queryName = "unknown_query"
 	}
@@ -232,16 +250,15 @@ func (a *Collector) recordQueryLatency(queryName string, duration time.Duration)
 		sanitized = "unknown_query"
 	}
 
-	if a.mx.queryLatencies == nil {
-		a.mx.queryLatencies = make(map[string]int64)
-	}
-
 	latency := duration.Microseconds()
 	if latency == 0 && duration > 0 {
 		latency = 1
 	}
 
-	a.mx.queryLatencies[sanitized] += latency
+	if a.fastQueryLatencyCounters == nil {
+		a.fastQueryLatencyCounters = make(map[string]int64)
+	}
+	a.fastQueryLatencyCounters[sanitized] += latency
 }
 
 func (a *Collector) collectSystemStatus(ctx context.Context) error {
@@ -428,137 +445,172 @@ func (a *Collector) collectJobInfo(ctx context.Context) error {
 }
 
 func (a *Collector) collectMessageQueues(ctx context.Context) error {
-	if !a.CollectMessageQueueMetrics.IsEnabled() {
+	if len(a.messageQueueTargets) == 0 {
 		return nil
 	}
 
-	allowed, count, err := a.messageQueuesCardinality.Allow(ctx, a.countMessageQueues)
-	if err != nil {
-		return fmt.Errorf("failed to count message queues: %w", err)
-	}
-	if !allowed {
-		limit := a.MaxMessageQueues
-		if limit <= 0 {
-			limit = messageQueueLimit
-		}
-		a.logOnce("message_queue_cardinality", "message queue count (%d) exceeds limit (%d), skipping collection", count, limit)
-		return nil
-	}
-
-	limit := a.MaxMessageQueues
-	if limit <= 0 {
-		limit = messageQueueLimit
-	}
-	query := fmt.Sprintf(queryMessageQueueAggregates, limit)
-
-	var (
-		library string
-		queue   string
-		metrics messageQueueInstanceMetrics
-	)
-
-	return a.doQuery(ctx, "message_queue_aggregates", query, func(column, value string, lineEnd bool) {
-		switch column {
-		case "MESSAGE_QUEUE_LIBRARY":
-			library = normalizeValue(value)
-		case "MESSAGE_QUEUE_NAME":
-			queue = normalizeValue(value)
-		case "MESSAGE_COUNT":
-			metrics.Total = parseInt64OrZero(value)
-		case "INFORMATIONAL_MESSAGES":
-			metrics.Informational = parseInt64OrZero(value)
-		case "INQUIRY_MESSAGES":
-			metrics.Inquiry = parseInt64OrZero(value)
-		case "DIAGNOSTIC_MESSAGES":
-			metrics.Diagnostic = parseInt64OrZero(value)
-		case "ESCAPE_MESSAGES":
-			metrics.Escape = parseInt64OrZero(value)
-		case "NOTIFY_MESSAGES":
-			metrics.Notify = parseInt64OrZero(value)
-		case "SENDER_COPY_MESSAGES":
-			metrics.SenderCopy = parseInt64OrZero(value)
-		case "MAX_SEVERITY":
-			metrics.MaxSeverity = parseInt64OrZero(value)
-		}
-
-		if lineEnd {
-			if queue != "" {
-				key := library + "/" + queue
-				meta := a.getMessageQueueMetrics(key)
-				meta.library = library
-				meta.name = queue
-				a.messageQueues[key] = meta
-				a.mx.messageQueues[key] = metrics
+	if a.slowPathActive() {
+		snapshot := a.slow.cache.getMessageQueues()
+		for _, target := range a.messageQueueTargets {
+			key := target.ID()
+			meta := a.getMessageQueueMetrics(key)
+			*meta = messageQueueMetrics{
+				library: target.Library,
+				name:    target.Name,
 			}
-			library = ""
-			queue = ""
+			if snapshotMeta, ok := snapshot.meta[key]; ok {
+				if snapshotMeta.library != "" {
+					meta.library = snapshotMeta.library
+				}
+				if snapshotMeta.name != "" {
+					meta.name = snapshotMeta.name
+				}
+			}
+			a.messageQueues[key] = meta
+			a.mx.messageQueues[key] = snapshot.metrics[key]
+		}
+		return snapshot.err
+	}
+
+	var firstErr error
+
+	for _, target := range a.messageQueueTargets {
+		key := target.ID()
+		meta := a.getMessageQueueMetrics(key)
+		meta.library = target.Library
+		meta.name = target.Name
+		a.messageQueues[key] = meta
+
+		metrics := messageQueueInstanceMetrics{}
+		found := false
+
+		queryName := fmt.Sprintf("message_queue_%s_%s", target.Library, target.Name)
+		query := buildMessageQueueQuery(target, a.supportsMessageQueueTableFunction())
+
+		err := a.doQuery(ctx, queryName, query, func(column, value string, lineEnd bool) {
+			switch column {
+			case "MESSAGE_COUNT":
+				metrics.Total = parseInt64OrZero(value)
+			case "INFORMATIONAL_MESSAGES":
+				metrics.Informational = parseInt64OrZero(value)
+			case "INQUIRY_MESSAGES":
+				metrics.Inquiry = parseInt64OrZero(value)
+			case "DIAGNOSTIC_MESSAGES":
+				metrics.Diagnostic = parseInt64OrZero(value)
+			case "ESCAPE_MESSAGES":
+				metrics.Escape = parseInt64OrZero(value)
+			case "NOTIFY_MESSAGES":
+				metrics.Notify = parseInt64OrZero(value)
+			case "SENDER_COPY_MESSAGES":
+				metrics.SenderCopy = parseInt64OrZero(value)
+			case "MAX_SEVERITY":
+				metrics.MaxSeverity = parseInt64OrZero(value)
+			}
+
+			if lineEnd {
+				found = true
+			}
+		})
+
+		if err != nil {
+			if firstErr == nil {
+				firstErr = fmt.Errorf("message queue %s: %w", key, err)
+			}
+			continue
+		}
+
+		if !found {
 			metrics = messageQueueInstanceMetrics{}
 		}
-	})
+
+		a.mx.messageQueues[key] = metrics
+	}
+
+	return firstErr
 }
 
 func (a *Collector) collectOutputQueues(ctx context.Context) error {
-	if !a.CollectOutputQueueMetrics.IsEnabled() {
+	if len(a.outputQueueTargets) == 0 {
 		return nil
 	}
 
-	allowed, count, err := a.outputQueuesCardinality.Allow(ctx, a.countOutputQueues)
-	if err != nil {
-		return fmt.Errorf("failed to count output queues: %w", err)
-	}
-	if !allowed {
-		limit := a.MaxOutputQueues
-		if limit <= 0 {
-			limit = outputQueueLimit
-		}
-		a.logOnce("output_queue_cardinality", "output queue count (%d) exceeds limit (%d), skipping collection", count, limit)
-		return nil
-	}
-
-	limit := a.MaxOutputQueues
-	if limit <= 0 {
-		limit = outputQueueLimit
-	}
-	query := fmt.Sprintf(queryOutputQueueInfo, limit)
-
-	var (
-		library string
-		queue   string
-		status  string
-		metrics outputQueueInstanceMetrics
-	)
-
-	return a.doQuery(ctx, "output_queue_info", query, func(column, value string, lineEnd bool) {
-		switch column {
-		case "OUTPUT_QUEUE_LIBRARY_NAME":
-			library = normalizeValue(value)
-		case "OUTPUT_QUEUE_NAME":
-			queue = normalizeValue(value)
-		case "OUTPUT_QUEUE_STATUS":
-			status = normalizeValue(value)
-		case "NUMBER_OF_FILES":
-			metrics.Files = parseInt64OrZero(value)
-		case "NUMBER_OF_WRITERS":
-			metrics.Writers = parseInt64OrZero(value)
-		}
-
-		if lineEnd {
-			if queue != "" {
-				key := library + "/" + queue
-				meta := a.getOutputQueueMetrics(key)
-				meta.library = library
-				meta.name = queue
-				meta.status = status
-				a.outputQueues[key] = meta
-				metrics.Released = boolToInt(strings.EqualFold(status, "RELEASED"))
-				a.mx.outputQueues[key] = metrics
+	if a.slowPathActive() {
+		snapshot := a.slow.cache.getOutputQueues()
+		for _, target := range a.outputQueueTargets {
+			key := target.ID()
+			metaPtr := a.getOutputQueueMetrics(key)
+			defaultMeta := outputQueueMetrics{
+				library: target.Library,
+				name:    target.Name,
+				status:  "UNKNOWN",
 			}
-			library = ""
-			queue = ""
-			status = ""
-			metrics = outputQueueInstanceMetrics{}
+			if snapshotMeta, ok := snapshot.meta[key]; ok {
+				*metaPtr = snapshotMeta
+			} else {
+				*metaPtr = defaultMeta
+			}
+			a.outputQueues[key] = metaPtr
+			a.mx.outputQueues[key] = snapshot.metrics[key]
 		}
-	})
+		return snapshot.err
+	}
+
+	var firstErr error
+
+	for _, target := range a.outputQueueTargets {
+		key := target.ID()
+		meta := a.getOutputQueueMetrics(key)
+		meta.library = target.Library
+		meta.name = target.Name
+		meta.status = "UNKNOWN"
+		a.outputQueues[key] = meta
+
+		metrics := outputQueueInstanceMetrics{}
+		entriesCount := int64(0)
+		entriesUsed := false
+
+		queryName := fmt.Sprintf("output_queue_%s_%s", target.Library, target.Name)
+		err := a.doQuery(ctx, queryName, buildOutputQueueEntriesQuery(target), func(column, value string, lineEnd bool) {
+			if lineEnd {
+				entriesCount++
+			}
+		})
+		if err != nil {
+			if isSQLFeatureError(err) {
+				a.Debugf("output queue entries function unavailable for %s/%s, falling back to view", target.Library, target.Name)
+			} else if firstErr == nil {
+				firstErr = fmt.Errorf("output queue %s (entries): %w", key, err)
+			}
+		} else {
+			entriesUsed = true
+			metrics.Files = entriesCount
+		}
+
+		viewErr := a.doQuery(ctx, queryName+"_view", buildOutputQueueInfoQuery(target), func(column, value string, lineEnd bool) {
+			switch column {
+			case "OUTPUT_QUEUE_STATUS":
+				meta.status = strings.TrimSpace(value)
+			case "NUMBER_OF_WRITERS":
+				metrics.Writers = parseInt64OrZero(value)
+			case "NUMBER_OF_FILES":
+				if !entriesUsed {
+					metrics.Files = parseInt64OrZero(value)
+				}
+			}
+		})
+		if viewErr != nil {
+			if firstErr == nil {
+				firstErr = fmt.Errorf("output queue %s (info): %w", key, viewErr)
+			}
+			continue
+		}
+
+		metrics.Released = boolToInt(strings.EqualFold(meta.status, "RELEASED"))
+		a.outputQueues[key] = meta
+		a.mx.outputQueues[key] = metrics
+	}
+
+	return firstErr
 }
 
 func (a *Collector) doQuery(ctx context.Context, queryName, query string, assign func(column, value string, lineEnd bool)) error {
@@ -941,30 +993,6 @@ func (a *Collector) countNetworkInterfaces(ctx context.Context) (int, error) {
 	return count, err
 }
 
-func (a *Collector) countMessageQueues(ctx context.Context) (int, error) {
-	var count int
-	err := a.doQueryRow(ctx, "count_message_queues", queryCountMessageQueues, func(column, value string) {
-		if column == "COUNT" {
-			if v, ok := a.parseInt64Value(value, 1); ok {
-				count = int(v)
-			}
-		}
-	})
-	return count, err
-}
-
-func (a *Collector) countOutputQueues(ctx context.Context) (int, error) {
-	var count int
-	err := a.doQueryRow(ctx, "count_output_queues", queryCountOutputQueues, func(column, value string) {
-		if column == "COUNT" {
-			if v, ok := a.parseInt64Value(value, 1); ok {
-				count = int(v)
-			}
-		}
-	})
-	return count, err
-}
-
 func (a *Collector) countHTTPServers(ctx context.Context) (int, error) {
 	var count int64
 	err := a.doQueryRow(ctx, "count_http_servers", queryCountHTTPServers, func(column, value string) {
@@ -992,18 +1020,6 @@ func withFetchLimit(query string, limit int) string {
 func (a *Collector) countSubsystems(ctx context.Context) (int, error) {
 	var count int64
 	err := a.doQueryRow(ctx, "count_subsystems", queryCountSubsystems, func(column, value string) {
-		if column == "COUNT" {
-			if v, ok := a.parseInt64Value(value, 1); ok {
-				count = v
-			}
-		}
-	})
-	return int(count), err
-}
-
-func (a *Collector) countJobQueues(ctx context.Context) (int, error) {
-	var count int64
-	err := a.doQueryRow(ctx, "count_job_queues", queryCountJobQueues, func(column, value string) {
 		if column == "COUNT" {
 			if v, ok := a.parseInt64Value(value, 1); ok {
 				count = v
@@ -1068,6 +1084,19 @@ func (a *Collector) collectTempStorage(ctx context.Context) error {
 
 // Subsystems collection
 func (a *Collector) collectSubsystems(ctx context.Context) error {
+	if a.slowPathActive() {
+		snapshot := a.slow.cache.getSubsystems()
+		for key, meta := range snapshot.meta {
+			ptr := a.getSubsystemMetrics(key)
+			*ptr = meta
+			a.subsystems[key] = ptr
+		}
+		for key, metrics := range snapshot.metrics {
+			a.mx.subsystems[key] = metrics
+		}
+		return snapshot.err
+	}
+
 	query := querySubsystems
 	if a.MaxSubsystems > 0 {
 		if total, err := a.countSubsystems(ctx); err != nil {
@@ -1136,61 +1165,79 @@ func (a *Collector) collectSubsystems(ctx context.Context) error {
 
 // Job queues collection
 func (a *Collector) collectJobQueues(ctx context.Context) error {
-	query := queryJobQueues
-	if a.MaxJobQueues > 0 {
-		if total, err := a.countJobQueues(ctx); err != nil {
-			a.logOnce("job_queue_count_failed", "failed to count job queues before applying limit: %v", err)
-		} else if total > a.MaxJobQueues {
-			a.logOnce("job_queue_limit", "job queue count (%d) exceeds limit (%d); truncating results", total, a.MaxJobQueues)
-		}
-		query = withFetchLimit(query, a.MaxJobQueues)
+	if len(a.jobQueueTargets) == 0 {
+		return nil
 	}
 
-	var currentQueue string
-	return a.doQuery(ctx, "job_queues", query, func(column, value string, lineEnd bool) {
-		switch column {
-		case "QUEUE_NAME":
-			name := strings.TrimSpace(value)
-			if name == "" {
-				currentQueue = ""
-				return
+	if a.slowPathActive() {
+		snapshot := a.slow.cache.getJobQueues()
+		for _, target := range a.jobQueueTargets {
+			key := target.ID()
+			metaPtr := a.getJobQueueMetrics(key)
+			defaultMeta := jobQueueMetrics{
+				library: target.Library,
+				name:    target.Name,
+				status:  "NOT_FOUND",
 			}
-			if a.jobQueueSelector != nil && !a.jobQueueSelector.MatchString(name) {
-				currentQueue = ""
-				return
-			}
-			currentQueue = name
-			queue := a.getJobQueueMetrics(currentQueue)
-			parts := strings.SplitN(name, "/", 2)
-			if len(parts) == 2 {
-				queue.library = parts[0]
-				queue.name = parts[1]
+			if snapshotMeta, ok := snapshot.meta[key]; ok {
+				*metaPtr = snapshotMeta
 			} else {
-				queue.name = name
-				queue.library = ""
+				*metaPtr = defaultMeta
 			}
-			queue.status = "RELEASED"
+			a.jobQueues[key] = metaPtr
+			a.mx.jobQueues[key] = snapshot.metrics[key]
+		}
+		return snapshot.err
+	}
 
-		case "NUMBER_OF_JOBS":
-			if currentQueue != "" && a.jobQueues[currentQueue] != nil {
-				if v, ok := a.parseInt64Value(value, 1); ok {
-					if m, ok := a.mx.jobQueues[currentQueue]; ok {
-						m.NumberOfJobs = v
-						a.mx.jobQueues[currentQueue] = m
-					} else {
-						a.mx.jobQueues[currentQueue] = jobQueueInstanceMetrics{
-							NumberOfJobs: v,
-						}
-					}
-				}
+	var firstErr error
+
+	for _, target := range a.jobQueueTargets {
+		key := target.ID()
+		queue := a.getJobQueueMetrics(key)
+		queue.library = target.Library
+		queue.name = target.Name
+		queue.status = "UNKNOWN"
+		a.jobQueues[key] = queue
+
+		metrics := jobQueueInstanceMetrics{}
+		found := false
+
+		queryName := fmt.Sprintf("job_queue_%s_%s", target.Library, target.Name)
+		err := a.doQuery(ctx, queryName, buildJobQueueQuery(target), func(column, value string, lineEnd bool) {
+			switch column {
+			case "JOB_QUEUE_STATUS":
+				queue.status = strings.TrimSpace(value)
+			case "NUMBER_OF_JOBS":
+				metrics.NumberOfJobs = parseInt64OrZero(value)
+			case "RELEASED_JOBS":
+				queue.jobsWaiting = parseInt64OrZero(value)
+			case "SCHEDULED_JOBS":
+				queue.jobsScheduled = parseInt64OrZero(value)
+			case "HELD_JOBS":
+				queue.jobsHeld = parseInt64OrZero(value)
 			}
-			// Note: HELD_JOB_COUNT column removed - it doesn't exist in JOB_QUEUE_INFO table
+
+			if lineEnd {
+				found = true
+			}
+		})
+
+		if err != nil {
+			if firstErr == nil {
+				firstErr = fmt.Errorf("job queue %s: %w", key, err)
+			}
+			continue
 		}
 
-		if lineEnd {
-			currentQueue = ""
+		if !found {
+			queue.status = "NOT_FOUND"
 		}
-	})
+
+		a.mx.jobQueues[key] = metrics
+	}
+
+	return firstErr
 }
 
 // Enhanced disk collection with all metrics
@@ -1611,6 +1658,19 @@ func (a *Collector) collectPlanCache(ctx context.Context) error {
 		return nil
 	}
 
+	if a.slowPathActive() {
+		snapshot := a.slow.cache.getPlanCache()
+		for key, meta := range snapshot.meta {
+			if ptr := a.getPlanCacheMetrics(key, meta.heading); ptr != nil {
+				a.planCache[key] = ptr
+			}
+		}
+		for key, values := range snapshot.values {
+			a.mx.planCache[key] = values
+		}
+		return snapshot.err
+	}
+
 	start := time.Now()
 	if err := a.client.Exec(ctx, callAnalyzePlanCache); err != nil {
 		return fmt.Errorf("failed to analyze plan cache: %w", err)
@@ -1715,23 +1775,8 @@ func (a *Collector) collectSystemActivity(ctx context.Context) error {
 			if a.UpdateEvery > 0 {
 				deltaSeconds := float64(deltaNanos) / 1e9
 				intervalSeconds := float64(a.UpdateEvery)
-
-				// TOTAL_CPU_TIME is naturally in per-core scale - do NOT divide by ConfiguredCPUs
-				cpuUtilization := (deltaSeconds / intervalSeconds) * 100.0 * precision
-				maxAllowed := float64(a.mx.ConfiguredCPUs) * 100.0 * precision
-				if cpuUtilization >= 0 && (a.mx.ConfiguredCPUs <= 0 || cpuUtilization <= maxAllowed) {
-					a.mx.systemActivity.AverageCPUUtilization = int64(cpuUtilization)
-					a.mx.systemActivity.AverageCPURate = int64(cpuUtilization)
-					a.mx.CPUPercentage = int64(cpuUtilization)
-					a.mx.EntitledCPUPercentage = a.computeEntitledCPUPercentage(cpuUtilization)
-				} else {
-					if cpuUtilization < 0 {
-						a.Warningf("CPU collection: calculated utilization negative (%.2f%%), skipping this sample", cpuUtilization/precision)
-					} else {
-						a.Warningf("CPU collection: calculated utilization (%.2f%%) exceeds configured capacity (%d CPUs), skipping this sample",
-							cpuUtilization/precision, a.mx.ConfiguredCPUs)
-					}
-				}
+				cpuUtilization := (deltaSeconds / intervalSeconds) * 100.0 * float64(precision)
+				a.applyCPUUtilization("TOTAL_CPU_TIME", cpuUtilization)
 			}
 		} else {
 			a.Debugf("CPU collection: establishing baseline for TOTAL_CPU_TIME method")
@@ -1771,21 +1816,7 @@ func (a *Collector) collectSystemActivity(ctx context.Context) error {
 				if deltaTime > 0 {
 					// ELAPSED_CPU_USED is already in per-core scaling
 					intervalCPU := float64(deltaProduct) / float64(deltaTime)
-					cpuUtilization := intervalCPU
-					maxAllowed := float64(a.mx.ConfiguredCPUs) * 100.0 * precision
-					if cpuUtilization >= 0 && (a.mx.ConfiguredCPUs <= 0 || cpuUtilization <= maxAllowed) {
-						a.mx.systemActivity.AverageCPUUtilization = int64(cpuUtilization)
-						a.mx.systemActivity.AverageCPURate = int64(cpuUtilization)
-						a.mx.CPUPercentage = int64(cpuUtilization)
-						a.mx.EntitledCPUPercentage = a.computeEntitledCPUPercentage(cpuUtilization)
-					} else {
-						if cpuUtilization < 0 {
-							a.Warningf("CPU collection: interval utilization negative (%.2f%%), skipping this sample", cpuUtilization/precision)
-						} else {
-							a.Warningf("CPU collection: interval utilization (%.2f%%) exceeds configured capacity (%d CPUs), skipping this sample",
-								cpuUtilization/precision, a.mx.ConfiguredCPUs)
-						}
-					}
+					a.applyCPUUtilization("ELAPSED_CPU_USED", intervalCPU)
 				}
 			} else {
 				a.Debugf("CPU collection: re-establishing baseline after reset")
