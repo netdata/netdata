@@ -972,13 +972,8 @@ if [ "$(id -u)" -eq 0 ]; then
 
   if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/otel-plugin" ]; then
     run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/otel-plugin"
-    capabilities=0
     if ! iscontainer && command -v setcap 1>/dev/null 2>&1; then
       run chmod 0750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/otel-plugin"
-    fi
-
-    if [ $capabilities -eq 0 ]; then
-      run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/otel-plugin"
     fi
   fi
 
