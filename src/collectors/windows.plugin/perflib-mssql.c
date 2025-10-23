@@ -2162,7 +2162,7 @@ static void netdata_mssql_recompilations(struct mssql_db_instance *mdi, struct m
                 "sql activity",
                 "mssql.instance_sqlstats_sql_recompilations",
                 "SQL re-compilations",
-                "recompiles/",
+                "recompiles/s",
                 PLUGIN_WINDOWS_NAME,
                 "PerflibMSSQL",
                 PRIO_MSSQL_STATS_RECOMPILATIONS,
