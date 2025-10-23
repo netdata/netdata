@@ -1,6 +1,12 @@
 # Netdata APIs
 
-Netdata provides two APIs for programmatic access to your monitoring infrastructure.
+Netdata provides multiple APIs for programmatic access to your monitoring infrastructure.
+
+:::note
+
+API documentation is a work in progress. More endpoints will be added soon.
+
+:::
 
 ## Agent API
 
