@@ -170,7 +170,8 @@ struct mssql_db_jobs {
     bool enabled;
 
     RRDSET *st_status;
-    RRDDIM *rd_status;
+    RRDDIM *rd_status_enabled;
+    RRDDIM *rd_status_disabled;
 
     COUNTER_DATA MSSQLJOBState;
 };
@@ -2310,15 +2311,20 @@ static void netdata_mssql_jobs_status(struct mssql_db_jobs *mdj, struct mssql_in
                 mi->update_every,
                 RRDSET_TYPE_LINE);
 
-        mdj->rd_status =
+        mdj->rd_status_enabled =
                 rrddim_add(mdj->st_status, "enabled", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+        mdj->rd_status_disabled =
+                rrddim_add(mdj->st_status, "disabled", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
 
         rrdlabels_add(mdj->st_status->rrdlabels, "mssql_instance", mi->instanceID, RRDLABEL_SRC_AUTO);
         rrdlabels_add(mdj->st_status->rrdlabels, "job_name", job, RRDLABEL_SRC_AUTO);
     }
 
     rrddim_set_by_pointer(
-            mdj->st_status, mdj->rd_status, (collected_number)mdj->MSSQLJOBState.current.Data);
+            mdj->st_status, mdj->rd_status_enabled, (collected_number)(mdj->MSSQLJOBState.current.Data == 1));
+    rrddim_set_by_pointer(
+            mdj->st_status, mdj->rd_status_disabled, (collected_number)(mdj->MSSQLJOBState.current.Data == 0));
     rrdset_done(mdj->st_status);
 }
 
