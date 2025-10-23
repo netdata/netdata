@@ -98,6 +98,27 @@ func (a *Collector) computeEntitledCPUPercentage(cpuUtilization float64) int64 {
 	return int64(math.Round(entitled * float64(precision)))
 }
 
+func (a *Collector) applyCPUUtilization(method string, cpuUtilization float64) {
+	adjusted := cpuUtilization
+	if adjusted < 0 {
+		a.Warningf("CPU collection (%s): interval utilization negative (%.2f%%), clamping to 0", method, adjusted/float64(precision))
+		adjusted = 0
+	}
+	if cpus := a.mx.ConfiguredCPUs; cpus > 0 {
+		maxAllowed := float64(cpus) * 100.0 * float64(precision)
+		if adjusted > maxAllowed {
+			a.Warningf("CPU collection (%s): interval utilization (%.2f%%) exceeds configured capacity (%d CPUs), clamping to %.2f%%",
+				method, adjusted/float64(precision), cpus, maxAllowed/float64(precision))
+			adjusted = maxAllowed
+		}
+	}
+	value := int64(math.Round(adjusted))
+	a.mx.systemActivity.AverageCPUUtilization = value
+	a.mx.systemActivity.AverageCPURate = value
+	a.mx.CPUPercentage = value
+	a.mx.EntitledCPUPercentage = a.computeEntitledCPUPercentage(adjusted)
+}
+
 func (a *Collector) parseFloat64Value(value string) (float64, bool) {
 	cleaned := cleanNumericString(value)
 	if cleaned == "" || cleaned == "-" || cleaned == "." || cleaned == "+" {
@@ -1754,23 +1775,8 @@ func (a *Collector) collectSystemActivity(ctx context.Context) error {
 			if a.UpdateEvery > 0 {
 				deltaSeconds := float64(deltaNanos) / 1e9
 				intervalSeconds := float64(a.UpdateEvery)
-
-				// TOTAL_CPU_TIME is naturally in per-core scale - do NOT divide by ConfiguredCPUs
-				cpuUtilization := (deltaSeconds / intervalSeconds) * 100.0 * precision
-				maxAllowed := float64(a.mx.ConfiguredCPUs) * 100.0 * precision
-				if cpuUtilization >= 0 && (a.mx.ConfiguredCPUs <= 0 || cpuUtilization <= maxAllowed) {
-					a.mx.systemActivity.AverageCPUUtilization = int64(cpuUtilization)
-					a.mx.systemActivity.AverageCPURate = int64(cpuUtilization)
-					a.mx.CPUPercentage = int64(cpuUtilization)
-					a.mx.EntitledCPUPercentage = a.computeEntitledCPUPercentage(cpuUtilization)
-				} else {
-					if cpuUtilization < 0 {
-						a.Warningf("CPU collection: calculated utilization negative (%.2f%%), keeping this sample", cpuUtilization/precision)
-					} else {
-						a.Warningf("CPU collection: calculated utilization (%.2f%%) exceeds configured capacity (%d CPUs), keeping this sample",
-							cpuUtilization/precision, a.mx.ConfiguredCPUs)
-					}
-				}
+				cpuUtilization := (deltaSeconds / intervalSeconds) * 100.0 * float64(precision)
+				a.applyCPUUtilization("TOTAL_CPU_TIME", cpuUtilization)
 			}
 		} else {
 			a.Debugf("CPU collection: establishing baseline for TOTAL_CPU_TIME method")
@@ -1810,21 +1816,7 @@ func (a *Collector) collectSystemActivity(ctx context.Context) error {
 				if deltaTime > 0 {
 					// ELAPSED_CPU_USED is already in per-core scaling
 					intervalCPU := float64(deltaProduct) / float64(deltaTime)
-					cpuUtilization := intervalCPU
-					maxAllowed := float64(a.mx.ConfiguredCPUs) * 100.0 * precision
-					if cpuUtilization >= 0 && (a.mx.ConfiguredCPUs <= 0 || cpuUtilization <= maxAllowed) {
-						a.mx.systemActivity.AverageCPUUtilization = int64(cpuUtilization)
-						a.mx.systemActivity.AverageCPURate = int64(cpuUtilization)
-						a.mx.CPUPercentage = int64(cpuUtilization)
-						a.mx.EntitledCPUPercentage = a.computeEntitledCPUPercentage(cpuUtilization)
-					} else {
-						if cpuUtilization < 0 {
-							a.Warningf("CPU collection: interval utilization negative (%.2f%%), keeping this sample", cpuUtilization/precision)
-						} else {
-							a.Warningf("CPU collection: interval utilization (%.2f%%) exceeds configured capacity (%d CPUs), keeping this sample",
-								cpuUtilization/precision, a.mx.ConfiguredCPUs)
-						}
-					}
+					a.applyCPUUtilization("ELAPSED_CPU_USED", intervalCPU)
 				}
 			} else {
 				a.Debugf("CPU collection: re-establishing baseline after reset")

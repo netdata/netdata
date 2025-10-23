@@ -210,6 +210,29 @@ FROM TABLE(QSYS2.SYSTEM_STATUS('NO','ALL'))`
 		WHERE STATUS = 'ACTIVE'
 	`
 
+	// Aggregated queue totals (expensive queries, run on batch path)
+	queryMessageQueueTotals = `
+		SELECT
+			COUNT(*) AS MESSAGE_COUNT,
+			COUNT(DISTINCT COALESCE(MESSAGE_QUEUE_LIBRARY, '') || '/' || COALESCE(MESSAGE_QUEUE_NAME, '')) AS QUEUE_COUNT
+		FROM QSYS2.MESSAGE_QUEUE_INFO
+	`
+
+	queryJobQueueTotals = `
+		SELECT
+			COUNT(*) AS QUEUE_COUNT,
+			COALESCE(SUM(NUMBER_OF_JOBS), 0) AS JOB_COUNT
+		FROM QSYS2.JOB_QUEUE_INFO
+		WHERE JOB_QUEUE_STATUS = 'RELEASED'
+	`
+
+	queryOutputQueueTotals = `
+		SELECT
+			COUNT(*) AS QUEUE_COUNT,
+			COALESCE(SUM(NUMBER_OF_FILES), 0) AS FILE_COUNT
+		FROM QSYS2.OUTPUT_QUEUE_INFO
+	`
+
 	// Enhanced disk query with all metrics
 	queryDiskInstancesEnhanced = `
 		SELECT 

@@ -60,6 +60,15 @@ type Config struct {
 	// CollectPlanCacheMetrics toggles collection of plan cache analysis metrics.
 	CollectPlanCacheMetrics confopt.AutoBool `yaml:"collect_plan_cache_metrics,omitempty" json:"collect_plan_cache_metrics" ui:"group:Other Metrics"`
 
+	// CollectMessageQueueTotals enables expensive aggregate counting across all message queues.
+	CollectMessageQueueTotals confopt.AutoBool `yaml:"collect_message_queue_totals,omitempty" json:"collect_message_queue_totals" ui:"group:Queues"`
+
+	// CollectJobQueueTotals enables expensive aggregate counting across all job queues.
+	CollectJobQueueTotals confopt.AutoBool `yaml:"collect_job_queue_totals,omitempty" json:"collect_job_queue_totals" ui:"group:Queues"`
+
+	// CollectOutputQueueTotals enables expensive aggregate counting across all output queues.
+	CollectOutputQueueTotals confopt.AutoBool `yaml:"collect_output_queue_totals,omitempty" json:"collect_output_queue_totals" ui:"group:Queues"`
+
 	// SlowPath enables the asynchronous slow-path worker for heavy queries.
 	SlowPath bool `yaml:"slow_path,omitempty" json:"slow_path" ui:"group:Advanced"`
 
@@ -68,6 +77,15 @@ type Config struct {
 
 	// SlowPathMaxConnections caps the number of concurrent queries the slow-path worker may run.
 	SlowPathMaxConnections int `yaml:"slow_path_max_connections,omitempty" json:"slow_path_max_connections" ui:"group:Advanced"`
+
+	// BatchPath enables the long-period batch worker for expensive queue aggregates.
+	BatchPath bool `yaml:"batch_path,omitempty" json:"batch_path" ui:"group:Advanced"`
+
+	// BatchPathUpdateEvery controls the beat interval for the batch worker.
+	BatchPathUpdateEvery confopt.Duration `yaml:"batch_path_update_every,omitempty" json:"batch_path_update_every" ui:"group:Advanced"`
+
+	// BatchPathMaxConnections caps concurrent queries for the batch worker.
+	BatchPathMaxConnections int `yaml:"batch_path_max_connections,omitempty" json:"batch_path_max_connections" ui:"group:Advanced"`
 
 	// MaxDisks caps how many disk units may be charted.
 	MaxDisks int `yaml:"max_disks,omitempty" json:"max_disks" ui:"group:Disks"`

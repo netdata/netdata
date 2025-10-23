@@ -33,6 +33,8 @@ type Collector struct {
 	mx *metricsData
 
 	fastQueryLatencyCounters map[string]int64
+	batchLatencyValues       contexts.ObservabilityQueryLatencyBatchValues
+	batchLatencyValid        bool
 
 	// Metadata caches (reset every iteration)
 	disks             map[string]*diskMetrics
@@ -56,6 +58,14 @@ type Collector struct {
 		wg     sync.WaitGroup
 		config slowPathConfig
 		cache  slowCache
+	}
+
+	batch struct {
+		client *as400proto.Client
+		cancel context.CancelFunc
+		wg     sync.WaitGroup
+		config batchPathConfig
+		cache  batchCache
 	}
 
 	// System identity
@@ -190,6 +200,7 @@ func (c *Collector) CollectOnce() error {
 	c.exportJobQueueMetrics()
 	c.exportMessageQueueMetrics()
 	c.exportOutputQueueMetrics()
+	c.exportQueueTotalsMetrics()
 	c.exportTempStorageMetrics()
 	c.exportActiveJobMetrics()
 	c.exportNetworkInterfaceMetrics()
@@ -677,6 +688,49 @@ func (c *Collector) exportOutputQueueMetrics() {
 	}
 }
 
+func (c *Collector) exportQueueTotalsMetrics() {
+	if !c.batchPathActive() {
+		return
+	}
+
+	snapshot := c.batch.cache.getTotals()
+	if snapshot.timestamp.IsZero() && len(snapshot.queues) == 0 && len(snapshot.items) == 0 && snapshot.err == nil {
+		return
+	}
+
+	interval := c.batchPathIntervalSeconds()
+	types := []struct {
+		queueType string
+		itemType  string
+		enabled   bool
+	}{
+		{"message_queue", "message", c.CollectMessageQueueTotals.IsEnabled()},
+		{"job_queue", "job", c.CollectJobQueueTotals.IsEnabled()},
+		{"output_queue", "spooled_file", c.CollectOutputQueueTotals.IsEnabled()},
+	}
+
+	for _, entry := range types {
+		if !entry.enabled {
+			continue
+		}
+
+		labels := contexts.QueueOverviewLabels{
+			Queue_type: entry.queueType,
+			Item_type:  entry.itemType,
+		}
+		if interval > 0 {
+			contexts.QueueOverview.Count.SetUpdateEvery(c.State, labels, interval)
+			contexts.QueueOverview.Items.SetUpdateEvery(c.State, labels, interval)
+		}
+		contexts.QueueOverview.Count.Set(c.State, labels, contexts.QueueOverviewCountValues{
+			Queues: snapshot.queues[entry.queueType],
+		})
+		contexts.QueueOverview.Items.Set(c.State, labels, contexts.QueueOverviewItemsValues{
+			Items: snapshot.items[entry.queueType],
+		})
+	}
+}
+
 func (c *Collector) exportActiveJobMetrics() {
 	for jobName, values := range c.mx.activeJobs {
 		meta := c.activeJobs[jobName]
@@ -811,93 +865,185 @@ func (c *Collector) exportPlanCacheMetrics() {
 	}
 }
 
-func (c *Collector) exportQueryLatencyMetrics() {
-	export := func(path string, counters map[string]int64, updateEvery int) {
-		if len(counters) == 0 {
-			return
-		}
+func (c *Collector) logUnknownQueryLatency(path, name string) {
+	c.logOnce("unknown_query_latency_"+path+"_"+name, "%s path query latency not mapped to chart dimension: %s", path, name)
+}
 
-		dimensionTotals := make(map[string]int64)
-		var otherTotal int64
+func (c *Collector) splitLatencyCounters(counters map[string]int64) (
+	contexts.ObservabilityQueryLatencyFastValues,
+	contexts.ObservabilityQueryLatencySlowValues,
+	contexts.ObservabilityQueryLatencyBatchValues,
+	bool, bool, bool,
+) {
+	var (
+		fast  contexts.ObservabilityQueryLatencyFastValues
+		slow  contexts.ObservabilityQueryLatencySlowValues
+		batch contexts.ObservabilityQueryLatencyBatchValues
+	)
 
-		mapDirect := map[string]string{
-			"analyze_plan_cache":           "analyze_plan_cache",
-			"count_disks":                  "count_disks",
-			"count_http_servers":           "count_http_servers",
-			"count_network_interfaces":     "count_network_interfaces",
-			"count_subsystems":             "count_subsystems",
-			"detect_ibmi_version_primary":  "detect_ibmi_version_primary",
-			"detect_ibmi_version_fallback": "detect_ibmi_version_fallback",
-			"disk_instances":               "disk_instances",
-			"disk_instances_enhanced":      "disk_instances_enhanced",
-			"disk_status":                  "disk_status",
-			"http_server_info":             "http_server_info",
-			"job_info":                     "job_info",
-			"job_queues":                   "job_queues",
-			"memory_pools":                 "memory_pools",
-			"message_queue_aggregates":     "message_queue_aggregates",
-			"network_connections":          "network_connections",
-			"network_interfaces":           "network_interfaces",
-			"output_queue_info":            "output_queue_info",
-			"plan_cache_summary":           "plan_cache_summary",
-			"serial_number":                "serial_number",
-			"system_activity":              "system_activity",
-			"system_model":                 "system_model",
-			"system_status":                "system_status",
-			"temp_storage_named":           "temp_storage_named",
-			"temp_storage_total":           "temp_storage_total",
-			"technology_refresh_level":     "technology_refresh_level",
-			"active_job":                   "active_job",
-		}
-
-		for name, total := range counters {
-			if total <= 0 {
-				continue
-			}
-
-			switch {
-			case strings.HasPrefix(name, "message_queue_"):
-				dimensionTotals["message_queue_aggregates"] += total
-				continue
-			case strings.HasPrefix(name, "job_queue_"):
-				dimensionTotals["job_queues"] += total
-				continue
-			case strings.HasPrefix(name, "output_queue_"):
-				dimensionTotals["output_queue_info"] += total
-				continue
-			case strings.HasPrefix(name, "active_job_"):
-				dimensionTotals["active_job"] += total
-				continue
-			}
-
-			if dim, ok := mapDirect[name]; ok {
-				dimensionTotals[dim] += total
-			} else {
-				otherTotal += total
-			}
-		}
-
-		if otherTotal > 0 {
-			dimensionTotals["other"] += otherTotal
-		}
-
-		if len(dimensionTotals) == 0 {
-			return
-		}
-
-		labels := contexts.ObservabilityLabels{Path: path}
-		if updateEvery > 0 {
-			contexts.Observability.QueryLatency.SetUpdateEvery(c.State, labels, updateEvery)
-		}
-		c.State.SetMetricsForGeneratedCode(&contexts.Observability.QueryLatency.Context, labels, dimensionTotals)
+	if len(counters) == 0 {
+		return fast, slow, batch, false, false, false
 	}
 
-	export("fast", c.fastQueryLatencyCounters, c.fastPathIntervalSeconds())
+	fastDirect := map[string]*int64{
+		"count_disks":                  &fast.Count_disks,
+		"count_http_servers":           &fast.Count_http_servers,
+		"count_network_interfaces":     &fast.Count_network_interfaces,
+		"detect_ibmi_version_primary":  &fast.Detect_ibmi_version_primary,
+		"detect_ibmi_version_fallback": &fast.Detect_ibmi_version_fallback,
+		"disk_instances":               &fast.Disk_instances,
+		"disk_instances_enhanced":      &fast.Disk_instances_enhanced,
+		"disk_status":                  &fast.Disk_status,
+		"http_server_info":             &fast.Http_server_info,
+		"job_info":                     &fast.Job_info,
+		"memory_pools":                 &fast.Memory_pools,
+		"network_connections":          &fast.Network_connections,
+		"network_interfaces":           &fast.Network_interfaces,
+		"serial_number":                &fast.Serial_number,
+		"system_activity":              &fast.System_activity,
+		"system_model":                 &fast.System_model,
+		"system_status":                &fast.System_status,
+		"system_name_metric":           &fast.System_name,
+		"temp_storage_named":           &fast.Temp_storage_named,
+		"temp_storage_total":           &fast.Temp_storage_total,
+		"technology_refresh_level":     &fast.Technology_refresh_level,
+	}
 
+	slowDirect := map[string]*int64{
+		"analyze_plan_cache": &slow.Analyze_plan_cache,
+		"count_subsystems":   &slow.Count_subsystems,
+		"subsystems":         &slow.Subsystems,
+		"plan_cache_summary": &slow.Plan_cache_summary,
+	}
+
+	var (
+		fastSet  bool
+		slowSet  bool
+		batchSet bool
+	)
+
+	for name, total := range counters {
+		if total <= 0 {
+			continue
+		}
+
+		if target, ok := fastDirect[name]; ok {
+			*target += total
+			fastSet = true
+			continue
+		}
+
+		if target, ok := slowDirect[name]; ok {
+			*target += total
+			slowSet = true
+			continue
+		}
+
+		switch {
+		case name == queryNameMessageQueueTotals:
+			batch.Message_queue_totals += total
+			batchSet = true
+		case name == queryNameJobQueueTotals:
+			batch.Job_queue_totals += total
+			batchSet = true
+		case name == queryNameOutputQueueTotals:
+			batch.Output_queue_totals += total
+			batchSet = true
+		case strings.HasPrefix(name, "message_queue_"):
+			slow.Message_queue_aggregates += total
+			slowSet = true
+		case strings.HasPrefix(name, "job_queue_"):
+			slow.Job_queues += total
+			slowSet = true
+		case strings.HasPrefix(name, "output_queue_"):
+			slow.Output_queue_info += total
+			slowSet = true
+		case strings.HasPrefix(name, "active_job_"):
+			fast.Active_job += total
+			fastSet = true
+		default:
+			c.logOnce("unknown_query_latency_"+name, "query latency not mapped to chart dimension: %s", name)
+		}
+	}
+
+	return fast, slow, batch, fastSet, slowSet, batchSet
+}
+
+func (c *Collector) exportQueryLatencyMetrics() {
+	fastValues, slowFallback, batchFallback, fastHasData, slowFallbackHasData, batchFallbackHasData := c.splitLatencyCounters(c.fastQueryLatencyCounters)
+
+	if fastHasData {
+		labels := contexts.EmptyLabels{}
+		if interval := c.fastPathIntervalSeconds(); interval > 0 {
+			contexts.Observability.QueryLatencyFast.SetUpdateEvery(c.State, labels, interval)
+		}
+		contexts.Observability.QueryLatencyFast.Set(c.State, labels, fastValues)
+	}
+
+	var slowSet bool
 	if c.slowPathActive() {
 		if counters, _ := c.slow.cache.getLatencies(); len(counters) > 0 {
-			export("slow", counters, c.slowPathIntervalSeconds())
+			_, slowValues, _, _, slowHasData, _ := c.splitLatencyCounters(counters)
+			if slowHasData {
+				labels := contexts.EmptyLabels{}
+				if interval := c.slowPathIntervalSeconds(); interval > 0 {
+					contexts.Observability.QueryLatencySlow.SetUpdateEvery(c.State, labels, interval)
+				}
+				contexts.Observability.QueryLatencySlow.Set(c.State, labels, slowValues)
+				slowSet = true
+			}
 		}
+	}
+	if !slowSet && slowFallbackHasData {
+		labels := contexts.EmptyLabels{}
+		if interval := c.fastPathIntervalSeconds(); interval > 0 {
+			contexts.Observability.QueryLatencySlow.SetUpdateEvery(c.State, labels, interval)
+		}
+		contexts.Observability.QueryLatencySlow.Set(c.State, labels, slowFallback)
+	} else if !slowSet && c.slowPathActive() {
+		labels := contexts.EmptyLabels{}
+		if interval := c.slowPathIntervalSeconds(); interval > 0 {
+			contexts.Observability.QueryLatencySlow.SetUpdateEvery(c.State, labels, interval)
+		}
+		contexts.Observability.QueryLatencySlow.Set(c.State, labels, contexts.ObservabilityQueryLatencySlowValues{})
+	}
+
+	var batchSet bool
+	if c.batchPathActive() {
+		if counters, _ := c.batch.cache.getLatencies(); len(counters) > 0 {
+			_, _, batchValues, _, _, batchHasData := c.splitLatencyCounters(counters)
+			if batchHasData {
+				c.batchLatencyValues = batchValues
+				c.batchLatencyValid = true
+				labels := contexts.EmptyLabels{}
+				if interval := c.batchPathIntervalSeconds(); interval > 0 {
+					contexts.Observability.QueryLatencyBatch.SetUpdateEvery(c.State, labels, interval)
+				}
+				contexts.Observability.QueryLatencyBatch.Set(c.State, labels, c.batchLatencyValues)
+				batchSet = true
+			}
+		}
+	}
+	if !batchSet && c.batchLatencyValid {
+		labels := contexts.EmptyLabels{}
+		if interval := c.batchPathIntervalSeconds(); interval > 0 {
+			contexts.Observability.QueryLatencyBatch.SetUpdateEvery(c.State, labels, interval)
+		}
+		contexts.Observability.QueryLatencyBatch.Set(c.State, labels, c.batchLatencyValues)
+		batchSet = true
+	}
+	if !batchSet && batchFallbackHasData {
+		labels := contexts.EmptyLabels{}
+		if interval := c.fastPathIntervalSeconds(); interval > 0 {
+			contexts.Observability.QueryLatencyBatch.SetUpdateEvery(c.State, labels, interval)
+		}
+		contexts.Observability.QueryLatencyBatch.Set(c.State, labels, batchFallback)
+	} else if c.batchPathActive() && !batchSet {
+		labels := contexts.EmptyLabels{}
+		if interval := c.batchPathIntervalSeconds(); interval > 0 {
+			contexts.Observability.QueryLatencyBatch.SetUpdateEvery(c.State, labels, interval)
+		}
+		contexts.Observability.QueryLatencyBatch.Set(c.State, labels, contexts.ObservabilityQueryLatencyBatchValues{})
 	}
 }
 
@@ -954,6 +1100,7 @@ func (c *Collector) verifyConfig() error {
 }
 
 func (c *Collector) Cleanup(ctx context.Context) {
+	c.stopBatchPath()
 	c.stopSlowPath()
 	if c.client != nil {
 		if err := c.client.Close(); err != nil {

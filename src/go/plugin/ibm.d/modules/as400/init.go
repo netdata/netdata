@@ -36,15 +36,21 @@ func defaultConfig() Config {
 		UseSSL:          false,
 		ResetStatistics: false,
 
-		CollectDiskMetrics:       confopt.AutoBoolAuto,
-		CollectSubsystemMetrics:  confopt.AutoBoolAuto,
-		CollectActiveJobs:        confopt.AutoBoolAuto,
-		CollectHTTPServerMetrics: confopt.AutoBoolAuto,
-		CollectPlanCacheMetrics:  confopt.AutoBoolAuto,
+		CollectDiskMetrics:        confopt.AutoBoolAuto,
+		CollectSubsystemMetrics:   confopt.AutoBoolAuto,
+		CollectActiveJobs:         confopt.AutoBoolAuto,
+		CollectHTTPServerMetrics:  confopt.AutoBoolAuto,
+		CollectPlanCacheMetrics:   confopt.AutoBoolAuto,
+		CollectMessageQueueTotals: confopt.AutoBoolAuto,
+		CollectJobQueueTotals:     confopt.AutoBoolAuto,
+		CollectOutputQueueTotals:  confopt.AutoBoolAuto,
 
-		SlowPath:               true,
-		SlowPathUpdateEvery:    confopt.Duration(10 * time.Second),
-		SlowPathMaxConnections: 1,
+		SlowPath:                true,
+		SlowPathUpdateEvery:     confopt.Duration(10 * time.Second),
+		SlowPathMaxConnections:  1,
+		BatchPath:               false,
+		BatchPathUpdateEvery:    confopt.Duration(60 * time.Second),
+		BatchPathMaxConnections: 1,
 
 		MaxDisks:      100,
 		MaxSubsystems: 100,
@@ -143,6 +149,10 @@ func (c *Collector) Init(ctx context.Context) error {
 	}
 
 	if err := c.startSlowPath(); err != nil {
+		return err
+	}
+
+	if err := c.startBatchPath(); err != nil {
 		return err
 	}
 

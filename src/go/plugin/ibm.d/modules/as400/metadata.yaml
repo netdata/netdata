@@ -32,6 +32,14 @@ modules:
           - libodbc.so (provided by unixODBC)
           - IBM i Access Client Solutions
 
+          **Collection paths**
+
+          The collector executes queries in multiple tracks:
+
+          - **Fast path (5s)**: lightweight system status queries remain sequential on the main plugin thread.
+          - **Slow path (10s beat)**: heavier queries (per-queue metrics, subsystems, plan cache, etc.) run in a background worker with bounded concurrency.
+          - **Batch path (≥60s beat)**: optional long-period worker used for expensive aggregate queries such as queue totals. Disabled by default unless queue totals are explicitly enabled.
+
           **CPU Collection Methods:**
 
           The collector uses a hybrid approach for CPU utilization metrics to handle IBM i 7.4+ where
@@ -111,6 +119,20 @@ modules:
           | `collect_disks_matching` | Glob pattern to filter disks (e.g., `"001* 002*"`) | `""` (match all) |
           | `collect_subsystems_matching` | Glob pattern to filter subsystems (e.g., `"QINTER QBATCH"`) | `""` (match all) |
           | `collect_job_queues_matching` | Glob pattern to filter job queues (e.g., `"QSYS/*"`) | `""` (match all) |
+
+          Optional batch-path controls:
+
+          | Option | Purpose | Default |
+          |--------|---------|---------|
+          | `batch_path` | Enables the long-period batch worker for aggregate queries | `false` |
+          | `batch_path_update_every` | Batch worker cadence (minimum 60s, recommend ≥600s in production) | `60s` |
+          | `batch_path_max_connections` | Maximum concurrent connections for batch queries | `1` |
+          | `collect_message_queue_totals` | Enables full-scan counting of all message queues and messages | `auto` (off) |
+          | `collect_job_queue_totals` | Enables aggregate counting of job queues and queued jobs | `auto` (off) |
+          | `collect_output_queue_totals` | Enables aggregate counting of output queues and spooled files | `auto` (off) |
+
+          > **Warning:** queue totals require scanning IBM i catalog views and can be very expensive on large systems. Leave these options disabled unless aggregate counts are absolutely necessary.
+
 
           **Example Workflow:**
 
@@ -430,6 +452,9 @@ modules:
                 - name: network_interfaces
                 - name: output_queue_info
                 - name: plan_cache_summary
+                - name: job_queue_totals
+                - name: message_queue_totals
+                - name: output_queue_totals
                 - name: serial_number
                 - name: system_activity
                 - name: system_model
@@ -479,6 +504,26 @@ modules:
               chart_type: line
               dimensions:
                 - name: value
+        - name: queueoverview
+          description: These metrics refer to queueoverview instances.
+          labels:
+            - name: queue_type
+              description: Queue_type identifier
+            - name: item_type
+              description: Item_type identifier
+          metrics:
+            - name: as400.queues_count
+              description: Queue Counts
+              unit: queues
+              chart_type: line
+              dimensions:
+                - name: queues
+            - name: as400.queued_items
+              description: Queued Items
+              unit: items
+              chart_type: line
+              dimensions:
+                - name: items
         - name: subsystem
           description: These metrics refer to subsystem instances.
           labels:

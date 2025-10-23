@@ -64,8 +64,7 @@ type slowCache struct {
 	outputQueues  outputQueueSnapshot
 	subsystems    subsystemSnapshot
 	planCache     planCacheSnapshot
-	latencies     map[string]int64
-	lastLatencyTs time.Time
+	latency       latencyCache
 }
 
 func (c *Collector) slowPathActive() bool {
@@ -73,24 +72,11 @@ func (c *Collector) slowPathActive() bool {
 }
 
 func (c *slowCache) beginLatencyCycle(ts time.Time) {
-	c.mu.Lock()
-	if c.latencies == nil {
-		c.latencies = make(map[string]int64)
-	}
-	c.lastLatencyTs = ts
-	c.mu.Unlock()
+	c.latency.beginCycle(ts)
 }
 
 func (c *slowCache) addLatency(name string, value int64) {
-	if value == 0 {
-		return
-	}
-	c.mu.Lock()
-	if c.latencies == nil {
-		c.latencies = make(map[string]int64)
-	}
-	c.latencies[name] += value
-	c.mu.Unlock()
+	c.latency.add(name, value)
 }
 
 func (c *slowCache) setMessageQueues(snapshot messageQueueSnapshot) {
@@ -154,16 +140,7 @@ func (c *slowCache) getPlanCache() planCacheSnapshot {
 }
 
 func (c *slowCache) getLatencies() (map[string]int64, time.Time) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	if len(c.latencies) == 0 {
-		return nil, c.lastLatencyTs
-	}
-	copyMap := make(map[string]int64, len(c.latencies))
-	for k, v := range c.latencies {
-		copyMap[k] = v
-	}
-	return copyMap, c.lastLatencyTs
+	return c.latency.snapshot()
 }
 
 func cloneMessageQueueSnapshot(src messageQueueSnapshot) messageQueueSnapshot {

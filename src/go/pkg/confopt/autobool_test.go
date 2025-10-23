@@ -107,6 +107,22 @@ func TestAutoBoolInvalidInputs(t *testing.T) {
 	}
 }
 
+func TestAutoBoolYAMLBooleanLiteral(t *testing.T) {
+	var a AutoBool
+	if err := yaml.Unmarshal([]byte("true\n"), &a); err != nil {
+		t.Fatalf("expected yaml.Unmarshal to accept boolean literal: %v", err)
+	}
+	if a != AutoBoolEnabled {
+		t.Fatalf("yaml bool literal true => %q, want %q", a, AutoBoolEnabled)
+	}
+	if err := yaml.Unmarshal([]byte("false\n"), &a); err != nil {
+		t.Fatalf("expected yaml.Unmarshal to accept boolean literal: %v", err)
+	}
+	if a != AutoBoolDisabled {
+		t.Fatalf("yaml bool literal false => %q, want %q", a, AutoBoolDisabled)
+	}
+}
+
 func TestAutoBoolWithDefault(t *testing.T) {
 	if got := AutoBoolAuto.WithDefault(true); got != AutoBoolEnabled {
 		t.Fatalf("AutoBoolAuto.WithDefault(true) => %q, want %q", got, AutoBoolEnabled)

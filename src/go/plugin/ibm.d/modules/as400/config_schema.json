@@ -11,6 +11,24 @@
         "title": "Active Jobs",
         "type": "array"
       },
+      "batch_path": {
+        "default": false,
+        "description": "BatchPath enables the long-period batch worker for expensive queue aggregates.",
+        "title": "Batch Path",
+        "type": "boolean"
+      },
+      "batch_path_max_connections": {
+        "default": 1,
+        "description": "BatchPathMaxConnections caps concurrent queries for the batch worker.",
+        "title": "Batch Path Max Connections",
+        "type": "integer"
+      },
+      "batch_path_update_every": {
+        "default": 60000000000,
+        "description": "BatchPathUpdateEvery controls the beat interval for the batch worker.",
+        "title": "Batch Path Update Every",
+        "type": "integer"
+      },
       "collect_active_jobs": {
         "default": "auto",
         "description": "CollectActiveJobs toggles collection of detailed per-job metrics.",
@@ -48,6 +66,39 @@
           "disabled"
         ],
         "title": "Collect Http Server Metrics",
+        "type": "string"
+      },
+      "collect_job_queue_totals": {
+        "default": "auto",
+        "description": "CollectJobQueueTotals enables expensive aggregate counting across all job queues.",
+        "enum": [
+          "auto",
+          "enabled",
+          "disabled"
+        ],
+        "title": "Collect Job Queue Totals",
+        "type": "string"
+      },
+      "collect_message_queue_totals": {
+        "default": "auto",
+        "description": "CollectMessageQueueTotals enables expensive aggregate counting across all message queues.",
+        "enum": [
+          "auto",
+          "enabled",
+          "disabled"
+        ],
+        "title": "Collect Message Queue Totals",
+        "type": "string"
+      },
+      "collect_output_queue_totals": {
+        "default": "auto",
+        "description": "CollectOutputQueueTotals enables expensive aggregate counting across all output queues.",
+        "enum": [
+          "auto",
+          "enabled",
+          "disabled"
+        ],
+        "title": "Collect Output Queue Totals",
         "type": "string"
       },
       "collect_plan_cache_metrics": {
@@ -185,7 +236,7 @@
         "type": "integer"
       },
       "slow_path_update_every": {
-        "default": 30000000000,
+        "default": 10000000000,
         "description": "SlowPathUpdateEvery controls the beat interval for the slow-path worker.",
         "title": "Slow Path Update Every",
         "type": "integer"
@@ -266,7 +317,10 @@
             "reset_statistics",
             "slow_path",
             "slow_path_update_every",
-            "slow_path_max_connections"
+            "slow_path_max_connections",
+            "batch_path",
+            "batch_path_update_every",
+            "batch_path_max_connections"
           ],
           "title": "Advanced"
         },
@@ -302,6 +356,9 @@
         },
         {
           "fields": [
+            "collect_message_queue_totals",
+            "collect_job_queue_totals",
+            "collect_output_queue_totals",
             "message_queues",
             "job_queues",
             "output_queues"

@@ -13,6 +13,14 @@ expose CPU, memory, storage, job, and subsystem activity.
 - libodbc.so (provided by unixODBC)
 - IBM i Access Client Solutions
 
+**Collection paths**
+
+The collector executes queries in multiple tracks:
+
+- **Fast path (5s)**: lightweight system status queries remain sequential on the main plugin thread.
+- **Slow path (10s beat)**: heavier queries (per-queue metrics, subsystems, plan cache, etc.) run in a background worker with bounded concurrency.
+- **Batch path (≥60s beat)**: optional long-period worker used for expensive aggregate queries such as queue totals. Disabled by default unless queue totals are explicitly enabled.
+
 **CPU Collection Methods:**
 
 The collector uses a hybrid approach for CPU utilization metrics to handle IBM i 7.4+ where
@@ -92,6 +100,20 @@ Use **both** limit and selector options together to manage high-cardinality envi
 | `collect_disks_matching` | Glob pattern to filter disks (e.g., `"001* 002*"`) | `""` (match all) |
 | `collect_subsystems_matching` | Glob pattern to filter subsystems (e.g., `"QINTER QBATCH"`) | `""` (match all) |
 | `collect_job_queues_matching` | Glob pattern to filter job queues (e.g., `"QSYS/*"`) | `""` (match all) |
+
+Optional batch-path controls:
+
+| Option | Purpose | Default |
+|--------|---------|---------|
+| `batch_path` | Enables the long-period batch worker for aggregate queries | `false` |
+| `batch_path_update_every` | Batch worker cadence (minimum 60s, recommend ≥600s in production) | `60s` |
+| `batch_path_max_connections` | Maximum concurrent connections for batch queries | `1` |
+| `collect_message_queue_totals` | Enables full-scan counting of all message queues and messages | `auto` (off) |
+| `collect_job_queue_totals` | Enables aggregate counting of job queues and queued jobs | `auto` (off) |
+| `collect_output_queue_totals` | Enables aggregate counting of output queues and spooled files | `auto` (off) |
+
+> **Warning:** queue totals require scanning IBM i catalog views and can be very expensive on large systems. Leave these options disabled unless aggregate counts are absolutely necessary.
+
 
 **Example Workflow:**
 
@@ -305,9 +327,7 @@ Metrics:
 
 | Metric | Dimensions | Unit |
 |:-------|:-----------|:-----|
-| netdata.plugin_ibm.as400_query_latency | analyze_plan_cache, count_disks, count_http_servers, count_message_queues, count_network_interfaces, count_subsystems, detect_ibmi_version_primary, detect_ibmi_version_fallback, disk_instances, disk_instances_enhanced, disk_status, http_server_info, job_info, job_queues, memory_pools, message_queue_aggregates, network_connections, network_interfaces, output_queue_info, plan_cache_summary, serial_number, system_activity, system_model, system_status, temp_storage_named, temp_storage_total, technology_refresh_level, active_job, other | ms |
-
-> **Note**: Query latency dimensions are exported as cumulative counters (microseconds). Netdata’s `incremental` algorithm derives per-interval latency automatically, so a non-zero delta indicates the query executed during that flush.
+| netdata.plugin_ibm.as400_query_latency | analyze_plan_cache, count_disks, count_http_servers, count_network_interfaces, count_subsystems, detect_ibmi_version_primary, detect_ibmi_version_fallback, disk_instances, disk_instances_enhanced, disk_status, http_server_info, job_info, job_queues, job_queue_totals, memory_pools, message_queue_aggregates, message_queue_totals, network_connections, network_interfaces, output_queue_info, output_queue_totals, plan_cache_summary, serial_number, system_activity, system_model, system_status, temp_storage_named, temp_storage_total, technology_refresh_level, active_job, other | ms |
 
 ### Per outputqueue
 
@@ -344,6 +364,24 @@ Metrics:
 | Metric | Dimensions | Unit |
 |:-------|:-----------|:-----|
 | as400.plan_cache_summary | value | value |
+
+### Per queueoverview
+
+These metrics refer to individual queueoverview instances.
+
+Labels:
+
+| Label | Description |
+|:------|:------------|
+| queue_type | Queue_type identifier |
+| item_type | Item_type identifier |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:-------|:-----------|:-----|
+| as400.queues_count | queues | queues |
+| as400.queued_items | items | items |
 
 ### Per subsystem
 
@@ -418,9 +456,15 @@ The following options can be defined globally or per job.
 | CollectActiveJobs | CollectActiveJobs toggles collection of detailed per-job metrics. | `auto` | no | - | - |
 | CollectHTTPServerMetrics | CollectHTTPServerMetrics toggles collection of IBM HTTP Server statistics. | `auto` | no | - | - |
 | CollectPlanCacheMetrics | CollectPlanCacheMetrics toggles collection of plan cache analysis metrics. | `auto` | no | - | - |
+| CollectMessageQueueTotals | CollectMessageQueueTotals enables expensive aggregate counting across all message queues. | `auto` | no | - | - |
+| CollectJobQueueTotals | CollectJobQueueTotals enables expensive aggregate counting across all job queues. | `auto` | no | - | - |
+| CollectOutputQueueTotals | CollectOutputQueueTotals enables expensive aggregate counting across all output queues. | `auto` | no | - | - |
 | SlowPath | SlowPath enables the asynchronous slow-path worker for heavy queries. | `true` | no | - | - |
 | SlowPathUpdateEvery | SlowPathUpdateEvery controls the beat interval for the slow-path worker. | `10000000000` | no | - | - |
 | SlowPathMaxConnections | SlowPathMaxConnections caps the number of concurrent queries the slow-path worker may run. | `1` | no | - | - |
+| BatchPath | BatchPath enables the long-period batch worker for expensive queue aggregates. | `true` | no | - | - |
+| BatchPathUpdateEvery | BatchPathUpdateEvery controls the beat interval for the batch worker. | `60000000000` | no | - | - |
+| BatchPathMaxConnections | BatchPathMaxConnections caps concurrent queries for the batch worker. | `1` | no | - | - |
 | MaxDisks | MaxDisks caps how many disk units may be charted. | `100` | no | - | - |
 | MaxSubsystems | MaxSubsystems caps how many subsystems may be charted. | `100` | no | - | - |
 | DiskSelector | DiskSelector filters disk units by name using glob-style patterns. | `` | no | - | - |

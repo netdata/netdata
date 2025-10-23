@@ -92,3 +92,21 @@ Legend: ✅ (fine), ⚠️ (needs filtering/guardrails), ❗️ (full scan / hea
 - Determine acceptable concurrency level per partition (number of simultaneous ODBC connections).
 - Validate whether additional IBM services (e.g., HTTP server info) provide table functions or existing views can be filtered by name list.
 - Decide cadence for selector refresh (e.g., once per minute vs. per iteration) balancing staleness vs. overhead.
+- Document how to reintroduce queue-total counts if a customer insists.
+
+## 8. Customer Request: Optional Queue Totals
+- Customer asked to restore `count_message_queues`, `count_job_queues`, `count_output_queues`, acknowledging high cost but wants opt-in capability.
+- Plan of record (pending research validation):
+  - **Configuration flags:** per-query booleans – `collect_message_queue_totals`, `collect_job_queue_totals`, `collect_output_queue_totals` – default `false` with explicit warnings about full scans.
+  - **Batch path:** mirror the slow-path configuration style (`batch_path_enabled`, `batch_path_update_every`, `batch_path_max_connections`). Default cadence 60 s for testing (enforce ≥60 s at load time, document ≥600 s for production). The worker starts only if at least one total flag is enabled.
+  - **Metrics/contexts:** emit two contexts when totals are enabled:
+    * `as400.queues_count` with a single `queues` dimension and instances labeled by `queue_type` (`message_queue`, `job_queue`, `output_queue`) and `item_type` (matching `message`, `job`, `spooled_file` for consistency).
+    * `as400.queued_items` with a single `items` dimension using the same label scheme.
+    Only instances corresponding to enabled flags are published.
+  - **Families:** reorganize queue-related families under a unified `queues/` namespace before release:
+    * rename existing `messaging/message_queues` → `queues/message`, `messaging/output_queues` → `queues/output`.
+    * move per-job-queue charts from `workloads/job_queues` into `queues/job`.
+    * add the new aggregate charts under `queues/overview`.
+  - **Error handling:** reuse existing slow-path behaviour—skip iteration on failure, log once per key, clear after a success.
+  - **Testing:** verify against pub400.com with flags on/off, measure latency impact, confirm throttled logging, and adjust the batch interval before handing off to production.
+- Deep research in progress to see if IBM i offers lighter-weight alternatives (aggregated services, APIs, event feeds). We'll adjust implementation if better options surface.

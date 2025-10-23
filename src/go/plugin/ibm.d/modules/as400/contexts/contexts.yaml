@@ -388,6 +388,31 @@ Subsystem:
           algo: absolute
         - name: maximum
           algo: absolute
+QueueOverview:
+  labels:
+    - queue_type
+    - item_type
+  contexts:
+    - name: Count
+      context: as400.queues_count
+      title: Queue Counts
+      family: queues/overview
+      units: queues
+      type: line
+      priority: 504
+      dimensions:
+        - name: queues
+          algo: absolute
+    - name: Items
+      context: as400.queued_items
+      title: Queued Items
+      family: queues/overview
+      units: items
+      type: line
+      priority: 505
+      dimensions:
+        - name: items
+          algo: absolute
 JobQueue:
   labels:
     - job_queue
@@ -397,7 +422,7 @@ JobQueue:
     - name: Length
       context: as400.jobqueue_length
       title: Job Queue Length
-      family: workloads/job_queues
+      family: queues/job
       units: jobs
       type: line
       priority: 505
@@ -574,7 +599,7 @@ MessageQueue:
     - name: Messages
       context: as400.message_queue_messages
       title: Message Queue Messages
-      family: messaging/message_queues
+      family: queues/message
       units: messages
       type: stacked
       priority: 700
@@ -596,7 +621,7 @@ MessageQueue:
     - name: Severity
       context: as400.message_queue_severity
       title: Message Queue Severity
-      family: messaging/message_queues
+      family: queues/message
       units: severity
       type: line
       priority: 701
@@ -612,7 +637,7 @@ OutputQueue:
     - name: Files
       context: as400.output_queue_files
       title: Output Queue Files
-      family: messaging/output_queues
+      family: queues/output
       units: files
       type: line
       priority: 702
@@ -622,7 +647,7 @@ OutputQueue:
     - name: Writers
       context: as400.output_queue_writers
       title: Output Queue Writers
-      family: messaging/output_queues
+      family: queues/output
       units: writers
       type: line
       priority: 703
@@ -632,7 +657,7 @@ OutputQueue:
     - name: Status
       context: as400.output_queue_status
       title: Output Queue Status
-      family: messaging/output_queues
+      family: queues/output
       units: state
       type: line
       priority: 704
@@ -655,20 +680,15 @@ PlanCache:
           algo: absolute
           div: 1000
 Observability:
-  labels:
-    - path
   contexts:
-    - name: QueryLatency
-      context: netdata.plugin_ibm.as400_query_latency
-      title: AS400 Query Latency
+    - name: QueryLatencyFast
+      context: netdata.plugin_ibm.as400_query_latency_fast
+      title: AS400 Query Latency (Fast Path)
       family: plugins/ibm.d/latency
       units: ms
       type: stacked
       priority: 146000
       dimensions:
-        - name: analyze_plan_cache
-          algo: incremental
-          div: 1000
         - name: count_disks
           algo: incremental
           div: 1000
@@ -676,9 +696,6 @@ Observability:
           algo: incremental
           div: 1000
         - name: count_network_interfaces
-          algo: incremental
-          div: 1000
-        - name: count_subsystems
           algo: incremental
           div: 1000
         - name: detect_ibmi_version_primary
@@ -702,13 +719,7 @@ Observability:
         - name: job_info
           algo: incremental
           div: 1000
-        - name: job_queues
-          algo: incremental
-          div: 1000
         - name: memory_pools
-          algo: incremental
-          div: 1000
-        - name: message_queue_aggregates
           algo: incremental
           div: 1000
         - name: network_connections
@@ -717,13 +728,10 @@ Observability:
         - name: network_interfaces
           algo: incremental
           div: 1000
-        - name: output_queue_info
-          algo: incremental
-          div: 1000
-        - name: plan_cache_summary
-          algo: incremental
-          div: 1000
         - name: serial_number
+          algo: incremental
+          div: 1000
+        - name: system_name
           algo: incremental
           div: 1000
         - name: system_activity
@@ -747,6 +755,49 @@ Observability:
         - name: active_job
           algo: incremental
           div: 1000
-        - name: other
+    - name: QueryLatencySlow
+      context: netdata.plugin_ibm.as400_query_latency_slow
+      title: AS400 Query Latency (Slow Path)
+      family: plugins/ibm.d/latency
+      units: ms
+      type: stacked
+      priority: 146010
+      dimensions:
+        - name: analyze_plan_cache
+          algo: incremental
+          div: 1000
+        - name: count_subsystems
+          algo: incremental
+          div: 1000
+        - name: subsystems
+          algo: incremental
+          div: 1000
+        - name: message_queue_aggregates
+          algo: incremental
+          div: 1000
+        - name: job_queues
+          algo: incremental
+          div: 1000
+        - name: output_queue_info
+          algo: incremental
+          div: 1000
+        - name: plan_cache_summary
+          algo: incremental
+          div: 1000
+    - name: QueryLatencyBatch
+      context: netdata.plugin_ibm.as400_query_latency_batch
+      title: AS400 Query Latency (Batch Path)
+      family: plugins/ibm.d/latency
+      units: ms
+      type: stacked
+      priority: 146020
+      dimensions:
+        - name: message_queue_totals
+          algo: incremental
+          div: 1000
+        - name: job_queue_totals
+          algo: incremental
+          div: 1000
+        - name: output_queue_totals
           algo: incremental
           div: 1000
