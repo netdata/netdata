@@ -2,7 +2,7 @@ name: netdata
 version: 1.0.0
 description: My awesome application
 container:
-  image: netdata/netdata
+  image: ghcr.io/netdata/netdata:edge-0
   port: 19999 
 resources:
   cpu: 500m
