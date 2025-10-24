@@ -538,15 +538,25 @@ done
 %preun
 %if 0%{?suse_version}
 %service_del_preun %{name}.service
+%service_del_preun %{name}-updater.timer
 %else
 %systemd_preun %{name}.service
+%systemd_preun %{name}-updater.timer
 %endif
+
+if [ "${1}" -eq 0 ]; then
+  if [ -x "%{_libexecdir}/%{name}/%{name}-updater.sh" ]; then
+    %{_libexecdir}/%{name}/%{name}-updater.sh --disable-auto-updates
+  fi
+fi
 
 %postun
 %if 0%{?suse_version}
 %service_del_postun %{name}.service
+%service_del_postun %{name}-updater.timer
 %else
 %systemd_postun_with_restart %{name}.service
+%systemd_postun_with_restart %{name}-updater.timer
 %endif
 
 %clean
@@ -3256,7 +3266,9 @@ fi
 %endif
 
 %changelog
-* Tue Sep 30 2025 Austin Hemmelgarn <austin@netdata.cloud>
+* Fri Oct 24 2025 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-36
+- Add proper cleanup of auto-update configuration on uninstall
+* Tue Sep 30 2025 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-35
 - Add IBM plugin
 * Tue Jul 29 2025 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-34
 - Add OpenTelemetry plugin
