@@ -368,11 +368,11 @@ var (
 		},
 	}
 	chartInnoDBLogOccupancy = module.Chart{
-		ID:       "innodb_log_occupancy",
+		ID:       "innodb_redo_log_occupancy",
 		Title:    "InnoDB Redo Log Occupancy",
 		Units:    "percentage",
 		Fam:      "innodb",
-		Ctx:      "mysql.innodb_log_occupancy",
+		Ctx:      "mysql.innodb_redo_log_occupancy",
 		Type:     module.Area,
 		Priority: prioInnoDBLog,
 		Dims: module.Dims{
