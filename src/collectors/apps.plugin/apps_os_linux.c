@@ -50,8 +50,23 @@ struct smaps_age_candidate {
     kernel_uint_t vmshared;
 };
 
-static int compare_smaps_candidate_desc(const void *a, const void *b);
-static int compare_smaps_age_desc(const void *a, const void *b);
+static int compare_smaps_candidate_desc(const void *a, const void *b) {
+    const struct smaps_candidate *A = (const struct smaps_candidate *)a;
+    const struct smaps_candidate *B = (const struct smaps_candidate *)b;
+    if(A->delta < B->delta) return 1;
+    if(A->delta > B->delta) return -1;
+    return 0;
+}
+
+static int compare_smaps_age_desc(const void *a, const void *b) {
+    const struct smaps_age_candidate *A = (const struct smaps_age_candidate *)a;
+    const struct smaps_age_candidate *B = (const struct smaps_age_candidate *)b;
+    if(A->age < B->age) return 1;
+    if(A->age > B->age) return -1;
+    if(A->vmshared < B->vmshared) return 1;
+    if(A->vmshared > B->vmshared) return -1;
+    return 0;
+}
 
 static inline void pid_update_estimated_memory(struct pid_stat *p) {
     kernel_uint_t vmrss = p->values[PDF_VMRSS];
@@ -1026,21 +1041,5 @@ bool apps_os_collect_all_pids_linux(void) {
 
     return true;
 }
-#endif
-static int compare_smaps_candidate_desc(const void *a, const void *b) {
-    const struct smaps_candidate *A = (const struct smaps_candidate *)a;
-    const struct smaps_candidate *B = (const struct smaps_candidate *)b;
-    if(A->delta < B->delta) return 1;
-    if(A->delta > B->delta) return -1;
-    return 0;
-}
 
-static int compare_smaps_age_desc(const void *a, const void *b) {
-    const struct smaps_age_candidate *A = (const struct smaps_age_candidate *)a;
-    const struct smaps_age_candidate *B = (const struct smaps_age_candidate *)b;
-    if(A->age < B->age) return 1;
-    if(A->age > B->age) return -1;
-    if(A->vmshared < B->vmshared) return 1;
-    if(A->vmshared > B->vmshared) return -1;
-    return 0;
-}
+#endif
