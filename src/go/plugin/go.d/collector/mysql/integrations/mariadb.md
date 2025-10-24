@@ -30,6 +30,7 @@ Executed queries:
 
 - `SELECT VERSION();`
 - `SHOW GLOBAL STATUS;`
+- `SHOW ENGINE INNODB STATUS;`
 - `SHOW GLOBAL VARIABLES;`
 - `SHOW SLAVE STATUS;` or `SHOW ALL SLAVES STATUS;` (MariaDBv10.2+) or `SHOW REPLICA STATUS;` (MySQL 8.0.22+)
 - `SHOW USER_STATISTICS;` (MariaDBv10.1.1+)
@@ -95,6 +96,9 @@ Metrics:
 | mysql.innodb_io_ops | reads, writes, fsyncs | operations/s | • | • | • |
 | mysql.innodb_io_pending_ops | reads, writes, fsyncs | operations | • | • | • |
 | mysql.innodb_log | waits, write_requests, writes | operations/s | • | • | • |
+| mysql.innodb_redo_log_activity | redo_written, checkpointed | B/s | • | • | • |
+| mysql.innodb_redo_log_occupancy | occupancy | percentage | • | • | • |
+| mysql.innodb_redo_log_checkpoint_age | age | B | • | • | • |
 | mysql.innodb_cur_row_lock | current waits | operations | • | • | • |
 | mysql.innodb_rows | inserted, read, updated, deleted | operations/s | • | • | • |
 | mysql.innodb_buffer_pool_pages | data, dirty, free, misc, total | pages | • | • | • |
