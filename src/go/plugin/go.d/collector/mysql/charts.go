@@ -393,11 +393,11 @@ var (
 		},
 	}
 	chartInnoDBCheckpointAge = module.Chart{
-		ID:       "innodb_checkpoint_age",
-		Title:    "InnoDB Checkpoint Age",
+		ID:       "innodb_redo_log_checkpoint_age",
+		Title:    "InnoDB Redo Log Checkpoint Age",
 		Units:    "B",
 		Fam:      "innodb",
-		Ctx:      "mysql.innodb_checkpoint_age",
+		Ctx:      "mysql.innodb_redo_log_checkpoint_age",
 		Priority: prioInnoDBLog,
 		Dims: module.Dims{
 			{ID: "innodb_checkpoint_age", Name: "age", Algo: module.Absolute},
