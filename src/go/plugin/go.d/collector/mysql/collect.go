@@ -71,7 +71,11 @@ func (c *Collector) collect() (map[string]int64, error) {
 	mx["innodb_log_files_in_group"] = c.varInnoDBLogFilesInGroup
 	mx["innodb_log_group_capacity"] = c.varInnoDBLogFileSize * c.varInnoDBLogFilesInGroup
 	// https://mariadb.com/docs/server/server-usage/storage-engines/innodb/innodb-redo-log#determining-the-redo-log-occupancy
-	mx["innodb_log_occupancy"] = 100 * 1000 * mx["innodb_checkpoint_age"] / mx["innodb_log_group_capacity"]
+	if mx["innodb_log_group_capacity"] > 0 {
+		mx["innodb_log_occupancy"] = 100 * 1000 * mx["innodb_checkpoint_age"] / mx["innodb_log_group_capacity"]
+	} else {
+		mx["innodb_log_occupancy"] = 0
+	}
 	mx["max_connections"] = c.varMaxConns
 	mx["table_open_cache"] = c.varTableOpenCache
 
