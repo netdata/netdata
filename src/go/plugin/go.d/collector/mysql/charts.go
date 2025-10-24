@@ -101,9 +101,9 @@ var baseCharts = module.Charts{
 	chartInnoDBIO.Copy(),
 	chartInnoDBIOOperations.Copy(),
 	chartInnoDBPendingIOOperations.Copy(),
+	chartInnoDBLogActivity.Copy(),
 	chartInnoDBLogOccupancy.Copy(),
 	chartInnoDBLogOperations.Copy(),
-	chartInnoDBLogActivity.Copy(),
 	chartInnoDBCheckpointAge.Copy(),
 	chartInnoDBCurrentRowLocks.Copy(),
 	chartInnoDBRowsOperations.Copy(),
@@ -354,6 +354,19 @@ var (
 			{ID: "innodb_data_pending_fsyncs", Name: "fsyncs"},
 		},
 	}
+	chartInnoDBLogActivity = module.Chart{
+		ID:       "innodb_redo_log_activity",
+		Title:    "InnoDB Redo Log Activity",
+		Units:    "B/s",
+		Fam:      "innodb",
+		Ctx:      "mysql.innodb_redo_log_activity",
+		Type:     module.Line,
+		Priority: prioInnoDBLog,
+		Dims: module.Dims{
+			{ID: "innodb_log_sequence_number", Name: "redo_written", Algo: module.Incremental},
+			{ID: "innodb_last_checkpoint_at", Name: "checkpointed", Algo: module.Incremental},
+		},
+	}
 	chartInnoDBLogOperations = module.Chart{
 		ID:       "innodb_log",
 		Title:    "InnoDB Log Operations",
@@ -377,19 +390,6 @@ var (
 		Priority: prioInnoDBLog,
 		Dims: module.Dims{
 			{ID: "innodb_log_occupancy", Name: "occupancy", Algo: module.Absolute, Div: 1000},
-		},
-	}
-	chartInnoDBLogActivity = module.Chart{
-		ID:       "innodb_redo_log_activity",
-		Title:    "InnoDB Redo Log Activity",
-		Units:    "B/s",
-		Fam:      "innodb",
-		Ctx:      "mysql.innodb_redo_log_activity",
-		Type:     module.Line,
-		Priority: prioInnoDBLog,
-		Dims: module.Dims{
-			{ID: "innodb_log_sequence_number", Name: "redo_written", Algo: module.Incremental},
-			{ID: "innodb_last_checkpoint_at", Name: "checkpointed", Algo: module.Incremental},
 		},
 	}
 	chartInnoDBCheckpointAge = module.Chart{
