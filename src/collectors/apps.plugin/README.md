@@ -47,6 +47,7 @@ Each of these sections presents the same number of charts:
     - User/system CPU usage
 - Memory
     - Estimated Memory Usage (RSS with PSS scaling, default on Linux 4.14+)
+    - Memory RSS Usage
     - Real Memory Used (non-shared)
     - Virtual Memory Allocated
     - Minor page faults (i.e. memory activity)
@@ -304,8 +305,8 @@ The `--pss` option controls PSS sampling behavior:
 - For systems without significant shared memory usage, disabling PSS sampling (`--pss off`) reduces overhead
 
 **Chart behavior:**
-- **Default (PSS enabled):** Shows "Estimated memory usage (RSS with shared scaling)" charts
-- **When disabled (`--pss 0`):** Shows traditional "Memory RSS usage" charts
+- **Default (PSS enabled):** Shows both "Estimated memory usage (RSS with shared scaling)" and "Memory RSS usage" charts
+- **When disabled (`--pss 0`):** Shows only "Memory RSS usage" charts
 - The `processes` function API exposes additional columns (PSS, PssAge, SharedRatio) when PSS is enabled
 
 ### Integration with eBPF
