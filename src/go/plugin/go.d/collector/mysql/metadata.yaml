@@ -392,21 +392,21 @@ modules:
                 - name: waits
                 - name: write_requests
                 - name: writes
-            - name: mysql.innodb_log_occupancy
+            - name: mysql.innodb_redo_log_activity
+              description: InnoDB Redo Log Activity
+              unit: B/s
+              chart_type: line
+              dimensions:
+                - name: redo_written
+                - name: checkpointed
+            - name: mysql.innodb_redo_log_occupancy
               description: InnoDB Redo Log Occupancy
               unit: percentage
               chart_type: area
               dimensions:
                 - name: occupancy
-            - name: mysql.innodb_log_progress
-              description: InnoDB Log Sequence Progress
-              unit: B/s
-              chart_type: area
-              dimensions:
-                - name: sequence number
-                - name: last checkpoint
-            - name: mysql.innodb_checkpoint_age
-              description: InnoDB Checkpoint Age
+            - name: mysql.innodb_redo_log_checkpoint_age
+              description: InnoDB Redo Log Checkpoint Age
               unit: B
               chart_type: line
               dimensions:
