@@ -995,32 +995,20 @@ virtual_metrics:
 
 ### Config reference
 
-#### Virtual metric item
+| Item               | Field          | Type                 | Required | Default | Applies to               | Description                                                                                                                                                                     |
+|--------------------|----------------|----------------------|----------|---------|--------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Virtual Metric** | `name`         | string               | yes      | —       | all                      | Unique within the profile. Used as metric/chart base name.                                                                                                                      |
+|                    | `sources`      | array\<Source\>      | no*      | —       | totals, per_row, grouped | Direct source set. Ignored if `alternatives` exist (alternatives take precedence).                                                                                              |
+|                    | `alternatives` | array\<Alternative\> | no*      | —       | totals, per_row, grouped | Ordered fallback sets. The first alternative whose sources produce data is used.                                                                                                |
+|                    | `per_row`      | bool                 | no       | false   | per-row/grouped          | When `true`, emits one output per input row; sources become dimensions; row tags attach.                                                                                        |
+|                    | `group_by`     | string / array       | no       | —       | per-row/grouped          | Label(s) used as row-key hints (in order). Missing/empty hints fall back to a full-tag stable key. With `per_row:false`, this acts like PromQL’s `sum by (...)`.                |
+|                    | `chart_meta`   | object               | no       | —       | all                      | Presentation metadata (`description`, `family`, `unit`, `type`).                                                                                                                |
+| **Source**         | `metric`       | string               | yes      | —       | —                        | Name of an existing metric (scalar or table column metric).                                                                                                                     |
+|                    | `table`        | string               | yes      | —       | —                        | Table name for the originating metric. Must match the metric’s table when used in per-row/grouped.                                                                              |
+|                    | `as`           | string               | yes      | —       | —                        | Dimension name within the composite (e.g., `in`, `out`).                                                                                                                        |
+| **Alternative**    | `sources`      | array\<Source\>      | yes      | —       | —                        | All sources in an alternative are evaluated together. If none produce data, the collector tries the next alternative. Per-row/group rules apply within the winning alternative. |
 
-| Field        | Type                 | Required | Default | Applies to               | Notes                                                                               |
-|--------------|----------------------|----------|---------|--------------------------|-------------------------------------------------------------------------------------|
-| name         | string               | yes      | —       | all                      | Unique within the profile. Used as metric/chart base name.                          |
-| sources      | array\<Source\>      | no*      | —       | totals, per_row, grouped | Direct source set. Ignored if `alternatives` exists (alternatives take precedence). |
-| alternatives | array\<Alternative\> | no*      | —       | totals, per_row, grouped | Ordered fallback sets. First alternative whose sources produce data wins.           |
-| per_row      | bool                 | no       | false   | per-row/grouped          | `true` → one output per input row; sources become dimensions; row tags attach.      |
-| group_by     | string               | array    | no      | —                        | per-row/grouped                                                                     | Label(s) used as row-key hints (in order). Missing/empty hints fall back to a full-tag stable key. With `per_row:false`, this is a PromQL-like “sum by (…)”. |
-| chart_meta   | object               | no       | —       | all                      | Presentation only (`description`, `family`, `unit`, `type`).                        |
-
-> * At least one of sources or alternatives must be provided.
-
-#### Source object
-
-| Field  | Type   | Required | Notes                                                                                               |
-|--------|--------|----------|-----------------------------------------------------------------------------------------------------|
-| metric | string | yes      | Name of a previously collected metric (scalar or table column metric).                              |
-| table  | string | yes      | Table name for the originating metric (must match the metric’s table when used in per-row/grouped). |
-| as     | string | yes      | Dimension name in the composite (e.g., `in`, `out`).                                                |
-
-#### Alternative
-
-| Field   | Type            | Required | Notes                                                                                                                                                                                   |
-|---------|-----------------|----------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| sources | array\<Source\> | yes      | All sources in an alternative are evaluated together. If **none** produce data, the collector tries the next alternative. Per-row/group rules apply **within** the winning alternative. |
+> At least one of `sources` or `alternatives` **must be defined**.
 
 #### Rules & Constraints
 
