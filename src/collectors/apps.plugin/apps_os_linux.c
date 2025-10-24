@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "apps_plugin.h"
+#include <limits.h>
+#include <unistd.h>
 
 #if defined(OS_LINUX)
 
@@ -22,6 +24,242 @@ struct arl_callback_ptr {
     procfile *ff;
     size_t line;
 };
+
+#if (PROCESSES_HAVE_SMAPS_ROLLUP == 1)
+
+struct arl_callback_smaps_ptr {
+    struct pid_stat *p;
+    procfile *ff;
+    size_t line;
+};
+
+static procfile *smaps_rollup_ff = NULL;
+static struct arl_callback_smaps_ptr smaps_rollup_ctx;
+static bool smaps_rollup_checked = false;
+static bool smaps_rollup_available = false;
+static bool smaps_rollup_warned = false;
+
+struct smaps_candidate {
+    struct pid_stat *p;
+    kernel_uint_t delta;
+};
+
+struct smaps_age_candidate {
+    struct pid_stat *p;
+    size_t age;
+    kernel_uint_t vmshared;
+};
+
+static int compare_smaps_candidate_desc(const void *a, const void *b);
+static int compare_smaps_age_desc(const void *a, const void *b);
+
+static inline void pid_update_estimated_memory(struct pid_stat *p) {
+    kernel_uint_t vmrss = p->values[PDF_VMRSS];
+#if (PROCESSES_HAVE_SMAPS_ROLLUP == 1)
+    p->values[PDF_PSS] = p->pss_bytes;
+#endif
+    if(vmrss == 0) {
+        p->values[PDF_MEM_ESTIMATED] = 0;
+        return;
+    }
+
+    NETDATA_DOUBLE ratio = p->pss_total_ratio;
+    if(unlikely(ratio < 0.0)) ratio = 0.0;
+    if(unlikely(ratio > 1.0)) ratio = 1.0;
+
+    NETDATA_DOUBLE scaled = (NETDATA_DOUBLE)vmrss * ratio;
+    if(unlikely(scaled > (NETDATA_DOUBLE)UINT64_MAX))
+        p->values[PDF_MEM_ESTIMATED] = vmrss;
+    else
+        p->values[PDF_MEM_ESTIMATED] = (kernel_uint_t)(scaled + 0.5);
+}
+
+static inline kernel_uint_t smaps_value_to_bytes(const char *value) {
+    return str2kernel_uint_t(value) * 1024ULL;
+}
+
+static void arl_callback_smaps_pss(const char *name __maybe_unused, uint32_t hash __maybe_unused, const char *value __maybe_unused, void *dst) {
+    struct arl_callback_smaps_ptr *ctx = (struct arl_callback_smaps_ptr *)dst;
+    if(unlikely(procfile_linewords(ctx->ff, ctx->line) < 2))
+        return;
+
+    ctx->p->values[PDF_PSS] = smaps_value_to_bytes(procfile_lineword(ctx->ff, ctx->line, 1));
+}
+
+bool apps_os_have_smaps_rollup_linux(void) {
+    if(likely(smaps_rollup_checked))
+        return smaps_rollup_available;
+
+    char filename[FILENAME_MAX + 1];
+    snprintfz(filename, FILENAME_MAX, "%s/proc/self/smaps_rollup", netdata_configured_host_prefix);
+
+    if(access(filename, R_OK) == 0) {
+        smaps_rollup_available = true;
+    }
+    else {
+        if(!smaps_rollup_warned) {
+            netdata_log_info("apps.plugin: /proc/*/smaps_rollup is not available on this kernel. PSS metrics will be disabled.");
+            smaps_rollup_warned = true;
+        }
+        smaps_rollup_available = false;
+    }
+
+    smaps_rollup_checked = true;
+    return smaps_rollup_available;
+}
+
+bool apps_os_read_pid_smaps_rollup_linux(struct pid_stat *p, void *ptr __maybe_unused) {
+    if(unlikely(!apps_os_have_smaps_rollup_linux()))
+        return false;
+
+    if(unlikely(!p->smaps_rollup_arl)) {
+        p->smaps_rollup_arl = arl_create("/proc/pid/smaps_rollup", NULL, 60);
+        arl_expect_custom(p->smaps_rollup_arl, "Pss", arl_callback_smaps_pss, &smaps_rollup_ctx);
+    }
+
+    if(unlikely(!p->smaps_rollup_filename)) {
+        char filename[FILENAME_MAX + 1];
+        snprintfz(filename, FILENAME_MAX, "%s/proc/%d/smaps_rollup", netdata_configured_host_prefix, p->pid);
+        p->smaps_rollup_filename = strdupz(filename);
+    }
+
+    smaps_rollup_ff = procfile_reopen(smaps_rollup_ff, p->smaps_rollup_filename, (!smaps_rollup_ff) ? " \t:" : NULL, PROCFILE_FLAG_NO_ERROR_ON_FILE_IO);
+    if(unlikely(!smaps_rollup_ff)) {
+        if(errno == EINVAL)
+            errno = ENOENT;
+        return false;
+    }
+
+    smaps_rollup_ff = procfile_readall(smaps_rollup_ff);
+    if(unlikely(!smaps_rollup_ff)) {
+        if(errno == EINVAL)
+            errno = ENOENT;
+        return false;
+    }
+
+    calls_counter++;
+
+    smaps_rollup_ctx.p = p;
+    smaps_rollup_ctx.ff = smaps_rollup_ff;
+
+    size_t lines = procfile_lines(smaps_rollup_ff);
+    arl_begin(p->smaps_rollup_arl);
+
+    for(size_t l = 0; l < lines; l++) {
+        smaps_rollup_ctx.line = l;
+        if(unlikely(arl_check(p->smaps_rollup_arl,
+                              procfile_lineword(smaps_rollup_ff, l, 0),
+                              procfile_lineword(smaps_rollup_ff, l, 1))))
+            break;
+    }
+
+    kernel_uint_t vmrss = p->values[PDF_VMRSS];
+    kernel_uint_t pss = p->values[PDF_PSS];
+    NETDATA_DOUBLE ratio = 1.0;
+    if(vmrss > 0)
+        ratio = (NETDATA_DOUBLE)pss / (NETDATA_DOUBLE)vmrss;
+
+    if(ratio < 0.0) ratio = 0.0;
+    if(ratio > 1.0) ratio = 1.0;
+
+    p->pss_total_ratio = ratio;
+    p->pss_bytes = pss;
+    pid_update_estimated_memory(p);
+    p->vmshared_delta = 0;
+    p->last_pss_iteration = global_iterations_counter;
+
+    return true;
+}
+
+#define PSS_REFRESH_MIN 1
+
+static void apps_handle_smaps_updates(void) {
+    if(pss_refresh_period <= 0)
+        return;
+
+    if(unlikely(!apps_os_have_smaps_rollup()))
+        return;
+
+    struct pid_stat *p;
+    size_t total_pids = 0;
+
+    for(p = root_of_pids(); p ; p = p->next)
+        total_pids++;
+
+    if(unlikely(total_pids == 0))
+        return;
+
+    int divisor = pss_refresh_period / update_every;
+    if(divisor < 1)
+        divisor = 1;
+
+    size_t budget = total_pids / (size_t)divisor;
+    if(budget < PSS_REFRESH_MIN)
+        budget = PSS_REFRESH_MIN;
+
+    struct smaps_candidate *delta_all = mallocz(sizeof(*delta_all) * total_pids);
+    size_t delta_count = 0;
+    struct smaps_age_candidate *age_all = mallocz(sizeof(*age_all) * total_pids);
+    size_t age_count = 0;
+
+    for(p = root_of_pids(); p ; p = p->next) {
+        kernel_uint_t vmshared = p->values[PDF_VMSHARED];
+
+        if(vmshared > 0 && p->vmshared_delta > 0) {
+            delta_all[delta_count].p = p;
+            delta_all[delta_count].delta = p->vmshared_delta;
+            delta_count++;
+        }
+
+        if(vmshared == 0)
+            continue;
+
+        size_t age;
+        if(p->last_pss_iteration == 0)
+            age = SIZE_MAX;
+        else if(global_iterations_counter >= p->last_pss_iteration)
+            age = global_iterations_counter - p->last_pss_iteration;
+        else
+            age = SIZE_MAX;
+
+        age_all[age_count].p = p;
+        age_all[age_count].age = age;
+        age_all[age_count].vmshared = vmshared;
+        age_count++;
+    }
+
+    if(delta_count > 1)
+        qsort(delta_all, delta_count, sizeof(*delta_all), compare_smaps_candidate_desc);
+    if(age_count > 1)
+        qsort(age_all, age_count, sizeof(*age_all), compare_smaps_age_desc);
+
+    size_t delta_to_refresh = delta_count;
+    if(delta_to_refresh > budget)
+        delta_to_refresh = budget;
+    for(size_t i = 0; i < delta_to_refresh; i++) {
+        struct pid_stat *pid_entry = delta_all[i].p;
+        if(!pid_entry)
+            continue;
+        OS_FUNCTION(apps_os_read_pid_smaps_rollup)(pid_entry, NULL);
+    }
+
+    size_t age_to_refresh = budget;
+    size_t refreshed = 0;
+    for(size_t i = 0; i < age_count && refreshed < age_to_refresh; i++) {
+        struct pid_stat *pid_entry = age_all[i].p;
+        if(!pid_entry)
+            continue;
+        if(pid_entry->last_pss_iteration == global_iterations_counter)
+            continue;
+        OS_FUNCTION(apps_os_read_pid_smaps_rollup)(pid_entry, NULL);
+        refreshed++;
+    }
+
+    freez(delta_all);
+    freez(age_all);
+}
+
+#endif // PROCESSES_HAVE_SMAPS_ROLLUP
 
 bool apps_os_read_pid_fds_linux(struct pid_stat *p, void *ptr __maybe_unused) {
     if(unlikely(!p->fds_dirname)) {
@@ -452,7 +690,24 @@ void arl_callback_status_rssshmem(const char *name, uint32_t hash, const char *v
     struct arl_callback_ptr *aptr = (struct arl_callback_ptr *)dst;
     if(unlikely(procfile_linewords(aptr->ff, aptr->line) < 3)) return;
 
-    aptr->p->values[PDF_RSSSHMEM] = str2kernel_uint_t(procfile_lineword(aptr->ff, aptr->line, 1)) * 1024;
+    struct pid_stat *p = aptr->p;
+#if (PROCESSES_HAVE_SMAPS_ROLLUP == 1)
+    kernel_uint_t old_shared = p->values[PDF_VMSHARED];
+#endif
+
+    p->values[PDF_RSSSHMEM] = str2kernel_uint_t(procfile_lineword(aptr->ff, aptr->line, 1)) * 1024;
+    p->values[PDF_VMSHARED] = p->values[PDF_RSSFILE] + p->values[PDF_RSSSHMEM];
+
+#if (PROCESSES_HAVE_SMAPS_ROLLUP == 1)
+    if(old_shared > p->values[PDF_VMSHARED])
+        p->vmshared_delta += old_shared - p->values[PDF_VMSHARED];
+    else
+        p->vmshared_delta += p->values[PDF_VMSHARED] - old_shared;
+
+    p->values[PDF_PSS] = p->pss_bytes;
+
+    pid_update_estimated_memory(p);
+#endif
 }
 
 void arl_callback_status_voluntary_ctxt_switches(const char *name, uint32_t hash, const char *value, void *dst) {
@@ -765,6 +1020,27 @@ bool apps_os_collect_all_pids_linux(void) {
     }
     closedir(dir);
 
+#if (PROCESSES_HAVE_SMAPS_ROLLUP == 1)
+    apps_handle_smaps_updates();
+#endif
+
     return true;
 }
 #endif
+static int compare_smaps_candidate_desc(const void *a, const void *b) {
+    const struct smaps_candidate *A = (const struct smaps_candidate *)a;
+    const struct smaps_candidate *B = (const struct smaps_candidate *)b;
+    if(A->delta < B->delta) return 1;
+    if(A->delta > B->delta) return -1;
+    return 0;
+}
+
+static int compare_smaps_age_desc(const void *a, const void *b) {
+    const struct smaps_age_candidate *A = (const struct smaps_age_candidate *)a;
+    const struct smaps_age_candidate *B = (const struct smaps_age_candidate *)b;
+    if(A->age < B->age) return 1;
+    if(A->age > B->age) return -1;
+    if(A->vmshared < B->vmshared) return 1;
+    if(A->vmshared > B->vmshared) return -1;
+    return 0;
+}

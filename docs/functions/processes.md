@@ -70,6 +70,10 @@ The `processes` function answers these questions by showing:
 | **iCtxSwitch**      | Rate       | Involuntary context switches per second                               | ✓          | ✓        | -         | Linux only             |
 | **Memory**          | Percentage | Memory usage as percentage of total system RAM                        | ✓          | ✓        | -         | All                    |
 | **Resident**        | MiB        | Resident Set Size (physical memory)                                   | ✓          | ✓        | -         | All                    |
+| **Estimated**       | MiB        | Estimated memory using PSS scaling (visible by default when enabled)  | ✓          | ✓        | -         | Linux 4.14+ (with PSS) |
+| **Pss**             | MiB        | Proportional Set Size (hidden by default)                             | ✓          | ✓        | -         | Linux 4.14+ (with PSS) |
+| **PssAge**          | Seconds    | Time since last smaps sample (hidden by default)                      | ✓          | ✓        | -         | Linux 4.14+ (with PSS) |
+| **SharedRatio**     | Percentage | Shared memory ratio from PSS (hidden by default)                      | ✓          | ✓        | -         | Linux 4.14+ (with PSS) |
 | **Shared**          | MiB        | Shared memory pages                                                   | ✓          | ✓        | -         | Linux only             |
 | **Virtual**         | MiB        | Virtual memory size                                                   | ✓          | ✓        | -         | All                    |
 | **Swap**            | MiB        | Swap memory usage                                                     | ✓          | ✓        | -         | Linux, Windows         |
@@ -102,8 +106,9 @@ The `processes` function answers these questions by showing:
 ### Platform-Specific Field Notes
 
 - **Linux**: The most comprehensive data with all metrics including physical I/O, detailed file descriptors, child process accumulation, and resource limits
+  - **PSS Memory Estimation** (kernel 4.14+): When enabled (default), provides `Estimated`, `Pss`, `PssAge`, and `SharedRatio` fields for more accurate memory accounting in shared-memory workloads. Disable with `--pss 0` to remove these fields and use traditional RSS measurements.
 - **macOS**: Full process data except physical I/O, children accumulation, and some advanced metrics
-- **FreeBSD**: Similar to macOS but includes children CPU accumulation  
+- **FreeBSD**: Similar to macOS but includes children CPU accumulation
 - **Windows**: Different approach using handles instead of file descriptors, includes I/O operations but lacks user/group ownership and command line access
 
 ## Drill-Down Workflow
@@ -142,6 +147,8 @@ Filter by `category:[name]` and sort by `CPU` descending to find the exact proce
 #### Find memory-consuming processes in application groups
 Filter by specific categories and sort by `Resident` or `Memory` percentage to identify which processes within an application group consume the most RAM. Compare `Virtual` vs `Resident` to understand memory allocation patterns and potential over-provisioning.
 
+On Linux 4.14+ with PSS enabled (default), use `Estimated` instead of `Resident` for more accurate memory accounting in shared-memory workloads (databases, cache servers, etc.). The `Estimated` field scales shared memory using PSS ratios to show true proportional memory usage. Check `SharedRatio` to see the scaling factor - values significantly below 100% indicate heavy shared memory usage where `Resident` would overstate consumption. Use `PssAge` to verify data freshness.
+
 #### Locate I/O-heavy processes causing disk bottlenecks
 Sort by `PReads + PWrites` for physical I/O or `LReads + LWrites` for logical I/O to find processes generating the most disk activity. Filter by category to drill down from chart-level I/O metrics to specific process-level I/O patterns.
 
@@ -150,7 +157,7 @@ Sort by `PReads + PWrites` for physical I/O or `LReads + LWrites` for logical I/
 The processes function excels at identifying various types of resource leaks by correlating resource usage with process uptime.
 
 #### Memory leak detection in long-running processes
-Filter processes with `Uptime > 3600` (one hour) and sort by `Resident` memory descending. Look for processes where memory consumption is disproportionately high relative to their uptime. Track specific PIDs over time to observe continuously growing memory usage patterns.
+Filter processes with `Uptime > 3600` (one hour) and sort by `Resident` (or `Estimated` on Linux with PSS enabled) memory descending. Look for processes where memory consumption is disproportionately high relative to their uptime. Track specific PIDs over time to observe continuously growing memory usage patterns. On shared-memory workloads, use `Estimated` to avoid false positives from shared pages that aren't actually leaking.
 
 #### File descriptor leak identification
 Sort by `FDs` count or filter for `FDsLimitPercent > 50` to find processes approaching their file descriptor limits. Examine the breakdown of descriptor types (`Files`, `Sockets`, `Pipes`, etc.) to understand what type of resources are leaking. Correlate high FD counts with process uptime to identify gradual leaks.
@@ -193,6 +200,7 @@ Use full-text search in `CmdLine` to find processes launched with specific param
 ## Special Features
 
 - **Child Process Accumulation**: Uniquely captures resources from exited children - critical for accurate measurement of shell scripts and applications that spawn many short-lived processes (even 100+ commands/second)
+- **PSS Memory Estimation** (Linux 4.14+): Provides accurate memory accounting for shared-memory workloads by using Proportional Set Size (PSS) to scale shared pages. Enabled by default with periodic sampling to minimize overhead. Shows true memory consumption vs inflated RSS values for databases and cache servers.
 - **Category Correlation**: The `Category` field directly matches the instance names in `apps.plugin` charts, enabling drill-down from chart to process level
 - **Intelligent Grouping**: Understands spawn managers (systemd, containerd, init) and groups by top-most parent to create manageable categories
 - **Normalized Metrics**: All per-process usage is normalized to accurately match total system resource usage

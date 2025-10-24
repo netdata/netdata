@@ -159,9 +159,22 @@ void send_collected_data_to_netdata(struct target *root, const char *type, usec_
         send_END();
 #endif
 
+#if (PROCESSES_HAVE_SMAPS_ROLLUP == 1)
+        if(pss_refresh_period > 0) {
+            send_BEGIN(type, string2str(w->clean_name), "estimated_mem_usage", dt);
+            send_SET("mem", w->values[PDF_MEM_ESTIMATED]);
+            send_END();
+        }
+        else {
+            send_BEGIN(type, string2str(w->clean_name), "mem_usage", dt);
+            send_SET("rss", w->values[PDF_VMRSS]);
+            send_END();
+        }
+#else
         send_BEGIN(type, string2str(w->clean_name), "mem_usage", dt);
         send_SET("rss", w->values[PDF_VMRSS]);
         send_END();
+#endif
 
         send_BEGIN(type, string2str(w->clean_name), "vmem_usage", dt);
         send_SET("vmem", w->values[PDF_VMSIZE]);
@@ -335,11 +348,28 @@ void send_charts_updates_to_netdata(struct target *root, const char *type, const
 #endif
 #endif
 
+#if (PROCESSES_HAVE_SMAPS_ROLLUP == 1)
+        if(pss_refresh_period > 0) {
+            fprintf(stdout, "CHART %s.%s_estimated_mem_usage '' '%s estimated memory usage (RSS with shared scaling)' 'MiB' mem %s.estimated_mem_usage area 20055 %d\n",
+                    type, string2str(w->clean_name), title, type, update_every);
+            fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, string2str(w->name));
+            fprintf(stdout, "CLABEL_COMMIT\n");
+            fprintf(stdout, "DIMENSION mem '' absolute %ld %ld\n", 1L, 1024L * 1024L);
+        }
+        else {
+            fprintf(stdout, "CHART %s.%s_mem_usage '' '%s memory RSS usage' 'MiB' mem %s.mem_usage area 20055 %d\n",
+                    type, string2str(w->clean_name), title, type, update_every);
+            fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, string2str(w->name));
+            fprintf(stdout, "CLABEL_COMMIT\n");
+            fprintf(stdout, "DIMENSION rss '' absolute %ld %ld\n", 1L, 1024L * 1024L);
+        }
+#else
         fprintf(stdout, "CHART %s.%s_mem_usage '' '%s memory RSS usage' 'MiB' mem %s.mem_usage area 20055 %d\n",
                 type, string2str(w->clean_name), title, type, update_every);
         fprintf(stdout, "CLABEL '%s' '%s' 1\n", lbl_name, string2str(w->name));
         fprintf(stdout, "CLABEL_COMMIT\n");
         fprintf(stdout, "DIMENSION rss '' absolute %ld %ld\n", 1L, 1024L * 1024L);
+#endif
 
         fprintf(stdout, "CHART %s.%s_vmem_usage '' '%s virtual memory size' 'MiB' mem %s.vmem_usage line 20065 %d\n",
                 type, string2str(w->clean_name), title, type, update_every);
@@ -439,4 +469,3 @@ void send_proc_states_count(usec_t dt __maybe_unused) {
     send_END();
 }
 #endif
-
