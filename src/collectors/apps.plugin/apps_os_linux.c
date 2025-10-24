@@ -41,16 +41,12 @@ static bool smaps_rollup_warned = false;
 
 struct smaps_candidate {
     struct pid_stat *p;
-    kernel_uint_t delta;
+    kernel_uint_t delta;        // for delta-based refresh strategy
+    size_t age;                 // for age-based refresh strategy
+    kernel_uint_t vmshared;     // for age-based refresh strategy (tiebreaker)
 };
 
-struct smaps_age_candidate {
-    struct pid_stat *p;
-    size_t age;
-    kernel_uint_t vmshared;
-};
-
-static int compare_smaps_candidate_desc(const void *a, const void *b) {
+static int compare_smaps_delta_desc(const void *a, const void *b) {
     const struct smaps_candidate *A = (const struct smaps_candidate *)a;
     const struct smaps_candidate *B = (const struct smaps_candidate *)b;
     if(A->delta < B->delta) return 1;
@@ -59,8 +55,8 @@ static int compare_smaps_candidate_desc(const void *a, const void *b) {
 }
 
 static int compare_smaps_age_desc(const void *a, const void *b) {
-    const struct smaps_age_candidate *A = (const struct smaps_age_candidate *)a;
-    const struct smaps_age_candidate *B = (const struct smaps_age_candidate *)b;
+    const struct smaps_candidate *A = (const struct smaps_candidate *)a;
+    const struct smaps_candidate *B = (const struct smaps_candidate *)b;
     if(A->age < B->age) return 1;
     if(A->age > B->age) return -1;
     if(A->vmshared < B->vmshared) return 1;
@@ -206,6 +202,9 @@ static void apps_handle_smaps_updates(void) {
         return;
     }
 
+    // Alternate between delta-based and age-based refresh strategies
+    static bool refresh_by_delta = true;
+
     size_t total_pids = 0;
 
     for(p = root_of_pids(); p ; p = p->next)
@@ -222,66 +221,69 @@ static void apps_handle_smaps_updates(void) {
     if(budget < PSS_REFRESH_MIN)
         budget = PSS_REFRESH_MIN;
 
-    struct smaps_candidate *delta_all = mallocz(sizeof(*delta_all) * total_pids);
-    size_t delta_count = 0;
-    struct smaps_age_candidate *age_all = mallocz(sizeof(*age_all) * total_pids);
-    size_t age_count = 0;
+    struct smaps_candidate *candidates = mallocz(sizeof(*candidates) * total_pids);
+    size_t candidate_count = 0;
 
-    for(p = root_of_pids(); p ; p = p->next) {
-        kernel_uint_t vmshared = p->values[PDF_VMSHARED];
+    // Populate candidates based on current strategy
+    if(refresh_by_delta) {
+        // Delta-based: prioritize processes with largest memory changes
+        for(p = root_of_pids(); p ; p = p->next) {
+            kernel_uint_t vmshared = p->values[PDF_VMSHARED];
 
-        if(vmshared > 0 && p->vmshared_delta > 0) {
-            delta_all[delta_count].p = p;
-            delta_all[delta_count].delta = p->vmshared_delta;
-            delta_count++;
+            if(vmshared > 0 && p->vmshared_delta > 0) {
+                candidates[candidate_count].p = p;
+                candidates[candidate_count].delta = p->vmshared_delta;
+                candidate_count++;
+            }
         }
 
-        if(vmshared == 0)
-            continue;
+        // Sort by delta (descending)
+        if(candidate_count > 1)
+            qsort(candidates, candidate_count, sizeof(*candidates), compare_smaps_delta_desc);
+    }
+    else {
+        // Age-based: prioritize processes that haven't been updated longest
+        for(p = root_of_pids(); p ; p = p->next) {
+            kernel_uint_t vmshared = p->values[PDF_VMSHARED];
 
-        size_t age;
-        if(p->last_pss_iteration == 0)
-            age = SIZE_MAX;
-        else if(global_iterations_counter >= p->last_pss_iteration)
-            age = global_iterations_counter - p->last_pss_iteration;
-        else
-            age = SIZE_MAX;
+            if(vmshared == 0)
+                continue;
 
-        age_all[age_count].p = p;
-        age_all[age_count].age = age;
-        age_all[age_count].vmshared = vmshared;
-        age_count++;
+            size_t age;
+            if(p->last_pss_iteration == 0)
+                age = SIZE_MAX;
+            else if(global_iterations_counter >= p->last_pss_iteration)
+                age = global_iterations_counter - p->last_pss_iteration;
+            else
+                age = SIZE_MAX;
+
+            candidates[candidate_count].p = p;
+            candidates[candidate_count].age = age;
+            candidates[candidate_count].vmshared = vmshared;
+            candidate_count++;
+        }
+
+        // Sort by age (descending), with vmshared as tiebreaker
+        if(candidate_count > 1)
+            qsort(candidates, candidate_count, sizeof(*candidates), compare_smaps_age_desc);
     }
 
-    if(delta_count > 1)
-        qsort(delta_all, delta_count, sizeof(*delta_all), compare_smaps_candidate_desc);
-    if(age_count > 1)
-        qsort(age_all, age_count, sizeof(*age_all), compare_smaps_age_desc);
+    // Refresh top priority processes within budget
+    size_t to_refresh = candidate_count;
+    if(to_refresh > budget)
+        to_refresh = budget;
 
-    size_t delta_to_refresh = delta_count;
-    if(delta_to_refresh > budget)
-        delta_to_refresh = budget;
-    for(size_t i = 0; i < delta_to_refresh; i++) {
-        struct pid_stat *pid_entry = delta_all[i].p;
+    for(size_t i = 0; i < to_refresh; i++) {
+        struct pid_stat *pid_entry = candidates[i].p;
         if(!pid_entry)
             continue;
         OS_FUNCTION(apps_os_read_pid_smaps_rollup)(pid_entry, NULL);
     }
 
-    size_t age_to_refresh = budget;
-    size_t refreshed = 0;
-    for(size_t i = 0; i < age_count && refreshed < age_to_refresh; i++) {
-        struct pid_stat *pid_entry = age_all[i].p;
-        if(!pid_entry)
-            continue;
-        if(pid_entry->last_pss_iteration == global_iterations_counter)
-            continue;
-        OS_FUNCTION(apps_os_read_pid_smaps_rollup)(pid_entry, NULL);
-        refreshed++;
-    }
+    freez(candidates);
 
-    freez(delta_all);
-    freez(age_all);
+    // Toggle strategy for next iteration
+    refresh_by_delta = !refresh_by_delta;
 }
 
 #endif // PROCESSES_HAVE_SMAPS_ROLLUP

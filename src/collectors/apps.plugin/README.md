@@ -24,17 +24,17 @@ On Linux systems with kernel 4.14 or later, `apps.plugin` uses Proportional Set 
 
 PSS is an expensive kernel operation that requires scanning all shared memory segments of a process to determine which memory pages are shared with other processes, and then proportionally dividing the shared memory among them to calculate each process's actual memory footprint. Since PSS for any process can change due to actions by other processes (such as mapping or unmapping the same files, or processes exiting), maintaining accurate real-time PSS data for all processes would be prohibitively expensive.
 
-To balance accuracy with performance, `apps.plugin` uses a **ratio-based estimation approach**: it periodically samples PSS values to calculate a PSS/RSS ratio for each process, then applies this cached ratio to the current RSS values **every second** to estimate memory usage. This means that estimated memory values are updated every second based on current RSS, while the ratio itself is recalibrated every 2.5 minutes on average. This approach provides responsive per-second memory tracking while only reading the expensive PSS data periodically.
+To balance accuracy with performance, `apps.plugin` uses a **ratio-based estimation approach**: it periodically samples PSS values to calculate a PSS/RSS ratio for each process, then applies this cached ratio to the current RSS values **every second** to estimate memory usage. This means that estimated memory values are updated every second based on current RSS, while the ratio itself is recalibrated adaptively based on process priority.
 
-The plugin implements a sampling strategy that **guarantees the PSS/RSS ratio is recalibrated within 2.5 minutes** (half of the configured 5-minute interval) by spreading the workload across the full interval. The plugin uses two complementary prioritization paths to determine which processes to sample:
+The plugin implements an **adaptive sampling strategy** designed to prioritize the largest memory consumers and processes with significant memory changes, refreshing them within seconds of detection, while guaranteeing that all processes are eventually sampled within **twice the configured interval** (10 minutes by default for a 5-minute interval). The plugin alternates between two complementary prioritization strategies each iteration:
 
-1. **Shared Memory Delta Priority**: Processes with the largest changes in shared memory are sampled first, ensuring that applications with significant memory footprint changes are recalibrated promptly.
+1. **Delta-Based Strategy**: Prioritizes processes with the largest changes in shared memory, ensuring rapid detection and response to memory growth. Large memory consumers (databases, cache servers, etc.) are typically refreshed within seconds when their memory footprint changes significantly.
 
-2. **Age-Based Priority**: Processes with the oldest PSS samples are prioritized, ensuring that all processes are eventually sampled within the configured interval.
+2. **Age-Based Strategy**: Prioritizes processes that haven't been sampled longest, ensuring eventual consistency for all processes. Even the smallest processes are guaranteed to be refreshed within twice the configured interval.
 
-Each prioritization path is independently throttled to complete within the configured duration (5 minutes by default), resulting in a maximum staleness of 2.5 minutes for any process's PSS data.
+Both strategies sort candidates by priority and refresh the top N processes within the configured budget each iteration. By alternating between these strategies, the plugin ensures responsive tracking of significant memory changes while maintaining bounded staleness for all processes.
 
-Additionally, the plugin prioritizes recalibration of all processes within the same application group or category whenever a new process enters or exits the group. This provides near real-time adjustment to PSS estimates when the set of processes sharing memory changes, which is particularly important for accurately tracking the memory usage of process managers and their subprocesses.
+Additionally, on the first iteration after startup, the plugin samples all processes to establish accurate initial estimates before switching to the adaptive sampling strategy.
 
 ## Charts
 
@@ -293,9 +293,11 @@ The `--pss` option controls PSS sampling behavior:
 **Default:** `5m` (5 minutes)
 
 **How it works:**
-- `apps.plugin` samples PSS values periodically (based on the configured interval) rather than on every iteration
-- Processes with changing shared memory are prioritized for sampling
+- `apps.plugin` uses adaptive sampling that alternates between two strategies each iteration:
+  - **Delta-based**: Prioritizes processes with largest shared memory changes (refreshes big memory consumers within seconds)
+  - **Age-based**: Prioritizes processes with oldest samples (ensures all processes refreshed within 2× the interval)
 - The sampled PSS/RSS ratio is cached and applied to subsequent RSS readings to estimate current memory usage
+- This approach ensures rapid response to significant memory changes while guaranteeing bounded staleness for all processes
 - When disabled (`--pss 0` or `--pss off`), no PSS sampling occurs and estimated memory charts are not shown
 
 **Performance considerations:**
