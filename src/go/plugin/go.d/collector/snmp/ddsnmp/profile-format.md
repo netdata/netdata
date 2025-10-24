@@ -600,57 +600,112 @@ This produces metrics like: `cfwConnectionStatValue{service_type="80", stat_type
 
 ## Tag Transformations
 
-Tag transformations let you **modify or extract parts of SNMP values** to create meaningful, human-readable tags.
+Tag transformations let you **modify or extract parts of SNMP values** to produce clear, human-readable tags.
 
-They are most often used with table columns or cross-table tags to normalize raw data.
+They work the same in **both** places:
+
+- `metadata` (e.g., device model, OS name), and
+- `metric_tags` (e.g., per-row interface labels).
 
 **Available Tag Transformations**:
 
-| **Transformation**              | **Purpose**                                        | **Example Input → Output**                                |
-|---------------------------------|----------------------------------------------------|-----------------------------------------------------------|
-| `mapping`                       | Convert numeric or string codes to readable names. | `1 → up`                                                  |
-| `extract_value`                 | Extract a substring using regex.                   | `"eth0" → "0"`                                            |
-| `match_pattern` + `match_value` | Rebuild a string from regex groups.                | `"Version 15.2.4" → "15.2"`                               |
-| `pattern`                       | Create multiple tags from one string.              | `"GigabitEthernet1/0/24" → type=GigabitEthernet, port=24` |
-| `format`                        | Apply predefined data conversions.                 | Raw MAC → `AA:BB:CC:DD:EE:FF`                             |
+| Transformation                   | Purpose                                         | Example Input → Output                                           |
+|----------------------------------|-------------------------------------------------|------------------------------------------------------------------|
+| `mapping`                        | Replace numeric/string codes with names.        | `1 → "ethernet"`, `161 → "lag"`                                  |
+| `extract_value`                  | Extract a substring via regex (first group).    | `"RouterOS CCR2004-16G-2S+" → "CCR2004-16G-2S+"`                 |
+| `match_pattern` + `match_value`  | Replace the value using regex groups or static. | `"Palo Alto Networks VM-Series firewall" → "VM-Series firewall"` |
+| `match` + `tags` (multiple tags) | Create **several** tags from one value.         | `"xe-0/0/1" → if_family=xe, fpc=0, pic=0, port=1`                |
+
+**Combination & Behavior**:
+
+| Rule                        | Description                                                                                                                                   |
+|-----------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------|
+| **Where**                   | Can be used inside `metadata.*.fields.*.symbols[]` and `metric_tags[]`.                                                                       |
+| **Order of application**    | 1️⃣ `match_pattern` + `match_value` **or** `extract_value` (whichever is present) → 2️⃣ `mapping` → 3️⃣ `match` + `tags` (if defined).        |
+| **No match behavior**       | • `extract_value`: keeps the original value.<br/>• `match_pattern`: skips the value (tag not emitted).<br/>• `match` + `tags`: emits no tags. |
+| **Multiple symbols**        | If multiple `symbols` are listed for the same tag, the **first non-empty result** is used.                                                    |
+| **Mapping key consistency** | Keys in a `mapping` must all be the same type — all numeric or all string.                                                                    |
+| **Safety**                  | Keep regexes simple and, when possible, **anchor them** (e.g. `^pattern$`) to prevent unwanted matches.                                       |
+
+**Quick Syntax Recap**:
+
+- `mapping`
+    ```yaml
+    mapping:
+      6: "ethernet"
+      161: "lag"
+    ```
+- `extract_value`
+    ```yaml
+     extract_value: 'RouterOS ([A-Za-z0-9-+]+)'   # first capture group is used
+     ```
+
+- `match_pattern` + `match_value`
+    ```yaml
+    match_pattern: 'Palo Alto Networks\s+(PA-\d+ series firewall|VM-Series firewall)'
+    match_value: '$1'   # or a static value like 'Router' when matched
+    ```
+- `match` + `tags` (multiple tags)
+    ```yaml
+    match: '^([A-Za-z]+)[-_]?(\d+)\/(\d+)\/(\d+)$'
+    tags:
+      if_family: $1
+      fpc: $2
+      pic: $3
+      port: $4
+    ```
 
 ### With Mapping
 
-Use mapping to convert raw SNMP values (usually integers) into descriptive strings:
+Use `mapping` to replace raw tag values with **human-readable text labels**.
 
-- You want to replace numeric codes with readable names.
-- You need to standardize tag values across vendors or devices.
+The collector:
+
+- Looks up the raw value in the mapping table.
+- Replaces it with the corresponding string.
+- If the value is not found in the mapping, the **original value** is **kept**.
+- Keys can be numeric or string, but must be consistent in type.
+- Mapping is applied to tag values from `metadata` or `metric_tags`.
 
 ```yaml
+metrics:
   - MIB: IF-MIB
     table:
       OID: 1.3.6.1.2.1.2.2
       name: ifTable
     symbols:
-      - OID: 1.3.6.1.2.1.2.2.1.7
-        name: ifAdminStatus
-        chart_meta:
-          description: Current administrative state of the interface
-          family: 'Network/Interface/Status/Admin'
-          unit: "{status}"
+      - OID: 1.3.6.1.2.1.2.2.1.10
+        name: ifInOctets
+    metric_tags:
+      - tag: if_type
+        symbol:
+          OID: 1.3.6.1.2.1.2.2.1.3
+          name: ifType
         mapping:
-          1: up
-          2: down
-          3: testing
+          1: "other"
+          6: "ethernet"
+          24: "loopback"
+          131: "tunnel"
+          161: "lag"
 ```
 
-Also works for string-to-string mappings:
+**What this does**:
 
-```yaml
-mapping:
-  "GigabitEthernet": "gbe"
-  "TenGigabitEthernet": "10gbe"
-  "FastEthernet": "fe"
-```
+- Replaces numeric interface type codes (1, 6, 24, 131, 161) with readable names (`other`, `ethernet`, `loopback`, `tunnel`, `lag`).
+- If a device reports an unknown type, the original numeric value is used.
+- Works identically for `metadata` fields and `metric_tags`.
 
 ### With Extract Value
 
 Use `extract_value` to capture a part of a string using a **regular expression**.
+
+The collector:
+
+- Applies the pattern to the raw value.
+- Replaces the value with the **first capture group** `( … )`.
+- Keeps the **original value** if no match is found.
+- Searches anywhere in the string unless you anchor the pattern with `^` or `$`.
+- Uses the **first non-empty** result when multiple `symbols` are defined.
 
 ```yaml
 metadata:
@@ -658,76 +713,107 @@ metadata:
     fields:
       model:
         symbols:
-          # RouterOS model extraction (e.g. 'RouterOS CCR2004-16G-2S+' => 'CCR2004-16G-2S+')
+          # Example: 'RouterOS CCR2004-16G-2S+' → 'CCR2004-16G-2S+'
           - OID: 1.3.6.1.2.1.1.1.0
             name: sysDescr
             extract_value: 'RouterOS ([A-Za-z0-9-+]+)'
+          # Example: 'CSS326-24G-2S+ SwOS v2.13' → 'CSS326-24G-2S+'
+          - OID: 1.3.6.1.2.1.1.1.0
+            name: sysDescr
+            extract_value: '([A-Za-z0-9-+]+) SwOS'
 ```
 
 ### With Match Pattern
 
 Use `match_pattern` and `match_value` together to build a tag value using multiple **regex capture groups**.
 
+The collector:
+
+- Tests the value against the regular expression in `match_pattern`.
+- If it **matches**, replaces the value with `match_value`.
+- Within `match_value`, you can reference **capture groups** using `$1`, `$2`, `$3`, etc.
+- If the value **does not match**, it is skipped (ignored).
+- Works both for reformatting captured text and for assigning a static replacement when matched.
+
+**Example 1 — Reformat using capture groups**:
+
 ```yaml
-metric_tags:
-  - tag: device_version
-    symbol:
-      OID: 1.3.6.1.2.1.1.1.0
-      name: sysDescr
-      match_pattern: 'Version (\d+)\.(\d+)\.(\d+)'
-      match_value: '$1.$2'  # Produces "15.2" from "Version 15.2.4"
+metadata:
+  device:
+    fields:
+      product_name:
+        symbol:
+          OID: 1.3.6.1.2.1.1.1.0
+          name: sysDescr
+          match_pattern: 'Palo Alto Networks\s+(PA-\d+ series firewall|WildFire Appliance|VM-Series firewall)'
+          match_value: "$1"
+          # Examples:
+          #  - Palo Alto Networks VM-Series firewall  →  VM-Series firewall
+          #  - Palo Alto Networks PA-3200 series firewall  →  PA-3200 series firewall
+          #  - Palo Alto Networks WildFire Appliance  →  WildFire Appliance
 ```
 
-- `$1`, `$2`, `$3` refer to regex capture groups in match_pattern.
-- Useful for **reformatting strings** (like firmware versions, model names, or build numbers).
+**Example 2 — Assign static value on match**:
 
-### With Pattern (Multiple Tags)
+```yaml
+metadata:
+  device:
+    fields:
+      type:
+        symbols:
+          - OID: 1.3.6.1.2.1.1.1.0
+            name: sysDescr
+            # RouterOS devices
+            match_pattern: 'RouterOS (CCR.*)'
+            match_value: 'Router'
+```
 
-Use `pattern` and `tags` to create multiple tags from one SNMP value.
+### With Match (Multiple Tags)
+
+Use `match` and `tags` to create **multiple tags** from a single SNMP value using a **regular expression** with capture groups.
+
+The collector:
+
+- Applies the regex in match to the raw value.
+- If it `matches`, creates all tags listed under `tags`, substituting `$1`, `$2`, `$3`, etc. from the capture groups.
+- If it **doesn’t match**, none of those tags are added.
+- Tags that resolve to an **empty capture** are not added.
+
+**Example 1 — Split OS name and model from sysDescr (metadata)**:
+
+```yaml
+metadata:
+  device:
+    fields:
+      type:
+        symbols:
+          - OID: 1.3.6.1.2.1.1.1.0
+            name: sysDescr
+            match: '^(\S+)\s+(.*)$'
+            tags:
+              os_name: $1    # e.g. 'RouterOS'
+              model: $2      # e.g. 'CCR2004-16G-2S+'
+```
+
+> Input like `RouterOS CCR2004-16G-2S+` becomes: `os_name=RouterOS`, `model=CCR2004-16G-2S+`.
+
+**Example 2 — Derive multiple labels from interface names (metric_tags)**:
 
 ```yaml
 metric_tags:
   - symbol:
       OID: 1.3.6.1.2.1.2.2.1.2
       name: ifDescr
-    pattern: '(\w+?)(\d+)/(\d+)/(\d+)'
+    match: '^([A-Za-z]+)[-_]?(\d+)\/(\d+)\/(\d+)$'
     tags:
-      interface_type: $1  # "GigabitEthernet"
-      module: $2          # "1"
-      slot: $3            # "0"
-      port: $4            # "24"
+      if_family: $1   # e.g. 'xe' or 'ge' or 'GigabitEthernet' → 'GigabitEthernet'
+      fpc: $2         # '0'
+      pic: $3         # '0'
+      port: $4        # '1'
 ```
 
-For example, `GigabitEthernet1/0/24` becomes: `interface_type=gigabitEthernet`, `module=1`, `slot=0`, `port=24`.
-
-**Use pattern when**:
-
-- One SNMP field encodes several useful pieces of information.
-- You need multiple tags extracted from a single value.
-
-### Format Conversions
-
-Use `format` for predefined data conversions — the collector automatically translates binary or encoded data into readable formats.
-
-```yaml
-metric_tags:
-  - tag: mac_address
-    symbol:
-      OID: 1.3.6.1.2.1.2.2.1.6
-      name: ifPhysAddress
-      format: mac_address  # Converts bytes → "AA:BB:CC:DD:EE:FF"
-
-  - tag: ip_address
-    symbol:
-      OID: 1.3.6.1.4.1.9.9.500.1.2.1.1.4
-      name: cdpCacheAddress
-      format: ip_address  # Converts bytes → "192.168.1.1"
-```
-
-Supported formats include:
-
-- `mac_address`
-- `ip_address`
+- Handles common patterns like `xe-0/0/1`, `ge-0/0/0`, or `GigabitEthernet1/0/24`.
+- Output tags might be: `if_family=xe`, `fpc=0`, `pic=0`, `port=1`.
 
 ## Value Transformations
 
@@ -1012,7 +1098,7 @@ virtual_metrics:
       unit: "bit/s"
 ```
 
-What this does
+**What this does**:
 
 - Performs **PromQL-like “sum by (ifType)” aggregation**.
 - Combines all rows sharing the same `ifType` label into grouped totals.
