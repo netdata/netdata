@@ -97,6 +97,23 @@ Metrics:
 | mssql.instance_memmgr_external_benefit_of_memory | benefit | bytes |
 | mssql.instance_blocked_processes | blocked | processes |
 
+### Per MSSQL Jobs
+
+These metrics refer to the Microsoft SQL Servers jobs on host.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| mssql_instance | The instance name. |
+| job_name | The job name. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| mssql.instance_jobs_status | enabled, disabled | jobs |
+
 ### Per MSSQL Resource Locks
 
 Monitors SQL Server resource locks by type. SQL Server uses locks to manage concurrent access to database resources during transactions, preventing conflicts when multiple users access the same data simultaneously. This metric tracks locks on different [resource types](https://learn.microsoft.com/en-us/sql/relational-databases/performance-monitor/sql-server-locks-object?view=sql-server-ver17) like rows, pages, tables, and databases.
@@ -215,7 +232,18 @@ For **each SQL Server** instance you want to monitor, complete the following ste
    GO
    ```
 
-3. **Configure SQL Server Network Settings**
+3. **Enable Query Job status**
+
+   Connect to your database and grant `SELECT` permission to `netdata_user`:
+
+  ```tsql
+  USE msdb;
+  GO
+  GRANT SELECT ON SCHEMA::[dbo] TO netdata_user;
+  GO
+  ```
+
+4. **Configure SQL Server Network Settings**
 
    Enable SQL Server to accept TCP connections:
 
@@ -228,7 +256,7 @@ For **each SQL Server** instance you want to monitor, complete the following ste
     - Enter a port number in the `TCP Port` field (default is `1433`)
   - Select `SQL Server Services` and restart your SQL Server instance
 
-4. **Configure SQL Server Authentication (Optional)**
+5. **Configure SQL Server Authentication (Optional)**
 
    If you're using SQL Server authentication (rather than Windows authentication):
 
