@@ -196,6 +196,16 @@ static void apps_handle_smaps_updates(void) {
         return;
 
     struct pid_stat *p;
+
+    // On first iteration, scan all processes to get accurate initial estimates
+    if(unlikely(global_iterations_counter == 1)) {
+        for(p = root_of_pids(); p ; p = p->next) {
+            if(p->values[PDF_VMSHARED] > 0)
+                OS_FUNCTION(apps_os_read_pid_smaps_rollup)(p, NULL);
+        }
+        return;
+    }
+
     size_t total_pids = 0;
 
     for(p = root_of_pids(); p ; p = p->next)
