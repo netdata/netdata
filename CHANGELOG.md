@@ -6,6 +6,11 @@
 
 **Merged pull requests:**
 
+- fix\(packagin/otel-plugin\): remove cap\_net\_bind\_service [\#21198](https://github.com/netdata/netdata/pull/21198) ([ilyam8](https://github.com/ilyam8))
+- MSSQL Small fixes \(windows.plugin\) [\#21197](https://github.com/netdata/netdata/pull/21197) ([thiagoftsm](https://github.com/thiagoftsm))
+- Netdata API [\#21193](https://github.com/netdata/netdata/pull/21193) ([kanelatechnical](https://github.com/kanelatechnical))
+- Alerts api summary option [\#21192](https://github.com/netdata/netdata/pull/21192) ([stelfrag](https://github.com/stelfrag))
+- ci: remove update-website.yml workflow [\#21191](https://github.com/netdata/netdata/pull/21191) ([ilyam8](https://github.com/ilyam8))
 - Initialize cli earlier during agent startup [\#21188](https://github.com/netdata/netdata/pull/21188) ([stelfrag](https://github.com/stelfrag))
 - Prometheus - exporting metrics [\#21187](https://github.com/netdata/netdata/pull/21187) ([kanelatechnical](https://github.com/kanelatechnical))
 - Regenerate integrations docs [\#21185](https://github.com/netdata/netdata/pull/21185) ([netdatabot](https://github.com/netdatabot))
@@ -23,6 +28,7 @@
 - build\(deps\): bump github.com/ibmdb/go\_ibm\_db from 0.5.3 to 0.5.4 in /src/go [\#21167](https://github.com/netdata/netdata/pull/21167) ([dependabot[bot]](https://github.com/apps/dependabot))
 - build\(deps\): bump github.com/ibm-messaging/mq-golang/v5 from 5.6.4 to 5.6.5 in /src/go [\#21166](https://github.com/netdata/netdata/pull/21166) ([dependabot[bot]](https://github.com/apps/dependabot))
 - stacktrace-common: define USE\_NOTRACE if no HAVE\_BACKTRACE [\#21165](https://github.com/netdata/netdata/pull/21165) ([clan](https://github.com/clan))
+- As400 part3: performance optimizations [\#21164](https://github.com/netdata/netdata/pull/21164) ([ktsaou](https://github.com/ktsaou))
 - Libunwind [\#21163](https://github.com/netdata/netdata/pull/21163) ([clan](https://github.com/clan))
 - Enable Rust-based systemd journal handling code in Docker builds. [\#21161](https://github.com/netdata/netdata/pull/21161) ([Ferroin](https://github.com/Ferroin))
 - Regenerate integrations docs [\#21160](https://github.com/netdata/netdata/pull/21160) ([netdatabot](https://github.com/netdatabot))
@@ -444,13 +450,6 @@
 - Fix coverity issues [\#20656](https://github.com/netdata/netdata/pull/20656) ([stelfrag](https://github.com/stelfrag))
 - Regenerate integrations docs [\#20655](https://github.com/netdata/netdata/pull/20655) ([netdatabot](https://github.com/netdatabot))
 - Stop submitting analytics [\#20654](https://github.com/netdata/netdata/pull/20654) ([stelfrag](https://github.com/stelfrag))
-- Fix documentation regarding header\_match [\#20652](https://github.com/netdata/netdata/pull/20652) ([tobias-richter](https://github.com/tobias-richter))
-- build\(deps\): bump golang.org/x/text from 0.26.0 to 0.27.0 in /src/go [\#20651](https://github.com/netdata/netdata/pull/20651) ([dependabot[bot]](https://github.com/apps/dependabot))
-- build\(deps\): bump github.com/docker/docker from 28.3.1+incompatible to 28.3.2+incompatible in /src/go [\#20650](https://github.com/netdata/netdata/pull/20650) ([dependabot[bot]](https://github.com/apps/dependabot))
-- build\(deps\): bump github.com/miekg/dns from 1.1.66 to 1.1.67 in /src/go [\#20649](https://github.com/netdata/netdata/pull/20649) ([dependabot[bot]](https://github.com/apps/dependabot))
-- SNMP profile edits ep3 [\#20648](https://github.com/netdata/netdata/pull/20648) ([Ancairon](https://github.com/Ancairon))
-- SNMP profiles pass ep2 [\#20647](https://github.com/netdata/netdata/pull/20647) ([Ancairon](https://github.com/Ancairon))
-- chore\(go.d/snmp-profiles\): charts meta fixes and fam updates p7 [\#20646](https://github.com/netdata/netdata/pull/20646) ([ilyam8](https://github.com/ilyam8))
 
 ## [v2.5.4](https://github.com/netdata/netdata/tree/v2.5.4) (2025-06-24)
 
