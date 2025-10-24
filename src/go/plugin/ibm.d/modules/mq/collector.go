@@ -4,6 +4,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/framework"
 	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/modules/mq/contexts"
 	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/protocols/pcf"
@@ -14,6 +15,9 @@ type Collector struct {
 	framework.Collector
 	Config `yaml:",inline" json:",inline"` // Embed config to receive YAML unmarshal
 	client *pcf.Client
+
+	queueIncludeMatcher matcher.Matcher
+	queueExcludeMatcher matcher.Matcher
 
 	// Resolved effective intervals (auto-detected or user-configured)
 	effectiveStatisticsInterval int

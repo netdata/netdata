@@ -19,12 +19,6 @@
         "title": "Collect Bufferpool Metrics",
         "type": "string"
       },
-      "collect_bufferpools_matching": {
-        "default": "",
-        "description": "CollectBufferpoolsMatching filters buffer pools by name using glob patterns.",
-        "title": "Collect Bufferpools Matching",
-        "type": "string"
-      },
       "collect_connection_metrics": {
         "default": "auto",
         "description": "CollectConnectionMetrics toggles per-connection activity metrics.",
@@ -34,12 +28,6 @@
           "disabled"
         ],
         "title": "Collect Connection Metrics",
-        "type": "string"
-      },
-      "collect_connections_matching": {
-        "default": "",
-        "description": "CollectConnectionsMatching filters monitored connections by application ID.",
-        "title": "Collect Connections Matching",
         "type": "string"
       },
       "collect_database_metrics": {
@@ -68,12 +56,6 @@
           "disabled"
         ],
         "title": "Collect Index Metrics",
-        "type": "string"
-      },
-      "collect_indexes_matching": {
-        "default": "",
-        "description": "CollectIndexesMatching filters indexes by schema/name.",
-        "title": "Collect Indexes Matching",
         "type": "string"
       },
       "collect_lock_metrics": {
@@ -110,12 +92,6 @@
         "title": "Collect Table Metrics",
         "type": "string"
       },
-      "collect_tables_matching": {
-        "default": "",
-        "description": "CollectTablesMatching filters tables by schema/name.",
-        "title": "Collect Tables Matching",
-        "type": "string"
-      },
       "collect_tablespace_metrics": {
         "default": "auto",
         "description": "CollectTablespaceMetrics toggles tablespace capacity metrics.",
@@ -125,12 +101,6 @@
           "disabled"
         ],
         "title": "Collect Tablespace Metrics",
-        "type": "string"
-      },
-      "collect_tablespaces_matching": {
-        "default": "",
-        "description": "CollectTablespacesMatching filters tablespaces by name using glob patterns.",
-        "title": "Collect Tablespaces Matching",
         "type": "string"
       },
       "collect_wait_metrics": {
@@ -145,6 +115,114 @@
         "title": "DSN",
         "type": "string"
       },
+      "exclude_bufferpools": {
+        "default": "nil",
+        "description": "ExcludeBufferpools excludes buffer pools after inclusion.",
+        "items": {
+          "type": "string"
+        },
+        "title": "Exclude Bufferpools",
+        "type": "array"
+      },
+      "exclude_connections": {
+        "default": [
+          "*TEMP*"
+        ],
+        "description": "ExcludeConnections excludes connections after inclusion matching.",
+        "items": {
+          "type": "string"
+        },
+        "title": "Exclude Connections",
+        "type": "array"
+      },
+      "exclude_indexes": {
+        "default": "nil",
+        "description": "ExcludeIndexes excludes indexes after inclusion.",
+        "items": {
+          "type": "string"
+        },
+        "title": "Exclude Indexes",
+        "type": "array"
+      },
+      "exclude_tables": {
+        "default": "nil",
+        "description": "ExcludeTables excludes tables after inclusion.",
+        "items": {
+          "type": "string"
+        },
+        "title": "Exclude Tables",
+        "type": "array"
+      },
+      "exclude_tablespaces": {
+        "default": [
+          "TEMPSPACE2"
+        ],
+        "description": "ExcludeTablespaces excludes tablespaces after inclusion.",
+        "items": {
+          "type": "string"
+        },
+        "title": "Exclude Tablespaces",
+        "type": "array"
+      },
+      "include_bufferpools": {
+        "default": [
+          "IBMDEFAULTBP",
+          "IBMSYSTEMBP*",
+          "IBMHADRBP*"
+        ],
+        "description": "IncludeBufferpools filters buffer pools by name.",
+        "items": {
+          "type": "string"
+        },
+        "title": "Include Bufferpools",
+        "type": "array"
+      },
+      "include_connections": {
+        "default": [
+          "db2sysc*",
+          "db2agent*",
+          "db2hadr*",
+          "db2acd*",
+          "db2bmgr*"
+        ],
+        "description": "IncludeConnections filters monitored connections by application ID or application name (wildcards supported).",
+        "items": {
+          "type": "string"
+        },
+        "title": "Include Connections",
+        "type": "array"
+      },
+      "include_indexes": {
+        "default": "nil",
+        "description": "IncludeIndexes filters indexes by schema/name.",
+        "items": {
+          "type": "string"
+        },
+        "title": "Include Indexes",
+        "type": "array"
+      },
+      "include_tables": {
+        "default": "nil",
+        "description": "IncludeTables filters tables by schema/name.",
+        "items": {
+          "type": "string"
+        },
+        "title": "Include Tables",
+        "type": "array"
+      },
+      "include_tablespaces": {
+        "default": [
+          "SYSCATSPACE",
+          "TEMPSPACE*",
+          "SYSTOOLSPACE"
+        ],
+        "description": "IncludeTablespaces filters tablespaces by name.",
+        "items": {
+          "type": "string"
+        },
+        "title": "Include Tablespaces",
+        "type": "array"
+      },
       "max_bufferpools": {
         "default": 20,
         "description": "MaxBufferpools caps the number of buffer pools charted.",
@@ -152,7 +230,7 @@
         "type": "integer"
       },
       "max_connections": {
-        "default": 200,
+        "default": 50,
         "description": "MaxConnections caps the number of connection instances charted.",
         "title": "Max Connections",
         "type": "integer"
@@ -176,19 +254,19 @@
         "type": "integer"
       },
       "max_indexes": {
-        "default": 100,
+        "default": 50,
         "description": "MaxIndexes caps the number of indexes charted.",
         "title": "Max Indexes",
         "type": "integer"
       },
       "max_tables": {
-        "default": 50,
+        "default": 25,
         "description": "MaxTables caps the number of tables charted.",
         "title": "Max Tables",
         "type": "integer"
       },
       "max_tablespaces": {
-        "default": 100,
+        "default": 50,
         "description": "MaxTablespaces caps the number of tablespaces charted.",
         "title": "Max Tablespaces",
         "type": "integer"
@@ -217,6 +295,36 @@
     "type": "object"
   },
   "uiSchema": {
+    "exclude_bufferpools": {
+      "ui:listFlavour": "list"
+    },
+    "exclude_connections": {
+      "ui:listFlavour": "list"
+    },
+    "exclude_indexes": {
+      "ui:listFlavour": "list"
+    },
+    "exclude_tables": {
+      "ui:listFlavour": "list"
+    },
+    "exclude_tablespaces": {
+      "ui:listFlavour": "list"
+    },
+    "include_bufferpools": {
+      "ui:listFlavour": "list"
+    },
+    "include_connections": {
+      "ui:listFlavour": "list"
+    },
+    "include_indexes": {
+      "ui:listFlavour": "list"
+    },
+    "include_tables": {
+      "ui:listFlavour": "list"
+    },
+    "include_tablespaces": {
+      "ui:listFlavour": "list"
+    },
     "ui:flavour": "tabs",
     "ui:options": {
       "tabs": [
@@ -249,7 +357,8 @@
           "fields": [
             "collect_bufferpool_metrics",
             "max_bufferpools",
-            "collect_bufferpools_matching"
+            "include_bufferpools",
+            "exclude_bufferpools"
           ],
           "title": "Buffer Pools"
         },
@@ -257,7 +366,8 @@
           "fields": [
             "collect_tablespace_metrics",
             "max_tablespaces",
-            "collect_tablespaces_matching"
+            "include_tablespaces",
+            "exclude_tablespaces"
           ],
           "title": "Tablespaces"
         },
@@ -265,7 +375,8 @@
           "fields": [
             "collect_connection_metrics",
             "max_connections",
-            "collect_connections_matching"
+            "include_connections",
+            "exclude_connections"
           ],
           "title": "Connections Monitoring"
         },
@@ -282,7 +393,8 @@
           "fields": [
             "collect_table_metrics",
             "max_tables",
-            "collect_tables_matching"
+            "include_tables",
+            "exclude_tables"
           ],
           "title": "Tables"
         },
@@ -290,7 +402,8 @@
           "fields": [
             "collect_index_metrics",
             "max_indexes",
-            "collect_indexes_matching"
+            "include_indexes",
+            "exclude_indexes"
           ],
           "title": "Indexes"
         }

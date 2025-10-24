@@ -445,6 +445,409 @@ var Bufferpool = struct {
 	},
 }
 
+// --- BufferpoolGroup ---
+
+// BufferpoolGroupHitRatioValues defines the type-safe values for BufferpoolGroup.HitRatio context
+type BufferpoolGroupHitRatioValues struct {
+	Overall int64
+}
+
+// BufferpoolGroupHitRatioContext provides type-safe operations for BufferpoolGroup.HitRatio context
+type BufferpoolGroupHitRatioContext struct {
+	framework.Context[BufferpoolGroupLabels]
+}
+
+// Set provides type-safe dimension setting for BufferpoolGroup.HitRatio context
+func (c BufferpoolGroupHitRatioContext) Set(state *framework.CollectorState, labels BufferpoolGroupLabels, values BufferpoolGroupHitRatioValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"overall": values.Overall,
+	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c BufferpoolGroupHitRatioContext) SetUpdateEvery(state *framework.CollectorState, labels BufferpoolGroupLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
+// BufferpoolGroupDetailedHitRatioValues defines the type-safe values for BufferpoolGroup.DetailedHitRatio context
+type BufferpoolGroupDetailedHitRatioValues struct {
+	Data   int64
+	Index  int64
+	Xda    int64
+	Column int64
+}
+
+// BufferpoolGroupDetailedHitRatioContext provides type-safe operations for BufferpoolGroup.DetailedHitRatio context
+type BufferpoolGroupDetailedHitRatioContext struct {
+	framework.Context[BufferpoolGroupLabels]
+}
+
+// Set provides type-safe dimension setting for BufferpoolGroup.DetailedHitRatio context
+func (c BufferpoolGroupDetailedHitRatioContext) Set(state *framework.CollectorState, labels BufferpoolGroupLabels, values BufferpoolGroupDetailedHitRatioValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"data":   values.Data,
+		"index":  values.Index,
+		"xda":    values.Xda,
+		"column": values.Column,
+	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c BufferpoolGroupDetailedHitRatioContext) SetUpdateEvery(state *framework.CollectorState, labels BufferpoolGroupLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
+// BufferpoolGroupReadsValues defines the type-safe values for BufferpoolGroup.Reads context
+type BufferpoolGroupReadsValues struct {
+	Logical  int64
+	Physical int64
+}
+
+// BufferpoolGroupReadsContext provides type-safe operations for BufferpoolGroup.Reads context
+type BufferpoolGroupReadsContext struct {
+	framework.Context[BufferpoolGroupLabels]
+}
+
+// Set provides type-safe dimension setting for BufferpoolGroup.Reads context
+func (c BufferpoolGroupReadsContext) Set(state *framework.CollectorState, labels BufferpoolGroupLabels, values BufferpoolGroupReadsValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"logical":  values.Logical,
+		"physical": values.Physical,
+	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c BufferpoolGroupReadsContext) SetUpdateEvery(state *framework.CollectorState, labels BufferpoolGroupLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
+// BufferpoolGroupDataReadsValues defines the type-safe values for BufferpoolGroup.DataReads context
+type BufferpoolGroupDataReadsValues struct {
+	Logical  int64
+	Physical int64
+}
+
+// BufferpoolGroupDataReadsContext provides type-safe operations for BufferpoolGroup.DataReads context
+type BufferpoolGroupDataReadsContext struct {
+	framework.Context[BufferpoolGroupLabels]
+}
+
+// Set provides type-safe dimension setting for BufferpoolGroup.DataReads context
+func (c BufferpoolGroupDataReadsContext) Set(state *framework.CollectorState, labels BufferpoolGroupLabels, values BufferpoolGroupDataReadsValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"logical":  values.Logical,
+		"physical": values.Physical,
+	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c BufferpoolGroupDataReadsContext) SetUpdateEvery(state *framework.CollectorState, labels BufferpoolGroupLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
+// BufferpoolGroupIndexReadsValues defines the type-safe values for BufferpoolGroup.IndexReads context
+type BufferpoolGroupIndexReadsValues struct {
+	Logical  int64
+	Physical int64
+}
+
+// BufferpoolGroupIndexReadsContext provides type-safe operations for BufferpoolGroup.IndexReads context
+type BufferpoolGroupIndexReadsContext struct {
+	framework.Context[BufferpoolGroupLabels]
+}
+
+// Set provides type-safe dimension setting for BufferpoolGroup.IndexReads context
+func (c BufferpoolGroupIndexReadsContext) Set(state *framework.CollectorState, labels BufferpoolGroupLabels, values BufferpoolGroupIndexReadsValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"logical":  values.Logical,
+		"physical": values.Physical,
+	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c BufferpoolGroupIndexReadsContext) SetUpdateEvery(state *framework.CollectorState, labels BufferpoolGroupLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
+// BufferpoolGroupPagesValues defines the type-safe values for BufferpoolGroup.Pages context
+type BufferpoolGroupPagesValues struct {
+	Used  int64
+	Total int64
+}
+
+// BufferpoolGroupPagesContext provides type-safe operations for BufferpoolGroup.Pages context
+type BufferpoolGroupPagesContext struct {
+	framework.Context[BufferpoolGroupLabels]
+}
+
+// Set provides type-safe dimension setting for BufferpoolGroup.Pages context
+func (c BufferpoolGroupPagesContext) Set(state *framework.CollectorState, labels BufferpoolGroupLabels, values BufferpoolGroupPagesValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"used":  values.Used,
+		"total": values.Total,
+	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c BufferpoolGroupPagesContext) SetUpdateEvery(state *framework.CollectorState, labels BufferpoolGroupLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
+// BufferpoolGroupWritesValues defines the type-safe values for BufferpoolGroup.Writes context
+type BufferpoolGroupWritesValues struct {
+	Writes int64
+}
+
+// BufferpoolGroupWritesContext provides type-safe operations for BufferpoolGroup.Writes context
+type BufferpoolGroupWritesContext struct {
+	framework.Context[BufferpoolGroupLabels]
+}
+
+// Set provides type-safe dimension setting for BufferpoolGroup.Writes context
+func (c BufferpoolGroupWritesContext) Set(state *framework.CollectorState, labels BufferpoolGroupLabels, values BufferpoolGroupWritesValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"writes": values.Writes,
+	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c BufferpoolGroupWritesContext) SetUpdateEvery(state *framework.CollectorState, labels BufferpoolGroupLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
+// BufferpoolGroupLabels defines the required labels for BufferpoolGroup contexts
+type BufferpoolGroupLabels struct {
+	Group string
+}
+
+// InstanceID generates a unique instance ID using the hardcoded label order from YAML
+func (l BufferpoolGroupLabels) InstanceID(contextName string) string {
+	// Label order from YAML: group
+	return contextName + "." + cleanLabelValue(l.Group)
+}
+
+// BufferpoolGroup contains all metric contexts for BufferpoolGroup
+var BufferpoolGroup = struct {
+	HitRatio         BufferpoolGroupHitRatioContext
+	DetailedHitRatio BufferpoolGroupDetailedHitRatioContext
+	Reads            BufferpoolGroupReadsContext
+	DataReads        BufferpoolGroupDataReadsContext
+	IndexReads       BufferpoolGroupIndexReadsContext
+	Pages            BufferpoolGroupPagesContext
+	Writes           BufferpoolGroupWritesContext
+}{
+	HitRatio: BufferpoolGroupHitRatioContext{
+		Context: framework.Context[BufferpoolGroupLabels]{
+			Name:        "db2.bufferpool_group_hit_ratio",
+			Family:      "bufferpools/groups",
+			Title:       "Buffer Pool Group Hit Ratio",
+			Units:       "percentage",
+			Type:        module.Line,
+			Priority:    1117,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "overall",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1000,
+					Precision: 1000,
+				},
+			},
+			LabelKeys: []string{
+				"group",
+			},
+		},
+	},
+	DetailedHitRatio: BufferpoolGroupDetailedHitRatioContext{
+		Context: framework.Context[BufferpoolGroupLabels]{
+			Name:        "db2.bufferpool_group_detailed_hit_ratio",
+			Family:      "bufferpools/groups",
+			Title:       "Buffer Pool Group Detailed Hit Ratios",
+			Units:       "percentage",
+			Type:        module.Line,
+			Priority:    1118,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "data",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1000,
+					Precision: 1000,
+				},
+				{
+					Name:      "index",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1000,
+					Precision: 1000,
+				},
+				{
+					Name:      "xda",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1000,
+					Precision: 1000,
+				},
+				{
+					Name:      "column",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1000,
+					Precision: 1000,
+				},
+			},
+			LabelKeys: []string{
+				"group",
+			},
+		},
+	},
+	Reads: BufferpoolGroupReadsContext{
+		Context: framework.Context[BufferpoolGroupLabels]{
+			Name:        "db2.bufferpool_group_reads",
+			Family:      "bufferpools/groups",
+			Title:       "Buffer Pool Group Reads",
+			Units:       "reads/s",
+			Type:        module.Stacked,
+			Priority:    1119,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "logical",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "physical",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+			},
+			LabelKeys: []string{
+				"group",
+			},
+		},
+	},
+	DataReads: BufferpoolGroupDataReadsContext{
+		Context: framework.Context[BufferpoolGroupLabels]{
+			Name:        "db2.bufferpool_group_data_reads",
+			Family:      "bufferpools/groups",
+			Title:       "Buffer Pool Group Data Reads",
+			Units:       "reads/s",
+			Type:        module.Stacked,
+			Priority:    1120,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "logical",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "physical",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+			},
+			LabelKeys: []string{
+				"group",
+			},
+		},
+	},
+	IndexReads: BufferpoolGroupIndexReadsContext{
+		Context: framework.Context[BufferpoolGroupLabels]{
+			Name:        "db2.bufferpool_group_index_reads",
+			Family:      "bufferpools/groups",
+			Title:       "Buffer Pool Group Index Reads",
+			Units:       "reads/s",
+			Type:        module.Stacked,
+			Priority:    1121,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "logical",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "physical",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+			},
+			LabelKeys: []string{
+				"group",
+			},
+		},
+	},
+	Pages: BufferpoolGroupPagesContext{
+		Context: framework.Context[BufferpoolGroupLabels]{
+			Name:        "db2.bufferpool_group_pages",
+			Family:      "bufferpools/groups",
+			Title:       "Buffer Pool Group Pages",
+			Units:       "pages",
+			Type:        module.Stacked,
+			Priority:    1122,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "used",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "total",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+			},
+			LabelKeys: []string{
+				"group",
+			},
+		},
+	},
+	Writes: BufferpoolGroupWritesContext{
+		Context: framework.Context[BufferpoolGroupLabels]{
+			Name:        "db2.bufferpool_group_writes",
+			Family:      "bufferpools/groups",
+			Title:       "Buffer Pool Group Writes",
+			Units:       "writes/s",
+			Type:        module.Line,
+			Priority:    1123,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "writes",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+			},
+			LabelKeys: []string{
+				"group",
+			},
+		},
+	},
+}
+
 // --- Connection ---
 
 // ConnectionStateValues defines the type-safe values for Connection.State context
@@ -789,6 +1192,371 @@ var Connection = struct {
 	},
 }
 
+// --- ConnectionGroup ---
+
+// ConnectionGroupCountValues defines the type-safe values for ConnectionGroup.Count context
+type ConnectionGroupCountValues struct {
+	Count int64
+}
+
+// ConnectionGroupCountContext provides type-safe operations for ConnectionGroup.Count context
+type ConnectionGroupCountContext struct {
+	framework.Context[ConnectionGroupLabels]
+}
+
+// Set provides type-safe dimension setting for ConnectionGroup.Count context
+func (c ConnectionGroupCountContext) Set(state *framework.CollectorState, labels ConnectionGroupLabels, values ConnectionGroupCountValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"count": values.Count,
+	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c ConnectionGroupCountContext) SetUpdateEvery(state *framework.CollectorState, labels ConnectionGroupLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
+// ConnectionGroupStateValues defines the type-safe values for ConnectionGroup.State context
+type ConnectionGroupStateValues struct {
+	State int64
+}
+
+// ConnectionGroupStateContext provides type-safe operations for ConnectionGroup.State context
+type ConnectionGroupStateContext struct {
+	framework.Context[ConnectionGroupLabels]
+}
+
+// Set provides type-safe dimension setting for ConnectionGroup.State context
+func (c ConnectionGroupStateContext) Set(state *framework.CollectorState, labels ConnectionGroupLabels, values ConnectionGroupStateValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"state": values.State,
+	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c ConnectionGroupStateContext) SetUpdateEvery(state *framework.CollectorState, labels ConnectionGroupLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
+// ConnectionGroupActivityValues defines the type-safe values for ConnectionGroup.Activity context
+type ConnectionGroupActivityValues struct {
+	Read    int64
+	Written int64
+}
+
+// ConnectionGroupActivityContext provides type-safe operations for ConnectionGroup.Activity context
+type ConnectionGroupActivityContext struct {
+	framework.Context[ConnectionGroupLabels]
+}
+
+// Set provides type-safe dimension setting for ConnectionGroup.Activity context
+func (c ConnectionGroupActivityContext) Set(state *framework.CollectorState, labels ConnectionGroupLabels, values ConnectionGroupActivityValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"read":    values.Read,
+		"written": values.Written,
+	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c ConnectionGroupActivityContext) SetUpdateEvery(state *framework.CollectorState, labels ConnectionGroupLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
+// ConnectionGroupWaitTimeValues defines the type-safe values for ConnectionGroup.WaitTime context
+type ConnectionGroupWaitTimeValues struct {
+	Lock         int64
+	Log_disk     int64
+	Log_buffer   int64
+	Pool_read    int64
+	Pool_write   int64
+	Direct_read  int64
+	Direct_write int64
+	Fcm_recv     int64
+	Fcm_send     int64
+}
+
+// ConnectionGroupWaitTimeContext provides type-safe operations for ConnectionGroup.WaitTime context
+type ConnectionGroupWaitTimeContext struct {
+	framework.Context[ConnectionGroupLabels]
+}
+
+// Set provides type-safe dimension setting for ConnectionGroup.WaitTime context
+func (c ConnectionGroupWaitTimeContext) Set(state *framework.CollectorState, labels ConnectionGroupLabels, values ConnectionGroupWaitTimeValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"lock":         values.Lock,
+		"log_disk":     values.Log_disk,
+		"log_buffer":   values.Log_buffer,
+		"pool_read":    values.Pool_read,
+		"pool_write":   values.Pool_write,
+		"direct_read":  values.Direct_read,
+		"direct_write": values.Direct_write,
+		"fcm_recv":     values.Fcm_recv,
+		"fcm_send":     values.Fcm_send,
+	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c ConnectionGroupWaitTimeContext) SetUpdateEvery(state *framework.CollectorState, labels ConnectionGroupLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
+// ConnectionGroupProcessingTimeValues defines the type-safe values for ConnectionGroup.ProcessingTime context
+type ConnectionGroupProcessingTimeValues struct {
+	Routine  int64
+	Compile  int64
+	Section  int64
+	Commit   int64
+	Rollback int64
+}
+
+// ConnectionGroupProcessingTimeContext provides type-safe operations for ConnectionGroup.ProcessingTime context
+type ConnectionGroupProcessingTimeContext struct {
+	framework.Context[ConnectionGroupLabels]
+}
+
+// Set provides type-safe dimension setting for ConnectionGroup.ProcessingTime context
+func (c ConnectionGroupProcessingTimeContext) Set(state *framework.CollectorState, labels ConnectionGroupLabels, values ConnectionGroupProcessingTimeValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"routine":  values.Routine,
+		"compile":  values.Compile,
+		"section":  values.Section,
+		"commit":   values.Commit,
+		"rollback": values.Rollback,
+	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c ConnectionGroupProcessingTimeContext) SetUpdateEvery(state *framework.CollectorState, labels ConnectionGroupLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
+// ConnectionGroupLabels defines the required labels for ConnectionGroup contexts
+type ConnectionGroupLabels struct {
+	Group string
+}
+
+// InstanceID generates a unique instance ID using the hardcoded label order from YAML
+func (l ConnectionGroupLabels) InstanceID(contextName string) string {
+	// Label order from YAML: group
+	return contextName + "." + cleanLabelValue(l.Group)
+}
+
+// ConnectionGroup contains all metric contexts for ConnectionGroup
+var ConnectionGroup = struct {
+	Count          ConnectionGroupCountContext
+	State          ConnectionGroupStateContext
+	Activity       ConnectionGroupActivityContext
+	WaitTime       ConnectionGroupWaitTimeContext
+	ProcessingTime ConnectionGroupProcessingTimeContext
+}{
+	Count: ConnectionGroupCountContext{
+		Context: framework.Context[ConnectionGroupLabels]{
+			Name:        "db2.connection_group.count",
+			Family:      "connections/groups",
+			Title:       "Connection Group Count",
+			Units:       "connections",
+			Type:        module.Line,
+			Priority:    1134,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "count",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+			},
+			LabelKeys: []string{
+				"group",
+			},
+		},
+	},
+	State: ConnectionGroupStateContext{
+		Context: framework.Context[ConnectionGroupLabels]{
+			Name:        "db2.connection_group.state",
+			Family:      "connections/groups",
+			Title:       "Connection Group State Sum",
+			Units:       "state",
+			Type:        module.Line,
+			Priority:    1135,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "state",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+			},
+			LabelKeys: []string{
+				"group",
+			},
+		},
+	},
+	Activity: ConnectionGroupActivityContext{
+		Context: framework.Context[ConnectionGroupLabels]{
+			Name:        "db2.connection_group.activity",
+			Family:      "connections/groups",
+			Title:       "Connection Group Row Activity",
+			Units:       "rows/s",
+			Type:        module.Area,
+			Priority:    1136,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "read",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "written",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+			},
+			LabelKeys: []string{
+				"group",
+			},
+		},
+	},
+	WaitTime: ConnectionGroupWaitTimeContext{
+		Context: framework.Context[ConnectionGroupLabels]{
+			Name:        "db2.connection_group.wait_time",
+			Family:      "connections/groups",
+			Title:       "Connection Group Wait Time",
+			Units:       "milliseconds",
+			Type:        module.Stacked,
+			Priority:    1137,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "lock",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "log_disk",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "log_buffer",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "pool_read",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "pool_write",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "direct_read",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "direct_write",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "fcm_recv",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "fcm_send",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+			},
+			LabelKeys: []string{
+				"group",
+			},
+		},
+	},
+	ProcessingTime: ConnectionGroupProcessingTimeContext{
+		Context: framework.Context[ConnectionGroupLabels]{
+			Name:        "db2.connection_group.processing_time",
+			Family:      "connections/groups",
+			Title:       "Connection Group Processing Time",
+			Units:       "milliseconds",
+			Type:        module.Stacked,
+			Priority:    1138,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "routine",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "compile",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "section",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "commit",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "rollback",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+			},
+			LabelKeys: []string{
+				"group",
+			},
+		},
+	},
+}
+
 // --- Database ---
 
 // DatabaseStatusValues defines the type-safe values for Database.Status context
@@ -970,6 +1738,79 @@ var Index = struct {
 			},
 			LabelKeys: []string{
 				"index",
+			},
+		},
+	},
+}
+
+// --- IndexGroup ---
+
+// IndexGroupUsageValues defines the type-safe values for IndexGroup.Usage context
+type IndexGroupUsageValues struct {
+	Index int64
+	Full  int64
+}
+
+// IndexGroupUsageContext provides type-safe operations for IndexGroup.Usage context
+type IndexGroupUsageContext struct {
+	framework.Context[IndexGroupLabels]
+}
+
+// Set provides type-safe dimension setting for IndexGroup.Usage context
+func (c IndexGroupUsageContext) Set(state *framework.CollectorState, labels IndexGroupLabels, values IndexGroupUsageValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"index": values.Index,
+		"full":  values.Full,
+	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c IndexGroupUsageContext) SetUpdateEvery(state *framework.CollectorState, labels IndexGroupLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
+// IndexGroupLabels defines the required labels for IndexGroup contexts
+type IndexGroupLabels struct {
+	Group string
+}
+
+// InstanceID generates a unique instance ID using the hardcoded label order from YAML
+func (l IndexGroupLabels) InstanceID(contextName string) string {
+	// Label order from YAML: group
+	return contextName + "." + cleanLabelValue(l.Group)
+}
+
+// IndexGroup contains all metric contexts for IndexGroup
+var IndexGroup = struct {
+	Usage IndexGroupUsageContext
+}{
+	Usage: IndexGroupUsageContext{
+		Context: framework.Context[IndexGroupLabels]{
+			Name:        "db2.index_group_usage",
+			Family:      "indexes/groups",
+			Title:       "Index Group Usage",
+			Units:       "scans/s",
+			Type:        module.Area,
+			Priority:    1151,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "index",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "full",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+			},
+			LabelKeys: []string{
+				"group",
 			},
 		},
 	},
@@ -3902,6 +4743,143 @@ var Table = struct {
 	},
 }
 
+// --- TableGroup ---
+
+// TableGroupSizeValues defines the type-safe values for TableGroup.Size context
+type TableGroupSizeValues struct {
+	Data     int64
+	Index    int64
+	Long_obj int64
+}
+
+// TableGroupSizeContext provides type-safe operations for TableGroup.Size context
+type TableGroupSizeContext struct {
+	framework.Context[TableGroupLabels]
+}
+
+// Set provides type-safe dimension setting for TableGroup.Size context
+func (c TableGroupSizeContext) Set(state *framework.CollectorState, labels TableGroupLabels, values TableGroupSizeValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"data":     values.Data,
+		"index":    values.Index,
+		"long_obj": values.Long_obj,
+	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c TableGroupSizeContext) SetUpdateEvery(state *framework.CollectorState, labels TableGroupLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
+// TableGroupActivityValues defines the type-safe values for TableGroup.Activity context
+type TableGroupActivityValues struct {
+	Read    int64
+	Written int64
+}
+
+// TableGroupActivityContext provides type-safe operations for TableGroup.Activity context
+type TableGroupActivityContext struct {
+	framework.Context[TableGroupLabels]
+}
+
+// Set provides type-safe dimension setting for TableGroup.Activity context
+func (c TableGroupActivityContext) Set(state *framework.CollectorState, labels TableGroupLabels, values TableGroupActivityValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"read":    values.Read,
+		"written": values.Written,
+	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c TableGroupActivityContext) SetUpdateEvery(state *framework.CollectorState, labels TableGroupLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
+// TableGroupLabels defines the required labels for TableGroup contexts
+type TableGroupLabels struct {
+	Group string
+}
+
+// InstanceID generates a unique instance ID using the hardcoded label order from YAML
+func (l TableGroupLabels) InstanceID(contextName string) string {
+	// Label order from YAML: group
+	return contextName + "." + cleanLabelValue(l.Group)
+}
+
+// TableGroup contains all metric contexts for TableGroup
+var TableGroup = struct {
+	Size     TableGroupSizeContext
+	Activity TableGroupActivityContext
+}{
+	Size: TableGroupSizeContext{
+		Context: framework.Context[TableGroupLabels]{
+			Name:        "db2.table_group_size",
+			Family:      "tables/groups",
+			Title:       "Table Group Size",
+			Units:       "bytes",
+			Type:        module.Stacked,
+			Priority:    1142,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "data",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "index",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "long_obj",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+			},
+			LabelKeys: []string{
+				"group",
+			},
+		},
+	},
+	Activity: TableGroupActivityContext{
+		Context: framework.Context[TableGroupLabels]{
+			Name:        "db2.table_group_activity",
+			Family:      "tables/groups",
+			Title:       "Table Group Activity",
+			Units:       "rows/s",
+			Type:        module.Area,
+			Priority:    1143,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "read",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "written",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+			},
+			LabelKeys: []string{
+				"group",
+			},
+		},
+	},
+}
+
 // --- TableIO ---
 
 // TableIOScansValues defines the type-safe values for TableIO.Scans context
@@ -4357,6 +5335,226 @@ var Tablespace = struct {
 	},
 }
 
+// --- TablespaceGroup ---
+
+// TablespaceGroupUsageValues defines the type-safe values for TablespaceGroup.Usage context
+type TablespaceGroupUsageValues struct {
+	Used int64
+}
+
+// TablespaceGroupUsageContext provides type-safe operations for TablespaceGroup.Usage context
+type TablespaceGroupUsageContext struct {
+	framework.Context[TablespaceGroupLabels]
+}
+
+// Set provides type-safe dimension setting for TablespaceGroup.Usage context
+func (c TablespaceGroupUsageContext) Set(state *framework.CollectorState, labels TablespaceGroupLabels, values TablespaceGroupUsageValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"used": values.Used,
+	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c TablespaceGroupUsageContext) SetUpdateEvery(state *framework.CollectorState, labels TablespaceGroupLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
+// TablespaceGroupSizeValues defines the type-safe values for TablespaceGroup.Size context
+type TablespaceGroupSizeValues struct {
+	Used int64
+	Free int64
+}
+
+// TablespaceGroupSizeContext provides type-safe operations for TablespaceGroup.Size context
+type TablespaceGroupSizeContext struct {
+	framework.Context[TablespaceGroupLabels]
+}
+
+// Set provides type-safe dimension setting for TablespaceGroup.Size context
+func (c TablespaceGroupSizeContext) Set(state *framework.CollectorState, labels TablespaceGroupLabels, values TablespaceGroupSizeValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"used": values.Used,
+		"free": values.Free,
+	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c TablespaceGroupSizeContext) SetUpdateEvery(state *framework.CollectorState, labels TablespaceGroupLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
+// TablespaceGroupUsableSizeValues defines the type-safe values for TablespaceGroup.UsableSize context
+type TablespaceGroupUsableSizeValues struct {
+	Total  int64
+	Usable int64
+}
+
+// TablespaceGroupUsableSizeContext provides type-safe operations for TablespaceGroup.UsableSize context
+type TablespaceGroupUsableSizeContext struct {
+	framework.Context[TablespaceGroupLabels]
+}
+
+// Set provides type-safe dimension setting for TablespaceGroup.UsableSize context
+func (c TablespaceGroupUsableSizeContext) Set(state *framework.CollectorState, labels TablespaceGroupLabels, values TablespaceGroupUsableSizeValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"total":  values.Total,
+		"usable": values.Usable,
+	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c TablespaceGroupUsableSizeContext) SetUpdateEvery(state *framework.CollectorState, labels TablespaceGroupLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
+// TablespaceGroupStateValues defines the type-safe values for TablespaceGroup.State context
+type TablespaceGroupStateValues struct {
+	State int64
+}
+
+// TablespaceGroupStateContext provides type-safe operations for TablespaceGroup.State context
+type TablespaceGroupStateContext struct {
+	framework.Context[TablespaceGroupLabels]
+}
+
+// Set provides type-safe dimension setting for TablespaceGroup.State context
+func (c TablespaceGroupStateContext) Set(state *framework.CollectorState, labels TablespaceGroupLabels, values TablespaceGroupStateValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"state": values.State,
+	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c TablespaceGroupStateContext) SetUpdateEvery(state *framework.CollectorState, labels TablespaceGroupLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
+// TablespaceGroupLabels defines the required labels for TablespaceGroup contexts
+type TablespaceGroupLabels struct {
+	Group string
+}
+
+// InstanceID generates a unique instance ID using the hardcoded label order from YAML
+func (l TablespaceGroupLabels) InstanceID(contextName string) string {
+	// Label order from YAML: group
+	return contextName + "." + cleanLabelValue(l.Group)
+}
+
+// TablespaceGroup contains all metric contexts for TablespaceGroup
+var TablespaceGroup = struct {
+	Usage      TablespaceGroupUsageContext
+	Size       TablespaceGroupSizeContext
+	UsableSize TablespaceGroupUsableSizeContext
+	State      TablespaceGroupStateContext
+}{
+	Usage: TablespaceGroupUsageContext{
+		Context: framework.Context[TablespaceGroupLabels]{
+			Name:        "db2.tablespace_group_usage",
+			Family:      "tablespaces/groups",
+			Title:       "Tablespace Group Usage",
+			Units:       "percentage",
+			Type:        module.Line,
+			Priority:    1124,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "used",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1000,
+					Precision: 1000,
+				},
+			},
+			LabelKeys: []string{
+				"group",
+			},
+		},
+	},
+	Size: TablespaceGroupSizeContext{
+		Context: framework.Context[TablespaceGroupLabels]{
+			Name:        "db2.tablespace_group_size",
+			Family:      "tablespaces/groups",
+			Title:       "Tablespace Group Size",
+			Units:       "bytes",
+			Type:        module.Stacked,
+			Priority:    1125,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "used",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "free",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+			},
+			LabelKeys: []string{
+				"group",
+			},
+		},
+	},
+	UsableSize: TablespaceGroupUsableSizeContext{
+		Context: framework.Context[TablespaceGroupLabels]{
+			Name:        "db2.tablespace_group_usable_size",
+			Family:      "tablespaces/groups",
+			Title:       "Tablespace Group Usable Size",
+			Units:       "bytes",
+			Type:        module.Line,
+			Priority:    1126,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "total",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "usable",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+			},
+			LabelKeys: []string{
+				"group",
+			},
+		},
+	},
+	State: TablespaceGroupStateContext{
+		Context: framework.Context[TablespaceGroupLabels]{
+			Name:        "db2.tablespace_group_state",
+			Family:      "tablespaces/groups",
+			Title:       "Tablespace Group State",
+			Units:       "state",
+			Type:        module.Line,
+			Priority:    1127,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "state",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+			},
+			LabelKeys: []string{
+				"group",
+			},
+		},
+	},
+}
+
 // GetAllContexts returns all contexts for framework registration
 func GetAllContexts() []interface{} {
 	return []interface{}{
@@ -4367,13 +5565,26 @@ func GetAllContexts() []interface{} {
 		&Bufferpool.IndexReads.Context,
 		&Bufferpool.Pages.Context,
 		&Bufferpool.Writes.Context,
+		&BufferpoolGroup.HitRatio.Context,
+		&BufferpoolGroup.DetailedHitRatio.Context,
+		&BufferpoolGroup.Reads.Context,
+		&BufferpoolGroup.DataReads.Context,
+		&BufferpoolGroup.IndexReads.Context,
+		&BufferpoolGroup.Pages.Context,
+		&BufferpoolGroup.Writes.Context,
 		&Connection.State.Context,
 		&Connection.Activity.Context,
 		&Connection.WaitTime.Context,
 		&Connection.ProcessingTime.Context,
+		&ConnectionGroup.Count.Context,
+		&ConnectionGroup.State.Context,
+		&ConnectionGroup.Activity.Context,
+		&ConnectionGroup.WaitTime.Context,
+		&ConnectionGroup.ProcessingTime.Context,
 		&Database.Status.Context,
 		&Database.Applications.Context,
 		&Index.Usage.Context,
+		&IndexGroup.Usage.Context,
 		&MemoryPool.Usage.Context,
 		&MemoryPool.HighWaterMark.Context,
 		&MemorySet.Usage.Context,
@@ -4427,6 +5638,8 @@ func GetAllContexts() []interface{} {
 		&System.TimeSpent.Context,
 		&Table.Size.Context,
 		&Table.Activity.Context,
+		&TableGroup.Size.Context,
+		&TableGroup.Activity.Context,
 		&TableIO.Scans.Context,
 		&TableIO.Rows.Context,
 		&TableIO.Activity.Context,
@@ -4435,5 +5648,9 @@ func GetAllContexts() []interface{} {
 		&Tablespace.Size.Context,
 		&Tablespace.UsableSize.Context,
 		&Tablespace.State.Context,
+		&TablespaceGroup.Usage.Context,
+		&TablespaceGroup.Size.Context,
+		&TablespaceGroup.UsableSize.Context,
+		&TablespaceGroup.State.Context,
 	}
 }

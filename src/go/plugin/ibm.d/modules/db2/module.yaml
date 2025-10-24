@@ -4,6 +4,18 @@ description: |
   Monitors IBM DB2 databases using system catalog views and MON_GET_* table
   functions to expose connections, locking, buffer pool efficiency, tablespace
   capacity, and workload performance metrics.
+
+  Detailed charts are opt-in per object family through include/exclude lists.
+  Defaults focus on engine activity (system connections, core buffer pools,
+  catalog tablespaces). Matching uses glob patterns that can target schema or
+  application names, with include rules taking precedence over excludes.
+
+  When the number of matching objects exceeds the configured `max_*` limits,
+  the collector publishes deterministic top-N per-instance charts, aggregates
+  the remainder under `group="__other__"`, and logs a throttled warning so you
+  can refine selectors before cardinality runs away. Group charts (by schema,
+  application prefix, or buffer pool family) are always emitted so high-level
+  visibility is preserved even when individual instances are trimmed.
 icon: ibm.svg
 categories:
   - data-collection.database-servers

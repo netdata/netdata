@@ -357,6 +357,78 @@ Queue:
         - {name: enabled, algo: absolute}
         - {name: disabled, algo: absolute}
 
+QueueGroup:
+  labels:
+    - group
+  contexts:
+    - name: Depth
+      context: mq.queue_group.depth
+      title: Queue Group Depth
+      units: messages
+      family: queues/group
+      type: line
+      priority: 2450
+      dimensions:
+        - {name: current, algo: absolute}
+        - {name: max, algo: absolute}
+    - name: DepthPercentage
+      context: mq.queue_group.depth_percentage
+      title: Queue Group Depth Percentage
+      units: percentage
+      family: queues/group
+      type: line
+      priority: 2451
+      dimensions:
+        - {name: percentage, algo: absolute, precision: 1000, div: 1000}
+    - name: Messages
+      context: mq.queue_group.messages
+      title: Queue Group Messages
+      units: messages/s
+      family: queues/group
+      type: line
+      priority: 2452
+      dimensions:
+        - {name: enqueued, algo: incremental}
+        - {name: dequeued, algo: incremental}
+    - name: Connections
+      context: mq.queue_group.connections
+      title: Queue Group Connections
+      units: connections
+      family: queues/group
+      type: line
+      priority: 2453
+      dimensions:
+        - {name: input, algo: absolute}
+        - {name: output, algo: absolute}
+    - name: UncommittedMessages
+      context: mq.queue_group.uncommitted_msgs
+      title: Queue Group Uncommitted Messages
+      units: messages
+      family: queues/group
+      type: line
+      priority: 2454
+      dimensions:
+        - {name: uncommitted, algo: absolute}
+    - name: FileSize
+      context: mq.queue_group.file_size
+      title: Queue Group File Size
+      units: bytes
+      family: queues/group
+      type: line
+      priority: 2455
+      dimensions:
+        - {name: current, algo: absolute}
+        - {name: max, algo: absolute}
+    - name: OldestMessageAge
+      context: mq.queue_group.oldest_msg_age
+      title: Queue Group Oldest Message Age
+      units: seconds
+      family: queues/group
+      type: line
+      priority: 2456
+      dimensions:
+        - {name: oldest_msg_age, algo: absolute}
+
 Channel:
   labels:
     - channel
