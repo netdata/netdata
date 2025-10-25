@@ -598,7 +598,7 @@ metrics:
 
 This produces metrics like: `cfwConnectionStatValue{service_type="80", stat_type="bytes"} = 123456`.
 
-## Tag Transformations
+## Tag Transformation
 
 Tag transformations let you **modify or extract parts of SNMP values** to produce clear, human-readable tags.
 
@@ -655,11 +655,11 @@ They work the same in **both** places:
       port: $4
     ```
 
-### With Mapping
+### Mapping
 
 Use `mapping` to replace raw tag values with **human-readable text labels**.
 
-The collector:
+**The collector**:
 
 - Looks up the raw value in the mapping table.
 - Replaces it with the corresponding string.
@@ -695,11 +695,11 @@ metrics:
 - If a device reports an unknown type, the original numeric value is used.
 - Works identically for `metadata` fields and `metric_tags`.
 
-### With Extract Value
+### Extract Value
 
 Use `extract_value` to capture a part of a string using a **regular expression**.
 
-The collector:
+**The collector**:
 
 - Applies the pattern to the raw value.
 - Replaces the value with the **first capture group** `( … )`.
@@ -723,11 +723,11 @@ metadata:
             extract_value: '([A-Za-z0-9-+]+) SwOS'
 ```
 
-### With Match Pattern
+### Match Pattern
 
 Use `match_pattern` and `match_value` together to build a tag value using multiple **regex capture groups**.
 
-The collector:
+**The collector**:
 
 - Tests the value against the regular expression in `match_pattern`.
 - If it **matches**, replaces the value with `match_value`.
@@ -768,11 +768,11 @@ metadata:
             match_value: 'Router'
 ```
 
-### With Match (Multiple Tags)
+### Match (Multiple Tags)
 
 Use `match` and `tags` to create **multiple tags** from a single SNMP value using a **regular expression** with capture groups.
 
-The collector:
+**The collector**:
 
 - Applies the regex in match to the raw value.
 - If it `matches`, creates all tags listed under `tags`, substituting `$1`, `$2`, `$3`, etc. from the capture groups.
@@ -815,146 +815,175 @@ metric_tags:
 - Handles common patterns like `xe-0/0/1`, `ge-0/0/0`, or `GigabitEthernet1/0/24`.
 - Output tags might be: `if_family=xe`, `fpc=0`, `pic=0`, `port=1`.
 
-## Value Transformations
+## Value Transformation
 
-Value transformations process **SNMP values into numeric metrics**.
+Value transformations let you **process or normalize raw SNMP metric values** before they are stored and charted.
 
-While tag transformations produce text labels, value transformations must ultimately yield **numbers** that Netdata can graph, alert on, and aggregate.
+They are applied **per symbol (per OID)** during SNMP data collection. They modify only **metric values**, not tags or metadata, and are **not applied to virtual metrics**.
 
-**Key Concepts**:
+These transformations are typically used to:
 
-- Transformations are applied in order: `Extract / Match → Mapping → Scaling`.
-- String values are auto-converted: If a string looks like a number (e.g., `"123"`), no extra parsing is needed.
-- Only one string transformation per value: Use either `extract_value` or `match_pattern` — not both.
-- Scaling is always last: Applied after all string processing and mappings.
+- Extract numeric substrings from mixed strings.
+- Scale or convert units (bytes → bits, megabits → bits).
+- Map discrete states (1 = up, 2 = down, etc.) into named dimensions.
 
-**Available Value Transformation**:
+**Available Value Transformations**:
 
-| **Transformation** | **Purpose**                          | **Input Type** | **Example Use Case**                  |
-|--------------------|--------------------------------------|----------------|---------------------------------------|
-| `extract_value`    | Extract number from a string         | String         | `"25C"` → `25`                        |
-| `match_pattern`    | Parse and rebuild strings with regex | String         | `"Version 15.2.4"` → `"15.2"` → `152` |
-| `mapping`          | Map specific values to numbers       | Any            | `"onBattery"` → `2`                   |
-| `scale_factor`     | Convert units                        | Numeric        | `KB → bytes (×1024)`                  |
+| Transformation                  | Purpose                                                           | Example Input → Output              |
+|---------------------------------|-------------------------------------------------------------------|-------------------------------------|
+| `mapping`                       | Convert numeric or string codes into state dimensions.            | `1 → up`, `2 → down`, `3 → testing` |
+| `extract_value`                 | Extract a numeric substring via regex.                            | `"23.8 °C" → "23"`                  |
+| `scale_factor`                  | Multiply values by a constant to adjust units.                    | `"1.5" (MBps) × 8 → 12 (Mbps)`      |
+| `match_pattern` + `match_value` | *Not applicable* for metric values (use `extract_value` instead). | —                                   |
 
-### With Extract Value
+**Combination & Behavior**:
 
-- Use **extract_value** to pull numeric parts out of strings.
-- The **first regex capture group** becomes the metric value.
+| Rule                      | Description                                                                                                               |
+|---------------------------|---------------------------------------------------------------------------------------------------------------------------|
+| **Where**                 | Value transformations are used inside `metrics[*].symbol` or `metrics[*].symbols[]`.                                      |
+| **Order of application**  | 1️⃣ `extract_value` (if present) → 2️⃣ `mapping` → 3️⃣ `scale_factor`.                                                    |
+| **Scale factor position** | `scale_factor` is always applied **last**, after all other transformations.                                               |
+| **Data type handling**    | Transformations preserve numeric type (integer/float) unless the mapping converts it to a multi-value metric.             |
+| **Error handling**        | If a transformation fails (e.g., regex doesn’t match), the collector keeps the original value.                            |
+| **Applicability**         | Transformations affect metric values only — not metadata or tags.                                                         |
+| **Mapping behavior**      | Always produces a multi-value metric where each mapped entry becomes a dimension; the active one reports `1`, others `0`. |
 
-```yaml
-symbols:
-  - OID: 1.3.6.1.4.1.232.6.2.6.7.1.3.1.4
-    name: cpuTemperature
-    extract_value: '(\d+)C'      # "25C" → 25
-    unit: "celsius"
+**Quick Syntax Recap**:
 
-  - OID: 1.3.6.1.4.1.12124.1.13.1.3
-    name: fanSpeed
-    extract_value: '(\d+)\s*RPM' # "1200 RPM" → 1200
-    unit: "rpm"
-
-  - OID: 1.3.6.1.4.1.2.3.51.2.2.7.1.0
-    name: batteryVoltage
-    extract_value: '(\d+\.\d+)V' # "13.6V" → 13.6
-    unit: "volts"
-```
-
-### With Match Pattern
-
-- Use `match_pattern` and `match_value` for **complex string parsing**.
-- This allows multiple capture groups and string reconstruction before mapping or scaling.
-
-```yaml
-symbols:
-  - OID: 1.3.6.1.2.1.1.1.0
-    name: version_number
-    match_pattern: 'Version (\d+)\.(\d+)\.(\d+)'
-    match_value: '$1$2'  # "Version 15.2.4" → "152"
+- `mapping`
+    ```yaml
     mapping:
-      "152": "152"  # Major version 15.2
-      "160": "160"  # Major version 16.0
-```
+      1: up
+      2: down
+      3: testing
+     ``` 
 
-**Note**: The final result must still resolve to a **number** — directly or through a mapping.
+- `extract_value`
+    ```yaml
+    extract_value: '(\d+)'   # First capture group is used
+    ```
 
-### With Mapping
+- `scale_factor`
+    ```yaml
+    scale_factor: 8   # Octets → bits
+    ```
 
-- Use `mapping` to convert specific string or numeric values into numbers.
-- It’s applied **after** extraction/matching, but **before** scaling.
+### Mapping
+
+Use `mapping` to convert raw metric values into **state dimensions**.
+
+Each mapping entry defines a **dimension name** and the numeric or string value that triggers it.
+
+**The collector**:
+
+- Evaluates the value against the mapping table.
+- For each mapping entry, creates a **dimension** named after the mapped key.
+- Sets that dimension to `1` if the current value matches the key, or `0` otherwise.
+- If the value doesn’t match any key, all mapped dimensions are `0`.
+- Works only for **metric values**, not for tags or metadata.
 
 ```yaml
-symbols:
-  - OID: 1.3.6.1.4.1.318.1.1.1.4.1.1.0
-    name: upsStatus
+metrics:
+  - OID: 1.3.6.1.2.1.2.2.1.7
+    name: ifAdminStatus
+    chart_meta:
+      description: Current administrative state of the interface
+      family: 'Network/Interface/Status/Admin'
+      unit: "{status}"
     mapping:
-      "onLine": "1"       # Normal operation
-      "onBattery": "2"    # Running on battery
-      "onBypass": "3"     # In bypass mode
-      "off": "0"          # Powered off
+      1: up
+      2: down
+      3: testing
 ```
 
-Mappings are also used to standardize vendor-specific string states across devices.
+**What this does**:
 
-### With Scale Factor
+- Converts SNMP integer values (1, 2, 3) into a **multi-value metric** with dimensions `up`, `down`, and `testing`.
+- The dimension corresponding to the current value reports `1`; all others report `0`.
 
-- Use `scale_factor` to **unit conversions** (e.g., KB to bytes, seconds to milliseconds) or **precision adjustments**.
-- It’s applied **last**, after all string processing and mappings.
+### Extract Value
+
+Use `extract_value` to extract a **numeric or string portion** from the raw SNMP value using a **regular expression**.
+
+This is often used when a metric is encoded as a string that contains numeric data (e.g. `"23.8 °C"`).
+
+**The collector**:
+
+- Applies the regular expression to the raw SNMP value.
+- Uses the **first capture group** `( … )` as the new metric value.
+- If the pattern doesn’t match, the original value is kept.
+- Works for any metric type (string or numeric).
+- When multiple `symbols` are defined, the first non-empty result is used.
 
 ```yaml
-symbols:
-  # Memory/Storage conversions
-  - OID: 1.3.6.1.4.1.9.9.48.1.1.1.5.1
-    name: memoryUsed
-    scale_factor: 1024    # KB → bytes
-    unit: "bytes"
-
-  # Temperature conversion
-  - OID: 1.3.6.1.4.1.9.9.13.1.3.1.3
-    name: temperature
-    scale_factor: 0.1     # Tenths → degrees
-    unit: "celsius"
-
-  # Percentage conversion
-  - OID: 1.3.6.1.4.1.2.3.51.2.22.1.5.1.1.4
-    name: cpuUsage
-    scale_factor: 0.01    # Hundredths → percent
-    unit: "percent"
-
-  # Power conversion
-  - OID: 1.3.6.1.4.1.318.1.1.1.12.2.3.1.1.2
-    name: power
-    scale_factor: 10      # Tens of watts → watts
-    unit: "watts"
+metrics:
+  - MIB: CORIANT-GROOVE-MIB
+    table:
+      OID: 1.3.6.1.4.1.42229.1.2.3.1.1
+      name: shelfTable
+    symbols:
+      - OID: 1.3.6.1.4.1.42229.1.2.3.1.1.1.3
+        name: coriant.groove.shelfInletTemperature
+        # Example: "23.8 °C" → "23"
+        extract_value: '(\d+)'
+        chart_meta:
+          description: Shelf inlet temperature
+          family: 'Hardware/Shelf/Temperature/Inlet'
+          unit: "Cel"
 ```
 
-### Combining Transformations
+**What this does**:
 
-Transformations can be combined, and are applied in this order:
+- Applies the regex `(\d+)` to the string `"23.8 °C"`.
+- Extracts only the numeric part `"23"` and uses it as the metric value.
+- If the value doesn’t match, the original string is retained.
+- Ideal for string metrics that embed numbers, units, or labels.
 
-1. **Extract Value** OR **Match Pattern** → string processing
-2. **Mapping** → normalization to numeric codes
-3. **Scale Factor** → numeric unit conversion
+### Scale Factor
+
+Use `scale_factor` to **multiply collected metric values** by a constant.
+
+This transformation is typically used to convert between units (for example, bytes to bits).
+
+**The collector**:
+
+- Multiplies the raw SNMP value by the specified factor.
+- Applies to both integer and floating-point values.
+- Keeps the result in the same numeric type (integer or float).
+- Works for **metric values only** (not for tags or metadata).
+- Applies **after all other transformations** on the same metric (such as `extract_value`).
 
 ```yaml
-symbols:
-  # Example 1: Temperature sensor returns "temp: 250 tenths"
-  - OID: 1.3.6.1.4.1.12345.1.1.1
-    name: sensor_temperature
-    extract_value: 'temp: (\d+)'  # Step 1: extract "250"
-    scale_factor: 0.1             # Step 2: 250 → 25.0
-    unit: "celsius"
+metrics:
+  - MIB: IP-MIB
+    table:
+      OID: 1.3.6.1.2.1.4.31.1
+      name: ipSystemStatsTable
+    symbols:
+      - OID: 1.3.6.1.2.1.4.31.1.1.6
+        name: ipSystemStatsHCInOctets
+        chart_meta:
+          description: Octets received in input IP datagrams
+          family: 'Network/IP/Traffic/Total/In'
+          unit: "bit/s"
+        scale_factor: 8   # Octets → bits
 
-  # Example 2: String state mapped to a score
-  - OID: 1.3.6.1.4.1.12345.1.1.2
-    name: device_health_score
-    mapping:
-      "healthy": "100"
-      "degraded": "50"
-      "failed": "0"
-    scale_factor: 0.01            # Step 2: convert to ratio
-    unit: "ratio"
+  - MIB: IF-MIB
+    symbol:
+      OID: 1.3.6.1.2.1.31.1.1.1.15
+      name: ifHighSpeed
+      chart_meta:
+        description: Estimate of the interface's current bandwidth
+        family: 'Network/Interface/Speed'
+        unit: "bit/s"
+      scale_factor: 1000000   # Megabits → bits
 ```
+
+**What this does**:
+
+- Multiplies octet counters by `8`, reporting traffic in **bits per second** instead of bytes.
+- Converts `ifHighSpeed` from **megabits** to **bits**.
+- Ensures scaling happens **after** other transformations, such as value extraction or regex processing.
 
 ## Virtual Metrics
 
