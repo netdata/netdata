@@ -6,6 +6,9 @@
 
 **Merged pull requests:**
 
+- Regenerate integrations docs [\#21205](https://github.com/netdata/netdata/pull/21205) ([netdatabot](https://github.com/netdatabot))
+- Regenerate integrations docs [\#21202](https://github.com/netdata/netdata/pull/21202) ([netdatabot](https://github.com/netdatabot))
+- Acquire and release metric as needed during journal v2 migration [\#21200](https://github.com/netdata/netdata/pull/21200) ([stelfrag](https://github.com/stelfrag))
 - fix\(packagin/otel-plugin\): remove cap\_net\_bind\_service [\#21198](https://github.com/netdata/netdata/pull/21198) ([ilyam8](https://github.com/ilyam8))
 - MSSQL Small fixes \(windows.plugin\) [\#21197](https://github.com/netdata/netdata/pull/21197) ([thiagoftsm](https://github.com/thiagoftsm))
 - Netdata API [\#21193](https://github.com/netdata/netdata/pull/21193) ([kanelatechnical](https://github.com/kanelatechnical))
@@ -16,6 +19,7 @@
 - Regenerate integrations docs [\#21185](https://github.com/netdata/netdata/pull/21185) ([netdatabot](https://github.com/netdatabot))
 - Calculate weights for multiple nodes in parallel [\#21184](https://github.com/netdata/netdata/pull/21184) ([stelfrag](https://github.com/stelfrag))
 - Fix ML concurrent dimension training  [\#21183](https://github.com/netdata/netdata/pull/21183) ([stelfrag](https://github.com/stelfrag))
+- SQL Server Jobs \(windows.plugin\) [\#21182](https://github.com/netdata/netdata/pull/21182) ([thiagoftsm](https://github.com/thiagoftsm))
 - fix\(health/dyncfg\): add mising "repeat" in userconfig response [\#21181](https://github.com/netdata/netdata/pull/21181) ([ilyam8](https://github.com/ilyam8))
 - chore\(go.d/snmp\): refactor static\_tags to structured key/value format [\#21180](https://github.com/netdata/netdata/pull/21180) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations docs [\#21179](https://github.com/netdata/netdata/pull/21179) ([netdatabot](https://github.com/netdatabot))
@@ -38,6 +42,7 @@
 - Regenerate integrations docs [\#21156](https://github.com/netdata/netdata/pull/21156) ([netdatabot](https://github.com/netdatabot))
 - Fix feature size calculation and add error handling for KMeans training [\#21155](https://github.com/netdata/netdata/pull/21155) ([stelfrag](https://github.com/stelfrag))
 - Add `ServiceNow` integration [\#21154](https://github.com/netdata/netdata/pull/21154) ([car12o](https://github.com/car12o))
+- improvement\(go.d/mysql\): Measure redo log occupancy [\#21153](https://github.com/netdata/netdata/pull/21153) ([arkamar](https://github.com/arkamar))
 - Customize node name addition [\#21151](https://github.com/netdata/netdata/pull/21151) ([kanelatechnical](https://github.com/kanelatechnical))
 - Skip adding Sentry breadcrumb during shutdown timeout [\#21150](https://github.com/netdata/netdata/pull/21150) ([stelfrag](https://github.com/stelfrag))
 - Fix NaN check in anomaly score calculation [\#21149](https://github.com/netdata/netdata/pull/21149) ([stelfrag](https://github.com/stelfrag))
@@ -446,10 +451,6 @@
 - Cloud Docs: updated [\#20661](https://github.com/netdata/netdata/pull/20661) ([kanelatechnical](https://github.com/kanelatechnical))
 - chore\(go.d/snmp-profiles\): charts meta fixes and fam updates p8 [\#20660](https://github.com/netdata/netdata/pull/20660) ([ilyam8](https://github.com/ilyam8))
 - Regenerate integrations docs [\#20659](https://github.com/netdata/netdata/pull/20659) ([netdatabot](https://github.com/netdatabot))
-- Improve job completion handling with timeout mechanism [\#20657](https://github.com/netdata/netdata/pull/20657) ([stelfrag](https://github.com/stelfrag))
-- Fix coverity issues [\#20656](https://github.com/netdata/netdata/pull/20656) ([stelfrag](https://github.com/stelfrag))
-- Regenerate integrations docs [\#20655](https://github.com/netdata/netdata/pull/20655) ([netdatabot](https://github.com/netdatabot))
-- Stop submitting analytics [\#20654](https://github.com/netdata/netdata/pull/20654) ([stelfrag](https://github.com/stelfrag))
 
 ## [v2.5.4](https://github.com/netdata/netdata/tree/v2.5.4) (2025-06-24)
 
