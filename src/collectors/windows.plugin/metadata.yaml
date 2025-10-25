@@ -905,6 +905,88 @@ modules:
                 - name: semaphores
   - meta:
       plugin_name: windows.plugin
+      module_name: GetHardwareInfo
+      monitored_instance:
+        name: Hardware information collected from kernel ring.
+        link: "https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/"
+        categories:
+          - data-collection.windows-systems
+        icon_filename: "windows.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - cpu
+        - temperature
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors cpu temperature on Windows systems.
+        method_description: |
+          It reads `msr` register using netdata_driver.sys driver.
+      supported_platforms:
+        include: ["windows"]
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+                This optional feature requires the Netdata Driver (netdata_driver.sys) to be installed on the host.
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:windows:GetHardwareInfo]"
+          description: "The Netdata main configuration file"
+        options:
+          description: ""
+          folding:
+            title: "Config option"
+            enabled: false
+          list:
+            - name: update every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: "This metric show latest CPU temperature."
+          labels: []
+          metrics:
+            - name: cpu.temperature
+              description: Core temperature
+              unit: "Celcius"
+              chart_type: line
+              dimensions:
+                - name: a dimension per core
+  - meta:
+      plugin_name: windows.plugin
       module_name: PerflibThermalZone
       monitored_instance:
         name: System thermal zone
