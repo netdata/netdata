@@ -1,0 +1,7 @@
+BACKSLASHES=C:\\Windows\\System32\\cmd.exe
+DOLLAR_BRACES=test  test
+DOUBLE_QUOTES=Double quotes with 'single quotes' inside
+MESSAGE=test message
+QUOTES_TEST=Single quotes with "double quotes" inside
+TEST_REWRITE=Found: 
+

@@ -1,0 +1,59 @@
+# Test YAML constructs that might behave differently between parsers
+pattern: "(?P<message>.*)"
+
+inject:
+  # Test multiline string styles that might differ
+  - key: LITERAL_MULTILINE
+    value: |
+      Line one
+      Line two with spaces   
+      Line three
+      
+  - key: FOLDED_MULTILINE
+    value: >
+      This is a folded style
+      that should become
+      a single line.
+      
+  - key: SINGLE_QUOTE_MULTILINE
+    value: 'Single quoted
+           with newline'
+           
+  - key: DOUBLE_QUOTE_ESCAPES
+    value: "Contains \"quotes\" and \\backslashes\\ and \n newlines"
+    
+  # Test empty values in different ways
+  - key: EMPTY_STRING
+    value: ""
+    
+  - key: NULL_VALUE
+    value: null
+    
+  - key: TILDE_NULL
+    value: ~
+    
+  # Test boolean representations
+  - key: BOOL_TRUE
+    value: true
+    
+  - key: BOOL_YES
+    value: yes
+    
+  - key: BOOL_ON
+    value: on
+    
+  # Test numeric representations
+  - key: DECIMAL_NUMBER
+    value: 123.456
+    
+  - key: SCIENTIFIC_NOTATION
+    value: 1.23e4
+    
+  - key: HEX_NUMBER
+    value: 0xFF
+    
+  - key: OCTAL_NUMBER
+    value: 0o755
+    
+  - key: BINARY_NUMBER
+    value: 0b1010
