@@ -235,6 +235,9 @@ Requires: %{name}-dashboard
 %if 0%{?_have_ebpf}
 Requires: %{name}-plugin-ebpf = %{version}
 %endif
+%if 0%{?_have_rust}
+Requires: %{name}-plugin-otel = %{version}
+%endif
 Requires: %{name}-plugin-apps = %{version}
 Requires: %{name}-plugin-pythond = %{version}
 Requires: %{name}-plugin-go = %{version}
