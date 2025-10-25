@@ -84,55 +84,6 @@ void arl_callback_str2ull(const char *name, uint32_t hash, const char *value, vo
 void arl_callback_str2kernel_uint_t(const char *name, uint32_t hash, const char *value, void *dst);
 void arl_callback_ssize_t(const char *name, uint32_t hash, const char *value, void *dst);
 
-// check a keyword against the ARL
-// this is to be called for each keyword read from source data
-// s = the keyword, as collected
-// src = the src data to be passed to the processor
-// it is defined in the header file in order to be inlined
-static inline int arl_check(ARL_BASE *base, const char *keyword, const char *value) {
-    ARL_ENTRY *e = base->next_keyword;
-
-#ifdef NETDATA_INTERNAL_CHECKS
-    if(unlikely((base->fast + base->slow) % (base->expected + base->allocated) == 0 && (base->fast + base->slow) > (base->expected + base->allocated) * base->iteration))
-        netdata_log_info("ARL '%s': Did you forget to call arl_begin()?", base->name);
-#endif
-
-    // it should be the first entry (pointed by base->next_keyword)
-    if(likely(!strcmp(keyword, e->name))) {
-        // it is
-
-#ifdef NETDATA_INTERNAL_CHECKS
-        base->fast++;
-#endif
-
-        e->flags |= ARL_ENTRY_FLAG_FOUND;
-
-        // execute the processor
-        if(unlikely(e->dst)) {
-            e->processor(e->name, e->hash, value, e->dst);
-            base->found++;
-        }
-
-        // be prepared for the next iteration
-        base->next_keyword = e->next;
-        if(unlikely(!base->next_keyword))
-            base->next_keyword = base->head;
-
-        // stop if we collected all the values for this iteration
-        if(unlikely(base->found == base->wanted)) {
-            // fprintf(stderr, "FOUND ALL WANTED 2: found = %zu, wanted = %zu, expected %zu\n", base->found, base->wanted, base->expected);
-            return 1;
-        }
-
-        return 0;
-    }
-
-#ifdef NETDATA_INTERNAL_CHECKS
-    base->slow++;
-#endif
-
-    // we read from source, a not-expected keyword
-    return arl_find_or_create_and_relink(base, keyword, value);
-}
+int arl_check(ARL_BASE *base, const char *keyword, const char *value);
 
 #endif //NETDATA_ADAPTIVE_RESORTABLE_LIST_H

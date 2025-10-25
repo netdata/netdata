@@ -15,6 +15,10 @@ static size_t zero_all_targets(struct target *root) {
         for(size_t f = 0; f < PDF_MAX ;f++)
             w->values[f] = 0;
 
+#if (PROCESSES_HAVE_SMAPS_ROLLUP == 1)
+        w->needs_smaps_update = false;
+#endif
+
         w->uptime_min = 0;
         w->uptime_max = 0;
 
@@ -52,7 +56,7 @@ static size_t zero_all_targets(struct target *root) {
     return count;
 }
 
-static inline void aggregate_pid_on_target(struct target *w, struct pid_stat *p, struct target *o __maybe_unused) {
+static inline void aggregate_pid_on_target(struct target *w, struct pid_stat *p, struct target *o) {
     if(unlikely(!p->updated)) {
         // the process is not running
         return;
@@ -66,6 +70,16 @@ static inline void aggregate_pid_on_target(struct target *w, struct pid_stat *p,
 #if (PROCESSES_HAVE_FDS == 1) && (PROCESSES_HAVE_PID_LIMITS == 1)
     if(p->openfds_limits_percent > w->max_open_files_percent)
         w->max_open_files_percent = p->openfds_limits_percent;
+#endif
+
+#if (PROCESSES_HAVE_SMAPS_ROLLUP == 1)
+    kernel_uint_t shared = p->values[PDF_VMSHARED];
+    if(shared > 0) {
+        if(o && o != w)
+            o->needs_smaps_update = true;
+        if(!o || o != w)
+            w->needs_smaps_update = true;
+    }
 #endif
 
     for(size_t f = 0; f < PDF_MAX ;f++)
@@ -89,6 +103,13 @@ static inline void cleanup_exited_pids(void) {
         if(!p->updated && (!p->keep || p->keeploops > 0)) {
             if(unlikely(debug_enabled && (p->keep || p->keeploops)))
                 debug_log(" > CLEANUP cannot keep exited process %d (%s) anymore - removing it.", p->pid, pid_stat_comm(p));
+
+#if (PROCESSES_HAVE_SMAPS_ROLLUP == 1)
+            if(p->values[PDF_VMSHARED] > 0) {
+                if(p->target)
+                    p->target->needs_smaps_update = true;
+            }
+#endif
 
 #if (PROCESSES_HAVE_FDS == 1)
             for(size_t c = 0; c < p->fds_size; c++)
@@ -183,7 +204,13 @@ void aggregate_processes_to_targets(void) {
         // --------------------------------------------------------------------
         // apps_groups and tree target
 
-        aggregate_pid_on_target(p->target, p, NULL);
+        aggregate_pid_on_target(p->target, p,
+#if (PROCESSES_HAVE_SMAPS_ROLLUP == 1)
+                                p->prev_target
+#else
+                                NULL
+#endif
+                                );
 
 
         // --------------------------------------------------------------------
@@ -244,7 +271,18 @@ void aggregate_processes_to_targets(void) {
         if(enable_file_charts)
             aggregate_pid_fds_on_targets(p);
 #endif
+
+#if (PROCESSES_HAVE_SMAPS_ROLLUP == 1)
+        p->prev_target = p->target;
+#endif
     }
 
     cleanup_exited_pids();
+
+#if (PROCESSES_HAVE_SMAPS_ROLLUP == 1)
+    for(struct pid_stat *p = root_of_pids(); p ; p = p->next) {
+        if(p->target && p->target->needs_smaps_update && p->values[PDF_VMSHARED] > 0)
+            p->vmshared_delta = p->values[PDF_VMSHARED];
+    }
+#endif
 }

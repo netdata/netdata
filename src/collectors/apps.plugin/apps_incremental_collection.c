@@ -50,6 +50,15 @@ bool managed_log(struct pid_stat *p, PID_LOG log, bool status) {
                         netdata_log_error("Cannot process %s/proc/%d/limits (command '%s')", netdata_configured_host_prefix, p->pid, pid_stat_comm(p));
 #endif
 
+                    case PID_LOG_LIMITS_DETAIL:
+                        break;
+
+#if (PROCESSES_HAVE_SMAPS_ROLLUP == 1)
+                    case PID_LOG_SMAPS:
+                        netdata_log_error("Cannot process %s/proc/%d/smaps_rollup (command '%s')", netdata_configured_host_prefix, p->pid, pid_stat_comm(p));
+                        break;
+#endif
+
                     case PID_LOG_STAT:
                         break;
 

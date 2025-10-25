@@ -76,6 +76,7 @@ struct pid_info {
 #define PROCESSES_HAVE_VMSHARED              0
 #define PROCESSES_HAVE_RSSFILE               0
 #define PROCESSES_HAVE_RSSSHMEM              0
+#define PROCESSES_HAVE_SMAPS_ROLLUP          0
 #define PROCESSES_HAVE_FDS                   1
 #define PROCESSES_HAVE_HANDLES               0
 #define PROCESSES_HAVE_CMDLINE               1
@@ -106,6 +107,7 @@ struct pid_info {
 #define PROCESSES_HAVE_VMSHARED              0
 #define PROCESSES_HAVE_RSSFILE               0
 #define PROCESSES_HAVE_RSSSHMEM              0
+#define PROCESSES_HAVE_SMAPS_ROLLUP          0
 #define PROCESSES_HAVE_FDS                   0
 #define PROCESSES_HAVE_HANDLES               1
 #define PROCESSES_HAVE_CMDLINE               0
@@ -136,6 +138,7 @@ struct pid_info {
 #define PROCESSES_HAVE_VMSHARED              1
 #define PROCESSES_HAVE_RSSFILE               1
 #define PROCESSES_HAVE_RSSSHMEM              1
+#define PROCESSES_HAVE_SMAPS_ROLLUP          1
 #define PROCESSES_HAVE_FDS                   1
 #define PROCESSES_HAVE_HANDLES               0
 #define PROCESSES_HAVE_CMDLINE               1
@@ -329,6 +332,11 @@ typedef enum __attribute__((packed)) {
     PDF_VMSHARED,   // the shared memory used by the process, in bytes
 #endif
 
+#if (PROCESSES_HAVE_SMAPS_ROLLUP == 1)
+    PDF_MEM_ESTIMATED, // estimated memory usage using smaps ratios, in bytes
+    PDF_PSS,        // proportional set size, in bytes
+#endif
+
 #if (PROCESSES_HAVE_RSSFILE == 1)
     PDF_RSSFILE,    // unit: bytes
 #endif
@@ -413,6 +421,7 @@ struct target {
 #endif
 
     bool exposed:1;         // if set, we have sent this to netdata
+    bool needs_smaps_update:1;
 
     struct pid_on_target *root_pid; // list of aggregated pids for target debugging
 
@@ -434,6 +443,9 @@ typedef enum __attribute__((packed)) {
     PID_LOG_STAT            = (1 << 4),
     PID_LOG_LIMITS          = (1 << 5),
     PID_LOG_LIMITS_DETAIL   = (1 << 6),
+#if (PROCESSES_HAVE_SMAPS_ROLLUP == 1)
+    PID_LOG_SMAPS           = (1 << 7),
+#endif
 } PID_LOG;
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -493,6 +505,7 @@ struct pid_stat {
     struct pid_stat *prev;
 
     struct target *target;          // app_groups.conf/tree targets
+    struct target *prev_target;
 
 #if (PROCESSES_HAVE_UID == 1)
     struct target *uid_target;      // uid based targets
@@ -584,6 +597,14 @@ struct pid_stat {
     char *io_filename;
     char *cmdline_filename;
     char *limits_filename;
+#if (PROCESSES_HAVE_SMAPS_ROLLUP == 1)
+    char *smaps_rollup_filename;
+    ARL_BASE *smaps_rollup_arl;
+    kernel_uint_t vmshared_delta;
+    NETDATA_DOUBLE pss_total_ratio;
+    size_t last_pss_iteration;
+    kernel_uint_t pss_bytes;
+#endif
 #endif
 };
 
@@ -754,6 +775,19 @@ bool OS_FUNCTION(apps_os_get_pid_cmdline)(struct pid_stat *p, char *cmdline, siz
 
 #if (PROCESSES_HAVE_FDS == 1)
 bool OS_FUNCTION(apps_os_read_pid_fds)(struct pid_stat *p, void *ptr);
+#endif
+
+#if (PROCESSES_HAVE_SMAPS_ROLLUP == 1)
+bool OS_FUNCTION(apps_os_read_pid_smaps_rollup)(struct pid_stat *p, void *ptr);
+bool OS_FUNCTION(apps_os_have_smaps_rollup)(void);
+static inline bool apps_os_have_smaps_rollup(void) {
+    return OS_FUNCTION(apps_os_have_smaps_rollup)();
+}
+extern int pss_refresh_period;
+#else
+static inline bool OS_FUNCTION(apps_os_read_pid_smaps_rollup)(struct pid_stat *p __maybe_unused, void *ptr __maybe_unused) { return false; }
+static inline bool OS_FUNCTION(apps_os_have_smaps_rollup)(void) { return false; }
+static inline bool apps_os_have_smaps_rollup(void) { return false; }
 #endif
 
 #if (ALL_PIDS_ARE_READ_INSTANTLY == 0)
