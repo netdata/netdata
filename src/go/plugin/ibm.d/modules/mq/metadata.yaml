@@ -24,6 +24,19 @@ modules:
           Monitors IBM MQ queue managers, queues, channels, and topics
           using the PCF (Programmable Command Format) protocol.
 
+          By default the collector tracks the critical system queues `SYSTEM.DEAD.LETTER.QUEUE`,
+          `SYSTEM.ADMIN.COMMAND.QUEUE`, and `SYSTEM.ADMIN.STATISTICS.QUEUE`. All other queues are
+          opt-in via the `include_queues` list, with `exclude_queues` removing noisy patterns such as
+          `SYSTEM.*` or `AMQ.*`. Include patterns take precedence over excludes so you can safely
+          monitor individual system queues while dropping the broader wildcard.
+
+          Per-queue charts are bounded by `max_queues` (default 50). When more queues are discovered,
+          the collector exports the busiest ones individually, rolls the remainder into an
+          aggregated `__other__` dimension, and logs a throttled warning listing the overflowed
+          groups. Parallel queue-group charts summarise depth, traffic, and backlog per naming
+          prefix (first two dot-separated segments, collapsing all `SYSTEM.*` queues together), so
+          high-level visibility is never lost even when detailed charts are trimmed.
+
         method_description: |
           The collector connects to IBM MQ and collects metrics via its monitoring interface.
       supported_platforms:
@@ -478,6 +491,58 @@ modules:
               dimensions:
                 - name: enabled
                 - name: disabled
+        - name: queuegroup
+          description: These metrics refer to queuegroup instances.
+          labels:
+            - name: group
+              description: Group identifier
+          metrics:
+            - name: mq.queue_group.depth
+              description: Queue Group Depth
+              unit: messages
+              chart_type: line
+              dimensions:
+                - name: current
+                - name: max
+            - name: mq.queue_group.depth_percentage
+              description: Queue Group Depth Percentage
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: percentage
+            - name: mq.queue_group.messages
+              description: Queue Group Messages
+              unit: messages/s
+              chart_type: line
+              dimensions:
+                - name: enqueued
+                - name: dequeued
+            - name: mq.queue_group.connections
+              description: Queue Group Connections
+              unit: connections
+              chart_type: line
+              dimensions:
+                - name: input
+                - name: output
+            - name: mq.queue_group.uncommitted_msgs
+              description: Queue Group Uncommitted Messages
+              unit: messages
+              chart_type: line
+              dimensions:
+                - name: uncommitted
+            - name: mq.queue_group.file_size
+              description: Queue Group File Size
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: current
+                - name: max
+            - name: mq.queue_group.oldest_msg_age
+              description: Queue Group Oldest Message Age
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: oldest_msg_age
         - name: global
           description: These metrics refer to the entire monitored instance.
           labels: []

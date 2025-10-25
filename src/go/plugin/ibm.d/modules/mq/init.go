@@ -4,10 +4,26 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
+	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/modules/mq/contexts"
 	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/protocols/pcf"
 )
+
+func compileMatcher(patterns []string) (matcher.Matcher, error) {
+	if len(patterns) == 0 {
+		return nil, nil
+	}
+
+	expr := strings.Join(patterns, " ")
+	expr = strings.TrimSpace(expr)
+	if expr == "" {
+		return nil, nil
+	}
+
+	return matcher.NewSimplePatternsMatcher(expr)
+}
 
 // defaultConfig returns a new Config with all default values set.
 // This is used both for New() and for the module registration to ensure
@@ -46,15 +62,24 @@ func defaultConfig() Config {
 		StatisticsInterval: 60, // Default 60s, auto-detected STATINT overwrites if available
 		SysTopicInterval:   10, // Default 10s per IBM docs, user can override if customized
 
-		// Selector defaults - empty means collect nothing (user must explicitly configure)
-		QueueSelector:        "",
+		// Queue selection defaults: monitor core system queues, ignore churny patterns
+		IncludeQueues: []string{
+			"SYSTEM.DEAD.LETTER.QUEUE",
+			"SYSTEM.ADMIN.COMMAND.QUEUE",
+			"SYSTEM.ADMIN.STATISTICS.QUEUE",
+		},
+		ExcludeQueues: []string{
+			"SYSTEM.*",
+			"AMQ.*",
+		},
+
 		ChannelSelector:      "",
 		TopicSelector:        "",
 		ListenerSelector:     "",
 		SubscriptionSelector: "",
 
 		// Cardinality control defaults
-		MaxQueues:    100,
+		MaxQueues:    50,
 		MaxChannels:  100,
 		MaxTopics:    100,
 		MaxListeners: 100,
@@ -106,13 +131,26 @@ func (c *Collector) Init(ctx context.Context) error {
 		Password:     c.Config.Password,
 	}, c.State)
 
-	// Log the selectors - these are applied locally after discovery
-	if c.Config.QueueSelector == "" {
-		c.Infof("Queue selector: empty (no queues will be collected)")
-	} else if c.Config.QueueSelector == "*" {
-		c.Infof("Queue selector: all queues will be collected")
+	includeMatcher, err := compileMatcher(c.Config.IncludeQueues)
+	if err != nil {
+		return fmt.Errorf("invalid include_queues patterns: %w", err)
+	}
+	excludeMatcher, err := compileMatcher(c.Config.ExcludeQueues)
+	if err != nil {
+		return fmt.Errorf("invalid exclude_queues patterns: %w", err)
+	}
+	c.queueIncludeMatcher = includeMatcher
+	c.queueExcludeMatcher = excludeMatcher
+
+	if len(c.Config.IncludeQueues) == 0 {
+		c.Infof("Queue include patterns: none (all queues eligible)")
 	} else {
-		c.Infof("Queue selector configured: %s (applied after discovery)", c.Config.QueueSelector)
+		c.Infof("Queue include patterns: %v", c.Config.IncludeQueues)
+	}
+	if len(c.Config.ExcludeQueues) == 0 {
+		c.Infof("Queue exclude patterns: none")
+	} else {
+		c.Infof("Queue exclude patterns: %v", c.Config.ExcludeQueues)
 	}
 
 	if c.Config.ChannelSelector == "" {
