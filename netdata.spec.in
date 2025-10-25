@@ -64,15 +64,6 @@ AutoReqProv: yes
 # Redefine centos_ver to standardize on a single macro
 %{?rhel:%global centos_ver %rhel}
 
-# Only try to build OTEL plugin if we have rust
-%global _nd_rust_cmd %(command -v rustc)
-
-%if "%{_nd_rustc_cmd}" == ""
-%global _have_rust 0
-%else
-%global _have_rust 1
-%endif
-
 # Disable FreeIPMI on Amazon Linux 2023 and newer
 %if 0%{?amzn} >= 2023
 %global _have_freeipmi 0
@@ -131,6 +122,18 @@ AutoReqProv: yes
 %global _have_mongo_exporter 1
 %endif
 
+# Only build OTEL plugin if we have rust
+%if %{?_upstream_rust_toolchain:0}%{!?_upstream_rust_toolchain:1}
+%if 0%{?centos_ver} && 0%{?centos_ver} >= 9
+BuildRequires: cargo >= 1.85.1
+%global _have_otel 1
+%else
+%global _have_otel 0
+%endif
+%else
+%global _have_otel 1
+%endif
+
 # log2journal can’t build on some systems, but we don’t support those systems anymore.
 %global _have_log2journal 1
 
@@ -187,6 +190,7 @@ BuildRequires: pkgconfig(libuv)
 BuildRequires: pkgconfig(openssl)
 BuildRequires: pkgconfig(libcurl)
 BuildRequires: pkgconfig(liblz4)
+BuildRequires: pkgconfig(libmnl)
 BuildRequires: pkgconfig(yaml-0.1)
 BuildRequires: pkgconfig(json-c)
 BuildRequires: pkgconfig(libunwind)
@@ -449,7 +453,7 @@ advanced correlations and fast root cause analysis, native horizontal scalabilit
 	%else
 	-DENABLE_PLUGIN_SYSTEMD_UNITS=Off \
 	%endif
-	%if 0%{_have_rust}
+	%if 0%{_have_otel}
 	-DENABLE_PLUGIN_OTEL=On \
 	%else
 	-DENABLE_PLUGIN_OTEL=Off \
@@ -3233,7 +3237,7 @@ fi
 %defattr(0644,root,root,0755)
 %{_datadir}/%{name}/web
 
-%if %{_have_rust}
+%if %{_have_otel}
 %package plugin-otel
 Summary: The Open Telemetry plugin for the Netdata Agent
 Group: Applications/System
@@ -3256,7 +3260,9 @@ fi
 %endif
 
 %changelog
-* Tue Sep 30 2025 Austin Hemmelgarn <austin@netdata.cloud>
+* Mon Oct 20 2025 Konstantin Shalygin <k0ste@k0ste.ru> 0.0.0-36
+- Added cargo to BuildRequires (rust is dependency for plugin-otel)
+* Tue Sep 30 2025 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-35
 - Add IBM plugin
 * Tue Jul 29 2025 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-34
 - Add OpenTelemetry plugin
