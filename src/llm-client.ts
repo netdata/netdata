@@ -4,10 +4,13 @@ import type {
   TurnResult,
   ProviderConfig,
   LogEntry,
+  LogDetailValue,
   ReasoningLevel,
   ProviderReasoningMapping,
   ProviderReasoningValue,
   ProviderTurnMetadata,
+  LLMInterceptor,
+  LLMInterceptorContext,
 } from './types.js';
 
 import { AnthropicProvider } from './llm-providers/anthropic.js';
@@ -27,6 +30,7 @@ export class LLMClient {
   private metadataCollectors = new Map<string, (payload: { url: string; response: Response }) => Promise<ProviderTurnMetadata | undefined>>();
   private onLog?: (entry: LogEntry) => void;
   private traceLLM: boolean;
+  private traceSdk: boolean;
   private currentTurn = 0;
   private currentSubturn = 0;
   private lastRouting?: { provider?: string; model?: string };
@@ -37,19 +41,24 @@ export class LLMClient {
   private pricing?: Partial<Record<string, Partial<Record<string, { unit?: 'per_1k'|'per_1m'; currency?: 'USD'; prompt?: number; completion?: number; cacheRead?: number; cacheWrite?: number }>>>>;
   private lastMetadataTask?: Promise<void>;
   private lastTraceTask?: Promise<void>;
+  private turnInterceptor?: LLMInterceptor;
 
   constructor(
     providerConfigs: Record<string, ProviderConfig>,
     options?: {
       traceLLM?: boolean;
+      traceSDK?: boolean;
       onLog?: (entry: LogEntry) => void;
       pricing?: Partial<Record<string, Partial<Record<string, { unit?: 'per_1k'|'per_1m'; currency?: 'USD'; prompt?: number; completion?: number; cacheRead?: number; cacheWrite?: number }>>>>;
+      turnInterceptor?: LLMInterceptor;
     }
   ) {
     this.traceLLM = options?.traceLLM ?? false;
+    this.traceSdk = options?.traceSDK ?? false;
     updateAiSdkWarningPreference(this.traceLLM);
     this.onLog = options?.onLog;
     this.pricing = options?.pricing;
+    this.turnInterceptor = options?.turnInterceptor;
 
     // Initialize providers - necessary for side effects
     // eslint-disable-next-line functional/no-loop-statements
@@ -85,10 +94,30 @@ export class LLMClient {
       throw new Error(`Unknown provider: ${request.provider}`);
     }
 
+    if (this.traceSdk) {
+      request.sdkTrace = true;
+      request.sdkTraceLogger = (event) => { this.logSdkPayload(event); };
+    } else {
+      request.sdkTrace = undefined;
+      request.sdkTraceLogger = undefined;
+    }
+
     // Log request
     this.logRequest(request);
 
     const startTime = Date.now();
+    const interceptor = this.turnInterceptor;
+    let context: LLMInterceptorContext | undefined;
+    if (interceptor !== undefined && typeof interceptor.replay === 'function') {
+      context = { turn: this.currentTurn, subturn: this.currentSubturn, request };
+      const replayed = await interceptor.replay(context);
+      if (replayed !== undefined) {
+        const clone = this.cloneTurnResult(replayed);
+        this.logResponse(request, clone, Date.now() - startTime);
+        return clone;
+      }
+    }
+
     try {
       const result = await provider.executeTurn(request);
       await this.awaitLastMetadataTask();
@@ -110,6 +139,10 @@ export class LLMClient {
       this.lastCacheWriteInputTokens = undefined;
       // Log response
       this.logResponse(request, result, Date.now() - startTime);
+      if (interceptor !== undefined && typeof interceptor.record === 'function') {
+        context ??= { turn: this.currentTurn, subturn: this.currentSubturn, request };
+        await interceptor.record(context, this.cloneTurnResult(result));
+      }
       return result;
     } catch (error) {
       await this.awaitLastMetadataTask();
@@ -121,7 +154,19 @@ export class LLMClient {
       };
       // Log error response
       this.logResponse(request, errorResult, latencyMs);
+      if (interceptor !== undefined && typeof interceptor.record === 'function') {
+        context ??= { turn: this.currentTurn, subturn: this.currentSubturn, request };
+        await interceptor.record(context, this.cloneTurnResult(errorResult));
+      }
       return errorResult;
+    }
+  }
+
+  private cloneTurnResult(result: TurnResult): TurnResult {
+    try {
+      return structuredClone(result);
+    } catch {
+      return JSON.parse(JSON.stringify(result)) as TurnResult;
     }
   }
 
@@ -518,11 +563,15 @@ export class LLMClient {
     const messagesStr = JSON.stringify(request.messages);
     const totalBytes = new TextEncoder().encode(messagesStr).length;
 
-    const isFinalTurn = request.isFinalTurn === true ? ' (final turn)' : '';
     const reasoningStatus = this.describeReasoningState(request);
-    const message = `messages ${String(request.messages.length)}, ${String(totalBytes)} bytes${isFinalTurn}, reasoning=${reasoningStatus}`;
-
-    this.log('VRB', 'request', 'llm', `${request.provider}:${request.model}`, message);
+    const details: Record<string, LogDetailValue> = {
+      messages: request.messages.length,
+      request_bytes: totalBytes,
+      final_turn: request.isFinalTurn === true,
+      reasoning: reasoningStatus,
+    };
+    const message = request.isFinalTurn === true ? 'LLM request prepared (final turn)' : 'LLM request prepared';
+    this.log('VRB', 'request', 'llm', `${request.provider}:${request.model}`, message, { details });
   }
 
   private logResponse(request: TurnRequest, result: TurnResult, latencyMs: number): void {
@@ -556,32 +605,106 @@ export class LLMClient {
       const responseBytes = result.response !== undefined ? new TextEncoder().encode(result.response).length : 0;
       // Do not include routed provider/model details here; keep log concise up to bytes
       const reasoningStatus = this.describeReasoningState(request);
-      let message = `input ${String(inputTokens)}, output ${String(outputTokens)}, cacheR ${String(cacheRead)}, cacheW ${String(cacheWrite)}, cached ${String(cachedTokens)} tokens, ${String(latencyMs)}ms, ${String(responseBytes)} bytes, reasoning=${reasoningStatus}`;
+      const details: Record<string, LogDetailValue> = {
+        input_tokens: inputTokens,
+        output_tokens: outputTokens,
+        cache_read_tokens: cacheRead,
+        cache_write_tokens: cacheWrite,
+        cached_tokens: cachedTokens,
+        latency_ms: latencyMs,
+        response_bytes: responseBytes,
+        reasoning: reasoningStatus,
+      };
+      const suffix: string[] = [
+        `input ${String(inputTokens)}`,
+        `output ${String(outputTokens)}`,
+        `cacheR ${String(cacheRead)}`,
+        `cacheW ${String(cacheWrite)}`,
+        `cached ${String(cachedTokens)}`,
+        `${String(latencyMs)}ms`,
+      ];
       if (typeof result.stopReason === 'string' && result.stopReason.length > 0) {
-        message += `, stop=${result.stopReason}`;
+        details.stop_reason = result.stopReason;
+        suffix.push(`stop=${result.stopReason}`);
       }
       if (typeof costToUse === 'number') {
-        message += `, cost $${costToUse.toFixed(5)}`;
+        details.cost_usd = costToUse;
+        suffix.push(`cost $${costToUse.toFixed(6)}`);
       }
       if (metadata?.upstreamCostUsd !== undefined && metadata.upstreamCostUsd > 0) {
-        message += `, upstream $${metadata.upstreamCostUsd.toFixed(5)}`;
+        details.upstream_cost_usd = metadata.upstreamCostUsd;
+        suffix.push(`upstream $${metadata.upstreamCostUsd.toFixed(6)}`);
       }
       this.lastCostInfo = (costToUse !== undefined || metadata?.upstreamCostUsd !== undefined)
         ? { costUsd: costToUse, upstreamInferenceCostUsd: metadata?.upstreamCostUsd }
         : undefined;
-      this.log('VRB', 'response', 'llm', remoteId, message);
+      details.response_bytes = responseBytes;
+      suffix.push(`${String(responseBytes)} bytes`);
+      suffix.push(`reasoning=${reasoningStatus}`);
+
+      const message = `LLM response received (${suffix.join(', ')})`;
+      this.log('VRB', 'response', 'llm', remoteId, message, { details });
     } else {
       const fatal = result.status.type === 'auth_error' || result.status.type === 'quota_exceeded';
       const statusMessage = 'message' in result.status ? result.status.message : result.status.type;
       const reasoningStatus = this.describeReasoningState(request);
-      let message = `error [${result.status.type.toUpperCase()}] ${statusMessage} (waited ${String(latencyMs)} ms), reasoning=${reasoningStatus}`;
+      const details: Record<string, LogDetailValue> = {
+        status: result.status.type,
+        status_message: statusMessage,
+        latency_ms: latencyMs,
+        reasoning: reasoningStatus,
+      };
       if (typeof result.stopReason === 'string' && result.stopReason.length > 0) {
-        message += `, stop=${result.stopReason}`;
+        details.stop_reason = result.stopReason;
+      }
+      if (typeof costToUse === 'number') {
+        details.cost_usd = costToUse;
+      }
+      if (metadata?.upstreamCostUsd !== undefined && metadata.upstreamCostUsd > 0) {
+        details.upstream_cost_usd = metadata.upstreamCostUsd;
       }
       this.lastCostInfo = (costToUse !== undefined || metadata?.upstreamCostUsd !== undefined)
         ? { costUsd: costToUse, upstreamInferenceCostUsd: metadata?.upstreamCostUsd }
         : undefined;
-      this.log(fatal ? 'ERR' : 'WRN', 'response', 'llm', remoteId, message, fatal);
+      const message = `LLM response failed [${result.status.type.toUpperCase()}]: ${statusMessage}`;
+      this.log(fatal ? 'ERR' : 'WRN', 'response', 'llm', remoteId, message, { fatal, details });
+    }
+  }
+
+  private logSdkPayload(event: { stage: 'request' | 'response'; provider: string; model: string; payload: unknown }): void {
+    if (!this.traceSdk) return;
+    const direction = event.stage === 'request' ? 'request' : 'response';
+    const remoteId = `${event.provider}:${event.model}`;
+    const label = event.stage === 'request' ? 'SDK request payload' : 'SDK response payload';
+    const serialized = this.serializeForTrace(event.payload);
+    this.log('TRC', direction, 'llm', remoteId, label, { details: { payload: serialized } });
+  }
+
+  private serializeForTrace(value: unknown): string {
+    try {
+      const seen = new WeakSet<object>();
+      const replacer = (_key: string, val: unknown): unknown => {
+        if (typeof val === 'function') {
+          const name = val.name;
+          return `[Function ${name.length > 0 ? name : 'anonymous'}]`;
+        }
+        if (typeof val === 'object' && val !== null) {
+          const obj = val;
+          if (seen.has(obj)) return '[Circular]';
+          seen.add(obj);
+        }
+        return val;
+      };
+      if (value === undefined) return 'undefined';
+      if (typeof value === 'symbol') return value.toString();
+      const serialized = JSON.stringify(value, replacer, 2);
+      return serialized;
+    } catch {
+      try {
+        return String(value);
+      } catch {
+        return '[Unserializable payload]';
+      }
     }
   }
 
@@ -591,7 +714,7 @@ export class LLMClient {
     type: LogEntry['type'],
     remoteIdentifier: string,
     message: string,
-    fatal = false
+    options: { fatal?: boolean; details?: Record<string, LogDetailValue> } = {}
   ): void {
     if (this.onLog === undefined) return;
 
@@ -603,8 +726,9 @@ export class LLMClient {
       direction,
       type,
       remoteIdentifier,
-      fatal,
-      message
+      fatal: options.fatal === true,
+      message,
+      details: options.details,
     };
 
     this.onLog(entry);

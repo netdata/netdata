@@ -1,9 +1,30 @@
+import { SpanKind } from '@opentelemetry/api';
+
 import type { SessionProgressReporter } from '../session-progress-reporter.js';
 import type { SessionTreeBuilder, SessionNode } from '../session-tree.js';
-import type { MCPTool, LogEntry, AccountingEntry, ProgressMetrics } from '../types.js';
+import type { ToolMetricsRecord } from '../telemetry/index.js';
+import type { MCPTool, LogEntry, AccountingEntry, ProgressMetrics, LogDetailValue } from '../types.js';
 import type { ToolExecuteOptions, ToolExecuteResult, ToolKind, ToolProvider, ToolExecutionContext } from './types.js';
 
+import { recordToolMetrics, runWithSpan, addSpanAttributes, addSpanEvent, recordSpanError } from '../telemetry/index.js';
 import { truncateUtf8WithNotice, formatToolRequestCompact, sanitizeToolName, warn } from '../utils.js';
+
+const toErrorMessage = (value: unknown): string => {
+  if (value instanceof Error && typeof value.message === 'string') return value.message;
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') {
+    return value.toString();
+  }
+  if (value === null) return 'null';
+  if (typeof value === 'object') {
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return '[unserializable-error]';
+    }
+  }
+  return 'unknown_error';
+};
 
 export class ToolsOrchestrator {
   private readonly providers: ToolProvider[] = [];
@@ -13,7 +34,7 @@ export class ToolsOrchestrator {
   private slotsInUse = 0;
   private waiters: (() => void)[] = [];
   private canceled = false;
-  private readonly sessionInfo: { agentId?: string; callPath?: string; txnId?: string };
+  private readonly sessionInfo: { agentId?: string; callPath?: string; txnId?: string; headendId?: string; telemetryLabels?: Record<string, string> };
 
   constructor(
     private readonly opts: { toolTimeout?: number; toolResponseMaxBytes?: number; maxConcurrentTools?: number; parallelToolCalls?: boolean; traceTools?: boolean },
@@ -22,7 +43,7 @@ export class ToolsOrchestrator {
     // Unified logger: session-level log() (must never throw)
     private readonly onLog: (entry: LogEntry, opts?: { opId?: string }) => void,
     private readonly onAccounting?: (entry: AccountingEntry) => void,
-    sessionInfo?: { agentId?: string; callPath?: string; txnId?: string },
+    sessionInfo?: { agentId?: string; callPath?: string; txnId?: string; headendId?: string; telemetryLabels?: Record<string, string> },
     private readonly progress?: SessionProgressReporter,
   ) {
     this.sessionInfo = sessionInfo ?? {};
@@ -36,7 +57,7 @@ export class ToolsOrchestrator {
   // Warmup providers that require async initialization (e.g., MCP) and refresh tool mapping
   async warmup(): Promise<void> {
     if (this.canceled) return;
-    await Promise.all(this.providers.map(async (p) => { try { await p.warmup(); } catch (e) { warn(`provider warmup failed: ${e instanceof Error ? e.message : String(e)}`); } }));
+    await Promise.all(this.providers.map(async (p) => { try { await p.warmup(); } catch (e) { warn(`provider warmup failed: ${toErrorMessage(e)}`); } }));
     // Refresh mapping now that providers are warmed
     this.listTools();
   }
@@ -118,6 +139,21 @@ export class ToolsOrchestrator {
     parameters: Record<string, unknown>,
     ctx: ToolExecutionContext,
     opts?: ToolExecuteOptions
+  ) {
+    const attributes: Record<string, string> = {
+      'ai.tool.requested_name': name,
+      'ai.tool.call_path': this.getSessionCallPath(),
+    };
+    return await runWithSpan('agent.tool', { attributes, kind: SpanKind.INTERNAL }, () =>
+      this.executeWithManagementInternal(name, parameters, ctx, opts)
+    );
+  }
+
+  async executeWithManagementInternal(
+    name: string,
+    parameters: Record<string, unknown>,
+    ctx: ToolExecutionContext,
+    opts?: ToolExecuteOptions
   ): Promise<{ result: string; providerLabel: string; latency: number; charactersIn: number; charactersOut: number }> {
     if (this.canceled) throw new Error('canceled');
     const bypass = opts?.bypassConcurrency === true;
@@ -129,6 +165,23 @@ export class ToolsOrchestrator {
 
     const provider = entry.provider;
     const kind = entry.kind;
+    const logProviderLabel = (() => {
+      try {
+        return provider.resolveLogProvider(effective);
+      } catch {
+        return provider.id;
+      }
+    })();
+    const logProviderServer = (() => {
+      if (kind !== 'mcp') return undefined;
+      const idx = logProviderLabel.indexOf(':');
+      return idx >= 0 ? logProviderLabel.slice(idx + 1) : undefined;
+    })();
+    addSpanAttributes({
+      'ai.tool.name': effective,
+      'ai.tool.provider': provider.id,
+      'ai.tool.kind': kind,
+    });
     // no spans; opTree is canonical
     // Begin hierarchical op (Option C).
     // Only treat actual sub-agents as child 'session' ops (provider.id === 'subagent').
@@ -139,6 +192,8 @@ export class ToolsOrchestrator {
     })();
     const callPathLabel = this.getSessionCallPath();
     const agentIdLabel = this.getSessionAgentId();
+    const headendId = this.sessionInfo.headendId;
+    const sessionTelemetryLabels: Record<string, string> | undefined = this.sessionInfo.telemetryLabels;
     const instrumentTool = opKind !== 'session' && provider.id !== 'agent';
 
     // For sub-agent session ops, attach a placeholder child session immediately so live views can show it
@@ -161,9 +216,15 @@ export class ToolsOrchestrator {
         this.opTree.attachChildSession(opId, stub);
         this.onOpTreeSnapshot(this.opTree.getSession());
       }
-    } catch (e) { warn(`unknown tool '${name}' after refresh: ${e instanceof Error ? e.message : String(e)}`); }
+    } catch (e) { warn(`unknown tool '${name}' after refresh: ${toErrorMessage(e)}`); }
     const requestMsg = formatToolRequestCompact(effective, parameters);
     // Log request (compact)
+    const requestDetails: Record<string, LogDetailValue> = {
+      tool: effective,
+      provider: logProviderLabel,
+      tool_kind: kind,
+      request_preview: requestMsg,
+    };
     const reqLog: LogEntry = {
       timestamp: Date.now(),
       severity: 'VRB',
@@ -175,6 +236,7 @@ export class ToolsOrchestrator {
       remoteIdentifier: `${kind}:${provider.id}`,
       fatal: false,
       message: requestMsg,
+      details: requestDetails,
     };
     // Single emission point via session logger
     this.onLog(reqLog, { opId });
@@ -191,7 +253,7 @@ export class ToolsOrchestrator {
         const paramSize = (() => { try { return JSON.stringify(parameters).length; } catch { return undefined; } })();
         this.opTree.setRequest(opId, { kind: 'tool', payload: parameters, size: paramSize });
       }
-    } catch (e) { warn(`setRequest failed: ${e instanceof Error ? e.message : String(e)}`); }
+    } catch (e) { warn(`setRequest failed: ${toErrorMessage(e)}`); }
     // Optional full request trace (parameters JSON)
     if (this.opts.traceTools === true) {
       const fullParams = (() => { try { return JSON.stringify(parameters, null, 2); } catch { return '[unserializable-parameters]'; } })();
@@ -288,7 +350,7 @@ export class ToolsOrchestrator {
               this.opTree.attachChildSession(opId, tree);
               this.onOpTreeSnapshot(this.opTree.getSession());
             }
-          } catch (e) { warn(`onChildOpTree snapshot failed: ${e instanceof Error ? e.message : String(e)}`); }
+          } catch (e) { warn(`onChildOpTree snapshot failed: ${toErrorMessage(e)}`); }
         };
         exec = await provider.execute(effective, preparedParameters, { ...opts, timeoutMs: undefined, trace: this.opts.traceTools, onChildOpTree, parentOpPath });
       } else {
@@ -305,18 +367,39 @@ export class ToolsOrchestrator {
         }
       }
     } catch (e) {
-      errorMessage = e instanceof Error ? e.message : String(e);
+      errorMessage = toErrorMessage(e);
     }
 
     const latency = Date.now() - start;
-    const charactersIn = (() => { try { return JSON.stringify(parameters).length; } catch { return 0; } })();
+    const serializedParameters = (() => {
+      try { return JSON.stringify(parameters); } catch { return undefined; }
+    })();
+    const charactersIn = serializedParameters !== undefined ? serializedParameters.length : 0;
+    const inputBytes = serializedParameters !== undefined ? Buffer.byteLength(serializedParameters, 'utf8') : 0;
 
     const isFailed = (() => {
       if (exec === undefined) return true;
       return !exec.ok;
     })();
     if (isFailed) {
-      const msg = (exec?.error ?? errorMessage ?? 'execution_failed');
+      const errorMessageDetail = (() => {
+        if (typeof exec?.error === 'string' && exec.error.length > 0) return exec.error;
+        if (typeof errorMessage === 'string' && errorMessage.length > 0) return errorMessage;
+        return 'execution_failed';
+      })();
+      const providerFieldFailed = kind === 'mcp'
+        ? `${provider.id}:${exec?.providerId ?? logProviderServer ?? provider.id}`
+        : logProviderLabel;
+      const failureDetails: Record<string, LogDetailValue> = {
+        tool: effective,
+        provider: providerFieldFailed,
+        tool_kind: kind,
+        latency_ms: latency,
+        input_bytes: inputBytes,
+        output_bytes: 0,
+        error_message: errorMessageDetail,
+      };
+      const msg = errorMessageDetail;
       if (this.opts.traceTools === true) {
         const traceErr: LogEntry = {
           timestamp: Date.now(),
@@ -342,7 +425,8 @@ export class ToolsOrchestrator {
         toolKind: kind,
         remoteIdentifier: `${kind}:${provider.id}`,
         fatal: false,
-        message: `error ${name}: ${msg}`,
+        message: `error ${effective}: ${msg}`,
+        details: failureDetails,
       };
       this.onLog(errLog, { opId });
       if (instrumentTool) {
@@ -364,13 +448,31 @@ export class ToolsOrchestrator {
         type: 'tool', timestamp: start, status: 'failed', latency,
         mcpServer: provider.id, command: name, charactersIn, charactersOut: 0, error: msg,
       };
-      try { if (opId !== undefined) this.opTree.appendAccounting(opId, acc); } catch (e) { warn(`tools accounting append failed: ${e instanceof Error ? e.message : String(e)}`); }
+      try { if (opId !== undefined) this.opTree.appendAccounting(opId, acc); } catch (e) { warn(`tools accounting append failed: ${toErrorMessage(e)}`); }
+      const errorMetrics = {
+        agentId: agentIdLabel,
+        callPath: callPathLabel,
+        headendId,
+        toolName: effective,
+        toolKind: kind,
+        provider: logProviderLabel,
+        status: 'error',
+        errorType: msg,
+        latencyMs: latency,
+        inputBytes,
+        outputBytes: 0,
+        ...(sessionTelemetryLabels !== undefined ? { customLabels: sessionTelemetryLabels } : {}),
+      } satisfies ToolMetricsRecord;
+      recordToolMetrics(errorMetrics);
+      addSpanAttributes({ 'ai.tool.status': 'error', 'ai.tool.latency_ms': latency });
+      addSpanEvent('tool.manage.error', { 'ai.tool.name': effective, 'ai.tool.error': msg });
+      recordSpanError(msg);
       // Accounting is recorded in opTree op context only via attach; keep arrays via SessionManager callbacks
     try {
         if (opId !== undefined) {
           this.opTree.endOp(opId, 'failed', { latency, error: msg });
         }
-      } catch (e) { warn(`tools endOp failed: ${e instanceof Error ? e.message : String(e)}`); }
+      } catch (e) { warn(`tools endOp failed: ${toErrorMessage(e)}`); }
       this.releaseSlot();
       throw new Error(msg);
     }
@@ -404,10 +506,20 @@ export class ToolsOrchestrator {
     }
     const sizeBytes = Buffer.byteLength(raw, 'utf8');
     const limit = this.opts.toolResponseMaxBytes;
-    const providerLabel = kind === 'mcp' ? safeExec.providerId : kind; // 'rest' or server name
+    const providerLabel = kind === 'mcp' ? safeExec.providerId : kind; // server or kind label
+    const providerField = kind === 'mcp'
+      ? `${provider.id}:${providerLabel}`
+      : logProviderLabel;
     let result = raw;
     if (typeof limit === 'number' && limit > 0 && sizeBytes > limit) {
       // Warn about truncation
+      const warnDetails: Record<string, LogDetailValue> = {
+        tool: effective,
+        provider: providerField,
+        tool_kind: kind,
+        actual_bytes: sizeBytes,
+        limit_bytes: limit,
+      };
       const warnLog: LogEntry = {
         timestamp: Date.now(),
         severity: 'WRN',
@@ -418,7 +530,8 @@ export class ToolsOrchestrator {
         toolKind: kind,
         remoteIdentifier: `${kind}:${provider.id}`,
         fatal: false,
-        message: `response exceeded max size: ${String(sizeBytes)} bytes > limit ${String(limit)} bytes (truncated)`
+        message: 'Tool response exceeded max size',
+        details: warnDetails,
       };
       this.onLog(warnLog, { opId });
       result = truncateUtf8WithNotice(raw, limit, sizeBytes);
@@ -426,7 +539,16 @@ export class ToolsOrchestrator {
 
     // Ensure non-empty result for downstream providers that expect a non-empty tool output
     if (result.length === 0) result = ' ';
+    const resultBytes = Buffer.byteLength(result, 'utf8');
 
+    const responseDetails: Record<string, LogDetailValue> = {
+      tool: effective,
+      provider: providerField,
+      tool_kind: kind,
+      result_chars: result.length,
+      result_bytes: resultBytes,
+      latency_ms: latency,
+    };
     const resLog: LogEntry = {
       timestamp: Date.now(),
       severity: 'VRB',
@@ -437,7 +559,16 @@ export class ToolsOrchestrator {
       toolKind: kind,
       remoteIdentifier: `${kind}:${provider.id}`,
       fatal: false,
-      message: `ok ${effective}: ${String(result.length)} chars`,
+      message: (() => {
+        const previewRaw = raw.slice(0, 80);
+        const preview = previewRaw.replace(/\s+/g, ' ').trim();
+        if (preview.length > 0) {
+          responseDetails.preview = preview;
+          return `ok ${effective} preview=${preview}`;
+        }
+        return `ok ${effective}`;
+      })(),
+      details: responseDetails,
     };
     this.onLog(resLog, { opId });
     if (instrumentTool) {
@@ -456,16 +587,16 @@ export class ToolsOrchestrator {
     }
     try {
       if (opId !== undefined) {
-        this.opTree.setResponse(opId, { payload: result.length > 0 ? result.slice(0, 4096) : '', size: Buffer.byteLength(result, 'utf8'), truncated: result.length > 4096 });
+        this.opTree.setResponse(opId, { payload: result.length > 0 ? result.slice(0, 4096) : '', size: resultBytes, truncated: result.length > 4096 });
       }
-    } catch (e) { warn(`tools setResponse failed: ${e instanceof Error ? e.message : String(e)}`); }
+    } catch (e) { warn(`tools setResponse failed: ${toErrorMessage(e)}`); }
 
     const accOk: AccountingEntry = {
       type: 'tool', timestamp: start, status: 'ok', latency,
       mcpServer: providerLabel, command: name, charactersIn, charactersOut: result.length,
     };
-    try { this.onAccounting?.(accOk); } catch (e) { warn(`tools accounting dispatch failed: ${e instanceof Error ? e.message : String(e)}`); }
-    try { if (opId !== undefined) this.opTree.appendAccounting(opId, accOk); } catch (e) { warn(`tools accounting append failed: ${e instanceof Error ? e.message : String(e)}`); }
+    try { this.onAccounting?.(accOk); } catch (e) { warn(`tools accounting dispatch failed: ${toErrorMessage(e)}`); }
+    try { if (opId !== undefined) this.opTree.appendAccounting(opId, accOk); } catch (e) { warn(`tools accounting append failed: ${toErrorMessage(e)}`); }
     // accounting will be attached under op
     // Optional: child accounting (from sub-agents)
     // Do NOT forward child accounting to the parent execution tree here.
@@ -483,14 +614,35 @@ export class ToolsOrchestrator {
               this.opTree.attachChildSession(opId, maybe);
             }
           }
-        } catch (e) { warn(`tools child attach failed: ${e instanceof Error ? e.message : String(e)}`); }
+        } catch (e) { warn(`tools child attach failed: ${toErrorMessage(e)}`); }
         this.opTree.endOp(opId, 'ok', { latency, size: result.length });
         try {
           this.onOpTreeSnapshot(this.opTree.getSession());
-        } catch (e) { warn(`tools onOpTreeSnapshot failed: ${e instanceof Error ? e.message : String(e)}`); }
+        } catch (e) { warn(`tools onOpTreeSnapshot failed: ${toErrorMessage(e)}`); }
       }
-    } catch (e) { warn(`tools finalize failed: ${e instanceof Error ? e.message : String(e)}`); }
+    } catch (e) { warn(`tools finalize failed: ${toErrorMessage(e)}`); }
     if (!bypass) this.releaseSlot();
+    const successMetrics = {
+      agentId: agentIdLabel,
+      callPath: callPathLabel,
+      headendId,
+      toolName: effective,
+      toolKind: kind,
+      provider: logProviderLabel,
+      status: 'success',
+      latencyMs: latency,
+      inputBytes,
+      outputBytes: resultBytes,
+      ...(sessionTelemetryLabels !== undefined ? { customLabels: sessionTelemetryLabels } : {}),
+    } satisfies ToolMetricsRecord;
+    recordToolMetrics(successMetrics);
+    addSpanAttributes({
+      'ai.tool.status': 'success',
+      'ai.tool.latency_ms': latency,
+      'ai.tool.input_bytes': charactersIn,
+      'ai.tool.output_bytes': result.length,
+      'ai.tool.provider_label': providerLabel,
+    });
     return { result, providerLabel, latency, charactersIn, charactersOut: result.length };
   }
 
@@ -509,7 +661,7 @@ export class ToolsOrchestrator {
   private releaseSlot(): void {
     this.slotsInUse = Math.max(0, this.slotsInUse - 1);
     const next = this.waiters.shift();
-    if (next !== undefined) { try { next(); } catch (e) { warn(`releaseSlot waiter failed: ${e instanceof Error ? e.message : String(e)}`); } }
+    if (next !== undefined) { try { next(); } catch (e) { warn(`releaseSlot waiter failed: ${toErrorMessage(e)}`); } }
   }
 
   // Aggregate instructions across providers
@@ -528,7 +680,7 @@ export class ToolsOrchestrator {
         } else {
           external.push(trimmed);
         }
-      } catch (e) { warn(`getCombinedInstructions failed: ${e instanceof Error ? e.message : String(e)}`); }
+      } catch (e) { warn(`getCombinedInstructions failed: ${toErrorMessage(e)}`); }
     }
     if (external.length === 0 && internal === undefined) {
       return '';
@@ -547,12 +699,12 @@ export class ToolsOrchestrator {
   async cleanup(): Promise<void> {
     this.canceled = true;
     // release all waiters
-    try { this.waiters.splice(0).forEach((w) => { try { w(); } catch (e) { warn(`cleanup waiter failed: ${e instanceof Error ? e.message : String(e)}`); } }); } catch (e) { warn(`cleanup waiters failed: ${e instanceof Error ? e.message : String(e)}`); }
+    try { this.waiters.splice(0).forEach((w) => { try { w(); } catch (e) { warn(`cleanup waiter failed: ${toErrorMessage(e)}`); } }); } catch (e) { warn(`cleanup waiters failed: ${toErrorMessage(e)}`); }
     // eslint-disable-next-line functional/no-loop-statements
     for (const p of this.providers) {
       const maybe = p as unknown as { cleanup?: () => Promise<void> };
       if (typeof maybe.cleanup === 'function') {
-        try { await maybe.cleanup(); } catch (e) { warn(`provider cleanup failed: ${e instanceof Error ? e.message : String(e)}`); }
+        try { await maybe.cleanup(); } catch (e) { warn(`provider cleanup failed: ${toErrorMessage(e)}`); }
       }
     }
   }
@@ -560,7 +712,7 @@ export class ToolsOrchestrator {
   // Explicit cancel entrypoint to abort queue and tear down providers
   cancel(): void {
     this.canceled = true;
-    try { this.waiters.splice(0).forEach((w) => { try { w(); } catch (e) { warn(`cancel waiter failed: ${e instanceof Error ? e.message : String(e)}`); } }); } catch (e) { warn(`cancel waiters failed: ${e instanceof Error ? e.message : String(e)}`); }
+    try { this.waiters.splice(0).forEach((w) => { try { w(); } catch (e) { warn(`cancel waiter failed: ${toErrorMessage(e)}`); } }); } catch (e) { warn(`cancel waiters failed: ${toErrorMessage(e)}`); }
     // Best-effort async cleanup; do not await here to avoid blocking callers
     void this.cleanup();
   }

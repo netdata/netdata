@@ -1,6 +1,9 @@
 import crypto from 'node:crypto';
 
+import { SpanKind, SpanStatusCode } from '@opentelemetry/api';
+
 import type { AIAgentCallbacks, AIAgentResult, ConversationMessage, LogEntry, ProgressEvent } from '../types.js';
+import { addSpanAttributes, addSpanEvent, recordSpanError, runWithSpan } from '../telemetry/index.js';
 import { warn } from '../utils.js';
 import type { RunKey, RunMeta } from './types.js';
 
@@ -22,11 +25,23 @@ export class SessionManager {
   private readonly stopRefs = new Map<string, { stopping: boolean }>();
   private readonly callbacks: Callbacks;
   private readonly treeUpdateListeners = new Set<(runId: string) => void>();
-  private readonly runner: (systemPrompt: string, userPrompt: string, opts: { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; renderTarget?: 'slack' | 'api' | 'web'; outputFormat?: string; abortSignal?: AbortSignal; stopRef?: { stopping: boolean }; initialTitle?: string }) => Promise<AIAgentResult>;
+  private readonly runner: (systemPrompt: string, userPrompt: string, opts: { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; renderTarget?: 'slack' | 'api' | 'web'; outputFormat?: string; abortSignal?: AbortSignal; stopRef?: { stopping: boolean }; initialTitle?: string; headendId?: string; telemetryLabels?: Record<string, string> }) => Promise<AIAgentResult>;
+  private readonly headendId?: string;
+  private readonly telemetryLabels: Record<string, string>;
 
-  public constructor(runner: (systemPrompt: string, userPrompt: string, opts: { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; renderTarget?: 'slack' | 'api' | 'web'; outputFormat?: string; abortSignal?: AbortSignal; initialTitle?: string }) => Promise<AIAgentResult>, callbacks: Callbacks = {}) {
+  public constructor(
+    runner: (systemPrompt: string, userPrompt: string, opts: { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; renderTarget?: 'slack' | 'api' | 'web'; outputFormat?: string; abortSignal?: AbortSignal; initialTitle?: string; headendId?: string; telemetryLabels?: Record<string, string> }) => Promise<AIAgentResult>,
+    callbacks: Callbacks = {},
+    options: { headendId?: string; telemetryLabels?: Record<string, string> } = {},
+  ) {
     this.runner = runner;
     this.callbacks = callbacks;
+    this.headendId = options.headendId;
+    const telemetryLabels = { ...(options.telemetryLabels ?? {}) };
+    if (this.headendId !== undefined && telemetryLabels.headend === undefined) {
+      telemetryLabels.headend = this.headendId;
+    }
+    this.telemetryLabels = telemetryLabels;
   }
 
   public getRun(runId: string): RunMeta | undefined {
@@ -119,56 +134,90 @@ export class SessionManager {
 
     const outputBuf: string[] = [];
 
+    const spanAttributes: Record<string, string> = {
+      'ai.session.run_id': runId,
+      'ai.session.source': key.source,
+    };
+    if (this.headendId !== undefined) spanAttributes['ai.session.headend_id'] = this.headendId;
+    if (key.threadTsOrSessionId !== undefined) spanAttributes['ai.session.thread_id'] = key.threadTsOrSessionId;
+    if (key.source === 'slack') {
+      if (key.teamId !== undefined) spanAttributes['ai.session.slack.team_id'] = key.teamId;
+      if (key.channelId !== undefined) spanAttributes['ai.session.slack.channel_id'] = key.channelId;
+    } else if (key.source === 'api' && key.threadTsOrSessionId !== undefined) {
+      spanAttributes['ai.session.api.request_id'] = key.threadTsOrSessionId;
+    }
+    Object.entries(this.telemetryLabels).forEach(([labelKey, labelValue]) => {
+      spanAttributes[`telemetry.label.${labelKey}`] = labelValue;
+    });
+
     void (async () => {
       try {
-        const result = await this.runner(systemPrompt, userPrompt, {
-          history,
-          renderTarget: key.source,
-          abortSignal: aborter.signal,
-          stopRef,
-          initialTitle: opts?.initialTitle,
-          callbacks: {
-          onLog: (entry: LogEntry) => {
-              const m = this.runs.get(runId);
-              if (m) {
-                m.updatedAt = Date.now();
-                this.runs.set(runId, m);
+        const result = await runWithSpan('headend.session', { attributes: spanAttributes, kind: SpanKind.SERVER }, async (span) => {
+          addSpanEvent('session.start', { run_id: runId, source: key.source });
+          const res = await this.runner(systemPrompt, userPrompt, {
+            history,
+            renderTarget: key.source,
+            abortSignal: aborter.signal,
+            stopRef,
+            initialTitle: opts?.initialTitle,
+            headendId: this.headendId,
+            telemetryLabels: this.telemetryLabels,
+            callbacks: {
+              onLog: (entry: LogEntry) => {
+                const m = this.runs.get(runId);
+                if (m) {
+                  m.updatedAt = Date.now();
+                  this.runs.set(runId, m);
+                }
+                try { this.callbacks.onLog?.(entry); } catch (e) { warn(`callbacks.onLog failed: ${e instanceof Error ? e.message : String(e)}`); }
+                this.callbacks.onTreeUpdate?.(runId);
+              },
+              onOpTree: (tree) => {
+                try {
+                  const ingressAttributes = this.ingress.get(runId);
+                  if (ingressAttributes && tree && typeof tree === 'object') {
+                    const root = tree as Record<string, unknown>;
+                    const attrs = (root.attributes as Record<string, unknown> | undefined) ?? {};
+                    attrs.ingress = { ...(attrs.ingress as Record<string, unknown> ?? {}), ...ingressAttributes };
+                    root.attributes = attrs;
+                  }
+                } catch (e) { warn(`opTree ingress enrichment failed: ${e instanceof Error ? e.message : String(e)}`); }
+                this.opTrees.set(runId, tree);
+                try { this.callbacks.onTreeUpdate?.(runId); } catch (e) { warn(`callbacks.onTreeUpdate failed: ${e instanceof Error ? e.message : String(e)}`); }
+              },
+              onOutput: (t: string) => {
+                outputBuf.push(t);
+                this.outputs.set(runId, outputBuf.join(''));
+                try { this.callbacks.onTreeUpdate?.(runId); } catch (e) { warn(`callbacks.onTreeUpdate failed: ${e instanceof Error ? e.message : String(e)}`); }
+              },
+              onThinking: (chunk: string) => {
+                addSpanEvent('session.thinking', { length: chunk.length });
+                try { this.callbacks.onThinking?.(runId, chunk); } catch (e) { warn(`callbacks.onThinking failed: ${e instanceof Error ? e.message : String(e)}`); }
+                try { this.callbacks.onTreeUpdate?.(runId); } catch (e) { warn(`callbacks.onTreeUpdate failed: ${e instanceof Error ? e.message : String(e)}`); }
+                for (const fn of this.treeUpdateListeners) { try { fn(runId); } catch (e) { warn(`treeUpdate listener failed: ${e instanceof Error ? e.message : String(e)}`); } }
+              },
+              onProgress: (event: ProgressEvent) => {
+                addSpanEvent('session.progress', {
+                  'progress.type': event.type,
+                  'progress.call_path': event.callPath,
+                  'progress.agent_id': 'agentId' in event ? event.agentId : undefined,
+                });
+                try { this.callbacks.onProgress?.(runId, event); } catch (e) { warn(`callbacks.onProgress failed: ${e instanceof Error ? e.message : String(e)}`); }
+              },
+              onAccounting: (_a) => {
+                this.callbacks.onTreeUpdate?.(runId);
+                for (const fn of this.treeUpdateListeners) { try { fn(runId); } catch (e) { warn(`treeUpdate listener failed: ${e instanceof Error ? e.message : String(e)}`); } }
               }
-              try { this.callbacks.onLog?.(entry); } catch (e) { warn(`callbacks.onLog failed: ${e instanceof Error ? e.message : String(e)}`); }
-            this.callbacks.onTreeUpdate?.(runId);
-          },
-          onOpTree: (tree) => {
-            try {
-              const ing = this.ingress.get(runId);
-              if (ing && tree && typeof tree === 'object') {
-                const root = tree as Record<string, unknown>;
-                const attrs = (root.attributes as Record<string, unknown>|undefined) ?? {};
-                attrs.ingress = { ...(attrs.ingress as Record<string, unknown> ?? {}), ...ing };
-                root.attributes = attrs;
-              }
-            } catch (e) { warn(`opTree ingress enrichment failed: ${e instanceof Error ? e.message : String(e)}`); }
-            this.opTrees.set(runId, tree);
-            try { this.callbacks.onTreeUpdate?.(runId); } catch (e) { warn(`callbacks.onTreeUpdate failed: ${e instanceof Error ? e.message : String(e)}`); }
-          },
-          onOutput: (t: string) => {
-            outputBuf.push(t);
-            this.outputs.set(runId, outputBuf.join(''));
-            try { this.callbacks.onTreeUpdate?.(runId); } catch (e) { warn(`callbacks.onTreeUpdate failed: ${e instanceof Error ? e.message : String(e)}`); }
-          },
-          onThinking: (chunk: string) => {
-            try { this.callbacks.onThinking?.(runId, chunk); } catch (e) { warn(`callbacks.onThinking failed: ${e instanceof Error ? e.message : String(e)}`); }
-            try { this.callbacks.onTreeUpdate?.(runId); } catch (e) { warn(`callbacks.onTreeUpdate failed: ${e instanceof Error ? e.message : String(e)}`); }
-            for (const fn of this.treeUpdateListeners) { try { fn(runId); } catch (e) { warn(`treeUpdate listener failed: ${e instanceof Error ? e.message : String(e)}`); } }
-          },
-          onProgress: (event: ProgressEvent) => {
-            try { this.callbacks.onProgress?.(runId, event); } catch (e) { warn(`callbacks.onProgress failed: ${e instanceof Error ? e.message : String(e)}`); }
-          },
-            onAccounting: (_a) => {
-              // No flat accounting storage; rely on opTree updates
-              this.callbacks.onTreeUpdate?.(runId);
-              for (const fn of this.treeUpdateListeners) { try { fn(runId); } catch (e) { warn(`treeUpdate listener failed: ${e instanceof Error ? e.message : String(e)}`); } }
             }
+          });
+          addSpanAttributes({ 'ai.session.success': res.success });
+          if (!res.success) {
+            const message = res.error ?? 'unknown error';
+            addSpanAttributes({ 'ai.session.error': message });
+            span.setStatus({ code: SpanStatusCode.ERROR, message });
           }
+          addSpanEvent('session.complete', { success: res.success });
+          return res;
         });
         this.results.set(runId, result);
         const m = this.runs.get(runId);
@@ -188,6 +237,7 @@ export class SessionManager {
         try { this.callbacks.onTreeUpdate?.(runId); } catch (e) { warn(`callbacks.onTreeUpdate failed: ${e instanceof Error ? e.message : String(e)}`); }
         for (const fn of this.treeUpdateListeners) { try { fn(runId); } catch (e) { warn(`treeUpdate listener failed: ${e instanceof Error ? e.message : String(e)}`); } }
       } catch (err: unknown) {
+        recordSpanError(err);
         const m = this.runs.get(runId);
         if (m) {
           m.status = 'failed';

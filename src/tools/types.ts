@@ -39,6 +39,9 @@ export abstract class ToolProvider {
   // Optional warmup hook for providers that need async initialization (e.g., MCP)
   async warmup(): Promise<void> { /* default no-op */ }
   getInstructions(): string { return ''; }
+  resolveLogProvider(_name: string): string {
+    return this.id;
+  }
 }
 
 export interface ToolExecutionContext {

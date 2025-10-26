@@ -3,6 +3,7 @@ import fs from 'node:fs';
 // import os from 'node:os';
 import path from 'node:path';
 
+import { SpanKind, SpanStatusCode } from '@opentelemetry/api';
 import Ajv from 'ajv';
 
 import type { OutputFormatId } from './formats.js';
@@ -52,18 +53,41 @@ import { buildPromptVars, applyFormat, expandVars } from './prompt-builder.js';
 import { SessionProgressReporter } from './session-progress-reporter.js';
 import { SessionTreeBuilder } from './session-tree.js';
 import { SubAgentRegistry } from './subagent-registry.js';
+import { recordLlmMetrics, runWithSpan, addSpanAttributes, addSpanEvent } from './telemetry/index.js';
 import { AgentProvider } from './tools/agent-provider.js';
 import { InternalToolProvider } from './tools/internal-provider.js';
 import { MCPProvider } from './tools/mcp-provider.js';
 import { RestProvider } from './tools/rest-provider.js';
 import { ToolsOrchestrator } from './tools/tools.js';
-import { formatToolRequestCompact, sanitizeToolName, truncateUtf8WithNotice, warn } from './utils.js';
+import { clampToolName, formatToolRequestCompact, sanitizeToolName, truncateUtf8WithNotice, warn } from './utils.js';
 
 // Immutable session class according to DESIGN.md
 type AjvInstance = AjvClass;
 type AjvErrorObject = ErrorObject<string, Record<string, unknown>>;
 type AjvConstructor = new (options?: AjvOptions) => AjvInstance;
 const AjvCtor: AjvConstructor = Ajv as unknown as AjvConstructor;
+
+const estimateMessagesBytes = (messages: readonly ConversationMessage[] | undefined): number => {
+  if (messages === undefined || messages.length === 0) return 0;
+  return messages.reduce((total, message) => total + safeJsonByteLength(message), 0);
+};
+
+const safeJsonByteLength = (value: unknown): number => {
+  try {
+    return Buffer.byteLength(JSON.stringify(value), 'utf8');
+  } catch {
+    if (typeof value === 'string') return Buffer.byteLength(value, 'utf8');
+    if (value === null || value === undefined) return 0;
+    if (typeof value === 'object') {
+      let total = 0;
+      Object.values(value as Record<string, unknown>).forEach((nested) => {
+        total += safeJsonByteLength(nested);
+      });
+      return total;
+    }
+    return 0;
+  }
+};
 
 export class AIAgentSession {
   // Log identifiers (avoid duplicate string literals)
@@ -96,10 +120,13 @@ export class AIAgentSession {
   private readonly originTxnId?: string;
   private readonly parentTxnId?: string;
   private readonly callPath?: string;
+  private readonly headendId?: string;
+  private readonly telemetryLabels: Record<string, string>;
   // opTree-only tracking (canonical)
   private readonly toolsOrchestrator?: ToolsOrchestrator;
   private readonly opTree: SessionTreeBuilder;
   private readonly progressReporter: SessionProgressReporter;
+  private readonly progressToolEnabled: boolean;
   // Per-turn planned subturns (tool call count) discovered when LLM yields toolCalls
   private plannedSubturns: Map<number, number> = new Map<number, number>();
   private resolvedFormat?: OutputFormatId;
@@ -315,6 +342,12 @@ export class AIAgentSession {
     this.sessionConfig = sessionConfig;
     this.abortSignal = sessionConfig.abortSignal;
     this.stopRef = sessionConfig.stopRef;
+    this.headendId = sessionConfig.headendId;
+    const telemetryLabels = { ...(sessionConfig.telemetryLabels ?? {}) };
+    if (this.headendId !== undefined && !Object.prototype.hasOwnProperty.call(telemetryLabels, 'headend')) {
+      telemetryLabels.headend = this.headendId;
+    }
+    this.telemetryLabels = telemetryLabels;
     try {
     if (this.abortSignal !== undefined) {
       if (this.abortSignal.aborted) {
@@ -357,7 +390,7 @@ export class AIAgentSession {
         this.systemTurnBegan = true;
       }
       const sysInitOp = this.opTree.beginOp(0, 'system', { label: 'init' });
-      this.log({ timestamp: Date.now(), severity: 'VRB', turn: 0, subturn: 0, direction: 'response', type: 'llm', remoteIdentifier: 'agent:init', fatal: false, message: 'session initialization' }, { opId: sysInitOp });
+      this.log({ timestamp: Date.now(), severity: 'VRB', turn: 0, subturn: 0, direction: 'response', type: 'llm', remoteIdentifier: 'agent:init', fatal: false, message: 'session initialized' }, { opId: sysInitOp });
       this.opTree.endOp(sysInitOp, 'ok');
       this.sessionConfig.callbacks?.onOpTree?.(this.opTree.getSession());
     } catch (e) { warn(`system init logging failed: ${e instanceof Error ? e.message : String(e)}`); }
@@ -374,7 +407,13 @@ export class AIAgentSession {
     (tree: SessionNode) => { try { this.sessionConfig.callbacks?.onOpTree?.(tree); } catch (e) { warn(`onOpTree callback failed: ${e instanceof Error ? e.message : String(e)}`); } },
     (entry, opts) => { this.log(entry, opts); },
     sessionConfig.callbacks?.onAccounting,
-    { agentId: sessionConfig.agentId, callPath: this.getCallPathLabel(), txnId: this.txnId },
+    {
+      agentId: sessionConfig.agentId,
+      callPath: this.getCallPathLabel(),
+      txnId: this.txnId,
+      headendId: this.headendId,
+      telemetryLabels: this.telemetryLabels,
+    },
     this.progressReporter);
     orch.register(new MCPProvider('mcp', sessionConfig.config.mcpServers, {
       trace: sessionConfig.traceMCP,
@@ -393,7 +432,21 @@ export class AIAgentSession {
     }
     // Internal tools provider
     {
-      const enableBatch = this.sessionConfig.tools.includes('batch');
+      const declaredTools = Array.isArray(this.sessionConfig.tools) ? this.sessionConfig.tools : [];
+      const hasNonInternalDeclaredTools = declaredTools.some((toolName) => {
+        if (typeof toolName !== 'string') return false;
+        const normalized = toolName.trim();
+        if (normalized.length === 0) return false;
+        if (normalized === 'batch') return false;
+        if (normalized === 'agent__progress_report') return false;
+        if (normalized === AIAgentSession.FINAL_REPORT_TOOL) return false;
+        return true;
+      });
+      const hasSubAgentsConfigured = Array.isArray(this.sessionConfig.subAgents) && this.sessionConfig.subAgents.length > 0;
+      const wantsProgressUpdates = this.sessionConfig.headendWantsProgressUpdates !== false;
+      const enableProgressTool = wantsProgressUpdates && (hasNonInternalDeclaredTools || hasSubAgentsConfigured);
+      this.progressToolEnabled = enableProgressTool;
+      const enableBatch = declaredTools.includes('batch');
       const eo = this.sessionConfig.expectedOutput;
       const expectedJsonSchema = (eo?.format === 'json') ? eo.schema : undefined;
       const internalProvider = new InternalToolProvider('agent', {
@@ -401,6 +454,7 @@ export class AIAgentSession {
         outputFormat: this.sessionConfig.outputFormat,
         expectedOutputFormat: eo?.format === 'json' ? 'json' : undefined,
         expectedJsonSchema,
+        disableProgressTool: !enableProgressTool,
         logError: (message: string) => {
           const entry: LogEntry = {
             timestamp: Date.now(),
@@ -489,6 +543,7 @@ export class AIAgentSession {
           stream: this.sessionConfig.stream,
           traceLLM: this.sessionConfig.traceLLM,
           traceMCP: this.sessionConfig.traceMCP,
+          traceSdk: this.sessionConfig.traceSdk,
           verbose: this.sessionConfig.verbose,
           temperature: this.sessionConfig.temperature,
           topP: this.sessionConfig.topP,
@@ -501,6 +556,7 @@ export class AIAgentSession {
           // propagate control signals so children can stop/abort
           abortSignal: this.abortSignal,
           stopRef: this.stopRef,
+          llmInterceptor: this.sessionConfig.llmInterceptor,
           trace: { originId: this.originTxnId, parentId: this.txnId, callPath: `${this.callPath ?? ''}->${name}` },
           onChildOpTree: opts?.onChildOpTree
         }, opts);
@@ -580,8 +636,10 @@ export class AIAgentSession {
     // Create session-owned LLM client
     const llmClient = new LLMClient(enrichedSessionConfig.config.providers, {
       traceLLM: enrichedSessionConfig.traceLLM,
+      traceSDK: enrichedSessionConfig.traceSdk,
       onLog: wrapLog(enrichedSessionConfig.callbacks?.onLog),
-      pricing: enrichedSessionConfig.config.pricing
+      pricing: enrichedSessionConfig.config.pricing,
+      turnInterceptor: enrichedSessionConfig.llmInterceptor,
     });
 
     const sess = new AIAgentSession(
@@ -644,6 +702,22 @@ export class AIAgentSession {
       ...(planned !== undefined ? { 'max_subturns': planned } : {}),
       ...entry,
     };
+    const label = this.getCallPathLabel();
+    const rawMessage = typeof enriched.message === 'string' ? enriched.message.trim() : '';
+    const prefix = `${label}:`;
+    if (rawMessage.length === 0) {
+      enriched.message = `${label}: (message missing)`;
+    } else if (!rawMessage.startsWith(prefix)) {
+      enriched.message = `${label}: ${rawMessage}`;
+    } else {
+      enriched.message = rawMessage;
+    }
+    if (enriched.headendId === undefined && this.headendId !== undefined) {
+      enriched.headendId = this.headendId;
+    }
+    if ((enriched.severity === 'WRN' || enriched.severity === 'ERR') && enriched.stack === undefined) {
+      enriched.stack = this.captureStackTrace(2);
+    }
     logs.push(enriched);
     // Anchor log to opTree when an opId is known, else best-effort for LLM logs
     try {
@@ -664,6 +738,15 @@ export class AIAgentSession {
     } catch (e) { warn(`addLog opTree anchor failed: ${e instanceof Error ? e.message : String(e)}`); }
     // Single place try/catch for external sinks
     try { this.sessionConfig.callbacks?.onLog?.(enriched); } catch (e) { warn(`onLog callback failed: ${e instanceof Error ? e.message : String(e)}`); }
+  }
+
+  private captureStackTrace(skip = 0): string | undefined {
+    const err = new Error();
+    if (typeof err.stack !== 'string') return undefined;
+    const lines = err.stack.split('\n');
+    const start = Math.min(lines.length, 1 + skip);
+    const pruned = lines.slice(start).join('\n');
+    return pruned;
   }
 
   // Relay for logs originating outside AIAgentSession (LLM/MCP internals)
@@ -731,22 +814,45 @@ export class AIAgentSession {
 
   // Main execution method - returns immutable result
   async run(): Promise<AIAgentResult> {
-    let currentConversation = [...this.conversation];
-    let currentLogs = [...this.logs];
-    let currentAccounting = [...this.accounting];
-    let currentTurn = this.currentTurn;
+    const sessionSpanAttributes: Record<string, string> = {};
+    if (typeof this.sessionConfig.agentId === 'string' && this.sessionConfig.agentId.length > 0) {
+      sessionSpanAttributes['ai.agent.id'] = this.sessionConfig.agentId;
+    }
+    if (typeof this.callPath === 'string' && this.callPath.length > 0) {
+      sessionSpanAttributes['ai.agent.call_path'] = this.callPath;
+    } else if (typeof this.sessionConfig.agentId === 'string' && this.sessionConfig.agentId.length > 0) {
+      sessionSpanAttributes['ai.agent.call_path'] = this.sessionConfig.agentId;
+    }
+    if (typeof this.txnId === 'string' && this.txnId.length > 0) {
+      sessionSpanAttributes['ai.session.txn_id'] = this.txnId;
+    }
+    if (typeof this.parentTxnId === 'string' && this.parentTxnId.length > 0) {
+      sessionSpanAttributes['ai.session.parent_txn_id'] = this.parentTxnId;
+    }
+    if (typeof this.originTxnId === 'string' && this.originTxnId.length > 0) {
+      sessionSpanAttributes['ai.session.origin_txn_id'] = this.originTxnId;
+    }
+    if (typeof this.headendId === 'string' && this.headendId.length > 0) {
+      sessionSpanAttributes['ai.session.headend_id'] = this.headendId;
+    }
 
-    this.progressReporter.agentStarted({
-      callPath: this.getCallPathLabel(),
-      agentId: this.getAgentIdLabel(),
-      agentName: this.getAgentDisplayName(),
-      txnId: this.txnId,
-      parentTxnId: this.parentTxnId,
-      originTxnId: this.originTxnId,
-      reason: this.sessionTitle?.title ?? this.sessionConfig.initialTitle,
-    });
+    return await runWithSpan('agent.session', { attributes: sessionSpanAttributes }, async (span) => {
+      let currentConversation = [...this.conversation];
+      let currentLogs = [...this.logs];
+      let currentAccounting = [...this.accounting];
+      let currentTurn = this.currentTurn;
 
-    try {
+      this.progressReporter.agentStarted({
+        callPath: this.getCallPathLabel(),
+        agentId: this.getAgentIdLabel(),
+        agentName: this.getAgentDisplayName(),
+        txnId: this.txnId,
+        parentTxnId: this.parentTxnId,
+        originTxnId: this.originTxnId,
+        reason: this.sessionTitle?.title ?? this.sessionConfig.initialTitle,
+      });
+
+      try {
       // Start execution session in the tree
       // opTree is canonical; no separate session
       // Warmup providers (ensures MCP tools/instructions are available) and refresh mapping
@@ -789,6 +895,7 @@ export class AIAgentSession {
           parallelToolCalls: this.sessionConfig.parallelToolCalls,
           traceLLM: this.sessionConfig.traceLLM,
           traceMCP: this.sessionConfig.traceMCP,
+          traceSdk: this.sessionConfig.traceSdk,
           verbose: this.sessionConfig.verbose,
           toolResponseMaxBytes: this.sessionConfig.toolResponseMaxBytes,
           mcpInitConcurrency: this.sessionConfig.mcpInitConcurrency,
@@ -952,7 +1059,7 @@ export class AIAgentSession {
         // System finalization log
         if (!this.systemTurnBegan) { this.opTree.beginTurn(0, { system: true, label: 'init' }); this.systemTurnBegan = true; }
         const finOp = this.opTree.beginOp(0, 'system', { label: 'fin' });
-        this.log({ timestamp: Date.now(), severity: 'VRB', turn: 0, subturn: 0, direction: 'response', type: 'llm', remoteIdentifier: 'agent:fin', fatal: false, message: 'session finalization' }, { opId: finOp });
+        this.log({ timestamp: Date.now(), severity: 'VRB', turn: 0, subturn: 0, direction: 'response', type: 'llm', remoteIdentifier: 'agent:fin', fatal: false, message: 'session finalized' }, { opId: finOp });
         this.opTree.endOp(finOp, 'ok');
         // End system turn
         this.opTree.endTurn(0);
@@ -966,9 +1073,19 @@ export class AIAgentSession {
       } catch (e) {
         warn(`final persistence failed: ${e instanceof Error ? e.message : String(e)}`);
       }
+      span.setAttributes({
+        'ai.agent.success': resultShape.success,
+        'ai.agent.turn_count': currentTurn,
+      });
+      if (typeof resultShape.finalReport?.status === 'string' && resultShape.finalReport.status.length > 0) {
+        span.setAttribute('ai.agent.final_report.status', resultShape.finalReport.status);
+      }
+      if (!resultShape.success && typeof resultShape.error === 'string' && resultShape.error.length > 0) {
+        span.setStatus({ code: SpanStatusCode.ERROR, message: resultShape.error });
+      }
       return resultShape;
 
-    } catch (error) {
+      } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       const logEntry: LogEntry = {
         timestamp: Date.now(),
@@ -1005,10 +1122,17 @@ export class AIAgentSession {
         this.opTree.endSession(false, message);
       } catch (e) { warn(`endSession failed: ${e instanceof Error ? e.message : String(e)}`); }
       this.emitAgentCompletion(false, message);
+      if (error instanceof Error) {
+        span.recordException(error);
+      } else {
+        span.recordException(new Error(message));
+      }
+      span.setStatus({ code: SpanStatusCode.ERROR, message });
       return failShape;
-    } finally {
-      await this.toolsOrchestrator?.cleanup();
-    }
+      } finally {
+        await this.toolsOrchestrator?.cleanup();
+      }
+    });
   }
 
   private async executeAgentLoop(
@@ -1099,9 +1223,10 @@ export class AIAgentSession {
             let attemptConversation = [...conversation];
             // On the last allowed attempt within this turn, nudge the model to use tools (not progress_report)
             if ((attempts === maxRetries - 1) && currentTurn < (maxTurns - 1)) {
+              const excludeProgress = this.progressToolEnabled ? ' (excluding `agent__progress_report`)' : '';
               attemptConversation.push({
                 role: 'user',
-                content: `Reminder: do not end with plain text. Use an available tool (excluding \`agent__progress_report\`) to make progress. When ready to conclude, call the tool \`${AIAgentSession.FINAL_REPORT_TOOL}\` to provide the final answer.`
+                content: `Reminder: do not end with plain text. Use an available tool${excludeProgress} to make progress. When ready to conclude, call the tool \`${AIAgentSession.FINAL_REPORT_TOOL}\` to provide the final answer.`
               });
             }
             // Do not inject final-turn user message here to avoid duplication.
@@ -1169,7 +1294,8 @@ export class AIAgentSession {
             try {
               // Consider only internal tool set as always known
               // Internal tools always available; include optional batch tool if enabled for this session
-              const internal = new Set<string>(['agent__progress_report', AIAgentSession.FINAL_REPORT_TOOL]);
+              const internal = new Set<string>([AIAgentSession.FINAL_REPORT_TOOL]);
+              if (this.progressToolEnabled) internal.add('agent__progress_report');
               if (this.sessionConfig.tools.includes('batch')) internal.add('agent__batch');
               const normalizeTool = (n: string) => n.replace(/^<\|[^|]+\|>/, '').trim();
               const assistantMessages = sanitizedMessages.filter((m) => m.role === 'assistant');
@@ -1272,6 +1398,12 @@ export class AIAgentSession {
               const assistantMessagesSanitized = sanitizedMessages.filter((m) => m.role === 'assistant');
               const lastAssistantSanitized = assistantMessagesSanitized.length > 0 ? assistantMessagesSanitized[assistantMessagesSanitized.length - 1] : undefined;
               const assistantForAdoption = lastAssistantSanitized;
+              if (assistantForAdoption !== undefined && Array.isArray(assistantForAdoption.toolCalls)) {
+                const expandedToolCalls = this.expandNestedLLMToolCalls(assistantForAdoption.toolCalls);
+                if (expandedToolCalls !== undefined) {
+                  assistantForAdoption.toolCalls = expandedToolCalls;
+                }
+              }
               let sanitizedHasToolCalls = assistantForAdoption !== undefined && Array.isArray(assistantForAdoption.toolCalls) && assistantForAdoption.toolCalls.length > 0;
               const textContent = assistantForAdoption !== undefined && typeof assistantForAdoption.content === 'string' ? assistantForAdoption.content : undefined;
               const sanitizedHasText = textContent !== undefined && textContent.trim().length > 0;
@@ -1528,43 +1660,32 @@ export class AIAgentSession {
           };
         }
               
-              // Debug logging
-              if (this.sessionConfig.verbose === true) {
-                const hasToolResults = sanitizedMessages.some((m: ConversationMessage) => m.role === 'tool');
-                const hasContent = turnResult.hasContent ?? (() => {
-                  const lastAssistant = [...sanitizedMessages].filter(m => m.role === 'assistant').pop();
-                  return (lastAssistant?.content.trim().length ?? 0) > 0;
-                })();
-                const hasReasoning = turnResult.hasReasoning ?? false;
-                const hasToolCallsStr = String(sanitizedHasToolCalls);
-                const hasToolResultsStr = String(hasToolResults);
-                const finalAnswerStr = String(turnResult.status.finalAnswer);
-                const hasReasoningStr = String(hasReasoning);
-                const hasContentStr = String(hasContent);
-                const responseLenStr = String(turnResult.response?.length ?? 0);
-                const messagesLenStr = String(sanitizedMessages.length);
-                const stopReasonStr = turnResult.stopReason ?? 'none';
-                const debugEntry: LogEntry = {
-                  timestamp: Date.now(),
-                  severity: 'VRB',
-                  turn: currentTurn,
-                  subturn: 0,
-                  direction: 'response',
-                  type: 'llm',
-                  remoteIdentifier: 'debug',
-                  fatal: false,
-                  message: `Turn result: hasToolCalls=${hasToolCallsStr}, hasToolResults=${hasToolResultsStr}, finalAnswer=${finalAnswerStr}, hasReasoning=${hasReasoningStr}, hasContent=${hasContentStr}, response length=${responseLenStr}, messages=${messagesLenStr}, stopReason=${stopReasonStr}`
-                };
-                this.log(debugEntry);
-                
-                // Debug: show the actual messages content
-                if (process.env.DEBUG === 'true') {
-                  // eslint-disable-next-line functional/no-loop-statements
-                  for (const msg of sanitizedMessages) {
-                    warn(`[DEBUG] Message role=${msg.role}, content length=${String(msg.content.length)}, hasToolCalls=${String(msg.toolCalls !== undefined)}`);
-                    if (msg.content.length > 0) {
-                      warn(`[DEBUG] Content: ${msg.content}`);
-                    }
+              const hasToolResults = sanitizedMessages.some((m: ConversationMessage) => m.role === 'tool');
+              const hasContent = turnResult.hasContent ?? (() => {
+                const lastAssistant = [...sanitizedMessages].filter((m) => m.role === 'assistant').pop();
+                return (lastAssistant?.content.trim().length ?? 0) > 0;
+              })();
+              const hasReasoning = turnResult.hasReasoning ?? false;
+              const debugEntry: LogEntry = {
+                timestamp: Date.now(),
+                severity: 'VRB',
+                turn: currentTurn,
+                subturn: 0,
+                direction: 'response',
+                type: 'llm',
+                remoteIdentifier: 'debug',
+                fatal: false,
+                message: `Turn result: hasToolCalls=${String(sanitizedHasToolCalls)}, hasToolResults=${String(hasToolResults)}, finalAnswer=${String(turnResult.status.finalAnswer)}, hasReasoning=${String(hasReasoning)}, hasContent=${String(hasContent)}, response length=${String(turnResult.response?.length ?? 0)}, messages=${String(sanitizedMessages.length)}, stopReason=${turnResult.stopReason ?? 'none'}`
+              };
+              this.log(debugEntry);
+
+              // Additional verbose diagnostics (only when explicitly requested)
+              if (this.sessionConfig.verbose === true && process.env.DEBUG === 'true') {
+                // eslint-disable-next-line functional/no-loop-statements
+                for (const msg of sanitizedMessages) {
+                  warn(`[DEBUG] Message role=${msg.role}, content length=${String(msg.content.length)}, hasToolCalls=${String(msg.toolCalls !== undefined)}`);
+                  if (msg.content.length > 0) {
+                    warn(`[DEBUG] Content: ${msg.content}`);
                   }
                 }
               }
@@ -1616,30 +1737,36 @@ export class AIAgentSession {
               // Check for reasoning-only responses (empty response but not final answer)
               if (!turnResult.status.finalAnswer && !turnResult.status.hasToolCalls &&
                   (turnResult.response === undefined || turnResult.response.trim().length === 0)) {
-                // Log warning and retry this turn on another provider/model
-                const metadata = turnResult.providerMetadata;
-                const remoteId = this.composeRemoteIdentifier(provider, model, metadata);
-                const warnEntry: LogEntry = {
-                  timestamp: Date.now(),
-                  severity: 'WRN',
-                  turn: currentTurn,
-                  subturn: 0,
-                  direction: 'response',
-                  type: 'llm',
-                  remoteIdentifier: remoteId,
-                  fatal: false,
-                  message: 'Empty response without tools; retrying with next provider/model in this turn.'
-                };
-                this.log(warnEntry);
-                this.llmSyntheticFailures++;
-                lastError = 'invalid_response: empty_without_tools';
-                if (cycleComplete) {
-                  rateLimitedInCycle = 0;
-                  maxRateLimitWaitMs = 0;
+                if (turnResult.hasReasoning === true) {
+                  // Reasoning-only response: allow conversation to continue without penalising the provider.
+                  // No retry metadata or synthetic failure counters are updated; the reasoning will be appended
+                  // to the conversation below so the model can build upon it in the next turn.
+                } else {
+                  // Log warning and retry this turn on another provider/model
+                  const metadata = turnResult.providerMetadata;
+                  const remoteId = this.composeRemoteIdentifier(provider, model, metadata);
+                  const warnEntry: LogEntry = {
+                    timestamp: Date.now(),
+                    severity: 'WRN',
+                    turn: currentTurn,
+                    subturn: 0,
+                    direction: 'response',
+                    type: 'llm',
+                    remoteIdentifier: remoteId,
+                    fatal: false,
+                    message: 'Empty response without tools; retrying with next provider/model in this turn.'
+                  };
+                  this.log(warnEntry);
+                  this.llmSyntheticFailures++;
+                  lastError = 'invalid_response: empty_without_tools';
+                  if (cycleComplete) {
+                    rateLimitedInCycle = 0;
+                    maxRateLimitWaitMs = 0;
+                  }
+                  this.pushSystemRetryMessage(conversation, `System notice: the previous response was empty and no tools were invoked. Provide a tool call such as ${AIAgentSession.FINAL_REPORT_TOOL} with valid arguments.`);
+                  // do not mark turnSuccessful; continue retry loop
+                  continue;
                 }
-                this.pushSystemRetryMessage(conversation, `System notice: the previous response was empty and no tools were invoked. Provide a tool call such as ${AIAgentSession.FINAL_REPORT_TOOL} with valid arguments.`);
-                // do not mark turnSuccessful; continue retry loop
-                continue;
               }
               
               if (turnResult.status.finalAnswer) {
@@ -2026,7 +2153,7 @@ export class AIAgentSession {
     try {
       if (!this.systemTurnBegan) { this.opTree.beginTurn(0, { system: true, label: 'init' }); this.systemTurnBegan = true; }
       const finOp = this.opTree.beginOp(0, 'system', { label: 'fin' });
-      this.log({ timestamp: Date.now(), severity: 'VRB', turn: 0, subturn: 0, direction: 'response', type: 'llm', remoteIdentifier: 'agent:fin', fatal: false, message: 'session finalization (uncaught)' }, { opId: finOp });
+      this.log({ timestamp: Date.now(), severity: 'VRB', turn: 0, subturn: 0, direction: 'response', type: 'llm', remoteIdentifier: 'agent:fin', fatal: false, message: 'session finalized after uncaught error' }, { opId: finOp });
       this.opTree.endOp(finOp, 'ok');
       this.opTree.endTurn(0);
       this.opTree.endSession(false, errMsg);
@@ -2043,7 +2170,7 @@ export class AIAgentSession {
     try {
       if (!this.systemTurnBegan) { this.opTree.beginTurn(0, { system: true, label: 'init' }); this.systemTurnBegan = true; }
       const finOp = this.opTree.beginOp(0, 'system', { label: 'fin' });
-      this.log({ timestamp: Date.now(), severity: 'VRB', turn: 0, subturn: 0, direction: 'response', type: 'llm', remoteIdentifier: 'agent:fin', fatal: false, message: 'session finalization' }, { opId: finOp });
+      this.log({ timestamp: Date.now(), severity: 'VRB', turn: 0, subturn: 0, direction: 'response', type: 'llm', remoteIdentifier: 'agent:fin', fatal: false, message: 'session finalized' }, { opId: finOp });
       this.opTree.endOp(finOp, 'ok');
       this.opTree.endTurn(0);
       this.opTree.endSession(true);
@@ -2597,6 +2724,49 @@ export class AIAgentSession {
     reasoningLevel?: ReasoningLevel,
     reasoningValue?: ProviderReasoningValue | null
   ) {
+    const attributes: Record<string, string | number | boolean> = {
+      'ai.llm.provider': provider,
+      'ai.llm.model': model,
+      'ai.llm.is_final_turn': isFinalTurn,
+    };
+    if (typeof reasoningLevel === 'string' && reasoningLevel.length > 0) {
+      attributes['ai.llm.reasoning.level'] = reasoningLevel;
+    }
+    if (typeof reasoningValue === 'number') {
+      attributes['ai.llm.reasoning.value'] = reasoningValue;
+    }
+    return await runWithSpan('agent.llm.turn', { attributes, kind: SpanKind.CLIENT }, () =>
+      this.executeSingleTurnInternal(
+        conversation,
+        provider,
+        model,
+        isFinalTurn,
+        currentTurn,
+        logs,
+        accounting,
+        lastShownThinkingHeaderTurn,
+        attempt,
+        maxAttempts,
+        reasoningLevel,
+        reasoningValue,
+      )
+    );
+  }
+
+  private async executeSingleTurnInternal(
+    conversation: ConversationMessage[],
+    provider: string,
+    model: string,
+    isFinalTurn: boolean,
+    currentTurn: number,
+    logs: LogEntry[],
+    accounting: AccountingEntry[],
+    lastShownThinkingHeaderTurn: number,
+    attempt: number,
+    maxAttempts: number,
+    reasoningLevel?: ReasoningLevel,
+    reasoningValue?: ProviderReasoningValue | null
+  ) {
     // no spans; opTree is canonical
     // Expose provider tools (which includes internal tools from InternalToolProvider)
     const allTools = [
@@ -2617,7 +2787,8 @@ export class AIAgentSession {
       }
     }
 
-    
+    addSpanAttributes({ 'ai.llm.reasoning.disabled': disableReasoningForTurn });
+
     // Track if we've shown thinking for this turn
     let shownThinking = false;
     
@@ -2628,6 +2799,18 @@ export class AIAgentSession {
     const toolExecutor = async (toolName: string, parameters: Record<string, unknown>): Promise<string> => {
       if (this.stopRef?.stopping === true) throw new Error('stop_requested');
       if (this.canceled) throw new Error('canceled');
+      const normalizedToolName = sanitizeToolName(toolName);
+      if (normalizedToolName === AIAgentSession.FINAL_REPORT_TOOL) {
+        const nestedCalls = this.parseNestedCallsFromFinalReport(parameters);
+        if (nestedCalls !== undefined) {
+          let nestedResult = '(no output)';
+          // eslint-disable-next-line functional/no-loop-statements
+          for (const nestedCall of nestedCalls) {
+            nestedResult = await toolExecutor(nestedCall.name, nestedCall.parameters);
+          }
+          return nestedResult;
+        }
+      }
       // Advance subturn for each tool call within this turn
       subturnCounter += 1;
       if (subturnCounter > maxToolCallsPerTurn) {
@@ -2641,7 +2824,8 @@ export class AIAgentSession {
       // (no local preview helpers needed)
 
       // Normalize tool name to strip router/provider wrappers like <|constrain|>
-      const effectiveToolName = sanitizeToolName(toolName);
+      const effectiveToolName = normalizedToolName;
+      addSpanEvent('tool.call.requested', { 'ai.tool.name': effectiveToolName });
       const startTime = Date.now();
       try {
         if (!allowedToolNames.has(effectiveToolName)) {
@@ -2694,6 +2878,7 @@ export class AIAgentSession {
           accounting.push(successEntry);
           try { this.sessionConfig.callbacks?.onAccounting?.(successEntry); } catch (e) { warn(`tool accounting callback failed: ${e instanceof Error ? e.message : String(e)}`); }
           // Ensure we always return a valid string
+          addSpanEvent('tool.call.success', { 'ai.tool.name': effectiveToolName, 'ai.tool.latency_ms': managed.latency });
           return managed.result || '(no output)';
         }
 
@@ -2702,11 +2887,13 @@ export class AIAgentSession {
           const req = formatToolRequestCompact(toolName, parameters);
           const warn: LogEntry = { timestamp: Date.now(), severity: 'WRN', turn: currentTurn, subturn: 0, direction: 'response', type: 'llm', remoteIdentifier: 'assistant:tool', fatal: false, message: `Unknown tool requested: ${req}` };
           this.log(warn);
+          addSpanEvent('tool.call.unknown', { 'ai.tool.name': effectiveToolName });
           throw new Error(`No server found for tool: ${effectiveToolName}`);
         }
       } catch (error) {
         const latency = Date.now() - startTime;
         const errorMsg = error instanceof Error ? error.message : String(error);
+        addSpanEvent('tool.call.error', { 'ai.tool.name': effectiveToolName, 'ai.tool.error': errorMsg });
 
         // Add failed tool accounting
         const accountingEntry: AccountingEntry = {
@@ -2773,12 +2960,17 @@ export class AIAgentSession {
       effectiveReasoningLevel = undefined;
       effectiveReasoningValue = null;
     }
+    addSpanAttributes({
+      'ai.llm.reasoning.level_effective': effectiveReasoningLevel ?? 'none',
+      'ai.llm.reasoning.value_effective': effectiveReasoningValue ?? 'none',
+    });
     const sendReasoning = disableReasoningForTurn ? false : undefined;
     let effectiveStream = this.sessionConfig.stream;
     if (this.llmClient.shouldAutoEnableReasoningStream(provider, effectiveReasoningLevel)) {
       effectiveStream = true;
     }
 
+    const requestMessagesBytes = estimateMessagesBytes(conversation);
     const request: TurnRequest = {
       messages: conversation,
       provider,
@@ -2814,7 +3006,7 @@ export class AIAgentSession {
               type: 'llm',
               remoteIdentifier: 'thinking',
               fatal: false,
-              message: ''
+              message: 'reasoning output stream'
             };
             this.log(thinkingHeader);
             shownThinking = true;
@@ -2845,6 +3037,53 @@ export class AIAgentSession {
 
     try {
       const result = await this.llmClient.executeTurn(request);
+      const tokens = result.tokens;
+      const promptTokens = tokens?.inputTokens ?? 0;
+      const completionTokens = tokens?.outputTokens ?? 0;
+      const cacheReadTokens = tokens?.cacheReadInputTokens ?? tokens?.cachedTokens ?? 0;
+      const cacheWriteTokens = tokens?.cacheWriteInputTokens ?? 0;
+      const responseBytes = typeof result.response === 'string' && result.response.length > 0
+        ? Buffer.byteLength(result.response, 'utf8')
+        : estimateMessagesBytes(result.messages);
+      const costInfo = this.llmClient.getLastCostInfo();
+      const attempts = request.turnMetadata?.attempt ?? 1;
+      const retries = attempts > 1 ? attempts - 1 : 0;
+      recordLlmMetrics({
+        agentId: this.sessionConfig.agentId,
+        callPath: this.callPath,
+        headendId: this.headendId,
+        provider,
+        model,
+        status: result.status.type === 'success' ? 'success' : 'error',
+        errorType: result.status.type === 'success' ? undefined : result.status.type,
+        latencyMs: result.latencyMs,
+        promptTokens,
+        completionTokens,
+        cacheReadTokens,
+        cacheWriteTokens,
+        requestBytes: requestMessagesBytes,
+        responseBytes,
+        retries,
+        costUsd: costInfo?.costUsd,
+        reasoningLevel: effectiveReasoningLevel ?? this.sessionConfig.reasoning,
+        customLabels: this.telemetryLabels,
+      });
+      addSpanAttributes({
+        'ai.llm.latency_ms': result.latencyMs,
+        'ai.llm.prompt_tokens': promptTokens,
+        'ai.llm.completion_tokens': completionTokens,
+        'ai.llm.cache_read_tokens': cacheReadTokens,
+        'ai.llm.cache_write_tokens': cacheWriteTokens,
+        'ai.llm.retry_count': retries,
+        'ai.llm.request_bytes': requestMessagesBytes,
+        'ai.llm.response_bytes': responseBytes,
+      });
+      if (typeof result.stopReason === 'string' && result.stopReason.length > 0) {
+        addSpanAttributes({ 'ai.llm.stop_reason': result.stopReason });
+      }
+      if (result.status.type !== 'success') {
+        addSpanAttributes({ 'ai.llm.status': result.status.type });
+      }
       return { ...result, shownThinking, incompleteFinalReportDetected };
     } catch (e) {
       // const msg = e instanceof Error ? e.message : String(e);
@@ -2954,6 +3193,9 @@ export class AIAgentSession {
       }
       // Handle progress_report directly in batch
       if (c.tool === 'agent__progress_report') {
+        if (!this.progressToolEnabled) {
+          return { id: c.id, tool: c.tool, ok: false, elapsedMs: 0, error: { code: 'PROGRESS_DISABLED', message: 'agent__progress_report is disabled for this session' } };
+        }
         const progress = typeof (c.parameters.progress) === 'string' ? c.parameters.progress : '';
         if (progress.trim().length > 0) {
           this.opTree.setLatestStatus(progress);
@@ -2990,6 +3232,62 @@ export class AIAgentSession {
     const payload = this.applyToolResponseCap(JSON.stringify({ results }), this.sessionConfig.toolResponseMaxBytes, logs, { server: 'agent', tool: toolName, turn: currentTurn, subturn: 0 });
     // end via opTree only
     return payload;
+  }
+
+  private expandNestedLLMToolCalls(toolCalls: ToolCall[]): ToolCall[] | undefined {
+    let mutated = false;
+    const expanded: ToolCall[] = [];
+    // eslint-disable-next-line functional/no-loop-statements
+    for (const call of toolCalls) {
+      const normalizedName = sanitizeToolName(call.name);
+      if (normalizedName === AIAgentSession.FINAL_REPORT_TOOL) {
+        const nested = this.parseNestedCallsFromFinalReport(call.parameters);
+        if (nested !== undefined) {
+          expanded.push(...nested);
+          mutated = true;
+          continue;
+        }
+      }
+      expanded.push(call);
+    }
+    return mutated ? expanded : undefined;
+  }
+
+  private parseNestedCallsFromFinalReport(parameters: Record<string, unknown>): ToolCall[] | undefined {
+    const rawCalls = (parameters as { calls?: unknown }).calls;
+    if (!Array.isArray(rawCalls) || rawCalls.length === 0) {
+      return undefined;
+    }
+    const parsed: ToolCall[] = [];
+    const isRecord = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value);
+    // eslint-disable-next-line functional/no-loop-statements
+    for (const entryUnknown of rawCalls) {
+      if (entryUnknown === null || typeof entryUnknown !== 'object' || Array.isArray(entryUnknown)) {
+        return undefined;
+      }
+      const entry = entryUnknown as { id?: unknown; tool?: unknown; parameters?: unknown };
+      const toolRaw = entry.tool;
+      if (typeof toolRaw !== 'string' || toolRaw.trim().length === 0) {
+        return undefined;
+      }
+      const sanitizedTool = sanitizeToolName(toolRaw);
+      const clampResult = clampToolName(sanitizedTool) as { name: string; truncated: boolean };
+      const clampedToolName = clampResult.name;
+      const idRaw = entry.id;
+      const toolCallId = (() => {
+        if (typeof idRaw === 'string' && idRaw.length > 0) {
+          return idRaw;
+        }
+        if (typeof idRaw === 'number' && Number.isFinite(idRaw)) {
+          return Math.trunc(idRaw).toString();
+        }
+        return 'call-' + (parsed.length + 1).toString();
+      })();
+      const parametersCandidate = entry.parameters;
+      const toolParameters: Record<string, unknown> = isRecord(parametersCandidate) ? parametersCandidate : {};
+      parsed.push({ id: toolCallId, name: clampedToolName, parameters: toolParameters });
+    }
+    return parsed.length > 0 ? parsed : undefined;
   }
 
   // Immutable retry method - returns new session

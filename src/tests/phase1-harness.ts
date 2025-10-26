@@ -41,6 +41,15 @@ const SUBAGENT_TOOL = 'agent__pricing-subagent';
 const COVERAGE_CHILD_TOOL = 'coverage.child';
 const COVERAGE_PARENT_BODY = 'Parent body.';
 const COVERAGE_CHILD_BODY = 'Child body.';
+const PRIMARY_REMOTE = `${PRIMARY_PROVIDER}:${MODEL_NAME}`;
+const RETRY_REMOTE = 'agent:retry';
+const FINAL_TURN_REMOTE = 'agent:final-turn';
+const BACKING_OFF_FRAGMENT = 'backing off';
+const RUN_TEST_11 = 'run-test-11';
+const RUN_TEST_21 = 'run-test-21';
+const RUN_TEST_31 = 'run-test-31';
+const RUN_TEST_33 = 'run-test-33';
+const RUN_TEST_37 = 'run-test-37';
 
 const toError = (value: unknown): Error => (value instanceof Error ? value : new Error(String(value)));
 const toErrorMessage = (value: unknown): string => (value instanceof Error ? value.message : String(value));
@@ -130,6 +139,8 @@ const ADOPTED_FINAL_CONTENT = 'Adopted final report content.';
 const ADOPTION_METADATA_ORIGIN = 'text-adoption';
 const ADOPTION_CONTENT_VALUE = 'value';
 const FINAL_REPORT_SANITIZED_CONTENT = 'Final report without sanitized tool calls.';
+const TOOL_OK_JSON = '{"ok":true}';
+const STOP_REASON_TOOL_CALLS = 'tool-calls';
 const JSON_ONLY_URL = 'https://example.com/resource';
 const DEFAULT_PROMPT_SCENARIO = 'run-test-1' as const;
 const BASE_DEFAULTS = {
@@ -333,6 +344,33 @@ function invariant(condition: boolean, message: string): asserts condition {
   if (!condition) throw new Error(message);
 }
 
+function expectLlmLogContext(
+  log: LogEntry | undefined,
+  scenarioId: string,
+  expectation: { message: string; severity: LogEntry['severity']; remote?: string }
+): LogEntry {
+  invariant(log !== undefined, expectation.message);
+  invariant(log.type === 'llm', `Expected llm log for ${scenarioId}.`);
+  invariant(log.severity === expectation.severity, `Expected ${expectation.severity} log for ${scenarioId}.`);
+  if (expectation.remote !== undefined) {
+    const actualRemote = log.remoteIdentifier;
+    invariant(actualRemote === expectation.remote, `Unexpected remoteIdentifier for ${scenarioId}: ${actualRemote}.`);
+  }
+  const expectedAgent = `phase1-${scenarioId}`;
+  invariant(log.agentId === expectedAgent, `agentId mismatch for ${scenarioId}.`);
+  invariant(log.callPath === expectedAgent, `callPath mismatch for ${scenarioId}.`);
+  invariant(typeof log.txnId === 'string' && log.txnId.length > 0, `txnId missing for ${scenarioId}.`);
+  invariant(typeof log.originTxnId === 'string' && log.originTxnId.length > 0, `originTxnId missing for ${scenarioId}.`);
+  invariant(typeof log.turn === 'number' && log.turn >= 0, `turn missing for ${scenarioId}.`);
+  invariant(typeof log.subturn === 'number' && log.subturn >= 0, `subturn missing for ${scenarioId}.`);
+  return log;
+}
+
+const rateLimitWarningExpected = (scenarioId: string): string => `Rate limit warning expected for ${scenarioId}.`;
+const rateLimitMessageMismatch = (scenarioId: string): string => `Rate limit log message mismatch for ${scenarioId}.`;
+const retryBackoffExpected = (scenarioId: string): string => `Retry backoff log expected for ${scenarioId}.`;
+const retryBackoffMessageMismatch = (scenarioId: string): string => `Retry backoff message mismatch for ${scenarioId}.`;
+
 function getPrivateMethod(instance: object, key: string): (...args: unknown[]) => unknown {
   const value = Reflect.get(instance as Record<string, unknown>, key);
   invariant(typeof value === 'function', `Private method '${key}' missing.`);
@@ -370,13 +408,14 @@ function createDeferred<T = void>(): { promise: Promise<T>; resolve: (value: T) 
   return { promise, resolve, reject };
 }
 
-function createParentSessionStub(configuration: Configuration): Pick<AIAgentSessionConfig, 'config' | 'callbacks' | 'stream' | 'traceLLM' | 'traceMCP' | 'verbose' | 'temperature' | 'topP' | 'llmTimeout' | 'toolTimeout' | 'maxRetries' | 'maxTurns' | 'toolResponseMaxBytes' | 'parallelToolCalls' | 'targets'> {
+function createParentSessionStub(configuration: Configuration): Pick<AIAgentSessionConfig, 'config' | 'callbacks' | 'stream' | 'traceLLM' | 'traceMCP' | 'traceSdk' | 'verbose' | 'temperature' | 'topP' | 'llmTimeout' | 'toolTimeout' | 'maxRetries' | 'maxTurns' | 'toolResponseMaxBytes' | 'parallelToolCalls' | 'targets'> {
   return {
     config: configuration,
     callbacks: undefined,
     stream: false,
     traceLLM: false,
     traceMCP: false,
+    traceSdk: false,
     verbose: false,
     temperature: 0.7,
     topP: 1,
@@ -491,6 +530,9 @@ const TEST_SCENARIOS: HarnessTest[] = [
       );
       const reasoningSegments = firstAssistant.reasoning;
       invariant(Array.isArray(reasoningSegments) && reasoningSegments.length === 1, 'Expected single reasoning segment with metadata for run-test-1.');
+      if (process.env.PHASE1_DEBUG === 'true') {
+        console.log('run-test-1 reasoning:', JSON.stringify(reasoningSegments, null, 2));
+      }
       const segment = reasoningSegments[0] as { type?: string; text?: string; providerMetadata?: Record<string, unknown> };
       invariant(segment.type === 'reasoning', 'Reasoning segment must be tagged as reasoning for run-test-1.');
       invariant(typeof segment.text === 'string' && segment.text.includes('Evaluating task'), 'Reasoning text missing for run-test-1.');
@@ -625,14 +667,15 @@ const TEST_SCENARIOS: HarnessTest[] = [
       const assistantMessages = result.conversation.filter((message) => message.role === 'assistant');
       const firstAssistant = assistantMessages.at(0);
       invariant(firstAssistant !== undefined, 'Assistant message missing in run-test-10.');
-      const toolCallNames = (firstAssistant.toolCalls ?? []).map((call) => call.name);
+      const toolCalls = firstAssistant.toolCalls ?? [];
+      const toolCallNames = toolCalls.map((call) => call.name);
       invariant(toolCallNames.includes('agent__progress_report'), 'Progress report tool call expected in run-test-10.');
     },
   },
   {
-    id: 'run-test-11',
+    id: RUN_TEST_11,
     expect: (result) => {
-      invariant(result.success, 'Scenario run-test-11 expected success.');
+      invariant(result.success, `Scenario ${RUN_TEST_11} expected success.`);
       const logs = result.logs;
       invariant(logs.some((log) => typeof log.message === 'string' && log.message.includes('agent__final_report(') && log.message.includes('report_format:json')), 'Final report log should capture JSON format attempt in run-test-11.');
     },
@@ -813,13 +856,15 @@ const TEST_SCENARIOS: HarnessTest[] = [
     },
   },
   {
-    id: 'run-test-21',
+    id: RUN_TEST_21,
     expect: (result) => {
-      invariant(result.success, 'Scenario run-test-21 expected success.');
-      const rateLimitLog = result.logs.find((entry) => typeof entry.message === 'string' && entry.message.toLowerCase().includes(RATE_LIMIT_WARNING_TOKEN));
-      invariant(rateLimitLog !== undefined, 'Rate limit warning expected for run-test-21.');
-      const retryLog = result.logs.find((entry) => entry.remoteIdentifier === 'agent:retry');
-      invariant(retryLog !== undefined && typeof retryLog.message === 'string' && retryLog.message.includes('backing off'), 'Backoff log expected for run-test-21.');
+      invariant(result.success, `Scenario ${RUN_TEST_21} expected success.`);
+      const rateLimitCandidate = result.logs.find((entry) => typeof entry.message === 'string' && entry.message.toLowerCase().includes(RATE_LIMIT_WARNING_TOKEN));
+      const rateLimitLog = expectLlmLogContext(rateLimitCandidate, RUN_TEST_21, { message: rateLimitWarningExpected(RUN_TEST_21), severity: 'WRN', remote: PRIMARY_REMOTE });
+      invariant(typeof rateLimitLog.message === 'string' && rateLimitLog.message.toLowerCase().includes(RATE_LIMIT_WARNING_TOKEN), rateLimitMessageMismatch(RUN_TEST_21));
+      const retryCandidate = result.logs.find((entry) => entry.remoteIdentifier === RETRY_REMOTE);
+      const retryLog = expectLlmLogContext(retryCandidate, RUN_TEST_21, { message: retryBackoffExpected(RUN_TEST_21), severity: 'WRN', remote: RETRY_REMOTE });
+      invariant(typeof retryLog.message === 'string' && retryLog.message.includes(BACKING_OFF_FRAGMENT), retryBackoffMessageMismatch(RUN_TEST_21));
     },
   },
   {
@@ -1039,13 +1084,17 @@ const TEST_SCENARIOS: HarnessTest[] = [
     },
   },
   {
-    id: 'run-test-31',
+    id: RUN_TEST_31,
     expect: (result) => {
-      invariant(result.success, 'Scenario run-test-31 expected success after provider throw.');
+      invariant(result.success, `Scenario ${RUN_TEST_31} expected success after provider throw.`);
       const finalReport = result.finalReport;
       invariant(finalReport?.status === 'success', 'Final report should indicate success for run-test-31.');
-      const thrownLog = result.logs.find((entry) => typeof entry.message === 'string' && entry.message.includes(THROW_FAILURE_MESSAGE));
-      invariant(thrownLog !== undefined, 'Thrown failure log expected for run-test-31.');
+      const thrownCandidate = result.logs.find((entry) => typeof entry.message === 'string' && entry.message.includes(THROW_FAILURE_MESSAGE));
+      const thrownLog = expectLlmLogContext(thrownCandidate, RUN_TEST_31, { message: `Thrown failure log expected for ${RUN_TEST_31}.`, severity: 'WRN', remote: PRIMARY_REMOTE });
+      const thrownDetails = thrownLog.details;
+      invariant(thrownDetails?.status === 'model_error', 'Thrown LLM error should record model_error status for run-test-31.');
+      const thrownStatusMessage = thrownDetails.status_message;
+      invariant(typeof thrownStatusMessage === 'string' && thrownStatusMessage.includes(THROW_FAILURE_MESSAGE), 'Thrown LLM error should preserve status message for run-test-31.');
       const failedAttempt = result.accounting.filter(isLlmAccounting).find((entry) => entry.status === 'failed');
       invariant(failedAttempt !== undefined, 'LLM accounting failure expected for run-test-31.');
     },
@@ -1066,19 +1115,21 @@ const TEST_SCENARIOS: HarnessTest[] = [
     },
   },
   {
-    id: 'run-test-33',
+    id: RUN_TEST_33,
     configure: (_configuration, sessionConfig) => {
       sessionConfig.maxTurns = 1;
     },
     expect: (result) => {
-      invariant(result.success, 'Scenario run-test-33 should complete with a synthesized failure final report.');
+      invariant(result.success, `Scenario ${RUN_TEST_33} should complete with a synthesized failure final report.`);
       const finalReport = result.finalReport;
       invariant(finalReport?.status === 'failure', 'Synthesized failure final report expected for run-test-33.');
       invariant(typeof finalReport.content === 'string' && finalReport.content.includes('did not produce a final report'), 'Synthesized content should mention missing final report for run-test-33.');
-      const syntheticLog = result.logs.find((entry) => typeof entry.message === 'string' && entry.message.includes('Synthetic retry: assistant returned content without tool calls and without final_report.'));
-      invariant(syntheticLog !== undefined, 'Synthetic retry warning expected for run-test-33.');
-      const finalTurnLog = result.logs.find((entry) => entry.remoteIdentifier === 'agent:final-turn');
-      invariant(finalTurnLog !== undefined, 'Final-turn retry warning expected for run-test-33.');
+      const syntheticCandidate = result.logs.find((entry) => typeof entry.message === 'string' && entry.message.includes('Synthetic retry: assistant returned content without tool calls and without final_report.'));
+      const syntheticLog = expectLlmLogContext(syntheticCandidate, RUN_TEST_33, { message: `Synthetic retry warning expected for ${RUN_TEST_33}.`, severity: 'WRN', remote: PRIMARY_REMOTE });
+      invariant(typeof syntheticLog.message === 'string' && syntheticLog.message.includes('Synthetic retry'), `Synthetic retry message mismatch for ${RUN_TEST_33}.`);
+      const finalTurnCandidate = result.logs.find((entry) => entry.remoteIdentifier === FINAL_TURN_REMOTE);
+      const finalTurnLog = expectLlmLogContext(finalTurnCandidate, RUN_TEST_33, { message: `Final-turn retry warning expected for ${RUN_TEST_33}.`, severity: 'WRN', remote: FINAL_TURN_REMOTE });
+      invariant(typeof finalTurnLog.message === 'string' && finalTurnLog.message.toLowerCase().includes('final turn'), `Final-turn message mismatch for ${RUN_TEST_33}.`);
       const exitLog = result.logs.find((entry) => entry.remoteIdentifier === EXIT_FINAL_REPORT_IDENTIFIER);
       invariant(exitLog !== undefined, 'Synthesized EXIT-FINAL-ANSWER log expected for run-test-33.');
     },
@@ -1133,18 +1184,20 @@ const TEST_SCENARIOS: HarnessTest[] = [
     },
   },
   {
-    id: 'run-test-37',
+    id: RUN_TEST_37,
     configure: (_configuration, sessionConfig) => {
       sessionConfig.maxRetries = 2;
     },
     expect: (result) => {
-      invariant(result.success, 'Scenario run-test-37 expected success after rate limit retry.');
+      invariant(result.success, `Scenario ${RUN_TEST_37} expected success after rate limit retry.`);
       const finalReport = result.finalReport;
       invariant(finalReport?.status === 'success', 'Final report should indicate success for run-test-37.');
-      const rateLimitLog = result.logs.find((entry) => typeof entry.message === 'string' && entry.message.toLowerCase().includes(RATE_LIMIT_WARNING_TOKEN));
-      invariant(rateLimitLog !== undefined, 'Rate limit warning expected for run-test-37.');
-      const retryLog = result.logs.find((entry) => entry.remoteIdentifier === 'agent:retry');
-      invariant(retryLog !== undefined, 'Retry backoff log expected for run-test-37.');
+      const rateLimitCandidate = result.logs.find((entry) => typeof entry.message === 'string' && entry.message.toLowerCase().includes(RATE_LIMIT_WARNING_TOKEN));
+      const rateLimitLog = expectLlmLogContext(rateLimitCandidate, RUN_TEST_37, { message: rateLimitWarningExpected(RUN_TEST_37), severity: 'WRN', remote: PRIMARY_REMOTE });
+      invariant(typeof rateLimitLog.message === 'string' && rateLimitLog.message.toLowerCase().includes(RATE_LIMIT_WARNING_TOKEN), rateLimitMessageMismatch(RUN_TEST_37));
+      const retryCandidate = result.logs.find((entry) => entry.remoteIdentifier === RETRY_REMOTE);
+      const retryLog = expectLlmLogContext(retryCandidate, RUN_TEST_37, { message: retryBackoffExpected(RUN_TEST_37), severity: 'WRN', remote: RETRY_REMOTE });
+      invariant(typeof retryLog.message === 'string' && retryLog.message.includes(BACKING_OFF_FRAGMENT), retryBackoffMessageMismatch(RUN_TEST_37));
     },
   },
   {
@@ -2158,8 +2211,15 @@ const TEST_SCENARIOS: HarnessTest[] = [
     },
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-59 expected success.');
-      const truncLog = result.logs.find((entry) => entry.severity === 'WRN' && typeof entry.message === 'string' && entry.message.includes('response exceeded max size'));
-      invariant(truncLog !== undefined, 'Truncation warning expected for run-test-59.');
+      const truncLogs = result.logs.filter((entry) => entry.severity === 'WRN' && typeof entry.message === 'string' && entry.message.includes('response exceeded max size'));
+      invariant(truncLogs.length > 0, 'Truncation warning expected for run-test-59.');
+      const mcpTrunc = truncLogs.find((entry) => entry.details?.tool === 'test__test');
+      invariant(mcpTrunc !== undefined, 'MCP truncation warning missing for run-test-59.');
+      invariant(mcpTrunc.details !== undefined, 'Truncation warning should include structured details for run-test-59.');
+      invariant(mcpTrunc.details.provider === 'mcp:test', 'Truncation warning must carry provider field for run-test-59.');
+      invariant(mcpTrunc.details.tool_kind === 'mcp', 'Truncation warning must carry tool_kind field for run-test-59.');
+      invariant(mcpTrunc.details.actual_bytes === 5000, 'Truncation warning must report actual_bytes for run-test-59.');
+      invariant(mcpTrunc.details.limit_bytes === 120, 'Truncation warning must report limit_bytes for run-test-59.');
       const batchTool = result.conversation.find((message) => message.role === 'tool' && typeof message.content === 'string' && message.content.includes(TRUNCATION_NOTICE));
       invariant(batchTool !== undefined, 'Truncated tool response expected for run-test-59.');
     },
@@ -4719,6 +4779,404 @@ const TEST_SCENARIOS: HarnessTest[] = [
     },
   },
   {
+    id: 'run-test-92',
+    configure: (_configuration, sessionConfig) => {
+      sessionConfig.outputFormat = 'pipe';
+    },
+    expect: (result) => {
+      invariant(result.success, 'Scenario run-test-92 expected success.');
+      const finalReport = result.finalReport;
+      invariant(finalReport?.status === 'success', 'Final report missing for run-test-92.');
+      invariant(finalReport.format === 'pipe', `Final report format mismatch for run-test-92 (actual=${finalReport.format}).`);
+      invariant(finalReport.content === 'My name is ChatGPT.', 'Final report content mismatch for run-test-92.');
+      const failureLog = result.logs.find((entry) => typeof entry.message === 'string' && entry.message.includes('requires non-empty report_content'));
+      invariant(failureLog === undefined, 'Final report validation error must not surface for run-test-92.');
+    },
+  },
+  {
+    id: 'run-test-93',
+    expect: (result) => {
+      invariant(result.success, 'Scenario run-test-93 expected success.');
+      const finalReport = result.finalReport;
+      invariant(finalReport?.status === 'success', 'Final report missing for run-test-93.');
+      invariant(finalReport.format === 'markdown', 'Final report format mismatch for run-test-93.');
+      const assistantMessages = result.conversation.filter((message) => message.role === 'assistant');
+      const firstAssistant = assistantMessages.at(0);
+      invariant(firstAssistant !== undefined, 'First assistant message missing for run-test-93.');
+      const assistantContent = typeof firstAssistant.content === 'string' ? firstAssistant.content.trim() : undefined;
+      invariant(assistantContent === undefined || assistantContent.length === 0, 'Reasoning-only assistant turn should not include textual content for run-test-93.');
+      invariant(Array.isArray(firstAssistant.reasoning) && firstAssistant.reasoning.length > 0, 'Reasoning payload missing for run-test-93.');
+      const emptyWarning = result.logs.find((entry) => typeof entry.message === 'string' && entry.message.includes('Empty response without tools'));
+      invariant(emptyWarning === undefined, 'Reasoning-only response must not trigger empty-response warning for run-test-93.');
+      const retryNotice = result.logs.find((entry) => entry.remoteIdentifier === RETRY_REMOTE);
+      invariant(retryNotice === undefined, 'Reasoning-only response should not schedule retry for run-test-93.');
+    },
+  },
+  {
+    id: 'run-test-104',
+    description: 'Reasoning signatures survive turn replay before final report.',
+    execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+      sessionConfig.targets = [{ provider: PRIMARY_PROVIDER, model: MODEL_NAME }];
+      sessionConfig.reasoning = 'high';
+      const signature = 'sig-preserve-123';
+      let invocation = 0;
+      let replayVerified = false;
+      // eslint-disable-next-line @typescript-eslint/unbound-method
+      const originalExecuteTurn = LLMClient.prototype.executeTurn;
+      LLMClient.prototype.executeTurn = function(this: LLMClient, request: TurnRequest): Promise<TurnResult> {
+        invocation += 1;
+        const turnIndex = invocation;
+        if (turnIndex === 1) {
+          const assistantMessage: ConversationMessage = {
+            role: 'assistant',
+            content: '',
+            reasoning: [
+              {
+                type: 'reasoning',
+                text: 'Initial Anthropic reasoning with signature.',
+                providerMetadata: { anthropic: { signature } },
+              },
+            ],
+          };
+          return Promise.resolve({
+            status: { type: 'success', hasToolCalls: false, finalAnswer: false },
+            latencyMs: 12,
+            messages: [assistantMessage],
+            tokens: { inputTokens: 58, outputTokens: 26, totalTokens: 84 },
+            response: '',
+            hasReasoning: true,
+            stopReason: 'other',
+          });
+        }
+        if (turnIndex === 2) {
+          const assistantHistory = request.messages.filter((message) => message.role === 'assistant');
+          const reasoningSegments = assistantHistory.flatMap((message) => (Array.isArray(message.reasoning) ? message.reasoning : []));
+          const hasSignature = reasoningSegments.some((segment) => {
+            const metadataUnknown = (segment as { providerMetadata?: unknown }).providerMetadata;
+            if (metadataUnknown === undefined || metadataUnknown === null || typeof metadataUnknown !== 'object') {
+              return false;
+            }
+            const anthropic = (metadataUnknown as { anthropic?: { signature?: unknown } }).anthropic;
+            return typeof anthropic?.signature === 'string' && anthropic.signature === signature;
+          });
+          if (!hasSignature) {
+            return Promise.reject(new Error('reasoning_signature_missing_on_replay'));
+          }
+          replayVerified = true;
+          const finalCallId = 'call-final-replay';
+          const assistantMessage: ConversationMessage = {
+            role: 'assistant',
+            content: '',
+            toolCalls: [
+              {
+                name: 'agent__final_report',
+                id: finalCallId,
+                parameters: {
+                  status: 'success',
+                  report_format: 'markdown',
+                  report_content: 'Reasoning replay final report.',
+                },
+              },
+            ],
+            reasoning: [
+              {
+                type: 'reasoning',
+                text: 'Confirming reasoning replay prior to final report.',
+                providerMetadata: { anthropic: { signature } },
+              },
+            ],
+          };
+          const toolMessage: ConversationMessage = {
+            role: 'tool',
+            toolCallId: finalCallId,
+            content: TOOL_OK_JSON,
+          };
+          return Promise.resolve({
+            status: { type: 'success', hasToolCalls: true, finalAnswer: true },
+            latencyMs: 18,
+            messages: [assistantMessage, toolMessage],
+            tokens: { inputTokens: 92, outputTokens: 28, totalTokens: 120 },
+            response: '',
+            hasReasoning: true,
+            stopReason: STOP_REASON_TOOL_CALLS,
+          });
+        }
+        return originalExecuteTurn.call(this, request);
+      };
+      try {
+        const session = AIAgentSession.create(sessionConfig);
+        const result = await session.run();
+        (result as { __reasoningReplayVerified?: boolean }).__reasoningReplayVerified = replayVerified;
+        return result;
+      } finally {
+        LLMClient.prototype.executeTurn = originalExecuteTurn;
+      }
+    },
+    expect: (result: AIAgentResult & { __reasoningReplayVerified?: boolean }) => {
+      invariant(result.success, 'Scenario run-test-104 expected success.');
+      invariant(result.__reasoningReplayVerified === true, 'Reasoning signatures were not verified during replay for run-test-104.');
+      const finalReport = result.finalReport;
+      invariant(finalReport?.status === 'success', 'Final report missing for run-test-104.');
+      invariant(finalReport.format === 'markdown', 'Final report format mismatch for run-test-104.');
+      invariant(finalReport.content === 'Reasoning replay final report.', 'Final report content mismatch for run-test-104.');
+    },
+  },
+  {
+    id: 'run-test-105',
+    description: 'Reasoning signature survives fallback from primary to secondary provider.',
+    configure: (configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+      configuration.providers = {
+        [PRIMARY_PROVIDER]: { type: 'test-llm' },
+        [SECONDARY_PROVIDER]: { type: 'test-llm' },
+      };
+      sessionConfig.targets = [
+        { provider: PRIMARY_PROVIDER, model: MODEL_NAME },
+        { provider: SECONDARY_PROVIDER, model: MODEL_NAME },
+      ];
+      sessionConfig.reasoning = 'high';
+      sessionConfig.maxRetries = 2;
+    },
+    execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+      const signature = 'sig-fallback-123';
+      let invocation = 0;
+      let fallbackSignatureVerified = false;
+      // eslint-disable-next-line @typescript-eslint/unbound-method
+      const originalExecuteTurn = LLMClient.prototype.executeTurn;
+      LLMClient.prototype.executeTurn = function(this: LLMClient, request: TurnRequest): Promise<TurnResult> {
+        invocation += 1;
+        const provider = request.provider;
+        if (invocation === 1) {
+          invariant(provider === PRIMARY_PROVIDER, 'First invocation should target primary provider in run-test-105.');
+          const assistantMessage: ConversationMessage = {
+            role: 'assistant',
+            content: '',
+            reasoning: [
+              {
+                type: 'reasoning',
+                text: 'Primary provider reasoning with signature.',
+                providerMetadata: { anthropic: { signature } },
+              },
+            ],
+          };
+          return Promise.resolve({
+            status: { type: 'success', hasToolCalls: false, finalAnswer: false },
+            latencyMs: 12,
+            messages: [assistantMessage],
+            tokens: { inputTokens: 72, outputTokens: 24, totalTokens: 96 },
+            hasReasoning: true,
+            response: '',
+            stopReason: 'other',
+          });
+        }
+        if (invocation === 2) {
+          invariant(provider === PRIMARY_PROVIDER, 'Second invocation should remain on primary provider in run-test-105.');
+          return Promise.resolve({
+            status: { type: 'model_error', message: 'primary failure', retryable: false },
+            latencyMs: 8,
+            messages: [],
+            tokens: { inputTokens: 40, outputTokens: 10, totalTokens: 50 },
+            response: '',
+            stopReason: 'other',
+          });
+        }
+        if (invocation === 3) {
+          invariant(provider === SECONDARY_PROVIDER, 'Fallback invocation should target secondary provider in run-test-105.');
+          const assistantHistory = request.messages.filter((message) => message.role === 'assistant');
+          const reasoningSegments = assistantHistory.flatMap((message) => (Array.isArray(message.reasoning) ? message.reasoning : []));
+          fallbackSignatureVerified = reasoningSegments.some((segment) => {
+            const metadataUnknown = (segment as { providerMetadata?: unknown }).providerMetadata;
+            if (metadataUnknown === undefined || metadataUnknown === null || typeof metadataUnknown !== 'object') {
+              return false;
+            }
+            const anthropic = (metadataUnknown as { anthropic?: { signature?: unknown } }).anthropic;
+            return typeof anthropic?.signature === 'string' && anthropic.signature === signature;
+          });
+          const finalCallId = 'call-final-fallback';
+          const assistantMessage: ConversationMessage = {
+            role: 'assistant',
+            content: '',
+            toolCalls: [
+              {
+                name: 'agent__final_report',
+                id: finalCallId,
+                parameters: {
+                  status: 'success',
+                  report_format: 'markdown',
+                  report_content: 'Fallback final report.',
+                },
+              },
+            ],
+            reasoning: [
+              {
+                type: 'reasoning',
+                text: 'Secondary provider final reasoning.',
+                providerMetadata: { anthropic: { signature } },
+              },
+            ],
+          };
+          const toolMessage: ConversationMessage = {
+            role: 'tool',
+            toolCallId: finalCallId,
+            content: TOOL_OK_JSON,
+          };
+          return Promise.resolve({
+            status: { type: 'success', hasToolCalls: true, finalAnswer: true },
+            latencyMs: 15,
+            messages: [assistantMessage, toolMessage],
+            tokens: { inputTokens: 90, outputTokens: 32, totalTokens: 122 },
+            hasReasoning: true,
+            response: '',
+            stopReason: STOP_REASON_TOOL_CALLS,
+          });
+        }
+        return originalExecuteTurn.call(this, request);
+      };
+      try {
+        const session = AIAgentSession.create(sessionConfig);
+        const result = await session.run();
+        (result as { __fallbackSignatureVerified?: boolean }).__fallbackSignatureVerified = fallbackSignatureVerified;
+        return result;
+      } finally {
+        LLMClient.prototype.executeTurn = originalExecuteTurn;
+      }
+    },
+    expect: (result: AIAgentResult & { __fallbackSignatureVerified?: boolean }) => {
+      invariant(result.success, 'Scenario run-test-105 expected success.');
+      invariant(result.__fallbackSignatureVerified === true, 'Fallback provider did not receive reasoning signature in run-test-105.');
+      const finalReport = result.finalReport;
+      invariant(finalReport?.status === 'success', 'Final report missing for run-test-105.');
+      invariant(finalReport.format === 'markdown', 'Final report format mismatch for run-test-105.');
+      invariant(finalReport.content === 'Fallback final report.', 'Final report content mismatch for run-test-105.');
+      const providersUsed = new Set(result.accounting.filter(isLlmAccounting).map((entry) => entry.provider));
+      invariant(providersUsed.has(SECONDARY_PROVIDER), 'Secondary provider was not used during fallback in run-test-105.');
+    },
+  },
+  {
+    id: 'run-test-106',
+    description: 'Reasoning without signature disables reasoning stream next turn but keeps transcript.',
+    configure: (configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+      configuration.providers = {
+        [PRIMARY_PROVIDER]: { type: 'anthropic' },
+      };
+      sessionConfig.targets = [{ provider: PRIMARY_PROVIDER, model: MODEL_NAME }];
+      sessionConfig.reasoning = 'high';
+    },
+    execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+      let invocation = 0;
+      let sendReasoningDisabled = false;
+      let sanitizedHistoryVerified = false;
+      const proto = LLMClient.prototype as unknown as {
+        createProvider: (name: string, config: ProviderConfig, tracedFetch: typeof fetch) => BaseLLMProvider;
+      };
+      const originalCreateProvider = proto.createProvider;
+      proto.createProvider = function(name: string, config: ProviderConfig, tracedFetch: typeof fetch) {
+        if (config.type === 'anthropic') {
+          return new TestLLMProvider({ ...config, type: 'test-llm' });
+        }
+        return originalCreateProvider.call(this, name, config, tracedFetch);
+      };
+      // eslint-disable-next-line @typescript-eslint/unbound-method
+      const originalExecuteTurn = LLMClient.prototype.executeTurn;
+      LLMClient.prototype.executeTurn = function(this: LLMClient, request: TurnRequest): Promise<TurnResult> {
+        invocation += 1;
+        if (invocation === 1) {
+          const progressCallId = 'call-progress-no-sig';
+          const assistantMessage: ConversationMessage = {
+            role: 'assistant',
+            content: '',
+            toolCalls: [
+              {
+                name: 'agent__progress_report',
+                id: progressCallId,
+                parameters: { progress: 'Reviewing instructions.' },
+              },
+            ],
+            reasoning: [
+              {
+                type: 'reasoning',
+                text: 'Primary reasoning without metadata.',
+              },
+            ],
+          };
+          const toolMessage: ConversationMessage = {
+            role: 'tool',
+            toolCallId: progressCallId,
+            content: 'ok',
+          };
+          return Promise.resolve({
+            status: { type: 'success', hasToolCalls: true, finalAnswer: false },
+            latencyMs: 9,
+            messages: [assistantMessage, toolMessage],
+            tokens: { inputTokens: 64, outputTokens: 24, totalTokens: 88 },
+            hasReasoning: true,
+            response: '',
+            stopReason: 'other',
+          });
+        }
+        if (invocation === 2) {
+          sendReasoningDisabled = request.sendReasoning === false;
+          const assistantHistory = request.messages.filter((message) => message.role === 'assistant');
+          sanitizedHistoryVerified = assistantHistory.some((message) => {
+            if (message.reasoning === undefined) {
+              return true;
+            }
+            return Array.isArray(message.reasoning) && message.reasoning.length === 0;
+          });
+          const finalCallId = 'call-final-no-signature';
+          const assistantMessage: ConversationMessage = {
+            role: 'assistant',
+            content: '',
+            toolCalls: [
+              {
+                name: 'agent__final_report',
+                id: finalCallId,
+                parameters: {
+                  status: 'success',
+                  report_format: 'markdown',
+                  report_content: 'Reasoning disabled final report.',
+                },
+              },
+            ],
+          };
+          const toolMessage: ConversationMessage = {
+            role: 'tool',
+            toolCallId: finalCallId,
+            content: TOOL_OK_JSON,
+          };
+          return Promise.resolve({
+            status: { type: 'success', hasToolCalls: true, finalAnswer: true },
+            latencyMs: 11,
+            messages: [assistantMessage, toolMessage],
+            tokens: { inputTokens: 70, outputTokens: 22, totalTokens: 92 },
+            hasReasoning: false,
+            response: '',
+            stopReason: STOP_REASON_TOOL_CALLS,
+          });
+        }
+        return originalExecuteTurn.call(this, request);
+      };
+      try {
+        const session = AIAgentSession.create(sessionConfig);
+        const result = await session.run();
+        (result as { __sendReasoningDisabled?: boolean }).__sendReasoningDisabled = sendReasoningDisabled;
+        (result as { __sanitizedHistoryVerified?: boolean }).__sanitizedHistoryVerified = sanitizedHistoryVerified;
+        return result;
+      } finally {
+        LLMClient.prototype.executeTurn = originalExecuteTurn;
+        proto.createProvider = originalCreateProvider;
+      }
+    },
+    expect: (result: AIAgentResult & { __sendReasoningDisabled?: boolean; __sanitizedHistoryVerified?: boolean }) => {
+      invariant(result.success, 'Scenario run-test-106 expected success.');
+      invariant(result.__sendReasoningDisabled === true, 'Reasoning stream should be disabled after missing signature in run-test-106.');
+      invariant(result.__sanitizedHistoryVerified === true, 'Assistant transcript missing sanitized reasoning entry for run-test-106.');
+      const finalReport = result.finalReport;
+      invariant(finalReport?.status === 'success', 'Final report missing for run-test-106.');
+      invariant(finalReport.format === 'markdown', 'Final report format mismatch for run-test-106.');
+      invariant(finalReport.content === 'Reasoning disabled final report.', 'Final report content mismatch for run-test-106.');
+    },
+  },
+  {
     id: 'run-test-101',
     description: 'Synthesizes a failure final report when tools keep failing on the final turn.',
     execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
@@ -4905,6 +5363,38 @@ const TEST_SCENARIOS: HarnessTest[] = [
       invariant(result.finalReport === undefined, 'No final report expected for run-test-49.');
       const finLog = result.logs.find((entry) => entry.remoteIdentifier === 'agent:fin');
       invariant(finLog !== undefined, 'Finalization log expected for run-test-49.');
+    },
+  },
+  {
+    id: 'run-test-114',
+    description: 'Trace SDK emits request/response payload logs without trace-llm.',
+    configure: (_configuration, sessionConfig) => {
+      sessionConfig.traceSdk = true;
+      sessionConfig.traceLLM = false;
+      sessionConfig.userPrompt = 'run-test-1';
+    },
+    execute: async (_configuration, sessionConfig) => {
+      const session = AIAgentSession.create(sessionConfig);
+      return await session.run();
+    },
+    expect: (result) => {
+      invariant(result.success, 'Scenario run-test-114 expected success.');
+      const traceLogs = result.logs.filter((entry) => entry.severity === 'TRC' && entry.type === 'llm');
+      invariant(traceLogs.some((log) => log.message === 'SDK request payload'), 'SDK request payload log missing for run-test-114.');
+      invariant(traceLogs.some((log) => log.message === 'SDK response payload'), 'SDK response payload log missing for run-test-114.');
+    },
+  },
+  {
+    id: 'run-test-124',
+    expect: (result) => {
+      invariant(result.success, 'Scenario run-test-124 expected success.');
+      const finalReport = result.finalReport;
+      invariant(finalReport !== undefined, 'Final report missing for run-test-124.');
+      invariant(finalReport.status === 'success', 'Final report status mismatch for run-test-124.');
+      invariant(typeof finalReport.content === 'string' && finalReport.content.includes('Reasoning-content only response handled successfully.'), 'Final report content mismatch for run-test-124.');
+      const reasoningDebug = result.logs.find((entry) => entry.remoteIdentifier === 'debug' && entry.turn === 1);
+      invariant(reasoningDebug !== undefined, 'Debug log missing for reasoning-only turn in run-test-124.');
+      invariant(typeof reasoningDebug.message === 'string' && reasoningDebug.message.includes('hasReasoning=true'), 'Reasoning flag not set for run-test-124.');
     },
   },
   {

@@ -3,8 +3,8 @@
 description: Perform a web search
 usage: The search term to be searched
 models:
-  - anthropic/claude-3-5-haiku-20241022
-  - anthropic/claude-3-haiku-20240307
+  - anthropic/claude-haiku-4-5
+  - anthropic/claude-haiku-4-5
   - openai/gpt-5-mini
   - google/gemini-2.5-pro
 #  - anthropic/claude-sonnet-4-5
@@ -30,7 +30,7 @@ maxRetries: 3
 maxToolTurns: 10
 maxToolCallsPerTurn: 20
 caching: full
-#reasoning: high
+# reasoning: high
 ---
 Your goal is to comprehensively search the subject requested.
 

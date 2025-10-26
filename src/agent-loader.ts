@@ -5,7 +5,7 @@ import type { AIAgentSession } from './ai-agent.js';
 // keep type imports grouped at top
 import type { OutputFormatId } from './formats.js';
 import type { PreloadedSubAgent } from './subagent-registry.js';
-import type { AIAgentCallbacks, AIAgentResult, AIAgentSessionConfig, Configuration, ConversationMessage, ProviderReasoningValue, RestToolConfig } from './types.js';
+import type { AIAgentCallbacks, AIAgentResult, AIAgentSessionConfig, Configuration, ConversationMessage, ProviderReasoningValue, RestToolConfig, LLMInterceptor } from './types.js';
 // no runtime format validation here; caller must pass a valid OutputFormatId
 
 import { AIAgent as Agent } from './ai-agent.js';
@@ -20,6 +20,26 @@ import { openApiToRestTools, parseOpenAPISpec } from './tools/openapi-importer.j
 import { clampToolName, sanitizeToolName } from './utils.js';
 import { mergeCallbacksWithPersistence } from './persistence.js';
 
+
+export interface LoadedAgentSessionOptions {
+  history?: ConversationMessage[];
+  callbacks?: AIAgentCallbacks;
+  trace?: AIAgentSessionConfig['trace'];
+  renderTarget?: 'cli' | 'slack' | 'api' | 'web' | 'sub-agent';
+  outputFormat: OutputFormatId;
+  abortSignal?: AbortSignal;
+  stopRef?: { stopping: boolean };
+  initialTitle?: string;
+  ancestors?: string[];
+  headendId?: string;
+  telemetryLabels?: Record<string, string>;
+  wantsProgressUpdates?: boolean;
+  traceLLM?: boolean;
+  traceMCP?: boolean;
+  traceSdk?: boolean;
+  verbose?: boolean;
+  llmInterceptor?: LLMInterceptor;
+}
 
 export interface LoadedAgent {
   id: string; // canonical path (or synthetic when no file)
@@ -52,6 +72,7 @@ export interface LoadedAgent {
     maxConcurrentTools: number;
     traceLLM: boolean;
     traceMCP: boolean;
+    traceSdk: boolean;
     verbose: boolean;
     mcpInitConcurrency?: number;
   };
@@ -59,12 +80,12 @@ export interface LoadedAgent {
   createSession: (
     systemPrompt: string,
     userPrompt: string,
-    opts?: { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; trace?: AIAgentSessionConfig['trace']; renderTarget?: 'cli' | 'slack' | 'api' | 'web' | 'sub-agent'; outputFormat: OutputFormatId; abortSignal?: AbortSignal; stopRef?: { stopping: boolean }; initialTitle?: string; ancestors?: string[] }
+    opts?: LoadedAgentSessionOptions
   ) => Promise<AIAgentSession>;
   run: (
     systemPrompt: string,
     userPrompt: string,
-    opts?: { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; trace?: AIAgentSessionConfig['trace']; renderTarget?: 'cli' | 'slack' | 'api' | 'web' | 'sub-agent'; outputFormat: OutputFormatId; abortSignal?: AbortSignal; stopRef?: { stopping: boolean }; initialTitle?: string; ancestors?: string[] }
+    opts?: LoadedAgentSessionOptions
   ) => Promise<AIAgentResult>;
 }
 
@@ -158,6 +179,7 @@ export interface LoadAgentOptions {
   mcpInitConcurrency?: number;
   traceLLM?: boolean;
   traceMCP?: boolean;
+  traceSdk?: boolean;
   reasoningValue?: ProviderReasoningValue | null;
   // Persistence overrides (CLI precedence)
   sessionsDir?: string;
@@ -371,6 +393,7 @@ function constructLoadedAgent(args: ConstructAgentArgs): LoadedAgent {
       mcpInitConcurrency: options?.mcpInitConcurrency,
       traceLLM: options?.traceLLM,
       traceMCP: options?.traceMCP,
+      traceSdk: options?.traceSdk,
       verbose: options?.verbose,
       reasoning: options?.reasoning,
       caching: options?.caching,
@@ -520,9 +543,9 @@ function constructLoadedAgent(args: ConstructAgentArgs): LoadedAgent {
   const createSession = (
     systemPrompt: string,
     userPrompt: string,
-    opts?: { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; trace?: AIAgentSessionConfig['trace']; renderTarget?: 'cli' | 'slack' | 'api' | 'web' | 'sub-agent'; outputFormat: OutputFormatId; abortSignal?: AbortSignal; stopRef?: { stopping: boolean }; initialTitle?: string; ancestors?: string[] }
+    opts?: LoadedAgentSessionOptions
   ): Promise<AIAgentSession> => {
-    const o = (opts ?? {}) as { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; trace?: AIAgentSessionConfig['trace']; renderTarget?: 'cli'|'slack'|'api'|'web'|'sub-agent'; outputFormat?: OutputFormatId; abortSignal?: AbortSignal; stopRef?: { stopping: boolean }; initialTitle?: string; ancestors?: string[] };
+    const o = (opts ?? {}) as LoadedAgentSessionOptions;
     if (o.outputFormat === undefined) throw new Error('outputFormat is required');
 
     let sessionConfig: AIAgentSessionConfig = {
@@ -542,6 +565,7 @@ function constructLoadedAgent(args: ConstructAgentArgs): LoadedAgent {
       stopRef: o.stopRef,
       initialTitle: o.initialTitle,
       abortSignal: (opts as { abortSignal?: AbortSignal } | undefined)?.abortSignal,
+      llmInterceptor: o.llmInterceptor,
       temperature: eff.temperature,
       topP: eff.topP,
       maxOutputTokens: eff.maxOutputTokens,
@@ -556,24 +580,57 @@ function constructLoadedAgent(args: ConstructAgentArgs): LoadedAgent {
       stream: eff.stream,
       traceLLM: eff.traceLLM,
       traceMCP: eff.traceMCP,
+      traceSdk: eff.traceSdk,
       verbose: eff.verbose,
       toolResponseMaxBytes: eff.toolResponseMaxBytes,
       mcpInitConcurrency: eff.mcpInitConcurrency,
       reasoning: eff.reasoning,
       reasoningValue: eff.reasoningValue,
       caching: eff.caching,
+      headendId: o.headendId ?? o.renderTarget ?? 'cli',
+      headendWantsProgressUpdates: o.wantsProgressUpdates !== undefined ? o.wantsProgressUpdates : true,
       // Preserve the original reference (no clone) so recursion guards see identical identity.
       // Harness expectations rely on the session receiving the exact array instance from callers.
       ancestors: Array.isArray(o.ancestors) ? o.ancestors : ancestorChain,
     };
+    if (config.telemetry?.labels !== undefined || o.telemetryLabels !== undefined) {
+      const combinedLabels: Record<string, string> = { ...(config.telemetry?.labels ?? {}) };
+      if (sessionConfig.headendId !== undefined && combinedLabels.headend === undefined) {
+        combinedLabels.headend = sessionConfig.headendId;
+      }
+      if (o.telemetryLabels !== undefined) {
+        Object.entries(o.telemetryLabels).forEach(([key, value]) => {
+          if (typeof value === 'string') {
+            combinedLabels[key] = value;
+          }
+        });
+      }
+      if (Object.keys(combinedLabels).length > 0) {
+        sessionConfig.telemetryLabels = combinedLabels;
+      }
+    } else if (sessionConfig.headendId !== undefined) {
+      sessionConfig.telemetryLabels = { headend: sessionConfig.headendId };
+    }
     sessionConfig.callbacks = mergeCallbacksWithPersistence(sessionConfig.callbacks, config.persistence);
+    if (typeof o.traceLLM === 'boolean') {
+      sessionConfig.traceLLM = o.traceLLM;
+    }
+    if (typeof o.traceMCP === 'boolean') {
+      sessionConfig.traceMCP = o.traceMCP;
+    }
+    if (typeof o.traceSdk === 'boolean') {
+      sessionConfig.traceSdk = o.traceSdk;
+    }
+    if (typeof o.verbose === 'boolean') {
+      sessionConfig.verbose = o.verbose;
+    }
     return Promise.resolve(Agent.create(sessionConfig));
   };
 
   const runSession = async (
     systemPrompt: string,
     userPrompt: string,
-    opts?: { history?: ConversationMessage[]; callbacks?: AIAgentCallbacks; trace?: AIAgentSessionConfig['trace']; renderTarget?: 'cli' | 'slack' | 'api' | 'web' | 'sub-agent'; outputFormat: OutputFormatId; abortSignal?: AbortSignal; stopRef?: { stopping: boolean }; initialTitle?: string; ancestors?: string[] }
+    opts?: LoadedAgentSessionOptions
   ): Promise<AIAgentResult> => {
     const session = await createSession(systemPrompt, userPrompt, opts);
     return await session.run();
@@ -611,6 +668,7 @@ function constructLoadedAgent(args: ConstructAgentArgs): LoadedAgent {
       maxConcurrentTools: eff.maxConcurrentTools,
       traceLLM: eff.traceLLM,
       traceMCP: eff.traceMCP,
+      traceSdk: eff.traceSdk,
       verbose: eff.verbose,
       mcpInitConcurrency: eff.mcpInitConcurrency,
     },

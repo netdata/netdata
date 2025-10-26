@@ -3,7 +3,7 @@
 description: Intercom Intelligence Agent - Extract customer conversations and engagement data
 usage: company name OR company domain OR contact email OR conversation ID
 models:
-#  - anthropic/claude-3-5-haiku-20241022
+#  - anthropic/claude-haiku-4-5
   - anthropic/claude-sonnet-4-5
 tools:
   - intercom

@@ -64,6 +64,18 @@ export interface TurnResult {
   retry?: TurnRetryDirective;
 }
 
+export interface LLMInterceptorContext {
+  turn: number;
+  subturn: number;
+  request: TurnRequest;
+}
+
+export interface LLMInterceptor {
+  replay?: (context: LLMInterceptorContext) => Promise<TurnResult | undefined> | TurnResult | undefined;
+  record?: (context: LLMInterceptorContext, result: TurnResult) => Promise<void> | void;
+  finalize?: (summary: { turns: number; recorded: number; replayed: number }) => Promise<void> | void;
+}
+
 export type ToolStatus =
   | { type: 'success' }
   | { type: 'mcp_server_error'; serverName: string; message: string }
@@ -90,6 +102,8 @@ export interface ToolResult {
 }
 
 // Structured logging interface
+export type LogDetailValue = string | number | boolean;
+
 export interface LogEntry {
   timestamp: number;                    // Unix timestamp (ms)
   severity: 'VRB' | 'WRN' | 'ERR' | 'TRC' | 'THK' | 'FIN'; // FIN for end-of-run summary
@@ -120,6 +134,10 @@ export interface LogEntry {
   // - max_subturns: number of tool calls requested by the LLM for the current turn (when known)
   'max_turns'?: number;
   'max_subturns'?: number;
+  // Optional structured details specific to the log entry
+  details?: Record<string, LogDetailValue>;
+  // Optional captured stack trace (warnings/errors)
+  stack?: string;
 }
 
 export interface ProgressMetrics {
@@ -273,6 +291,49 @@ export interface ProviderConfig {
   reasoningAutoStreamLevel?: ReasoningLevel;
 }
 
+export interface TelemetryOtlpConfig {
+  endpoint?: string;
+  timeoutMs?: number;
+}
+
+export interface TelemetryPrometheusConfig {
+  enabled?: boolean;
+  host?: string;
+  port?: number;
+}
+
+export type TelemetryTraceSampler = 'always_on' | 'always_off' | 'parent' | 'ratio';
+
+export interface TelemetryTraceConfig {
+  enabled?: boolean;
+  sampler?: TelemetryTraceSampler;
+  ratio?: number;
+}
+
+export type TelemetryLogFormat = 'journald' | 'logfmt' | 'json' | 'none';
+
+export type TelemetryLogExtra = 'otlp';
+
+export interface TelemetryLoggingOtlpConfig {
+  endpoint?: string;
+  timeoutMs?: number;
+}
+
+export interface TelemetryLoggingConfig {
+  formats?: TelemetryLogFormat[];
+  extra?: TelemetryLogExtra[];
+  otlp?: TelemetryLoggingOtlpConfig;
+}
+
+export interface TelemetryConfig {
+  enabled?: boolean;
+  otlp?: TelemetryOtlpConfig;
+  prometheus?: TelemetryPrometheusConfig;
+  labels?: Record<string, string>;
+  traces?: TelemetryTraceConfig;
+  logging?: TelemetryLoggingConfig;
+}
+
 export interface Configuration {
   providers: Record<string, ProviderConfig>;
   mcpServers: Record<string, MCPServerConfig>;
@@ -321,6 +382,7 @@ export interface Configuration {
     };
     reasoningValue?: ProviderReasoningValue | null;
   };
+  telemetry?: TelemetryConfig;
   // Server headend configuration (optional)
   slack?: {
     enabled?: boolean;
@@ -447,6 +509,9 @@ export interface AIAgentSessionConfig {
   subAgents?: PreloadedSubAgent[];
   // Agent identity (prompt path or synthetic id)
   agentId?: string;
+  headendId?: string;
+  headendWantsProgressUpdates?: boolean;
+  telemetryLabels?: Record<string, string>;
   systemPrompt: string;
   userPrompt: string;
   // Resolved output format for this session (must be provided by caller)
@@ -471,7 +536,9 @@ export interface AIAgentSessionConfig {
   callbacks?: AIAgentCallbacks;
   traceLLM?: boolean;
   traceMCP?: boolean;
+  traceSdk?: boolean;
   verbose?: boolean;
+  llmInterceptor?: LLMInterceptor;
   reasoning?: ReasoningLevel;
   reasoningValue?: ProviderReasoningValue | null;
   caching?: CachingMode;
@@ -603,6 +670,8 @@ export interface TurnRequest {
   reasoningValue?: ProviderReasoningValue | null;
   sendReasoning?: boolean;
   caching?: CachingMode;
+  sdkTrace?: boolean;
+  sdkTraceLogger?: (event: { stage: 'request' | 'response'; provider: string; model: string; payload: unknown }) => void;
 }
 
 export interface LLMProvider {
@@ -620,6 +689,7 @@ export interface AIAgentOptions {
   callbacks?: AIAgentCallbacks;
   traceLLM?: boolean;
   traceMCP?: boolean;
+  traceSdk?: boolean;
   parallelToolCalls?: boolean;
   maxToolTurns?: number;
   verbose?: boolean;

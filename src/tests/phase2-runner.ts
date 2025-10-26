@@ -1,0 +1,593 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import process from 'node:process';
+
+import type { GlobalOverrides } from '../agent-loader.js';
+import type { AccountingEntry, ConversationMessage, LogEntry, ReasoningLevel } from '../types.js';
+
+import { loadAgent, LoadedAgentCache } from '../agent-loader.js';
+
+import { Phase2FixtureManager } from './phase2-fixtures.js';
+import { phase2ModelConfigs } from './phase2-models.js';
+
+type Tier = 1 | 2 | 3;
+
+interface ScenarioDefinition {
+  readonly id: 'basic' | 'multi';
+  readonly label: string;
+  readonly systemPrompt: string;
+  readonly userPrompt: string;
+  readonly reasoning?: ReasoningLevel;
+  readonly minTurns: number;
+  readonly requiredAgentTools?: readonly string[];
+  readonly requireReasoningSignatures?: boolean;
+}
+
+interface ScenarioVariant {
+  readonly scenario: ScenarioDefinition;
+  readonly stream: boolean;
+}
+
+interface ScenarioRunResult {
+  readonly modelLabel: string;
+  readonly provider: string;
+  readonly modelId: string;
+  readonly tier: Tier;
+  readonly scenarioId: string;
+  readonly scenarioLabel: string;
+  readonly stream: boolean;
+  readonly reasoning?: ReasoningLevel;
+  readonly success: boolean;
+  readonly failureReasons: readonly string[];
+  readonly error?: string;
+  readonly accounting: readonly AccountingEntry[];
+  readonly maxTurn?: number;
+  readonly reasoningSummary?: {
+    readonly requested: boolean;
+    readonly present: boolean;
+    readonly preserved: boolean;
+  };
+}
+
+interface AccountingSummary {
+  readonly tokensIn: number;
+  readonly tokensOut: number;
+  readonly totalTokens: number;
+  readonly cacheReadTokens: number;
+  readonly cacheWriteTokens: number;
+  readonly requests: number;
+  readonly latencyMs: number;
+  readonly costUsd?: number;
+}
+
+const PROJECT_ROOT = process.cwd();
+const FIXTURES_DIR = path.resolve(PROJECT_ROOT, 'fixtures', 'test-agents');
+const MASTER_AGENT_PATH = path.join(FIXTURES_DIR, 'test-master.ai');
+const DEFAULT_CONFIG_PATH = path.resolve(PROJECT_ROOT, 'neda/.ai-agent.json');
+const PHASE2_FIXTURE_ROOT = path.resolve(PROJECT_ROOT, 'fixtures', 'phase2');
+
+const FINAL_REPORT_INSTRUCTION = 'Call agent__final_report with status="success", report_format="text", and content set to the required text.';
+const FINAL_REPORT_ARGS = 'agent__final_report(status="success", report_format="text", content=<value>)';
+const BASIC_PROMPT = `${FINAL_REPORT_INSTRUCTION} The content must be exactly "test".`;
+const BASIC_USER = `Invoke ${FINAL_REPORT_ARGS.replace('<value>', '"test"')} and produce no other output.`;
+const MULTI_PROMPT = '1) Call agent__test-agent1 with parameters {"prompt":"run","reason":"execute phase two","format":"sub-agent"}. 2) Wait for the response and call agent__test-agent2 with {"prompt":<agent1 output>,"reason":"execute phase two","format":"sub-agent"}. 3) Finish by calling agent__final_report(status="success", report_format="text", content=<agent2 output>). Do not emit plain text.';
+const MULTI_USER = 'Execute agent__test-agent1({"prompt":"run","reason":"execute phase two","format":"sub-agent"}), pass its output into agent__test-agent2({"prompt":<agent1 output>,"reason":"execute phase two","format":"sub-agent"}), and conclude with agent__final_report(status="success", report_format="text", content=<agent2 output>).';
+
+const REQUIRED_AGENT_TOOLS: readonly string[] = ['agent__test-agent1', 'agent__test-agent2'] as const;
+
+const BASE_SCENARIOS: readonly ScenarioDefinition[] = [
+  {
+    id: 'basic',
+    label: 'basic-llm',
+    systemPrompt: BASIC_PROMPT,
+    userPrompt: BASIC_USER,
+    minTurns: 1,
+  },
+  {
+    id: 'multi',
+    label: 'multi-turn',
+    systemPrompt: MULTI_PROMPT,
+    userPrompt: MULTI_USER,
+    reasoning: 'high',
+    minTurns: 3,
+    requiredAgentTools: REQUIRED_AGENT_TOOLS,
+    requireReasoningSignatures: true,
+  },
+] as const;
+
+const STREAM_VARIANTS: readonly boolean[] = [false, true] as const;
+const STOP_ON_FAILURE = process.env.PHASE2_STOP_ON_FAILURE === '1';
+let REFRESH_FIXTURES = false;
+const TRACE_LLM = process.env.PHASE2_TRACE_LLM === '1';
+const TRACE_SDK = process.env.PHASE2_TRACE_SDK === '1';
+const TRACE_MCP = process.env.PHASE2_TRACE_MCP === '1';
+const VERBOSE_LOGS = process.env.PHASE2_VERBOSE === '1';
+
+const toErrorMessage = (value: unknown): string => (value instanceof Error ? value.message : String(value));
+
+const ensureFileExists = (description: string, candidate: string): void => {
+  if (!fs.existsSync(candidate)) {
+    throw new Error(`${description} not found at ${candidate}`);
+  }
+};
+
+const parseTierFilter = (value: string): Set<Tier> => {
+  const parts = value.split(',').map((part) => part.trim()).filter((part) => part.length > 0);
+  if (parts.length === 0) {
+    throw new Error('tier list cannot be empty');
+  }
+  const tiers = new Set<Tier>();
+  parts.forEach((part) => {
+    const parsed = Number.parseInt(part, 10);
+    if (parsed !== 1 && parsed !== 2 && parsed !== 3) {
+      throw new Error(`invalid tier value '${part}'`);
+    }
+    tiers.add(parsed as Tier);
+  });
+  return tiers;
+};
+
+const parseModelFilter = (value: string): Set<string> => {
+  const parts = value.split(',').map((part) => part.trim()).filter((part) => part.length > 0);
+  if (parts.length === 0) {
+    throw new Error('model list cannot be empty');
+  }
+  return new Set(parts);
+};
+
+const scenarioVariants: readonly ScenarioVariant[] = (() => {
+  const variants: ScenarioVariant[] = [];
+  BASE_SCENARIOS.forEach((scenario) => {
+    STREAM_VARIANTS.forEach((stream) => {
+      variants.push({ scenario, stream });
+    });
+  });
+  return variants;
+})();
+
+const buildAccountingSummary = (entries: readonly AccountingEntry[]): AccountingSummary => {
+  let tokensIn = 0;
+  let tokensOut = 0;
+  let totalTokens = 0;
+  let cacheReadTokens = 0;
+  let cacheWriteTokens = 0;
+  let latencyMs = 0;
+  let requests = 0;
+  let costUsd: number | undefined;
+  entries.forEach((entry) => {
+    if (entry.type === 'llm') {
+      tokensIn += entry.tokens.inputTokens;
+      tokensOut += entry.tokens.outputTokens;
+      totalTokens += entry.tokens.totalTokens;
+      const read = entry.tokens.cacheReadInputTokens ?? entry.tokens.cachedTokens ?? 0;
+      const write = entry.tokens.cacheWriteInputTokens ?? 0;
+      cacheReadTokens += read;
+      cacheWriteTokens += write;
+      latencyMs += entry.latency;
+      requests += 1;
+      if (typeof entry.costUsd === 'number') {
+        costUsd = (costUsd ?? 0) + entry.costUsd;
+      }
+      if (typeof entry.upstreamInferenceCostUsd === 'number') {
+        costUsd = (costUsd ?? 0) + entry.upstreamInferenceCostUsd;
+      }
+    }
+  });
+  if (costUsd !== undefined) {
+    return {
+      tokensIn,
+      tokensOut,
+      totalTokens,
+      cacheReadTokens,
+      cacheWriteTokens,
+      requests,
+      latencyMs,
+      costUsd,
+    };
+  }
+  return {
+    tokensIn,
+    tokensOut,
+    totalTokens,
+    cacheReadTokens,
+    cacheWriteTokens,
+    requests,
+    latencyMs,
+  };
+};
+
+const extractMaxLlmTurn = (logs: readonly LogEntry[]): number => {
+  const turns = logs
+    .filter((log) => log.type === 'llm' && log.direction === 'response')
+    .map((log) => log.turn);
+  if (turns.length === 0) return 0;
+  return Math.max(...turns);
+};
+
+const findToolIndex = (logs: readonly LogEntry[], toolName: string): number => {
+  return logs.findIndex((log) => log.type === 'tool' && log.direction === 'request' && log.details?.tool === toolName);
+};
+
+const hasFinalReport = (logs: readonly LogEntry[]): boolean => {
+  return logs.some((log) => log.type === 'tool' && log.direction === 'request' && log.details?.tool === 'agent__final_report');
+};
+
+const hasAccountingEntries = (entries: readonly AccountingEntry[]): boolean => {
+  return entries.some((entry) => entry.type === 'llm');
+};
+
+const isAssistantWithReasoning = (
+  message: ConversationMessage
+): message is ConversationMessage & { reasoning: NonNullable<ConversationMessage['reasoning']> } => {
+  return message.role === 'assistant' && Array.isArray(message.reasoning) && message.reasoning.length > 0;
+};
+
+interface ReasoningSignatureStatus {
+  readonly present: boolean;
+  readonly preserved: boolean;
+}
+
+const analyzeReasoningSignatures = (messages: readonly ConversationMessage[]): ReasoningSignatureStatus => {
+  const reasoningMessages = messages.filter(isAssistantWithReasoning);
+  if (reasoningMessages.length === 0) {
+    return { present: false, preserved: false };
+  }
+
+  const firstMessage = reasoningMessages[0];
+  const firstHasSignature = firstMessage.reasoning.some((segment) => {
+    const candidate = segment as { signature?: unknown };
+    return typeof candidate.signature === 'string' && candidate.signature.length > 0;
+  });
+  const othersHaveSignature = reasoningMessages.slice(1).every((message) => {
+    return message.reasoning.some((segment) => {
+      const candidate = segment as { signature?: unknown };
+      return typeof candidate.signature === 'string' && candidate.signature.length > 0;
+    });
+  });
+  const preserved = firstHasSignature && othersHaveSignature;
+  return { present: true, preserved };
+};
+
+const validateScenarioResult = (
+  result: ScenarioRunResult,
+  runResult: { result?: Awaited<ReturnType<ReturnType<typeof loadAgent>['run']>>; error?: string }
+): ScenarioRunResult => {
+  if (runResult.error !== undefined) {
+    return {
+      ...result,
+      success: false,
+      failureReasons: [...result.failureReasons, runResult.error],
+      error: runResult.error,
+    };
+  }
+  const session = runResult.result;
+  if (session === undefined) {
+    const reason = 'missing session result';
+    return { ...result, success: false, failureReasons: [...result.failureReasons, reason], error: reason };
+  }
+
+  const failures: string[] = [];
+  if (!session.success) {
+    failures.push(`session unsuccessful: ${session.error ?? 'unknown error'}`);
+  }
+  if (session.finalReport?.status !== 'success') {
+    failures.push('final report missing or not successful');
+  }
+  if (!hasFinalReport(session.logs)) {
+    failures.push('final report tool was not invoked');
+  }
+  const maxTurn = extractMaxLlmTurn(session.logs);
+  const accountingOk = hasAccountingEntries(session.accounting);
+  if (!accountingOk) {
+    failures.push('no llm accounting entries recorded');
+  }
+
+  const scenario = BASE_SCENARIOS.find((candidate) => candidate.id === result.scenarioId);
+  let reasoningSummary: ScenarioRunResult['reasoningSummary'];
+  const reasoningRequested = scenario?.reasoning !== undefined;
+  if (scenario !== undefined) {
+    if (maxTurn < scenario.minTurns) {
+      failures.push(`expected at least ${String(scenario.minTurns)} turns, observed ${String(maxTurn)}`);
+    }
+    if (Array.isArray(scenario.requiredAgentTools)) {
+      const tools = scenario.requiredAgentTools.filter((value): value is string => typeof value === 'string');
+      tools.forEach((toolName) => {
+        const idx = findToolIndex(session.logs, toolName);
+        if (idx === -1) {
+          failures.push(`required sub-agent tool '${toolName}' was not invoked`);
+        }
+      });
+      if (tools.length >= 2) {
+        const firstIdx = findToolIndex(session.logs, tools[0]);
+        const secondIdx = findToolIndex(session.logs, tools[1]);
+        if (firstIdx >= 0 && secondIdx >= 0 && firstIdx > secondIdx) {
+          failures.push('agent2 ran before agent1');
+        }
+      }
+    }
+    if (reasoningRequested) {
+      const { present, preserved } = analyzeReasoningSignatures(session.conversation);
+      reasoningSummary = { requested: true, present, preserved };
+      if (scenario.requireReasoningSignatures === true && result.provider === 'anthropic') {
+        if (!present) {
+          console.warn(
+            `[WARN] ${result.modelLabel} :: ${scenario.label} :: requested reasoning but provider returned no reasoning segments`
+          );
+        } else if (!preserved) {
+          failures.push('reasoning signatures missing or not preserved across turns');
+          const assistantReasoning = session.conversation
+            .filter(isAssistantWithReasoning)
+            .map((message, index) => {
+              const segments = message.reasoning;
+              const signatureFlags = segments.map((segment) => {
+                const signature = (segment as unknown as { signature?: unknown }).signature;
+                return typeof signature === 'string';
+              });
+              return {
+                index,
+                segments: segments.length,
+                signatures: signatureFlags,
+                raw: segments.map((segment) => ({
+                  keys: Object.keys(segment as unknown as Record<string, unknown>),
+                  providerMetadata: segment.providerMetadata,
+                  textSnippet: segment.text.slice(0, 80),
+                })),
+              };
+            });
+          console.warn(
+            `[WARN] ${result.modelLabel} :: ${scenario.label} :: reasoning signature map ${JSON.stringify(assistantReasoning)}`
+          );
+        }
+      }
+    }
+  }
+
+  reasoningSummary ??= { requested: reasoningRequested, present: false, preserved: false };
+
+  return {
+    ...result,
+    success: failures.length === 0,
+    failureReasons: failures,
+    accounting: session.accounting,
+    maxTurn,
+    reasoningSummary,
+  };
+};
+
+const runScenarioVariant = async (
+  configPath: string,
+  modelLabel: string,
+  provider: string,
+  modelId: string,
+  tier: Tier,
+  variant: ScenarioVariant
+): Promise<ScenarioRunResult> => {
+  const { scenario, stream } = variant;
+  const cache = new LoadedAgentCache();
+  const overrides: GlobalOverrides = {
+    models: [{ provider, model: modelId }],
+  };
+  if (scenario.reasoning !== undefined) {
+    overrides.reasoning = scenario.reasoning;
+  }
+  const fixtureManager = new Phase2FixtureManager({
+    rootDir: PHASE2_FIXTURE_ROOT,
+    modelLabel,
+    provider,
+    modelId,
+    scenarioId: scenario.id,
+    scenarioLabel: scenario.label,
+    stream,
+    refresh: REFRESH_FIXTURES,
+  });
+  const baseResult: ScenarioRunResult = {
+    modelLabel,
+    provider,
+    modelId,
+    tier,
+    scenarioId: scenario.id,
+    scenarioLabel: scenario.label,
+    stream,
+    reasoning: scenario.reasoning,
+    success: false,
+    failureReasons: [],
+    accounting: [],
+    maxTurn: 0,
+  };
+
+  try {
+    const agent = loadAgent(MASTER_AGENT_PATH, cache, {
+      configPath,
+      globalOverrides: overrides,
+      stream,
+      reasoning: scenario.reasoning,
+    });
+    const callbacks = VERBOSE_LOGS
+      ? {
+          onLog: (entry: LogEntry) => {
+            const turnSegment = Number.isFinite(entry.turn) ? ` turn=${String(entry.turn)}` : '';
+            console.log(`[LOG] ${entry.severity} ${entry.remoteIdentifier}${turnSegment}: ${entry.message}`);
+          },
+        }
+      : undefined;
+    const result = await agent.run(scenario.systemPrompt, scenario.userPrompt, {
+      outputFormat: 'markdown',
+      callbacks,
+      traceLLM: TRACE_LLM,
+      traceSdk: TRACE_SDK,
+      traceMCP: TRACE_MCP,
+      verbose: VERBOSE_LOGS,
+      llmInterceptor: fixtureManager,
+    });
+    const validated = validateScenarioResult(baseResult, { result });
+    fixtureManager.finalize();
+    const stats = fixtureManager.stats();
+    if (stats.recorded > 0) {
+      console.log(`[INFO] recorded ${String(stats.recorded)} new LLM fixture turn(s) at ${stats.dir}`);
+    }
+    return validated;
+  } catch (error: unknown) {
+    try {
+      fixtureManager.finalize();
+    } catch (finalizeError) {
+      process.stderr.write(`[warn] fixture finalize failed: ${finalizeError instanceof Error ? finalizeError.message : String(finalizeError)}\n`);
+    }
+    const message = toErrorMessage(error);
+    return { ...baseResult, success: false, failureReasons: [message], error: message };
+  }
+};
+
+const describeReasoningStatus = (run: ScenarioRunResult): string => {
+  const summary = run.reasoningSummary;
+  const requested = summary?.requested ?? false;
+  if (!requested) {
+    return 'not-requested';
+  }
+  const present = summary?.present ?? false;
+  if (!present) {
+    return 'requested-absent';
+  }
+  const preserved = summary?.preserved ?? false;
+  return preserved ? 'preserved' : 'missing-signatures';
+};
+
+const formatRunMetrics = (run: ScenarioRunResult, summaryOverride?: AccountingSummary): string => {
+  const accounting = summaryOverride ?? buildAccountingSummary(run.accounting);
+  const reasoning = describeReasoningStatus(run);
+  const latencyPart = `latency=${String(accounting.latencyMs)}ms`;
+  const requestsPart = accounting.requests > 0 ? `, requests=${String(accounting.requests)}` : '';
+  const tokensPart = `tokens[in=${String(accounting.tokensIn)}, out=${String(accounting.tokensOut)}, cacheR=${String(accounting.cacheReadTokens)}, cacheW=${String(accounting.cacheWriteTokens)}, total=${String(accounting.totalTokens)}]`;
+  const costPart = accounting.costUsd !== undefined ? `, costUsd≈${accounting.costUsd.toFixed(4)}` : '';
+  return `reasoning=${reasoning} | ${latencyPart}${requestsPart} | ${tokensPart}${costPart}`;
+};
+
+const formatSummaryLine = (run: ScenarioRunResult, summaryOverride?: AccountingSummary): string => {
+  const outcome = run.success ? 'PASS' : 'FAIL';
+  const streamLabel = run.stream ? 'stream-on' : 'stream-off';
+  return `[${outcome}] ${run.modelLabel} (${run.provider}:${run.modelId}) :: ${run.scenarioLabel} :: ${streamLabel} | ${formatRunMetrics(run, summaryOverride)}`;
+};
+
+const printSummary = (runs: readonly ScenarioRunResult[]): void => {
+  console.log('Phase 2 Integration Summary');
+  let totalTokensIn = 0;
+  let totalTokensOut = 0;
+  let totalCacheRead = 0;
+  let totalCacheWrite = 0;
+  let totalTokens = 0;
+  let totalLatency = 0;
+  let totalRequests = 0;
+  let totalCost = 0;
+  let costObserved = false;
+  // eslint-disable-next-line functional/no-loop-statements
+  for (const run of runs) {
+    const summary = buildAccountingSummary(run.accounting);
+    console.log(formatSummaryLine(run, summary));
+    if (!run.success) {
+      run.failureReasons.forEach((reason) => {
+        console.log(`  - ${reason}`);
+      });
+    }
+    totalTokensIn += summary.tokensIn;
+    totalTokensOut += summary.tokensOut;
+    totalCacheRead += summary.cacheReadTokens;
+    totalCacheWrite += summary.cacheWriteTokens;
+    totalTokens += summary.totalTokens;
+    totalLatency += summary.latencyMs;
+    totalRequests += summary.requests;
+    if (summary.costUsd !== undefined) {
+      totalCost += summary.costUsd;
+      costObserved = true;
+    }
+  }
+  const totalsLine = [
+    `tokens[in=${String(totalTokensIn)}, out=${String(totalTokensOut)}, cacheR=${String(totalCacheRead)}, cacheW=${String(totalCacheWrite)}, total=${String(totalTokens)}]`,
+    `latency=${String(totalLatency)}ms`,
+    `requests=${String(totalRequests)}`,
+  ];
+  if (costObserved) {
+    totalsLine.push(`costUsd≈${totalCost.toFixed(4)}`);
+  }
+  console.log(`Overall Totals: ${totalsLine.join(' | ')}`);
+};
+
+const printUsage = (): void => {
+  console.log('Usage: node dist/tests/phase2-runner.js [--config=path] [--tier=1,2,3] [--model=label,modelId]');
+  console.log('Environment override: PHASE2_CONFIG=/path/to/config.json');
+  console.log('Set PHASE2_STOP_ON_FAILURE=1 to halt immediately after the first failure (default: continue running all models).');
+  console.log('Use --refresh-llm-fixtures to regenerate cached LLM turn fixtures before running.');
+};
+
+async function main(): Promise<void> {
+  ensureFileExists('Master agent prompt', MASTER_AGENT_PATH);
+  const argv = process.argv.slice(2);
+  if (argv.includes('--help') || argv.includes('-h')) {
+    printUsage();
+    return;
+  }
+
+  let configPath = process.env.PHASE2_CONFIG ?? DEFAULT_CONFIG_PATH;
+  let tierFilter: Set<Tier> | undefined;
+  let modelFilter: Set<string> | undefined;
+
+  argv.forEach((arg) => {
+    if (arg.startsWith('--config=')) {
+      configPath = path.resolve(arg.slice('--config='.length));
+    } else if (arg.startsWith('--tier=')) {
+      tierFilter = parseTierFilter(arg.slice('--tier='.length));
+    } else if (arg.startsWith('--model=')) {
+      modelFilter = parseModelFilter(arg.slice('--model='.length));
+    } else if (arg === '--refresh-llm-fixtures') {
+      REFRESH_FIXTURES = true;
+    } else {
+      throw new Error(`unknown argument '${arg}'`);
+    }
+  });
+
+  ensureFileExists('Configuration file', configPath);
+
+  const runs: ScenarioRunResult[] = [];
+  const tiersToRun = tierFilter ?? new Set<Tier>([1, 2, 3]);
+  let abort = false;
+  let executed = 0;
+  // eslint-disable-next-line functional/no-loop-statements
+  for (const model of phase2ModelConfigs) {
+    if (abort) break;
+    if (!tiersToRun.has(model.tier)) continue;
+    if (modelFilter !== undefined) {
+      const matches = modelFilter.has(model.label) || modelFilter.has(`${model.provider}/${model.modelId}`) || modelFilter.has(model.modelId);
+      if (!matches) continue;
+    }
+    // eslint-disable-next-line functional/no-loop-statements
+    for (const variant of scenarioVariants) {
+      executed += 1;
+      const streamLabel = variant.stream ? 'stream-on' : 'stream-off';
+      const runIndexLabel = String(executed);
+      const tierLabel = String(model.tier);
+      console.log(`[RUN] #${runIndexLabel} ${model.label} (${model.provider}:${model.modelId}, tier ${tierLabel}) :: ${variant.scenario.label} :: ${streamLabel}`);
+      const run = await runScenarioVariant(configPath, model.label, model.provider, model.modelId, model.tier, variant);
+      runs.push(run);
+      const summary = buildAccountingSummary(run.accounting);
+      const outcomeLine = formatSummaryLine(run, summary);
+      console.log(outcomeLine);
+      if (!run.success) {
+        run.failureReasons.forEach((reason) => {
+          console.log(`  - ${reason}`);
+        });
+      }
+      if (STOP_ON_FAILURE && !run.success) {
+        abort = true;
+        break;
+      }
+    }
+  }
+
+  printSummary(runs);
+  if (runs.some((run) => !run.success)) {
+    process.exitCode = 1;
+  }
+}
+
+main().catch((error: unknown) => {
+  console.error('phase2-runner failed', toErrorMessage(error));
+  process.exit(1);
+});

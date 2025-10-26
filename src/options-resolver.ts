@@ -19,6 +19,7 @@ interface CLIOverrides {
   traceLLM?: boolean;
   traceMCP?: boolean;
   traceSlack?: boolean;
+  traceSdk?: boolean;
   verbose?: boolean;
   reasoning?: ReasoningLevel;
   reasoningValue?: ProviderReasoningValue | null;
@@ -80,6 +81,7 @@ interface ResolvedEffectiveOptions {
   traceLLM: boolean;
   traceMCP: boolean;
   traceSlack: boolean;
+  traceSdk: boolean;
   verbose: boolean;
   mcpInitConcurrency?: number;
   reasoning?: ReasoningLevel;
@@ -241,6 +243,7 @@ export function resolveEffectiveOptions(args: {
     traceLLM: cli?.traceLLM === true,
     traceMCP: cli?.traceMCP === true,
     traceSlack: cli?.traceSlack === true,
+    traceSdk: cli?.traceSdk === true,
     verbose: cli?.verbose === true,
     mcpInitConcurrency: ((): number | undefined => {
       const globalConcurrency = getGlobalVal('mcpInitConcurrency');

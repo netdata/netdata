@@ -9,15 +9,17 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { WebSocketServer } from 'ws';
 
 import type { AgentMetadata, AgentRegistry } from '../agent-registry.js';
-import type { AIAgentCallbacks, LogEntry } from '../types.js';
+import type { AIAgentCallbacks, LogDetailValue, LogEntry } from '../types.js';
 import type { Headend, HeadendClosedEvent, HeadendContext, HeadendDescription } from './types.js';
 import type { AuthInfo } from '@modelcontextprotocol/sdk/server/auth/types.js';
 
+import { describeFormat } from '../formats.js';
+import { createStructuredLogger } from '../logging/structured-logger.js';
+import { resolveToolName, type AgentSchemaSummary } from '../schema-adapters.js';
+import { getTelemetryLabels } from '../telemetry/index.js';
+
 /* eslint-disable-next-line @typescript-eslint/consistent-type-imports -- Need runtime type mapping for SDK's bundled Zod */
 type ZodExports = typeof import('zod');
-
-import { describeFormat } from '../formats.js';
-import { resolveToolName, type AgentSchemaSummary } from '../schema-adapters.js';
 
 import { ConcurrencyLimiter } from './concurrency.js';
 import { McpWebSocketServerTransport } from './mcp-ws-transport.js';
@@ -84,6 +86,7 @@ export class McpHeadend implements Headend {
   private readonly registry: AgentRegistry;
   private readonly instructions?: string;
   private readonly transportSpec: McpTransportSpec;
+  private readonly label: string;
   private readonly closeDeferred = createDeferred<HeadendClosedEvent>();
   private server?: McpServer;
   private context?: HeadendContext;
@@ -105,6 +108,7 @@ export class McpHeadend implements Headend {
     this.instructions = options.instructions;
     this.transportSpec = options.transport;
     this.id = this.computeId(options.transport);
+    this.label = this.describeLabel();
     this.closed = this.closeDeferred.promise;
     this.verboseLogging = options.verboseLogging === true;
     if (options.transport.type !== 'stdio') {
@@ -116,12 +120,13 @@ export class McpHeadend implements Headend {
   }
 
   public describe(): HeadendDescription {
-    return { id: this.id, kind: this.kind, label: this.describeLabel() };
+    return { id: this.id, kind: this.kind, label: this.label };
   }
 
   public async start(context: HeadendContext): Promise<void> {
     if (this.context !== undefined) return;
     this.context = context;
+    this.log('starting');
 
     switch (this.transportSpec.type) {
       case 'stdio': {
@@ -345,9 +350,17 @@ export class McpHeadend implements Headend {
         abortSignal.addEventListener('abort', () => { stopRef.stopping = true; }, { once: true });
 
         let output = '';
+        const telemetryLabels = { ...getTelemetryLabels(), headend: this.id };
+        const structuredLogger = createStructuredLogger({
+          labels: telemetryLabels,
+        });
         const callbacks: AIAgentCallbacks = {
           onOutput: (chunk) => { output += chunk; },
-          onLog: (entry) => { this.logEntry(entry); },
+          onLog: (entry) => {
+            entry.headendId = this.id;
+            structuredLogger.emit(entry);
+            this.logEntry(entry);
+          },
         };
         try {
           if (format === 'json') {
@@ -381,6 +394,9 @@ export class McpHeadend implements Headend {
             callbacks,
             abortSignal,
             stopRef,
+            headendId: this.id,
+            telemetryLabels,
+            wantsProgressUpdates: false,
           });
           const result = await session.run();
           let text = output;
@@ -428,8 +444,24 @@ export class McpHeadend implements Headend {
     });
   }
 
-  private log(message: string, severity: LogEntry['severity'] = 'VRB', fatal = false, direction: LogEntry['direction'] = 'response'): void {
+  private log(
+    message: string,
+    severity: LogEntry['severity'] = 'VRB',
+    fatal = false,
+    direction: LogEntry['direction'] = 'response',
+    extraDetails?: Record<string, LogDetailValue>,
+  ): void {
     if (this.context === undefined) return;
+    const inferred: Record<string, LogDetailValue> = {};
+    message.split(' ').forEach((segment) => {
+      const eq = segment.indexOf('=');
+      if (eq <= 0) return;
+      const key = segment.slice(0, eq).trim();
+      const value = segment.slice(eq + 1).trim();
+      if (key.length === 0 || value.length === 0) return;
+      if (!Object.prototype.hasOwnProperty.call(inferred, key)) inferred[key] = value;
+    });
+    const details = extraDetails !== undefined ? { ...inferred, ...extraDetails } : Object.keys(inferred).length > 0 ? inferred : undefined;
     this.context.log({
       timestamp: Date.now(),
       severity,
@@ -439,8 +471,9 @@ export class McpHeadend implements Headend {
       type: 'tool',
       remoteIdentifier: 'headend:mcp',
       fatal,
-      message,
+      message: `${this.label}: ${message}`,
       headendId: this.id,
+      ...(details !== undefined ? { details } : {}),
     });
   }
 
@@ -449,9 +482,14 @@ export class McpHeadend implements Headend {
     this.context.log(entry);
   }
 
-  private logVerbose(message: string, direction: LogEntry['direction'] = 'response', severity: LogEntry['severity'] = 'VRB'): void {
+  private logVerbose(
+    message: string,
+    direction: LogEntry['direction'] = 'response',
+    severity: LogEntry['severity'] = 'VRB',
+    details?: Record<string, LogDetailValue>,
+  ): void {
     if (!this.verboseLogging) return;
-    this.log(message, severity, false, direction);
+    this.log(message, severity, false, direction, details);
   }
 
   private logVerboseError(message: string): void {

@@ -38,6 +38,9 @@ export interface SpawnSessionArgs {
   stopRef?: { stopping: boolean };
   initialTitle?: string;
   ancestors?: string[];
+  headendId?: string;
+  telemetryLabels?: Record<string, string>;
+  wantsProgressUpdates?: boolean;
 }
 
 export class AgentRegistry {
@@ -123,6 +126,9 @@ export class AgentRegistry {
       stopRef: args.stopRef,
       initialTitle: args.initialTitle,
       ancestors: args.ancestors,
+      headendId: args.headendId,
+      telemetryLabels: args.telemetryLabels,
+      wantsProgressUpdates: args.wantsProgressUpdates,
     });
   }
 

@@ -10,8 +10,10 @@ import type { Headend, HeadendClosedEvent, HeadendContext, HeadendDescription } 
 
 import { loadAgent, LoadedAgentCache, type LoadAgentOptions, type LoadedAgent } from '../agent-loader.js';
 import { discoverLayers } from '../config-resolver.js';
+import { createStructuredLogger } from '../logging/structured-logger.js';
 import { SessionManager } from '../server/session-manager.js';
 import { initSlackHeadend } from '../server/slack.js';
+import { getTelemetryLabels } from '../telemetry/index.js';
 
 import { ConcurrencyLimiter } from './concurrency.js';
 
@@ -32,6 +34,7 @@ interface SlackHeadendOptions {
   verbose?: boolean;
   traceLLM?: boolean;
   traceMCP?: boolean;
+  traceSdk?: boolean;
   traceSlack?: boolean;
 }
 
@@ -74,6 +77,7 @@ export class SlackHeadend implements Headend {
   private readonly verbose: boolean;
   private readonly traceLLM: boolean;
   private readonly traceMCP: boolean;
+  private readonly traceSdk: boolean;
   private readonly traceSlack: boolean;
   private readonly closeDeferred = this.createDeferred<HeadendClosedEvent>();
   private readonly agentCache = new Map<string, LoadedAgentRecord>();
@@ -82,6 +86,9 @@ export class SlackHeadend implements Headend {
   private readonly slackLimiter = new ConcurrencyLimiter(10);
   private readonly runReleases = new Map<string, () => void>();
   private readonly registeredSessions = new WeakSet<SessionManager>();
+  private readonly telemetryLabels: Record<string, string>;
+  private readonly structuredLogger;
+  private readonly label: string;
 
   private context?: HeadendContext;
   private slackApp?: InstanceType<typeof App>;
@@ -102,12 +109,18 @@ export class SlackHeadend implements Headend {
     this.verbose = options.verbose === true;
     this.traceLLM = options.traceLLM === true;
     this.traceMCP = options.traceMCP === true;
+    this.traceSdk = options.traceSdk === true;
     this.traceSlack = options.traceSlack === true;
     this.closed = this.closeDeferred.promise;
+    this.telemetryLabels = { ...getTelemetryLabels(), headend: this.id };
+    this.structuredLogger = createStructuredLogger({
+      labels: this.telemetryLabels,
+    });
+    this.label = 'Slack Socket Mode';
   }
 
   public describe(): HeadendDescription {
-    return { id: this.id, kind: this.kind, label: 'Slack Socket Mode' };
+    return { id: this.id, kind: this.kind, label: this.label };
   }
 
   public getSlashCommandRoute(): RestExtraRoute | undefined {
@@ -121,6 +134,8 @@ export class SlackHeadend implements Headend {
   public async start(context: HeadendContext): Promise<void> {
     if (this.slackApp !== undefined) return;
     this.context = context;
+
+    this.log('starting');
 
     const primaryAgentPath = this.agentPaths[0];
     if (primaryAgentPath === undefined) {
@@ -184,7 +199,7 @@ export class SlackHeadend implements Headend {
     }
 
     await this.slackApp.start();
-    this.log('Slack headend started');
+    this.log('started');
   }
 
   public async stop(): Promise<void> {
@@ -196,7 +211,7 @@ export class SlackHeadend implements Headend {
         await slackApp.stop();
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
-        this.log(`Slack stop failed: ${message}`, 'WRN');
+        this.log(`stop failed: ${message}`, 'WRN');
       }
       this.slackApp = undefined;
       this.slackClient = undefined;
@@ -224,7 +239,7 @@ export class SlackHeadend implements Headend {
         res.end('not_found');
       })().catch((err: unknown) => {
         const message = err instanceof Error ? err.message : String(err);
-        this.log(`Slash command fallback failed: ${message}`, 'ERR');
+        this.log(`slash command fallback failed: ${message}`, 'ERR');
         if (!res.writableEnded && !res.writableFinished) {
           res.statusCode = 500;
           res.end('internal_error');
@@ -236,7 +251,7 @@ export class SlackHeadend implements Headend {
       server.listen(port, () => resolve());
     });
     this.fallbackServer = server;
-    this.log(`Slash command fallback listening on port ${String(port)}`);
+    this.log(`slash command fallback listening on port ${String(port)}`);
   }
 
   private createSlashCommandRoute(): RestExtraRoute | undefined {
@@ -277,7 +292,7 @@ export class SlackHeadend implements Headend {
       void this.processSlashCommand({ command, text, userId, channelId, teamId, responseUrl, requestId });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      this.log(`Slash command handler failed: ${message}`, 'ERR');
+      this.log(`slash command handler failed: ${message}`, 'ERR');
       if (!res.writableEnded && !res.writableFinished) {
         res.statusCode = 500;
         res.end('error');
@@ -370,7 +385,7 @@ export class SlackHeadend implements Headend {
       void this.pollAndFinalize(activeSessions, runId, targetChannel, liveTs);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      this.log(`Slash command processing failed: ${message}`, 'ERR');
+      this.log(`slash command processing failed: ${message}`, 'ERR');
       if (args.responseUrl !== '') {
         try {
           await fetch(args.responseUrl, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ response_type: 'ephemeral', text: `Failed: ${message}` }) });
@@ -637,6 +652,7 @@ export class SlackHeadend implements Headend {
       verbose: this.verbose,
       traceLLM: this.traceLLM,
       traceMCP: this.traceMCP,
+      traceSdk: this.traceSdk,
     });
     const sessions = new SessionManager(
       (systemPrompt, userPrompt, opts) => {
@@ -644,9 +660,21 @@ export class SlackHeadend implements Headend {
         const baseOpts = (opts ?? {}) as Record<string, unknown>;
         const renderTarget = typeof baseOpts.renderTarget === 'string' ? baseOpts.renderTarget : undefined;
         const outputFormat = expectedJson ? 'json' : (renderTarget === 'slack' ? 'slack-block-kit' : 'markdown');
-        return loaded.run(systemPrompt, userPrompt, ({ ...baseOpts, outputFormat } as any));
+        return loaded.run(systemPrompt, userPrompt, ({
+          ...baseOpts,
+          outputFormat,
+          headendId: this.id,
+          telemetryLabels: this.telemetryLabels,
+          wantsProgressUpdates: true,
+        } as any));
       },
-      { onLog: (entry) => { this.context?.log(entry); } }
+      {
+        onLog: (entry) => {
+          this.structuredLogger.emit(entry);
+          this.context?.log(entry);
+        },
+      },
+      { headendId: this.id, telemetryLabels: this.telemetryLabels }
     );
     const record: LoadedAgentRecord = { loaded, sessions };
     this.agentCache.set(abs, record);
@@ -686,8 +714,7 @@ export class SlackHeadend implements Headend {
   }
 
   private log(message: string, severity: Parameters<HeadendContext['log']>[0]['severity'] = 'VRB'): void {
-    if (!this.context) return;
-    this.context.log({
+    const entry: Parameters<HeadendContext['log']>[0] = {
       timestamp: Date.now(),
       severity,
       turn: 0,
@@ -696,8 +723,10 @@ export class SlackHeadend implements Headend {
       type: 'tool',
       remoteIdentifier: 'headend:slack',
       fatal: severity === 'ERR',
-      message,
+      message: `${this.label}: ${message}`,
       headendId: this.id,
-    });
+    };
+    this.structuredLogger.emit(entry);
+    this.context?.log(entry);
   }
 }

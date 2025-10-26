@@ -51,6 +51,11 @@
             "top_p": null
           }
         },
+        "claude-haiku-4-5": {
+          "overrides": {
+            "top_p": null
+          }
+        },
         "claude-3-5-sonnet-20241022": {
           "reasoning": null
         },
@@ -704,6 +709,14 @@
         "cacheRead": 0.08,
         "cacheWrite": 1
       },
+      "claude-haiku-4-5": {
+        "unit": "per_1m",
+        "currency": "USD",
+        "prompt": 1,
+        "completion": 5,
+        "cacheRead": 0.10,
+        "cacheWrite": 1.25
+      },
       "claude-3-5-sonnet-20241022": {
         "unit": "per_1m",
         "currency": "USD",
@@ -1274,6 +1287,14 @@
         "currency": "USD",
         "prompt": 0.075,
         "completion": 0.3
+      }
+    },
+    "openrouter": {
+      "x-ai/grok-code-fast-1": {
+        "unit": "per_1m",
+        "currency": "USD",
+        "prompt": 0.2,
+        "completion": 1.5
       }
     }
   }

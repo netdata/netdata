@@ -51,6 +51,15 @@ export class MCPProvider extends ToolProvider {
     return this.getCombinedInstructions();
   }
 
+  override resolveLogProvider(name: string): string {
+    const mapping = this.toolNameMap.get(name);
+    if (mapping !== undefined) {
+      return `${this.id}:${mapping.serverName}`;
+    }
+    const prefix = name.includes('__') ? name.split('__')[0] : name;
+    return `${this.id}:${prefix}`;
+  }
+
   private sanitizeNamespace(name: string): string {
     return name
       .replace(/[^A-Za-z0-9]/g, '_')

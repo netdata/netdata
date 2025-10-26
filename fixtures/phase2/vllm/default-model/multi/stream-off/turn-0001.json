@@ -1,0 +1,109 @@
+{
+  "version": 1,
+  "meta": {
+    "provider": "vllm",
+    "model": "default-model",
+    "scenarioId": "multi",
+    "scenarioLabel": "multi-turn",
+    "modelLabel": "vllm/default-model",
+    "stream": false,
+    "turn": 1,
+    "timestamp": "2025-10-26T11:40:10.601Z"
+  },
+  "request": {
+    "provider": "vllm",
+    "model": "default-model",
+    "stream": false,
+    "temperature": 0.7,
+    "topP": 1,
+    "maxOutputTokens": 4096,
+    "reasoningLevel": "high",
+    "reasoningValue": "high",
+    "parallelToolCalls": true,
+    "isFinalTurn": false,
+    "turn": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "1) Call agent__test-agent1 with parameters {\"prompt\":\"run\",\"reason\":\"execute phase two\",\"format\":\"sub-agent\"}. 2) Wait for the response and call agent__test-agent2 with {\"prompt\":<agent1 output>,\"reason\":\"execute phase two\",\"format\":\"sub-agent\"}. 3) Finish by calling agent__final_report(status=\"success\", report_format=\"text\", content=<agent2 output>). Do not emit plain text.\n\n## TOOLS' INSTRUCTIONS\n\n## Available Tools\n\n### Internal Tools\n\n#### agent__progress_report — Progress Updates for the user\n- Use this tool to update the user on your progress.\n- Keep the `progress` message concise (≤20 words).\n- Always pair this tool with other tools you are invoking (except `agent__final_report`).\n- Do not call this tool by itself.\n- Do not pair this tool with `agent__final_report`\n\n#### agent__final_report - Deliver Your Final Answer\n- You MUST call 'agent__final_report' to provide your final answer to the user.\n- Required fields:\n  - `status`: one of `success`, `failure`, `partial`.\n  - `report_format`: \"markdown\".\n  - `report_content`: complete deliverable in the requested format.\n- Include optional `metadata` only when explicitly relevant.\n- After this tool succeeds, do not send additional assistant messages.\n\n*You run in agentic mode, interfacing with software tools.*\n\n**YOU MUST:**\n- **ALWAYS** respond with valid tool calls, even for your final answer.\n- **ALWAYS** provide your final report to the user using the agent__final_report tool, with the correct format.\n**YOU MUST NOT:**\n- Do not provide any other output except calling your tools. Any other output you provide is ignored."
+      },
+      {
+        "role": "user",
+        "content": "Execute agent__test-agent1({\"prompt\":\"run\",\"reason\":\"execute phase two\",\"format\":\"sub-agent\"}), pass its output into agent__test-agent2({\"prompt\":<agent1 output>,\"reason\":\"execute phase two\",\"format\":\"sub-agent\"}), and conclude with agent__final_report(status=\"success\", report_format=\"text\", content=<agent2 output>)."
+      }
+    ],
+    "toolNames": [
+      "agent__progress_report",
+      "agent__final_report",
+      "agent__test-agent1",
+      "agent__test-agent2"
+    ]
+  },
+  "requestHash": "f2c61383eb2785d8925b2c2e2e714b7c3375ccc131c5ae3d1b67649b776467e9",
+  "result": {
+    "status": {
+      "type": "success",
+      "hasToolCalls": true,
+      "finalAnswer": false
+    },
+    "response": "",
+    "toolCalls": [
+      {
+        "id": "chatcmpl-tool-baf1ee14859a409db1cf1b365700255f",
+        "name": "agent__progress_report",
+        "parameters": {
+          "progress": "Running test-agent1"
+        }
+      }
+    ],
+    "tokens": {
+      "inputTokens": 835,
+      "outputTokens": 1577,
+      "totalTokens": 2412
+    },
+    "latencyMs": 7947,
+    "messages": [
+      {
+        "role": "assistant",
+        "content": "",
+        "toolCalls": [
+          {
+            "id": "chatcmpl-tool-baf1ee14859a409db1cf1b365700255f",
+            "name": "agent__progress_report",
+            "parameters": {
+              "progress": "Running test-agent1"
+            }
+          }
+        ],
+        "metadata": {
+          "provider": "vllm",
+          "model": "default-model",
+          "tokens": {
+            "inputTokens": 835,
+            "outputTokens": 1577,
+            "totalTokens": 2412
+          },
+          "timestamp": 1761478810601
+        }
+      },
+      {
+        "role": "tool",
+        "content": "{\"ok\":true}",
+        "toolCallId": "chatcmpl-tool-baf1ee14859a409db1cf1b365700255f",
+        "metadata": {
+          "provider": "vllm",
+          "model": "default-model",
+          "tokens": {
+            "inputTokens": 835,
+            "outputTokens": 1577,
+            "totalTokens": 2412
+          },
+          "timestamp": 1761478810601
+        }
+      }
+    ],
+    "hasReasoning": false,
+    "hasContent": false,
+    "stopReason": "tool-calls"
+  }
+}

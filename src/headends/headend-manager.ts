@@ -81,7 +81,6 @@ export class HeadendManager {
 
   private async startHeadend(headend: Headend): Promise<void> {
     const desc = headend.describe();
-    this.emit(headend, 'VRB', 'request', `starting ${desc.label}`, false, desc);
     const ctx: HeadendContext = {
       log: (entry: LogEntry) => {
         const remote = typeof entry.remoteIdentifier === 'string' && entry.remoteIdentifier.length > 0
@@ -98,7 +97,6 @@ export class HeadendManager {
     await headend.start(ctx);
     this.active.add(headend);
     this.watchers.push(this.watchHeadend(headend));
-    this.emit(headend, 'VRB', 'response', `started ${desc.label}`, false, desc);
   }
 
   private async watchHeadend(headend: Headend): Promise<void> {
@@ -112,8 +110,6 @@ export class HeadendManager {
         const err = new Error('headend stopped unexpectedly');
         this.emit(headend, 'ERR', 'response', err.message, true);
         this.registerFatal(headend, err);
-      } else {
-        this.emit(headend, 'VRB', 'response', 'stopped', false);
       }
     } catch (err: unknown) {
       this.active.delete(headend);
@@ -133,6 +129,7 @@ export class HeadendManager {
 
   private emit(headend: Headend, severity: LogEntry['severity'], direction: LogEntry['direction'], message: string, fatal = false, desc?: HeadendDescription): void {
     const info = desc ?? headend.describe();
+    const formattedMessage = `${info.label}: ${message}`;
     const entry: LogEntry = {
       timestamp: Date.now(),
       severity,
@@ -142,7 +139,7 @@ export class HeadendManager {
       type: 'tool',
       remoteIdentifier: `headend:${headend.kind}`,
       fatal,
-      message,
+      message: formattedMessage,
       headendId: info.id,
     };
     this.log(entry);

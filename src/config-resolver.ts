@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import type { Configuration, MCPServerConfig, ProviderConfig, RestToolConfig, OpenAPISpecConfig } from './types.js';
+import type { Configuration, MCPServerConfig, ProviderConfig, RestToolConfig, OpenAPISpecConfig, TelemetryConfig } from './types.js';
 
 import { warn } from './utils.js';
 
@@ -329,6 +329,24 @@ function resolvePricing(layers: ResolvedConfigLayer[]): Configuration['pricing']
   return pr;
 }
 
+function resolveTelemetry(layers: ResolvedConfigLayer[]): TelemetryConfig | undefined {
+  const found = layers.find((layer) => {
+    const j = layer.json as { telemetry?: Record<string, unknown> } | undefined;
+    return j?.telemetry !== undefined;
+  });
+  if (found === undefined) return undefined;
+  const source = found.json as { telemetry?: Record<string, unknown> } | undefined;
+  const telemetryRaw = source?.telemetry;
+  if (telemetryRaw === undefined) return undefined;
+  const env = found.env ?? {};
+  const expanded = expandPlaceholders(telemetryRaw, (name: string) => {
+    const envVal = Object.prototype.hasOwnProperty.call(env, name) ? env[name] : undefined;
+    const v = envVal ?? process.env[name];
+    return v ?? '';
+  }) as TelemetryConfig;
+  return expanded;
+}
+
 export function buildUnifiedConfiguration(
   needs: { providers: string[]; mcpServers: string[]; restTools: string[] },
   layers: ResolvedConfigLayer[],
@@ -374,6 +392,7 @@ export function buildUnifiedConfiguration(
   const defaults = resolveDefaults(layers);
   const accounting = resolveAccounting(layers, opts);
   const pricing = resolvePricing(layers);
+  const telemetry = resolveTelemetry(layers);
 
-  return { providers, mcpServers, restTools, openapiSpecs, defaults, accounting, pricing } as Configuration;
+  return { providers, mcpServers, restTools, openapiSpecs, defaults, accounting, pricing, telemetry } as Configuration;
 }

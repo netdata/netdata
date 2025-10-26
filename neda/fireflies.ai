@@ -7,7 +7,7 @@ usage: |
   company or email and time period
 models:
   - anthropic/claude-sonnet-4-5
-#  - anthropic/claude-3-haiku-20240307
+#  - anthropic/claude-haiku-4-5
 #  - openrouter/deepseek/deepseek-chat-v3.1
 #  - openrouter/openai/gpt-oss-120b
 #  - openrouter/openai/gpt-oss-20b

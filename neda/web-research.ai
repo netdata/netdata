@@ -6,7 +6,7 @@ description: |-
 usage: any query or topic you need thoroughly researched
 models:
   - anthropic/claude-sonnet-4-5
-#  - anthropic/claude-3-5-haiku-20241022
+#  - anthropic/claude-haiku-4-5
 #  - openrouter/openai/gpt-oss-120b
 #  - openrouter/openai/gpt-oss-20b
 tools:
@@ -28,7 +28,7 @@ maxToolTurns: 20
 maxToolCallsPerTurn: 20
 parallelToolCalls: true
 caching: full
-reasoning: high
+# reasoning: high
 ---
 You are an elite investigative researcher with access to web search capabilities. Your mission is to provide comprehensive, well-verified answers through systematic research methodology.
 

@@ -151,4 +151,8 @@ export class AnthropicProvider extends BaseLLMProvider {
     // Use base class helper that handles AI SDK's content array format
     return this.convertResponseMessagesGeneric(messages, provider, model, tokens);
   }
+
+  protected override supportsReasoningReplay(): boolean {
+    return true;
+  }
 }

@@ -133,6 +133,49 @@ const FormatsConfigSchema = z.object({
   subAgent: OutputFormatEnum.optional(),
 }).partial();
 
+const TelemetryOtlpSchema = z.object({
+  endpoint: z.string().optional(),
+  timeoutMs: z.number().int().positive().optional(),
+}).optional();
+
+const TelemetryPrometheusSchema = z.object({
+  enabled: z.boolean().optional(),
+  host: z.string().optional(),
+  port: z.number().int().positive().optional(),
+}).optional();
+
+const TelemetryTraceSamplerSchema = z.enum(['always_on', 'always_off', 'parent', 'ratio']);
+
+const TelemetryTraceSchema = z.object({
+  enabled: z.boolean().optional(),
+  sampler: TelemetryTraceSamplerSchema.optional(),
+  ratio: z.number().min(0).max(1).optional(),
+}).optional();
+
+const TelemetryLogFormatSchema = z.enum(['journald', 'logfmt', 'json', 'none']);
+
+const TelemetryLogExtraSchema = z.enum(['otlp']);
+
+const TelemetryLoggingOtlpSchema = z.object({
+  endpoint: z.string().optional(),
+  timeoutMs: z.number().int().positive().optional(),
+}).optional();
+
+const TelemetryLoggingSchema = z.object({
+  formats: z.array(TelemetryLogFormatSchema).nonempty().optional(),
+  extra: z.array(TelemetryLogExtraSchema).optional(),
+  otlp: TelemetryLoggingOtlpSchema,
+}).optional();
+
+const TelemetrySchema = z.object({
+  enabled: z.boolean().optional(),
+  otlp: TelemetryOtlpSchema,
+  prometheus: TelemetryPrometheusSchema,
+  labels: z.record(z.string(), z.string()).optional(),
+  traces: TelemetryTraceSchema,
+  logging: TelemetryLoggingSchema,
+}).optional();
+
 const ConfigurationSchema = z.object({
   providers: z.record(z.string(), ProviderConfigSchema),
   mcpServers: z.record(z.string(), MCPServerConfigSchema),
@@ -170,6 +213,7 @@ const ConfigurationSchema = z.object({
       formats: FormatsConfigSchema.optional(),
     })
     .optional(),
+  telemetry: TelemetrySchema,
   slack: SlackConfigSchema.optional(),
   api: ApiConfigSchema.optional(),
 });

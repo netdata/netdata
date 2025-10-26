@@ -78,6 +78,7 @@ These rules help generate code that passes `npm run lint` and `npm run build` on
   - Use explicit `typeof` checks for `unknown` values.
 - Minimal, targeted disable comments:
   - If you must disable a rule, do it on the narrowest possible scope (single line or block) and add a short reason.
+- Core loop invariants (LLM I/O, turn orchestration, retries): every change **must** ship with new or updated Phase 1 harness coverage that recreates the exact scenario. No exceptions.
 - Provider-specific patterns:
   - Centralize cross-provider logic in the base class (e.g., splitting bundled tool results, message conversions). Keep providers thin.
   - For provider option merging, read user config once, type-guard it, and deep-merge into a typed base object (avoid casting).

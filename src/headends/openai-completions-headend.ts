@@ -4,10 +4,12 @@ import path from 'node:path';
 import { URL } from 'node:url';
 
 import type { AgentMetadata, AgentRegistry } from '../agent-registry.js';
-import type { AccountingEntry, AIAgentCallbacks, LLMAccountingEntry, LogEntry, ProgressEvent, ProgressMetrics } from '../types.js';
+import type { AccountingEntry, AIAgentCallbacks, LLMAccountingEntry, LogDetailValue, LogEntry, ProgressEvent, ProgressMetrics } from '../types.js';
 import type { Headend, HeadendClosedEvent, HeadendContext, HeadendDescription } from './types.js';
 
+import { createStructuredLogger } from '../logging/structured-logger.js';
 import { mergeCallbacksWithPersistence } from '../persistence.js';
+import { getTelemetryLabels } from '../telemetry/index.js';
 
 import { ConcurrencyLimiter } from './concurrency.js';
 import { HttpError, readJson, writeJson, writeSseChunk, writeSseDone } from './http-utils.js';
@@ -62,7 +64,14 @@ interface OpenAIChatResponse {
   };
 }
 
-const buildLog = (headendId: string, message: string, severity: LogEntry['severity'] = 'VRB', fatal = false): LogEntry => ({
+const buildLog = (
+  headendId: string,
+  label: string,
+  message: string,
+  severity: LogEntry['severity'] = 'VRB',
+  fatal = false,
+  details?: Record<string, LogDetailValue>,
+): LogEntry => ({
   timestamp: Date.now(),
   severity,
   turn: 0,
@@ -71,8 +80,9 @@ const buildLog = (headendId: string, message: string, severity: LogEntry['severi
   type: 'tool',
   remoteIdentifier: 'headend:openai-completions',
   fatal,
-  message,
+  message: `${label}: ${message}`,
   headendId,
+  details,
 });
 
 const SYSTEM_PREFIX = 'System context:\n';
@@ -116,6 +126,7 @@ export class OpenAICompletionsHeadend implements Headend {
   private readonly limiter: ConcurrencyLimiter;
   private readonly closeDeferred = createDeferred<HeadendClosedEvent>();
   private readonly modelIdMap = new Map<string, string>();
+  private readonly label: string;
   private context?: HeadendContext;
   private server?: http.Server;
   private stopping = false;
@@ -125,6 +136,7 @@ export class OpenAICompletionsHeadend implements Headend {
     this.registry = registry;
     this.options = options;
     this.id = `openai-completions:${String(options.port)}`;
+    this.label = `OpenAI chat headend (port ${String(options.port)})`;
     const limit = typeof options.concurrency === 'number' && Number.isFinite(options.concurrency) && options.concurrency > 0
       ? Math.floor(options.concurrency)
       : 10;
@@ -134,17 +146,18 @@ export class OpenAICompletionsHeadend implements Headend {
   }
 
   public describe(): HeadendDescription {
-    return { id: this.id, kind: this.kind, label: `OpenAI chat headend (port ${String(this.options.port)})` };
+    return { id: this.id, kind: this.kind, label: this.label };
   }
 
   public async start(context: HeadendContext): Promise<void> {
     if (this.server !== undefined) return;
     this.context = context;
+    this.log('starting');
     const server = http.createServer((req, res) => { void this.handleRequest(req, res); });
     this.server = server;
     server.on('error', (err) => {
       const message = err instanceof Error ? err.message : String(err);
-      this.log(`server error: ${message}`, 'ERR', true);
+      this.log('server error', 'ERR', true, { error: message });
       if (!this.stopping) {
         this.stopping = true;
         this.signalClosed({ reason: 'error', error: err instanceof Error ? err : new Error(message) });
@@ -169,7 +182,8 @@ export class OpenAICompletionsHeadend implements Headend {
       server.once('error', onError);
       server.listen(this.options.port);
     });
-    this.log('listening');
+    this.log('listening', 'VRB', false, { port: this.options.port, concurrency_limit: this.limiter.maxConcurrency });
+    this.log('started');
   }
 
   public async stop(): Promise<void> {
@@ -209,7 +223,7 @@ export class OpenAICompletionsHeadend implements Headend {
         return;
       }
       const message = err instanceof Error ? err.message : String(err);
-      this.log(`request failure: ${message}`, 'ERR');
+      this.log('request failed', 'ERR', false, { error: message });
       writeJson(res, 500, { error: 'internal_error' });
     }
   }
@@ -251,7 +265,7 @@ export class OpenAICompletionsHeadend implements Headend {
       if (abortController.signal.aborted) return;
       stopRef.stopping = true;
       abortController.abort();
-      this.log(`chat completion aborted model=${agent.id}`, 'WRN');
+      this.log('chat completion aborted', 'WRN', false, { model: agent.id });
     };
     req.on('aborted', onAbort);
     res.on('close', onAbort);
@@ -269,7 +283,7 @@ export class OpenAICompletionsHeadend implements Headend {
         return;
       }
       const message = err instanceof Error ? err.message : String(err);
-      this.log(`concurrency acquire failed for model=${agent.id}: ${message}`, 'ERR');
+      this.log('concurrency acquisition failed', 'ERR', false, { model: agent.id, error: message });
       writeJson(res, 503, { error: 'concurrency_unavailable', message: 'Concurrency limit reached' });
       return;
     }
@@ -277,7 +291,7 @@ export class OpenAICompletionsHeadend implements Headend {
     const created = Math.floor(Date.now() / 1000);
     const responseId = randomUUID();
     const streamed = body.stream === true;
-    this.log(`chat completion request stream=${String(streamed)}`, 'VRB');
+    this.log('chat completion request received', 'VRB', false, { stream: streamed });
     let output = '';
     let streamedChunks = 0;
     let assistantRoleSent = false;
@@ -465,6 +479,11 @@ export class OpenAICompletionsHeadend implements Headend {
           emitBullet(`${agentLabel} update: ${italicize('progress event')}`);
       }
     };
+    const telemetryLabels = { ...getTelemetryLabels(), headend: this.id };
+    const structuredLogger = createStructuredLogger({
+      labels: telemetryLabels,
+    });
+
     const baseCallbacks: AIAgentCallbacks = {
       onOutput: (chunk) => {
         output += chunk;
@@ -497,7 +516,11 @@ export class OpenAICompletionsHeadend implements Headend {
       onProgress: (event) => {
         handleProgressEvent(event);
       },
-      onLog: (entry) => { this.logEntry(entry); },
+      onLog: (entry) => {
+        entry.headendId = this.id;
+        structuredLogger.emit(entry);
+        this.logEntry(entry);
+      },
       onAccounting: (entry) => { accounting.push(entry); },
     };
     const callbacks = mergeCallbacksWithPersistence(baseCallbacks, this.registry.getPersistence(agent.id)) ?? baseCallbacks;
@@ -519,6 +542,9 @@ export class OpenAICompletionsHeadend implements Headend {
         callbacks,
         abortSignal: abortController.signal,
         stopRef,
+        headendId: this.id,
+        telemetryLabels,
+        wantsProgressUpdates: true,
       });
       const result = await session.run();
       if (abortController.signal.aborted) {
@@ -662,10 +688,10 @@ export class OpenAICompletionsHeadend implements Headend {
         };
         writeJson(res, result.success ? 200 : 500, response);
       }
-      this.log(`chat completion model=${agent.id} ${result.success ? 'ok' : 'error'}`);
+      this.log('chat completion finished', 'VRB', false, { model: agent.id, status: result.success ? 'ok' : 'error' });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      this.log(`chat completion failed model=${agent.id}: ${message}`, 'ERR');
+      this.log('chat completion failed', 'ERR', false, { model: agent.id, error: message });
       if (streamed) {
         emitAssistantRole();
         const chunk = {
@@ -847,9 +873,9 @@ export class OpenAICompletionsHeadend implements Headend {
     return output;
   }
 
-  private log(message: string, severity: LogEntry['severity'] = 'VRB', fatal = false): void {
+  private log(message: string, severity: LogEntry['severity'] = 'VRB', fatal = false, details?: Record<string, LogDetailValue>): void {
     if (this.context === undefined) return;
-    this.context.log(buildLog(this.id, message, severity, fatal));
+    this.context.log(buildLog(this.id, this.label, message, severity, fatal, details));
   }
 
   private logEntry(entry: LogEntry): void {

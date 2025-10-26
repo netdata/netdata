@@ -20,6 +20,9 @@ import type { LanguageModel, ModelMessage, ProviderMetadata, ReasoningOutput, St
 import { clampToolName, sanitizeToolName, TOOL_NAME_MAX_LENGTH, warn } from '../utils.js';
 
 const GUIDANCE_STRING_FORMATS = ['date-time', 'time', 'date', 'duration', 'email', 'hostname', 'ipv4', 'ipv6', 'uuid'] as const;
+const TOOL_FAILED_PREFIX = '(tool failed: ' as const;
+const TOOL_FAILED_SUFFIX = ')' as const;
+const NO_TOOL_OUTPUT = '(no output)' as const;
 
 interface LLMProviderInterface {
   name: string;
@@ -97,6 +100,199 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
     return true;
   }
 
+  protected traceSdkPayload(request: TurnRequest, stage: 'request' | 'response', payload: unknown): void {
+    if (request.sdkTrace !== true) return;
+    const logger = request.sdkTraceLogger;
+    if (typeof logger !== 'function') return;
+    try {
+      logger({ stage, provider: request.provider, model: request.model, payload });
+    } catch (error) {
+      try { warn(`sdkTraceLogger failed: ${error instanceof Error ? error.message : String(error)}`); } catch { /* ignore */ }
+    }
+  }
+
+  protected normalizeResponseMessages(payload: unknown): ResponseMessage[] {
+    const record = this.isPlainObject(payload) ? payload : undefined;
+
+    const isResponseMessageArray = (value: unknown): value is ResponseMessage[] => Array.isArray(value);
+
+    const extractMessages = (value: unknown): ResponseMessage[] | undefined => {
+      if (isResponseMessageArray(value) && value.length > 0) {
+        return value;
+      }
+      return undefined;
+    };
+
+    const buildFromChoices = (value: unknown): ResponseMessage[] => {
+      const choices = Array.isArray(value) ? value : [];
+      const normalized: ResponseMessage[] = [];
+      choices.forEach((choice) => {
+        const message = (choice as { message?: unknown }).message;
+        if (message === undefined || message === null || typeof message !== 'object') return;
+        const msgRecord = message as Record<string, unknown>;
+        const role = typeof msgRecord.role === 'string' ? msgRecord.role as ResponseMessage['role'] : 'assistant';
+        const content = msgRecord.content ?? '';
+        const toolCallsRaw = msgRecord.tool_calls;
+        const toolCalls = Array.isArray(toolCallsRaw)
+          ? toolCallsRaw
+              .map((entry, index) => {
+                const recordEntry = entry as { id?: unknown; type?: unknown; function?: { name?: unknown; arguments?: unknown }; name?: unknown; arguments?: unknown };
+                const rawName = typeof recordEntry.name === 'string'
+                  ? recordEntry.name
+                  : typeof recordEntry.function?.name === 'string'
+                    ? recordEntry.function.name
+                    : '';
+                const sanitized = sanitizeToolName(rawName);
+                const { name } = clampToolName(sanitized);
+                const id = typeof recordEntry.id === 'string' ? recordEntry.id : `tool-call-${String(index + 1)}`;
+                const rawArgs = recordEntry.arguments ?? recordEntry.function?.arguments;
+                let parsedArgs: Record<string, unknown> = {};
+                if (typeof rawArgs === 'string') {
+                  try {
+                    parsedArgs = JSON.parse(rawArgs) as Record<string, unknown>;
+                  } catch {
+                    parsedArgs = {};
+                  }
+                } else if (rawArgs !== null && typeof rawArgs === 'object') {
+                  parsedArgs = rawArgs as Record<string, unknown>;
+                }
+                return {
+                  id,
+                  name,
+                  parameters: parsedArgs,
+                };
+              })
+              .filter((entry): entry is { id: string; name: string; parameters: Record<string, unknown> } => Boolean(entry))
+          : undefined;
+        const reasoning = this.collectReasoningSegmentsFromMessage(msgRecord);
+        const normalizedMessage: ResponseMessage = {
+          role,
+          content: content as ResponseMessage['content'],
+          ...(toolCalls !== undefined && toolCalls.length > 0 ? { toolCalls } : {}),
+          ...(reasoning.length > 0 ? { reasoning } : {}),
+        };
+        normalized.push(normalizedMessage);
+      });
+      return normalized;
+    };
+
+    const directMessages = extractMessages(record?.messages);
+    if (directMessages !== undefined) {
+      return directMessages;
+    }
+
+    const directChoices = buildFromChoices(record?.choices);
+    if (directChoices.length > 0) {
+      return directChoices;
+    }
+
+    const bodyCandidate = record?.body;
+    const body = this.isPlainObject(bodyCandidate) ? bodyCandidate : undefined;
+    if (body !== undefined) {
+      const bodyMessages = extractMessages(body.messages);
+      if (bodyMessages !== undefined) {
+        return bodyMessages;
+      }
+      const bodyChoices = buildFromChoices(body.choices);
+      if (bodyChoices.length > 0) {
+        return bodyChoices;
+      }
+    }
+
+    return [];
+  }
+
+  protected collectReasoningSegmentsFromMessage(message: unknown): ReasoningOutput[] {
+    if (message === null || typeof message !== 'object') return [];
+    const msgRecord = message as Record<string, unknown>;
+    const fromReasoning = this.collectReasoningOutputs(msgRecord.reasoning);
+    const fromReasoningContent = this.collectReasoningOutputs(msgRecord.reasoning_content ?? msgRecord.reasoningContent);
+    return this.mergeReasoningOutputs(fromReasoning, fromReasoningContent);
+  }
+
+  protected collectReasoningOutputs(value: unknown): ReasoningOutput[] {
+    if (value === undefined || value === null) return [];
+    if (Array.isArray(value)) {
+      return this.mergeReasoningOutputs(...value.map((entry) => this.collectReasoningOutputs(entry)));
+    }
+    if (typeof value === 'string') {
+      const text = value.trim();
+      if (text.length === 0) return [];
+      return [{ type: BaseLLMProvider.PART_REASONING, text }];
+    }
+    if (typeof value === 'object') {
+      const record = value as {
+        text?: unknown;
+        delta?: unknown;
+        providerMetadata?: ProviderMetadata;
+        provider_metadata?: ProviderMetadata;
+        providerOptions?: ProviderMetadata;
+        provider_options?: ProviderMetadata;
+        reasoning?: unknown;
+        segments?: unknown;
+        signature?: unknown;
+      };
+      if (Array.isArray(record.segments)) {
+        return this.collectReasoningOutputs(record.segments);
+      }
+      const rawThinking = (record as { thinking?: unknown; redacted_thinking?: unknown }).thinking;
+      const textCandidate = typeof record.text === 'string'
+        ? record.text
+        : typeof record.delta === 'string'
+          ? record.delta
+          : typeof rawThinking === 'string'
+            ? rawThinking
+            : typeof (record as { redacted_thinking?: unknown }).redacted_thinking === 'string'
+              ? (record as { redacted_thinking?: unknown }).redacted_thinking as string
+              : undefined;
+      if (textCandidate !== undefined) {
+        const text = textCandidate.trim();
+        if (text.length === 0) return [];
+        type AnnotatedReasoningOutput = ReasoningOutput & { signature?: string };
+        const output: AnnotatedReasoningOutput = { type: BaseLLMProvider.PART_REASONING, text };
+        const metadata = record.providerMetadata
+          ?? record.provider_metadata
+          ?? record.providerOptions
+          ?? record.provider_options;
+        if (metadata !== undefined) {
+          output.providerMetadata = metadata;
+          if (output.signature === undefined) {
+            const metadataSignature = this.extractSignatureFromMetadata(metadata);
+            if (metadataSignature !== undefined) {
+              output.signature = metadataSignature;
+            }
+          }
+        }
+        if (typeof record.signature === 'string' && record.signature.trim().length > 0) {
+          output.signature = record.signature;
+        }
+        return [output];
+      }
+      if (record.reasoning !== undefined) {
+        return this.collectReasoningOutputs(record.reasoning);
+      }
+    }
+    return [];
+  }
+
+  protected mergeReasoningOutputs(...groups: ReasoningOutput[][]): ReasoningOutput[] {
+    const merged: ReasoningOutput[] = [];
+    const seen = new Set<string>();
+    groups.forEach((group) => {
+      group.forEach((segment) => {
+        const text = segment.text.trim();
+        if (!text) return;
+        const metadataKey = segment.providerMetadata !== undefined ? JSON.stringify(segment.providerMetadata) : '';
+        const key = `${text}::${metadataKey}`;
+        if (seen.has(key)) return;
+        seen.add(key);
+        merged.push(segment);
+      });
+    });
+    return merged;
+  }
+
+
   protected extractTurnMetadata(
     request: TurnRequest,
     context: { usage?: unknown; response?: unknown; latencyMs: number }
@@ -142,6 +338,22 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
       }
     });
     return base as ProviderTurnMetadata;
+  }
+
+  private extractSignatureFromMetadata(metadata: ProviderMetadata): string | undefined {
+    const record = metadata as Record<string, unknown>;
+    const direct = record.signature;
+    if (typeof direct === 'string' && direct.trim().length > 0) {
+      return direct;
+    }
+    const anthropicEntry = record.anthropic ?? record.Anthropic;
+    if (anthropicEntry !== undefined && typeof anthropicEntry === 'object' && anthropicEntry !== null) {
+      const signature = (anthropicEntry as { signature?: unknown }).signature;
+      if (typeof signature === 'string' && signature.trim().length > 0) {
+        return signature;
+      }
+    }
+    return undefined;
   }
 
   protected isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -964,6 +1176,7 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
       
       const toolChoiceRequired = request.toolChoiceRequired ?? this.shouldForceToolChoice(request);
       const toolChoice = toolChoiceRequired ? 'required' : undefined;
+      this.traceSdkPayload(request, 'request', messages);
       const result = streamText({
         model,
         messages,
@@ -1012,6 +1225,7 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
 
       const usage = await result.usage;
       const resp = await result.response;
+      this.traceSdkPayload(request, 'response', resp);
       stopReason = stopReason ?? this.extractStopReason(resp) ?? this.extractStopReason(result);
       if (process.env.DEBUG === 'true') {
         try {
@@ -1127,7 +1341,8 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
         }
       }
       
-      const conversationMessages = this.convertResponseMessages(resp.messages, request.provider, request.model, tokens);
+      const normalizedMessages = this.normalizeResponseMessages(resp);
+      const conversationMessages = this.convertResponseMessages(normalizedMessages, request.provider, request.model, tokens);
       if (process.env.DEBUG === 'true') {
         try {
           const tMsgs = conversationMessages.filter((m) => m.role === 'tool');
@@ -1154,13 +1369,16 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
       const hasToolResults = conversationMessages.some(m => m.role === 'tool');
       
       // Detect if provider emitted any reasoning parts
-      const respAny = resp as { messages?: unknown[] };
-      const respMsgs: unknown[] = Array.isArray(respAny.messages) ? respAny.messages : [];
-      const hasReasoning = respMsgs.some((msg) => {
-          const m = msg as { role?: string; content?: unknown };
-          if (m.role !== 'assistant' || !Array.isArray(m.content)) return false;
-          return (m.content as unknown[]).some((p) => (p as { type?: string }).type === this.REASONING_TYPE);
-        });
+      const hasReasoningFromRaw = normalizedMessages.some((msg) => {
+        if (msg.role !== 'assistant') return false;
+        if (Array.isArray(msg.content)) {
+          return msg.content.some((part) => (part as { type?: string }).type === this.REASONING_TYPE);
+        }
+        const reasoningSegments = this.collectReasoningSegmentsFromMessage(msg);
+        return reasoningSegments.length > 0;
+      });
+      const hasReasoningFromConversation = conversationMessages.some((message) => Array.isArray(message.reasoning) && message.reasoning.length > 0);
+      const hasReasoning = hasReasoningFromRaw || hasReasoningFromConversation;
       
       // FINAL ANSWER POLICY: only when agent_final_report tool is requested (normalized), regardless of other conditions
       const finalAnswer = finalReportRequested;
@@ -1214,6 +1432,7 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
       } catch (e) { try { warn(`streaming read failed: ${e instanceof Error ? e.message : String(e)}`); } catch {} }
       const toolChoiceRequired = request.toolChoiceRequired ?? this.shouldForceToolChoice(request);
       const toolChoice = toolChoiceRequired ? 'required' : undefined;
+      this.traceSdkPayload(request, 'request', messages);
       const result = await generateText({
         model,
         messages,
@@ -1230,6 +1449,8 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
       const tokens = this.extractTokenUsage(result.usage);
       const latencyMs = Date.now() - startTime;
       let response = result.text;
+
+      this.traceSdkPayload(request, 'response', (result as { response?: unknown }).response ?? result);
       
       // Debug logging to understand the response structure
       if (process.env.DEBUG === 'true') {
@@ -1329,10 +1550,16 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
         warn(`[DEBUG] Non-stream respObj.messages: ${JSON.stringify(respObj.messages, null, 2).substring(0, 2000)}`);
       }
       
+      const normalizedMessages = this.normalizeResponseMessages(respObj);
+      if (process.env.DEBUG === 'true' && Array.isArray(respObj.messages)) {
+        try {
+          console.log('normalizedMessages:', JSON.stringify(normalizedMessages, null, 2));
+        } catch { /* ignore */ }
+      }
       const conversationMessages = this.convertResponseMessages(
-        (Array.isArray(respObj.messages) ? respObj.messages : []) as ResponseMessage[], 
-        request.provider, 
-        request.model, 
+        normalizedMessages,
+        request.provider,
+        request.model,
         tokens
       );
       if (process.env.DEBUG === 'true') {
@@ -1356,12 +1583,16 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
       const hasAssistantText = (lastAssistantMessage?.content.trim().length ?? 0) > 0;
 
       // Detect reasoning parts in non-streaming response
-      const hasReasoning = Array.isArray(respObj.messages)
-        && (respObj.messages).some((msg) => {
-          const m = msg as { role?: string; content?: unknown };
-          if (m.role !== 'assistant' || !Array.isArray(m.content)) return false;
-          return (m.content as unknown[]).some((p) => (p as { type?: string }).type === this.REASONING_TYPE);
-        });
+      const hasReasoningFromRaw = normalizedMessages.some((msg) => {
+        if (msg.role !== 'assistant') return false;
+        if (Array.isArray(msg.content)) {
+          return msg.content.some((part) => (part as { type?: string }).type === this.REASONING_TYPE);
+        }
+        const segments = this.collectReasoningSegmentsFromMessage(msg);
+        return segments.length > 0;
+      });
+      const hasReasoningFromConversation = conversationMessages.some((message) => Array.isArray(message.reasoning) && message.reasoning.length > 0);
+      const hasReasoning = hasReasoningFromRaw || hasReasoningFromConversation;
       
       // FINAL ANSWER POLICY: only when agent_final_report tool is requested (normalized), regardless of other conditions
       const finalAnswer = finalReportRequested;
@@ -1424,7 +1655,7 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
                   } else if (p.output?.value !== undefined) {
                     errorMsg = p.output.value;
                   }
-                  messages.push(`(tool failed: ${errorMsg})`);
+                  messages.push(`${TOOL_FAILED_PREFIX}${errorMsg}${TOOL_FAILED_SUFFIX}`);
                 } else if (p.type !== this.REASONING_TYPE && p.text !== undefined) {
                   messages.push(p.text);
                 }
@@ -1502,12 +1733,12 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
             // Handle tool errors - ensure we always have valid output
             if (t === this.TOOL_ERROR_TYPE && p.error !== undefined) {
               if (typeof p.error === 'string') {
-                text = `(tool failed: ${p.error})`;
+                text = `${TOOL_FAILED_PREFIX}${p.error}${TOOL_FAILED_SUFFIX}`;
               } else if (typeof p.error === 'object' && p.error !== null) {
                 const e = p.error as { message?: string; error?: string };
-                text = `(tool failed: ${e.message ?? e.error ?? JSON.stringify(p.error)})`;
+                text = `${TOOL_FAILED_PREFIX}${e.message ?? e.error ?? JSON.stringify(p.error)}${TOOL_FAILED_SUFFIX}`;
               } else {
-                text = `(tool failed: ${JSON.stringify(p.error)})`;
+                text = `${TOOL_FAILED_PREFIX}${JSON.stringify(p.error)}${TOOL_FAILED_SUFFIX}`;
               }
             } 
             // Handle tool results - ensure we always have valid output
@@ -1520,7 +1751,7 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
               }
               // Ensure we always have valid output
               if (!text || text.trim().length === 0) {
-                text = '(no output)';
+                text = NO_TOOL_OUTPUT;
               }
             }
             
@@ -1558,12 +1789,12 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
             // Handle tool errors - ensure we always have valid output
             if (t === this.TOOL_ERROR_TYPE && p.error !== undefined) {
               if (typeof p.error === 'string') {
-                text = `(tool failed: ${p.error})`;
+                text = `${TOOL_FAILED_PREFIX}${p.error}${TOOL_FAILED_SUFFIX}`;
               } else if (typeof p.error === 'object' && p.error !== null) {
                 const e = p.error as { message?: string; error?: string };
-                text = `(tool failed: ${e.message ?? e.error ?? JSON.stringify(p.error)})`;
+                text = `${TOOL_FAILED_PREFIX}${e.message ?? e.error ?? JSON.stringify(p.error)}${TOOL_FAILED_SUFFIX}`;
               } else {
-                text = `(tool failed: ${JSON.stringify(p.error)})`;
+                text = `${TOOL_FAILED_PREFIX}${JSON.stringify(p.error)}${TOOL_FAILED_SUFFIX}`;
               }
             } 
             // Handle tool results - ensure we always have valid output
@@ -1575,9 +1806,9 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
                 else if (typeof (outObj as unknown as string) === 'string') text = outObj as unknown as string;
               }
               // Ensure we always have valid output
-              if (!text || text.trim().length === 0) {
-                text = '(no output)';
-              }
+                if (!text || text.trim().length === 0) {
+                  text = NO_TOOL_OUTPUT;
+                }
             }
             
             out.push({
@@ -1637,41 +1868,110 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
         continue;
       }
       if (m.role === 'assistant') {
-        const reasoningSegmentsRaw = Array.isArray(m.reasoning) ? m.reasoning : [];
-      const reasoningSegments = reasoningSegmentsRaw.filter((segment) => segment.text.trim().length > 0);
-        const reasoningSegmentsWithMetadata = reasoningSegments.filter((segment) => segment.providerMetadata !== undefined);
-        const shouldIncludeReasoning = reasoningSegmentsWithMetadata.length > 0;
+        const reasoningFromMessage = this.collectReasoningSegmentsFromMessage(m);
+        const contentReasoningSegments: ReasoningOutput[] = [];
         const hasToolCalls = Array.isArray(m.toolCalls) && m.toolCalls.length > 0;
-        if (hasToolCalls || shouldIncludeReasoning) {
-          const parts: (
-            { type: 'reasoning'; text: string; providerOptions?: Record<string, unknown> } |
-            { type: 'text'; text: string } |
-            { type: 'tool-call'; toolCallId: string; toolName: string; input: unknown }
-          )[] = [];
-          if (shouldIncludeReasoning) {
-            reasoningSegmentsWithMetadata.forEach((segment) => {
-              const providerOptions = segment.providerMetadata !== undefined
-                ? this.toProviderOptions(segment.providerMetadata)
-                : undefined;
-              parts.push({
-                type: 'reasoning',
-                text: segment.text,
-                ...(providerOptions !== undefined ? { providerOptions } : {}),
-              });
-            });
-          }
-          if (m.content && m.content.trim().length > 0) {
-            parts.push({ type: 'text', text: m.content });
-          }
-          if (hasToolCalls) {
-            // eslint-disable-next-line functional/no-loop-statements
-            for (const tc of m.toolCalls ?? []) {
-              parts.push({ type: 'tool-call', toolCallId: tc.id, toolName: tc.name, input: tc.parameters });
+        const parts: (
+          { type: 'reasoning'; text: string; providerOptions?: Record<string, unknown> } |
+          { type: 'text'; text: string } |
+          { type: 'tool-call'; toolCallId: string; toolName: string; input: unknown }
+        )[] = [];
+
+        if (Array.isArray(m.content)) {
+          // eslint-disable-next-line functional/no-loop-statements
+          for (const part of m.content) {
+            const entry = part as { type?: string; text?: string; toolCallId?: string; toolName?: string; input?: unknown; output?: unknown; error?: unknown };
+            const normalizedType = (entry.type ?? '').replace('_', '-');
+            if (normalizedType === 'text' || entry.type === undefined) {
+              if (typeof entry.text === 'string' && entry.text.trim().length > 0) {
+                parts.push({ type: 'text', text: entry.text });
+              }
+              continue;
+            }
+            if (normalizedType === 'tool-call' && entry.toolCallId !== undefined && entry.toolName !== undefined) {
+              parts.push({ type: 'tool-call', toolCallId: entry.toolCallId, toolName: entry.toolName, input: entry.input ?? {} });
+              continue;
+            }
+            const extractedReasoning = this.collectReasoningOutputs(entry);
+            if (extractedReasoning.length > 0) {
+              extractedReasoning.forEach((segment) => contentReasoningSegments.push(segment));
+              continue;
+            }
+            if ((normalizedType === this.TOOL_RESULT_TYPE || normalizedType === this.TOOL_ERROR_TYPE) && entry.toolCallId !== undefined) {
+              let text = '';
+              if (normalizedType === this.TOOL_ERROR_TYPE && entry.error !== undefined) {
+                if (typeof entry.error === 'string') {
+              text = `${TOOL_FAILED_PREFIX}${entry.error}${TOOL_FAILED_SUFFIX}`;
+                } else if (entry.error !== null && typeof entry.error === 'object') {
+                  const errObj = entry.error as { message?: string; error?: string };
+              text = `${TOOL_FAILED_PREFIX}${errObj.message ?? errObj.error ?? JSON.stringify(entry.error)}${TOOL_FAILED_SUFFIX}`;
+                } else {
+              text = `${TOOL_FAILED_PREFIX}${JSON.stringify(entry.error)}${TOOL_FAILED_SUFFIX}`;
+                }
+              } else {
+                const outObj = entry.output as { type?: string; value?: unknown } | undefined;
+                if (outObj !== undefined) {
+                  if (outObj.type === 'text' && typeof outObj.value === 'string') text = outObj.value;
+                  else if (outObj.type === 'json') text = JSON.stringify(outObj.value);
+                  else if (typeof (outObj as unknown as string) === 'string') text = outObj as unknown as string;
+                }
+                if (!text || text.trim().length === 0) {
+                  text = NO_TOOL_OUTPUT;
+                }
+              }
+              parts.push({ type: 'text', text });
+              continue;
             }
           }
-          modelMessages.push({ role: 'assistant', content: parts as never });
+        } else if (typeof m.content === 'string' && m.content.trim().length > 0) {
+          parts.push({ type: 'text', text: m.content });
+        }
+
+        if (hasToolCalls) {
+          // eslint-disable-next-line functional/no-loop-statements
+          for (const tc of m.toolCalls ?? []) {
+            parts.push({ type: 'tool-call', toolCallId: tc.id, toolName: tc.name, input: tc.parameters });
+          }
+        }
+
+        const combinedReasoning = this.mergeReasoningOutputs(reasoningFromMessage, contentReasoningSegments);
+        const metadataProvider = m.metadata?.provider;
+        const providerSupportsReasoningReplay = this.supportsReasoningReplay()
+          || metadataProvider === 'anthropic';
+        const reasoningSegmentsToInclude = providerSupportsReasoningReplay
+          ? combinedReasoning.filter((segment) => segment.providerMetadata !== undefined)
+          : [];
+        const shouldIncludeReasoning = reasoningSegmentsToInclude.length > 0;
+
+        let finalParts = parts;
+        if (shouldIncludeReasoning) {
+          const reasoningParts = reasoningSegmentsToInclude.map((segment) => {
+            const providerOptions = segment.providerMetadata !== undefined
+              ? this.toProviderOptions(segment.providerMetadata)
+              : undefined;
+            const basePart: {
+              type: 'reasoning';
+              text: string;
+              providerOptions?: Record<string, unknown>;
+              signature?: string;
+            } = {
+              type: 'reasoning' as const,
+              text: segment.text,
+              ...(providerOptions !== undefined ? { providerOptions } : {}),
+            };
+            const signature = (segment as unknown as { signature?: unknown }).signature;
+            if (typeof signature === 'string') {
+              basePart.signature = signature;
+            }
+            return basePart;
+          });
+          finalParts = [...reasoningParts, ...parts];
+        }
+
+        if (finalParts.length === 0) {
+          modelMessages.push({ role: 'assistant', content: '' });
         } else {
-          modelMessages.push({ role: 'assistant', content: m.content });
+          modelMessages.push({ role: 'assistant', content: finalParts as never });
         }
         continue;
       }
@@ -1699,7 +1999,11 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
 
     return modelMessages;
   }
-  
+
+  protected supportsReasoningReplay(): boolean {
+    return false;
+  }
+
   /**
    * Helper method to parse AI SDK response messages which embed tool calls in content array
    */
@@ -1722,7 +2026,7 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
       }
       return name;
     };
-    const reasoningSegments: ReasoningOutput[] = [];
+    const reasoningSegments: ReasoningOutput[] = [...this.collectReasoningSegmentsFromMessage(m)];
 
     if (Array.isArray(m.content)) {
       const textParts: string[] = [];
@@ -1733,27 +2037,23 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
           if (part.text !== undefined && part.text !== '') {
             textParts.push(part.text);
           }
-        } else if (
-          (part.type === this.REASONING_TYPE ||
-            part.type === 'thinking' ||
-            part.type === 'redacted_thinking') &&
-          typeof part.text === 'string' &&
-          part.text.length > 0
-        ) {
-          const providerMetadata = this.extractProviderMetadata(part);
-          reasoningSegments.push({
-            type: BaseLLMProvider.PART_REASONING,
-            text: part.text,
-            ...(providerMetadata !== undefined ? { providerMetadata } : {}),
-          });
-        } else if (part.type === 'tool-call' && part.toolCallId !== undefined && part.toolName !== undefined) {
+          continue;
+        }
+        const extractedReasoning = this.collectReasoningOutputs(part);
+        if (extractedReasoning.length > 0) {
+          extractedReasoning.forEach((segment) => reasoningSegments.push(segment));
+          continue;
+        }
+        if (part.type === 'tool-call' && part.toolCallId !== undefined && part.toolName !== undefined) {
           // AI SDK embeds tool calls in content
           toolCalls.push({
             id: part.toolCallId,
             name: toSafeToolName(part.toolName),
             parameters: (part.input ?? {}) as Record<string, unknown>
           });
-        } else if (part.type === this.TOOL_RESULT_TYPE && part.toolCallId !== undefined) {
+          continue;
+        }
+        if (part.type === this.TOOL_RESULT_TYPE && part.toolCallId !== undefined) {
           // This is a tool result message
           toolCallId = part.toolCallId;
           // Tool results have their output in a nested structure
@@ -1781,7 +2081,8 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
       };
     }) : undefined);
     
-    const reasoning = reasoningSegments.length > 0 ? reasoningSegments : undefined;
+    const mergedReasoning = this.mergeReasoningOutputs(reasoningSegments);
+    const reasoning = mergedReasoning.length > 0 ? mergedReasoning : undefined;
 
     return {
       role: (m.role ?? 'assistant') as ConversationMessage['role'],

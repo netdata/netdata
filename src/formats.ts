@@ -52,6 +52,8 @@ const OUTPUT_FORMATS: Record<OutputFormatId, OutputFormat> = {
   },
 };
 
+const isOutputFormatId = (value: string): value is OutputFormatId => Object.prototype.hasOwnProperty.call(OUTPUT_FORMATS, value);
+
 export function describeFormat(id: OutputFormatId): string {
   return OUTPUT_FORMATS[id].toolDescription;
 }
@@ -66,6 +68,20 @@ export function describeFormatParameter(id: OutputFormatId): string {
 
 export function resolveFormatIdForCli(override: string | undefined, expectedJson: boolean, isTTY: boolean): OutputFormatId {
   if (expectedJson) return 'json';
-  if (typeof override === 'string' && override in OUTPUT_FORMATS) return override as OutputFormatId;
+  const normalized = typeof override === 'string' ? override.trim().toLowerCase() : undefined;
+  if (normalized !== undefined && normalized.length > 0) {
+    const aliasMap: Record<string, OutputFormatId> = {
+      text: 'pipe',
+      plain: 'pipe',
+      plaintext: 'pipe',
+      'plain-text': 'pipe',
+      ansi: 'tty',
+      terminal: 'tty',
+    };
+    const candidate = aliasMap[normalized] ?? normalized;
+    if (isOutputFormatId(candidate)) {
+      return candidate;
+    }
+  }
   return isTTY ? 'tty' : 'pipe';
 }

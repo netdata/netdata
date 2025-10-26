@@ -20,6 +20,7 @@ const EFFECTIVE_KEYS = [
   'traceLLM',
   'traceMCP',
   'traceSlack',
+  'traceSdk',
   'verbose',
   'mcpInitConcurrency',
   'reasoning',

@@ -27,6 +27,7 @@ interface InternalToolProviderOptions {
   orchestrator: ToolsOrchestrator;
   getCurrentTurn: () => number;
   toolTimeoutMs?: number;
+  disableProgressTool?: boolean;
 }
 
 const PROGRESS_TOOL = 'agent__progress_report';
@@ -43,6 +44,7 @@ export class InternalToolProvider extends ToolProvider {
   private readonly formatDescription: string;
   private instructions: string;
   private cachedBatchSchemas?: { schemas: Record<string, unknown>[]; summaries: { name: string; required: string[] }[] };
+  private readonly disableProgressTool: boolean;
 
   constructor(
     public readonly id: string,
@@ -61,12 +63,14 @@ export class InternalToolProvider extends ToolProvider {
     if (this.formatId === 'json' && expected !== undefined && expected !== 'json') {
       throw new Error(`JSON output required but expected format is ${expected}`);
     }
+    this.disableProgressTool = opts.disableProgressTool === true;
     this.instructions = this.buildInstructions();
   }
 
   listTools(): MCPTool[] {
-    const tools: MCPTool[] = [
-      {
+    const tools: MCPTool[] = [];
+    if (!this.disableProgressTool) {
+      tools.push({
         name: PROGRESS_TOOL,
         description: 'Report current progress to user (max 15 words). MUST call in parallel with primary actions for real-time visibility.',
         inputSchema: {
@@ -77,9 +81,9 @@ export class InternalToolProvider extends ToolProvider {
             progress: { type: 'string', description: 'Brief progress message (max 15 words)' }
           },
         },
-      },
-      this.buildFinalReportTool()
-    ];
+      });
+    }
+    tools.push(this.buildFinalReportTool());
     if (this.opts.enableBatch) {
       const { schemas } = this.ensureBatchSchemas();
       const fallbackItemSchema: Record<string, unknown> = {
@@ -118,7 +122,10 @@ export class InternalToolProvider extends ToolProvider {
   }
 
   hasTool(name: string): boolean {
-    return name === PROGRESS_TOOL || name === FINAL_REPORT_TOOL || (this.opts.enableBatch && name === BATCH_TOOL);
+    if (name === FINAL_REPORT_TOOL) return true;
+    if (this.opts.enableBatch && name === BATCH_TOOL) return true;
+    if (name === PROGRESS_TOOL) return !this.disableProgressTool;
+    return false;
   }
 
   override getInstructions(): string {
@@ -136,19 +143,14 @@ export class InternalToolProvider extends ToolProvider {
   private buildInstructions(): string {
     const lines: string[] = ['### Internal Tools', ''];
 
-    lines.push(`#### ${PROGRESS_TOOL} — Progress Updates`);
-    lines.push('- Call this tool whenever you invoke any other tool; include it in the same turn or batch.');
-    lines.push('- Never call this tool by itself.');
-    lines.push('- Keep the `progress` message concise (≤20 words).');
-    lines.push('- Example (batch call):');
-    lines.push('  {');
-    lines.push('    "calls": [');
-    lines.push(`      { "id": 1, "tool": "${PROGRESS_TOOL}", "parameters": { "progress": "Searching documentation for XYZ" } },`);
-    lines.push('      { "id": 2, "tool": "tool_name_here", "parameters": { "required_field": "value", ... } }');
-    lines.push('      (Provide the exact exposed tool name and every required parameter.)');
-    lines.push('    ]');
-    lines.push('  }');
-    lines.push('  When calling multiple tools without the batch helper, include this tool in the same turn.');
+    if (!this.disableProgressTool) {
+      lines.push(`#### ${PROGRESS_TOOL} — Progress Updates for the user`);
+      lines.push('- Use this tool to update the user on your progress.');
+      lines.push('- Keep the `progress` message concise (≤20 words).');
+      lines.push('- Always pair this tool with other tools you are invoking (except `agent__final_report`).');
+      lines.push('- Do not call this tool by itself.');
+      lines.push('- Do not pair this tool with `agent__final_report`');
+    }
 
     if (this.opts.enableBatch) {
       lines.push('');
@@ -158,12 +160,20 @@ export class InternalToolProvider extends ToolProvider {
       lines.push('- Example:');
       lines.push('  {');
       lines.push('    "calls": [');
-      lines.push(`      { "id": 1, "tool": "${PROGRESS_TOOL}", "parameters": { "progress": "Researching Netdata and eBPF" } },`);
-      lines.push('      { "id": 2, "tool": "tool1", "parameters": { "param1": "value1", "param2": "value2" } },');
-      lines.push('      { "id": 3, "tool": "tool2", "parameters": { "param1": "value1" } }');
+      if (!this.disableProgressTool) {
+        lines.push(`      { "id": 1, "tool": "${PROGRESS_TOOL}", "parameters": { "progress": "Researching Netdata and eBPF" } },`);
+        lines.push('      { "id": 2, "tool": "tool1", "parameters": { "param1": "value1", "param2": "value2" } },');
+        lines.push('      { "id": 3, "tool": "tool2", "parameters": { "param1": "value1" } }');
+      } else {
+        lines.push('      { "id": 1, "tool": "tool1", "parameters": { "param1": "value1", "param2": "value2" } },');
+        lines.push('      { "id": 2, "tool": "tool2", "parameters": { "param1": "value1" } }');
+      }
       lines.push('      (Tool names must match exactly and every required parameter must be present.)');
       lines.push('    ]');
       lines.push('  }');
+      if (!this.disableProgressTool) {
+        lines.push('- Do not combine `agent__progress_report` with `agent__final_report` in the same request; send the final report on its own.');
+      }
     }
 
     lines.push('');
@@ -356,6 +366,9 @@ export class InternalToolProvider extends ToolProvider {
 
   async execute(name: string, parameters: Record<string, unknown>, _opts?: ToolExecuteOptions): Promise<ToolExecuteResult> {
     const start = Date.now();
+    if (name === PROGRESS_TOOL && this.disableProgressTool) {
+      throw new Error('agent__progress_report is disabled for this session');
+    }
     if (name === 'agent__progress_report') {
       const progress = typeof (parameters.progress) === 'string' ? parameters.progress : '';
       this.opts.updateStatus(progress);
@@ -771,7 +784,7 @@ export class InternalToolProvider extends ToolProvider {
       // Ignore orchestrator failures; callers will use fallback schema
     }
 
-    if (!summaries.some((summary) => summary.name === PROGRESS_TOOL)) {
+    if (!this.disableProgressTool && !summaries.some((summary) => summary.name === PROGRESS_TOOL)) {
       pushSchema(PROGRESS_TOOL, {
         type: 'object',
         additionalProperties: false,

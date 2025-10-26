@@ -88,8 +88,50 @@ One simple format (`.ai` files) works as standalone agents, sub-agents, master o
   - `--verbose` flag for detailed execution logs
   - `--trace-llm` to debug model interactions
   - `--trace-mcp` to debug tool calls
-  - Structured logging with severity levels
+  - Structured logging with severity levels (journald/logfmt by default, JSON optional)
+  - Telemetry pipeline: OTLP metrics, optional spans, Prometheus exporter, and opt-in OTLP log export
   - Complete accounting exports
+
+### Telemetry & Logging
+
+- **Default sinks**: when the agent runs under systemd, logs flow to journald; otherwise they are printed in logfmt to `stderr`. You can override this with `telemetry.logging.formats` (config) or `--telemetry-log-format` (CLI) using any combination of `journald`, `logfmt`, `json`, or `none` (first valid entry wins).
+- **Metrics & traces**: keep telemetry opt-in by default. Enable the exporters with `telemetry.enabled: true` (or `--telemetry-enabled`) and configure the OTLP collector endpoint via `telemetry.otlp.endpoint`. Tracing stays disabled until you also set `telemetry.traces.enabled: true` (or `--telemetry-traces-enabled`) and optionally choose a sampler (`always_on`, `always_off`, `parent`, `ratio`).
+- **JSON output**: select `json` in `telemetry.logging.formats` (or pass `--telemetry-log-format json`) to stream newline-delimited JSON logs on `stderr`—handy for shipping into structured log processors when journals aren’t available.
+- **OTLP log export**: keep the local sink and add OTLP shipping by including `otlp` in `telemetry.logging.extra` (or `--telemetry-log-extra otlp`). Use `telemetry.logging.otlp.endpoint`/`timeoutMs` (or `--telemetry-logging-otlp-*`) to override the collector target if it differs from the metrics endpoint.
+- **Environment override**: set `AI_TELEMETRY_DISABLE=1` to skip all telemetry initialisation during local testing.
+
+Example config snippet (`ai-agent.json`):
+
+```jsonc
+{
+  "telemetry": {
+    "enabled": true,
+    "otlp": { "endpoint": "grpc://localhost:4317", "timeoutMs": 2000 },
+    "traces": { "enabled": true, "sampler": "ratio", "ratio": 0.25 },
+    "logging": {
+      "formats": ["journald", "json"],
+      "extra": ["otlp"],
+      "otlp": { "endpoint": "grpc://collector.internal:4317", "timeoutMs": 1500 }
+    },
+    "labels": { "environment": "production", "cluster": "headend-a" },
+    "prometheus": { "enabled": true, "host": "127.0.0.1", "port": 9464 }
+  }
+}
+```
+
+CLI equivalents:
+
+```bash
+ai-agent run \
+  --telemetry-enabled \
+  --telemetry-otlp-endpoint grpc://localhost:4317 \
+  --telemetry-traces-enabled \
+  --telemetry-trace-sampler ratio \
+  --telemetry-trace-ratio 0.25 \
+  --telemetry-log-format json \
+  --telemetry-log-extra otlp \
+  --telemetry-logging-otlp-endpoint grpc://collector.internal:4317
+```
 
 - **Flexible Deployment**:
   - [x] CLI for development and automation

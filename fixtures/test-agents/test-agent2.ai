@@ -1,0 +1,5 @@
+---
+description: "Test agent 2"
+usage: "call me with the output of agent 1"
+---
+Call agent__final_report with status="success", report_format="text", and content="test completed".

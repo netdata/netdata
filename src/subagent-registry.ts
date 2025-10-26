@@ -157,7 +157,7 @@ export class SubAgentRegistry {
   async execute(
     exposedToolName: string,
     parameters: Record<string, unknown>,
-    parentSession: Pick<AIAgentSessionConfig, 'config' | 'callbacks' | 'stream' | 'traceLLM' | 'traceMCP' | 'verbose' | 'temperature' | 'topP' | 'llmTimeout' | 'toolTimeout' | 'maxRetries' | 'maxTurns' | 'toolResponseMaxBytes' | 'parallelToolCalls' | 'targets'> & {
+    parentSession: Pick<AIAgentSessionConfig, 'config' | 'callbacks' | 'stream' | 'traceLLM' | 'traceMCP' | 'traceSdk' | 'verbose' | 'temperature' | 'topP' | 'llmTimeout' | 'toolTimeout' | 'maxRetries' | 'maxTurns' | 'toolResponseMaxBytes' | 'parallelToolCalls' | 'targets' | 'llmInterceptor'> & {
       // extra trace/metadata for child
       trace?: { originId?: string; parentId?: string; callPath?: string };
       // control signals to propagate
@@ -277,7 +277,8 @@ export class SubAgentRegistry {
         abortSignal: parentSession.abortSignal,
         stopRef: parentSession.stopRef,
         // propagate ancestors to prevent recursion cycles in nested sessions
-        ancestors: [...this.ancestors, info.promptPath]
+        ancestors: [...this.ancestors, info.promptPath],
+        llmInterceptor: parentSession.llmInterceptor
       });
     } finally {
       // no chdir in static mode

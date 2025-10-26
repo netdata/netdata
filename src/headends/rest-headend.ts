@@ -6,6 +6,9 @@ import type { AgentRegistry } from '../agent-registry.js';
 import type { AIAgentCallbacks, LogEntry } from '../types.js';
 import type { Headend, HeadendClosedEvent, HeadendContext, HeadendDescription } from './types.js';
 
+import { createStructuredLogger } from '../logging/structured-logger.js';
+import { getTelemetryLabels } from '../telemetry/index.js';
+
 import { ConcurrencyLimiter } from './concurrency.js';
 import { HttpError, writeJson } from './http-utils.js';
 
@@ -80,6 +83,7 @@ export class RestHeadend implements Headend {
 
   private readonly registry: AgentRegistry;
   private readonly options: RestHeadendOptions;
+  private readonly label: string;
   private readonly closeDeferred = createDeferred<HeadendClosedEvent>();
   private stopping = false;
   private closedSignaled = false;
@@ -87,20 +91,27 @@ export class RestHeadend implements Headend {
   private context?: HeadendContext;
   private readonly limiter: ConcurrencyLimiter;
   private readonly extraRoutes: { method: RestExtraRoute['method']; path: string; handler: RestExtraRoute['handler']; originalPath: string }[] = [];
+  private readonly telemetryLabels: Record<string, string>;
+  private readonly structuredLogger;
 
   public constructor(registry: AgentRegistry, opts: RestHeadendOptions) {
     this.registry = registry;
     this.options = opts;
     this.id = `api:${String(opts.port)}`;
+    this.label = `REST API ${String(opts.port)}`;
     this.closed = this.closeDeferred.promise;
     const limit = typeof opts.concurrency === 'number' && Number.isFinite(opts.concurrency) && opts.concurrency > 0
       ? Math.floor(opts.concurrency)
       : 10;
     this.limiter = new ConcurrencyLimiter(limit);
+    this.telemetryLabels = { ...getTelemetryLabels(), headend: this.id };
+    this.structuredLogger = createStructuredLogger({
+      labels: this.telemetryLabels,
+    });
   }
 
   public describe(): HeadendDescription {
-    return { id: this.id, kind: this.kind, label: `REST API ${String(this.options.port)}` };
+    return { id: this.id, kind: this.kind, label: this.label };
   }
 
   public registerRoute(route: RestExtraRoute): void {
@@ -115,6 +126,7 @@ export class RestHeadend implements Headend {
   public async start(context: HeadendContext): Promise<void> {
     if (this.server !== undefined) return;
     this.context = context;
+    this.log('starting');
 
     const server = http.createServer((req, res) => {
       void this.handleRequest(req, res);
@@ -146,7 +158,8 @@ export class RestHeadend implements Headend {
       server.once('listening', onListening);
       server.listen(this.options.port);
     });
-    this.log(`listening on port ${String(this.options.port)}`);
+    this.log('listening');
+    this.log('started');
   }
 
   public async stop(): Promise<void> {
@@ -263,6 +276,8 @@ export class RestHeadend implements Headend {
         reasoningLog += chunk;
       },
       onLog: (entry) => {
+        entry.headendId = this.id;
+        this.structuredLogger.emit(entry);
         this.logEntry(entry);
       },
     };
@@ -274,6 +289,9 @@ export class RestHeadend implements Headend {
         callbacks,
         abortSignal: abortController.signal,
         stopRef,
+        headendId: this.id,
+        telemetryLabels: this.telemetryLabels,
+        wantsProgressUpdates: true,
       });
       const result = await session.run();
       if (abortController.signal.aborted || res.writableEnded || res.writableFinished) return;
@@ -381,13 +399,16 @@ export class RestHeadend implements Headend {
     fatal = false,
     direction: LogEntry['direction'] = 'response'
   ): void {
-    if (this.context === undefined) return;
-    this.context.log(buildLog(message, severity, fatal, direction));
+    const entry = buildLog(`${this.label}: ${message}`, severity, fatal, direction);
+    entry.headendId = this.id;
+    this.structuredLogger.emit(entry);
+    this.context?.log(entry);
   }
 
   private logEntry(entry: LogEntry): void {
-    if (this.context === undefined) return;
-    this.context.log(entry);
+    entry.headendId = this.id;
+    this.structuredLogger.emit(entry);
+    this.context?.log(entry);
   }
 
   private signalClosed(event: HeadendClosedEvent): void {

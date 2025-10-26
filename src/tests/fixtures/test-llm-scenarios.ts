@@ -16,6 +16,7 @@ export type ScenarioStepResponse =
       finishReason?: 'tool-calls';
       tokenUsage?: TokenUsage;
       reasoning?: ReasoningOutput[];
+      reasoningContent?: string | ReasoningOutput | ReasoningOutput[];
       providerMetadata?: ProviderTurnMetadata;
     }
   | {
@@ -27,6 +28,7 @@ export type ScenarioStepResponse =
       reportContentJson?: Record<string, unknown>;
       tokenUsage?: TokenUsage;
       reasoning?: ReasoningOutput[];
+      reasoningContent?: string | ReasoningOutput | ReasoningOutput[];
       finishReason?: string;
       providerMetadata?: ProviderTurnMetadata;
     }
@@ -36,6 +38,7 @@ export type ScenarioStepResponse =
       finishReason?: 'stop' | 'other';
       tokenUsage?: TokenUsage;
       reasoning?: ReasoningOutput[];
+      reasoningContent?: string | ReasoningOutput | ReasoningOutput[];
       providerMetadata?: ProviderTurnMetadata;
     };
 
@@ -2989,6 +2992,154 @@ const SCENARIOS: ScenarioDefinition[] = [
             inputTokens: 88,
             outputTokens: 32,
             totalTokens: 120,
+          },
+        },
+      },
+    ],
+  },
+  {
+    id: 'run-test-92',
+    description: 'LLM returns batched final report payload via nested calls array.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        expectedTools: ['agent__progress_report', 'agent__final_report'],
+        response: {
+          kind: 'tool-call',
+          assistantText: 'Preparing batched final report call.',
+          toolCalls: [
+            {
+              toolName: 'agent__final_report',
+              callId: 'call-batched-final',
+              assistantText: 'Bundling progress update with final report.',
+              arguments: {
+                calls: [
+                  {
+                    id: 'call-progress',
+                    tool: 'agent__progress_report',
+                    parameters: { progress: 'Providing name' },
+                  },
+                  {
+                    id: 'call-final',
+                    tool: 'agent__final_report',
+                    parameters: {
+                      status: STATUS_SUCCESS,
+                      report_format: 'pipe',
+                      report_content: 'My name is ChatGPT.',
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+          finishReason: TOOL_FINISH_REASON,
+          reasoning: [
+            {
+              type: 'reasoning',
+              text: 'Batching required tool invocations before delivering final report.',
+            },
+          ],
+        },
+      },
+      {
+        turn: 2,
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Final report emitted after batched tool execution.',
+          reportContent: 'My name is ChatGPT.',
+          reportFormat: 'pipe',
+          status: STATUS_SUCCESS,
+          tokenUsage: {
+            inputTokens: 90,
+            outputTokens: 30,
+            totalTokens: 120,
+          },
+        },
+      },
+    ],
+  },
+  {
+    id: 'run-test-93',
+    description: 'LLM emits reasoning-only turn that must not trigger retry before final report.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        response: {
+          kind: 'text',
+          assistantText: '',
+          finishReason: 'other',
+          reasoning: [
+            {
+              type: 'reasoning',
+              text: 'Analyzing request before producing final report.',
+              providerMetadata: { anthropic: { signature: 'reasoning-only-turn-1' } },
+            },
+          ],
+          tokenUsage: {
+            inputTokens: 70,
+            outputTokens: 20,
+            totalTokens: 90,
+          },
+        },
+      },
+      {
+        turn: 2,
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Delivering final report after reasoning-only turn.',
+          reportContent: `${RESULT_HEADING}Reasoning-only turn accepted without retry.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_SUCCESS,
+          reasoning: [
+            {
+              type: 'reasoning',
+              text: 'Finalizing response after reasoning-only analysis.',
+              providerMetadata: { anthropic: { signature: 'reasoning-only-turn-2' } },
+            },
+          ],
+          tokenUsage: {
+            inputTokens: 85,
+            outputTokens: 34,
+            totalTokens: 119,
+          },
+        },
+      },
+    ],
+  },
+  {
+    id: 'run-test-124',
+    description: 'LLM provides reasoning_content without assistant text or tool calls.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        response: {
+          kind: 'text',
+          assistantText: '',
+          finishReason: 'stop',
+          tokenUsage: {
+            inputTokens: 72,
+            outputTokens: 42,
+            totalTokens: 114,
+          },
+          reasoningContent: 'Evaluating instructions and preparing the final report tool invocation.',
+        },
+      },
+      {
+        turn: 2,
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Completing request after reasoning-only turn.',
+          reportContent: `${RESULT_HEADING}Reasoning-content only response handled successfully.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_SUCCESS,
+          tokenUsage: {
+            inputTokens: 88,
+            outputTokens: 36,
+            totalTokens: 124,
           },
         },
       },

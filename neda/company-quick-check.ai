@@ -3,8 +3,8 @@
 description: Perform a quick company check to find basic information about a company
 usage: The company to check for (name, domain, email)
 models:
-  - anthropic/claude-3-5-haiku-20241022
-  - anthropic/claude-3-haiku-20240307
+  - anthropic/claude-haiku-4-5
+  - anthropic/claude-haiku-4-5
 tools:
   - jina-search
   - brave
@@ -24,7 +24,7 @@ maxRetries: 3
 maxToolTurns: 3
 maxToolCallsPerTurn: 10
 caching: 'none'
-reasoning: 'low'
+# reasoning: 'low'
 ---
 Your goal is to find information about the company the user provided:
 

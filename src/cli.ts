@@ -11,7 +11,7 @@ import type { LoadAgentOptions } from './agent-loader.js';
 import type { FrontmatterOptions } from './frontmatter.js';
 import type { McpTransportSpec } from './headends/mcp-headend.js';
 import type { Headend, HeadendLogSink } from './headends/types.js';
-import type { LogEntry, AccountingEntry, AIAgentCallbacks, ConversationMessage, Configuration, MCPTool, ProviderReasoningValue } from './types.js';
+import type { LogEntry, AccountingEntry, AIAgentCallbacks, ConversationMessage, Configuration, MCPTool, ProviderReasoningValue, TelemetryLogExtra, TelemetryLogFormat, TelemetryTraceSampler } from './types.js';
 import type { CommanderError } from 'commander';
 
 import { AgentRegistry } from './agent-registry.js';
@@ -29,8 +29,10 @@ import { formatLog } from './log-formatter.js';
 import { makeTTYLogCallbacks } from './log-sink-tty.js';
 import { getOptionsByGroup, formatCliNames, OPTIONS_REGISTRY } from './options-registry.js';
 import { mergeCallbacksWithPersistence } from './persistence.js';
+import { initTelemetry, shutdownTelemetry } from './telemetry/index.js';
+import { buildTelemetryRuntimeConfig, type TelemetryOverrides } from './telemetry/runtime-config.js';
 import { MCPProvider } from './tools/mcp-provider.js';
-import { formatAgentResultHumanReadable, setWarningSink } from './utils.js';
+import { formatAgentResultHumanReadable, setWarningSink, warn } from './utils.js';
 import { VERSION } from './version.generated.js';
 import './setup-undici.js';
 
@@ -53,6 +55,26 @@ function exitWith(code: number, reason: string, tag = 'EXIT-CLI'): never {
   // TypeScript: inform this never returns
   throw new Error('unreachable');
 }
+
+let telemetryInitialized = false;
+
+const markTelemetryInitialized = (): void => {
+  telemetryInitialized = true;
+};
+
+const ensureTelemetryShutdown = async (): Promise<void> => {
+  if (!telemetryInitialized) return;
+  telemetryInitialized = false;
+  try {
+    await shutdownTelemetry();
+  } catch { /* ignore telemetry shutdown errors */ }
+};
+
+const exitAndShutdown = async (code: number, reason: string, tag: string): Promise<never> => {
+  await ensureTelemetryShutdown();
+  exitWith(code, reason, tag);
+  throw new Error('unreachable');
+};
 
 const program = new Command();
 const defaultWarningSink = (message: string): void => {
@@ -127,6 +149,206 @@ const normalizeListOption = (value: unknown): string | undefined => {
   return undefined;
 };
 
+const parseTelemetryLabelPairs = (raw: unknown): Record<string, string> => {
+  const entries = Array.isArray(raw) ? raw : typeof raw === 'string' ? [raw] : [];
+  return entries.reduce<Record<string, string>>((acc, entry) => {
+    if (typeof entry !== 'string') return acc;
+    const trimmed = entry.trim();
+    if (trimmed.length === 0) return acc;
+    const eq = trimmed.indexOf('=');
+    if (eq <= 0) {
+      warn(`Invalid telemetry label '${trimmed}', expected key=value`);
+      return acc;
+    }
+    const key = trimmed.slice(0, eq).trim();
+    const value = trimmed.slice(eq + 1).trim();
+    if (key.length === 0 || value.length === 0) {
+      warn(`Invalid telemetry label '${trimmed}', expected key=value`);
+      return acc;
+    }
+    acc[key] = value;
+    return acc;
+  }, {});
+};
+
+const normalizeTraceSampler = (value: unknown): TelemetryTraceSampler | undefined => {
+  if (typeof value !== 'string') return undefined;
+  const normalized = value.trim().toLowerCase().replace(/-/g, '_');
+  if (normalized.length === 0) return undefined;
+  switch (normalized) {
+    case 'always_on':
+    case 'always_off':
+    case 'parent':
+    case 'ratio':
+      return normalized as TelemetryTraceSampler;
+    default:
+      return undefined;
+  }
+};
+
+const parseStringArrayOption = (value: unknown): string[] => {
+  if (Array.isArray(value)) {
+    return value
+      .map((entry) => (typeof entry === 'string' ? entry : String(entry)))
+      .map((entry) => entry.trim())
+      .filter((entry) => entry.length > 0);
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? [trimmed] : [];
+  }
+  return [];
+};
+
+const parseLogFormatsOption = (value: unknown): TelemetryLogFormat[] => {
+  const entries = parseStringArrayOption(value);
+  const formats: TelemetryLogFormat[] = [];
+  entries.forEach((entry) => {
+    const normalized = entry.toLowerCase();
+    switch (normalized) {
+      case 'journald':
+      case 'logfmt':
+      case 'json':
+      case 'none':
+        if (!formats.includes(normalized as TelemetryLogFormat)) {
+          formats.push(normalized as TelemetryLogFormat);
+        }
+        break;
+      default:
+        warn(`Ignoring invalid --telemetry-log-format value '${entry}'`);
+        break;
+    }
+  });
+  return formats;
+};
+
+const parseLogExtraOption = (value: unknown): TelemetryLogExtra[] => {
+  const entries = parseStringArrayOption(value);
+  const extras: TelemetryLogExtra[] = [];
+  entries.forEach((entry) => {
+    const normalized = entry.toLowerCase();
+    if (normalized === 'otlp') {
+      if (!extras.includes('otlp')) extras.push('otlp');
+    } else {
+      warn(`Ignoring invalid --telemetry-log-extra value '${entry}'`);
+    }
+  });
+  return extras;
+};
+
+const formatUnknownValue = (value: unknown): string => {
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  if (value === null) return 'null';
+  return `[${typeof value}]`;
+};
+
+const extractTelemetryOverrides = (
+  opts: Record<string, unknown>,
+  sourceOf: (name: string) => ('cli' | 'default' | 'env' | 'implied' | undefined),
+): TelemetryOverrides => {
+  const overrides: TelemetryOverrides = {};
+
+  if (sourceOf('telemetryEnabled') === 'cli') {
+    overrides.enabled = opts.telemetryEnabled === true;
+  }
+
+  if (sourceOf('telemetryOtlpEndpoint') === 'cli') {
+    const endpoint = typeof opts.telemetryOtlpEndpoint === 'string' ? opts.telemetryOtlpEndpoint.trim() : '';
+    if (endpoint.length > 0) overrides.otlpEndpoint = endpoint;
+    else overrides.otlpEndpoint = '';
+  }
+
+  if (sourceOf('telemetryOtlpTimeoutMs') === 'cli') {
+    const raw = opts.telemetryOtlpTimeoutMs;
+    const parsed = typeof raw === 'number' ? raw : (typeof raw === 'string' ? Number(raw) : Number.NaN);
+    if (Number.isFinite(parsed) && parsed > 0) {
+      overrides.otlpTimeoutMs = Math.trunc(parsed);
+    } else if (raw !== undefined) {
+      warn(`Ignoring invalid --telemetry-otlp-timeout-ms value '${formatUnknownValue(raw)}'`);
+    }
+  }
+
+  if (sourceOf('telemetryPrometheusEnabled') === 'cli') {
+    overrides.prometheusEnabled = opts.telemetryPrometheusEnabled === true;
+  }
+
+  if (sourceOf('telemetryPrometheusHost') === 'cli') {
+    const host = typeof opts.telemetryPrometheusHost === 'string' ? opts.telemetryPrometheusHost.trim() : '';
+    if (host.length > 0) overrides.prometheusHost = host;
+    else overrides.prometheusHost = '';
+  }
+
+  if (sourceOf('telemetryPrometheusPort') === 'cli') {
+    const raw = opts.telemetryPrometheusPort;
+    const parsed = typeof raw === 'number' ? raw : (typeof raw === 'string' ? Number(raw) : Number.NaN);
+    if (Number.isFinite(parsed) && parsed > 0) {
+      overrides.prometheusPort = Math.trunc(parsed);
+    } else if (raw !== undefined) {
+      warn(`Ignoring invalid --telemetry-prometheus-port value '${formatUnknownValue(raw)}'`);
+    }
+  }
+
+  if (sourceOf('telemetryLabels') === 'cli') {
+    const labels = parseTelemetryLabelPairs(opts.telemetryLabels);
+    if (Object.keys(labels).length > 0) overrides.labels = labels;
+  }
+
+  if (sourceOf('telemetryTracesEnabled') === 'cli') {
+    overrides.tracesEnabled = opts.telemetryTracesEnabled === true;
+  }
+
+  if (sourceOf('telemetryTraceSampler') === 'cli') {
+    const sampler = normalizeTraceSampler(opts.telemetryTraceSampler);
+    if (sampler !== undefined) {
+      overrides.traceSampler = sampler;
+    } else if (opts.telemetryTraceSampler !== undefined) {
+      warn(`Ignoring invalid --telemetry-trace-sampler value '${formatUnknownValue(opts.telemetryTraceSampler)}'`);
+    }
+  }
+
+  if (sourceOf('telemetryTraceRatio') === 'cli') {
+    const raw = opts.telemetryTraceRatio;
+    const parsed = typeof raw === 'number' ? raw : (typeof raw === 'string' ? Number(raw) : Number.NaN);
+    if (Number.isFinite(parsed) && parsed >= 0 && parsed <= 1) {
+      overrides.traceSamplerRatio = parsed;
+    } else if (raw !== undefined) {
+      warn(`Ignoring invalid --telemetry-trace-ratio value '${formatUnknownValue(raw)}'`);
+    }
+  }
+
+  if (sourceOf('telemetryLogFormat') === 'cli') {
+    const formats = parseLogFormatsOption(opts.telemetryLogFormat);
+    if (formats.length > 0) {
+      overrides.logFormats = formats;
+    }
+  }
+
+  if (sourceOf('telemetryLogExtra') === 'cli') {
+    const extras = parseLogExtraOption(opts.telemetryLogExtra);
+    if (extras.length > 0) {
+      overrides.logExtra = extras;
+    }
+  }
+
+  if (sourceOf('telemetryLoggingOtlpEndpoint') === 'cli') {
+    const endpoint = typeof opts.telemetryLoggingOtlpEndpoint === 'string' ? opts.telemetryLoggingOtlpEndpoint.trim() : '';
+    overrides.logOtlpEndpoint = endpoint.length > 0 ? endpoint : '';
+  }
+
+  if (sourceOf('telemetryLoggingOtlpTimeoutMs') === 'cli') {
+    const raw = opts.telemetryLoggingOtlpTimeoutMs;
+    const parsed = typeof raw === 'number' ? raw : (typeof raw === 'string' ? Number(raw) : Number.NaN);
+    if (Number.isFinite(parsed) && parsed > 0) {
+      overrides.logOtlpTimeoutMs = Math.trunc(parsed);
+    } else if (raw !== undefined) {
+      warn(`Ignoring invalid --telemetry-logging-otlp-timeout-ms value '${formatUnknownValue(raw)}'`);
+    }
+  }
+
+  return overrides;
+};
+
 const parsePort = (value: string): number => {
   const port = Number.parseInt(value, 10);
   if (!Number.isFinite(port) || port <= 0 || port > 65535) {
@@ -141,6 +363,14 @@ const parsePositive = (value: string): number => {
     throw new Error(`invalid positive number '${value}'`);
   }
   return num;
+};
+
+const getOptionSource = (name: string): 'cli' | 'default' | 'env' | 'implied' | undefined => {
+  try {
+    return program.getOptionValueSource(name) as 'cli' | 'default' | 'env' | 'implied' | undefined;
+  } catch {
+    return undefined;
+  }
 };
 
 const indentMultiline = (text: string, spaces: number): string => {
@@ -462,6 +692,7 @@ function buildResolvedDefaultsHelp(): string {
         parallelToolCalls,
         traceLLM: false,
         traceMCP: false,
+        traceSdk: false,
         verbose: false,
       },
       strings: {},
@@ -868,6 +1099,7 @@ async function runHeadendMode(config: HeadendModeConfig): Promise<void> {
   const verbose = config.options.verbose === true;
   const traceLLMFlag = config.options.traceLlm === true;
   const traceMCPFlag = config.options.traceMcp === true;
+  const traceSdkFlag = config.options.traceSdk === true;
   const traceSlackFlag = config.options.traceSlack === true;
 
   const overrideValues = readOverrideValues(config.options);
@@ -908,6 +1140,7 @@ async function runHeadendMode(config: HeadendModeConfig): Promise<void> {
     verbose,
     traceLLM: traceLLMFlag,
     traceMCP: traceMCPFlag,
+    traceSdk: traceSdkFlag,
   };
   if (typeof config.options.reasoning === 'string' && config.options.reasoning.length > 0) {
     try {
@@ -989,6 +1222,24 @@ async function runHeadendMode(config: HeadendModeConfig): Promise<void> {
   const openaiCompletionsConcurrency = readConcurrency('openaiCompletionsConcurrency');
   const anthropicCompletionsConcurrency = readConcurrency('anthropicCompletionsConcurrency');
 
+  let telemetryConfigSnapshot: Configuration | undefined;
+  try {
+    const telemetryLayers = discoverLayers({ configPath: configPathValue, promptPath: undefined });
+    telemetryConfigSnapshot = buildUnifiedConfiguration({ providers: [], mcpServers: [], restTools: [] }, telemetryLayers, { verbose });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    exitWith(1, `failed to resolve configuration for telemetry: ${message}`, 'EXIT-HEADEND-TELEMETRY-CONFIG');
+  }
+
+  const telemetryOverrides = extractTelemetryOverrides(config.options, getOptionSource);
+  const runtimeTelemetryConfig = buildTelemetryRuntimeConfig({
+    configuration: telemetryConfigSnapshot,
+    overrides: telemetryOverrides,
+    mode: 'server',
+  });
+  await initTelemetry(runtimeTelemetryConfig);
+  markTelemetryInitialized();
+
   const headends: Headend[] = [];
   const restHeadends: RestHeadend[] = [];
 
@@ -1032,6 +1283,7 @@ async function runHeadendMode(config: HeadendModeConfig): Promise<void> {
     verbose: config.options.verbose === true,
     traceLlm: config.options.traceLlm === true,
     traceMcp: config.options.traceMcp === true,
+    traceSdk: config.options.traceSdk === true,
   });
   const logSink: HeadendLogSink = (entry) => { ttyLog.onLog?.(entry); };
   const emit = (message: string, severity: LogEntry['severity'] = 'VRB'): void => {
@@ -1083,7 +1335,8 @@ async function runHeadendMode(config: HeadendModeConfig): Promise<void> {
     const message = err instanceof Error ? err.message : String(err);
     await stopManager();
     emit(`failed to start headends: ${message}`, 'ERR');
-    exitWith(1, `failed to start headends: ${message}`, 'EXIT-HEADEND-START');
+    await exitAndShutdown(1, `failed to start headends: ${message}`, 'EXIT-HEADEND-START');
+    return;
   }
 
   const fatal = await manager.waitForFatal();
@@ -1096,9 +1349,17 @@ async function runHeadendMode(config: HeadendModeConfig): Promise<void> {
     const desc = fatal.headend.describe();
     const message = fatal.error.message;
     emit(`headend ${desc.label} failed: ${message}`, 'ERR');
-    exitWith(1, `headend '${desc.label}' failed: ${message}`, 'EXIT-HEADEND-FATAL');
+    await exitAndShutdown(1, `headend '${desc.label}' failed: ${message}`, 'EXIT-HEADEND-FATAL');
+    return;
   }
   emit('all headends stopped gracefully', 'FIN');
+  emit('shutdown completed', 'FIN');
+  try {
+    process.stderr.write('[info] shutdown completed\n');
+  } catch {
+    /* ignore */
+  }
+  await ensureTelemetryShutdown();
   __RUNNING_SERVER = false;
 }
 
@@ -1223,13 +1484,7 @@ program
       const fmSource = (fmSys !== undefined) ? resolvedSystemRaw : resolvedUserRaw;
       const fmBaseDir = (fmSys !== undefined) ? sysBaseDir : usrBaseDir;
       // Only override numeric options if explicitly provided via CLI (avoid overriding frontmatter with Commander defaults)
-      const optSrc = (name: string): 'cli' | 'default' | 'env' | 'implied' | undefined => {
-        try {
-          return program.getOptionValueSource(name) as 'cli' | 'default' | 'env' | 'implied' | undefined;
-        } catch {
-          return undefined;
-        }
-      };
+      const optSrc = (name: string): 'cli' | 'default' | 'env' | 'implied' | undefined => getOptionSource(name);
 
       let cliReasoning: ('minimal' | 'low' | 'medium' | 'high') | undefined;
       if (optSrc('reasoning') === 'cli') {
@@ -1313,11 +1568,22 @@ program
         stream: typeof options.stream === 'boolean' ? options.stream : undefined,
         traceLLM: options.traceLlm === true ? true : undefined,
         traceMCP: options.traceMcp === true ? true : undefined,
+        traceSdk: options.traceSdk === true ? true : undefined,
         mcpInitConcurrency: (typeof options.mcpInitConcurrency === 'string' && options.mcpInitConcurrency.length>0) ? Number(options.mcpInitConcurrency) : undefined,
         reasoning: cliReasoning,
         reasoningValue: cliReasoningValue,
         caching: cliCaching,
       });
+
+      const cliTelemetryOverrides = extractTelemetryOverrides(options, getOptionSource);
+      const runtimeTelemetryConfig = buildTelemetryRuntimeConfig({
+        configuration: loaded.config,
+        overrides: cliTelemetryOverrides,
+        mode: 'cli',
+      });
+      await initTelemetry(runtimeTelemetryConfig);
+      markTelemetryInitialized();
+      const sessionTelemetryLabels = runtimeTelemetryConfig.labels;
 
       // Prompt variable substitution using loader-effective max tool turns
       const expectedJson = fm?.expectedOutput?.format === 'json';
@@ -1338,7 +1604,8 @@ program
           conversationHistory = JSON.parse(content) as ConversationMessage[];
         } catch (e) {
           const msg = e instanceof Error ? e.message : String(e);
-          exitWith(1, `failed to load conversation from ${effLoad}: ${msg}`, 'EXIT-CONVERSATION-LOAD');
+          await exitAndShutdown(1, `failed to load conversation from ${effLoad}: ${msg}`, 'EXIT-CONVERSATION-LOAD');
+          return;
         }
       }
 
@@ -1350,15 +1617,24 @@ program
       // Setup logging callbacks (CLI-only)
       const effectiveTraceLLM = options.traceLlm === true;
       const effectiveTraceMCP = options.traceMcp === true;
+      const effectiveTraceSdk = options.traceSdk === true;
       const effectiveVerbose = options.verbose === true;
-      const callbacks = createCallbacks({ traceLlm: effectiveTraceLLM, traceMcp: effectiveTraceMCP, verbose: effectiveVerbose }, loaded.config.persistence, accountingFile);
+      const callbacks = createCallbacks({ traceLlm: effectiveTraceLLM, traceMcp: effectiveTraceMCP, traceSdk: effectiveTraceSdk, verbose: effectiveVerbose }, loaded.config.persistence, accountingFile);
 
       if (options.dryRun === true) {
-        exitWith(0, 'dry run complete: configuration and MCP servers validated', 'EXIT-DRY-RUN');
+        await exitAndShutdown(0, 'dry run complete: configuration and MCP servers validated', 'EXIT-DRY-RUN');
+        return;
       }
 
       // Create and run session via unified loader
-      const result = await loaded.run(resolvedSystem, resolvedUser, { history: conversationHistory, callbacks, renderTarget: 'cli', outputFormat: chosenFormatId });
+      const result = await loaded.run(resolvedSystem, resolvedUser, {
+        history: conversationHistory,
+        callbacks,
+        renderTarget: 'cli',
+        outputFormat: chosenFormatId,
+        telemetryLabels: sessionTelemetryLabels,
+        wantsProgressUpdates: false,
+      });
 
       // Always print only the formatted human-readable output to stdout
       try {
@@ -1392,7 +1668,8 @@ program
         if (options.showTree === true && typeof result.treeAscii === 'string' && result.treeAscii.length > 0) {
           try { process.stderr.write(`\n=== Execution Tree ===\n${result.treeAscii}\n`); } catch { /* ignore */ }
         }
-        exitWith(code, `agent failure: ${err || 'unknown error'}`, 'EXIT-AGENT-FAILURE');
+        await exitAndShutdown(code, `agent failure: ${err || 'unknown error'}`, 'EXIT-AGENT-FAILURE');
+        return;
       }
 
       // Save conversation if requested (CLI-only)
@@ -1402,7 +1679,8 @@ program
           fs.writeFileSync(effSave, JSON.stringify(result.conversation, null, 2), 'utf-8');
         } catch (e) {
           const msg = e instanceof Error ? e.message : String(e);
-          exitWith(1, `failed to save conversation to ${effSave}: ${msg}`, 'EXIT-SAVE-CONVERSATION');
+          await exitAndShutdown(1, `failed to save conversation to ${effSave}: ${msg}`, 'EXIT-SAVE-CONVERSATION');
+          return;
         }
       }
 
@@ -1436,7 +1714,8 @@ program
           });
         } catch (e) {
           const msg = e instanceof Error ? e.message : String(e);
-          exitWith(1, `failed to save conversations to ${saveAllDir}: ${msg}`, 'EXIT-SAVE-ALL');
+          await exitAndShutdown(1, `failed to save conversations to ${saveAllDir}: ${msg}`, 'EXIT-SAVE-ALL');
+          return;
         }
       }
 
@@ -1450,14 +1729,16 @@ program
         }
       }
       // Agent already logged EXIT-FINAL-ANSWER or similar
-      exitWith(0, 'success', 'EXIT-SUCCESS');
+      await exitAndShutdown(0, 'success', 'EXIT-SUCCESS');
+      return;
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : 'Unknown error';
       const code = msg.includes('config') ? 1
         : msg.includes('argument') ? 4
         : msg.includes('tool') ? 3
         : 1;
-      exitWith(code, `fatal error in CLI: ${msg}`, 'EXIT-UNKNOWN');
+      await exitAndShutdown(code, `fatal error in CLI: ${msg}`, 'EXIT-UNKNOWN');
+      return;
     }
   });
 
@@ -1579,6 +1860,7 @@ function createCallbacks(
     verbose: options.verbose === true,
     traceLlm: options.traceLlm === true,
     traceMcp: options.traceMcp === true,
+    traceSdk: options.traceSdk === true,
   });
 
   const home = process.env.HOME ?? process.env.USERPROFILE ?? '';
@@ -1597,9 +1879,6 @@ function createCallbacks(
       if (entry.severity === 'THK') {
         const header = formatLog(entry, {
           color: true,
-          verbose: options.verbose === true,
-          traceLlm: options.traceLlm === true,
-          traceMcp: options.traceMcp === true,
         });
         try { process.stderr.write(`${header} `); } catch { /* ignore */ }
         thinkingOpen = true;
@@ -1641,7 +1920,7 @@ process.on('uncaughtException', (e) => {
 `); } catch {}
     return;
   }
-  exitWith(1, `uncaught exception: ${msg}`, 'EXIT-UNCAUGHT-EXCEPTION');
+  void exitAndShutdown(1, `uncaught exception: ${msg}`, 'EXIT-UNCAUGHT-EXCEPTION');
 });
 process.on('unhandledRejection', (r) => {
   const msg = r instanceof Error ? `${r.name}: ${r.message}` : String(r);
@@ -1652,7 +1931,7 @@ process.on('unhandledRejection', (r) => {
 `); } catch {}
     return;
   }
-  exitWith(1, `unhandled rejection: ${msg}`, 'EXIT-UNHANDLED-REJECTION');
+  void exitAndShutdown(1, `unhandled rejection: ${msg}`, 'EXIT-UNHANDLED-REJECTION');
 });
 
 program.parse();

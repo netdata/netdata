@@ -1,5 +1,6 @@
 import type { ConversationMessage, ProviderConfig, TokenUsage, TurnRequest, TurnResult } from '../types.js';
 import type { LanguageModelV2, LanguageModelV2CallOptions, LanguageModelV2Content, LanguageModelV2FinishReason, LanguageModelV2StreamPart, LanguageModelV2Usage } from '@ai-sdk/provider';
+import type { ReasoningOutput } from 'ai';
 
 import { getScenario, listScenarioIds, type ScenarioDefinition, type ScenarioStepResponse, type ScenarioTurn } from '../tests/fixtures/test-llm-scenarios.js';
 import { sanitizeToolName, truncateUtf8WithNotice } from '../utils.js';
@@ -374,16 +375,44 @@ function buildFinalReportContent(response: FinalReportStep): LanguageModelV2Cont
 }
 
 function appendReasoningParts(content: LanguageModelV2Content[], response: ScenarioStepResponse): void {
-  if (!Array.isArray(response.reasoning) || response.reasoning.length === 0) return;
-  response.reasoning.forEach((entry) => {
-    if (entry.text.trim().length === 0) {
-      return;
+  const segments: { text: string; providerMetadata?: ReasoningOutput['providerMetadata'] }[] = [];
+
+  if (Array.isArray(response.reasoning)) {
+    response.reasoning.forEach((entry) => {
+      const text = entry.text.trim();
+      if (text.length === 0) return;
+      segments.push({ text, providerMetadata: entry.providerMetadata });
+    });
+  }
+
+  const raw = response.reasoningContent;
+  if (raw !== undefined) {
+    const pushEntry = (entry: ReasoningOutput | string) => {
+      if (typeof entry === 'string') {
+        const text = entry.trim();
+        if (text.length === 0) return;
+        segments.push({ text });
+        return;
+      }
+      const text = typeof entry.text === 'string' ? entry.text.trim() : '';
+      if (text.length === 0) return;
+      segments.push({ text, providerMetadata: entry.providerMetadata });
+    };
+
+    if (Array.isArray(raw)) {
+      raw.forEach((entry) => { pushEntry(entry); });
+    } else if (typeof raw === 'string') {
+      pushEntry(raw);
+    } else {
+      pushEntry(raw);
     }
-    const providerMetadata = entry.providerMetadata;
+  }
+
+  segments.forEach((segment) => {
     content.push({
       type: 'reasoning',
-      text: entry.text,
-      ...(providerMetadata !== undefined ? { providerMetadata } : {}),
+      text: segment.text,
+      ...(segment.providerMetadata !== undefined ? { providerMetadata: segment.providerMetadata } : {}),
     });
   });
 }
