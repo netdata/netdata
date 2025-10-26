@@ -159,7 +159,7 @@ export async function initTelemetry(config: TelemetryRuntimeConfig): Promise<voi
   Object.entries(labels).forEach(([key, value]) => {
     resourceAttrs[`telemetry.label.${key}`] = value;
   });
-  const resource = new otel.Resource(resourceAttrs);
+  const resource = otel.resourceFromAttributes(resourceAttrs);
 
   if (enableMetrics) {
     const exporterOptions: Record<string, unknown> = {};
@@ -265,7 +265,7 @@ function cloneLoggingConfig(config?: TelemetryRuntimeLoggingConfig): TelemetryRu
 
 async function setupLogExporter(
   otel: OtelDependencies,
-  resource: InstanceType<OtelDependencies['Resource']>,
+  resource: OtelResource,
   config: TelemetryRuntimeConfig,
 ): Promise<void> {
   await shutdownLogExporter();
@@ -290,9 +290,8 @@ async function setupLogExporter(
     ? { scheduledDelayMillis: 200, exportTimeoutMillis: typeof loggingTimeout === 'number' ? loggingTimeout : 2000 }
     : undefined;
 
-  const provider = new otel.LoggerProvider({ resource });
   const processor = new otel.BatchLogRecordProcessor(exporter, processorOptions);
-  provider.addLogRecordProcessor(processor);
+  const provider = new otel.LoggerProvider({ resource, processors: [processor] });
   otelLogs.setGlobalLoggerProvider(provider);
   const logger = provider.getLogger('ai-agent');
 
@@ -419,7 +418,9 @@ interface OtelDependencies {
   AggregationTemporality: typeof OtelMetrics.AggregationTemporality;
   OTLPMetricExporter: typeof OtelOtlp.OTLPMetricExporter;
   PrometheusExporter?: typeof OtelProm.PrometheusExporter;
-  Resource: typeof OtelResources.Resource;
+  resourceFromAttributes: typeof OtelResources.resourceFromAttributes;
+  defaultResource: typeof OtelResources.defaultResource;
+  emptyResource: typeof OtelResources.emptyResource;
   serviceNameAttribute: string;
   serviceVersionAttribute: string;
   ExportResultCode: typeof OtelCore.ExportResultCode;
@@ -436,6 +437,8 @@ interface OtelDependencies {
   OTLPLogExporter: typeof OtelLogsOtlp.OTLPLogExporter;
   SeverityNumber: typeof OtelLogsApi.SeverityNumber;
 }
+
+type OtelResource = ReturnType<OtelDependencies['resourceFromAttributes']>;
 
 async function loadOtelDependencies(includePrometheus: boolean): Promise<OtelDependencies> {
   const apiModule = (await import('@opentelemetry/api')) as typeof OtelApi;
@@ -463,7 +466,9 @@ async function loadOtelDependencies(includePrometheus: boolean): Promise<OtelDep
     AggregationTemporality: metricsModule.AggregationTemporality,
     OTLPMetricExporter: metricExporterModule.OTLPMetricExporter,
     PrometheusExporter: promModule?.PrometheusExporter,
-    Resource: resourcesModule.Resource,
+    resourceFromAttributes: resourcesModule.resourceFromAttributes,
+    defaultResource: resourcesModule.defaultResource,
+    emptyResource: resourcesModule.emptyResource,
     serviceNameAttribute: semanticModule.ATTR_SERVICE_NAME,
     serviceVersionAttribute: semanticModule.ATTR_SERVICE_VERSION,
     ExportResultCode: coreModule.ExportResultCode,
@@ -628,7 +633,7 @@ class OtelMetricsRecorder implements TelemetryRecorder {
 
 function setupTracing(
   otel: OtelDependencies,
-  resource: InstanceType<OtelDependencies['Resource']>,
+  resource: OtelResource,
   config: TelemetryRuntimeConfig,
 ): void {
   if (config.traces?.enabled !== true) return;

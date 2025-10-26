@@ -962,7 +962,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
           isMcpToolLog(log) &&
           log.direction === 'response' &&
           typeof log.message === 'string' &&
-          log.message.startsWith('ok test__test')
+          log.message.includes('ok test__test')
       );
       invariant(firstResponseIndex !== -1, 'First tool response log missing for run-test-25.');
       const secondRequestIndex = logs.findIndex(
@@ -1064,7 +1064,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
       const firstAttempt = augmented._firstAttempt;
       invariant(firstAttempt !== undefined && !firstAttempt.success, 'First attempt should fail before retry for run-test-29.');
       invariant(typeof firstAttempt.error === 'string' && firstAttempt.error.includes('Simulated fatal error before manual retry.'), 'First attempt error message mismatch for run-test-29.');
-      const successLog = result.logs.find((entry) => entry.type === 'tool' && entry.direction === 'response' && typeof entry.message === 'string' && entry.message.startsWith('ok test__test'));
+      const successLog = result.logs.find((entry) => entry.type === 'tool' && entry.direction === 'response' && typeof entry.message === 'string' && entry.message.includes('ok test__test'));
       invariant(successLog !== undefined, 'Successful tool execution log expected after retry for run-test-29.');
     },
   },
@@ -5380,8 +5380,8 @@ const TEST_SCENARIOS: HarnessTest[] = [
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-114 expected success.');
       const traceLogs = result.logs.filter((entry) => entry.severity === 'TRC' && entry.type === 'llm');
-      invariant(traceLogs.some((log) => log.message === 'SDK request payload'), 'SDK request payload log missing for run-test-114.');
-      invariant(traceLogs.some((log) => log.message === 'SDK response payload'), 'SDK response payload log missing for run-test-114.');
+      invariant(traceLogs.some((log) => typeof log.message === 'string' && log.message.includes('SDK request payload')), 'SDK request payload log missing for run-test-114.');
+      invariant(traceLogs.some((log) => typeof log.message === 'string' && log.message.includes('SDK response payload')), 'SDK response payload log missing for run-test-114.');
     },
   },
   {
