@@ -1,0 +1,116 @@
+{
+  "version": 1,
+  "meta": {
+    "provider": "google",
+    "model": "gemini-2.5-pro",
+    "scenarioId": "multi",
+    "scenarioLabel": "multi-turn",
+    "modelLabel": "google/gemini-2.5-pro",
+    "stream": false,
+    "turn": 3,
+    "timestamp": "2025-10-26T20:21:18.751Z"
+  },
+  "request": {
+    "provider": "google",
+    "model": "gemini-2.5-pro",
+    "stream": false,
+    "temperature": 0.7,
+    "topP": 1,
+    "maxOutputTokens": 4096,
+    "reasoningLevel": "high",
+    "reasoningValue": 3276,
+    "parallelToolCalls": true,
+    "isFinalTurn": false,
+    "turn": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "Call agent__final_report with status=\"success\", report_format=\"text\", and content=\"test completed\".\n\n\n## TOOLS' INSTRUCTIONS\n\n## Available Tools\n\n### Internal Tools\n\n\n#### agent__final_report - Deliver Your Final Answer\n- You MUST call 'agent__final_report' to provide your final answer to the user.\n- Required fields:\n  - `status`: one of `success`, `failure`, `partial`.\n  - `report_format`: \"markdown\".\n  - `report_content`: complete deliverable in the requested format.\n- Include optional `metadata` only when explicitly relevant.\n- After this tool succeeds, do not send additional assistant messages.\n\n*You run in agentic mode, interfacing with software tools.*\n\n**YOU MUST:**\n- **ALWAYS** respond with valid tool calls, even for your final answer.\n- **ALWAYS** provide your final report to the user using the agent__final_report tool, with the correct format.\n**YOU MUST NOT:**\n- Do not provide any other output except calling your tools. Any other output you provide is ignored."
+      },
+      {
+        "role": "user",
+        "content": "{\"reason\":\"execute phase two\",\"format\":\"sub-agent\",\"prompt\":\"phase1 completed, now run agent 2\"}"
+      }
+    ],
+    "toolNames": [
+      "agent__final_report"
+    ]
+  },
+  "requestHash": "9caf2b091756ce81d2bb311816c159f22826693c506eb74acc380ff27dfcd7a8",
+  "result": {
+    "status": {
+      "type": "success",
+      "hasToolCalls": true,
+      "finalAnswer": true
+    },
+    "response": "",
+    "toolCalls": [
+      {
+        "id": "W9qeYsXingm4LzYo",
+        "name": "agent__final_report",
+        "parameters": {
+          "status": "success",
+          "report_content": "test completed",
+          "report_format": "markdown"
+        }
+      }
+    ],
+    "tokens": {
+      "inputTokens": 380,
+      "outputTokens": 32,
+      "totalTokens": 2491
+    },
+    "latencyMs": 20506,
+    "messages": [
+      {
+        "role": "assistant",
+        "content": "",
+        "toolCalls": [
+          {
+            "id": "W9qeYsXingm4LzYo",
+            "name": "agent__final_report",
+            "parameters": {
+              "status": "success",
+              "report_content": "test completed",
+              "report_format": "markdown"
+            }
+          }
+        ],
+        "reasoning": [
+          {
+            "type": "reasoning",
+            "text": "**Final Report: Analysis and Tool Call Preparation**\n\nOkay, so the user wants me to do something. They've given me a prompt, which looks like an instruction to start the next phase of a process, \"execute phase two\".  I see the tools available are limited, and the most relevant one is `agent__final_report`. It looks like the goal here is to signal that *this* agent is done, and it's time for the next one to step in. The user's prompt is, essentially, a command to initiate the next sub-agent.\n\nNow, there are some conflicting instructions here.  I have the user's prompt (which says \"phase1 completed, now run agent 2\") and, more importantly, a developer instruction. The developer's instruction *explicitly* tells me to call `agent__final_report` with specific values: `status=\"success\"`, `report_format=\"text\"`, and `report_content=\"test completed\"`.  There's a contradiction, because the tool definition for `report_format` only allows \"markdown\".\n\nMy job is to obey instructions. The developer instruction seems very specific and overrides the user's prompt. So I need to use the `agent__final_report` tool, with \"success\" for `status`. However, `report_format` *has* to be \"markdown\" or the tool call will fail. Therefore, I will use \"markdown\" and, for the content, \"test completed\" as directly specified in the developer instruction.\n\nSo, the action will be to call `agent__final_report(status=\"success\", report_format=\"markdown\", report_content=\"test completed\")`. I'm confident that this accurately addresses the instructions given. The user prompt appears to be more of a trigger for the specified tool call, rather than a question to answer."
+          }
+        ],
+        "metadata": {
+          "provider": "google",
+          "model": "gemini-2.5-pro",
+          "tokens": {
+            "inputTokens": 380,
+            "outputTokens": 32,
+            "totalTokens": 2491
+          },
+          "timestamp": 1761510078751
+        }
+      },
+      {
+        "role": "tool",
+        "content": "{\"ok\":true}",
+        "toolCallId": "W9qeYsXingm4LzYo",
+        "metadata": {
+          "provider": "google",
+          "model": "gemini-2.5-pro",
+          "tokens": {
+            "inputTokens": 380,
+            "outputTokens": 32,
+            "totalTokens": 2491
+          },
+          "timestamp": 1761510078751
+        }
+      }
+    ],
+    "hasReasoning": true,
+    "hasContent": false,
+    "stopReason": "tool-calls"
+  }
+}

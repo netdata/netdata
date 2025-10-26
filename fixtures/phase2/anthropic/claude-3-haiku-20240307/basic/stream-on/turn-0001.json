@@ -1,0 +1,113 @@
+{
+  "version": 1,
+  "meta": {
+    "provider": "anthropic",
+    "model": "claude-3-haiku-20240307",
+    "scenarioId": "basic",
+    "scenarioLabel": "basic-llm",
+    "modelLabel": "anthropic/claude-3-haiku-20240307",
+    "stream": true,
+    "turn": 1,
+    "timestamp": "2025-10-26T20:05:41.768Z"
+  },
+  "request": {
+    "provider": "anthropic",
+    "model": "claude-3-haiku-20240307",
+    "stream": true,
+    "temperature": 0.7,
+    "topP": 1,
+    "maxOutputTokens": 4096,
+    "reasoningLevel": null,
+    "reasoningValue": null,
+    "parallelToolCalls": true,
+    "isFinalTurn": false,
+    "turn": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "Call agent__final_report with status=\"success\", report_format=\"text\", and content set to the required text. The content must be exactly \"test\".\n\n## TOOLS' INSTRUCTIONS\n\n## Available Tools\n\n### Internal Tools\n\n#### agent__progress_report — Progress Updates for the user\n- Use this tool to update the user on your progress.\n- Keep the `progress` message concise (≤20 words).\n- Always pair this tool with other tools you are invoking (except `agent__final_report`).\n- Do not call this tool by itself.\n- Do not pair this tool with `agent__final_report`\n\n#### agent__final_report - Deliver Your Final Answer\n- You MUST call 'agent__final_report' to provide your final answer to the user.\n- Required fields:\n  - `status`: one of `success`, `failure`, `partial`.\n  - `report_format`: \"markdown\".\n  - `report_content`: complete deliverable in the requested format.\n- Include optional `metadata` only when explicitly relevant.\n- After this tool succeeds, do not send additional assistant messages.\n\n*You run in agentic mode, interfacing with software tools.*\n\n**YOU MUST:**\n- **ALWAYS** respond with valid tool calls, even for your final answer.\n- **ALWAYS** provide your final report to the user using the agent__final_report tool, with the correct format.\n**YOU MUST NOT:**\n- Do not provide any other output except calling your tools. Any other output you provide is ignored."
+      },
+      {
+        "role": "user",
+        "content": "Invoke agent__final_report(status=\"success\", report_format=\"text\", content=\"test\") and produce no other output."
+      }
+    ],
+    "toolNames": [
+      "agent__progress_report",
+      "agent__final_report",
+      "agent__test-agent1",
+      "agent__test-agent2"
+    ]
+  },
+  "requestHash": "0755eb1c6c9ad31e6a45ea98639f81e65caa373ecf90cd4b09763e4e678fd535",
+  "result": {
+    "status": {
+      "type": "success",
+      "hasToolCalls": true,
+      "finalAnswer": true
+    },
+    "response": "",
+    "toolCalls": [
+      {
+        "id": "toolu_016zoz14KFbxPMMS6prg2EJg",
+        "name": "agent__final_report",
+        "parameters": {
+          "status": "success",
+          "report_format": "markdown",
+          "report_content": "test"
+        }
+      }
+    ],
+    "tokens": {
+      "inputTokens": 1337,
+      "outputTokens": 78,
+      "totalTokens": 1415
+    },
+    "latencyMs": 994,
+    "messages": [
+      {
+        "role": "assistant",
+        "content": "",
+        "toolCalls": [
+          {
+            "id": "toolu_016zoz14KFbxPMMS6prg2EJg",
+            "name": "agent__final_report",
+            "parameters": {
+              "status": "success",
+              "report_format": "markdown",
+              "report_content": "test"
+            }
+          }
+        ],
+        "metadata": {
+          "provider": "anthropic",
+          "model": "claude-3-haiku-20240307",
+          "tokens": {
+            "inputTokens": 1337,
+            "outputTokens": 78,
+            "totalTokens": 1415
+          },
+          "timestamp": 1761509141768
+        }
+      },
+      {
+        "role": "tool",
+        "content": "{\"ok\":true}",
+        "toolCallId": "toolu_016zoz14KFbxPMMS6prg2EJg",
+        "metadata": {
+          "provider": "anthropic",
+          "model": "claude-3-haiku-20240307",
+          "tokens": {
+            "inputTokens": 1337,
+            "outputTokens": 78,
+            "totalTokens": 1415
+          },
+          "timestamp": 1761509141768
+        }
+      }
+    ],
+    "hasReasoning": false,
+    "hasContent": false,
+    "stopReason": "tool-calls"
+  }
+}

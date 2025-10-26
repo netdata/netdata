@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "meta": {
+    "provider": "vllm",
+    "model": "default-model",
+    "scenarioId": "multi",
+    "scenarioLabel": "multi-turn",
+    "modelLabel": "vllm/default-model",
+    "stream": true,
+    "turn": 1,
+    "timestamp": "2025-10-26T20:24:33.592Z"
+  },
+  "request": {
+    "provider": "vllm",
+    "model": "default-model",
+    "stream": true,
+    "temperature": 0.7,
+    "topP": 1,
+    "maxOutputTokens": 4096,
+    "reasoningLevel": "high",
+    "reasoningValue": "high",
+    "parallelToolCalls": true,
+    "isFinalTurn": false,
+    "turn": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "1) Call agent__test-agent1 with parameters {\"prompt\":\"run\",\"reason\":\"execute phase two\",\"format\":\"sub-agent\"}. 2) Wait for the response and call agent__test-agent2 with {\"prompt\":<agent1 output>,\"reason\":\"execute phase two\",\"format\":\"sub-agent\"}. 3) Finish by calling agent__final_report(status=\"success\", report_format=\"text\", content=<agent2 output>). Do not emit plain text.\n\n## TOOLS' INSTRUCTIONS\n\n## Available Tools\n\n### Internal Tools\n\n#### agent__progress_report — Progress Updates for the user\n- Use this tool to update the user on your progress.\n- Keep the `progress` message concise (≤20 words).\n- Always pair this tool with other tools you are invoking (except `agent__final_report`).\n- Do not call this tool by itself.\n- Do not pair this tool with `agent__final_report`\n\n#### agent__final_report - Deliver Your Final Answer\n- You MUST call 'agent__final_report' to provide your final answer to the user.\n- Required fields:\n  - `status`: one of `success`, `failure`, `partial`.\n  - `report_format`: \"markdown\".\n  - `report_content`: complete deliverable in the requested format.\n- Include optional `metadata` only when explicitly relevant.\n- After this tool succeeds, do not send additional assistant messages.\n\n*You run in agentic mode, interfacing with software tools.*\n\n**YOU MUST:**\n- **ALWAYS** respond with valid tool calls, even for your final answer.\n- **ALWAYS** provide your final report to the user using the agent__final_report tool, with the correct format.\n**YOU MUST NOT:**\n- Do not provide any other output except calling your tools. Any other output you provide is ignored."
+      },
+      {
+        "role": "user",
+        "content": "Execute agent__test-agent1({\"prompt\":\"run\",\"reason\":\"execute phase two\",\"format\":\"sub-agent\"}), pass its output into agent__test-agent2({\"prompt\":<agent1 output>,\"reason\":\"execute phase two\",\"format\":\"sub-agent\"}), and conclude with agent__final_report(status=\"success\", report_format=\"text\", content=<agent2 output>)."
+      }
+    ],
+    "toolNames": [
+      "agent__progress_report",
+      "agent__final_report",
+      "agent__test-agent1",
+      "agent__test-agent2"
+    ]
+  },
+  "requestHash": "12c24f8396b4ca9a14b78997083b2bc1547be244d9069fa019dc23b3ba42e24f",
+  "result": {
+    "status": {
+      "type": "success",
+      "hasToolCalls": false,
+      "finalAnswer": false
+    },
+    "response": "",
+    "tokens": {
+      "inputTokens": 835,
+      "outputTokens": 4096,
+      "totalTokens": 4931
+    },
+    "latencyMs": 21146,
+    "messages": [],
+    "hasReasoning": false,
+    "hasContent": false,
+    "stopReason": "length"
+  }
+}

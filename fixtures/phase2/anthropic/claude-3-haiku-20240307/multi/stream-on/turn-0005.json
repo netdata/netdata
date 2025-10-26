@@ -1,0 +1,193 @@
+{
+  "version": 1,
+  "meta": {
+    "provider": "anthropic",
+    "model": "claude-3-haiku-20240307",
+    "scenarioId": "multi",
+    "scenarioLabel": "multi-turn",
+    "modelLabel": "anthropic/claude-3-haiku-20240307",
+    "stream": true,
+    "turn": 5,
+    "timestamp": "2025-10-26T20:05:55.151Z"
+  },
+  "request": {
+    "provider": "anthropic",
+    "model": "claude-3-haiku-20240307",
+    "stream": true,
+    "temperature": 0.7,
+    "topP": 1,
+    "maxOutputTokens": 4096,
+    "reasoningLevel": "high",
+    "reasoningValue": null,
+    "parallelToolCalls": true,
+    "isFinalTurn": false,
+    "turn": 3,
+    "messages": [
+      {
+        "role": "system",
+        "content": "1) Call agent__test-agent1 with parameters {\"prompt\":\"run\",\"reason\":\"execute phase two\",\"format\":\"sub-agent\"}. 2) Wait for the response and call agent__test-agent2 with {\"prompt\":<agent1 output>,\"reason\":\"execute phase two\",\"format\":\"sub-agent\"}. 3) Finish by calling agent__final_report(status=\"success\", report_format=\"text\", content=<agent2 output>). Do not emit plain text.\n\n## TOOLS' INSTRUCTIONS\n\n## Available Tools\n\n### Internal Tools\n\n#### agent__progress_report — Progress Updates for the user\n- Use this tool to update the user on your progress.\n- Keep the `progress` message concise (≤20 words).\n- Always pair this tool with other tools you are invoking (except `agent__final_report`).\n- Do not call this tool by itself.\n- Do not pair this tool with `agent__final_report`\n\n#### agent__final_report - Deliver Your Final Answer\n- You MUST call 'agent__final_report' to provide your final answer to the user.\n- Required fields:\n  - `status`: one of `success`, `failure`, `partial`.\n  - `report_format`: \"markdown\".\n  - `report_content`: complete deliverable in the requested format.\n- Include optional `metadata` only when explicitly relevant.\n- After this tool succeeds, do not send additional assistant messages.\n\n*You run in agentic mode, interfacing with software tools.*\n\n**YOU MUST:**\n- **ALWAYS** respond with valid tool calls, even for your final answer.\n- **ALWAYS** provide your final report to the user using the agent__final_report tool, with the correct format.\n**YOU MUST NOT:**\n- Do not provide any other output except calling your tools. Any other output you provide is ignored."
+      },
+      {
+        "role": "user",
+        "content": "Execute agent__test-agent1({\"prompt\":\"run\",\"reason\":\"execute phase two\",\"format\":\"sub-agent\"}), pass its output into agent__test-agent2({\"prompt\":<agent1 output>,\"reason\":\"execute phase two\",\"format\":\"sub-agent\"}), and conclude with agent__final_report(status=\"success\", report_format=\"text\", content=<agent2 output>)."
+      },
+      {
+        "role": "assistant",
+        "content": "",
+        "toolCalls": [
+          {
+            "id": "toolu_01YFnwqv1hjGww1ueR9zx9LM",
+            "name": "agent__test-agent1",
+            "parameters": {
+              "prompt": "run",
+              "reason": "execute phase two",
+              "format": "sub-agent"
+            }
+          }
+        ],
+        "metadata": {
+          "provider": "anthropic",
+          "model": "claude-3-haiku-20240307",
+          "tokens": {
+            "inputTokens": 1381,
+            "outputTokens": 94,
+            "totalTokens": 1475
+          },
+          "timestamp": 1761509150692
+        }
+      },
+      {
+        "role": "tool",
+        "content": "phase1 completed, now run agent 2",
+        "toolCallId": "toolu_01YFnwqv1hjGww1ueR9zx9LM",
+        "metadata": {
+          "provider": "anthropic",
+          "model": "claude-3-haiku-20240307",
+          "tokens": {
+            "inputTokens": 1381,
+            "outputTokens": 94,
+            "totalTokens": 1475
+          },
+          "timestamp": 1761509150692
+        }
+      },
+      {
+        "role": "assistant",
+        "content": "",
+        "toolCalls": [
+          {
+            "id": "toolu_01YDeG6APTh5eCcYa5sX1Sm2",
+            "name": "agent__test-agent2",
+            "parameters": {
+              "prompt": "phase1 completed, now run agent 2",
+              "reason": "execute phase two",
+              "format": "sub-agent"
+            }
+          }
+        ],
+        "metadata": {
+          "provider": "anthropic",
+          "model": "claude-3-haiku-20240307",
+          "tokens": {
+            "inputTokens": 1497,
+            "outputTokens": 104,
+            "totalTokens": 1601
+          },
+          "timestamp": 1761509153379
+        }
+      },
+      {
+        "role": "tool",
+        "content": "# Phase 2 Execution\n\nThank you for the request to execute phase two. I have received the prompt \"phase1 completed, now run agent 2\" with the reason \"execute phase two\" in the requested \"sub-agent\" format.\n\nI am ready to proceed to the next phase of the overall task. Please provide any additional instructions or information needed for me to successfully execute phase two.",
+        "toolCallId": "toolu_01YDeG6APTh5eCcYa5sX1Sm2",
+        "metadata": {
+          "provider": "anthropic",
+          "model": "claude-3-haiku-20240307",
+          "tokens": {
+            "inputTokens": 1497,
+            "outputTokens": 104,
+            "totalTokens": 1601
+          },
+          "timestamp": 1761509153379
+        }
+      }
+    ],
+    "toolNames": [
+      "agent__progress_report",
+      "agent__final_report",
+      "agent__test-agent1",
+      "agent__test-agent2"
+    ]
+  },
+  "requestHash": "cf0ff275b5cbe355e498061dbc4abd4c657bc87569d203da5572e1bfc216e0d0",
+  "result": {
+    "status": {
+      "type": "success",
+      "hasToolCalls": true,
+      "finalAnswer": true
+    },
+    "response": "",
+    "toolCalls": [
+      {
+        "id": "toolu_01QoeC8Sbjmr7ADZ15AoJTaP",
+        "name": "agent__final_report",
+        "parameters": {
+          "status": "success",
+          "report_format": "text",
+          "report_content": "# Phase 2 Execution\n\nThank you for the request to execute phase two. I have received the prompt \"phase1 completed, now run agent 2\" with the reason \"execute phase two\" in the requested \"sub-agent\" format.\n\nI am ready to proceed to the next phase of the overall task. Please provide any additional instructions or information needed for me to successfully execute phase two."
+        }
+      }
+    ],
+    "tokens": {
+      "inputTokens": 1694,
+      "outputTokens": 176,
+      "totalTokens": 1870
+    },
+    "latencyMs": 1771,
+    "messages": [
+      {
+        "role": "assistant",
+        "content": "",
+        "toolCalls": [
+          {
+            "id": "toolu_01QoeC8Sbjmr7ADZ15AoJTaP",
+            "name": "agent__final_report",
+            "parameters": {
+              "status": "success",
+              "report_format": "text",
+              "report_content": "# Phase 2 Execution\n\nThank you for the request to execute phase two. I have received the prompt \"phase1 completed, now run agent 2\" with the reason \"execute phase two\" in the requested \"sub-agent\" format.\n\nI am ready to proceed to the next phase of the overall task. Please provide any additional instructions or information needed for me to successfully execute phase two."
+            }
+          }
+        ],
+        "metadata": {
+          "provider": "anthropic",
+          "model": "claude-3-haiku-20240307",
+          "tokens": {
+            "inputTokens": 1694,
+            "outputTokens": 176,
+            "totalTokens": 1870
+          },
+          "timestamp": 1761509155150
+        }
+      },
+      {
+        "role": "tool",
+        "content": "{\"ok\":true}",
+        "toolCallId": "toolu_01QoeC8Sbjmr7ADZ15AoJTaP",
+        "metadata": {
+          "provider": "anthropic",
+          "model": "claude-3-haiku-20240307",
+          "tokens": {
+            "inputTokens": 1694,
+            "outputTokens": 176,
+            "totalTokens": 1870
+          },
+          "timestamp": 1761509155150
+        }
+      }
+    ],
+    "hasReasoning": false,
+    "hasContent": false,
+    "stopReason": "tool-calls"
+  }
+}

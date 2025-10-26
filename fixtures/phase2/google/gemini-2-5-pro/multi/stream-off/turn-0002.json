@@ -1,0 +1,119 @@
+{
+  "version": 1,
+  "meta": {
+    "provider": "google",
+    "model": "gemini-2.5-pro",
+    "scenarioId": "multi",
+    "scenarioLabel": "multi-turn",
+    "modelLabel": "google/gemini-2.5-pro",
+    "stream": false,
+    "turn": 2,
+    "timestamp": "2025-10-26T20:20:52.656Z"
+  },
+  "request": {
+    "provider": "google",
+    "model": "gemini-2.5-pro",
+    "stream": false,
+    "temperature": 0.7,
+    "topP": 1,
+    "maxOutputTokens": 4096,
+    "reasoningLevel": "high",
+    "reasoningValue": 3276,
+    "parallelToolCalls": true,
+    "isFinalTurn": false,
+    "turn": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "1) Call agent__test-agent1 with parameters {\"prompt\":\"run\",\"reason\":\"execute phase two\",\"format\":\"sub-agent\"}. 2) Wait for the response and call agent__test-agent2 with {\"prompt\":<agent1 output>,\"reason\":\"execute phase two\",\"format\":\"sub-agent\"}. 3) Finish by calling agent__final_report(status=\"success\", report_format=\"text\", content=<agent2 output>). Do not emit plain text.\n\n## TOOLS' INSTRUCTIONS\n\n## Available Tools\n\n### Internal Tools\n\n#### agent__progress_report — Progress Updates for the user\n- Use this tool to update the user on your progress.\n- Keep the `progress` message concise (≤20 words).\n- Always pair this tool with other tools you are invoking (except `agent__final_report`).\n- Do not call this tool by itself.\n- Do not pair this tool with `agent__final_report`\n\n#### agent__final_report - Deliver Your Final Answer\n- You MUST call 'agent__final_report' to provide your final answer to the user.\n- Required fields:\n  - `status`: one of `success`, `failure`, `partial`.\n  - `report_format`: \"markdown\".\n  - `report_content`: complete deliverable in the requested format.\n- Include optional `metadata` only when explicitly relevant.\n- After this tool succeeds, do not send additional assistant messages.\n\n*You run in agentic mode, interfacing with software tools.*\n\n**YOU MUST:**\n- **ALWAYS** respond with valid tool calls, even for your final answer.\n- **ALWAYS** provide your final report to the user using the agent__final_report tool, with the correct format.\n**YOU MUST NOT:**\n- Do not provide any other output except calling your tools. Any other output you provide is ignored."
+      },
+      {
+        "role": "user",
+        "content": "Execute agent__test-agent1({\"prompt\":\"run\",\"reason\":\"execute phase two\",\"format\":\"sub-agent\"}), pass its output into agent__test-agent2({\"prompt\":<agent1 output>,\"reason\":\"execute phase two\",\"format\":\"sub-agent\"}), and conclude with agent__final_report(status=\"success\", report_format=\"text\", content=<agent2 output>)."
+      }
+    ],
+    "toolNames": [
+      "agent__progress_report",
+      "agent__final_report",
+      "agent__test-agent1",
+      "agent__test-agent2"
+    ]
+  },
+  "requestHash": "8d931e4e93bbf3e9a2ccaf4d870919c88d22a2062f90c7e6faaa66b70bd0bd04",
+  "result": {
+    "status": {
+      "type": "success",
+      "hasToolCalls": true,
+      "finalAnswer": false
+    },
+    "response": "",
+    "toolCalls": [
+      {
+        "id": "Z1RuXFF60PbJ21Vl",
+        "name": "agent__test-agent1",
+        "parameters": {
+          "reason": "execute phase two",
+          "format": "sub-agent",
+          "prompt": "run"
+        }
+      }
+    ],
+    "tokens": {
+      "inputTokens": 862,
+      "outputTokens": 32,
+      "totalTokens": 1324
+    },
+    "latencyMs": 65079,
+    "messages": [
+      {
+        "role": "assistant",
+        "content": "",
+        "toolCalls": [
+          {
+            "id": "Z1RuXFF60PbJ21Vl",
+            "name": "agent__test-agent1",
+            "parameters": {
+              "reason": "execute phase two",
+              "format": "sub-agent",
+              "prompt": "run"
+            }
+          }
+        ],
+        "reasoning": [
+          {
+            "type": "reasoning",
+            "text": "**My Plan for Executing a Tool Call Sequence**\n\nOkay, so I've got a clear task in front of me: the user wants me to run a series of tool calls in a specific order.  I see the sequence laid out, and it's straightforward.\n\nFirst, I need to call `agent__test-agent1`. The parameters are all set: `{\"prompt\":\"run\",\"reason\":\"execute phase two\",\"format\":\"sub-agent\"}`.  That's my starting point.\n\nThe trick, and where I show my intelligence, is that the output of `agent__test-agent1` becomes the input for the next tool, `agent__test-agent2`.  I'll grab that output, and then call `agent__test-agent2` using the given parameters: `{\"reason\":\"execute phase two\",\"format\":\"sub-agent\"}` and the output of the first tool for the prompt.\n\nFinally, I take the output of `agent__test-agent2` and pass it to the final tool, `agent__final_report`. The parameters here are `{\"status\":\"success\", \"report_format\":\"text\"}`.\n\nSo, the plan is simple:  execute the calls in order, feeding the output of each into the next. I'll get started with `agent__test-agent1` and move from there. This is a very standard workflow, and one that is second nature to me."
+          }
+        ],
+        "metadata": {
+          "provider": "google",
+          "model": "gemini-2.5-pro",
+          "tokens": {
+            "inputTokens": 862,
+            "outputTokens": 32,
+            "totalTokens": 1324
+          },
+          "timestamp": 1761510052656
+        }
+      },
+      {
+        "role": "tool",
+        "content": "phase1 completed, now run agent 2",
+        "toolCallId": "Z1RuXFF60PbJ21Vl",
+        "metadata": {
+          "provider": "google",
+          "model": "gemini-2.5-pro",
+          "tokens": {
+            "inputTokens": 862,
+            "outputTokens": 32,
+            "totalTokens": 1324
+          },
+          "timestamp": 1761510052656
+        }
+      }
+    ],
+    "hasReasoning": true,
+    "hasContent": false,
+    "stopReason": "tool-calls"
+  }
+}

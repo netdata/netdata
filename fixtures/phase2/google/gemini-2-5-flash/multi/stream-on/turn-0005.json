@@ -1,0 +1,265 @@
+{
+  "version": 1,
+  "meta": {
+    "provider": "google",
+    "model": "gemini-2.5-flash",
+    "scenarioId": "multi",
+    "scenarioLabel": "multi-turn",
+    "modelLabel": "google/gemini-2.5-flash",
+    "stream": true,
+    "turn": 5,
+    "timestamp": "2025-10-26T20:14:46.263Z"
+  },
+  "request": {
+    "provider": "google",
+    "model": "gemini-2.5-flash",
+    "stream": true,
+    "temperature": 0.7,
+    "topP": 1,
+    "maxOutputTokens": 4096,
+    "reasoningLevel": "high",
+    "reasoningValue": 3276,
+    "parallelToolCalls": true,
+    "isFinalTurn": false,
+    "turn": 3,
+    "messages": [
+      {
+        "role": "system",
+        "content": "1) Call agent__test-agent1 with parameters {\"prompt\":\"run\",\"reason\":\"execute phase two\",\"format\":\"sub-agent\"}. 2) Wait for the response and call agent__test-agent2 with {\"prompt\":<agent1 output>,\"reason\":\"execute phase two\",\"format\":\"sub-agent\"}. 3) Finish by calling agent__final_report(status=\"success\", report_format=\"text\", content=<agent2 output>). Do not emit plain text.\n\n## TOOLS' INSTRUCTIONS\n\n## Available Tools\n\n### Internal Tools\n\n#### agent__progress_report — Progress Updates for the user\n- Use this tool to update the user on your progress.\n- Keep the `progress` message concise (≤20 words).\n- Always pair this tool with other tools you are invoking (except `agent__final_report`).\n- Do not call this tool by itself.\n- Do not pair this tool with `agent__final_report`\n\n#### agent__final_report - Deliver Your Final Answer\n- You MUST call 'agent__final_report' to provide your final answer to the user.\n- Required fields:\n  - `status`: one of `success`, `failure`, `partial`.\n  - `report_format`: \"markdown\".\n  - `report_content`: complete deliverable in the requested format.\n- Include optional `metadata` only when explicitly relevant.\n- After this tool succeeds, do not send additional assistant messages.\n\n*You run in agentic mode, interfacing with software tools.*\n\n**YOU MUST:**\n- **ALWAYS** respond with valid tool calls, even for your final answer.\n- **ALWAYS** provide your final report to the user using the agent__final_report tool, with the correct format.\n**YOU MUST NOT:**\n- Do not provide any other output except calling your tools. Any other output you provide is ignored."
+      },
+      {
+        "role": "user",
+        "content": "Execute agent__test-agent1({\"prompt\":\"run\",\"reason\":\"execute phase two\",\"format\":\"sub-agent\"}), pass its output into agent__test-agent2({\"prompt\":<agent1 output>,\"reason\":\"execute phase two\",\"format\":\"sub-agent\"}), and conclude with agent__final_report(status=\"success\", report_format=\"text\", content=<agent2 output>)."
+      },
+      {
+        "role": "assistant",
+        "content": "",
+        "toolCalls": [
+          {
+            "id": "cf76K4KmG9Z9oJ06",
+            "name": "agent__progress_report",
+            "parameters": {
+              "progress": "Starting phase one with agent__test-agent1."
+            }
+          },
+          {
+            "id": "iZD42lMIUmbPUdeo",
+            "name": "agent__test-agent1",
+            "parameters": {
+              "reason": "execute phase two",
+              "format": "sub-agent",
+              "prompt": "run"
+            }
+          }
+        ],
+        "reasoning": [
+          {
+            "type": "reasoning",
+            "text": "**Planning Tool Execution**\n\nI'm currently focused on sequencing tool calls. The goal is to execute a flow: first `agent__test -agent1` with predefined params, then use its output as input for `agent__test-agent2`. I'm working on how to orchestrate the passing of data between these tools now.\n\n\n**Sequencing Tool Actions**\n\nI've refined the execution plan. After the initial `agent__test -agent1` call (with params `prompt: \"run\"`, `reason: \"execute phase two\"`, `format: \"sub-agent\"`), the output will be fed to `agent__test-agent2`. This second call will use the output as its `prompt` param, keeping the same `reason` and `format`. The ultimate output goes to `agent__final_report`, formatted as `markdown` (resolving the format discrepancy). I'll also incorporate `agent__progress_report` for updates. I must ensure only tool calls are generated."
+          }
+        ],
+        "metadata": {
+          "provider": "google",
+          "model": "gemini-2.5-flash",
+          "tokens": {
+            "inputTokens": 862,
+            "outputTokens": 56,
+            "cachedTokens": 827,
+            "totalTokens": 1330
+          },
+          "timestamp": 1761509663135
+        }
+      },
+      {
+        "role": "tool",
+        "content": "{\"ok\":true}",
+        "toolCallId": "cf76K4KmG9Z9oJ06",
+        "metadata": {
+          "provider": "google",
+          "model": "gemini-2.5-flash",
+          "tokens": {
+            "inputTokens": 862,
+            "outputTokens": 56,
+            "cachedTokens": 827,
+            "totalTokens": 1330
+          },
+          "timestamp": 1761509663135
+        }
+      },
+      {
+        "role": "tool",
+        "content": "phase1 completed, now run agent 2",
+        "toolCallId": "iZD42lMIUmbPUdeo",
+        "metadata": {
+          "provider": "google",
+          "model": "gemini-2.5-flash",
+          "tokens": {
+            "inputTokens": 862,
+            "outputTokens": 56,
+            "cachedTokens": 827,
+            "totalTokens": 1330
+          },
+          "timestamp": 1761509663135
+        }
+      },
+      {
+        "role": "assistant",
+        "content": "",
+        "toolCalls": [
+          {
+            "id": "rGQBesPh4Gw3tWks",
+            "name": "agent__progress_report",
+            "parameters": {
+              "progress": "Executing phase two with agent__test-agent2."
+            }
+          },
+          {
+            "id": "mUUrtQZ4z41htMua",
+            "name": "agent__test-agent2",
+            "parameters": {
+              "prompt": "phase1 completed, now run agent 2",
+              "reason": "execute phase two",
+              "format": "sub-agent"
+            }
+          }
+        ],
+        "reasoning": [
+          {
+            "type": "reasoning",
+            "text": "**Planning Tool Call Sequences**\n\nI'm currently focused on the orchestration of tool calls. The goal is to define a sequential process:  `agent__test-agent1` runs first, its results feed directly into `agent__test-agent2`, and finally, the output from that agent is used by `agent__final_report` to generate the final output.  The plan is to execute this ordered process, with each agent dependent on its predecessor.\n\n\n**Executing The Next Phase**\n\nI've got the first phase results from `agent__test-agent1`. I'm now setting up a call to `agent__test-agent2`.  I'm passing the output from phase one as the prompt, with a reason of \"execute phase two\" and requesting a \"sub-agent\" format. I'm also calling `agent__progress_report` to keep you in the loop."
+          }
+        ],
+        "metadata": {
+          "provider": "google",
+          "model": "gemini-2.5-flash",
+          "tokens": {
+            "inputTokens": 986,
+            "outputTokens": 64,
+            "cachedTokens": 838,
+            "totalTokens": 1219
+          },
+          "timestamp": 1761509684040
+        }
+      },
+      {
+        "role": "tool",
+        "content": "{\"ok\":true}",
+        "toolCallId": "rGQBesPh4Gw3tWks",
+        "metadata": {
+          "provider": "google",
+          "model": "gemini-2.5-flash",
+          "tokens": {
+            "inputTokens": 986,
+            "outputTokens": 64,
+            "cachedTokens": 838,
+            "totalTokens": 1219
+          },
+          "timestamp": 1761509684040
+        }
+      },
+      {
+        "role": "tool",
+        "content": "test completed",
+        "toolCallId": "mUUrtQZ4z41htMua",
+        "metadata": {
+          "provider": "google",
+          "model": "gemini-2.5-flash",
+          "tokens": {
+            "inputTokens": 986,
+            "outputTokens": 64,
+            "cachedTokens": 838,
+            "totalTokens": 1219
+          },
+          "timestamp": 1761509684040
+        }
+      }
+    ],
+    "toolNames": [
+      "agent__progress_report",
+      "agent__final_report",
+      "agent__test-agent1",
+      "agent__test-agent2"
+    ]
+  },
+  "requestHash": "566e838e2525ea903aa2ebcc9c4952776ca59d38abf8b49e19728e8a296e8c97",
+  "result": {
+    "status": {
+      "type": "success",
+      "hasToolCalls": true,
+      "finalAnswer": true
+    },
+    "response": "",
+    "toolCalls": [
+      {
+        "id": "cuqBbbp73UQiBen4",
+        "name": "agent__final_report",
+        "parameters": {
+          "report_format": "markdown",
+          "report_content": "test completed",
+          "status": "success"
+        }
+      }
+    ],
+    "tokens": {
+      "inputTokens": 1111,
+      "outputTokens": 30,
+      "cachedTokens": 847,
+      "cacheReadInputTokens": 847,
+      "totalTokens": 1268
+    },
+    "latencyMs": 2223,
+    "messages": [
+      {
+        "role": "assistant",
+        "content": "",
+        "toolCalls": [
+          {
+            "id": "cuqBbbp73UQiBen4",
+            "name": "agent__final_report",
+            "parameters": {
+              "report_format": "markdown",
+              "report_content": "test completed",
+              "status": "success"
+            }
+          }
+        ],
+        "reasoning": [
+          {
+            "type": "reasoning",
+            "text": "**Completing the Chain**\n\nI've successfully executed `agent__test-agent1` and `agent__test-agent2`. Now I'm on the verge of the final step: initiating `agent__final_report`. The input for that will be the output from `agent__test-agent2`.  I'm ready to move forward, assuming the `report_format` parameter in the prompt has a reasonable format.\n\n\n**Refining the Input**\n\nI'm making a critical adjustment before running `agent__final_report`. I've realized the `report_format` needs to be \"markdown\" for it to function correctly, even though the user initially specified \"text.\"  The content will be the output from `agent__test-agent2`, which is \"test completed\". This should enable the final report generation."
+          }
+        ],
+        "metadata": {
+          "provider": "google",
+          "model": "gemini-2.5-flash",
+          "tokens": {
+            "inputTokens": 1111,
+            "outputTokens": 30,
+            "cachedTokens": 847,
+            "totalTokens": 1268
+          },
+          "timestamp": 1761509686263
+        }
+      },
+      {
+        "role": "tool",
+        "content": "{\"ok\":true}",
+        "toolCallId": "cuqBbbp73UQiBen4",
+        "metadata": {
+          "provider": "google",
+          "model": "gemini-2.5-flash",
+          "tokens": {
+            "inputTokens": 1111,
+            "outputTokens": 30,
+            "cachedTokens": 847,
+            "totalTokens": 1268
+          },
+          "timestamp": 1761509686263
+        }
+      }
+    ],
+    "hasReasoning": true,
+    "hasContent": false,
+    "stopReason": "tool-calls"
+  }
+}

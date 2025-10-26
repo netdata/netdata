@@ -1,0 +1,119 @@
+{
+  "version": 1,
+  "meta": {
+    "provider": "ollama",
+    "model": "gpt-oss:20b",
+    "scenarioId": "basic",
+    "scenarioLabel": "basic-llm",
+    "modelLabel": "ollama/gpt-oss:20b",
+    "stream": true,
+    "turn": 1,
+    "timestamp": "2025-10-26T20:05:12.713Z"
+  },
+  "request": {
+    "provider": "ollama",
+    "model": "gpt-oss:20b",
+    "stream": true,
+    "temperature": 0.7,
+    "topP": 1,
+    "maxOutputTokens": 4096,
+    "reasoningLevel": null,
+    "reasoningValue": null,
+    "parallelToolCalls": true,
+    "isFinalTurn": false,
+    "turn": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "Call agent__final_report with status=\"success\", report_format=\"text\", and content set to the required text. The content must be exactly \"test\".\n\n## TOOLS' INSTRUCTIONS\n\n## Available Tools\n\n### Internal Tools\n\n#### agent__progress_report — Progress Updates for the user\n- Use this tool to update the user on your progress.\n- Keep the `progress` message concise (≤20 words).\n- Always pair this tool with other tools you are invoking (except `agent__final_report`).\n- Do not call this tool by itself.\n- Do not pair this tool with `agent__final_report`\n\n#### agent__final_report - Deliver Your Final Answer\n- You MUST call 'agent__final_report' to provide your final answer to the user.\n- Required fields:\n  - `status`: one of `success`, `failure`, `partial`.\n  - `report_format`: \"markdown\".\n  - `report_content`: complete deliverable in the requested format.\n- Include optional `metadata` only when explicitly relevant.\n- After this tool succeeds, do not send additional assistant messages.\n\n*You run in agentic mode, interfacing with software tools.*\n\n**YOU MUST:**\n- **ALWAYS** respond with valid tool calls, even for your final answer.\n- **ALWAYS** provide your final report to the user using the agent__final_report tool, with the correct format.\n**YOU MUST NOT:**\n- Do not provide any other output except calling your tools. Any other output you provide is ignored."
+      },
+      {
+        "role": "user",
+        "content": "Invoke agent__final_report(status=\"success\", report_format=\"text\", content=\"test\") and produce no other output."
+      }
+    ],
+    "toolNames": [
+      "agent__progress_report",
+      "agent__final_report",
+      "agent__test-agent1",
+      "agent__test-agent2"
+    ]
+  },
+  "requestHash": "6137a6a51323986b64c1b6af7ffc3220ef980de14f2c9ec5c5512e592db6259c",
+  "result": {
+    "status": {
+      "type": "success",
+      "hasToolCalls": true,
+      "finalAnswer": true
+    },
+    "response": "",
+    "toolCalls": [
+      {
+        "id": "4lAAMyLQ7S9gQmg2",
+        "name": "agent__final_report",
+        "parameters": {
+          "report_content": "test",
+          "report_format": "text",
+          "status": "success"
+        }
+      }
+    ],
+    "tokens": {
+      "inputTokens": 720,
+      "outputTokens": 271,
+      "totalTokens": 991
+    },
+    "latencyMs": 2080,
+    "messages": [
+      {
+        "role": "assistant",
+        "content": "",
+        "toolCalls": [
+          {
+            "id": "4lAAMyLQ7S9gQmg2",
+            "name": "agent__final_report",
+            "parameters": {
+              "report_content": "test",
+              "report_format": "text",
+              "status": "success"
+            }
+          }
+        ],
+        "reasoning": [
+          {
+            "type": "reasoning",
+            "text": "The user wants to invoke agent__final_report with status=\"success\", report_format=\"text\", and content=\"test\". But the tool signature for agent__final_report has fields: metadata, report_content, report_format, status. The instruction says \"call agent__final_report with status=\"success\", report_format=\"text\", and content set to the required text. The content must be exactly 'test'.\" So we need to call the tool with those fields. But content vs report_content. The instruction uses \"content\". So we should set report_content to \"test\". We also might need metadata field. The instructions: \"You MUST call 'agent__final_report' to provide your final answer to the user. Required fields: status, report_format, report_content. Include optional metadata only when explicitly relevant.\" So we don't need metadata. So we call agent__final_report with status=\"success\", report_format=\"text\", report_content=\"test\". Also do not produce any other output. So we just need to call the tool. No progress reports. The user explicitly said produce no other output. But we must call the tool. So we produce a tool invocation."
+          }
+        ],
+        "metadata": {
+          "provider": "ollama",
+          "model": "gpt-oss:20b",
+          "tokens": {
+            "inputTokens": 720,
+            "outputTokens": 271,
+            "totalTokens": 991
+          },
+          "timestamp": 1761509112712
+        }
+      },
+      {
+        "role": "tool",
+        "content": "{\"ok\":true}",
+        "toolCallId": "4lAAMyLQ7S9gQmg2",
+        "metadata": {
+          "provider": "ollama",
+          "model": "gpt-oss:20b",
+          "tokens": {
+            "inputTokens": 720,
+            "outputTokens": 271,
+            "totalTokens": 991
+          },
+          "timestamp": 1761509112712
+        }
+      }
+    ],
+    "hasReasoning": true,
+    "hasContent": false,
+    "stopReason": "stop"
+  }
+}

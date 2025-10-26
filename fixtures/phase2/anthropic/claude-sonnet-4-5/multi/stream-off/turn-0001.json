@@ -1,0 +1,122 @@
+{
+  "version": 1,
+  "meta": {
+    "provider": "anthropic",
+    "model": "claude-sonnet-4-5",
+    "scenarioId": "multi",
+    "scenarioLabel": "multi-turn",
+    "modelLabel": "anthropic/claude-sonnet-4-5",
+    "stream": false,
+    "turn": 1,
+    "timestamp": "2025-10-26T20:22:26.720Z"
+  },
+  "request": {
+    "provider": "anthropic",
+    "model": "claude-sonnet-4-5",
+    "stream": false,
+    "temperature": 0.7,
+    "topP": null,
+    "maxOutputTokens": 4096,
+    "reasoningLevel": "high",
+    "reasoningValue": 3276,
+    "parallelToolCalls": true,
+    "isFinalTurn": false,
+    "turn": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "Call agent__final_report with status=\"success\", report_format=\"text\", and content=\"phase1 completed, now run agent 2\".\n\n\n## TOOLS' INSTRUCTIONS\n\n## Available Tools\n\n### Internal Tools\n\n\n#### agent__final_report - Deliver Your Final Answer\n- You MUST call 'agent__final_report' to provide your final answer to the user.\n- Required fields:\n  - `status`: one of `success`, `failure`, `partial`.\n  - `report_format`: \"markdown\".\n  - `report_content`: complete deliverable in the requested format.\n- Include optional `metadata` only when explicitly relevant.\n- After this tool succeeds, do not send additional assistant messages.\n\n*You run in agentic mode, interfacing with software tools.*\n\n**YOU MUST:**\n- **ALWAYS** respond with valid tool calls, even for your final answer.\n- **ALWAYS** provide your final report to the user using the agent__final_report tool, with the correct format.\n**YOU MUST NOT:**\n- Do not provide any other output except calling your tools. Any other output you provide is ignored."
+      },
+      {
+        "role": "user",
+        "content": "{\"prompt\":\"run\",\"reason\":\"execute phase two\",\"format\":\"sub-agent\"}"
+      }
+    ],
+    "toolNames": [
+      "agent__final_report"
+    ]
+  },
+  "requestHash": "22891f34e516e87e19bd5dda40f2f5f131112aa188a27ad8e559534e9f6d6862",
+  "result": {
+    "status": {
+      "type": "success",
+      "hasToolCalls": true,
+      "finalAnswer": true
+    },
+    "response": "",
+    "toolCalls": [
+      {
+        "id": "toolu_0129VL8LkW2VJFCie44p5wgc",
+        "name": "agent__final_report",
+        "parameters": {
+          "status": "success",
+          "report_format": "markdown",
+          "report_content": "phase1 completed, now run agent 2"
+        }
+      }
+    ],
+    "tokens": {
+      "inputTokens": 990,
+      "outputTokens": 326,
+      "totalTokens": 1316
+    },
+    "latencyMs": 6141,
+    "messages": [
+      {
+        "role": "assistant",
+        "content": "",
+        "toolCalls": [
+          {
+            "id": "toolu_0129VL8LkW2VJFCie44p5wgc",
+            "name": "agent__final_report",
+            "parameters": {
+              "status": "success",
+              "report_format": "markdown",
+              "report_content": "phase1 completed, now run agent 2"
+            }
+          }
+        ],
+        "reasoning": [
+          {
+            "type": "reasoning",
+            "text": "The user is asking me to \"run\" with a reason of \"execute phase two\" and format is \"sub-agent\". However, looking at the instructions, I'm told to call agent__final_report with specific parameters:\n\n- status=\"success\"\n- report_format=\"text\" (but wait, the schema says it must be \"markdown\" with a const value)\n- content=\"phase1 completed, now run agent 2\"\n\nBut there's a conflict here. The instructions say to use report_format=\"text\", but the schema for agent__final_report has:\n```\n\"report_format\": {\"const\": \"markdown\", \"description\": \"Render the final report in GitHub Markdown.\", \"type\": \"string\"}\n```\n\nSo it must be \"markdown\". I'll follow the schema requirement and use \"markdown\" as the report_format.\n\nThe content should be \"phase1 completed, now run agent 2\" based on the instructions.\n\nThe status should be \"success\".",
+            "providerMetadata": {
+              "anthropic": {
+                "signature": "EuMHCkYICRgCKkBqMAcOo4dc7/vtVQdqfJwrFssWFsfhbJhVf/sFei5hPFpj7Xg55+2r8SRZh41ZkiV7B+O55x6nFXvJ0qhYVXhKEgxYOyfM5AfrSLYrQp4aDINlT1yJ3h7+ttJDJyIwwZiaeICMiuB85sSBt0cS1PA6s1s0zicvKjtBC/qElPG+Muf1tG1o3kPykGVXFWKuKsoGXUEVBMfTmopEV8zMKSbBeUX1nMlzDtwXFMhoavNGG8hm0QHiTTsnmfEUefbEVsX2/j/nS2XZ17QWoQcTXTSDkvezT8QY9ncko8UpR2hPnb3DEvLytIWPXtIPe5qIyXNXBJpfECjRwYOu1UFNjA1miq1lnnU+W2wusg7Se4TNuoYnBVAYBZr+k3LZsdkK2GxKfysb3CFHzdz0hqVPKac4YK5WwtgovAgkIRmrLFYVp34VLWGqVfP6hcTNVI5ayjOY+FpjmH3vrIstWn+3pa/lOe/VOFPhDcDIai748Rdo68vU8eQYLWvl6njKEb+giEIBRYpD0I2HKTVjA0brJDbERu+8h0cDugkGOQX9lyvhpBE7ryJv3Opuh7UqcrEWnPppMb/WWHjbBeoWk8JTEnjQ8iCx9A+INXbI6kclUBZ8zGu7tND8wQg47jNCUYt6wy1ly0zavD36LD51pSQc4bVtgWM/P86772klRuUcKhin4jWuJg1YABtpbM4k8O2zDq2HQIesFdcqetBLVKgEKj7IwZ987zlQES6NQQjauuqntkIQLZpF7mmnSZwZwA+2dXASTokxDsViCdjBJdAhfo1/BQKr73O6zt8kc93tLh6Fc6I3n+vYO7lEeBvwuOB0JGwGI9PdEk/Zw3uWvK1Oj/UOX4icIN+7tDEvdxnGy34Xum/+OaRMzGsEcBM7N57cwSGhh3z6TWY14mH6OpB7795zdC1dfrkyH8ihD1pBTXwJAqls3GmUhqFQ7eJUjRr1j+50Ui4bVSpq6jQFqV4l2LzDdO30szSg71AEsEvnoMWd1RWtwg60MUJx65/MSVokbZqCTgbUsMxbU5WdmL6NlHsGwKMqiWu4g/5c/If6OAeWdMzJWw0+yB5EQtU71UYNxJ1Llfo9+fgHtpfKne8t9AToli3KzYL+dj69WWld/Lhv2IBTS55HvqZfFTLNC1t3vfc+CfbjntlT/FBw3cxJFNeQ3GPVfeyBNb3o51kBYNYVMMsVG8Kf7bCR4jrhR3oWL+knhHquvkUgGzfRzJRFpH5FN9DkqUlnnEz0rYo+IKbqUFRALw7VKotbXoyM5GQUmn8mCfUgxzrEd4o2ImRH7TWWiohm005tKoaK6UEYAQ=="
+              }
+            },
+            "signature": "EuMHCkYICRgCKkBqMAcOo4dc7/vtVQdqfJwrFssWFsfhbJhVf/sFei5hPFpj7Xg55+2r8SRZh41ZkiV7B+O55x6nFXvJ0qhYVXhKEgxYOyfM5AfrSLYrQp4aDINlT1yJ3h7+ttJDJyIwwZiaeICMiuB85sSBt0cS1PA6s1s0zicvKjtBC/qElPG+Muf1tG1o3kPykGVXFWKuKsoGXUEVBMfTmopEV8zMKSbBeUX1nMlzDtwXFMhoavNGG8hm0QHiTTsnmfEUefbEVsX2/j/nS2XZ17QWoQcTXTSDkvezT8QY9ncko8UpR2hPnb3DEvLytIWPXtIPe5qIyXNXBJpfECjRwYOu1UFNjA1miq1lnnU+W2wusg7Se4TNuoYnBVAYBZr+k3LZsdkK2GxKfysb3CFHzdz0hqVPKac4YK5WwtgovAgkIRmrLFYVp34VLWGqVfP6hcTNVI5ayjOY+FpjmH3vrIstWn+3pa/lOe/VOFPhDcDIai748Rdo68vU8eQYLWvl6njKEb+giEIBRYpD0I2HKTVjA0brJDbERu+8h0cDugkGOQX9lyvhpBE7ryJv3Opuh7UqcrEWnPppMb/WWHjbBeoWk8JTEnjQ8iCx9A+INXbI6kclUBZ8zGu7tND8wQg47jNCUYt6wy1ly0zavD36LD51pSQc4bVtgWM/P86772klRuUcKhin4jWuJg1YABtpbM4k8O2zDq2HQIesFdcqetBLVKgEKj7IwZ987zlQES6NQQjauuqntkIQLZpF7mmnSZwZwA+2dXASTokxDsViCdjBJdAhfo1/BQKr73O6zt8kc93tLh6Fc6I3n+vYO7lEeBvwuOB0JGwGI9PdEk/Zw3uWvK1Oj/UOX4icIN+7tDEvdxnGy34Xum/+OaRMzGsEcBM7N57cwSGhh3z6TWY14mH6OpB7795zdC1dfrkyH8ihD1pBTXwJAqls3GmUhqFQ7eJUjRr1j+50Ui4bVSpq6jQFqV4l2LzDdO30szSg71AEsEvnoMWd1RWtwg60MUJx65/MSVokbZqCTgbUsMxbU5WdmL6NlHsGwKMqiWu4g/5c/If6OAeWdMzJWw0+yB5EQtU71UYNxJ1Llfo9+fgHtpfKne8t9AToli3KzYL+dj69WWld/Lhv2IBTS55HvqZfFTLNC1t3vfc+CfbjntlT/FBw3cxJFNeQ3GPVfeyBNb3o51kBYNYVMMsVG8Kf7bCR4jrhR3oWL+knhHquvkUgGzfRzJRFpH5FN9DkqUlnnEz0rYo+IKbqUFRALw7VKotbXoyM5GQUmn8mCfUgxzrEd4o2ImRH7TWWiohm005tKoaK6UEYAQ=="
+          }
+        ],
+        "metadata": {
+          "provider": "anthropic",
+          "model": "claude-sonnet-4-5",
+          "tokens": {
+            "inputTokens": 990,
+            "outputTokens": 326,
+            "totalTokens": 1316
+          },
+          "timestamp": 1761510146720
+        }
+      },
+      {
+        "role": "tool",
+        "content": "{\"ok\":true}",
+        "toolCallId": "toolu_0129VL8LkW2VJFCie44p5wgc",
+        "metadata": {
+          "provider": "anthropic",
+          "model": "claude-sonnet-4-5",
+          "tokens": {
+            "inputTokens": 990,
+            "outputTokens": 326,
+            "totalTokens": 1316
+          },
+          "timestamp": 1761510146720
+        }
+      }
+    ],
+    "hasReasoning": true,
+    "hasContent": false,
+    "stopReason": "tool-calls"
+  }
+}

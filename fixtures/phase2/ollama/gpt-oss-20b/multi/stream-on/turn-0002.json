@@ -1,0 +1,119 @@
+{
+  "version": 1,
+  "meta": {
+    "provider": "ollama",
+    "model": "gpt-oss:20b",
+    "scenarioId": "multi",
+    "scenarioLabel": "multi-turn",
+    "modelLabel": "ollama/gpt-oss:20b",
+    "stream": true,
+    "turn": 2,
+    "timestamp": "2025-10-26T20:05:28.919Z"
+  },
+  "request": {
+    "provider": "ollama",
+    "model": "gpt-oss:20b",
+    "stream": true,
+    "temperature": 0.7,
+    "topP": 1,
+    "maxOutputTokens": 4096,
+    "reasoningLevel": "high",
+    "reasoningValue": null,
+    "parallelToolCalls": true,
+    "isFinalTurn": false,
+    "turn": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "1) Call agent__test-agent1 with parameters {\"prompt\":\"run\",\"reason\":\"execute phase two\",\"format\":\"sub-agent\"}. 2) Wait for the response and call agent__test-agent2 with {\"prompt\":<agent1 output>,\"reason\":\"execute phase two\",\"format\":\"sub-agent\"}. 3) Finish by calling agent__final_report(status=\"success\", report_format=\"text\", content=<agent2 output>). Do not emit plain text.\n\n## TOOLS' INSTRUCTIONS\n\n## Available Tools\n\n### Internal Tools\n\n#### agent__progress_report — Progress Updates for the user\n- Use this tool to update the user on your progress.\n- Keep the `progress` message concise (≤20 words).\n- Always pair this tool with other tools you are invoking (except `agent__final_report`).\n- Do not call this tool by itself.\n- Do not pair this tool with `agent__final_report`\n\n#### agent__final_report - Deliver Your Final Answer\n- You MUST call 'agent__final_report' to provide your final answer to the user.\n- Required fields:\n  - `status`: one of `success`, `failure`, `partial`.\n  - `report_format`: \"markdown\".\n  - `report_content`: complete deliverable in the requested format.\n- Include optional `metadata` only when explicitly relevant.\n- After this tool succeeds, do not send additional assistant messages.\n\n*You run in agentic mode, interfacing with software tools.*\n\n**YOU MUST:**\n- **ALWAYS** respond with valid tool calls, even for your final answer.\n- **ALWAYS** provide your final report to the user using the agent__final_report tool, with the correct format.\n**YOU MUST NOT:**\n- Do not provide any other output except calling your tools. Any other output you provide is ignored."
+      },
+      {
+        "role": "user",
+        "content": "Execute agent__test-agent1({\"prompt\":\"run\",\"reason\":\"execute phase two\",\"format\":\"sub-agent\"}), pass its output into agent__test-agent2({\"prompt\":<agent1 output>,\"reason\":\"execute phase two\",\"format\":\"sub-agent\"}), and conclude with agent__final_report(status=\"success\", report_format=\"text\", content=<agent2 output>)."
+      }
+    ],
+    "toolNames": [
+      "agent__progress_report",
+      "agent__final_report",
+      "agent__test-agent1",
+      "agent__test-agent2"
+    ]
+  },
+  "requestHash": "420bbc63fef28f73cbca1d87abf39951d79bfddf46c22435d281e46cd8677ed3",
+  "result": {
+    "status": {
+      "type": "success",
+      "hasToolCalls": true,
+      "finalAnswer": false
+    },
+    "response": "",
+    "toolCalls": [
+      {
+        "id": "3FYRABZRxn25WFbD",
+        "name": "agent__test-agent1",
+        "parameters": {
+          "format": "sub-agent",
+          "prompt": "run",
+          "reason": "execute phase two"
+        }
+      }
+    ],
+    "tokens": {
+      "inputTokens": 834,
+      "outputTokens": 494,
+      "totalTokens": 1328
+    },
+    "latencyMs": 8065,
+    "messages": [
+      {
+        "role": "assistant",
+        "content": "",
+        "toolCalls": [
+          {
+            "id": "3FYRABZRxn25WFbD",
+            "name": "agent__test-agent1",
+            "parameters": {
+              "format": "sub-agent",
+              "prompt": "run",
+              "reason": "execute phase two"
+            }
+          }
+        ],
+        "reasoning": [
+          {
+            "type": "reasoning",
+            "text": "We need to follow instructions: 1) Call agent__test-agent1 with parameters {\"prompt\":\"run\",\"reason\":\"execute phase two\",\"format\":\"sub-agent\"}. Then wait for response, then call agent__test-agent2 with {\"prompt\":<agent1 output>,\"reason\":\"execute phase two\",\"format\":\"sub-agent\"}. Then finish by calling agent__final_report(status=\"success\", report_format=\"text\", content=<agent2 output>).\n\nWe must not emit any other text. We must call the tools. So first tool call: agent__test-agent1. Then once we get the response, we will call agent__test-agent2 with prompt set to the output from agent1. Then we call agent__final_report. But the final tool requires fields: metadata, report_content, report_format, status. Actually the instructions: agent__final_report(status=\"success\", report_format=\"text\", content=<agent2 output>) but the tool signature requires metadata, report_content, report_format, status. So we need to pass metadata optional. We can supply empty object for metadata. The report_content should be the output of agent2. So we need to keep the output of agent2. But we don't know it until we get response. We will do chain.\n\nWe must only respond with tool calls. No text. So we produce first tool call. Then upon receiving the tool response, we produce next tool call. The platform will handle chaining.\n\nThus produce:\n\n{\n  \"name\": \"agent__test-agent1\",\n  \"arguments\": {\"prompt\":\"run\",\"reason\":\"execute phase two\",\"format\":\"sub-agent\"}\n}\n\nWait for response.\n\nThen produce:\n\n{\n  \"name\": \"agent__test-agent2\",\n  \"arguments\": {\"prompt\":<agent1 output>,\"reason\":\"execute phase two\",\"format\":\"sub-agent\"}\n}\n\nThen produce:\n\n{\n  \"name\":\"agent__final_report\",\n  \"arguments\": {\"metadata\":{},\"report_content\":<agent2 output>,\"report_format\":\"text\",\"status\":\"success\"}\n}\n\nEnsure proper JSON.\n\nThus we only output tool calls. According to the system, we can't include explanatory text. So we must output the tool calls in JSON format.\n\nWe need to produce first call."
+          }
+        ],
+        "metadata": {
+          "provider": "ollama",
+          "model": "gpt-oss:20b",
+          "tokens": {
+            "inputTokens": 834,
+            "outputTokens": 494,
+            "totalTokens": 1328
+          },
+          "timestamp": 1761509128919
+        }
+      },
+      {
+        "role": "tool",
+        "content": "phase1 completed, now run agent 2",
+        "toolCallId": "3FYRABZRxn25WFbD",
+        "metadata": {
+          "provider": "ollama",
+          "model": "gpt-oss:20b",
+          "tokens": {
+            "inputTokens": 834,
+            "outputTokens": 494,
+            "totalTokens": 1328
+          },
+          "timestamp": 1761509128919
+        }
+      }
+    ],
+    "hasReasoning": true,
+    "hasContent": false,
+    "stopReason": "stop"
+  }
+}

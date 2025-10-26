@@ -1,0 +1,247 @@
+{
+  "version": 1,
+  "meta": {
+    "provider": "openrouter",
+    "model": "x-ai/grok-code-fast-1",
+    "scenarioId": "multi",
+    "scenarioLabel": "multi-turn",
+    "modelLabel": "openrouter/x-ai/grok-code-fast-1",
+    "stream": true,
+    "turn": 5,
+    "timestamp": "2025-10-26T20:07:12.739Z"
+  },
+  "request": {
+    "provider": "openrouter",
+    "model": "x-ai/grok-code-fast-1",
+    "stream": true,
+    "temperature": 0.7,
+    "topP": 1,
+    "maxOutputTokens": 4096,
+    "reasoningLevel": "high",
+    "reasoningValue": "high",
+    "parallelToolCalls": true,
+    "isFinalTurn": false,
+    "turn": 3,
+    "messages": [
+      {
+        "role": "system",
+        "content": "1) Call agent__test-agent1 with parameters {\"prompt\":\"run\",\"reason\":\"execute phase two\",\"format\":\"sub-agent\"}. 2) Wait for the response and call agent__test-agent2 with {\"prompt\":<agent1 output>,\"reason\":\"execute phase two\",\"format\":\"sub-agent\"}. 3) Finish by calling agent__final_report(status=\"success\", report_format=\"text\", content=<agent2 output>). Do not emit plain text.\n\n## TOOLS' INSTRUCTIONS\n\n## Available Tools\n\n### Internal Tools\n\n#### agent__progress_report — Progress Updates for the user\n- Use this tool to update the user on your progress.\n- Keep the `progress` message concise (≤20 words).\n- Always pair this tool with other tools you are invoking (except `agent__final_report`).\n- Do not call this tool by itself.\n- Do not pair this tool with `agent__final_report`\n\n#### agent__final_report - Deliver Your Final Answer\n- You MUST call 'agent__final_report' to provide your final answer to the user.\n- Required fields:\n  - `status`: one of `success`, `failure`, `partial`.\n  - `report_format`: \"markdown\".\n  - `report_content`: complete deliverable in the requested format.\n- Include optional `metadata` only when explicitly relevant.\n- After this tool succeeds, do not send additional assistant messages.\n\n*You run in agentic mode, interfacing with software tools.*\n\n**YOU MUST:**\n- **ALWAYS** respond with valid tool calls, even for your final answer.\n- **ALWAYS** provide your final report to the user using the agent__final_report tool, with the correct format.\n**YOU MUST NOT:**\n- Do not provide any other output except calling your tools. Any other output you provide is ignored."
+      },
+      {
+        "role": "user",
+        "content": "Execute agent__test-agent1({\"prompt\":\"run\",\"reason\":\"execute phase two\",\"format\":\"sub-agent\"}), pass its output into agent__test-agent2({\"prompt\":<agent1 output>,\"reason\":\"execute phase two\",\"format\":\"sub-agent\"}), and conclude with agent__final_report(status=\"success\", report_format=\"text\", content=<agent2 output>)."
+      },
+      {
+        "role": "assistant",
+        "content": "",
+        "toolCalls": [
+          {
+            "id": "call_89458490",
+            "name": "agent__test-agent1",
+            "parameters": {
+              "prompt": "run",
+              "format": "sub-agent",
+              "reason": "execute phase two"
+            }
+          }
+        ],
+        "reasoning": [
+          {
+            "type": "reasoning",
+            "text": "First, the user wants me to execute agent__test-agent1 with specific parameters: {\"prompt\":\"run\",\"reason\":\"execute phase two\",\"format\":\"sub-agent\"}.\n\n\n## Executing Agent Task  \n- The task involves running agent__test-agent1 with parameters: {\"prompt\":\"run\",\"reason\":\"execute phase two\",\"format\":\"sub-agent\"}.  \n- The output from this execution will serve as the prompt for the next step.\n\n## Preparing Next Steps  \n- The next task is to run agent__test-agent2 with parameters: {\"prompt\":<agent1 output>,\"reason\":\"execute phase two\",\"format\":\"sub-agent\"}.[REDACTED]"
+          }
+        ],
+        "metadata": {
+          "provider": "openrouter",
+          "model": "x-ai/grok-code-fast-1",
+          "tokens": {
+            "inputTokens": 1233,
+            "outputTokens": 528,
+            "cachedTokens": 768,
+            "totalTokens": 1761
+          },
+          "timestamp": 1761509218665
+        }
+      },
+      {
+        "role": "tool",
+        "content": "# Phase Two Execution Report\n\n## Status\nPhase two has been successfully executed as a sub-agent.\n\n## Details\n- **Prompt**: run\n- **Format**: sub-agent\n- **Reason**: execute phase two\n\nThe sub-agent completed its tasks without issues.\n\n## Next Steps\nProceed to phase three if applicable.",
+        "toolCallId": "call_89458490",
+        "metadata": {
+          "provider": "openrouter",
+          "model": "x-ai/grok-code-fast-1",
+          "tokens": {
+            "inputTokens": 1233,
+            "outputTokens": 528,
+            "cachedTokens": 768,
+            "totalTokens": 1761
+          },
+          "timestamp": 1761509218665
+        }
+      },
+      {
+        "role": "assistant",
+        "content": "",
+        "toolCalls": [
+          {
+            "id": "call_77202535",
+            "name": "agent__progress_report",
+            "parameters": {
+              "progress": "Calling agent 2 with phase 1 output"
+            }
+          },
+          {
+            "id": "call_07950200",
+            "name": "agent__test-agent2",
+            "parameters": {
+              "prompt": "# Phase Two Execution Report\n\n## Status\nPhase two has been successfully executed as a sub-agent.\n\n## Details\n- **Prompt**: run\n- **Format**: sub-agent\n- **Reason**: execute phase two\n\nThe sub-agent completed its tasks without issues.\n\n## Next Steps\nProceed to phase three if applicable.",
+              "format": "sub-agent",
+              "reason": "execute phase two"
+            }
+          }
+        ],
+        "reasoning": [
+          {
+            "type": "reasoning",
+            "text": "First, the instructions: 1) Call agent__test-agent1 with parameters {\"prompt\":\"run\",\"reason\":\"execute phase two\",\"format\":\"sub-agent\"}. 2) Wait for the response and call agent__test-agent2 with {\"prompt\":<agent1 output>,\"reason\":\"execute phase two\",\"format\":\"sub-agent\"}. 3) Finish by calling agent__final_report(status=\"success\", report_format=\"text\", content=<agent2 output>). Do not emit plain text.\n\n\n## Initiating Agent Sequence  \n- The process starts by calling agent__test-agent1 with parameters: prompt \"run,\" reason \"execute phase two,\" and format \"sub-agent.\"  \n- This initial step sets up the execution of phase two, ensuring the agent is ready to handle subsequent tasks.  \n- The system waits for the response from agent__test-agent1 before proceeding.  \n\n## Processing Agent Output  \n- After receiving the output from agent__test-agent1, call agent__test-agent2 with the same reason \"execute phase two\" and format \"sub-agent.\"  \n- The prompt for agent__test-agent2 is dynamically set to the output from agent__test-agent1, ensuring continuity.[REDACTED]"
+          }
+        ],
+        "metadata": {
+          "provider": "openrouter",
+          "model": "x-ai/grok-code-fast-1",
+          "tokens": {
+            "inputTokens": 1358,
+            "outputTokens": 849,
+            "cachedTokens": 1280,
+            "totalTokens": 2207
+          },
+          "timestamp": 1761509229562
+        }
+      },
+      {
+        "role": "tool",
+        "content": "{\"ok\":true}",
+        "toolCallId": "call_77202535",
+        "metadata": {
+          "provider": "openrouter",
+          "model": "x-ai/grok-code-fast-1",
+          "tokens": {
+            "inputTokens": 1358,
+            "outputTokens": 849,
+            "cachedTokens": 1280,
+            "totalTokens": 2207
+          },
+          "timestamp": 1761509229562
+        }
+      },
+      {
+        "role": "tool",
+        "content": "# Phase Two Execution Report\n\n## Status\nPhase two has been successfully executed as a sub-agent.\n\n## Details\n- **Prompt**: run\n- **Format**: sub-agent\n- **Reason**: execute phase two\n\nThe sub-agent completed its tasks without issues.\n\n## Next Steps\nProceed to phase three if applicable.",
+        "toolCallId": "call_07950200",
+        "metadata": {
+          "provider": "openrouter",
+          "model": "x-ai/grok-code-fast-1",
+          "tokens": {
+            "inputTokens": 1358,
+            "outputTokens": 849,
+            "cachedTokens": 1280,
+            "totalTokens": 2207
+          },
+          "timestamp": 1761509229562
+        }
+      }
+    ],
+    "toolNames": [
+      "agent__progress_report",
+      "agent__final_report",
+      "agent__test-agent1",
+      "agent__test-agent2"
+    ]
+  },
+  "requestHash": "5d68341467acc7616b744525a0c6f2870535424e355501788a044375468e0937",
+  "result": {
+    "status": {
+      "type": "success",
+      "hasToolCalls": true,
+      "finalAnswer": true
+    },
+    "response": "",
+    "toolCalls": [
+      {
+        "id": "call_06437644",
+        "name": "agent__final_report",
+        "parameters": {
+          "status": "success",
+          "report_format": "markdown",
+          "report_content": "{\"ok\":true}\n\n# Phase Two Execution Report\n\n## Status\nPhase two has been successfully executed as a sub-agent.\n\n## Details\n- **Prompt**: run\n- **Format**: sub-agent\n- **Reason**: execute phase two\n\nThe sub-agent completed its tasks without issues.\n\n## Next Steps\nProceed to phase three if applicable."
+        }
+      }
+    ],
+    "tokens": {
+      "inputTokens": 1585,
+      "outputTokens": 431,
+      "cachedTokens": 1344,
+      "cacheReadInputTokens": 1344,
+      "totalTokens": 2016
+    },
+    "latencyMs": 3176,
+    "messages": [
+      {
+        "role": "assistant",
+        "content": "",
+        "toolCalls": [
+          {
+            "id": "call_06437644",
+            "name": "agent__final_report",
+            "parameters": {
+              "status": "success",
+              "report_format": "markdown",
+              "report_content": "{\"ok\":true}\n\n# Phase Two Execution Report\n\n## Status\nPhase two has been successfully executed as a sub-agent.\n\n## Details\n- **Prompt**: run\n- **Format**: sub-agent\n- **Reason**: execute phase two\n\nThe sub-agent completed its tasks without issues.\n\n## Next Steps\nProceed to phase three if applicable."
+            }
+          }
+        ],
+        "reasoning": [
+          {
+            "type": "reasoning",
+            "text": "First, the user instructed: Execute agent__test-agent1 with specific params, pass its output to agent__test-agent2, then conclude with agent__final_report where content is the agent2 output.\n\n\n## Processing user instructions  \n- The user requested executing agent__test-agent1 with specific parameters and passing its output to agent__test-agent2.[REDACTED]"
+          }
+        ],
+        "metadata": {
+          "provider": "openrouter",
+          "model": "x-ai/grok-code-fast-1",
+          "tokens": {
+            "inputTokens": 1585,
+            "outputTokens": 431,
+            "cachedTokens": 1344,
+            "totalTokens": 2016
+          },
+          "timestamp": 1761509232739
+        }
+      },
+      {
+        "role": "tool",
+        "content": "{\"ok\":true}",
+        "toolCallId": "call_06437644",
+        "metadata": {
+          "provider": "openrouter",
+          "model": "x-ai/grok-code-fast-1",
+          "tokens": {
+            "inputTokens": 1585,
+            "outputTokens": 431,
+            "cachedTokens": 1344,
+            "totalTokens": 2016
+          },
+          "timestamp": 1761509232739
+        }
+      }
+    ],
+    "hasReasoning": true,
+    "hasContent": false,
+    "stopReason": "tool-calls",
+    "providerMetadata": {
+      "actualProvider": "xAI",
+      "actualModel": "x-ai/grok-code-fast-1",
+      "reportedCostUsd": 0.00072158
+    }
+  }
+}

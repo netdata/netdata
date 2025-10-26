@@ -1,0 +1,116 @@
+{
+  "version": 1,
+  "meta": {
+    "provider": "google",
+    "model": "gemini-2.5-pro",
+    "scenarioId": "multi",
+    "scenarioLabel": "multi-turn",
+    "modelLabel": "google/gemini-2.5-pro",
+    "stream": true,
+    "turn": 1,
+    "timestamp": "2025-10-26T20:21:36.618Z"
+  },
+  "request": {
+    "provider": "google",
+    "model": "gemini-2.5-pro",
+    "stream": false,
+    "temperature": 0.7,
+    "topP": 1,
+    "maxOutputTokens": 4096,
+    "reasoningLevel": "high",
+    "reasoningValue": 3276,
+    "parallelToolCalls": true,
+    "isFinalTurn": false,
+    "turn": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "Call agent__final_report with status=\"success\", report_format=\"text\", and content=\"phase1 completed, now run agent 2\".\n\n\n## TOOLS' INSTRUCTIONS\n\n## Available Tools\n\n### Internal Tools\n\n\n#### agent__final_report - Deliver Your Final Answer\n- You MUST call 'agent__final_report' to provide your final answer to the user.\n- Required fields:\n  - `status`: one of `success`, `failure`, `partial`.\n  - `report_format`: \"markdown\".\n  - `report_content`: complete deliverable in the requested format.\n- Include optional `metadata` only when explicitly relevant.\n- After this tool succeeds, do not send additional assistant messages.\n\n*You run in agentic mode, interfacing with software tools.*\n\n**YOU MUST:**\n- **ALWAYS** respond with valid tool calls, even for your final answer.\n- **ALWAYS** provide your final report to the user using the agent__final_report tool, with the correct format.\n**YOU MUST NOT:**\n- Do not provide any other output except calling your tools. Any other output you provide is ignored."
+      },
+      {
+        "role": "user",
+        "content": "{\"reason\":\"execute phase two\",\"prompt\":\"run\",\"format\":\"sub-agent\"}"
+      }
+    ],
+    "toolNames": [
+      "agent__final_report"
+    ]
+  },
+  "requestHash": "e31f5ffb968e0d09b5302b3c5cc5faab9a1fea24527ed1290cea8b8fb3f94517",
+  "result": {
+    "status": {
+      "type": "success",
+      "hasToolCalls": true,
+      "finalAnswer": true
+    },
+    "response": "",
+    "toolCalls": [
+      {
+        "id": "vXLKvJ4fOzFUiY7D",
+        "name": "agent__final_report",
+        "parameters": {
+          "status": "success",
+          "report_content": "phase1 completed, now run agent 2",
+          "report_format": "markdown"
+        }
+      }
+    ],
+    "tokens": {
+      "inputTokens": 379,
+      "outputTokens": 39,
+      "totalTokens": 1076
+    },
+    "latencyMs": 8264,
+    "messages": [
+      {
+        "role": "assistant",
+        "content": "",
+        "toolCalls": [
+          {
+            "id": "vXLKvJ4fOzFUiY7D",
+            "name": "agent__final_report",
+            "parameters": {
+              "status": "success",
+              "report_content": "phase1 completed, now run agent 2",
+              "report_format": "markdown"
+            }
+          }
+        ],
+        "reasoning": [
+          {
+            "type": "reasoning",
+            "text": "**My Interpretation of the User's Intent**\n\nOkay, I've got it. The user has given me a simple command: \"run,\" along with the format \"sub-agent\" and the reason \"execute phase two.\"  This strongly suggests I'm being asked to execute a sub-process, specifically to move on to Phase Two.  They aren't giving me specific instructions beyond that, so I'll interpret this as a directive to initiate the next stage.\n\nSince I need to report my progress, and a final report is expected, I'll need to use the `agent__final_report` tool. I need to make sure I use it correctly, given the parameters specified. The user did specify `content` but the available tool uses `report_content` so I need to translate to that parameter. The user did specify `text` but the `report_format` enum only has \"markdown\" available so I'll need to use \"markdown\".  Therefore, I'll call `agent__final_report` with `status=\"success\"`, `report_format=\"markdown\"`, and `report_content=\"phase1 completed, now run agent 2\"`. This seems the most logical and appropriate action based on the information provided. I believe this precisely aligns with the user's intent to transition to Phase Two and keep them informed. I will now proceed to call the tool."
+          }
+        ],
+        "metadata": {
+          "provider": "google",
+          "model": "gemini-2.5-pro",
+          "tokens": {
+            "inputTokens": 379,
+            "outputTokens": 39,
+            "totalTokens": 1076
+          },
+          "timestamp": 1761510096617
+        }
+      },
+      {
+        "role": "tool",
+        "content": "{\"ok\":true}",
+        "toolCallId": "vXLKvJ4fOzFUiY7D",
+        "metadata": {
+          "provider": "google",
+          "model": "gemini-2.5-pro",
+          "tokens": {
+            "inputTokens": 379,
+            "outputTokens": 39,
+            "totalTokens": 1076
+          },
+          "timestamp": 1761510096617
+        }
+      }
+    ],
+    "hasReasoning": true,
+    "hasContent": false,
+    "stopReason": "tool-calls"
+  }
+}

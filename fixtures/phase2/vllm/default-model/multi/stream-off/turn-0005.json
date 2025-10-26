@@ -8,7 +8,7 @@
     "modelLabel": "vllm/default-model",
     "stream": false,
     "turn": 5,
-    "timestamp": "2025-10-26T11:40:29.336Z"
+    "timestamp": "2025-10-26T20:24:12.438Z"
   },
   "request": {
     "provider": "vllm",
@@ -21,7 +21,7 @@
     "reasoningValue": "high",
     "parallelToolCalls": true,
     "isFinalTurn": false,
-    "turn": 4,
+    "turn": 3,
     "messages": [
       {
         "role": "system",
@@ -36,50 +36,12 @@
         "content": "",
         "toolCalls": [
           {
-            "id": "chatcmpl-tool-baf1ee14859a409db1cf1b365700255f",
-            "name": "agent__progress_report",
-            "parameters": {
-              "progress": "Running test-agent1"
-            }
-          }
-        ],
-        "metadata": {
-          "provider": "vllm",
-          "model": "default-model",
-          "tokens": {
-            "inputTokens": 835,
-            "outputTokens": 1577,
-            "totalTokens": 2412
-          },
-          "timestamp": 1761478810601
-        }
-      },
-      {
-        "role": "tool",
-        "content": "{\"ok\":true}",
-        "toolCallId": "chatcmpl-tool-baf1ee14859a409db1cf1b365700255f",
-        "metadata": {
-          "provider": "vllm",
-          "model": "default-model",
-          "tokens": {
-            "inputTokens": 835,
-            "outputTokens": 1577,
-            "totalTokens": 2412
-          },
-          "timestamp": 1761478810601
-        }
-      },
-      {
-        "role": "assistant",
-        "content": "",
-        "toolCalls": [
-          {
-            "id": "chatcmpl-tool-8fff68d3f181493a88d2480a5dc82dd8",
+            "id": "chatcmpl-tool-182e95fa9087402bb6991c2117bb8f9a",
             "name": "agent__test-agent1",
             "parameters": {
               "prompt": "run",
-              "format": "sub-agent",
-              "reason": "execute phase two"
+              "reason": "execute phase two",
+              "format": "sub-agent"
             }
           }
         ],
@@ -87,26 +49,26 @@
           "provider": "vllm",
           "model": "default-model",
           "tokens": {
-            "inputTokens": 871,
-            "outputTokens": 1784,
-            "totalTokens": 2655
+            "inputTokens": 835,
+            "outputTokens": 3354,
+            "totalTokens": 4189
           },
-          "timestamp": 1761478823687
+          "timestamp": 1761510233091
         }
       },
       {
         "role": "tool",
-        "content": "phase1 completed, now run agent 2",
-        "toolCallId": "chatcmpl-tool-8fff68d3f181493a88d2480a5dc82dd8",
+        "content": "# Phase 2 Execution\n\nPhase 1 completed. Proceeding to Phase 2 as requested.",
+        "toolCallId": "chatcmpl-tool-182e95fa9087402bb6991c2117bb8f9a",
         "metadata": {
           "provider": "vllm",
           "model": "default-model",
           "tokens": {
-            "inputTokens": 871,
-            "outputTokens": 1784,
-            "totalTokens": 2655
+            "inputTokens": 835,
+            "outputTokens": 3354,
+            "totalTokens": 4189
           },
-          "timestamp": 1761478823687
+          "timestamp": 1761510233091
         }
       },
       {
@@ -114,10 +76,12 @@
         "content": "",
         "toolCalls": [
           {
-            "id": "chatcmpl-tool-990bc35ea60443118406180c12f84386",
-            "name": "agent__progress_report",
+            "id": "chatcmpl-tool-5902d96d092f4ac2a11461196fa72ed3",
+            "name": "agent__test-agent2",
             "parameters": {
-              "progress": "Running test-agent2"
+              "prompt": "# Phase 2 Execution\n\nPhase 1 completed. Proceeding to Phase 2 as requested.",
+              "reason": "execute phase two",
+              "format": "sub-agent"
             }
           }
         ],
@@ -125,26 +89,26 @@
           "provider": "vllm",
           "model": "default-model",
           "tokens": {
-            "inputTokens": 920,
-            "outputTokens": 394,
-            "totalTokens": 1314
+            "inputTokens": 895,
+            "outputTokens": 494,
+            "totalTokens": 1389
           },
-          "timestamp": 1761478825706
+          "timestamp": 1761510249365
         }
       },
       {
         "role": "tool",
-        "content": "{\"ok\":true}",
-        "toolCallId": "chatcmpl-tool-990bc35ea60443118406180c12f84386",
+        "content": "test completed",
+        "toolCallId": "chatcmpl-tool-5902d96d092f4ac2a11461196fa72ed3",
         "metadata": {
           "provider": "vllm",
           "model": "default-model",
           "tokens": {
-            "inputTokens": 920,
-            "outputTokens": 394,
-            "totalTokens": 1314
+            "inputTokens": 895,
+            "outputTokens": 494,
+            "totalTokens": 1389
           },
-          "timestamp": 1761478825706
+          "timestamp": 1761510249365
         }
       }
     ],
@@ -155,7 +119,7 @@
       "agent__test-agent2"
     ]
   },
-  "requestHash": "c66557756ec5e58849d5c8794a602814369a8669b69636429cad24f0b6aedac0",
+  "requestHash": "86e9e40f96204fec27ca76a3af598c921308636164e06e8b3096955280afc565",
   "result": {
     "status": {
       "type": "success",
@@ -165,33 +129,33 @@
     "response": "",
     "toolCalls": [
       {
-        "id": "chatcmpl-tool-27f6bf487ec24c46bec48f9f72a0d92f",
+        "id": "chatcmpl-tool-d9fb8229a9f64616a8eece57bbaeafb5",
         "name": "agent__final_report",
         "parameters": {
           "status": "success",
           "report_format": "markdown",
-          "report_content": "# Execution Summary\n\n**Agent 1 Output:**\n```\nphase1 completed, now run agent 2\n```\n\n**Agent 2 Output:**\n```\n{\"ok\":true}\n```"
+          "report_content": "# Final Output\n\ntest completed"
         }
       }
     ],
     "tokens": {
       "inputTokens": 956,
-      "outputTokens": 715,
-      "totalTokens": 1671
+      "outputTokens": 605,
+      "totalTokens": 1561
     },
-    "latencyMs": 3629,
+    "latencyMs": 3072,
     "messages": [
       {
         "role": "assistant",
         "content": "",
         "toolCalls": [
           {
-            "id": "chatcmpl-tool-27f6bf487ec24c46bec48f9f72a0d92f",
+            "id": "chatcmpl-tool-d9fb8229a9f64616a8eece57bbaeafb5",
             "name": "agent__final_report",
             "parameters": {
               "status": "success",
               "report_format": "markdown",
-              "report_content": "# Execution Summary\n\n**Agent 1 Output:**\n```\nphase1 completed, now run agent 2\n```\n\n**Agent 2 Output:**\n```\n{\"ok\":true}\n```"
+              "report_content": "# Final Output\n\ntest completed"
             }
           }
         ],
@@ -200,25 +164,25 @@
           "model": "default-model",
           "tokens": {
             "inputTokens": 956,
-            "outputTokens": 715,
-            "totalTokens": 1671
+            "outputTokens": 605,
+            "totalTokens": 1561
           },
-          "timestamp": 1761478829336
+          "timestamp": 1761510252438
         }
       },
       {
         "role": "tool",
         "content": "{\"ok\":true}",
-        "toolCallId": "chatcmpl-tool-27f6bf487ec24c46bec48f9f72a0d92f",
+        "toolCallId": "chatcmpl-tool-d9fb8229a9f64616a8eece57bbaeafb5",
         "metadata": {
           "provider": "vllm",
           "model": "default-model",
           "tokens": {
             "inputTokens": 956,
-            "outputTokens": 715,
-            "totalTokens": 1671
+            "outputTokens": 605,
+            "totalTokens": 1561
           },
-          "timestamp": 1761478829336
+          "timestamp": 1761510252438
         }
       }
     ],

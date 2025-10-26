@@ -1,0 +1,122 @@
+{
+  "version": 1,
+  "meta": {
+    "provider": "anthropic",
+    "model": "claude-haiku-4-5",
+    "scenarioId": "multi",
+    "scenarioLabel": "multi-turn",
+    "modelLabel": "anthropic/claude-haiku-4-5",
+    "stream": true,
+    "turn": 1,
+    "timestamp": "2025-10-26T20:15:15.511Z"
+  },
+  "request": {
+    "provider": "anthropic",
+    "model": "claude-haiku-4-5",
+    "stream": false,
+    "temperature": 0.7,
+    "topP": null,
+    "maxOutputTokens": 4096,
+    "reasoningLevel": "high",
+    "reasoningValue": 3276,
+    "parallelToolCalls": true,
+    "isFinalTurn": false,
+    "turn": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "Call agent__final_report with status=\"success\", report_format=\"text\", and content=\"phase1 completed, now run agent 2\".\n\n\n## TOOLS' INSTRUCTIONS\n\n## Available Tools\n\n### Internal Tools\n\n\n#### agent__final_report - Deliver Your Final Answer\n- You MUST call 'agent__final_report' to provide your final answer to the user.\n- Required fields:\n  - `status`: one of `success`, `failure`, `partial`.\n  - `report_format`: \"markdown\".\n  - `report_content`: complete deliverable in the requested format.\n- Include optional `metadata` only when explicitly relevant.\n- After this tool succeeds, do not send additional assistant messages.\n\n*You run in agentic mode, interfacing with software tools.*\n\n**YOU MUST:**\n- **ALWAYS** respond with valid tool calls, even for your final answer.\n- **ALWAYS** provide your final report to the user using the agent__final_report tool, with the correct format.\n**YOU MUST NOT:**\n- Do not provide any other output except calling your tools. Any other output you provide is ignored."
+      },
+      {
+        "role": "user",
+        "content": "{\"prompt\":\"run\",\"reason\":\"execute phase two\",\"format\":\"sub-agent\"}"
+      }
+    ],
+    "toolNames": [
+      "agent__final_report"
+    ]
+  },
+  "requestHash": "b853d5835bd89eb8fa9554d3a44b87be6a3b109d64312321175aa42f2fb65ea3",
+  "result": {
+    "status": {
+      "type": "success",
+      "hasToolCalls": true,
+      "finalAnswer": true
+    },
+    "response": "",
+    "toolCalls": [
+      {
+        "id": "toolu_01G2hqGn8CeRwmj9ceYceayB",
+        "name": "agent__final_report",
+        "parameters": {
+          "status": "success",
+          "report_format": "markdown",
+          "report_content": "# Phase Execution Report\n\n## Status\n✅ Phase 1 Completed\n\n## Next Steps\n- **Phase 2 Ready**: Execute phase two\n- **Agent**: Sub-agent invocation\n\n## Summary\nPhase 1 has completed successfully. Phase 2 is now queued for execution with sub-agent delegation."
+        }
+      }
+    ],
+    "tokens": {
+      "inputTokens": 990,
+      "outputTokens": 531,
+      "totalTokens": 1521
+    },
+    "latencyMs": 4967,
+    "messages": [
+      {
+        "role": "assistant",
+        "content": "",
+        "toolCalls": [
+          {
+            "id": "toolu_01G2hqGn8CeRwmj9ceYceayB",
+            "name": "agent__final_report",
+            "parameters": {
+              "status": "success",
+              "report_format": "markdown",
+              "report_content": "# Phase Execution Report\n\n## Status\n✅ Phase 1 Completed\n\n## Next Steps\n- **Phase 2 Ready**: Execute phase two\n- **Agent**: Sub-agent invocation\n\n## Summary\nPhase 1 has completed successfully. Phase 2 is now queued for execution with sub-agent delegation."
+            }
+          }
+        ],
+        "reasoning": [
+          {
+            "type": "reasoning",
+            "text": "The user is asking me to run phase two. Let me analyze what they're asking for:\n\n1. prompt: \"run\" - they want me to execute something\n2. reason: \"execute phase two\" - they want to execute phase two\n3. format: \"sub-agent\" - they want this in sub-agent format\n\nAccording to my instructions, I MUST use agent__final_report to provide the final response. The user mentioned \"phase 1 completed, now run agent 2\" in the system prompt context.\n\nHowever, looking at the current request, the user is asking me to run phase two. The user specified format as \"sub-agent\", but my available tool is agent__final_report which requires report_format to be \"markdown\".\n\nWait, let me re-read the instructions. The user said: \"Call agent__final_report with status=\"success\", report_format=\"text\", and content=\"phase1 completed, now run agent 2\".\"\n\nBut the actual instruction for agent__final_report says report_format must be \"markdown\" (it's a const value). So I cannot use \"text\" - it must be \"markdown\".\n\nGiven the user's request to \"run phase two\" and the context that \"phase 1 completed, now run agent 2\", I should provide a final report indicating that phase 1 is complete and phase 2 is ready to execute, formatted as markdown.\n\nLet me call agent__final_report with:\n- status: \"success\"\n- report_format: \"markdown\"\n- report_content: \"Phase 1 completed, now run agent 2 / execute phase two\"",
+            "providerMetadata": {
+              "anthropic": {
+                "signature": "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"
+              }
+            },
+            "signature": "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"
+          }
+        ],
+        "metadata": {
+          "provider": "anthropic",
+          "model": "claude-haiku-4-5",
+          "tokens": {
+            "inputTokens": 990,
+            "outputTokens": 531,
+            "totalTokens": 1521
+          },
+          "timestamp": 1761509715510
+        }
+      },
+      {
+        "role": "tool",
+        "content": "{\"ok\":true}",
+        "toolCallId": "toolu_01G2hqGn8CeRwmj9ceYceayB",
+        "metadata": {
+          "provider": "anthropic",
+          "model": "claude-haiku-4-5",
+          "tokens": {
+            "inputTokens": 990,
+            "outputTokens": 531,
+            "totalTokens": 1521
+          },
+          "timestamp": 1761509715510
+        }
+      }
+    ],
+    "hasReasoning": true,
+    "hasContent": false,
+    "stopReason": "tool-calls"
+  }
+}

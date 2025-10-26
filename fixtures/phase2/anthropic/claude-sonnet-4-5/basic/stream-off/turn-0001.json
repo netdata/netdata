@@ -1,0 +1,114 @@
+{
+  "version": 1,
+  "meta": {
+    "provider": "anthropic",
+    "model": "claude-sonnet-4-5",
+    "scenarioId": "basic",
+    "scenarioLabel": "basic-llm",
+    "modelLabel": "anthropic/claude-sonnet-4-5",
+    "stream": false,
+    "turn": 1,
+    "timestamp": "2025-10-26T20:22:13.147Z"
+  },
+  "request": {
+    "provider": "anthropic",
+    "model": "claude-sonnet-4-5",
+    "stream": false,
+    "temperature": 0.7,
+    "topP": null,
+    "maxOutputTokens": 4096,
+    "reasoningLevel": null,
+    "reasoningValue": null,
+    "parallelToolCalls": true,
+    "isFinalTurn": false,
+    "turn": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "Call agent__final_report with status=\"success\", report_format=\"text\", and content set to the required text. The content must be exactly \"test\".\n\n## TOOLS' INSTRUCTIONS\n\n## Available Tools\n\n### Internal Tools\n\n#### agent__progress_report — Progress Updates for the user\n- Use this tool to update the user on your progress.\n- Keep the `progress` message concise (≤20 words).\n- Always pair this tool with other tools you are invoking (except `agent__final_report`).\n- Do not call this tool by itself.\n- Do not pair this tool with `agent__final_report`\n\n#### agent__final_report - Deliver Your Final Answer\n- You MUST call 'agent__final_report' to provide your final answer to the user.\n- Required fields:\n  - `status`: one of `success`, `failure`, `partial`.\n  - `report_format`: \"markdown\".\n  - `report_content`: complete deliverable in the requested format.\n- Include optional `metadata` only when explicitly relevant.\n- After this tool succeeds, do not send additional assistant messages.\n\n*You run in agentic mode, interfacing with software tools.*\n\n**YOU MUST:**\n- **ALWAYS** respond with valid tool calls, even for your final answer.\n- **ALWAYS** provide your final report to the user using the agent__final_report tool, with the correct format.\n**YOU MUST NOT:**\n- Do not provide any other output except calling your tools. Any other output you provide is ignored."
+      },
+      {
+        "role": "user",
+        "content": "Invoke agent__final_report(status=\"success\", report_format=\"text\", content=\"test\") and produce no other output."
+      }
+    ],
+    "toolNames": [
+      "agent__progress_report",
+      "agent__final_report",
+      "agent__test-agent1",
+      "agent__test-agent2"
+    ]
+  },
+  "requestHash": "3511c66c56c610442190766d7b13145a01c08d1857682d6514f0f0bbfb5242ef",
+  "result": {
+    "status": {
+      "type": "success",
+      "hasToolCalls": true,
+      "finalAnswer": true
+    },
+    "response": "",
+    "toolCalls": [
+      {
+        "id": "toolu_01LaKgAZJ2veuweHb5NM39Gv",
+        "name": "agent__final_report",
+        "parameters": {
+          "status": "success",
+          "report_format": "markdown",
+          "report_content": "test"
+        }
+      }
+    ],
+    "tokens": {
+      "inputTokens": 19,
+      "outputTokens": 78,
+      "cacheWriteInputTokens": 1551,
+      "totalTokens": 97
+    },
+    "latencyMs": 2787,
+    "messages": [
+      {
+        "role": "assistant",
+        "content": "",
+        "toolCalls": [
+          {
+            "id": "toolu_01LaKgAZJ2veuweHb5NM39Gv",
+            "name": "agent__final_report",
+            "parameters": {
+              "status": "success",
+              "report_format": "markdown",
+              "report_content": "test"
+            }
+          }
+        ],
+        "metadata": {
+          "provider": "anthropic",
+          "model": "claude-sonnet-4-5",
+          "tokens": {
+            "inputTokens": 19,
+            "outputTokens": 78,
+            "totalTokens": 97
+          },
+          "timestamp": 1761510133147
+        }
+      },
+      {
+        "role": "tool",
+        "content": "{\"ok\":true}",
+        "toolCallId": "toolu_01LaKgAZJ2veuweHb5NM39Gv",
+        "metadata": {
+          "provider": "anthropic",
+          "model": "claude-sonnet-4-5",
+          "tokens": {
+            "inputTokens": 19,
+            "outputTokens": 78,
+            "totalTokens": 97
+          },
+          "timestamp": 1761510133147
+        }
+      }
+    ],
+    "hasReasoning": false,
+    "hasContent": false,
+    "stopReason": "tool-calls"
+  }
+}

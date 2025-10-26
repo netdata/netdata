@@ -1,0 +1,129 @@
+{
+  "version": 1,
+  "meta": {
+    "provider": "openrouter",
+    "model": "x-ai/grok-code-fast-1",
+    "scenarioId": "multi",
+    "scenarioLabel": "multi-turn",
+    "modelLabel": "openrouter/x-ai/grok-code-fast-1",
+    "stream": true,
+    "turn": 3,
+    "timestamp": "2025-10-26T20:07:09.561Z"
+  },
+  "request": {
+    "provider": "openrouter",
+    "model": "x-ai/grok-code-fast-1",
+    "stream": false,
+    "temperature": 0.7,
+    "topP": 1,
+    "maxOutputTokens": 4096,
+    "reasoningLevel": "high",
+    "reasoningValue": "high",
+    "parallelToolCalls": true,
+    "isFinalTurn": false,
+    "turn": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "Call agent__final_report with status=\"success\", report_format=\"text\", and content=\"test completed\".\n\n\n## TOOLS' INSTRUCTIONS\n\n## Available Tools\n\n### Internal Tools\n\n\n#### agent__final_report - Deliver Your Final Answer\n- You MUST call 'agent__final_report' to provide your final answer to the user.\n- Required fields:\n  - `status`: one of `success`, `failure`, `partial`.\n  - `report_format`: \"markdown\".\n  - `report_content`: complete deliverable in the requested format.\n- Include optional `metadata` only when explicitly relevant.\n- After this tool succeeds, do not send additional assistant messages.\n\n*You run in agentic mode, interfacing with software tools.*\n\n**YOU MUST:**\n- **ALWAYS** respond with valid tool calls, even for your final answer.\n- **ALWAYS** provide your final report to the user using the agent__final_report tool, with the correct format.\n**YOU MUST NOT:**\n- Do not provide any other output except calling your tools. Any other output you provide is ignored."
+      },
+      {
+        "role": "user",
+        "content": "{\"prompt\":\"# Phase Two Execution Report\\n\\n## Status\\nPhase two has been successfully executed as a sub-agent.\\n\\n## Details\\n- **Prompt**: run\\n- **Format**: sub-agent\\n- **Reason**: execute phase two\\n\\nThe sub-agent completed its tasks without issues.\\n\\n## Next Steps\\nProceed to phase three if applicable.\",\"format\":\"sub-agent\",\"reason\":\"execute phase two\"}"
+      }
+    ],
+    "toolNames": [
+      "agent__final_report"
+    ]
+  },
+  "requestHash": "b5848940a5d9a8c812dc1686a7d2184e47ba02c31abd4985089e655e0b944b6a",
+  "result": {
+    "status": {
+      "type": "success",
+      "hasToolCalls": true,
+      "finalAnswer": true
+    },
+    "response": "",
+    "toolCalls": [
+      {
+        "id": "call_98285418",
+        "name": "agent__final_report",
+        "parameters": {
+          "status": "success",
+          "report_format": "markdown",
+          "report_content": "# Phase Two Execution Report\n\n## Status\nPhase two has been successfully executed as a sub-agent.\n\n## Details\n- **Prompt**: run\n- **Format**: sub-agent\n- **Reason**: execute phase two\n\nThe sub-agent completed its tasks without issues.\n\n## Next Steps\nProceed to phase three if applicable."
+        }
+      }
+    ],
+    "tokens": {
+      "inputTokens": 777,
+      "outputTokens": 632,
+      "cachedTokens": 320,
+      "cacheReadInputTokens": 320,
+      "totalTokens": 1409
+    },
+    "latencyMs": 5192,
+    "messages": [
+      {
+        "role": "assistant",
+        "content": "",
+        "toolCalls": [
+          {
+            "id": "call_98285418",
+            "name": "agent__final_report",
+            "parameters": {
+              "status": "success",
+              "report_format": "markdown",
+              "report_content": "# Phase Two Execution Report\n\n## Status\nPhase two has been successfully executed as a sub-agent.\n\n## Details\n- **Prompt**: run\n- **Format**: sub-agent\n- **Reason**: execute phase two\n\nThe sub-agent completed its tasks without issues.\n\n## Next Steps\nProceed to phase three if applicable."
+            }
+          }
+        ],
+        "reasoning": [
+          {
+            "type": "reasoning",
+            "text": "The human message is a JSON object: {\"prompt\":\"# Phase Two Execution Report\\n\\n## Status\\nPhase two has been successfully executed as a sub-agent.\\n\\n## Details\\n- **Prompt**: run\\n- **Format**: sub-agent\\n- **Reason**: execute phase two\\n\\nThe sub-agent completed its tasks without issues.\\n\\n## Next Steps\\nProceed to phase three if applicable.\",\"format\":\"sub-agent\",\"reason\":\"execute phase two\"}\n\n\n## Reviewing execution details  \n- The message is a JSON object detailing a Phase Two Execution Report.  \n- It confirms phase two was executed successfully by a sub-agent with the prompt \"run.\"  \n- The format specified was \"sub-agent,\" and the reason given was to execute phase two.  \n\n## Planning next steps  \n- The sub-agent completed all tasks without issues.  \n- Next steps involve proceeding to phase three, if applicable.\n\n## Reviewing execution details  \n- The message indicates a sub-agent report, confirming phase two executed successfully.  \n- It suggests processing this as part of a multi-phase workflow, with a focus on sequential execution."
+          },
+          {
+            "type": "reasoning",
+            "text": "[REDACTED]"
+          }
+        ],
+        "metadata": {
+          "provider": "openrouter",
+          "model": "x-ai/grok-code-fast-1",
+          "tokens": {
+            "inputTokens": 777,
+            "outputTokens": 632,
+            "cachedTokens": 320,
+            "totalTokens": 1409
+          },
+          "timestamp": 1761509229561
+        }
+      },
+      {
+        "role": "tool",
+        "content": "{\"ok\":true}",
+        "toolCallId": "call_98285418",
+        "metadata": {
+          "provider": "openrouter",
+          "model": "x-ai/grok-code-fast-1",
+          "tokens": {
+            "inputTokens": 777,
+            "outputTokens": 632,
+            "cachedTokens": 320,
+            "totalTokens": 1409
+          },
+          "timestamp": 1761509229561
+        }
+      }
+    ],
+    "hasReasoning": true,
+    "hasContent": false,
+    "stopReason": "tool-calls",
+    "providerMetadata": {
+      "actualProvider": "xAI",
+      "actualModel": "x-ai/grok-code-fast-1",
+      "reportedCostUsd": 0.0010458
+    }
+  }
+}

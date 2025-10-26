@@ -1,0 +1,122 @@
+{
+  "version": 1,
+  "meta": {
+    "provider": "anthropic",
+    "model": "claude-sonnet-4-5",
+    "scenarioId": "multi",
+    "scenarioLabel": "multi-turn",
+    "modelLabel": "anthropic/claude-sonnet-4-5",
+    "stream": true,
+    "turn": 1,
+    "timestamp": "2025-10-26T20:23:03.317Z"
+  },
+  "request": {
+    "provider": "anthropic",
+    "model": "claude-sonnet-4-5",
+    "stream": false,
+    "temperature": 0.7,
+    "topP": null,
+    "maxOutputTokens": 4096,
+    "reasoningLevel": "high",
+    "reasoningValue": 3276,
+    "parallelToolCalls": true,
+    "isFinalTurn": false,
+    "turn": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "Call agent__final_report with status=\"success\", report_format=\"text\", and content=\"phase1 completed, now run agent 2\".\n\n\n## TOOLS' INSTRUCTIONS\n\n## Available Tools\n\n### Internal Tools\n\n\n#### agent__final_report - Deliver Your Final Answer\n- You MUST call 'agent__final_report' to provide your final answer to the user.\n- Required fields:\n  - `status`: one of `success`, `failure`, `partial`.\n  - `report_format`: \"markdown\".\n  - `report_content`: complete deliverable in the requested format.\n- Include optional `metadata` only when explicitly relevant.\n- After this tool succeeds, do not send additional assistant messages.\n\n*You run in agentic mode, interfacing with software tools.*\n\n**YOU MUST:**\n- **ALWAYS** respond with valid tool calls, even for your final answer.\n- **ALWAYS** provide your final report to the user using the agent__final_report tool, with the correct format.\n**YOU MUST NOT:**\n- Do not provide any other output except calling your tools. Any other output you provide is ignored."
+      },
+      {
+        "role": "user",
+        "content": "{\"prompt\":\"run\",\"reason\":\"execute phase two\",\"format\":\"sub-agent\"}"
+      }
+    ],
+    "toolNames": [
+      "agent__final_report"
+    ]
+  },
+  "requestHash": "22891f34e516e87e19bd5dda40f2f5f131112aa188a27ad8e559534e9f6d6862",
+  "result": {
+    "status": {
+      "type": "success",
+      "hasToolCalls": true,
+      "finalAnswer": true
+    },
+    "response": "",
+    "toolCalls": [
+      {
+        "id": "toolu_013L2W1i9AHU7kfgnphRYH29",
+        "name": "agent__final_report",
+        "parameters": {
+          "status": "success",
+          "report_format": "markdown",
+          "report_content": "phase1 completed, now run agent 2"
+        }
+      }
+    ],
+    "tokens": {
+      "inputTokens": 990,
+      "outputTokens": 433,
+      "totalTokens": 1423
+    },
+    "latencyMs": 8080,
+    "messages": [
+      {
+        "role": "assistant",
+        "content": "",
+        "toolCalls": [
+          {
+            "id": "toolu_013L2W1i9AHU7kfgnphRYH29",
+            "name": "agent__final_report",
+            "parameters": {
+              "status": "success",
+              "report_format": "markdown",
+              "report_content": "phase1 completed, now run agent 2"
+            }
+          }
+        ],
+        "reasoning": [
+          {
+            "type": "reasoning",
+            "text": "The user is asking me to run something with the reason \"execute phase two\" in a \"sub-agent\" format. Looking at the instructions, I need to call agent__final_report with status=\"success\", report_format=\"text\", and content=\"phase1 completed, now run agent 2\".\n\nHowever, I notice the instructions say report_format should be \"markdown\" according to the schema, but the example says report_format=\"text\". Let me check the schema again:\n\nThe schema shows:\n- report_format should be \"markdown\" (it has a const value of \"markdown\")\n- But the instruction says: Call agent__final_report with status=\"success\", report_format=\"text\", and content=\"phase1 completed, now run agent 2\".\n\nThis is a contradiction. However, the schema is more authoritative since it defines what the function actually accepts. The const value \"markdown\" means only \"markdown\" is accepted.\n\nBut wait, let me re-read the instructions more carefully. It says:\n\"Call agent__final_report with status=\"success\", report_format=\"text\", and content=\"phase1 completed, now run agent 2\".\"\n\nThis appears to be a specific instruction for this particular case. However, the schema clearly shows report_format must be \"markdown\" (const: \"markdown\"). \n\nI think there's an error in the instructions, and I should follow the schema. So I'll use report_format=\"markdown\" and provide the content as requested.",
+            "providerMetadata": {
+              "anthropic": {
+                "signature": "EvQLCkYICRgCKkDKfAsNrfRO59FBxATidYtWRaD4iIpZhXGQSB9YG03Xziq0UqVQ6aVVpu0azyK8l9n7cTL/PvpC0fLxXlcPyX5gEgwK8YFaIp6M/T3DpN8aDL2EJOJ3oa2NYToMRyIwcuAMi+EKgq+wwYGeT/LX2DdP/UxDl+Pcn4NOtlShhOuuBQB+WXtEeuWZ75ipypmOKtsKxEP+gmulz5fIl/rTsEqvKiMck2DcSkqMFHnDf2nT2Ot4QCk14yhh4HJlz1qfzkxPJzxb5COCWhVn28a3nThLAaj+zwTno9s7NE3DXsTLZxiMa64caDU05ImP/wBenu2FOV9t/3jfkAlO0wl68vL4yp/rKXA2hCrBQ0xDw1zX3NY6hXSs/cXeSjye1/VrOrRbwFsVzYLtDE/Y0Pv3HVKLu7+J95qkbcsaCD/zuuq30a4YoFlW3vJbLpaxpq74AXmkfBpdmOSAz+EaCkRvE77hnbxpC3nSf5Wwc64aURI3cagNx0p0/nbradhb/0aPZqzVpG9tPT2i4MEMVFWkU6IDbVuY2M7AuFwZTyCF/bWwZUyVWSQPnX+pv2wOsKrgneiINjTRPEsifuhuRypNL6PgW2OMPU/oPH46lyGH1AawORBcwtPKoAb8cg3fia5VItfqGuFmOj0Pi+wL7UhFejAC2H8TcKp4BbkQPGZKT8NQk68w5aYLNF0RBo16FtfFFUPwTmiCKfd7hPrBXhbtNExoMWn0pt0j97IfVvPGDsmwSPfBltFsG45WztZNak3gMIgPINvKXJo3MqSBjJDKlTzpv0S4Y2KhEhDzJg4PC2Wzovr15sRtor9/LN6WKgMtQ3enxPWblDtvX+yMfadiH/SHODCzZtSTejUea3CWr5VIHq/AC2UU29rp+TNTzXzxCLlH0ieMJ8SYkFptarNAA/hxik2Y+sQHdkaxtag/IEltN6beIb08+4jh7iCXSCbAz9Do0EzBRr91Rugk148B6YurKCV55xD2HT6GYG5ejicz/IDi9T+HjkL9IaG2cS3CD6It1VJXW+6yBidSyar5Af/xCvQH1v6xTDktf/vpFKvP3GXLe69s4BaTyrtzjsuM/Xeq70TVYIt+WXJE95IJq3F6+HQi/+EdDK0JKsh+i+6gnnftgXON3yJryImwyOBaW0yicNjju7PSqOlZSmNd3ExyDdUxy/7Zw267LK8c0XS4m5NOzk+MYFe/VwW3U7A0wAJpdrsfKhUB5dzYq28hLEHEV2i9LIv8piJpvd5NcNSo2AFHJVi/liUhWlL/CcTRkObf9Aybudd5/VSQQGRiMXmbQmjXhQPBSaIQ+o8RN/yGiGmpS7TuJDATOYW6f5nB+Y3jYEGz6+eZq6PO/vVCuay+uUUZ2cg/kGB2hxlRg3qu8+/JOwONGaNs83A7tkDZl91o9FUichEEXjh0rfsmXLfIxzG2SHRI+SjYik3N7qS3xUDuZiNm+GksAccQkHueVUSqbhXYh+W/ZP4ARGCqjJcTYGUE+wXO3/RUkJnLt4RCysln4zSIOYF3+dytfCGGsiv2SDwR3WWSum/eIk0Q4/WH+dB3W4q3GM9Cdoe0aiHSB/r1Lur9hI/LT6w9C7FbSsYK0DKihmY6xGGIGtzMjjWJJ6Jj24W1d6KdUKivoVPODIc0OmXlh+knX8f1E/Hys9wiu5sGl1PNzXMuIx+U32zO3+cAvWd3CYj4zQrCyJt5pNSvbzFZe7HaKkN7G5wStldum8rbErbK4JBpbAjBg5MbHlaIXTiCJVYWZc7xi1zswWOgT/jYkOTqj9n/jCxRROm5dbw6QhRgTfemdtwYvtB+8fdv5DOOiGyo3xjgtMimZFZbLPt/VXu8D+uDmPW0Uj6XI/8Sm8wGeTlgDbndTIIvPFvczsLGsCJAb8MLk6XKwpjmUOqblY/9S3x1FKok+rIOSWBfIGLm0dIex5yw5StfthfLMUjF/IEp08nG18NswdkkQ64bVre97UQN9PKmqQUnICC5MACECrKqb+6ytBDezGqsSaGboAHFwMeRGAE="
+              }
+            },
+            "signature": "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"
+          }
+        ],
+        "metadata": {
+          "provider": "anthropic",
+          "model": "claude-sonnet-4-5",
+          "tokens": {
+            "inputTokens": 990,
+            "outputTokens": 433,
+            "totalTokens": 1423
+          },
+          "timestamp": 1761510183317
+        }
+      },
+      {
+        "role": "tool",
+        "content": "{\"ok\":true}",
+        "toolCallId": "toolu_013L2W1i9AHU7kfgnphRYH29",
+        "metadata": {
+          "provider": "anthropic",
+          "model": "claude-sonnet-4-5",
+          "tokens": {
+            "inputTokens": 990,
+            "outputTokens": 433,
+            "totalTokens": 1423
+          },
+          "timestamp": 1761510183317
+        }
+      }
+    ],
+    "hasReasoning": true,
+    "hasContent": false,
+    "stopReason": "tool-calls"
+  }
+}

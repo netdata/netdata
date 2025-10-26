@@ -1,0 +1,116 @@
+{
+  "version": 1,
+  "meta": {
+    "provider": "google",
+    "model": "gemini-2.5-flash",
+    "scenarioId": "multi",
+    "scenarioLabel": "multi-turn",
+    "modelLabel": "google/gemini-2.5-flash",
+    "stream": true,
+    "turn": 1,
+    "timestamp": "2025-10-26T20:14:23.134Z"
+  },
+  "request": {
+    "provider": "google",
+    "model": "gemini-2.5-flash",
+    "stream": false,
+    "temperature": 0.7,
+    "topP": 1,
+    "maxOutputTokens": 4096,
+    "reasoningLevel": "high",
+    "reasoningValue": 3276,
+    "parallelToolCalls": true,
+    "isFinalTurn": false,
+    "turn": 1,
+    "messages": [
+      {
+        "role": "system",
+        "content": "Call agent__final_report with status=\"success\", report_format=\"text\", and content=\"phase1 completed, now run agent 2\".\n\n\n## TOOLS' INSTRUCTIONS\n\n## Available Tools\n\n### Internal Tools\n\n\n#### agent__final_report - Deliver Your Final Answer\n- You MUST call 'agent__final_report' to provide your final answer to the user.\n- Required fields:\n  - `status`: one of `success`, `failure`, `partial`.\n  - `report_format`: \"markdown\".\n  - `report_content`: complete deliverable in the requested format.\n- Include optional `metadata` only when explicitly relevant.\n- After this tool succeeds, do not send additional assistant messages.\n\n*You run in agentic mode, interfacing with software tools.*\n\n**YOU MUST:**\n- **ALWAYS** respond with valid tool calls, even for your final answer.\n- **ALWAYS** provide your final report to the user using the agent__final_report tool, with the correct format.\n**YOU MUST NOT:**\n- Do not provide any other output except calling your tools. Any other output you provide is ignored."
+      },
+      {
+        "role": "user",
+        "content": "{\"reason\":\"execute phase two\",\"format\":\"sub-agent\",\"prompt\":\"run\"}"
+      }
+    ],
+    "toolNames": [
+      "agent__final_report"
+    ]
+  },
+  "requestHash": "ffeea115edcc25e84d19439419757a53923dc4ea35d754c876aabc03b10b858b",
+  "result": {
+    "status": {
+      "type": "success",
+      "hasToolCalls": true,
+      "finalAnswer": true
+    },
+    "response": "",
+    "toolCalls": [
+      {
+        "id": "uQfx3I2vtRQY3DU8",
+        "name": "agent__final_report",
+        "parameters": {
+          "report_content": "phase1 completed, now run agent 2",
+          "status": "success",
+          "report_format": "markdown"
+        }
+      }
+    ],
+    "tokens": {
+      "inputTokens": 379,
+      "outputTokens": 39,
+      "totalTokens": 1730
+    },
+    "latencyMs": 9320,
+    "messages": [
+      {
+        "role": "assistant",
+        "content": "",
+        "toolCalls": [
+          {
+            "id": "uQfx3I2vtRQY3DU8",
+            "name": "agent__final_report",
+            "parameters": {
+              "report_content": "phase1 completed, now run agent 2",
+              "status": "success",
+              "report_format": "markdown"
+            }
+          }
+        ],
+        "reasoning": [
+          {
+            "type": "reasoning",
+            "text": "**Addressing a Discrepancy Between Instructions and Tool Definition**\n\nOkay, so the user wants me to \"run\" phase two using a sub-agent format.  My current instruction is essentially \"phase 1 complete, now run agent 2.\" The task is straightforward: use the `agent__final_report` tool to indicate phase 1's completion and signal the start of agent 2. The `status` should be \"success,\" and the message should convey that phase 1 is finished and agent 2 needs to start.\n\nHere's the problem: the prompt *explicitly* tells me to use `report_format=\"text\"`. However, the tool's definition *strictly* requires `report_format=\"markdown\"`. I'm in a bind! I *must* adhere to the tool definition because of my core instructions. Using a format other than \"markdown\" would be invalid. I'm torn because the user's intent is clear, and I want to be compliant, but the constraints are clear too.\n\nThe prompt is a direct instruction, but the rules are also very clear. Since the tool definition is the ultimate authority, I *have* to use \"markdown\". It's the only valid option. I can't use \"text\" even though the user specifically asked for it.\n\nThe tool call has to be valid above all else. Since I can't deviate from the tool definition, I'll go with `report_format=\"markdown\"` and call `default_api.agent__final_report(status=\"success\", report_format=\"markdown\", report_content=\"phase1 completed, now run agent 2\")`. My focus is to be compliant and accurate."
+          }
+        ],
+        "metadata": {
+          "provider": "google",
+          "model": "gemini-2.5-flash",
+          "tokens": {
+            "inputTokens": 379,
+            "outputTokens": 39,
+            "totalTokens": 1730
+          },
+          "timestamp": 1761509663134
+        }
+      },
+      {
+        "role": "tool",
+        "content": "{\"ok\":true}",
+        "toolCallId": "uQfx3I2vtRQY3DU8",
+        "metadata": {
+          "provider": "google",
+          "model": "gemini-2.5-flash",
+          "tokens": {
+            "inputTokens": 379,
+            "outputTokens": 39,
+            "totalTokens": 1730
+          },
+          "timestamp": 1761509663134
+        }
+      }
+    ],
+    "hasReasoning": true,
+    "hasContent": false,
+    "stopReason": "tool-calls"
+  }
+}
