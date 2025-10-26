@@ -182,7 +182,7 @@ jobs:
       - name: Store
         id: store
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/upload-artifact@v4.6.2
+        uses: actions/upload-artifact@v5.0.0
         with:
           name: dist-tarball
           path: artifacts/*.tar.gz
@@ -313,7 +313,7 @@ jobs:
       - name: Store
         id: store
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/upload-artifact@v4.6.2
+        uses: actions/upload-artifact@v5.0.0
         with:
           name: dist-static-${{ matrix.arch }}
           path: artifacts/*.gz.run
@@ -418,7 +418,7 @@ jobs:
           timestamp-digest: SHA256
       - name: Upload Installer
         id: upload
-        uses: actions/upload-artifact@v4.6.2
+        uses: actions/upload-artifact@v5.0.0
         with:
           name: windows-x86_64-installer
           path: packaging\windows\netdata*.msi
@@ -508,7 +508,7 @@ jobs:
       - name: Store Artifacts
         id: store
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/upload-artifact@v4.6.2
+        uses: actions/upload-artifact@v5.0.0
         with:
           name: final-artifacts
           path: artifacts/*
