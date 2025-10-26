@@ -67,10 +67,10 @@ log_info "Starting AI Agent build and installation process..."
 log_info "Building AI Agent from source..."
 
 # Install dependencies if needed
-if [ ! -d "node_modules" ]; then
+#if [ ! -d "node_modules" ]; then
     log_info "Installing Node.js dependencies..."
     run npm install
-fi
+#fi
 
 # Build TypeScript
 log_info "Compiling TypeScript..."
