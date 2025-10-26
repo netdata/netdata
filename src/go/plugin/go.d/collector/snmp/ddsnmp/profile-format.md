@@ -1,83 +1,141 @@
 # Profile Format
 
-## Overview & Purpose
+## Overview
 
-An **SNMP profile** defines _how_ a device type is monitored through SNMP.
-It tells the collector which OIDs to query, how to interpret their values, and how to present them as Netdata metrics, dimensions, and tags.
+An **SNMP profile** defines how _Netdata monitors a specific type of SNMP device_.
 
-Profiles let you describe entire device families (routers, switches, printers, UPSes, etc.) declaratively—so that users don’t have to hard-code OIDs or chart logic.
+It tells the collector **which OIDs to query, how to interpret their values**, and **how to present them** as metrics, dimensions, and tags in Netdata.
 
-### What an SNMP profile does
+Profiles describe entire device families — routers, switches, firewalls, UPSes, printers — declaratively, so you don’t have to hard-code OIDs or chart logic.
 
-When Netdata connects to an SNMP device, it:
+Each profile combines several sections that describe what to monitor and how
 
-1. Reads the device’s system OID (sysObjectID) and system description (sysDescr).
-2. Finds the first profile whose selector rules match that information.
-3. Uses the profile’s configuration to:
-    - Collect scalar metrics (single values such as uptime or temperature).
-    - Collect table metrics (rows of data such as per-interface counters).
-    - Create virtual metrics (derived or combined values).
-    - Extract tags and metadata to enrich the metrics.
+### How Profiles Work
 
-Each profile therefore acts as a schema for one or more related device models.
+When Netdata connects to an SNMP device, the collector:
 
-### Example: a minimal “Hello World” profile
+1. Reads the device’s **sysObjectID** and **sysDescr**.
+2. Evaluates all available profiles.
+3. Applies every profile whose [selector](#1-selector) matches.
+4. Uses the combined configuration to:
+    - Collect [scalar metrics](#scalar-metrics-single-values) (single values like uptime or temperature).
+    - Collect [table metrics](#table-metrics-multiple-rows) (multi-row values like per-interface traffic).
+    - Build [virtual metrics](#virtual-metrics) (derived totals, fallbacks, or aggregates).
+    - Gather [metadata](#3-metadata) and [tags](#5-metric_tags) for labeling and grouping.
+
+**Visual: Profile Lifecycle**
+
+```text
+            +--------------------------+
+            |      SNMP Device         |
+            | (sysObjectID, sysDescr)  |
+            +------------+-------------+
+                         |
+                         v
+               [ Profile Matching ]
+                    selector
+                         |
+                         v
+          +--------------+---------------+
+          |     Profile Definition        |
+          |-------------------------------|
+          | extends        → inherit bases |
+          | metadata       → device labels |
+          | metrics        → OIDs to read  |
+          | metric_tags    → global tags   |
+          | static_tags    → fixed tags    |
+          | virtual_metrics → calculations |
+          +--------------+---------------+
+                         |
+                         v
+              [ SNMP Collector Execution ]
+                    (collects data)
+                         |
+                         v
+          +-------------------------------+
+          |     Netdata Metrics & Charts  |
+          +-------------------------------+
+```
+
+### Example: Complete SNMP Profile
 
 ```yaml
-# hello-world.yaml
+# example-device.yaml
+
+# selects which devices this profile applies to.
 selector:
-  sysobjectid:
-    - 1.3.6.1.4.1.8072.3.2.10  # Matches Net-SNMP demo devices
+  - sysobjectid:
+      include: ["1.3.6.1.4.1.9.*"]     # Cisco devices
+    sysdescr:
+      include: ["IOS"]
 
+# imports common base metrics
+extends:
+  - _system-base.yaml
+  - _std-if-mib.yaml
+
+# defines device-level labels (virtual node)
+metadata:
+  device:
+    fields:
+      vendor:
+        value: "Cisco"
+      model:
+        symbol:
+          OID: 1.3.6.1.2.1.47.1.1.1.1.2.1
+          name: entPhysicalModelName
+
+#  specifies which OIDs to collect
 metrics:
-  - name: sysUpTime
+  - MIB: IF-MIB
+    table:
+      OID: 1.3.6.1.2.1.2.2
+      name: ifTable
+    symbols:
+      - OID: 1.3.6.1.2.1.2.2.1.10
+        name: ifInOctets
+        chart_meta:
+          description: Interface inbound traffic
+          family: 'Network/Interface/Traffic/In'
+          unit: "bit/s"
+        scale_factor: 8
+    metric_tags:
+      - tag: interface
+        symbol:
+          OID: 1.3.6.1.2.1.31.1.1.1.1
+          name: ifName
+
+# add dynamic  tags to all metrics
+metric_tags:
+  - tag: fs_sys_version
     symbol:
-      OID: 1.3.6.1.2.1.1.3.0
-      name: sysUpTime
+      OID: 1.3.6.1.4.1.9.2.1.73.0
+      name: fsSysVersion
+
+# add fixed tags to all metrics
+static_tags:
+  - tag: region
+    value: "us-east-1"
+  - tag: environment
+    value: "production"
+
+# computes combined metrics
+virtual_metrics:
+  - name: ifTotalTraffic
+    sources:
+      - { metric: _ifHCInOctets,  table: ifXTable, as: in }
+      - { metric: _ifHCOutOctets, table: ifXTable, as: out }
     chart_meta:
-      description: System uptime
-      unit: seconds
+      description: Total traffic across all interfaces
+      family: 'Network/Total/Traffic'
+      unit: "bit/s"
 ```
-
-This profile:
-
-- Matches devices whose sysObjectID is 1.3.6.1.4.1.8072.3.2.10.
-- Defines one scalar metric (sysUpTime).
-- Creates a chart in Netdata showing system uptime in seconds.
-
-### Profiles in context
-
-A typical monitoring setup includes many profiles:
-
-```
-+-------------------+
-|   SNMP Collector  |
-|-------------------|
-| 1. Load profiles  |
-| 2. Discover device|
-| 3. Match profiles |
-| 4. Collect metrics|
-+-------------------+
-        |
-        v
-+------------------+
-|  Netdata Charts  |
-+------------------+
-```
-
-When the SNMP collector discovers a device, it evaluates all available profiles and applies **every profile** whose `selector` **rules match** that device.
-This means:
-
-- A device can match **multiple profiles**.
-- The collector **merges** metrics, tags, and metadata from all of them.
-- This enables _modular profile_ design:
-    - One profile can define common metrics (e.g., `IF-MIB` for interfaces).
-    - Another can define vendor-specific extensions (e.g., Cisco, Juniper).
-    - Together, they produce a complete set of metrics for that device.
-
-Profiles can also extend one another explicitly (see the `extends` key), but matching multiple profiles dynamically is the usual way to compose functionality.
 
 ## Profile Structure
+
+Each SNMP profile is a YAML file that defines **how Netdata collects, interprets, and labels SNMP metrics** from a device.
+
+Profiles are modular — you can extend others, define metadata, and specify what to collect.
 
 ```yaml
 selector: <device matching pattern>
@@ -89,11 +147,21 @@ static_tags: <static tags>
 virtual_metrics: <calculated metrics>
 ```
 
+| Section                                   | Purpose                                                   |
+|-------------------------------------------|-----------------------------------------------------------|
+| [**selector**](#1-selector)               | Defines which devices the profile applies to.             |
+| [**extends**](#2-extends)                 | Inherits and merges other base profiles.                  |
+| [**metadata**](#3-metadata)               | Collects device-level information (host labels).          |
+| [**metrics**](#4-metrics)                 | Defines which OIDs to collect and how to chart them.      |
+| [**metric_tags**](#5-metric_tags)         | Defines global dynamic tags collected once per device.    |
+| [**static_tags**](#6-static_tags)         | Defines fixed tags applied to all metrics.                |
+| [**virtual_metrics**](#7-virtual_metrics) | Defines calculated or aggregated metrics based on others. |
+
 ### 1. selector
 
-The `selector` decides **which devices this profile applies to**. Netdata evaluates all profiles; any profile whose selector matches a device is **applied and merged** with others.
+The `selector` defines **which devices this profile applies to**.
 
-**Example**:
+During discovery, Netdata evaluates all profiles; any profile whose selector matches a device is **applied **.
 
 ```yaml
 selector:
@@ -105,204 +173,253 @@ selector:
       exclude: ["emulator", "lab"]      # optional excludes
 ```
 
-- A profile is applied to a device if **at least one** of its `selector` rules matches the device.
-- Each selector rule is a **set of conditions**.
-- For the rule to match, **all defined conditions must pass**.
-- If both `sysobjectid` and `sysdescr` blocks are present, both must succeed.
+**How it works**:
 
-Here is a breakdown of the individual conditions:
+- Each selector rule is a set of conditions (`sysobjectid`, `sysdescr`, etc.).
+- For a rule to match, **all its conditions must pass**.
+- A profile is applied if **at least one rule** in the `selector` list matches the device.
+- If both `sysobjectid` and `sysdescr` are defined within the same rule, **both must succeed**.
 
-| Condition Key         | What It Checks                       | Rule to **Pass** (Success)                             | Rule to **Fail** (Immediate)        |
-|-----------------------|--------------------------------------|--------------------------------------------------------|-------------------------------------|
-| `sysobjectid.include` | Device `sysObjectID`                 | **Must match at least one** item in the list.          | Fails if _no_ items match.          |
-| `sysobjectid.exclude` | Device `sysObjectID`                 | **Must not match any** item in the list.               | Fails if _any_ item matches.        |
-| `sysdescr.include`    | Device `sysDescr` (case-insensitive) | **Must contain at least one** substring from the list. | Fails if _no_ substrings are found. |
-| `sysdescr.exclude`    | Device `sysDescr` (case-insensitive) | **Must not contain any** substring from the list.      | Fails if _any_ substring is found.  |
+**Supported conditions**:
+
+| Key                   | What It Checks                       | Match Criteria (Pass)                            | Fails When...                   |
+|-----------------------|--------------------------------------|--------------------------------------------------|---------------------------------|
+| `sysobjectid.include` | Device `sysObjectID`                 | Matches **at least one** pattern in the list.    | No items match.                 |
+| `sysobjectid.exclude` | Device `sysObjectID`                 | Matches **none** of the listed patterns.         | Any item matches.               |
+| `sysdescr.include`    | Device `sysDescr` (case-insensitive) | Contains **at least one** substring in the list. | No listed substrings are found. |
+| `sysdescr.exclude`    | Device `sysDescr` (case-insensitive) | Contains **none** of the listed substrings.      | Any listed substring is found.  |
 
 ### 2. extends
 
-Use `extends` to **reuse** and **compose** existing profiles instead of copy-pasting common metrics. Most real profiles extend a few base building blocks, then add device-specific bits.
+Use `extends` to **inherit and combine** existing profiles instead of duplicating common metrics.
 
-**Example**:
+Most real profiles extend a few shared building blocks and then add device-specific definitions.
 
 ```yaml
 extends:
-  - _system-base.yaml              # System basics (uptime, contact, location)
-  - _std-if-mib.yaml        # Network interfaces (IF-MIB)
-  - _std-ip-mib.yaml        # IP statistics
+  - _system-base.yaml        # System basics (uptime, contact, location)
+  - _std-if-mib.yaml         # Network interfaces (IF-MIB)
+  - _std-ip-mib.yaml         # IP statistics
 ```
 
-The final, effective profile is the **merge** of all inherited profiles **plus** the content in the current file.
+The final profile is the **merged result** of all inherited profiles plus the content in the current file.
 
 **How inheritance works**:
 
-1. **Order matters** - Profiles are loaded in the order listed
-2. **Metrics are combined** - All metrics from all profiles are collected
-3. **Later profiles override** - If the same field is defined in multiple profiles, the last one wins
+1. **Order matters** — profiles are loaded in the order listed.
+2. **Metrics are merged** — all metrics from all referenced profiles are included.
+3. **Later overrides earlier** — if the same field is defined multiple times, the last one wins.
 
-**Common base profiles**:
+**Common base profiles**
 
-| Profile             | Provides                            | Use For             |
-|---------------------|-------------------------------------|---------------------|
-| `_system_base.yaml` | System info (uptime, name, contact) | All devices         |
-| `_std-if-mib.yaml`  | Interface statistics (IF-MIB)       | Network devices     |
-| `_std-ip-mib.yaml`  | IP statistics (IP-MIB)              | Routers/L3 switches |
-| `_std-tcp-mib.yaml` | TCP statistics                      | Servers, firewalls  |
-| `_std-udp-mib.yaml` | UDP statistics                      | Servers, firewalls  |
-| `_std-ups-mib.yaml` | UPS metrics                         | UPS devices         |
+| Profile             | Provides                                  | Typical Use        |
+|---------------------|-------------------------------------------|--------------------|
+| `_system-base.yaml` | Basic system info (uptime, name, contact) | All devices        |
+| `_std-if-mib.yaml`  | Interface statistics (IF-MIB)             | Network devices    |
+| `_std-ip-mib.yaml`  | IP-level statistics (IP-MIB)              | Routers, switches  |
+| `_std-tcp-mib.yaml` | TCP statistics                            | Servers, firewalls |
+| `_std-udp-mib.yaml` | UDP statistics                            | Servers, firewalls |
+| `_std-ups-mib.yaml` | Power and UPS metrics                     | UPS devices        |
 
 ### 3. metadata
 
-The `metadata `section defines **descriptive information** about the device, such as vendor, model, or serial number.
+The `metadata` section defines **device-level information** (not metric tags).
 
-This information is collected once per device and used to populate **device (virtual node) host labels** in Netdata.
+It is collected **once per device** and populates the device’s **host labels** in Netdata (the “virtual node” labels shown on the device page).
 
-**Example**:
+It always follows the structure `metadata → device → fields`, where each field defines a single label.
+
+Each field can be:
+
+- **Static** — `value:` is a fixed string.
+- **Dynamic** — `symbol:` reads the value from an SNMP OID.
 
 ```yaml
 metadata:
   device:
     fields:
       vendor:
-        value: "Cisco"
+        value: "Cisco"   # static label
       model:
-        symbol:
+        symbol: # dynamic label from SNMP
           OID: 1.3.6.1.2.1.47.1.1.1.1.2.1
           name: entPhysicalModelName
 ```
 
-In this example:
+**How it works**:
 
-- The` vendor` label is set statically to `Cisco`.
-- The `model` label is retrieved from the SNMP object entPhysicalModelName.
+- `vendor` is set statically to `"Cisco"`.
+- `model` is collected from `entPhysicalModelName`.
+- These values appear as **device (virtual node) host labels** in the UI. They are **not** per-metric tags.
 
-The exact metadata syntax and field options will be covered in detail later in this document.
+:::tip
+
+See [**Tag Transformation**](#tag-transformation) for supported transformations and syntax examples.
+
+:::
 
 ### 4. metrics
 
-The `metrics` section defines **what data to collect** from the device — which OIDs to read, how to interpret them, and how to display them as charts in Netdata.
+The `metrics` section defines **what data to collect** from the device — which OIDs to query, how to interpret them, and how to display them as charts in Netdata.
 
-You can define **as many metrics as needed**, mixing both scalar and table types freely.
+**Metrics can be**:
 
-The collector automatically handles **SNMP GET** and **WALK** operations as appropriate.
+- **Scalars** — single values that apply to the entire device (for example, uptime).
+- **Tables** — repeating rows of related values (for example, interfaces, disks, sensors).
 
-There are two main types of metrics:
+The collector automatically uses **SNMP GET** for scalars and **SNMP BULKWALK** for tables.
 
-- **Scalar metrics** — single values (e.g., system uptime, CPU load).
-- **Table metrics** — repeated rows (e.g., interfaces, disks, sensors).
+```yaml
+metrics:
+  - MIB: HOST-RESOURCES-MIB
+    symbol:
+      OID: 1.3.6.1.2.1.1.3.0
+      name: systemUptime
+      scale_factor: 0.01  # Value is in hundredths of a second
+      chart_meta:
+        description: Time since the system was last rebooted or powered on
+        family: 'System/Uptime'
+        unit: "s"
 
-**Examples**:
-
-- Scalar metrics:
-    ```yaml
-    metrics:
-      - name: sysUpTime
-        symbol:
-          OID: 1.3.6.1.2.1.1.3.0
-          name: sysUpTime
+  - MIB: IF-MIB
+    table:
+      OID: 1.3.6.1.2.1.31.1.1
+      name: ifXTable
+    symbols:
+      - OID: 1.3.6.1.2.1.31.1.1.1.6
+        name: ifHCInOctets
         chart_meta:
-          description: System uptime
-          unit: seconds
-    ```
+          description: Traffic
+          family: 'Network/Interface/Traffic/In'
+          unit: "bit/s"
+        scale_factor: 8  # Octets → bits
+    metric_tags:
+      - tag: interface
+        symbol:
+          OID: 1.3.6.1.2.1.31.1.1.1.1
+          name: ifName
+```
 
-- Table metrics:
-    ```yaml
-    metrics:
-      - name: ifInOctets
-        table:
-          OID: 1.3.6.1.2.1.2.2
-          name: ifTable
-        symbols:
-          - OID: 1.3.6.1.2.1.2.2.1.10
-            name: ifInOctets
-        metric_tags:
-          - tag: interface
-            column:
-              OID: 1.3.6.1.2.1.31.1.1.1.1
-              name: ifName
-    ```
+**How it works**:
 
-More detailed syntax, value modifiers, and tagging options will be covered later in this document.
+- Each entry defines a metric or table of metrics to collect via SNMP.
+- Scalars use a single `symbol`, while tables define a `table` and one or more `symbols`.
+- Metrics can include transformations (`extract_value`, `scale_factor`, etc.) and chart metadata.
+- Table metrics can include tags (`metric_tags`) to identify rows by interface, disk, or other attributes.
+
+:::tip
+
+See also
+
+- [Collecting Metrics](#collecting-metrics)  — explains SNMP OIDs, scalars, and tables.
+- [Scalar Metrics](#scalar-metrics-single-values) — detailed syntax for single-value metrics.
+- [Table Metrics](#table-metrics-multiple-rows)— how tables and row indexes work.
+- [Adding Tags to Metrics](#adding-tags-to-metrics) — tag types and how to label table rows.
+- [Tag Transformations](#tag-transformation) — extract, match, or map tag values.
+- [Value Transformations](#value-transformation) — manipulate or scale collected values.
+- [Virtual Metrics](#virtual-metrics) — build new metrics from existing ones.
+
+:::
 
 ### 5. metric_tags
 
-The `metric_tags` section defines **global tags** — values collected once from the device and applied to **every metric** produced by the profile.
+The `metric_tags` section defines **global dynamic tags** — values collected once from the device and applied to **every metric** in the profile.
 
-Global tags help you:
+They are evaluated during collection, just like other SNMP symbols, and remain the same for all metrics within that device.
 
-- Attach consistent metadata across all collected data.
-- Group and filter metrics in Netdata dashboards and alerts.
-- Complement tags defined inside individual metrics (for example, per-interface or per-sensor tags in tables).
+**Typical uses**:
 
-**Example**:
+- Attach device-wide metadata such as serial number, firmware version, or model.
+- Enable grouping and filtering by hardware, OS, or vendor attributes.
+- Complement per-metric tags (for example, per-interface or per-sensor tags in tables).
 
 ```yaml
 metric_tags:
-  - OID: 1.3.6.1.4.1.14988.1.1.4.1.0
-    symbol: mtxrLicSoftwareId
-    tag: software_id
-  - OID: 1.3.6.1.4.1.14988.1.1.4.4.0
-    symbol: mtxrLicVersion
-    tag: license_version
+  - tag: fs_sys_serial
+    symbol:
+      OID: 1.3.6.1.4.1.12356.106.1.1.1.0
+      name: fsSysSerial
+  - tag: fs_sys_version
+    symbol:
+      OID: 1.3.6.1.4.1.12356.106.4.1.1.0
+      name: fsSysVersion
 ```
 
-In this example:
+**How it works**:
 
-- The tag `software_id` is populated from the SNMP object `mtxrLicSoftwareId`.
-- The tag `license_version` is populated from `mtxrLicVersion`.
+- Each tag is collected once per device, not per metric or per table row.
+- The resulting tag values are attached to **all metrics** collected by the profile.
+- Tags can be transformed (for example, reformatted or mapped) using the same rules as per-metric tags.
+
+:::tip
+
+See [**Tag Transformation**](#tag-transformation) for supported transformations and syntax examples.
+
+:::
 
 ### 6. static_tags
 
-The `static_tags` section defines **fixed key–value tags** that are attached to every metric produced by the profile.
+The `static_tags` section defines **fixed key–value pairs** that are attached to every metric collected by the profile.
 
-They are useful for:
+They don’t depend on SNMP data and remain constant for all devices using the profile.
 
-- Adding constant metadata such as environment, region, or service.
-- Tagging all collected metrics with deployment-specific identifiers.
-- Making it easier to group and filter data in dashboards and alerts.
+**Typical uses**:
 
-**Example**:
+- Add environment or deployment identifiers (for example, `environment`, `region`, or `service`).
+- Simplify filtering, grouping, and alerting across metrics from multiple devices.
+- Provide consistent context (for example, datacenter or team ownership).
 
 ```yaml
 static_tags:
-  - environment:production
-  - region:us-east-1
-  - service:network
+  - tag: environment
+    value: production
+  - tag: region
+    value: us-east-1
+  - tag: service
+    value: network
 ```
 
-In this example:
+**How it works**:
 
-- Every metric collected from matching devices will include these static tags.
-- Static tags are merged with any dynamic tags defined elsewhere (metric_tags, table tags, etc.).
+- Each tag is added to **all metrics** collected by the profile.
+- Static tags are merged with any dynamic tags defined in `metric_tags`.
+- Device-specific or dynamic tags always take precedence if they overlap.
 
 ### 7. virtual_metrics
 
-The `virtual_metrics` section defines **calculated or combined metrics** — values derived from other metrics rather than collected directly from SNMP.
+The `virtual_metrics` section defines **calculated metrics** built from other metrics already collected by the profile.
 
-Virtual metrics are useful for:
+They don’t query SNMP directly — instead, they reuse existing metric values to produce totals, sums, or fallbacks.
 
-- Combining related counters (for example, totals or aggregates).
-- Creating fallbacks (for example, prefer 64-bit counters, but use 32-bit if unavailable).
-- Summing or grouping metrics per interface, CPU, or other tags.
+:::tip
+
+See [**Virtual Metrics**](#virtual-metrics) for the complete reference, configuration options, and advanced examples.
+
+:::
+
+**Typical uses**:
+
+- Combine related counters (for example, `in` + `out` traffic or errors).
+- Create fallbacks (prefer 64-bit counters, fall back to 32-bit if missing).
+- Aggregate or group metrics per tag (for example, total per interface or per type).
 
 ```yaml
-  - name: ifTotalErrors
+  - name: ifTotalTraffic
     sources:
-      - { metric: _ifInErrors,  table: ifTable, as: in }
-      - { metric: _ifOutErrors, table: ifTable, as: out }
+      - { metric: ifHCInOctets,  table: ifXTable, as: in }
+      - { metric: ifHCOutOctets, table: ifXTable, as: out }
     chart_meta:
-      description: Total packets with errors across all interfaces
-      family: 'Network/Total/Error'
-      unit: "{error}/s"
+      description: Total traffic across all interfaces
+      family: 'Network/Total/Traffic'
+      unit: "bit/s"
 ```
 
-In this example:
+**How it works**:
 
-- The virtual metric `ifTotalErrors` combines two existing table metrics — inbound and outbound errors.
-- Each source is identified by its metric name (`_ifInErrors`, `_ifOutErrors`) and the table it comes from (`ifTable`).
-- The `as` field labels the dimensions (`in` and `out`) in the resulting chart.
-
-Virtual metrics behave like regular metrics in Netdata — they can have `chart_meta`, appear in charts, and be used in alerts — but their values are **computed dynamically** based on other metrics collected by the profile.
+- Defines a new virtual metric named `ifTotalTraffic`.
+- Uses existing metrics (`ifHCInOctets`, `ifHCOutOctets`) as sources.
+- The as field names the resulting dimensions (`in`, `out`).
+- The resulting chart behaves like a regular metric — visible in dashboards, alertable, and included in exports.
 
 ## Collecting Metrics
 
