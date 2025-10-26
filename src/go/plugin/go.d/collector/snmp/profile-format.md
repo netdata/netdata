@@ -105,7 +105,7 @@ metrics:
           OID: 1.3.6.1.2.1.31.1.1.1.1
           name: ifName
 
-# add dynamic  tags to all metrics
+# add dynamic tags to all metrics
 metric_tags:
   - tag: fs_sys_version
     symbol:
@@ -418,7 +418,7 @@ See [**Virtual Metrics**](#virtual-metrics) for the complete reference, configur
 
 - Defines a new virtual metric named `ifTotalTraffic`.
 - Uses existing metrics (`ifHCInOctets`, `ifHCOutOctets`) as sources.
-- The as field names the resulting dimensions (`in`, `out`).
+- The `as` field names the resulting dimensions (`in`, `out`).
 - The resulting chart behaves like a regular metric — visible in dashboards, alertable, and included in exports.
 
 ## Collecting Metrics
