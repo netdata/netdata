@@ -306,84 +306,148 @@ Virtual metrics behave like regular metrics in Netdata — they can have `chart_
 
 ## Collecting Metrics
 
-This section explains how SNMP data is organized and how it maps to metrics in a profile.
-
----
+This section explains how SNMP data is structured and how it maps to metrics in a Netdata profile.
 
 ### Understanding SNMP Data
 
-SNMP data is organized as a **tree** of numeric addresses called **OIDs (Object Identifiers)** — similar to file paths.
+SNMP data is organized as a **hierarchical tree** of numeric identifiers called **OIDs** (**Object Identifiers**).
+
+Each OID uniquely identifies a value on a device — similar to a file path in a filesystem.
 
 ```text
 1.3.6.1.2.1.1.3.0
-└─┬─┘ └──┬──┘ └┬┘
-  │      │     └─ Instance (0 = scalar)
-  │      └─ Object (3 = sysUpTime)
-  └─ MIB-2 prefix
+│ │ │ │ │ │ │ └── Instance (0 = scalar)
+│ │ │ │ │ │ └──── Object (3 = sysUpTime)
+│ │ │ │ │ └────── Branch: system (MIB-2)
+│ │ │ └────────── MIB-2 root
+└─ SNMP global prefix
 ```
 
-- **MIBs** are collections of OIDs grouped by purpose (e.g., `IF-MIB`, `HOST-RESOURCES-MIB`).
-- Each OID points to a value: integer, counter, string, or status.
-- Profiles refer to OIDs either directly by number or via their symbolic name.
+- **MIBs** (Management Information Bases) are named collections of related OIDs.
+
+  Examples: `IF-MIB` (interfaces), `IP-MIB` (IP statistics), `HOST-RESOURCES-MIB` (system info).
+- Each OID maps to a **typed value**, such as `Counter64`, `Gauge32`, `Integer`, or `TimeTicks`.
+- Some OIDs represent **single values** (scalars), while others represent **tables** of related values (rows).
 
 ### Scalar Metrics (Single Values)
 
-Scalar metrics represent **a single value for the entire device**.
+Scalar metrics represent a **single value for the entire device**.
 
-Their OIDs always end with `.0`.
+Their OIDs always end with `.0`, which denotes the **instance number** for a scalar object.
 
 ```yaml
 metrics:
-  - name: sysUpTime
+  - MIB: HOST-RESOURCES-MIB
     symbol:
       OID: 1.3.6.1.2.1.1.3.0
-      name: sysUpTime
+      name: systemUptime
+      scale_factor: 0.01  # Value is in hundredths of a second
+      chart_meta:
+        description: Time since the system was last rebooted or powered on.
+        family: 'System/Uptime'
+        unit: "s"
 ```
 
-Common examples include uptime, system name, temperature, and overall status.
+**What this does**:
+
+- Collects the `sysUpTime` value once per device.
+- The `.0` at the end indicates there is only **one instance** of this value.
+- Common scalar metrics: device uptime, total memory, or overall temperature.
 
 ### Table Metrics (Multiple Rows)
 
-Table metrics represent **lists of related values** — one row per interface, disk, or sensor.
+Table metrics represent **lists of related values**, such as one entry per network interface, disk, or CPU.
 
-Each row is identified by an **index**, such as `.1`, `.2`, `.3`.
+Each row in a table is identified by an **index** appended to the base OID — for example:
 
-**Note**: Table data MUST have tags to identify each row in Netdata. Without tags, you can't tell which metric belongs to which interface/CPU/disk
+```text
+ifHCInOctets.1 = 1024
+ifHCInOctets.2 = 2048
+```
+
+- `.1`, `.2`, … are `row indexes` that identify the instance (e.g., interface #1, interface #2).
+- Each column (symbol) in the table has its own OID pattern but shares the same row indexes.
+
+> Table metrics **must define at least one tag** (`metric_tags`) to identify each row.
+> Without tags, only a single row can be emitted.
 
 ```yaml
 metrics:
-  - name: ifInOctets
+  - MIB: IF-MIB
     table:
-      OID: 1.3.6.1.2.1.2.2
-      name: ifTable
+      OID: 1.3.6.1.2.1.31.1.1
+      name: ifXTable
     symbols:
-      - OID: 1.3.6.1.2.1.2.2.1.10
-        name: ifInOctets
+      - OID: 1.3.6.1.2.1.31.1.1.1.6
+        name: ifHCInOctets
+        chart_meta:
+          description: Traffic
+          family: 'Network/Interface/Traffic/In'
+          unit: "bit/s"
+        scale_factor: 8  # Octets → bits
     metric_tags:
       - tag: interface
-        column:
+        symbol:
           OID: 1.3.6.1.2.1.31.1.1.1.1
           name: ifName
 ```
 
+**How Table Metrics Expand into Rows**
+
+```text
+SNMP Table: ifTable
+───────────────────────────────────────────────
+Index | ifName | ifHCInOctets
+───────────────────────────────────────────────
+1     | eth0   | 1024
+2     | eth1   | 2048
+───────────────────────────────────────────────
+
+metric_tags:
+  - tag: interface
+    symbol:
+      OID: 1.3.6.1.2.1.31.1.1.1.1   # ifName
+
+Resulting metrics:
+───────────────────────────────────────────────
+ifHCInOctets{interface="eth0"} = 1024
+ifHCInOctets{interface="eth1"} = 2048
+───────────────────────────────────────────────
+```
+
+**How it works**:
+
+1. The collector reads both columns (`ifHCInOctets` and `ifName`) from the same table.
+2. It aligns rows using their shared SNMP index (`1`, `2`, …).
+3. Each metric is emitted with its corresponding tag from the same row.
+
+**What this does**:
+
+- Collects traffic (`ifHCInOctets`) from each interface.
+- Tags each row with its name (`ifName`) from the same index.
+- Produces metrics like:
+    ```text
+    ifHCInOctets{interface="eth0"} = 1024
+    ifHCInOctets{interface="eth1"} = 2048
+     ```
+
 ### Metric Types
 
-Netdata needs to know **how to interpret each metric’s value**.
-The type determines how the value is processed and displayed (e.g., as an instantaneous gauge or a per-second rate).
+Each SNMP value has a data type that determines **how Netdata interprets and displays it**.
 
-Most of the time, the type is **detected automatically** from the SNMP data type, but you can override it if necessary.
+The collector automatically detects the appropriate **metric type** (e.g., `gauge` or `rate`), but you can override it manually.
 
-**Automatic Type Detection**:
+**Automatic Type Detection**
 
-| **SNMP Type**            | **Default Netdata Type** | **Typical Use**                         |
-|--------------------------|--------------------------|-----------------------------------------|
-| `Counter32`, `Counter64` | `rate`                   | Network traffic, packet counters        |
-| `Gauge32`, `Integer`     | `gauge`                  | Temperatures, CPU usage, current values |
-| `TimeTicks`              | `gauge`                  | Uptime, time-based values               |
+| SNMP Type                | Default Netdata Type | Typical Use                          |
+|--------------------------|----------------------|--------------------------------------|
+| `Counter32`, `Counter64` | `rate`               | Network traffic, packet counters     |
+| `Gauge32`, `Integer`     | `gauge`              | Temperatures, usage levels, statuses |
+| `TimeTicks`              | `gauge`              | Uptime, time-based values            |
 
-**Overriding the Metric Type**:
+**Overriding the Metric Type**
 
-You can explicitly set a metric type using the metric_type field inside a symbol definition.
+You can explicitly set a metric’s type using the `metric_type` field inside a symbol definition.
 
 ```yaml
 metrics:
@@ -397,7 +461,10 @@ metrics:
         metric_type: gauge  # Override default 'rate'
 ```
 
-This example forces `ifInOctets` to be treated as a **gauge**, even though it’s an SNMP counter (normally converted to a per-second rate).
+**What this does**:
+
+- Forces `ifInOctets` to be treated as a **gauge** (instantaneous value) instead of a rate.
+- Normally, `Counter` types are automatically converted to per-second rates.
 
 ## Adding Tags to Metrics
 
