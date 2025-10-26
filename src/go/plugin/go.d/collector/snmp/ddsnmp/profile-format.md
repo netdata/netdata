@@ -401,39 +401,117 @@ This example forces `ifInOctets` to be treated as a **gauge**, even though it’
 
 ## Adding Tags to Metrics
 
-Tags help **organize and filter metric**s in Netdata.
+Tags add **context and identity** to SNMP metrics.
 
-They **identify specific instances** of metrics (for example, which interface or disk a value belongs to) and enable grouping and filtering in the UI.
+They let you distinguish between instances (for example, which interface, disk, or IP) and allow filtering and grouping in the Netdata UI.
+
+**The collector**:
+
+- Attaches tags to each metric as labels.
+- Uses tags to differentiate rows when building charts.
+- Requires at least one tag for every **table metric** (to identify each row).
+- Ignores tags for **scalar metrics**, which represent a single value per device.
 
 **Key Concepts**:
 
-- **Table metrics must have tags** — Tags uniquely identify each row (instance). Without tags, table metrics cannot be created.
-- **Scalar metrics don’t need tags** — They represent a single value for the entire device.
-- **Static tags** apply the same value to all metrics.
-- **Dynamic tags** extract values from the device via SNMP.
-- **Global tags** (defined in `metric_tags` at the top level) apply to all metrics in the profile.
+| Concept                            | Description                                                                                                                                   |
+|------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------|
+| **Table metrics must have tags**   | Each table row must be uniquely identified by at least one tag (for example, interface name or index). Without tags, only one row is emitted. |
+| **Scalar metrics don’t need tags** | Scalars represent one value for the entire device, not per-instance data.                                                                     |
+| **Static tags**                    | Fixed values that never change (for example, datacenter, environment).                                                                        |
+| **Dynamic tags**                   | Extracted from SNMP data — from table columns, related tables, or row indexes.                                                                |
+| **Global tags**                    | Defined in the profile’s top-level `metric_tags` section and applied to all metrics.                                                          |
 
-**Tag Types and Transformations**:
+**Tag Types and Available Transformations**:
 
-| **Tag Type**    | **Description**                                      | **Available Transformations**                   |
-|-----------------|------------------------------------------------------|-------------------------------------------------|
-| **Static**      | Fixed values that never change.                      | None (fixed value).                             |
-| **Same-Table**  | Values from columns in the same table as the metric. | Mapping, Pattern, Extract Value, Match Pattern. |
-| **Cross-Table** | Values from a different table.                       | Mapping, Pattern, Extract Value, Match Pattern. |
-| **Row Index**   | Values derived from the SNMP table row index.        | Mapping only.                                   |
+| Tag Type            | Description                                                     | Supported Transformations                                                     |
+|---------------------|-----------------------------------------------------------------|-------------------------------------------------------------------------------|
+| **Static**          | Fixed tags with constant values.                                | None (value is fixed).                                                        |
+| **Same-Table**      | Values from columns in the same table as the metric.            | `mapping`, `extract_value`, `match_pattern` + `match_value`, `match` + `tags` |
+| **Cross-Table**     | Values from another table.                                      | `mapping`, `extract_value`, `match_pattern` + `match_value`, `match` + `tags` |
+| **Index-Based**     | Values derived from the OID index of each row.                  | `mapping` (optional)                                                          |
+| **Index Transform** | Adjusts multi-part indexes so cross-table tags align correctly. | — (structural, not a transformation)                                          |
 
-**Important**: Only one transformation is applied per tag, in the order shown above. If no transformation applies, the raw value is used.
+**Summary**:
+
+- Each **table metric** must define at least one **tag source** (`metric_tags`) to distinguish rows.
+- Tags can come from **the same table**, **another table**, or the **row index** itself.
+- Tag transformations (`mapping`, `extract_value`, `match_pattern`, `match + tags`) can modify or extract parts of raw values.
+- **Static tags** apply globally and are not transformed.
+- **Index transformations** are a special mechanism used only for aligning multi-part indexes between tables.
+
+**How the Collector Matches Values and Tags**:
+
+```text
+SNMP Table (ifTable)
+───────────────────────────────────────────────
+Index | ifDescr        | ifInOctets
+───────────────────────────────────────────────
+1     | eth0           | 1024
+2     | eth1           | 2048
+───────────────────────────────────────────────
+
+metric_tags:
+  - tag: interface
+    symbol:
+      OID: 1.3.6.1.2.1.2.2.1.2   # ifDescr
+
+Resulting metrics:
+───────────────────────────────────────────────
+ifInOctets{interface="eth0"} = 1024
+ifInOctets{interface="eth1"} = 2048
+───────────────────────────────────────────────
+```
+
+How it works:
+
+1. The collector walks the table and collects both columns: `ifInOctets` (value) and `ifDescr` (tag source).
+2. It aligns them by their shared SNMP index (`1`, `2`, …).
+3. Each metric row is tagged with the corresponding column value from the same index.
+
+**Cross-Table Example**:
+
+```text
+SNMP Tables: ifTable + ifXTable
+───────────────────────────────────────────────
+ifTable.ifInOctets.1  = 1024
+ifTable.ifInOctets.2  = 2048
+
+ifXTable.ifName.1     = "eth0"
+ifXTable.ifName.2     = "eth1"
+───────────────────────────────────────────────
+
+metric_tags:
+  - tag: interface
+    table: ifXTable
+    symbol:
+      OID: 1.3.6.1.2.1.31.1.1.1.1   # ifName
+
+Result:
+───────────────────────────────────────────────
+ifInOctets{interface="eth0"} = 1024
+ifInOctets{interface="eth1"} = 2048
+───────────────────────────────────────────────
+```
+
+How it works:
+
+- The collector collects metrics from `ifTable` but fetches tag values from `ifXTable`.
+- It matches rows from both tables using their shared index (`.1`, `.2`, …).
+- The `interface` tag is populated from `ifXTable.ifName` for each matching row
 
 ### Static
 
-Static tags are fixed values that never change.
+Static tags define **fixed key–value pairs** that are attached to metrics without being collected from SNMP.
 
-#### Profile-level static tags
+They are useful for identifying **environment**, **location**, or other context that applies to all collected data.
 
-Applied to ALL metrics in the profile:
+#### Profile-level Static Tags
+
+Profile-level static tags apply to **all metrics** defined in the profile.
 
 ```yaml
-# Global static tags (all metrics)
+# Global static tags (applied to all metrics)
 static_tags:
   - tag: datacenter
     value: "DC1"
@@ -441,9 +519,19 @@ static_tags:
     value: "production"
 ```
 
-#### Metric-level static tags
+**What this does**:
 
-Applied only to specific metrics:
+- These tags are injected into every metric reported by the profile.
+
+**Typical use cases**:
+
+- Identify the datacenter, region, or cluster where the device belongs.
+- Mark metrics from staging or production environments.
+- Add organization-wide context that doesn’t depend on SNMP data.
+
+#### Metric-level Static Tags
+
+Metric-level static tags apply to **specific metrics only**.
 
 ```yaml
 # Metric-specific static tags
@@ -462,9 +550,25 @@ metrics:
         value: "physical"
 ```
 
+**What this does**:
+
+- Adds the tags `source=snmp` and `interface_type=physical` only to the `ifInOctets` metric.
+- Does not affect other metrics in the same profile.
+
+> Metric-level static tags are technically supported but rarely needed.
+> In most cases, prefer profile-level `static_tags` for consistency and simplicity.
+
 ### Same-Table
 
-Same-table tags extract values from columns in the same SNMP table as the metric.
+Same-table tags extract values from **columns in the same SNMP table** as the metric.
+
+They are the most common way to label per-row metrics with identifiers like interface names or indexes.
+
+**The collector**:
+
+- Retrieves both the metric value and the tag column from the same table row.
+- Automatically aligns rows by their shared index.
+- Adds the tag to every metric collected from that row.
 
 ```yaml
 metrics:
@@ -482,15 +586,42 @@ metrics:
           name: ifDescr
 ```
 
-Produces metrics like: `ifInOctets{interface="eth0"} = 1000`.
+**What this does**:
+
+- Collects `ifInOctets` (input bytes) for each row in `ifTable`.
+- Reads the `ifDescr` column from the same table to label each row.
+- Produces metrics like:
+    ```text
+    ifInOctets{interface="eth0"} = 1000
+    ifInOctets{interface="eth1"} = 2000
+    ```
 
 ### Cross-Table
 
-Cross-table tags allow you to **use data from another SNMP table** as a tag source.
+Cross-table tags let you **use data from another SNMP table** as a tag source.
+
+**The collector**:
+
+- Reads tag values from the specified `table:` instead of the current one.
+- Matches rows between tables by their **index**.
+- When index structures differ, an optional `index_transform` can modify the current table’s index to align it with the target.
 
 #### Same Index
 
-Pull tag values from another table:
+Two tables are said to have the **same index** when their row identifiers (OID suffixes after the base OID) are identical — meaning they describe the same entity.
+
+In practice, this means that the row number (index) in one table corresponds directly to the same row in another.
+
+For example:
+
+```text
+ifTable.ifInOctets.2  = 123456
+ifXTable.ifName.2     = "xe-0/0/1"
+```
+
+Both OIDs end with `.2`, so they refer to the same interface.
+
+This allows you to use `ifName` (from `ifXTable`) as a tag for metrics collected from `ifTable`.
 
 ```yaml
 metrics:
@@ -509,9 +640,36 @@ metrics:
           name: ifName
 ```
 
+**What this does**:
+
+- Collects `ifInOctets` from `ifTable`.
+- Finds the row with the same index in `ifXTable` (e.g., `.2`).
+- Uses `ifName` as the `interface` tag.
+- Produces metrics like:
+    ```text
+    ifInOctets{interface="xe-0/0/1"} = 123456
+    ```
+
 #### With Index Transformation
 
-This is common when related tables (for example, IP and interface tables) use **different index structures**.
+Some tables describe related data but use **different index structures** — meaning their OID suffixes don’t line up directly.
+
+For example, in `ipIfStatsTable` the index contains **two parts**:
+
+```text
+ipIfStatsTable.ipIfStatsHCInOctets.2.1 = 38560
+ipIfStatsTable.ipIfStatsHCInOctets.2.2 = 44408
+```
+
+Here:
+
+- The first component (`2`) is the **IP version** (e.g., 2 = IPv4, 3 = IPv6).
+- The second component (`1`, `2`, `3`, …) is the **interface index**.
+- `ifXTable`, on the other hand, uses only the interface index (`1`, `2`, `3`, …).
+
+Because the indexes differ, they can’t be matched directly.
+
+To fix this, use `index_transform` to **select only the relevant part of the index** so it matches the target table’s format.
 
 ```yaml
 metrics:
@@ -527,13 +685,6 @@ metrics:
           family: 'Network/Interface/IP/Traffic/Total/In'
           unit: "bit/s"
         scale_factor: 8
-      - OID: 1.3.6.1.2.1.4.31.3.1.33
-        name: ipIfStatsHCOutOctets
-        chart_meta:
-          description: Total outbound IP octets
-          family: 'Network/Interface/IP/Traffic/Total/Out'
-          unit: "bit/s"
-        scale_factor: 8
     metric_tags:
       - tag: _interface
         table: ifXTable
@@ -545,58 +696,86 @@ metrics:
             end: 1
 ```
 
-In this example, the `ipIfStatsTable` uses an **interface index** that includes multiple components, while `ifXTable` uses a simpler index (just the interface number).
-The `index_transform` block extracts only the portion of the index needed to align the two tables.
+**What this does**:
+
+- Collects IP traffic metrics from `ipIfStatsTable`.
+- Keeps only the **second index element** (`start: 1`, `end: 1`) from `2.1` → becomes `1`.
+- Looks up that interface index in `ifXTable` to find the corresponding `ifName`.
+- Produces:
+    ```yaml
+    ipIfStatsHCInOctets{_interface="xe-0/0/1"} = 38560
+    ```
 
 ##### How `index_transform` Works
 
-SNMP tables often use **different index formats**.
+`index_transform` tells the collector which parts of the current table’s index to keep when matching rows across tables.
 
-For example, one table might index rows by interface number, while another adds extra parts like address family or IP address.
-
-`index_transform` tells the collector **which parts of the index to keep** when matching rows between tables.
-
-Think of it as **“cutting out”** a portion of the index from the current table so it lines up with the target table.
-
-**Example**:
-
-- Index from `ipIfStatsTable`: `2.4.192.168.1.10`
-- Index from `ifXTable`: `2`
-- To match them, keep only the first number:
-    ```yaml
-      index_transform:
-      - start: 1
-        end: 1
-    ```
-    - Now the tag lookup uses index `2` to find the right row in `ifXTable`.
+| Concept            | Example                                                                                       |
+|--------------------|-----------------------------------------------------------------------------------------------|
+| **Original index** | `2.1` (from `ipIfStatsTable`) → `[ipVersion, ifIndex]`                                        |
+| **Target index**   | `1` (from `ifXTable`)                                                                         |
+| **Transform**      | `index_transform: [ { start: 1, end: 1 } ]`                                                   |
+| **Result**         | The collector keeps only the **second element** (`ifIndex = 1`), which now matches `ifXTable` |
 
 **In short**:
 
-- `start` and `end` define which parts of the index to keep (counting from 1).
-- You can list multiple ranges to join non-contiguous parts.
-- The goal is simply to make the current table’s index **look like** the target table’s index so the tag matches correctly.
+- `start` and `end` positions are **zero-based** (0 = first index element).
+- Each range defines which parts of the index to keep.
+- You can list multiple ranges to combine non-contiguous parts.
+- The goal is to make the current table’s index **match** the target table’s index so tags align correctly.
 
-### Row Index
+### Index-Based
 
-Sometimes the SNMP table index itself is meaningful (e.g., compound identifiers):
+Index-based tags extract values directly from the **OID index** of the SNMP table rather than from a column.
+
+This is useful when a table encodes identifiers (like method, code, or port number) as part of the OID itself instead of storing them in separate columns.
+
+**The collector**:
+
+- Splits the table’s row index into numbered parts (1-based).
+- For each `index:` rule, assigns a tag using the specified position in the index.
+- Converts numeric index components to strings automatically.
+- Attaches all resulting tags to the metric collected from that row.
 
 ```yaml
 metrics:
-  - MIB: CISCO-FIREWALL-MIB
+  - MIB: SIP-COMMON-MIB
     table:
-      OID: 1.3.6.1.4.1.9.9.147.1.2.2.2
-      name: cfwConnectionStatTable
+      name: sipCommonStatusCodeTable
+      OID: 1.3.6.1.2.1.149.1.5.1
     symbols:
-      - OID: 1.3.6.1.4.1.9.9.147.1.2.2.2.1.5
-        name: cfwConnectionStatValue
+      - OID: 1.3.6.1.2.1.149.1.5.1.1.3
+        name: sipCommonStatusCodeIns
+        chart_meta:
+          family: 'Network/VoIP/SIP/Response/StatusCode/In'
+          description: Total number of response messages received with the specified status code
+          unit: "{response}/s"
     metric_tags:
-      - index: 1  # first index part
-        tag: service_type
-      - index: 2  # second index part
-        tag: stat_type
+      - index: 1
+        tag: applIndex
+      - index: 2
+        tag: sipCommonStatusCodeMethod
+      - index: 3
+        tag: sipCommonStatusCodeValue
 ```
 
-This produces metrics like: `cfwConnectionStatValue{service_type="80", stat_type="bytes"} = 123456`.
+**What this does**:
+
+- Extracts the first three components of each row’s OID index and uses them as tags.
+- For example, if the full OID is:
+    ```text
+    1.3.6.1.2.1.149.1.5.1.1.3.1.6.200
+    ```
+  The collector interprets:
+    ```ini
+    applIndex=1
+    sipCommonStatusCodeMethod=6
+    sipCommonStatusCodeValue=200
+    ```
+- Produces metrics like:
+    ```text
+    sipCommonStatusCodeIns{applIndex="1", sipCommonStatusCodeMethod="6", sipCommonStatusCodeValue="200"} = 42
+    ```
 
 ## Tag Transformation
 
