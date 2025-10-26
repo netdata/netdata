@@ -23,6 +23,21 @@ Module: snmp
 
 This SNMP collector discovers and monitors SNMP-enabled devices using **profiles**.
 
+:::tip
+
+See: [SNMP Profile Format](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/snmp/profile-format.md) to learn how to write profiles and define their fields.
+
+**Profile locations**
+
+| Type | Default path | Notes |
+|------|---------------|--------|
+| **Stock profiles** | `/usr/lib/netdata/conf.d/go.d/snmp.profiles/default/` | Provided with Netdata. |
+| **User profiles**  | `/etc/netdata/go.d/snmp.profiles/` | Place your custom or modified profiles here. |
+
+Depending on your installation method, both paths may include the `/opt/netdata` prefix.
+
+:::
+
 A *profile* declares:
 - device selectors (e.g. `sysObjectID`, `sysDescr`) for auto-matching,
 - which OIDs to collect (scalars and tables),
@@ -58,7 +73,7 @@ SNMP service discovery can automatically scan configured networks and feed the S
 - Supports single IPs, ranges, and CIDR blocks (up to 512 IPs per subnet).
 - Uses the provided SNMP credentials (v1/v2c/v3) to probe devices.
 - Caches discovery results (configurable) to reduce network load.
-- At collection time, each discovered device is matched to the appropriate profile based on its `sysObjectID`, `sysDescr`, and the profile’s selector rules.
+- At collection time, each discovered device is matched to the appropriate [profile](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/snmp/profile-format.md) based on its `sysObjectID`, `sysDescr`, and the profile’s selector rules.
 
 The configuration file name is [go.d/sd/snmp.conf](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/sd/snmp.conf).
 
@@ -84,6 +99,12 @@ The default configuration for this integration does not impose any limits on dat
 ## Metrics
 
 Metrics and charts are **defined by the matched SNMP profile(s)** at runtime. They differ by vendor/model/OS and may include, for example, interface counters, optics, CPU/memory, temperature, VLANs, and more. Use the **Metrics** tab on the device’s dashboard to see exactly what is collected for that device.
+
+:::tip
+
+ To understand the structure of these profiles (metrics, tags, virtual metrics, etc.), see **[SNMP Profile Format](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/snmp/profile-format.md)**.
+
+:::
 
 If `ping.enabled` is true, ICMP latency/packet-loss charts are also provided (or exclusively, when `ping_only: true`).
 
