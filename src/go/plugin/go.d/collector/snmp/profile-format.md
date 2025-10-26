@@ -2,13 +2,23 @@
 
 ## Overview
 
-An **SNMP profile** defines how _Netdata monitors a specific type of SNMP device_.
+An **SNMP profile** defines _how a specific class of devices is monitored through SNMP_.
 
-It tells the collector **which OIDs to query, how to interpret their values**, and **how to present them** as metrics, dimensions, and tags in Netdata.
+:::info
 
-Profiles describe entire device families — routers, switches, firewalls, UPSes, printers — declaratively, so you don’t have to hard-code OIDs or chart logic.
+SNMP profiles are reusable and declarative — you never need to modify the collector source code to support new devices.
 
-Each profile combines several sections that describe what to monitor and how
+:::
+
+It tells the Netdata SNMP collector:
+
+- which **OIDs** to query
+- how to **interpret** the returned values
+- how to **transform** them into **metrics**, **dimensions**, **tags**, and **metadata**
+
+Profiles make it possible to describe _entire device families_ (switches, routers, UPSes, firewalls, printers, etc.) declaratively — so you don’t need to hard-code logic in Go or manually define metrics for each device.
+
+Each profile is a single YAML file that can be reused, extended, and combined.
 
 ### How Profiles Work
 
@@ -23,38 +33,32 @@ When Netdata connects to an SNMP device, the collector:
     - Build [virtual metrics](#virtual-metrics) (derived totals, fallbacks, or aggregates).
     - Gather [metadata](#3-metadata) and [tags](#5-metric_tags) for labeling and grouping.
 
-**Visual: Profile Lifecycle**
+**Profile Lifecycle**
 
 ```text
-            +--------------------------+
-            |      SNMP Device         |
-            | (sysObjectID, sysDescr)  |
-            +------------+-------------+
-                         |
-                         v
-               [ Profile Matching ]
-                    selector
-                         |
-                         v
-          +--------------+---------------+
-          |     Profile Definition        |
-          |-------------------------------|
-          | extends        → inherit bases |
-          | metadata       → device labels |
-          | metrics        → OIDs to read  |
-          | metric_tags    → global tags   |
-          | static_tags    → fixed tags    |
-          | virtual_metrics → calculations |
-          +--------------+---------------+
-                         |
-                         v
-              [ SNMP Collector Execution ]
-                    (collects data)
-                         |
-                         v
-          +-------------------------------+
-          |     Netdata Metrics & Charts  |
-          +-------------------------------+
+┌──────────────────────┐
+│ SNMP Device          │ → provides sysObjectID/sysDescr
+└──────────┬───────────┘
+           ↓
+┌──────────────────────┐
+│ selector             │ → matches device profile
+├──────────────────────┤
+│ extends              │ → inherits base profiles
+├──────────────────────┤
+│ metadata             │ → device info (vendor, model, etc.)
+├──────────────────────┤
+│ metrics              │ → OIDs to collect
+├──────────────────────┤
+│ metric_tags          │ → dynamic tags for all metrics
+├──────────────────────┤
+│ static_tags          │ → fixed tags for all metrics
+├──────────────────────┤
+│ virtual_metrics      │ → calculated or aggregated metrics
+└──────────┬───────────┘
+           ↓
+┌──────────────────────┐
+│ Netdata charts & UI  │ → visualized in dashboard
+└──────────────────────┘
 ```
 
 ### Example: Complete SNMP Profile
@@ -159,7 +163,11 @@ virtual_metrics: <calculated metrics>
 
 ### 1. selector
 
-The `selector` defines **which devices this profile applies to**.
+You use the selector to:
+
+- Target specific **device families** (e.g., Cisco, Juniper, HP)
+- Match devices supporting specific **MIBs**
+- Exclude unwanted devices
 
 During discovery, Netdata evaluates all profiles; any profile whose selector matches a device is **applied **.
 
@@ -191,7 +199,7 @@ selector:
 
 ### 2. extends
 
-Use `extends` to **inherit and combine** existing profiles instead of duplicating common metrics.
+Use `extends` to inherit metrics, tags, and metadata from another profile instead of duplicating common metrics — perfect for vendor-specific variations of a base MIB.
 
 Most real profiles extend a few shared building blocks and then add device-specific definitions.
 
@@ -246,6 +254,12 @@ metadata:
           name: entPhysicalModelName
 ```
 
+:::info
+
+You can define multiple symbols for fallback — the first valid one will be used.
+
+:::
+
 **How it works**:
 
 - `vendor` is set statically to `"Cisco"`.
@@ -266,6 +280,13 @@ The `metrics` section defines **what data to collect** from the device — which
 
 - **Scalars** — single values that apply to the entire device (for example, uptime).
 - **Tables** — repeating rows of related values (for example, interfaces, disks, sensors).
+
+:::note
+
+A metric is **either scalar** (single value) or **table-based** (multiple rows).
+Never mix both in the same metric entry.
+
+:::
 
 The collector automatically uses **SNMP GET** for scalars and **SNMP BULKWALK** for tables.
 
