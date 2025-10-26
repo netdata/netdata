@@ -123,6 +123,7 @@ https://github.com/netdata/netdata/edit/master/docs/collecting-metrics/system-me
 https://github.com/netdata/netdata/edit/master/docs/collecting-metrics/application-metrics.md,Application metrics,Unpublished,Collecting Metrics,"Monitor and troubleshoot every application on your infrastructure with per-second metrics, zero configuration, and meaningful charts."
 https://github.com/netdata/netdata/edit/master/docs/collecting-metrics/container-metrics.md,Container metrics,Unpublished,Collecting Metrics,Use Netdata to collect per-second utilization and application-level metrics from Linux/Docker containers and Kubernetes clusters.
 https://github.com/netdata/netdata/edit/master/src/collectors/COLLECTORS.md,Monitor Anything,Published,Collecting Metrics,Netdata gathers real-time metrics from hundreds of data sources using collectors. Most require zero configuration and are pre-configured out of the box.
+https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/collector/snmp/profile-format.md,SNMP Profile Format,Published,Collecting Metrics,Learn how Netdata’s SNMP collector uses profiles.
 collectors_integrations,,,,
 ,,,,
 ,,,,

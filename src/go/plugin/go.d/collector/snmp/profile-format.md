@@ -604,6 +604,34 @@ metrics:
 - Forces `ifInOctets` to be treated as a **gauge** (instantaneous value) instead of a rate.
 - Normally, `Counter` types are automatically converted to per-second rates.
 
+### Chart Metadata
+
+Each metric or virtual metric can include an optional `chart_meta` block that defines how it appears in Netdata charts.
+
+This metadata **does not affect data collection** — it only controls how the chart is **named** and **grouped**  in the Netdata dashboard.
+
+```yaml
+metrics:
+  - MIB: IF-MIB
+    table:
+      OID: 1.3.6.1.2.1.2.2
+      name: ifTable
+    symbols:
+      - OID: 1.3.6.1.2.1.2.2.1.10
+        name: ifInOctets
+        chart_meta:
+          description: Inbound network traffic
+          family: 'Network/Interface/Traffic/In'
+          unit: "bit/s"
+```
+
+| Field         | Type   | Required | Description                                                                                       |
+|---------------|--------|----------|---------------------------------------------------------------------------------------------------|
+| `description` | string | no       | Human-readable description shown in dashboards and alerts.                                        |
+| `family`      | string | no       | Chart grouping path (slashes `/` define hierarchy). Helps organize charts by system or subsystem. |
+| `unit`        | string | no       | Display unit, e.g. `"bit/s"`, `"%"`, `"{status}"`, `"Cel"`.                                       |
+| `type`        | string | no       | Optional chart style override: `line`, `area`, or `stacked`. Defaults depend on metric type.      |
+
 ## Adding Tags to Metrics
 
 Tags add **context and identity** to SNMP metrics.
