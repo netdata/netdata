@@ -9,7 +9,7 @@ Group=neda
 WorkingDirectory=/opt/neda
 
 # Environment
-Environment="PATH=/usr/local/bin:/usr/bin:/bin:/opt/neda/google-cloud-sdk/bin:/opt/neda/bin"
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/opt/neda/google-cloud-sdk/bin:/opt/neda/bin:/opt/netdata/usr/bin"
 Environment="HOME=/opt/neda"
 Environment="NODE_ENV=production"
 

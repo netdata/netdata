@@ -4,6 +4,36 @@ import fs from 'node:fs';
 import type { StructuredLogEvent } from './structured-log-event.js';
 
 const JOURNAL_SOCKET_PATH = '/run/systemd/journal/socket';
+const SYSTEMD_CAT_PATHS = [
+  '/usr/sbin/systemd-cat-native',
+  '/usr/bin/systemd-cat-native',
+  '/sbin/systemd-cat-native',
+  '/bin/systemd-cat-native',
+  '/opt/netdata/usr/bin/systemd-cat-native',
+];
+
+let cachedSystemdCatPath: string | undefined;
+
+function findSystemdCatNative(): string | undefined {
+  if (cachedSystemdCatPath !== undefined) return cachedSystemdCatPath;
+
+  const found = SYSTEMD_CAT_PATHS.find((path) => {
+    try {
+      const stats = fs.statSync(path);
+      if (!stats.isFile()) return false;
+      fs.accessSync(path, fs.constants.X_OK);
+      return true;
+    } catch {
+      return false;
+    }
+  });
+
+  if (found !== undefined) {
+    cachedSystemdCatPath = found;
+  }
+
+  return found;
+}
 
 export function isJournaldAvailable(): boolean {
   if (process.env.JOURNAL_STREAM === undefined) return false;
@@ -84,23 +114,34 @@ class SharedJournaldSink implements JournaldEmitter {
     if (!isJournaldAvailable()) {
       return 'systemd journald unavailable';
     }
+
+    const binaryPath = findSystemdCatNative();
+    if (binaryPath === undefined) {
+      return 'systemd-cat-native not found in standard locations';
+    }
+
     try {
-      const child = spawn('systemd-cat-native', [], {
+      const child = spawn(binaryPath, [], {
         stdio: ['pipe', 'ignore', 'ignore'],
       });
+
+      // Attach error handlers before any other operations
       child.once('error', (error: Error) => {
         const reason = `failed to run systemd-cat-native: ${error.message}`;
         this.handleHelperFailure(reason);
       });
+
       child.once('exit', (code, signal) => {
         const result = code !== null ? `exit code ${String(code)}` : `signal ${String(signal)}`;
         this.handleHelperExit(`systemd-cat-native exited (${result})`);
       });
+
       const stdin = child.stdin;
       stdin.once('error', (err: Error) => {
         const message = err instanceof Error ? err.message : String(err);
         this.disable(`systemd-cat-native stdin error: ${message}`);
       });
+
       this.child = child;
       this.stdin = stdin;
       this.restartAttempts = 0;
