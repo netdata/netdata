@@ -136,7 +136,7 @@ ai-agent run \
 - **Flexible Deployment**:
   - [x] CLI for development and automation
   - [x] Library for embedding in applications
-  - [x] Slack bot mode
+  - [x] **Slack bot integration** with real-time progress, interactive controls, and intelligent routing
   - [ ] Web UI mode (experimental)
   - [x] REST API server
 
@@ -307,7 +307,7 @@ Each flag is repeatable—every port or transport spins up an independent headen
 - `--mcp stdio|http:PORT|sse:PORT|ws:PORT` – Model Context Protocol servers. Tool invocations must include a `format` argument, and when `format=json` the payload must also provide a `schema` object.
 - `--openai-completions <port>` – OpenAI Chat Completions compatible endpoint exposing agents as models via `/v1/models` and `/v1/chat/completions` (supports SSE streaming).
 - `--anthropic-completions <port>` – Anthropic Messages compatible endpoint with `/v1/models` and `/v1/messages`, including SSE streaming events.
-- `--slack` – Slack Socket Mode headend that mirrors the existing Slack bot behaviour. Slash commands reuse the first registered REST headend when available; otherwise a fallback listener starts on the configured `api.port` (default `8080`).
+- `--slack` – Slack Socket Mode headend with @mentions, DMs, channel posts, shortcuts, and slash commands. Real-time progress updates with Block Kit UI, per-channel routing, and interactive controls. See [docs/SLACK.md](docs/SLACK.md) for setup and configuration.
 
 Per-headend concurrency guards are available (e.g., `--api-concurrency 8`). Each incoming request acquires a slot before the agent session is spawned, keeping the system responsive under load.
 
@@ -363,7 +363,7 @@ Run the multi-agent system:
 - Design overview: docs/DESIGN.md
 - Multi-agent patterns: docs/MULTI-AGENT.md
 - Internal API: docs/AI-AGENT-INTERNAL-API.md
-- Slack bot notes: docs/SLACK-BOT.md
+- Slack integration: docs/SLACK.md
 
 ## Why AI Agent?
 

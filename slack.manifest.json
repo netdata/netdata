@@ -1,28 +1,28 @@
 {
-  "_comment": "Import this manifest at https://api.slack.com/apps → Create New App → From an app manifest",
+  "_comment": "Template manifest for ai-agent Slack integration. Customize names to fit your needs. Import at https://api.slack.com/apps → Create New App → From an app manifest",
   "display_information": {
-    "name": "AI Agent Bot",
-    "description": "AI agent that responds to mentions and DMs with LLM + tools",
+    "name": "Your Bot Name",
+    "description": "Your bot description",
     "background_color": "#2b6cb0"
   },
   "features": {
     "bot_user": {
-      "display_name": "ai-agent",
+      "display_name": "your-bot",
       "always_online": true
     },
     "shortcuts": [
       {
-        "name": "Ask Neda",
+        "name": "Ask Your Bot",
         "type": "message",
         "callback_id": "ask_bot",
-        "description": "Ask Neda about this message"
+        "description": "Ask your bot about this message"
       }
     ],
     "slash_commands": [
       {
-        "command": "/neda",
+        "command": "/your-command",
         "url": "https://YOUR_PUBLIC_URL/slack/commands",
-        "description": "Ask Neda",
+        "description": "Invoke your bot",
         "usage_hint": "<prompt>",
         "should_escape": false
       }
