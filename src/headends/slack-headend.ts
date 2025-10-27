@@ -10,7 +10,6 @@ import type { Headend, HeadendClosedEvent, HeadendContext, HeadendDescription } 
 
 import { loadAgent, LoadedAgentCache, type LoadAgentOptions, type LoadedAgent } from '../agent-loader.js';
 import { discoverLayers } from '../config-resolver.js';
-import { createStructuredLogger } from '../logging/structured-logger.js';
 import { SessionManager } from '../server/session-manager.js';
 import { initSlackHeadend } from '../server/slack.js';
 import { getTelemetryLabels } from '../telemetry/index.js';
@@ -87,7 +86,6 @@ export class SlackHeadend implements Headend {
   private readonly runReleases = new Map<string, () => void>();
   private readonly registeredSessions = new WeakSet<SessionManager>();
   private readonly telemetryLabels: Record<string, string>;
-  private readonly structuredLogger;
   private readonly label: string;
 
   private context?: HeadendContext;
@@ -113,9 +111,6 @@ export class SlackHeadend implements Headend {
     this.traceSlack = options.traceSlack === true;
     this.closed = this.closeDeferred.promise;
     this.telemetryLabels = { ...getTelemetryLabels(), headend: this.id };
-    this.structuredLogger = createStructuredLogger({
-      labels: this.telemetryLabels,
-    });
     this.label = 'Slack Socket Mode';
   }
 
@@ -670,7 +665,7 @@ export class SlackHeadend implements Headend {
       },
       {
         onLog: (entry) => {
-          this.structuredLogger.emit(entry);
+          entry.headendId = this.id;
           this.context?.log(entry);
         },
       },
@@ -726,7 +721,6 @@ export class SlackHeadend implements Headend {
       message: `${this.label}: ${message}`,
       headendId: this.id,
     };
-    this.structuredLogger.emit(entry);
     this.context?.log(entry);
   }
 }

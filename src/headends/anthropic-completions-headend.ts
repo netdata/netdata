@@ -7,7 +7,6 @@ import type { AgentMetadata, AgentRegistry } from '../agent-registry.js';
 import type { AccountingEntry, AIAgentCallbacks, LLMAccountingEntry, LogDetailValue, LogEntry, ProgressEvent, ProgressMetrics } from '../types.js';
 import type { Headend, HeadendClosedEvent, HeadendContext, HeadendDescription } from './types.js';
 
-import { createStructuredLogger } from '../logging/structured-logger.js';
 import { getTelemetryLabels } from '../telemetry/index.js';
 
 import { ConcurrencyLimiter } from './concurrency.js';
@@ -344,9 +343,6 @@ export class AnthropicCompletionsHeadend implements Headend {
       masterSummary = { text: summary, origin };
     };
     const telemetryLabels = { ...getTelemetryLabels(), headend: this.id };
-    const structuredLogger = createStructuredLogger({
-      labels: telemetryLabels,
-    });
 
     const callbacks: AIAgentCallbacks = {
       onOutput: (chunk) => {
@@ -377,7 +373,6 @@ export class AnthropicCompletionsHeadend implements Headend {
       onProgress: (event) => { handleProgressEvent(event); },
       onLog: (entry) => {
         entry.headendId = this.id;
-        structuredLogger.emit(entry);
         this.logEntry(entry);
       },
       onAccounting: (entry) => { accounting.push(entry); },

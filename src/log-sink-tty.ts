@@ -17,7 +17,7 @@ export function makeTTYLogCallbacks(
         }
       };
 
-  const baseLabels = { ...getTelemetryLabels(), headend: 'cli' };
+  const baseLabels = { ...getTelemetryLabels() };
   const logger = createStructuredLogger({
     color: opts.color ?? process.stderr.isTTY,
     logfmtWriter,

@@ -6,7 +6,6 @@ import type { AgentRegistry } from '../agent-registry.js';
 import type { AIAgentCallbacks, LogEntry } from '../types.js';
 import type { Headend, HeadendClosedEvent, HeadendContext, HeadendDescription } from './types.js';
 
-import { createStructuredLogger } from '../logging/structured-logger.js';
 import { getTelemetryLabels } from '../telemetry/index.js';
 
 import { ConcurrencyLimiter } from './concurrency.js';
@@ -92,7 +91,6 @@ export class RestHeadend implements Headend {
   private readonly limiter: ConcurrencyLimiter;
   private readonly extraRoutes: { method: RestExtraRoute['method']; path: string; handler: RestExtraRoute['handler']; originalPath: string }[] = [];
   private readonly telemetryLabels: Record<string, string>;
-  private readonly structuredLogger;
 
   public constructor(registry: AgentRegistry, opts: RestHeadendOptions) {
     this.registry = registry;
@@ -105,9 +103,6 @@ export class RestHeadend implements Headend {
       : 10;
     this.limiter = new ConcurrencyLimiter(limit);
     this.telemetryLabels = { ...getTelemetryLabels(), headend: this.id };
-    this.structuredLogger = createStructuredLogger({
-      labels: this.telemetryLabels,
-    });
   }
 
   public describe(): HeadendDescription {
@@ -277,7 +272,6 @@ export class RestHeadend implements Headend {
       },
       onLog: (entry) => {
         entry.headendId = this.id;
-        this.structuredLogger.emit(entry);
         this.logEntry(entry);
       },
     };
@@ -401,13 +395,11 @@ export class RestHeadend implements Headend {
   ): void {
     const entry = buildLog(`${this.label}: ${message}`, severity, fatal, direction);
     entry.headendId = this.id;
-    this.structuredLogger.emit(entry);
     this.context?.log(entry);
   }
 
   private logEntry(entry: LogEntry): void {
     entry.headendId = this.id;
-    this.structuredLogger.emit(entry);
     this.context?.log(entry);
   }
 

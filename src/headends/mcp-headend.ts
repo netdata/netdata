@@ -14,7 +14,6 @@ import type { Headend, HeadendClosedEvent, HeadendContext, HeadendDescription } 
 import type { AuthInfo } from '@modelcontextprotocol/sdk/server/auth/types.js';
 
 import { describeFormat } from '../formats.js';
-import { createStructuredLogger } from '../logging/structured-logger.js';
 import { resolveToolName, type AgentSchemaSummary } from '../schema-adapters.js';
 import { getTelemetryLabels } from '../telemetry/index.js';
 
@@ -351,14 +350,10 @@ export class McpHeadend implements Headend {
 
         let output = '';
         const telemetryLabels = { ...getTelemetryLabels(), headend: this.id };
-        const structuredLogger = createStructuredLogger({
-          labels: telemetryLabels,
-        });
         const callbacks: AIAgentCallbacks = {
           onOutput: (chunk) => { output += chunk; },
           onLog: (entry) => {
             entry.headendId = this.id;
-            structuredLogger.emit(entry);
             this.logEntry(entry);
           },
         };

@@ -7,7 +7,6 @@ import type { AgentMetadata, AgentRegistry } from '../agent-registry.js';
 import type { AccountingEntry, AIAgentCallbacks, LLMAccountingEntry, LogDetailValue, LogEntry, ProgressEvent, ProgressMetrics } from '../types.js';
 import type { Headend, HeadendClosedEvent, HeadendContext, HeadendDescription } from './types.js';
 
-import { createStructuredLogger } from '../logging/structured-logger.js';
 import { mergeCallbacksWithPersistence } from '../persistence.js';
 import { getTelemetryLabels } from '../telemetry/index.js';
 
@@ -480,9 +479,6 @@ export class OpenAICompletionsHeadend implements Headend {
       }
     };
     const telemetryLabels = { ...getTelemetryLabels(), headend: this.id };
-    const structuredLogger = createStructuredLogger({
-      labels: telemetryLabels,
-    });
 
     const baseCallbacks: AIAgentCallbacks = {
       onOutput: (chunk) => {
@@ -518,7 +514,6 @@ export class OpenAICompletionsHeadend implements Headend {
       },
       onLog: (entry) => {
         entry.headendId = this.id;
-        structuredLogger.emit(entry);
         this.logEntry(entry);
       },
       onAccounting: (entry) => { accounting.push(entry); },

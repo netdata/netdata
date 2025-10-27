@@ -28,10 +28,10 @@
     "node": ">=20"
   },
   "dependencies": {
-    "@ai-sdk/anthropic": "^2.0.37",
-    "@ai-sdk/google": "2.0.23",
-    "@ai-sdk/openai": "2.0.53",
-    "@ai-sdk/provider-utils": "^3.0.12",
+    "@ai-sdk/anthropic": "^2.0.38",
+    "@ai-sdk/google": "2.0.24",
+    "@ai-sdk/openai": "2.0.56",
+    "@ai-sdk/provider-utils": "^3.0.13",
     "@modelcontextprotocol/sdk": "1.20.2",
     "@openrouter/ai-sdk-provider": "1.2.0",
     "@opentelemetry/api": "^1.9.0",
@@ -46,7 +46,7 @@
     "@opentelemetry/sdk-trace-node": "^2.2.0",
     "@opentelemetry/semantic-conventions": "^1.9.0",
     "@slack/bolt": "^4.5.0",
-    "ai": "5.0.80",
+    "ai": "5.0.81",
     "ajv": "^8.17.1",
     "commander": "^14.0.2",
     "express": "^5.1.0",
