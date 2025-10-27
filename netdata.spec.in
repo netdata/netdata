@@ -3235,7 +3235,7 @@ Provides: group(netdata)
  This package provides the netdata user and group that are used by the Netdata Agent.
 
 %post user
-%if %{_need_explicit_user_provides} || ! 0%{?_have_sysuser}
+%if %{_need_explicit_user_provides} || ! %{_have_sysuser}
 if command -v systemd-sysusers >/dev/null 2>&1; then
     systemd-sysusers %{_sysusersdir}/%{name}.conf
 else
