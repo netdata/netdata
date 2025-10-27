@@ -6,10 +6,13 @@
 
 **Merged pull requests:**
 
+- Regenerate integrations docs [\#21211](https://github.com/netdata/netdata/pull/21211) ([netdatabot](https://github.com/netdatabot))
+- docs: add snmp profile format to snmp collector doc [\#21210](https://github.com/netdata/netdata/pull/21210) ([ilyam8](https://github.com/ilyam8))
 - build\(deps\): bump github.com/redis/go-redis/v9 from 9.14.1 to 9.16.0 in /src/go [\#21208](https://github.com/netdata/netdata/pull/21208) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Regenerate integrations docs [\#21205](https://github.com/netdata/netdata/pull/21205) ([netdatabot](https://github.com/netdatabot))
 - ibm.d: various fixes [\#21204](https://github.com/netdata/netdata/pull/21204) ([ktsaou](https://github.com/ktsaou))
 - Regenerate integrations docs [\#21202](https://github.com/netdata/netdata/pull/21202) ([netdatabot](https://github.com/netdatabot))
+- docs: add SNMP profile format doc [\#21201](https://github.com/netdata/netdata/pull/21201) ([ilyam8](https://github.com/ilyam8))
 - Acquire and release metric as needed during journal v2 migration [\#21200](https://github.com/netdata/netdata/pull/21200) ([stelfrag](https://github.com/stelfrag))
 - fix\(packagin/otel-plugin\): remove cap\_net\_bind\_service [\#21198](https://github.com/netdata/netdata/pull/21198) ([ilyam8](https://github.com/ilyam8))
 - MSSQL Small fixes \(windows.plugin\) [\#21197](https://github.com/netdata/netdata/pull/21197) ([thiagoftsm](https://github.com/thiagoftsm))
@@ -447,10 +450,6 @@
 - Regenerate integrations docs [\#20668](https://github.com/netdata/netdata/pull/20668) ([netdatabot](https://github.com/netdatabot))
 - build\(deps\): bump golang.org/x/net from 0.41.0 to 0.42.0 in /src/go [\#20667](https://github.com/netdata/netdata/pull/20667) ([dependabot[bot]](https://github.com/apps/dependabot))
 - build\(deps\): bump github.com/bmatcuk/doublestar/v4 from 4.8.1 to 4.9.0 in /src/go [\#20666](https://github.com/netdata/netdata/pull/20666) ([dependabot[bot]](https://github.com/apps/dependabot))
-- docs: fix "Unsupported markdown: list" in NC readme diagram [\#20665](https://github.com/netdata/netdata/pull/20665) ([ilyam8](https://github.com/ilyam8))
-- Add ML anomaly detection accuracy analysis documentation [\#20663](https://github.com/netdata/netdata/pull/20663) ([ktsaou](https://github.com/ktsaou))
-- Fix datafile creation race condition [\#20662](https://github.com/netdata/netdata/pull/20662) ([stelfrag](https://github.com/stelfrag))
-- Cloud Docs: updated [\#20661](https://github.com/netdata/netdata/pull/20661) ([kanelatechnical](https://github.com/kanelatechnical))
 
 ## [v2.5.4](https://github.com/netdata/netdata/tree/v2.5.4) (2025-06-24)
 
