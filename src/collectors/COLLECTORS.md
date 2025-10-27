@@ -7,7 +7,6 @@ Learn more about [how collectors work](/src/collectors/README.md), and then lear
 
 
 
-:::
 
 ## Add your application to Netdata
 
