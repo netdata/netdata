@@ -239,8 +239,8 @@ disable_updater() {
     rm_file /etc/cron.d/netdata-updater-daily
 
     if command -v systemctl >/dev/null 2>&1 ; then
-      systemctl stop netdata-updater.timer
-      systemctl disable netdata-updater.timer
+      systemctl stop netdata-updater.timer >/dev/null 2>&1 || true
+      systemctl disable netdata-updater.timer >/dev/null 2>&1 || true
     fi
   fi
 }
