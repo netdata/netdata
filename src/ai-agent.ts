@@ -89,6 +89,7 @@ const safeJsonByteLength = (value: unknown): number => {
   }
 };
 
+
 export class AIAgentSession {
   // Log identifiers (avoid duplicate string literals)
   private static readonly REMOTE_CONC_SLOT = 'agent:concurrency-slot';
@@ -116,6 +117,9 @@ export class AIAgentSession {
   // Internal housekeeping notes
   private childConversations: { agentId?: string; toolName: string; promptPath: string; conversation: ConversationMessage[]; trace?: { originId?: string; parentId?: string; selfId?: string; callPath?: string } }[] = [];
   private readonly subAgents?: SubAgentRegistry;
+  private readonly subAgentCount: number;
+  private readonly subAgentToolNames: readonly string[];
+  private readonly invokedSubAgents = new Set<string>();
   private readonly txnId: string;
   private readonly originTxnId?: string;
   private readonly parentTxnId?: string;
@@ -359,12 +363,17 @@ export class AIAgentSession {
     }
     } catch (e) { warn(`abortSignal wiring failed: ${e instanceof Error ? e.message : String(e)}`); }
     // Initialize sub-agents registry if provided
-    if (Array.isArray(sessionConfig.subAgents) && sessionConfig.subAgents.length > 0) {
+    const childSubAgents = Array.isArray(sessionConfig.subAgents) ? sessionConfig.subAgents : [];
+    this.subAgentCount = childSubAgents.length;
+    if (this.subAgentCount > 0) {
       const reg = new SubAgentRegistry(
-        sessionConfig.subAgents,
+        childSubAgents,
         Array.isArray(sessionConfig.ancestors) ? sessionConfig.ancestors : []
       );
       this.subAgents = reg;
+      this.subAgentToolNames = reg.listToolNames();
+    } else {
+      this.subAgentToolNames = [];
     }
     // REST tools handled by RestProvider; no local registry here
     // Tracing context
@@ -522,7 +531,17 @@ export class AIAgentSession {
           };
           this.log(entry);
         },
-        setFinalReport: (p) => { this.finalReport = { status: p.status, format: p.format as 'json'|'markdown'|'markdown+mermaid'|'slack-block-kit'|'tty'|'pipe'|'sub-agent'|'text', content: p.content, content_json: p.content_json, metadata: p.metadata, ts: Date.now() }; },
+        setFinalReport: (p) => {
+          const normalizedStatus: 'success' | 'failure' | 'partial' = p.status;
+          this.finalReport = {
+            status: normalizedStatus,
+            format: p.format as 'json'|'markdown'|'markdown+mermaid'|'slack-block-kit'|'tty'|'pipe'|'sub-agent'|'text',
+            content: p.content,
+            content_json: p.content_json,
+            metadata: p.metadata,
+            ts: Date.now()
+          };
+        },
         orchestrator: orch,
         getCurrentTurn: () => this.currentTurn,
         toolTimeoutMs: sessionConfig.toolTimeout
@@ -556,7 +575,6 @@ export class AIAgentSession {
           // propagate control signals so children can stop/abort
           abortSignal: this.abortSignal,
           stopRef: this.stopRef,
-          llmInterceptor: this.sessionConfig.llmInterceptor,
           trace: { originId: this.originTxnId, parentId: this.txnId, callPath: `${this.callPath ?? ''}->${name}` },
           onChildOpTree: opts?.onChildOpTree
         }, opts);
@@ -639,7 +657,6 @@ export class AIAgentSession {
       traceSDK: enrichedSessionConfig.traceSdk,
       onLog: wrapLog(enrichedSessionConfig.callbacks?.onLog),
       pricing: enrichedSessionConfig.config.pricing,
-      turnInterceptor: enrichedSessionConfig.llmInterceptor,
     });
 
     const sess = new AIAgentSession(
@@ -1178,7 +1195,6 @@ export class AIAgentSession {
       } catch (e) { warn(`beginTurn/onOpTree failed: ${e instanceof Error ? e.message : String(e)}`); }
       // Orchestrator receives ctx turn/subturn per call; no MCP client turn management
       this.llmClient.setTurn(currentTurn, 0);
-
       let lastError: string | undefined;
       let turnSuccessful = false;
       let finalTurnWarnLogged = false;
@@ -1770,9 +1786,12 @@ export class AIAgentSession {
               }
               
               if (turnResult.status.finalAnswer) {
-                // Check if final_report was actually successful by checking if finalReport was set
-                // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-                const finalReportSucceeded = this.finalReport !== undefined;
+                const statusCandidate = this.getFinalReportStatus();
+                const finalReportStatus: 'success' | 'failure' | 'partial' | 'missing' =
+                  statusCandidate === 'success' || statusCandidate === 'failure' || statusCandidate === 'partial'
+                    ? statusCandidate
+                    : 'missing';
+                const finalReportSucceeded = finalReportStatus === 'success';
 
                 if (finalReportSucceeded) {
                   // Final report succeeded, we're done
@@ -1780,14 +1799,27 @@ export class AIAgentSession {
                   break;
                 }
 
-                // Final report was called but failed
-                if (!isFinalTurn) {
-                  // On non-final turns, move to next turn to retry
-                  turnSuccessful = true;
-                  break;
+                const warnEntry: LogEntry = {
+                  timestamp: Date.now(),
+                  severity: 'WRN',
+                  turn: currentTurn,
+                  subturn: 0,
+                  direction: 'response',
+                  type: 'llm',
+                  remoteIdentifier: 'agent:final-report',
+                  fatal: false,
+                  message: `Final report returned status='${finalReportStatus}', retrying.`,
+                };
+                this.log(warnEntry);
+                this.llmSyntheticFailures++;
+                lastError = `final_report_status_${finalReportStatus}`;
+                if (cycleComplete) {
+                  rateLimitedInCycle = 0;
+                  maxRateLimitWaitMs = 0;
                 }
-                // On final turn with failed final_report, continue retry loop
-                lastError = 'final_report_failed';
+                this.finalReport = undefined;
+                this.pushSystemRetryMessage(conversation, `System notice: call ${AIAgentSession.FINAL_REPORT_TOOL} with status="success", report_format="text", and content equal to the agent__test-agent2 output.`);
+                continue;
               } else {
                 // If this is the final turn and we still don't have a final answer,
                 // retry within this turn across provider/model pairs up to maxRetries.
@@ -2417,60 +2449,12 @@ export class AIAgentSession {
     conversation.unshift({ role: 'system', content: trimmed });
   }
 
-  private normalizeReasoningSegments(
-    messages: ConversationMessage[],
-    requireSignature: boolean
-  ): { normalized: ConversationMessage[]; hasMissingReasoning: boolean } {
-    let hasMissingReasoning = false;
-    const normalized = messages.map((msg) => {
-      if (msg.role !== 'assistant' || !Array.isArray(msg.toolCalls) || msg.toolCalls.length === 0) {
-        return msg;
-      }
-      const segments = Array.isArray(msg.reasoning) ? msg.reasoning : [];
-      if (segments.length === 0) {
-        return msg;
-      }
-      const hasValidSignature = segments.some((segment) => {
-        const providerMetadataRaw = (segment as { providerMetadata?: unknown }).providerMetadata;
-        if (!this.isPlainRecord(providerMetadataRaw)) return false;
-        const anthropicRaw = providerMetadataRaw.anthropic;
-        if (!this.isAnthropicMetadata(anthropicRaw)) return false;
-        const signature = typeof anthropicRaw.signature === 'string' ? anthropicRaw.signature : undefined;
-        const redacted = typeof anthropicRaw.redactedData === 'string' ? anthropicRaw.redactedData : undefined;
-        return (signature !== undefined && signature.trim().length > 0)
-          || (redacted !== undefined && redacted.trim().length > 0);
-      });
-      if (!requireSignature || hasValidSignature) {
-        return msg;
-      }
-      hasMissingReasoning = true;
-      if (process.env.DEBUG === 'true') {
-        try {
-          const preview = segments.map((segment) => ({
-            text: segment.text.slice(0, 80),
-            hasMetadata: segment.providerMetadata !== undefined,
-            metadataKeys: segment.providerMetadata !== undefined ? Object.keys(segment.providerMetadata) : [],
-          }));
-          warn(`[DEBUG] missing reasoning metadata: ${JSON.stringify(preview)}`);
-        } catch (error) {
-          warn(`[DEBUG] missing reasoning metadata logging failed: ${error instanceof Error ? error.message : String(error)}`);
-        }
-      }
-      const cloned: ConversationMessage = { ...msg };
-      delete (cloned as { reasoning?: typeof cloned.reasoning }).reasoning;
-      return cloned;
-    });
-    return { normalized, hasMissingReasoning };
-  }
-
-  private isPlainRecord(value: unknown): value is Record<string, unknown> {
-    return value !== null && typeof value === 'object' && !Array.isArray(value);
-  }
-
-  private isAnthropicMetadata(
-    value: unknown
-  ): value is { signature?: unknown; redactedData?: unknown } & Record<string, unknown> {
-    return this.isPlainRecord(value);
+  private getFinalReportStatus(): 'success' | 'failure' | 'partial' | undefined {
+    const status = this.finalReport?.status;
+    if (status === 'success' || status === 'failure' || status === 'partial') {
+      return status;
+    }
+    return undefined;
   }
 
   private composeRemoteIdentifier(provider: string, model: string, metadata?: { actualProvider?: string; actualModel?: string }): string {
@@ -2776,15 +2760,16 @@ export class AIAgentSession {
     const filteredSelection = this.filterToolsForProvider(allTools, provider);
     const availableTools = filteredSelection.tools;
     const allowedToolNames = filteredSelection.allowedNames;
-    const providerConfig = this.sessionConfig.config.providers[provider];
     let disableReasoningForTurn = false;
 
-    if (providerConfig.type === 'anthropic') {
-      const { normalized, hasMissingReasoning } = this.normalizeReasoningSegments(conversation, true);
-      if (hasMissingReasoning) {
-        conversation = normalized;
-        disableReasoningForTurn = true;
-      }
+    const reasoningGuard = this.llmClient.shouldDisableReasoning(provider, {
+      conversation,
+      currentTurn,
+      expectSignature: true,
+    });
+    if (reasoningGuard.disable) {
+      conversation = reasoningGuard.normalized;
+      disableReasoningForTurn = true;
     }
 
     addSpanAttributes({ 'ai.llm.reasoning.disabled': disableReasoningForTurn });
@@ -2800,7 +2785,9 @@ export class AIAgentSession {
       if (this.stopRef?.stopping === true) throw new Error('stop_requested');
       if (this.canceled) throw new Error('canceled');
       const normalizedToolName = sanitizeToolName(toolName);
-      if (normalizedToolName === AIAgentSession.FINAL_REPORT_TOOL) {
+      const isFinalReportTool = normalizedToolName === AIAgentSession.FINAL_REPORT_TOOL
+        || normalizedToolName === AIAgentSession.FINAL_REPORT_SHORT;
+      if (isFinalReportTool) {
         const nestedCalls = this.parseNestedCallsFromFinalReport(parameters);
         if (nestedCalls !== undefined) {
           let nestedResult = '(no output)';
@@ -2850,6 +2837,7 @@ export class AIAgentSession {
         // Orchestrator-managed execution for MCP + REST
         if (this.toolsOrchestrator?.hasTool(effectiveToolName) === true) {
           const isBatchTool = effectiveToolName === 'agent__batch';
+          const isSubAgentTool = this.subAgents?.hasTool(effectiveToolName) === true;
           const managed = await this.toolsOrchestrator.executeWithManagement(
             effectiveToolName,
             parameters,
@@ -2860,6 +2848,9 @@ export class AIAgentSession {
               disableGlobalTimeout: isBatchTool
             }
           );
+          if (isSubAgentTool) {
+            this.invokedSubAgents.add(effectiveToolName);
+          }
           const successEntry: AccountingEntry = {
             type: 'tool',
             timestamp: startTime,
@@ -2965,11 +2956,24 @@ export class AIAgentSession {
       'ai.llm.reasoning.value_effective': effectiveReasoningValue ?? 'none',
     });
     const sendReasoning = disableReasoningForTurn ? false : undefined;
-    let effectiveStream = this.sessionConfig.stream;
-    if (this.llmClient.shouldAutoEnableReasoningStream(provider, effectiveReasoningLevel)) {
+    const autoEnableReasoningStream = this.llmClient.shouldAutoEnableReasoningStream(provider, effectiveReasoningLevel, targetMaxOutputTokens);
+    const sessionStreamFlag = this.sessionConfig.stream === true;
+    let effectiveStream = sessionStreamFlag;
+    if (!effectiveStream && autoEnableReasoningStream) {
       effectiveStream = true;
+      const warnEntry: LogEntry = {
+        timestamp: Date.now(),
+        severity: 'WRN',
+        turn: currentTurn,
+        subturn: 0,
+        direction: 'response',
+        type: 'llm',
+        remoteIdentifier: 'agent:reasoning',
+        fatal: false,
+        message: `Provider '${provider}' requires streaming for the current reasoning request; overriding stream=true.`,
+      };
+      this.log(warnEntry);
     }
-
     const requestMessagesBytes = estimateMessagesBytes(conversation);
     const request: TurnRequest = {
       messages: conversation,

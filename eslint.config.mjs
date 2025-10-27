@@ -15,7 +15,7 @@ import unicorn from 'eslint-plugin-unicorn';
 
 const tsProject = ['./tsconfig.json'];
 
-const IGNORE_GLOBS = ['**/node_modules/**', '**/dist/**', '**/mcp/**', '**/tmp/**', '**/.venv/**', 'src/config-resolver.ts', 'src/agent-loader.ts'];
+const IGNORE_GLOBS = ['**/node_modules/**', '**/dist/**', '**/mcp/**', '**/tmp/**', '**/.venv/**', 'src/config-resolver.ts', 'src/agent-loader.ts', 'eslint.complexity.config.mjs'];
 
 export default [
   // Global ignores - must be first

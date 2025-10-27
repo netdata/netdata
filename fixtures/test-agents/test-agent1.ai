@@ -1,5 +1,0 @@
----
-description: "Test agent 1"
-usage: "call me with just the word 'run'"
----
-Call agent__final_report with status="success", report_format="text", and content="phase1 completed, now run agent 2".

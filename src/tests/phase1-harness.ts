@@ -23,6 +23,7 @@ import { parseFrontmatter, parseList, parsePairs } from '../frontmatter.js';
 import { resolveIncludes } from '../include-resolver.js';
 import { DEFAULT_TOOL_INPUT_SCHEMA } from '../input-contract.js';
 import { LLMClient } from '../llm-client.js';
+import { AnthropicProvider } from '../llm-providers/anthropic.js';
 import { BaseLLMProvider, type ResponseMessage } from '../llm-providers/base.js';
 import { TestLLMProvider } from '../llm-providers/test-llm.js';
 import { SubAgentRegistry } from '../subagent-registry.js';
@@ -5277,9 +5278,9 @@ const TEST_SCENARIOS: HarnessTest[] = [
     expect: (result: AIAgentResult) => {
       invariant(!result.success, 'Scenario run-test-102 should report failure when final_report tool fails.');
       invariant(result.finalReport === undefined, 'No final report expected when agent__final_report fails in run-test-102.');
-      invariant(result.error === 'final_report_failed', 'Failure error should be final_report_failed for run-test-102.');
+      invariant(result.error === 'final_report_status_missing', 'Failure error should be final_report_status_missing for run-test-102.');
       const exitLog = result.logs.find((entry) => entry.remoteIdentifier === 'agent:EXIT-NO-LLM-RESPONSE');
-      invariant(exitLog !== undefined && typeof exitLog.message === 'string' && exitLog.message.includes('final_report_failed'), 'EXIT-NO-LLM-RESPONSE log with final_report_failed reason expected for run-test-102.');
+      invariant(exitLog !== undefined && typeof exitLog.message === 'string' && exitLog.message.includes('final_report_status_missing'), 'EXIT-NO-LLM-RESPONSE log with final_report_status_missing reason expected for run-test-102.');
       const synthesizedFallbackLog = result.logs.find((entry) => typeof entry.message === 'string' && entry.message.includes('Synthesized failure final_report'));
       invariant(synthesizedFallbackLog === undefined, 'Synthesized fallback log must not appear for run-test-102.');
     },
@@ -5767,17 +5768,6 @@ const TEST_SCENARIOS: HarnessTest[] = [
   {
     id: 'reasoning-normalization',
     execute: async (_configuration, _sessionConfig, _defaults) => {
-      const normalize = getPrivateMethod(AIAgentSession.prototype, 'normalizeReasoningSegments') as (
-        this: { isPlainRecord: (value: unknown) => value is Record<string, unknown>; isAnthropicMetadata: (value: unknown) => value is { signature?: unknown; redactedData?: unknown } & Record<string, unknown> },
-        messages: ConversationMessage[],
-        requireSignature: boolean,
-      ) => { normalized: ConversationMessage[]; hasMissingReasoning: boolean };
-      const stub = {
-        isPlainRecord: (value: unknown): value is Record<string, unknown> =>
-          value !== null && typeof value === 'object' && !Array.isArray(value),
-        isAnthropicMetadata: (value: unknown): value is { signature?: unknown; redactedData?: unknown } & Record<string, unknown> =>
-          value !== null && typeof value === 'object' && !Array.isArray(value),
-      };
       const conversation: ConversationMessage[] = [
         {
           role: 'assistant',
@@ -5786,14 +5776,22 @@ const TEST_SCENARIOS: HarnessTest[] = [
           reasoning: [{ type: 'reasoning', text: 'missing metadata', providerMetadata: { anthropic: {} } }],
         },
       ];
-      const requireSignatureResult = normalize.call(stub, conversation, true) as { normalized: ConversationMessage[]; hasMissingReasoning: boolean };
-      invariant(requireSignatureResult.hasMissingReasoning, 'Reasoning without signature should trigger enforcement.');
-      const normalizedMessage = requireSignatureResult.normalized[0];
-      invariant(normalizedMessage.reasoning === undefined, 'Reasoning array should be removed when metadata is missing.');
-      const noSignatureRequirement = normalize.call(stub, conversation, false) as { normalized: ConversationMessage[]; hasMissingReasoning: boolean };
-      invariant(!noSignatureRequirement.hasMissingReasoning, 'Reasoning should be preserved when signature is not required.');
-      const preserved = noSignatureRequirement.normalized[0];
-      invariant(Array.isArray(preserved.reasoning) && preserved.reasoning.length === 1, 'Reasoning segments should remain without signature requirement.');
+      const provider = new AnthropicProvider({ type: 'anthropic' });
+      const result = provider.shouldDisableReasoning({
+        conversation,
+        currentTurn: 2,
+        expectSignature: true,
+      });
+      invariant(result.disable, 'Reasoning without signature should trigger enforcement.');
+      invariant(Array.isArray(result.normalized) && result.normalized.length === 1, 'Normalized conversation should return same number of messages.');
+      invariant(result.normalized[0]?.reasoning === undefined, 'Reasoning array should be removed when metadata is missing.');
+      const preserve = provider.shouldDisableReasoning({
+        conversation,
+        currentTurn: 1,
+        expectSignature: true,
+      });
+      invariant(!preserve.disable, 'Reasoning should be preserved on first turn.');
+      invariant(Array.isArray(preserve.normalized) && preserve.normalized[0]?.reasoning !== undefined, 'Reasoning segments should remain without signature requirement.');
       return Promise.resolve(makeSuccessResult('reasoning-normalization'));
     },
     expect: (result) => {

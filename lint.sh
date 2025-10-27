@@ -103,12 +103,22 @@ echo "Checking function complexity and size..."
 echo "  - Max cyclomatic complexity: 10"
 echo "  - Max function lines: 100"
 echo "  - Max nesting depth: 4"
+echo "  - Max nested callbacks: 3"
 echo ""
 
-if node check-complexity.cjs 2>&1; then
-    success "No complexity issues found"
+COMPLEXITY_OUTPUT=$(npx eslint --config eslint.complexity.config.mjs 'src/**/*.ts' 2>&1 || true)
+
+# Filter to show only actual issues, not "Oops" messages or stack traces
+FILTERED_OUTPUT=$(echo "$COMPLEXITY_OUTPUT" | grep -E "^\s+[0-9]+:[0-9]+\s+(error|warning)\s+" || true)
+
+if [ -n "$FILTERED_OUTPUT" ]; then
+    echo "$FILTERED_OUTPUT"
+    echo ""
+    # Count issues
+    ISSUE_COUNT=$(echo "$FILTERED_OUTPUT" | wc -l)
+    warning "$ISSUE_COUNT complexity issues detected (see output above)"
 else
-    warning "Complexity issues detected (see output above)"
+    success "No complexity issues found"
 fi
 
 header "6. Duplicate Code Detection"

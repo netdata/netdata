@@ -91,9 +91,13 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
     return this.getDefaultReasoningValue(context.level, context.maxOutputTokens);
   }
 
-  public shouldAutoEnableReasoningStream(level: ReasoningLevel | undefined): boolean {
+  public shouldAutoEnableReasoningStream(level: ReasoningLevel | undefined, _options?: { maxOutputTokens?: number }): boolean {
     void level;
     return false;
+  }
+
+  public shouldDisableReasoning(_context: { conversation: ConversationMessage[]; currentTurn: number; expectSignature: boolean }): { disable: boolean; normalized: ConversationMessage[] } {
+    return { disable: false, normalized: _context.conversation };
   }
 
   protected shouldForceToolChoice(_request: TurnRequest): boolean {
@@ -109,6 +113,29 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
     } catch (error) {
       try { warn(`sdkTraceLogger failed: ${error instanceof Error ? error.message : String(error)}`); } catch { /* ignore */ }
     }
+  }
+
+  protected buildWireRequestSnapshot(options: {
+    request: TurnRequest;
+    messages: ModelMessage[];
+    providerOptions: unknown;
+    toolChoice: string | undefined;
+  }): Record<string, unknown> {
+    const { request, messages, providerOptions, toolChoice } = options;
+    return {
+      provider: request.provider,
+      model: request.model,
+      stream: request.stream === true,
+      temperature: request.temperature ?? null,
+      topP: request.topP ?? null,
+      maxOutputTokens: request.maxOutputTokens ?? null,
+      parallelToolCalls: request.parallelToolCalls ?? null,
+      reasoningLevel: request.reasoningLevel ?? null,
+      reasoningValue: request.reasoningValue ?? null,
+      toolChoice: toolChoice ?? null,
+      providerOptions,
+      messages,
+    };
   }
 
   protected normalizeResponseMessages(payload: unknown): ResponseMessage[] {
@@ -1200,7 +1227,7 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
         
         if (part.type === 'text-delta') {
           response += part.text;
-          
+
           // Call chunk callback for real-time text streaming
           if (request.onChunk !== undefined) {
             request.onChunk(part.text, 'content');

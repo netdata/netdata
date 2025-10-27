@@ -5,7 +5,7 @@ import type { AIAgentSession } from './ai-agent.js';
 // keep type imports grouped at top
 import type { OutputFormatId } from './formats.js';
 import type { PreloadedSubAgent } from './subagent-registry.js';
-import type { AIAgentCallbacks, AIAgentResult, AIAgentSessionConfig, Configuration, ConversationMessage, ProviderReasoningValue, RestToolConfig, LLMInterceptor } from './types.js';
+import type { AIAgentCallbacks, AIAgentResult, AIAgentSessionConfig, Configuration, ConversationMessage, ProviderConfig, ProviderReasoningValue, RestToolConfig } from './types.js';
 // no runtime format validation here; caller must pass a valid OutputFormatId
 
 import { AIAgent as Agent } from './ai-agent.js';
@@ -38,7 +38,6 @@ export interface LoadedAgentSessionOptions {
   traceMCP?: boolean;
   traceSdk?: boolean;
   verbose?: boolean;
-  llmInterceptor?: LLMInterceptor;
 }
 
 export interface LoadedAgent {
@@ -202,6 +201,7 @@ export interface LoadAgentOptions {
     reasoningValue?: ProviderReasoningValue | null;
     caching?: 'none' | 'full';
   };
+  providerOverrides?: Record<string, Partial<ProviderConfig>>;
   ancestors?: string[];
   reasoning?: 'minimal' | 'low' | 'medium' | 'high';
   caching?: 'none' | 'full';
@@ -339,6 +339,24 @@ function constructLoadedAgent(args: ConstructAgentArgs): LoadedAgent {
   ));
 
   let config = buildUnifiedConfiguration({ providers: needProviders, mcpServers: externalToolNames, restTools: externalToolNames }, layers, { verbose: options?.verbose });
+  if (options?.providerOverrides !== undefined) {
+    Object.entries(options.providerOverrides).forEach(([name, override]) => {
+      const existing = config.providers[name];
+      if (existing === undefined) {
+        return;
+      }
+      const mergedCustom = {
+        ...(existing.custom ?? {}),
+        ...(override.custom ?? {}),
+      } as Record<string, unknown>;
+      const next: ProviderConfig = {
+        ...existing,
+        ...override,
+        custom: mergedCustom,
+      };
+      config.providers[name] = next;
+    });
+  }
   const defaults = resolveDefaults(layers);
   validateNoPlaceholders(config);
 
@@ -565,7 +583,6 @@ function constructLoadedAgent(args: ConstructAgentArgs): LoadedAgent {
       stopRef: o.stopRef,
       initialTitle: o.initialTitle,
       abortSignal: (opts as { abortSignal?: AbortSignal } | undefined)?.abortSignal,
-      llmInterceptor: o.llmInterceptor,
       temperature: eff.temperature,
       topP: eff.topP,
       maxOutputTokens: eff.maxOutputTokens,

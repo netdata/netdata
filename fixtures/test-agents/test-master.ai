@@ -1,8 +1,0 @@
----
-description: "Phase 2 master test agent"
-usage: "Delegates to test-agent1 and test-agent2"
-agents:
-  - test-agent1.ai
-  - test-agent2.ai
----
-You are the Phase 2 master test agent. Follow the provided system prompt and user instructions exactly.

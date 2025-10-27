@@ -7,6 +7,8 @@ import { warn } from '../utils.js';
 
 import { BaseLLMProvider, type ResponseMessage } from './base.js';
 
+const ANTHROPIC_REASONING_STREAM_TOKEN_THRESHOLD = 21_333;
+
 interface OptionsWithAnthropic extends Record<string, unknown> {
   anthropic?: Record<string, unknown>;
 }
@@ -115,7 +117,11 @@ export class AnthropicProvider extends BaseLLMProvider {
     }
   }
 
-  public override shouldAutoEnableReasoningStream(level: ReasoningLevel | undefined): boolean {
+  public override shouldAutoEnableReasoningStream(level: ReasoningLevel | undefined, options?: { maxOutputTokens?: number }): boolean {
+    const maxOutputTokens = options?.maxOutputTokens;
+    if (typeof maxOutputTokens === 'number' && Number.isFinite(maxOutputTokens) && maxOutputTokens >= ANTHROPIC_REASONING_STREAM_TOKEN_THRESHOLD) {
+      return true;
+    }
     if (level === undefined) return false;
     const threshold = this.config.reasoningAutoStreamLevel;
     if (threshold === undefined) return false;
@@ -129,6 +135,51 @@ export class AnthropicProvider extends BaseLLMProvider {
       return false;
     }
     return super.shouldForceToolChoice(request);
+  }
+
+  public override shouldDisableReasoning(context: { conversation: ConversationMessage[]; currentTurn: number; expectSignature: boolean }): { disable: boolean; normalized: ConversationMessage[] } {
+    if (context.currentTurn <= 1 || !context.expectSignature) {
+      return { disable: false, normalized: context.conversation };
+    }
+    const { normalized, missing } = this.stripReasoningWithoutSignature(context.conversation);
+    return { disable: missing, normalized };
+  }
+
+  private stripReasoningWithoutSignature(messages: ConversationMessage[]): { normalized: ConversationMessage[]; missing: boolean } {
+    let missing = false;
+    const normalized = messages.map((message) => {
+      if (message.role !== 'assistant' || !Array.isArray(message.toolCalls) || message.toolCalls.length === 0) {
+        return message;
+      }
+      const segments = Array.isArray(message.reasoning) ? message.reasoning : [];
+      if (segments.length === 0) {
+        return message;
+      }
+      const hasSignedSegment = segments.some((segment) => this.segmentHasSignature(segment));
+      if (hasSignedSegment) {
+        return message;
+      }
+      missing = true;
+      const cloned: ConversationMessage = { ...message };
+      delete (cloned as { reasoning?: ConversationMessage['reasoning'] }).reasoning;
+      return cloned;
+    });
+    return { normalized, missing };
+  }
+
+  private segmentHasSignature(segment: { providerMetadata?: unknown }): boolean {
+    const metadata = segment.providerMetadata;
+    if (metadata === null || typeof metadata !== 'object' || Array.isArray(metadata)) {
+      return false;
+    }
+    const anthropic = (metadata as { anthropic?: unknown }).anthropic;
+    if (anthropic === null || typeof anthropic !== 'object' || Array.isArray(anthropic)) {
+      return false;
+    }
+    const record = anthropic as { signature?: unknown; redactedData?: unknown };
+    const signature = typeof record.signature === 'string' ? record.signature.trim() : '';
+    const redacted = typeof record.redactedData === 'string' ? record.redactedData.trim() : '';
+    return signature.length > 0 || redacted.length > 0;
   }
 
   protected override buildRetryDirective(request: TurnRequest, status: TurnStatus): TurnRetryDirective | undefined {

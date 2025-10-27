@@ -61,3 +61,17 @@ We must update this document again after applying the fixes and validating real 
 - Extend deterministic harness scenarios to cover redacted thinking, budget exhaustion, and final-report retries with reasoning enabled.
 - Evaluate Block Kit-friendly rendering of reasoning streams in Slack headend.
 - Continue monitoring AI SDK releases for schema changes to reasoning/metadata.
+
+## MANDATORY RULES
+
+1. The agent should set a reasoning effort on the requests if unset
+2. Configuration option `reasoning = none` should unset reasoning (even if set in front matter)
+3. Valid reasoning options are:
+   - `none`: to unset reasoning
+   - `minimal`: to set it minimal (or 1024 tokens)
+   - `low`: low or 30% of max output tokens
+   - `medium`: medium or 60% of max output tokens
+   - `high`: high or 80% to max output tokens
+4. Specific to `anthropic` provider:
+   - Anthropic ALWAYS sends reasoning with signatures on the first LLM turn, so: reasoning MUST be turned off if the first request does not return signatures
+   - Anthropic demands `stream` to be `true` when max output tokens is >= 21333 tokens, so: `stream` must be switched automatically to `true` when sending requests with max output tokens >= 21333 tokens to anthropic

@@ -1,0 +1,12 @@
+---
+description: "Test agent 2"
+usage: "call me with the output of agent 1"
+---
+
+You will receive a number. Double it.
+
+Example:
+You received: 5
+You output: 10
+
+Call `agent__final_report` with status="success", report_format="sub-agent", and content="[the number your received x 2]".

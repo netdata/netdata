@@ -9,8 +9,7 @@ import type {
   ProviderReasoningMapping,
   ProviderReasoningValue,
   ProviderTurnMetadata,
-  LLMInterceptor,
-  LLMInterceptorContext,
+  ConversationMessage,
 } from './types.js';
 
 import { AnthropicProvider } from './llm-providers/anthropic.js';
@@ -41,7 +40,6 @@ export class LLMClient {
   private pricing?: Partial<Record<string, Partial<Record<string, { unit?: 'per_1k'|'per_1m'; currency?: 'USD'; prompt?: number; completion?: number; cacheRead?: number; cacheWrite?: number }>>>>;
   private lastMetadataTask?: Promise<void>;
   private lastTraceTask?: Promise<void>;
-  private turnInterceptor?: LLMInterceptor;
 
   constructor(
     providerConfigs: Record<string, ProviderConfig>,
@@ -50,7 +48,6 @@ export class LLMClient {
       traceSDK?: boolean;
       onLog?: (entry: LogEntry) => void;
       pricing?: Partial<Record<string, Partial<Record<string, { unit?: 'per_1k'|'per_1m'; currency?: 'USD'; prompt?: number; completion?: number; cacheRead?: number; cacheWrite?: number }>>>>;
-      turnInterceptor?: LLMInterceptor;
     }
   ) {
     this.traceLLM = options?.traceLLM ?? false;
@@ -58,7 +55,6 @@ export class LLMClient {
     updateAiSdkWarningPreference(this.traceLLM);
     this.onLog = options?.onLog;
     this.pricing = options?.pricing;
-    this.turnInterceptor = options?.turnInterceptor;
 
     // Initialize providers - necessary for side effects
     // eslint-disable-next-line functional/no-loop-statements
@@ -106,17 +102,6 @@ export class LLMClient {
     this.logRequest(request);
 
     const startTime = Date.now();
-    const interceptor = this.turnInterceptor;
-    let context: LLMInterceptorContext | undefined;
-    if (interceptor !== undefined && typeof interceptor.replay === 'function') {
-      context = { turn: this.currentTurn, subturn: this.currentSubturn, request };
-      const replayed = await interceptor.replay(context);
-      if (replayed !== undefined) {
-        const clone = this.cloneTurnResult(replayed);
-        this.logResponse(request, clone, Date.now() - startTime);
-        return clone;
-      }
-    }
 
     try {
       const result = await provider.executeTurn(request);
@@ -139,10 +124,6 @@ export class LLMClient {
       this.lastCacheWriteInputTokens = undefined;
       // Log response
       this.logResponse(request, result, Date.now() - startTime);
-      if (interceptor !== undefined && typeof interceptor.record === 'function') {
-        context ??= { turn: this.currentTurn, subturn: this.currentSubturn, request };
-        await interceptor.record(context, this.cloneTurnResult(result));
-      }
       return result;
     } catch (error) {
       await this.awaitLastMetadataTask();
@@ -154,19 +135,7 @@ export class LLMClient {
       };
       // Log error response
       this.logResponse(request, errorResult, latencyMs);
-      if (interceptor !== undefined && typeof interceptor.record === 'function') {
-        context ??= { turn: this.currentTurn, subturn: this.currentSubturn, request };
-        await interceptor.record(context, this.cloneTurnResult(errorResult));
-      }
       return errorResult;
-    }
-  }
-
-  private cloneTurnResult(result: TurnResult): TurnResult {
-    try {
-      return structuredClone(result);
-    } catch {
-      return JSON.parse(JSON.stringify(result)) as TurnResult;
     }
   }
 
@@ -765,10 +734,18 @@ export class LLMClient {
     return provider.resolveReasoningValue(context);
   }
 
-  shouldAutoEnableReasoningStream(providerName: string, level: ReasoningLevel | undefined): boolean {
+  shouldAutoEnableReasoningStream(providerName: string, level: ReasoningLevel | undefined, maxOutputTokens?: number): boolean {
     const provider = this.providers.get(providerName);
     if (provider === undefined) return false;
-    return provider.shouldAutoEnableReasoningStream(level);
+    return provider.shouldAutoEnableReasoningStream(level, { maxOutputTokens });
+  }
+
+  shouldDisableReasoning(providerName: string, context: { conversation: ConversationMessage[]; currentTurn: number; expectSignature: boolean }): { disable: boolean; normalized: ConversationMessage[] } {
+    const provider = this.providers.get(providerName);
+    if (provider === undefined) {
+      return { disable: false, normalized: context.conversation };
+    }
+    return provider.shouldDisableReasoning(context);
   }
 
   private selectProviderFromRecord(record: Record<string, unknown>): { provider?: string; model?: string } | undefined {

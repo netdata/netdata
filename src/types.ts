@@ -64,18 +64,6 @@ export interface TurnResult {
   retry?: TurnRetryDirective;
 }
 
-export interface LLMInterceptorContext {
-  turn: number;
-  subturn: number;
-  request: TurnRequest;
-}
-
-export interface LLMInterceptor {
-  replay?: (context: LLMInterceptorContext) => Promise<TurnResult | undefined> | TurnResult | undefined;
-  record?: (context: LLMInterceptorContext, result: TurnResult) => Promise<void> | void;
-  finalize?: (summary: { turns: number; recorded: number; replayed: number }) => Promise<void> | void;
-}
-
 export type ToolStatus =
   | { type: 'success' }
   | { type: 'mcp_server_error'; serverName: string; message: string }
@@ -538,7 +526,6 @@ export interface AIAgentSessionConfig {
   traceMCP?: boolean;
   traceSdk?: boolean;
   verbose?: boolean;
-  llmInterceptor?: LLMInterceptor;
   reasoning?: ReasoningLevel;
   reasoningValue?: ProviderReasoningValue | null;
   caching?: CachingMode;

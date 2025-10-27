@@ -6,8 +6,8 @@ import type { GlobalOverrides } from '../agent-loader.js';
 import type { AccountingEntry, ConversationMessage, LogEntry, ReasoningLevel } from '../types.js';
 
 import { loadAgent, LoadedAgentCache } from '../agent-loader.js';
+import { sanitizeToolName } from '../utils.js';
 
-import { Phase2FixtureManager } from './phase2-fixtures.js';
 import { phase2ModelConfigs } from './phase2-models.js';
 
 type Tier = 1 | 2 | 3;
@@ -61,17 +61,39 @@ interface AccountingSummary {
 }
 
 const PROJECT_ROOT = process.cwd();
-const FIXTURES_DIR = path.resolve(PROJECT_ROOT, 'fixtures', 'test-agents');
-const MASTER_AGENT_PATH = path.join(FIXTURES_DIR, 'test-master.ai');
+const TEST_AGENTS_DIR = path.resolve(PROJECT_ROOT, 'src', 'tests', 'phase2', 'test-agents');
+const MASTER_AGENT_PATH = path.join(TEST_AGENTS_DIR, 'test-master.ai');
 const DEFAULT_CONFIG_PATH = path.resolve(PROJECT_ROOT, 'neda/.ai-agent.json');
-const PHASE2_FIXTURE_ROOT = path.resolve(PROJECT_ROOT, 'fixtures', 'phase2');
-
 const FINAL_REPORT_INSTRUCTION = 'Call agent__final_report with status="success", report_format="text", and content set to the required text.';
 const FINAL_REPORT_ARGS = 'agent__final_report(status="success", report_format="text", content=<value>)';
 const BASIC_PROMPT = `${FINAL_REPORT_INSTRUCTION} The content must be exactly "test".`;
 const BASIC_USER = `Invoke ${FINAL_REPORT_ARGS.replace('<value>', '"test"')} and produce no other output.`;
-const MULTI_PROMPT = '1) Call agent__test-agent1 with parameters {"prompt":"run","reason":"execute phase two","format":"sub-agent"}. 2) Wait for the response and call agent__test-agent2 with {"prompt":<agent1 output>,"reason":"execute phase two","format":"sub-agent"}. 3) Finish by calling agent__final_report(status="success", report_format="text", content=<agent2 output>). Do not emit plain text.';
-const MULTI_USER = 'Execute agent__test-agent1({"prompt":"run","reason":"execute phase two","format":"sub-agent"}), pass its output into agent__test-agent2({"prompt":<agent1 output>,"reason":"execute phase two","format":"sub-agent"}), and conclude with agent__final_report(status="success", report_format="text", content=<agent2 output>).';
+const MULTI_PROMPT = `You are a helpful CI tester helping the verification of multi-turn agentic operation.
+
+You have 2 agents: agent1 and agent2. The test completes in 3 turns.
+
+## Turns
+1. You call just agent1 with the parameter "run"
+2. You call just agent2 with the output of agent1
+3. You provide your final-report with the output of agent2
+
+For the test to complete successfully, you must call each agent alone, without any other tools.
+
+## Process
+Follow exactly these steps for a successful outcome:
+
+1. Call ONLY "agent__test-agent1" with parameters {"prompt":"run","reason":"execute agent1","format":"sub-agent"}.
+2. Once agent1 responds and you have its output, call ONLY "agent__test-agent2" with {"prompt":"I received this from agent1: [agent1 response]","reason":"execute agent2","format":"sub-agent"}.
+3. Once agent2 responds and you have its output, call ONLY agent__final_report with status="success", report_format="text", and content="I received this from agent2: [agent2 response]".
+
+Do not emit plain text.`;
+const MULTI_USER = `CI verification scenario: follow the multi-turn process exactly.
+
+1) Call ONLY "agent__test-agent1" with parameters {"prompt":"run","reason":"execute agent1","format":"sub-agent"}.
+2) After agent__test-agent1 responds, call ONLY "agent__test-agent2" with {"prompt":"I received this from agent1: [agent1 response]","reason":"execute agent2","format":"sub-agent"}.
+3) After agent__test-agent2 responds, call ONLY agent__final_report with status="success", report_format="text", and content="I received this from agent2: [agent2 response]".
+
+If you skip a step or call any other tool, the CI test fails.`;
 
 const REQUIRED_AGENT_TOOLS: readonly string[] = ['agent__test-agent1', 'agent__test-agent2'] as const;
 
@@ -97,12 +119,13 @@ const BASE_SCENARIOS: readonly ScenarioDefinition[] = [
 
 const STREAM_VARIANTS: readonly boolean[] = [false, true] as const;
 const STOP_ON_FAILURE = process.env.PHASE2_STOP_ON_FAILURE === '1';
-let REFRESH_FIXTURES = false;
 const TRACE_LLM = process.env.PHASE2_TRACE_LLM === '1';
 const TRACE_SDK = process.env.PHASE2_TRACE_SDK === '1';
 const TRACE_MCP = process.env.PHASE2_TRACE_MCP === '1';
 const VERBOSE_LOGS = process.env.PHASE2_VERBOSE === '1';
-
+const STREAM_ON_LABEL = 'stream-on';
+const STREAM_OFF_LABEL = 'stream-off';
+const TEMP_DISABLED_PROVIDERS = new Set<string>();
 const toErrorMessage = (value: unknown): string => (value instanceof Error ? value.message : String(value));
 
 const ensureFileExists = (description: string, candidate: string): void => {
@@ -204,12 +227,72 @@ const extractMaxLlmTurn = (logs: readonly LogEntry[]): number => {
   return Math.max(...turns);
 };
 
+const normalizeToolName = (toolName: string): string => sanitizeToolName(toolName);
+
 const findToolIndex = (logs: readonly LogEntry[], toolName: string): number => {
-  return logs.findIndex((log) => log.type === 'tool' && log.direction === 'request' && log.details?.tool === toolName);
+  const normalized = normalizeToolName(toolName);
+  return logs.findIndex((log) => log.type === 'tool' && log.direction === 'request' && normalizeToolName(String(log.details?.tool ?? '')) === normalized);
 };
 
-const hasFinalReport = (logs: readonly LogEntry[]): boolean => {
-  return logs.some((log) => log.type === 'tool' && log.direction === 'request' && log.details?.tool === 'agent__final_report');
+const collectConversationToolCalls = (conversation: readonly ConversationMessage[]): Map<string, string> => {
+  const map = new Map<string, string>();
+  conversation.forEach((message) => {
+    if (message.role !== 'assistant') return;
+    const rawCalls = (message as { toolCalls?: unknown }).toolCalls;
+    if (!Array.isArray(rawCalls)) return;
+    rawCalls.forEach((call) => {
+      if (call === null || typeof call !== 'object') return;
+      const callObj = call as { id?: unknown; name?: unknown };
+      const id = typeof callObj.id === 'string' && callObj.id.length > 0 ? callObj.id : undefined;
+      const name = typeof callObj.name === 'string' ? callObj.name : undefined;
+      if (id === undefined || name === undefined) return;
+      map.set(id, normalizeToolName(name));
+    });
+  });
+  return map;
+};
+
+const conversationHasToolCall = (conversation: readonly ConversationMessage[], toolName: string): boolean => {
+  const normalized = normalizeToolName(toolName);
+  const callMap = collectConversationToolCalls(conversation);
+  if (callMap.size === 0) return false;
+  return conversation.some((message) => {
+    if (message.role !== 'tool') return false;
+    const toolCallId = (message as { toolCallId?: unknown }).toolCallId;
+    if (typeof toolCallId !== 'string' || toolCallId.length === 0) return false;
+    return callMap.get(toolCallId) === normalized;
+  });
+};
+
+const conversationToolOrder = (conversation: readonly ConversationMessage[], toolName: string): number => {
+  const normalized = normalizeToolName(toolName);
+  let order = 0;
+  // eslint-disable-next-line functional/no-loop-statements -- imperative scan is clearer for ordered assistant turns
+  for (const message of conversation) {
+    if (message.role !== 'assistant') continue;
+    const rawCalls = (message as { toolCalls?: unknown }).toolCalls;
+    if (!Array.isArray(rawCalls)) continue;
+    const hasMatch = rawCalls.some((call) => {
+      if (call === null || typeof call !== 'object') return false;
+      const nameValue = (call as { name?: unknown }).name;
+      if (typeof nameValue !== 'string' || nameValue.length === 0) return false;
+      return normalizeToolName(nameValue) === normalized;
+    });
+    if (hasMatch) {
+      return order;
+    }
+    order += 1;
+  }
+  return -1;
+};
+
+const hasToolInvocation = (
+  logs: readonly LogEntry[],
+  conversation: readonly ConversationMessage[],
+  toolName: string,
+): boolean => {
+  if (findToolIndex(logs, toolName) !== -1) return true;
+  return conversationHasToolCall(conversation, toolName);
 };
 
 const hasAccountingEntries = (entries: readonly AccountingEntry[]): boolean => {
@@ -273,7 +356,7 @@ const validateScenarioResult = (
   if (session.finalReport?.status !== 'success') {
     failures.push('final report missing or not successful');
   }
-  if (!hasFinalReport(session.logs)) {
+  if (!hasToolInvocation(session.logs, session.conversation, 'agent__final_report')) {
     failures.push('final report tool was not invoked');
   }
   const maxTurn = extractMaxLlmTurn(session.logs);
@@ -291,16 +374,23 @@ const validateScenarioResult = (
     }
     if (Array.isArray(scenario.requiredAgentTools)) {
       const tools = scenario.requiredAgentTools.filter((value): value is string => typeof value === 'string');
-      tools.forEach((toolName) => {
-        const idx = findToolIndex(session.logs, toolName);
-        if (idx === -1) {
-          failures.push(`required sub-agent tool '${toolName}' was not invoked`);
+      const toolInvocationStatus = tools.map((toolName) => ({
+        name: toolName,
+        logIndex: findToolIndex(session.logs, toolName),
+        conversationIndex: conversationToolOrder(session.conversation, toolName),
+        invoked: hasToolInvocation(session.logs, session.conversation, toolName),
+      }));
+      toolInvocationStatus.forEach((status) => {
+        if (!status.invoked) {
+          failures.push(`required sub-agent tool '${status.name}' was not invoked`);
         }
       });
-      if (tools.length >= 2) {
-        const firstIdx = findToolIndex(session.logs, tools[0]);
-        const secondIdx = findToolIndex(session.logs, tools[1]);
-        if (firstIdx >= 0 && secondIdx >= 0 && firstIdx > secondIdx) {
+      if (toolInvocationStatus.every((status) => status.invoked) && tools.length >= 2) {
+        const first = toolInvocationStatus[0];
+        const second = toolInvocationStatus[1];
+        const firstOrder = first.logIndex >= 0 ? first.logIndex : first.conversationIndex;
+        const secondOrder = second.logIndex >= 0 ? second.logIndex : second.conversationIndex;
+        if (firstOrder >= 0 && secondOrder >= 0 && firstOrder > secondOrder) {
           failures.push('agent2 ran before agent1');
         }
       }
@@ -370,16 +460,6 @@ const runScenarioVariant = async (
   if (scenario.reasoning !== undefined) {
     overrides.reasoning = scenario.reasoning;
   }
-  const fixtureManager = new Phase2FixtureManager({
-    rootDir: PHASE2_FIXTURE_ROOT,
-    modelLabel,
-    provider,
-    modelId,
-    scenarioId: scenario.id,
-    scenarioLabel: scenario.label,
-    stream,
-    refresh: REFRESH_FIXTURES,
-  });
   const baseResult: ScenarioRunResult = {
     modelLabel,
     provider,
@@ -417,21 +497,9 @@ const runScenarioVariant = async (
       traceSdk: TRACE_SDK,
       traceMCP: TRACE_MCP,
       verbose: VERBOSE_LOGS,
-      llmInterceptor: fixtureManager,
     });
-    const validated = validateScenarioResult(baseResult, { result });
-    fixtureManager.finalize();
-    const stats = fixtureManager.stats();
-    if (stats.recorded > 0) {
-      console.log(`[INFO] recorded ${String(stats.recorded)} new LLM fixture turn(s) at ${stats.dir}`);
-    }
-    return validated;
+    return validateScenarioResult(baseResult, { result });
   } catch (error: unknown) {
-    try {
-      fixtureManager.finalize();
-    } catch (finalizeError) {
-      process.stderr.write(`[warn] fixture finalize failed: ${finalizeError instanceof Error ? finalizeError.message : String(finalizeError)}\n`);
-    }
     const message = toErrorMessage(error);
     return { ...baseResult, success: false, failureReasons: [message], error: message };
   }
@@ -463,7 +531,7 @@ const formatRunMetrics = (run: ScenarioRunResult, summaryOverride?: AccountingSu
 
 const formatSummaryLine = (run: ScenarioRunResult, summaryOverride?: AccountingSummary): string => {
   const outcome = run.success ? 'PASS' : 'FAIL';
-  const streamLabel = run.stream ? 'stream-on' : 'stream-off';
+  const streamLabel = run.stream ? STREAM_ON_LABEL : STREAM_OFF_LABEL;
   return `[${outcome}] ${run.modelLabel} (${run.provider}:${run.modelId}) :: ${run.scenarioLabel} :: ${streamLabel} | ${formatRunMetrics(run, summaryOverride)}`;
 };
 
@@ -514,7 +582,6 @@ const printUsage = (): void => {
   console.log('Usage: node dist/tests/phase2-runner.js [--config=path] [--tier=1,2,3] [--model=label,modelId]');
   console.log('Environment override: PHASE2_CONFIG=/path/to/config.json');
   console.log('Set PHASE2_STOP_ON_FAILURE=1 to halt immediately after the first failure (default: continue running all models).');
-  console.log('Use --refresh-llm-fixtures to regenerate cached LLM turn fixtures before running.');
 };
 
 async function main(): Promise<void> {
@@ -527,6 +594,7 @@ async function main(): Promise<void> {
 
   let configPath = process.env.PHASE2_CONFIG ?? DEFAULT_CONFIG_PATH;
   let tierFilter: Set<Tier> | undefined;
+  let tierThreshold: number | undefined;
   let modelFilter: Set<string> | undefined;
 
   argv.forEach((arg) => {
@@ -534,10 +602,9 @@ async function main(): Promise<void> {
       configPath = path.resolve(arg.slice('--config='.length));
     } else if (arg.startsWith('--tier=')) {
       tierFilter = parseTierFilter(arg.slice('--tier='.length));
+      tierThreshold = Math.max(...Array.from(tierFilter));
     } else if (arg.startsWith('--model=')) {
       modelFilter = parseModelFilter(arg.slice('--model='.length));
-    } else if (arg === '--refresh-llm-fixtures') {
-      REFRESH_FIXTURES = true;
     } else {
       throw new Error(`unknown argument '${arg}'`);
     }
@@ -546,13 +613,16 @@ async function main(): Promise<void> {
   ensureFileExists('Configuration file', configPath);
 
   const runs: ScenarioRunResult[] = [];
-  const tiersToRun = tierFilter ?? new Set<Tier>([1, 2, 3]);
   let abort = false;
   let executed = 0;
   // eslint-disable-next-line functional/no-loop-statements
   for (const model of phase2ModelConfigs) {
     if (abort) break;
-    if (!tiersToRun.has(model.tier)) continue;
+    if (TEMP_DISABLED_PROVIDERS.has(model.provider)) {
+      console.log(`[SKIP] ${model.label} (${model.provider}:${model.modelId}) disabled temporarily`);
+      continue;
+    }
+    if (tierThreshold !== undefined && model.tier > tierThreshold) continue;
     if (modelFilter !== undefined) {
       const matches = modelFilter.has(model.label) || modelFilter.has(`${model.provider}/${model.modelId}`) || modelFilter.has(model.modelId);
       if (!matches) continue;
@@ -560,7 +630,7 @@ async function main(): Promise<void> {
     // eslint-disable-next-line functional/no-loop-statements
     for (const variant of scenarioVariants) {
       executed += 1;
-      const streamLabel = variant.stream ? 'stream-on' : 'stream-off';
+      const streamLabel = variant.stream ? STREAM_ON_LABEL : STREAM_OFF_LABEL;
       const runIndexLabel = String(executed);
       const tierLabel = String(model.tier);
       console.log(`[RUN] #${runIndexLabel} ${model.label} (${model.provider}:${model.modelId}, tier ${tierLabel}) :: ${variant.scenario.label} :: ${streamLabel}`);

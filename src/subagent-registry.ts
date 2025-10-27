@@ -153,11 +153,15 @@ export class SubAgentRegistry {
     return this.children.has(name);
   }
 
+  listToolNames(): string[] {
+    return Array.from(this.children.keys()).map((name) => `agent__${name}`);
+  }
+
   // Execute a child agent and return its serialized result (string) and child id
   async execute(
     exposedToolName: string,
     parameters: Record<string, unknown>,
-    parentSession: Pick<AIAgentSessionConfig, 'config' | 'callbacks' | 'stream' | 'traceLLM' | 'traceMCP' | 'traceSdk' | 'verbose' | 'temperature' | 'topP' | 'llmTimeout' | 'toolTimeout' | 'maxRetries' | 'maxTurns' | 'toolResponseMaxBytes' | 'parallelToolCalls' | 'targets' | 'llmInterceptor'> & {
+    parentSession: Pick<AIAgentSessionConfig, 'config' | 'callbacks' | 'stream' | 'traceLLM' | 'traceMCP' | 'traceSdk' | 'verbose' | 'temperature' | 'topP' | 'llmTimeout' | 'toolTimeout' | 'maxRetries' | 'maxTurns' | 'toolResponseMaxBytes' | 'parallelToolCalls' | 'targets'> & {
       // extra trace/metadata for child
       trace?: { originId?: string; parentId?: string; callPath?: string };
       // control signals to propagate
@@ -260,6 +264,9 @@ export class SubAgentRegistry {
       const callPath = (typeof basePath === 'string' && basePath.length > 0) ? `${basePath}->${info.toolName}` : info.toolName;
       const childTrace = { selfId: crypto.randomUUID(), originId: parentSession.trace?.originId, parentId: parentSession.trace?.parentId, callPath };
       const outputFormat = (() => {
+        const requestedFormat = (parameters as { format?: unknown }).format;
+        if (requestedFormat === 'sub-agent') return 'sub-agent';
+
         const fmt = loaded.expectedOutput?.format;
         if (fmt === 'json') return 'json';
         if (fmt === 'markdown') return 'markdown';
@@ -278,7 +285,6 @@ export class SubAgentRegistry {
         stopRef: parentSession.stopRef,
         // propagate ancestors to prevent recursion cycles in nested sessions
         ancestors: [...this.ancestors, info.promptPath],
-        llmInterceptor: parentSession.llmInterceptor
       });
     } finally {
       // no chdir in static mode
