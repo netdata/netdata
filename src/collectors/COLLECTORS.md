@@ -7,7 +7,6 @@ Learn more about [how collectors work](/src/collectors/README.md), and then lear
 
 :::note
 
-Some collectors have both Go and Python versions as we continue our effort to migrate all collectors to Go. In these cases, _Netdata always prioritizes the Go version_, and we highly recommend you use the Go versions for the best experience.
 
 :::
 
