@@ -5,9 +5,11 @@ real-time, interactive charts. The following list includes all the integrations 
 
 Learn more about [how collectors work](/src/collectors/README.md), and then learn how to [enable or configure](/src/collectors/REFERENCE.md#enable-or-disable-collectors-and-plugins) a specific collector.
 
-> **Note**
->
-> Some collectors have both Go and Python versions as we continue our effort to migrate all collectors to Go. In these cases, _Netdata always prioritizes the Go version_, and we highly recommend you use the Go versions for the best experience.
+:::note
+
+Some collectors have both Go and Python versions as we continue our effort to migrate all collectors to Go. In these cases, _Netdata always prioritizes the Go version_, and we highly recommend you use the Go versions for the best experience.
+
+:::
 
 ## Add your application to Netdata
 
