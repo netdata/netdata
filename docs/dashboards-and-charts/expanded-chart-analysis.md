@@ -30,12 +30,12 @@ All analysis modes support both time range options.
 
 Switch between modes by clicking the icons in the panel header. Each mode is designed for a specific type of investigation.
 
-| Mode | Icon | Use For |
-|------|------|---------|
-| **Chart Values** | 📊 | Viewing detailed statistics for all dimensions |
-| **Drill Down** | 🔽 | Exploring which nodes or instances contribute most |
-| **Compare Periods** | 📈 | Comparing current metrics with historical data |
-| **Correlate Metrics** | 🔗 | Finding related metrics across your infrastructure |
+| Mode                  | Icon | Use For                                            |
+|-----------------------|------|----------------------------------------------------|
+| **Chart Values**      | 📊   | Viewing detailed statistics for all dimensions     |
+| **Drill Down**        | 🔽   | Exploring which nodes or instances contribute most |
+| **Compare Periods**   | 📈   | Comparing current metrics with historical data     |
+| **Correlate Metrics** | 🔗   | Finding related metrics across your infrastructure |
 
 ### Chart Values
 
@@ -43,14 +43,14 @@ View detailed statistics for every dimension in your chart. This mode shows you 
 
 ![chart values](https://raw.githubusercontent.com/netdata/docs-images/7a86c33450c24df340b7381c2c9587f332ad0c04/expanded-analysis/Chart%20Values.png)
 
-| Column | Description |
-|--------|-------------|
-| **Dimension** | Dimension name with color indicator |
-| **Value** | Current or hovering value with units |
-| **Min** | Minimum value in the time period |
-| **Avg** | Average value in the time period |
-| **Max** | Maximum value in the time period |
-| **Anomaly** | Anomaly rate (percentage of time behaving unusually) |
+| Column        | Description                                          |
+|---------------|------------------------------------------------------|
+| **Dimension** | Dimension name with color indicator                  |
+| **Value**     | Current or hovering value with units                 |
+| **Min**       | Minimum value in the time period                     |
+| **Avg**       | Average value in the time period                     |
+| **Max**       | Maximum value in the time period                     |
+| **Anomaly**   | Anomaly rate (percentage of time behaving unusually) |
 
 :::tip
 
@@ -62,13 +62,13 @@ Sort by the Anomaly column to quickly find which dimensions are behaving strange
 
 Click the metrics icon in the panel header to reveal additional columns:
 
-| Advanced Column | Description |
-|-----------------|-------------|
-| **Median** | Middle value (50th percentile) |
-| **StdDev** | Standard deviation |
-| **P95** | 95th percentile |
-| **Range** | Difference between max and min |
-| **Volume** | Sum of all values |
+| Advanced Column | Description                    |
+|-----------------|--------------------------------|
+| **Median**      | Middle value (50th percentile) |
+| **StdDev**      | Standard deviation             |
+| **P95**         | 95th percentile                |
+| **Range**       | Difference between max and min |
+| **Volume**      | Sum of all values              |
 
 **Sort and export**
 
@@ -92,39 +92,44 @@ flowchart TD
     B --> E("**Dimension Level**<br/>write<br/>Contribution: 15%")
     C --> F("**Dimension Level**<br/>read<br/>Contribution: 12%")
     C --> G("**Dimension Level**<br/>write<br/>Contribution: 8%")
-    
     H("**Node Level**<br/>server-prod-02<br/>Contribution: 35%") --> I("**Instance Level**<br/>disk: sda<br/>Contribution: 35%")
     I --> J("**Dimension Level**<br/>read<br/>Contribution: 20%")
     I --> K("**Dimension Level**<br/>write<br/>Contribution: 15%")
-
-%% Style definitions matching the reference
-    classDef alert fill:#ffeb3b,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
-    classDef neutral fill:#f9f9f9,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
-    classDef complete fill:#4caf50,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
-    classDef database fill:#2196F3,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
-
+%% Style definitions
+    classDef alert fill: #ffeb3b, stroke: #000000, stroke-width: 3px, color: #000000, font-size: 18px
+    classDef neutral fill: #f9f9f9, stroke: #000000, stroke-width: 3px, color: #000000, font-size: 18px
+    classDef complete fill: #4caf50, stroke: #000000, stroke-width: 3px, color: #000000, font-size: 18px
+    classDef database fill: #2196F3, stroke: #000000, stroke-width: 3px, color: #000000, font-size: 18px
 %% Apply styles
-    class A,H alert
-    class B,C,I database
-    class D,E,F,G,J,K neutral
+    class A alert
+    class H alert
+    class B database
+    class C database
+    class I database
+    class D neutral
+    class E neutral
+    class F neutral
+    class G neutral
+    class J neutral
+    class K neutral
 ```
 
-| Level | Description | Examples |
-|-------|-------------|----------|
-| **Node** | Individual servers or hosts | server-01, web-prod-03 |
-| **Instance** | Specific entities being monitored | disk "sda", network "eth0" |
-| **Dimension** | Individual metrics | "read", "write", "used" |
+| Level         | Description                       | Examples                   |
+|---------------|-----------------------------------|----------------------------|
+| **Node**      | Individual servers or hosts       | server-01, web-prod-03     |
+| **Instance**  | Specific entities being monitored | disk "sda", network "eth0" |
+| **Dimension** | Individual metrics                | "read", "write", "used"    |
 
 Each level shows:
 
-| Column | Description |
-|--------|-------------|
-| **Name** | Node, instance, or dimension name with expand icon |
-| **Contribution** | Percentage weight (contribution to total) |
-| **Anomaly Rate** | Aggregated anomaly rate for this branch |
-| **Min** | Minimum value in period |
-| **Avg** | Average value in period |
-| **Max** | Maximum value in period |
+| Column           | Description                                        |
+|------------------|----------------------------------------------------|
+| **Name**         | Node, instance, or dimension name with expand icon |
+| **Contribution** | Percentage weight (contribution to total)          |
+| **Anomaly Rate** | Aggregated anomaly rate for this branch            |
+| **Min**          | Minimum value in period                            |
+| **Avg**          | Average value in period                            |
+| **Max**          | Maximum value in period                            |
 
 **Navigate the hierarchy**
 
@@ -146,23 +151,24 @@ Compare current metrics with historical periods to identify trends and changes. 
 
 ![compare periods](https://raw.githubusercontent.com/netdata/docs-images/7a86c33450c24df340b7381c2c9587f332ad0c04/expanded-analysis/Compare.png)
 
-| Period | Description |
-|--------|-------------|
-| **Current** | The visible time window or selected area (base period) |
-| **Yesterday** | Same duration, 24 hours ago |
-| **Last Week** | Same duration, 7 days ago |
-| **Last Month** | Same duration, 30 days ago |
+| Period         | Description                                            |
+|----------------|--------------------------------------------------------|
+| **Current**    | The visible time window or selected area (base period) |
+| **Yesterday**  | Same duration, 24 hours ago                            |
+| **Last Week**  | Same duration, 7 days ago                              |
+| **Last Month** | Same duration, 30 days ago                             |
 
 Each period card displays:
+
 - Period label and date range
 - Basic statistics (Min, Avg, Max)
 - Change indicators showing percentage and absolute change compared to current
 
-| Indicator | Meaning |
-|-----------|---------|
-| 🔴 Red | Increase from current period |
-| 🟢 Green | Decrease from current period |
-| ⚪ Gray | No significant change |
+| Indicator | Meaning                      |
+|-----------|------------------------------|
+| 🔴 Red    | Increase from current period |
+| 🟢 Green  | Decrease from current period |
+| ⚪ Gray    | No significant change        |
 
 **Show advanced statistics**
 
@@ -192,33 +198,33 @@ Discover which metrics across your infrastructure correlate with the current cha
 
 The table displays correlated metrics grouped by context:
 
-| Column | Description |
-|--------|-------------|
-| **Context** | Metric category (grouped header) |
-| **Metric** | Full metric name (node:instance:dimension) |
-| **Weight** | Correlation weight (lower = stronger correlation) |
-| **Sparkline** | Mini chart showing the metric's behavior |
+| Column        | Description                                       |
+|---------------|---------------------------------------------------|
+| **Context**   | Metric category (grouped header)                  |
+| **Metric**    | Full metric name (node:instance:dimension)        |
+| **Weight**    | Correlation weight (lower = stronger correlation) |
+| **Sparkline** | Mini chart showing the metric's behavior          |
 
 **Choose your correlation method**
 
 Select how to calculate correlations:
 
-| Method | Description | Best For |
-|--------|-------------|----------|
-| **Volume** | Identifies metrics with similar magnitude changes | Most use cases (recommended) |
-| **KS2** | Uses statistical analysis for similar distributions | Complex pattern matching |
+| Method     | Description                                         | Best For                     |
+|------------|-----------------------------------------------------|------------------------------|
+| **Volume** | Identifies metrics with similar magnitude changes   | Most use cases (recommended) |
+| **KS2**    | Uses statistical analysis for similar distributions | Complex pattern matching     |
 
 **Select aggregation**
 
 Choose how to aggregate data:
 
-| Aggregation | Use When |
-|-------------|----------|
+| Aggregation | Use When                       |
+|-------------|--------------------------------|
 | **Average** | General patterns (recommended) |
-| **Median** | Outliers might skew results |
-| **Min** | Focusing on minimum values |
-| **Max** | Focusing on peak values |
-| **StdDev** | Focusing on variability |
+| **Median**  | Outliers might skew results    |
+| **Min**     | Focusing on minimum values     |
+| **Max**     | Focusing on peak values        |
+| **StdDev**  | Focusing on variability        |
 
 **Adjust the threshold**
 
@@ -274,6 +280,7 @@ The threshold might be set too low. Try increasing the threshold slider to 1-5% 
 <summary><strong>Drill Down shows "No data available"</strong></summary>
 
 This occurs when:
+
 - The time range is too short
 - No data was collected during this period
 
@@ -299,6 +306,7 @@ Click the metrics icon button in the panel header to show advanced statistics (M
 <summary><strong>The analysis panel is slow to load</strong></summary>
 
 For large time ranges or many dimensions:
+
 - Use a shorter time range
 - Highlight a specific area to analyze
 - Filter to fewer dimensions using the chart legend
