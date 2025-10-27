@@ -5,7 +5,6 @@ real-time, interactive charts. The following list includes all the integrations 
 
 Learn more about [how collectors work](/src/collectors/README.md), and then learn how to [enable or configure](/src/collectors/REFERENCE.md#enable-or-disable-collectors-and-plugins) a specific collector.
 
-:::note
 
 
 :::
