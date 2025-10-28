@@ -1,7 +1,6 @@
 # git-cliff ~ configuration file
 # https://git-cliff.org/docs/configuration
 
-
 [changelog]
 # A Tera template to be rendered for each release in the changelog.
 # See https://keats.github.io/tera/docs/#introduction
@@ -31,6 +30,12 @@ postprocessors = [
     { pattern = '<REPO>', replace = "https://github.com/netdata/netdata" },
 ]
 # output file path
+#
+# This is intentionally set to a dummy path, as we need additional
+# options that can only be specified on the command line to generate
+# the file correctly, and it’s expected that anyone is using the
+# packaging/generate-changelog.sh script (or is smart enough to inspect
+# it and extrapolate how to run the command correctly).
 output = "test.md"
 
 [git]
@@ -38,7 +43,7 @@ output = "test.md"
 # See https://www.conventionalcommits.org
 conventional_commits = false
 # Exclude commits that do not match the conventional commits specification.
-filter_unconventional = true
+filter_unconventional = false
 # Require all commits to be conventional.
 # Takes precedence over filter_unconventional.
 require_conventional = false
@@ -47,7 +52,7 @@ split_commits = false
 # An array of regex based parsers to modify commit messages prior to further processing.
 commit_preprocessors = [
     # Replace issue numbers with link templates to be updated in `changelog.postprocessors`.
-    { pattern = '\((\w+\s)?#([0-9]+)\)', replace = "([#${2}](<REPO>/issues/${2}))"},
+    { pattern = '(\w+\s)?#([0-9]+)', replace = "[#${2}](<REPO>/issues/${2})"},
     # Check spelling of the commit message using https://github.com/crate-ci/typos.
     # If the spelling is incorrect, it will be fixed automatically.
     #{ pattern = '.*', replace_command = 'typos --write-changes -' },
@@ -57,6 +62,9 @@ protect_breaking_commits = false
 # An array of regex based parsers for extracting data from the commit message.
 # Assigns commits to groups.
 # Optionally sets the commit's scope and can decide to exclude commits from further processing.
+#
+# Our workflow only generates PRs for actual changes, thus we don’t
+# need special grouping here.
 commit_parsers = [
     { message = "^(?i)\\[ci skip]", skip = true },
     { message = ".*", group = "Merged Pull Requests:" },
@@ -65,7 +73,7 @@ commit_parsers = [
 filter_commits = false
 # An array of link parsers for extracting external references, and turning them into URLs, using regex.
 link_parsers = [
-    { pattern = "#(\\d+)", href = "https://github.com/orhun/git-cliff/issues/$1"},
+    { pattern = "#(\\d+)", href = "https://github.com/netdata/netdata/issues/$1"},
     { pattern = "RFC(\\d+)", text = "ietf-rfc$1", href = "https://datatracker.ietf.org/doc/html/rfc$1"},
 ]
 # Include only the tags that belong to the current branch.
