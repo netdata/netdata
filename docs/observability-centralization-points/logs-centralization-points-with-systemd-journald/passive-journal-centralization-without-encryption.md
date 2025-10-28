@@ -11,9 +11,12 @@ A _passive_ journal server waits for clients to push their metrics to it, so in 
 1. configure `systemd-journal-remote` on the server, to listen for incoming connections.
 2. configure `systemd-journal-upload` on the clients, to push their logs to the server.
 
-> ⚠️ **IMPORTANT**<br/>
-> These instructions will copy your logs to a central server, without any encryption or authorization.<br/>
-> DO NOT USE THIS ON NON-TRUSTED NETWORKS.
+:::warning
+
+These instructions will copy your logs to a central server, without any encryption or authorization.<br/>
+DO NOT USE THIS ON NON-TRUSTED NETWORKS.
+
+:::
 
 ## Server configuration
 
