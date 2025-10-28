@@ -4,9 +4,12 @@ This page will guide you through creating an active journal source without the u
 
 Once you enable an active journal source on a server, `systemd-journal-gatewayd` will expose an REST API on TCP port 19531. This API can be used for querying the logs, exporting the logs, or monitoring new log entries, remotely.
 
-> ⚠️ **IMPORTANT**<br/>
-> These instructions will expose your logs to the network, without any encryption or authorization.<br/>
-> DO NOT USE THIS ON NON-TRUSTED NETWORKS.
+:::warning
+
+These instructions will expose your logs to the network, without any encryption or authorization.<br/>
+DO NOT USE THIS ON NON-TRUSTED NETWORKS.
+
+:::
 
 ## Configuring an active journal source
 
