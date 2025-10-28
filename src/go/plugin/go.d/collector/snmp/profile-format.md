@@ -26,7 +26,7 @@ When Netdata connects to an SNMP device, the collector:
 
 1. Reads the device’s **sysObjectID** and **sysDescr**.
 2. Evaluates all available profiles.
-3. Applies every profile whose [selector](#1-selector) matches.
+3. Applies all profiles whose [selectors](#1-selector) match (multiple profiles can apply simultaneously).
 4. Uses the combined configuration to:
     - Collect [scalar metrics](#scalar-metrics-single-values) (single values like uptime or temperature).
     - Collect [table metrics](#table-metrics-multiple-rows) (multi-row values like per-interface traffic).
@@ -151,15 +151,15 @@ static_tags: <static tags>
 virtual_metrics: <calculated metrics>
 ```
 
-| Section                                   | Purpose                                                   |
-|-------------------------------------------|-----------------------------------------------------------|
-| [**selector**](#1-selector)               | Defines which devices the profile applies to.             |
-| [**extends**](#2-extends)                 | Inherits and merges other base profiles.                  |
-| [**metadata**](#3-metadata)               | Collects device-level information (host labels).          |
-| [**metrics**](#4-metrics)                 | Defines which OIDs to collect and how to chart them.      |
-| [**metric_tags**](#5-metric_tags)         | Defines global dynamic tags collected once per device.    |
-| [**static_tags**](#6-static_tags)         | Defines fixed tags applied to all metrics.                |
-| [**virtual_metrics**](#7-virtual_metrics) | Defines calculated or aggregated metrics based on others. |
+| Section                                   | Purpose                                                                            |
+|-------------------------------------------|------------------------------------------------------------------------------------|
+| [**selector**](#1-selector)               | Defines which devices the profile applies to.                                      |
+| [**extends**](#2-extends)                 | Inherits and merges other base profiles.                                           |
+| [**metadata**](#3-metadata)               | Collects device-level information (host labels).                                   |
+| [**metrics**](#4-metrics)                 | Defines which OIDs to collect and how to chart them.                               |
+| [**metric_tags**](#5-metric_tags)         | Defines global dynamic tags collected once per device and attached to all metrics. |
+| [**static_tags**](#6-static_tags)         | Defines fixed tags applied to all metrics.                                         |
+| [**virtual_metrics**](#7-virtual_metrics) | Defines calculated or aggregated metrics based on others.                          |
 
 ### 1. selector
 
@@ -240,7 +240,9 @@ It always follows the structure `metadata → device → fields`, where each fie
 Each field can be:
 
 - **Static** — `value:` is a fixed string.
-- **Dynamic** — `symbol:` reads the value from an SNMP OID.
+- **Dynamic** — the value is read from one or more SNMP OIDs using either:
+    - `symbol` — a single OID to read from.
+    - `symbols` — an ordered list of OIDs to try, **first non-empty wins**.
 
 ```yaml
 metadata:
@@ -248,23 +250,21 @@ metadata:
     fields:
       vendor:
         value: "Cisco"   # static label
+
       model:
-        symbol: # dynamic label from SNMP
-          OID: 1.3.6.1.2.1.47.1.1.1.1.2.1
-          name: entPhysicalModelName
+        symbols: # dynamic label with fallback
+          - OID: 1.3.6.1.4.1.9.3.6.3.0
+            name: ciscoModelA
+          - OID: 1.3.6.1.2.1.47.1.1.1.1.13.1
+            name: entPhysicalModelName
 ```
-
-:::info
-
-You can define multiple symbols for fallback — the first valid one will be used.
-
-:::
 
 **How it works**:
 
 - `vendor` is set statically to `"Cisco"`.
-- `model` is collected from `entPhysicalModelName`.
-- These values appear as **device (virtual node) host labels** in the UI. They are **not** per-metric tags.
+- `model` is collected dynamically. The collector tries the listed OIDs **in order** and uses the **first** one that returns a non-empty value.
+- These values appear as **device (virtual node) host labels** in the Netdata UI.
+- They are **not per-metric tags** and are applied to the device itself, not individual charts.
 
 :::tip
 
@@ -342,6 +342,57 @@ See also
 
 :::
 
+#### Underscore-prefixed metrics
+
+Metric names that start with an underscore (e.g., `_ifHCInOctets`) are **private**: they’re collected but **not** propagated to the SNMP collector output. Use them as internal building blocks (typically as inputs for [virtual_metrics](#7-virtual_metrics)) so the final metric set remains clean. After virtual metrics are computed, the collector drops underscored metrics from the exported set.
+
+```yaml
+# IF-MIB::ifXTable
+metrics:
+  - MIB: IF-MIB
+    table:
+      OID: 1.3.6.1.2.1.31.1.1
+      name: ifXTable
+    symbols:
+      - { OID: 1.3.6.1.2.1.31.1.1.1.6,  name: _ifHCInOctets,  scale_factor: 8 }
+      - { OID: 1.3.6.1.2.1.31.1.1.1.10, name: _ifHCOutOctets, scale_factor: 8 }
+
+virtual_metrics:
+  - name: ifTraffic
+    per_row: true
+    group_by: ["interface"]
+    sources:
+      - { metric: _ifHCInOctets,  table: ifXTable, as: in }
+      - { metric: _ifHCOutOctets, table: ifXTable, as: out }
+```
+
+#### Multiple symbol fallbacks
+
+You can express “try this OID, otherwise try that OID” by declaring **multiple metrics with the same** `symbol.name`, each pointing to a different OID. At runtime the collector **GETs** all declared scalar OIDs, marks missing ones, and **emits** the metric from whichever OID returns data. Missing OIDs are skipped cleanly.
+
+```yaml
+metrics:
+  - MIB: HOST-RESOURCES-MIB
+    symbol:
+      OID: 1.3.6.1.2.1.25.1.1.0
+      name: systemUptime
+      scale_factor: 0.01
+      chart_meta:
+        description: Time since the system was last rebooted or powered on.
+        family: 'System/Uptime'
+        unit: "s"
+
+  - MIB: HOST-RESOURCES-MIB
+    symbol:
+      OID: 1.3.6.1.2.1.1.3.0
+      name: systemUptime
+      scale_factor: 0.01
+      chart_meta:
+        description: Time since the system was last rebooted or powered on.
+        family: 'System/Uptime'
+        unit: "s"
+```
+
 ### 5. metric_tags
 
 The `metric_tags` section defines **global dynamic tags** — values collected once from the device and applied to **every metric** in the profile.
@@ -377,6 +428,64 @@ metric_tags:
 See [**Tag Transformation**](#tag-transformation) for supported transformations and syntax examples.
 
 :::
+
+#### Underscore-prefixed tags
+
+Tag names that start with an underscore (e.g., `_if_type`) are **emitted as labels** but are **ignored for chart-ID composition** by the SNMP collector that consumes these metrics. Use underscore tags to keep chart IDs short when another tag already guarantees uniqueness (for example, `interface`). (You still get the underscore-tag value as a chart label.)
+
+```yaml
+metrics:
+  - MIB: IF-MIB
+    table:
+      OID: 1.3.6.1.2.1.31.1.1
+      name: ifXTable
+    symbols:
+      - OID: 1.3.6.1.2.1.31.1.1.1.6
+        name: ifHCInOctets
+        chart_meta:
+          description: Traffic
+          family: 'Network/Interface/Traffic/In'
+          unit: "bit/s"
+        scale_factor: 8
+    metric_tags:
+      - tag: interface
+        symbol: { OID: 1.3.6.1.2.1.31.1.1.1.1, name: ifName }
+      - tag: _if_type
+        table: ifTable
+        symbol: { OID: 1.3.6.1.2.1.2.2.1.3, name: ifType }
+        mapping:
+          1: "other"
+          6: "ethernet"
+          24: "loopback"
+          131: "tunnel"
+          161: "lag"
+```
+
+#### Tag fallback (first non-empty wins)
+
+If you declare the **same tag name** multiple times, tags are evaluated **in order** and the **first non-empty** value is kept. This lets you fall back from a preferred column to an alternative. (Internally, the tag adder only sets a tag if it isn’t already set or is empty.)
+
+```yaml
+metrics:
+  - MIB: IF-MIB
+    table:
+      OID: 1.3.6.1.2.1.31.1.1
+      name: ifXTable
+    symbols:
+      - OID: 1.3.6.1.2.1.31.1.1.1.6
+        name: ifHCInOctets
+        chart_meta:
+          description: Traffic
+          family: 'Network/Interface/Traffic/In'
+          unit: "bit/s"
+        scale_factor: 8  # Octets → bits
+    metric_tags:
+      - tag: interface
+        symbol: { OID: 1.3.6.1.2.1.31.1.1.1.1, name: ifName } # preferred
+      - tag: interface
+        table: ifTable
+        symbol: { OID: 1.3.6.1.2.1.2.2.1.2, name: ifDescr } # fallback
+```
 
 ### 6. static_tags
 
@@ -1414,15 +1523,17 @@ Common use cases:
 ```yaml
 virtual_metrics:
   - name: <string>
+
+    # Option 1 — Direct sources (no fallback)
     sources:
       - { metric: <metricName>, table: <tableName>, as: <dimensionName> }
-      # Optional: direct primary source set
 
+    # Option 2 — Alternatives (with fallback sets)
     alternatives:
-      - sources:
+      - sources: # Try this first (preferred)
           - { metric: <metricNameA>, table: <tableName>, as: <dimensionName> }
           - { metric: <metricNameB>, table: <tableName>, as: <dimensionName> }
-      - sources:
+      - sources: # Fallback if the first set is missing
           - { metric: <fallbackMetricA>, table: <tableName>, as: <dimensionName> }
           - { metric: <fallbackMetricB>, table: <tableName>, as: <dimensionName> }
 
@@ -1433,6 +1544,13 @@ virtual_metrics:
       family: ...
       unit: ...
 ```
+
+**Sources vs. Alternatives**:
+
+- `sources:` defines the **primary or default** input set — used when there is only one way to compute the metric.
+- `alternatives:` defines **ordered fallback sets**, each containing its own `sources:` block.
+
+The collector evaluates alternatives **in order** and uses the **first** set that successfully produces data.
 
 ### Config reference
 
@@ -1555,7 +1673,7 @@ virtual_metrics:
 **What this does**:
 
 - Defines two **alternatives**, each as a list of sources.
-- At runtime, the collector **picks the first alternative whose sources produce data** (HC first).
+- At runtime, the collector **evaluates alternatives in order and uses the first one where all source metrics exist and contain data** (HC first).
 - Once a winner is found, **later alternatives are ignored**.
 - The parent emits metrics using **its own** `name` and `chart_meta`, sourcing values from the selected child.
 - If both `sources` and `alternatives` are present, `alternatives` take precedence.
