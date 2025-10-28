@@ -1,6 +1,5 @@
 """
 Generate the integrations section in COLLECTORS.md from integrations/integrations.js
-with per-category **tables** matching desired-COLLECTORS.md style.
 Key behavior:
 - Use **children of 'data-collection' (second-level categories) as section headings**. Any child category IDs on integrations
   are rolled up to their section-level parent.
