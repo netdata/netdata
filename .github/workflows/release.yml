@@ -44,6 +44,7 @@ jobs:
               ${{ github.event.inputs.version }} \
               ${{ secrets.NETDATA_RELEASE_TEST }}
       - name: Set up git-cliff
+        id: setup-git-cliff
         if: steps.target.outputs.run == 'true'
         uses: kenji-miyake/setup-git-cliff@v1
       - name: Generate Release Changelog
