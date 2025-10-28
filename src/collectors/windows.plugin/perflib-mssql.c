@@ -146,8 +146,6 @@ struct mssql_instance {
     DICTIONARY *sysjobs;
     DICTIONARY *publisher_publication;
 
-    bool running_replication;
-
     RRDSET *st_conn_memory;
     RRDDIM *rd_conn_memory;
 
@@ -205,6 +203,7 @@ struct mssql_db_instance {
 
     bool collecting_data;
     bool collect_instance;
+    bool running_replication;
 
     RRDSET *st_db_data_file_size;
     RRDSET *st_db_active_transactions;
@@ -955,6 +954,9 @@ void metdata_mssql_fill_dictionary_from_db(struct mssql_instance *mi)
         mdi->updated = 0;
         if (!mdi->parent) {
             mdi->parent = mi;
+            if (mi->conn || !strncmp(dbname, NETDATA_REPLICATION_DB, sizeof(NETDATA_REPLICATION_DB)- 1)) {
+                mdi->running_replication = true;
+            }
         }
 
         if (!i) {
