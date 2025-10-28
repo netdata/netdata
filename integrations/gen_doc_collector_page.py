@@ -388,20 +388,14 @@ def main() -> None:
     md = header + "## Available Data Collection Integrations\n\n" + tables
 
     outfile = pathlib.Path("./src/collectors/COLLECTORS.md")
-    txt = outfile.read_text(encoding='utf-8')
 
-    # Find the start of the content to replace
-    if "## Available Data Collection Integrations" in txt:
-        pre = txt.split("## Available Data Collection Integrations")[0]
-    elif "# Monitor anything with Netdata" in txt:
-        # If the header exists, keep only what's before it
-        pre = txt.split("# Monitor anything with Netdata")[0]
-    else:
-        # Otherwise keep everything before the marker
-        pre = txt.split("## Add your application to Netdata")[0] if "## Add your application to Netdata" in txt else ""
+    outfile.parent.mkdir(parents=True, exist_ok=True)
 
-    new_txt = pre.rstrip() + "\n\n" + md
-    outfile.write_text(new_txt.rstrip('\n') + "\n", encoding='utf-8')
+    # Always overwrite the file with freshly generated content (no partial preserves)
+    # Write atomically to avoid partial writes
+    tmp = outfile.with_suffix(outfile.suffix + ".tmp")
+    tmp.write_text(md.rstrip('\n') + "\n", encoding='utf-8')
+    tmp.replace(outfile)
 
 
 if __name__ == '__main__':
