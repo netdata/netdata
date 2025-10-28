@@ -90,6 +90,26 @@ struct mssql_db_waits {
     COUNTER_DATA MSSQLDatabaseWaitingTasks;
 };
 
+// https://learn.microsoft.com/en-us/sql/relational-databases/system-stored-procedures/sp-replmonitorhelppublication-transact-sql?view=sql-server-ver17
+struct mssql_publisher_publication {
+    char *publisher;
+    char *publication;
+    char *db;
+
+    int type;
+    int status;
+    int warning;
+
+    int avg_latency;
+
+    int retention;
+
+    int subscriptioncount;
+    int runningdistagentcount;
+
+    int average_runspeedPerf;
+};
+
 struct mssql_instance {
     char *instanceID;
     int update_every;
@@ -123,6 +143,9 @@ struct mssql_instance {
 
     DICTIONARY *databases;
     DICTIONARY *sysjobs;
+    DICTIONARY *publisher_publication;
+
+    bool running_replication;
 
     RRDSET *st_conn_memory;
     RRDDIM *rd_conn_memory;
@@ -1158,6 +1181,11 @@ void dict_mssql_insert_databases_cb(const DICTIONARY_ITEM *item __maybe_unused, 
     mdi->collecting_data = true;
 }
 
+void dict_mssql_insert_replication_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
+{
+    UNUSED(value);
+}
+
 void dict_mssql_insert_jobs_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
 {
     UNUSED(value);
@@ -1307,6 +1335,12 @@ void dict_mssql_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *valu
         mi->databases = dictionary_create_advanced(
             DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct mssql_db_instance));
         dictionary_register_insert_callback(mi->databases, dict_mssql_insert_databases_cb, NULL);
+    }
+
+    if (!mi->publisher_publication) {
+        mi->publisher_publication = dictionary_create_advanced(
+                DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct mssql_publisher_publication));
+        dictionary_register_insert_callback(mi->databases, dict_mssql_insert_replication_cb, NULL);
     }
 
     if (!mi->sysjobs) {
