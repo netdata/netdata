@@ -6,6 +6,10 @@
 
 **Merged pull requests:**
 
+- Monitor Anything [\#21217](https://github.com/netdata/netdata/pull/21217) ([kanelatechnical](https://github.com/kanelatechnical))
+- Dashboards and Charts [\#21216](https://github.com/netdata/netdata/pull/21216) ([kanelatechnical](https://github.com/kanelatechnical))
+- Events Feed [\#21215](https://github.com/netdata/netdata/pull/21215) ([kanelatechnical](https://github.com/kanelatechnical))
+- Add Expanded Chart Analysis doc and update map.csv [\#21213](https://github.com/netdata/netdata/pull/21213) ([kanelatechnical](https://github.com/kanelatechnical))
 - Regenerate integrations docs [\#21211](https://github.com/netdata/netdata/pull/21211) ([netdatabot](https://github.com/netdatabot))
 - docs: add snmp profile format to snmp collector doc [\#21210](https://github.com/netdata/netdata/pull/21210) ([ilyam8](https://github.com/ilyam8))
 - build\(deps\): bump github.com/redis/go-redis/v9 from 9.14.1 to 9.16.0 in /src/go [\#21208](https://github.com/netdata/netdata/pull/21208) ([dependabot[bot]](https://github.com/apps/dependabot))
@@ -446,10 +450,6 @@
 - Code cleanup [\#20673](https://github.com/netdata/netdata/pull/20673) ([stelfrag](https://github.com/stelfrag))
 - Improve agent shutdown on windows [\#20672](https://github.com/netdata/netdata/pull/20672) ([stelfrag](https://github.com/stelfrag))
 - Escape chars on documentation [\#20671](https://github.com/netdata/netdata/pull/20671) ([Ancairon](https://github.com/Ancairon))
-- Add comprehensive welcome document [\#20669](https://github.com/netdata/netdata/pull/20669) ([ktsaou](https://github.com/ktsaou))
-- Regenerate integrations docs [\#20668](https://github.com/netdata/netdata/pull/20668) ([netdatabot](https://github.com/netdatabot))
-- build\(deps\): bump golang.org/x/net from 0.41.0 to 0.42.0 in /src/go [\#20667](https://github.com/netdata/netdata/pull/20667) ([dependabot[bot]](https://github.com/apps/dependabot))
-- build\(deps\): bump github.com/bmatcuk/doublestar/v4 from 4.8.1 to 4.9.0 in /src/go [\#20666](https://github.com/netdata/netdata/pull/20666) ([dependabot[bot]](https://github.com/apps/dependabot))
 
 ## [v2.5.4](https://github.com/netdata/netdata/tree/v2.5.4) (2025-06-24)
 
