@@ -42,6 +42,7 @@ struct netdata_mssql_conn {
     SQLHSTMT dbLocksSTMT;
     SQLHSTMT dbSQLState;
     SQLHSTMT dbSQLJobs;
+    SQLHSTMT dbReplicationPublisher;
 
     BOOL is_connected;
 };
@@ -1065,6 +1066,12 @@ static bool netdata_MSSQL_initialize_connection(struct netdata_mssql_conn *nmc)
         }
 
         ret = SQLAllocHandle(SQL_HANDLE_STMT, nmc->netdataSQLHDBc, &nmc->dbSQLJobs);
+        if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
+            retConn = FALSE;
+            goto endMSSQLInitializationConnection;
+        }
+
+        ret = SQLAllocHandle(SQL_HANDLE_STMT, nmc->netdataSQLHDBc, &nmc->dbReplicationPublisher);
         if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
             retConn = FALSE;
             goto endMSSQLInitializationConnection;
