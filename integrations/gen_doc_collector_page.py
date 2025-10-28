@@ -122,10 +122,14 @@ def _desc_for_integration(integ: Dict[str, Any]) -> str:
     return f"Metrics for {name}"
 
 
+def _to_slug(text: str) -> str:
+    """Convert a string to a slug suitable for URLs and anchors."""
+    return text.lower().replace(' ', '_').replace('/', '-').replace('(', '').replace(')', '')
+
 def _doc_link(integ: Dict[str, Any], display_name: str) -> str:
     base = (integ.get('edit_link') or '') if isinstance(integ, dict) else ''
     base = base.replace('metadata.yaml', '')
-    slug = display_name.lower().replace(' ', '_').replace('/', '-').replace('(', '').replace(')', '')
+    slug = _to_slug(display_name)
     return f"{base}integrations/{slug}.md"
 
 
