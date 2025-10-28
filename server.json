@@ -1,16 +1,53 @@
 {
-  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-09-29/server.schema.json",
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-10-17/server.schema.json",
   "name": "io.github.netdata/mcp-server",
-  "description": "AI-powered infrastructure monitoring with real-time metrics, logs, alerts, and ML anomaly detection.",
+  "title": "Netdata MCP Server",
+  "description": "Real-time infrastructure monitoring with metrics, logs, alerts, and ML-based anomaly detection.",
   "version": "2.7.1-1",
-  "homepage": "https://www.netdata.cloud",
-  "documentation": "https://learn.netdata.cloud/docs/netdata-ai/mcp",
-  "license": "GPL-3.0",
+  "websiteUrl": "https://www.netdata.cloud",
   "repository": {
     "url": "https://github.com/netdata/netdata",
     "source": "github",
     "subfolder": "docs/netdata-ai/mcp"
   },
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "http://localhost:19999/mcp",
+      "headers": [
+        {
+          "type": "named",
+          "name": "Authorization",
+          "value": "Bearer {NETDATA_MCP_API_KEY}",
+          "isSecret": true,
+          "variables": {
+            "NETDATA_MCP_API_KEY": {
+              "description": "Netdata MCP API key",
+              "isSecret": true
+            }
+          }
+        }
+      ]
+    },
+    {
+      "type": "sse",
+      "url": "http://localhost:19999/mcp?transport=sse",
+      "headers": [
+        {
+          "type": "named",
+          "name": "Authorization",
+          "value": "Bearer {NETDATA_MCP_API_KEY}",
+          "isSecret": true,
+          "variables": {
+            "NETDATA_MCP_API_KEY": {
+              "description": "Netdata MCP API key",
+              "isSecret": true
+            }
+          }
+        }
+      ]
+    }
+  ],
   "capabilities": {
     "features": [
       "Real-time infrastructure observability",
@@ -194,12 +231,18 @@
   },
   "version_compatibility": {
     "v2.6.0-v2.7.1": {
-      "transports": ["WebSocket"],
+      "transports": [
+        "WebSocket"
+      ],
       "required_bridge": "nd-mcp",
       "direct_connection": false
     },
     "v2.7.2+": {
-      "transports": ["WebSocket", "HTTP Streamable", "SSE"],
+      "transports": [
+        "WebSocket",
+        "HTTP Streamable",
+        "SSE"
+      ],
       "required_bridge": "nd-mcp or mcp-remote (optional for stdio clients)",
       "direct_connection": true,
       "notes": "Currently available in nightly builds"
