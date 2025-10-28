@@ -6,7 +6,8 @@ Once you enable an active journal source on a server, `systemd-journal-gatewayd`
 
 :::warning
 
-These instructions will expose your logs to the network, without any encryption or authorization.<br/>
+These instructions will expose your logs to the network, without any encryption or authorization.
+
 DO NOT USE THIS ON NON-TRUSTED NETWORKS.
 
 :::
