@@ -35,6 +35,49 @@ export class TestLLMProvider extends BaseLLMProvider {
     super();
   }
 
+  public override shouldDisableReasoning(context: { conversation: ConversationMessage[]; currentTurn: number; expectSignature: boolean }): { disable: boolean; normalized: ConversationMessage[] } {
+    if (context.currentTurn <= 1 || !context.expectSignature) {
+      return { disable: false, normalized: context.conversation };
+    }
+    let missing = false;
+    const normalized = context.conversation.map((message) => {
+      if (message.role !== 'assistant') {
+        return message;
+      }
+      if (!Array.isArray(message.toolCalls) || message.toolCalls.length === 0) {
+        return message;
+      }
+      const segments = Array.isArray(message.reasoning) ? message.reasoning : [];
+      if (segments.length === 0) {
+        return message;
+      }
+      const hasSignature = segments.some((segment) => this.segmentHasSignature(segment));
+      if (hasSignature) {
+        return message;
+      }
+      missing = true;
+      const cloned: ConversationMessage = { ...message };
+      delete (cloned as { reasoning?: ConversationMessage['reasoning'] }).reasoning;
+      return cloned;
+    });
+    return { disable: missing, normalized };
+  }
+
+  private segmentHasSignature(segment: { providerMetadata?: unknown }): boolean {
+    const metadata = segment.providerMetadata;
+    if (metadata === null || typeof metadata !== 'object' || Array.isArray(metadata)) {
+      return false;
+    }
+    const anthropic = (metadata as { anthropic?: unknown }).anthropic;
+    if (anthropic === null || typeof anthropic !== 'object' || Array.isArray(anthropic)) {
+      return false;
+    }
+    const record = anthropic as { signature?: unknown; redactedData?: unknown };
+    const signature = typeof record.signature === 'string' ? record.signature.trim() : '';
+    const redacted = typeof record.redactedData === 'string' ? record.redactedData.trim() : '';
+    return signature.length > 0 || redacted.length > 0;
+  }
+
   protected convertResponseMessages(messages: ResponseMessage[], provider: string, model: string, tokens: TokenUsage): ConversationMessage[] {
     return this.convertResponseMessagesGeneric(messages, provider, model, tokens);
   }
