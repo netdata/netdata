@@ -1347,7 +1347,7 @@ void dict_mssql_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *valu
     if (!mi->publisher_publication) {
         mi->publisher_publication = dictionary_create_advanced(
                 DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct mssql_publisher_publication));
-        dictionary_register_insert_callback(mi->databases, dict_mssql_insert_replication_cb, NULL);
+        dictionary_register_insert_callback(mi->publisher_publication, dict_mssql_insert_replication_cb, NULL);
     }
 
     if (!mi->sysjobs) {
