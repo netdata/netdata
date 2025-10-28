@@ -51,7 +51,7 @@ require (
 	github.com/tidwall/gjson v1.18.0
 	github.com/valyala/fastjson v1.6.4
 	github.com/vmware/govmomi v0.52.0
-	go.mongodb.org/mongo-driver v1.17.4
+	go.mongodb.org/mongo-driver v1.17.6
 	go.uber.org/automaxprocs v1.6.0
 	golang.org/x/net v0.46.0
 	golang.org/x/sync v0.17.0
