@@ -13,7 +13,8 @@ A _passive_ journal server waits for clients to push their metrics to it, so in 
 
 :::warning
 
-These instructions will copy your logs to a central server, without any encryption or authorization.<br/>
+These instructions will copy your logs to a central server, without any encryption or authorization.
+
 DO NOT USE THIS ON NON-TRUSTED NETWORKS.
 
 :::
