@@ -2,11 +2,11 @@
 Generate the integrations section in COLLECTORS.md from integrations/integrations.js
 with per-category **tables** matching desired-COLLECTORS.md style.
 Key behavior:
-- Use **top-level categories as section headings**. Any child category IDs on integrations
-  are rolled up to their top-level parent section.
+- Use **children of 'data-collection' (second-level categories) as section headings**. Any child category IDs on integrations
+  are rolled up to their section-level parent.
 - Read categories from meta.monitored_instance.categories (array of strings).
 - If an integration has no categories, assign categories where any ancestor has collector_default=true,
-  rolled up to its top-level parent(s).
+  rolled up to its section-level parent(s).
 - Render Markdown tables: | Integration | Description |.
 """
 
