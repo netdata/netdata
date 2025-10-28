@@ -21,11 +21,13 @@ def _extract_json_blobs(js_text: str) -> Tuple[str, str]:
     after_categories = js_text.split("export const categories = ", 1)[1]
     categories_str, after_integrations = after_categories.split("export const integrations = ", 1)
     integrations_str = after_integrations
+
     def _cleanup(s: str) -> str:
         s = re.split(r"\n\s*export const|\Z", s, maxsplit=1)[0].strip()
         if s.endswith(';'):
             s = s[:-1]
         return s.strip()
+
     return _cleanup(categories_str), _cleanup(integrations_str)
 
 
@@ -125,6 +127,7 @@ def _to_slug(text: str) -> str:
     """Convert a string to a slug suitable for URLs and anchors."""
     return text.lower().replace(' ', '_').replace('/', '-').replace('(', '').replace(')', '')
 
+
 def _doc_link(integ: Dict[str, Any], display_name: str) -> str:
     base = (integ.get('edit_link') or '') if isinstance(integ, dict) else ''
     base = base.replace('metadata.yaml', '')
@@ -133,7 +136,8 @@ def _doc_link(integ: Dict[str, Any], display_name: str) -> str:
 
 
 def _collect_sections(categories: List[Dict[str, Any]], integrations: Dict[str, Any]):
-    id_to_title, id_to_parent, section_level_ids, default_section_level, section_ancestor = _build_category_maps(categories)
+    id_to_title, id_to_parent, section_level_ids, default_section_level, section_ancestor = _build_category_maps(
+        categories)
 
     # Custom section order: Linux Systems first, then others, but exclude "Other" category
     ordered_sections = []
@@ -159,7 +163,8 @@ def _collect_sections(categories: List[Dict[str, Any]], integrations: Dict[str, 
         per_section[other_id] = []
     other_bucket: List[Tuple[str, str, str]] = []
 
-    items = integrations.items() if isinstance(integrations, dict) else enumerate(integrations if isinstance(integrations, list) else [])
+    items = integrations.items() if isinstance(integrations, dict) else enumerate(
+        integrations if isinstance(integrations, list) else [])
     for _key, integ in items:
         if not isinstance(integ, dict):
             continue
