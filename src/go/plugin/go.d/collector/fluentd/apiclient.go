@@ -8,7 +8,7 @@ import (
 	"net/url"
 	"path"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
+	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
 
 const pluginsPath = "/api/plugins.json"

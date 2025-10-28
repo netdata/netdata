@@ -14,8 +14,6 @@ Based on your Space plan, the time range available for querying past events may 
 
 :::
 
----
-
 ## Available Event Domains
 
 The Events feed provides visibility into the following event types:
@@ -25,8 +23,6 @@ The Events feed provides visibility into the following event types:
 | **[Auditing events](#auditing-events)** | 4 hours       | 90 days     | 90 days      | User-dependent            |
 | **[Topology events](#topology-events)** | 4 hours       | 14 days     | 14 days      | User-dependent            |
 | **[Alert events](#alert-events)**       | 4 hours       | 90 days     | 90 days      | User-dependent            |
-
----
 
 ## Auditing Events
 
@@ -43,8 +39,6 @@ These events log user actions and Space configuration changes:
 | Silencing Rule Changed  | An existing silencing rule was modified. | Silencing rule was **changed** by `John Doe`.                                   |
 | Silencing Rule Deleted  | A silencing rule was removed.            | Silencing rule was **deleted** by `Alan Smith`.                                 |
 
----
-
 ## Topology Events
 
 These events track changes to node connectivity and state:
@@ -58,8 +52,6 @@ These events track changes to node connectivity and state:
 | Agent Connected     | Agent connected to the Cloud server (MQTT link). | Agent `7d87bqs9-cv42-4823-8sd4-3614548850c7` connected. |
 | Agent Disconnected  | Agent disconnected from the Cloud server.        | Agent disconnected due to **Connection Timeout**.       |
 
----
-
 ## Alert Events
 
 These events log alert state transitions for node metrics:
@@ -67,8 +59,6 @@ These events log alert state transitions for node metrics:
 | **Event Name**           | **Description**                                                                       | **Example**                                                                                                         |
 |--------------------------|---------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------|
 | Node Alert State Changed | Records state changes such as Cleared, Warning, Critical, Removed, Error, or Unknown. | Alert `httpcheck_web_service_bad_status` on node `netdata-parent-xyz` escalated to **CRITICAL** with value **25%**. |
-
----
 
 ## Who Can Access Events?
 
@@ -82,8 +72,6 @@ These events log alert state transitions for node metrics:
 See the [Role-Based Access model](/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md) for details.
 
 :::
-
----
 
 ## How to Use the Events Feed
 

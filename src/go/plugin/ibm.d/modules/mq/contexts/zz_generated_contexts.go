@@ -542,7 +542,7 @@ var Channel = struct {
 	Status: ChannelStatusContext{
 		Context: framework.Context[ChannelLabels]{
 			Name:        "mq.channel.status",
-			Family:      "channels",
+			Family:      "channels/overview",
 			Title:       "Channel Status",
 			Units:       "status",
 			Type:        module.Stacked,
@@ -643,7 +643,7 @@ var Channel = struct {
 	Messages: ChannelMessagesContext{
 		Context: framework.Context[ChannelLabels]{
 			Name:        "mq.channel.messages",
-			Family:      "channels",
+			Family:      "channels/overview",
 			Title:       "Channel Message Rate",
 			Units:       "messages/s",
 			Type:        module.Line,
@@ -667,7 +667,7 @@ var Channel = struct {
 	Bytes: ChannelBytesContext{
 		Context: framework.Context[ChannelLabels]{
 			Name:        "mq.channel.bytes",
-			Family:      "channels",
+			Family:      "channels/overview",
 			Title:       "Channel Data Transfer Rate",
 			Units:       "bytes/s",
 			Type:        module.Line,
@@ -691,7 +691,7 @@ var Channel = struct {
 	Batches: ChannelBatchesContext{
 		Context: framework.Context[ChannelLabels]{
 			Name:        "mq.channel.batches",
-			Family:      "channels",
+			Family:      "channels/overview",
 			Title:       "Channel Batch Rate",
 			Units:       "batches/s",
 			Type:        module.Line,
@@ -715,7 +715,7 @@ var Channel = struct {
 	BatchSize: ChannelBatchSizeContext{
 		Context: framework.Context[ChannelLabels]{
 			Name:        "mq.channel.batch_size",
-			Family:      "channels",
+			Family:      "channels/overview",
 			Title:       "Channel Batch Size",
 			Units:       "messages",
 			Type:        module.Line,
@@ -739,7 +739,7 @@ var Channel = struct {
 	BatchInterval: ChannelBatchIntervalContext{
 		Context: framework.Context[ChannelLabels]{
 			Name:        "mq.channel.batch_interval",
-			Family:      "channels",
+			Family:      "channels/overview",
 			Title:       "Channel Batch Interval",
 			Units:       "milliseconds",
 			Type:        module.Line,
@@ -763,7 +763,7 @@ var Channel = struct {
 	Intervals: ChannelIntervalsContext{
 		Context: framework.Context[ChannelLabels]{
 			Name:        "mq.channel.intervals",
-			Family:      "channels",
+			Family:      "channels/overview",
 			Title:       "Channel Intervals",
 			Units:       "seconds",
 			Type:        module.Line,
@@ -801,7 +801,7 @@ var Channel = struct {
 	ShortRetryCount: ChannelShortRetryCountContext{
 		Context: framework.Context[ChannelLabels]{
 			Name:        "mq.channel.short_retry_count",
-			Family:      "channels",
+			Family:      "channels/overview",
 			Title:       "Channel Short Retry Count",
 			Units:       "retries",
 			Type:        module.Line,
@@ -825,7 +825,7 @@ var Channel = struct {
 	LongRetryInterval: ChannelLongRetryIntervalContext{
 		Context: framework.Context[ChannelLabels]{
 			Name:        "mq.channel.long_retry_interval",
-			Family:      "channels",
+			Family:      "channels/overview",
 			Title:       "Channel Long Retry Interval",
 			Units:       "seconds",
 			Type:        module.Line,
@@ -849,7 +849,7 @@ var Channel = struct {
 	MaxMessageLength: ChannelMaxMessageLengthContext{
 		Context: framework.Context[ChannelLabels]{
 			Name:        "mq.channel.max_msg_length",
-			Family:      "channels",
+			Family:      "channels/overview",
 			Title:       "Channel Max Message Length",
 			Units:       "bytes",
 			Type:        module.Line,
@@ -873,7 +873,7 @@ var Channel = struct {
 	SharingConversations: ChannelSharingConversationsContext{
 		Context: framework.Context[ChannelLabels]{
 			Name:        "mq.channel.sharing_conversations",
-			Family:      "channels",
+			Family:      "channels/overview",
 			Title:       "Channel Sharing Conversations",
 			Units:       "conversations",
 			Type:        module.Line,
@@ -897,7 +897,7 @@ var Channel = struct {
 	NetworkPriority: ChannelNetworkPriorityContext{
 		Context: framework.Context[ChannelLabels]{
 			Name:        "mq.channel.network_priority",
-			Family:      "channels",
+			Family:      "channels/overview",
 			Title:       "Channel Network Priority",
 			Units:       "priority",
 			Type:        module.Line,
@@ -921,7 +921,7 @@ var Channel = struct {
 	BufferCounts: ChannelBufferCountsContext{
 		Context: framework.Context[ChannelLabels]{
 			Name:        "mq.channel.buffer_counts",
-			Family:      "channels",
+			Family:      "channels/overview",
 			Title:       "Channel Buffer Counts",
 			Units:       "buffers",
 			Type:        module.Line,
@@ -952,7 +952,7 @@ var Channel = struct {
 	CurrentMessages: ChannelCurrentMessagesContext{
 		Context: framework.Context[ChannelLabels]{
 			Name:        "mq.channel.current_messages",
-			Family:      "channels",
+			Family:      "channels/overview",
 			Title:       "Channel Current Messages",
 			Units:       "messages",
 			Type:        module.Line,
@@ -976,7 +976,7 @@ var Channel = struct {
 	XmitQueueTime: ChannelXmitQueueTimeContext{
 		Context: framework.Context[ChannelLabels]{
 			Name:        "mq.channel.xmitq_time",
-			Family:      "channels",
+			Family:      "channels/overview",
 			Title:       "Channel Transmission Queue Time",
 			Units:       "milliseconds",
 			Type:        module.Line,
@@ -1000,7 +1000,7 @@ var Channel = struct {
 	MCAStatus: ChannelMCAStatusContext{
 		Context: framework.Context[ChannelLabels]{
 			Name:        "mq.channel.mca_status",
-			Family:      "channels",
+			Family:      "channels/overview",
 			Title:       "Channel MCA Status",
 			Units:       "status",
 			Type:        module.Line,
@@ -1024,7 +1024,7 @@ var Channel = struct {
 	InDoubtStatus: ChannelInDoubtStatusContext{
 		Context: framework.Context[ChannelLabels]{
 			Name:        "mq.channel.indoubt_status",
-			Family:      "channels",
+			Family:      "channels/overview",
 			Title:       "Channel In-Doubt Status",
 			Units:       "status",
 			Type:        module.Line,
@@ -1048,7 +1048,7 @@ var Channel = struct {
 	SSLKeyResets: ChannelSSLKeyResetsContext{
 		Context: framework.Context[ChannelLabels]{
 			Name:        "mq.channel.ssl_key_resets",
-			Family:      "channels",
+			Family:      "channels/overview",
 			Title:       "Channel SSL Key Resets",
 			Units:       "resets",
 			Type:        module.Line,
@@ -1072,7 +1072,7 @@ var Channel = struct {
 	NPMSpeed: ChannelNPMSpeedContext{
 		Context: framework.Context[ChannelLabels]{
 			Name:        "mq.channel.npm_speed",
-			Family:      "channels",
+			Family:      "channels/overview",
 			Title:       "Channel Non-Persistent Message Speed",
 			Units:       "speed",
 			Type:        module.Line,
@@ -1096,7 +1096,7 @@ var Channel = struct {
 	CurrentSharingConversations: ChannelCurrentSharingConversationsContext{
 		Context: framework.Context[ChannelLabels]{
 			Name:        "mq.channel.current_sharing_convs",
-			Family:      "channels",
+			Family:      "channels/overview",
 			Title:       "Channel Current Sharing Conversations",
 			Units:       "conversations",
 			Type:        module.Line,
@@ -2990,6 +2990,382 @@ var Queue = struct {
 	},
 }
 
+// --- QueueGroup ---
+
+// QueueGroupDepthValues defines the type-safe values for QueueGroup.Depth context
+type QueueGroupDepthValues struct {
+	Current int64
+	Max     int64
+}
+
+// QueueGroupDepthContext provides type-safe operations for QueueGroup.Depth context
+type QueueGroupDepthContext struct {
+	framework.Context[QueueGroupLabels]
+}
+
+// Set provides type-safe dimension setting for QueueGroup.Depth context
+func (c QueueGroupDepthContext) Set(state *framework.CollectorState, labels QueueGroupLabels, values QueueGroupDepthValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"current": values.Current,
+		"max":     values.Max,
+	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c QueueGroupDepthContext) SetUpdateEvery(state *framework.CollectorState, labels QueueGroupLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
+// QueueGroupDepthPercentageValues defines the type-safe values for QueueGroup.DepthPercentage context
+type QueueGroupDepthPercentageValues struct {
+	Percentage int64
+}
+
+// QueueGroupDepthPercentageContext provides type-safe operations for QueueGroup.DepthPercentage context
+type QueueGroupDepthPercentageContext struct {
+	framework.Context[QueueGroupLabels]
+}
+
+// Set provides type-safe dimension setting for QueueGroup.DepthPercentage context
+func (c QueueGroupDepthPercentageContext) Set(state *framework.CollectorState, labels QueueGroupLabels, values QueueGroupDepthPercentageValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"percentage": values.Percentage,
+	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c QueueGroupDepthPercentageContext) SetUpdateEvery(state *framework.CollectorState, labels QueueGroupLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
+// QueueGroupMessagesValues defines the type-safe values for QueueGroup.Messages context
+type QueueGroupMessagesValues struct {
+	Enqueued int64
+	Dequeued int64
+}
+
+// QueueGroupMessagesContext provides type-safe operations for QueueGroup.Messages context
+type QueueGroupMessagesContext struct {
+	framework.Context[QueueGroupLabels]
+}
+
+// Set provides type-safe dimension setting for QueueGroup.Messages context
+func (c QueueGroupMessagesContext) Set(state *framework.CollectorState, labels QueueGroupLabels, values QueueGroupMessagesValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"enqueued": values.Enqueued,
+		"dequeued": values.Dequeued,
+	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c QueueGroupMessagesContext) SetUpdateEvery(state *framework.CollectorState, labels QueueGroupLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
+// QueueGroupConnectionsValues defines the type-safe values for QueueGroup.Connections context
+type QueueGroupConnectionsValues struct {
+	Input  int64
+	Output int64
+}
+
+// QueueGroupConnectionsContext provides type-safe operations for QueueGroup.Connections context
+type QueueGroupConnectionsContext struct {
+	framework.Context[QueueGroupLabels]
+}
+
+// Set provides type-safe dimension setting for QueueGroup.Connections context
+func (c QueueGroupConnectionsContext) Set(state *framework.CollectorState, labels QueueGroupLabels, values QueueGroupConnectionsValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"input":  values.Input,
+		"output": values.Output,
+	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c QueueGroupConnectionsContext) SetUpdateEvery(state *framework.CollectorState, labels QueueGroupLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
+// QueueGroupUncommittedMessagesValues defines the type-safe values for QueueGroup.UncommittedMessages context
+type QueueGroupUncommittedMessagesValues struct {
+	Uncommitted int64
+}
+
+// QueueGroupUncommittedMessagesContext provides type-safe operations for QueueGroup.UncommittedMessages context
+type QueueGroupUncommittedMessagesContext struct {
+	framework.Context[QueueGroupLabels]
+}
+
+// Set provides type-safe dimension setting for QueueGroup.UncommittedMessages context
+func (c QueueGroupUncommittedMessagesContext) Set(state *framework.CollectorState, labels QueueGroupLabels, values QueueGroupUncommittedMessagesValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"uncommitted": values.Uncommitted,
+	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c QueueGroupUncommittedMessagesContext) SetUpdateEvery(state *framework.CollectorState, labels QueueGroupLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
+// QueueGroupFileSizeValues defines the type-safe values for QueueGroup.FileSize context
+type QueueGroupFileSizeValues struct {
+	Current int64
+	Max     int64
+}
+
+// QueueGroupFileSizeContext provides type-safe operations for QueueGroup.FileSize context
+type QueueGroupFileSizeContext struct {
+	framework.Context[QueueGroupLabels]
+}
+
+// Set provides type-safe dimension setting for QueueGroup.FileSize context
+func (c QueueGroupFileSizeContext) Set(state *framework.CollectorState, labels QueueGroupLabels, values QueueGroupFileSizeValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"current": values.Current,
+		"max":     values.Max,
+	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c QueueGroupFileSizeContext) SetUpdateEvery(state *framework.CollectorState, labels QueueGroupLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
+// QueueGroupOldestMessageAgeValues defines the type-safe values for QueueGroup.OldestMessageAge context
+type QueueGroupOldestMessageAgeValues struct {
+	Oldest_msg_age int64
+}
+
+// QueueGroupOldestMessageAgeContext provides type-safe operations for QueueGroup.OldestMessageAge context
+type QueueGroupOldestMessageAgeContext struct {
+	framework.Context[QueueGroupLabels]
+}
+
+// Set provides type-safe dimension setting for QueueGroup.OldestMessageAge context
+func (c QueueGroupOldestMessageAgeContext) Set(state *framework.CollectorState, labels QueueGroupLabels, values QueueGroupOldestMessageAgeValues) {
+	state.SetMetricsForGeneratedCode(&c.Context, labels, map[string]int64{
+		"oldest_msg_age": values.Oldest_msg_age,
+	})
+}
+
+// SetUpdateEvery sets the update interval for this instance
+func (c QueueGroupOldestMessageAgeContext) SetUpdateEvery(state *framework.CollectorState, labels QueueGroupLabels, updateEvery int) {
+	state.SetUpdateEveryOverrideForGeneratedCode(&c.Context, labels, updateEvery)
+}
+
+// QueueGroupLabels defines the required labels for QueueGroup contexts
+type QueueGroupLabels struct {
+	Group string
+}
+
+// InstanceID generates a unique instance ID using the hardcoded label order from YAML
+func (l QueueGroupLabels) InstanceID(contextName string) string {
+	// Label order from YAML: group
+	return contextName + "." + cleanLabelValue(l.Group)
+}
+
+// QueueGroup contains all metric contexts for QueueGroup
+var QueueGroup = struct {
+	Depth               QueueGroupDepthContext
+	DepthPercentage     QueueGroupDepthPercentageContext
+	Messages            QueueGroupMessagesContext
+	Connections         QueueGroupConnectionsContext
+	UncommittedMessages QueueGroupUncommittedMessagesContext
+	FileSize            QueueGroupFileSizeContext
+	OldestMessageAge    QueueGroupOldestMessageAgeContext
+}{
+	Depth: QueueGroupDepthContext{
+		Context: framework.Context[QueueGroupLabels]{
+			Name:        "mq.queue_group.depth",
+			Family:      "queues/group",
+			Title:       "Queue Group Depth",
+			Units:       "messages",
+			Type:        module.Line,
+			Priority:    2450,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "current",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "max",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+			},
+			LabelKeys: []string{
+				"group",
+			},
+		},
+	},
+	DepthPercentage: QueueGroupDepthPercentageContext{
+		Context: framework.Context[QueueGroupLabels]{
+			Name:        "mq.queue_group.depth_percentage",
+			Family:      "queues/group",
+			Title:       "Queue Group Depth Percentage",
+			Units:       "percentage",
+			Type:        module.Line,
+			Priority:    2451,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "percentage",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1000,
+					Precision: 1000,
+				},
+			},
+			LabelKeys: []string{
+				"group",
+			},
+		},
+	},
+	Messages: QueueGroupMessagesContext{
+		Context: framework.Context[QueueGroupLabels]{
+			Name:        "mq.queue_group.messages",
+			Family:      "queues/group",
+			Title:       "Queue Group Messages",
+			Units:       "messages/s",
+			Type:        module.Line,
+			Priority:    2452,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "enqueued",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "dequeued",
+					Algorithm: module.Incremental,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+			},
+			LabelKeys: []string{
+				"group",
+			},
+		},
+	},
+	Connections: QueueGroupConnectionsContext{
+		Context: framework.Context[QueueGroupLabels]{
+			Name:        "mq.queue_group.connections",
+			Family:      "queues/group",
+			Title:       "Queue Group Connections",
+			Units:       "connections",
+			Type:        module.Line,
+			Priority:    2453,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "input",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "output",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+			},
+			LabelKeys: []string{
+				"group",
+			},
+		},
+	},
+	UncommittedMessages: QueueGroupUncommittedMessagesContext{
+		Context: framework.Context[QueueGroupLabels]{
+			Name:        "mq.queue_group.uncommitted_msgs",
+			Family:      "queues/group",
+			Title:       "Queue Group Uncommitted Messages",
+			Units:       "messages",
+			Type:        module.Line,
+			Priority:    2454,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "uncommitted",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+			},
+			LabelKeys: []string{
+				"group",
+			},
+		},
+	},
+	FileSize: QueueGroupFileSizeContext{
+		Context: framework.Context[QueueGroupLabels]{
+			Name:        "mq.queue_group.file_size",
+			Family:      "queues/group",
+			Title:       "Queue Group File Size",
+			Units:       "bytes",
+			Type:        module.Line,
+			Priority:    2455,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "current",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+				{
+					Name:      "max",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+			},
+			LabelKeys: []string{
+				"group",
+			},
+		},
+	},
+	OldestMessageAge: QueueGroupOldestMessageAgeContext{
+		Context: framework.Context[QueueGroupLabels]{
+			Name:        "mq.queue_group.oldest_msg_age",
+			Family:      "queues/group",
+			Title:       "Queue Group Oldest Message Age",
+			Units:       "seconds",
+			Type:        module.Line,
+			Priority:    2456,
+			UpdateEvery: 1,
+			Dimensions: []framework.Dimension{
+				{
+					Name:      "oldest_msg_age",
+					Algorithm: module.Absolute,
+					Mul:       1,
+					Div:       1,
+					Precision: 1,
+				},
+			},
+			LabelKeys: []string{
+				"group",
+			},
+		},
+	},
+}
+
 // --- QueueManager ---
 
 // QueueManagerStatusValues defines the type-safe values for QueueManager.Status context
@@ -4566,6 +4942,13 @@ func GetAllContexts() []interface{} {
 		&Queue.QueueUsage.Context,
 		&Queue.MessageDeliverySequence.Context,
 		&Queue.HardenGetBackout.Context,
+		&QueueGroup.Depth.Context,
+		&QueueGroup.DepthPercentage.Context,
+		&QueueGroup.Messages.Context,
+		&QueueGroup.Connections.Context,
+		&QueueGroup.UncommittedMessages.Context,
+		&QueueGroup.FileSize.Context,
+		&QueueGroup.OldestMessageAge.Context,
 		&QueueManager.Status.Context,
 		&QueueManager.ConnectionCount.Context,
 		&QueueManager.Uptime.Context,

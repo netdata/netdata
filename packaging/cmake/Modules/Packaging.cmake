@@ -56,9 +56,9 @@ set(CPACK_DEBIAN_NETDATA_PACKAGE_NAME "netdata")
 set(CPACK_DEBIAN_NETDATA_PACKAGE_SECTION "net")
 set(CPACK_DEBIAN_NETDATA_PACKAGE_PREDEPENDS "adduser, libcap2-bin")
 set(CPACK_DEBIAN_NETDATA_PACKAGE_SUGGESTS
-		"netdata-plugin-cups, netdata-plugin-freeipmi")
+		"netdata-plugin-cups, netdata-plugin-freeipmi, netdata-plugin-ibm")
 set(CPACK_DEBIAN_NETDATA_PACKAGE_RECOMMENDS
-		"netdata-plugin-systemd-journal, \
+		"netdata-plugin-systemd-journal, netdata-plugin-systemd-units, \
 netdata-plugin-network-viewer")
 set(CPACK_DEBIAN_NETDATA_PACKAGE_CONFLICTS
 		"netdata-core, netdata-plugins-bash, netdata-plugins-python, netdata-web")
@@ -81,10 +81,6 @@ endif()
 
 if(ENABLE_PLUGIN_GO)
         list(APPEND _main_deps "netdata-plugin-go")
-endif()
-
-if(ENABLE_PLUGIN_IBM)
-        list(APPEND _main_deps "netdata-plugin-ibm")
 endif()
 
 if(ENABLE_PLUGIN_DEBUGFS)

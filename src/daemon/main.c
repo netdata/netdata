@@ -859,7 +859,6 @@ int netdata_main(int argc, char **argv) {
 
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("temp spawn server");
-
     netdata_main_spawn_server_init("init", argc, (const char **)argv);
 
     // ----------------------------------------------------------------------------------------------------------------
@@ -982,7 +981,6 @@ int netdata_main(int argc, char **argv) {
 
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("stop temporary spawn server");
-
     // stop the old server and later start a new one under the new permissions
     netdata_main_spawn_server_cleanup();
 
@@ -1057,6 +1055,10 @@ int netdata_main(int argc, char **argv) {
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("RRD structures");
 
+    delta_startup_time("commands liveness support");
+
+    commands_init();
+
     abort_on_fatal_disable();
     if (rrd_init(netdata_configured_hostname, system_info, false))
         fatal("Cannot initialize localhost instance with name '%s'.", netdata_configured_hostname);
@@ -1100,7 +1102,7 @@ int netdata_main(int argc, char **argv) {
     ml_start_threads();
 
     // ----------------------------------------------------------------------------------------------------------------
-    delta_startup_time("commands API");
+    delta_startup_time("commands full API");
 
     commands_init();
 

@@ -780,9 +780,9 @@ func TestTableCollector_Collect(t *testing.T) {
 									Name: "ifInOctets",
 								},
 							},
-							StaticTags: []string{
-								"source:interface",
-								"table:if",
+							StaticTags: []ddprofiledefinition.StaticMetricTagConfig{
+								{Tag: "source", Value: "interface"},
+								{Tag: "table", Value: "if"},
 							},
 							MetricTags: []ddprofiledefinition.MetricTagConfig{
 								{
@@ -1004,8 +1004,8 @@ func TestTableCollector_Collect(t *testing.T) {
 									Name: "ifInOctets",
 								},
 							},
-							StaticTags: []string{
-								"source:network",
+							StaticTags: []ddprofiledefinition.StaticMetricTagConfig{
+								{Tag: "source", Value: "network"},
 							},
 							MetricTags: []ddprofiledefinition.MetricTagConfig{
 								{
@@ -3821,7 +3821,7 @@ func TestTableCollector_Collect(t *testing.T) {
 
 			missingOIDs := make(map[string]bool)
 			tableCache := newTableCache(0, 0) // Cache disabled
-			collector := newTableCollector(mockHandler, missingOIDs, tableCache, logger.New())
+			collector := newTableCollector(mockHandler, missingOIDs, tableCache, logger.New(), false)
 
 			result, err := collector.Collect(tc.profile)
 

@@ -1190,6 +1190,70 @@ modules:
               chart_type: line
               dimensions:
                 - name: input
+            - name: system.hw.sensor.color.input
+              description: Color temperature of light
+              unit: "Cel"
+              chart_type: line
+              dimensions:
+                - name: input
+            - name: system.hw.sensor.voltage.input
+              description: Electrical potential
+              unit: "V"
+              chart_type: line
+              dimensions:
+                - name: input
+            - name: system.hw.sensor.resistence.input
+              description: Electrical resistence.
+              unit: "Ohms"
+              chart_type: line
+              dimensions:
+                - name: input
+            - name: system.hw.sensor.pressure.input
+              description: Ambient atmospheric pressure
+              unit: "Pa"
+              chart_type: line
+              dimensions:
+                - name: input
+            - name: system.hw.sensor.latitude.input
+              description: Geographic latitude
+              unit: "Degrees"
+              chart_type: line
+              dimensions:
+                - name: input
+            - name: system.hw.sensor.longitude.input
+              description: Geographic longitude
+              unit: "Degrees"
+              chart_type: line
+              dimensions:
+                - name: input
+            - name: system.hw.sensor.force.input
+              description: Force
+              unit: "N"
+              chart_type: line
+              dimensions:
+                - name: input
+            - name: system.hw.sensor.gauge_pressure.input
+              description: Gauge Pressure
+              unit: "Pa"
+              chart_type: line
+              dimensions:
+                - name: input
+            - name: system.hw.sensor.distance.input
+              description: Distance
+              unit: "m"
+              chart_type: line
+              dimensions:
+                - name: inputX
+                - name: inputY
+                - name: inputZ
+            - name: system.hw.sensor.acceleration.input
+              description: Acceleration
+              unit: "g"
+              chart_type: line
+              dimensions:
+                - name: inputX
+                - name: inputY
+                - name: inputZ
             - name: system.hw.sensor.state.input
               description: Current sensor state.
               unit: "status"
@@ -1972,7 +2036,18 @@ modules:
                  GO
                  ```
 
-              3. **Configure SQL Server Network Settings**
+              3. **Enable Query Job status**
+
+                 Connect to your database and grant `SELECT` permission to `netdata_user`:
+
+                ```tsql
+                USE msdb;
+                GO
+                GRANT SELECT ON SCHEMA::[dbo] TO netdata_user;
+                GO
+                ```
+
+              4. **Configure SQL Server Network Settings**
 
                  Enable SQL Server to accept TCP connections:
 
@@ -1985,7 +2060,7 @@ modules:
                   - Enter a port number in the `TCP Port` field (default is `1433`)
                 - Select `SQL Server Services` and restart your SQL Server instance
 
-              4. **Configure SQL Server Authentication (Optional)**
+              5. **Configure SQL Server Authentication (Optional)**
 
                  If you're using SQL Server authentication (rather than Windows authentication):
 
@@ -2233,6 +2308,21 @@ modules:
               chart_type: line
               dimensions:
                 - name: blocked
+        - name: MSSQL Jobs
+          description: "These metrics refer to the Microsoft SQL Servers jobs on host."
+          labels:
+            - name: mssql_instance
+              description: The instance name.
+            - name: job_name
+              description: The job name.
+          metrics:
+            - name: mssql.instance_jobs_status
+              description: Jobs running
+              unit: jobs
+              chart_type: line
+              dimensions:
+                - name: enabled
+                - name: disabled
         - name: MSSQL Resource Locks
           description: "Monitors SQL Server resource locks by type. SQL Server uses locks to manage concurrent access to database resources during transactions, preventing conflicts when multiple users access the same data simultaneously. This metric tracks locks on different [resource types](https://learn.microsoft.com/en-us/sql/relational-databases/performance-monitor/sql-server-locks-object?view=sql-server-ver17) like rows, pages, tables, and databases."
           labels:

@@ -17,19 +17,19 @@ require (
 	github.com/clbanning/rfile/v2 v2.0.0-20231024120205-ac3fca974b0e
 	github.com/cloudflare/cfssl v1.6.5
 	github.com/coreos/go-systemd/v22 v22.6.0
-	github.com/docker/docker v28.5.0+incompatible
+	github.com/docker/docker v28.5.1+incompatible
 	github.com/facebook/time v0.0.0-20250211113239-e3e1421a0980
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/go-ldap/ldap/v3 v3.4.12
 	github.com/go-sql-driver/mysql v1.9.3
 	github.com/godbus/dbus/v5 v5.1.0
-	github.com/gofrs/flock v0.12.1
-	github.com/gohugoio/hashstructure v0.5.0
+	github.com/gofrs/flock v0.13.0
+	github.com/gohugoio/hashstructure v0.6.0
 	github.com/golang/mock v1.6.0
 	github.com/google/uuid v1.6.0
 	github.com/gorcon/rcon v1.4.0
 	github.com/gosnmp/gosnmp v1.42.1
-	github.com/ibmdb/go_ibm_db v0.5.3 // Used by ibm.d.plugin (requires CGO)
+	github.com/ibmdb/go_ibm_db v0.5.4 // Used by ibm.d.plugin (requires CGO)
 	github.com/jackc/pgx/v4 v4.18.3
 	github.com/jackc/pgx/v5 v5.7.6
 	github.com/jessevdk/go-flags v1.6.1
@@ -44,7 +44,7 @@ require (
 	github.com/prometheus-community/pro-bing v0.7.0
 	github.com/prometheus/common v0.67.1
 	github.com/prometheus/prometheus v2.55.1+incompatible
-	github.com/redis/go-redis/v9 v9.14.0
+	github.com/redis/go-redis/v9 v9.16.0
 	github.com/sijms/go-ora/v2 v2.9.0
 	github.com/sourcegraph/conc v0.3.0
 	github.com/stretchr/testify v1.11.1
@@ -53,9 +53,9 @@ require (
 	github.com/vmware/govmomi v0.52.0
 	go.mongodb.org/mongo-driver v1.17.4
 	go.uber.org/automaxprocs v1.6.0
-	golang.org/x/net v0.44.0
+	golang.org/x/net v0.46.0
 	golang.org/x/sync v0.17.0
-	golang.org/x/text v0.29.0
+	golang.org/x/text v0.30.0
 	golang.zx2c4.com/wireguard/wgctrl v0.0.0-20220504211119-3d4a969bb56b
 	gopkg.in/ini.v1 v1.67.0
 	gopkg.in/rethinkdb/rethinkdb-go.v6 v6.2.2
@@ -68,7 +68,7 @@ require (
 
 require (
 	github.com/alexbrainman/odbc v0.0.0-20250601004241-49e6b2bc0cf0
-	github.com/ibm-messaging/mq-golang/v5 v5.6.4
+	github.com/ibm-messaging/mq-golang/v5 v5.6.5
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -161,13 +161,13 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.3 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
-	golang.org/x/crypto v0.42.0 // indirect
-	golang.org/x/mod v0.27.0 // indirect
+	golang.org/x/crypto v0.43.0 // indirect
+	golang.org/x/mod v0.28.0 // indirect
 	golang.org/x/oauth2 v0.31.0 // indirect
-	golang.org/x/sys v0.36.0 // indirect
-	golang.org/x/term v0.35.0 // indirect
+	golang.org/x/sys v0.37.0 // indirect
+	golang.org/x/term v0.36.0 // indirect
 	golang.org/x/time v0.9.0 // indirect
-	golang.org/x/tools v0.36.0 // indirect
+	golang.org/x/tools v0.37.0 // indirect
 	golang.zx2c4.com/wireguard v0.0.0-20230325221338-052af4a8072b // indirect
 	google.golang.org/protobuf v1.36.10 // indirect
 	gopkg.in/cenkalti/backoff.v2 v2.2.1 // indirect

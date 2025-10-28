@@ -5,9 +5,9 @@ package rabbitmq
 import (
 	"fmt"
 
+	"github.com/netdata/netdata/go/plugins/pkg/stm"
+	"github.com/netdata/netdata/go/plugins/pkg/web"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/stm"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
 )
 
 func (c *Collector) collectQueues(mx map[string]int64) error {

@@ -15,6 +15,7 @@ var configSchema string
 
 type Collector struct {
 	module.Base
+	Config
 }
 
 func New() *Collector {
@@ -22,7 +23,7 @@ func New() *Collector {
 }
 
 func (c *Collector) Configuration() any {
-	return nil
+	return &c.Config
 }
 
 func (c *Collector) Init(context.Context) error {

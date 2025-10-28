@@ -7,8 +7,9 @@
 #define UNW_LOCAL_ONLY
 #endif
 #include <libunwind.h>
+#include <dlfcn.h>
 
-const char *stacktrace_capture_backend(void) {
+const char *stacktrace_backend(void) {
     return "libunwind";
 }
 
@@ -33,7 +34,7 @@ bool stacktrace_available(void) {
 }
 
 NEVER_INLINE
-void stack_trace_capture(BUFFER *wb) {
+void stacktrace_capture(BUFFER *wb) {
     // this function is async-signal-safe, if the buffer has enough space to hold the stack trace
 
     root_cause_function[0] = '\0';

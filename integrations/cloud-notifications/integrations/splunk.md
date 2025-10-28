@@ -33,7 +33,7 @@ endmeta-->
     - **Notification settings**
       - Configuration name (optional): A name for your configuration in order to easily refer to it
       - Rooms: A list of Rooms for which you want to be notified
-      - Notifications: The notifications which you want to be notified
+      - Notifications: The notification types you want to receive
     - **Integration configuration**
       - HTTP Event Collector URI: The URI of your HTTP event collector in Splunk
       - HTTP Event Collector Token: The token that Splunk provided to you when you created the HTTP Event Collector

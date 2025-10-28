@@ -17,6 +17,7 @@ import (
 	"gopkg.in/yaml.v2"
 
 	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/pkg/executable"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/functions"
@@ -24,15 +25,12 @@ import (
 )
 
 const (
-	DefaultDyncfgCollectorPrefix = "go.d:collector:"
-	dyncfgCollectorPath          = "/collectors/jobs"
+	dyncfgCollectorPrefixf = "%s:collector:"
+	dyncfgCollectorPath    = "/collectors/%s/Jobs"
 )
 
 func (m *Manager) dyncfgCollectorPrefixValue() string {
-	if strings.TrimSpace(m.dyncfgCollectorPrefix) == "" {
-		return DefaultDyncfgCollectorPrefix
-	}
-	return m.dyncfgCollectorPrefix
+	return fmt.Sprintf(dyncfgCollectorPrefixf, executable.Name)
 }
 
 func (m *Manager) dyncfgModID(name string) string {
@@ -59,7 +57,7 @@ func (m *Manager) dyncfgCollectorModuleCreate(name string) {
 		ID:                m.dyncfgModID(name),
 		Status:            dyncfgAccepted.String(),
 		ConfigType:        "template",
-		Path:              dyncfgCollectorPath,
+		Path:              fmt.Sprintf(dyncfgCollectorPath, executable.Name),
 		SourceType:        "internal",
 		Source:            "internal",
 		SupportedCommands: dyncfgModCmds(),
@@ -71,7 +69,7 @@ func (m *Manager) dyncfgCollectorJobCreate(cfg confgroup.Config, status dyncfgSt
 		ID:                m.dyncfgJobID(cfg),
 		Status:            status.String(),
 		ConfigType:        "job",
-		Path:              dyncfgCollectorPath,
+		Path:              fmt.Sprintf(dyncfgCollectorPath, executable.Name),
 		SourceType:        cfg.SourceType(),
 		Source:            cfg.Source(),
 		SupportedCommands: dyncfgJobCmds(cfg),

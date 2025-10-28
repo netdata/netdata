@@ -5,6 +5,19 @@
 Monitors IBM MQ queue managers, queues, channels, and topics
 using the PCF (Programmable Command Format) protocol.
 
+By default the collector tracks the critical system queues `SYSTEM.DEAD.LETTER.QUEUE`,
+`SYSTEM.ADMIN.COMMAND.QUEUE`, and `SYSTEM.ADMIN.STATISTICS.QUEUE`. All other queues are
+opt-in via the `include_queues` list, with `exclude_queues` removing noisy patterns such as
+`SYSTEM.*` or `AMQ.*`. Include patterns take precedence over excludes so you can safely
+monitor individual system queues while dropping the broader wildcard.
+
+Per-queue charts are bounded by `max_queues` (default 50). When more queues are discovered,
+the collector exports the busiest ones individually, rolls the remainder into an
+aggregated `__other__` dimension, and logs a throttled warning listing the overflowed
+groups. Parallel queue-group charts summarise depth, traffic, and backlog per naming
+prefix (first two dot-separated segments, collapsing all `SYSTEM.*` queues together), so
+high-level visibility is never lost even when detailed charts are trimmed.
+
 
 This collector is part of the [Netdata](https://github.com/netdata/netdata) monitoring solution.
 
@@ -184,6 +197,28 @@ Metrics:
 | mq.queue.msg_delivery_sequence | priority, fifo | boolean |
 | mq.queue.harden_get_backout | enabled, disabled | boolean |
 
+### Per queuegroup
+
+These metrics refer to individual queuegroup instances.
+
+Labels:
+
+| Label | Description |
+|:------|:------------|
+| group | Group identifier |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:-------|:-----------|:-----|
+| mq.queue_group.depth | current, max | messages |
+| mq.queue_group.depth_percentage | percentage | percentage |
+| mq.queue_group.messages | enqueued, dequeued | messages/s |
+| mq.queue_group.connections | input, output | connections |
+| mq.queue_group.uncommitted_msgs | uncommitted | messages |
+| mq.queue_group.file_size | current, max | bytes |
+| mq.queue_group.oldest_msg_age | oldest_msg_age | seconds |
+
 ### Per queuestatistics
 
 These metrics refer to individual queuestatistics instances.
@@ -283,12 +318,13 @@ The following options can be defined globally or per job.
 | CollectSystemListeners | Enable collection of system listener metrics (SYSTEM.* listeners show internal connectivity) | `true` | no | - | - |
 | CollectChannelConfig | Enable collection of channel configuration metrics | `true` | no | - | - |
 | CollectQueueConfig | Enable collection of queue configuration metrics | `true` | no | - | - |
-| QueueSelector | Pattern to filter queues (wildcards supported) | `` | no | - | - |
+| IncludeQueues | Patterns to include queues (wildcards supported). Empty means include everything. | `[SYSTEM.DEAD.LETTER.QUEUE SYSTEM.ADMIN.COMMAND.QUEUE SYSTEM.ADMIN.STATISTICS.QUEUE]` | no | - | - |
+| ExcludeQueues | Patterns to exclude queues after inclusion (wildcards supported). | `[SYSTEM.* AMQ.*]` | no | - | - |
 | ChannelSelector | Pattern to filter channels (wildcards supported) | `` | no | - | - |
 | TopicSelector | Pattern to filter topics (wildcards supported) | `` | no | - | - |
 | ListenerSelector | Pattern to filter listeners (wildcards supported) | `` | no | - | - |
 | SubscriptionSelector | Pattern to filter subscriptions (wildcards supported) | `` | no | - | - |
-| MaxQueues | Maximum number of queues to collect (0 = no limit) | `100` | no | - | - |
+| MaxQueues | Maximum number of queues to collect (0 = no limit) | `50` | no | - | - |
 | MaxChannels | Maximum number of channels to collect (0 = no limit) | `100` | no | - | - |
 | MaxTopics | Maximum number of topics to collect (0 = no limit) | `100` | no | - | - |
 | MaxListeners | Maximum number of listeners to collect (0 = no limit) | `100` | no | - | - |

@@ -8,7 +8,7 @@ import (
 	"slices"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/stm"
+	"github.com/netdata/netdata/go/plugins/pkg/stm"
 )
 
 func (c *Collector) collect() (map[string]int64, error) {

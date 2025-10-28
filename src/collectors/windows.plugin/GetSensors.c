@@ -15,13 +15,34 @@ static ISensorManager *pSensorManager = NULL;
 static ND_THREAD *sensors_thread_update = NULL;
 
 #define NETDATA_WIN_SENSOR_STATES (6)
+#define NETDATA_WIN_VECTOR_POS (3)
 
 enum netdata_win_sensor_monitored {
     NETDATA_WIN_SENSOR_CELSIUS,
     NETDATA_WIN_SENSOR_POWER_WATTS,
     NETDATA_WIN_SENSOR_CURRENT_AMPS,
     NETDATA_WIN_SENSOR_RELATIVITY_HUMIDITY,
-    NETDATA_WIN_SENSOR_LIGHT_LEVEL
+    NETDATA_WIN_SENSOR_LIGHT_LEVEL,
+    NETDATA_WIN_SENSOR_DATA_TYPE_LIGHT_TEMPERATURE,
+    NETDATA_WIN_SENSOR_VOLTAGE,
+    NETDATA_WIN_SENSOR_RESISTENCE,
+    NETDATA_WIN_SENSOR_ATMOSPHERE_PRESSURE,
+    NETDATA_WIN_SENSOR_LATITUDE_DEGREES,
+    NETDATA_WIN_SENSOR_LONGITUDE_DEGREES,
+    NETDATA_WIN_SENSOR_FORCE_NEWTONS,
+    NETDATA_WIN_SENSOR_GAUGE_PRESSURE,
+
+    // Add only one vector axis here
+    NETDATA_WIN_SENSOR_TYPE_DISTANCE_X,
+    NETDATA_WIN_SENSOR_ACCELERATION_X_G,
+
+    NETDATA_WIN_SENSOR_NEVER_USE_ME,
+
+    // Remaining axis should be added here
+    NETDATA_WIN_SENSOR_TYPE_DISTANCE_Y,
+    NETDATA_WIN_SENSOR_TYPE_DISTANCE_Z,
+    NETDATA_WIN_SENSOR_ACCELERATION_Y_G,
+    NETDATA_WIN_SENSOR_ACCELERATION_Z_G
 };
 
 REFPROPERTYKEY sensor_keys[] = {
@@ -30,8 +51,27 @@ REFPROPERTYKEY sensor_keys[] = {
         &SENSOR_DATA_TYPE_CURRENT_AMPS,
         &SENSOR_DATA_TYPE_RELATIVE_HUMIDITY_PERCENT,
         &SENSOR_DATA_TYPE_LIGHT_LEVEL_LUX,
+        &SENSOR_DATA_TYPE_LIGHT_TEMPERATURE_KELVIN,
+        &SENSOR_DATA_TYPE_VOLTAGE_VOLTS,
+        &SENSOR_DATA_TYPE_RESISTANCE_OHMS,
+        &SENSOR_DATA_TYPE_ATMOSPHERIC_PRESSURE_BAR,
+        &SENSOR_DATA_TYPE_LATITUDE_DEGREES,
+        &SENSOR_DATA_TYPE_LONGITUDE_DEGREES,
+        &SENSOR_DATA_TYPE_FORCE_NEWTONS,
+        &SENSOR_DATA_TYPE_GAUGE_PRESSURE_PASCAL,
 
-        NULL};
+        // Add only one vector axis here
+        &SENSOR_DATA_TYPE_DISTANCE_X_METERS,
+        &SENSOR_DATA_TYPE_ACCELERATION_X_G,
+
+        // Main loop stop
+        NULL,
+
+        // Remaining axis should be added here
+        &SENSOR_DATA_TYPE_DISTANCE_Y_METERS,
+        &SENSOR_DATA_TYPE_DISTANCE_Z_METERS,
+        &SENSOR_DATA_TYPE_ACCELERATION_Y_G,
+        &SENSOR_DATA_TYPE_ACCELERATION_Z_G};
 
 
 static struct win_sensor_config {
@@ -76,6 +116,76 @@ static struct win_sensor_config {
             .context = "system.hw.sensor.lux.input",
             .family = "illuminance",
             .priority = 70010,
+        },
+        {
+            .title = "Color temperature of light",
+            .units = "Cel",
+            .context = "system.hw.sensor.color.input",
+            .family = "Temperature",
+            .priority = 70011,
+        },
+        {
+            .title = "Electrical potential.",
+            .units = "V",
+            .context = "system.hw.sensor.voltage.input",
+            .family = "Potential",
+            .priority = 70012,
+        },
+        {
+            .title = "Electrical resistence.",
+            .units = "Ohms",
+            .context = "system.hw.sensor.resistence.input",
+            .family = "Resistence",
+            .priority = 70013,
+        },
+        {
+            .title = "Ambient atmospheric pressure",
+            .units = "Pa",
+            .context = "system.hw.sensor.pressure.input",
+            .family = "Pressure",
+            .priority = 70014,
+        },
+        {
+            .title = "Geographic latitude",
+            .units = "Degrees",
+            .context = "system.hw.sensor.latitude.input",
+            .family = "Location",
+            .priority = 70015,
+        },
+        {
+            .title = "Geographic longitude",
+            .units = "Degrees",
+            .context = "system.hw.sensor.longitude.input",
+            .family = "Location",
+            .priority = 70016,
+        },
+        {
+            .title = "Force",
+            .units = "N",
+            .context = "system.hw.sensor.force.input",
+            .family = "Force",
+            .priority = 70017,
+        },
+        {
+            .title = "Gauge Pressure",
+            .units = "Pa",
+            .context = "system.hw.sensor.gauge_pressure.input",
+            .family = "Pressure",
+            .priority = 70018,
+        },
+        {
+            .title = "Distance",
+            .units = "m",
+            .context = "system.hw.sensor.distance.input",
+            .family = "Distance",
+            .priority = 70019,
+        },
+        {
+            .title = "Acceleration.",
+            .units = "g",
+            .context = "system.hw.sensor.acceleration.input",
+            .family = "Acceleration",
+            .priority = 70022,
         }
 };
 
@@ -98,9 +208,15 @@ struct sensor_data {
     RRDDIM *rd_sensor_state[NETDATA_WIN_SENSOR_STATES];
 
     RRDSET *st_sensor_data;
-    RRDDIM *rd_sensor_data;
+    RRDDIM *rd_sensor_data_0;
+    RRDDIM *rd_sensor_data_1;
+    RRDDIM *rd_sensor_data_2;
 
-    collected_number current_data_value;
+    // Some sensors are vectors, this means they have three different values (Time is ignored here)
+    collected_number current_data_value[NETDATA_WIN_VECTOR_POS];
+    NETDATA_DOUBLE mult_factor;
+    NETDATA_DOUBLE div_factor;
+    NETDATA_DOUBLE add_factor;
 };
 
 DICTIONARY *sensors;
@@ -127,18 +243,18 @@ static inline char *netdata_convert_guid_to_string(HRESULT hr, GUID *value) {
     return NULL;
 }
 
-static inline void netdata_fill_sensor_type(struct sensor_data *s, ISensor *pSensor)
+static inline void netdata_fill_sensor_type(struct sensor_data *sd, ISensor *pSensor)
 {
     GUID type = {0};
     HRESULT hr = pSensor->lpVtbl->GetType(pSensor, &type);
-    s->type =  netdata_convert_guid_to_string(hr, &type);
+    sd->type =  netdata_convert_guid_to_string(hr, &type);
 }
 
-static inline void netdata_fill_sensor_category(struct sensor_data *s, ISensor *pSensor)
+static inline void netdata_fill_sensor_category(struct sensor_data *sd, ISensor *pSensor)
 {
     GUID category = {0};
     HRESULT hr = pSensor->lpVtbl->GetCategory(pSensor, &category);
-    s->category =  netdata_convert_guid_to_string(hr, &category);
+    sd->category =  netdata_convert_guid_to_string(hr, &category);
 }
 
 static inline char *netdata_pvar_to_char(const PROPERTYKEY *key, ISensor *pSensor)
@@ -157,17 +273,17 @@ static inline char *netdata_pvar_to_char(const PROPERTYKEY *key, ISensor *pSenso
     return NULL;
 }
 
-static void netdata_initialize_sensor_dict(struct sensor_data *s, ISensor *pSensor)
+static void netdata_initialize_sensor_dict(struct sensor_data *sd, ISensor *pSensor)
 {
-    netdata_fill_sensor_type(s, pSensor);
-    netdata_fill_sensor_category(s, pSensor);
-    s->name = netdata_pvar_to_char(&SENSOR_PROPERTY_FRIENDLY_NAME, pSensor);
-    s->model = netdata_pvar_to_char(&SENSOR_PROPERTY_MODEL, pSensor);
-    s->manufacturer = netdata_pvar_to_char(&SENSOR_PROPERTY_MANUFACTURER, pSensor);
+    netdata_fill_sensor_type(sd, pSensor);
+    netdata_fill_sensor_category(sd, pSensor);
+    sd->name = netdata_pvar_to_char(&SENSOR_PROPERTY_FRIENDLY_NAME, pSensor);
+    sd->model = netdata_pvar_to_char(&SENSOR_PROPERTY_MODEL, pSensor);
+    sd->manufacturer = netdata_pvar_to_char(&SENSOR_PROPERTY_MANUFACTURER, pSensor);
 }
 
 static int
-netdata_collect_sensor_data(struct sensor_data *s, ISensor *pSensor, REFPROPERTYKEY key)
+netdata_collect_sensor_data(struct sensor_data *sd, ISensor *pSensor, REFPROPERTYKEY key, int vector_idx)
 {
     ISensorDataReport *pReport = NULL;
     PROPVARIANT pv = {};
@@ -181,36 +297,49 @@ netdata_collect_sensor_data(struct sensor_data *s, ISensor *pSensor, REFPROPERTY
         if (SUCCEEDED(hr) && (pv.vt == VT_R4 || pv.vt == VT_R8 || pv.vt == VT_UI4)) {
             switch (pv.vt) {
                 case VT_UI4:
-                    s->current_data_value = (collected_number)(pv.ulVal * 100);
+                    sd->current_data_value[vector_idx] = (collected_number)(pv.ulVal * 100);
                     break;
                 case VT_R4:
-                    s->current_data_value = (collected_number)(pv.fltVal * 100.0);
+                    sd->current_data_value[vector_idx] = (collected_number)(pv.fltVal * sd->div_factor);
                     break;
                 case VT_R8:
-                    s->current_data_value = (collected_number)(pv.dblVal * 100.0);
+                    sd->current_data_value[vector_idx] = (collected_number)(pv.dblVal * sd->div_factor);
                     break;
             }
             defined = 1;
         }
         PropVariantClear(&pv);
         pReport->lpVtbl->Release(pReport);
+    } else {
+        sd->current_data_value[vector_idx] = 0;
     }
 
     return defined;
 }
 
-static void netdata_sensors_get_data(struct sensor_data *s, ISensor *pSensor)
+static void netdata_sensors_get_data(struct sensor_data *sd, ISensor *pSensor)
 {
     for (int i = 0; sensor_keys[i]; i++) {
-        if (netdata_collect_sensor_data(s, pSensor, sensor_keys[i])) {
-            s->sensor_data_type = i;
-            s->config = &configs[i];
-            s->enabled = true;
+        if (netdata_collect_sensor_data(sd, pSensor, sensor_keys[i], 0)) {
+            sd->sensor_data_type = i;
+            sd->config = &configs[i];
+            sd->enabled = true;
+
+            if (i == NETDATA_WIN_SENSOR_TYPE_DISTANCE_X) {
+                netdata_collect_sensor_data(sd, pSensor, sensor_keys[NETDATA_WIN_SENSOR_TYPE_DISTANCE_Y], 1);
+                netdata_collect_sensor_data(sd, pSensor, sensor_keys[NETDATA_WIN_SENSOR_TYPE_DISTANCE_Z], 2);
+            } else if (i == NETDATA_WIN_SENSOR_ACCELERATION_X_G) {
+                netdata_collect_sensor_data(sd, pSensor, sensor_keys[NETDATA_WIN_SENSOR_ACCELERATION_Y_G], 1);
+                netdata_collect_sensor_data(sd, pSensor, sensor_keys[NETDATA_WIN_SENSOR_ACCELERATION_Z_G], 2);
+            } else if (i == NETDATA_WIN_SENSOR_DATA_TYPE_LIGHT_TEMPERATURE) {
+                sd->div_factor = 100.0;
+                sd->add_factor = -27315.0; // 273.15 * 100.0
+            }
             break;
         }
     }
 
-    s->first_time = false;
+    sd->first_time = false;
 }
 
 static void netdata_get_sensors()
@@ -243,20 +372,28 @@ static void netdata_get_sensors()
         }
         netdata_clsid_to_char(thread_values, &id);
 
-        struct sensor_data *s = dictionary_set(sensors, thread_values, NULL, sizeof(*s));
+        struct sensor_data *sd = dictionary_set(sensors, thread_values, NULL, sizeof(*sd));
 
-        if (unlikely(!s->initialized)) {
-            netdata_initialize_sensor_dict(s, pSensor);
-            s->initialized = true;
+        if (unlikely(!sd->initialized)) {
+            netdata_initialize_sensor_dict(sd, pSensor);
+            sd->initialized = true;
         }
 
-        s->current_state = SENSOR_STATE_MIN;
-        (void)pSensor->lpVtbl->GetState(pSensor, &s->current_state);
+        sd->current_state = SENSOR_STATE_MIN;
+        (void)pSensor->lpVtbl->GetState(pSensor, &sd->current_state);
 
-        if (likely(s->first_time))
-            netdata_sensors_get_data(s, pSensor);
-        else if (likely(s->enabled))
-            netdata_collect_sensor_data(s, pSensor, sensor_keys[s->sensor_data_type]);
+        if (sd->first_time)
+            netdata_sensors_get_data(sd, pSensor);
+        else if (likely(sd->enabled)) {
+            netdata_collect_sensor_data(sd, pSensor, sensor_keys[sd->sensor_data_type], 0);
+            if (sd->sensor_data_type == NETDATA_WIN_SENSOR_TYPE_DISTANCE_X) {
+                netdata_collect_sensor_data(sd, pSensor, sensor_keys[NETDATA_WIN_SENSOR_TYPE_DISTANCE_Y], 1);
+                netdata_collect_sensor_data(sd, pSensor, sensor_keys[NETDATA_WIN_SENSOR_TYPE_DISTANCE_Z], 2);
+            } else if (sd->sensor_data_type == NETDATA_WIN_SENSOR_ACCELERATION_X_G) {
+                netdata_collect_sensor_data(sd, pSensor, sensor_keys[NETDATA_WIN_SENSOR_ACCELERATION_Y_G], 1);
+                netdata_collect_sensor_data(sd, pSensor, sensor_keys[NETDATA_WIN_SENSOR_ACCELERATION_Z_G], 2);
+            }
+        }
 
         pSensor->lpVtbl->Release(pSensor);
     }
@@ -286,6 +423,9 @@ void dict_sensor_insert(const DICTIONARY_ITEM *item __maybe_unused, void *value,
     sd->first_time = true;
     sd->sensor_data_type = 0;
     sd->config = NULL;
+    sd->mult_factor = 1.0;
+    sd->div_factor = 100.0;
+    sd->add_factor = 0.0;
 }
 
 static int initialize(int update_every)
@@ -319,7 +459,7 @@ static int initialize(int update_every)
     return 0;
 }
 
-static void mssql_db_states_chart(struct sensor_data *sd, int update_every)
+static void sensors_states_chart(struct sensor_data *sd, int update_every)
 {
     if (!sd->st_sensor_state) {
         char id[RRD_ID_LENGTH_MAX + 1];
@@ -335,7 +475,7 @@ static void mssql_db_states_chart(struct sensor_data *sd, int update_every)
             "status",
             PLUGIN_WINDOWS_NAME,
             "GetSensors",
-            70010,
+            69999,
             update_every,
             RRDSET_TYPE_LINE);
 
@@ -352,9 +492,9 @@ static void mssql_db_states_chart(struct sensor_data *sd, int update_every)
     }
 }
 
-static void mssql_sensor_state_chart_loop(struct sensor_data *sd, int update_every)
+static inline void sensors_state_chart_loop(struct sensor_data *sd, int update_every)
 {
-    mssql_db_states_chart(sd, update_every);
+    sensors_states_chart(sd, update_every);
     collected_number set_value = (collected_number)sd->current_state;
     for (collected_number i = 0; i < NETDATA_WIN_SENSOR_STATES; i++) {
         rrddim_set_by_pointer(sd->st_sensor_state, sd->rd_sensor_state[i], i == set_value);
@@ -362,7 +502,23 @@ static void mssql_sensor_state_chart_loop(struct sensor_data *sd, int update_eve
     rrdset_done(sd->st_sensor_state);
 }
 
-static void mssql_sensor_data_chart(struct sensor_data *sd, int update_every)
+static inline RRDDIM *netdata_add_sensor_dimension(struct sensor_data *sd, char *label)
+{
+    return rrddim_add(sd->st_sensor_data,
+                      label,
+                      NULL,
+                      (collected_number )sd->mult_factor,
+                      (collected_number )sd->div_factor,
+                      RRD_ALGORITHM_ABSOLUTE);
+}
+
+static inline void netdata_state_chart_set_value(RRDDIM *dim, struct sensor_data *sd, int value_idx)
+{
+    collected_number value = sd->current_data_value[value_idx] + (collected_number )sd->add_factor;
+    rrddim_set_by_pointer(sd->st_sensor_data, dim, value);
+}
+
+static void sensors_data_chart(struct sensor_data *sd, int update_every)
 {
     if (!sd->st_sensor_data) {
         char id[RRD_ID_LENGTH_MAX + 1];
@@ -386,10 +542,20 @@ static void mssql_sensor_data_chart(struct sensor_data *sd, int update_every)
         rrdlabels_add(sd->st_sensor_data->rrdlabels, "manufacturer", sd->manufacturer, RRDLABEL_SRC_AUTO);
         rrdlabels_add(sd->st_sensor_data->rrdlabels, "model", sd->model, RRDLABEL_SRC_AUTO);
 
-        sd->rd_sensor_data = rrddim_add(sd->st_sensor_data, "input", NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
+        if (sd->sensor_data_type != NETDATA_WIN_SENSOR_TYPE_DISTANCE_X && sd->sensor_data_type != NETDATA_WIN_SENSOR_ACCELERATION_X_G)
+            sd->rd_sensor_data_0 = netdata_add_sensor_dimension(sd, "input");
+        else {
+            sd->rd_sensor_data_0 = netdata_add_sensor_dimension(sd, "inputX");
+            sd->rd_sensor_data_1 = netdata_add_sensor_dimension(sd, "inputY");
+            sd->rd_sensor_data_2 = netdata_add_sensor_dimension(sd, "inputZ");
+        }
     }
 
-    rrddim_set_by_pointer(sd->st_sensor_data, sd->rd_sensor_data, sd->current_data_value);
+    netdata_state_chart_set_value(sd->rd_sensor_data_0, sd, 0);
+    if (sd->sensor_data_type == NETDATA_WIN_SENSOR_TYPE_DISTANCE_X || sd->sensor_data_type == NETDATA_WIN_SENSOR_ACCELERATION_X_G) {
+        netdata_state_chart_set_value(sd->rd_sensor_data_1, sd, 1);
+        netdata_state_chart_set_value(sd->rd_sensor_data_2, sd, 2);
+    }
     rrdset_done(sd->st_sensor_data);
 }
 
@@ -401,12 +567,12 @@ int dict_sensors_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *val
     if (unlikely(!sd->name))
         return 1;
 
-    mssql_sensor_state_chart_loop(sd, *update_every);
+    sensors_state_chart_loop(sd, *update_every);
 
     if (unlikely(!sd->enabled))
         return 1;
 
-    mssql_sensor_data_chart(sd, *update_every);
+    sensors_data_chart(sd, *update_every);
 
     return 1;
 }

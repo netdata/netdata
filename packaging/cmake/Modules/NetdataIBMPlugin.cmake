@@ -8,8 +8,9 @@ include(FetchContent)
 # This plugin requires CGO and IBM DB2/MQ headers for compilation.
 # The plugin will download IBM libraries on first run.
 macro(add_ibm_plugin_target)
-  set(IBM_MQ_BUILD_DIR "${CMAKE_BINARY_DIR}/ibm-mqclient")
-  set(IBM_MQ_INSTALL_DIR "${CMAKE_INSTALL_PREFIX}/usr/lib/netdata/ibm-mqclient")
+  set(IBM_MQ_DIR_NAME "ibm-mqclient")
+  set(IBM_MQ_BUILD_DIR "${CMAKE_BINARY_DIR}/${IBM_MQ_DIR_NAME}")
+  set(IBM_MQ_INSTALL_SUFFIX "lib/netdata/${IBM_MQ_DIR_NAME}")
 
   FetchContent_Declare(
     ibm_mq
@@ -44,7 +45,7 @@ macro(add_ibm_plugin_target)
   if(EXISTS "${IBM_MQ_BUILD_DIR}/inc/cmqc.h")
     set(IBM_CGO_CFLAGS "-I${IBM_MQ_BUILD_DIR}/inc")
     set(IBM_CGO_LDFLAGS "-L${IBM_MQ_BUILD_DIR}/lib64 -lmqic_r")
-    set(IBM_RPATH_FLAGS "-Wl,-rpath,${IBM_MQ_INSTALL_DIR}/lib64")
+    set(IBM_RPATH_FLAGS "-Wl,-rpath,$ORIGIN/../../../${IBM_MQ_INSTALL_SUFFIX}/lib64")
     set(MQ_INSTALLATION_PATH "${IBM_MQ_BUILD_DIR}")
   else()
     message(WARNING "IBM MQ client libraries not found - MQ PCF collector will be disabled")
@@ -93,7 +94,7 @@ function(install_ibm_runtime component)
       continue()
     endif()
 
-    if(NOT "${line}" MATCHES ",(Runtime|GSKit),")
+    if(NOT "${line}" MATCHES ",(Client|Runtime|GSKit),")
       continue()
     endif()
 
@@ -120,7 +121,7 @@ function(install_ibm_runtime component)
 
   install(DIRECTORY ${IBM_MQ_BUILD_DIR}
           DESTINATION usr/lib/netdata
-          COMPONENT plugin-ibm-mqclient
+          COMPONENT plugin-ibm-libs
           USE_SOURCE_PERMISSIONS
           FILES_MATCHING REGEX "(${_file_group_0})"
                          REGEX "(${_file_group_1})"

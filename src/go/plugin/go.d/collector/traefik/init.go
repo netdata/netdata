@@ -5,9 +5,9 @@ package traefik
 import (
 	"errors"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/prometheus"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/prometheus/selector"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
+	"github.com/netdata/netdata/go/plugins/pkg/prometheus"
+	"github.com/netdata/netdata/go/plugins/pkg/prometheus/selector"
+	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
 
 func (c *Collector) validateConfig() error {

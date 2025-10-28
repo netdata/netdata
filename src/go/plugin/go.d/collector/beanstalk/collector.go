@@ -10,9 +10,9 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 )
 
 //go:embed "config_schema.json"

@@ -8,13 +8,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/tlscfg"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/vmware/govmomi/simulator"
 	"github.com/vmware/govmomi/vim25/mo"
 	"github.com/vmware/govmomi/vim25/types"
+
+	"github.com/netdata/netdata/go/plugins/pkg/tlscfg"
 )
 
 func TestNew(t *testing.T) {

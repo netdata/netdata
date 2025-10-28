@@ -8,9 +8,9 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
+	"github.com/netdata/netdata/go/plugins/pkg/web"
 	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/framework"
 	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/modules/websphere/common"
 	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/modules/websphere/mp/contexts"
@@ -28,8 +28,8 @@ func defaultConfig() Config {
 		NodeName:            "",
 		ServerName:          "",
 		MetricsEndpoint:     "/metrics",
-		CollectJVMMetrics:   framework.AutoBoolEnabled,
-		CollectRESTMetrics:  framework.AutoBoolEnabled,
+		CollectJVMMetrics:   confopt.AutoBoolEnabled,
+		CollectRESTMetrics:  confopt.AutoBoolEnabled,
 		MaxRESTEndpoints:    50,
 		CollectRESTMatching: "",
 		HTTPConfig: web.HTTPConfig{

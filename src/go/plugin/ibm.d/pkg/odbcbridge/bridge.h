@@ -85,4 +85,9 @@ int odbc_bind_column(odbc_conn_t conn, int column_index, void* buffer, size_t bu
 const char* odbc_get_last_error(odbc_conn_t conn);
 int odbc_get_sqlstate(odbc_conn_t conn, char* state, size_t state_size);
 
+// Helpers for extracting values from odbc_value_t (return neutral values when NULL or type mismatch)
+int64_t odbc_value_get_int64(const odbc_value_t* value);
+double odbc_value_get_double(const odbc_value_t* value);
+const char* odbc_value_get_string(const odbc_value_t* value);
+
 #endif // ODBC_BRIDGE_H

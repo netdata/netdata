@@ -13,7 +13,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/buildinfo"
 	"github.com/netdata/netdata/go/plugins/pkg/executable"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/hostinfo"
+	"github.com/netdata/netdata/go/plugins/pkg/hostinfo"
 )
 
 // RequestConfig is the configuration of the HTTP request.

@@ -20,18 +20,12 @@
         "type": [
           "object",
           "null"
-        ],
-        "additionalProperties": {
-          "type": "string"
-        }
+        ]
       }
     },
     "required": [
       "guid"
-    ],
-    "patternProperties": {
-      "^name$": {}
-    }
+    ]
   },
   "uiSchema": {
     "uiOptions": {

@@ -9,16 +9,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/vsphere/discover"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/vsphere/match"
-	rs "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/vsphere/resources"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/vmware/govmomi/performance"
 	"github.com/vmware/govmomi/simulator"
+
+	"github.com/netdata/netdata/go/plugins/pkg/confopt"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/vsphere/discover"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/vsphere/match"
+	rs "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/vsphere/resources"
 )
 
 var (
