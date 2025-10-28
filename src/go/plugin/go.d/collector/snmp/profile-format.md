@@ -431,7 +431,7 @@ See [**Tag Transformation**](#tag-transformation) for supported transformations 
 
 #### Underscore-prefixed tags
 
-Tag names that start with an underscore (e.g., `_if_type`) are `emitted as labels` but are **ignored for chart-ID composition** by the SNMP collector that consumes these metrics. Use underscore tags to keep chart IDs short when another tag already guarantees uniqueness (for example, `interface`). (You still get the underscore-tag value as a chart label.)
+Tag names that start with an underscore (e.g., `_if_type`) are **emitted as labels** but are **ignored for chart-ID composition** by the SNMP collector that consumes these metrics. Use underscore tags to keep chart IDs short when another tag already guarantees uniqueness (for example, `interface`). (You still get the underscore-tag value as a chart label.)
 
 ```yaml
 metrics:
