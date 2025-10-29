@@ -2539,6 +2539,29 @@ modules:
               chart_type: line
               dimensions:
                 - name: size
+        - name: MSSQL Replication
+          description: "These metrics refer to the Microsoft SQL Servers replication on host."
+          labels:
+            - name: mssql_instance
+              description: The instance name.
+            - name: publisher
+              description: The SQL server publisher name.
+            - name: database
+              description: The database being replicated.
+            - name: publication
+              description: The publication name.
+          metrics:
+            - name: mssql.replication_status
+              description: Current replication status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: started
+                - name: successed
+                - name: in_progress
+                - name: idle
+                - name: retrying
+                - name: failed
   - meta:
       plugin_name: windows.plugin
       module_name: PerflibNetFramework

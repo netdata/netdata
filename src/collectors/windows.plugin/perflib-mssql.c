@@ -93,6 +93,8 @@ struct mssql_db_waits {
 
 // https://learn.microsoft.com/en-us/sql/relational-databases/system-stored-procedures/sp-replmonitorhelppublication-transact-sql?view=sql-server-ver17
 struct mssql_publisher_publication {
+    struct mssql_instance *parent;
+
     // Lables
     char *publisher;
     char *publication;
@@ -113,7 +115,12 @@ struct mssql_publisher_publication {
     int average_runspeedPerf;
 
     RRDSET *st_publisher_status;
-    RRDDIM *rd_publisher_status;
+    RRDDIM *rd_publisher_status_started;
+    RRDDIM *rd_publisher_status_successed;
+    RRDDIM *rd_publisher_status_in_progress;
+    RRDDIM *rd_publisher_status_idle;
+    RRDDIM *rd_publisher_status_retrying;
+    RRDDIM *rd_publisher_status_failed;
 
     RRDSET *st_warning;
     RRDDIM *rd_warning;
@@ -907,8 +914,10 @@ void dict_mssql_fill_replication(struct mssql_db_instance *mdi)
         struct mssql_publisher_publication *mpp =
                 dictionary_set(mdi->parent->publisher_publication, key, NULL, sizeof(*mpp));
 
-        if (!mpp->publisher)
+        if (!mpp->publisher) {
             mpp->publisher = strdupz(publisher);
+            mpp->parent = mdi->parent;
+        }
 
         if (!mpp->publication)
             mpp->publication = strdupz(publication);
@@ -2578,9 +2587,55 @@ static void do_mssql_job_status_sql(PERF_DATA_BLOCK *pDataBlock, struct mssql_in
     dictionary_sorted_walkthrough_read(mi->sysjobs, dict_mssql_sysjobs_chart_cb, mi);
 }
 
+void dict_mssql_replication_status(struct mssql_publisher_publication *mpp, int update_every)
+{
+    if (!mpp->st_publisher_status) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+
+        snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_replication_%s_%s_status", mpp->parent->instanceID, mpp->publication, mpp->db);
+        netdata_fix_chart_name(id);
+        mpp->st_publisher_status = rrdset_create_localhost(
+                "mssql",
+                id,
+                NULL,
+                "replication",
+                "mssql.replication_status",
+                "Current replication status",
+                "status",
+                PLUGIN_WINDOWS_NAME,
+                "PerflibMSSQL",
+                PRIO_MSSQL_REPLICATION_STATUS,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+        rrdlabels_add(mpp->st_publisher_status->rrdlabels, "mssql_instance", mpp->parent->instanceID, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(mpp->st_publisher_status->rrdlabels, "publisher", mpp->publisher, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(mpp->st_publisher_status->rrdlabels, "database", mpp->db, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(mpp->st_publisher_status->rrdlabels, "publication", mpp->publication, RRDLABEL_SRC_AUTO);
+
+        mpp->rd_publisher_status_started = rrddim_add(mpp->st_publisher_status, "started", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        mpp->rd_publisher_status_successed = rrddim_add(mpp->st_publisher_status, "successed", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        mpp->rd_publisher_status_in_progress = rrddim_add(mpp->st_publisher_status, "in_progress", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        mpp->rd_publisher_status_idle = rrddim_add(mpp->st_publisher_status, "idle", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        mpp->rd_publisher_status_retrying = rrddim_add(mpp->st_publisher_status, "retrying", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        mpp->rd_publisher_status_failed = rrddim_add(mpp->st_publisher_status, "failed", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    }
+
+    int status = mpp->status;
+    rrddim_set_by_pointer(mpp->st_publisher_status, mpp->rd_publisher_status_started, (collected_number)(status == 1));
+    rrddim_set_by_pointer(mpp->st_publisher_status, mpp->rd_publisher_status_successed, (collected_number)(status == 2));
+    rrddim_set_by_pointer(mpp->st_publisher_status, mpp->rd_publisher_status_in_progress, (collected_number)(status == 3));
+    rrddim_set_by_pointer(mpp->st_publisher_status, mpp->rd_publisher_status_idle, (collected_number)(status == 4));
+    rrddim_set_by_pointer(mpp->st_publisher_status, mpp->rd_publisher_status_retrying, (collected_number)(status == 5));
+    rrddim_set_by_pointer(mpp->st_publisher_status, mpp->rd_publisher_status_failed, (collected_number)(status == 6));
+    rrdset_done(mpp->st_publisher_status);
+}
+
 int dict_mssql_replication_chart_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
     struct mssql_publisher_publication *mpp = value;
     int *update_every = data;
+
+    dict_mssql_replication_status(mpp, *update_every);
 }
 
 static void do_mssql_replication(struct mssql_instance *mi, int update_every)
