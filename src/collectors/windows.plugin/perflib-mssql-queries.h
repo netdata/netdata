@@ -11,6 +11,10 @@
 
 #define NETDATA_REPLICATION_DB "distribution"
 
+#define NETDATA_REPLICATION_MONITOR_QUERY "EXEC sp_replmonitorhelppublication;"
+
+#define NETDATA_QUERY_LIST_DB "SELECT name FROM sys.databases;"
+
 // https://learn.microsoft.com/en-us/sql/relational-databases/system-catalog-views/sys-database-files-transact-sql?view=sql-server-ver16
 #define NETDATA_QUERY_DATA_FILE_SIZE_MASK "SELECT size * 8/1024 FROM %s.sys.database_files WHERE type = 0;"
 

@@ -744,6 +744,147 @@ endwait:
     return success;
 }
 
+void dict_mssql_fill_replication(struct mssql_db_instance *mdi)
+{
+    char publisher[NETDATA_MAX_INSTANCE_OBJECT + 1] = {};
+    char publisher_db[NETDATA_MAX_INSTANCE_OBJECT + 1] = {};
+    char publication[NETDATA_MAX_INSTANCE_OBJECT + 1] = {};
+    char key[NETDATA_MAX_INSTANCE_OBJECT * 2 + 2];
+    int type = 0, status = 0, warning = 0, avg_latency = 0, retention = 0, subscriptioncount = 0,
+            runningdistagentcount = 0, average_runspeedPerf = 0;
+    SQLLEN publisher_len = 0, publisherdb_len = 0, publication_len = 0, type_len = 0, status_len = 0,
+            warning_len = 0, avg_latency_len = 0, retention_len = 0, subscriptioncount_len = 0, runningagentcount_len = 0,
+            average_runspeedperf_len = 0;
+
+    SQLRETURN ret = SQLExecDirect(mdi->parent->conn->dbReplicationPublisher, (SQLCHAR *)NETDATA_REPLICATION_MONITOR_QUERY, SQL_NTS);
+    if (ret != SQL_SUCCESS) {
+        mdi->collecting_data = false;
+        netdata_MSSQL_error(
+                SQL_HANDLE_STMT, mdi->parent->conn->dbReplicationPublisher, NETDATA_MSSQL_ODBC_QUERY, mdi->parent->instanceID);
+        goto endreplication;
+    }
+
+    ret = SQLBindCol(
+            mdi->parent->conn->dbReplicationPublisher, 1, SQL_C_CHAR, publisher_db, sizeof(publisher_db), &publisherdb_len);
+    if (ret != SQL_SUCCESS) {
+        netdata_MSSQL_error(
+                SQL_HANDLE_STMT, mdi->parent->conn->dbReplicationPublisher, NETDATA_MSSQL_ODBC_PREPARE, mdi->parent->instanceID);
+        goto endreplication;
+    }
+
+    ret = SQLBindCol(
+            mdi->parent->conn->dbReplicationPublisher, 2, SQL_C_CHAR, publication, sizeof(publication), &publication_len);
+    if (ret != SQL_SUCCESS) {
+        netdata_MSSQL_error(
+                SQL_HANDLE_STMT, mdi->parent->conn->dbReplicationPublisher, NETDATA_MSSQL_ODBC_PREPARE, mdi->parent->instanceID);
+        goto endreplication;
+    }
+
+    ret = SQLBindCol(mdi->parent->conn->dbReplicationPublisher, 3, SQL_C_LONG, &type, sizeof(type), &type_len);
+    if (ret != SQL_SUCCESS) {
+        netdata_MSSQL_error(
+                SQL_HANDLE_STMT, mdi->parent->conn->dbReplicationPublisher, NETDATA_MSSQL_ODBC_PREPARE, mdi->parent->instanceID);
+        goto endreplication;
+    }
+
+    ret = SQLBindCol(mdi->parent->conn->dbReplicationPublisher, 4, SQL_C_LONG, &status, sizeof(status), &status_len);
+    if (ret != SQL_SUCCESS) {
+        netdata_MSSQL_error(
+                SQL_HANDLE_STMT, mdi->parent->conn->dbReplicationPublisher, NETDATA_MSSQL_ODBC_PREPARE, mdi->parent->instanceID);
+        goto endreplication;
+    }
+
+    ret = SQLBindCol(mdi->parent->conn->dbReplicationPublisher, 5, SQL_C_LONG, &warning, sizeof(warning), &warning_len);
+    if (ret != SQL_SUCCESS) {
+        netdata_MSSQL_error(
+                SQL_HANDLE_STMT, mdi->parent->conn->dbReplicationPublisher, NETDATA_MSSQL_ODBC_PREPARE, mdi->parent->instanceID);
+        goto endreplication;
+    }
+
+    ret = SQLBindCol(mdi->parent->conn->dbReplicationPublisher, 8, SQL_C_LONG, &avg_latency, sizeof(avg_latency), &avg_latency_len);
+    if (ret != SQL_SUCCESS) {
+        netdata_MSSQL_error(
+                SQL_HANDLE_STMT, mdi->parent->conn->dbReplicationPublisher, NETDATA_MSSQL_ODBC_PREPARE, mdi->parent->instanceID);
+        goto endreplication;
+    }
+
+    ret = SQLBindCol(mdi->parent->conn->dbReplicationPublisher, 10, SQL_C_LONG, &retention, sizeof(retention), &retention_len);
+    if (ret != SQL_SUCCESS) {
+        netdata_MSSQL_error(
+                SQL_HANDLE_STMT, mdi->parent->conn->dbReplicationPublisher, NETDATA_MSSQL_ODBC_PREPARE, mdi->parent->instanceID);
+        goto endreplication;
+    }
+
+    ret = SQLBindCol(mdi->parent->conn->dbReplicationPublisher, 14, SQL_C_LONG, &subscriptioncount, sizeof(subscriptioncount), &subscriptioncount_len);
+    if (ret != SQL_SUCCESS) {
+        netdata_MSSQL_error(
+                SQL_HANDLE_STMT, mdi->parent->conn->dbReplicationPublisher, NETDATA_MSSQL_ODBC_PREPARE, mdi->parent->instanceID);
+        goto endreplication;
+    }
+
+    ret = SQLBindCol(mdi->parent->conn->dbReplicationPublisher, 15, SQL_C_LONG, &runningdistagentcount, sizeof(runningdistagentcount), &runningagentcount_len);
+    if (ret != SQL_SUCCESS) {
+        netdata_MSSQL_error(
+                SQL_HANDLE_STMT, mdi->parent->conn->dbReplicationPublisher, NETDATA_MSSQL_ODBC_PREPARE, mdi->parent->instanceID);
+        goto endreplication;
+    }
+
+    ret = SQLBindCol(mdi->parent->conn->dbReplicationPublisher, 21, SQL_C_LONG, &average_runspeedPerf, sizeof(average_runspeedPerf), &average_runspeedperf_len);
+    if (ret != SQL_SUCCESS) {
+        netdata_MSSQL_error(
+                SQL_HANDLE_STMT, mdi->parent->conn->dbReplicationPublisher, NETDATA_MSSQL_ODBC_PREPARE, mdi->parent->instanceID);
+        goto endreplication;
+    }
+
+    ret = SQLBindCol(
+            mdi->parent->conn->dbReplicationPublisher, 23, SQL_C_CHAR, publisher, sizeof(publisher), &publisher_len);
+    if (ret != SQL_SUCCESS) {
+        netdata_MSSQL_error(
+                SQL_HANDLE_STMT, mdi->parent->conn->dbReplicationPublisher, NETDATA_MSSQL_ODBC_PREPARE, mdi->parent->instanceID);
+        goto endreplication;
+    }
+
+    do {
+        ret = SQLFetch(mdi->parent->conn->dbReplicationPublisher);
+        switch (ret) {
+            case SQL_SUCCESS:
+            case SQL_SUCCESS_WITH_INFO:
+                break;
+            case SQL_NO_DATA:
+            default:
+                goto endreplication;
+        }
+
+        snprintfz(key, sizeof(key) - 1, "%s:%s", publisher_db, publication);
+        struct mssql_publisher_publication *mpp =
+                dictionary_set(mdi->parent->publisher_publication, key, NULL, sizeof(*mpp));
+
+        if (!mpp->publisher)
+            mpp->publisher = strdupz(publisher);
+
+        if (!mpp->publication)
+            mpp->publication = strdupz(publication);
+
+        if (!mpp->db)
+            mpp->db = strdupz(publisher_db);
+
+        mpp->type = type;
+        mpp->status = status;
+        mpp->warning = warning;
+
+        mpp->avg_latency = avg_latency;
+
+        mpp->retention = retention;
+
+        mpp->subscriptioncount = subscriptioncount;
+        mpp->runningdistagentcount = runningdistagentcount;
+
+        mpp->average_runspeedPerf = average_runspeedPerf;
+    } while (true);
+
+    endreplication:
+    netdata_MSSQL_release_results(mdi->parent->conn->dbReplicationPublisher);
+}
 int dict_mssql_databases_run_queries(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
 {
     struct mssql_db_instance *mdi = value;
@@ -764,6 +905,9 @@ int dict_mssql_databases_run_queries(const DICTIONARY_ITEM *item __maybe_unused,
 
     dict_mssql_fill_transactions(mdi, dbname);
     dict_mssql_fill_locks(mdi, dbname);
+
+    if (mdi->running_replication)
+        dict_mssql_fill_replication(mdi);
 
 enddrunquery:
     return 1;
