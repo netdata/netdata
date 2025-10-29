@@ -107,6 +107,14 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
     return true;
   }
 
+  protected resolveToolChoice(request: TurnRequest): 'auto' | 'required' | undefined {
+    if (request.toolChoice !== undefined) {
+      return request.toolChoice;
+    }
+    const required = request.toolChoiceRequired ?? this.shouldForceToolChoice(request);
+    return required ? 'required' : undefined;
+  }
+
   protected traceSdkPayload(request: TurnRequest, stage: 'request' | 'response', payload: unknown): void {
     if (request.sdkTrace !== true) return;
     const logger = request.sdkTraceLogger;
@@ -1210,8 +1218,7 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
     try {
       let stopReason: string | undefined;
       
-      const toolChoiceRequired = request.toolChoiceRequired ?? this.shouldForceToolChoice(request);
-      const toolChoice = toolChoiceRequired ? 'required' : undefined;
+      const toolChoice = this.resolveToolChoice(request);
       this.traceSdkPayload(request, 'request', messages);
       const result = streamText({
         model,
@@ -1472,8 +1479,7 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
           }
         }
       } catch (e) { try { warn(`streaming read failed: ${e instanceof Error ? e.message : String(e)}`); } catch {} }
-      const toolChoiceRequired = request.toolChoiceRequired ?? this.shouldForceToolChoice(request);
-      const toolChoice = toolChoiceRequired ? 'required' : undefined;
+      const toolChoice = this.resolveToolChoice(request);
       this.traceSdkPayload(request, 'request', messages);
       const result = await generateText({
         model,

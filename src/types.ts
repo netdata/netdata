@@ -263,9 +263,12 @@ export interface ProviderModelOverrides {
   top_p?: number | null;
 }
 
+export type ToolChoiceMode = 'auto' | 'required';
+
 export interface ProviderModelConfig {
   overrides?: ProviderModelOverrides;
   reasoning?: ProviderReasoningMapping | null;
+  toolChoice?: ToolChoiceMode;
 }
 
 export interface ProviderConfig {
@@ -284,6 +287,7 @@ export interface ProviderConfig {
   reasoning?: ProviderReasoningMapping | null;
   reasoningValue?: ProviderReasoningValue | null;
   reasoningAutoStreamLevel?: ReasoningLevel;
+  toolChoice?: ToolChoiceMode;
 }
 
 export interface TelemetryOtlpConfig {
@@ -648,6 +652,7 @@ export interface TurnRequest {
   parallelToolCalls?: boolean;
   stream?: boolean;
   toolChoiceRequired?: boolean;
+  toolChoice?: ToolChoiceMode;
   maxConcurrentTools?: number;
   isFinalTurn?: boolean;
   llmTimeout?: number;

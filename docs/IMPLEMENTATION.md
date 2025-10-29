@@ -262,3 +262,4 @@ Tool-calling
 
 - Full agentic loop: assistant tool_calls and tool messages are preserved and returned to Ollama in the next turn. No synthetic user messages are used for tool results.
 - On the final allowed turn, tools are disabled for the request and a single user message instructs the model to conclude using existing tool outputs.
+- Tool-choice overrides: `.ai-agent.json` supports `providers.<name>.toolChoice` and per-model `providers.<name>.models.<model>.toolChoice` (`"auto" | "required"`). The resolved value is injected into both the AI SDK request and provider-specific payloads (e.g., OpenRouter’s OpenAI shim) so routed vendors that reject `tool_choice="required"` stay compatible.

@@ -28,4 +28,5 @@ export type {
   LLMAccountingEntry,
   ToolAccountingEntry,
   LLMProvider,
+  ToolChoiceMode,
 } from './types.js';

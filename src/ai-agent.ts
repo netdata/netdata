@@ -8,7 +8,7 @@ import Ajv from 'ajv';
 
 import type { OutputFormatId } from './formats.js';
 import type { SessionNode } from './session-tree.js';
-import type { AIAgentSessionConfig, AIAgentResult, ConversationMessage, LogEntry, AccountingEntry, Configuration, TurnRequest, LLMAccountingEntry, MCPTool, ToolAccountingEntry, RestToolConfig, ProgressMetrics, ToolCall, SessionSnapshotPayload, AccountingFlushPayload, ReasoningLevel, ProviderReasoningMapping, ProviderReasoningValue, TurnRetryDirective, TurnStatus, LogDetailValue } from './types.js';
+import type { AIAgentSessionConfig, AIAgentResult, ConversationMessage, LogEntry, AccountingEntry, Configuration, TurnRequest, LLMAccountingEntry, MCPTool, ToolAccountingEntry, RestToolConfig, ProgressMetrics, ToolCall, SessionSnapshotPayload, AccountingFlushPayload, ReasoningLevel, ProviderReasoningMapping, ProviderReasoningValue, TurnRetryDirective, TurnStatus, LogDetailValue, ToolChoiceMode } from './types.js';
 import type { Ajv as AjvClass, ErrorObject, Options as AjvOptions } from 'ajv';
 
 // Exit codes according to DESIGN.md
@@ -3161,6 +3161,7 @@ export class AIAgentSession {
       stream: effectiveStream,
       isFinalTurn,
       llmTimeout: this.sessionConfig.llmTimeout,
+      toolChoice: this.resolveToolChoice(provider, model),
       abortSignal: this.abortSignal,
       sendReasoning,
       onChunk: (chunk: string, type: 'content' | 'thinking') => {
@@ -3291,6 +3292,18 @@ export class AIAgentSession {
     if (modelReasoning !== undefined) return modelReasoning;
     if (providerConfig.reasoning !== undefined) return providerConfig.reasoning;
     return undefined;
+  }
+
+  private resolveToolChoice(provider: string, model: string): ToolChoiceMode | undefined {
+    const providerConfig = this.sessionConfig.config.providers[provider] as (Configuration['providers'][string] | undefined);
+    if (providerConfig === undefined) {
+      return undefined;
+    }
+    const modelChoice = providerConfig.models?.[model]?.toolChoice;
+    if (modelChoice !== undefined) {
+      return modelChoice;
+    }
+    return providerConfig.toolChoice;
   }
 
   private resolveReasoningValue(provider: string, model: string, level: ReasoningLevel, maxOutputTokens: number | undefined): ProviderReasoningValue | null | undefined {

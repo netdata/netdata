@@ -86,7 +86,9 @@ export class OpenRouterProvider extends BaseLLMProvider {
       // Add final turn message if needed
       const finalMessages = this.buildFinalTurnMessages(messages, request.isFinalTurn);
 
-      const openaiOpts: { toolChoice: 'required'; parallelToolCalls?: boolean; maxTokens?: number; frequencyPenalty?: number } = { toolChoice: 'required' };
+      const resolvedToolChoice = this.resolveToolChoice(request);
+      const openaiOpts: { toolChoice?: 'auto' | 'required'; parallelToolCalls?: boolean; maxTokens?: number; frequencyPenalty?: number } = {};
+      if (resolvedToolChoice !== undefined) openaiOpts.toolChoice = resolvedToolChoice;
       if (request.parallelToolCalls !== undefined) openaiOpts.parallelToolCalls = request.parallelToolCalls;
       if (typeof request.maxOutputTokens === 'number' && Number.isFinite(request.maxOutputTokens)) openaiOpts.maxTokens = Math.trunc(request.maxOutputTokens);
       if (typeof request.repeatPenalty === 'number' && Number.isFinite(request.repeatPenalty)) openaiOpts.frequencyPenalty = request.repeatPenalty;

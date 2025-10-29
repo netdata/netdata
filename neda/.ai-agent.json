@@ -87,6 +87,11 @@
           "sort": "throughput"
         }
       },
+      "models": {
+        "z-ai/glm-4.5-air:free": {
+          "toolChoice": "auto"
+        }
+      },
       "headers": {},
       "mergeStrategy": "overlay",
       "stringSchemaFormatsAllowed": ["*"],
