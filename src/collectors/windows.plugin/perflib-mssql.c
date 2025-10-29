@@ -2578,6 +2578,16 @@ static void do_mssql_job_status_sql(PERF_DATA_BLOCK *pDataBlock, struct mssql_in
     dictionary_sorted_walkthrough_read(mi->sysjobs, dict_mssql_sysjobs_chart_cb, mi);
 }
 
+int dict_mssql_replication_chart_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
+    struct mssql_publisher_publication *mpp = value;
+    int *update_every = data;
+}
+
+static void do_mssql_replication(struct mssql_instance *mi, int update_every)
+{
+    dictionary_sorted_walkthrough_read(mi->publisher_publication, dict_mssql_replication_chart_cb, &update_every);
+}
+
 static void mssql_database_backup_restore_chart(struct mssql_db_instance *mdi, const char *db, int update_every)
 {
     char id[RRD_ID_LENGTH_MAX + 1];
@@ -3308,6 +3318,8 @@ int dict_mssql_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value
 
         doMSSQL[i](pDataBlock, mi, *update_every);
     }
+
+    do_mssql_replication(mi, update_every);
 
     return 1;
 }
