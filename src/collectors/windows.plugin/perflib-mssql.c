@@ -93,11 +93,13 @@ struct mssql_db_waits {
 
 // https://learn.microsoft.com/en-us/sql/relational-databases/system-stored-procedures/sp-replmonitorhelppublication-transact-sql?view=sql-server-ver17
 struct mssql_publisher_publication {
+    // Lables
     char *publisher;
     char *publication;
     char *db;
-
     int type;
+
+    // Charts
     int status;
     int warning;
 
@@ -109,6 +111,27 @@ struct mssql_publisher_publication {
     int runningdistagentcount;
 
     int average_runspeedPerf;
+
+    RRDSET *st_publisher_status;
+    RRDDIM *rd_publisher_status;
+
+    RRDSET *st_warning;
+    RRDDIM *rd_warning;
+
+    RRDSET *st_avg_latency;
+    RRDDIM *rd_avg_latency;
+
+    RRDSET *st_retention;
+    RRDDIM *rd_retention;
+
+    RRDSET *st_subscription_count;
+    RRDDIM *rd_subscription_count;
+
+    RRDSET *st_running_agent;
+    RRDDIM *rd_running_agent;
+
+    RRDSET *st_synchronization_time;
+    RRDDIM *rd_synchronization_time;
 };
 
 struct mssql_instance {
