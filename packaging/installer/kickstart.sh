@@ -1601,11 +1601,10 @@ common_dnf_opts() {
   fi
   if command -v dnf > /dev/null; then
     pm_cmd="dnf"
-    repo_subcmd="makecache"
   else
     pm_cmd="yum"
-    repo_subcmd="makecache"
   fi
+  repo_subcmd="makecache"
   install_subcmd="install"
   pkg_install_opts="${interactive_opts}"
   repo_update_opts="${interactive_opts}"
@@ -1645,7 +1644,7 @@ try_package_install() {
   env=""
 
   if [ -n "${SKIP_DISTRO_DETECTION}" ]; then
-    warning "Attempting to use native packages with a distro override. This is not officially supported, but may work in some cases. If your system requires a distro override to use native packages, please open an feature request at ${AGENT_BUG_REPORT_URL} about it so that we can update the installer to auto-detect this."
+    warning "Attempting to use native packages with a distro override. This is not officially supported, but may work in some cases. If your system requires a distro override to use native packages, please open a feature request at ${AGENT_BUG_REPORT_URL} about it so that we can update the installer to auto-detect this."
   fi
 
   case "${DISTRO_COMPAT_NAME}" in
@@ -1669,7 +1668,6 @@ try_package_install() {
       pkg_suffix="+${DISTRO_COMPAT_NAME}${SYSVERSION}_all"
       INSTALL_TYPE="binpkg-deb"
       NATIVE_VERSION="${INSTALL_VERSION:+"=${INSTALL_VERSION}"}"
-      cleanup_apt_state
       ;;
     centos)
       common_rpm_opts
@@ -1678,13 +1676,11 @@ try_package_install() {
       # if [ "${SYSVERSION}" -lt 8 ]; then
       #   explicitly_install_native_plugins=1
       # fi
-      cleanup_dnf_state
       ;;
     fedora|ol)
       common_rpm_opts
       common_dnf_opts
       repo_prefix="${DISTRO_COMPAT_NAME}/${SYSVERSION}"
-      cleanup_dnf_state
       ;;
     opensuse)
       if [ "${INTERACTIVE}" = "0" ]; then
@@ -1699,13 +1695,11 @@ try_package_install() {
       pkg_install_opts="${interactive_opts} --allow-unsigned-rpm"
       repo_update_opts=""
       uninstall_subcmd="remove"
-      cleanup_zypper_state
       ;;
     amzn)
       common_rpm_opts
       common_dnf_opts
       repo_prefix="amazonlinux/${SYSVERSION}"
-      cleanup_dnf_state
       ;;
     *)
       warning "We do not provide native packages for ${DISTRO}."
