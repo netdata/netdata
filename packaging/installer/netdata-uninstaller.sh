@@ -229,7 +229,31 @@ pkg_installed() {
   esac
 }
 
+disable_updater() {
+  if [ -x "${NETDATA_PREFIX}/usr/libexec/netdata-updater.sh" ]; then
+    "${NETDATA_PREFIX}/usr/libexec/netdata-updater.sh" --disable-auto-updates
+  else
+    rm_file /etc/periodic/daily/netdata-updater
+    rm_file /etc/cron.daily/netdata-updater
+    rm_file /etc/cron.d/netdata-updater
+    rm_file /etc/cron.d/netdata-updater-daily
+
+    if command -v systemctl >/dev/null 2>&1 ; then
+      systemctl stop netdata-updater.timer >/dev/null 2>&1 || true
+      systemctl disable netdata-updater.timer >/dev/null 2>&1 || true
+    fi
+  fi
+}
+
+cleanup_data_and_config() {
+  rm_dir "${NETDATA_PREFIX}/var/lib/netdata"
+  rm_dir "${NETDATA_PREFIX}/var/cache/netdata"
+  rm_dir "${NETDATA_PREFIX}/var/log/netdata"
+  rm_dir "${NETDATA_PREFIX}/etc/netdata"
+}
+
 detect_existing_install
+disable_updater
 
 if [ -x "$(command -v apt-get)" ] && [ "${INSTALL_TYPE}" = "binpkg-deb" ]; then
   if dpkg -s netdata > /dev/null; then
@@ -250,6 +274,7 @@ if [ -x "$(command -v apt-get)" ] && [ "${INSTALL_TYPE}" = "binpkg-deb" ]; then
         apt-get remove netdata-repo ${FLAG}
       fi
     fi
+    cleanup_data_and_config
     exit 0
   fi
 elif [ -x "$(command -v dnf)" ] && [ "${INSTALL_TYPE}" = "binpkg-rpm" ]; then
@@ -271,6 +296,7 @@ elif [ -x "$(command -v dnf)" ] && [ "${INSTALL_TYPE}" = "binpkg-rpm" ]; then
         dnf remove netdata-repo ${FLAG}
       fi
     fi
+    cleanup_data_and_config
     exit 0
   fi
 elif [ -x "$(command -v yum)" ] && [ "${INSTALL_TYPE}" = "binpkg-rpm" ]; then
@@ -292,6 +318,7 @@ elif [ -x "$(command -v yum)" ] && [ "${INSTALL_TYPE}" = "binpkg-rpm" ]; then
         yum remove netdata-repo ${FLAG}
       fi
     fi
+    cleanup_data_and_config
     exit 0
   fi
 elif [ -x "$(command -v zypper)" ] && [ "${INSTALL_TYPE}" = "binpkg-rpm" ]; then
@@ -316,6 +343,7 @@ elif [ -x "$(command -v zypper)" ] && [ "${INSTALL_TYPE}" = "binpkg-rpm" ]; then
         zypper ${FLAG} remove netdata-repo
       fi
     fi
+    cleanup_data_and_config
     exit 0
   fi
 fi
@@ -758,17 +786,6 @@ fi
 
 #### REMOVE NETDATA FILES
 
-# Handle updater files first so that it doesn’t try to run while we
-# are uninstalling things.
-if [ -x "${NETDATA_PREFIX}/usr/libexec/netdata-updater.sh" ]; then
-  "${NETDATA_PREFIX}/usr/libexec/netdata-updater.sh" --disable-auto-updates
-else
-  rm_file /etc/periodic/daily/netdata-updater
-  rm_file /etc/cron.daily/netdata-updater
-  rm_file /etc/cron.d/netdata-updater
-  rm_file /etc/cron.d/netdata-updater-daily
-fi
-
 if issystemd; then
   for unit in netdata.service netdata-updater.timer; do
     systemctl disable "${unit}"
@@ -808,10 +825,7 @@ else
   rm_file "/tmp/netdata-service-cmds"
   rm_dir "${NETDATA_PREFIX}/usr/share/netdata"
   rm_dir "${NETDATA_PREFIX}/usr/libexec/netdata"
-  rm_dir "${NETDATA_PREFIX}/var/lib/netdata"
-  rm_dir "${NETDATA_PREFIX}/var/cache/netdata"
-  rm_dir "${NETDATA_PREFIX}/var/log/netdata"
-  rm_dir "${NETDATA_PREFIX}/etc/netdata"
+  cleanup_data_and_config
 fi
 
 if [ -n "${tmpdir}" ]; then
