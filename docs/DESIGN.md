@@ -456,7 +456,7 @@ interface LogEntry {
   subturn: number;                      // Sequential tool ID within turn
   direction: 'request' | 'response';    // Request or response
   type: 'llm' | 'mcp';                 // Operation type
-  remoteIdentifier: string;             // 'provider:model' or 'mcp-server:tool-name'
+  remoteIdentifier: string;             // 'provider:model' (LLM) or 'protocol:namespace:tool'
   fatal: boolean;                       // True if this caused agent to stop
   message: string;                      // Human readable message
 }

@@ -401,7 +401,8 @@ export class OpenAICompletionsHeadend implements Headend {
         } else if (event.agentId === agent.id) {
           rootCallPath = agent.id;
         } else if (callPath !== undefined) {
-          rootCallPath = callPath.includes('→') ? callPath.split('→')[0] : callPath;
+          const segments = callPath.split(':');
+          rootCallPath = segments.length > 1 ? segments.slice(0, -1).join(':') : callPath;
         }
       }
       const txnId = 'txnId' in event ? event.txnId : undefined;
@@ -411,8 +412,8 @@ export class OpenAICompletionsHeadend implements Headend {
         if (rootCallPath === undefined) return agentMatches;
         if (callPath === undefined) return agentMatches;
         if (callPath === rootCallPath) return true;
-        if (callPath.startsWith(`${rootCallPath}->`)) return true;
-        return callPath.startsWith(`${rootCallPath}→`);
+        if (callPath.startsWith(`${rootCallPath}:`)) return true;
+        return false;
       })();
       if (!agentMatches && !callPathMatches) return;
       const eventAgentName = 'agentName' in event && typeof (event as { agentName?: unknown }).agentName === 'string'

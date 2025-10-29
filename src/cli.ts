@@ -1284,6 +1284,13 @@ async function runHeadendMode(config: HeadendModeConfig): Promise<void> {
     traceLlm: config.options.traceLlm === true,
     traceMcp: config.options.traceMcp === true,
     traceSdk: config.options.traceSdk === true,
+    serverMode: true, // This is for server/headend mode
+    explicitFormat: (() => {
+      const formats = config.options.telemetryLogFormat;
+      return Array.isArray(formats) && formats.length > 0 && typeof formats[0] === 'string'
+        ? formats[0]
+        : undefined;
+    })(), // Check if user explicitly requested a format
   });
   const logSink: HeadendLogSink = (entry) => { ttyLog.onLog?.(entry); };
   const emit = (message: string, severity: LogEntry['severity'] = 'VRB'): void => {
@@ -1861,6 +1868,13 @@ function createCallbacks(
     traceLlm: options.traceLlm === true,
     traceMcp: options.traceMcp === true,
     traceSdk: options.traceSdk === true,
+    serverMode: false, // This is for interactive/console mode
+    explicitFormat: (() => {
+      const formats = options.telemetryLogFormat;
+      return Array.isArray(formats) && formats.length > 0 && typeof formats[0] === 'string'
+        ? formats[0]
+        : undefined;
+    })(), // Check if user explicitly requested a format
   });
 
   const home = process.env.HOME ?? process.env.USERPROFILE ?? '';

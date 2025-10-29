@@ -69,7 +69,7 @@ Every log originates as a `LogEntry`. The table below lists the fields (all valu
 | `turn` | `AI_TURN` | `turn` | Sequential turn index (stringified). |
 | `subturn` | `AI_SUBTURN` | `subturn` | Sequential tool index within the turn. |
 | `toolKind` | `AI_TOOL_KIND` | `tool_kind` | Emitted when defined. |
-| `toolProvider` | `AI_TOOL_PROVIDER` | `tool_provider` | Present for tool events; mirrors `provider` when the entry type is `tool`. |
+| `toolNamespace` | `AI_TOOL_NAMESPACE` | `tool_namespace` | Present for tool events; captures the tool namespace (e.g., MCP server or internal toolkit). |
 | `tool` | `AI_TOOL` | `tool` | Tool name for tool events (also mirrored in `model` for compatibility). |
 | `headendId` | `AI_HEADEND` | `headend` | Headend identifier such as `cli` or `api:8080`. |
 | `agentId` | `AI_AGENT` | `agent` | Agent identifier for correlation. |
@@ -77,14 +77,14 @@ Every log originates as a `LogEntry`. The table below lists the fields (all valu
 | `txnId` | `AI_TXN_ID` | `txn_id` | Current transaction identifier. |
 | `parentTxnId` | `AI_PARENT_TXN_ID` | `parent_txn_id` | Parent transaction identifier. |
 | `originTxnId` | `AI_ORIGIN_TXN_ID` | `origin_txn_id` | Root transaction identifier. |
-| `remoteIdentifier` | `AI_REMOTE` | `remote` | `provider:model` (LLM) or `server:tool` (tool). |
+| `remoteIdentifier` | `AI_REMOTE` | `remote` | `provider:model` (LLM) or `protocol:namespace:tool` (tool). |
 | `provider` | `AI_PROVIDER` | `provider` | Derived from `remoteIdentifier` when available. |
 | `model` | `AI_MODEL` | `model` | Parsed model/tool name. |
 | `labels` | `AI_LABEL_<UPPERCASE>` | individual `key=value` entries | Journald uppercases and prefixes each label, logfmt/json keep original lowercase keys. |
 
 ### Label Aggregation Rules
 
-- Base labels seeded from the `LogEntry`: `agent`, `call_path`, `severity`, `type`, `direction`, `turn`, `subturn`, optional `tool_kind`, `headend`, parsed `provider`, and `model`. Tool events also receive `tool_provider` and `tool` labels that mirror the dedicated fields.
+- Base labels seeded from the `LogEntry`: `agent`, `call_path`, `severity`, `type`, `direction`, `turn`, `subturn`, optional `tool_kind`, `headend`, parsed `provider`, and `model`. Tool events also receive `tool_namespace` and `tool` labels that mirror the dedicated fields.
 - Global labels passed to `StructuredLogger` (typically telemetry labels such as `mode`, `environment`, or per-headend `headend`) are merged in.
 - Custom labels supplied at the telemetry layer (configuration `telemetry.labels`) appear verbatim. Label values must be non-empty strings.
 - Entry-level `details` (attached via `LogEntry.details`) are surfaced as additional labels, so use stable snake_case keys when recording structured metrics like `input_tokens` or `latency_ms`.
@@ -105,7 +105,7 @@ Messages should focus on incremental information; implied fields live in the str
 ### Journald Sink
 
 - Detection: `isJournaldAvailable()` checks for `process.env.JOURNAL_STREAM` and ensures `/run/systemd/journal/socket` exists. When true, servers/headends prefer journald; otherwise they fall back to logfmt.
-- Transport: the shared journald sink writes newline-separated `KEY=value` pairs in a single datagram. Keys conform to journald semantics: built-ins (`MESSAGE`, `PRIORITY`, `SYSLOG_IDENTIFIER`, `MESSAGE_ID`) remain uppercase, while custom metadata uses uppercase ASCII with the `AI_` prefix (`AI_SEVERITY`, `AI_TOOL_KIND`, `AI_TOOL_PROVIDER`, `AI_TOOL`, `AI_LABEL_<KEY>`, etc.). Only defined values are emitted; absent fields are omitted.
+- Transport: the shared journald sink writes newline-separated `KEY=value` pairs in a single datagram. Keys conform to journald semantics: built-ins (`MESSAGE`, `PRIORITY`, `SYSLOG_IDENTIFIER`, `MESSAGE_ID`) remain uppercase, while custom metadata uses uppercase ASCII with the `AI_` prefix (`AI_SEVERITY`, `AI_TOOL_KIND`, `AI_TOOL_NAMESPACE`, `AI_TOOL`, `AI_LABEL_<KEY>`, etc.). Only defined values are emitted; absent fields are omitted.
 - Resilience: if the helper exits, the sink restarts it once; if that restart attempt fails (spawn error or the replacement helper immediately terminates), the logger disables journald output and promotes logfmt on stderr so operators continue to receive logs.
 - Stack traces: warnings and errors capture the originating Node.js stack (`AI_STACKTRACE`). Stack traces are withheld from other sinks to keep CLI/JSON output concise.
 - Example entry (journald key/value framing):
@@ -129,7 +129,7 @@ AI_LABEL_latency_ms=42
 
 - Renderer: `formatLogfmt` produces a single line per event with `key=value` pairs separated by spaces. Quoting follows logfmt conventions (space, equals, or quote in value triggers quoting with `"` escaping).
 - Mandatory keys: `ts`, `level`, `priority`, `type`, `direction`, `turn`, `subturn`, `message` (rendered last to keep the free-form text easy to spot).
-- Optional keys: `message_id`, `remote`, `tool_kind`, `tool_provider`, `tool`, `headend`, `agent`, `call_path`, `txn_id`, `parent_txn_id`, `origin_txn_id`, `provider`, `model`, plus every label (lowercase, unprefixed).
+- Optional keys: `message_id`, `remote`, `tool_kind`, `tool_namespace`, `tool`, `headend`, `agent`, `call_path`, `txn_id`, `parent_txn_id`, `origin_txn_id`, `provider`, `model`, plus every label (lowercase, unprefixed).
 - Colour: When `color` is true (TTY default), `ERR`/`WRN`/`FIN`/`VRB`/`THK`/`TRC` lines receive ANSI colours.
 - Writers: CLI sink writes to `stderr`; server headends inject their logfmt output through per-headend writers or fallback to `stderr` if no custom writer exists. When the journald sink disables itself, the structured logger auto-registers the logfmt writer so messages keep flowing without operator action.
 

@@ -3,6 +3,8 @@ import fs from 'node:fs';
 
 import type { StructuredLogEvent } from './structured-log-event.js';
 
+import { buildRichLogLine } from './rich-format.js';
+
 const JOURNAL_SOCKET_PATH = '/run/systemd/journal/socket';
 const SYSTEMD_CAT_PATHS = [
   '/usr/sbin/systemd-cat-native',
@@ -214,19 +216,23 @@ class SharedJournaldSink implements JournaldEmitter {
 
   private formatPayload(event: StructuredLogEvent): string {
     const lines: string[] = [];
-    lines.push(`MESSAGE=${sanitizeMessage(event.message)}`);
+    const rich = buildRichLogLine(event);
+    const rendered = `${rich.prefix}${rich.message}`;
+    lines.push(`MESSAGE=${sanitizeMessage(rendered)}`);
     lines.push(`PRIORITY=${String(event.priority)}`);
     lines.push('SYSLOG_IDENTIFIER=ai-agent');
     if (event.messageId !== undefined) lines.push(`MESSAGE_ID=${event.messageId}`);
     lines.push(`AI_SEVERITY=${event.severity}`);
     lines.push(`AI_TIMESTAMP=${event.isoTimestamp}`);
     if (typeof event.agentId === 'string' && event.agentId.length > 0) lines.push(`AI_AGENT=${event.agentId}`);
+    if (typeof event.agentPath === 'string' && event.agentPath.length > 0) lines.push(`AI_AGENT_PATH=${event.agentPath}`);
     if (typeof event.callPath === 'string' && event.callPath.length > 0) lines.push(`AI_CALL_PATH=${event.callPath}`);
+    if (typeof event.turnPath === 'string' && event.turnPath.length > 0) lines.push(`AI_TURN_PATH=${event.turnPath}`);
     if (typeof event.remoteIdentifier === 'string' && event.remoteIdentifier.length > 0) lines.push(`AI_REMOTE=${event.remoteIdentifier}`);
     if (typeof event.provider === 'string' && event.provider.length > 0) lines.push(`AI_PROVIDER=${event.provider}`);
     if (typeof event.model === 'string' && event.model.length > 0) lines.push(`AI_MODEL=${event.model}`);
     if (typeof event.toolKind === 'string' && event.toolKind.length > 0) lines.push(`AI_TOOL_KIND=${event.toolKind}`);
-    if (typeof event.toolProvider === 'string' && event.toolProvider.length > 0) lines.push(`AI_TOOL_PROVIDER=${event.toolProvider}`);
+    if (typeof event.toolNamespace === 'string' && event.toolNamespace.length > 0) lines.push(`AI_TOOL_NAMESPACE=${event.toolNamespace}`);
     if (typeof event.tool === 'string' && event.tool.length > 0) lines.push(`AI_TOOL=${event.tool}`);
     if (typeof event.headendId === 'string' && event.headendId.length > 0) lines.push(`AI_HEADEND=${event.headendId}`);
     lines.push(`AI_DIRECTION=${event.direction}`);

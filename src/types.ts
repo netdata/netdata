@@ -40,6 +40,9 @@ export interface ProviderTurnMetadata {
   reportedCostUsd?: number;
   upstreamCostUsd?: number;
   cacheWriteInputTokens?: number;
+  cacheReadInputTokens?: number;
+  effectiveCostUsd?: number;
+  reasoningState?: string;
 }
 
 export interface TurnRetryDirective {
@@ -62,6 +65,7 @@ export interface TurnResult {
   stopReason?: string;
   providerMetadata?: ProviderTurnMetadata;
   retry?: TurnRetryDirective;
+  responseBytes?: number;
 }
 
 export type ToolStatus =
@@ -103,7 +107,7 @@ export interface LogEntry {
   type: 'llm' | 'tool';                 // Operation type (llm = model-side, tool = any tool-side)
   // Optional precise tool kind for 'tool' logs.
   toolKind?: 'mcp' | 'rest' | 'agent' | 'command';
-  remoteIdentifier: string;             // 'provider:model' or 'mcp-server:tool-name'
+  remoteIdentifier: string;             // 'provider:model' or 'protocol:namespace:tool'
   fatal: boolean;                       // True if this caused agent to stop
   message: string;                      // Human readable message
   // Optional emphasis hint for TTY renderers (bold in same severity color)
@@ -116,6 +120,8 @@ export interface LogEntry {
   txnId?: string;
   parentTxnId?: string;
   originTxnId?: string;
+  agentPath?: string;
+  turnPath?: string;
   // Optional planning fields for richer live status in UIs (Slack/web)
   // Enriched on existing log events (no new event types):
   // - max_turns: declared maximum number of turns for this agent session
@@ -218,6 +224,7 @@ export interface ConversationMessage {
     model?: string;
     tokens?: TokenUsage;
     timestamp?: number;
+    retryMessage?: string;
   };
 }
 
@@ -536,7 +543,9 @@ export interface AIAgentSessionConfig {
   // Preferred MCP init concurrency override for this session
   mcpInitConcurrency?: number;
   // Trace context propagation
-  trace?: { selfId?: string; originId?: string; parentId?: string; callPath?: string };
+  trace?: { selfId?: string; originId?: string; parentId?: string; callPath?: string; agentPath?: string; turnPath?: string };
+  agentPath?: string;
+  turnPathPrefix?: string;
   // External cancellation signal to abort the session immediately
   abortSignal?: AbortSignal;
   // Graceful stop reference toggled by headend (no abort); agent should avoid starting new work

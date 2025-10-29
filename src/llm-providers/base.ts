@@ -91,7 +91,10 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
     return this.getDefaultReasoningValue(context.level, context.maxOutputTokens);
   }
 
-  public shouldAutoEnableReasoningStream(level: ReasoningLevel | undefined, _options?: { maxOutputTokens?: number }): boolean {
+  public shouldAutoEnableReasoningStream(
+    level: ReasoningLevel | undefined,
+    _options?: { maxOutputTokens?: number; reasoningActive?: boolean; streamRequested?: boolean }
+  ): boolean {
     void level;
     return false;
   }

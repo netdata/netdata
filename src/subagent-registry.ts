@@ -163,14 +163,16 @@ export class SubAgentRegistry {
     parameters: Record<string, unknown>,
     parentSession: Pick<AIAgentSessionConfig, 'config' | 'callbacks' | 'stream' | 'traceLLM' | 'traceMCP' | 'traceSdk' | 'verbose' | 'temperature' | 'topP' | 'llmTimeout' | 'toolTimeout' | 'maxRetries' | 'maxTurns' | 'toolResponseMaxBytes' | 'parallelToolCalls' | 'targets'> & {
       // extra trace/metadata for child
-      trace?: { originId?: string; parentId?: string; callPath?: string };
+      trace?: { originId?: string; parentId?: string; callPath?: string; agentPath?: string; turnPath?: string };
       // control signals to propagate
       abortSignal?: AbortSignal;
       stopRef?: { stopping: boolean };
       // live updates: stream child opTree snapshots to parent orchestrator
       onChildOpTree?: (tree: SessionNode) => void;
+      agentPath?: string;
+      turnPathPrefix?: string;
     },
-    opts?: { onChildOpTree?: (tree: SessionNode) => void; parentOpPath?: string }
+    opts?: { onChildOpTree?: (tree: SessionNode) => void; parentOpPath?: string; parentTurnPath?: string }
   ): Promise<{ result: string; child: ChildInfo; accounting: readonly AccountingEntry[]; conversation: ConversationMessage[]; trace?: { originId?: string; parentId?: string; selfId?: string; callPath?: string }, opTree?: SessionNode }> {
     const name = exposedToolName.startsWith('agent__') ? exposedToolName.slice('agent__'.length) : exposedToolName;
     const info = this.children.get(name);
@@ -223,16 +225,11 @@ export class SubAgentRegistry {
     let result: AIAgentResult;
     try {
       const loaded = info.loaded;
-      // Build callbacks wrapper to prefix child logs
+      // Build callbacks wrapper so parent observers still receive child events
       const orig = parentSession.callbacks;
-      const childPrefix = `child:${info.toolName}`;
       const cb: AIAgentCallbacks | undefined = orig === undefined ? undefined : {
         onLog: (e) => {
           const cloned = { ...e };
-          // Preserve 'agent:title' identifier exactly so aggregators can detect titles per agent
-          if (e.remoteIdentifier !== 'agent:title') {
-            cloned.remoteIdentifier = `${childPrefix}:${e.remoteIdentifier}`;
-          }
           // Prefix opTree-provided path labels with parent op path so logs are hierarchically greppable
           try {
             const parentPath = (opts !== undefined && typeof opts.parentOpPath === 'string' && opts.parentOpPath.length > 0) ? opts.parentOpPath : undefined;
@@ -259,10 +256,30 @@ export class SubAgentRegistry {
 
       const history: ConversationMessage[] | undefined = undefined;
       // Ensure child gets a fresh selfId (span id)
-      // Extend callPath with the child tool name so live status shows hierarchy correctly
-      const basePath = parentSession.trace?.callPath;
-      const callPath = (typeof basePath === 'string' && basePath.length > 0) ? `${basePath}->${info.toolName}` : info.toolName;
-      const childTrace = { selfId: crypto.randomUUID(), originId: parentSession.trace?.originId, parentId: parentSession.trace?.parentId, callPath };
+      const parentAgentPathCandidates = [
+        parentSession.agentPath,
+        parentSession.trace?.agentPath,
+        parentSession.trace?.callPath,
+      ].filter((value): value is string => typeof value === 'string' && value.length > 0);
+      const parentAgentPath = parentAgentPathCandidates.length > 0 ? parentAgentPathCandidates[0] : 'agent';
+      const childAgentName = info.toolName;
+      const childAgentPath = parentAgentPath.length > 0
+        ? `${parentAgentPath}:${childAgentName}`
+        : childAgentName;
+      const inheritedTurnPathCandidates = [
+        opts?.parentTurnPath,
+        parentSession.turnPathPrefix,
+        parentSession.trace?.turnPath,
+      ].filter((value): value is string => typeof value === 'string' && value.length > 0);
+      const inheritedTurnPath = inheritedTurnPathCandidates.length > 0 ? inheritedTurnPathCandidates[0] : '';
+      const childTrace = {
+        selfId: crypto.randomUUID(),
+        originId: parentSession.trace?.originId,
+        parentId: parentSession.trace?.parentId,
+        callPath: childAgentPath,
+        agentPath: childAgentPath,
+        turnPath: inheritedTurnPath,
+      };
       const outputFormat = (() => {
         const requestedFormat = (parameters as { format?: unknown }).format;
         if (requestedFormat === 'sub-agent') return 'sub-agent';
@@ -280,6 +297,8 @@ export class SubAgentRegistry {
         renderTarget: 'sub-agent',
         outputFormat,
         initialTitle: reason,
+        agentPath: childAgentPath,
+        turnPathPrefix: inheritedTurnPath,
         // propagate control signals from parent session
         abortSignal: parentSession.abortSignal,
         stopRef: parentSession.stopRef,
@@ -304,7 +323,7 @@ export class SubAgentRegistry {
 
     const convo: ConversationMessage[] = result.conversation;
     const acct: AccountingEntry[] = result.accounting;
-    const firstAcct = result.accounting.find((a) => typeof a.txnId === "string" || typeof a.originTxnId === "string" || typeof a.parentTxnId === "string" || typeof a.callPath === "string");
+    const firstAcct = result.accounting.find((a) => typeof a.txnId === 'string' || typeof a.originTxnId === 'string' || typeof a.parentTxnId === 'string' || typeof a.callPath === 'string');
     const trace: { originId?: string; parentId?: string; selfId?: string; callPath?: string } = { originId: firstAcct?.originTxnId, parentId: firstAcct?.parentTxnId, selfId: firstAcct?.txnId, callPath: firstAcct?.callPath };
     const payload: { result: string; child: ChildInfo; accounting: readonly AccountingEntry[]; conversation: ConversationMessage[]; trace?: { originId?: string; parentId?: string; selfId?: string; callPath?: string }, opTree?: SessionNode } = { result: out, child: info, accounting: acct, conversation: convo, trace, opTree: (result as { opTree?: SessionNode }).opTree };
     return payload;

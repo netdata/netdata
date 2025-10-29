@@ -53,7 +53,7 @@ maxToolCallsPerTurn: 2
 parallelToolCalls: false
 temperature: 0.3
 topP: 1
-maxOutputTokens: 4096
+maxOutputTokens: 8192
 repeatPenalty: 1
 maxRetries: 5
 maxToolTurns: 5

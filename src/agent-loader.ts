@@ -38,6 +38,8 @@ export interface LoadedAgentSessionOptions {
   traceMCP?: boolean;
   traceSdk?: boolean;
   verbose?: boolean;
+  agentPath?: string;
+  turnPathPrefix?: string;
 }
 
 export interface LoadedAgent {
@@ -610,6 +612,18 @@ function constructLoadedAgent(args: ConstructAgentArgs): LoadedAgent {
       // Harness expectations rely on the session receiving the exact array instance from callers.
       ancestors: Array.isArray(o.ancestors) ? o.ancestors : ancestorChain,
     };
+    const resolvedAgentPath = (() => {
+      if (typeof o.agentPath === 'string' && o.agentPath.length > 0) return o.agentPath;
+      if (typeof sessionConfig.agentPath === 'string' && sessionConfig.agentPath.length > 0) return sessionConfig.agentPath;
+      return agentName;
+    })();
+    sessionConfig.agentPath = resolvedAgentPath;
+    const resolvedTurnPathPrefix = (() => {
+      if (typeof o.turnPathPrefix === 'string' && o.turnPathPrefix.length > 0) return o.turnPathPrefix;
+      if (typeof sessionConfig.turnPathPrefix === 'string' && sessionConfig.turnPathPrefix.length > 0) return sessionConfig.turnPathPrefix;
+      return '';
+    })();
+    sessionConfig.turnPathPrefix = resolvedTurnPathPrefix;
     if (config.telemetry?.labels !== undefined || o.telemetryLabels !== undefined) {
       const combinedLabels: Record<string, string> = { ...(config.telemetry?.labels ?? {}) };
       if (sessionConfig.headendId !== undefined && combinedLabels.headend === undefined) {
@@ -641,6 +655,12 @@ function constructLoadedAgent(args: ConstructAgentArgs): LoadedAgent {
     if (typeof o.verbose === 'boolean') {
       sessionConfig.verbose = o.verbose;
     }
+    sessionConfig.trace = {
+      ...sessionConfig.trace,
+      callPath: sessionConfig.trace?.callPath ?? resolvedAgentPath,
+      agentPath: resolvedAgentPath,
+      turnPath: resolvedTurnPathPrefix,
+    };
     return Promise.resolve(Agent.create(sessionConfig));
   };
 

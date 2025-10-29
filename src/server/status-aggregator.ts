@@ -133,7 +133,7 @@ export function buildSnapshotFromOpTree(root: SessionNode, nowTs: number): Snaps
 }
 
 export function formatSlackStatus(summary: SnapshotSummary, masterAgentId?: string): string {
-  const depthOf = (cp?: string): number => cp ? (cp.split('→').length - 1) : 0;
+  const depthOf = (cp?: string): number => cp ? (cp.split(':').length - 1) : 0;
   // Sort lines by depth, then by agentId for stability
   const sorted = [...summary.lines]
     .sort((a, b) => depthOf(a.callPath) - depthOf(b.callPath) || (a.agentId ?? '').localeCompare(b.agentId ?? ''));
@@ -211,7 +211,7 @@ export function buildStatusBlocks(summary: SnapshotSummary, rootAgentId?: string
   
   // Build running agents list (exclude finished and root master)
   const running = summary.lines.filter((l) => l.status !== 'Finished');
-  const prefix = (typeof rootAgentId === 'string' && rootAgentId.length > 0) ? `${rootAgentId}->` : undefined;
+  const prefix = (typeof rootAgentId === 'string' && rootAgentId.length > 0) ? `${rootAgentId}:` : undefined;
   const asClock = (n: number): string => {
     const mm = Math.floor(n / 60);
     const ss = n % 60;
@@ -230,11 +230,11 @@ export function buildStatusBlocks(summary: SnapshotSummary, rootAgentId?: string
     .flatMap((l) => {
       if (typeof rootAgentId === 'string' && l.agentId === rootAgentId) return []; // drop master
       const cpRaw = typeof l.callPath === 'string' && l.callPath.length > 0 ? l.callPath : l.agentId;
-      const cpNorm = cpRaw.replace(/→/g, '->');
+      const cpNorm = cpRaw.replace(/→/g, ':');
       const startsWithPrefix = typeof prefix === 'string' && (cpNorm.startsWith(prefix));
       const shownPath = startsWithPrefix ? cpNorm.slice(prefix.length) : cpNorm;
       // Show only the final segment (child agent name), strip 'agent__' prefix if present
-      const segments = shownPath.split('->').filter((s) => s.length > 0);
+      const segments = shownPath.split(':').filter((s) => s.length > 0);
       const last = segments.length > 0 ? segments[segments.length - 1] : shownPath;
       const shownName = last.startsWith('agent__') ? last.slice('agent__'.length) : last;
       const secs = l.elapsedSec ?? 0;

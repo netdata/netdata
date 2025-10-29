@@ -3,7 +3,7 @@ import Ajv from 'ajv';
 import type { OutputFormatId } from '../formats.js';
 import type { MCPTool } from '../types.js';
 import type { ToolsOrchestrator } from './tools.js';
-import type { ToolExecuteOptions, ToolExecuteResult } from './types.js';
+import type { ToolExecuteOptions, ToolExecuteResult, ToolExecutionContext } from './types.js';
 import type { Ajv as AjvClass, ErrorObject, Options as AjvOptions } from 'ajv';
 
 type AjvInstance = AjvClass;
@@ -47,7 +47,7 @@ export class InternalToolProvider extends ToolProvider {
   private readonly disableProgressTool: boolean;
 
   constructor(
-    public readonly id: string,
+    public readonly namespace: string,
     private readonly opts: InternalToolProviderOptions
   ) {
     super();
@@ -128,6 +128,11 @@ export class InternalToolProvider extends ToolProvider {
     return false;
   }
 
+  override resolveToolIdentity(name: string): { namespace: string; tool: string } {
+    const tool = name.startsWith('agent__') ? name.slice('agent__'.length) : name;
+    return { namespace: this.namespace, tool };
+  }
+
   override getInstructions(): string {
     return this.instructions;
   }
@@ -154,7 +159,7 @@ export class InternalToolProvider extends ToolProvider {
 
     if (this.opts.enableBatch) {
       lines.push('');
-      lines.push(`#### ${BATCH_TOOL} — Parallel Tooling`);
+      lines.push(`#### ${BATCH_TOOL} — How to Run Tools in Parallel`);
       lines.push('- Use this helper to execute multiple tools in one request.');
       lines.push("- Each `calls[]` entry needs an `id`, the real tool name, and a `parameters` object that matches that tool's schema.");
       lines.push('- Example:');
@@ -177,8 +182,8 @@ export class InternalToolProvider extends ToolProvider {
     }
 
     lines.push('');
-    lines.push(`#### ${FINAL_REPORT_TOOL} - Deliver Your Final Answer`);
-    lines.push(`- You MUST call '${FINAL_REPORT_TOOL}' to provide your final answer to the user.`);
+    lines.push(`#### ${FINAL_REPORT_TOOL} - How to Deliver Your Final Answer`);
+    lines.push(`- You MUST call '${FINAL_REPORT_TOOL}' to provide your final answer to the user. All the content of your final report MUST be delivered using this tool.`);
     lines.push('- Required fields:');
     lines.push('  - `status`: one of `success`, `failure`, `partial`.');
     if (this.formatId === 'json') {
@@ -190,20 +195,17 @@ export class InternalToolProvider extends ToolProvider {
       lines.push('    • Up to 20 messages, each with ≤50 blocks. Sections/context mrkdwn ≤2000 chars; headers plain_text ≤150.');
     } else {
       lines.push(`  - ${REPORT_FORMAT_LABEL}: "${this.formatId}".`);
-      lines.push('  - `report_content`: complete deliverable in the requested format.');
+      lines.push('  - `report_content`: the content of your final report, in the requested format.');
     }
     lines.push('- Include optional `metadata` only when explicitly relevant.');
-    lines.push('- After this tool succeeds, do not send additional assistant messages.');
+    lines.push('- **CRITICAL:** The content of your final report MUST be delivered using this tool ONLY, not as part of your regular output.');
 
     lines.push('');
-    lines.push('*You run in agentic mode, interfacing with software tools.*');
-    lines.push('');
-    lines.push('**YOU MUST:**');
-    lines.push('- **ALWAYS** respond with valid tool calls, even for your final answer.');
-    lines.push(`- **ALWAYS** provide your final report to the user using the ${FINAL_REPORT_TOOL} tool, with the correct format.`);
-
-    lines.push('**YOU MUST NOT:**');
-    lines.push('- Do not provide any other output except calling your tools. Any other output you provide is ignored.');
+    lines.push('**MANDATORY TOOLS COMPLIANCE**');
+    lines.push('- You run in agentic mode, interfacing with software tools with specific output requirements.');
+    lines.push('- Always respond with valid tool calls, even for your final answer.');
+    lines.push(`- You must provide your final report to the user using the ${FINAL_REPORT_TOOL} tool, with the correct format.`);
+    lines.push(`- The CONTENT of your final report must be delivered using the ${FINAL_REPORT_TOOL} tool ONLY.`);
 
     return lines.join('\n');
   }
@@ -349,7 +351,7 @@ export class InternalToolProvider extends ToolProvider {
     const descSuffix = this.formatDescription.length > 0 ? this.formatDescription : this.formatId;
     return {
       name: FINAL_REPORT_TOOL,
-      description: `${baseDescription} Final deliverable must be ${descSuffix}.`.trim(),
+      description: `${baseDescription}. ${descSuffix}`.trim(),
       inputSchema: {
         type: 'object',
         additionalProperties: false,
@@ -357,14 +359,14 @@ export class InternalToolProvider extends ToolProvider {
         properties: {
           status: statusProp,
           report_format: { type: 'string', const: this.formatId, description: this.formatDescription },
-          report_content: { type: 'string', minLength: 1, description: 'Complete final deliverable in the requested format.' },
+          report_content: { type: 'string', minLength: 1, description: 'MANDATORY: the content of your final report.' },
           metadata: metadataProp,
         },
       },
     };
   }
 
-  async execute(name: string, parameters: Record<string, unknown>, _opts?: ToolExecuteOptions): Promise<ToolExecuteResult> {
+  async execute(name: string, parameters: Record<string, unknown>, executionOpts?: ToolExecuteOptions): Promise<ToolExecuteResult> {
     const start = Date.now();
     if (name === PROGRESS_TOOL && this.disableProgressTool) {
       throw new Error('agent__progress_report is disabled for this session');
@@ -372,7 +374,7 @@ export class InternalToolProvider extends ToolProvider {
     if (name === 'agent__progress_report') {
       const progress = typeof (parameters.progress) === 'string' ? parameters.progress : '';
       this.opts.updateStatus(progress);
-      return { ok: true, result: JSON.stringify({ ok: true }), latencyMs: Date.now() - start, kind: this.kind, providerId: this.id };
+      return { ok: true, result: JSON.stringify({ ok: true }), latencyMs: Date.now() - start, kind: this.kind, namespace: this.namespace };
     }
     if (name === 'agent__final_report') {
       const status = (typeof parameters.status === 'string' ? parameters.status : 'success') as 'success'|'failure'|'partial';
@@ -600,7 +602,7 @@ export class InternalToolProvider extends ToolProvider {
         const metaSlack: Record<string, unknown> = { ...slackExisting, messages: normalizedMessages };
         const mergedMeta: Record<string, unknown> = { ...metaBase, slack: metaSlack };
         this.opts.setFinalReport({ status, format: this.formatId, content, content_json: contentJson, metadata: mergedMeta });
-        return { ok: true, result: JSON.stringify({ ok: true }), latencyMs: Date.now() - start, kind: this.kind, providerId: this.id };
+        return { ok: true, result: JSON.stringify({ ok: true }), latencyMs: Date.now() - start, kind: this.kind, namespace: this.namespace };
       }
 
       if (this.formatId === 'json') {
@@ -620,12 +622,12 @@ export class InternalToolProvider extends ToolProvider {
           }
         }
         this.opts.setFinalReport({ status, format: this.formatId, content, content_json: contentJson, metadata });
-        return { ok: true, result: JSON.stringify({ ok: true }), latencyMs: Date.now() - start, kind: this.kind, providerId: this.id };
+        return { ok: true, result: JSON.stringify({ ok: true }), latencyMs: Date.now() - start, kind: this.kind, namespace: this.namespace };
       }
 
       if (typeof content !== 'string' || content.trim().length === 0) throw new Error('agent__final_report requires non-empty report_content field.');
       this.opts.setFinalReport({ status, format: this.formatId, content, content_json: contentJson, metadata });
-      return { ok: true, result: JSON.stringify({ ok: true }), latencyMs: Date.now() - start, kind: this.kind, providerId: this.id };
+      return { ok: true, result: JSON.stringify({ ok: true }), latencyMs: Date.now() - start, kind: this.kind, namespace: this.namespace };
     }
     if (this.opts.enableBatch && name === 'agent__batch') {
       // Minimal batch: always use orchestrator for inner calls
@@ -720,7 +722,17 @@ export class InternalToolProvider extends ToolProvider {
       }
 
       interface R { id: string; tool: string; ok: boolean; elapsedMs: number; output?: string; error?: { code: string; message: string } }
-      const results: R[] = await Promise.all(normalizedCalls.map(async ({ id, tool, parameters: callParameters }) => {
+      const parentContext: ToolExecutionContext | undefined = (() => {
+        if (executionOpts === undefined || typeof executionOpts !== 'object') return undefined;
+        if (!Object.prototype.hasOwnProperty.call(executionOpts, 'parentContext')) return undefined;
+        const candidate = (executionOpts as { parentContext?: unknown }).parentContext;
+        if (candidate === null || typeof candidate !== 'object') return undefined;
+        const { turn, subturn } = candidate as { turn?: unknown; subturn?: unknown };
+        if (typeof turn !== 'number' || typeof subturn !== 'number') return undefined;
+        return { turn, subturn };
+      })();
+      const baseSubturn = typeof parentContext?.subturn === 'number' ? parentContext.subturn : 0;
+      const results: R[] = await Promise.all(normalizedCalls.map(async ({ id, tool, parameters: callParameters }, index) => {
         const t0 = Date.now();
         // Allow progress_report in batch, but not final_report or nested batch
         if (tool === 'agent__final_report' || tool === 'agent__batch') return { id, tool, ok: false, elapsedMs: 0, error: { code: 'INTERNAL_NOT_ALLOWED', message: 'Internal tools are not allowed in batch' } };
@@ -732,7 +744,13 @@ export class InternalToolProvider extends ToolProvider {
         }
         try {
           if (!(this.opts.orchestrator.hasTool(tool))) return { id, tool, ok: false, elapsedMs: 0, error: { code: 'UNKNOWN_TOOL', message: `Unknown tool: ${tool}` } };
-          const managed = await this.opts.orchestrator.executeWithManagement(tool, callParameters, { turn: batchTurn, subturn: 0 }, { timeoutMs: this.opts.toolTimeoutMs });
+          const subturnForCall = baseSubturn + index + 1;
+          const managed = await this.opts.orchestrator.executeWithManagement(
+            tool,
+            callParameters,
+            { turn: batchTurn, subturn: subturnForCall },
+            { timeoutMs: this.opts.toolTimeoutMs, parentContext: { turn: batchTurn, subturn: subturnForCall } }
+          );
           return { id, tool, ok: true, elapsedMs: managed.latency, output: managed.result };
         } catch (e) {
           const msg = e instanceof Error ? e.message : String(e);
@@ -740,7 +758,7 @@ export class InternalToolProvider extends ToolProvider {
         }
       }));
       const payload = JSON.stringify({ results });
-      return { ok: true, result: payload, latencyMs: Date.now() - start, kind: this.kind, providerId: this.id };
+      return { ok: true, result: payload, latencyMs: Date.now() - start, kind: this.kind, namespace: this.namespace };
     }
     throw new Error(`Unknown internal tool: ${name}`);
   }

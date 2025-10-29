@@ -8,7 +8,7 @@ import Ajv from 'ajv';
 
 import type { OutputFormatId } from './formats.js';
 import type { SessionNode } from './session-tree.js';
-import type { AIAgentSessionConfig, AIAgentResult, ConversationMessage, LogEntry, AccountingEntry, Configuration, TurnRequest, LLMAccountingEntry, MCPTool, ToolAccountingEntry, RestToolConfig, ProgressMetrics, ToolCall, SessionSnapshotPayload, AccountingFlushPayload, ReasoningLevel, ProviderReasoningMapping, ProviderReasoningValue, TurnRetryDirective, TurnStatus } from './types.js';
+import type { AIAgentSessionConfig, AIAgentResult, ConversationMessage, LogEntry, AccountingEntry, Configuration, TurnRequest, LLMAccountingEntry, MCPTool, ToolAccountingEntry, RestToolConfig, ProgressMetrics, ToolCall, SessionSnapshotPayload, AccountingFlushPayload, ReasoningLevel, ProviderReasoningMapping, ProviderReasoningValue, TurnRetryDirective, TurnStatus, LogDetailValue } from './types.js';
 import type { Ajv as AjvClass, ErrorObject, Options as AjvOptions } from 'ajv';
 
 // Exit codes according to DESIGN.md
@@ -118,6 +118,8 @@ export class AIAgentSession {
   private childConversations: { agentId?: string; toolName: string; promptPath: string; conversation: ConversationMessage[]; trace?: { originId?: string; parentId?: string; selfId?: string; callPath?: string } }[] = [];
   private readonly subAgents?: SubAgentRegistry;
   private readonly subAgentCount: number;
+  private readonly agentPath: string;
+  private readonly turnPathPrefix: string;
   private readonly subAgentToolNames: readonly string[];
   private readonly invokedSubAgents = new Set<string>();
   private readonly txnId: string;
@@ -150,6 +152,7 @@ export class AIAgentSession {
     metadata?: Record<string, unknown>;
     ts: number;
   };
+  private pendingRetryMessages: string[] = [];
 
   // Concurrency gate for tool executions
   private toolSlotsInUse = 0;
@@ -200,10 +203,7 @@ export class AIAgentSession {
 
   private getCallPathLabel(): string {
     if (typeof this.callPath === 'string' && this.callPath.length > 0) return this.callPath;
-    if (typeof this.sessionConfig.agentId === 'string' && this.sessionConfig.agentId.length > 0) {
-      return this.sessionConfig.agentId;
-    }
-    return 'agent';
+    return this.agentPath;
   }
 
   private getAgentIdLabel(): string {
@@ -215,9 +215,36 @@ export class AIAgentSession {
 
   private getAgentDisplayName(): string {
     const label = this.getCallPathLabel();
-    const parts = label.split('->').map((part) => part.trim()).filter((part) => part.length > 0);
+    const parts = label.split(':').map((part) => part.trim()).filter((part) => part.length > 0);
     if (parts.length > 0) return parts[parts.length - 1];
     return label;
+  }
+
+  private composeTurnPath(turn: number, subturn: number): string {
+    const segment = `${String(turn)}.${String(subturn)}`;
+    return this.turnPathPrefix.length > 0
+      ? `${this.turnPathPrefix}-${segment}`
+      : segment;
+  }
+
+  private extractToolNameForCallPath(entry: LogEntry): string | undefined {
+    if (entry.type !== 'tool') return undefined;
+    const remote = entry.remoteIdentifier;
+    if (typeof remote === 'string' && remote.length > 0) {
+      const parts = remote.split(':');
+      if (parts.length > 0) {
+        const candidate = parts[parts.length - 1];
+        if (candidate.length > 0) return candidate;
+      }
+    }
+    const detailsTool = entry.details?.tool;
+    if (typeof detailsTool === 'string' && detailsTool.length > 0) {
+      const tokens = detailsTool.split('__');
+      const tail = tokens[tokens.length - 1];
+      if (tail.length > 0) return tail;
+      return detailsTool;
+    }
+    return undefined;
   }
 
   private buildMetricsFromSession(session: SessionNode | undefined): ProgressMetrics | undefined {
@@ -373,14 +400,20 @@ export class AIAgentSession {
       this.subAgents = reg;
       this.subAgentToolNames = reg.listToolNames();
     } else {
-      this.subAgentToolNames = [];
+    this.subAgentToolNames = [];
     }
     // REST tools handled by RestProvider; no local registry here
     // Tracing context
     this.txnId = sessionConfig.trace?.selfId ?? crypto.randomUUID();
     this.originTxnId = sessionConfig.trace?.originId ?? this.txnId;
     this.parentTxnId = sessionConfig.trace?.parentId;
-    this.callPath = sessionConfig.trace?.callPath ?? sessionConfig.agentId;
+    this.agentPath = sessionConfig.agentPath
+      ?? sessionConfig.trace?.agentPath
+      ?? (sessionConfig.agentId ?? 'agent');
+    this.turnPathPrefix = sessionConfig.turnPathPrefix
+      ?? sessionConfig.trace?.turnPath
+      ?? '';
+    this.callPath = sessionConfig.trace?.callPath ?? this.agentPath;
 
     // Hierarchical operation tree (Option C)
     this.opTree = new SessionTreeBuilder({ traceId: this.txnId, agentId: sessionConfig.agentId, callPath: this.callPath, sessionTitle: sessionConfig.initialTitle ?? '' });
@@ -554,7 +587,18 @@ export class AIAgentSession {
     }
     if (this.subAgents !== undefined) {
       const subAgents = this.subAgents;
-      const execFn = async (name: string, parameters: Record<string, unknown>, opts?: { onChildOpTree?: (tree: SessionNode) => void; parentOpPath?: string }) => {
+      const execFn = async (
+        name: string,
+        parameters: Record<string, unknown>,
+        opts?: { onChildOpTree?: (tree: SessionNode) => void; parentOpPath?: string; parentContext?: { turn: number; subturn: number } }
+      ) => {
+        const normalizedChildName = name.startsWith('agent__') ? name.slice('agent__'.length) : name;
+        const parentTurnPath = opts?.parentContext !== undefined
+          ? this.composeTurnPath(opts.parentContext.turn, opts.parentContext.subturn)
+          : this.turnPathPrefix;
+        const childAgentPath = this.agentPath.length > 0
+          ? `${this.agentPath}:${normalizedChildName}`
+          : normalizedChildName;
         const exec = await subAgents.execute(name, parameters, {
           config: this.sessionConfig.config,
           callbacks: this.sessionConfig.callbacks,
@@ -575,9 +619,11 @@ export class AIAgentSession {
           // propagate control signals so children can stop/abort
           abortSignal: this.abortSignal,
           stopRef: this.stopRef,
-          trace: { originId: this.originTxnId, parentId: this.txnId, callPath: `${this.callPath ?? ''}->${name}` },
+          trace: { originId: this.originTxnId, parentId: this.txnId, callPath: childAgentPath, agentPath: childAgentPath, turnPath: parentTurnPath },
+          agentPath: childAgentPath,
+          turnPathPrefix: parentTurnPath,
           onChildOpTree: opts?.onChildOpTree
-        }, opts);
+        }, { ...opts, parentTurnPath });
         // Keep child conversation list (may be reported in results for compatibility)
         this.childConversations.push({ agentId: exec.child.toolName, toolName: exec.child.toolName, promptPath: exec.child.promptPath, conversation: exec.conversation, trace: exec.trace });
         await this.persistSessionSnapshot('subagent_finish');
@@ -621,13 +667,24 @@ export class AIAgentSession {
 
     // Generate a unique span id (self) for this session and enrich trace context
     const sessionTxnId = crypto.randomUUID();
+    const inferredAgentPath = sessionConfig.agentPath
+      ?? sessionConfig.trace?.agentPath
+      ?? sessionConfig.agentId
+      ?? 'agent';
+    const inferredTurnPathPrefix = sessionConfig.turnPathPrefix
+      ?? sessionConfig.trace?.turnPath
+      ?? '';
     const enrichedSessionConfig: AIAgentSessionConfig = {
       ...sessionConfig,
+      agentPath: inferredAgentPath,
+      turnPathPrefix: inferredTurnPathPrefix,
       trace: {
         selfId: sessionTxnId,
         originId: sessionConfig.trace?.originId ?? sessionTxnId,
         parentId: sessionConfig.trace?.parentId,
-        callPath: sessionConfig.trace?.callPath ?? sessionConfig.agentId,
+        callPath: sessionConfig.trace?.callPath ?? inferredAgentPath,
+        agentPath: sessionConfig.trace?.agentPath ?? inferredAgentPath,
+        turnPath: sessionConfig.trace?.turnPath ?? inferredTurnPathPrefix,
       },
     };
 
@@ -643,7 +700,8 @@ export class AIAgentSession {
       const enriched: LogEntry = {
         ...entry,
         agentId: enrichedSessionConfig.agentId,
-        callPath: enrichedSessionConfig.trace?.callPath ?? enrichedSessionConfig.agentId,
+        agentPath: enrichedSessionConfig.agentPath,
+        callPath: enrichedSessionConfig.trace?.callPath ?? enrichedSessionConfig.agentPath,
         txnId: enrichedSessionConfig.trace?.selfId,
         parentTxnId: enrichedSessionConfig.trace?.parentId,
         originTxnId: enrichedSessionConfig.trace?.originId,
@@ -711,7 +769,8 @@ export class AIAgentSession {
     const planned = this.plannedSubturns.get(turnNum);
     const enriched: LogEntry = {
       agentId: this.sessionConfig.agentId,
-      callPath: this.callPath,
+      agentPath: this.agentPath,
+      callPath: this.agentPath,
       txnId: this.txnId,
       parentTxnId: this.parentTxnId,
       originTxnId: this.originTxnId,
@@ -719,13 +778,21 @@ export class AIAgentSession {
       ...(planned !== undefined ? { 'max_subturns': planned } : {}),
       ...entry,
     };
+    const turnPath = this.composeTurnPath(enriched.turn, enriched.subturn);
+    enriched.turnPath = turnPath;
+
+    if (enriched.type === 'tool') {
+      const toolName = this.extractToolNameForCallPath(enriched);
+      if (toolName !== undefined && toolName.length > 0) {
+        enriched.callPath = `${this.agentPath}:${toolName}`;
+      }
+    } else {
+      enriched.callPath = this.agentPath;
+    }
     const label = this.getCallPathLabel();
     const rawMessage = typeof enriched.message === 'string' ? enriched.message.trim() : '';
-    const prefix = `${label}:`;
     if (rawMessage.length === 0) {
       enriched.message = `${label}: (message missing)`;
-    } else if (!rawMessage.startsWith(prefix)) {
-      enriched.message = `${label}: ${rawMessage}`;
     } else {
       enriched.message = rawMessage;
     }
@@ -1573,7 +1640,8 @@ export class AIAgentSession {
                   rateLimitedInCycle = 0;
                   maxRateLimitWaitMs = 0;
                 }
-                this.pushSystemRetryMessage(conversation, `System notice: plain text responses are ignored. Call ${AIAgentSession.FINAL_REPORT_TOOL} with JSON arguments to deliver the final report.`);
+                this.pushSystemRetryMessage(conversation, this.buildFinalReportReminder());
+                this.pushSystemRetryMessage(conversation, 'System notice: plain text responses are ignored. Use the tool with JSON arguments to deliver the final report.');
                 // do not append these messages; try next provider/model in same turn
                 continue;
               }
@@ -1682,18 +1750,91 @@ export class AIAgentSession {
                 return (lastAssistant?.content.trim().length ?? 0) > 0;
               })();
               const hasReasoning = turnResult.hasReasoning ?? false;
-              const debugEntry: LogEntry = {
+              const tokens = turnResult.tokens;
+              const inputTokens = tokens?.inputTokens ?? 0;
+              const outputTokens = tokens?.outputTokens ?? 0;
+              const cacheRead = tokens?.cacheReadInputTokens
+                ?? turnResult.providerMetadata?.cacheReadInputTokens
+                ?? tokens?.cachedTokens
+                ?? 0;
+              const cacheWrite = tokens?.cacheWriteInputTokens
+                ?? turnResult.providerMetadata?.cacheWriteInputTokens
+                ?? 0;
+              const cachedTokens = tokens?.cachedTokens ?? cacheRead;
+              const latencyMs = turnResult.latencyMs;
+              const costInfo = this.llmClient.getLastCostInfo();
+              const reportedCost = turnResult.providerMetadata?.reportedCostUsd;
+              const effectiveCost = turnResult.providerMetadata?.effectiveCostUsd ?? reportedCost ?? costInfo?.costUsd;
+              const upstreamCost = turnResult.providerMetadata?.upstreamCostUsd ?? costInfo?.upstreamInferenceCostUsd;
+              const responseBytes = (() => {
+                if (typeof turnResult.responseBytes === 'number') return turnResult.responseBytes;
+                if (typeof turnResult.response === 'string') return Buffer.byteLength(turnResult.response, 'utf8');
+                return 0;
+              })();
+              const reasoningStatus = turnResult.providerMetadata?.reasoningState
+                ?? (turnResult.hasReasoning === true ? 'present' : 'unset');
+              const metricsParts: string[] = [
+                `input ${String(inputTokens)}`,
+                `output ${String(outputTokens)}`,
+                `cacheR ${String(cacheRead)}`,
+                `cacheW ${String(cacheWrite)}`,
+                `cached ${String(cachedTokens)}`,
+                `${String(latencyMs)}ms`,
+              ];
+              if (typeof turnResult.stopReason === 'string' && turnResult.stopReason.length > 0) {
+                metricsParts.push(`stop=${turnResult.stopReason}`);
+              }
+              if (typeof effectiveCost === 'number') {
+                metricsParts.push(`cost $${effectiveCost.toFixed(6)}`);
+              }
+              if (typeof upstreamCost === 'number' && upstreamCost > 0) {
+                metricsParts.push(`upstream $${upstreamCost.toFixed(6)}`);
+              }
+              metricsParts.push(`${String(responseBytes)} bytes`);
+              metricsParts.push(`reasoning=${reasoningStatus}`);
+
+              const turnSummary = `hasToolCalls=${String(sanitizedHasToolCalls)}, hasToolResults=${String(hasToolResults)}, finalAnswer=${String(turnResult.status.finalAnswer)}, hasReasoning=${String(hasReasoning)}, hasContent=${String(hasContent)}, response length=${String(turnResult.response?.length ?? 0)}, messages=${String(sanitizedMessages.length)}, stopReason=${turnResult.stopReason ?? 'none'}`;
+              const remoteId = this.composeRemoteIdentifier(provider, model, turnResult.providerMetadata);
+              const combinedMessage = `Turn result: ${turnSummary}`;
+              const combinedDetails: Record<string, LogDetailValue> = {
+                input_tokens: inputTokens,
+                output_tokens: outputTokens,
+                cache_read_tokens: cacheRead,
+                cache_write_tokens: cacheWrite,
+                cached_tokens: cachedTokens,
+                latency_ms: latencyMs,
+                response_bytes: responseBytes,
+                reasoning: reasoningStatus,
+                has_tool_calls: sanitizedHasToolCalls,
+                has_tool_results: hasToolResults,
+                final_answer: turnResult.status.finalAnswer,
+                has_reasoning: hasReasoning,
+                has_content: hasContent,
+                response_length: turnResult.response?.length ?? 0,
+                messages: sanitizedMessages.length,
+              };
+              if (turnResult.stopReason !== undefined) {
+                combinedDetails.stop_reason = turnResult.stopReason;
+              }
+              if (typeof effectiveCost === 'number') {
+                combinedDetails.cost_usd = effectiveCost;
+              }
+              if (typeof upstreamCost === 'number' && upstreamCost > 0) {
+                combinedDetails.upstream_cost_usd = upstreamCost;
+              }
+              const combinedEntry: LogEntry = {
                 timestamp: Date.now(),
                 severity: 'VRB',
                 turn: currentTurn,
                 subturn: 0,
                 direction: 'response',
                 type: 'llm',
-                remoteIdentifier: 'debug',
+                remoteIdentifier: remoteId,
                 fatal: false,
-                message: `Turn result: hasToolCalls=${String(sanitizedHasToolCalls)}, hasToolResults=${String(hasToolResults)}, finalAnswer=${String(turnResult.status.finalAnswer)}, hasReasoning=${String(hasReasoning)}, hasContent=${String(hasContent)}, response length=${String(turnResult.response?.length ?? 0)}, messages=${String(sanitizedMessages.length)}, stopReason=${turnResult.stopReason ?? 'none'}`
+                message: combinedMessage,
+                details: combinedDetails,
               };
-              this.log(debugEntry);
+              this.log(combinedEntry);
 
               // Additional verbose diagnostics (only when explicitly requested)
               if (this.sessionConfig.verbose === true && process.env.DEBUG === 'true') {
@@ -1818,7 +1959,7 @@ export class AIAgentSession {
                   maxRateLimitWaitMs = 0;
                 }
                 this.finalReport = undefined;
-                this.pushSystemRetryMessage(conversation, `System notice: call ${AIAgentSession.FINAL_REPORT_TOOL} with status="success", report_format="text", and content equal to the agent__test-agent2 output.`);
+                this.pushSystemRetryMessage(conversation, this.buildFinalReportReminder());
                 continue;
               } else {
                 // If this is the final turn and we still don't have a final answer,
@@ -1858,7 +1999,8 @@ export class AIAgentSession {
                     rateLimitedInCycle = 0;
                     maxRateLimitWaitMs = 0;
                   }
-                  this.pushSystemRetryMessage(conversation, `System notice: this is the final turn. Call ${AIAgentSession.FINAL_REPORT_TOOL} with the required JSON payload to finish.`);
+                  this.pushSystemRetryMessage(conversation, 'System notice: this is the final turn. Provide the final report now.');
+                  this.pushSystemRetryMessage(conversation, this.buildFinalReportReminder());
                   continue;
               }
               // Non-final turns: proceed to next turn; tools already executed if present
@@ -2433,20 +2575,40 @@ export class AIAgentSession {
   private pushSystemRetryMessage(conversation: ConversationMessage[], message: string): void {
     const trimmed = message.trim();
     if (trimmed.length === 0) return;
-    const firstSystemIndex = conversation.findIndex((msg) => msg.role === 'system');
-    if (firstSystemIndex !== -1) {
-      const current = conversation[firstSystemIndex].content;
-      if (current.includes(trimmed)) {
-        return;
+    if (this.pendingRetryMessages.includes(trimmed)) return;
+    this.pendingRetryMessages.push(trimmed);
+  }
+
+  private buildFinalReportReminder(): string {
+    const format = this.resolvedFormat ?? 'text';
+    const formatDescription = this.resolvedFormatParameterDescription ?? 'the required format';
+    const contentField = (() => {
+      if (format === 'json') return 'content_json';
+      if (format === 'slack-block-kit') return 'messages';
+      return 'report_content';
+    })();
+    const contentGuidance = (() => {
+      if (contentField === 'content_json') {
+        return 'include a `content_json` object that matches the expected schema';
       }
-      const separator = current.trim().length === 0 ? '' : '\n\n';
-      conversation[firstSystemIndex] = {
-        ...conversation[firstSystemIndex],
-        content: `${current}${separator}${trimmed}`,
-      };
-      return;
+      if (contentField === 'messages') {
+        return 'include a `messages` array populated with the final Slack Block Kit blocks';
+      }
+      return 'include `report_content` containing the full final answer';
+    })();
+    return `System notice: call ${AIAgentSession.FINAL_REPORT_TOOL} with report_format="${format}" (${formatDescription}), set status to success, failure, or partial as appropriate, and ${contentGuidance}.`;
+  }
+
+  private mergePendingRetryMessages(conversation: ConversationMessage[]): ConversationMessage[] {
+    const cleaned = conversation.filter((msg) => msg.metadata?.retryMessage === undefined);
+    if (cleaned.length !== conversation.length) {
+      conversation.splice(0, conversation.length, ...cleaned);
     }
-    conversation.unshift({ role: 'system', content: trimmed });
+    if (this.pendingRetryMessages.length === 0) {
+      return conversation;
+    }
+    const retryMessages = this.pendingRetryMessages.map((text) => ({ role: 'user' as const, content: text }));
+    return [...conversation, ...retryMessages];
   }
 
   private getFinalReportStatus(): 'success' | 'failure' | 'partial' | undefined {
@@ -2956,8 +3118,16 @@ export class AIAgentSession {
       'ai.llm.reasoning.value_effective': effectiveReasoningValue ?? 'none',
     });
     const sendReasoning = disableReasoningForTurn ? false : undefined;
-    const autoEnableReasoningStream = this.llmClient.shouldAutoEnableReasoningStream(provider, effectiveReasoningLevel, targetMaxOutputTokens);
     const sessionStreamFlag = this.sessionConfig.stream === true;
+    const autoEnableReasoningStream = this.llmClient.shouldAutoEnableReasoningStream(
+      provider,
+      effectiveReasoningLevel,
+      {
+        maxOutputTokens: targetMaxOutputTokens,
+        reasoningActive,
+        streamRequested: sessionStreamFlag,
+      }
+    );
     let effectiveStream = sessionStreamFlag;
     if (!effectiveStream && autoEnableReasoningStream) {
       effectiveStream = true;
@@ -2974,9 +3144,11 @@ export class AIAgentSession {
       };
       this.log(warnEntry);
     }
-    const requestMessagesBytes = estimateMessagesBytes(conversation);
+    const requestMessages = this.mergePendingRetryMessages(conversation);
+    const requestMessagesBytes = estimateMessagesBytes(requestMessages);
+    this.pendingRetryMessages = [];
     const request: TurnRequest = {
-      messages: conversation,
+      messages: requestMessages,
       provider,
       model,
       tools: availableTools,

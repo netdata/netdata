@@ -566,53 +566,24 @@ export class LLMClient {
 
     if (result.status.type === 'success') {
       const tokens = result.tokens;
-      const inputTokens = tokens?.inputTokens ?? 0;
-      const outputTokens = tokens?.outputTokens ?? 0;
-      const cachedTokens = tokens?.cachedTokens ?? 0;
-      const cacheRead = tokens?.cacheReadInputTokens ?? cachedTokens;
+      const cacheRead = tokens?.cacheReadInputTokens ?? tokens?.cachedTokens ?? 0;
       const cacheWrite = tokens?.cacheWriteInputTokens ?? 0;
       const responseBytes = result.response !== undefined ? new TextEncoder().encode(result.response).length : 0;
-      // Do not include routed provider/model details here; keep log concise up to bytes
       const reasoningStatus = this.describeReasoningState(request);
-      const details: Record<string, LogDetailValue> = {
-        input_tokens: inputTokens,
-        output_tokens: outputTokens,
-        cache_read_tokens: cacheRead,
-        cache_write_tokens: cacheWrite,
-        cached_tokens: cachedTokens,
-        latency_ms: latencyMs,
-        response_bytes: responseBytes,
-        reasoning: reasoningStatus,
-      };
-      const suffix: string[] = [
-        `input ${String(inputTokens)}`,
-        `output ${String(outputTokens)}`,
-        `cacheR ${String(cacheRead)}`,
-        `cacheW ${String(cacheWrite)}`,
-        `cached ${String(cachedTokens)}`,
-        `${String(latencyMs)}ms`,
-      ];
-      if (typeof result.stopReason === 'string' && result.stopReason.length > 0) {
-        details.stop_reason = result.stopReason;
-        suffix.push(`stop=${result.stopReason}`);
-      }
-      if (typeof costToUse === 'number') {
-        details.cost_usd = costToUse;
-        suffix.push(`cost $${costToUse.toFixed(6)}`);
-      }
-      if (metadata?.upstreamCostUsd !== undefined && metadata.upstreamCostUsd > 0) {
-        details.upstream_cost_usd = metadata.upstreamCostUsd;
-        suffix.push(`upstream $${metadata.upstreamCostUsd.toFixed(6)}`);
-      }
       this.lastCostInfo = (costToUse !== undefined || metadata?.upstreamCostUsd !== undefined)
         ? { costUsd: costToUse, upstreamInferenceCostUsd: metadata?.upstreamCostUsd }
         : undefined;
-      details.response_bytes = responseBytes;
-      suffix.push(`${String(responseBytes)} bytes`);
-      suffix.push(`reasoning=${reasoningStatus}`);
-
-      const message = `LLM response received (${suffix.join(', ')})`;
-      this.log('VRB', 'response', 'llm', remoteId, message, { details });
+      result.providerMetadata ??= {};
+      result.providerMetadata.cacheReadInputTokens = cacheRead;
+      result.providerMetadata.cacheWriteInputTokens = cacheWrite;
+      if (typeof costToUse === 'number') {
+        result.providerMetadata.effectiveCostUsd = costToUse;
+      }
+      if (metadata?.upstreamCostUsd !== undefined) {
+        result.providerMetadata.upstreamCostUsd = metadata.upstreamCostUsd;
+      }
+      result.providerMetadata.reasoningState = reasoningStatus;
+      result.responseBytes = responseBytes;
     } else {
       const fatal = result.status.type === 'auth_error' || result.status.type === 'quota_exceeded';
       const statusMessage = 'message' in result.status ? result.status.message : result.status.type;
@@ -635,6 +606,8 @@ export class LLMClient {
       this.lastCostInfo = (costToUse !== undefined || metadata?.upstreamCostUsd !== undefined)
         ? { costUsd: costToUse, upstreamInferenceCostUsd: metadata?.upstreamCostUsd }
         : undefined;
+      result.providerMetadata ??= {};
+      result.providerMetadata.reasoningState = reasoningStatus;
       const message = `LLM response failed [${result.status.type.toUpperCase()}]: ${statusMessage}`;
       this.log(fatal ? 'ERR' : 'WRN', 'response', 'llm', remoteId, message, { fatal, details });
     }
@@ -734,10 +707,14 @@ export class LLMClient {
     return provider.resolveReasoningValue(context);
   }
 
-  shouldAutoEnableReasoningStream(providerName: string, level: ReasoningLevel | undefined, maxOutputTokens?: number): boolean {
+  shouldAutoEnableReasoningStream(
+    providerName: string,
+    level: ReasoningLevel | undefined,
+    options?: { maxOutputTokens?: number; reasoningActive?: boolean; streamRequested?: boolean }
+  ): boolean {
     const provider = this.providers.get(providerName);
     if (provider === undefined) return false;
-    return provider.shouldAutoEnableReasoningStream(level, { maxOutputTokens });
+    return provider.shouldAutoEnableReasoningStream(level, options);
   }
 
   shouldDisableReasoning(providerName: string, context: { conversation: ConversationMessage[]; currentTurn: number; expectSignature: boolean }): { disable: boolean; normalized: ConversationMessage[] } {

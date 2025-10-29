@@ -377,7 +377,7 @@ function buildLogAttributes(event: StructuredLogEvent): OtelLogsApi.AnyValueMap 
   };
   if (event.messageId !== undefined) attributes.message_id = event.messageId;
   if (typeof event.toolKind === 'string') attributes.tool_kind = event.toolKind;
-  if (typeof event.toolProvider === 'string') attributes.tool_provider = event.toolProvider;
+  if (typeof event.toolNamespace === 'string') attributes.tool_namespace = event.toolNamespace;
   if (typeof event.tool === 'string') attributes.tool = event.tool;
   if (typeof event.headendId === 'string') attributes.headend = event.headendId;
   if (typeof event.agentId === 'string') attributes.agent = event.agentId;

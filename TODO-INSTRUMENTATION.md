@@ -18,7 +18,7 @@ Deliver a single, coherent observability story for `ai-agent`—regardless of wh
 - `LogEntry` metadata is preserved end-to-end; sinks emit structured key/value fields rather than flattened strings.
 - Warning/error paths route through the shared logger (`warn()` delegates to structured sinks), so journald/logfmt/json/OTLP receive identical context.
 - Headends reuse the same callback interface (`onLog`) and therefore inherit the structured pipeline without adapter-specific formatting.
-- Structured logging publishes dedicated tool metadata (`tool_provider`, `tool`) alongside provider/model; the contract lives in `docs/LOGS.md` and is referenced by the harness assertions.
+- Structured logging publishes dedicated tool metadata (`tool_namespace`, `tool`) alongside provider/model; the contract lives in `docs/LOGS.md` and is referenced by the harness assertions.
 - Journald detection verifies `$JOURNAL_STREAM` device/inode and honours `AI_FORCE_JOURNAL` / `AI_DISABLE_JOURNAL` overrides for manual control. When journald is active and `systemd-cat-native` is present, the sink streams Journal Export Format lines via the helper; otherwise the agent warns once and downgrades to logfmt.
 - OpenTelemetry exporters for metrics/traces (and optional logs) initialise lazily when `telemetry.enabled` is set; default harness runs keep telemetry disabled to preserve deterministic output.
 - Phase1 harness checks implied fields on key warnings/errors so regressions surface immediately in CI.
@@ -144,7 +144,7 @@ Deliver a single, coherent observability story for `ai-agent`—regardless of wh
 ### Phase 1 – Structured Logging Infrastructure _(Status: Completed — October 24, 2025)_
 1. Implement shared structured logging core:
    - `StructuredLogEvent` abstraction, journald/logfmt/json sinks, `log_uid`, custom label injection, `MESSAGE_ID` registry helper.
-   - Emit dedicated tool metadata (`tool_provider`, `tool`) alongside provider/model, keeping backwards compatibility.
+   - Emit dedicated tool metadata (`tool_namespace`, `tool`) alongside provider/model, keeping backwards compatibility.
    - Bootstrap detection (journald vs console) and configuration toggles (`telemetry.logging.formats`, `telemetry.enabled`).
 2. Refactor existing log emitters (`AIAgentSession`, `LLMClient`, `ToolsOrchestrator`, headends, CLI) to populate structured events (no metrics/traces yet).
 3. Update persistence (session snapshots/accounting) and headend renderers to consume structured logs.

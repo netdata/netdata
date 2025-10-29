@@ -2,11 +2,12 @@ import type { LogEntry } from '../types.js';
 
 import { emitTelemetryLog, getTelemetryLoggingConfig } from '../telemetry/index.js';
 
+import { formatConsole } from './console-format.js';
 import { acquireJournaldSink, isJournaldAvailable, type JournaldEmitter } from './journald-sink.js';
 import { formatLogfmt } from './logfmt.js';
 import { buildStructuredLogEvent, type StructuredLogEvent, type BuildStructuredEventOptions } from './structured-log-event.js';
 
-export type LogFormat = 'journald' | 'logfmt' | 'json';
+export type LogFormat = 'journald' | 'logfmt' | 'json' | 'console';
 
 type CandidateFormat = LogFormat | 'none';
 
@@ -14,14 +15,17 @@ export interface StructuredLoggerOptions {
   formats?: LogFormat[];
   labels?: Record<string, string>;
   color?: boolean;
+  verbose?: boolean;
   logfmtWriter?: (line: string) => void;
   jsonWriter?: (line: string) => void;
+  consoleWriter?: (line: string) => void;
 }
 
 export class StructuredLogger {
   private readonly labels: Record<string, string>;
   private readonly sinks: ((event: StructuredLogEvent) => void)[] = [];
   private readonly color: boolean;
+  private readonly verbose: boolean;
   private readonly logfmtEmitter?: (event: StructuredLogEvent) => void;
   private logfmtRegistered = false;
   private journaldSink?: JournaldEmitter;
@@ -31,6 +35,7 @@ export class StructuredLogger {
   constructor(options: StructuredLoggerOptions = {}) {
     this.labels = options.labels ?? {};
     this.color = options.color ?? false;
+    this.verbose = options.verbose ?? false;
     const selectedFormat = selectLogFormat(options.formats);
     const logfmtWriter = options.logfmtWriter ?? defaultLogfmtWriter;
     this.logfmtEmitter = (event: StructuredLogEvent) => {
@@ -60,6 +65,13 @@ export class StructuredLogger {
       this.sinks.push((event) => {
         const writer = options.jsonWriter ?? defaultJsonWriter;
         writer(`${JSON.stringify(buildJsonPayload(event))}\n`);
+      });
+    }
+    if (selectedFormat === 'console') {
+      this.sinks.push((event) => {
+        const writer = options.consoleWriter ?? defaultConsoleWriter;
+        const line = formatConsole(event, { color: this.color, verbose: this.verbose });
+        writer(`${line}\n`);
       });
     }
   }
@@ -120,6 +132,14 @@ function defaultJsonWriter(line: string): void {
   }
 }
 
+function defaultConsoleWriter(line: string): void {
+  try {
+    process.stderr.write(line);
+  } catch {
+    // ignore
+  }
+}
+
 function selectLogFormat(explicit?: LogFormat[]): CandidateFormat {
   const candidates = normalizeFormatPreference(explicit);
   const resolved = candidates.reduce<CandidateFormat | undefined>((current, candidate) => {
@@ -167,7 +187,7 @@ function buildJsonPayload(event: StructuredLogEvent): Record<string, unknown> {
   push('turn', event.turn);
   push('subturn', event.subturn);
   push('tool_kind', event.toolKind);
-  push('tool_provider', event.toolProvider);
+  push('tool_namespace', event.toolNamespace);
   push('tool', event.tool);
   push('headend', event.headendId);
   push('agent', event.agentId);

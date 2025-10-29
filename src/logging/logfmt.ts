@@ -46,11 +46,13 @@ export function formatLogfmt(event: StructuredLogEvent, options: FormatOptions =
   if (event.messageId !== undefined) push('message_id', event.messageId);
   push('remote', event.remoteIdentifier);
   push('tool_kind', event.toolKind);
-  push('tool_provider', event.toolProvider);
+  push('tool_namespace', event.toolNamespace);
   push('tool', event.tool);
   push('headend', event.headendId);
   push('agent', event.agentId);
+  push('agent_path', event.agentPath);
   push('call_path', event.callPath);
+  push('turn_path', event.turnPath);
   push('txn_id', event.txnId);
   push('parent_txn_id', event.parentTxnId);
   push('origin_txn_id', event.originTxnId);

@@ -9,15 +9,15 @@ const TOOL = 'unittest.echo';
 
 class FakeRestProvider extends ToolProvider {
   readonly kind: ToolKind = 'rest';
-  readonly id = 'rest';
+  readonly namespace = 'rest';
   listTools(): MCPTool[] { return [ { name: TOOL, description: 'echo', inputSchema: {} } ]; }
   hasTool(name: string): boolean { return name === TOOL; }
   execute(_name: string, parameters: Record<string, unknown>, _opts?: ToolExecuteOptions): Promise<ToolExecuteResult> {
     const fail = (parameters as { fail?: boolean }).fail === true;
-    if (fail) return Promise.resolve({ ok: false, error: 'fail requested', latencyMs: 5, kind: this.kind, providerId: this.id });
+    if (fail) return Promise.resolve({ ok: false, error: 'fail requested', latencyMs: 5, kind: this.kind, namespace: this.namespace });
     const maybeText = (parameters as { text?: unknown }).text;
     const payload = typeof maybeText === 'string' ? maybeText : 'ok';
-    return Promise.resolve({ ok: true, result: payload, latencyMs: 5, kind: this.kind, providerId: this.id, extras: { rawResponse: payload } });
+    return Promise.resolve({ ok: true, result: payload, latencyMs: 5, kind: this.kind, namespace: this.namespace, extras: { rawResponse: payload } });
   }
 }
 

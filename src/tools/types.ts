@@ -17,6 +17,8 @@ export interface ToolExecuteOptions {
   onChildOpTree?: (tree: SessionNode) => void;
   // Parent op path label (e.g., 1.2). Used to prefix child log entry.path for hierarchical greppability
   parentOpPath?: string;
+  // Parent execution context (turn/subturn) for hierarchical numbering
+  parentContext?: ToolExecutionContext;
 }
 
 export interface ToolExecuteResult {
@@ -25,14 +27,14 @@ export interface ToolExecuteResult {
   error?: string;
   latencyMs: number;
   kind: ToolKind;
-  providerId: string; // e.g., mcp server name, 'rest', 'subagent'
+  namespace: string; // e.g., mcp server namespace, 'rest', 'subagent'
   // Optional extras for providers that produce rich results (e.g., sub-agents)
   extras?: Record<string, unknown>;
 }
 
 export abstract class ToolProvider {
   abstract readonly kind: ToolKind;
-  abstract readonly id: string; // provider instance id (e.g., 'rest', server name)
+  abstract readonly namespace: string; // provider namespace (e.g., 'rest', server namespace)
   abstract listTools(): MCPTool[];
   abstract hasTool(name: string): boolean;
   abstract execute(name: string, parameters: Record<string, unknown>, opts?: ToolExecuteOptions): Promise<ToolExecuteResult>;
@@ -40,7 +42,10 @@ export abstract class ToolProvider {
   async warmup(): Promise<void> { /* default no-op */ }
   getInstructions(): string { return ''; }
   resolveLogProvider(_name: string): string {
-    return this.id;
+    return this.namespace;
+  }
+  resolveToolIdentity(name: string): { namespace: string; tool: string } {
+    return { namespace: this.namespace, tool: name };
   }
 }
 

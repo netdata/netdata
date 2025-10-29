@@ -14,11 +14,13 @@ export interface StructuredLogEvent {
   turn: number;
   subturn: number;
   toolKind?: string;
-  toolProvider?: string;
+  toolNamespace?: string;
   tool?: string;
   headendId?: string;
   agentId?: string;
+  agentPath?: string;
   callPath?: string;
+  turnPath?: string;
   txnId?: string;
   parentTxnId?: string;
   originTxnId?: string;
@@ -62,12 +64,16 @@ export function buildStructuredLogEvent(
   labels.subturn = String(entry.subturn);
   if (typeof entry.toolKind === 'string' && entry.toolKind.length > 0) labels.tool_kind = entry.toolKind;
   if (typeof entry.headendId === 'string' && entry.headendId.length > 0) labels.headend = entry.headendId;
+  if (typeof entry.agentPath === 'string' && entry.agentPath.length > 0) labels.agent_path = entry.agentPath;
+  if (typeof entry.turnPath === 'string' && entry.turnPath.length > 0) labels.turn_path = entry.turnPath;
   if (typeof entry.remoteIdentifier === 'string' && entry.remoteIdentifier.length > 0) {
     labels.remote = entry.remoteIdentifier;
     const parsed = parseRemoteIdentifier(entry.remoteIdentifier, entry.type);
     if (parsed.provider !== undefined) {
       labels.provider = parsed.provider;
-      if (entry.type === 'tool') labels.tool_provider = parsed.provider;
+    }
+    if (parsed.namespace !== undefined) {
+      labels.tool_namespace = parsed.namespace;
     }
     if (parsed.model !== undefined) labels.model = parsed.model;
     if (parsed.tool !== undefined) labels.tool = parsed.tool;
@@ -108,11 +114,13 @@ export function buildStructuredLogEvent(
     turn: entry.turn,
     subturn: entry.subturn,
     toolKind: entry.toolKind,
-    toolProvider: entry.type === 'tool' ? labels.tool_provider : undefined,
+    toolNamespace: entry.type === 'tool' ? labels.tool_namespace : undefined,
     tool: entry.type === 'tool' ? labels.tool : undefined,
     headendId: entry.headendId,
     agentId: entry.agentId,
     callPath: entry.callPath,
+    agentPath: entry.agentPath ?? labels.agent_path,
+    turnPath: entry.turnPath ?? labels.turn_path,
     txnId: entry.txnId,
     parentTxnId: entry.parentTxnId,
     originTxnId: entry.originTxnId,
@@ -127,7 +135,7 @@ export function buildStructuredLogEvent(
 function parseRemoteIdentifier(
   identifier: string,
   type: LogEntry['type'],
-): { provider?: string; model?: string; tool?: string } {
+): { provider?: string; model?: string; tool?: string; namespace?: string } {
   if (type === 'llm') {
     const idx = identifier.indexOf(':');
     if (idx !== -1) {
@@ -137,11 +145,16 @@ function parseRemoteIdentifier(
     }
     return { provider: identifier };
   }
-  const idx = identifier.indexOf(':');
-  if (idx !== -1) {
-    const provider = identifier.slice(0, idx);
-    const tool = identifier.slice(idx + 1);
-    return { provider, model: tool, tool };
+  const parts = identifier.split(':');
+  if (parts.length >= 3) {
+    const [protocol, namespace, ...toolParts] = parts;
+    const tool = toolParts.join(':');
+    const provider = `${protocol}:${namespace}`;
+    return { provider, model: tool, tool, namespace };
+  }
+  if (parts.length === 2) {
+    const [provider, tool] = parts;
+    return { provider, model: tool, tool, namespace: provider };
   }
   return { provider: identifier, tool: identifier };
 }

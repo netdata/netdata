@@ -1,10 +1,18 @@
 import type { AIAgentCallbacks, LogEntry } from './types.js';
 
-import { createStructuredLogger } from './logging/structured-logger.js';
+import { createStructuredLogger, type LogFormat } from './logging/structured-logger.js';
 import { getTelemetryLabels } from './telemetry/index.js';
 
 export function makeTTYLogCallbacks(
-  opts: { color?: boolean; verbose?: boolean; traceLlm?: boolean; traceMcp?: boolean; traceSdk?: boolean },
+  opts: {
+    color?: boolean;
+    verbose?: boolean;
+    traceLlm?: boolean;
+    traceMcp?: boolean;
+    traceSdk?: boolean;
+    serverMode?: boolean;
+    explicitFormat?: string;
+  },
   write?: (s: string) => void
 ): Pick<AIAgentCallbacks, 'onLog'> {
   const logfmtWriter = typeof write === 'function'
@@ -18,8 +26,25 @@ export function makeTTYLogCallbacks(
       };
 
   const baseLabels = { ...getTelemetryLabels() };
+
+  // Determine format based on context
+  let formats: LogFormat[] | undefined;
+
+  if (opts.explicitFormat !== undefined && opts.explicitFormat.length > 0) {
+    // User explicitly requested a format
+    formats = [opts.explicitFormat as LogFormat];
+  } else if (process.stderr.isTTY && opts.serverMode !== true) {
+    // Interactive console mode - use simplified format
+    formats = ['console'];
+  } else {
+    // Server mode or non-TTY - use default selection logic
+    formats = undefined;
+  }
+
   const logger = createStructuredLogger({
+    formats,
     color: opts.color ?? process.stderr.isTTY,
+    verbose: opts.verbose === true,
     logfmtWriter,
     labels: baseLabels,
   });

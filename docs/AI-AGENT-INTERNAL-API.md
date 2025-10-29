@@ -44,8 +44,8 @@ The library performs no direct I/O (no stdout/stderr/file writes). All output, l
 - `LogEntry` – structured logs
   - `severity: 'VRB' | 'WRN' | 'ERR' | 'TRC' | 'THK' | 'FIN'`
   - `direction: 'request' | 'response'`
-  - `type: 'llm' | 'mcp'`
-  - `remoteIdentifier: string`
+  - `type: 'llm' | 'tool'`
+  - `remoteIdentifier: string` – `provider:model` for LLM events, `protocol:namespace:tool` for tool events
   - `message: string`
   - `headendId?: string` – populated when invoked via a headend so consumers can correlate activity with the entry point
 - `AccountingEntry`

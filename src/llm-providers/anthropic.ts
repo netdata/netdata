@@ -72,8 +72,26 @@ export class AnthropicProvider extends BaseLLMProvider {
         msg.providerOptions = Object.keys(nextOptions).length > 0 ? nextOptions : undefined;
       }
 
-      if (extendedMessages.length > 0 && cachingMode !== 'none') {
-        const lastMessage = extendedMessages[extendedMessages.length - 1];
+      const isSystemNotice = (msg: ResponseMessage): boolean => {
+        const content = (msg as { content?: unknown }).content;
+        return typeof content === 'string' && content.trim().startsWith('System notice:');
+      };
+
+      const findCacheTargetIndex = (): number => {
+        // eslint-disable-next-line functional/no-loop-statements
+        for (let i = extendedMessages.length - 1; i >= 0; i -= 1) {
+          const candidate = extendedMessages[i] as ResponseMessage;
+          if (!isSystemNotice(candidate)) {
+            return i;
+          }
+        }
+        return -1;
+      };
+
+      const cacheTargetIndex = cachingMode === 'none' ? -1 : findCacheTargetIndex();
+
+      if (cacheTargetIndex !== -1) {
+        const lastMessage = extendedMessages[cacheTargetIndex];
         const baseOptions: OptionsWithAnthropic = isRecord(lastMessage.providerOptions) ? cloneOptions(lastMessage.providerOptions) : {};
         const existingAnthropic = isRecord(baseOptions.anthropic) ? baseOptions.anthropic : {};
         baseOptions.anthropic = {
@@ -117,17 +135,17 @@ export class AnthropicProvider extends BaseLLMProvider {
     }
   }
 
-  public override shouldAutoEnableReasoningStream(level: ReasoningLevel | undefined, options?: { maxOutputTokens?: number }): boolean {
+  public override shouldAutoEnableReasoningStream(
+    level: ReasoningLevel | undefined,
+    options?: { maxOutputTokens?: number; reasoningActive?: boolean; streamRequested?: boolean }
+  ): boolean {
+    const reasoningActive = options?.reasoningActive === true || level !== undefined;
+    if (!reasoningActive) return false;
+    if (options?.streamRequested === true) return false;
     const maxOutputTokens = options?.maxOutputTokens;
-    if (typeof maxOutputTokens === 'number' && Number.isFinite(maxOutputTokens) && maxOutputTokens >= ANTHROPIC_REASONING_STREAM_TOKEN_THRESHOLD) {
-      return true;
-    }
-    if (level === undefined) return false;
-    const threshold = this.config.reasoningAutoStreamLevel;
-    if (threshold === undefined) return false;
-    const levelIdx = this.getReasoningLevelIndex(level);
-    const thresholdIdx = this.getReasoningLevelIndex(threshold);
-    return levelIdx >= thresholdIdx;
+    if (typeof maxOutputTokens !== 'number' || !Number.isFinite(maxOutputTokens)) return false;
+    if (maxOutputTokens < ANTHROPIC_REASONING_STREAM_TOKEN_THRESHOLD) return false;
+    return true;
   }
 
   protected override shouldForceToolChoice(request: TurnRequest): boolean {

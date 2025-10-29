@@ -64,7 +64,7 @@ export class RestProvider extends ToolProvider {
     return val !== null && typeof val === 'object' && !Array.isArray(val);
   }
 
-  constructor(public readonly id: string, config?: Record<string, RestToolConfig>) { 
+  constructor(public readonly namespace: string, config?: Record<string, RestToolConfig>) { 
     super();
     if (config !== undefined) {
       Object.entries(config).forEach(([name, def]) => { this.tools.set(name, def); });
@@ -80,6 +80,10 @@ export class RestProvider extends ToolProvider {
   }
 
   hasTool(exposed: string): boolean { return this.tools.has(this.internalName(exposed)); }
+
+  override resolveToolIdentity(exposed: string): { namespace: string; tool: string } {
+    return { namespace: this.namespace, tool: this.internalName(exposed) };
+  }
 
   async execute(exposed: string, parameters: Record<string, unknown>, opts?: ToolExecuteOptions): Promise<ToolExecuteResult> {
     const start = Date.now();
@@ -223,10 +227,10 @@ export class RestProvider extends ToolProvider {
     const latency = Date.now() - start;
     
     if (errorMsg !== undefined) {
-      return { ok: false, error: errorMsg, latencyMs: latency, kind: this.kind, providerId: this.id };
+      return { ok: false, error: errorMsg, latencyMs: latency, kind: this.kind, namespace: this.namespace };
     }
     
-    return { ok: true, result, latencyMs: latency, kind: this.kind, providerId: this.id };
+    return { ok: true, result, latencyMs: latency, kind: this.kind, namespace: this.namespace };
   }
 
   private async consumeJsonStream(res: Response, cfg: RestToolConfig, signal?: AbortSignal): Promise<string> {

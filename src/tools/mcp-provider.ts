@@ -31,7 +31,7 @@ export class MCPProvider extends ToolProvider {
   private onLog?: (entry: LogEntry) => void;
   private initConcurrency?: number;
 
-  constructor(public readonly id: string, servers: Record<string, MCPServerConfig>, opts?: { trace?: boolean; verbose?: boolean; requestTimeoutMs?: number; onLog?: (entry: LogEntry) => void; initConcurrency?: number }) {
+  constructor(public readonly namespace: string, servers: Record<string, MCPServerConfig>, opts?: { trace?: boolean; verbose?: boolean; requestTimeoutMs?: number; onLog?: (entry: LogEntry) => void; initConcurrency?: number }) {
     super();
     this.serversConfig = servers;
     this.trace = opts?.trace === true;
@@ -54,10 +54,21 @@ export class MCPProvider extends ToolProvider {
   override resolveLogProvider(name: string): string {
     const mapping = this.toolNameMap.get(name);
     if (mapping !== undefined) {
-      return `${this.id}:${mapping.serverName}`;
+      return `${this.namespace}:${mapping.serverName}`;
     }
     const prefix = name.includes('__') ? name.split('__')[0] : name;
-    return `${this.id}:${prefix}`;
+    return `${this.namespace}:${prefix}`;
+  }
+
+  override resolveToolIdentity(name: string): { namespace: string; tool: string } {
+    const mapping = this.toolNameMap.get(name);
+    if (mapping !== undefined) {
+      const sanitizedNamespace = name.includes('__') ? name.split('__')[0] : this.sanitizeNamespace(mapping.serverName);
+      return { namespace: sanitizedNamespace, tool: mapping.originalName };
+    }
+    const sanitizedNamespace = name.includes('__') ? name.split('__')[0] : this.sanitizeNamespace(name);
+    const tool = name.includes('__') ? name.slice(name.indexOf('__') + 2) : name;
+    return { namespace: sanitizedNamespace, tool };
   }
 
   private sanitizeNamespace(name: string): string {
@@ -360,6 +371,7 @@ export class MCPProvider extends ToolProvider {
     const mapping = this.toolNameMap.get(name);
     if (mapping === undefined) throw new Error(`No server found for tool: ${name}`);
     const { serverName, originalName } = mapping;
+    const sanitizedNamespace = name.includes('__') ? name.split('__')[0] : this.sanitizeNamespace(serverName);
     const client = this.clients.get(serverName);
     if (client === undefined) throw new Error(`MCP server not ready: ${serverName}`);
     const start = Date.now();
@@ -390,7 +402,14 @@ export class MCPProvider extends ToolProvider {
     })();
     const rawJson = (() => { try { return JSON.stringify(res, null, 2); } catch { return undefined; } })();
     const rawReq = (() => { try { return JSON.stringify(parameters, null, 2); } catch { return undefined; } })();
-    return { ok: true, result: text, latencyMs: latency, kind: this.kind, providerId: serverName, extras: { rawResponse: rawJson, rawRequest: rawReq } };
+    return {
+      ok: true,
+      result: text,
+      latencyMs: latency,
+      kind: this.kind,
+      namespace: sanitizedNamespace,
+      extras: { rawResponse: rawJson, rawRequest: rawReq }
+    };
   }
 
   getCombinedInstructions(): string {
