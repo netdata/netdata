@@ -323,6 +323,7 @@ Need a dedicated integration? [Submit a feature request](https://github.com/netd
 | [Active Directory Certificate Service](https://github.com/netdata/netdata/blob/master/src/collectors/windows.plugin/integrations/active_directory_certificate_service.md) | This collector monitors Active Directory Certificate Services statistics. |
 | [Active Directory Federation Service](https://github.com/netdata/netdata/blob/master/src/collectors/windows.plugin/integrations/active_directory_federation_service.md) | This collector monitors Active Directory Federation Services statistics. |
 | [ASP.NET](https://github.com/netdata/netdata/blob/master/src/collectors/windows.plugin/integrations/asp.net.md) | This collector monitors ASP.NET applications. |
+| [Hardware information collected from kernel ring.](https://github.com/netdata/netdata/blob/master/src/collectors/windows.plugin/integrations/hardware_information_collected_from_kernel_ring..md) | This collector monitors cpu temperature on Windows systems. |
 | [Hyper-V](https://github.com/netdata/netdata/blob/master/src/collectors/windows.plugin/integrations/hyper-v.md) | This collector monitors website requests and logins. |
 | [IIS](https://github.com/netdata/netdata/blob/master/src/collectors/windows.plugin/integrations/iis.md) | This collector monitors website requests and logins. |
 | [Memory statistics](https://github.com/netdata/netdata/blob/master/src/collectors/windows.plugin/integrations/memory_statistics.md) | This collector monitors swap and memory pool statistics on Windows systems. |
