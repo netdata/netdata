@@ -744,6 +744,27 @@ endwait:
     return success;
 }
 
+int netdata_select_db(SQLHDBC hdbc, const char* database)
+{
+    SQLHSTMT hstmt;
+    SQLRETURN ret;
+
+    ret = SQLAllocHandle(SQL_HANDLE_STMT, hdbc, &hstmt);
+    if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
+        return -1;
+    }
+
+    char query[512];
+    snprintfz(query, sizeof(query), "USE %s", database);
+    ret = SQLExecDirect(hstmt, (SQLCHAR*)query, SQL_NTS);
+    int result = 0;
+    if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
+        result = -1;
+    }
+    SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
+    return result;
+}
+
 void dict_mssql_fill_replication(struct mssql_db_instance *mdi)
 {
     char publisher[NETDATA_MAX_INSTANCE_OBJECT + 1] = {};
@@ -755,6 +776,10 @@ void dict_mssql_fill_replication(struct mssql_db_instance *mdi)
     SQLLEN publisher_len = 0, publisherdb_len = 0, publication_len = 0, type_len = 0, status_len = 0,
             warning_len = 0, avg_latency_len = 0, retention_len = 0, subscriptioncount_len = 0, runningagentcount_len = 0,
             average_runspeedperf_len = 0;
+
+    if (netdata_select_db(mdi->parent->conn->netdataSQLHDBc, NETDATA_REPLICATION_DB)) {
+        return;
+    }
 
     SQLRETURN ret = SQLExecDirect(mdi->parent->conn->dbReplicationPublisher, (SQLCHAR *)NETDATA_REPLICATION_MONITOR_QUERY, SQL_NTS);
     if (ret != SQL_SUCCESS) {
@@ -882,7 +907,9 @@ void dict_mssql_fill_replication(struct mssql_db_instance *mdi)
         mpp->average_runspeedPerf = average_runspeedPerf;
     } while (true);
 
-    endreplication:
+    (void)netdata_select_db(mdi->parent->conn->netdataSQLHDBc, "master");
+
+endreplication:
     netdata_MSSQL_release_results(mdi->parent->conn->dbReplicationPublisher);
 }
 int dict_mssql_databases_run_queries(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
