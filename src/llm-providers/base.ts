@@ -1063,20 +1063,26 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
   private readonly TOOL_ERROR_TYPE: string = BaseLLMProvider.PART_TOOL_ERROR.replace('_','-');
   
   // Shared streaming utilities
-  protected createTimeoutController(timeoutMs: number): { controller: AbortController; resetIdle: () => void; clearIdle: () => void } {
+  protected createTimeoutController(timeoutMs: number): { controller: AbortController; resetIdle: () => void; clearIdle: () => void; didTimeout: () => boolean } {
     const controller = new AbortController();
     let idleTimer: ReturnType<typeof setTimeout> | undefined;
-    
+    let timedOut = false;
+
     const resetIdle = () => {
       try { if (idleTimer !== undefined) clearTimeout(idleTimer); } catch {}
-      idleTimer = setTimeout(() => { try { controller.abort(); } catch {} }, timeoutMs);
+      timedOut = false;
+      idleTimer = setTimeout(() => {
+        timedOut = true;
+        try { controller.abort(); } catch {}
+      }, timeoutMs);
     };
 
     const clearIdle = () => { 
-      try { if (idleTimer !== undefined) { clearTimeout(idleTimer); idleTimer = undefined; } } catch {} 
+      try { if (idleTimer !== undefined) { clearTimeout(idleTimer); idleTimer = undefined; } } catch {}
+      timedOut = false;
     };
 
-    return { controller, resetIdle, clearIdle };
+    return { controller, resetIdle, clearIdle, didTimeout: () => timedOut };
   }
 
   protected async drainTextStream(stream: StreamTextResult<ToolSet, boolean>): Promise<string> {
@@ -1188,7 +1194,8 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
     startTime: number,
     providerOptions?: unknown
   ): Promise<TurnResult> {
-    const { controller, resetIdle, clearIdle } = this.createTimeoutController(request.llmTimeout ?? 120000);
+    const timeoutMs = request.llmTimeout ?? 600000;
+    const { controller, resetIdle, clearIdle, didTimeout } = this.createTimeoutController(timeoutMs);
     try {
       if (request.abortSignal !== undefined) {
         if (request.abortSignal.aborted) { controller.abort(); }
@@ -1201,7 +1208,6 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
     } catch (e) { try { warn(`fetch finalization failed: ${e instanceof Error ? e.message : String(e)}`); } catch {} }
     
     try {
-      resetIdle();
       let stopReason: string | undefined;
       
       const toolChoiceRequired = request.toolChoiceRequired ?? this.shouldForceToolChoice(request);
@@ -1220,14 +1226,15 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
       });
 
       // Drain both text and reasoning streams with real-time callbacks
+      resetIdle();
       const fullIterator = result.fullStream[Symbol.asyncIterator]();
       let response = '';
       let fullStep = await fullIterator.next();
-      
+
       // eslint-disable-next-line functional/no-loop-statements
       while (fullStep.done !== true) {
         const part = fullStep.value;
-        
+
         if (part.type === 'text-delta') {
           response += part.text;
 
@@ -1435,8 +1442,13 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
         metadata
       );
     } catch (error) {
+      const timedOut = didTimeout();
       clearIdle();
-      return this.createFailureResult(request, this.mapError(error), Date.now() - startTime);
+      let failure = this.mapError(error);
+      if (timedOut) {
+        failure = { type: 'timeout', message: 'Streaming timed out while waiting for the next chunk.' };
+      }
+      return this.createFailureResult(request, failure, Date.now() - startTime);
     }
   }
 
@@ -1450,7 +1462,7 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
   ): Promise<TurnResult> {
     try {
       // Combine external abort signal with a timeout controller
-      const { controller } = this.createTimeoutController(request.llmTimeout ?? 120000);
+      const { controller } = this.createTimeoutController(request.llmTimeout ?? 600000);
       try {
         if (request.abortSignal !== undefined) {
           if (request.abortSignal.aborted) { controller.abort(); }

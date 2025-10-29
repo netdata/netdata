@@ -224,8 +224,8 @@ export function resolveEffectiveOptions(args: {
       const v = readNum('repeatPenalty', (fm as { repeatPenalty?: number } | undefined)?.repeatPenalty, 1.1);
       return Number.isNaN(v) ? undefined : v;
     })(),
-    llmTimeout: readNum('llmTimeout', fm?.llmTimeout, 120000),
-    toolTimeout: readNum('toolTimeout', fm?.toolTimeout, 60000),
+    llmTimeout: readNum('llmTimeout', fm?.llmTimeout, 600000),
+    toolTimeout: readNum('toolTimeout', fm?.toolTimeout, 300000),
     maxRetries: readNum('maxRetries', fm?.maxRetries, 3),
     maxToolTurns: readNum('maxToolTurns', fm?.maxToolTurns, 10),
     maxToolCallsPerTurn: readNum('maxToolCallsPerTurn', (fm as { maxToolCallsPerTurn?: number } | undefined)?.maxToolCallsPerTurn, 10),

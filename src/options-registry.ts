@@ -79,7 +79,7 @@ export const OPTIONS_REGISTRY: OptionDef[] = [
   // Master Defaults
   numDef({
     key: 'llmTimeout',
-    default: 120000,
+    default: 600000,
     description: 'How long to wait (ms) for the LLM to respond before giving up (resets each time a token arrives); default 2 minutes',
     cli: { names: ['--llm-timeout-ms', '--llmTimeoutMs'], showInHelp: true },
     fm: { allowed: true, key: 'llmTimeout' },
@@ -90,8 +90,8 @@ export const OPTIONS_REGISTRY: OptionDef[] = [
   }),
   numDef({
     key: 'toolTimeout',
-    default: 60000,
-    description: 'How long to wait (ms) for each tool call to complete before aborting it; default 1 minute',
+    default: 300000,
+    description: 'How long to wait (ms) for each tool call to complete before aborting it; default 5 minutes',
     cli: { names: ['--tool-timeout-ms', '--toolTimeoutMs'], showInHelp: true },
     fm: { allowed: true, key: 'toolTimeout' },
     config: { path: 'defaults.toolTimeout' },
