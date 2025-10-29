@@ -3319,7 +3319,7 @@ int dict_mssql_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value
         doMSSQL[i](pDataBlock, mi, *update_every);
     }
 
-    do_mssql_replication(mi, update_every);
+    do_mssql_replication(mi, *update_every);
 
     return 1;
 }
