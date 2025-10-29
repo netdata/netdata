@@ -29,6 +29,7 @@ int do_GetSystemRAM(int update_every, usec_t dt);
 int do_GetSystemCPU(int update_every, usec_t dt);
 int do_GetPowerSupply(int update_every, usec_t dt);
 int do_GetServicesStatus(int update_every, usec_t dt);
+int do_GetHardwareInfo(int update_every, usec_t dt);
 int do_GetSensors(int update_every, usec_t dt);
 
 // Perflib
@@ -52,6 +53,7 @@ int do_PerflibASP(int update_every, usec_t dt __maybe_unused);
 
 // Cleanup
 void do_PerflibMSSQL_cleanup();
+void do_GetHardwareInfo_cleanup();
 void do_Sensors_cleanup();
 
 enum PERFLIB_PRIO {
