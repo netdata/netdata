@@ -2762,11 +2762,11 @@ void dict_mssql_replication_dist_agent_running(struct mssql_publisher_publicatio
                 NULL,
                 "replication",
                 "mssql.replication_agent_running",
-                "Distribution agents running."
+                "Distribution agents running.",
                 "agents",
                 PLUGIN_WINDOWS_NAME,
                 "PerflibMSSQL",
-                PRIO_MSSQL_REPLICATION_AGENTS_RUNNING,
+                PRIO_MSSQL_REPLICATION_AGENT_RUNNING,
                 update_every,
                 RRDSET_TYPE_LINE);
 
@@ -2795,11 +2795,11 @@ void dict_mssql_replication_sync_time(struct mssql_publisher_publication *mpp, i
                 NULL,
                 "replication",
                 "mssql.replication_synchronization",
-                "The shortest synchronization."
-                "seconds"
+                "The shortest synchronization.",
+                "seconds",
                 PLUGIN_WINDOWS_NAME,
                 "PerflibMSSQL",
-                PRIO_MSSQL_REPLICATION_AGENTS_RUNNING,
+                PRIO_MSSQL_REPLICATION_SYNC_TIME,
                 update_every,
                 RRDSET_TYPE_LINE);
 
@@ -2824,7 +2824,7 @@ int dict_mssql_replication_chart_cb(const DICTIONARY_ITEM *item __maybe_unused, 
     dict_mssql_replication_avg_latency(mpp, *update_every);
     dict_mssql_replication_subscription(mpp, *update_every);
     dict_mssql_replication_dist_agent_running(mpp, *update_every);
-    dict_mssql_replication_dist_sync_time(mpp, *update_every);
+    dict_mssql_replication_sync_time(mpp, *update_every);
 }
 
 static void do_mssql_replication(struct mssql_instance *mi, int update_every)
