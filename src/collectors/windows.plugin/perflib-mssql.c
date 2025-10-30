@@ -2782,6 +2782,39 @@ void dict_mssql_replication_dist_agent_running(struct mssql_publisher_publicatio
     rrdset_done(mpp->st_running_agent);
 }
 
+void dict_mssql_replication_sync_time(struct mssql_publisher_publication *mpp, int update_every)
+{
+    if (!mpp->st_synchronization_time) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+
+        snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_replication_%s_%s_synchronization", mpp->parent->instanceID, mpp->publication, mpp->db);
+        netdata_fix_chart_name(id);
+        mpp->st_synchronization_time = rrdset_create_localhost(
+                "mssql",
+                id,
+                NULL,
+                "replication",
+                "mssql.replication_synchronization",
+                "The shortest synchronization."
+                "seconds"
+                PLUGIN_WINDOWS_NAME,
+                "PerflibMSSQL",
+                PRIO_MSSQL_REPLICATION_AGENTS_RUNNING,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+        rrdlabels_add(mpp->st_synchronization_time->rrdlabels, "mssql_instance", mpp->parent->instanceID, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(mpp->st_synchronization_time->rrdlabels, "publisher", mpp->publisher, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(mpp->st_synchronization_time->rrdlabels, "database", mpp->db, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(mpp->st_synchronization_time->rrdlabels, "publication", mpp->publication, RRDLABEL_SRC_AUTO);
+
+        mpp->rd_synchronization_time = rrddim_add(mpp->st_synchronization_time, "seconds", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    }
+
+    rrddim_set_by_pointer(mpp->st_synchronization_time, mpp->rd_synchronization_time, (collected_number)mpp->runningdistagentcount);
+    rrdset_done(mpp->st_synchronization_time);
+}
+
 int dict_mssql_replication_chart_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
     struct mssql_publisher_publication *mpp = value;
     int *update_every = data;
@@ -2791,6 +2824,7 @@ int dict_mssql_replication_chart_cb(const DICTIONARY_ITEM *item __maybe_unused, 
     dict_mssql_replication_avg_latency(mpp, *update_every);
     dict_mssql_replication_subscription(mpp, *update_every);
     dict_mssql_replication_dist_agent_running(mpp, *update_every);
+    dict_mssql_replication_dist_sync_time(mpp, *update_every);
 }
 
 static void do_mssql_replication(struct mssql_instance *mi, int update_every)

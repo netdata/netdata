@@ -2592,6 +2592,12 @@ modules:
               chart_type: line
               dimensions:
                 - name: agents
+            - name: mssql.replication_synchronization
+              description: The shortest synchronization.
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: seconds
   - meta:
       plugin_name: windows.plugin
       module_name: PerflibNetFramework
