@@ -2,10 +2,23 @@
 
 ## [**Next release**](https://github.com/netdata/netdata/tree/HEAD)
 
-[Full Changelog](https://github.com/netdata/netdata/compare/v2.7.2...HEAD)
+[Full Changelog](https://github.com/netdata/netdata/compare/v2.7.3...HEAD)
 
 **Merged pull requests:**
 
+- Regenerate integrations docs [\#21234](https://github.com/netdata/netdata/pull/21234) ([netdatabot](https://github.com/netdatabot))
+- docs: improve COLLECTORS.md generation [\#21233](https://github.com/netdata/netdata/pull/21233) ([ilyam8](https://github.com/ilyam8))
+- build\(deps\): bump github.com/prometheus/common from 0.67.1 to 0.67.2 in /src/go [\#21232](https://github.com/netdata/netdata/pull/21232) ([dependabot[bot]](https://github.com/apps/dependabot))
+- build\(deps\): bump go.mongodb.org/mongo-driver from 1.17.4 to 1.17.6 in /src/go [\#21231](https://github.com/netdata/netdata/pull/21231) ([dependabot[bot]](https://github.com/apps/dependabot))
+- Update MCP Registry publishing workflow and migrate server.json to latest schema [\#21230](https://github.com/netdata/netdata/pull/21230) ([ilyam8](https://github.com/ilyam8))
+- Regenerate integrations docs [\#21229](https://github.com/netdata/netdata/pull/21229) ([netdatabot](https://github.com/netdatabot))
+- docs: fix COLLECTORS.md generation [\#21228](https://github.com/netdata/netdata/pull/21228) ([ilyam8](https://github.com/ilyam8))
+- doc: improve COLLECTORS.md generation [\#21225](https://github.com/netdata/netdata/pull/21225) ([ilyam8](https://github.com/ilyam8))
+- docs: improve snmp profile format documentation [\#21223](https://github.com/netdata/netdata/pull/21223) ([ilyam8](https://github.com/ilyam8))
+- Systemd-journal [\#21222](https://github.com/netdata/netdata/pull/21222) ([kanelatechnical](https://github.com/kanelatechnical))
+- active\_journal\_centralization\_guide\_no\_encryption.md [\#21221](https://github.com/netdata/netdata/pull/21221) ([kanelatechnical](https://github.com/kanelatechnical))
+- passive-journal-centralization-without-encryption.md [\#21220](https://github.com/netdata/netdata/pull/21220) ([kanelatechnical](https://github.com/kanelatechnical))
+- Charts [\#21219](https://github.com/netdata/netdata/pull/21219) ([kanelatechnical](https://github.com/kanelatechnical))
 - Monitor Anything [\#21217](https://github.com/netdata/netdata/pull/21217) ([kanelatechnical](https://github.com/kanelatechnical))
 - Dashboards and Charts [\#21216](https://github.com/netdata/netdata/pull/21216) ([kanelatechnical](https://github.com/kanelatechnical))
 - Events Feed [\#21215](https://github.com/netdata/netdata/pull/21215) ([kanelatechnical](https://github.com/kanelatechnical))
@@ -15,11 +28,13 @@
 - build\(deps\): bump github.com/redis/go-redis/v9 from 9.14.1 to 9.16.0 in /src/go [\#21208](https://github.com/netdata/netdata/pull/21208) ([dependabot[bot]](https://github.com/apps/dependabot))
 - Regenerate integrations docs [\#21205](https://github.com/netdata/netdata/pull/21205) ([netdatabot](https://github.com/netdatabot))
 - ibm.d: various fixes [\#21204](https://github.com/netdata/netdata/pull/21204) ([ktsaou](https://github.com/ktsaou))
+- Fix handling of auto updater and data files during native package removal. [\#21203](https://github.com/netdata/netdata/pull/21203) ([Ferroin](https://github.com/Ferroin))
 - Regenerate integrations docs [\#21202](https://github.com/netdata/netdata/pull/21202) ([netdatabot](https://github.com/netdatabot))
 - docs: add SNMP profile format doc [\#21201](https://github.com/netdata/netdata/pull/21201) ([ilyam8](https://github.com/ilyam8))
 - Acquire and release metric as needed during journal v2 migration [\#21200](https://github.com/netdata/netdata/pull/21200) ([stelfrag](https://github.com/stelfrag))
 - fix\(packagin/otel-plugin\): remove cap\_net\_bind\_service [\#21198](https://github.com/netdata/netdata/pull/21198) ([ilyam8](https://github.com/ilyam8))
 - MSSQL Small fixes \(windows.plugin\) [\#21197](https://github.com/netdata/netdata/pull/21197) ([thiagoftsm](https://github.com/thiagoftsm))
+- Make OpenTelemetry plugin a required dependency for native DEB/RPM packages. [\#21194](https://github.com/netdata/netdata/pull/21194) ([Ferroin](https://github.com/Ferroin))
 - Netdata API [\#21193](https://github.com/netdata/netdata/pull/21193) ([kanelatechnical](https://github.com/kanelatechnical))
 - Alerts api summary option [\#21192](https://github.com/netdata/netdata/pull/21192) ([stelfrag](https://github.com/stelfrag))
 - ci: remove update-website.yml workflow [\#21191](https://github.com/netdata/netdata/pull/21191) ([ilyam8](https://github.com/ilyam8))
@@ -134,11 +149,16 @@
 - Add documentation and fallback to /host/ for getting the machine id [\#21044](https://github.com/netdata/netdata/pull/21044) ([vkalintiris](https://github.com/vkalintiris))
 - ai-docs [\#21043](https://github.com/netdata/netdata/pull/21043) ([shyamvalsan](https://github.com/shyamvalsan))
 - Remote MCP support \(streamable http and sse\) [\#21036](https://github.com/netdata/netdata/pull/21036) ([ktsaou](https://github.com/ktsaou))
+- CPU Temperature \(windows.plugin\) [\#20992](https://github.com/netdata/netdata/pull/20992) ([thiagoftsm](https://github.com/thiagoftsm))
 - Add helper to run external commands without additional privileges. [\#20990](https://github.com/netdata/netdata/pull/20990) ([Ferroin](https://github.com/Ferroin))
 - Windows Sensors \(Part II\) [\#20988](https://github.com/netdata/netdata/pull/20988) ([thiagoftsm](https://github.com/thiagoftsm))
 - Clean up handling of compiler flags in our build code. [\#20821](https://github.com/netdata/netdata/pull/20821) ([Ferroin](https://github.com/Ferroin))
 - Use parallelization for LTO processing to reduce build times. [\#20809](https://github.com/netdata/netdata/pull/20809) ([Ferroin](https://github.com/Ferroin))
 - Rework maintenance thread [\#20694](https://github.com/netdata/netdata/pull/20694) ([stelfrag](https://github.com/stelfrag))
+
+## [v2.7.3](https://github.com/netdata/netdata/tree/v2.7.3) (2025-10-28)
+
+[Full Changelog](https://github.com/netdata/netdata/compare/v2.7.2...v2.7.3)
 
 ## [v2.7.2](https://github.com/netdata/netdata/tree/v2.7.2) (2025-10-15)
 
@@ -414,8 +434,6 @@
 - Update LIBBPF [\#20696](https://github.com/netdata/netdata/pull/20696) ([thiagoftsm](https://github.com/thiagoftsm))
 - Fix SSL certificate detection for Rocky Linux and static curl [\#20695](https://github.com/netdata/netdata/pull/20695) ([ktsaou](https://github.com/ktsaou))
 - update otel-collector components deps [\#20693](https://github.com/netdata/netdata/pull/20693) ([ilyam8](https://github.com/ilyam8))
-- Add Oracle Linux 10 to CI and package builds. [\#20684](https://github.com/netdata/netdata/pull/20684) ([Ferroin](https://github.com/Ferroin))
-- Split collection \(Windows.plugin\) [\#20677](https://github.com/netdata/netdata/pull/20677) ([thiagoftsm](https://github.com/thiagoftsm))
 
 ## [v2.6.3](https://github.com/netdata/netdata/tree/v2.6.3) (2025-08-22)
 
@@ -436,20 +454,6 @@
 **Merged pull requests:**
 
 - docs: remove Profiles heading from collapsible section [\#20691](https://github.com/netdata/netdata/pull/20691) ([ilyam8](https://github.com/ilyam8))
-- docs: fix file location in continue setup [\#20690](https://github.com/netdata/netdata/pull/20690) ([ilyam8](https://github.com/ilyam8))
-- docs: update continue ext setup [\#20689](https://github.com/netdata/netdata/pull/20689) ([ilyam8](https://github.com/ilyam8))
-- Fix log message format for buffered reader error [\#20687](https://github.com/netdata/netdata/pull/20687) ([stelfrag](https://github.com/stelfrag))
-- Fix systemd-journal-plugin RPM package. [\#20686](https://github.com/netdata/netdata/pull/20686) ([Ferroin](https://github.com/Ferroin))
-- Remove Fedora 40 from CI and package builds. [\#20685](https://github.com/netdata/netdata/pull/20685) ([Ferroin](https://github.com/Ferroin))
-- Remove Ubuntu 24.10 from CI and package builds. [\#20681](https://github.com/netdata/netdata/pull/20681) ([Ferroin](https://github.com/Ferroin))
-- chore\(charts.d\): suppress broken pipe error from echo during cleanup [\#20680](https://github.com/netdata/netdata/pull/20680) ([ilyam8](https://github.com/ilyam8))
-- Fix deadlock in dictionary cleanup [\#20679](https://github.com/netdata/netdata/pull/20679) ([stelfrag](https://github.com/stelfrag))
-- Agent docs alignement [\#20676](https://github.com/netdata/netdata/pull/20676) ([kanelatechnical](https://github.com/kanelatechnical))
-- Regenerate integrations docs [\#20675](https://github.com/netdata/netdata/pull/20675) ([netdatabot](https://github.com/netdatabot))
-- feat\(go.d/snmp\): enable table metrics by default [\#20674](https://github.com/netdata/netdata/pull/20674) ([ilyam8](https://github.com/ilyam8))
-- Code cleanup [\#20673](https://github.com/netdata/netdata/pull/20673) ([stelfrag](https://github.com/stelfrag))
-- Improve agent shutdown on windows [\#20672](https://github.com/netdata/netdata/pull/20672) ([stelfrag](https://github.com/stelfrag))
-- Escape chars on documentation [\#20671](https://github.com/netdata/netdata/pull/20671) ([Ancairon](https://github.com/Ancairon))
 
 ## [v2.5.4](https://github.com/netdata/netdata/tree/v2.5.4) (2025-06-24)
 
