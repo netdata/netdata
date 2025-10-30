@@ -1299,6 +1299,10 @@ bool journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
                                         Pvoid_t JudyL_metrics, Pvoid_t JudyL_extents_pos,
                                         size_t number_of_extents, size_t number_of_metrics, size_t number_of_pages, void *user_data)
 {
+    // Nothing to migrate if no metrics
+    if (number_of_metrics == 0)
+        return true;
+
     char path[RRDENG_PATH_MAX];
     Pvoid_t *PValue;
     struct rrdengine_instance *ctx = (struct rrdengine_instance *) section;
