@@ -199,6 +199,12 @@ void function_processes(const char *transaction, char *function,
         , CPU_max = 0.0
         , VMSize_max = 0.0
         , RSS_max = 0.0
+#if (PROCESSES_HAVE_SMAPS_ROLLUP == 1)
+        , Estimated_max = 0.0
+        , Pss_max = 0.0
+        , PssAge_max = 0.0
+        , SharedRatio_max = 0.0
+#endif
 #if (PROCESSES_HAVE_VMSHARED == 1)
         , Shared_max = 0.0
 #endif
@@ -387,7 +393,22 @@ void function_processes(const char *transaction, char *function,
             add_value_field_ndd_with_max(wb, Memory, (NETDATA_DOUBLE)p->values[PDF_VMRSS] * 100.0 / (NETDATA_DOUBLE)total_memory_bytes);
 
         add_value_field_ndd_with_max(wb, RSS, (NETDATA_DOUBLE)p->values[PDF_VMRSS] / memory_divisor);
-
+#if (PROCESSES_HAVE_SMAPS_ROLLUP == 1)
+        if(pss_refresh_period > 0) {
+            add_value_field_ndd_with_max(wb, Estimated, (NETDATA_DOUBLE)p->values[PDF_MEM_ESTIMATED] / memory_divisor);
+            add_value_field_ndd_with_max(wb, Pss, (NETDATA_DOUBLE)p->values[PDF_PSS] / memory_divisor);
+            NETDATA_DOUBLE pss_age;
+            if(p->last_pss_iteration == 0)
+                pss_age = NAN;
+            else if(global_iterations_counter >= p->last_pss_iteration)
+                pss_age = (NETDATA_DOUBLE)(global_iterations_counter - p->last_pss_iteration) * update_every;
+            else
+                pss_age = NAN;
+            add_value_field_ndd_with_max(wb, PssAge, pss_age);
+            NETDATA_DOUBLE shared_ratio = p->pss_total_ratio * 100.0;
+            add_value_field_ndd_with_max(wb, SharedRatio, shared_ratio);
+        }
+#endif
 #if (PROCESSES_HAVE_VMSHARED == 1)
         add_value_field_ndd_with_max(wb, Shared, (NETDATA_DOUBLE)p->values[PDF_VMSHARED] / memory_divisor);
 #endif
@@ -614,6 +635,34 @@ void function_processes(const char *transaction, char *function,
                                     2, "MiB", RSS_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
                                     RRDF_FIELD_FILTER_RANGE,
                                     RRDF_FIELD_OPTS_VISIBLE, NULL);
+#if (PROCESSES_HAVE_SMAPS_ROLLUP == 1)
+        if(pss_refresh_period > 0) {
+            buffer_rrdf_table_add_field(wb, field_id++, "Estimated", "Estimated Memory Usage", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+                                        RRDF_FIELD_VISUAL_BAR,
+                                        RRDF_FIELD_TRANSFORM_NUMBER,
+                                        2, "MiB", Estimated_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
+                                        RRDF_FIELD_FILTER_RANGE,
+                                        RRDF_FIELD_OPTS_VISIBLE, NULL);
+            buffer_rrdf_table_add_field(wb, field_id++, "Pss", "Proportional Set Size", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+                                        RRDF_FIELD_VISUAL_BAR,
+                                        RRDF_FIELD_TRANSFORM_NUMBER,
+                                        2, "MiB", Pss_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_SUM,
+                                        RRDF_FIELD_FILTER_RANGE,
+                                        RRDF_FIELD_OPTS_NONE, NULL);
+            buffer_rrdf_table_add_field(wb, field_id++, "PssAge", "Time since last smaps sample", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+                                        RRDF_FIELD_VISUAL_BAR,
+                                        RRDF_FIELD_TRANSFORM_NUMBER,
+                                        2, "s", PssAge_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_MAX,
+                                        RRDF_FIELD_FILTER_RANGE,
+                                        RRDF_FIELD_OPTS_NONE, NULL);
+            buffer_rrdf_table_add_field(wb, field_id++, "SharedRatio", "Shared Memory Ratio", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
+                                        RRDF_FIELD_VISUAL_BAR,
+                                        RRDF_FIELD_TRANSFORM_NUMBER,
+                                        2, "%", SharedRatio_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_MEAN,
+                                        RRDF_FIELD_FILTER_RANGE,
+                                        RRDF_FIELD_OPTS_NONE, NULL);
+        }
+#endif
 #if (PROCESSES_HAVE_VMSHARED == 1)
         buffer_rrdf_table_add_field(wb, field_id++, "Shared", "Shared Pages", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
                                     RRDF_FIELD_VISUAL_BAR, RRDF_FIELD_TRANSFORM_NUMBER, 2,

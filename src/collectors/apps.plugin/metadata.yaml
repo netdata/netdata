@@ -93,6 +93,12 @@ modules:
               dimensions:
                 - name: voluntary
                 - name: involuntary
+            - name: app.estimated_mem_usage
+              description: Apps estimated memory usage (RSS with shared scaling). Requires kernel 4.14+. Enabled by default, disable with --pss 0.
+              unit: MiB
+              chart_type: line
+              dimensions:
+                - name: mem
             - name: app.mem_usage
               description: Apps memory RSS usage
               unit: MiB
@@ -278,6 +284,12 @@ modules:
               dimensions:
                 - name: voluntary
                 - name: involuntary
+            - name: usergroup.estimated_mem_usage
+              description: User Groups estimated memory usage (RSS with shared scaling). Requires kernel 4.14+. Enabled by default, disable with --pss 0.
+              unit: MiB
+              chart_type: area
+              dimensions:
+                - name: mem
             - name: usergroup.mem_usage
               description: User Groups memory RSS usage
               unit: MiB
@@ -461,6 +473,12 @@ modules:
               dimensions:
                 - name: voluntary
                 - name: involuntary
+            - name: user.estimated_mem_usage
+              description: User memory estimated usage (RSS with shared scaling). Requires kernel 4.14+. Enabled by default, disable with --pss 0.
+              unit: MiB
+              chart_type: area
+              dimensions:
+                - name: mem
             - name: user.mem_usage
               description: User memory RSS usage
               unit: MiB

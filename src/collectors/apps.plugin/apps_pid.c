@@ -90,6 +90,11 @@ struct pid_stat *get_or_allocate_pid_entry(pid_t pid) {
 
     p->pid = pid;
     p->values[PDF_PROCESSES] = 1;
+#if (PROCESSES_HAVE_SMAPS_ROLLUP == 1)
+    p->pss_total_ratio = 1.0;
+    p->last_pss_iteration = 0;
+    p->pss_bytes = 0;
+#endif
 
     DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(pids.all_pids.root, p, prev, next);
     simple_hashtable_set_slot_PID(&pids.all_pids.ht, sl, hash, p);
@@ -123,6 +128,9 @@ void del_pid_entry(pid_t pid) {
     }
 
     arl_free(p->status_arl);
+#if (PROCESSES_HAVE_SMAPS_ROLLUP == 1)
+    arl_free(p->smaps_rollup_arl);
+#endif
 
     freez(p->fds_dirname);
     freez(p->stat_filename);
@@ -130,6 +138,9 @@ void del_pid_entry(pid_t pid) {
     freez(p->limits_filename);
     freez(p->io_filename);
     freez(p->cmdline_filename);
+#if (PROCESSES_HAVE_SMAPS_ROLLUP == 1)
+    freez(p->smaps_rollup_filename);
+#endif
 #endif
 
 #if (PROCESSES_HAVE_FDS == 1)
