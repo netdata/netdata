@@ -19,6 +19,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/safewriter"
 	"github.com/netdata/netdata/go/plugins/pkg/ticker"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/confgroup"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/dyncfg"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/functions"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/vnodes"
@@ -45,11 +46,11 @@ func New() *Manager {
 		runningJobs:       newRunningJobsCache(),
 		retryingTasks:     newRetryingTasksCache(),
 
-		started:  make(chan struct{}),
-		api:      netdataapi.New(safewriter.Stdout),
-		addCh:    make(chan confgroup.Config),
-		rmCh:     make(chan confgroup.Config),
-		dyncfgCh: make(chan functions.Function),
+		started:   make(chan struct{}),
+		addCh:     make(chan confgroup.Config),
+		rmCh:      make(chan confgroup.Config),
+		dyncfgCh:  make(chan functions.Function),
+		dyncfgApi: dyncfg.NewResponder(netdataapi.New(safewriter.Stdout)),
 	}
 
 	return mgr
@@ -80,14 +81,16 @@ type Manager struct {
 	retryingTasks     *retryingTasks
 	runningJobs       *runningJobs
 
-	ctx      context.Context
-	started  chan struct{}
-	api      dyncfgAPI
+	ctx     context.Context
+	started chan struct{}
+	//api      dyncfgAPI
 	addCh    chan confgroup.Config
 	rmCh     chan confgroup.Config
 	dyncfgCh chan functions.Function
 
 	waitCfgOnOff string // block processing of discovered configs until "enable"/"disable" is received from Netdata
+
+	dyncfgApi *dyncfg.Responder
 }
 
 func (m *Manager) Run(ctx context.Context, in chan []*confgroup.Group) {
@@ -101,7 +104,7 @@ func (m *Manager) Run(ctx context.Context, in chan []*confgroup.Group) {
 	m.dyncfgVnodeModuleCreate()
 
 	for _, cfg := range m.Vnodes {
-		m.dyncfgVnodeJobCreate(cfg, dyncfgRunning)
+		m.dyncfgVnodeJobCreate(cfg, dyncfg.StatusRunning)
 	}
 
 	for name := range m.Modules {
@@ -175,7 +178,7 @@ func (m *Manager) run() {
 				case strings.HasPrefix(id, m.dyncfgVnodePrefixValue()):
 					m.dyncfgVnodeSeqExec(fn)
 				default:
-					m.dyncfgRespf(fn, 503, "unknown function '%s' (%s).", fn.Name, id)
+					m.dyncfgApi.SendCodef(fn, 503, "unknown function '%s' (%s).", fn.Name, id)
 				}
 			}
 		}
@@ -197,19 +200,19 @@ func (m *Manager) addConfig(cfg confgroup.Config) {
 
 	ecfg, ok := m.exposedConfigs.lookup(cfg)
 	if !ok {
-		scfg.status = dyncfgAccepted
+		scfg.status = dyncfg.StatusAccepted
 		ecfg = scfg
 		m.exposedConfigs.add(ecfg)
 	} else {
 		sp, ep := scfg.cfg.SourceTypePriority(), ecfg.cfg.SourceTypePriority()
-		if ep > sp || (ep == sp && ecfg.status == dyncfgRunning) {
+		if ep > sp || (ep == sp && ecfg.status == dyncfg.StatusRunning) {
 			return
 		}
-		if ecfg.status == dyncfgRunning {
+		if ecfg.status == dyncfg.StatusRunning {
 			m.stopRunningJob(ecfg.cfg.FullName())
 			m.fileStatus.remove(ecfg.cfg)
 		}
-		scfg.status = dyncfgAccepted
+		scfg.status = dyncfg.StatusAccepted
 		m.exposedConfigs.add(scfg) // replace existing exposed
 		ecfg = scfg
 	}
@@ -241,7 +244,7 @@ func (m *Manager) removeConfig(cfg confgroup.Config) {
 	m.stopRunningJob(cfg.FullName())
 	m.fileStatus.remove(cfg)
 
-	if !isStock(cfg) || ecfg.status == dyncfgRunning {
+	if !isStock(cfg) || ecfg.status == dyncfg.StatusRunning {
 		m.dyncfgJobRemove(cfg)
 	}
 }
