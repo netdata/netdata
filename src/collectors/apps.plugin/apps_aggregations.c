@@ -56,7 +56,7 @@ static size_t zero_all_targets(struct target *root) {
     return count;
 }
 
-static inline void aggregate_pid_on_target(struct target *w, struct pid_stat *p, struct target *o) {
+static inline void aggregate_pid_on_target(struct target *w, struct pid_stat *p, struct target *o __maybe_unused) {
     if(unlikely(!p->updated)) {
         // the process is not running
         return;

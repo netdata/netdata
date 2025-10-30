@@ -658,7 +658,7 @@ void function_processes(const char *transaction, char *function,
             buffer_rrdf_table_add_field(wb, field_id++, "SharedRatio", "Shared Memory Ratio", RRDF_FIELD_TYPE_BAR_WITH_INTEGER,
                                         RRDF_FIELD_VISUAL_BAR,
                                         RRDF_FIELD_TRANSFORM_NUMBER,
-                                        2, "%", SharedRatio_max * 100.0, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_MEAN,
+                                        2, "%", SharedRatio_max, RRDF_FIELD_SORT_DESCENDING, NULL, RRDF_FIELD_SUMMARY_MEAN,
                                         RRDF_FIELD_FILTER_RANGE,
                                         RRDF_FIELD_OPTS_NONE, NULL);
         }
