@@ -48,6 +48,12 @@ struct websocket_thread;
 #define WS_MAX_OUTGOING_FRAME_SIZE  (4ULL * 1024 * 1024)  // 4MB max outgoing frame size for browser compatibility
 #define WS_MAX_DECOMPRESSED_SIZE    (200ULL * 1024 * 1024) // 200MB max inbound uncompressed message
 
+// WebSocket timeout constants (in seconds)
+#define WS_PERIODIC_PING_INTERVAL   60   // Send periodic ping every 60 seconds
+#define WS_IDLE_CHECK_INTERVAL      120  // Check if client is idle after 120 seconds
+#define WS_INACTIVITY_TIMEOUT       1800 // Disconnect after 30 minutes (1800 seconds) of inactivity
+#define WS_CLOSING_STATE_TIMEOUT    5    // Force close if stuck in closing state for 5 seconds
+
 // WebSocket frame header structure - used for processing frame headers
 typedef struct websocket_frame_header {
     unsigned char fin:1;

@@ -439,28 +439,28 @@ void websocket_thread(void *ptr) {
                 WS_CLIENT *next = wsc->next; // Save next in case we remove this client
 
                 if(wsc->state == WS_STATE_OPEN) {
-                    // Check if client is idle (no activity for over 120 seconds)
-                    if(now - wsc->last_activity_t > 120) {
+                    // Check if client is idle (no activity for over WS_IDLE_CHECK_INTERVAL seconds)
+                    if(now - wsc->last_activity_t > WS_IDLE_CHECK_INTERVAL) {
                         // Client is idle - send a ping to check if it's still alive
                         worker_is_busy(WORKERS_WEBSOCKET_SEND_PING);
                         websocket_protocol_send_ping(wsc, NULL, 0);
 
-                        // If no activity for over 300 seconds (5 minutes), consider it dead
-                        if(now - wsc->last_activity_t > 300) {
+                        // If no activity for over WS_INACTIVITY_TIMEOUT seconds, consider it dead
+                        if(now - wsc->last_activity_t > WS_INACTIVITY_TIMEOUT) {
                             worker_is_busy(WORKERS_WEBSOCKET_CLIENT_TIMEOUT);
-                            websocket_error(wsc, "Client timed out (no activity for over 5 minutes)");
+                            websocket_error(wsc, "Client timed out (no activity for over %d minutes)", WS_INACTIVITY_TIMEOUT / 60);
                             websocket_protocol_exception(wsc, WS_CLOSE_GOING_AWAY, "Timeout - no activity");
                         }
                     }
-                    // For normal clients, send periodic pings (every 60 seconds)
-                    else if(now - wsc->last_activity_t > 60) {
+                    // For normal clients, send periodic pings (every WS_PERIODIC_PING_INTERVAL seconds)
+                    else if(now - wsc->last_activity_t > WS_PERIODIC_PING_INTERVAL) {
                         worker_is_busy(WORKERS_WEBSOCKET_SEND_PING);
                         websocket_protocol_send_ping(wsc, NULL, 0);
                     }
                 }
                 else if(wsc->state == WS_STATE_CLOSING_SERVER || wsc->state == WS_STATE_CLOSING_CLIENT) {
-                    // If a client is in any CLOSING state for more than 5 seconds, force close it
-                    if(now - wsc->last_activity_t > 5) {
+                    // If a client is in any CLOSING state for more than WS_CLOSING_STATE_TIMEOUT seconds, force close it
+                    if(now - wsc->last_activity_t > WS_CLOSING_STATE_TIMEOUT) {
                         worker_is_busy(WORKERS_WEBSOCKET_CLIENT_STUCK);
                         websocket_error(wsc, "Forcing close (stuck in %s state)",
                                         wsc->state == WS_STATE_CLOSING_SERVER ? "CLOSING_SERVER" : "CLOSING_CLIENT");
