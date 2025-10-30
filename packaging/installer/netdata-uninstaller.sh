@@ -252,6 +252,104 @@ cleanup_data_and_config() {
   rm_dir "${NETDATA_PREFIX}/etc/netdata"
 }
 
+setup_terminal() {
+  TPUT_RESET=""
+  TPUT_YELLOW=""
+  TPUT_WHITE=""
+  TPUT_BGRED=""
+  TPUT_BGGREEN=""
+  TPUT_BOLD=""
+  TPUT_DIM=""
+
+  # Is stderr on the terminal? If not, then fail
+  test -t 2 || return 1
+
+  if command -v tput 1> /dev/null 2>&1; then
+    if [ $(($(tput colors 2> /dev/null))) -ge 8 ]; then
+      # Enable colors
+      TPUT_RESET="$(tput sgr 0)"
+      TPUT_YELLOW="$(tput setaf 3)"
+      TPUT_WHITE="$(tput setaf 7)"
+      TPUT_BGRED="$(tput setab 1)"
+      TPUT_BGGREEN="$(tput setab 2)"
+      TPUT_BOLD="$(tput bold)"
+      TPUT_DIM="$(tput dim)"
+    fi
+  fi
+
+  return 0
+}
+setup_terminal || echo > /dev/null
+
+ESCAPED_PRINT_METHOD=
+if printf "%s " test > /dev/null 2>&1; then
+  ESCAPED_PRINT_METHOD="printfq"
+fi
+escaped_print() {
+  if [ "${ESCAPED_PRINT_METHOD}" = "printfq" ]; then
+    printf "%s " "${@}"
+  else
+    printf "%s" "${*}"
+  fi
+  return 0
+}
+
+run_logfile="/dev/null"
+run() {
+  user="${USER--}"
+  dir="${PWD}"
+
+  if [ "$(id -u)" = "0" ]; then
+    info="[root ${dir}]# "
+    info_console="[${TPUT_DIM}${dir}${TPUT_RESET}]# "
+  else
+    info="[${user} ${dir}]$ "
+    info_console="[${TPUT_DIM}${dir}${TPUT_RESET}]$ "
+  fi
+
+  {
+    printf "%s" "${info}"
+    escaped_print "${@}"
+    printf "%s" " ... "
+  } >> "${run_logfile}"
+
+  printf "%s" "${info_console}${TPUT_BOLD}${TPUT_YELLOW}" >&2
+  escaped_print >&2 "${@}"
+  printf "%s\n" "${TPUT_RESET}" >&2
+
+  "${@}"
+
+  ret=$?
+  if [ ${ret} -ne 0 ]; then
+    printf >&2 "%s FAILED %s\n\n" "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD}" "${TPUT_RESET}"
+    printf >> "${run_logfile}" "FAILED with exit code %s\n" "${ret}"
+    NETDATA_WARNINGS="${NETDATA_WARNINGS}\n  - Command \"${*}\" failed with exit code ${ret}."
+  else
+    printf >&2 "%s OK %s\n\n" "${TPUT_BGGREEN}${TPUT_WHITE}${TPUT_BOLD}" "${TPUT_RESET}"
+    printf >> "${run_logfile}" "OK\n"
+  fi
+
+  return ${ret}
+}
+
+rm_file() {
+  FILE="$1"
+  if [ -f "${FILE}" ]; then
+    if user_input "Do you want to delete this file '$FILE' ? "; then
+      run rm -v "${FILE}"
+    fi
+  fi
+}
+
+rm_dir() {
+  DIR="$1"
+  if [ -n "$DIR" ] && [ -d "$DIR" ]; then
+    if user_input "Do you want to delete this directory '$DIR' ? "; then
+      run rm -v -f -R "${DIR}"
+    fi
+  fi
+}
+
 detect_existing_install
 disable_updater
 
@@ -373,86 +471,6 @@ service() {
 }
 
 # -----------------------------------------------------------------------------
-
-setup_terminal() {
-  TPUT_RESET=""
-  TPUT_YELLOW=""
-  TPUT_WHITE=""
-  TPUT_BGRED=""
-  TPUT_BGGREEN=""
-  TPUT_BOLD=""
-  TPUT_DIM=""
-
-  # Is stderr on the terminal? If not, then fail
-  test -t 2 || return 1
-
-  if command -v tput 1> /dev/null 2>&1; then
-    if [ $(($(tput colors 2> /dev/null))) -ge 8 ]; then
-      # Enable colors
-      TPUT_RESET="$(tput sgr 0)"
-      TPUT_YELLOW="$(tput setaf 3)"
-      TPUT_WHITE="$(tput setaf 7)"
-      TPUT_BGRED="$(tput setab 1)"
-      TPUT_BGGREEN="$(tput setab 2)"
-      TPUT_BOLD="$(tput bold)"
-      TPUT_DIM="$(tput dim)"
-    fi
-  fi
-
-  return 0
-}
-setup_terminal || echo > /dev/null
-
-ESCAPED_PRINT_METHOD=
-if printf "%s " test > /dev/null 2>&1; then
-  ESCAPED_PRINT_METHOD="printfq"
-fi
-escaped_print() {
-  if [ "${ESCAPED_PRINT_METHOD}" = "printfq" ]; then
-    printf "%s " "${@}"
-  else
-    printf "%s" "${*}"
-  fi
-  return 0
-}
-
-run_logfile="/dev/null"
-run() {
-  user="${USER--}"
-  dir="${PWD}"
-
-  if [ "$(id -u)" = "0" ]; then
-    info="[root ${dir}]# "
-    info_console="[${TPUT_DIM}${dir}${TPUT_RESET}]# "
-  else
-    info="[${user} ${dir}]$ "
-    info_console="[${TPUT_DIM}${dir}${TPUT_RESET}]$ "
-  fi
-
-  {
-    printf "%s" "${info}"
-    escaped_print "${@}"
-    printf "%s" " ... "
-  } >> "${run_logfile}"
-
-  printf "%s" "${info_console}${TPUT_BOLD}${TPUT_YELLOW}" >&2
-  escaped_print >&2 "${@}"
-  printf "%s\n" "${TPUT_RESET}" >&2
-
-  "${@}"
-
-  ret=$?
-  if [ ${ret} -ne 0 ]; then
-    printf >&2 "%s FAILED %s\n\n" "${TPUT_BGRED}${TPUT_WHITE}${TPUT_BOLD}" "${TPUT_RESET}"
-    printf >> "${run_logfile}" "FAILED with exit code %s\n" "${ret}"
-    NETDATA_WARNINGS="${NETDATA_WARNINGS}\n  - Command \"${*}\" failed with exit code ${ret}."
-  else
-    printf >&2 "%s OK %s\n\n" "${TPUT_BGGREEN}${TPUT_WHITE}${TPUT_BOLD}" "${TPUT_RESET}"
-    printf >> "${run_logfile}" "OK\n"
-  fi
-
-  return ${ret}
-}
 
 portable_del_group() {
   groupname="${1}"
@@ -619,24 +637,6 @@ quit_msg() {
     fatal "Failed to completely remove Netdata from this system." R0004
   else
     info "Netdata files were successfully removed from your system"
-  fi
-}
-
-rm_file() {
-  FILE="$1"
-  if [ -f "${FILE}" ]; then
-    if user_input "Do you want to delete this file '$FILE' ? "; then
-      run rm -v "${FILE}"
-    fi
-  fi
-}
-
-rm_dir() {
-  DIR="$1"
-  if [ -n "$DIR" ] && [ -d "$DIR" ]; then
-    if user_input "Do you want to delete this directory '$DIR' ? "; then
-      run rm -v -f -R "${DIR}"
-    fi
   fi
 }
 
