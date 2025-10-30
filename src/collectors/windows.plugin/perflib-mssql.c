@@ -2683,12 +2683,46 @@ void dict_mssql_replication_warning(struct mssql_publisher_publication *mpp, int
     rrdset_done(mpp->st_warning);
 }
 
+void dict_mssql_replication_avg_latency(struct mssql_publisher_publication *mpp, int update_every)
+{
+    if (!mpp->st_avg_latency) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+
+        snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_replication_%s_%s_avg_latency", mpp->parent->instanceID, mpp->publication, mpp->db);
+        netdata_fix_chart_name(id);
+        mpp->st_avg_latency = rrdset_create_localhost(
+                "mssql",
+                id,
+                NULL,
+                "replication",
+                "mssql.replication_avg_latency",
+                "Average latency for a transactional publication.",
+                "seconds",
+                PLUGIN_WINDOWS_NAME,
+                "PerflibMSSQL",
+                PRIO_MSSQL_REPLICATION_AVG_LATENCY,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+        rrdlabels_add(mpp->st_avg_latency->rrdlabels, "mssql_instance", mpp->parent->instanceID, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(mpp->st_avg_latency->rrdlabels, "publisher", mpp->publisher, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(mpp->st_avg_latency->rrdlabels, "database", mpp->db, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(mpp->st_avg_latency->rrdlabels, "publication", mpp->publication, RRDLABEL_SRC_AUTO);
+
+        mpp->rd_avg_latency = rrddim_add(mpp->st_avg_latency, "latency", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    }
+
+    rrddim_set_by_pointer(mpp->st_avg_latency, mpp->rd_avg_latency, (collected_number)mpp->avg_latency);
+    rrdset_done(mpp->st_avg_latency);
+}
+
 int dict_mssql_replication_chart_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
     struct mssql_publisher_publication *mpp = value;
     int *update_every = data;
 
     dict_mssql_replication_status(mpp, *update_every);
     dict_mssql_replication_warning(mpp, *update_every);
+    dict_mssql_replication_avg_latency(mpp, *update_every);
 }
 
 static void do_mssql_replication(struct mssql_instance *mi, int update_every)

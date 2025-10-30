@@ -2574,6 +2574,12 @@ modules:
                 - name: low duration
                 - name: fast run speed
                 - name: low run speed
+            - name: mssql.replication_avg_latency
+              description: Average latency for a transactional publication.
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: latency
   - meta:
       plugin_name: windows.plugin
       module_name: PerflibNetFramework
