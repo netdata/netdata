@@ -513,6 +513,8 @@ install -m 755 -d "${RPM_BUILD_ROOT}%{_presetdir}"
 install -m 644 -p "system/systemd/50-%{name}.preset" "${RPM_BUILD_ROOT}%{_presetdir}/50-%{name}.preset"
 install -m 755 -d "${RPM_BUILD_ROOT}%{_systemd_util_dir}/journald@%{name}.conf.d"
 install -m 644 -p "system/systemd/journald@%{name}.conf" "${RPM_BUILD_ROOT}%{_systemd_util_dir}/journald@%{name}.conf.d/%{name}.conf"
+install -m 755 -d "${RPM_BUILD_ROOT}%{_tmpfilesdir}"
+install -m 644 -p "%{__cmake_builddir}/system/systemd/tmpfiles/%{name}.conf" "${RPM_BUILD_ROOT}%{_tmpfilesdir}/%{name}.conf"
 
 %pre
 
@@ -590,6 +592,7 @@ rm -rf "${RPM_BUILD_ROOT}"
 %{_unitdir}/%{name}-updater.service
 %{_presetdir}/50-%{name}.preset
 %{_systemd_util_dir}/journald@%{name}.conf.d/%{name}.conf
+%{_tmpfilesdir}/%{name}.conf
 
 %{_datarootdir}/%{name}/build-info-cmake-cache.gz
 

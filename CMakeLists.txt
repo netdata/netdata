@@ -3312,6 +3312,7 @@ set(libconfigdir_POST "${LIBCONFIG_DIR}")
 set(cachedir_POST "${CACHE_DIR}")
 set(varlibdir_POST "${VARLIB_DIR}")
 set(registrydir_POST "${VARLIB_DIR}/registry")
+set(logdir_POST "${LOG_DIR}")
 set(netdata_user_POST "${NETDATA_USER}")
 set(netdata_group_POST "${NETDATA_USER}")
 
@@ -3474,12 +3475,22 @@ install(FILES
         COMPONENT netdata
         DESTINATION usr/lib/netdata/system/systemd)
 
+configure_file(system/systemd/tmpfiles.conf.in system/systemd/tmpfiles/netdata.conf @ONLY)
+install(FILES
+        ${CMAKE_BINARY_DIR}/system/systemd/tmpfiles/netdata.conf
+        COMPONENT netdata
+        DESTINATION usr/lib/netdata/system/systemd)
+
 
 if(BUILD_FOR_PACKAGING)
         install(FILES
                 ${CMAKE_BINARY_DIR}/system/systemd/netdata.service
                 COMPONENT netdata
                 DESTINATION lib/systemd/system)
+        install(FILES
+                ${CMAKE_BINARY_DIR}/system/systemd/tmpfiles/netdata.conf
+                COMPONENT netdata
+                DESTINATION usr/lib/tmpfiles.d)
         install(DIRECTORY
                 COMPONENT netdata
                 DESTINATION usr/lib/systemd/journald@netdata.conf.d)
