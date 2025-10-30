@@ -2562,6 +2562,18 @@ modules:
                 - name: idle
                 - name: retrying
                 - name: failed
+            - name: mssql.replication_warning
+              description: Maximum threshold warning.
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: expiration
+                - name: latency
+                - name: merge expiration
+                - name: fast duration
+                - name: low duration
+                - name: fast run speed
+                - name: low run speed
   - meta:
       plugin_name: windows.plugin
       module_name: PerflibNetFramework

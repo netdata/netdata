@@ -123,7 +123,13 @@ struct mssql_publisher_publication {
     RRDDIM *rd_publisher_status_failed;
 
     RRDSET *st_warning;
-    RRDDIM *rd_warning;
+    RRDDIM *rd_warning_expiration;
+    RRDDIM *rd_warning_latency;
+    RRDDIM *rd_warning_mergeeexpiration;
+    RRDDIM *rd_warning_mergefastduration;
+    RRDDIM *rd_warning_mergelowduration;
+    RRDDIM *rd_warning_mergefastrunspeed;
+    RRDDIM *rd_warning_mergelowrunspeed;
 
     RRDSET *st_avg_latency;
     RRDDIM *rd_avg_latency;
@@ -2631,11 +2637,58 @@ void dict_mssql_replication_status(struct mssql_publisher_publication *mpp, int 
     rrdset_done(mpp->st_publisher_status);
 }
 
+void dict_mssql_replication_warning(struct mssql_publisher_publication *mpp, int update_every)
+{
+    if (!mpp->st_warning) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+
+        snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_replication_%s_%s_warning", mpp->parent->instanceID, mpp->publication, mpp->db);
+        netdata_fix_chart_name(id);
+        mpp->st_warning = rrdset_create_localhost(
+                "mssql",
+                id,
+                NULL,
+                "replication",
+                "mssql.replication_warning",
+                "Maximum threshold warning.",
+                "status",
+                PLUGIN_WINDOWS_NAME,
+                "PerflibMSSQL",
+                PRIO_MSSQL_REPLICATION_WARNING,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+        rrdlabels_add(mpp->st_warning->rrdlabels, "mssql_instance", mpp->parent->instanceID, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(mpp->st_warning->rrdlabels, "publisher", mpp->publisher, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(mpp->st_warning->rrdlabels, "database", mpp->db, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(mpp->st_warning->rrdlabels, "publication", mpp->publication, RRDLABEL_SRC_AUTO);
+
+        mpp->rd_warning_expiration = rrddim_add(mpp->st_warning, "expiration", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        mpp->rd_warning_latency = rrddim_add(mpp->st_warning, "latency", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        mpp->rd_warning_mergeeexpiration = rrddim_add(mpp->st_warning, "merge expiration", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        mpp->rd_warning_mergefastduration = rrddim_add(mpp->st_warning, "fast duration", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        mpp->rd_warning_mergelowduration = rrddim_add(mpp->st_warning, "low duration", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        mpp->rd_warning_mergefastrunspeed = rrddim_add(mpp->st_warning, "fast run speed", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        mpp->rd_warning_mergelowrunspeed = rrddim_add(mpp->st_warning, "low run speed", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    }
+
+    int warning = mpp->warning;
+    rrddim_set_by_pointer(mpp->st_warning, mpp->rd_warning_expiration, (collected_number)(warning & MSSQL_REPLICATON_EXPIRATION));
+    rrddim_set_by_pointer(mpp->st_warning, mpp->rd_warning_latency, (collected_number)(warning & MSSQL_REPLICATON_LATENCY));
+    rrddim_set_by_pointer(mpp->st_warning, mpp->rd_warning_mergeeexpiration, (collected_number)(warning & MSSQL_REPLICATON_MERGEEXPIRATION));
+    rrddim_set_by_pointer(mpp->st_warning, mpp->rd_warning_mergefastduration, (collected_number)(warning & MSSQL_REPLICATON_MERGEFASTDURATION));
+    rrddim_set_by_pointer(mpp->st_warning, mpp->rd_warning_mergelowduration, (collected_number)(warning & MSSQL_REPLICATON_MERGELOWDURATION));
+    rrddim_set_by_pointer(mpp->st_warning, mpp->rd_warning_mergefastrunspeed, (collected_number)(warning & MSSQL_REPLICATON_MERGEFASTUNSPEED));
+    rrddim_set_by_pointer(mpp->st_warning, mpp->rd_warning_mergelowrunspeed, (collected_number)(warning & MSSQL_REPLICATON_MERGELOWUNSPEED));
+    rrdset_done(mpp->st_warning);
+}
+
 int dict_mssql_replication_chart_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
     struct mssql_publisher_publication *mpp = value;
     int *update_every = data;
 
     dict_mssql_replication_status(mpp, *update_every);
+    dict_mssql_replication_warning(mpp, *update_every);
 }
 
 static void do_mssql_replication(struct mssql_instance *mi, int update_every)
