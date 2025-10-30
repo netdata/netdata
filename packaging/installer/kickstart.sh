@@ -1551,12 +1551,40 @@ check_special_native_deps() {
   fi
 }
 
-cleanup_apt_cache() {
-    cache_dir="/var/cache/apt/archives"
+cleanup_apt_state() {
+  cache_dir="/var/cache/apt/archives"
 
-    if [ -d "${cache_dir}" ]; then
-        run_as_root find "${cache_dir}" -type f -name 'netdata*.deb' -delete
+  if [ -d "${cache_dir}" ]; then
+      run_as_root find "${cache_dir}" -type f -name 'netdata*.deb' -delete
+  fi
+
+  for p in netdata-repo netdata-repo-edge; do
+    if pkg_installed "${p}" ; then
+      warning "Detected already installed repository configuration ${p}, attempting to remove it."
+      # shellcheck disable=SC2086
+      run_as_root env ${env} ${pm_cmd} ${uninstall_subcmd} ${pkg_install_opts} "${p}"
     fi
+  done
+}
+
+cleanup_dnf_state() {
+  for p in "" "-edge"; do
+    if pkg_installed "netdata-repo${p}"; then
+      warning "Detected already installed repository configuration netdata-repo${p}, attempting to remove it."
+      run_as_root "${pm_cmd}" clean all --disablerepo "*" --enablerepo "netdata${p}"
+      run_as_root "${pm_cmd}" "${uninstall_subcmd}" -y "netdata-repo${p}"
+    fi
+  done
+}
+
+cleanup_zypper_state() {
+  for p in netdata-repo netdata-repo-edge; do
+    if pkg_installed "${p}" ; then
+      warning "Detected already installed repository configuration ${p}, attempting to remove it."
+      # shellcheck disable=SC2086
+      run_as_root env ${env} ${pm_cmd} ${uninstall_subcmd} ${pkg_install_opts} "${p}"
+    fi
+  done
 }
 
 common_rpm_opts() {
@@ -1573,10 +1601,10 @@ common_dnf_opts() {
   fi
   if command -v dnf > /dev/null; then
     pm_cmd="dnf"
-    repo_subcmd="makecache"
   else
     pm_cmd="yum"
   fi
+  repo_subcmd="makecache"
   install_subcmd="install"
   pkg_install_opts="${interactive_opts}"
   repo_update_opts="${interactive_opts}"
@@ -1615,6 +1643,10 @@ try_package_install() {
   interactive_opts=""
   env=""
 
+  if [ -n "${SKIP_DISTRO_DETECTION}" ]; then
+    warning "Attempting to use native packages with a distro override. This is not officially supported, but may work in some cases. If your system requires a distro override to use native packages, please open a feature request at ${AGENT_BUG_REPORT_URL} about it so that we can update the installer to auto-detect this."
+  fi
+
   case "${DISTRO_COMPAT_NAME}" in
     debian|ubuntu)
       if [ "${INTERACTIVE}" = "0" ]; then
@@ -1625,7 +1657,6 @@ try_package_install() {
         install_subcmd="install"
       fi
       needs_early_refresh=1
-      needs_apt_cache_cleanup=1
       pm_cmd="apt-get"
       repo_subcmd="update"
       pkg_type="deb"
@@ -1676,10 +1707,6 @@ try_package_install() {
       ;;
   esac
 
-  if [ -n "${SKIP_DISTRO_DETECTION}" ]; then
-    warning "Attempting to use native packages with a distro override. This is not officially supported, but may work in some cases. If your system requires a distro override to use native packages, please open an feature request at ${AGENT_BUG_REPORT_URL} about it so that we can update the installer to auto-detect this."
-  fi
-
   if [ -n "${INSTALL_VERSION}" ]; then
     if echo "${INSTALL_VERSION}" | grep -q "nightly"; then
       new_release="-edge"
@@ -1709,47 +1736,46 @@ try_package_install() {
       ;;
   esac
 
-  if ! pkg_installed "${repoconfig_name}"; then
-    progress "Checking for availability of repository configuration package."
-    if ! check_for_remote_file "${ref_check_url}"; then
-      NETDATA_ASSUME_REMOTE_FILES_ARE_PRESENT=1
-    fi
+  progress "Checking for availability of repository configuration package."
+  if ! check_for_remote_file "${ref_check_url}"; then
+    NETDATA_ASSUME_REMOTE_FILES_ARE_PRESENT=1
+  fi
 
-    if ! check_for_remote_file "${repoconfig_url}"; then
-      warning "No repository configuration package available for ${DISTRO} ${SYSVERSION}. Cannot install native packages on this system."
-      return 2
-    fi
+  if ! check_for_remote_file "${repoconfig_url}"; then
+    warning "No repository configuration package available for ${DISTRO} ${SYSVERSION}. Cannot install native packages on this system."
+    return 2
+  fi
 
-    if ! download "${repoconfig_url}" "${tmpdir}/${repoconfig_file}"; then
-      fatal "Failed to download repository configuration package. ${BADNET_MSG}." F0209
-    fi
+  if ! download "${repoconfig_url}" "${tmpdir}/${repoconfig_file}"; then
+    fatal "Failed to download repository configuration package. ${BADNET_MSG}." F0209
+  fi
 
-    if [ -n "${needs_early_refresh}" ]; then
-      # shellcheck disable=SC2086
-      if ! run_as_root env ${env} ${pm_cmd} ${repo_subcmd} ${repo_update_opts}; then
-        warning "${failed_refresh_msg}"
-        return 2
-      fi
+  case "${pm_cmd}" in
+    apt-get) cleanup_apt_state ;;
+    yum|dnf) cleanup_dnf_state ;;
+    zypper) cleanup_zypper_state ;;
+    *) warning "I don’t know how to clean up package manager state for ${pm_cmd}. Please report this as a bug at ${AGENT_BUG_REPORT_URL}."
+  esac
 
-      if [ -n "${needs_apt_cache_cleanup}" ]; then
-        cleanup_apt_cache
-      fi
-    fi
-
+  if [ -n "${needs_early_refresh}" ]; then
     # shellcheck disable=SC2086
-    if ! run_as_root env ${env} ${pm_cmd} ${install_subcmd} ${pkg_install_opts} "${tmpdir}/${repoconfig_file}"; then
-      warning "Failed to install repository configuration package."
+    if ! run_as_root env ${env} ${pm_cmd} ${repo_subcmd} ${repo_update_opts}; then
+      warning "${failed_refresh_msg}"
       return 2
     fi
+  fi
 
-    if [ -n "${repo_subcmd}" ]; then
-      # shellcheck disable=SC2086
-      if ! run_as_root env ${env} ${pm_cmd} ${repo_subcmd} ${repo_update_opts}; then
-        fatal "${failed_refresh_msg} In most cases, disabling any third-party repositories on the system and re-running the installer with the same options should work. If that does not work, consider using a static build with the --static-only option instead of native packages." F0205
-      fi
+  # shellcheck disable=SC2086
+  if ! run_as_root env ${env} ${pm_cmd} ${install_subcmd} ${pkg_install_opts} "${tmpdir}/${repoconfig_file}"; then
+    warning "Failed to install repository configuration package."
+    return 2
+  fi
+
+  if [ -n "${repo_subcmd}" ]; then
+    # shellcheck disable=SC2086
+    if ! run_as_root env ${env} ${pm_cmd} ${repo_subcmd} ${repo_update_opts}; then
+      fatal "${failed_refresh_msg} In most cases, disabling any third-party repositories on the system and re-running the installer with the same options should work. If that does not work, consider using a static build with the --static-only option instead of native packages." F0205
     fi
-  else
-    progress "Repository configuration is already present, attempting to install netdata."
   fi
 
   if [ "${ACTION}" = "repositories-only" ]; then
