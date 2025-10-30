@@ -95,7 +95,8 @@ func (m *Manager) Run(ctx context.Context, in chan []*confgroup.Group) {
 	defer func() { m.cleanup(); m.Info("instance is stopped") }()
 	m.ctx = ctx
 
-	m.FnReg.Register("config", m.dyncfgConfig)
+	m.FnReg.RegisterPrefix("config", m.dyncfgCollectorPrefixValue(), m.dyncfgConfig)
+	m.FnReg.RegisterPrefix("config", m.dyncfgVnodePrefixValue(), m.dyncfgConfig)
 
 	m.dyncfgVnodeModuleCreate()
 
@@ -284,7 +285,8 @@ func (m *Manager) stopRunningJob(name string) {
 }
 
 func (m *Manager) cleanup() {
-	m.FnReg.Unregister("config")
+	m.FnReg.UnregisterPrefix("config", m.dyncfgCollectorPrefixValue())
+	m.FnReg.UnregisterPrefix("config", m.dyncfgVnodePrefixValue())
 
 	m.runningJobs.lock()
 	defer m.runningJobs.unlock()

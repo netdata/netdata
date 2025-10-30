@@ -344,8 +344,8 @@ jobs:
             && needs.file-check.outputs.run == 'true'
           }}
 
-  windows-build: # Test building on Windows
-    name: Test building on Windows
+  windows-build: # Build on Windows
+    name: Build Windows
     runs-on: windows-latest
     needs:
       - file-check
@@ -389,7 +389,7 @@ jobs:
           trusted-signing-account-name: Netdata
           certificate-profile-name: Netdata
           files-folder: ${{ github.workspace }}\build
-          files-folder-filter: exe,dll
+          files-folder-filter: exe,dll,sys
           files-folder-recurse: true
           file-digest: SHA256
           timestamp-rfc3161: "http://timestamp.acs.microsoft.com"

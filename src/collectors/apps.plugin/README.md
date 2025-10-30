@@ -18,6 +18,24 @@
 This is particularly valuable for scenarios where processes spawn numerous short-lived subprocesses, such as shell scripts that fork hundreds or thousands of times per second.
 Even though these subprocesses may have a brief lifespan, `apps.plugin` effectively aggregates their resource utilization, providing a comprehensive overview of how resources are shared among all processes within the system.
 
+## PSS Memory Estimation
+
+On Linux systems with kernel 4.14 or later, `apps.plugin` uses Proportional Set Size (PSS) data to provide more accurate memory usage estimates for processes that use shared memory.
+
+PSS is an expensive kernel operation that requires scanning all shared memory segments of a process to determine which memory pages are shared with other processes, and then proportionally dividing the shared memory among them to calculate each process's actual memory footprint. Since PSS for any process can change due to actions by other processes (such as mapping or unmapping the same files, or processes exiting), maintaining accurate real-time PSS data for all processes would be prohibitively expensive.
+
+To balance accuracy with performance, `apps.plugin` uses a **ratio-based estimation approach**: it periodically samples PSS values to calculate a PSS/RSS ratio for each process, then applies this cached ratio to the current RSS values **every second** to estimate memory usage. This means that estimated memory values are updated every second based on current RSS, while the ratio itself is recalibrated adaptively based on process priority.
+
+The plugin implements an **adaptive sampling strategy** designed to prioritize the largest memory consumers and processes with significant memory changes, refreshing them within seconds of detection, while guaranteeing that all processes are eventually sampled within **twice the configured interval** (10 minutes by default for a 5-minute interval). The plugin alternates between two complementary prioritization strategies each iteration:
+
+1. **Delta-Based Strategy**: Prioritizes processes with the largest changes in shared memory, ensuring rapid detection and response to memory growth. Large memory consumers (databases, cache servers, etc.) are typically refreshed within seconds when their memory footprint changes significantly.
+
+2. **Age-Based Strategy**: Prioritizes processes that haven't been sampled longest, ensuring eventual consistency for all processes. Even the smallest processes are guaranteed to be refreshed within twice the configured interval.
+
+Both strategies sort candidates by priority and refresh the top N processes within the configured budget each iteration. By alternating between these strategies, the plugin ensures responsive tracking of significant memory changes while maintaining bounded staleness for all processes.
+
+Additionally, on the first iteration after startup, the plugin samples all processes to establish accurate initial estimates before switching to the adaptive sampling strategy.
+
 ## Charts
 
 `apps.plugin` offers a set of charts for three groups within the **System->Processes** section of the Netdata dashboard: **Apps**, **Users**, and **Groups**.
@@ -28,6 +46,8 @@ Each of these sections presents the same number of charts:
     - Total CPU usage
     - User/system CPU usage
 - Memory
+    - Estimated Memory Usage (RSS with PSS scaling, default on Linux 4.14+)
+    - Memory RSS Usage
     - Real Memory Used (non-shared)
     - Virtual Memory Allocated
     - Minor page faults (i.e. memory activity)
@@ -250,6 +270,46 @@ For example, to disable user and user group charts you would set:
 [plugin:apps]
   command options = without-users without-groups
 ```
+
+### Memory Estimation with PSS Sampling
+
+On Linux systems with kernel 4.14 or later, `apps.plugin` uses Proportional Set Size (PSS) data from `/proc/<pid>/smaps_rollup` to provide more accurate memory usage estimates for processes that heavily use shared memory (e.g., databases, shared memory applications).
+
+**By default, PSS sampling is enabled with a 5-minute refresh interval.** This provides better accuracy than raw RSS (Resident Set Size), which can overstate memory usage for processes sharing memory pages. The plugin periodically samples PSS values and uses them to scale the shared memory portion of RSS, providing a more accurate estimate without the overhead of reading smaps on every iteration.
+
+#### Configuration
+
+The `--pss` option controls PSS sampling behavior:
+
+```text
+[plugin:apps]
+  command options = --pss 5m
+```
+
+**Valid values:**
+- Duration (e.g., `5m`, `300s`, `10m`): Sets the refresh interval for PSS sampling. Lower values provide more accurate estimates but increase CPU overhead.
+- `off` or `0`: Completely disables PSS sampling. Memory charts will show traditional RSS-based measurements.
+
+**Default:** `5m` (5 minutes)
+
+**How it works:**
+- `apps.plugin` uses adaptive sampling that alternates between two strategies each iteration:
+  - **Delta-based**: Prioritizes processes with largest shared memory changes (refreshes big memory consumers within seconds)
+  - **Age-based**: Prioritizes processes with oldest samples (ensures all processes refreshed within 2× the interval)
+- The sampled PSS/RSS ratio is cached and applied to subsequent RSS readings to estimate current memory usage
+- This approach ensures rapid response to significant memory changes while guaranteeing bounded staleness for all processes
+- When disabled (`--pss 0` or `--pss off`), no PSS sampling occurs and estimated memory charts are not shown
+
+**Performance considerations:**
+- Reading `/proc/<pid>/smaps_rollup` is more expensive than reading `/proc/<pid>/status`
+- Shorter refresh periods provide more accurate estimates but increase CPU usage
+- On systems with thousands of processes, consider increasing the refresh period (e.g., `10m` or `15m`)
+- For systems without significant shared memory usage, disabling PSS sampling (`--pss off`) reduces overhead
+
+**Chart behavior:**
+- **Default (PSS enabled):** Shows both "Estimated memory usage (RSS with shared scaling)" and "Memory RSS usage" charts
+- **When disabled (`--pss 0`):** Shows only "Memory RSS usage" charts
+- The `processes` function API exposes additional columns (PSS, PssAge, SharedRatio) when PSS is enabled
 
 ### Integration with eBPF
 

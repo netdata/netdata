@@ -5,6 +5,7 @@ package functions
 import (
 	"bufio"
 	"context"
+	"fmt"
 	"sort"
 	"strings"
 	"testing"
@@ -68,6 +69,162 @@ func TestManager_Register(t *testing.T) {
 			var got []string
 			for name := range mgr.FunctionRegistry {
 				got = append(got, name)
+			}
+			sort.Strings(got)
+			sort.Strings(test.expected)
+
+			assert.Equal(t, test.expected, got)
+		})
+	}
+}
+
+func TestManager_RegisterPrefix(t *testing.T) {
+	type inputFn struct {
+		name    string
+		prefix  string
+		invalid bool
+	}
+
+	tests := map[string]struct {
+		input    []inputFn
+		expected []string // flattened as "name:prefix"
+	}{
+		"valid registration (two prefixes under same name)": {
+			input: []inputFn{
+				{name: "config", prefix: "collector:"},
+				{name: "config", prefix: "vnode:"},
+			},
+			expected: []string{"config:collector:", "config:vnode:"},
+		},
+		"registration with duplicates (same name+prefix)": {
+			input: []inputFn{
+				{name: "config", prefix: "collector:"},
+				{name: "config", prefix: "collector:"}, // duplicate should overwrite, not duplicate
+				{name: "config", prefix: "vnode:"},
+			},
+			expected: []string{"config:collector:", "config:vnode:"},
+		},
+		"registration across multiple names": {
+			input: []inputFn{
+				{name: "config", prefix: "collector:"},
+				{name: "status", prefix: "node:"},
+			},
+			expected: []string{"config:collector:", "status:node:"},
+		},
+		"registration with nil functions is ignored": {
+			input: []inputFn{
+				{name: "config", prefix: "collector:"},
+				{name: "config", prefix: "vnode:", invalid: true}, // nil fn -> ignored
+			},
+			expected: []string{"config:collector:"},
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			mgr := NewManager()
+
+			for _, v := range test.input {
+				if v.invalid {
+					mgr.RegisterPrefix(v.name, v.prefix, nil)
+				} else {
+					mgr.RegisterPrefix(v.name, v.prefix, func(Function) {})
+				}
+			}
+
+			var got []string
+			for fname, fs := range mgr.FunctionRegistry {
+				if fs == nil || len(fs.prefixes) == 0 {
+					continue
+				}
+				for p := range fs.prefixes {
+					got = append(got, fmt.Sprintf("%s:%s", fname, p))
+				}
+			}
+			sort.Strings(got)
+			sort.Strings(test.expected)
+
+			assert.Equal(t, test.expected, got)
+		})
+	}
+}
+
+func TestManager_UnregisterPrefix(t *testing.T) {
+	type regFn struct {
+		name   string
+		prefix string
+	}
+	type unregFn struct {
+		name   string
+		prefix string
+	}
+
+	tests := map[string]struct {
+		register []regFn
+		unreg    []unregFn
+		expected []string // flattened as "name:prefix"
+	}{
+		"remove one of multiple prefixes keeps the other": {
+			register: []regFn{
+				{name: "config", prefix: "collector:"},
+				{name: "config", prefix: "vnode:"},
+			},
+			unreg: []unregFn{
+				{name: "config", prefix: "collector:"},
+			},
+			expected: []string{"config:vnode:"},
+		},
+		"remove last prefix deletes the name entry": {
+			register: []regFn{
+				{name: "config", prefix: "collector:"},
+			},
+			unreg: []unregFn{
+				{name: "config", prefix: "collector:"},
+			},
+			expected: nil,
+		},
+		"unregister non-existing prefix is a no-op": {
+			register: []regFn{
+				{name: "config", prefix: "collector:"},
+			},
+			unreg: []unregFn{
+				{name: "config", prefix: "vnode:"}, // doesn't exist
+			},
+			expected: []string{"config:collector:"},
+		},
+		"unregister on unknown name is a no-op": {
+			register: []regFn{
+				{name: "config", prefix: "collector:"},
+			},
+			unreg: []unregFn{
+				{name: "status", prefix: "node:"}, // name not present
+			},
+			expected: []string{"config:collector:"},
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			mgr := NewManager()
+
+			// initial registrations
+			for _, r := range test.register {
+				mgr.RegisterPrefix(r.name, r.prefix, func(Function) {})
+			}
+
+			// perform unregistrations
+			for _, u := range test.unreg {
+				mgr.UnregisterPrefix(u.name, u.prefix)
+			}
+
+			var got []string
+			for fname, fs := range mgr.FunctionRegistry {
+				if fs == nil || len(fs.prefixes) == 0 {
+					continue
+				}
+				for p := range fs.prefixes {
+					got = append(got, fmt.Sprintf("%s:%s", fname, p))
+				}
 			}
 			sort.Strings(got)
 			sort.Strings(test.expected)
