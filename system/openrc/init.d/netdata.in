@@ -17,7 +17,7 @@ command_args_foreground="-D"
 
 depend() {
     use logger
-    need net
+    need net systemd-tmpfiles-setup
     after apache2 squid nginx mysql named opensips upsd hostapd postfix lm_sensors
 }
 

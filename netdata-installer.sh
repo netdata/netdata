@@ -765,20 +765,26 @@ run find "${NETDATA_WEB_DIR}" -type d -exec chmod 0775 {} \;
 
 # --- data dirs ----
 
-for x in "${NETDATA_LIB_DIR}" "${NETDATA_CACHE_DIR}" "${NETDATA_LOG_DIR}"; do
-  if [ ! -d "${x}" ]; then
-    echo >&2 "Creating directory '${x}'"
-    if ! run mkdir -p "${x}"; then
-      warning "Failed to create ${x}, it must be created by hand or the Netdata Agent will not be able to be started."
+install_netdata_tmpfiles || run_failed "Cannot install netdata tmpfiles.d configuration."
+
+if command -v systemd-tmpfiles >/dev/null 2>&1 && [ -f /usr/lib/tmpfiles.d/netdata.conf ]; then
+  run systemd-tmpfiles --create /usr/lib/tmpfiles.d/netdata.conf
+else
+  for x in "${NETDATA_LIB_DIR}" "${NETDATA_CACHE_DIR}" "${NETDATA_LOG_DIR}"; do
+    if [ ! -d "${x}" ]; then
+      echo >&2 "Creating directory '${x}'"
+      if ! run mkdir -p "${x}"; then
+        warning "Failed to create ${x}, it must be created by hand or the Netdata Agent will not be able to be started."
+      fi
     fi
-  fi
 
-  run chown -R "${NETDATA_USER}:${NETDATA_GROUP}" "${x}"
-  #run find "${x}" -type f -exec chmod 0660 {} \;
-  #run find "${x}" -type d -exec chmod 0770 {} \;
-done
+    run chown -R "${NETDATA_USER}:${NETDATA_GROUP}" "${x}"
+    #run find "${x}" -type f -exec chmod 0660 {} \;
+    #run find "${x}" -type d -exec chmod 0770 {} \;
+  done
 
-run chmod 755 "${NETDATA_LOG_DIR}"
+  run chmod 755 "${NETDATA_LOG_DIR}"
+fi
 
 # --- claiming dir ----
 

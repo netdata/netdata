@@ -3,8 +3,8 @@
 Description=Netdata, X-Ray Vision for your infrastructure!
 
 # append here other services you want netdata to wait for them to start
-After=network.target network-online.target nss-lookup.target
-Wants=network-online.target nss-lookup.target
+After=systemd-tmpfiles-setup.service network.target network-online.target nss-lookup.target
+Wants=systemd-tmpfiles-setup.service network-online.target nss-lookup.target
 
 [Service]
 LogNamespace=netdata
