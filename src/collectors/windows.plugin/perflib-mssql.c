@@ -1163,9 +1163,10 @@ void metdata_mssql_fill_dictionary_from_db(struct mssql_instance *mi)
         mdi->updated = 0;
         if (!mdi->parent) {
             mdi->parent = mi;
-            if (mi->conn || !strncmp(dbname, NETDATA_REPLICATION_DB, sizeof(NETDATA_REPLICATION_DB)- 1)) {
-                mdi->running_replication = true;
-            }
+        }
+
+        if (mi->conn || !strncmp(dbname, NETDATA_REPLICATION_DB, sizeof(NETDATA_REPLICATION_DB)- 1)) {
+            mdi->running_replication = true;
         }
 
         if (!i) {
