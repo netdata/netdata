@@ -2580,6 +2580,12 @@ modules:
               chart_type: line
               dimensions:
                 - name: latency
+            - name: mssql.replication_subscription
+              description: Number of subscriptions to a publication.
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: subscription
   - meta:
       plugin_name: windows.plugin
       module_name: PerflibNetFramework

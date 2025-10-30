@@ -2716,6 +2716,39 @@ void dict_mssql_replication_avg_latency(struct mssql_publisher_publication *mpp,
     rrdset_done(mpp->st_avg_latency);
 }
 
+void dict_mssql_replication_subscription(struct mssql_publisher_publication *mpp, int update_every)
+{
+    if (!mpp->st_subscription_count) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+
+        snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_replication_%s_%s_subscription", mpp->parent->instanceID, mpp->publication, mpp->db);
+        netdata_fix_chart_name(id);
+        mpp->st_subscription_count = rrdset_create_localhost(
+                "mssql",
+                id,
+                NULL,
+                "replication",
+                "mssql.replication_subscription",
+                "Number of subscriptions to a publication.",
+                "subscription",
+                PLUGIN_WINDOWS_NAME,
+                "PerflibMSSQL",
+                PRIO_MSSQL_REPLICATION_SUBSCRIPTION_COUNT,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+        rrdlabels_add(mpp->st_subscription_count->rrdlabels, "mssql_instance", mpp->parent->instanceID, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(mpp->st_subscription_count->rrdlabels, "publisher", mpp->publisher, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(mpp->st_subscription_count->rrdlabels, "database", mpp->db, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(mpp->st_subscription_count->rrdlabels, "publication", mpp->publication, RRDLABEL_SRC_AUTO);
+
+        mpp->rd_subscription_count = rrddim_add(mpp->st_subscription_count, "subscription", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    }
+
+    rrddim_set_by_pointer(mpp->st_subscription_count, mpp->rd_subscription_count, (collected_number)mpp->subscriptioncount);
+    rrdset_done(mpp->st_subscription_count);
+}
+
 int dict_mssql_replication_chart_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
     struct mssql_publisher_publication *mpp = value;
     int *update_every = data;
@@ -2723,6 +2756,7 @@ int dict_mssql_replication_chart_cb(const DICTIONARY_ITEM *item __maybe_unused, 
     dict_mssql_replication_status(mpp, *update_every);
     dict_mssql_replication_warning(mpp, *update_every);
     dict_mssql_replication_avg_latency(mpp, *update_every);
+    dict_mssql_replication_subscription(mpp, *update_every);
 }
 
 static void do_mssql_replication(struct mssql_instance *mi, int update_every)
