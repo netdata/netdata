@@ -2678,8 +2678,8 @@ void dict_mssql_replication_warning(struct mssql_publisher_publication *mpp, int
     rrddim_set_by_pointer(mpp->st_warning, mpp->rd_warning_mergeeexpiration, (collected_number)(warning & MSSQL_REPLICATON_MERGEEXPIRATION));
     rrddim_set_by_pointer(mpp->st_warning, mpp->rd_warning_mergefastduration, (collected_number)(warning & MSSQL_REPLICATON_MERGEFASTDURATION));
     rrddim_set_by_pointer(mpp->st_warning, mpp->rd_warning_mergelowduration, (collected_number)(warning & MSSQL_REPLICATON_MERGELOWDURATION));
-    rrddim_set_by_pointer(mpp->st_warning, mpp->rd_warning_mergefastrunspeed, (collected_number)(warning & MSSQL_REPLICATON_MERGEFASTUNSPEED));
-    rrddim_set_by_pointer(mpp->st_warning, mpp->rd_warning_mergelowrunspeed, (collected_number)(warning & MSSQL_REPLICATON_MERGELOWUNSPEED));
+    rrddim_set_by_pointer(mpp->st_warning, mpp->rd_warning_mergefastrunspeed, (collected_number)(warning & MSSQL_REPLICATON_MERGEFASTRUNSPEED));
+    rrddim_set_by_pointer(mpp->st_warning, mpp->rd_warning_mergelowrunspeed, (collected_number)(warning & MSSQL_REPLICATON_MERGELOWRUNSPEED));
     rrdset_done(mpp->st_warning);
 }
 
