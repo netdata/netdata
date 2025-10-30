@@ -25,6 +25,18 @@ modules:
           functions to expose connections, locking, buffer pool efficiency, tablespace
           capacity, and workload performance metrics.
 
+          Detailed charts are opt-in per object family through include/exclude lists.
+          Defaults focus on engine activity (system connections, core buffer pools,
+          catalog tablespaces). Matching uses glob patterns that can target schema or
+          application names, with include rules taking precedence over excludes.
+
+          When the number of matching objects exceeds the configured `max_*` limits,
+          the collector publishes deterministic top-N per-instance charts, aggregates
+          the remainder under `group="__other__"`, and logs a throttled warning so you
+          can refine selectors before cardinality runs away. Group charts (by schema,
+          application prefix, or buffer pool family) are always emitted so high-level
+          visibility is preserved even when individual instances are trimmed.
+
         method_description: |
           The collector connects to IBM DB2 and collects metrics via its monitoring interface.
       supported_platforms:
@@ -136,6 +148,61 @@ modules:
               chart_type: line
               dimensions:
                 - name: writes
+        - name: bufferpoolgroup
+          description: These metrics refer to bufferpoolgroup instances.
+          labels:
+            - name: group
+              description: Group identifier
+          metrics:
+            - name: db2.bufferpool_group_hit_ratio
+              description: Buffer Pool Group Hit Ratio
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: overall
+            - name: db2.bufferpool_group_detailed_hit_ratio
+              description: Buffer Pool Group Detailed Hit Ratios
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: data
+                - name: index
+                - name: xda
+                - name: column
+            - name: db2.bufferpool_group_reads
+              description: Buffer Pool Group Reads
+              unit: reads/s
+              chart_type: stacked
+              dimensions:
+                - name: logical
+                - name: physical
+            - name: db2.bufferpool_group_data_reads
+              description: Buffer Pool Group Data Reads
+              unit: reads/s
+              chart_type: stacked
+              dimensions:
+                - name: logical
+                - name: physical
+            - name: db2.bufferpool_group_index_reads
+              description: Buffer Pool Group Index Reads
+              unit: reads/s
+              chart_type: stacked
+              dimensions:
+                - name: logical
+                - name: physical
+            - name: db2.bufferpool_group_pages
+              description: Buffer Pool Group Pages
+              unit: pages
+              chart_type: stacked
+              dimensions:
+                - name: used
+                - name: total
+            - name: db2.bufferpool_group_writes
+              description: Buffer Pool Group Writes
+              unit: writes/s
+              chart_type: line
+              dimensions:
+                - name: writes
         - name: connection
           description: These metrics refer to connection instances.
           labels:
@@ -189,6 +256,55 @@ modules:
                 - name: section
                 - name: commit
                 - name: rollback
+        - name: connectiongroup
+          description: These metrics refer to connectiongroup instances.
+          labels:
+            - name: group
+              description: Group identifier
+          metrics:
+            - name: db2.connection_group.count
+              description: Connection Group Count
+              unit: connections
+              chart_type: line
+              dimensions:
+                - name: count
+            - name: db2.connection_group.state
+              description: Connection Group State Sum
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: state
+            - name: db2.connection_group.activity
+              description: Connection Group Row Activity
+              unit: rows/s
+              chart_type: area
+              dimensions:
+                - name: read
+                - name: written
+            - name: db2.connection_group.wait_time
+              description: Connection Group Wait Time
+              unit: milliseconds
+              chart_type: stacked
+              dimensions:
+                - name: lock
+                - name: log_disk
+                - name: log_buffer
+                - name: pool_read
+                - name: pool_write
+                - name: direct_read
+                - name: direct_write
+                - name: fcm_recv
+                - name: fcm_send
+            - name: db2.connection_group.processing_time
+              description: Connection Group Processing Time
+              unit: milliseconds
+              chart_type: stacked
+              dimensions:
+                - name: routine
+                - name: compile
+                - name: section
+                - name: commit
+                - name: rollback
         - name: database
           description: These metrics refer to database instances.
           labels:
@@ -217,6 +333,19 @@ modules:
           metrics:
             - name: db2.index_usage
               description: Index Usage
+              unit: scans/s
+              chart_type: area
+              dimensions:
+                - name: index
+                - name: full
+        - name: indexgroup
+          description: These metrics refer to indexgroup instances.
+          labels:
+            - name: group
+              description: Group identifier
+          metrics:
+            - name: db2.index_group_usage
+              description: Index Group Usage
               unit: scans/s
               chart_type: area
               dimensions:
@@ -626,6 +755,27 @@ modules:
               dimensions:
                 - name: read
                 - name: written
+        - name: tablegroup
+          description: These metrics refer to tablegroup instances.
+          labels:
+            - name: group
+              description: Group identifier
+          metrics:
+            - name: db2.table_group_size
+              description: Table Group Size
+              unit: bytes
+              chart_type: stacked
+              dimensions:
+                - name: data
+                - name: index
+                - name: long_obj
+            - name: db2.table_group_activity
+              description: Table Group Activity
+              unit: rows/s
+              chart_type: area
+              dimensions:
+                - name: read
+                - name: written
         - name: tableio
           description: These metrics refer to tableio instances.
           labels:
@@ -692,6 +842,38 @@ modules:
                 - name: usable
             - name: db2.tablespace_state
               description: Tablespace State
+              unit: state
+              chart_type: line
+              dimensions:
+                - name: state
+        - name: tablespacegroup
+          description: These metrics refer to tablespacegroup instances.
+          labels:
+            - name: group
+              description: Group identifier
+          metrics:
+            - name: db2.tablespace_group_usage
+              description: Tablespace Group Usage
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: used
+            - name: db2.tablespace_group_size
+              description: Tablespace Group Size
+              unit: bytes
+              chart_type: stacked
+              dimensions:
+                - name: used
+                - name: free
+            - name: db2.tablespace_group_usable_size
+              description: Tablespace Group Usable Size
+              unit: bytes
+              chart_type: line
+              dimensions:
+                - name: total
+                - name: usable
+            - name: db2.tablespace_group_state
+              description: Tablespace Group State
               unit: state
               chart_type: line
               dimensions:

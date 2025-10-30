@@ -3,6 +3,19 @@ display_name: IBM MQ
 description: |
   Monitors IBM MQ queue managers, queues, channels, and topics
   using the PCF (Programmable Command Format) protocol.
+
+  By default the collector tracks the critical system queues `SYSTEM.DEAD.LETTER.QUEUE`,
+  `SYSTEM.ADMIN.COMMAND.QUEUE`, and `SYSTEM.ADMIN.STATISTICS.QUEUE`. All other queues are
+  opt-in via the `include_queues` list, with `exclude_queues` removing noisy patterns such as
+  `SYSTEM.*` or `AMQ.*`. Include patterns take precedence over excludes so you can safely
+  monitor individual system queues while dropping the broader wildcard.
+
+  Per-queue charts are bounded by `max_queues` (default 50). When more queues are discovered,
+  the collector exports the busiest ones individually, rolls the remainder into an
+  aggregated `__other__` dimension, and logs a throttled warning listing the overflowed
+  groups. Parallel queue-group charts summarise depth, traffic, and backlog per naming
+  prefix (first two dot-separated segments, collapsing all `SYSTEM.*` queues together), so
+  high-level visibility is never lost even when detailed charts are trimmed.
 icon: ibm-mq.svg
 categories:
   - data-collection.message-brokers

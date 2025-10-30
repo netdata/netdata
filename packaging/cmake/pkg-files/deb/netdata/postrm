@@ -3,7 +3,12 @@
 set -e
 
 case "$1" in
-  remove) ;;
+  remove)
+    if [ -x "/usr/bin/deb-systemd-helper" ]; then
+      deb-systemd-helper mask 'netdata.service' >/dev/null || true
+      deb-systemd-helper mask 'netdata-updater.timer' >/dev/null || true
+    fi
+    ;;
 
   purge)
     if dpkg-statoverride --list | grep -qw /var/cache/netdata; then
@@ -25,23 +30,20 @@ case "$1" in
     if dpkg-statoverride --list | grep -qw /var/log/netdata; then
       dpkg-statoverride --remove /var/log/netdata
     fi
+
+    if [ -x "/usr/bin/deb-systemd-helper" ]; then
+        deb-systemd-helper purge 'netdata.service' >/dev/null || true
+        deb-systemd-helper unmask 'netdata.service' >/dev/null || true
+        deb-systemd-helper purge 'netdata-updater.timer' >/dev/null || true
+        deb-systemd-helper unmask 'netdata-updater.timer' >/dev/null || true
+    fi
+
+    rm -rf /var/cache/netdata || true
+    rm -rf /var/lib/netdata || true
     ;;
 
   *) ;;
 
 esac
-
-if [ "$1" = "remove" ]; then
-	if [ -x "/usr/bin/deb-systemd-helper" ]; then
-		deb-systemd-helper mask 'netdata.service' >/dev/null || true
-	fi
-fi
-
-if [ "$1" = "purge" ]; then
-	if [ -x "/usr/bin/deb-systemd-helper" ]; then
-		deb-systemd-helper purge 'netdata.service' >/dev/null || true
-		deb-systemd-helper unmask 'netdata.service' >/dev/null || true
-	fi
-fi
 
 exit 0

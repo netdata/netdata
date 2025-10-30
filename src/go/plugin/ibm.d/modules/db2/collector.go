@@ -8,7 +8,9 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"strings"
 	"sync"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/framework"
@@ -45,12 +47,22 @@ type Collector struct {
 	prefetchers map[string]*prefetcherInstanceMetrics
 
 	// Selectors
-	databaseSelector   matcher.Matcher
-	bufferpoolSelector matcher.Matcher
-	tablespaceSelector matcher.Matcher
-	connectionSelector matcher.Matcher
-	tableSelector      matcher.Matcher
-	indexSelector      matcher.Matcher
+	databaseSelector matcher.Matcher
+
+	connectionInclude matcher.Matcher
+	connectionExclude matcher.Matcher
+
+	bufferpoolInclude matcher.Matcher
+	bufferpoolExclude matcher.Matcher
+
+	tablespaceInclude matcher.Matcher
+	tablespaceExclude matcher.Matcher
+
+	tableInclude matcher.Matcher
+	tableExclude matcher.Matcher
+
+	indexInclude matcher.Matcher
+	indexExclude matcher.Matcher
 
 	// DB2 version info
 	version      string
@@ -60,12 +72,7 @@ type Collector struct {
 	serverInfo   serverInfo
 
 	// Filtering mode flags
-	databaseFilterMode   bool
-	bufferpoolFilterMode bool
-	tablespaceFilterMode bool
-	connectionFilterMode bool
-	tableFilterMode      bool
-	indexFilterMode      bool
+	databaseFilterMode bool
 
 	// Resilience tracking
 	disabledMetrics  map[string]bool
@@ -87,6 +94,51 @@ type Collector struct {
 
 	once     sync.Once
 	metaOnce sync.Once
+
+	warnMu sync.Mutex
+	warns  map[string]time.Time
+}
+
+const warnThrottleInterval = 10 * time.Minute
+
+func compileMatcher(patterns []string) (matcher.Matcher, error) {
+	if len(patterns) == 0 {
+		return nil, nil
+	}
+
+	expr := strings.TrimSpace(strings.Join(patterns, " "))
+	if expr == "" {
+		return nil, nil
+	}
+
+	return matcher.NewSimplePatternsMatcher(expr)
+}
+
+func (c *Collector) warnOnce(key string, format string, args ...interface{}) {
+	c.warnMu.Lock()
+	defer c.warnMu.Unlock()
+
+	if c.warns == nil {
+		c.warns = make(map[string]time.Time)
+	}
+
+	now := time.Now()
+	if last, ok := c.warns[key]; ok && now.Sub(last) < warnThrottleInterval {
+		return
+	}
+
+	c.Warningf(format, args...)
+	c.warns[key] = now
+}
+
+func (c *Collector) clearWarnOnce(key string) {
+	c.warnMu.Lock()
+	defer c.warnMu.Unlock()
+
+	if c.warns == nil {
+		return
+	}
+	delete(c.warns, key)
 }
 
 func (c *Collector) initOnce() {
@@ -120,6 +172,73 @@ func (c *Collector) resetCaches() {
 	c.memoryPools = make(map[string]*memoryPoolMetrics)
 	c.memorySets = make(map[string]*memorySetInstanceMetrics)
 	c.prefetchers = make(map[string]*prefetcherInstanceMetrics)
+}
+
+func (c *Collector) matchIncludeExclude(include, exclude matcher.Matcher, values ...string) bool {
+	matched := false
+	matchedMap := make(map[string]bool)
+
+	if include == nil {
+		matched = true
+	} else {
+		for _, v := range values {
+			if v == "" {
+				continue
+			}
+			if include.MatchString(v) {
+				matched = true
+				matchedMap[v] = true
+			}
+		}
+	}
+
+	if !matched {
+		return false
+	}
+
+	if exclude != nil {
+		for _, v := range values {
+			if v == "" {
+				continue
+			}
+			if exclude.MatchString(v) {
+				if include != nil && matchedMap[v] {
+					continue
+				}
+				return false
+			}
+		}
+	}
+
+	return true
+}
+
+func (c *Collector) allowConnection(id string, meta *connectionMetrics) bool {
+	appName := ""
+	host := ""
+	ip := ""
+	if meta != nil {
+		appName = meta.applicationName
+		host = meta.clientHostname
+		ip = meta.clientIP
+	}
+	return c.matchIncludeExclude(c.connectionInclude, c.connectionExclude, id, appName, host, ip)
+}
+
+func (c *Collector) allowBufferpool(name string) bool {
+	return c.matchIncludeExclude(c.bufferpoolInclude, c.bufferpoolExclude, name)
+}
+
+func (c *Collector) allowTablespace(name, contentType, state string) bool {
+	return c.matchIncludeExclude(c.tablespaceInclude, c.tablespaceExclude, name, contentType, state)
+}
+
+func (c *Collector) allowTable(key string) bool {
+	return c.matchIncludeExclude(c.tableInclude, c.tableExclude, key)
+}
+
+func (c *Collector) allowIndex(key string) bool {
+	return c.matchIncludeExclude(c.indexInclude, c.indexExclude, key)
 }
 
 // CollectOnce implements framework.CollectorImpl.

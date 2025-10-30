@@ -98,11 +98,36 @@
         "title": "Collect Topics",
         "type": "boolean"
       },
+      "exclude_queues": {
+        "default": [
+          "SYSTEM.*",
+          "AMQ.*"
+        ],
+        "description": "Patterns to exclude queues after inclusion (wildcards supported).",
+        "items": {
+          "type": "string"
+        },
+        "title": "Exclude Queues",
+        "type": "array"
+      },
       "host": {
         "default": "localhost",
         "description": "IBM MQ server hostname or IP address",
         "title": "Host",
         "type": "string"
+      },
+      "include_queues": {
+        "default": [
+          "SYSTEM.DEAD.LETTER.QUEUE",
+          "SYSTEM.ADMIN.COMMAND.QUEUE",
+          "SYSTEM.ADMIN.STATISTICS.QUEUE"
+        ],
+        "description": "Patterns to include queues (wildcards supported). Empty means include everything.",
+        "items": {
+          "type": "string"
+        },
+        "title": "Include Queues",
+        "type": "array"
       },
       "listener_selector": {
         "default": "",
@@ -123,7 +148,7 @@
         "type": "integer"
       },
       "max_queues": {
-        "default": 100,
+        "default": 50,
         "description": "Maximum number of queues to collect (0 = no limit)",
         "title": "Max Queues",
         "type": "integer"
@@ -153,12 +178,6 @@
         "default": "QM1",
         "description": "IBM MQ Queue Manager name to connect to",
         "title": "Queue Manager",
-        "type": "string"
-      },
-      "queue_selector": {
-        "default": "",
-        "description": "Pattern to filter queues (wildcards supported)",
-        "title": "Queue Selector",
         "type": "string"
       },
       "statistics_interval,omitempty": {
@@ -203,6 +222,12 @@
     "type": "object"
   },
   "uiSchema": {
+    "exclude_queues": {
+      "ui:listFlavour": "list"
+    },
+    "include_queues": {
+      "ui:listFlavour": "list"
+    },
     "password": {
       "ui:widget": "password"
     },
@@ -222,6 +247,8 @@
             "host",
             "port",
             "user",
+            "include_queues",
+            "exclude_queues",
             "statistics_interval,omitempty",
             "sys_topic_interval,omitempty"
           ],
@@ -254,7 +281,6 @@
         },
         {
           "fields": [
-            "queue_selector",
             "channel_selector",
             "topic_selector",
             "listener_selector",

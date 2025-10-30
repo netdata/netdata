@@ -67,6 +67,10 @@ if(ENABLE_DASHBOARD)
   list(APPEND _main_deps "netdata-dashboard")
 endif()
 
+if(ENABLE_PLUGIN_OTEL)
+  list(APPEND _main_deps "netdata-plugin-otel")
+endif()
+
 if(ENABLE_PLUGIN_CHARTS)
   list(APPEND _main_deps "netdata-plugin-chartsd")
 endif()
@@ -109,6 +113,7 @@ set(CPACK_DEBIAN_PACKAGE_CONTROL_EXTRA
 	  "${PKG_FILES_PATH}/deb/netdata/conffiles;"
 	  "${PKG_FILES_PATH}/deb/netdata/preinst"
 	  "${PKG_FILES_PATH}/deb/netdata/postinst"
+	  "${PKG_FILES_PATH}/deb/netdata/prerm"
 	  "${PKG_FILES_PATH}/deb/netdata/postrm")
 
 set(CPACK_DEBIAN_NETDATA_DEBUGINFO_PACKAGE Off)

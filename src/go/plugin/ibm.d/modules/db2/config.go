@@ -78,18 +78,28 @@ type Config struct {
 	// CollectDatabasesMatching filters databases by name using glob patterns.
 	CollectDatabasesMatching string `yaml:"collect_databases_matching,omitempty" json:"collect_databases_matching" ui:"group:Databases"`
 
-	// CollectBufferpoolsMatching filters buffer pools by name using glob patterns.
-	CollectBufferpoolsMatching string `yaml:"collect_bufferpools_matching,omitempty" json:"collect_bufferpools_matching" ui:"group:Buffer Pools"`
+	// IncludeConnections filters monitored connections by application ID or application name (wildcards supported).
+	IncludeConnections []string `yaml:"include_connections,omitempty" json:"include_connections" ui:"group:Connections Monitoring"`
+	// ExcludeConnections excludes connections after inclusion matching.
+	ExcludeConnections []string `yaml:"exclude_connections,omitempty" json:"exclude_connections" ui:"group:Connections Monitoring"`
 
-	// CollectTablespacesMatching filters tablespaces by name using glob patterns.
-	CollectTablespacesMatching string `yaml:"collect_tablespaces_matching,omitempty" json:"collect_tablespaces_matching" ui:"group:Tablespaces"`
+	// IncludeBufferpools filters buffer pools by name.
+	IncludeBufferpools []string `yaml:"include_bufferpools,omitempty" json:"include_bufferpools" ui:"group:Buffer Pools"`
+	// ExcludeBufferpools excludes buffer pools after inclusion.
+	ExcludeBufferpools []string `yaml:"exclude_bufferpools,omitempty" json:"exclude_bufferpools" ui:"group:Buffer Pools"`
 
-	// CollectConnectionsMatching filters monitored connections by application ID.
-	CollectConnectionsMatching string `yaml:"collect_connections_matching,omitempty" json:"collect_connections_matching" ui:"group:Connections Monitoring"`
+	// IncludeTablespaces filters tablespaces by name.
+	IncludeTablespaces []string `yaml:"include_tablespaces,omitempty" json:"include_tablespaces" ui:"group:Tablespaces"`
+	// ExcludeTablespaces excludes tablespaces after inclusion.
+	ExcludeTablespaces []string `yaml:"exclude_tablespaces,omitempty" json:"exclude_tablespaces" ui:"group:Tablespaces"`
 
-	// CollectTablesMatching filters tables by schema/name.
-	CollectTablesMatching string `yaml:"collect_tables_matching,omitempty" json:"collect_tables_matching" ui:"group:Tables"`
+	// IncludeTables filters tables by schema/name.
+	IncludeTables []string `yaml:"include_tables,omitempty" json:"include_tables" ui:"group:Tables"`
+	// ExcludeTables excludes tables after inclusion.
+	ExcludeTables []string `yaml:"exclude_tables,omitempty" json:"exclude_tables" ui:"group:Tables"`
 
-	// CollectIndexesMatching filters indexes by schema/name.
-	CollectIndexesMatching string `yaml:"collect_indexes_matching,omitempty" json:"collect_indexes_matching" ui:"group:Indexes"`
+	// IncludeIndexes filters indexes by schema/name.
+	IncludeIndexes []string `yaml:"include_indexes,omitempty" json:"include_indexes" ui:"group:Indexes"`
+	// ExcludeIndexes excludes indexes after inclusion.
+	ExcludeIndexes []string `yaml:"exclude_indexes,omitempty" json:"exclude_indexes" ui:"group:Indexes"`
 }

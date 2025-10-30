@@ -171,10 +171,11 @@ struct jv2_extents_info {
 
 struct jv2_metrics_info {
     nd_uuid_t *uuid;
+    void *metric;
     uint32_t page_list_header;
+    uint32_t number_of_pages;
     time_t first_time_s;
     time_t last_time_s;
-    size_t number_of_pages;
     Pvoid_t JudyL_pages_by_start_time;
 };
 

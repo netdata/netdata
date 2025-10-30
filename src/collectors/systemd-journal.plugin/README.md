@@ -6,8 +6,6 @@ The `systemd` journal plugin provides an efficient way to view, explore, and ana
 
 ![Netdata systemd journal plugin interface](https://github.com/netdata/netdata/assets/2662304/691b7470-ec56-430c-8b81-0c9e49012679)
 
----
-
 ## Key features
 
 - **Unified view of logs** from multiple sources (system, user, namespace, remote)
@@ -21,8 +19,6 @@ The `systemd` journal plugin provides an efficient way to view, explore, and ana
 - **Multi-node support** for centralized log analysis
 - **UI-based exploration** without needing to learn complex journalctl syntax
 - **Integrated with Netdata's dashboard** for correlation with metrics
-
----
 
 ## Prerequisites
 
@@ -39,8 +35,6 @@ This plugin is a Netdata Function Plugin. A free Netdata Cloud account is requir
 :::
 
 The plugin is designed for native package installations, source installations, and Docker installations (Debian-based). If using Docker, make sure you're using the Debian-based containers.
-
----
 
 ## Journal sources
 
@@ -82,8 +76,6 @@ Default journals on all `systemd`-based systems. Includes:
 
 - Created by `systemd-journal-remote`
 - Typically named by sender IP, then resolved to hostname
-
----
 
 ## Journal fields
 
@@ -161,8 +153,6 @@ Histograms visualize log frequency per field value over time. Supports:
 
 ![Log frequency histogram](https://github.com/netdata/netdata/assets/2662304/d3dcb1d1-daf4-49cf-9663-91b5b3099c2d)
 
----
-
 ## Visualization capabilities
 
 The plugin offers several visualization features to help you understand and navigate your logs effectively.
@@ -200,8 +190,6 @@ The interface offers several ways to navigate logs:
 - Use filter panels to narrow down results
 - Toggle between data views
 
----
-
 ## PLAY mode
 
 The plugin supports PLAY mode for real-time log streaming. Click the ▶️ button at the top of the dashboard to activate it.
@@ -214,8 +202,6 @@ The plugin supports PLAY mode for real-time log streaming. Click the ▶️ butt
 **PLAY** mode offers a similar experience to `journalctl -f`, but with visual enhancements.
 
 :::
-
----
 
 ## Full text search
 
@@ -233,8 +219,6 @@ The plugin supports full-text search using flexible pattern matching:
 Full-text search applies across all fields. Combine with filters for precise results.
 
 :::
-
----
 
 ## Query performance
 
@@ -254,8 +238,6 @@ For best performance:
 - **Limit the number of rows** displayed
 - **Apply filters** to reduce the dataset
 - **Use specific sources** instead of querying across all journals
-
----
 
 ## Performance at scale
 
@@ -282,30 +264,29 @@ The sampling algorithm is designed to be resilient to large datasets. Even if yo
 
 :::
 
-#### Accuracy implications
-Netdata’s sampling budget evaluates **up to 1,000,000 log entries** before it ever marks rows as `[unsampled]`. The proportion of the dataset we examine is:
+### Accuracy implications
+
+Netdata's sampling budget evaluates **up to 1,000,000 log entries** before it ever marks rows as `[unsampled]`. The proportion of the dataset we examine is:
 
 ```
 evaluated_entries = min(total_entries, 1_000_000)
 evaluated_ratio   = evaluated_entries / total_entries
 ```
 
-Because the sampling set is so large, percentage breakdowns stay tight even on massive datasets. For a 10 M–entry window where 60 % of logs share a value, the 95 % confidence interval around that percentage is:
+Because the sampling set is so large, percentage breakdowns stay tight even on massive datasets. For a 10 M–entry window where 60 % of logs share a value, the 95 % confidence interval around that percentage is:
 
 ```
 standard_error ≈ sqrt(p * (1 - p) / evaluated_entries)
-CI95 ≈ 1.96 * standard_error = 1.96 * sqrt(0.6 * 0.4 / 1_000_000) ≈ ±0.9 %
+CI95 ≈ 1.96 * standard_error = 1.96 * sqrt(0.6 * 0.4 / 1_000_000) ≈ ±0.9 %
 ```
 
 By contrast, evaluating only 5,000 entries (a small-sample approach typical of many log explorers when speed is prioritized) would yield:
 
 ```
-CI95 ≈ 1.96 * sqrt(0.6 * 0.4 / 5_000) ≈ ±8.7 %
+CI95 ≈ 1.96 * sqrt(0.6 * 0.4 / 5_000) ≈ ±8.7 %
 ```
 
 The result is that even at extreme scale, mainly because Netdata samples 200x more data, it can provide significantly more accurate estimations on value distributions, at comparable performance.
-
----
 
 ## Best practices for better performance
 
@@ -342,8 +323,6 @@ Journal data is cached by the operating system. The more RAM available for cachi
 | Limit the number of rows returned in the UI | Keeps response times fast and manageable |
 | Enable PLAY mode only when necessary | Reduces continuous query load on the system |
 
----
-
 ## Configuration and maintenance
 
 The Netdata `systemd` journal plugin is designed to work **out of the box** with minimal configuration.
@@ -371,11 +350,10 @@ No additional configuration is required for this plugin to operate on supported 
 | **Verify** journal file **locations** | Confirms the plugin can access the intended sources |
 | **Review** source selections **periodically** | Adjusts scope as infrastructure changes |
 
----
-
 ## FAQ
 
-### Can I use this plugin on journal centralization servers?
+<details>
+<summary><strong>Can I use this plugin on journal centralization servers?</strong></summary>
 
 Yes — you can centralize your logs using `systemd-journal-remote` and install Netdata on the centralization server to explore logs from your entire infrastructure.  
 The plugin provides **multi-node views** and allows you to combine logs from multiple servers.
@@ -386,12 +364,18 @@ For details on configuring a journal centralization server, see the [journal cen
 
 :::
 
-### Can I use this plugin from a parent Netdata node?
+</details>
+
+<details>
+<summary><strong>Can I use this plugin from a parent Netdata node?</strong></summary>
 
 Yes — if your nodes are connected to a Netdata parent, all their functions are accessible via the parent's UI.  
 This includes access to the `systemd` journal plugin for each child node.
 
-### Does this plugin expose any data to Netdata Cloud?
+</details>
+
+<details>
+<summary><strong>Does this plugin expose any data to Netdata Cloud?</strong></summary>
 
 No — when accessing the Agent directly, **no data is exposed to Netdata Cloud**.  
 The Cloud account is only used for authentication. Data flows directly from your Netdata Agent to your web browser.
@@ -403,7 +387,10 @@ See [this discussion](https://github.com/netdata/netdata/discussions/16136) for 
 
 :::
 
-### What are `volatile` and `persistent` journals?
+</details>
+
+<details>
+<summary><strong>What are `volatile` and `persistent` journals?</strong></summary>
 
 - **Persistent journals** are stored on disk in `/var/log/journal`
 - **Volatile journals** are kept in memory in `/run/log/journal` and cleared on reboot
@@ -414,7 +401,10 @@ For more, check `man systemd-journald`.
 
 :::
 
-### I centralize my logs with Loki. Why use Netdata for journals?
+</details>
+
+<details>
+<summary><strong>I centralize my logs with Loki. Why use Netdata for journals?</strong></summary>
 
 `systemd` journals support **dynamic, high-cardinality labels** with all fields indexed by default.  
 When sending logs to Loki, you must predefine which fields to include, reducing flexibility.
@@ -433,12 +423,18 @@ Loki and `systemd` journals serve different use cases — they can complement, n
 
 :::
 
-### Is it worth setting up a `systemd` logs centralization server?
+</details>
+
+<details>
+<summary><strong>Is it worth setting up a `systemd` logs centralization server?</strong></summary>
 
 Yes — the tools required are included in modern Linux systems, and setup is straightforward.  
 Centralized logs provide high visibility with minimal overhead.
 
-### How do I configure a journal centralization server?
+</details>
+
+<details>
+<summary><strong>How do I configure a journal centralization server?</strong></summary>
 
 Two main strategies:
 
@@ -454,14 +450,20 @@ or the [encrypted setup guide](https://github.com/netdata/netdata/blob/master/do
 
 :::
 
-### Limitations when using centralization
+</details>
+
+<details>
+<summary><strong>What are the limitations when using centralization?</strong></summary>
 
 | Limitation | Notes |
 |------------|-------|
 | Namespaces not supported by Docker | [Related issue](https://github.com/moby/moby/issues/41879) |
 | `systemd-journal-upload` does not handle namespaces automatically | Requires manual configuration per namespace |
 
-### How can I report bugs or request features?
+</details>
+
+<details>
+<summary><strong>How can I report bugs or request features?</strong></summary>
 
 If you encounter issues or have ideas for improvements:
 
@@ -471,7 +473,10 @@ If you encounter issues or have ideas for improvements:
 
 The plugin is actively maintained, and feedback helps improve it for everyone.
 
-### Can I customize the plugin's appearance or behavior?
+</details>
+
+<details>
+<summary><strong>Can I customize the plugin's appearance or behavior?</strong></summary>
 
 Currently, customization options are limited to:
 - Column selection in the table view
@@ -481,7 +486,7 @@ Currently, customization options are limited to:
 
 Additional customization features may be added in future releases based on user feedback.
 
----
+</details>
 
 ## How to troubleshoot common issues
 
@@ -544,8 +549,6 @@ Sampling ensures responsiveness at scale, but selecting sources and filters rema
 | "Timeout while querying" | Query is taking too long to complete | Reduce the query scope with filters or shorter timeframes |
 | "No sources detected" | Cannot find valid journal files | Check journal file locations and setup |
 | "Source selection failed" | Selected source cannot be accessed | Verify the source exists and permissions are correct |
-
----
 
 ## How to verify setup
 
