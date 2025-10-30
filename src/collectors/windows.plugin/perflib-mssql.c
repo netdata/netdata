@@ -2749,6 +2749,39 @@ void dict_mssql_replication_subscription(struct mssql_publisher_publication *mpp
     rrdset_done(mpp->st_subscription_count);
 }
 
+void dict_mssql_replication_dist_agent_running(struct mssql_publisher_publication *mpp, int update_every)
+{
+    if (!mpp->st_running_agent) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+
+        snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_replication_%s_%s_agent_running", mpp->parent->instanceID, mpp->publication, mpp->db);
+        netdata_fix_chart_name(id);
+        mpp->st_running_agent = rrdset_create_localhost(
+                "mssql",
+                id,
+                NULL,
+                "replication",
+                "mssql.replication_agent_running",
+                "Distribution agents running."
+                "agents",
+                PLUGIN_WINDOWS_NAME,
+                "PerflibMSSQL",
+                PRIO_MSSQL_REPLICATION_AGENTS_RUNNING,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+        rrdlabels_add(mpp->st_running_agent->rrdlabels, "mssql_instance", mpp->parent->instanceID, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(mpp->st_running_agent->rrdlabels, "publisher", mpp->publisher, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(mpp->st_running_agent->rrdlabels, "database", mpp->db, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(mpp->st_running_agent->rrdlabels, "publication", mpp->publication, RRDLABEL_SRC_AUTO);
+
+        mpp->rd_running_agent = rrddim_add(mpp->st_running_agent, "agents", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    }
+
+    rrddim_set_by_pointer(mpp->st_running_agent, mpp->rd_running_agent, (collected_number)mpp->runningdistagentcount);
+    rrdset_done(mpp->st_running_agent);
+}
+
 int dict_mssql_replication_chart_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
     struct mssql_publisher_publication *mpp = value;
     int *update_every = data;
@@ -2757,6 +2790,7 @@ int dict_mssql_replication_chart_cb(const DICTIONARY_ITEM *item __maybe_unused, 
     dict_mssql_replication_warning(mpp, *update_every);
     dict_mssql_replication_avg_latency(mpp, *update_every);
     dict_mssql_replication_subscription(mpp, *update_every);
+    dict_mssql_replication_dist_agent_running(mpp, *update_every);
 }
 
 static void do_mssql_replication(struct mssql_instance *mi, int update_every)

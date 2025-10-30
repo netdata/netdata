@@ -2582,10 +2582,16 @@ modules:
                 - name: latency
             - name: mssql.replication_subscription
               description: Number of subscriptions to a publication.
-              unit: seconds
+              unit: subscription
               chart_type: line
               dimensions:
                 - name: subscription
+            - name: mssql.replication_agent_running
+              description: Distribution agents running.
+              unit: agents
+              chart_type: line
+              dimensions:
+                - name: agents
   - meta:
       plugin_name: windows.plugin
       module_name: PerflibNetFramework
