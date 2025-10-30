@@ -13,8 +13,8 @@ type Vnodes interface {
 }
 
 type FunctionRegistry interface {
-	Register(name string, reg func(functions.Function))
-	Unregister(name string)
+	RegisterPrefix(name, prefix string, fn func(functions.Function))
+	UnregisterPrefix(name string, prefix string)
 }
 
 type dyncfgAPI interface {
