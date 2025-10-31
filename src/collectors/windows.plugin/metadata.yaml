@@ -2129,7 +2129,18 @@ modules:
                 GO
                 ```
 
-              4. **Configure SQL Server Network Settings**
+              4 . **Enable Query replication stored procedure**
+
+                 Connect to your database and add `netdata_user` to `replmonitor`:
+
+                ```tsql
+                USE distribution;
+                GO
+                EXEC sp_addrolemember 'replmonitor', 'netdata_user';
+                GO
+                ```
+
+              5. **Configure SQL Server Network Settings**
 
                  Enable SQL Server to accept TCP connections:
 
@@ -2142,7 +2153,7 @@ modules:
                   - Enter a port number in the `TCP Port` field (default is `1433`)
                 - Select `SQL Server Services` and restart your SQL Server instance
 
-              5. **Configure SQL Server Authentication (Optional)**
+              6. **Configure SQL Server Authentication (Optional)**
 
                  If you're using SQL Server authentication (rather than Windows authentication):
 
