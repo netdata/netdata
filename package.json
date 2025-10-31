@@ -46,7 +46,7 @@
     "@opentelemetry/sdk-trace-node": "^2.2.0",
     "@opentelemetry/semantic-conventions": "^1.37.0",
     "@slack/bolt": "^4.6.0",
-    "ai": "5.0.82",
+    "ai": "5.0.84",
     "ajv": "^8.17.1",
     "commander": "^14.0.2",
     "express": "^5.1.0",
@@ -76,6 +76,7 @@
     "eslint-plugin-sonarjs": "^3.0.5",
     "eslint-plugin-unicorn": "^62.0.0",
     "knip": "^5.66.4",
+    "prettier": "^3.6.2",
     "typescript": "^5.9.3"
   }
 }
