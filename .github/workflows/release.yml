@@ -46,7 +46,7 @@ jobs:
       - name: Set up git-cliff
         id: setup-git-cliff
         if: steps.target.outputs.run == 'true'
-        uses: kenji-miyake/setup-git-cliff@v1
+        uses: kenji-miyake/setup-git-cliff@v2
       - name: Generate Release Changelog
         id: release-changelog
         if: steps.target.outputs.run == 'true'
