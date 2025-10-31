@@ -748,7 +748,7 @@ install_netdata_service() {
 install_netdata_tmpfiles() {
   if [ "${UID}" -eq 0 ]; then
     run mkdir -p /usr/lib/tmpfiles.d || return 1
-    run install -m 0755 -p "${NETDATA_PREFIX}/usr/lib/netdata/system/systemd/tmpfiles/netdata.conf" /usr/lib/tmpfiles.d/netdata.conf
+    run install -m 0644 -p "${NETDATA_PREFIX}/usr/lib/netdata/system/systemd/tmpfiles/netdata.conf" /usr/lib/tmpfiles.d/netdata.conf
   fi
 }
 

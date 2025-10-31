@@ -3485,7 +3485,7 @@ configure_file(system/systemd/tmpfiles.conf.in system/systemd/tmpfiles/netdata.c
 install(FILES
         ${CMAKE_BINARY_DIR}/system/systemd/tmpfiles/netdata.conf
         COMPONENT netdata
-        DESTINATION usr/lib/netdata/system/systemd)
+        DESTINATION usr/lib/netdata/system/systemd/tmpfiles)
 
 if(BUILD_FOR_PACKAGING)
         install(FILES
