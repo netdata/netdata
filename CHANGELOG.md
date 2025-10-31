@@ -160,6 +160,10 @@
 - Handle problematic repo configuration states in kickstart. ([#21226](https://github.com/netdata/netdata/issues/21226))
 - Extend code signing in Windows CI to cover drivers. ([#21242](https://github.com/netdata/netdata/issues/21242))
 - Check metric count during journal creation ([#21238](https://github.com/netdata/netdata/issues/21238))
+- Switch to git-cliff for changelog generation. ([#21218](https://github.com/netdata/netdata/issues/21218))
+- WebSocket: Increase inactivity timeout from 5 to 30 minutes ([#21244](https://github.com/netdata/netdata/issues/21244))
+- Chore(go.d): add prefix-based func registration ([#21245](https://github.com/netdata/netdata/issues/21245))
+- Fix(uninstaller): define rm_file before first use ([#21246](https://github.com/netdata/netdata/issues/21246))
 
 ## [2.7.0] - 2025-09-25
 
@@ -1811,7 +1815,7 @@
 - Fix(go.d): correct unlockall impl ([#19154](https://github.com/netdata/netdata/issues/19154))
 - Fix(go.d): correct sd dir ([#19155](https://github.com/netdata/netdata/issues/19155))
 - Fix(build): fix building go.d on 32bit ([#19156](https://github.com/netdata/netdata/issues/19156))
-- Streaming improvements #1 ([#19137](https://github.com/netdata/netdata/issues/19137))
+- Streaming [#1](https://github.com/netdata/netdata/issues/1) ([#19137](https://github.com/netdata/netdata/issues/19137))
 - NET Framework metadata (Windows.plugin Part 1) ([#19158](https://github.com/netdata/netdata/issues/19158))
 - Regenerate integrations docs ([#19161](https://github.com/netdata/netdata/issues/19161))
 - Docs: edit Authentication and Authorization section ([#19160](https://github.com/netdata/netdata/issues/19160))
@@ -2057,7 +2061,7 @@
 - Remove python ceph collector implementation ([#18584](https://github.com/netdata/netdata/issues/18584))
 - Port Ceph collector to Go ([#18582](https://github.com/netdata/netdata/issues/18582))
 - Regenerate integrations.js ([#18627](https://github.com/netdata/netdata/issues/18627))
-- Go.d/ceph: fix leftovers after #18582 ([#18628](https://github.com/netdata/netdata/issues/18628))
+- Go.d/ceph: fix leftovers [#18582](https://github.com/netdata/netdata/issues/18582) ([#18628](https://github.com/netdata/netdata/issues/18628))
 - Go.d/postgres: fix checkpoints query for postgres 17 ([#18629](https://github.com/netdata/netdata/issues/18629))
 - Regenerate integrations.js ([#18630](https://github.com/netdata/netdata/issues/18630))
 - Go.d pkg/socket: keep only one timeout option ([#18633](https://github.com/netdata/netdata/issues/18633))
