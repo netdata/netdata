@@ -1,4 +1,4 @@
-d /run/netdata 0755 @netdatauser_POST@ @netdatagroup_POST@ -
-d @varcachedir_POST@ 0770 @netdatauser_POST@ @netdatagroup_POST@ -
-d @varlibdir_POST@ 0770 @netdatauser_POST@ @netdatagroup_POST@ -
-d @logdir_POST@ 0755 @netdatauser_POST@ @netdatagroup_POST@ -
+d /run/netdata 0755 @netdata_user_POST@ @netdata_group_POST@ -
+d @cachedir_POST@ 0770 @netdata_user_POST@ @netdata_group_POST@ -
+d @varlibdir_POST@ 0770 @netdata_user_POST@ @netdata_group_POST@ -
+d @logdir_POST@ 0755 @netdata_user_POST@ @netdata_group_POST@ -
