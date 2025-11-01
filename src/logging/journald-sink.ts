@@ -3,7 +3,7 @@ import fs from 'node:fs';
 
 import type { StructuredLogEvent } from './structured-log-event.js';
 
-import { buildRichLogLine } from './rich-format.js';
+import { formatRichLogLine } from './rich-format.js';
 
 const JOURNAL_SOCKET_PATH = '/run/systemd/journal/socket';
 const SYSTEMD_CAT_PATHS = [
@@ -216,8 +216,7 @@ class SharedJournaldSink implements JournaldEmitter {
 
   private formatPayload(event: StructuredLogEvent): string {
     const lines: string[] = [];
-    const rich = buildRichLogLine(event);
-    const rendered = `${rich.prefix}${rich.message}`;
+    const rendered = formatRichLogLine(event, { tty: false });
     lines.push(`MESSAGE=${sanitizeMessage(rendered)}`);
     lines.push(`PRIORITY=${String(event.priority)}`);
     lines.push('SYSLOG_IDENTIFIER=ai-agent');

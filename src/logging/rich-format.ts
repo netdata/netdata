@@ -9,9 +9,15 @@ const SEVERITY_LABELS: Record<StructuredLogEvent['severity'], string> = {
   TRC: 'TRC',
 };
 
-export type HighlightKind = 'error' | 'warning' | 'llm' | 'tool' | undefined;
+const ANSI_RESET = '\u001B[0m';
+const ANSI_RED = '\u001B[31m';
+const ANSI_YELLOW = '\u001B[33m';
+const ANSI_GREEN = '\u001B[32m';
+const ANSI_BLUE = '\u001B[34m';
 
-export interface RichLogLine {
+type HighlightKind = 'error' | 'warning' | 'llm' | 'tool' | undefined;
+
+interface RichLogLine {
   prefix: string;
   context?: string;
   message: string;
@@ -184,7 +190,7 @@ function buildContext(event: StructuredLogEvent): { text?: string; highlight: 'l
   return { text: context, highlight: 'tool' };
 }
 
-export function buildRichLogLine(event: StructuredLogEvent): RichLogLine {
+function buildRichLogLine(event: StructuredLogEvent): RichLogLine {
   const severityLabel = SEVERITY_LABELS[event.severity];
   const turnStr = event.turnPath ?? `${String(event.turn)}.${String(event.subturn)}`;
   const direction = event.direction === 'request' ? '→' : '←';
@@ -211,4 +217,54 @@ export function buildRichLogLine(event: StructuredLogEvent): RichLogLine {
     highlight: lineHighlight,
     contextHighlight,
   };
+}
+
+export interface FormatRichLogLineOptions {
+  tty?: boolean;
+}
+
+export function formatRichLogLine(
+  event: StructuredLogEvent,
+  options: FormatRichLogLineOptions = {},
+): string {
+  const rich = buildRichLogLine(event);
+  const useColor = options.tty === true;
+  const needsFullLineColor = useColor && (rich.highlight === 'error' || rich.highlight === 'warning');
+
+  let output = '';
+  if (needsFullLineColor) {
+    output = rich.highlight === 'error' ? ANSI_RED : ANSI_YELLOW;
+  }
+
+  output += rich.prefix;
+
+  const shouldColorContext = useColor
+    && !needsFullLineColor
+    && rich.context !== undefined
+    && rich.context.length > 0
+    && rich.contextHighlight !== undefined;
+
+  if (rich.context !== undefined && rich.context.length > 0) {
+    if (shouldColorContext) {
+      const color = rich.contextHighlight === 'llm' ? ANSI_BLUE : ANSI_GREEN;
+      output += `${color}${rich.context}${ANSI_RESET}`;
+    } else {
+      output += rich.context;
+    }
+  }
+
+  const needsSeparator = rich.context !== undefined
+    && rich.context.length > 0
+    && rich.message.length > 0;
+  if (needsSeparator) {
+    output += ' ';
+  }
+
+  output += rich.message;
+
+  if (needsFullLineColor) {
+    output += ANSI_RESET;
+  }
+
+  return output;
 }

@@ -8,6 +8,7 @@ import { WebSocketServer } from 'ws';
 
 import type { LoadAgentOptions, LoadedAgent } from '../agent-loader.js';
 import type { ResolvedConfigLayer } from '../config-resolver.js';
+import type { StructuredLogEvent } from '../logging/structured-log-event.js';
 import type { PreloadedSubAgent } from '../subagent-registry.js';
 import type { AIAgentCallbacks, AIAgentResult, AIAgentSessionConfig, AccountingEntry, AgentFinishedEvent, Configuration, ConversationMessage, LogDetailValue, LogEntry, MCPServerConfig, MCPTool, ProviderConfig, TokenUsage, TurnRequest, TurnResult, TurnStatus, ToolChoiceMode } from '../types.js';
 import type { JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js';
@@ -27,6 +28,7 @@ import { AnthropicProvider } from '../llm-providers/anthropic.js';
 import { BaseLLMProvider, type ResponseMessage } from '../llm-providers/base.js';
 import { OpenRouterProvider } from '../llm-providers/openrouter.js';
 import { TestLLMProvider } from '../llm-providers/test-llm.js';
+import { formatRichLogLine } from '../logging/rich-format.js';
 import { SubAgentRegistry } from '../subagent-registry.js';
 import { MCPProvider } from '../tools/mcp-provider.js';
 import { clampToolName, sanitizeToolName, formatToolRequestCompact, truncateUtf8WithNotice, formatAgentResultHumanReadable, setWarningSink, getWarningSink, warn } from '../utils.js';
@@ -344,6 +346,102 @@ let coverageSessionSnapshot: {
 
 function invariant(condition: boolean, message: string): asserts condition {
   if (!condition) throw new Error(message);
+}
+
+function stripAnsiCodes(value: string): string {
+  return value.replace(/\u001B\[[0-9;]*m/g, '');
+}
+
+function validateRichFormatterParity(): void {
+  const baseTimestamp = 1_735_446_400_000; // 2025-12-01T00:00:00.000Z
+  const baseIso = new Date(baseTimestamp).toISOString();
+  const parityRemoteIdentifier = 'mcp:brave:web_search';
+  const parityAgentPath = 'main:search';
+  const createEvent = (overrides: Partial<StructuredLogEvent>): StructuredLogEvent => {
+    const { labels: labelsOverride, ...rest } = overrides;
+    return {
+      timestamp: baseTimestamp,
+      isoTimestamp: baseIso,
+      severity: 'VRB',
+      priority: 6,
+      message: '',
+      type: 'tool',
+      direction: 'request',
+      turn: 1,
+      subturn: 0,
+      labels: { ...(labelsOverride ?? {}) },
+      ...rest,
+    };
+  };
+
+  const events: StructuredLogEvent[] = [
+    createEvent({
+      message: 'Invoking brave search',
+      toolKind: 'mcp',
+      type: 'tool',
+      direction: 'request',
+      remoteIdentifier: parityRemoteIdentifier,
+      agentPath: parityAgentPath,
+      turnPath: '1.0',
+      labels: {
+        request_preview: 'web_search(query="ai logging")',
+        tool_namespace: 'brave',
+        tool: 'web_search',
+      },
+    }),
+    createEvent({
+      message: 'Completed in 120 ms, input 10 output 2, cost $0.002',
+      toolKind: 'mcp',
+      type: 'tool',
+      direction: 'response',
+      remoteIdentifier: parityRemoteIdentifier,
+      agentPath: parityAgentPath,
+      turnPath: '1.1',
+    }),
+    createEvent({
+      message: 'LLM call succeeded',
+      type: 'llm',
+      direction: 'response',
+      severity: 'FIN',
+      priority: 5,
+      provider: 'anthropic',
+      model: 'claude-3-haiku',
+      remoteIdentifier: 'anthropic:claude-3-haiku',
+      agentPath: 'main',
+      turnPath: '1.2',
+      labels: {
+        cost_usd: '0.012345',
+        latency_ms: '250',
+        response_bytes: '2048',
+        input_tokens: '1200',
+        output_tokens: '300',
+        stop_reason: 'end_turn',
+      },
+    }),
+    createEvent({
+      message: 'Tool failed: timeout after 5s',
+      type: 'tool',
+      direction: 'response',
+      severity: 'ERR',
+      priority: 3,
+      toolKind: 'mcp',
+      remoteIdentifier: parityRemoteIdentifier,
+      agentPath: parityAgentPath,
+      turnPath: '1.3',
+    }),
+  ];
+
+  events.forEach((event, index) => {
+    const colored = formatRichLogLine(event, { tty: true });
+    const plain = formatRichLogLine(event, { tty: false });
+    const strippedColored = stripAnsiCodes(colored);
+    invariant(stripAnsiCodes(plain) === plain, `Plain formatter emitted ANSI codes for sample event ${String(index)}`);
+    invariant(strippedColored === plain, `TTY/plain formatter mismatch for sample event ${String(index)}`);
+    const hasHighlight = strippedColored !== colored;
+    if (event.severity === 'ERR' || event.severity === 'WRN') {
+      invariant(hasHighlight, `TTY formatter missing severity highlight for sample event ${String(index)}`);
+    }
+  });
 }
 
 function expectLlmLogContext(
@@ -6201,6 +6299,7 @@ function formatFailureHint(result: AIAgentResult): string {
 }
 
 async function runPhaseOne(): Promise<void> {
+  validateRichFormatterParity();
   const total = TEST_SCENARIOS.length;
   // eslint-disable-next-line functional/no-loop-statements
   for (let index = 0; index < total; index += 1) {
