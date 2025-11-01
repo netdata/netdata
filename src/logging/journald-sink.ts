@@ -68,11 +68,16 @@ export function acquireJournaldSink(): JournaldEmitter | undefined {
 }
 
 class SharedJournaldSink implements JournaldEmitter {
+  private static readonly MAX_BUFFERED_MESSAGES = 100;
   private child?: ChildProcess;
   private stdin?: NodeJS.WritableStream;
   private disabled = false;
   private restartAttempts = 0;
   private readonly disableListeners = new Set<DisableListener>();
+  private readonly queue: string[] = [];
+  private pendingDrain = false;
+  private droppedMessages = 0;
+  private drainHandler?: () => void;
 
   constructor() {
     const failure = this.spawnHelper();
@@ -86,9 +91,19 @@ class SharedJournaldSink implements JournaldEmitter {
     const writer = this.stdin;
     if (writer === undefined) return false;
     const payload = this.formatPayload(event);
+    if (this.pendingDrain || this.queue.length > 0) {
+      const queued = this.enqueuePayload(payload);
+      if (!this.pendingDrain) {
+        this.flushQueue();
+      }
+      return queued;
+    }
     try {
       const flushed = writer.write(payload, 'utf8');
-      if (!flushed) writer.once('drain', () => undefined);
+      if (!flushed) {
+        this.pendingDrain = true;
+        this.ensureDrainHandler();
+      }
       return true;
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);
@@ -147,6 +162,7 @@ class SharedJournaldSink implements JournaldEmitter {
       this.child = child;
       this.stdin = stdin;
       this.restartAttempts = 0;
+      this.flushQueue();
       return undefined;
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);
@@ -167,6 +183,7 @@ class SharedJournaldSink implements JournaldEmitter {
   }
 
   private cleanupChild(): void {
+    this.clearDrainHandler();
     if (this.stdin !== undefined) {
       try { this.stdin.removeAllListeners('error'); } catch { /* ignore */ }
       try { this.stdin.end(); } catch { /* ignore */ }
@@ -182,6 +199,7 @@ class SharedJournaldSink implements JournaldEmitter {
     }
     this.child = undefined;
     this.stdin = undefined;
+    this.pendingDrain = false;
   }
 
   private disable(reason: string): void {
@@ -193,6 +211,16 @@ class SharedJournaldSink implements JournaldEmitter {
     } catch {
       /* ignore */
     }
+    if (this.queue.length > 0 || this.droppedMessages > 0) {
+      const lost = this.queue.length + this.droppedMessages;
+      try {
+        process.stderr.write(`journald sink discarded ${String(lost)} buffered log entries\n`);
+      } catch {
+        /* ignore */
+      }
+    }
+    this.queue.length = 0;
+    this.droppedMessages = 0;
     this.disableListeners.forEach((listener) => {
       try { listener(); } catch { /* ignore */ }
     });
@@ -266,8 +294,119 @@ class SharedJournaldSink implements JournaldEmitter {
     }
     return `${lines.join('\n')}\n\n`;
   }
+
+  private enqueuePayload(payload: string): boolean {
+    if (this.queue.length >= SharedJournaldSink.MAX_BUFFERED_MESSAGES) {
+      this.droppedMessages += 1;
+      return false;
+    }
+    this.queue.push(payload);
+    return true;
+  }
+
+  private ensureDrainHandler(): void {
+    if (!this.pendingDrain) return;
+    if (this.drainHandler !== undefined) return;
+    const writer = this.stdin;
+    if (writer === undefined) return;
+    const handler = (): void => {
+      this.pendingDrain = false;
+      this.clearDrainHandler();
+      this.flushQueue();
+    };
+    this.drainHandler = handler;
+    writer.on('drain', handler);
+  }
+
+  private clearDrainHandler(): void {
+    if (this.drainHandler === undefined) return;
+    const writer = this.stdin;
+    if (writer !== undefined) {
+      try { writer.removeListener('drain', this.drainHandler); } catch { /* ignore */ }
+    }
+    this.drainHandler = undefined;
+  }
+
+  private flushQueue(): void {
+    if (this.disabled) return;
+    const writer = this.stdin;
+    if (writer === undefined) return;
+    // eslint-disable-next-line functional/no-loop-statements -- queue draining requires sequential writes with backpressure awareness
+    while (this.queue.length > 0) {
+      const payload = this.queue.shift();
+      if (payload === undefined) break;
+      try {
+        const flushed = writer.write(payload, 'utf8');
+        if (!flushed) {
+          this.pendingDrain = true;
+          this.ensureDrainHandler();
+          return;
+        }
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : String(error);
+        this.disable(`failed to write to systemd-cat-native: ${reason}`);
+        return;
+      }
+    }
+    this.pendingDrain = false;
+    this.clearDrainHandler();
+    if (this.droppedMessages > 0) {
+      const dropped = this.droppedMessages;
+      this.droppedMessages = 0;
+      this.writeDropSummary(dropped);
+    }
+  }
+
+  private writeDropSummary(count: number): void {
+    if (this.disabled) return;
+    const writer = this.stdin;
+    if (writer === undefined) return;
+    const event = this.buildDropSummaryEvent(count);
+    const payload = this.formatPayload(event);
+    try {
+      const flushed = writer.write(payload, 'utf8');
+      if (!flushed) {
+        this.pendingDrain = true;
+        this.queue.unshift(payload);
+        if (this.queue.length > SharedJournaldSink.MAX_BUFFERED_MESSAGES) {
+          this.queue.length = SharedJournaldSink.MAX_BUFFERED_MESSAGES;
+        }
+        this.ensureDrainHandler();
+      }
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      this.disable(`failed to write drop summary to systemd-cat-native: ${reason}`);
+    }
+  }
+
+  private buildDropSummaryEvent(count: number): StructuredLogEvent {
+    const now = Date.now();
+    return {
+      timestamp: now,
+      isoTimestamp: new Date(now).toISOString(),
+      severity: 'WRN',
+      priority: 4,
+      message: `journald sink dropped ${String(count)} log entries while backpressured`,
+      type: 'tool',
+      direction: 'response',
+      turn: 0,
+      subturn: 0,
+      remoteIdentifier: 'logging:journald',
+      labels: {
+        component: 'journald_sink',
+        dropped: String(count),
+      },
+    };
+  }
 }
 
 function sanitizeMessage(message: string): string {
   return message.replace(/\n/g, '\\n');
 }
+
+export const __test = {
+  resetSharedSink(): void {
+    sharedSink = undefined;
+    cachedSystemdCatPath = undefined;
+  },
+} as const;

@@ -35,6 +35,7 @@ import { clampToolName, sanitizeToolName, formatToolRequestCompact, truncateUtf8
 import { createWebSocketTransport } from '../websocket-transport.js';
 
 import { getScenario } from './fixtures/test-llm-scenarios.js';
+import { runJournaldSinkUnitTests } from './unit/journald-sink.test.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -6411,6 +6412,7 @@ function formatFailureHint(result: AIAgentResult): string {
 
 async function runPhaseOne(): Promise<void> {
   validateRichFormatterParity();
+  await runJournaldSinkUnitTests();
   const total = TEST_SCENARIOS.length;
   // eslint-disable-next-line functional/no-loop-statements
   for (let index = 0; index < total; index += 1) {
