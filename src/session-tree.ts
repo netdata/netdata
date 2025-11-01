@@ -228,7 +228,7 @@ export class SessionTreeBuilder {
     op.request = {
       kind: req.kind,
       payload: this.mergePayload(existing.payload, req.payload),
-      size: req.size !== undefined ? req.size : existing.size,
+      size: req.size ?? existing.size,
     };
   }
 
@@ -242,8 +242,8 @@ export class SessionTreeBuilder {
     }
     op.response = {
       payload: this.mergePayload(existing.payload, res.payload),
-      size: res.size !== undefined ? res.size : existing.size,
-      truncated: res.truncated !== undefined ? res.truncated : existing.truncated,
+      size: res.size ?? existing.size,
+      truncated: res.truncated ?? existing.truncated,
     };
   }
 
