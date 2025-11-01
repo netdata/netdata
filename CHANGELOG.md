@@ -164,6 +164,9 @@
 - WebSocket: Increase inactivity timeout from 5 to 30 minutes ([#21244](https://github.com/netdata/netdata/issues/21244))
 - Chore(go.d): add prefix-based func registration ([#21245](https://github.com/netdata/netdata/issues/21245))
 - Fix(uninstaller): define rm_file before first use ([#21246](https://github.com/netdata/netdata/issues/21246))
+- Build(deps): bump kenji-miyake/setup-git-cliff from 1 to 2 ([#21247](https://github.com/netdata/netdata/issues/21247))
+- Route dyncfg GET requests through plugin ([#21249](https://github.com/netdata/netdata/issues/21249))
+- Fix(go.d/ping): preserve original ping error by using %w for wrapping ([#21251](https://github.com/netdata/netdata/issues/21251))
 
 ## [2.7.0] - 2025-09-25
 
