@@ -26,6 +26,10 @@ function encodeValue(value: string): string {
   return needsQuotes ? `"${escaped}"` : escaped;
 }
 
+function sanitizePayload(value: string): string {
+  return value.replace(/\n/g, '\\n').replace(/\r/g, '\\r');
+}
+
 export function formatLogfmt(event: StructuredLogEvent, options: FormatOptions = {}): string {
   const pairs: [string, string][] = [];
   const seen = new Set<string>();
@@ -58,6 +62,20 @@ export function formatLogfmt(event: StructuredLogEvent, options: FormatOptions =
   push('origin_txn_id', event.originTxnId);
   push('provider', event.provider);
   push('model', event.model);
+  if (event.llmRequestPayload !== undefined) {
+    push('payload_request', sanitizePayload(event.llmRequestPayload.body));
+    push('payload_request_format', event.llmRequestPayload.format);
+  } else if (event.toolRequestPayload !== undefined) {
+    push('payload_request', sanitizePayload(event.toolRequestPayload.body));
+    push('payload_request_format', event.toolRequestPayload.format);
+  }
+  if (event.llmResponsePayload !== undefined) {
+    push('payload_response', sanitizePayload(event.llmResponsePayload.body));
+    push('payload_response_format', event.llmResponsePayload.format);
+  } else if (event.toolResponsePayload !== undefined) {
+    push('payload_response', sanitizePayload(event.toolResponsePayload.body));
+    push('payload_response_format', event.toolResponsePayload.format);
+  }
 
   Object.entries(event.labels).forEach(([key, value]) => {
     push(key, value);

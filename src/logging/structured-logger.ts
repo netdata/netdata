@@ -198,6 +198,20 @@ function buildJsonPayload(event: StructuredLogEvent): Record<string, unknown> {
   push('remote', event.remoteIdentifier);
   push('provider', event.provider);
   push('model', event.model);
+  if (event.llmRequestPayload !== undefined) {
+    push('payload_request', event.llmRequestPayload.body);
+    push('payload_request_format', event.llmRequestPayload.format);
+  } else if (event.toolRequestPayload !== undefined) {
+    push('payload_request', event.toolRequestPayload.body);
+    push('payload_request_format', event.toolRequestPayload.format);
+  }
+  if (event.llmResponsePayload !== undefined) {
+    push('payload_response', event.llmResponsePayload.body);
+    push('payload_response_format', event.llmResponsePayload.format);
+  } else if (event.toolResponsePayload !== undefined) {
+    push('payload_response', event.toolResponsePayload.body);
+    push('payload_response_format', event.toolResponsePayload.format);
+  }
   push('labels', event.labels);
 
   entries.push(['message', event.message]);

@@ -8,7 +8,7 @@ import Ajv from 'ajv';
 
 import type { OutputFormatId } from './formats.js';
 import type { SessionNode } from './session-tree.js';
-import type { AIAgentSessionConfig, AIAgentResult, ConversationMessage, LogEntry, AccountingEntry, Configuration, TurnRequest, LLMAccountingEntry, MCPTool, ToolAccountingEntry, RestToolConfig, ProgressMetrics, ToolCall, SessionSnapshotPayload, AccountingFlushPayload, ReasoningLevel, ProviderReasoningMapping, ProviderReasoningValue, TurnRetryDirective, TurnStatus, LogDetailValue, ToolChoiceMode } from './types.js';
+import type { AIAgentSessionConfig, AIAgentResult, ConversationMessage, LogEntry, AccountingEntry, Configuration, TurnRequest, LLMAccountingEntry, MCPTool, ToolAccountingEntry, RestToolConfig, ProgressMetrics, ToolCall, SessionSnapshotPayload, AccountingFlushPayload, ReasoningLevel, ProviderReasoningMapping, ProviderReasoningValue, TurnRetryDirective, TurnStatus, LogDetailValue, ToolChoiceMode, LogPayload } from './types.js';
 import type { Ajv as AjvClass, ErrorObject, Options as AjvOptions } from 'ajv';
 
 // Exit codes according to DESIGN.md
@@ -171,6 +171,17 @@ export class AIAgentSession {
 
   // Per-turn buffer of tool failures to synthesize messages when provider omits tool_error
   private pendingToolErrors: { id?: string; name: string; message: string; parameters?: Record<string, unknown> }[] = [];
+
+  private encodePayloadForSnapshot(payload?: LogPayload): { format: string; encoding: 'base64'; value: string } | undefined {
+    if (payload === undefined) return undefined;
+    try {
+      const encoded = Buffer.from(payload.body, 'utf8').toString('base64');
+      return { format: payload.format, encoding: 'base64', value: encoded };
+    } catch {
+      const fallback = Buffer.from('[unavailable]', 'utf8').toString('base64');
+      return { format: payload.format, encoding: 'base64', value: fallback };
+    }
+  }
 
 
   private resolveModelOverrides(
@@ -807,11 +818,13 @@ export class AIAgentSession {
       enriched.stack = this.captureStackTrace(2);
     }
     logs.push(enriched);
+    let appendedOpId: string | undefined;
     // Anchor log to opTree when an opId is known, else best-effort for LLM logs
     try {
       const explicitOp = opts?.opId;
       if (typeof explicitOp === 'string' && explicitOp.length > 0) {
         this.opTree.appendLog(explicitOp, enriched);
+        appendedOpId = explicitOp;
         this.sessionConfig.callbacks?.onOpTree?.(this.opTree.getSession());
       } else if (enriched.type === 'llm') {
         const active = this.currentLlmOpId;
@@ -820,10 +833,19 @@ export class AIAgentSession {
           : this.getLastLlmOpIdForTurn(typeof enriched.turn === 'number' ? enriched.turn : this.currentTurn);
         if (typeof targetOp === 'string' && targetOp.length > 0) {
           this.opTree.appendLog(targetOp, enriched);
+          appendedOpId = targetOp;
           this.sessionConfig.callbacks?.onOpTree?.(this.opTree.getSession());
         }
       }
     } catch (e) { warn(`addLog opTree anchor failed: ${e instanceof Error ? e.message : String(e)}`); }
+    if (appendedOpId !== undefined) {
+      try {
+        const updated = this.applyLogPayloadToOp(appendedOpId, enriched);
+        if (updated) {
+          this.sessionConfig.callbacks?.onOpTree?.(this.opTree.getSession());
+        }
+      } catch (e) { warn(`opTree payload update failed: ${e instanceof Error ? e.message : String(e)}`); }
+    }
     // Single place try/catch for external sinks
     try { this.sessionConfig.callbacks?.onLog?.(enriched); } catch (e) { warn(`onLog callback failed: ${e instanceof Error ? e.message : String(e)}`); }
   }
@@ -898,6 +920,24 @@ export class AIAgentSession {
     } catch { /* ignore logging errors */ }
     this.centralSizeCapHits += 1;
     return truncateUtf8WithNotice(result, limitBytes, sizeBytes);
+  }
+
+  private applyLogPayloadToOp(opId: string, log: LogEntry): boolean {
+    let updated = false;
+    const kind: 'llm' | 'tool' = log.type === 'tool' ? 'tool' : 'llm';
+    const requestPayload = log.llmRequestPayload ?? (kind === 'tool' ? log.toolRequestPayload : undefined);
+    const responsePayload = log.llmResponsePayload ?? (kind === 'tool' ? log.toolResponsePayload : undefined);
+    const encodedRequest = this.encodePayloadForSnapshot(requestPayload);
+    if (encodedRequest !== undefined) {
+      this.opTree.setRequest(opId, { kind, payload: { raw: encodedRequest } });
+      updated = true;
+    }
+    const encodedResponse = this.encodePayloadForSnapshot(responsePayload);
+    if (encodedResponse !== undefined) {
+      this.opTree.setResponse(opId, { payload: { raw: encodedResponse } });
+      updated = true;
+    }
+    return updated;
   }
 
   // Main execution method - returns immutable result

@@ -204,14 +204,47 @@ export class SessionTreeBuilder {
     op.reasoning = r;
   }
 
+  private mergePayload(existing: unknown, incoming: unknown): unknown {
+    if (existing === undefined || existing === null) return incoming;
+    if (incoming === undefined || incoming === null) return existing;
+    if (typeof existing !== 'object' || typeof incoming !== 'object') return incoming;
+    const merged: Record<string, unknown> = { ...(existing as Record<string, unknown>) };
+    Object.entries(incoming as Record<string, unknown>).forEach(([key, value]) => {
+      if (value === undefined) return;
+      const current = merged[key];
+      merged[key] = this.mergePayload(current, value);
+    });
+    return merged;
+  }
+
   setRequest(opId: string, req: { kind: 'llm'|'tool'; payload: unknown; size?: number }): void {
     const op = this.opIndex.get(opId);
-    if (op !== undefined) op.request = req;
+    if (op === undefined) return;
+    const existing = op.request;
+    if (existing === undefined) {
+      op.request = req;
+      return;
+    }
+    op.request = {
+      kind: req.kind,
+      payload: this.mergePayload(existing.payload, req.payload),
+      size: req.size !== undefined ? req.size : existing.size,
+    };
   }
 
   setResponse(opId: string, res: { payload: unknown; size?: number; truncated?: boolean }): void {
     const op = this.opIndex.get(opId);
-    if (op !== undefined) op.response = res;
+    if (op === undefined) return;
+    const existing = op.response;
+    if (existing === undefined) {
+      op.response = res;
+      return;
+    }
+    op.response = {
+      payload: this.mergePayload(existing.payload, res.payload),
+      size: res.size !== undefined ? res.size : existing.size,
+      truncated: res.truncated !== undefined ? res.truncated : existing.truncated,
+    };
   }
 
   // Flatten all logs and accounting from the tree in timestamp order for legacy consumers

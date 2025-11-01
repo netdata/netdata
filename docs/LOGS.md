@@ -130,6 +130,7 @@ AI_LABEL_latency_ms=42
 - Renderer: `formatLogfmt` produces a single line per event with `key=value` pairs separated by spaces. Quoting follows logfmt conventions (space, equals, or quote in value triggers quoting with `"` escaping).
 - Mandatory keys: `ts`, `level`, `priority`, `type`, `direction`, `turn`, `subturn`, `message` (rendered last to keep the free-form text easy to spot).
 - Optional keys: `message_id`, `remote`, `tool_kind`, `tool_namespace`, `tool`, `headend`, `agent`, `call_path`, `txn_id`, `parent_txn_id`, `origin_txn_id`, `provider`, `model`, plus every label (lowercase, unprefixed).
+- Payload keys: When present, `payload_request` / `payload_response` contain the raw on-the-wire bodies (HTTP JSON, SSE text, or JSON-RPC). Journald mirrors them under `AI_LLM_REQUEST` / `AI_LLM_RESPONSE` for model turns and `AI_TOOL_REQUEST` / `AI_TOOL_RESPONSE` for tools. Each payload is accompanied by `payload_*_format` indicating the transport (`http` or `sse`). The values are intentionally untruncated.
 - Colour: When `color` is true (TTY default), `ERR`/`WRN`/`FIN`/`VRB`/`THK`/`TRC` lines receive ANSI colours.
 - Writers: CLI sink writes to `stderr`; server headends inject their logfmt output through per-headend writers or fallback to `stderr` if no custom writer exists. When the journald sink disables itself, the structured logger auto-registers the logfmt writer so messages keep flowing without operator action.
 
@@ -163,6 +164,7 @@ When adding new log-producing code:
 - Keep label keys lowercase with snake_case. The journald sink uppercases keys, while logfmt preserves the original case.
 - Register any new stable `remoteIdentifier` values in `message-ids.ts` and document them in this file (update both tables).
 - Ensure tests that assert on log output account for filtering (trace/verbose flags) and the default sink selection rules described above.
+- When capturing raw request/response bodies, set `payload_request` / `payload_response` (and the matching journald keys). The structured logger forwards them to every sink and persists them in session snapshots as `{ format: 'http' | 'sse' | 'jsonrpc', encoding: 'base64', value: '...' }`.
 - **JSON Sink**
   - Renderer: serialises a structured payload mirroring the logfmt keys plus `timestamp` into a single-line JSON object per event, with `message` placed last for readability when streaming.
   - Selection: opt-in via `telemetry.logging.formats`/`--telemetry-log-format json`; defaults follow the journald/logfmt auto-detection described above.

@@ -826,6 +826,11 @@ const TEST_SCENARIOS: HarnessTest[] = [
       invariant(finalReport?.status === 'success', 'Final report should complete successfully for run-test-12.');
       const finalTurnLog = result.logs.find((log) => typeof log.remoteIdentifier === 'string' && log.remoteIdentifier.includes('primary:') && typeof log.message === 'string' && log.message.includes('final turn'));
       invariant(finalTurnLog !== undefined, 'LLM request log should reflect final turn for run-test-12.');
+      const llmRequestLog = result.logs.find((log) => log.direction === 'request' && log.type === 'llm' && log.llmRequestPayload !== undefined);
+      invariant(llmRequestLog !== undefined, 'LLM request payload missing for run-test-12.');
+      invariant(typeof llmRequestLog.llmRequestPayload?.body === 'string' && llmRequestLog.llmRequestPayload.body.includes('run-test-12'), 'LLM request payload should include user prompt for run-test-12.');
+      const llmResponseLog = result.logs.find((log) => log.direction === 'response' && log.type === 'llm' && log.llmResponsePayload !== undefined);
+      invariant(llmResponseLog !== undefined, 'LLM response payload missing for run-test-12.');
     },
   },
   {
@@ -5838,6 +5843,12 @@ const TEST_SCENARIOS: HarnessTest[] = [
       invariant(typeof coverageOpenrouterJson.referer === 'string' && coverageOpenrouterJson.referer.length > 0, 'Referer header missing for openrouter json.');
       invariant(typeof coverageOpenrouterJson.title === 'string' && coverageOpenrouterJson.title.length > 0, 'Title header missing for openrouter json.');
       invariant(typeof coverageOpenrouterJson.userAgent === 'string' && coverageOpenrouterJson.userAgent.length > 0, 'User-Agent header missing for openrouter json.');
+      const coverageRequestLog = coverageOpenrouterJson.logs.find((log) => log.llmRequestPayload !== undefined);
+      invariant(coverageRequestLog !== undefined, 'LLM request payload missing for openrouter json.');
+      invariant(typeof coverageRequestLog.llmRequestPayload?.body === 'string' && coverageRequestLog.llmRequestPayload.body.includes(COVERAGE_PROMPT), 'LLM request payload should contain prompt for openrouter json.');
+      const coverageResponseLog = coverageOpenrouterJson.logs.find((log) => log.llmResponsePayload !== undefined);
+      invariant(coverageResponseLog !== undefined, 'LLM response payload missing for openrouter json.');
+      invariant(typeof coverageResponseLog.llmResponsePayload?.body === 'string' && coverageResponseLog.llmResponsePayload.body.includes(COVERAGE_ROUTER_MODEL), 'LLM response payload should include model name for openrouter json.');
       invariant(coverageOpenrouterJson.logs.some((log) => log.severity === 'TRC' && log.direction === 'request'), 'Trace request log expected for openrouter json.');
       invariant(coverageOpenrouterJson.logs.some((log) => log.severity === 'TRC' && log.direction === 'response'), 'Trace response log expected for openrouter json.');
       invariant(coverageOpenrouterJson.routed.provider === COVERAGE_ROUTER_PROVIDER, 'Actual provider mismatch for openrouter json.');
@@ -5898,6 +5909,9 @@ const TEST_SCENARIOS: HarnessTest[] = [
       invariant(coverageOpenrouterSse !== undefined, 'Coverage data missing for openrouter sse.');
       invariant(coverageOpenrouterSse.accept === CONTENT_TYPE_JSON, 'Accept header should remain unchanged when preset.');
       invariant(coverageOpenrouterSse.logs.some((log) => typeof log.message === 'string' && log.message.includes('raw-sse')), 'Trace response should capture raw SSE content.');
+      const ssePayloadLog = coverageOpenrouterSse.logs.find((log) => log.llmResponsePayload !== undefined);
+      invariant(ssePayloadLog !== undefined, 'LLM response payload missing for openrouter sse.');
+      invariant(ssePayloadLog.llmResponsePayload?.format === 'sse', 'LLM response payload format should be sse for openrouter sse.');
       invariant(coverageOpenrouterSse.routed.provider === COVERAGE_ROUTER_SSE_PROVIDER, 'Actual provider mismatch for openrouter sse.');
       invariant(coverageOpenrouterSse.routed.model === COVERAGE_ROUTER_SSE_MODEL, 'Actual model mismatch for openrouter sse.');
       invariant(coverageOpenrouterSse.cost.costUsd === 0.4, 'Cost extraction mismatch for openrouter sse.');
@@ -6032,6 +6046,10 @@ const TEST_SCENARIOS: HarnessTest[] = [
       invariant(coverageGenericJson !== undefined, 'Coverage data missing for generic json.');
       invariant(coverageGenericJson.accept === CONTENT_TYPE_JSON, 'Accept header should default to application/json for generic json.');
       invariant(coverageGenericJson.cacheWrite === 42, 'Cache write tokens not extracted from generic json.');
+      const genericRequestLog = coverageGenericJson.logs.find((log) => log.llmRequestPayload !== undefined);
+      invariant(genericRequestLog !== undefined, 'LLM request payload missing for generic json.');
+      const genericResponseLog = coverageGenericJson.logs.find((log) => log.llmResponsePayload !== undefined);
+      invariant(genericResponseLog !== undefined, 'LLM response payload missing for generic json.');
       invariant(coverageGenericJson.logs.some((log) => log.direction === 'response' && log.severity === 'TRC'), 'Trace response log expected for generic json.');
     },
   },

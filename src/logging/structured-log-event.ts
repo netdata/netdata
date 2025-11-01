@@ -1,4 +1,4 @@
-import type { LogEntry } from '../types.js';
+import type { LogEntry, LogPayload } from '../types.js';
 
 import { resolveMessageId } from './message-ids.js';
 
@@ -29,6 +29,10 @@ export interface StructuredLogEvent {
   model?: string;
   labels: Record<string, string>;
   stack?: string;
+  llmRequestPayload?: LogPayload;
+  llmResponsePayload?: LogPayload;
+  toolRequestPayload?: LogPayload;
+  toolResponsePayload?: LogPayload;
 }
 
 const PRIORITY_BY_SEVERITY: Partial<Record<LogEntry['severity'], number>> = {
@@ -163,6 +167,10 @@ export function buildStructuredLogEvent(
     model: modelLabel,
     labels: filteredLabels,
     stack: entry.stack,
+    llmRequestPayload: entry.llmRequestPayload,
+    llmResponsePayload: entry.llmResponsePayload,
+    toolRequestPayload: entry.toolRequestPayload,
+    toolResponsePayload: entry.toolResponsePayload,
   };
 }
 

@@ -132,6 +132,16 @@ export interface LogEntry {
   details?: Record<string, LogDetailValue>;
   // Optional captured stack trace (warnings/errors)
   stack?: string;
+  // Optional raw payloads captured for LLM/tool activity
+  llmRequestPayload?: LogPayload;
+  llmResponsePayload?: LogPayload;
+  toolRequestPayload?: LogPayload;
+  toolResponsePayload?: LogPayload;
+}
+
+export interface LogPayload {
+  format: 'http' | 'sse' | 'jsonrpc';
+  body: string;
 }
 
 export interface ProgressMetrics {

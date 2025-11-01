@@ -10,6 +10,7 @@ import type {
   ProviderReasoningValue,
   ProviderTurnMetadata,
   ConversationMessage,
+  LogPayload,
 } from './types.js';
 
 import { AnthropicProvider } from './llm-providers/anthropic.js';
@@ -40,6 +41,12 @@ export class LLMClient {
   private pricing?: Partial<Record<string, Partial<Record<string, { unit?: 'per_1k'|'per_1m'; currency?: 'USD'; prompt?: number; completion?: number; cacheRead?: number; cacheWrite?: number }>>>>;
   private lastMetadataTask?: Promise<void>;
   private lastTraceTask?: Promise<void>;
+  private activeHttpContext?: {
+    request: TurnRequest;
+    requestLogged: boolean;
+    requestPayload?: LogPayload;
+    responsePayload?: LogPayload;
+  };
 
   constructor(
     providerConfigs: Record<string, ProviderConfig>,
@@ -98,9 +105,7 @@ export class LLMClient {
       request.sdkTraceLogger = undefined;
     }
 
-    // Log request
-    this.logRequest(request);
-
+    this.activeHttpContext = { request, requestLogged: false };
     const startTime = Date.now();
 
     try {
@@ -123,7 +128,8 @@ export class LLMClient {
       }
       this.lastCacheWriteInputTokens = undefined;
       // Log response
-      this.logResponse(request, result, Date.now() - startTime);
+      this.flushPendingLlmRequestLog();
+      this.logResponse(request, result, Date.now() - startTime, this.activeHttpContext.responsePayload);
       return result;
     } catch (error) {
       await this.awaitLastMetadataTask();
@@ -133,9 +139,12 @@ export class LLMClient {
         latencyMs,
         messages: []
       };
-      // Log error response
-      this.logResponse(request, errorResult, latencyMs);
+      this.flushPendingLlmRequestLog();
+      this.logResponse(request, errorResult, latencyMs, this.activeHttpContext.responsePayload);
       return errorResult;
+    }
+    finally {
+      this.activeHttpContext = undefined;
     }
   }
 
@@ -224,6 +233,14 @@ export class LLMClient {
         }
 
         const requestInit = { ...init, headers };
+        const requestObject = new Request(input, requestInit);
+        try {
+          const cloned = requestObject.clone();
+          const bodyText = await cloned.text();
+          this.captureLlmRequestPayload(bodyText, 'http');
+        } catch {
+          this.captureLlmRequestPayload('[unavailable]', 'http');
+        }
 
         // Log request details
         if (this.traceLLM) {
@@ -264,6 +281,19 @@ export class LLMClient {
 
         const contentTypeHeader = response.headers.get(LLMClient.CONTENT_TYPE_HEADER);
         const contentType = typeof contentTypeHeader === 'string' ? contentTypeHeader.toLowerCase() : '';
+
+        const isSse = contentType.includes(LLMClient.CONTENT_TYPE_EVENT_STREAM);
+        if (isSse) {
+          this.captureLlmResponsePayload('[streaming]', 'sse');
+        } else {
+          try {
+            const cloneForPayload = response.clone();
+            const responseText = await cloneForPayload.text();
+            this.captureLlmResponsePayload(responseText, 'http');
+          } catch {
+            this.captureLlmResponsePayload('[unavailable]', 'http');
+          }
+        }
 
         let metadataTask: Promise<void> | undefined;
         const collector = this.metadataCollectors.get(providerName);
@@ -524,26 +554,22 @@ export class LLMClient {
     return value !== null && typeof value === 'object' && !Array.isArray(value);
   }
 
-
-
-
-  private logRequest(request: TurnRequest): void {
-    // Calculate payload size
-    const messagesStr = JSON.stringify(request.messages);
-    const totalBytes = new TextEncoder().encode(messagesStr).length;
-
-    const reasoningStatus = this.describeReasoningState(request);
+  private logRequest(request: TurnRequest, payload?: LogPayload): void {
+    const payloadBytes = payload !== undefined ? new TextEncoder().encode(payload.body).length : undefined;
     const details: Record<string, LogDetailValue> = {
       messages: request.messages.length,
-      request_bytes: totalBytes,
+      request_bytes: payloadBytes ?? new TextEncoder().encode(JSON.stringify(request.messages)).length,
       final_turn: request.isFinalTurn === true,
-      reasoning: reasoningStatus,
+      reasoning: this.describeReasoningState(request),
     };
     const message = request.isFinalTurn === true ? 'LLM request prepared (final turn)' : 'LLM request prepared';
-    this.log('VRB', 'request', 'llm', `${request.provider}:${request.model}`, message, { details });
+    this.log('VRB', 'request', 'llm', `${request.provider}:${request.model}`, message, {
+      details,
+      payload: payload !== undefined ? { type: 'llmRequest', value: payload } : undefined,
+    });
   }
 
-  private logResponse(request: TurnRequest, result: TurnResult, latencyMs: number): void {
+  private logResponse(request: TurnRequest, result: TurnResult, latencyMs: number, payload?: LogPayload): void {
     const metadata = result.providerMetadata;
     const providerSegment = metadata?.actualProvider !== undefined && metadata.actualProvider.length > 0 && metadata.actualProvider !== request.provider
       ? `${request.provider}/${metadata.actualProvider}`
@@ -609,8 +635,63 @@ export class LLMClient {
       result.providerMetadata ??= {};
       result.providerMetadata.reasoningState = reasoningStatus;
       const message = `LLM response failed [${result.status.type.toUpperCase()}]: ${statusMessage}`;
-      this.log(fatal ? 'ERR' : 'WRN', 'response', 'llm', remoteId, message, { fatal, details });
+      this.log(fatal ? 'ERR' : 'WRN', 'response', 'llm', remoteId, message, {
+        fatal,
+        details,
+        payload: payload !== undefined ? { type: 'llmResponse', value: payload } : undefined,
+      });
+      return;
     }
+
+    const reasoningStatus = this.describeReasoningState(request);
+    const tokens = result.tokens;
+    const cacheRead = tokens?.cacheReadInputTokens ?? tokens?.cachedTokens ?? 0;
+    const cacheWrite = tokens?.cacheWriteInputTokens ?? 0;
+    const responseBytes = payload !== undefined
+      ? new TextEncoder().encode(payload.body).length
+      : result.response !== undefined ? new TextEncoder().encode(result.response).length : 0;
+    const details: Record<string, LogDetailValue> = {
+      latency_ms: latencyMs,
+      reasoning: reasoningStatus,
+      response_bytes: responseBytes,
+      cache_read_tokens: cacheRead,
+      cache_write_tokens: cacheWrite,
+    };
+    if (typeof costToUse === 'number') {
+      details.cost_usd = costToUse;
+    }
+    if (metadata?.upstreamCostUsd !== undefined && metadata.upstreamCostUsd > 0) {
+      details.upstream_cost_usd = metadata.upstreamCostUsd;
+    }
+    if (typeof result.stopReason === 'string' && result.stopReason.length > 0) {
+      details.stop_reason = result.stopReason;
+    }
+    const responseMessage = 'LLM response received';
+    this.log('VRB', 'response', 'llm', remoteId, responseMessage, {
+      details,
+      payload: payload !== undefined ? { type: 'llmResponse', value: payload } : undefined,
+    });
+  }
+
+  private flushPendingLlmRequestLog(): void {
+    const ctx = this.activeHttpContext;
+    if (ctx === undefined) return;
+    if (ctx.requestLogged) return;
+    this.logRequest(ctx.request, ctx.requestPayload);
+    ctx.requestLogged = true;
+  }
+
+  private captureLlmRequestPayload(body: string, format: 'http' | 'sse' = 'http'): void {
+    const ctx = this.activeHttpContext;
+    if (ctx === undefined) return;
+    ctx.requestPayload = { body, format };
+    this.flushPendingLlmRequestLog();
+  }
+
+  private captureLlmResponsePayload(body: string, format: 'http' | 'sse'): void {
+    const ctx = this.activeHttpContext;
+    if (ctx === undefined) return;
+    ctx.responsePayload = { body, format };
   }
 
   private logSdkPayload(event: { stage: 'request' | 'response'; provider: string; model: string; payload: unknown }): void {
@@ -656,7 +737,7 @@ export class LLMClient {
     type: LogEntry['type'],
     remoteIdentifier: string,
     message: string,
-    options: { fatal?: boolean; details?: Record<string, LogDetailValue> } = {}
+    options: { fatal?: boolean; details?: Record<string, LogDetailValue>; payload?: { type: 'llmRequest' | 'llmResponse' | 'toolRequest' | 'toolResponse'; value: LogPayload } } = {}
   ): void {
     if (this.onLog === undefined) return;
 
@@ -672,6 +753,14 @@ export class LLMClient {
       message,
       details: options.details,
     };
+
+    if (options.payload !== undefined) {
+      const { type: payloadType, value } = options.payload;
+      if (payloadType === 'llmRequest') entry.llmRequestPayload = value;
+      else if (payloadType === 'llmResponse') entry.llmResponsePayload = value;
+      else if (payloadType === 'toolRequest') entry.toolRequestPayload = value;
+      else entry.toolResponsePayload = value;
+    }
 
     this.onLog(entry);
   }

@@ -241,6 +241,22 @@ class SharedJournaldSink implements JournaldEmitter {
     if (typeof event.txnId === 'string' && event.txnId.length > 0) lines.push(`AI_TXN_ID=${event.txnId}`);
     if (typeof event.parentTxnId === 'string' && event.parentTxnId.length > 0) lines.push(`AI_PARENT_TXN_ID=${event.parentTxnId}`);
     if (typeof event.originTxnId === 'string' && event.originTxnId.length > 0) lines.push(`AI_ORIGIN_TXN_ID=${event.originTxnId}`);
+    if (event.llmRequestPayload !== undefined) {
+      lines.push(`AI_LLM_REQUEST=${sanitizeMessage(event.llmRequestPayload.body)}`);
+      lines.push(`AI_LLM_REQUEST_FORMAT=${event.llmRequestPayload.format}`);
+    }
+    if (event.llmResponsePayload !== undefined) {
+      lines.push(`AI_LLM_RESPONSE=${sanitizeMessage(event.llmResponsePayload.body)}`);
+      lines.push(`AI_LLM_RESPONSE_FORMAT=${event.llmResponsePayload.format}`);
+    }
+    if (event.toolRequestPayload !== undefined) {
+      lines.push(`AI_TOOL_REQUEST=${sanitizeMessage(event.toolRequestPayload.body)}`);
+      lines.push(`AI_TOOL_REQUEST_FORMAT=${event.toolRequestPayload.format}`);
+    }
+    if (event.toolResponsePayload !== undefined) {
+      lines.push(`AI_TOOL_RESPONSE=${sanitizeMessage(event.toolResponsePayload.body)}`);
+      lines.push(`AI_TOOL_RESPONSE_FORMAT=${event.toolResponsePayload.format}`);
+    }
     Object.entries(event.labels).forEach(([key, value]) => {
       const upper = key.toUpperCase();
       lines.push(`AI_LABEL_${upper}=${value}`);
