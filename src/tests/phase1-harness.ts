@@ -554,7 +554,11 @@ function makeBasicConfiguration(): Configuration {
       [PRIMARY_PROVIDER]: {
         type: 'test-llm',
         models: {
-          [MODEL_NAME]: {},
+          [MODEL_NAME]: {
+            contextWindow: 8192,
+            tokenizer: 'approximate',
+            contextWindowBufferTokens: 256,
+          },
         },
       },
     },
@@ -865,6 +869,73 @@ const TEST_SCENARIOS: HarnessTest[] = [
       invariant(log !== undefined, 'Batch execution failure log expected for run-test-14.');
       const batchAccounting = result.accounting.filter(isToolAccounting).find((entry) => entry.command === 'agent__batch');
       invariant(batchAccounting?.status === 'failed', 'Batch accounting must record failure for run-test-14.');
+    },
+  },
+  {
+    id: 'run-test-context-limit',
+    configure: (configuration, _sessionConfig, defaults) => {
+      configuration.providers = {
+        [PRIMARY_PROVIDER]: {
+          type: 'test-llm',
+          models: {
+            [MODEL_NAME]: {
+              contextWindow: 40,
+              tokenizer: 'tiktoken:gpt-4o-mini',
+              contextWindowBufferTokens: 16,
+            },
+          },
+        },
+      };
+      defaults.contextWindowBufferTokens = 16;
+      configuration.defaults = defaults;
+    },
+    expect: (result) => {
+      if (process.env.PHASE1_DEBUG === 'true') {
+        console.log('context-limit accounting:', JSON.stringify(result.accounting, null, 2));
+        console.log('context-limit conversation:', JSON.stringify(result.conversation, null, 2));
+      }
+      const toolMessages = result.conversation.filter((message) => message.role === 'tool');
+      invariant(toolMessages.some((message) => message.content.includes('context window budget exceeded')), 'Tool output should be replaced with context overflow failure message.');
+      const contextWarning = result.logs.find((entry) => entry.remoteIdentifier === 'agent:context');
+      invariant(contextWarning !== undefined, 'Context warning log expected.');
+      const contextDetails = contextWarning.details;
+      invariant(contextDetails !== undefined, 'Context warning should include detail payload.');
+      const remainingDetail = contextDetails.remaining_tokens;
+      invariant(typeof remainingDetail === 'number' && remainingDetail >= 0, 'Context warning should report remaining token budget.');
+      const toolEntries = result.accounting.filter(isToolAccounting);
+      invariant(toolEntries.length > 0, 'Tool accounting entries expected.');
+    },
+  },
+  {
+    id: 'run-test-context-limit-default',
+    configure: (configuration, sessionConfig, defaults) => {
+      configuration.providers = {
+        [PRIMARY_PROVIDER]: {
+          type: 'test-llm',
+          models: {
+            [MODEL_NAME]: {
+              tokenizer: 'tiktoken:gpt-4o-mini',
+            },
+          },
+        },
+      };
+      defaults.contextWindowBufferTokens = 16;
+      configuration.defaults = defaults;
+      sessionConfig.maxOutputTokens = 131072;
+    },
+    expect: (result) => {
+      if (process.env.PHASE1_DEBUG === 'true') {
+        console.log('context-limit-default log count:', result.logs.length);
+        console.log('context-limit-default logs:', JSON.stringify(result.logs, null, 2));
+        console.log('context-limit-default conversation:', JSON.stringify(result.conversation, null, 2));
+        console.log('context-limit-default finalReport:', JSON.stringify(result.finalReport, null, 2));
+        console.log('context-limit-default success:', result.success, 'error:', result.error);
+      }
+      invariant(result.success, 'Scenario run-test-context-limit-default should conclude with forced final report.');
+      const finalReport = result.finalReport;
+      invariant(finalReport !== undefined, 'Final report missing for run-test-context-limit-default.');
+      invariant(finalReport.status === 'failure', 'Final report should indicate failure for fallback context window scenario.');
+      invariant(typeof finalReport.content === 'string' && finalReport.content.includes('Context window budget exhausted'), 'Fallback final report should explain context exhaustion.');
     },
   },
   {

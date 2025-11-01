@@ -3,7 +3,7 @@ import fs from 'node:fs';
 // import os from 'node:os';
 import path from 'node:path';
 
-import { SpanKind, SpanStatusCode } from '@opentelemetry/api';
+import { SpanKind, SpanStatusCode, type Attributes } from '@opentelemetry/api';
 import Ajv from 'ajv';
 
 import type { OutputFormatId } from './formats.js';
@@ -53,7 +53,8 @@ import { buildPromptVars, applyFormat, expandVars } from './prompt-builder.js';
 import { SessionProgressReporter } from './session-progress-reporter.js';
 import { SessionTreeBuilder } from './session-tree.js';
 import { SubAgentRegistry } from './subagent-registry.js';
-import { recordLlmMetrics, runWithSpan, addSpanAttributes, addSpanEvent } from './telemetry/index.js';
+import { recordContextGuardMetrics, recordLlmMetrics, runWithSpan, addSpanAttributes, addSpanEvent } from './telemetry/index.js';
+import { estimateMessagesTokens, resolveTokenizer, tokenizerKey } from './tokenizer-registry.js';
 import { AgentProvider } from './tools/agent-provider.js';
 import { InternalToolProvider } from './tools/internal-provider.js';
 import { MCPProvider } from './tools/mcp-provider.js';
@@ -89,6 +90,14 @@ const safeJsonByteLength = (value: unknown): number => {
   }
 };
 
+interface TargetContextConfig {
+  provider: string;
+  model: string;
+  contextWindow: number | undefined;
+  tokenizerId?: string;
+  bufferTokens: number;
+}
+
 
 export class AIAgentSession {
   // Log identifiers (avoid duplicate string literals)
@@ -99,8 +108,11 @@ export class AIAgentSession {
   private static readonly FINAL_REPORT_TOOL = 'agent__final_report';
   private static readonly FINAL_REPORT_SHORT = 'final_report';
   private static readonly MAX_TURNS_FINAL_MESSAGE = 'Maximum number of turns/steps reached. You must provide your final report now, by calling the `agent__final_report` tool. Do not attempt to call any other tool. Read carefully the instructions on how to call the `agent__final_report` tool and call it now.';
+  private static readonly CONTEXT_FINAL_MESSAGE = 'The conversation is at the context window limit. You must call `agent__final_report` immediately to deliver your final answer using the information already gathered. Do not call any other tools.';
   private static readonly TOOL_NO_OUTPUT = '(no output)';
   private static readonly RETRY_ACTION_SKIP_PROVIDER = 'skip-provider';
+  private static readonly DEFAULT_CONTEXT_WINDOW_TOKENS = 131072;
+  private static readonly DEFAULT_CONTEXT_BUFFER_TOKENS = 256;
   readonly config: Configuration;
   readonly conversation: ConversationMessage[];
   readonly logs: LogEntry[];
@@ -118,6 +130,9 @@ export class AIAgentSession {
   private ajv?: AjvInstance;
   private readonly toolFailureMessages = new Map<string, string>();
   private readonly toolFailureFallbacks: string[] = [];
+  private readonly targetContextConfigs: TargetContextConfig[];
+  private forcedFinalTurnReason?: 'context';
+  private contextLimitWarningLogged = false;
   // Internal housekeeping notes
   private childConversations: { agentId?: string; toolName: string; promptPath: string; conversation: ConversationMessage[]; trace?: { originId?: string; parentId?: string; selfId?: string; callPath?: string } }[] = [];
   private readonly subAgents?: SubAgentRegistry;
@@ -394,6 +409,27 @@ export class AIAgentSession {
       telemetryLabels.headend = this.headendId;
     }
     this.telemetryLabels = telemetryLabels;
+    const sessionTargets = Array.isArray(this.sessionConfig.targets) ? this.sessionConfig.targets : [];
+    const defaultBuffer = this.config.defaults?.contextWindowBufferTokens ?? AIAgentSession.DEFAULT_CONTEXT_BUFFER_TOKENS;
+    const defaultContextWindow = AIAgentSession.DEFAULT_CONTEXT_WINDOW_TOKENS;
+    this.targetContextConfigs = sessionTargets.map((target) => {
+      const providerConfig = this.config.providers[target.provider];
+      const modelConfig = providerConfig.models?.[target.model];
+      const contextWindow = modelConfig?.contextWindow
+        ?? providerConfig.contextWindow
+        ?? defaultContextWindow;
+      const tokenizerId = modelConfig?.tokenizer ?? providerConfig.tokenizer;
+      const bufferTokens = modelConfig?.contextWindowBufferTokens
+        ?? providerConfig.contextWindowBufferTokens
+        ?? defaultBuffer;
+      return {
+        provider: target.provider,
+        model: target.model,
+        contextWindow,
+        tokenizerId,
+        bufferTokens,
+      } satisfies TargetContextConfig;
+    });
     try {
     if (this.abortSignal !== undefined) {
       if (this.abortSignal.aborted) {
@@ -1345,6 +1381,50 @@ export class AIAgentSession {
         let cycleIndex = 0;
         let cycleComplete = false;
 
+        const providerContextStatus = this.evaluateContextForProvider(provider, model);
+        if (providerContextStatus === 'final') {
+          const evaluation = this.evaluateContextWithExtras([]);
+          this.enforceContextFinalTurn(evaluation.blocked, 'turn_preflight');
+          break;
+        }
+        if (providerContextStatus === 'skip') {
+          const evaluation = this.evaluateContextWithExtras([]);
+          const blocked = evaluation.blocked.find((entry) => entry.provider === provider && entry.model === model);
+          if (blocked !== undefined) {
+            const limitTokens = blocked.limit ?? Number.NaN;
+            const remainingTokens = typeof blocked.limit === 'number' && Number.isFinite(blocked.limit)
+              ? Math.max(0, blocked.limit - blocked.projected)
+              : undefined;
+            this.reportContextGuardEvent({
+              provider,
+              model,
+              trigger: 'turn_preflight',
+              outcome: 'skipped_provider',
+              limitTokens: blocked.limit,
+              projectedTokens: blocked.projected,
+              remainingTokens,
+            });
+            const warnEntry: LogEntry = {
+              timestamp: Date.now(),
+              severity: 'WRN',
+              turn: currentTurn,
+              subturn: 0,
+              direction: 'response',
+              type: 'llm',
+              remoteIdentifier: 'agent:context',
+              fatal: false,
+              message: `Skipping provider ${provider}:${model} due to projected context size ${String(blocked.projected)} tokens exceeding limit ${String(blocked.limit ?? Number.NaN)}.`,
+              details: {
+                projected_tokens: blocked.projected,
+                limit_tokens: limitTokens,
+                ...(remainingTokens !== undefined ? { remaining_tokens: remainingTokens } : {}),
+              },
+            };
+            this.log(warnEntry);
+          }
+          continue;
+        }
+
           try {
             // Build per-attempt conversation with optional guidance injection
             let attemptConversation = [...conversation];
@@ -1358,12 +1438,16 @@ export class AIAgentSession {
             }
             // Force the final-report instruction onto the conversation once we enter the last turn.
 
-            const isFinalTurn = currentTurn === maxTurns;
+            const forcedFinalTurn = this.forcedFinalTurnReason !== undefined;
+            const isFinalTurn = forcedFinalTurn || currentTurn === maxTurns;
             if (isFinalTurn) {
-              this.pushSystemRetryMessage(conversation, AIAgentSession.MAX_TURNS_FINAL_MESSAGE);
+              const finalInstruction = this.forcedFinalTurnReason === 'context'
+                ? AIAgentSession.CONTEXT_FINAL_MESSAGE
+                : AIAgentSession.MAX_TURNS_FINAL_MESSAGE;
+              this.pushSystemRetryMessage(conversation, finalInstruction);
               attemptConversation.push({
                 role: 'user',
-                content: AIAgentSession.MAX_TURNS_FINAL_MESSAGE,
+                content: finalInstruction,
                 metadata: { retryMessage: 'final-turn-instruction' },
               });
             }
@@ -1377,7 +1461,9 @@ export class AIAgentSession {
                 type: 'llm',
                 remoteIdentifier: AIAgentSession.REMOTE_FINAL_TURN,
                 fatal: false,
-                message: `Final turn detected: restricting tools to \`${AIAgentSession.FINAL_REPORT_TOOL}\` and injecting finalization instruction.`
+                message: forcedFinalTurn
+                  ? `Context guard enforced: restricting tools to \`${AIAgentSession.FINAL_REPORT_TOOL}\` and injecting finalization instruction.`
+                  : `Final turn detected: restricting tools to \`${AIAgentSession.FINAL_REPORT_TOOL}\` and injecting finalization instruction.`
               };
               this.log(warn);
               finalTurnWarnLogged = true;
@@ -1811,7 +1897,11 @@ export class AIAgentSession {
           }
 
           // Log successful exit
-        this.logExit('EXIT-FINAL-ANSWER', `Final report received (${AIAgentSession.FINAL_REPORT_TOOL}), session complete`, currentTurn);
+          const exitCode = this.forcedFinalTurnReason === 'context' ? 'EXIT-TOKEN-LIMIT' : 'EXIT-FINAL-ANSWER';
+          const exitMessage = this.forcedFinalTurnReason === 'context'
+            ? `Final report received after context guard triggered (${AIAgentSession.FINAL_REPORT_TOOL}), session complete`
+            : `Final report received (${AIAgentSession.FINAL_REPORT_TOOL}), session complete`;
+          this.logExit(exitCode, exitMessage, currentTurn);
 
           // Emit FIN summary log entry
           this.emitFinalSummary(logs, accounting);
@@ -2317,6 +2407,28 @@ export class AIAgentSession {
       }
 
       if (!turnSuccessful) {
+        if (this.forcedFinalTurnReason === 'context') {
+          const fallbackFormatCandidate = this.resolvedFormat ?? 'text';
+          const fallbackFormat = FINAL_REPORT_FORMAT_VALUES.find((value) => value === fallbackFormatCandidate) ?? 'text';
+          const detailMessage = 'Context window budget exhausted before another model call could be attempted. Providing a synthesized final report with known limitations.';
+          const fallbackReport: NonNullable<AIAgentResult['finalReport']> = {
+            status: 'failure',
+            format: fallbackFormat,
+            content: detailMessage,
+            ts: Date.now(),
+          };
+          this.finalReport = fallbackReport;
+          this.logExit('EXIT-TOKEN-LIMIT', 'Context window reached; synthesized final report without additional model turn', currentTurn);
+          this.emitFinalSummary(logs, accounting);
+          return {
+            success: true,
+            conversation,
+            logs,
+            accounting,
+            finalReport: fallbackReport,
+            childConversations: this.childConversations,
+          };
+        }
         if (currentTurn === maxTurns && this.finalReport === undefined && !finalReportToolFailed) {
           const attemptLabel = `${String(maxRetries)} attempt${maxRetries === 1 ? '' : 's'}`;
           const baseSummary = `The model did not produce a final report after ${attemptLabel} on the final turn.`;
@@ -2661,6 +2773,53 @@ export class AIAgentSession {
     this.pendingRetryMessages.push(trimmed);
   }
 
+  private reportContextGuardEvent(params: {
+    provider: string;
+    model: string;
+    trigger: 'tool_preflight' | 'turn_preflight';
+    outcome: 'skipped_provider' | 'forced_final';
+    limitTokens?: number;
+    projectedTokens: number;
+    remainingTokens?: number;
+  }): void {
+    const { provider, model, trigger, outcome, limitTokens, projectedTokens } = params;
+    const directRemaining = params.remainingTokens;
+    const hasDirectRemaining = typeof directRemaining === 'number' && Number.isFinite(directRemaining);
+    const computedRemaining = hasDirectRemaining
+      ? Math.max(0, directRemaining)
+      : ((typeof limitTokens === 'number' && Number.isFinite(limitTokens))
+        ? Math.max(0, limitTokens - projectedTokens)
+        : undefined);
+
+    recordContextGuardMetrics({
+      agentId: this.sessionConfig.agentId,
+      callPath: this.callPath,
+      headendId: this.headendId,
+      provider,
+      model,
+      trigger,
+      outcome,
+      limitTokens,
+      projectedTokens,
+      remainingTokens: computedRemaining,
+    });
+
+    const attributes: Attributes = {
+      'ai.context.trigger': trigger,
+      'ai.context.outcome': outcome,
+      'ai.context.provider': provider,
+      'ai.context.model': model,
+      'ai.context.projected_tokens': projectedTokens,
+    } satisfies Attributes;
+    if (typeof limitTokens === 'number' && Number.isFinite(limitTokens)) {
+      attributes['ai.context.limit_tokens'] = limitTokens;
+    }
+    if (computedRemaining !== undefined) {
+      attributes['ai.context.remaining_tokens'] = computedRemaining;
+    }
+    addSpanEvent('context.guard', attributes);
+  }
+
   private buildFinalReportReminder(): string {
     const format = this.resolvedFormat ?? 'text';
     const formatDescription = this.resolvedFormatParameterDescription ?? 'the required format';
@@ -2692,6 +2851,137 @@ export class AIAgentSession {
     const retryMessages = this.pendingRetryMessages.map((text) => ({ role: 'user' as const, content: text }));
     return [...conversation, ...retryMessages];
   }
+
+  private projectConversationForBudget(): ConversationMessage[] {
+    const cleaned = this.conversation.filter((msg) => msg.metadata?.retryMessage === undefined);
+    if (this.pendingRetryMessages.length === 0) {
+      return [...cleaned];
+    }
+    const pending = this.pendingRetryMessages.map((text) => ({ role: 'user' as const, content: text }));
+    return [...cleaned, ...pending];
+  }
+
+  private estimateTokensByTokenizer(messages: ConversationMessage[]): Map<string, number> {
+    const totals = new Map<string, number>();
+    const uniqueIds = new Set<string>();
+    const approximateKey = tokenizerKey(undefined);
+    if (this.targetContextConfigs.length === 0) {
+      uniqueIds.add(approximateKey);
+    } else {
+      // eslint-disable-next-line functional/no-loop-statements
+      for (const cfg of this.targetContextConfigs) {
+        uniqueIds.add(tokenizerKey(cfg.tokenizerId));
+      }
+    }
+    // eslint-disable-next-line functional/no-loop-statements
+    for (const id of uniqueIds) {
+      const idForLookup = id === approximateKey ? undefined : id;
+      const tokenizer = resolveTokenizer(idForLookup);
+      totals.set(id, estimateMessagesTokens(tokenizer, messages));
+    }
+    return totals;
+  }
+
+  private evaluateContextWithExtras(extras: ConversationMessage[]): {
+    allExceeded: boolean;
+    blocked: { provider: string; model: string; limit?: number; projected: number }[];
+  } {
+    const projected = [...this.projectConversationForBudget(), ...extras];
+    const tokensByTokenizer = this.estimateTokensByTokenizer(projected);
+    const blocked: { provider: string; model: string; limit?: number; projected: number }[] = [];
+    const maxOutputTokens = this.sessionConfig.maxOutputTokens ?? 0;
+    let anyFit = this.targetContextConfigs.length === 0;
+
+    // eslint-disable-next-line functional/no-loop-statements
+    for (const target of this.targetContextConfigs) {
+      const key = tokenizerKey(target.tokenizerId);
+      const projectedTokens = tokensByTokenizer.get(key);
+      if (projectedTokens === undefined) {
+        continue;
+      }
+      const contextWindow = target.contextWindow;
+      if (contextWindow === undefined) {
+        anyFit = true;
+        continue;
+      }
+      const limit = contextWindow - maxOutputTokens - target.bufferTokens;
+      if (limit > 0 && projectedTokens <= limit) {
+        anyFit = true;
+        continue;
+      }
+      blocked.push({ provider: target.provider, model: target.model, limit, projected: projectedTokens });
+    }
+
+    return { allExceeded: !anyFit, blocked };
+  }
+
+  private evaluateContextForProvider(provider: string, model: string): 'ok' | 'skip' | 'final' {
+    const evaluation = this.evaluateContextWithExtras([]);
+    const targetKey = `${provider}:${model}`;
+    const blockedKeys = new Set(evaluation.blocked.map((entry) => `${entry.provider}:${entry.model}`));
+    if (!blockedKeys.has(targetKey)) {
+      return 'ok';
+    }
+    if (evaluation.allExceeded) {
+      return 'final';
+    }
+    return 'skip';
+  }
+
+  private enforceContextFinalTurn(
+    blocked: { provider: string; model: string; limit?: number; projected: number }[],
+    trigger: 'tool_preflight' | 'turn_preflight'
+  ): void {
+    // Emit metrics for each blocked provider/model combination
+    if (blocked.length > 0) {
+      blocked.forEach((entry) => {
+        const remainingTokens = typeof entry.limit === 'number' && Number.isFinite(entry.limit)
+          ? Math.max(0, entry.limit - entry.projected)
+          : undefined;
+        this.reportContextGuardEvent({
+          provider: entry.provider,
+          model: entry.model,
+          trigger,
+          outcome: 'forced_final',
+          limitTokens: entry.limit,
+          projectedTokens: entry.projected,
+          remainingTokens,
+        });
+      });
+    }
+    if (this.forcedFinalTurnReason === undefined) {
+      this.forcedFinalTurnReason = 'context';
+      this.contextLimitWarningLogged = false;
+    }
+    this.pushSystemRetryMessage(this.conversation, AIAgentSession.CONTEXT_FINAL_MESSAGE);
+    if (this.contextLimitWarningLogged) {
+      return;
+    }
+    const first = blocked[0] ?? { provider: 'unknown', model: 'unknown', limit: 0, projected: 0 };
+    const remainingTokens = typeof first.limit === 'number' && Number.isFinite(first.limit)
+      ? Math.max(0, first.limit - first.projected)
+      : undefined;
+    const message = `Context budget exceeded (${first.provider}:${first.model} - projected ${String(first.projected)} tokens vs limit ${String(first.limit ?? Number.NaN)}). Forcing final turn.`;
+    const warnEntry: LogEntry = {
+      timestamp: Date.now(),
+      severity: 'WRN',
+      turn: this.currentTurn,
+      subturn: 0,
+      direction: 'response',
+      type: 'llm',
+      remoteIdentifier: 'agent:context',
+      fatal: false,
+      message,
+      details: {
+        projected_tokens: first.projected,
+        limit_tokens: first.limit ?? Number.NaN,
+        ...(remainingTokens !== undefined ? { remaining_tokens: remainingTokens } : {}),
+      },
+    };
+    this.log(warnEntry);
+    this.contextLimitWarningLogged = true;
+  }
+
 
   private getFinalReportStatus(): 'success' | 'failure' | 'partial' | undefined {
     const status = this.finalReport?.status;
@@ -3103,6 +3393,54 @@ export class AIAgentSession {
           if (isSubAgentTool) {
             this.invokedSubAgents.add(effectiveToolName);
           }
+          const toolOutput = managed.result.length > 0 ? managed.result : AIAgentSession.TOOL_NO_OUTPUT;
+          const toolMessage: ConversationMessage = {
+            role: 'tool',
+            content: toolOutput,
+            ...(typeof options?.toolCallId === 'string' && options.toolCallId.length > 0 ? { toolCallId: options.toolCallId } : {}),
+          };
+          const overflowEvaluation = this.evaluateContextWithExtras([toolMessage]);
+          if (overflowEvaluation.allExceeded) {
+            const blockedEntries = overflowEvaluation.blocked.length > 0
+              ? overflowEvaluation.blocked
+              : [{ provider: 'unknown', model: 'unknown', limit: 0, projected: 0 }];
+            const first = blockedEntries[0];
+            const projectedTokens = first.projected;
+            const limitTokens = first.limit ?? 0;
+            const remainingTokens = limitTokens > projectedTokens ? limitTokens - projectedTokens : 0;
+            const failureEntry: AccountingEntry = {
+              type: 'tool',
+              timestamp: startTime,
+              status: 'failed',
+              latency: managed.latency,
+              mcpServer: managed.providerLabel,
+              command: effectiveToolName,
+              charactersIn: managed.charactersIn,
+              charactersOut: managed.charactersOut,
+              error: 'context_budget_exceeded',
+              agentId: this.sessionConfig.agentId,
+              callPath: this.callPath,
+              txnId: this.txnId,
+              parentTxnId: this.parentTxnId,
+              originTxnId: this.originTxnId,
+              details: {
+                projected_tokens: projectedTokens,
+                limit_tokens: limitTokens,
+                remaining_tokens: remainingTokens,
+              },
+            };
+            accounting.push(failureEntry);
+            try { this.sessionConfig.callbacks?.onAccounting?.(failureEntry); } catch (e) { warn(`tool accounting callback failed: ${e instanceof Error ? e.message : String(e)}`); }
+            this.enforceContextFinalTurn(overflowEvaluation.blocked, 'tool_preflight');
+            const renderedFailure = '(tool failed: context window budget exceeded)';
+            if (typeof options?.toolCallId === 'string' && options.toolCallId.length > 0) {
+              this.toolFailureMessages.set(options.toolCallId, renderedFailure);
+            } else {
+              this.toolFailureFallbacks.push(renderedFailure);
+            }
+            this.releaseToolSlot();
+            return renderedFailure;
+          }
           const successEntry: AccountingEntry = {
             type: 'tool',
             timestamp: startTime,
@@ -3120,9 +3458,8 @@ export class AIAgentSession {
           };
           accounting.push(successEntry);
           try { this.sessionConfig.callbacks?.onAccounting?.(successEntry); } catch (e) { warn(`tool accounting callback failed: ${e instanceof Error ? e.message : String(e)}`); }
-          // Ensure we always return a valid string
           addSpanEvent('tool.call.success', { 'ai.tool.name': effectiveToolName, 'ai.tool.latency_ms': managed.latency });
-          return managed.result || AIAgentSession.TOOL_NO_OUTPUT;
+          return toolOutput;
         }
 
         // Unknown tool after all paths

@@ -279,6 +279,9 @@ export interface ProviderModelConfig {
   overrides?: ProviderModelOverrides;
   reasoning?: ProviderReasoningMapping | null;
   toolChoice?: ToolChoiceMode;
+  contextWindow?: number;
+  tokenizer?: string;
+  contextWindowBufferTokens?: number;
 }
 
 export interface ProviderConfig {
@@ -298,6 +301,9 @@ export interface ProviderConfig {
   reasoningValue?: ProviderReasoningValue | null;
   reasoningAutoStreamLevel?: ReasoningLevel;
   toolChoice?: ToolChoiceMode;
+  contextWindow?: number;
+  tokenizer?: string;
+  contextWindowBufferTokens?: number;
 }
 
 export interface TelemetryOtlpConfig {
@@ -390,6 +396,7 @@ export interface Configuration {
       subAgent?: 'markdown' | 'markdown+mermaid' | 'slack-block-kit' | 'tty' | 'pipe' | 'json' | 'sub-agent';
     };
     reasoningValue?: ProviderReasoningValue | null;
+    contextWindowBufferTokens?: number;
   };
   telemetry?: TelemetryConfig;
   // Server headend configuration (optional)
@@ -615,6 +622,7 @@ interface BaseAccountingEntry {
   txnId?: string;
   parentTxnId?: string;
   originTxnId?: string;
+  details?: Record<string, LogDetailValue>;
 }
 
 export interface LLMAccountingEntry extends BaseAccountingEntry {

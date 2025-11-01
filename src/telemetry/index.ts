@@ -86,9 +86,24 @@ export interface ToolMetricsRecord {
   customLabels?: Record<string, string>;
 }
 
+export interface ContextGuardMetricsRecord {
+  agentId?: string;
+  callPath?: string;
+  headendId?: string;
+  provider: string;
+  model: string;
+  trigger: 'tool_preflight' | 'turn_preflight';
+  outcome: 'skipped_provider' | 'forced_final';
+  limitTokens?: number;
+  projectedTokens: number;
+  remainingTokens?: number;
+  customLabels?: Record<string, string>;
+}
+
 interface TelemetryRecorder {
   recordLlmMetrics: (record: LlmMetricsRecord) => void;
   recordToolMetrics: (record: ToolMetricsRecord) => void;
+  recordContextGuardMetrics: (record: ContextGuardMetricsRecord) => void;
   shutdown: () => Promise<void>;
 }
 
@@ -96,6 +111,8 @@ class NoopRecorder implements TelemetryRecorder {
   recordLlmMetrics = (_record: LlmMetricsRecord): void => { /* noop */ };
 
   recordToolMetrics = (_record: ToolMetricsRecord): void => { /* noop */ };
+
+  recordContextGuardMetrics = (_record: ContextGuardMetricsRecord): void => { /* noop */ };
 
   shutdown = async (): Promise<void> => {
     // noop
@@ -235,6 +252,10 @@ export function recordLlmMetrics(record: LlmMetricsRecord): void {
 
 export function recordToolMetrics(record: ToolMetricsRecord): void {
   recorder.recordToolMetrics(record);
+}
+
+export function recordContextGuardMetrics(record: ContextGuardMetricsRecord): void {
+  recorder.recordContextGuardMetrics(record);
 }
 
 export function emitTelemetryLog(event: StructuredLogEvent): void {
@@ -408,6 +429,7 @@ type PrometheusExporter = OtelProm.PrometheusExporter;
 
 type CounterInstrument = ReturnType<Meter['createCounter']>;
 type HistogramInstrument = ReturnType<Meter['createHistogram']>;
+type ObservableGaugeInstrument = ReturnType<Meter['createObservableGauge']>;
 
 interface OtelDependencies {
   diag: OtelApi.DiagAPI;
@@ -525,6 +547,11 @@ class OtelMetricsRecorder implements TelemetryRecorder {
     bytesOut: CounterInstrument;
     errors: CounterInstrument;
   };
+  private readonly contextGuard: {
+    events: CounterInstrument;
+    remainingGauge: ObservableGaugeInstrument;
+  };
+  private readonly contextGuardGaugeValues = new Map<string, { labels: Attributes; value: number }>();
   private readonly deps: OtelDependencies;
 
   constructor(params: {
@@ -561,6 +588,21 @@ class OtelMetricsRecorder implements TelemetryRecorder {
       bytesOut: this.meter.createCounter('ai_agent_tool_bytes_out_total', { description: 'Output bytes produced by tools' }),
       errors: this.meter.createCounter('ai_agent_tool_errors_total', { description: 'Total number of tool execution errors' }),
     };
+
+    this.contextGuard = {
+      events: this.meter.createCounter('ai_agent_context_guard_events_total', {
+        description: 'Total number of context guard activations',
+      }),
+      remainingGauge: this.meter.createObservableGauge('ai_agent_context_guard_remaining_tokens', {
+        description: 'Remaining token budget when the context guard activates',
+      }),
+    };
+
+    this.contextGuard.remainingGauge.addCallback((observable) => {
+      this.contextGuardGaugeValues.forEach((entry) => {
+        observable.observe(entry.value, entry.labels);
+      });
+    });
   }
 
   recordLlmMetrics(record: LlmMetricsRecord): void {
@@ -615,6 +657,29 @@ class OtelMetricsRecorder implements TelemetryRecorder {
     if (record.status === 'error') {
       const errorLabels = { ...labels, error_type: record.errorType ?? 'unknown' };
       this.tool.errors.add(1, errorLabels);
+    }
+  }
+
+  recordContextGuardMetrics(record: ContextGuardMetricsRecord): void {
+    const labels = buildLabelSet({
+      agent: record.agentId ?? 'unknown',
+      call_path: record.callPath ?? 'unknown',
+      provider: record.provider,
+      model: record.model,
+      trigger: record.trigger,
+      outcome: record.outcome,
+      headend: record.headendId ?? 'cli',
+    }, this.labels, record.customLabels);
+
+    this.contextGuard.events.add(1, labels);
+
+    const remaining = resolveRemainingTokens(record);
+    const key = serializeLabelSet(labels);
+    if (remaining !== undefined) {
+      const gaugeLabels: Attributes = labels;
+      this.contextGuardGaugeValues.set(key, { labels: gaugeLabels, value: remaining });
+    } else {
+      this.contextGuardGaugeValues.delete(key);
     }
   }
 
@@ -773,4 +838,29 @@ function buildLabelSet(
     });
   }
   return labels;
+}
+
+function serializeLabelSet(labels: Record<string, string>): string {
+  return Object.keys(labels)
+    .sort((a, b) => a.localeCompare(b))
+    .map((key) => `${key}=${labels[key]}`)
+    .join('|');
+}
+
+function resolveRemainingTokens(record: ContextGuardMetricsRecord): number | undefined {
+  const { remainingTokens, limitTokens, projectedTokens } = record;
+  if (typeof remainingTokens === 'number' && Number.isFinite(remainingTokens)) {
+    return Math.max(0, remainingTokens);
+  }
+  if (
+    typeof limitTokens === 'number'
+    && Number.isFinite(limitTokens)
+    && Number.isFinite(projectedTokens)
+  ) {
+    const delta = limitTokens - projectedTokens;
+    if (Number.isFinite(delta)) {
+      return Math.max(0, delta);
+    }
+  }
+  return undefined;
 }

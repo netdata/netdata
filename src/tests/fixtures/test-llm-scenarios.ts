@@ -84,6 +84,7 @@ const STATUS_SUCCESS = 'success' as const;
 const STATUS_FAILURE = 'failure' as const;
 const TOOL_REQUEST_TEXT = 'Requesting test to gather information.';
 const TOOL_ARGUMENT_SUCCESS = 'phase-1-tool-success';
+const TOOL_ARGUMENT_LONG_OUTPUT = 'long-output';
 const CONCURRENCY_TIMEOUT_ARGUMENT = 'trigger-timeout';
 const CONCURRENCY_SECOND_ARGUMENT = 'concurrency-second';
 const BATCH_INVALID_INPUT_ARGUMENT = 'batch-missing-id';
@@ -520,7 +521,7 @@ const SCENARIOS: ScenarioDefinition[] = [
               callId: 'call-truncation',
               assistantText: 'Fetching extended payload.',
               arguments: {
-                text: 'long-output',
+                text: TOOL_ARGUMENT_LONG_OUTPUT,
               },
             },
           ],
@@ -3187,6 +3188,90 @@ const SCENARIOS: ScenarioDefinition[] = [
             inputTokens: 88,
             outputTokens: 36,
             totalTokens: 124,
+          },
+        },
+      },
+    ],
+  },
+  {
+    id: 'run-test-context-limit',
+    description: 'Context guard forces final turn when tool output would overflow.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        response: {
+          kind: 'tool-call',
+          assistantText: 'Attempting to fetch large dataset.',
+          toolCalls: [
+            {
+              toolName: TOOL_NAME,
+              callId: 'call-context-overflow',
+              assistantText: 'Retrieving expansive payload.',
+              arguments: {
+                text: TOOL_ARGUMENT_LONG_OUTPUT,
+              },
+            },
+          ],
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+          finishReason: TOOL_FINISH_REASON,
+        },
+      },
+      {
+        turn: 2,
+        expectedTools: ['agent__final_report'],
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Context window nearly exhausted; delivering final report.',
+          reportContent: `${RESULT_HEADING}Final answer provided without additional tool data.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_SUCCESS,
+          tokenUsage: {
+            inputTokens: 90,
+            outputTokens: 30,
+            totalTokens: 120,
+          },
+        },
+      },
+    ],
+  },
+  {
+    id: 'run-test-context-limit-default',
+    description: 'Context guard fires using the internal default context window when output tokens reserve is too large.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        response: {
+          kind: 'tool-call',
+          assistantText: 'Attempting to fetch dataset without explicit window config.',
+          toolCalls: [
+            {
+              toolName: TOOL_NAME,
+              callId: 'call-context-overflow',
+              assistantText: 'Retrieving expansive payload with default window.',
+              arguments: {
+                text: TOOL_ARGUMENT_LONG_OUTPUT,
+              },
+            },
+          ],
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+          finishReason: TOOL_FINISH_REASON,
+        },
+      },
+      {
+        turn: 2,
+        expectedTools: ['agent__final_report'],
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Internal guard triggered; providing final report.',
+          reportContent: `${RESULT_HEADING}Final answer issued after default context budget enforcement.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_SUCCESS,
+          tokenUsage: {
+            inputTokens: 88,
+            outputTokens: 32,
+            totalTokens: 120,
           },
         },
       },

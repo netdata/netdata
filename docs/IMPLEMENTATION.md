@@ -19,8 +19,9 @@ Architecture
 - Environment expansion: `${VAR}` expanded for all strings except under `mcpServers.*.(env|headers)` where literal placeholders are preserved for the server process; these are resolved at spawn/transport time instead.
 - Schema (selected fields):
   - `providers[providerName]`: `{ apiKey?: string; baseUrl?: string }`
+  - `providers[providerName].models[modelName]`: `{ contextWindow?: number; tokenizer?: string; contextWindowBufferTokens?: number; overrides?: ... }`
   - `mcpServers[name]`: `{ type: 'stdio'|'websocket'|'http'|'sse', command?: string|[string,...], args?: string[], url?: string, headers?: Record<string,string>, env?: Record<string,string>, enabled?: boolean }`
-  - `defaults`: `{ llmTimeout?: number; toolTimeout?: number; temperature?: number; topP?: number; parallelToolCalls?: boolean }`
+  - `defaults`: `{ llmTimeout?: number; toolTimeout?: number; temperature?: number; topP?: number; parallelToolCalls?: boolean; contextWindowBufferTokens?: number }`
 
 2) MCP client layer (libs/typescript-sdk)
 
@@ -93,6 +94,11 @@ Architecture
 - Accounting:
   - On each successful step, compute `{ inputTokens, outputTokens, totalTokens, cachedTokens? }` and emit an `AccountingEntry` for `type: 'llm'`.
   - For each tool execution, emit `type: 'tool'` with `latency`, `charactersIn`, `charactersOut`, and `mcpServer`/`command`.
+- Context budget guard:
+  - Resolve `contextWindow`, `tokenizer`, and `contextWindowBufferTokens` for each target model during session creation. When no window is declared, the session falls back to an internal ceiling of 131072 tokens. Tokenizer identifiers support `tiktoken:*`, `anthropic`/`claude` prefixes, and `gemini`/`google:gemini` prefixes via local libraries, with an approximate heuristic as the last resort.
+  - Before executing a tool, estimate the tokens contributed by the prospective tool message. If the projection exceeds `contextWindow - maxOutputTokens - buffer`, synthetic failure `(tool failed: context window budget exceeded)` is returned, the session logs `agent:context`, and `EXIT-TOKEN-LIMIT` is enforced.
+  - Every guard activation emits telemetry: the counter `ai_agent_context_guard_events_total{provider,model,trigger,outcome}` and the observable gauge `ai_agent_context_guard_remaining_tokens{provider,model,trigger,outcome}` capture activation frequency and remaining token headroom.
+  - Accounting entries for such failures include `details.projected_tokens`, `details.limit_tokens`, and `details.remaining_tokens` to support downstream audits.
 
 Prompt construction and MCP instructions
 

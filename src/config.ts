@@ -32,6 +32,9 @@ const ProviderReasoningSchema = z
 const ProviderModelConfigSchema = z.object({
   overrides: ProviderModelOverridesSchema.optional(),
   reasoning: ProviderReasoningSchema,
+  contextWindow: z.number().int().positive().optional(),
+  tokenizer: z.string().optional(),
+  contextWindowBufferTokens: z.number().int().positive().optional(),
 });
 
 const ProviderConfigSchema = z.object({
@@ -49,6 +52,9 @@ const ProviderConfigSchema = z.object({
   stringSchemaFormatsDenied: z.array(z.string()).optional(),
   reasoning: ProviderReasoningSchema,
   reasoningAutoStreamLevel: ReasoningLevelSchema.optional(),
+  contextWindow: z.number().int().positive().optional(),
+  tokenizer: z.string().optional(),
+  contextWindowBufferTokens: z.number().int().positive().optional(),
 });
 
 const MCPServerConfigSchema = z.object({
@@ -209,6 +215,7 @@ const ConfigurationSchema = z.object({
       maxRetries: z.number().int().positive().optional(),
       toolResponseMaxBytes: z.number().int().positive().optional(),
       mcpInitConcurrency: z.number().int().positive().optional(),
+      contextWindowBufferTokens: z.number().int().positive().optional(),
       outputFormat: OutputFormatEnum.optional(),
       formats: FormatsConfigSchema.optional(),
     })

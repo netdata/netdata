@@ -45,6 +45,7 @@ One simple format (`.ai` files) works as standalone agents, sub-agents, master o
 - [x] **Cost Tracking**: Real-time token usage and cost accounting per provider
 - [x] **Retry Strategies**: Intelligent retry with exponential backoff and jitter
 - [x] **Error Recovery**: Graceful degradation with detailed error reporting
+- [x] **Token Budget Management**: Enforce per-model context limits with tokenizers and early final turns
 
 ### 📝 **Simple Configuration Format**
 - [x] **Frontmatter-Driven**: Configure agents with simple YAML frontmatter in `.ai` files:
@@ -77,6 +78,11 @@ One simple format (`.ai` files) works as standalone agents, sub-agents, master o
       required: [results, confidence]
   ```
 
+### 📏 **Token Budget Guardrails**
+- [x] **Per-Model Context Windows**: Configure `contextWindow`, optional `tokenizer`, and `contextWindowBufferTokens` per provider/model in `.ai-agent.json`; when omitted, the agent falls back to a 131072-token window so the guard is always active
+- [x] **Tool Output Guard**: Tool responses are preflight token-counted; overflows are rejected with `(tool failed: context window budget exceeded)` and a forced final turn
+- [x] **Context Exit Reporting**: Sessions terminated by the guard emit `EXIT-TOKEN-LIMIT`, annotate accounting entries with projected vs. allowed tokens, and export telemetry via `ai_agent_context_guard_events_total` and `ai_agent_context_guard_remaining_tokens`
+
 ### 🔧 **Developer Experience**
 - [x] **CI/CD Friendly**: 
   - Test each agent in isolation
@@ -104,6 +110,21 @@ Example config snippet (`ai-agent.json`):
 
 ```jsonc
 {
+  "providers": {
+    "openai": {
+      "type": "openai",
+      "models": {
+        "gpt-4o": {
+          "contextWindow": 128000,
+          "tokenizer": "tiktoken:gpt-4o",
+          "contextWindowBufferTokens": 512
+        }
+      }
+    }
+  },
+  "defaults": {
+    "contextWindowBufferTokens": 512
+  },
   "telemetry": {
     "enabled": true,
     "otlp": { "endpoint": "grpc://localhost:4317", "timeoutMs": 2000 },
@@ -118,6 +139,7 @@ Example config snippet (`ai-agent.json`):
   }
 }
 ```
+Tokenizers also accept `anthropic`/`claude` and `gemini`/`google:gemini` prefixes (for example `anthropic:claude-3-5-sonnet` or `google:gemini-1.5-pro`), leveraging local libraries before falling back to the approximate heuristic.
 
 CLI equivalents:
 

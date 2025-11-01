@@ -141,6 +141,14 @@ All string values in the configuration support environment variable expansion us
 }
 ```
 
+### Context Window Configuration
+
+- Each provider/model pair should declare a `contextWindow` (maximum tokens permitted by the upstream model) and may optionally specify a canonical `tokenizer` identifier (for example `tiktoken:gpt-4o`). When no explicit window is supplied, the agent falls back to an internal ceiling of **131072 tokens** so the guard remains active even with sparse configuration.
+- The agent reserves a safety margin (`contextWindowBufferTokens`, default 256) to ensure forced-final-turn messages fit inside the remaining budget. This value can be set globally under `defaults` or overridden per provider/model.
+- Before every tool result is appended and before every LLM turn, the agent estimates the token footprint using the configured tokenizer. If the projected usage would exceed `contextWindow - maxOutputTokens - buffer`, the tool call is rejected with `(tool failed: context window budget exceeded)` and the session is forced into a final-turn flow.
+- Context guard activations are exported as telemetry: `ai_agent_context_guard_events_total{provider,model,trigger,outcome}` counts each activation, and `ai_agent_context_guard_remaining_tokens{provider,model,trigger,outcome}` reports the most recent remaining budget, enabling dashboards to track proximity to limits.
+- When the guard fires, the session emits `EXIT-TOKEN-LIMIT` and augments tool accounting entries with `projected_tokens`, `limit_tokens`, and `remaining_tokens` so downstream systems can audit the decision.
+
 ### Per-Model Parameter Overrides
 
 Some providers require bespoke sampling controls for specific models. Add a `models`

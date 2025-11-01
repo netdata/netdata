@@ -89,11 +89,14 @@ Type `tool` (MCP tool calls and internal tools):
 - `charactersIn: number` – length of JSON-serialized input parameters
 - `charactersOut: number` – length of returned text (after any truncation)
 - `error?: string` – only when `status: 'failed'`
+- `details?: Record<string, string | number | boolean>` – optional structured metadata (e.g., `projected_tokens`, `limit_tokens`, `remaining_tokens` for context guard failures)
 
 Emission timing (tool): Immediately after each tool execution completes or fails:
 - Internal tools `agent__progress_report`, `agent__final_report`: `status: 'ok'`, `mcpServer: 'agent'`, fixed `charactersOut` (15 and 12 respectively), `charactersIn` reflects parameter size.
 - External MCP tools: `status: 'ok'` with the resolved `mcpServer` on success; `status: 'failed'`, `mcpServer: 'unknown'`, and `charactersOut: 0` on error.
 - Truncation: If the tool response exceeds `toolResponseMaxBytes`, the library prefixes a truncation notice and trims the content to the limit; `charactersOut` reflects the returned (prefixed + truncated) content length.
+- Context overflow: If projecting a tool result would overflow the configured `contextWindow`, the agent injects `(tool failed: context window budget exceeded)`, records an accounting entry with `error: 'context_budget_exceeded'`, and populates `details` with `projected_tokens`, `limit_tokens`, and `remaining_tokens`.
+- Telemetry: every guard activation increments `ai_agent_context_guard_events_total{provider,model,trigger,outcome}` and updates the observable gauge `ai_agent_context_guard_remaining_tokens{provider,model,trigger,outcome}` so integrators can monitor how close sessions are to exhausting their budgets.
 
 Persistence guidance: The CLI demonstrates persisting accounting to JSONL. As a library user, consume `onAccounting` in real time and/or persist `result.accounting` after `run()`.
 
@@ -108,6 +111,7 @@ Persistence guidance: The CLI demonstrates persisting accounting to JSONL. As a 
    - Preserves message history (assistant/tool/tool-result order).
 5. Completion conditions:
    - Success: model calls internal `agent_final_report` tool → `EXIT-FINAL-ANSWER` logged, `FIN` summaries emitted, returns `success: true`.
+   - Context guard: projected token use exceeds `contextWindow` → tool call rejected, `EXIT-TOKEN-LIMIT` logged, forced final turn instructs the model to answer with existing information.
    - Max turns exceeded: `EXIT-MAX-TURNS-NO-RESPONSE` logged, `FIN` summaries emitted, returns failure.
    - Other failures (auth/quota/timeouts/model errors or uncaught exception): logs error, logs an `agent:EXIT-...` reason, emits `FIN` summaries, returns failure.
 6. Cleanup: MCP transports closed gracefully.
