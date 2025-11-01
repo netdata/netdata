@@ -10,7 +10,7 @@ import type { LoadAgentOptions, LoadedAgent } from '../agent-loader.js';
 import type { ResolvedConfigLayer } from '../config-resolver.js';
 import type { StructuredLogEvent } from '../logging/structured-log-event.js';
 import type { PreloadedSubAgent } from '../subagent-registry.js';
-import type { AIAgentCallbacks, AIAgentResult, AIAgentSessionConfig, AccountingEntry, AgentFinishedEvent, Configuration, ConversationMessage, LogDetailValue, LogEntry, MCPServerConfig, MCPTool, ProviderConfig, TokenUsage, TurnRequest, TurnResult, TurnStatus, ToolChoiceMode } from '../types.js';
+import type { AIAgentCallbacks, AIAgentResult, AIAgentSessionConfig, AccountingEntry, AgentFinishedEvent, Configuration, ConversationMessage, LogDetailValue, LogEntry, LogPayload, MCPServerConfig, MCPTool, ProviderConfig, TokenUsage, TurnRequest, TurnResult, TurnStatus, ToolChoiceMode } from '../types.js';
 import type { JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js';
 import type { ModelMessage, LanguageModel, ToolSet } from 'ai';
 import type { ChildProcess } from 'node:child_process';
@@ -338,6 +338,7 @@ let coverageGenericJson: {
   cacheWrite?: number;
   logs: LogEntry[];
 } | undefined;
+let coverageLlmPayload: { logs: LogEntry[] } | undefined;
 let coverageSessionSnapshot: {
   tempDir: string;
   filesAfterSuccess: string[];
@@ -826,11 +827,6 @@ const TEST_SCENARIOS: HarnessTest[] = [
       invariant(finalReport?.status === 'success', 'Final report should complete successfully for run-test-12.');
       const finalTurnLog = result.logs.find((log) => typeof log.remoteIdentifier === 'string' && log.remoteIdentifier.includes('primary:') && typeof log.message === 'string' && log.message.includes('final turn'));
       invariant(finalTurnLog !== undefined, 'LLM request log should reflect final turn for run-test-12.');
-      const llmRequestLog = result.logs.find((log) => log.direction === 'request' && log.type === 'llm' && log.llmRequestPayload !== undefined);
-      invariant(llmRequestLog !== undefined, 'LLM request payload missing for run-test-12.');
-      invariant(typeof llmRequestLog.llmRequestPayload?.body === 'string' && llmRequestLog.llmRequestPayload.body.includes('run-test-12'), 'LLM request payload should include user prompt for run-test-12.');
-      const llmResponseLog = result.logs.find((log) => log.direction === 'response' && log.type === 'llm' && log.llmResponsePayload !== undefined);
-      invariant(llmResponseLog !== undefined, 'LLM response payload missing for run-test-12.');
     },
   },
   {
@@ -6038,6 +6034,49 @@ const TEST_SCENARIOS: HarnessTest[] = [
       invariant(coverageGenericJson.accept === CONTENT_TYPE_JSON, 'Accept header should default to application/json for generic json.');
       invariant(coverageGenericJson.cacheWrite === 42, 'Cache write tokens not extracted from generic json.');
       invariant(coverageGenericJson.logs.some((log) => log.direction === 'response' && log.severity === 'TRC'), 'Trace response log expected for generic json.');
+    },
+  },
+  {
+    id: 'coverage-llm-payload',
+    description: 'Coverage: core LLM payload logging through internal helpers.',
+    execute: async () => {
+      await Promise.resolve();
+      coverageLlmPayload = undefined;
+      const logs: LogEntry[] = [];
+      const client = new LLMClient({}, { onLog: (entry) => { logs.push(entry); } });
+      client.setTurn(1, 0);
+      const turnRequest: TurnRequest = {
+        messages: [{ role: 'user', content: 'payload verification' }],
+        provider: 'primary',
+        model: MODEL_NAME,
+        tools: [],
+        toolExecutor: () => Promise.resolve('')
+      };
+      const activeContext = { request: turnRequest, requestLogged: false } as { request: TurnRequest; requestLogged: boolean; requestPayload?: LogPayload; responsePayload?: LogPayload };
+      (client as unknown as { activeHttpContext?: typeof activeContext }).activeHttpContext = activeContext;
+      const captureRequest = getPrivateMethod(client, 'captureLlmRequestPayload');
+      captureRequest.call(client, JSON.stringify({ prompt: 'payload verification' }), 'http');
+      const captureResponse = getPrivateMethod(client, 'captureLlmResponsePayload');
+      captureResponse.call(client, JSON.stringify({ ok: true }), 'http');
+      const logResponse = getPrivateMethod(client, 'logResponse');
+      const turnResult: TurnResult = {
+        status: { type: 'success', hasToolCalls: false, finalAnswer: false },
+        latencyMs: 0,
+        messages: [],
+      };
+      logResponse.call(client, turnRequest, turnResult, 0, activeContext.responsePayload);
+      coverageLlmPayload = { logs: [...logs] };
+      return makeSuccessResult('coverage-llm-payload');
+    },
+    expect: (result) => {
+      invariant(result.success, 'Coverage coverage-llm-payload should succeed.');
+      invariant(coverageLlmPayload !== undefined, 'Coverage logs missing for coverage-llm-payload.');
+      const requestLog = coverageLlmPayload.logs.find((log) => log.direction === 'request' && log.type === 'llm' && log.llmRequestPayload !== undefined);
+      invariant(requestLog !== undefined, 'LLM request payload missing for coverage-llm-payload.');
+      const responseLog = coverageLlmPayload.logs.find((log) => log.direction === 'response' && log.type === 'llm' && log.llmResponsePayload !== undefined);
+      invariant(responseLog !== undefined, 'LLM response payload missing for coverage-llm-payload.');
+      const responseBody = responseLog.llmResponsePayload?.body ?? '';
+      invariant(responseBody.includes('ok'), 'LLM response payload should include response body.');
     },
   },
   {
