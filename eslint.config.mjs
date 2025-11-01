@@ -97,6 +97,8 @@ export default [
       '@typescript-eslint/prefer-nullish-coalescing': 'error',
       '@typescript-eslint/prefer-optional-chain': 'error',
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+      // Workaround for https://github.com/typescript-eslint/typescript-eslint/issues/9105 (crash under ESLint 9.39 / TS 5.9)
+      '@typescript-eslint/unified-signatures': 'off',
       'functional/no-try-statements': 'off',
       'functional/no-loop-statements': 'warn',
       'functional/no-throw-statements': 'off',
