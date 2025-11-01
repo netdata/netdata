@@ -359,6 +359,12 @@ class SharedJournaldSink implements JournaldEmitter {
 
   private writeDropSummary(count: number): void {
     if (this.disabled) return;
+    const message = `journald sink dropped ${String(count)} log entries while backpressured`;
+    try {
+      process.stderr.write(`[warn] ${message}\n`);
+    } catch {
+      /* ignore */
+    }
     const writer = this.stdin;
     if (writer === undefined) return;
     const event = this.buildDropSummaryEvent(count);

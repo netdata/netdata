@@ -182,19 +182,39 @@ async function testDropSummary(): Promise<void> {
   const { sink } = await createSink(writer);
   sink.emit(buildEvent('initial'));
 
-  let dropped = 0;
-  // eslint-disable-next-line functional/no-loop-statements -- precise control over buffered emit iterations simplifies drop counting
-  for (let index = 0; index < 120; index += 1) {
-    const ok = sink.emit(buildEvent(`buffer-${String(index)}`));
-    if (!ok) {
-      dropped += 1;
+  const stderrWrites: string[] = [];
+  const mutableStderr = process.stderr as unknown as { write: typeof process.stderr.write };
+  const originalStderrWrite = mutableStderr.write;
+  mutableStderr.write = ((chunk: string | Uint8Array, encoding?: BufferEncoding | ((err?: Error) => void), callback?: (err?: Error) => void): boolean => {
+    const resolvedEncoding: BufferEncoding = typeof encoding === 'string' ? encoding : 'utf8';
+    const text = typeof chunk === 'string' ? chunk : Buffer.from(chunk).toString(resolvedEncoding);
+    stderrWrites.push(text);
+    const cb = typeof encoding === 'function' ? encoding : callback;
+    if (typeof cb === 'function') {
+      cb();
     }
-  }
-  assert.equal(dropped, 20, '20 log entries should be dropped when buffer exceeds 100');
+    return true;
+  }) as typeof process.stderr.write;
 
-  writer.emit('drain');
+  let dropped = 0;
+  try {
+    // eslint-disable-next-line functional/no-loop-statements -- precise control over buffered emit iterations simplifies drop counting
+    for (let index = 0; index < 120; index += 1) {
+      const ok = sink.emit(buildEvent(`buffer-${String(index)}`));
+      if (!ok) {
+        dropped += 1;
+      }
+    }
+    assert.equal(dropped, 20, '20 log entries should be dropped when buffer exceeds 100');
+
+    writer.emit('drain');
+  } finally {
+    mutableStderr.write = originalStderrWrite;
+  }
   const summary = writer.writes.find((entry) => entry.includes('dropped 20 log entries'));
   assert.ok(summary !== undefined, 'drop summary should be written after drain');
+  const stderrSummary = stderrWrites.find((entry) => entry.includes('dropped 20 log entries'));
+  assert.ok(stderrSummary !== undefined, 'drop summary should also be printed to stderr');
 }
 
 export async function runJournaldSinkUnitTests(): Promise<void> {
