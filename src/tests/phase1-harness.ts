@@ -54,6 +54,7 @@ const RUN_TEST_21 = 'run-test-21';
 const RUN_TEST_31 = 'run-test-31';
 const RUN_TEST_33 = 'run-test-33';
 const RUN_TEST_37 = 'run-test-37';
+const RUN_TEST_MAX_TURN_LIMIT = 'run-test-max-turn-limit';
 
 const toError = (value: unknown): Error => (value instanceof Error ? value : new Error(String(value)));
 const toErrorMessage = (value: unknown): string => (value instanceof Error ? value.message : String(value));
@@ -2509,8 +2510,74 @@ const TEST_SCENARIOS: HarnessTest[] = [
         invariant(result.success, 'Scenario run-test-61 expected session completion.');
         const limitLog = capturedLogs.find((entry) => entry.remoteIdentifier === 'agent:limits' && typeof entry.message === 'string' && entry.message.includes(TOOL_LIMIT_WARNING_MESSAGE));
         invariant(limitLog !== undefined, 'Limit enforcement log expected for run-test-61.');
+        invariant(limitLog.severity === 'ERR', 'Tool limit log should be severity ERR for run-test-61.');
         const finalReport = result.finalReport;
         invariant(finalReport?.status === 'failure', 'Final report should indicate failure for run-test-61.');
+      },
+    };
+  })(),
+  (() => {
+    const FINAL_TURN_INSTRUCTION = 'Maximum number of turns/steps reached. You must provide your final report now, by calling the `agent__final_report` tool. Do not attempt to call any other tool. Read carefully the instructions on how to call the `agent__final_report` tool and call it now.';
+    let capturedRequests: TurnRequest[] = [];
+    let capturedLogs: LogEntry[] = [];
+    return {
+      id: RUN_TEST_MAX_TURN_LIMIT,
+      configure: (configuration: Configuration, sessionConfig: AIAgentSessionConfig, _defaults) => {
+        configuration.providers = {
+          [PRIMARY_PROVIDER]: { type: 'test-llm' },
+        };
+        sessionConfig.targets = [{ provider: PRIMARY_PROVIDER, model: MODEL_NAME }];
+        sessionConfig.maxTurns = 2;
+        sessionConfig.userPrompt = RUN_TEST_MAX_TURN_LIMIT;
+        sessionConfig.tools = ['test'];
+        const existingCallbacks = sessionConfig.callbacks ?? {};
+        sessionConfig.callbacks = {
+          ...existingCallbacks,
+          onLog: (entry) => {
+            capturedLogs.push(entry);
+            existingCallbacks.onLog?.(entry);
+          },
+        };
+      },
+      execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+        capturedRequests = [];
+        capturedLogs = [];
+        // eslint-disable-next-line @typescript-eslint/unbound-method -- capture method for restoration after interception
+        const originalExecute = LLMClient.prototype.executeTurn;
+        LLMClient.prototype.executeTurn = async function(request: TurnRequest): Promise<TurnResult> {
+          capturedRequests.push(request);
+          return await originalExecute.call(this, request);
+        };
+        try {
+          const session = AIAgentSession.create(sessionConfig);
+          return await session.run();
+        } finally {
+          LLMClient.prototype.executeTurn = originalExecute;
+        }
+      },
+      expect: (result: AIAgentResult) => {
+        invariant(result.success, `Scenario ${RUN_TEST_MAX_TURN_LIMIT} should synthesize a failure report but complete successfully.`);
+        const conversationHasInstruction = result.conversation.some((message) => message.role === 'user' && message.content === FINAL_TURN_INSTRUCTION);
+        if (conversationHasInstruction && process.env.PHASE1_DEBUG === 'true') {
+          console.log(`${RUN_TEST_MAX_TURN_LIMIT} conversation:`, JSON.stringify(result.conversation, null, 2));
+        }
+        invariant(!conversationHasInstruction, `Final turn instruction should remain ephemeral and not persist in conversation for ${RUN_TEST_MAX_TURN_LIMIT}.`);
+        invariant(capturedRequests.length >= 2, `At least two LLM requests expected for ${RUN_TEST_MAX_TURN_LIMIT}.`);
+        const finalTurnRequest = capturedRequests.at(-1);
+        invariant(finalTurnRequest !== undefined, `Final turn request missing for ${RUN_TEST_MAX_TURN_LIMIT}.`);
+        const requestMessages = Array.isArray(finalTurnRequest.messages) ? finalTurnRequest.messages : [];
+        const instructionOccurrences = requestMessages.filter((message) => message.role === 'user' && message.content === FINAL_TURN_INSTRUCTION);
+        if (instructionOccurrences.length !== 1 && process.env.PHASE1_DEBUG === 'true') {
+          console.log(`${RUN_TEST_MAX_TURN_LIMIT} final request messages:`, JSON.stringify(requestMessages, null, 2));
+        }
+        invariant(instructionOccurrences.length === 1, `Final turn instruction should be present exactly once in the final LLM request for ${RUN_TEST_MAX_TURN_LIMIT}.`);
+        const toolNames = Array.isArray(finalTurnRequest.tools)
+          ? finalTurnRequest.tools.map((tool) => sanitizeToolName(tool.name))
+          : [];
+        invariant(toolNames.length === 1 && toolNames[0] === 'agent__final_report', `Final turn should restrict tools to agent__final_report for ${RUN_TEST_MAX_TURN_LIMIT}.`);
+        const finalTurnLog = capturedLogs.find((entry) => entry.remoteIdentifier === FINAL_TURN_REMOTE);
+        invariant(finalTurnLog !== undefined, `Final turn log expected for ${RUN_TEST_MAX_TURN_LIMIT}.`);
+        invariant(result.finalReport?.status === 'failure', `Synthesized final report should indicate failure for ${RUN_TEST_MAX_TURN_LIMIT}.`);
       },
     };
   })(),
@@ -4129,7 +4196,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
     },
     expect: (result: AIAgentResult) => {
       invariant(result.success, 'Scenario run-test-84 expected success.');
-      const finalTurnLog = result.logs.find((entry) => entry.remoteIdentifier === 'agent:final-turn');
+      const finalTurnLog = result.logs.find((entry) => entry.remoteIdentifier === FINAL_TURN_REMOTE);
       if (finalTurnLog === undefined) {
          
         console.error('run-test-84 logs:', result.logs.map((entry) => ({ id: entry.remoteIdentifier, severity: entry.severity, message: entry.message })));
@@ -4264,7 +4331,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
       const finalTurnObservation = observed.find((entry) => entry.isFinalTurn);
       invariant(finalTurnObservation !== undefined, 'Final turn observation missing for run-test-86.');
       invariant(finalTurnObservation.output.length === 1 && finalTurnObservation.output[0] === 'agent__final_report', 'Final turn tools not filtered to agent__final_report.');
-      invariant(finalTurnObservation.input.some((tool) => tool !== 'agent__final_report'), 'Final turn input should include additional tools prior to filtering.');
+      invariant(finalTurnObservation.input.length === 1 && finalTurnObservation.input[0] === 'agent__final_report', 'Final turn input should already be restricted to agent__final_report.');
       const nonFinalObservation = observed.find((entry) => !entry.isFinalTurn);
       invariant(nonFinalObservation !== undefined, 'Non-final turn observation missing for run-test-86.');
       invariant(nonFinalObservation.output.length > 1, 'Non-final turn should retain multiple tools.');

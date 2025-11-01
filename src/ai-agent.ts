@@ -98,6 +98,8 @@ export class AIAgentSession {
   private static readonly REMOTE_FINAL_TURN = 'agent:final-turn';
   private static readonly FINAL_REPORT_TOOL = 'agent__final_report';
   private static readonly FINAL_REPORT_SHORT = 'final_report';
+  private static readonly MAX_TURNS_FINAL_MESSAGE = 'Maximum number of turns/steps reached. You must provide your final report now, by calling the `agent__final_report` tool. Do not attempt to call any other tool. Read carefully the instructions on how to call the `agent__final_report` tool and call it now.';
+  private static readonly TOOL_NO_OUTPUT = '(no output)';
   private static readonly RETRY_ACTION_SKIP_PROVIDER = 'skip-provider';
   readonly config: Configuration;
   readonly conversation: ConversationMessage[];
@@ -114,6 +116,8 @@ export class AIAgentSession {
   private canceled = false;
   private readonly stopRef?: { stopping: boolean };
   private ajv?: AjvInstance;
+  private readonly toolFailureMessages = new Map<string, string>();
+  private readonly toolFailureFallbacks: string[] = [];
   // Internal housekeeping notes
   private childConversations: { agentId?: string; toolName: string; promptPath: string; conversation: ConversationMessage[]; trace?: { originId?: string; parentId?: string; selfId?: string; callPath?: string } }[] = [];
   private readonly subAgents?: SubAgentRegistry;
@@ -1312,10 +1316,17 @@ export class AIAgentSession {
                 content: `Reminder: do not end with plain text. Use an available tool${excludeProgress} to make progress. When ready to conclude, call the tool \`${AIAgentSession.FINAL_REPORT_TOOL}\` to provide the final answer.`
               });
             }
-            // Do not inject final-turn user message here to avoid duplication.
-            // Providers append a single, standardized final-turn instruction.
+            // Force the final-report instruction onto the conversation once we enter the last turn.
 
             const isFinalTurn = currentTurn === maxTurns;
+            if (isFinalTurn) {
+              this.pushSystemRetryMessage(conversation, AIAgentSession.MAX_TURNS_FINAL_MESSAGE);
+              attemptConversation.push({
+                role: 'user',
+                content: AIAgentSession.MAX_TURNS_FINAL_MESSAGE,
+                metadata: { retryMessage: 'final-turn-instruction' },
+              });
+            }
             if (isFinalTurn && !finalTurnWarnLogged) {
               const warn: LogEntry = {
                 timestamp: Date.now(),
@@ -1367,7 +1378,30 @@ export class AIAgentSession {
               turnResult.messages,
               { turn: currentTurn, provider, model }
             );
-            
+
+            sanitizedMessages.forEach((message) => {
+              if (message.role !== 'tool') return;
+              const callId = (message as { toolCallId?: string }).toolCallId;
+              if (typeof callId !== 'string' || callId.length === 0) return;
+              const override = this.toolFailureMessages.get(callId);
+              if (override === undefined) return;
+              message.content = override;
+              this.toolFailureMessages.delete(callId);
+            });
+
+            if (this.toolFailureFallbacks.length > 0) {
+              sanitizedMessages.forEach((message) => {
+                if (this.toolFailureFallbacks.length === 0) return;
+                if (message.role !== 'tool') return;
+                const content = typeof message.content === 'string' ? message.content.trim() : '';
+                if (content.length > 0 && content !== AIAgentSession.TOOL_NO_OUTPUT) return;
+                const fallback = this.toolFailureFallbacks.shift();
+                if (fallback === undefined) return;
+                message.content = fallback;
+              });
+              this.toolFailureFallbacks.length = 0;
+            }
+
             // Update tracking if thinking was shown
             if (turnResult.shownThinking) {
               lastShownThinkingHeaderTurn = currentTurn;
@@ -1500,19 +1534,27 @@ export class AIAgentSession {
                     const trimmed = msg.content.trim().toLowerCase();
                     return trimmed.startsWith('(tool failed:');
                   });
-                if (failureToolMessage !== undefined && typeof (failureToolMessage as { toolCallId?: unknown }).toolCallId === 'string') {
-                  const owningAssistant = sanitizedMessages.find(
-                    (msg): msg is ConversationMessage & { toolCalls: ToolCall[] } =>
-                      msg.role === 'assistant' && Array.isArray((msg as { toolCalls?: unknown }).toolCalls)
-                  );
-                  if (owningAssistant !== undefined) {
-                    const relatedCall = owningAssistant.toolCalls.find((tc) => tc.id === (failureToolMessage as { toolCallId?: string }).toolCallId);
-                    if (relatedCall !== undefined) {
-                      failureToolNameNormalized = sanitizeToolName(relatedCall.name);
-                      if (failureToolNameNormalized === AIAgentSession.FINAL_REPORT_TOOL) {
-                        finalReportToolFailed = true;
+                if (failureToolMessage !== undefined) {
+                  const failureCallId = (failureToolMessage as { toolCallId?: string }).toolCallId;
+                  if (typeof failureCallId === 'string') {
+                    const override = this.toolFailureMessages.get(failureCallId);
+                    if (typeof override === 'string' && override.length > 0) {
+                      failureToolMessage.content = override;
+                    }
+                    const owningAssistant = sanitizedMessages.find(
+                      (msg): msg is ConversationMessage & { toolCalls: ToolCall[] } =>
+                        msg.role === 'assistant' && Array.isArray((msg as { toolCalls?: unknown }).toolCalls)
+                    );
+                    if (owningAssistant !== undefined) {
+                      const relatedCall = owningAssistant.toolCalls.find((tc) => tc.id === failureCallId);
+                      if (relatedCall !== undefined) {
+                        failureToolNameNormalized = sanitizeToolName(relatedCall.name);
+                        if (failureToolNameNormalized === AIAgentSession.FINAL_REPORT_TOOL) {
+                          finalReportToolFailed = true;
+                        }
                       }
                     }
+                    this.toolFailureMessages.delete(failureCallId);
                   }
                 }
               }
@@ -2922,6 +2964,12 @@ export class AIAgentSession {
     const filteredSelection = this.filterToolsForProvider(allTools, provider);
     const availableTools = filteredSelection.tools;
     const allowedToolNames = filteredSelection.allowedNames;
+    const toolsForTurn = isFinalTurn
+      ? (() => {
+          const filtered = availableTools.filter((tool) => sanitizeToolName(tool.name) === AIAgentSession.FINAL_REPORT_TOOL);
+          return filtered.length > 0 ? filtered : availableTools;
+        })()
+      : availableTools;
     let disableReasoningForTurn = false;
 
     const reasoningGuard = this.llmClient.shouldDisableReasoning(provider, {
@@ -2938,12 +2986,14 @@ export class AIAgentSession {
 
     // Track if we've shown thinking for this turn
     let shownThinking = false;
+    this.toolFailureMessages.clear();
+    this.toolFailureFallbacks.length = 0;
     
     // Create tool executor function that delegates to MCP client with accounting
     let subturnCounter = 0;
     let incompleteFinalReportDetected = false;
     const maxToolCallsPerTurn = Math.max(1, this.sessionConfig.maxToolCallsPerTurn ?? 10);
-    const toolExecutor = async (toolName: string, parameters: Record<string, unknown>): Promise<string> => {
+    const toolExecutor = async (toolName: string, parameters: Record<string, unknown>, options?: { toolCallId?: string }): Promise<string> => {
       if (this.stopRef?.stopping === true) throw new Error('stop_requested');
       if (this.canceled) throw new Error('canceled');
       const normalizedToolName = sanitizeToolName(toolName);
@@ -2952,7 +3002,7 @@ export class AIAgentSession {
       if (isFinalReportTool) {
         const nestedCalls = this.parseNestedCallsFromFinalReport(parameters);
         if (nestedCalls !== undefined) {
-          let nestedResult = '(no output)';
+          let nestedResult = AIAgentSession.TOOL_NO_OUTPUT;
           // eslint-disable-next-line functional/no-loop-statements
           for (const nestedCall of nestedCalls) {
             nestedResult = await toolExecutor(nestedCall.name, nestedCall.parameters);
@@ -2964,7 +3014,7 @@ export class AIAgentSession {
       subturnCounter += 1;
       if (subturnCounter > maxToolCallsPerTurn) {
         const msg = `Tool calls per turn exceeded: limit=${String(maxToolCallsPerTurn)}. Switch strategy: avoid further tool calls this turn; either summarize progress or call ${AIAgentSession.FINAL_REPORT_TOOL} to conclude.`;
-        const warn: LogEntry = { timestamp: Date.now(), severity: 'WRN', turn: currentTurn, subturn: subturnCounter, direction: 'response', type: 'tool', remoteIdentifier: 'agent:limits', fatal: false, message: msg };
+        const warn: LogEntry = { timestamp: Date.now(), severity: 'ERR', turn: currentTurn, subturn: subturnCounter, direction: 'response', type: 'tool', remoteIdentifier: 'agent:limits', fatal: false, message: msg };
         this.log(warn);
         throw new Error('tool_calls_per_turn_limit_exceeded');
       }
@@ -3032,7 +3082,7 @@ export class AIAgentSession {
           try { this.sessionConfig.callbacks?.onAccounting?.(successEntry); } catch (e) { warn(`tool accounting callback failed: ${e instanceof Error ? e.message : String(e)}`); }
           // Ensure we always return a valid string
           addSpanEvent('tool.call.success', { 'ai.tool.name': effectiveToolName, 'ai.tool.latency_ms': managed.latency });
-          return managed.result || '(no output)';
+          return managed.result || AIAgentSession.TOOL_NO_OUTPUT;
         }
 
         // Unknown tool after all paths
@@ -3071,7 +3121,15 @@ export class AIAgentSession {
 
         // Return error message instead of throwing - ensures LLM always gets valid tool output
         this.releaseToolSlot();
-        return `(tool failed: ${errorMsg})`;
+        const limitMessage = `execution not allowed because the per-turn tool limit (${String(maxToolCallsPerTurn)}) was reached; retry this tool on the next turn if available.`;
+        const failureDetail = errorMsg === 'tool_calls_per_turn_limit_exceeded' ? limitMessage : errorMsg;
+        const renderedFailure = `(tool failed: ${failureDetail})`;
+        if (typeof options?.toolCallId === 'string' && options.toolCallId.length > 0) {
+          this.toolFailureMessages.set(options.toolCallId, renderedFailure);
+        } else {
+          this.toolFailureFallbacks.push(renderedFailure);
+        }
+        return renderedFailure;
       }
     };
     const modelOverrides = this.resolveModelOverrides(provider, model);
@@ -3151,7 +3209,7 @@ export class AIAgentSession {
       messages: requestMessages,
       provider,
       model,
-      tools: availableTools,
+      tools: toolsForTurn,
       toolExecutor,
       temperature: effectiveTemperature,
       topP: effectiveTopP,

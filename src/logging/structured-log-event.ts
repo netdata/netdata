@@ -42,6 +42,28 @@ const PRIORITY_BY_SEVERITY: Partial<Record<LogEntry['severity'], number>> = {
 
 const DEFAULT_PRIORITY = 6;
 
+const RESERVED_LABEL_KEYS = new Set([
+  'severity',
+  'type',
+  'direction',
+  'turn',
+  'subturn',
+  'remote',
+  'tool_kind',
+  'tool_namespace',
+  'tool',
+  'headend',
+  'agent',
+  'agent_path',
+  'call_path',
+  'turn_path',
+  'txn_id',
+  'parent_txn_id',
+  'origin_txn_id',
+  'provider',
+  'model',
+]);
+
 export interface BuildStructuredEventOptions {
   labels?: Record<string, string>;
 }
@@ -102,6 +124,18 @@ export function buildStructuredLogEvent(
     });
   }
 
+  const providerLabel = labels.provider;
+  const modelLabel = labels.model;
+  const toolNamespaceLabel = labels.tool_namespace;
+  const toolLabel = labels.tool;
+
+  const filteredLabels = Object.entries(labels).reduce<Record<string, string>>((acc, [key, value]) => {
+    if (value.length === 0) return acc;
+    if (RESERVED_LABEL_KEYS.has(key)) return acc;
+    acc[key] = value;
+    return acc;
+  }, {});
+
   return {
     timestamp: entry.timestamp,
     isoTimestamp,
@@ -114,8 +148,8 @@ export function buildStructuredLogEvent(
     turn: entry.turn,
     subturn: entry.subturn,
     toolKind: entry.toolKind,
-    toolNamespace: entry.type === 'tool' ? labels.tool_namespace : undefined,
-    tool: entry.type === 'tool' ? labels.tool : undefined,
+    toolNamespace: entry.type === 'tool' ? toolNamespaceLabel : undefined,
+    tool: entry.type === 'tool' ? toolLabel : undefined,
     headendId: entry.headendId,
     agentId: entry.agentId,
     callPath: entry.callPath,
@@ -125,9 +159,9 @@ export function buildStructuredLogEvent(
     parentTxnId: entry.parentTxnId,
     originTxnId: entry.originTxnId,
     remoteIdentifier: entry.remoteIdentifier,
-    provider: labels.provider,
-    model: labels.model,
-    labels,
+    provider: providerLabel,
+    model: modelLabel,
+    labels: filteredLabels,
     stack: entry.stack,
   };
 }

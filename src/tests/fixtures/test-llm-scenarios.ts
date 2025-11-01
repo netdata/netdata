@@ -2560,6 +2560,53 @@ const SCENARIOS: ScenarioDefinition[] = [
     ],
   },
   {
+    id: 'run-test-max-turn-limit',
+    description: 'Session max-turn enforcement when no final report is produced.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        expectedTools: [TOOL_NAME],
+        response: {
+          kind: 'tool-call',
+          assistantText: 'Collecting preliminary data before final turn.',
+          toolCalls: [
+            {
+              toolName: TOOL_NAME,
+              callId: 'max-turn-call-1',
+              assistantText: 'Gathering initial evidence.',
+              arguments: {
+                text: 'max-turn-initial',
+              },
+            },
+          ],
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+          finishReason: TOOL_FINISH_REASON,
+        },
+      },
+      {
+        turn: 2,
+        expectedTools: [TOOL_NAME],
+        response: {
+          kind: 'tool-call',
+          assistantText: 'Attempting additional research instead of final report.',
+          toolCalls: [
+            {
+              toolName: TOOL_NAME,
+              callId: 'max-turn-call-2',
+              assistantText: 'Continuing research on final turn.',
+              arguments: {
+                text: 'max-turn-follow-up',
+              },
+            },
+          ],
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+          finishReason: TOOL_FINISH_REASON,
+        },
+      },
+    ],
+  },
+  {
     id: 'run-test-62',
     description: 'Rate limit waits interrupted by abort signal.',
     systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
