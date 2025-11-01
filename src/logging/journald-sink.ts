@@ -16,14 +16,28 @@ const SYSTEMD_CAT_PATHS = [
 
 let cachedSystemdCatPath: string | undefined;
 
+type SpawnFunction = typeof spawn;
+type StatSyncFunction = typeof fs.statSync;
+type AccessSyncFunction = typeof fs.accessSync;
+
+let spawnImpl: SpawnFunction = spawn;
+let statSyncImpl: StatSyncFunction = fs.statSync;
+let accessSyncImpl: AccessSyncFunction = fs.accessSync;
+
+function restoreDependencyDefaults(): void {
+  spawnImpl = spawn;
+  statSyncImpl = fs.statSync;
+  accessSyncImpl = fs.accessSync;
+}
+
 function findSystemdCatNative(): string | undefined {
   if (cachedSystemdCatPath !== undefined) return cachedSystemdCatPath;
 
   const found = SYSTEMD_CAT_PATHS.find((path) => {
     try {
-      const stats = fs.statSync(path);
+      const stats = statSyncImpl(path);
       if (!stats.isFile()) return false;
-      fs.accessSync(path, fs.constants.X_OK);
+      accessSyncImpl(path, fs.constants.X_OK);
       return true;
     } catch {
       return false;
@@ -40,7 +54,7 @@ function findSystemdCatNative(): string | undefined {
 export function isJournaldAvailable(): boolean {
   if (process.env.JOURNAL_STREAM === undefined) return false;
   try {
-    const stats = fs.statSync(JOURNAL_SOCKET_PATH);
+    const stats = statSyncImpl(JOURNAL_SOCKET_PATH);
     return stats.isSocket();
   } catch {
     return false;
@@ -138,7 +152,7 @@ class SharedJournaldSink implements JournaldEmitter {
     }
 
     try {
-      const child = spawn(binaryPath, [], {
+      const child = spawnImpl(binaryPath, [], {
         stdio: ['pipe', 'ignore', 'ignore'],
       });
 
@@ -413,6 +427,19 @@ function sanitizeMessage(message: string): string {
 export const __test = {
   resetSharedSink(): void {
     sharedSink = undefined;
+    cachedSystemdCatPath = undefined;
+    restoreDependencyDefaults();
+  },
+  setOverrides(overrides: Partial<{ spawn: SpawnFunction; statSync: StatSyncFunction; accessSync: AccessSyncFunction }>): void {
+    if (overrides.spawn !== undefined) {
+      spawnImpl = overrides.spawn;
+    }
+    if (overrides.statSync !== undefined) {
+      statSyncImpl = overrides.statSync;
+    }
+    if (overrides.accessSync !== undefined) {
+      accessSyncImpl = overrides.accessSync;
+    }
     cachedSystemdCatPath = undefined;
   },
 } as const;
