@@ -569,20 +569,24 @@ export class OpenAICompletionsHeadend implements Headend {
           const isRoot = agentMatches && (callPath === undefined || callPath === rootCallPath);
           if (isRoot) return;
           const reason = typeof event.reason === 'string' && event.reason.length > 0 ? italicize(event.reason) : undefined;
-          const prefix = escapeMarkdown(displayCallPath);
+          const prefix = `**${escapeMarkdown(displayCallPath)}**`;
           const line = reason !== undefined ? `${prefix} started ${reason}` : `${prefix} started`;
           appendProgressLine(line);
           return;
         }
         case 'agent_update': {
-          const prefix = escapeMarkdown(displayCallPath);
+          const prefix = `**${escapeMarkdown(displayCallPath)}**`;
           const updateLine = `${prefix} update ${italicize(event.message)}`;
           appendProgressLine(updateLine);
           return;
         }
         case 'agent_finished': {
-          const prefix = escapeMarkdown(displayCallPath);
-          const line = metricsText.length > 0 ? `${prefix} finished ${metricsText}` : `${prefix} finished`;
+          const prefix = `**${escapeMarkdown(displayCallPath)}**`;
+          const isRoot = agentMatches && (callPath === undefined || callPath === rootCallPath);
+          const line = (() => {
+            if (isRoot) return `${prefix} finished`;
+            return metricsText.length > 0 ? `${prefix} finished ${metricsText}` : `${prefix} finished`;
+          })();
           appendProgressLine(line);
           if (agentMatches && (callPath === undefined || callPath === rootCallPath)) {
             const summary = metricsText.length > 0 ? metricsText : 'completed';
@@ -596,7 +600,7 @@ export class OpenAICompletionsHeadend implements Headend {
         }
         case 'agent_failed': {
           const errorText = typeof event.error === 'string' && event.error.length > 0 ? italicize(event.error) : undefined;
-          const prefix = escapeMarkdown(displayCallPath);
+          const prefix = `**${escapeMarkdown(displayCallPath)}**`;
           let line = `${prefix} failed`;
           if (errorText !== undefined && metricsText.length > 0) {
             line += `: ${errorText}, ${metricsText}`;
@@ -619,7 +623,7 @@ export class OpenAICompletionsHeadend implements Headend {
           return;
         }
         default:
-          appendProgressLine(`${escapeMarkdown(displayCallPath)} update ${italicize('progress event')}`);
+          appendProgressLine(`**${escapeMarkdown(displayCallPath)}** update ${italicize('progress event')}`);
       }
     };
     const telemetryLabels = { ...getTelemetryLabels(), headend: this.id };

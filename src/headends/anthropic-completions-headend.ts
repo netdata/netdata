@@ -470,7 +470,7 @@ export class AnthropicCompletionsHeadend implements Headend {
         const fallback = normalizeCallPath(event.agentId);
         return fallback.length > 0 ? fallback : event.agentId;
       })();
-      const prefix = escapeMarkdown(displayCallPath);
+      const prefix = `**${escapeMarkdown(displayCallPath)}**`;
       if (expectingNewTurn || turns.length === 0) {
         startNextTurn();
         expectingNewTurn = false;
@@ -488,7 +488,12 @@ export class AnthropicCompletionsHeadend implements Headend {
         case 'agent_finished': {
           const metrics = 'metrics' in event ? (event as { metrics?: ProgressMetrics }).metrics : undefined;
           const metricsText = formatMetricsLine(metrics);
-          appendProgressLine(metricsText.length > 0 ? `${prefix}: finished ${metricsText}` : `${prefix}: finished`);
+          const isRoot = callPathForHeader === normalizedAgentPath || (normalizedAgentPath.length === 0 && callPathForHeader === event.agentId);
+          const finishedLine = (() => {
+            if (isRoot) return `${prefix}: finished`;
+            return metricsText.length > 0 ? `${prefix}: finished ${metricsText}` : `${prefix}: finished`;
+          })();
+          appendProgressLine(finishedLine);
           const originCandidate = (event as { originTxnId?: string }).originTxnId;
           if (typeof originCandidate === 'string' && originCandidate.length > 0) {
             rootOriginTxnId = originCandidate;
