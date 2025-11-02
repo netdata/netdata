@@ -691,6 +691,17 @@ export interface TurnRequest {
   caching?: CachingMode;
   sdkTrace?: boolean;
   sdkTraceLogger?: (event: { stage: 'request' | 'response'; provider: string; model: string; payload: unknown }) => void;
+  contextSnapshot?: TurnRequestContextSnapshot;
+}
+
+export interface TurnRequestContextSnapshot {
+  ctxTokens: number;
+  toolsAdded: number;
+  expectedTokens: number;
+  expectedPct?: number;
+  contextWindow?: number;
+  bufferTokens: number;
+  maxOutputTokens: number;
 }
 
 export interface LLMProvider {

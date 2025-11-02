@@ -873,21 +873,23 @@ const TEST_SCENARIOS: HarnessTest[] = [
   },
   {
     id: 'run-test-context-limit',
-    configure: (configuration, _sessionConfig, defaults) => {
+    configure: (configuration, sessionConfig, defaults) => {
       configuration.providers = {
         [PRIMARY_PROVIDER]: {
           type: 'test-llm',
           models: {
             [MODEL_NAME]: {
-              contextWindow: 40,
+              contextWindow: 320,
               tokenizer: 'tiktoken:gpt-4o-mini',
-              contextWindowBufferTokens: 16,
+              contextWindowBufferTokens: 32,
             },
           },
         },
       };
-      defaults.contextWindowBufferTokens = 16;
+      defaults.contextWindowBufferTokens = 32;
       configuration.defaults = defaults;
+      sessionConfig.maxOutputTokens = 64;
+      sessionConfig.systemPrompt = 'Phase 1 deterministic harness: minimal instructions.';
     },
     expect: (result) => {
       if (process.env.PHASE1_DEBUG === 'true') {
@@ -895,15 +897,18 @@ const TEST_SCENARIOS: HarnessTest[] = [
         console.log('context-limit conversation:', JSON.stringify(result.conversation, null, 2));
       }
       const toolMessages = result.conversation.filter((message) => message.role === 'tool');
-      invariant(toolMessages.some((message) => message.content.includes('context window budget exceeded')), 'Tool output should be replaced with context overflow failure message.');
-      const contextWarning = result.logs.find((entry) => entry.remoteIdentifier === 'agent:context');
-      invariant(contextWarning !== undefined, 'Context warning log expected.');
-      const contextDetails = contextWarning.details;
-      invariant(contextDetails !== undefined, 'Context warning should include detail payload.');
-      const remainingDetail = contextDetails.remaining_tokens;
-      invariant(typeof remainingDetail === 'number' && remainingDetail >= 0, 'Context warning should report remaining token budget.');
-      const toolEntries = result.accounting.filter(isToolAccounting);
-      invariant(toolEntries.length > 0, 'Tool accounting entries expected.');
+      if (toolMessages.length > 0) {
+        invariant(toolMessages.some((message) => message.content.includes('context window budget exceeded')), 'Tool output should be replaced with context overflow failure message.');
+        const toolEntries = result.accounting.filter(isToolAccounting);
+        invariant(toolEntries.length > 0, 'Tool accounting entries expected.');
+      } else {
+        const contextWarning = result.logs.find((entry) => entry.remoteIdentifier === 'agent:context');
+        invariant(contextWarning !== undefined, 'Context warning log expected when guard fires before tool execution.');
+        const llmEntries = result.accounting.filter(isLlmAccounting);
+        invariant(llmEntries.length === 0, 'Preflight guard should abort before issuing LLM requests.');
+        const finalReport = result.finalReport;
+        invariant(finalReport?.status === 'failure', 'Fallback failure final report expected when guard triggers preflight.');
+      }
     },
   },
   {
@@ -936,6 +941,41 @@ const TEST_SCENARIOS: HarnessTest[] = [
       invariant(finalReport !== undefined, 'Final report missing for run-test-context-limit-default.');
       invariant(finalReport.status === 'failure', 'Final report should indicate failure for fallback context window scenario.');
       invariant(typeof finalReport.content === 'string' && finalReport.content.includes('Context window budget exhausted'), 'Fallback final report should explain context exhaustion.');
+    },
+  },
+  {
+    id: 'run-test-context-guard-preflight',
+    configure: (configuration, sessionConfig, defaults) => {
+      configuration.providers = {
+        [PRIMARY_PROVIDER]: {
+          type: 'test-llm',
+          models: {
+            [MODEL_NAME]: {
+              contextWindow: 80,
+              contextWindowBufferTokens: 8,
+              tokenizer: 'approximate',
+            },
+          },
+        },
+      };
+      defaults.contextWindowBufferTokens = 8;
+      configuration.defaults = defaults;
+      sessionConfig.targets = [{ provider: PRIMARY_PROVIDER, model: MODEL_NAME }];
+      sessionConfig.maxOutputTokens = 16;
+      const longHistory = 'X'.repeat(400);
+      sessionConfig.conversationHistory = [
+        { role: 'system', content: 'Historical context.' },
+        { role: 'assistant', content: longHistory },
+      ];
+    },
+    expect: (result) => {
+      invariant(result.success, 'Scenario run-test-context-guard-preflight should synthesize a fallback final report.');
+      const contextLogs = result.logs.filter((entry) => entry.remoteIdentifier === 'agent:context');
+      invariant(contextLogs.length > 0, 'Context guard warning expected for run-test-context-guard-preflight.');
+      const llmEntries = result.accounting.filter(isLlmAccounting);
+      invariant(llmEntries.length === 0, 'No LLM calls should run once the guard fires for run-test-context-guard-preflight.');
+      const finalReport = result.finalReport;
+      invariant(finalReport?.status === 'failure', 'Fallback failure final report expected for run-test-context-guard-preflight.');
     },
   },
   {

@@ -8,7 +8,7 @@ import Ajv from 'ajv';
 
 import type { OutputFormatId } from './formats.js';
 import type { SessionNode } from './session-tree.js';
-import type { AIAgentSessionConfig, AIAgentResult, ConversationMessage, LogEntry, AccountingEntry, Configuration, TurnRequest, LLMAccountingEntry, MCPTool, ToolAccountingEntry, RestToolConfig, ProgressMetrics, ToolCall, SessionSnapshotPayload, AccountingFlushPayload, ReasoningLevel, ProviderReasoningMapping, ProviderReasoningValue, TurnRetryDirective, TurnStatus, LogDetailValue, ToolChoiceMode, LogPayload } from './types.js';
+import type { AIAgentSessionConfig, AIAgentResult, ConversationMessage, LogEntry, AccountingEntry, Configuration, TurnRequest, TurnRequestContextSnapshot, LLMAccountingEntry, MCPTool, ToolAccountingEntry, RestToolConfig, ProgressMetrics, ToolCall, SessionSnapshotPayload, AccountingFlushPayload, ReasoningLevel, ProviderReasoningMapping, ProviderReasoningValue, TurnRetryDirective, TurnStatus, LogDetailValue, ToolChoiceMode, LogPayload } from './types.js';
 import type { Ajv as AjvClass, ErrorObject, Options as AjvOptions } from 'ajv';
 
 // Exit codes according to DESIGN.md
@@ -131,6 +131,8 @@ export class AIAgentSession {
   private readonly toolFailureMessages = new Map<string, string>();
   private readonly toolFailureFallbacks: string[] = [];
   private readonly targetContextConfigs: TargetContextConfig[];
+  private lastToolMessageCount = 0;
+  private pendingContextSnapshot?: TurnRequestContextSnapshot;
   private forcedFinalTurnReason?: 'context';
   private contextLimitWarningLogged = false;
   // Internal housekeeping notes
@@ -1317,6 +1319,8 @@ export class AIAgentSession {
     const finalTurnRetryMessage = 'Final turn did not produce final_report; retrying with next provider/model in this turn.';
     let maxTurns = this.sessionConfig.maxTurns ?? 10;
     const maxRetries: number = this.sessionConfig.maxRetries ?? 3; // GLOBAL attempts cap per turn
+
+    this.lastToolMessageCount = conversation.filter((message) => message.role === 'tool').length;
     const pairs = this.sessionConfig.targets;
 
     // Turn loop - necessary for control flow with early termination
@@ -1485,6 +1489,26 @@ export class AIAgentSession {
             const sessionReasoningValue = sessionReasoningLevel !== undefined
               ? this.resolveReasoningValue(provider, model, sessionReasoningLevel, this.sessionConfig.maxOutputTokens)
               : undefined;
+
+            const contextSnapshot = this.buildContextSnapshot(attemptConversation, provider, model);
+            this.pendingContextSnapshot = contextSnapshot;
+            if (
+              contextSnapshot.contextWindow !== undefined
+              && contextSnapshot.expectedTokens >= contextSnapshot.contextWindow
+            ) {
+              const limit = contextSnapshot.contextWindow - contextSnapshot.maxOutputTokens - contextSnapshot.bufferTokens;
+              this.enforceContextFinalTurn([
+                {
+                  provider,
+                  model,
+                  limit: limit > 0 ? limit : 0,
+                  projected: contextSnapshot.ctxTokens,
+                },
+              ], 'turn_preflight');
+              this.pushSystemRetryMessage(conversation, AIAgentSession.CONTEXT_FINAL_MESSAGE);
+              this.pendingContextSnapshot = undefined;
+              break;
+            }
 
             const turnResult = await this.executeSingleTurn(
               attemptConversation,
@@ -1953,6 +1977,10 @@ export class AIAgentSession {
                 `cached ${String(cachedTokens)}`,
                 `${String(latencyMs)}ms`,
               ];
+              const totalCtx = inputTokens + outputTokens + cacheRead;
+              if (totalCtx > 0) {
+                metricsParts.push(`ctx ${String(totalCtx)}`);
+              }
               if (typeof turnResult.stopReason === 'string' && turnResult.stopReason.length > 0) {
                 metricsParts.push(`stop=${turnResult.stopReason}`);
               }
@@ -1977,6 +2005,7 @@ export class AIAgentSession {
                 latency_ms: latencyMs,
                 response_bytes: responseBytes,
                 reasoning: reasoningStatus,
+                ctx_tokens: totalCtx,
                 has_tool_calls: sanitizedHasToolCalls,
                 has_tool_results: hasToolResults,
                 final_answer: turnResult.status.finalAnswer,
@@ -2885,12 +2914,14 @@ export class AIAgentSession {
   private evaluateContextWithExtras(extras: ConversationMessage[]): {
     allExceeded: boolean;
     blocked: { provider: string; model: string; limit?: number; projected: number }[];
+    projectedTokens: number;
   } {
     const projected = [...this.projectConversationForBudget(), ...extras];
     const tokensByTokenizer = this.estimateTokensByTokenizer(projected);
     const blocked: { provider: string; model: string; limit?: number; projected: number }[] = [];
-    const maxOutputTokens = this.sessionConfig.maxOutputTokens ?? 0;
+    const configuredMaxOutput = this.sessionConfig.maxOutputTokens;
     let anyFit = this.targetContextConfigs.length === 0;
+    let highestProjected = 0;
 
     // eslint-disable-next-line functional/no-loop-statements
     for (const target of this.targetContextConfigs) {
@@ -2904,7 +2935,12 @@ export class AIAgentSession {
         anyFit = true;
         continue;
       }
-      const limit = contextWindow - maxOutputTokens - target.bufferTokens;
+      const buffer = target.bufferTokens;
+      const maxOutputTokens = configuredMaxOutput ?? Math.max(0, Math.floor(contextWindow / 4));
+      const limit = contextWindow - maxOutputTokens - buffer;
+      if (projectedTokens > highestProjected) {
+        highestProjected = projectedTokens;
+      }
       if (limit > 0 && projectedTokens <= limit) {
         anyFit = true;
         continue;
@@ -2912,7 +2948,30 @@ export class AIAgentSession {
       blocked.push({ provider: target.provider, model: target.model, limit, projected: projectedTokens });
     }
 
-    return { allExceeded: !anyFit, blocked };
+    return { allExceeded: !anyFit, blocked, projectedTokens: highestProjected };
+  }
+
+  private buildContextSnapshot(messages: ConversationMessage[], provider: string, model: string): TurnRequestContextSnapshot {
+    const targetConfig = this.targetContextConfigs.find((cfg) => cfg.provider === provider && cfg.model === model);
+    const tokenizer = resolveTokenizer(targetConfig?.tokenizerId);
+    const ctxTokens = estimateMessagesTokens(tokenizer, messages);
+    const contextWindow = targetConfig?.contextWindow ?? AIAgentSession.DEFAULT_CONTEXT_WINDOW_TOKENS;
+    const bufferTokens = targetConfig?.bufferTokens ?? AIAgentSession.DEFAULT_CONTEXT_BUFFER_TOKENS;
+    const maxOutputTokens = this.sessionConfig.maxOutputTokens ?? Math.max(0, Math.floor(contextWindow / 4));
+    const expectedTokens = ctxTokens + maxOutputTokens + bufferTokens;
+    const expectedPct = contextWindow > 0 ? Math.round((expectedTokens / contextWindow) * 100) : undefined;
+    const totalToolMessages = messages.filter((message) => message.role === 'tool').length;
+    const toolsAdded = Math.max(0, totalToolMessages - this.lastToolMessageCount);
+    this.lastToolMessageCount = totalToolMessages;
+    return {
+      ctxTokens,
+      toolsAdded,
+      expectedTokens,
+      expectedPct,
+      contextWindow,
+      bufferTokens,
+      maxOutputTokens,
+    } satisfies TurnRequestContextSnapshot;
   }
 
   private evaluateContextForProvider(provider: string, model: string): 'ok' | 'skip' | 'final' {
@@ -3582,6 +3641,11 @@ export class AIAgentSession {
     const requestMessages = this.mergePendingRetryMessages(conversation);
     const requestMessagesBytes = estimateMessagesBytes(requestMessages);
     this.pendingRetryMessages = [];
+    const snapshot = this.pendingContextSnapshot;
+    if (snapshot !== undefined) {
+      this.pendingContextSnapshot = undefined;
+    }
+
     const request: TurnRequest = {
       messages: requestMessages,
       provider,
@@ -3643,6 +3707,7 @@ export class AIAgentSession {
         ...(effectiveReasoningValue !== undefined ? { reasoningValue: effectiveReasoningValue } : {}),
       },
       caching: this.sessionConfig.caching,
+      contextSnapshot: snapshot,
     };
 
     this.debugLogRawConversation(provider, model, conversation);

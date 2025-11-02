@@ -106,6 +106,7 @@ function buildContext(event: StructuredLogEvent): { text?: string; highlight: 'l
       const outputTokens = getNumber('output_tokens');
       const cacheRead = getNumber('cache_read_tokens');
       const cacheWrite = getNumber('cache_write_tokens');
+      const ctxTokens = getNumber('ctx_tokens');
       const stopReason = getString('stop_reason');
       const reasoning = getString('reasoning');
 
@@ -121,6 +122,9 @@ function buildContext(event: StructuredLogEvent): { text?: string; highlight: 'l
       if (typeof cacheWrite === 'number') tokenSegments.push(`cW ${String(cacheWrite)}`);
       if (tokenSegments.length > 0) {
         parts.push(`tokens: ${tokenSegments.join(', ')}`);
+      }
+      if (typeof ctxTokens === 'number') {
+        parts.push(`ctx ${String(ctxTokens)}`);
       }
       if (typeof stopReason === 'string') parts.push(`stop=${stopReason}`);
       if (typeof reasoning === 'string') parts.push(`reasoning=${reasoning}`);

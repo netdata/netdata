@@ -562,7 +562,22 @@ export class LLMClient {
       final_turn: request.isFinalTurn === true,
       reasoning: this.describeReasoningState(request),
     };
-    const message = request.isFinalTurn === true ? 'LLM request prepared (final turn)' : 'LLM request prepared';
+    const baseMessage = request.isFinalTurn === true ? 'LLM request prepared (final turn)' : 'LLM request prepared';
+    const snapshot = request.contextSnapshot;
+    let message = baseMessage;
+    if (snapshot !== undefined) {
+      details.ctx_tokens = snapshot.ctxTokens;
+      details.tools_added = snapshot.toolsAdded;
+      details.expected_tokens = snapshot.expectedTokens;
+      if (snapshot.contextWindow !== undefined) {
+        details.context_window = snapshot.contextWindow;
+      }
+      if (snapshot.expectedPct !== undefined) {
+        details.context_pct = snapshot.expectedPct;
+      }
+      const percentText = snapshot.expectedPct !== undefined ? `${String(snapshot.expectedPct)}%` : 'n/a';
+      message = `${baseMessage} [tokens: ctx ${String(snapshot.ctxTokens)}, tools ${String(snapshot.toolsAdded)}, expected ${String(snapshot.expectedTokens)}, ${percentText}]`;
+    }
     this.log('VRB', 'request', 'llm', `${request.provider}:${request.model}`, message, {
       details,
       payload: payload !== undefined ? { type: 'llmRequest', value: payload } : undefined,
@@ -647,9 +662,14 @@ export class LLMClient {
     const tokens = result.tokens;
     const cacheRead = tokens?.cacheReadInputTokens ?? tokens?.cachedTokens ?? 0;
     const cacheWrite = tokens?.cacheWriteInputTokens ?? 0;
+    const inputTokens = tokens?.inputTokens;
+    const outputTokens = tokens?.outputTokens;
     const responseBytes = payload !== undefined
       ? new TextEncoder().encode(payload.body).length
       : result.response !== undefined ? new TextEncoder().encode(result.response).length : 0;
+    if (responseBytes > 0) {
+      result.responseBytes = responseBytes;
+    }
     const details: Record<string, LogDetailValue> = {
       latency_ms: latencyMs,
       reasoning: reasoningStatus,
@@ -657,6 +677,18 @@ export class LLMClient {
       cache_read_tokens: cacheRead,
       cache_write_tokens: cacheWrite,
     };
+    if (typeof inputTokens === 'number' && Number.isFinite(inputTokens)) {
+      details.input_tokens = inputTokens;
+    }
+    if (typeof outputTokens === 'number' && Number.isFinite(outputTokens)) {
+      details.output_tokens = outputTokens;
+    }
+    const ctxTokens = cacheRead
+      + (typeof inputTokens === 'number' && Number.isFinite(inputTokens) ? inputTokens : 0)
+      + (typeof outputTokens === 'number' && Number.isFinite(outputTokens) ? outputTokens : 0);
+    if (ctxTokens > 0 && Number.isFinite(ctxTokens)) {
+      details.ctx_tokens = ctxTokens;
+    }
     if (typeof costToUse === 'number') {
       details.cost_usd = costToUse;
     }
