@@ -563,20 +563,21 @@ export class LLMClient {
       reasoning: this.describeReasoningState(request),
     };
     const baseMessage = request.isFinalTurn === true ? 'LLM request prepared (final turn)' : 'LLM request prepared';
-    const snapshot = request.contextSnapshot;
+    const metrics = request.contextMetrics;
     let message = baseMessage;
-    if (snapshot !== undefined) {
-      details.ctx_tokens = snapshot.ctxTokens;
-      details.tools_added = snapshot.toolsAdded;
-      details.expected_tokens = snapshot.expectedTokens;
-      if (snapshot.contextWindow !== undefined) {
-        details.context_window = snapshot.contextWindow;
+    if (metrics !== undefined) {
+      details.ctx_tokens = metrics.ctxTokens;
+      details.new_tokens = metrics.newTokens;
+      details.schema_tokens = metrics.schemaTokens;
+      details.expected_tokens = metrics.expectedTokens;
+      if (metrics.contextWindow !== undefined) {
+        details.context_window = metrics.contextWindow;
       }
-      if (snapshot.expectedPct !== undefined) {
-        details.context_pct = snapshot.expectedPct;
+      if (metrics.expectedPct !== undefined) {
+        details.context_pct = metrics.expectedPct;
       }
-      const percentText = snapshot.expectedPct !== undefined ? `${String(snapshot.expectedPct)}%` : 'n/a';
-      message = `${baseMessage} [tokens: ctx ${String(snapshot.ctxTokens)}, tools ${String(snapshot.toolsAdded)}, expected ${String(snapshot.expectedTokens)}, ${percentText}]`;
+      const percentText = metrics.expectedPct !== undefined ? `${String(metrics.expectedPct)}%` : 'n/a';
+      message = `${baseMessage} [tokens: ctx ${String(metrics.ctxTokens)}, new ${String(metrics.newTokens)}, schema ${String(metrics.schemaTokens)}, expected ${String(metrics.expectedTokens)}, ${percentText}]`;
     }
     this.log('VRB', 'request', 'llm', `${request.provider}:${request.model}`, message, {
       details,

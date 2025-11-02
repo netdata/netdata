@@ -691,12 +691,13 @@ export interface TurnRequest {
   caching?: CachingMode;
   sdkTrace?: boolean;
   sdkTraceLogger?: (event: { stage: 'request' | 'response'; provider: string; model: string; payload: unknown }) => void;
-  contextSnapshot?: TurnRequestContextSnapshot;
+  contextMetrics?: TurnRequestContextMetrics;
 }
 
-export interface TurnRequestContextSnapshot {
+export interface TurnRequestContextMetrics {
   ctxTokens: number;
-  toolsAdded: number;
+  newTokens: number;
+  schemaTokens: number;
   expectedTokens: number;
   expectedPct?: number;
   contextWindow?: number;

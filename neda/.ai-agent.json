@@ -771,6 +771,13 @@
         "completion": 10,
         "cacheRead": 0.125
       },
+      "gpt-5-codex": {
+        "unit": "per_1m",
+        "currency": "USD",
+        "prompt": 1.25,
+        "completion": 10,
+        "cacheRead": 0.125
+      },
       "gpt-5-mini": {
         "unit": "per_1m",
         "currency": "USD",
