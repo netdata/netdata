@@ -8,7 +8,7 @@ import Ajv from 'ajv';
 
 import type { OutputFormatId } from './formats.js';
 import type { SessionNode } from './session-tree.js';
-import type { AIAgentSessionConfig, AIAgentResult, ConversationMessage, LogEntry, AccountingEntry, Configuration, TurnRequest, TurnRequestContextSnapshot, LLMAccountingEntry, MCPTool, ToolAccountingEntry, RestToolConfig, ProgressMetrics, ToolCall, SessionSnapshotPayload, AccountingFlushPayload, ReasoningLevel, ProviderReasoningMapping, ProviderReasoningValue, TurnRetryDirective, TurnStatus, LogDetailValue, ToolChoiceMode, LogPayload } from './types.js';
+import type { AIAgentSessionConfig, AIAgentResult, ConversationMessage, LogEntry, AccountingEntry, Configuration, TurnRequest, LLMAccountingEntry, MCPTool, ToolAccountingEntry, RestToolConfig, ProgressMetrics, ToolCall, SessionSnapshotPayload, AccountingFlushPayload, ReasoningLevel, ProviderReasoningMapping, ProviderReasoningValue, TurnRetryDirective, TurnStatus, LogDetailValue, ToolChoiceMode, LogPayload, TurnRequestContextMetrics } from './types.js';
 import type { Ajv as AjvClass, ErrorObject, Options as AjvOptions } from 'ajv';
 
 // Exit codes according to DESIGN.md
@@ -54,7 +54,7 @@ import { SessionProgressReporter } from './session-progress-reporter.js';
 import { SessionTreeBuilder } from './session-tree.js';
 import { SubAgentRegistry } from './subagent-registry.js';
 import { recordContextGuardMetrics, recordLlmMetrics, runWithSpan, addSpanAttributes, addSpanEvent } from './telemetry/index.js';
-import { estimateMessagesTokens, resolveTokenizer, tokenizerKey } from './tokenizer-registry.js';
+import { estimateMessagesTokens, resolveTokenizer } from './tokenizer-registry.js';
 import { AgentProvider } from './tools/agent-provider.js';
 import { InternalToolProvider } from './tools/internal-provider.js';
 import { MCPProvider } from './tools/mcp-provider.js';
@@ -93,9 +93,24 @@ const safeJsonByteLength = (value: unknown): number => {
 interface TargetContextConfig {
   provider: string;
   model: string;
-  contextWindow: number | undefined;
+  contextWindow: number;
   tokenizerId?: string;
   bufferTokens: number;
+}
+
+interface ContextGuardBlockedEntry {
+  provider: string;
+  model: string;
+  contextWindow: number;
+  bufferTokens: number;
+  maxOutputTokens: number;
+  limit: number;
+  projected: number;
+}
+
+interface ContextGuardEvaluation {
+  blocked: ContextGuardBlockedEntry[];
+  projectedTokens: number;
 }
 
 
@@ -105,6 +120,7 @@ export class AIAgentSession {
   private static readonly REMOTE_CONC_HINT = 'agent:concurrency-hint';
   private static readonly REMOTE_AGENT_TOOLS = 'agent:tools';
   private static readonly REMOTE_FINAL_TURN = 'agent:final-turn';
+  private static readonly REMOTE_CONTEXT = 'agent:context';
   private static readonly FINAL_REPORT_TOOL = 'agent__final_report';
   private static readonly FINAL_REPORT_SHORT = 'final_report';
   private static readonly MAX_TURNS_FINAL_MESSAGE = 'Maximum number of turns/steps reached. You must provide your final report now, by calling the `agent__final_report` tool. Do not attempt to call any other tool. Read carefully the instructions on how to call the `agent__final_report` tool and call it now.';
@@ -113,6 +129,8 @@ export class AIAgentSession {
   private static readonly RETRY_ACTION_SKIP_PROVIDER = 'skip-provider';
   private static readonly DEFAULT_CONTEXT_WINDOW_TOKENS = 131072;
   private static readonly DEFAULT_CONTEXT_BUFFER_TOKENS = 256;
+  private static readonly CONTEXT_POST_SHRINK_WARN = 'Context guard post-shrink still over projected limit; continuing with forced final turn.';
+  private static readonly CONTEXT_POST_SHRINK_TURN_WARN = 'Context guard post-shrink still over projected limit during turn execution; proceeding anyway.';
   readonly config: Configuration;
   readonly conversation: ConversationMessage[];
   readonly logs: LogEntry[];
@@ -131,8 +149,10 @@ export class AIAgentSession {
   private readonly toolFailureMessages = new Map<string, string>();
   private readonly toolFailureFallbacks: string[] = [];
   private readonly targetContextConfigs: TargetContextConfig[];
-  private lastToolMessageCount = 0;
-  private pendingContextSnapshot?: TurnRequestContextSnapshot;
+  private currentCtxTokens = 0;
+  private pendingCtxTokens = 0;
+  private newCtxTokens = 0;
+  private schemaCtxTokens = 0;
   private forcedFinalTurnReason?: 'context';
   private contextLimitWarningLogged = false;
   // Internal housekeeping notes
@@ -432,6 +452,16 @@ export class AIAgentSession {
         bufferTokens,
       } satisfies TargetContextConfig;
     });
+    this.currentCtxTokens = this.estimateTokensForCounters(this.conversation);
+    if (process.env.CONTEXT_DEBUG === 'true') {
+      console.log('context-guard/init-counters', {
+        currentCtxTokens: this.currentCtxTokens,
+        pendingCtxTokens: this.pendingCtxTokens,
+        newCtxTokens: this.newCtxTokens,
+        schemaCtxTokens: this.schemaCtxTokens,
+        conversationMessages: this.conversation.length,
+      });
+    }
     try {
     if (this.abortSignal !== undefined) {
       if (this.abortSignal.aborted) {
@@ -1208,11 +1238,27 @@ export class AIAgentSession {
 
       // Derive arrays from opTree for canonical output
       const flat = (() => { try { return this.opTree.flatten(); } catch { return { logs: this.logs, accounting: this.accounting }; } })();
+      const mergedLogs = (() => {
+        const combined = [...flat.logs];
+        const seen = new Set<string>();
+        combined.forEach((entry) => {
+          const key = `${String(entry.timestamp)}:${entry.remoteIdentifier}:${entry.message}`;
+          seen.add(key);
+        });
+        this.logs.forEach((entry) => {
+          const key = `${String(entry.timestamp)}:${entry.remoteIdentifier}:${entry.message}`;
+          if (!seen.has(key)) {
+            combined.push(entry);
+            seen.add(key);
+          }
+        });
+        return combined;
+      })();
       const resultShape = {
         success: result.success,
         error: result.error,
         conversation: result.conversation,
-        logs: flat.logs,
+        logs: mergedLogs,
         accounting: flat.accounting,
         finalReport: result.finalReport,
         // Provide ASCII tree for downstream consumers (CLI may choose to print)
@@ -1272,11 +1318,27 @@ export class AIAgentSession {
       // Emit FIN summary even on failure
       this.emitFinalSummary(currentLogs, currentAccounting);
       const flatFail = (() => { try { return this.opTree.flatten(); } catch { return { logs: this.logs, accounting: this.accounting }; } })();
+      const mergedFailLogs = (() => {
+        const combined = [...flatFail.logs];
+        const seen = new Set<string>();
+        combined.forEach((entry) => {
+          const key = `${String(entry.timestamp)}:${entry.remoteIdentifier}:${entry.message}`;
+          seen.add(key);
+        });
+        this.logs.forEach((entry) => {
+          const key = `${String(entry.timestamp)}:${entry.remoteIdentifier}:${entry.message}`;
+          if (!seen.has(key)) {
+            combined.push(entry);
+            seen.add(key);
+          }
+        });
+        return combined;
+      })();
       const failShape = {
         success: false,
         error: message,
         conversation: currentConversation,
-        logs: flatFail.logs,
+        logs: mergedFailLogs,
         accounting: flatFail.accounting
       } as AIAgentResult;
       try {
@@ -1312,7 +1374,20 @@ export class AIAgentSession {
     let accounting = [...initialAccounting];
     let currentTurn = startTurn;
     let finalReportToolFailed = false;
-    
+
+    this.currentCtxTokens = this.estimateTokensForCounters(conversation);
+    this.pendingCtxTokens = 0;
+    this.newCtxTokens = 0;
+    if (process.env.CONTEXT_DEBUG === 'true') {
+      console.log('context-guard/loop-init', {
+        currentCtxTokens: this.currentCtxTokens,
+        pendingCtxTokens: this.pendingCtxTokens,
+        newCtxTokens: this.newCtxTokens,
+        schemaCtxTokens: this.schemaCtxTokens,
+        turn: currentTurn,
+      });
+    }
+
     // Track the last turn where we showed thinking header
     let lastShownThinkingHeaderTurn = -1;
 
@@ -1320,7 +1395,6 @@ export class AIAgentSession {
     let maxTurns = this.sessionConfig.maxTurns ?? 10;
     const maxRetries: number = this.sessionConfig.maxRetries ?? 3; // GLOBAL attempts cap per turn
 
-    this.lastToolMessageCount = conversation.filter((message) => message.role === 'tool').length;
     const pairs = this.sessionConfig.targets;
 
     // Turn loop - necessary for control flow with early termination
@@ -1387,16 +1461,38 @@ export class AIAgentSession {
 
         const providerContextStatus = this.evaluateContextForProvider(provider, model);
         if (providerContextStatus === 'final') {
-          const evaluation = this.evaluateContextWithExtras([]);
+          const evaluation = this.evaluateContextGuard(this.schemaCtxTokens);
           this.enforceContextFinalTurn(evaluation.blocked, 'turn_preflight');
-          break;
+          this.schemaCtxTokens = this.computeForcedFinalSchemaTokens(provider);
+          const postEnforce = this.evaluateContextGuard(this.schemaCtxTokens);
+          if (postEnforce.blocked.length > 0) {
+            const [firstBlocked] = postEnforce.blocked;
+            const warnEntry: LogEntry = {
+              timestamp: Date.now(),
+              severity: 'WRN',
+              turn: currentTurn,
+              subturn: 0,
+              direction: 'response',
+              type: 'llm',
+              remoteIdentifier: AIAgentSession.REMOTE_CONTEXT,
+              fatal: false,
+              message: AIAgentSession.CONTEXT_POST_SHRINK_WARN,
+              details: {
+                projected_tokens: postEnforce.projectedTokens,
+                limit_tokens: firstBlocked.limit,
+                provider: firstBlocked.provider,
+                model: firstBlocked.model,
+              },
+            };
+            this.log(warnEntry);
+          }
         }
         if (providerContextStatus === 'skip') {
-          const evaluation = this.evaluateContextWithExtras([]);
+          const evaluation = this.evaluateContextGuard(this.schemaCtxTokens);
           const blocked = evaluation.blocked.find((entry) => entry.provider === provider && entry.model === model);
           if (blocked !== undefined) {
-            const limitTokens = blocked.limit ?? Number.NaN;
-            const remainingTokens = typeof blocked.limit === 'number' && Number.isFinite(blocked.limit)
+            const limitTokens = blocked.limit;
+            const remainingTokens = Number.isFinite(blocked.limit)
               ? Math.max(0, blocked.limit - blocked.projected)
               : undefined;
             this.reportContextGuardEvent({
@@ -1415,9 +1511,9 @@ export class AIAgentSession {
               subturn: 0,
               direction: 'response',
               type: 'llm',
-              remoteIdentifier: 'agent:context',
+              remoteIdentifier: AIAgentSession.REMOTE_CONTEXT,
               fatal: false,
-              message: `Skipping provider ${provider}:${model} due to projected context size ${String(blocked.projected)} tokens exceeding limit ${String(blocked.limit ?? Number.NaN)}.`,
+              message: `Skipping provider ${provider}:${model} due to projected context size ${String(blocked.projected)} tokens exceeding limit ${String(blocked.limit)}.`,
               details: {
                 projected_tokens: blocked.projected,
                 limit_tokens: limitTokens,
@@ -1490,24 +1586,36 @@ export class AIAgentSession {
               ? this.resolveReasoningValue(provider, model, sessionReasoningLevel, this.sessionConfig.maxOutputTokens)
               : undefined;
 
-            const contextSnapshot = this.buildContextSnapshot(attemptConversation, provider, model);
-            this.pendingContextSnapshot = contextSnapshot;
-            if (
-              contextSnapshot.contextWindow !== undefined
-              && contextSnapshot.expectedTokens >= contextSnapshot.contextWindow
-            ) {
-              const limit = contextSnapshot.contextWindow - contextSnapshot.maxOutputTokens - contextSnapshot.bufferTokens;
-              this.enforceContextFinalTurn([
-                {
-                  provider,
-                  model,
-                  limit: limit > 0 ? limit : 0,
-                  projected: contextSnapshot.ctxTokens,
-                },
-              ], 'turn_preflight');
-              this.pushSystemRetryMessage(conversation, AIAgentSession.CONTEXT_FINAL_MESSAGE);
-              this.pendingContextSnapshot = undefined;
-              break;
+            if (this.newCtxTokens > 0) {
+              this.pendingCtxTokens += this.newCtxTokens;
+              this.newCtxTokens = 0;
+            }
+            const guardEvaluation = this.evaluateContextGuard(this.schemaCtxTokens);
+            if (guardEvaluation.blocked.length > 0) {
+              this.enforceContextFinalTurn(guardEvaluation.blocked, 'turn_preflight');
+              this.schemaCtxTokens = this.computeForcedFinalSchemaTokens(provider);
+              const postEnforceGuard = this.evaluateContextGuard(this.schemaCtxTokens);
+              if (postEnforceGuard.blocked.length > 0) {
+                const [firstBlocked] = postEnforceGuard.blocked;
+                const warnEntry: LogEntry = {
+                  timestamp: Date.now(),
+                  severity: 'WRN',
+                  turn: currentTurn,
+                  subturn: 0,
+                  direction: 'response',
+                  type: 'llm',
+                  remoteIdentifier: AIAgentSession.REMOTE_CONTEXT,
+                  fatal: false,
+                  message: AIAgentSession.CONTEXT_POST_SHRINK_TURN_WARN,
+                  details: {
+                    projected_tokens: postEnforceGuard.projectedTokens,
+                    limit_tokens: firstBlocked.limit,
+                    provider: firstBlocked.provider,
+                    model: firstBlocked.model,
+                  },
+                };
+                this.log(warnEntry);
+              }
             }
 
             const turnResult = await this.executeSingleTurn(
@@ -1978,6 +2086,9 @@ export class AIAgentSession {
                 `${String(latencyMs)}ms`,
               ];
               const totalCtx = inputTokens + outputTokens + cacheRead;
+              this.currentCtxTokens = totalCtx;
+              this.pendingCtxTokens = 0;
+              this.schemaCtxTokens = 0;
               if (totalCtx > 0) {
                 metricsParts.push(`ctx ${String(totalCtx)}`);
               }
@@ -2555,7 +2666,7 @@ export class AIAgentSession {
       this.opTree.endTurn(0);
       this.opTree.endSession(false, errMsg);
     } catch (e) { warn(`endSession failed: ${e instanceof Error ? e.message : String(e)}`); }
-    return { success: false, error: errMsg, conversation, logs, accounting };
+    return { success: false, error: errMsg, conversation, logs: this.logs, accounting };
   }
 
   private finalizeGracefulStopSession(
@@ -2572,7 +2683,7 @@ export class AIAgentSession {
       this.opTree.endTurn(0);
       this.opTree.endSession(true);
     } catch (e) { warn(`endSession failed: ${e instanceof Error ? e.message : String(e)}`); }
-    return { success: true, conversation, logs, accounting } as AIAgentResult;
+    return { success: true, conversation, logs: this.logs, accounting } as AIAgentResult;
   }
 
   private async sleepWithAbort(
@@ -2881,120 +2992,176 @@ export class AIAgentSession {
     return [...conversation, ...retryMessages];
   }
 
-  private projectConversationForBudget(): ConversationMessage[] {
-    const cleaned = this.conversation.filter((msg) => msg.metadata?.retryMessage === undefined);
-    if (this.pendingRetryMessages.length === 0) {
-      return [...cleaned];
+  private getContextTargets(): TargetContextConfig[] {
+    if (this.targetContextConfigs.length > 0) {
+      return this.targetContextConfigs;
     }
-    const pending = this.pendingRetryMessages.map((text) => ({ role: 'user' as const, content: text }));
-    return [...cleaned, ...pending];
+    const defaultBuffer = this.config.defaults?.contextWindowBufferTokens ?? AIAgentSession.DEFAULT_CONTEXT_BUFFER_TOKENS;
+    return [{
+      provider: 'default',
+      model: 'default',
+      contextWindow: AIAgentSession.DEFAULT_CONTEXT_WINDOW_TOKENS,
+      tokenizerId: undefined,
+      bufferTokens: defaultBuffer,
+    }];
   }
 
-  private estimateTokensByTokenizer(messages: ConversationMessage[]): Map<string, number> {
-    const totals = new Map<string, number>();
-    const uniqueIds = new Set<string>();
-    const approximateKey = tokenizerKey(undefined);
-    if (this.targetContextConfigs.length === 0) {
-      uniqueIds.add(approximateKey);
-    } else {
-      // eslint-disable-next-line functional/no-loop-statements
-      for (const cfg of this.targetContextConfigs) {
-        uniqueIds.add(tokenizerKey(cfg.tokenizerId));
+  private estimateTokensForCounters(messages: ConversationMessage[]): number {
+    if (messages.length === 0) {
+      return 0;
+    }
+    let maxTokens = 0;
+    const targets = this.getContextTargets();
+    // eslint-disable-next-line functional/no-loop-statements
+    for (const target of targets) {
+      const tokenizer = resolveTokenizer(target.tokenizerId);
+      const tokens = estimateMessagesTokens(tokenizer, messages);
+      if (tokens > maxTokens) {
+        maxTokens = tokens;
       }
     }
-    // eslint-disable-next-line functional/no-loop-statements
-    for (const id of uniqueIds) {
-      const idForLookup = id === approximateKey ? undefined : id;
-      const tokenizer = resolveTokenizer(idForLookup);
-      totals.set(id, estimateMessagesTokens(tokenizer, messages));
-    }
-    return totals;
+    const approxTokens = Math.ceil(estimateMessagesBytes(messages) / 4);
+    return Math.max(maxTokens, approxTokens);
   }
 
-  private evaluateContextWithExtras(extras: ConversationMessage[]): {
-    allExceeded: boolean;
-    blocked: { provider: string; model: string; limit?: number; projected: number }[];
-    projectedTokens: number;
-  } {
-    const projected = [...this.projectConversationForBudget(), ...extras];
-    const tokensByTokenizer = this.estimateTokensByTokenizer(projected);
-    const blocked: { provider: string; model: string; limit?: number; projected: number }[] = [];
-    const configuredMaxOutput = this.sessionConfig.maxOutputTokens;
-    let anyFit = this.targetContextConfigs.length === 0;
-    let highestProjected = 0;
+  private estimateToolSchemaTokens(tools: readonly MCPTool[]): number {
+    if (tools.length === 0) {
+      return 0;
+    }
+    const serialized = tools.map((tool) => {
+      const payload = {
+        name: tool.name,
+        description: tool.description,
+        instructions: tool.instructions ?? '',
+        inputSchema: tool.inputSchema,
+      };
+      return {
+        role: 'system' as const,
+        content: JSON.stringify(payload),
+      } satisfies ConversationMessage;
+    });
+    const estimated = this.estimateTokensForCounters(serialized);
+    if (process.env.CONTEXT_DEBUG === 'true') {
+      console.log('context-guard/schema-estimate', { toolCount: tools.length, estimated });
+    }
+    return estimated;
+  }
 
+  private computeMaxOutputTokens(contextWindow: number): number {
+    const configured = this.sessionConfig.maxOutputTokens;
+    return configured ?? Math.max(0, Math.floor(contextWindow / 4));
+  }
+
+  private evaluateContextGuard(extraTokens = 0): ContextGuardEvaluation {
+    const projectedTokens = this.currentCtxTokens + this.pendingCtxTokens + this.newCtxTokens + extraTokens;
+    const blocked: ContextGuardBlockedEntry[] = [];
+    const targets = this.getContextTargets();
     // eslint-disable-next-line functional/no-loop-statements
-    for (const target of this.targetContextConfigs) {
-      const key = tokenizerKey(target.tokenizerId);
-      const projectedTokens = tokensByTokenizer.get(key);
-      if (projectedTokens === undefined) {
-        continue;
-      }
+    for (const target of targets) {
       const contextWindow = target.contextWindow;
-      if (contextWindow === undefined) {
-        anyFit = true;
-        continue;
+      const bufferTokens = target.bufferTokens;
+      const maxOutputTokens = this.computeMaxOutputTokens(contextWindow);
+      const limit = Math.max(0, contextWindow - bufferTokens - maxOutputTokens);
+      if (limit > 0 && projectedTokens > limit) {
+        blocked.push({
+          provider: target.provider,
+          model: target.model,
+          contextWindow,
+          bufferTokens,
+          maxOutputTokens,
+          limit,
+          projected: projectedTokens,
+        });
       }
-      const buffer = target.bufferTokens;
-      const maxOutputTokens = configuredMaxOutput ?? Math.max(0, Math.floor(contextWindow / 4));
-      const limit = contextWindow - maxOutputTokens - buffer;
-      if (projectedTokens > highestProjected) {
-        highestProjected = projectedTokens;
-      }
-      if (limit > 0 && projectedTokens <= limit) {
-        anyFit = true;
-        continue;
-      }
-      blocked.push({ provider: target.provider, model: target.model, limit, projected: projectedTokens });
     }
-
-    return { allExceeded: !anyFit, blocked, projectedTokens: highestProjected };
+    return { blocked, projectedTokens };
   }
 
-  private buildContextSnapshot(messages: ConversationMessage[], provider: string, model: string): TurnRequestContextSnapshot {
-    const targetConfig = this.targetContextConfigs.find((cfg) => cfg.provider === provider && cfg.model === model);
-    const tokenizer = resolveTokenizer(targetConfig?.tokenizerId);
-    const ctxTokens = estimateMessagesTokens(tokenizer, messages);
-    const contextWindow = targetConfig?.contextWindow ?? AIAgentSession.DEFAULT_CONTEXT_WINDOW_TOKENS;
-    const bufferTokens = targetConfig?.bufferTokens ?? AIAgentSession.DEFAULT_CONTEXT_BUFFER_TOKENS;
-    const maxOutputTokens = this.sessionConfig.maxOutputTokens ?? Math.max(0, Math.floor(contextWindow / 4));
-    const expectedTokens = ctxTokens + maxOutputTokens + bufferTokens;
-    const expectedPct = contextWindow > 0 ? Math.round((expectedTokens / contextWindow) * 100) : undefined;
-    const totalToolMessages = messages.filter((message) => message.role === 'tool').length;
-    const toolsAdded = Math.max(0, totalToolMessages - this.lastToolMessageCount);
-    this.lastToolMessageCount = totalToolMessages;
+  private buildContextMetrics(provider: string, model: string): TurnRequestContextMetrics {
+    const targets = this.getContextTargets();
+    const target = targets.find((cfg) => cfg.provider === provider && cfg.model === model) ?? targets[0];
+    const contextWindow = target.contextWindow;
+    const bufferTokens = target.bufferTokens;
+    const maxOutputTokens = this.computeMaxOutputTokens(contextWindow);
+    const ctxTokens = this.currentCtxTokens;
+    const newTokens = this.pendingCtxTokens;
+    const schemaTokens = this.schemaCtxTokens;
+    const expectedTokens = ctxTokens + newTokens + schemaTokens;
+    const expectedPct = contextWindow > 0
+      ? Math.round(((expectedTokens + bufferTokens + maxOutputTokens) / contextWindow) * 100)
+      : undefined;
+    if (process.env.CONTEXT_DEBUG === 'true') {
+      console.log('context-guard/build-metrics', {
+        provider,
+        model,
+        ctxTokens,
+        pendingCtxTokens: this.pendingCtxTokens,
+        schemaCtxTokens: this.schemaCtxTokens,
+        newTokens,
+        schemaTokens,
+        expectedTokens,
+      });
+    }
     return {
       ctxTokens,
-      toolsAdded,
+      newTokens,
+      schemaTokens,
       expectedTokens,
       expectedPct,
       contextWindow,
       bufferTokens,
       maxOutputTokens,
-    } satisfies TurnRequestContextSnapshot;
+    };
   }
 
   private evaluateContextForProvider(provider: string, model: string): 'ok' | 'skip' | 'final' {
-    const evaluation = this.evaluateContextWithExtras([]);
-    const targetKey = `${provider}:${model}`;
-    const blockedKeys = new Set(evaluation.blocked.map((entry) => `${entry.provider}:${entry.model}`));
-    if (!blockedKeys.has(targetKey)) {
+    const targets = this.getContextTargets();
+    const evaluation = this.evaluateContextGuard(this.schemaCtxTokens);
+    if (process.env.CONTEXT_DEBUG === 'true') {
+      console.log('context-guard/provider-eval', {
+        provider,
+        model,
+        blocked: evaluation.blocked.map((entry) => ({
+          provider: entry.provider,
+          model: entry.model,
+          limit: entry.limit,
+          projected: entry.projected,
+        })),
+      });
+    }
+    if (evaluation.blocked.length === 0) {
       return 'ok';
     }
-    if (evaluation.allExceeded) {
+    const blockedKeys = new Set(evaluation.blocked.map((entry) => `${entry.provider}:${entry.model}`));
+    const currentKey = `${provider}:${model}`;
+    if (blockedKeys.size >= targets.length) {
       return 'final';
     }
-    return 'skip';
+    if (blockedKeys.has(currentKey)) {
+      return 'skip';
+    }
+    if (targets.length === 1 && targets[0].provider === 'default') {
+      return 'final';
+    }
+    return 'ok';
   }
 
-  private enforceContextFinalTurn(
-    blocked: { provider: string; model: string; limit?: number; projected: number }[],
-    trigger: 'tool_preflight' | 'turn_preflight'
-  ): void {
+  private enforceContextFinalTurn(blocked: ContextGuardBlockedEntry[], trigger: 'tool_preflight' | 'turn_preflight'): void {
     // Emit metrics for each blocked provider/model combination
+    if (process.env.CONTEXT_DEBUG === 'true') {
+      console.log('context-guard/enforce', {
+        trigger,
+        blocked: blocked.map((entry) => ({
+          provider: entry.provider,
+          model: entry.model,
+          limit: entry.limit,
+          projected: entry.projected,
+        })),
+      });
+    }
     if (blocked.length > 0) {
       blocked.forEach((entry) => {
-        const remainingTokens = typeof entry.limit === 'number' && Number.isFinite(entry.limit)
+        const remainingTokens = Number.isFinite(entry.limit)
           ? Math.max(0, entry.limit - entry.projected)
           : undefined;
         this.reportContextGuardEvent({
@@ -3016,11 +3183,19 @@ export class AIAgentSession {
     if (this.contextLimitWarningLogged) {
       return;
     }
-    const first = blocked[0] ?? { provider: 'unknown', model: 'unknown', limit: 0, projected: 0 };
-    const remainingTokens = typeof first.limit === 'number' && Number.isFinite(first.limit)
+    const first = blocked[0] ?? {
+      provider: 'unknown',
+      model: 'unknown',
+      contextWindow: AIAgentSession.DEFAULT_CONTEXT_WINDOW_TOKENS,
+      bufferTokens: AIAgentSession.DEFAULT_CONTEXT_BUFFER_TOKENS,
+      maxOutputTokens: this.computeMaxOutputTokens(AIAgentSession.DEFAULT_CONTEXT_WINDOW_TOKENS),
+      limit: 0,
+      projected: 0,
+    };
+    const remainingTokens = Number.isFinite(first.limit)
       ? Math.max(0, first.limit - first.projected)
       : undefined;
-    const message = `Context budget exceeded (${first.provider}:${first.model} - projected ${String(first.projected)} tokens vs limit ${String(first.limit ?? Number.NaN)}). Forcing final turn.`;
+    const message = `Context budget exceeded (${first.provider}:${first.model} - projected ${String(first.projected)} tokens vs limit ${String(first.limit)}). Forcing final turn.`;
     const warnEntry: LogEntry = {
       timestamp: Date.now(),
       severity: 'WRN',
@@ -3028,15 +3203,18 @@ export class AIAgentSession {
       subturn: 0,
       direction: 'response',
       type: 'llm',
-      remoteIdentifier: 'agent:context',
+      remoteIdentifier: AIAgentSession.REMOTE_CONTEXT,
       fatal: false,
       message,
       details: {
         projected_tokens: first.projected,
-        limit_tokens: first.limit ?? Number.NaN,
+        limit_tokens: first.limit,
         ...(remainingTokens !== undefined ? { remaining_tokens: remainingTokens } : {}),
       },
     };
+    if (process.env.CONTEXT_DEBUG === 'true') {
+      console.log('context-guard/log-entry', warnEntry);
+    }
     this.log(warnEntry);
     this.contextLimitWarningLogged = true;
   }
@@ -3361,6 +3539,15 @@ export class AIAgentSession {
       : availableTools;
     let disableReasoningForTurn = false;
 
+    this.schemaCtxTokens = this.estimateToolSchemaTokens(toolsForTurn);
+    if (process.env.CONTEXT_DEBUG === 'true') {
+      console.log('context-guard/schema-tokens', {
+        turn: currentTurn,
+        schemaCtxTokens: this.schemaCtxTokens,
+        toolsForTurn: toolsForTurn.map((tool) => sanitizeToolName(tool.name)),
+      });
+    }
+
     const reasoningGuard = this.llmClient.shouldDisableReasoning(provider, {
       conversation,
       currentTurn,
@@ -3452,27 +3639,84 @@ export class AIAgentSession {
           if (isSubAgentTool) {
             this.invokedSubAgents.add(effectiveToolName);
           }
+          const providerLabel = typeof managed.providerLabel === 'string' && managed.providerLabel.length > 0
+            ? managed.providerLabel
+            : AIAgentSession.REMOTE_AGENT_TOOLS;
           const toolOutput = managed.result.length > 0 ? managed.result : AIAgentSession.TOOL_NO_OUTPUT;
-          const toolMessage: ConversationMessage = {
-            role: 'tool',
-            content: toolOutput,
-            ...(typeof options?.toolCallId === 'string' && options.toolCallId.length > 0 ? { toolCallId: options.toolCallId } : {}),
-          };
-          const overflowEvaluation = this.evaluateContextWithExtras([toolMessage]);
-          if (overflowEvaluation.allExceeded) {
-            const blockedEntries = overflowEvaluation.blocked.length > 0
-              ? overflowEvaluation.blocked
-              : [{ provider: 'unknown', model: 'unknown', limit: 0, projected: 0 }];
+          const callId = typeof options?.toolCallId === 'string' && options.toolCallId.length > 0
+            ? options.toolCallId
+            : undefined;
+          const toolTokens = this.estimateTokensForCounters([{ role: 'tool', content: toolOutput }]);
+          const guardEvaluation = this.evaluateContextGuard(toolTokens);
+          if (process.env.CONTEXT_DEBUG === 'true') {
+            const approxTokens = Math.ceil(estimateMessagesBytes([{ role: 'tool', content: toolOutput }]) / 4);
+            let limitTokens: number | undefined;
+            let contextWindow: number | undefined;
+            if (guardEvaluation.blocked.length > 0) {
+              const firstBlocked = guardEvaluation.blocked[0];
+              limitTokens = firstBlocked.limit;
+              contextWindow = firstBlocked.contextWindow;
+            }
+            console.log('context-guard/tool-eval', {
+              toolTokens,
+              approxTokens,
+              contentLength: toolOutput.length,
+              currentCtx: this.currentCtxTokens,
+              pendingCtx: this.pendingCtxTokens,
+              newCtx: this.newCtxTokens,
+              projectedTokens: guardEvaluation.projectedTokens,
+              limitTokens,
+              contextWindow,
+            });
+          }
+          if (guardEvaluation.blocked.length > 0) {
+            const blockedEntries = guardEvaluation.blocked.length > 0
+              ? guardEvaluation.blocked
+              : [{
+                  provider: 'unknown',
+                  model: 'unknown',
+                  contextWindow: AIAgentSession.DEFAULT_CONTEXT_WINDOW_TOKENS,
+                  bufferTokens: AIAgentSession.DEFAULT_CONTEXT_BUFFER_TOKENS,
+                  maxOutputTokens: this.computeMaxOutputTokens(AIAgentSession.DEFAULT_CONTEXT_WINDOW_TOKENS),
+                  limit: 0,
+                  projected: guardEvaluation.projectedTokens,
+                }];
             const first = blockedEntries[0];
-            const projectedTokens = first.projected;
-            const limitTokens = first.limit ?? 0;
-            const remainingTokens = limitTokens > projectedTokens ? limitTokens - projectedTokens : 0;
+            const remainingTokens = first.limit > first.projected ? first.limit - first.projected : 0;
+            const warnEntry: LogEntry = {
+              timestamp: Date.now(),
+              severity: 'WRN',
+              turn: currentTurn,
+              subturn: subturnCounter,
+              direction: 'response',
+              type: 'tool',
+              remoteIdentifier: providerLabel,
+              fatal: false,
+              message: `Tool '${effectiveToolName}' output discarded: context window budget exceeded (${String(toolTokens)} tokens, limit ${String(first.limit)}).`,
+              details: {
+                tool: effectiveToolName,
+                provider: providerLabel,
+                tokens_estimated: toolTokens,
+                projected_tokens: guardEvaluation.projectedTokens,
+                limit_tokens: first.limit,
+                remaining_tokens: remainingTokens,
+              },
+            };
+            this.log(warnEntry);
+            const renderedFailure = '(tool failed: context window budget exceeded)';
+            const failureTokens = this.estimateTokensForCounters([{ role: 'tool', content: renderedFailure }]);
+            this.newCtxTokens += failureTokens;
+            if (callId !== undefined) {
+              this.toolFailureMessages.set(callId, renderedFailure);
+            } else {
+              this.toolFailureFallbacks.push(renderedFailure);
+            }
             const failureEntry: AccountingEntry = {
               type: 'tool',
               timestamp: startTime,
               status: 'failed',
               latency: managed.latency,
-              mcpServer: managed.providerLabel,
+              mcpServer: providerLabel,
               command: effectiveToolName,
               charactersIn: managed.charactersIn,
               charactersOut: managed.charactersOut,
@@ -3483,29 +3727,32 @@ export class AIAgentSession {
               parentTxnId: this.parentTxnId,
               originTxnId: this.originTxnId,
               details: {
-                projected_tokens: projectedTokens,
-                limit_tokens: limitTokens,
+                projected_tokens: first.projected,
+                limit_tokens: first.limit,
                 remaining_tokens: remainingTokens,
+                original_tokens: toolTokens,
+                replacement_tokens: failureTokens,
               },
             };
             accounting.push(failureEntry);
             try { this.sessionConfig.callbacks?.onAccounting?.(failureEntry); } catch (e) { warn(`tool accounting callback failed: ${e instanceof Error ? e.message : String(e)}`); }
-            this.enforceContextFinalTurn(overflowEvaluation.blocked, 'tool_preflight');
-            const renderedFailure = '(tool failed: context window budget exceeded)';
-            if (typeof options?.toolCallId === 'string' && options.toolCallId.length > 0) {
-              this.toolFailureMessages.set(options.toolCallId, renderedFailure);
-            } else {
-              this.toolFailureFallbacks.push(renderedFailure);
-            }
+            addSpanEvent('tool.call.failure', {
+              'ai.tool.name': effectiveToolName,
+              'ai.tool.latency_ms': managed.latency,
+              'ai.tool.failure.reason': 'context_budget_exceeded',
+            });
+            this.enforceContextFinalTurn(blockedEntries, 'tool_preflight');
             this.releaseToolSlot();
             return renderedFailure;
           }
+
+          this.newCtxTokens += toolTokens;
           const successEntry: AccountingEntry = {
             type: 'tool',
             timestamp: startTime,
             status: 'ok',
             latency: managed.latency,
-            mcpServer: managed.providerLabel,
+            mcpServer: providerLabel,
             command: effectiveToolName,
             charactersIn: managed.charactersIn,
             charactersOut: managed.charactersOut,
@@ -3513,11 +3760,34 @@ export class AIAgentSession {
             callPath: this.callPath,
             txnId: this.txnId,
             parentTxnId: this.parentTxnId,
-            originTxnId: this.originTxnId
+            originTxnId: this.originTxnId,
+            details: { tokens: toolTokens },
           };
           accounting.push(successEntry);
           try { this.sessionConfig.callbacks?.onAccounting?.(successEntry); } catch (e) { warn(`tool accounting callback failed: ${e instanceof Error ? e.message : String(e)}`); }
-          addSpanEvent('tool.call.success', { 'ai.tool.name': effectiveToolName, 'ai.tool.latency_ms': managed.latency });
+          const toolLog: LogEntry = {
+            timestamp: Date.now(),
+            severity: 'VRB',
+            turn: currentTurn,
+            subturn: subturnCounter,
+            direction: 'response',
+            type: 'tool',
+            remoteIdentifier: providerLabel,
+            fatal: false,
+            message: `Tool '${effectiveToolName}' completed (${String(managed.charactersOut)} bytes, ${String(toolTokens)} tokens).`,
+            details: {
+              latency_ms: managed.latency,
+              characters_in: managed.charactersIn,
+              characters_out: managed.charactersOut,
+              tokens: toolTokens,
+            },
+          };
+          this.log(toolLog);
+          addSpanEvent('tool.call.success', {
+            'ai.tool.name': effectiveToolName,
+            'ai.tool.latency_ms': managed.latency,
+            'ai.tool.tokens': toolTokens,
+          });
           return toolOutput;
         }
 
@@ -3638,12 +3908,25 @@ export class AIAgentSession {
       };
       this.log(warnEntry);
     }
-    const requestMessages = this.mergePendingRetryMessages(conversation);
+    const requestMessages: ConversationMessage[] = this.mergePendingRetryMessages(conversation);
     const requestMessagesBytes = estimateMessagesBytes(requestMessages);
     this.pendingRetryMessages = [];
-    const snapshot = this.pendingContextSnapshot;
-    if (snapshot !== undefined) {
-      this.pendingContextSnapshot = undefined;
+    const metricsForRequest = this.buildContextMetrics(provider, model);
+    if (process.env.CONTEXT_DEBUG === 'true') {
+      console.log('context-guard/request-metrics', { provider, model, metricsForRequest });
+    }
+
+    const turnMetadata: TurnRequest['turnMetadata'] = {
+      attempt,
+      maxAttempts,
+      turn: currentTurn,
+      isFinalTurn,
+    };
+    if (effectiveReasoningLevel !== undefined) {
+      turnMetadata.reasoningLevel = effectiveReasoningLevel;
+    }
+    if (effectiveReasoningValue !== undefined) {
+      turnMetadata.reasoningValue = effectiveReasoningValue;
     }
 
     const request: TurnRequest = {
@@ -3698,16 +3981,9 @@ export class AIAgentSession {
       },
       reasoningLevel: effectiveReasoningLevel,
       reasoningValue: effectiveReasoningValue,
-      turnMetadata: {
-        attempt,
-        maxAttempts,
-        turn: currentTurn,
-        isFinalTurn,
-        ...(effectiveReasoningLevel !== undefined ? { reasoningLevel: effectiveReasoningLevel } : {}),
-        ...(effectiveReasoningValue !== undefined ? { reasoningValue: effectiveReasoningValue } : {}),
-      },
+      turnMetadata,
       caching: this.sessionConfig.caching,
-      contextSnapshot: snapshot,
+      contextMetrics: metricsForRequest,
     };
 
     this.debugLogRawConversation(provider, model, conversation);
@@ -3783,6 +4059,20 @@ export class AIAgentSession {
     }
 
     return { tools: filtered, allowedNames };
+  }
+
+  private computeForcedFinalSchemaTokens(provider: string): number {
+    const allTools = [...(this.toolsOrchestrator?.listTools() ?? [])];
+    if (allTools.length === 0) {
+      return this.schemaCtxTokens;
+    }
+    const filtered = this.filterToolsForProvider(allTools, provider).tools;
+    if (filtered.length === 0) {
+      return this.schemaCtxTokens;
+    }
+    const finalOnly = filtered.filter((tool) => sanitizeToolName(tool.name) === AIAgentSession.FINAL_REPORT_TOOL);
+    const targetTools = finalOnly.length > 0 ? finalOnly : filtered;
+    return this.estimateToolSchemaTokens(targetTools);
   }
 
   private resolveReasoningMapping(provider: string, model: string): ProviderReasoningMapping | null | undefined {

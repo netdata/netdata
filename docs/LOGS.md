@@ -100,6 +100,17 @@ Structured fields are inherited from the runtime component that emits a log. Eac
 
 Messages should focus on incremental information; implied fields live in the structured metadata and are automatically populated from the owning runtime object.
 
+### LLM Request/Response Metrics
+
+- **Request context fields** – Every `LLM request prepared` log now includes `ctx_tokens`, `new_tokens`, `schema_tokens`, `expected_tokens`, `context_window`, `context_pct`, and renders `[tokens: ctx <ctx>, new <new>, schema <schema>, expected <expected>, <pct>%]` in the human-readable message.
+  - `ctx_tokens` reflects the tokenizer count for the conversation as of the previous successful LLM turn (`input + output + cache_read`).
+  - `new_tokens` is the accumulated tokenizer estimate for tool responses added since the last model call (the payload that will be replayed to the model).
+  - `schema_tokens` estimates the cost of the active tool definitions that accompany the request; it guarantees the guard accounts for tool schema overhead.
+  - `expected_tokens` equals `ctx_tokens + new_tokens + schema_tokens`, the projected prompt length for the upcoming request.
+  - `context_pct` measures `(expected_tokens + buffer + reserved_output) / context_window`, providing the guard headroom after subtracting both the configured buffer and the reserved completion tokens.
+- **Response metrics** – The matching `LLM response received` log includes `ctx` in the human-readable metrics list and the `ctx_tokens` detail field, mirroring the provider-reported `input + output + cache_read` total so operators can correlate request forecasts with actual usage.
+- **Tool execution tokens** – Each successful tool invocation emits a `VRB` log with `details.tokens` capturing the estimated tokenizer cost of the tool output. When the context guard replaces a tool response with the fallback `(tool failed: context window budget exceeded)`, the corresponding accounting entry records `original_tokens`, `replacement_tokens`, and the context guard warning references the offending provider/model pair.
+
 ## Sink Behaviour and Field Sets
 
 ### Journald Sink

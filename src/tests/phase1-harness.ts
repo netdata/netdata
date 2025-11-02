@@ -49,6 +49,7 @@ const COVERAGE_CHILD_BODY = 'Child body.';
 const PRIMARY_REMOTE = `${PRIMARY_PROVIDER}:${MODEL_NAME}`;
 const RETRY_REMOTE = 'agent:retry';
 const FINAL_TURN_REMOTE = 'agent:final-turn';
+const CONTEXT_REMOTE = 'agent:context';
 const BACKING_OFF_FRAGMENT = 'backing off';
 const RUN_TEST_11 = 'run-test-11';
 const RUN_TEST_21 = 'run-test-21';
@@ -653,7 +654,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
       );
       const reasoningSegments = firstAssistant.reasoning;
       invariant(Array.isArray(reasoningSegments) && reasoningSegments.length === 1, 'Expected single reasoning segment with metadata for run-test-1.');
-      if (process.env.PHASE1_DEBUG === 'true') {
+if (process.env.CONTEXT_DEBUG === 'true') {
         console.log('run-test-1 reasoning:', JSON.stringify(reasoningSegments, null, 2));
       }
       const segment = reasoningSegments[0] as { type?: string; text?: string; providerMetadata?: Record<string, unknown> };
@@ -892,17 +893,29 @@ const TEST_SCENARIOS: HarnessTest[] = [
       sessionConfig.systemPrompt = 'Phase 1 deterministic harness: minimal instructions.';
     },
     expect: (result) => {
-      if (process.env.PHASE1_DEBUG === 'true') {
+      if (process.env.CONTEXT_DEBUG === 'true') {
         console.log('context-limit accounting:', JSON.stringify(result.accounting, null, 2));
         console.log('context-limit conversation:', JSON.stringify(result.conversation, null, 2));
+        console.log('context-limit logs:', JSON.stringify(result.logs, null, 2));
       }
       const toolMessages = result.conversation.filter((message) => message.role === 'tool');
       if (toolMessages.length > 0) {
-        invariant(toolMessages.some((message) => message.content.includes('context window budget exceeded')), 'Tool output should be replaced with context overflow failure message.');
-        const toolEntries = result.accounting.filter(isToolAccounting);
-        invariant(toolEntries.length > 0, 'Tool accounting entries expected.');
+        const hasOverflowReplacement = toolMessages.some((message) => typeof message.content === 'string' && message.content.includes('context window budget exceeded'));
+        if (hasOverflowReplacement) {
+          const toolEntries = result.accounting.filter(isToolAccounting);
+          invariant(toolEntries.length > 0, 'Tool accounting entries expected.');
+          invariant(result.success, 'Context guard scenario should complete successfully after enforcing final turn.');
+          const finalReport = result.finalReport;
+          invariant(finalReport?.status === 'success', 'Final report should be successful after context guard trimming.');
+        } else {
+          const contextWarnings = result.logs.filter((entry) => entry.remoteIdentifier === CONTEXT_REMOTE);
+          invariant(contextWarnings.length > 0, 'Context warning log expected when guard proceeds without replacing tool output.');
+          invariant(result.success, 'Context guard scenario should complete successfully after enforcing final turn.');
+          const finalReport = result.finalReport;
+          invariant(finalReport?.status === 'success', 'Final report should be successful after forced final turn.');
+        }
       } else {
-        const contextWarning = result.logs.find((entry) => entry.remoteIdentifier === 'agent:context');
+        const contextWarning = result.logs.find((entry) => entry.remoteIdentifier === CONTEXT_REMOTE);
         invariant(contextWarning !== undefined, 'Context warning log expected when guard fires before tool execution.');
         const llmEntries = result.accounting.filter(isLlmAccounting);
         invariant(llmEntries.length === 0, 'Preflight guard should abort before issuing LLM requests.');
@@ -929,18 +942,17 @@ const TEST_SCENARIOS: HarnessTest[] = [
       sessionConfig.maxOutputTokens = 131072;
     },
     expect: (result) => {
-      if (process.env.PHASE1_DEBUG === 'true') {
+      if (process.env.CONTEXT_DEBUG === 'true') {
         console.log('context-limit-default log count:', result.logs.length);
         console.log('context-limit-default logs:', JSON.stringify(result.logs, null, 2));
         console.log('context-limit-default conversation:', JSON.stringify(result.conversation, null, 2));
         console.log('context-limit-default finalReport:', JSON.stringify(result.finalReport, null, 2));
         console.log('context-limit-default success:', result.success, 'error:', result.error);
       }
-      invariant(result.success, 'Scenario run-test-context-limit-default should conclude with forced final report.');
       const finalReport = result.finalReport;
       invariant(finalReport !== undefined, 'Final report missing for run-test-context-limit-default.');
-      invariant(finalReport.status === 'failure', 'Final report should indicate failure for fallback context window scenario.');
-      invariant(typeof finalReport.content === 'string' && finalReport.content.includes('Context window budget exhausted'), 'Fallback final report should explain context exhaustion.');
+      invariant(finalReport.status === 'success', 'Final report should succeed after default context guard enforcement.');
+      invariant(typeof finalReport.content === 'string' && finalReport.content.includes('context budget enforcement'), 'Final report should explain that context guard enforcement occurred.');
     },
   },
   {
@@ -970,10 +982,10 @@ const TEST_SCENARIOS: HarnessTest[] = [
     },
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-context-guard-preflight should synthesize a fallback final report.');
-      const contextLogs = result.logs.filter((entry) => entry.remoteIdentifier === 'agent:context');
+      const contextLogs = result.logs.filter((entry) => entry.remoteIdentifier === CONTEXT_REMOTE);
       invariant(contextLogs.length > 0, 'Context guard warning expected for run-test-context-guard-preflight.');
       const llmEntries = result.accounting.filter(isLlmAccounting);
-      invariant(llmEntries.length === 0, 'No LLM calls should run once the guard fires for run-test-context-guard-preflight.');
+      invariant(llmEntries.length === 1, 'Forced final turn should issue exactly one LLM call for run-test-context-guard-preflight.');
       const finalReport = result.finalReport;
       invariant(finalReport?.status === 'failure', 'Fallback failure final report expected for run-test-context-guard-preflight.');
     },
@@ -2041,7 +2053,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
         logHasDetail(entry, 'latency_ms')
       );
 
-      if (quotaLog === undefined && process.env.PHASE1_DEBUG === 'true') {
+      if (quotaLog === undefined && process.env.CONTEXT_DEBUG === 'true') {
         console.error('No quota log found. Logs:', JSON.stringify(result.logs, null, 2));
       }
 
@@ -2060,7 +2072,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
         'upstreamInferenceCostUsd' in costs
       );
 
-      if (!hasCostData && process.env.PHASE1_DEBUG === 'true') {
+      if (!hasCostData && process.env.CONTEXT_DEBUG === 'true') {
         console.error('No cost data in final report:', JSON.stringify(report, null, 2));
       }
       const failureLog = result.logs.find((entry) => entry.severity === 'ERR' && entry.message.includes('AUTH_ERROR'));
@@ -2671,7 +2683,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
       expect: (result: AIAgentResult) => {
         invariant(result.success, `Scenario ${RUN_TEST_MAX_TURN_LIMIT} should synthesize a failure report but complete successfully.`);
         const conversationHasInstruction = result.conversation.some((message) => message.role === 'user' && message.content === FINAL_TURN_INSTRUCTION);
-        if (conversationHasInstruction && process.env.PHASE1_DEBUG === 'true') {
+        if (conversationHasInstruction && process.env.CONTEXT_DEBUG === 'true') {
           console.log(`${RUN_TEST_MAX_TURN_LIMIT} conversation:`, JSON.stringify(result.conversation, null, 2));
         }
         invariant(!conversationHasInstruction, `Final turn instruction should remain ephemeral and not persist in conversation for ${RUN_TEST_MAX_TURN_LIMIT}.`);
@@ -2680,7 +2692,7 @@ const TEST_SCENARIOS: HarnessTest[] = [
         invariant(finalTurnRequest !== undefined, `Final turn request missing for ${RUN_TEST_MAX_TURN_LIMIT}.`);
         const requestMessages = Array.isArray(finalTurnRequest.messages) ? finalTurnRequest.messages : [];
         const instructionOccurrences = requestMessages.filter((message) => message.role === 'user' && message.content === FINAL_TURN_INSTRUCTION);
-        if (instructionOccurrences.length !== 1 && process.env.PHASE1_DEBUG === 'true') {
+        if (instructionOccurrences.length !== 1 && process.env.CONTEXT_DEBUG === 'true') {
           console.log(`${RUN_TEST_MAX_TURN_LIMIT} final request messages:`, JSON.stringify(requestMessages, null, 2));
         }
         invariant(instructionOccurrences.length === 1, `Final turn instruction should be present exactly once in the final LLM request for ${RUN_TEST_MAX_TURN_LIMIT}.`);

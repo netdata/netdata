@@ -542,6 +542,8 @@ export class ToolsOrchestrator {
       : logProviderLabel;
     let result = raw;
     if (!isBatchTool && typeof limit === 'number' && limit > 0 && sizeBytes > limit) {
+      // Truncate first, because downstream token accounting (context guard) must
+      // operate on the already-clamped payload; do not reorder this block.
       // Warn about truncation
       const warnDetails: Record<string, LogDetailValue> = {
         tool: composedToolName,
