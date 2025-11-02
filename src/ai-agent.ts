@@ -60,7 +60,7 @@ import { InternalToolProvider } from './tools/internal-provider.js';
 import { MCPProvider } from './tools/mcp-provider.js';
 import { RestProvider } from './tools/rest-provider.js';
 import { ToolsOrchestrator } from './tools/tools.js';
-import { clampToolName, formatToolRequestCompact, sanitizeToolName, truncateUtf8WithNotice, warn } from './utils.js';
+import { appendCallPathSegment, clampToolName, formatToolRequestCompact, normalizeCallPath, sanitizeToolName, truncateUtf8WithNotice, warn } from './utils.js';
 
 // Immutable session class according to DESIGN.md
 type AjvInstance = AjvClass;
@@ -272,6 +272,11 @@ export class AIAgentSession {
     return label;
   }
 
+  private getAgentPathLabel(): string {
+    if (typeof this.agentPath === 'string' && this.agentPath.length > 0) return this.agentPath;
+    return this.getCallPathLabel();
+  }
+
   private composeTurnPath(turn: number, subturn: number): string {
     const segment = `${String(turn)}.${String(subturn)}`;
     return this.turnPathPrefix.length > 0
@@ -328,6 +333,7 @@ export class AIAgentSession {
     const payload = {
       callPath: this.getCallPathLabel(),
       agentId: this.getAgentIdLabel(),
+      agentPath: this.getAgentPathLabel(),
       agentName: this.getAgentDisplayName(),
       txnId: this.txnId,
       parentTxnId: this.parentTxnId,
@@ -490,13 +496,14 @@ export class AIAgentSession {
     this.txnId = sessionConfig.trace?.selfId ?? crypto.randomUUID();
     this.originTxnId = sessionConfig.trace?.originId ?? this.txnId;
     this.parentTxnId = sessionConfig.trace?.parentId;
-    this.agentPath = sessionConfig.agentPath
+    const initialAgentPath = sessionConfig.agentPath
       ?? sessionConfig.trace?.agentPath
       ?? (sessionConfig.agentId ?? 'agent');
+    this.agentPath = normalizeCallPath(initialAgentPath);
     this.turnPathPrefix = sessionConfig.turnPathPrefix
       ?? sessionConfig.trace?.turnPath
       ?? '';
-    this.callPath = sessionConfig.trace?.callPath ?? this.agentPath;
+    this.callPath = normalizeCallPath(sessionConfig.trace?.callPath ?? this.agentPath);
 
     // Hierarchical operation tree (Option C)
     this.opTree = new SessionTreeBuilder({ traceId: this.txnId, agentId: sessionConfig.agentId, callPath: this.callPath, sessionTitle: sessionConfig.initialTitle ?? '' });
@@ -534,6 +541,7 @@ export class AIAgentSession {
     sessionConfig.callbacks?.onAccounting,
     {
       agentId: sessionConfig.agentId,
+      agentPath: this.agentPath,
       callPath: this.getCallPathLabel(),
       txnId: this.txnId,
       headendId: this.headendId,
@@ -620,6 +628,7 @@ export class AIAgentSession {
             this.progressReporter.agentUpdate({
               callPath: this.getCallPathLabel(),
               agentId: this.getAgentIdLabel(),
+              agentPath: this.getAgentPathLabel(),
               agentName: this.getAgentDisplayName(),
               txnId: this.txnId,
               parentTxnId: this.parentTxnId,
@@ -679,9 +688,7 @@ export class AIAgentSession {
         const parentTurnPath = opts?.parentContext !== undefined
           ? this.composeTurnPath(opts.parentContext.turn, opts.parentContext.subturn)
           : this.turnPathPrefix;
-        const childAgentPath = this.agentPath.length > 0
-          ? `${this.agentPath}:${normalizedChildName}`
-          : normalizedChildName;
+        const childAgentPath = appendCallPathSegment(this.agentPath, normalizedChildName);
         const exec = await subAgents.execute(name, parameters, {
           config: this.sessionConfig.config,
           callbacks: this.sessionConfig.callbacks,
@@ -867,10 +874,12 @@ export class AIAgentSession {
     if (enriched.type === 'tool') {
       const toolName = this.extractToolNameForCallPath(enriched);
       if (toolName !== undefined && toolName.length > 0) {
-        enriched.callPath = `${this.agentPath}:${toolName}`;
+        enriched.callPath = appendCallPathSegment(this.agentPath, toolName);
+      } else {
+        enriched.callPath = normalizeCallPath(this.agentPath);
       }
     } else {
-      enriched.callPath = this.agentPath;
+      enriched.callPath = normalizeCallPath(this.agentPath);
     }
     const label = this.getCallPathLabel();
     const rawMessage = typeof enriched.message === 'string' ? enriched.message.trim() : '';
@@ -1041,6 +1050,7 @@ export class AIAgentSession {
       this.progressReporter.agentStarted({
         callPath: this.getCallPathLabel(),
         agentId: this.getAgentIdLabel(),
+        agentPath: this.getAgentPathLabel(),
         agentName: this.getAgentDisplayName(),
         txnId: this.txnId,
         parentTxnId: this.parentTxnId,
@@ -4187,6 +4197,7 @@ export class AIAgentSession {
           this.progressReporter.agentUpdate({
             callPath: this.getCallPathLabel(),
             agentId: this.getAgentIdLabel(),
+            agentPath: this.getAgentPathLabel(),
             agentName: this.getAgentDisplayName(),
             txnId: this.txnId,
             parentTxnId: this.parentTxnId,

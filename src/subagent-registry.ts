@@ -20,6 +20,7 @@ type AjvConstructor = new (options?: AjvOptions) => AjvInstance;
 const AjvCtor: AjvConstructor = Ajv as unknown as AjvConstructor;
 
 import { DEFAULT_TOOL_INPUT_SCHEMA, cloneJsonSchema } from './input-contract.js';
+import { appendCallPathSegment } from './utils.js';
 
 export interface PreloadedSubAgent {
   toolName: string;
@@ -263,9 +264,7 @@ export class SubAgentRegistry {
       ].filter((value): value is string => typeof value === 'string' && value.length > 0);
       const parentAgentPath = parentAgentPathCandidates.length > 0 ? parentAgentPathCandidates[0] : 'agent';
       const childAgentName = info.toolName;
-      const childAgentPath = parentAgentPath.length > 0
-        ? `${parentAgentPath}:${childAgentName}`
-        : childAgentName;
+      const childAgentPath = appendCallPathSegment(parentAgentPath, childAgentName);
       const inheritedTurnPathCandidates = [
         opts?.parentTurnPath,
         parentSession.turnPathPrefix,

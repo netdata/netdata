@@ -3279,6 +3279,148 @@ const SCENARIOS: ScenarioDefinition[] = [
     ],
   },
   {
+    id: 'run-test-context-bulk-tools',
+    description: 'Context guard trims newest tool outputs when multiple large results arrive in a single turn.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        response: {
+          kind: 'tool-call',
+          assistantText: 'Gathering multiple large datasets before trimming.',
+          toolCalls: [
+            {
+              toolName: TOOL_NAME,
+              callId: 'call-context-bulk-1',
+              assistantText: 'Fetching dataset alpha.',
+              arguments: { text: TOOL_ARGUMENT_LONG_OUTPUT },
+            },
+            {
+              toolName: TOOL_NAME,
+              callId: 'call-context-bulk-2',
+              assistantText: 'Fetching dataset beta.',
+              arguments: { text: TOOL_ARGUMENT_LONG_OUTPUT },
+            },
+            {
+              toolName: TOOL_NAME,
+              callId: 'call-context-bulk-3',
+              assistantText: 'Fetching dataset gamma.',
+              arguments: { text: TOOL_ARGUMENT_LONG_OUTPUT },
+            },
+          ],
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+          finishReason: TOOL_FINISH_REASON,
+        },
+      },
+      {
+        turn: 2,
+        expectedTools: ['agent__final_report'],
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Bulk tool outputs trimmed; delivering final report.',
+          reportContent: `${RESULT_HEADING}Bulk fetch completed with trimmed context to stay within limits.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_SUCCESS,
+          tokenUsage: {
+            inputTokens: 88,
+            outputTokens: 32,
+            totalTokens: 120,
+          },
+        },
+      },
+    ],
+  },
+  {
+    id: 'run-test-context-tokenizer-drift',
+    description: 'Context guard tolerates tokenizer drift while still enforcing final turn.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        response: {
+          kind: 'tool-call',
+          assistantText: 'Collecting data with approximate token estimates.',
+          toolCalls: [
+            {
+              toolName: TOOL_NAME,
+              callId: 'call-context-drift',
+              assistantText: 'Pulling drift-prone payload.',
+              arguments: { text: TOOL_ARGUMENT_LONG_OUTPUT },
+            },
+          ],
+          tokenUsage: {
+            inputTokens: 160,
+            outputTokens: 60,
+            totalTokens: 220,
+          },
+          finishReason: TOOL_FINISH_REASON,
+        },
+      },
+      {
+        turn: 2,
+        expectedTools: ['agent__final_report'],
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Tokenizer drift accounted for; responding within limits.',
+          reportContent: `${RESULT_HEADING}Final answer provided after reconciling tokenizer estimates.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_SUCCESS,
+          tokenUsage: {
+            inputTokens: 90,
+            outputTokens: 28,
+            totalTokens: 118,
+          },
+        },
+      },
+    ],
+  },
+  {
+    id: 'run-test-context-cache-tokens',
+    description: 'Context guard accounts for cache read/write tokens while enforcing limits.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        response: {
+          kind: 'tool-call',
+          assistantText: 'Loading cached insights prior to finalization.',
+          toolCalls: [
+            {
+              toolName: TOOL_NAME,
+              callId: 'call-context-cache',
+              assistantText: 'Retrieving cached payload.',
+              arguments: { text: TOOL_ARGUMENT_LONG_OUTPUT },
+            },
+          ],
+          tokenUsage: {
+            inputTokens: 140,
+            outputTokens: 50,
+            totalTokens: 190,
+            cacheWriteInputTokens: 45,
+          },
+          finishReason: TOOL_FINISH_REASON,
+        },
+      },
+      {
+        turn: 2,
+        expectedTools: ['agent__final_report'],
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Cache tokens reconciled; delivering cached summary.',
+          reportContent: `${RESULT_HEADING}Final answer incorporates cached context within window.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_SUCCESS,
+          tokenUsage: {
+            inputTokens: 92,
+            outputTokens: 30,
+            totalTokens: 122,
+            cacheReadInputTokens: 40,
+          },
+        },
+      },
+    ],
+  },
+  {
     id: 'run-test-context-multi-provider',
     description: 'Context guard skips primary provider and succeeds with secondary.',
     systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],

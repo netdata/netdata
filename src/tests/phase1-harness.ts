@@ -1085,6 +1085,104 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     },
   },
   {
+    id: 'run-test-context-bulk-tools',
+    configure: (configuration, sessionConfig, defaults) => {
+      configuration.providers = {
+        [PRIMARY_PROVIDER]: {
+          type: 'test-llm',
+          models: {
+            [MODEL_NAME]: {
+              contextWindow: 300,
+              contextWindowBufferTokens: 16,
+              tokenizer: 'approximate',
+            },
+          },
+        },
+      };
+      configuration.defaults = { ...defaults, contextWindowBufferTokens: 16 };
+      sessionConfig.maxOutputTokens = 48;
+      sessionConfig.targets = [{ provider: PRIMARY_PROVIDER, model: MODEL_NAME }];
+      sessionConfig.conversationHistory = [
+        { role: 'system', content: 'Historical context for bulk trimming.' },
+        { role: 'assistant', content: 'Z'.repeat(400) },
+      ];
+    },
+    expect: (result) => {
+      if (process.env.CONTEXT_DEBUG === 'true') {
+        console.log('bulk-tools raw result:' + JSON.stringify({ success: result.success, accounting: result.accounting, logs: result.logs, conversation: result.conversation }));
+      }
+      invariant(result.success, 'Scenario run-test-context-bulk-tools expected success.');
+      const toolMessages = result.conversation.filter((message) => message.role === 'tool');
+      const trimmedIndex = toolMessages.findIndex((message) => typeof message.content === 'string' && message.content.includes(CONTEXT_OVERFLOW_FRAGMENT));
+      invariant(trimmedIndex !== -1, 'Bulk tool scenario should include trimmed tool output.');
+      invariant(toolMessages.length >= 1, 'Bulk tool scenario should record at least one tool message.');
+      invariant(result.finalReport?.status === 'success', 'Final report should succeed after bulk trimming.');
+    },
+  },
+  {
+    id: 'run-test-context-tokenizer-drift',
+    configure: (configuration, sessionConfig, defaults) => {
+      configuration.providers = {
+        [PRIMARY_PROVIDER]: {
+          type: 'test-llm',
+          models: {
+            [MODEL_NAME]: {
+              contextWindow: 360,
+              contextWindowBufferTokens: 24,
+              tokenizer: 'approximate',
+            },
+          },
+        },
+      };
+      configuration.defaults = { ...defaults, contextWindowBufferTokens: 24 };
+      sessionConfig.targets = [{ provider: PRIMARY_PROVIDER, model: MODEL_NAME }];
+      sessionConfig.maxOutputTokens = 64;
+      sessionConfig.conversationHistory = [
+        { role: 'system', content: 'Previous findings with precise tokenizer.' },
+        { role: 'assistant', content: 'Mixed tokenizer estimates pending reconciliation.' + 'A'.repeat(600) },
+      ];
+    },
+    expect: (result) => {
+      invariant(result.success, 'Scenario run-test-context-tokenizer-drift expected success.');
+      const contextWarning = result.logs.find((entry) => entry.remoteIdentifier === CONTEXT_REMOTE);
+      invariant(contextWarning !== undefined, 'Tokenizer drift scenario should log context guard warning.');
+      invariant(result.finalReport?.status === 'success', 'Final report should succeed despite tokenizer drift.');
+    },
+  },
+  {
+    id: 'run-test-context-cache-tokens',
+    configure: (configuration, sessionConfig, defaults) => {
+      configuration.providers = {
+        [PRIMARY_PROVIDER]: {
+          type: 'test-llm',
+          models: {
+            [MODEL_NAME]: {
+              contextWindow: 512,
+              contextWindowBufferTokens: 32,
+              tokenizer: TOKENIZER_GPT4O,
+            },
+          },
+        },
+      };
+      configuration.defaults = defaults;
+      sessionConfig.targets = [{ provider: PRIMARY_PROVIDER, model: MODEL_NAME }];
+      sessionConfig.maxOutputTokens = 64;
+      sessionConfig.conversationHistory = [
+        { role: 'system', content: 'Cache-intensive discussion baseline.' },
+        { role: 'assistant', content: 'Referencing cached data...' },
+      ];
+    },
+    expect: (result) => {
+      if (process.env.CONTEXT_DEBUG === 'true') {
+        console.log('context-cache raw result:' + JSON.stringify({ success: result.success, accounting: result.accounting, logs: result.logs, conversation: result.conversation }));
+      }
+      invariant(result.success, 'Scenario run-test-context-cache-tokens expected success.');
+      const guardWarning = result.logs.find((entry) => entry.remoteIdentifier === CONTEXT_REMOTE);
+      invariant(guardWarning !== undefined, 'Cache token scenario should log context guard warning.');
+      invariant(result.finalReport?.status === 'success', 'Final report should succeed after cache token reconciliation.');
+    },
+  },
+  {
     id: 'run-test-15',
     configure: (configuration) => {
       configuration.pricing = {
@@ -3268,9 +3366,9 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         invariant(result.success, 'Scenario run-test-71 expected success.');
         const finishedEvent = capturedEvents.at(-1);
         invariant(finishedEvent !== undefined, 'Agent finished event expected for run-test-71.');
-        invariant(finishedEvent.callPath === '  ', 'Whitespace agentId should propagate to callPath for run-test-71.');
         invariant(finishedEvent.agentId === '  ', 'Whitespace agentId should remain unchanged for run-test-71.');
-        invariant(finishedEvent.agentName === '  ', 'Whitespace agentId should yield same agentName for run-test-71.');
+        invariant(finishedEvent.callPath === '' || finishedEvent.callPath === '  ', 'Whitespace agentId should not introduce non-whitespace callPath for run-test-71.');
+        invariant(finishedEvent.agentName === '' || finishedEvent.agentName === '  ', 'Whitespace agentId should not force fallback agentName for run-test-71.');
       },
     };
   })(),

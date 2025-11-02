@@ -7,7 +7,7 @@ import type { MCPTool, LogEntry, AccountingEntry, ProgressMetrics, LogDetailValu
 import type { ToolExecuteOptions, ToolExecuteResult, ToolKind, ToolProvider, ToolExecutionContext } from './types.js';
 
 import { recordToolMetrics, runWithSpan, addSpanAttributes, addSpanEvent, recordSpanError } from '../telemetry/index.js';
-import { truncateUtf8WithNotice, formatToolRequestCompact, sanitizeToolName, warn } from '../utils.js';
+import { appendCallPathSegment, formatToolRequestCompact, normalizeCallPath, sanitizeToolName, truncateUtf8WithNotice, warn } from '../utils.js';
 
 const toErrorMessage = (value: unknown): string => {
   if (value instanceof Error && typeof value.message === 'string') return value.message;
@@ -34,7 +34,7 @@ export class ToolsOrchestrator {
   private slotsInUse = 0;
   private waiters: (() => void)[] = [];
   private canceled = false;
-  private readonly sessionInfo: { agentId?: string; callPath?: string; txnId?: string; headendId?: string; telemetryLabels?: Record<string, string> };
+  private readonly sessionInfo: { agentId?: string; agentPath?: string; callPath?: string; txnId?: string; headendId?: string; telemetryLabels?: Record<string, string> };
 
   constructor(
     private readonly opts: { toolTimeout?: number; toolResponseMaxBytes?: number; maxConcurrentTools?: number; parallelToolCalls?: boolean; traceTools?: boolean },
@@ -43,10 +43,22 @@ export class ToolsOrchestrator {
     // Unified logger: session-level log() (must never throw)
     private readonly onLog: (entry: LogEntry, opts?: { opId?: string }) => void,
     private readonly onAccounting?: (entry: AccountingEntry) => void,
-    sessionInfo?: { agentId?: string; callPath?: string; txnId?: string; headendId?: string; telemetryLabels?: Record<string, string> },
+    sessionInfo?: { agentId?: string; agentPath?: string; callPath?: string; txnId?: string; headendId?: string; telemetryLabels?: Record<string, string> },
     private readonly progress?: SessionProgressReporter,
   ) {
-    this.sessionInfo = sessionInfo ?? {};
+    const normalizedCallPath = sessionInfo?.callPath !== undefined ? normalizeCallPath(sessionInfo.callPath) : undefined;
+    const normalizedAgentPath = sessionInfo?.agentPath !== undefined ? normalizeCallPath(sessionInfo.agentPath) : undefined;
+    const normalizedAgentId = sessionInfo?.agentId !== undefined ? normalizeCallPath(sessionInfo.agentId) : undefined;
+    const maybeValue = (value: string | undefined): string | undefined => (value !== undefined && value.length > 0 ? value : undefined);
+    this.sessionInfo = {
+      ...sessionInfo,
+      agentId: maybeValue(normalizedAgentId) ?? sessionInfo?.agentId,
+      agentPath: maybeValue(normalizedAgentPath) ?? maybeValue(normalizedAgentId) ?? sessionInfo?.agentPath,
+      callPath: maybeValue(normalizedCallPath)
+        ?? maybeValue(sessionInfo?.callPath)
+        ?? maybeValue(normalizedAgentPath)
+        ?? maybeValue(normalizedAgentId),
+    };
   }
 
   register(provider: ToolProvider): void {
@@ -63,8 +75,15 @@ export class ToolsOrchestrator {
   }
 
   private getSessionCallPath(): string {
-    const { callPath, agentId } = this.sessionInfo;
+    const { callPath, agentPath, agentId } = this.sessionInfo;
+    const normalizedCallPath = normalizeCallPath(callPath);
+    if (normalizedCallPath.length > 0) return normalizedCallPath;
     if (typeof callPath === 'string' && callPath.length > 0) return callPath;
+    const normalizedAgentPath = normalizeCallPath(agentPath);
+    if (normalizedAgentPath.length > 0) return normalizedAgentPath;
+    if (typeof agentPath === 'string' && agentPath.length > 0) return agentPath;
+    const normalizedAgentId = normalizeCallPath(agentId);
+    if (normalizedAgentId.length > 0) return normalizedAgentId;
     if (typeof agentId === 'string' && agentId.length > 0) return agentId;
     return 'agent';
   }
@@ -73,6 +92,20 @@ export class ToolsOrchestrator {
     const { agentId } = this.sessionInfo;
     if (typeof agentId === 'string' && agentId.length > 0) return agentId;
     return this.getSessionCallPath();
+  }
+
+  private getSessionAgentPath(): string {
+    const { agentPath, agentId, callPath } = this.sessionInfo;
+    const normalizedAgentPath = normalizeCallPath(agentPath);
+    if (normalizedAgentPath.length > 0) return normalizedAgentPath;
+    if (typeof agentPath === 'string' && agentPath.length > 0) return agentPath;
+    const normalizedAgentId = normalizeCallPath(agentId);
+    if (normalizedAgentId.length > 0) return normalizedAgentId;
+    if (typeof agentId === 'string' && agentId.length > 0) return agentId;
+    const normalizedCallPath = normalizeCallPath(callPath);
+    if (normalizedCallPath.length > 0) return normalizedCallPath;
+    if (typeof callPath === 'string' && callPath.length > 0) return callPath;
+    return 'agent';
   }
 
   listTools(): MCPTool[] {
@@ -196,6 +229,7 @@ export class ToolsOrchestrator {
     })();
     const callPathLabel = this.getSessionCallPath();
     const agentIdLabel = this.getSessionAgentId();
+    const agentPathLabel = this.getSessionAgentPath();
     const headendId = this.sessionInfo.headendId;
     const sessionTelemetryLabels: Record<string, string> | undefined = this.sessionInfo.telemetryLabels;
     const instrumentTool = opKind !== 'session' && provider.namespace !== 'agent';
@@ -205,14 +239,21 @@ export class ToolsOrchestrator {
       if (opKind === 'session' && opId !== undefined) {
         const parentSession = this.opTree.getSession();
         const childName = effective.startsWith('agent__') ? effective.slice('agent__'.length) : effective;
-        const childCallPathBase = (typeof parentSession.callPath === 'string' && parentSession.callPath.length > 0)
-          ? parentSession.callPath
-          : (typeof parentSession.agentId === 'string' && parentSession.agentId.length > 0 ? parentSession.agentId : 'agent');
+        const baseAgentPath = (() => {
+          const sessionAgentPath = this.sessionInfo.agentPath;
+          if (typeof sessionAgentPath === 'string' && sessionAgentPath.length > 0) return sessionAgentPath;
+          const sessionAgentId = this.sessionInfo.agentId;
+          if (typeof sessionAgentId === 'string' && sessionAgentId.length > 0) return sessionAgentId;
+          if (typeof parentSession.agentId === 'string' && parentSession.agentId.length > 0) return parentSession.agentId;
+          if (typeof parentSession.callPath === 'string' && parentSession.callPath.length > 0) return parentSession.callPath;
+          return 'agent';
+        })();
+        const childCallPath = appendCallPathSegment(baseAgentPath, childName);
         const stub: SessionNode = {
           id: `${Date.now().toString(36)}-stub`,
           traceId: parentSession.traceId,
           agentId: childName,
-          callPath: `${childCallPathBase}:${childName}`,
+          callPath: childCallPath,
           sessionTitle: '',
           startedAt: Date.now(),
           turns: [],
@@ -252,6 +293,7 @@ export class ToolsOrchestrator {
       this.progress?.toolStarted({
         callPath: callPathLabel,
         agentId: agentIdLabel,
+        agentPath: agentPathLabel,
         tool: { name: composedToolName, provider: logProviderNamespace },
       });
     }
@@ -464,6 +506,7 @@ export class ToolsOrchestrator {
         this.progress?.toolFinished({
           callPath: callPathLabel,
           agentId: agentIdLabel,
+          agentPath: agentPathLabel,
           tool: { name: composedToolName, provider: logProviderNamespace },
           metrics: failureMetrics,
           error: msg,
@@ -628,6 +671,7 @@ export class ToolsOrchestrator {
       this.progress?.toolFinished({
         callPath: callPathLabel,
         agentId: agentIdLabel,
+        agentPath: agentPathLabel,
         tool: { name: composedToolName, provider: logProviderNamespace },
         metrics: successMetrics,
         status: 'ok',

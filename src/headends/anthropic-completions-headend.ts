@@ -8,6 +8,7 @@ import type { AccountingEntry, AIAgentCallbacks, LLMAccountingEntry, LogDetailVa
 import type { Headend, HeadendClosedEvent, HeadendContext, HeadendDescription } from './types.js';
 
 import { getTelemetryLabels } from '../telemetry/index.js';
+import { normalizeCallPath } from '../utils.js';
 
 import { ConcurrencyLimiter } from './concurrency.js';
 import { HttpError, readJson, writeJson, writeSseChunk, writeSseDone } from './http-utils.js';
@@ -359,16 +360,6 @@ export class AnthropicCompletionsHeadend implements Headend {
       });
       return { tokensIn, tokensOut, tokensCacheRead, tokensCacheWrite, tools, costUsd };
     };
-    const sanitizeCallPath = (raw: string): string => {
-      const segments = raw.split(':').filter((part) => part.length > 0);
-      const result: string[] = [];
-      segments.forEach((segment) => {
-        if (segment === 'tool' && result.length > 0 && result[result.length - 1] === 'agent') return;
-        result.push(segment);
-      });
-      if (result.length === 0) return raw;
-      return result.join(':');
-    };
     const formatTotals = (): string | undefined => {
       const totals = computeTotals();
       const parts: string[] = [];
@@ -381,7 +372,7 @@ export class AnthropicCompletionsHeadend implements Headend {
         parts.push(`tokens ${segments.join(' ')}`);
       }
       if (totals.tools > 0) parts.push(`tools ${String(totals.tools)}`);
-      if (totals.costUsd > 0) parts.push(`cost $**${totals.costUsd.toFixed(4)}**`);
+      if (totals.costUsd > 0) parts.push(`cost $${totals.costUsd.toFixed(4)}`);
       return parts.length > 0 ? parts.join(', ') : undefined;
     };
     const renderReasoning = (): string => {
@@ -400,7 +391,7 @@ export class AnthropicCompletionsHeadend implements Headend {
       });
       if (summaryEmitted && masterSummary !== undefined) {
         const originSuffix = masterSummary.origin !== undefined && masterSummary.origin.length > 0
-          ? ` | origin ${escapeMarkdown(masterSummary.origin)}`
+          ? ` (origin ${escapeMarkdown(masterSummary.origin)})`
           : '';
         lines.push(`Transaction summary: ${masterSummary.text}${originSuffix}`);
       }
@@ -439,9 +430,10 @@ export class AnthropicCompletionsHeadend implements Headend {
       flushReasoning();
     };
     const appendProgressLine = (line: string): void => {
-      if (line.length === 0) return;
+      const trimmed = line.trim();
+      if (trimmed.length === 0) return;
       const turn = ensureTurn();
-      turn.updates.push(line);
+      turn.updates.push(trimmed);
       flushReasoning();
     };
     const ensureHeader = (txnId?: string, callPath?: string): void => {
@@ -466,10 +458,19 @@ export class AnthropicCompletionsHeadend implements Headend {
       if (event.type === 'tool_started' || event.type === 'tool_finished') return;
       if (event.agentId !== agent.id) return;
       const callPathRaw = typeof event.callPath === 'string' && event.callPath.length > 0 ? event.callPath : event.agentId;
-      const callPath = sanitizeCallPath(callPathRaw);
-      ensureHeader(event.txnId, callPath);
-      const displayCallPath = callPath;
-      const prefix = `[${escapeMarkdown(displayCallPath)}]`;
+      const normalizedCallPath = normalizeCallPath(callPathRaw);
+      const callPathForHeader = normalizedCallPath.length > 0 ? normalizedCallPath : callPathRaw;
+      ensureHeader(event.txnId, callPathForHeader);
+      const agentPathRaw = (event as { agentPath?: string }).agentPath;
+      const normalizedAgentPath = normalizeCallPath(agentPathRaw);
+      const displayCallPath = (() => {
+        if (normalizedAgentPath.length > 0) return normalizedAgentPath;
+        if (typeof agentPathRaw === 'string' && agentPathRaw.length > 0) return agentPathRaw;
+        if (callPathForHeader.length > 0) return callPathForHeader;
+        const fallback = normalizeCallPath(event.agentId);
+        return fallback.length > 0 ? fallback : event.agentId;
+      })();
+      const prefix = escapeMarkdown(displayCallPath);
       if (expectingNewTurn || turns.length === 0) {
         startNextTurn();
         expectingNewTurn = false;

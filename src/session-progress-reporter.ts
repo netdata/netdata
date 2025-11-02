@@ -12,6 +12,7 @@ import type {
 interface AgentStartPayload {
   callPath: string;
   agentId: string;
+  agentPath: string;
   agentName?: string;
   txnId?: string;
   parentTxnId?: string;
@@ -22,6 +23,7 @@ interface AgentStartPayload {
 interface AgentUpdatePayload {
   callPath: string;
   agentId: string;
+  agentPath: string;
   agentName?: string;
   txnId?: string;
   parentTxnId?: string;
@@ -32,6 +34,7 @@ interface AgentUpdatePayload {
 interface AgentCompletionPayload {
   callPath: string;
   agentId: string;
+  agentPath: string;
   agentName?: string;
   txnId?: string;
   parentTxnId?: string;
@@ -43,6 +46,7 @@ interface AgentCompletionPayload {
 interface ToolEventPayload {
   callPath: string;
   agentId: string;
+  agentPath: string;
   tool: { name: string; provider: string };
   metrics?: ProgressMetrics;
   error?: string;
@@ -63,6 +67,7 @@ export class SessionProgressReporter {
       type: 'agent_started',
       callPath: payload.callPath,
       agentId: payload.agentId,
+      agentPath: payload.agentPath,
       agentName: payload.agentName,
       txnId: payload.txnId,
       parentTxnId: payload.parentTxnId,
@@ -84,6 +89,7 @@ export class SessionProgressReporter {
       type: 'agent_update',
       callPath: payload.callPath,
       agentId: payload.agentId,
+      agentPath: payload.agentPath,
       agentName: payload.agentName,
       txnId: payload.txnId,
       parentTxnId: payload.parentTxnId,
@@ -100,6 +106,7 @@ export class SessionProgressReporter {
       type: 'agent_finished',
       callPath: payload.callPath,
       agentId: payload.agentId,
+      agentPath: payload.agentPath,
       agentName: payload.agentName,
       txnId: payload.txnId,
       parentTxnId: payload.parentTxnId,
@@ -117,6 +124,7 @@ export class SessionProgressReporter {
       type: 'agent_failed',
       callPath: payload.callPath,
       agentId: payload.agentId,
+      agentPath: payload.agentPath,
       agentName: payload.agentName,
       txnId: payload.txnId,
       parentTxnId: payload.parentTxnId,
@@ -135,6 +143,7 @@ export class SessionProgressReporter {
       type: 'tool_started',
       callPath: payload.callPath,
       agentId: payload.agentId,
+      agentPath: payload.agentPath,
       tool: payload.tool,
       metrics: payload.metrics,
       timestamp: Date.now(),
@@ -151,6 +160,7 @@ export class SessionProgressReporter {
       type: 'tool_finished',
       callPath: payload.callPath,
       agentId: payload.agentId,
+      agentPath: payload.agentPath,
       tool: payload.tool,
       metrics: payload.metrics,
       status,

@@ -162,6 +162,7 @@ interface AgentProgressBase {
   type: 'agent_started' | 'agent_update' | 'agent_finished' | 'agent_failed';
   callPath: string;
   agentId: string;
+  agentPath: string;
   agentName?: string;
   timestamp: number;
   txnId?: string;
@@ -193,6 +194,7 @@ export interface AgentFailedEvent extends AgentProgressBase {
 interface ToolProgressBase {
   callPath: string;
   agentId: string;
+  agentPath: string;
   timestamp: number;
   tool: { name: string; provider: string };
   metrics?: ProgressMetrics;

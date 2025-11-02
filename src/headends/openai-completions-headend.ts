@@ -9,6 +9,7 @@ import type { Headend, HeadendClosedEvent, HeadendContext, HeadendDescription } 
 
 import { mergeCallbacksWithPersistence } from '../persistence.js';
 import { getTelemetryLabels } from '../telemetry/index.js';
+import { normalizeCallPath } from '../utils.js';
 
 import { ConcurrencyLimiter } from './concurrency.js';
 import { HttpError, readJson, writeJson, writeSseChunk, writeSseDone } from './http-utils.js';
@@ -357,16 +358,6 @@ export class OpenAICompletionsHeadend implements Headend {
       });
       return { tokensIn, tokensOut, tokensCacheRead, tokensCacheWrite, tools, costUsd };
     };
-    const sanitizeCallPath = (raw: string): string => {
-      const segments = raw.split(':').filter((part) => part.length > 0);
-      const result: string[] = [];
-      segments.forEach((segment) => {
-        if (segment === 'tool' && result.length > 0 && result[result.length - 1] === 'agent') return;
-        result.push(segment);
-      });
-      if (result.length === 0) return raw;
-      return result.join(':');
-    };
     const resolveOriginFromAccounting = (): string | undefined => {
       const entry = accounting.find((item) => typeof item.originTxnId === 'string' && item.originTxnId.length > 0);
       return entry?.originTxnId;
@@ -383,7 +374,7 @@ export class OpenAICompletionsHeadend implements Headend {
         parts.push(`tokens ${segments.join(' ')}`);
       }
       if (totals.tools > 0) parts.push(`tools ${String(totals.tools)}`);
-      if (totals.costUsd > 0) parts.push(`cost $**${totals.costUsd.toFixed(4)}**`);
+      if (totals.costUsd > 0) parts.push(`cost $${totals.costUsd.toFixed(4)}`);
       return parts.length > 0 ? parts.join(', ') : undefined;
     };
     const renderReasoning = (): string => {
@@ -402,7 +393,7 @@ export class OpenAICompletionsHeadend implements Headend {
       });
       if (summaryEmitted && masterSummary !== undefined) {
         const originSuffix = masterSummary.origin !== undefined && masterSummary.origin.length > 0
-          ? ` | origin ${escapeMarkdown(masterSummary.origin)}`
+          ? ` (origin ${escapeMarkdown(masterSummary.origin)})`
           : '';
         lines.push(`Transaction summary: ${masterSummary.text}${originSuffix}`);
       }
@@ -507,9 +498,10 @@ export class OpenAICompletionsHeadend implements Headend {
       flushReasoning();
     };
     const appendProgressLine = (line: string): void => {
-      if (line.length === 0) return;
+      const trimmed = line.trim();
+      if (trimmed.length === 0) return;
       const turn = ensureTurn();
-      turn.updates.push(line);
+      turn.updates.push(trimmed);
       flushReasoning();
     };
     const ensureHeader = (txnId?: string, callPath?: string, agentIdParam?: string): void => {
@@ -530,7 +522,9 @@ export class OpenAICompletionsHeadend implements Headend {
     const handleProgressEvent = (event: ProgressEvent): void => {
       if (event.type === 'tool_started' || event.type === 'tool_finished') return;
       const callPathRaw = typeof event.callPath === 'string' && event.callPath.length > 0 ? event.callPath : undefined;
-      const callPath = callPathRaw !== undefined ? sanitizeCallPath(callPathRaw) : undefined;
+      const callPath = callPathRaw !== undefined ? normalizeCallPath(callPathRaw) : undefined;
+      const agentPathRaw = (event as { agentPath?: string }).agentPath;
+      const normalizedAgentPath = normalizeCallPath(agentPathRaw);
       if (rootCallPath === undefined) {
         if (event.agentId === agent.id && callPath !== undefined) {
           rootCallPath = callPath;
@@ -558,7 +552,14 @@ export class OpenAICompletionsHeadend implements Headend {
       if (typeof originCandidate === 'string' && originCandidate.length > 0) {
         rootOriginTxnId = originCandidate;
       }
-      const displayCallPath = sanitizeCallPath(callPath ?? event.agentId);
+      const displayCallPath = (() => {
+        if (normalizedAgentPath.length > 0) return normalizedAgentPath;
+        if (typeof agentPathRaw === 'string' && agentPathRaw.length > 0) return agentPathRaw;
+        if (callPath !== undefined && callPath.length > 0) return callPath;
+        if (callPathRaw !== undefined && callPathRaw.length > 0) return callPathRaw;
+        const fallback = normalizeCallPath(event.agentId);
+        return fallback.length > 0 ? fallback : event.agentId;
+      })();
 
       if (expectingNewTurn || turns.length === 0) {
         startNextTurn();
@@ -568,20 +569,20 @@ export class OpenAICompletionsHeadend implements Headend {
           const isRoot = agentMatches && (callPath === undefined || callPath === rootCallPath);
           if (isRoot) return;
           const reason = typeof event.reason === 'string' && event.reason.length > 0 ? italicize(event.reason) : undefined;
-          const prefix = `[${escapeMarkdown(displayCallPath)}]`;
-          const line = reason !== undefined ? `${prefix}: started ${reason}` : `${prefix}: started`;
+          const prefix = escapeMarkdown(displayCallPath);
+          const line = reason !== undefined ? `${prefix} started ${reason}` : `${prefix} started`;
           appendProgressLine(line);
           return;
         }
         case 'agent_update': {
-          const prefix = `[${escapeMarkdown(displayCallPath)}]`;
-          const updateLine = `${prefix}: update ${italicize(event.message)}`;
+          const prefix = escapeMarkdown(displayCallPath);
+          const updateLine = `${prefix} update ${italicize(event.message)}`;
           appendProgressLine(updateLine);
           return;
         }
         case 'agent_finished': {
-          const prefix = `[${escapeMarkdown(displayCallPath)}]`;
-          const line = metricsText.length > 0 ? `${prefix}: finished ${metricsText}` : `${prefix}: finished`;
+          const prefix = escapeMarkdown(displayCallPath);
+          const line = metricsText.length > 0 ? `${prefix} finished ${metricsText}` : `${prefix} finished`;
           appendProgressLine(line);
           if (agentMatches && (callPath === undefined || callPath === rootCallPath)) {
             const summary = metricsText.length > 0 ? metricsText : 'completed';
@@ -595,8 +596,8 @@ export class OpenAICompletionsHeadend implements Headend {
         }
         case 'agent_failed': {
           const errorText = typeof event.error === 'string' && event.error.length > 0 ? italicize(event.error) : undefined;
-          const prefix = `[${escapeMarkdown(displayCallPath)}]`;
-          let line = `${prefix}: failed`;
+          const prefix = escapeMarkdown(displayCallPath);
+          let line = `${prefix} failed`;
           if (errorText !== undefined && metricsText.length > 0) {
             line += `: ${errorText}, ${metricsText}`;
           } else if (errorText !== undefined) {
@@ -618,7 +619,7 @@ export class OpenAICompletionsHeadend implements Headend {
           return;
         }
         default:
-          appendProgressLine(`[${escapeMarkdown(displayCallPath)}]: update ${italicize('progress event')}`);
+          appendProgressLine(`${escapeMarkdown(displayCallPath)} update ${italicize('progress event')}`);
       }
     };
     const telemetryLabels = { ...getTelemetryLabels(), headend: this.id };

@@ -268,3 +268,5 @@ export function warn(message: string): void {
     /* ignore sink failures to keep core resilient */
   }
 }
+
+export { appendCallPathSegment, normalizeCallPath } from './utils/call-path.js';
