@@ -338,20 +338,19 @@ static ULONGLONG netdata_MSSQL_fill_long_value(SQLHSTMT *stmt, const char *mask,
     SQLRETURN ret;
 
     ret = SQLExecDirect(stmt, query, SQL_NTS);
-    if (ret != SQL_SUCCESS) {
+    if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
         netdata_MSSQL_error(SQL_HANDLE_STMT, stmt, NETDATA_MSSQL_ODBC_QUERY, instance);
         return (ULONGLONG)ULONG_LONG_MAX;
     }
 
     ret = SQLBindCol(stmt, 1, SQL_C_LONG, &db_size, sizeof(long), &col_data_len);
-
-    if (ret != SQL_SUCCESS) {
+    if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
         netdata_MSSQL_error(SQL_HANDLE_STMT, stmt, NETDATA_MSSQL_ODBC_PREPARE, instance);
         return (ULONGLONG)ULONG_LONG_MAX;
     }
 
     ret = SQLFetch(stmt);
-    if (ret != SQL_SUCCESS) {
+    if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
         netdata_MSSQL_error(SQL_HANDLE_STMT, stmt, NETDATA_MSSQL_ODBC_FETCH, instance);
         return (ULONGLONG)ULONG_LONG_MAX;
     }
@@ -385,7 +384,7 @@ void dict_mssql_fill_instance_transactions(struct mssql_db_instance *mdi)
             mdi->parent->instanceID);
 
     SQLRETURN ret = SQLExecDirect(mdi->parent->conn->dbInstanceTransactionSTMT, (SQLCHAR *)query, SQL_NTS);
-    if (ret != SQL_SUCCESS) {
+    if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
         mdi->collecting_data = false;
         netdata_MSSQL_error(
                 SQL_HANDLE_STMT, mdi->parent->conn->dbInstanceTransactionSTMT, NETDATA_MSSQL_ODBC_QUERY, mdi->parent->instanceID);
@@ -394,14 +393,14 @@ void dict_mssql_fill_instance_transactions(struct mssql_db_instance *mdi)
 
     ret = SQLBindCol(
             mdi->parent->conn->dbInstanceTransactionSTMT, 1, SQL_C_CHAR, object_name, sizeof(object_name), &col_object_len);
-    if (ret != SQL_SUCCESS) {
+    if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
         netdata_MSSQL_error(
                 SQL_HANDLE_STMT, mdi->parent->conn->dbInstanceTransactionSTMT, NETDATA_MSSQL_ODBC_PREPARE, mdi->parent->instanceID);
         goto enditransactions;
     }
 
     ret = SQLBindCol(mdi->parent->conn->dbInstanceTransactionSTMT, 2, SQL_C_LONG, &value, sizeof(value), &col_value_len);
-    if (ret != SQL_SUCCESS) {
+    if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
         netdata_MSSQL_error(
                 SQL_HANDLE_STMT, mdi->parent->conn->dbInstanceTransactionSTMT, NETDATA_MSSQL_ODBC_PREPARE, mdi->parent->instanceID);
         goto enditransactions;
@@ -481,7 +480,7 @@ void dict_mssql_fill_transactions(struct mssql_db_instance *mdi, const char *dbn
         dbname);
 
     SQLRETURN ret = SQLExecDirect(mdi->parent->conn->dbTransactionSTMT, (SQLCHAR *)query, SQL_NTS);
-    if (ret != SQL_SUCCESS) {
+    if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
         mdi->collecting_data = false;
         netdata_MSSQL_error(
             SQL_HANDLE_STMT, mdi->parent->conn->dbTransactionSTMT, NETDATA_MSSQL_ODBC_QUERY, mdi->parent->instanceID);
@@ -490,14 +489,14 @@ void dict_mssql_fill_transactions(struct mssql_db_instance *mdi, const char *dbn
 
     ret = SQLBindCol(
         mdi->parent->conn->dbTransactionSTMT, 1, SQL_C_CHAR, object_name, sizeof(object_name), &col_object_len);
-    if (ret != SQL_SUCCESS) {
+    if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
         netdata_MSSQL_error(
             SQL_HANDLE_STMT, mdi->parent->conn->dbTransactionSTMT, NETDATA_MSSQL_ODBC_PREPARE, mdi->parent->instanceID);
         goto endtransactions;
     }
 
     ret = SQLBindCol(mdi->parent->conn->dbTransactionSTMT, 2, SQL_C_LONG, &value, sizeof(value), &col_value_len);
-    if (ret != SQL_SUCCESS) {
+    if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
         netdata_MSSQL_error(
             SQL_HANDLE_STMT, mdi->parent->conn->dbTransactionSTMT, NETDATA_MSSQL_ODBC_PREPARE, mdi->parent->instanceID);
         goto endtransactions;
@@ -573,7 +572,7 @@ void dict_mssql_fill_locks(struct mssql_db_instance *mdi, const char *dbname)
         dbname);
 
     SQLRETURN ret = SQLExecDirect(mdi->parent->conn->dbLocksSTMT, (SQLCHAR *)query, SQL_NTS);
-    if (ret != SQL_SUCCESS) {
+    if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
         mdi->collecting_data = false;
         netdata_MSSQL_error(
             SQL_HANDLE_STMT, mdi->parent->conn->dbLocksSTMT, NETDATA_MSSQL_ODBC_QUERY, mdi->parent->instanceID);
@@ -582,14 +581,14 @@ void dict_mssql_fill_locks(struct mssql_db_instance *mdi, const char *dbname)
 
     ret = SQLBindCol(
         mdi->parent->conn->dbLocksSTMT, 1, SQL_C_CHAR, resource_type, sizeof(resource_type), &col_object_len);
-    if (ret != SQL_SUCCESS) {
+    if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
         netdata_MSSQL_error(
             SQL_HANDLE_STMT, mdi->parent->conn->dbLocksSTMT, NETDATA_MSSQL_ODBC_PREPARE, mdi->parent->instanceID);
         goto endlocks;
     }
 
     ret = SQLBindCol(mdi->parent->conn->dbLocksSTMT, 2, SQL_C_LONG, &value, sizeof(value), &col_value_len);
-    if (ret != SQL_SUCCESS) {
+    if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
         netdata_MSSQL_error(
             SQL_HANDLE_STMT, mdi->parent->conn->dbLocksSTMT, NETDATA_MSSQL_ODBC_PREPARE, mdi->parent->instanceID);
         goto endlocks;
@@ -636,52 +635,52 @@ int dict_mssql_fill_waits(struct mssql_instance *mi)
            col_max_wait_len = 0, col_waiting_tasks_len = 0, col_wait_category_len = 0;
 
     SQLRETURN ret = SQLExecDirect(mi->conn->dbWaitsSTMT, (SQLCHAR *)NETDATA_QUERY_CHECK_WAITS, SQL_NTS);
-    if (ret != SQL_SUCCESS) {
+    if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
         netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn->dbWaitsSTMT, NETDATA_MSSQL_ODBC_QUERY, mi->instanceID);
         goto endwait;
     }
 
     ret = SQLBindCol(mi->conn->dbWaitsSTMT, 1, SQL_C_CHAR, wait_type, sizeof(wait_type), &col_wait_type_len);
-    if (ret != SQL_SUCCESS) {
+    if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
         netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn->dbWaitsSTMT, NETDATA_MSSQL_ODBC_PREPARE, mi->instanceID);
         goto endwait;
     }
 
     ret = SQLBindCol(mi->conn->dbWaitsSTMT, 2, SQL_C_LONG, &total_wait, sizeof(total_wait), &col_total_wait_len);
-    if (ret != SQL_SUCCESS) {
+    if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
         netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn->dbWaitsSTMT, NETDATA_MSSQL_ODBC_PREPARE, mi->instanceID);
         goto endwait;
     }
 
     ret =
         SQLBindCol(mi->conn->dbWaitsSTMT, 3, SQL_C_LONG, &resource_wait, sizeof(resource_wait), &col_resource_wait_len);
-    if (ret != SQL_SUCCESS) {
+    if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
         netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn->dbWaitsSTMT, NETDATA_MSSQL_ODBC_PREPARE, mi->instanceID);
         goto endwait;
     }
 
     ret = SQLBindCol(mi->conn->dbWaitsSTMT, 4, SQL_C_LONG, &signal_wait, sizeof(signal_wait), &col_signal_wait_len);
-    if (ret != SQL_SUCCESS) {
+    if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
         netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn->dbWaitsSTMT, NETDATA_MSSQL_ODBC_PREPARE, mi->instanceID);
         goto endwait;
     }
 
     ret = SQLBindCol(mi->conn->dbWaitsSTMT, 5, SQL_C_LONG, &max_wait, sizeof(max_wait), &col_max_wait_len);
-    if (ret != SQL_SUCCESS) {
+    if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
         netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn->dbWaitsSTMT, NETDATA_MSSQL_ODBC_PREPARE, mi->instanceID);
         goto endwait;
     }
 
     ret =
         SQLBindCol(mi->conn->dbWaitsSTMT, 6, SQL_C_LONG, &waiting_tasks, sizeof(waiting_tasks), &col_waiting_tasks_len);
-    if (ret != SQL_SUCCESS) {
+    if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
         netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn->dbWaitsSTMT, NETDATA_MSSQL_ODBC_PREPARE, mi->instanceID);
         goto endwait;
     }
 
     ret =
         SQLBindCol(mi->conn->dbWaitsSTMT, 7, SQL_C_CHAR, wait_category, sizeof(wait_category), &col_wait_category_len);
-    if (ret != SQL_SUCCESS) {
+    if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
         netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn->dbWaitsSTMT, NETDATA_MSSQL_ODBC_PREPARE, mi->instanceID);
         goto endwait;
     }
@@ -760,7 +759,7 @@ long metdata_mssql_check_permission(struct mssql_instance *mi)
     SQLRETURN ret;
 
     ret = SQLExecDirect(mi->conn->checkPermSTMT, (SQLCHAR *)NETDATA_QUERY_CHECK_PERM, SQL_NTS);
-    if (ret != SQL_SUCCESS) {
+    if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
         netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn->checkPermSTMT, NETDATA_MSSQL_ODBC_QUERY, mi->instanceID);
         perm = LONG_MAX;
         goto endperm;
@@ -768,14 +767,14 @@ long metdata_mssql_check_permission(struct mssql_instance *mi)
 
     ret = SQLBindCol(mi->conn->checkPermSTMT, 1, SQL_C_LONG, &perm, sizeof(perm), &col_data_len);
 
-    if (ret != SQL_SUCCESS) {
+    if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
         netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn->checkPermSTMT, NETDATA_MSSQL_ODBC_PREPARE, mi->instanceID);
         perm = LONG_MAX;
         goto endperm;
     }
 
     ret = SQLFetch(mi->conn->checkPermSTMT);
-    if (ret != SQL_SUCCESS) {
+    if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
         netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn->checkPermSTMT, NETDATA_MSSQL_ODBC_FETCH, mi->instanceID);
         perm = LONG_MAX;
         goto endperm;
@@ -803,19 +802,19 @@ void metdata_mssql_fill_mssql_status(struct mssql_instance *mi)
     SQLRETURN ret;
 
     ret = SQLExecDirect(mi->conn->dbSQLState, (SQLCHAR *)NETDATA_QUERY_DATABASE_STATUS, SQL_NTS);
-    if (ret != SQL_SUCCESS) {
+    if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
         netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn->dbSQLState, NETDATA_MSSQL_ODBC_QUERY, mi->instanceID);
         goto enddbstate;
     }
 
     ret = SQLBindCol(mi->conn->dbSQLState, 1, SQL_C_TINYINT, &state, sizeof(state), &col_data_len);
-    if (ret != SQL_SUCCESS) {
+    if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
         netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn->dbSQLState, NETDATA_MSSQL_ODBC_PREPARE, mi->instanceID);
         goto enddbstate;
     }
 
     ret = SQLBindCol(mi->conn->dbSQLState, 3, SQL_C_BIT, &readonly, sizeof(readonly), &col_data_len);
-    if (ret != SQL_SUCCESS) {
+    if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
         netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn->dbWaitsSTMT, NETDATA_MSSQL_ODBC_PREPARE, mi->instanceID);
         goto enddbstate;
     }
@@ -856,19 +855,19 @@ void metdata_mssql_fill_job_status(struct mssql_instance *mi)
     SQLRETURN ret;
 
     ret = SQLExecDirect(mi->conn->dbSQLJobs, (SQLCHAR *)NETDATA_QUERY_JOBS_STATUS, SQL_NTS);
-    if (ret != SQL_SUCCESS) {
+    if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
         netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn->dbSQLJobs, NETDATA_MSSQL_ODBC_QUERY, mi->instanceID);
         goto enddbjobs;
     }
 
     ret = SQLBindCol(mi->conn->dbSQLJobs, 1, SQL_C_CHAR, job, sizeof(job), &col_job_len);
-    if (ret != SQL_SUCCESS) {
+    if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
         netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn->dbSQLJobs, NETDATA_MSSQL_ODBC_PREPARE, mi->instanceID);
         goto enddbjobs;
     }
 
     ret = SQLBindCol(mi->conn->dbSQLJobs, 2, SQL_C_TINYINT, &state, sizeof(state), &col_state_len);
-    if (ret != SQL_SUCCESS) {
+    if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
         netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn->dbSQLJobs, NETDATA_MSSQL_ODBC_PREPARE, mi->instanceID);
         goto enddbjobs;
     }
@@ -905,14 +904,14 @@ void metdata_mssql_fill_dictionary_from_db(struct mssql_instance *mi)
     SQLRETURN ret;
 
     ret = SQLExecDirect(mi->conn->databaseListSTMT, (SQLCHAR *)NETDATA_QUERY_LIST_DB, SQL_NTS);
-    if (ret != SQL_SUCCESS) {
+    if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
         netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn->databaseListSTMT, NETDATA_MSSQL_ODBC_QUERY, mi->instanceID);
         goto enddblist;
     }
 
     ret = SQLBindCol(mi->conn->databaseListSTMT, 1, SQL_C_CHAR, dbname, sizeof(dbname), &col_data_len);
 
-    if (ret != SQL_SUCCESS) {
+    if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
         netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn->databaseListSTMT, NETDATA_MSSQL_ODBC_PREPARE, mi->instanceID);
         goto enddblist;
     }
