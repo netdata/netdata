@@ -292,13 +292,12 @@ export class OpenAICompletionsHeadend implements Headend {
     let rootOriginTxnId: string | undefined;
     let summaryEmitted = false;
     const accounting: AccountingEntry[] = [];
-    const agentHeadingLabel = `**[${escapeMarkdown(agent.toolName ?? agent.id)}]**`;
+    const agentHeadingLabel = `**${escapeMarkdown(agent.toolName ?? agent.id)}**`;
     interface TurnRenderState { index: number; summary?: string; thinking?: string; updates: string[] }
     let rootCallPath: string | undefined;
     let transactionHeader: string | undefined;
     let renderedReasoning = '';
     const turns: TurnRenderState[] = [];
-    let pendingUpdates: string[] = [];
     let turnCounter = 0;
     let expectingNewTurn = true;
     let masterSummary: { text: string; origin?: string } | undefined;
@@ -474,15 +473,9 @@ export class OpenAICompletionsHeadend implements Headend {
       return { text: summaryText, origin: summaryOrigin };
     };
     const ensureTurn = (): TurnRenderState => {
-      if (turns.length === 0) {
-        turnCounter += 1;
-        const firstTurn: TurnRenderState = { index: turnCounter, updates: [] };
-        if (pendingUpdates.length > 0) {
-          firstTurn.updates.push(...pendingUpdates);
-          pendingUpdates = [];
-        }
-        turns.push(firstTurn);
-        flushReasoning();
+      if (expectingNewTurn || turns.length === 0) {
+        startNextTurn();
+        expectingNewTurn = false;
       }
       return turns[turns.length - 1];
     };
@@ -493,11 +486,8 @@ export class OpenAICompletionsHeadend implements Headend {
         const summary = formatTotals();
         if (summary !== undefined) turn.summary = summary;
       }
-      if (pendingUpdates.length > 0) {
-        turn.updates.push(...pendingUpdates);
-        pendingUpdates = [];
-      }
       turns.push(turn);
+      expectingNewTurn = false;
       flushReasoning();
     };
     const appendThinkingChunk = (chunk: string): void => {
@@ -508,11 +498,7 @@ export class OpenAICompletionsHeadend implements Headend {
     };
     const appendProgressLine = (line: string): void => {
       if (line.length === 0) return;
-      if (turns.length === 0) {
-        pendingUpdates.push(line);
-        return;
-      }
-      const turn = turns[turns.length - 1];
+      const turn = ensureTurn();
       turn.updates.push(line);
       flushReasoning();
     };
@@ -532,7 +518,6 @@ export class OpenAICompletionsHeadend implements Headend {
       }
     };
     const handleProgressEvent = (event: ProgressEvent): void => {
-      if (!streamed) return;
       if (event.type === 'tool_started' || event.type === 'tool_finished') return;
       const callPath = typeof event.callPath === 'string' && event.callPath.length > 0 ? event.callPath : undefined;
       if (rootCallPath === undefined) {
@@ -564,6 +549,9 @@ export class OpenAICompletionsHeadend implements Headend {
       }
       const displayCallPath = callPath ?? event.agentId;
 
+      if (expectingNewTurn || turns.length === 0) {
+        startNextTurn();
+      }
       switch (event.type) {
         case 'agent_started': {
           const isRoot = agentMatches && (callPath === undefined || callPath === rootCallPath);

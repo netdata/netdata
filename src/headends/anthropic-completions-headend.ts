@@ -291,10 +291,9 @@ export class AnthropicCompletionsHeadend implements Headend {
     let rootOriginTxnId: string | undefined;
     let textBlockOpen = false;
     let thinkingBlockOpen = false;
-    const agentHeadingLabel = `**[${escapeMarkdown(agent.toolName ?? agent.id)}]**`;
+    const agentHeadingLabel = `**${escapeMarkdown(agent.toolName ?? agent.id)}**`;
     interface TurnRenderState { index: number; summary?: string; thinking?: string; updates: string[] }
     const turns: TurnRenderState[] = [];
-    let pendingUpdates: string[] = [];
     let renderedReasoning = '';
     let transactionHeader: string | undefined;
     let turnCounter = 0;
@@ -406,15 +405,9 @@ export class AnthropicCompletionsHeadend implements Headend {
       renderedReasoning = next;
     };
     const ensureTurn = (): TurnRenderState => {
-      if (turns.length === 0) {
-        turnCounter += 1;
-        const firstTurn: TurnRenderState = { index: turnCounter, updates: [] };
-        if (pendingUpdates.length > 0) {
-          firstTurn.updates.push(...pendingUpdates);
-          pendingUpdates = [];
-        }
-        turns.push(firstTurn);
-        flushReasoning();
+      if (expectingNewTurn || turns.length === 0) {
+        startNextTurn();
+        expectingNewTurn = false;
       }
       return turns[turns.length - 1];
     };
@@ -425,11 +418,8 @@ export class AnthropicCompletionsHeadend implements Headend {
         const summary = formatTotals();
         if (summary !== undefined) turn.summary = summary;
       }
-      if (pendingUpdates.length > 0) {
-        turn.updates.push(...pendingUpdates);
-        pendingUpdates = [];
-      }
       turns.push(turn);
+      expectingNewTurn = false;
       flushReasoning();
     };
     const appendThinkingChunk = (chunk: string): void => {
@@ -440,11 +430,7 @@ export class AnthropicCompletionsHeadend implements Headend {
     };
     const appendProgressLine = (line: string): void => {
       if (line.length === 0) return;
-      if (turns.length === 0) {
-        pendingUpdates.push(line);
-        return;
-      }
-      const turn = turns[turns.length - 1];
+      const turn = ensureTurn();
       turn.updates.push(line);
       flushReasoning();
     };
@@ -467,13 +453,16 @@ export class AnthropicCompletionsHeadend implements Headend {
       return entry?.originTxnId;
     };
     const handleProgressEvent = (event: ProgressEvent): void => {
-      if (!streamed) return;
       if (event.type === 'tool_started' || event.type === 'tool_finished') return;
       if (event.agentId !== agent.id) return;
       const callPath: string = typeof event.callPath === 'string' && event.callPath.length > 0 ? event.callPath : event.agentId;
       ensureHeader(event.txnId, callPath);
       const displayCallPath = callPath;
       const prefix = `[${escapeMarkdown(displayCallPath)}]`;
+      if (expectingNewTurn || turns.length === 0) {
+        startNextTurn();
+        expectingNewTurn = false;
+      }
       switch (event.type) {
         case 'agent_started': {
           const reason = typeof event.reason === 'string' && event.reason.length > 0 ? italicize(event.reason) : undefined;
