@@ -291,6 +291,17 @@ export class AnthropicCompletionsHeadend implements Headend {
     let rootOriginTxnId: string | undefined;
     let textBlockOpen = false;
     let thinkingBlockOpen = false;
+    const agentHeadingLabel = `**[${escapeMarkdown(agent.toolName ?? agent.id)}]**`;
+    interface TurnRenderState { index: number; summary?: string; thinking?: string; updates: string[] }
+    const turns: TurnRenderState[] = [];
+    let pendingUpdates: string[] = [];
+    let renderedReasoning = '';
+    let transactionHeader: string | undefined;
+    let turnCounter = 0;
+    let expectingNewTurn = true;
+    let rootCallPath: string | undefined;
+    let summaryEmitted = false;
+    let rootTxnId: string | undefined;
 
     const openTextBlock = (): void => {
       if (!streamed || textBlockOpen) return;
@@ -319,28 +330,206 @@ export class AnthropicCompletionsHeadend implements Headend {
       writeSseChunk(res, stop);
       thinkingBlockOpen = false;
     };
+    const emitReasoningDelta = (text: string): void => {
+      if (!streamed || text.length === 0) return;
+      if (textBlockOpen) closeTextBlock();
+      openThinkingBlock();
+      const event = {
+        type: 'content_block_delta' as const,
+        content_block: { type: 'thinking' as const, thinking_delta: text },
+      };
+      writeSseChunk(res, event);
+    };
+    const computeTotals = (): { tokensIn: number; tokensOut: number; tokensCacheRead: number; tokensCacheWrite: number; tools: number; costUsd: number } => {
+      let tokensIn = 0;
+      let tokensOut = 0;
+      let tokensCacheRead = 0;
+      let tokensCacheWrite = 0;
+      let costUsd = 0;
+      let tools = 0;
+      accounting.forEach((entry) => {
+        if (entry.type === 'llm') {
+          tokensIn += entry.tokens.inputTokens;
+          tokensOut += entry.tokens.outputTokens;
+          tokensCacheRead += entry.tokens.cacheReadInputTokens ?? entry.tokens.cachedTokens ?? 0;
+          tokensCacheWrite += entry.tokens.cacheWriteInputTokens ?? 0;
+          if (typeof entry.costUsd === 'number' && Number.isFinite(entry.costUsd)) costUsd += entry.costUsd;
+          return;
+        }
+        tools += 1;
+      });
+      return { tokensIn, tokensOut, tokensCacheRead, tokensCacheWrite, tools, costUsd };
+    };
+    const formatTotals = (): string | undefined => {
+      const totals = computeTotals();
+      const parts: string[] = [];
+      if (totals.tokensIn > 0 || totals.tokensOut > 0 || totals.tokensCacheRead > 0 || totals.tokensCacheWrite > 0) {
+        const segments: string[] = [];
+        if (totals.tokensIn > 0) segments.push(`→${String(totals.tokensIn)}`);
+        if (totals.tokensOut > 0) segments.push(`←${String(totals.tokensOut)}`);
+        if (totals.tokensCacheRead > 0) segments.push(`c→${String(totals.tokensCacheRead)}`);
+        if (totals.tokensCacheWrite > 0) segments.push(`c←${String(totals.tokensCacheWrite)}`);
+        parts.push(`tokens ${segments.join(' ')}`);
+      }
+      if (totals.tools > 0) parts.push(`tools ${String(totals.tools)}`);
+      if (totals.costUsd > 0) parts.push(`cost $**${totals.costUsd.toFixed(4)}**`);
+      return parts.length > 0 ? parts.join(', ') : undefined;
+    };
+    const renderReasoning = (): string => {
+      if (transactionHeader === undefined) return '';
+      const lines: string[] = [transactionHeader];
+      turns.forEach((turn) => {
+        const headingParts = [`${String(turn.index)}. Turn ${String(turn.index)}`];
+        if (turn.summary !== undefined && turn.summary.length > 0) headingParts.push(`(${turn.summary})`);
+        lines.push(headingParts.join(' '));
+        if (turn.thinking !== undefined && turn.thinking.trim().length > 0) {
+          lines.push(`  - thinking: _${escapeMarkdown(turn.thinking.trim())}_`);
+        }
+        turn.updates.forEach((line) => {
+          lines.push(`  - ${line}`);
+        });
+      });
+      if (summaryEmitted && masterSummary !== undefined) {
+        const originSuffix = masterSummary.origin !== undefined && masterSummary.origin.length > 0
+          ? ` | origin ${escapeMarkdown(masterSummary.origin)}`
+          : '';
+        lines.push(`Transaction summary: ${masterSummary.text}${originSuffix}`);
+      }
+      return `${lines.join('\n')}\n`;
+    };
+    const flushReasoning = (): void => {
+      if (!streamed || transactionHeader === undefined) return;
+      const next = renderReasoning();
+      if (next.length <= renderedReasoning.length) return;
+      const delta = next.slice(renderedReasoning.length);
+      emitReasoningDelta(delta);
+      renderedReasoning = next;
+    };
+    const ensureTurn = (): TurnRenderState => {
+      if (turns.length === 0) {
+        turnCounter += 1;
+        const firstTurn: TurnRenderState = { index: turnCounter, updates: [] };
+        if (pendingUpdates.length > 0) {
+          firstTurn.updates.push(...pendingUpdates);
+          pendingUpdates = [];
+        }
+        turns.push(firstTurn);
+        flushReasoning();
+      }
+      return turns[turns.length - 1];
+    };
+    const startNextTurn = (): void => {
+      turnCounter += 1;
+      const turn: TurnRenderState = { index: turnCounter, updates: [] };
+      if (turnCounter > 1) {
+        const summary = formatTotals();
+        if (summary !== undefined) turn.summary = summary;
+      }
+      if (pendingUpdates.length > 0) {
+        turn.updates.push(...pendingUpdates);
+        pendingUpdates = [];
+      }
+      turns.push(turn);
+      flushReasoning();
+    };
+    const appendThinkingChunk = (chunk: string): void => {
+      if (chunk.length === 0) return;
+      const turn = ensureTurn();
+      turn.thinking = (turn.thinking ?? '') + chunk;
+      flushReasoning();
+    };
+    const appendProgressLine = (line: string): void => {
+      if (line.length === 0) return;
+      if (turns.length === 0) {
+        pendingUpdates.push(line);
+        return;
+      }
+      const turn = turns[turns.length - 1];
+      turn.updates.push(line);
+      flushReasoning();
+    };
+    const ensureHeader = (txnId?: string, callPath?: string): void => {
+      if (rootTxnId === undefined && typeof txnId === 'string' && txnId.length > 0) {
+        rootTxnId = txnId;
+      }
+      if (transactionHeader === undefined) {
+        const headerId = rootTxnId ?? txnId ?? callPath ?? requestId;
+        const headerLabel = `**${escapeMarkdown(headerId)}**`;
+        transactionHeader = `Started ${agentHeadingLabel} transaction ${headerLabel}:`;
+        flushReasoning();
+      }
+      if (rootCallPath === undefined && typeof callPath === 'string' && callPath.length > 0) {
+        rootCallPath = callPath;
+      }
+    };
     const resolveOriginFromAccounting = (): string | undefined => {
       const entry = accounting.find((item) => typeof item.originTxnId === 'string' && item.originTxnId.length > 0);
       return entry?.originTxnId;
     };
     const handleProgressEvent = (event: ProgressEvent): void => {
-      if (event.type !== 'agent_finished' && event.type !== 'agent_failed') return;
+      if (!streamed) return;
+      if (event.type === 'tool_started' || event.type === 'tool_finished') return;
       if (event.agentId !== agent.id) return;
-      const metrics = 'metrics' in event ? (event as { metrics?: ProgressMetrics }).metrics : undefined;
-      const metricsText = formatMetricsLine(metrics);
-      const originCandidate = (event as { originTxnId?: string }).originTxnId;
-      if (typeof originCandidate === 'string' && originCandidate.length > 0) {
-        rootOriginTxnId = originCandidate;
+      const callPath: string = typeof event.callPath === 'string' && event.callPath.length > 0 ? event.callPath : event.agentId;
+      ensureHeader(event.txnId, callPath);
+      const displayCallPath = callPath;
+      const prefix = `[${escapeMarkdown(displayCallPath)}]`;
+      switch (event.type) {
+        case 'agent_started': {
+          const reason = typeof event.reason === 'string' && event.reason.length > 0 ? italicize(event.reason) : undefined;
+          appendProgressLine(reason !== undefined ? `${prefix}: started ${reason}` : `${prefix}: started`);
+          return;
+        }
+        case 'agent_update': {
+          appendProgressLine(`${prefix}: update ${italicize(event.message)}`);
+          return;
+        }
+        case 'agent_finished': {
+          const metrics = 'metrics' in event ? (event as { metrics?: ProgressMetrics }).metrics : undefined;
+          const metricsText = formatMetricsLine(metrics);
+          appendProgressLine(metricsText.length > 0 ? `${prefix}: finished ${metricsText}` : `${prefix}: finished`);
+          const originCandidate = (event as { originTxnId?: string }).originTxnId;
+          if (typeof originCandidate === 'string' && originCandidate.length > 0) {
+            rootOriginTxnId = originCandidate;
+          }
+          const summary = metricsText.length > 0 ? metricsText : 'completed';
+          const origin = originCandidate ?? rootOriginTxnId;
+          if (typeof origin === 'string' && origin.length > 0) rootOriginTxnId = origin;
+          masterSummary = { text: summary, origin };
+          summaryEmitted = true;
+          flushReasoning();
+          return;
+        }
+        case 'agent_failed': {
+          const metrics = 'metrics' in event ? (event as { metrics?: ProgressMetrics }).metrics : undefined;
+          const metricsText = formatMetricsLine(metrics);
+          const errorText = typeof event.error === 'string' && event.error.length > 0 ? italicize(event.error) : undefined;
+          let line = `${prefix}: failed`;
+          if (errorText !== undefined && metricsText.length > 0) {
+            line += `: ${errorText}, ${metricsText}`;
+          } else if (errorText !== undefined) {
+            line += `: ${errorText}`;
+          } else if (metricsText.length > 0) {
+            line += `: ${metricsText}`;
+          }
+          appendProgressLine(line);
+          const originCandidate = (event as { originTxnId?: string }).originTxnId;
+          if (typeof originCandidate === 'string' && originCandidate.length > 0) {
+            rootOriginTxnId = originCandidate;
+          }
+          const summary = metricsText.length > 0
+            ? metricsText
+            : (errorText !== undefined ? `failed: ${errorText}` : 'failed');
+          const origin = originCandidate ?? rootOriginTxnId;
+          if (typeof origin === 'string' && origin.length > 0) rootOriginTxnId = origin;
+          masterSummary = { text: summary, origin };
+          summaryEmitted = true;
+          flushReasoning();
+          return;
+        }
+        default:
+          appendProgressLine(`${prefix}: update ${italicize('progress event')}`);
       }
-      const errorText = event.type === 'agent_failed' && typeof event.error === 'string' && event.error.length > 0
-        ? italicize(event.error)
-        : undefined;
-      const summary = metricsText.length > 0
-        ? metricsText
-        : (event.type === 'agent_failed' ? (errorText !== undefined ? `failed: ${errorText}` : 'failed') : 'completed');
-      const origin = originCandidate ?? rootOriginTxnId;
-      if (typeof origin === 'string' && origin.length > 0) rootOriginTxnId = origin;
-      masterSummary = { text: summary, origin };
     };
     const telemetryLabels = { ...getTelemetryLabels(), headend: this.id };
 
@@ -360,22 +549,24 @@ export class AnthropicCompletionsHeadend implements Headend {
       onThinking: (chunk) => {
         if (chunk.length === 0) return;
         reasoning += chunk;
-        if (streamed) {
-          if (textBlockOpen) closeTextBlock();
-          openThinkingBlock();
-          const event = {
-            type: 'content_block_delta',
-            content_block: { type: 'thinking', thinking_delta: chunk },
-          };
-          writeSseChunk(res, event);
+        ensureHeader(undefined, rootCallPath ?? agent.id);
+        if (expectingNewTurn) {
+          startNextTurn();
+          expectingNewTurn = false;
         }
+        appendThinkingChunk(chunk);
       },
       onProgress: (event) => { handleProgressEvent(event); },
       onLog: (entry) => {
         entry.headendId = this.id;
         this.logEntry(entry);
       },
-      onAccounting: (entry) => { accounting.push(entry); },
+      onAccounting: (entry) => {
+        accounting.push(entry);
+        if (entry.type === 'llm' && (entry.agentId === undefined || entry.agentId === agent.id)) {
+          expectingNewTurn = true;
+        }
+      },
     };
 
     if (streamed) {
@@ -418,8 +609,16 @@ export class AnthropicCompletionsHeadend implements Headend {
       const finalText = this.resolveContent(output, result.finalReport);
       const usage = collectUsage(accounting);
       if (streamed) {
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-        if (thinkingBlockOpen) closeThinkingBlock();
+        if (turns.length === 0) {
+          startNextTurn();
+          expectingNewTurn = false;
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- guard preserves existing turn numbering when additional turns aren't scheduled
+        } else if (expectingNewTurn) {
+          startNextTurn();
+          expectingNewTurn = false;
+        }
+        flushReasoning();
+        closeThinkingBlock();
         if (finalText.length > 0) {
           openTextBlock();
           const textEvent = {
@@ -485,6 +684,8 @@ export class AnthropicCompletionsHeadend implements Headend {
         if (masterSummary === undefined) {
           masterSummary = { text: summaryText, origin: summaryOrigin };
           if (typeof summaryOrigin === 'string' && summaryOrigin.length > 0) rootOriginTxnId = summaryOrigin;
+          summaryEmitted = true;
+          flushReasoning();
         }
         const originSuffix = typeof summaryOrigin === 'string' && summaryOrigin.length > 0
           ? ` | origin ${escapeMarkdown(summaryOrigin)}`
@@ -501,9 +702,21 @@ export class AnthropicCompletionsHeadend implements Headend {
         writeSseDone(res);
       } else {
         const trimmedReasoning = reasoning.trim();
+        ensureHeader(undefined, rootCallPath ?? agent.id);
+        if (turns.length === 0) {
+          startNextTurn();
+          expectingNewTurn = false;
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- guard preserves existing turn numbering when additional turns aren't scheduled
+        } else if (expectingNewTurn) {
+          startNextTurn();
+          expectingNewTurn = false;
+        }
+        const rendered = renderReasoning().trim();
         const contentBlocks = (() => {
           const blocks: { type: 'text' | 'thinking'; text?: string; thinking?: string }[] = [];
-          if (trimmedReasoning.length > 0) {
+          if (rendered.length > 0) {
+            blocks.push({ type: 'thinking', thinking: rendered });
+          } else if (trimmedReasoning.length > 0) {
             blocks.push({ type: 'thinking', thinking: trimmedReasoning });
           }
           blocks.push({ type: 'text', text: finalText });
@@ -529,10 +742,8 @@ export class AnthropicCompletionsHeadend implements Headend {
       const message = err instanceof Error ? err.message : String(err);
       this.log('anthropic completion failed', 'ERR', false, { model: agent.id, error: message });
       if (streamed) {
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-        if (thinkingBlockOpen) closeThinkingBlock();
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-        if (textBlockOpen) closeTextBlock();
+        closeThinkingBlock();
+        closeTextBlock();
         const errorEvent = { type: 'error', message };
         writeSseChunk(res, errorEvent);
         writeSseDone(res);

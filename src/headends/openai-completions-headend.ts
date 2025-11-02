@@ -103,13 +103,6 @@ const collectUsage = (entries: AccountingEntry[]): { prompt: number; completion:
   return { ...usage, total: usage.prompt + usage.completion };
 };
 
-const formatAgentLabel = (params: { agentId: string; agentName?: string; callPath?: string }): string => {
-  const source = typeof params.agentName === 'string' && params.agentName.length > 0
-    ? params.agentName
-    : (typeof params.callPath === 'string' && params.callPath.length > 0 ? params.callPath : params.agentId);
-  return `**${escapeMarkdown(source)}**`;
-};
-
 interface FormatResolution {
   format: string;
   schema?: Record<string, unknown>;
@@ -298,15 +291,17 @@ export class OpenAICompletionsHeadend implements Headend {
     let rootTxnId: string | undefined;
     let rootOriginTxnId: string | undefined;
     let summaryEmitted = false;
-    let thinkingOpen = false;
-    let rootCallPath: string | undefined;
     const accounting: AccountingEntry[] = [];
-    const rootAgentLabel = formatAgentLabel({ agentId: agent.id, agentName: agent.toolName, callPath: agent.id });
+    const agentHeadingLabel = `**[${escapeMarkdown(agent.toolName ?? agent.id)}]**`;
+    interface TurnRenderState { index: number; summary?: string; thinking?: string; updates: string[] }
+    let rootCallPath: string | undefined;
+    let transactionHeader: string | undefined;
+    let renderedReasoning = '';
+    const turns: TurnRenderState[] = [];
+    let pendingUpdates: string[] = [];
+    let turnCounter = 0;
+    let expectingNewTurn = true;
     let masterSummary: { text: string; origin?: string } | undefined;
-    const resolveOriginFromAccounting = (): string | undefined => {
-      const entry = accounting.find((item) => typeof item.originTxnId === 'string' && item.originTxnId.length > 0);
-      return entry?.originTxnId;
-    };
     const emitAssistantRole = (): void => {
       if (!streamed || assistantRoleSent) return;
       assistantRoleSent = true;
@@ -325,11 +320,8 @@ export class OpenAICompletionsHeadend implements Headend {
       };
       writeSseChunk(res, roleChunk);
     };
-    const emitReasoning = (text: string, options?: { ensureNewline?: boolean }): void => {
-      if (!streamed) return;
-      if (!/[\S\r\n]/u.test(text)) return;
-      const ensureNewline = options?.ensureNewline ?? true;
-      const payloadText = ensureNewline ? (text.endsWith('\n') ? text : `${text}\n`) : text;
+    const emitReasoning = (text: string): void => {
+      if (!streamed || text.length === 0) return;
       emitAssistantRole();
       const chunk: Record<string, unknown> = {
         id: responseId,
@@ -339,43 +331,190 @@ export class OpenAICompletionsHeadend implements Headend {
         choices: [
           {
             index: 0,
-            delta: { reasoning_content: payloadText },
+            delta: { reasoning_content: text },
             finish_reason: null,
           },
         ],
       };
       writeSseChunk(res, chunk);
     };
-    const emitBullet = (text: string): void => {
-      const trimmed = text.trim();
-      if (trimmed.length === 0) return;
-      emitReasoning(`- ${trimmed}`);
+    const computeTotals = (): { tokensIn: number; tokensOut: number; tokensCacheRead: number; tokensCacheWrite: number; tools: number; costUsd: number } => {
+      let tokensIn = 0;
+      let tokensOut = 0;
+      let tokensCacheRead = 0;
+      let tokensCacheWrite = 0;
+      let costUsd = 0;
+      let tools = 0;
+      accounting.forEach((entry) => {
+        if (entry.type === 'llm') {
+          tokensIn += entry.tokens.inputTokens;
+          tokensOut += entry.tokens.outputTokens;
+          tokensCacheRead += entry.tokens.cacheReadInputTokens ?? entry.tokens.cachedTokens ?? 0;
+          tokensCacheWrite += entry.tokens.cacheWriteInputTokens ?? 0;
+          if (typeof entry.costUsd === 'number' && Number.isFinite(entry.costUsd)) costUsd += entry.costUsd;
+          return;
+        }
+        tools += 1;
+      });
+      return { tokensIn, tokensOut, tokensCacheRead, tokensCacheWrite, tools, costUsd };
     };
-    const emitThinking = (text: string): void => {
-      const trimmed = escapeMarkdown(text);
-      if (trimmed.length === 0) return;
-      if (!thinkingOpen) {
-        thinkingOpen = true;
-        emitReasoning(`- ${rootAgentLabel} thinking: _${trimmed}`, { ensureNewline: false });
+    const resolveOriginFromAccounting = (): string | undefined => {
+      const entry = accounting.find((item) => typeof item.originTxnId === 'string' && item.originTxnId.length > 0);
+      return entry?.originTxnId;
+    };
+    const formatTotals = (): string | undefined => {
+      const totals = computeTotals();
+      const parts: string[] = [];
+      if (totals.tokensIn > 0 || totals.tokensOut > 0 || totals.tokensCacheRead > 0 || totals.tokensCacheWrite > 0) {
+        const segments: string[] = [];
+        if (totals.tokensIn > 0) segments.push(`→${String(totals.tokensIn)}`);
+        if (totals.tokensOut > 0) segments.push(`←${String(totals.tokensOut)}`);
+        if (totals.tokensCacheRead > 0) segments.push(`c→${String(totals.tokensCacheRead)}`);
+        if (totals.tokensCacheWrite > 0) segments.push(`c←${String(totals.tokensCacheWrite)}`);
+        parts.push(`tokens ${segments.join(' ')}`);
+      }
+      if (totals.tools > 0) parts.push(`tools ${String(totals.tools)}`);
+      if (totals.costUsd > 0) parts.push(`cost $**${totals.costUsd.toFixed(4)}**`);
+      return parts.length > 0 ? parts.join(', ') : undefined;
+    };
+    const renderReasoning = (): string => {
+      if (transactionHeader === undefined) return '';
+      const lines: string[] = [transactionHeader];
+      turns.forEach((turn) => {
+        const headingParts = [`${String(turn.index)}. Turn ${String(turn.index)}`];
+        if (turn.summary !== undefined && turn.summary.length > 0) headingParts.push(`(${turn.summary})`);
+        lines.push(headingParts.join(' '));
+        if (turn.thinking !== undefined && turn.thinking.trim().length > 0) {
+          lines.push(`  - thinking: _${escapeMarkdown(turn.thinking.trim())}_`);
+        }
+        turn.updates.forEach((line) => {
+          lines.push(`  - ${line}`);
+        });
+      });
+      if (summaryEmitted && masterSummary !== undefined) {
+        const originSuffix = masterSummary.origin !== undefined && masterSummary.origin.length > 0
+          ? ` | origin ${escapeMarkdown(masterSummary.origin)}`
+          : '';
+        lines.push(`Transaction summary: ${masterSummary.text}${originSuffix}`);
+      }
+      return `${lines.join('\n')}\n`;
+    };
+    const flushReasoning = (): void => {
+      if (!streamed || transactionHeader === undefined) return;
+      const next = renderReasoning();
+      if (next.length <= renderedReasoning.length) return;
+      const delta = next.slice(renderedReasoning.length);
+      emitReasoning(delta);
+      renderedReasoning = next;
+    };
+    const ensureSummary = (usageSnapshot: { prompt: number; completion: number; total: number }): { text: string; origin: string } => {
+      const fallbackMetrics = masterSummary === undefined
+        ? (() => {
+          const agentIds = new Set<string>();
+          let toolsRun = 0;
+          let tokensCacheRead = 0;
+          let tokensCacheWrite = 0;
+          let costUsd = 0;
+          let minTs: number | undefined;
+          let maxTs: number | undefined;
+          accounting.forEach((entry) => {
+            if (typeof entry.agentId === 'string' && entry.agentId.length > 0) agentIds.add(entry.agentId);
+            if (entry.type === 'tool') toolsRun += 1;
+            if (entry.type === 'llm') {
+              tokensCacheRead += entry.tokens.cacheReadInputTokens ?? entry.tokens.cachedTokens ?? 0;
+              tokensCacheWrite += entry.tokens.cacheWriteInputTokens ?? 0;
+              if (typeof entry.costUsd === 'number' && Number.isFinite(entry.costUsd)) {
+                costUsd += entry.costUsd;
+              }
+            }
+            const ts = entry.timestamp;
+            if (typeof ts === 'number' && Number.isFinite(ts)) {
+              minTs = minTs === undefined ? ts : Math.min(minTs, ts);
+              maxTs = maxTs === undefined ? ts : Math.max(maxTs, ts);
+            }
+          });
+          const durationMs = (minTs !== undefined && maxTs !== undefined) ? Math.max(0, maxTs - minTs) : undefined;
+          const agentsRun = agentIds.size > 0 ? agentIds.size : 1;
+          const normalizedCost = Number(costUsd.toFixed(4));
+          const metrics: ProgressMetrics = {
+            durationMs,
+            tokensIn: usageSnapshot.prompt,
+            tokensOut: usageSnapshot.completion,
+            tokensCacheRead,
+            tokensCacheWrite,
+            toolsRun,
+            agentsRun,
+            costUsd: Number.isFinite(normalizedCost) ? normalizedCost : undefined,
+          };
+          return metrics;
+        })()
+        : undefined;
+      const summaryText = masterSummary?.text
+        ?? (() => {
+          const metricsLine = fallbackMetrics !== undefined ? formatMetricsLine(fallbackMetrics) : '';
+          if (metricsLine.length > 0) return metricsLine;
+          if (usageSnapshot.total > 0) {
+            const tokenSegments = [`→${String(usageSnapshot.prompt)}`, `←${String(usageSnapshot.completion)}`];
+            return `tokens ${tokenSegments.join(' ')}`;
+          }
+          return 'completed';
+        })();
+      const summaryOrigin = masterSummary?.origin
+        ?? rootOriginTxnId
+        ?? resolveOriginFromAccounting()
+        ?? rootTxnId
+        ?? agent.id;
+      if (masterSummary === undefined) {
+        masterSummary = { text: summaryText, origin: summaryOrigin };
+        if (typeof summaryOrigin === 'string' && summaryOrigin.length > 0) {
+          rootOriginTxnId = summaryOrigin;
+        }
+        summaryEmitted = true;
+      }
+      return { text: summaryText, origin: summaryOrigin };
+    };
+    const ensureTurn = (): TurnRenderState => {
+      if (turns.length === 0) {
+        turnCounter += 1;
+        const firstTurn: TurnRenderState = { index: turnCounter, updates: [] };
+        if (pendingUpdates.length > 0) {
+          firstTurn.updates.push(...pendingUpdates);
+          pendingUpdates = [];
+        }
+        turns.push(firstTurn);
+        flushReasoning();
+      }
+      return turns[turns.length - 1];
+    };
+    const startNextTurn = (): void => {
+      turnCounter += 1;
+      const turn: TurnRenderState = { index: turnCounter, updates: [] };
+      if (turnCounter > 1) {
+        const summary = formatTotals();
+        if (summary !== undefined) turn.summary = summary;
+      }
+      if (pendingUpdates.length > 0) {
+        turn.updates.push(...pendingUpdates);
+        pendingUpdates = [];
+      }
+      turns.push(turn);
+      flushReasoning();
+    };
+    const appendThinkingChunk = (chunk: string): void => {
+      if (chunk.length === 0) return;
+      const turn = ensureTurn();
+      turn.thinking = (turn.thinking ?? '') + chunk;
+      flushReasoning();
+    };
+    const appendProgressLine = (line: string): void => {
+      if (line.length === 0) return;
+      if (turns.length === 0) {
+        pendingUpdates.push(line);
         return;
       }
-      emitReasoning(trimmed, { ensureNewline: false });
-    };
-    const closeThinking = (): void => {
-      if (!thinkingOpen) return;
-      emitReasoning('_\n');
-      thinkingOpen = false;
-    };
-    const emitSummaryLine = (summary: string, originId?: string): void => {
-      if (summaryEmitted) return;
-      const trimmed = summary.trim();
-      const text = trimmed.length > 0 ? trimmed : 'completed';
-      closeThinking();
-      const originSuffix = typeof originId === 'string' && originId.length > 0
-        ? ` | origin ${escapeMarkdown(originId)}`
-        : '';
-      emitReasoning(`\nTransaction summary: ${text}${originSuffix}\n`);
-      summaryEmitted = true;
+      const turn = turns[turns.length - 1];
+      turn.updates.push(line);
+      flushReasoning();
     };
     const ensureHeader = (txnId?: string, callPath?: string, agentIdParam?: string): void => {
       if (rootTxnId === undefined && typeof txnId === 'string' && txnId.length > 0) {
@@ -384,8 +523,9 @@ export class OpenAICompletionsHeadend implements Headend {
       if (!transactionHeaderSent) {
         const headerId = rootTxnId ?? txnId ?? agentIdParam ?? callPath ?? 'transaction';
         const headerLabel = `**${escapeMarkdown(headerId)}**`;
-        emitReasoning(`Started transaction ${headerLabel}:\n`);
+        transactionHeader = `Started ${agentHeadingLabel} transaction ${headerLabel}:`;
         transactionHeaderSent = true;
+        flushReasoning();
       }
       if (rootCallPath === undefined && typeof callPath === 'string' && callPath.length > 0) {
         rootCallPath = callPath;
@@ -416,46 +556,48 @@ export class OpenAICompletionsHeadend implements Headend {
         return false;
       })();
       if (!agentMatches && !callPathMatches) return;
-      const eventAgentName = 'agentName' in event && typeof (event as { agentName?: unknown }).agentName === 'string'
-        ? (event as { agentName?: string }).agentName
-        : undefined;
-      const agentLabel = formatAgentLabel({ agentId: event.agentId, agentName: eventAgentName, callPath: event.callPath });
       const eventMetrics = 'metrics' in event ? (event as { metrics?: ProgressMetrics }).metrics : undefined;
       const metricsText = formatMetricsLine(eventMetrics);
       const originCandidate = (event as { originTxnId?: string }).originTxnId;
       if (typeof originCandidate === 'string' && originCandidate.length > 0) {
         rootOriginTxnId = originCandidate;
       }
+      const displayCallPath = callPath ?? event.agentId;
 
       switch (event.type) {
         case 'agent_started': {
           const isRoot = agentMatches && (callPath === undefined || callPath === rootCallPath);
           if (isRoot) return;
           const reason = typeof event.reason === 'string' && event.reason.length > 0 ? italicize(event.reason) : undefined;
-          const line = reason !== undefined ? `${agentLabel} started: ${reason}` : `${agentLabel} started`;
-          emitBullet(line);
+          const prefix = `[${escapeMarkdown(displayCallPath)}]`;
+          const line = reason !== undefined ? `${prefix}: started ${reason}` : `${prefix}: started`;
+          appendProgressLine(line);
           return;
         }
         case 'agent_update': {
-          const updateLine = `${agentLabel} update: ${italicize(event.message)}`;
-          emitBullet(updateLine);
+          const prefix = `[${escapeMarkdown(displayCallPath)}]`;
+          const updateLine = `${prefix}: update ${italicize(event.message)}`;
+          appendProgressLine(updateLine);
           return;
         }
         case 'agent_finished': {
-          const line = metricsText.length > 0 ? `${agentLabel} finished: ${metricsText}` : `${agentLabel} finished`;
-          emitBullet(line);
+          const prefix = `[${escapeMarkdown(displayCallPath)}]`;
+          const line = metricsText.length > 0 ? `${prefix}: finished ${metricsText}` : `${prefix}: finished`;
+          appendProgressLine(line);
           if (agentMatches && (callPath === undefined || callPath === rootCallPath)) {
             const summary = metricsText.length > 0 ? metricsText : 'completed';
             const origin = (event as { originTxnId?: string }).originTxnId ?? rootOriginTxnId;
             if (origin !== undefined && origin.length > 0) rootOriginTxnId = origin;
             masterSummary = { text: summary, origin };
-            emitSummaryLine(summary, origin);
+            summaryEmitted = true;
+            flushReasoning();
           }
           return;
         }
         case 'agent_failed': {
           const errorText = typeof event.error === 'string' && event.error.length > 0 ? italicize(event.error) : undefined;
-          let line = `${agentLabel} failed`;
+          const prefix = `[${escapeMarkdown(displayCallPath)}]`;
+          let line = `${prefix}: failed`;
           if (errorText !== undefined && metricsText.length > 0) {
             line += `: ${errorText}, ${metricsText}`;
           } else if (errorText !== undefined) {
@@ -463,7 +605,7 @@ export class OpenAICompletionsHeadend implements Headend {
           } else if (metricsText.length > 0) {
             line += `: ${metricsText}`;
           }
-          emitBullet(line);
+          appendProgressLine(line);
           if (agentMatches && (callPath === undefined || callPath === rootCallPath)) {
             const summary = metricsText.length > 0
               ? metricsText
@@ -471,12 +613,13 @@ export class OpenAICompletionsHeadend implements Headend {
             const origin = (event as { originTxnId?: string }).originTxnId ?? rootOriginTxnId;
             if (origin !== undefined && origin.length > 0) rootOriginTxnId = origin;
             masterSummary = { text: summary, origin };
-            emitSummaryLine(summary, origin);
+            summaryEmitted = true;
+            flushReasoning();
           }
           return;
         }
         default:
-          emitBullet(`${agentLabel} update: ${italicize('progress event')}`);
+          appendProgressLine(`[${escapeMarkdown(displayCallPath)}]: update ${italicize('progress event')}`);
       }
     };
     const telemetryLabels = { ...getTelemetryLabels(), headend: this.id };
@@ -508,7 +651,11 @@ export class OpenAICompletionsHeadend implements Headend {
       onThinking: (chunk) => {
         if (chunk.length === 0) return;
         ensureHeader(undefined, rootCallPath, agent.id);
-        emitThinking(chunk);
+        if (expectingNewTurn) {
+          startNextTurn();
+          expectingNewTurn = false;
+        }
+        appendThinkingChunk(chunk);
       },
       onProgress: (event) => {
         handleProgressEvent(event);
@@ -517,7 +664,12 @@ export class OpenAICompletionsHeadend implements Headend {
         entry.headendId = this.id;
         this.logEntry(entry);
       },
-      onAccounting: (entry) => { accounting.push(entry); },
+      onAccounting: (entry) => {
+        accounting.push(entry);
+        if (entry.type === 'llm' && (entry.agentId === undefined || entry.agentId === agent.id)) {
+          expectingNewTurn = true;
+        }
+      },
     };
     const callbacks = mergeCallbacksWithPersistence(baseCallbacks, this.registry.getPersistence(agent.id)) ?? baseCallbacks;
 
@@ -558,9 +710,13 @@ export class OpenAICompletionsHeadend implements Headend {
         : (finalText.length > 0
           ? finalText
           : (fallbackError ?? 'Agent session failed without details.'));
-      const usage = collectUsage(accounting);
+      const usageSnapshot = collectUsage(accounting);
       if (streamed) {
-        closeThinking();
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- guard avoids duplicating turn entries when a new LLM turn begins
+        if (expectingNewTurn || turns.length === 0) {
+          startNextTurn();
+          expectingNewTurn = false;
+        }
         if (streamedChunks === 0 && effectiveText.length > 0) {
           emitAssistantRole();
           const contentChunk = {
@@ -578,70 +734,8 @@ export class OpenAICompletionsHeadend implements Headend {
           };
           writeSseChunk(res, contentChunk);
         }
-        const fallbackMetrics = masterSummary === undefined
-          ? (() => {
-            const agentIds = new Set<string>();
-            let toolsRun = 0;
-            let tokensCacheRead = 0;
-            let tokensCacheWrite = 0;
-            let costUsd = 0;
-            let minTs: number | undefined;
-            let maxTs: number | undefined;
-            accounting.forEach((entry) => {
-              if (typeof entry.agentId === 'string' && entry.agentId.length > 0) agentIds.add(entry.agentId);
-              if (entry.type === 'tool') toolsRun += 1;
-              if (entry.type === 'llm') {
-                tokensCacheRead += entry.tokens.cacheReadInputTokens ?? entry.tokens.cachedTokens ?? 0;
-                tokensCacheWrite += entry.tokens.cacheWriteInputTokens ?? 0;
-                if (typeof entry.costUsd === 'number' && Number.isFinite(entry.costUsd)) {
-                  costUsd += entry.costUsd;
-                }
-              }
-              const ts = entry.timestamp;
-              if (typeof ts === 'number' && Number.isFinite(ts)) {
-                minTs = minTs === undefined ? ts : Math.min(minTs, ts);
-                maxTs = maxTs === undefined ? ts : Math.max(maxTs, ts);
-              }
-            });
-            const durationMs = (minTs !== undefined && maxTs !== undefined) ? Math.max(0, maxTs - minTs) : undefined;
-            const agentsRun = agentIds.size > 0 ? agentIds.size : 1;
-            const normalizedCost = Number(costUsd.toFixed(4));
-            const metrics: ProgressMetrics = {
-              durationMs,
-              tokensIn: usage.prompt,
-              tokensOut: usage.completion,
-              tokensCacheRead,
-              tokensCacheWrite,
-              toolsRun,
-              agentsRun,
-              costUsd: Number.isFinite(normalizedCost) ? normalizedCost : undefined,
-            };
-            return metrics;
-          })()
-          : undefined;
-        const fallbackSummaryText = masterSummary?.text
-          ?? (() => {
-            const metricsLine = fallbackMetrics !== undefined ? formatMetricsLine(fallbackMetrics) : '';
-            if (metricsLine.length > 0) return metricsLine;
-            if (usage.total > 0) {
-              const tokenSegments = [`→${String(usage.prompt)}`, `←${String(usage.completion)}`];
-              return `tokens ${tokenSegments.join(' ')}`;
-            }
-            return 'completed';
-          })();
-        const fallbackOrigin = masterSummary?.origin
-          ?? rootOriginTxnId
-          ?? resolveOriginFromAccounting()
-          ?? (accounting.find((entry) => typeof entry.txnId === 'string' && entry.txnId.length > 0)?.txnId)
-          ?? rootTxnId
-          ?? agent.id;
-        if (masterSummary === undefined) {
-          masterSummary = { text: fallbackSummaryText, origin: fallbackOrigin };
-          if (typeof fallbackOrigin === 'string' && fallbackOrigin.length > 0) {
-            rootOriginTxnId = fallbackOrigin;
-          }
-        }
-        emitSummaryLine(fallbackSummaryText, fallbackOrigin);
+        ensureSummary(usageSnapshot);
+        flushReasoning();
         const finalChunk: Record<string, unknown> = {
           id: responseId,
           object: CHAT_CHUNK_OBJECT,
@@ -655,15 +749,22 @@ export class OpenAICompletionsHeadend implements Headend {
             },
           ],
           usage: {
-            prompt_tokens: usage.prompt,
-            completion_tokens: usage.completion,
-            total_tokens: usage.total,
+            prompt_tokens: usageSnapshot.prompt,
+            completion_tokens: usageSnapshot.completion,
+            total_tokens: usageSnapshot.total,
           },
         };
         emitAssistantRole();
         writeSseChunk(res, finalChunk);
         writeSseDone(res);
       } else {
+        const usageSnapshot = collectUsage(accounting);
+        ensureSummary(usageSnapshot);
+        const reasoningText = renderReasoning().trim();
+        const combinedContent = reasoningText.length > 0
+          ? `${reasoningText}${reasoningText.endsWith('\n') ? '' : '\n'}${effectiveText}`
+          : effectiveText;
+        flushReasoning();
         const response: OpenAIChatResponse = {
           id: responseId,
           object: CHAT_COMPLETION_OBJECT,
@@ -672,14 +773,14 @@ export class OpenAICompletionsHeadend implements Headend {
           choices: [
             {
               index: 0,
-              message: { role: 'assistant', content: effectiveText },
+              message: { role: 'assistant', content: combinedContent },
               finish_reason: result.success ? 'stop' : 'error',
             },
           ],
           usage: {
-            prompt_tokens: usage.prompt,
-            completion_tokens: usage.completion,
-            total_tokens: usage.total,
+            prompt_tokens: usageSnapshot.prompt,
+            completion_tokens: usageSnapshot.completion,
+            total_tokens: usageSnapshot.total,
           },
         };
         writeJson(res, result.success ? 200 : 500, response);
