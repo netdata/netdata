@@ -357,6 +357,16 @@ export class OpenAICompletionsHeadend implements Headend {
       });
       return { tokensIn, tokensOut, tokensCacheRead, tokensCacheWrite, tools, costUsd };
     };
+    const sanitizeCallPath = (raw: string): string => {
+      const segments = raw.split(':').filter((part) => part.length > 0);
+      const result: string[] = [];
+      segments.forEach((segment) => {
+        if (segment === 'tool' && result.length > 0 && result[result.length - 1] === 'agent') return;
+        result.push(segment);
+      });
+      if (result.length === 0) return raw;
+      return result.join(':');
+    };
     const resolveOriginFromAccounting = (): string | undefined => {
       const entry = accounting.find((item) => typeof item.originTxnId === 'string' && item.originTxnId.length > 0);
       return entry?.originTxnId;
@@ -519,7 +529,8 @@ export class OpenAICompletionsHeadend implements Headend {
     };
     const handleProgressEvent = (event: ProgressEvent): void => {
       if (event.type === 'tool_started' || event.type === 'tool_finished') return;
-      const callPath = typeof event.callPath === 'string' && event.callPath.length > 0 ? event.callPath : undefined;
+      const callPathRaw = typeof event.callPath === 'string' && event.callPath.length > 0 ? event.callPath : undefined;
+      const callPath = callPathRaw !== undefined ? sanitizeCallPath(callPathRaw) : undefined;
       if (rootCallPath === undefined) {
         if (event.agentId === agent.id && callPath !== undefined) {
           rootCallPath = callPath;
@@ -547,7 +558,7 @@ export class OpenAICompletionsHeadend implements Headend {
       if (typeof originCandidate === 'string' && originCandidate.length > 0) {
         rootOriginTxnId = originCandidate;
       }
-      const displayCallPath = callPath ?? event.agentId;
+      const displayCallPath = sanitizeCallPath(callPath ?? event.agentId);
 
       if (expectingNewTurn || turns.length === 0) {
         startNextTurn();

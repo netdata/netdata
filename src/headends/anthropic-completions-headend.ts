@@ -359,6 +359,16 @@ export class AnthropicCompletionsHeadend implements Headend {
       });
       return { tokensIn, tokensOut, tokensCacheRead, tokensCacheWrite, tools, costUsd };
     };
+    const sanitizeCallPath = (raw: string): string => {
+      const segments = raw.split(':').filter((part) => part.length > 0);
+      const result: string[] = [];
+      segments.forEach((segment) => {
+        if (segment === 'tool' && result.length > 0 && result[result.length - 1] === 'agent') return;
+        result.push(segment);
+      });
+      if (result.length === 0) return raw;
+      return result.join(':');
+    };
     const formatTotals = (): string | undefined => {
       const totals = computeTotals();
       const parts: string[] = [];
@@ -455,7 +465,8 @@ export class AnthropicCompletionsHeadend implements Headend {
     const handleProgressEvent = (event: ProgressEvent): void => {
       if (event.type === 'tool_started' || event.type === 'tool_finished') return;
       if (event.agentId !== agent.id) return;
-      const callPath: string = typeof event.callPath === 'string' && event.callPath.length > 0 ? event.callPath : event.agentId;
+      const callPathRaw = typeof event.callPath === 'string' && event.callPath.length > 0 ? event.callPath : event.agentId;
+      const callPath = sanitizeCallPath(callPathRaw);
       ensureHeader(event.txnId, callPath);
       const displayCallPath = callPath;
       const prefix = `[${escapeMarkdown(displayCallPath)}]`;
