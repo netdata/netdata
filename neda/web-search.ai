@@ -24,7 +24,7 @@ toolTimeout: 60000
 toolResponseMaxBytes: 65536
 maxConcurrentTools: 5
 parallelToolCalls: true
-temperature: 0.7
+temperature: 0.3
 topP: 1
 maxOutputTokens: 8192
 repeatPenalty: 1.2
