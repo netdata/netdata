@@ -50,6 +50,9 @@ const PRIMARY_REMOTE = `${PRIMARY_PROVIDER}:${MODEL_NAME}`;
 const RETRY_REMOTE = 'agent:retry';
 const FINAL_TURN_REMOTE = 'agent:final-turn';
 const CONTEXT_REMOTE = 'agent:context';
+const CONTEXT_OVERFLOW_FRAGMENT = 'context window budget exceeded';
+const TOKENIZER_GPT4O = 'tiktoken:gpt-4o-mini';
+const MINIMAL_SYSTEM_PROMPT = 'Phase 1 deterministic harness: minimal instructions.';
 const BACKING_OFF_FRAGMENT = 'backing off';
 const RUN_TEST_11 = 'run-test-11';
 const RUN_TEST_21 = 'run-test-21';
@@ -881,7 +884,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
           models: {
             [MODEL_NAME]: {
               contextWindow: 320,
-              tokenizer: 'tiktoken:gpt-4o-mini',
+              tokenizer: TOKENIZER_GPT4O,
               contextWindowBufferTokens: 32,
             },
           },
@@ -889,8 +892,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       };
       defaults.contextWindowBufferTokens = 32;
       configuration.defaults = defaults;
-      sessionConfig.maxOutputTokens = 64;
-      sessionConfig.systemPrompt = 'Phase 1 deterministic harness: minimal instructions.';
+      sessionConfig.maxOutputTokens = 32;
+      sessionConfig.systemPrompt = MINIMAL_SYSTEM_PROMPT;
     },
     expect: (result) => {
       if (process.env.CONTEXT_DEBUG === 'true') {
@@ -900,7 +903,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       }
       const toolMessages = result.conversation.filter((message) => message.role === 'tool');
       if (toolMessages.length > 0) {
-        const hasOverflowReplacement = toolMessages.some((message) => typeof message.content === 'string' && message.content.includes('context window budget exceeded'));
+        const hasOverflowReplacement = toolMessages.some((message) => typeof message.content === 'string' && message.content.includes(CONTEXT_OVERFLOW_FRAGMENT));
         if (hasOverflowReplacement) {
           const toolEntries = result.accounting.filter(isToolAccounting);
           invariant(toolEntries.length > 0, 'Tool accounting entries expected.');
@@ -932,7 +935,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
           type: 'test-llm',
           models: {
             [MODEL_NAME]: {
-              tokenizer: 'tiktoken:gpt-4o-mini',
+              tokenizer: TOKENIZER_GPT4O,
             },
           },
         },
@@ -988,6 +991,97 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       invariant(llmEntries.length === 1, 'Forced final turn should issue exactly one LLM call for run-test-context-guard-preflight.');
       const finalReport = result.finalReport;
       invariant(finalReport?.status === 'failure', 'Fallback failure final report expected for run-test-context-guard-preflight.');
+    },
+  },
+  {
+    id: 'run-test-context-multi-provider',
+    configure: (configuration, sessionConfig, defaults) => {
+      configuration.providers = {
+        [PRIMARY_PROVIDER]: {
+          type: 'test-llm',
+          models: {
+            [MODEL_NAME]: {
+              contextWindow: 160,
+              contextWindowBufferTokens: 8,
+              tokenizer: 'approximate',
+            },
+          },
+        },
+        [SECONDARY_PROVIDER]: {
+          type: 'test-llm',
+          models: {
+            [MODEL_NAME]: {
+              contextWindow: 2048,
+              contextWindowBufferTokens: 64,
+              tokenizer: TOKENIZER_GPT4O,
+            },
+          },
+        },
+      };
+      configuration.defaults = { ...defaults, contextWindowBufferTokens: 8 };
+      sessionConfig.targets = [
+        { provider: PRIMARY_PROVIDER, model: MODEL_NAME },
+        { provider: SECONDARY_PROVIDER, model: MODEL_NAME },
+      ];
+      sessionConfig.maxOutputTokens = 48;
+      sessionConfig.conversationHistory = [
+        { role: 'system', content: 'Historical context for provider fallback coverage.' },
+        { role: 'assistant', content: 'Y'.repeat(400) },
+      ];
+    },
+    expect: (result) => {
+      invariant(result.success, 'Scenario run-test-context-multi-provider expected success.');
+      const finalReport = result.finalReport;
+      invariant(finalReport?.status === 'success', 'Final report should succeed after provider fallback.');
+      const skipLog = result.logs.find((entry) => entry.remoteIdentifier === CONTEXT_REMOTE && typeof entry.message === 'string' && entry.message.includes(`Skipping provider ${PRIMARY_PROVIDER}:${MODEL_NAME}`));
+      invariant(skipLog !== undefined, 'Expected context skip log for primary provider.');
+      const llmEntries = result.accounting.filter(isLlmAccounting);
+      invariant(llmEntries.length > 0, 'LLM accounting entries expected for provider fallback.');
+      invariant(llmEntries.some((entry) => entry.provider === SECONDARY_PROVIDER), 'Expected LLM attempt on secondary provider.');
+      invariant(llmEntries.every((entry) => entry.provider !== PRIMARY_PROVIDER), 'Primary provider should have no LLM attempts when skipped.');
+    },
+  },
+  {
+    id: 'run-test-context-retry',
+    configure: (configuration, sessionConfig, defaults) => {
+      configuration.providers = {
+        [PRIMARY_PROVIDER]: {
+          type: 'test-llm',
+          models: {
+            [MODEL_NAME]: {
+              contextWindow: 914,
+              contextWindowBufferTokens: 32,
+              tokenizer: TOKENIZER_GPT4O,
+            },
+          },
+        },
+      };
+      configuration.defaults = defaults;
+      sessionConfig.targets = [{ provider: PRIMARY_PROVIDER, model: MODEL_NAME }];
+      sessionConfig.maxOutputTokens = 64;
+      sessionConfig.systemPrompt = MINIMAL_SYSTEM_PROMPT;
+      sessionConfig.conversationHistory = [];
+      sessionConfig.systemPrompt = MINIMAL_SYSTEM_PROMPT;
+      sessionConfig.conversationHistory = [];
+    },
+    expect: (result) => {
+      invariant(result.success, 'Scenario run-test-context-retry expected success.');
+      const toolMessages = result.conversation.filter((message) => message.role === 'tool');
+      const toolEntries = result.accounting.filter(isToolAccounting);
+      if (process.env.CONTEXT_DEBUG === 'true') {
+        console.log('context-retry conversation:', JSON.stringify(result.conversation, null, 2));
+        console.log('context-retry toolEntries:', JSON.stringify(toolEntries, null, 2));
+      }
+      invariant(toolMessages.length > 0, 'Retry scenario should include at least one tool message.');
+      invariant(toolEntries.length > 0, 'Retry scenario should record tool accounting entries.');
+      const llmEntries = result.accounting.filter(isLlmAccounting);
+      invariant(llmEntries.length >= 1, 'Retry scenario should record LLM accounting entries.');
+      const failedEntry = llmEntries.find((entry) => entry.status === 'failed');
+      invariant(failedEntry !== undefined && typeof failedEntry.error === 'string' && failedEntry.error.includes('Simulated model failure'), 'Initial LLM attempt should record failure for retry scenario.');
+      const finalTurnLog = result.logs.find((entry) => entry.remoteIdentifier === FINAL_TURN_REMOTE);
+      invariant(finalTurnLog !== undefined, 'Final turn instruction log expected for retry scenario.');
+      const finalReport = result.finalReport;
+      invariant(finalReport?.status === 'success', 'Final report should be successful after retry enforcement.');
     },
   },
   {

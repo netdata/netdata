@@ -50,4 +50,4 @@
 - [x] Logging/docs updated (`docs/LOGS.md`) to cover new `ctx/tool/expected` fields.
 - [x] Harness expectations adjusted; `npm run lint`, `npm run build`, and `npm run test:phase1` pass locally (Nov 02 2025).
 - [x] Per-tool overflow replacements log a `WRN` entry with matching turn/subturn metadata.
-- [ ] Forced-final guard continues into concluding LLM call (needs harness coverage/doc update).
+- [x] Forced-final guard continues into concluding LLM call (needs harness coverage/doc update).

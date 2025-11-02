@@ -115,6 +115,7 @@ const RATE_LIMIT_FAILURE_MESSAGE = 'Rate limit simulated.' as const;
 const SANITIZER_VALID_ARGUMENT = 'sanitizer-valid-call';
 const LONG_TOOL_NAME = `tool-${'x'.repeat(140)}`;
 const FINAL_REPORT_RETRY_MESSAGE = 'Final report completed after mixed tools.';
+const CONTEXT_RETRY_FAILURE_MESSAGE = 'Simulated model failure before retry.';
 
 const SCENARIOS: ScenarioDefinition[] = [
   {
@@ -3266,6 +3267,94 @@ const SCENARIOS: ScenarioDefinition[] = [
           kind: FINAL_RESPONSE_KIND,
           assistantText: 'Internal guard triggered; providing final report.',
           reportContent: `${RESULT_HEADING}Final answer issued after default context budget enforcement.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_SUCCESS,
+          tokenUsage: {
+            inputTokens: 88,
+            outputTokens: 32,
+            totalTokens: 120,
+          },
+        },
+      },
+    ],
+  },
+  {
+    id: 'run-test-context-multi-provider',
+    description: 'Context guard skips primary provider and succeeds with secondary.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        response: {
+          kind: 'tool-call',
+          assistantText: 'Primary provider lacks budget; attempting tool call.',
+          toolCalls: [
+            {
+              toolName: TOOL_NAME,
+              callId: 'call-context-fallback',
+              assistantText: 'Requesting expansive payload to test fallback.',
+              arguments: {
+                text: TOOL_ARGUMENT_LONG_OUTPUT,
+              },
+            },
+          ],
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+          finishReason: TOOL_FINISH_REASON,
+        },
+      },
+      {
+        turn: 2,
+        expectedTools: ['agent__final_report'],
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Secondary provider completed work after primary budget exhaustion.',
+          reportContent: `${RESULT_HEADING}Secondary provider produced the final report successfully.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_SUCCESS,
+          tokenUsage: {
+            inputTokens: 92,
+            outputTokens: 31,
+            totalTokens: 123,
+          },
+        },
+      },
+    ],
+  },
+  {
+    id: 'run-test-context-retry',
+    description: 'Context guard handles LLM retry before enforcing final turn.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        failuresBeforeSuccess: 1,
+        failureStatus: 'model_error',
+        failureRetryable: true,
+        failureMessage: CONTEXT_RETRY_FAILURE_MESSAGE,
+        response: {
+          kind: 'tool-call',
+          assistantText: 'Retrying after failure and fetching large dataset.',
+          toolCalls: [
+            {
+              toolName: TOOL_NAME,
+              callId: 'call-context-retry',
+              assistantText: 'Gathering expansive payload on retry.',
+              arguments: {
+                text: TOOL_ARGUMENT_LONG_OUTPUT,
+              },
+            },
+          ],
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+          finishReason: TOOL_FINISH_REASON,
+        },
+      },
+      {
+        turn: 2,
+        expectedTools: ['agent__final_report'],
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Context guard enforced final turn following retry.',
+          reportContent: `${RESULT_HEADING}Final answer produced after handling retry and trimming tool output.`,
           reportFormat: MARKDOWN_FORMAT,
           status: STATUS_SUCCESS,
           tokenUsage: {
