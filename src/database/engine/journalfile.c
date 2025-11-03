@@ -1008,6 +1008,8 @@ void journalfile_v2_populate_retention_to_mrg(struct rrdengine_instance *ctx, st
     time_t global_first_time_s;
     bool failed = false;
     uint32_t entries;
+    // Calculate number of samples here and update once the file is loaded
+    uint64_t journal_samples = 0;
     PROTECTED_ACCESS_SETUP(data_start, journalfile->mmap.size, path_v2, "mrg-load");
     if(no_signal_received) {
         entries = j2_header->metric_count;
@@ -1020,7 +1022,14 @@ void journalfile_v2_populate_retention_to_mrg(struct rrdengine_instance *ctx, st
             time_t end_time_s = header_start_time_s + metric->delta_end_s;
 
             mrg_update_metric_retention_and_granularity_by_uuid(
-                main_mrg, (Word_t)ctx, &metric->uuid, start_time_s, end_time_s, metric->update_every_s, now_s);
+                main_mrg,
+                (Word_t)ctx,
+                &metric->uuid,
+                start_time_s,
+                end_time_s,
+                metric->update_every_s,
+                now_s,
+                &journal_samples);
 
             metric++;
         }
@@ -1031,6 +1040,8 @@ void journalfile_v2_populate_retention_to_mrg(struct rrdengine_instance *ctx, st
 
     if (unlikely(failed))
         return;
+
+    __atomic_add_fetch(&ctx->atomic.samples, journal_samples, __ATOMIC_RELAXED);
 
     usec_t ended_ut = now_monotonic_usec();
 
