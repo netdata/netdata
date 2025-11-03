@@ -530,7 +530,6 @@ export class AIAgentSession {
           }
           return { ok: false as const, tokens, reason: 'token_budget_exceeded' };
         }
-        this.pendingCtxTokens += tokens;
         return { ok: true as const, tokens };
       }),
       canExecuteTool: () => !this.toolBudgetExceeded,

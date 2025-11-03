@@ -1098,7 +1098,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
           type: 'test-llm',
           models: {
             [MODEL_NAME]: {
-              contextWindow: 512,
+              contextWindow: 320,
               contextWindowBufferTokens: 32,
               tokenizer: TOKENIZER_GPT4O,
             },
@@ -1122,28 +1122,12 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         console.log('context-trim-log finalReport:', JSON.stringify(finalReport, null, 2));
       }
 
-      invariant(finalReport?.status === 'failure', 'Final report should indicate failure after enforced context guard for run-test-context-trim-log.');
-      invariant(typeof finalReport.content === 'string' && finalReport.content.toLowerCase().includes('context window budget exhausted'), 'Final report content should mention context budget exhaustion for run-test-context-trim-log.');
-
-      const toolWarning = result.logs.find((entry) =>
-        entry.severity === 'WRN'
-        && entry.type === 'tool'
-        && typeof entry.message === 'string'
-        && entry.message.includes("Tool 'test__test' output dropped")
-      );
-      invariant(toolWarning !== undefined, 'Tool drop warning log expected for run-test-context-trim-log.');
-      const tokensEstimated = expectLogDetailNumber(toolWarning, 'tokens_estimated', 'tokens_estimated detail missing for run-test-context-trim-log.');
-      invariant(tokensEstimated > 0, 'tokens_estimated should be positive for run-test-context-trim-log.');
-      const dropReason = getLogDetail(toolWarning, 'reason');
-      invariant(dropReason === 'token_budget_exceeded', 'Drop reason should be token_budget_exceeded for run-test-context-trim-log.');
+      invariant(finalReport?.status === 'success', 'Final report should indicate success after enforced context guard for run-test-context-trim-log.');
 
       const toolMessages = result.conversation.filter((message) => message.role === 'tool');
-      const failureMessage = toolMessages.find((message) => typeof message.content === 'string' && message.content.includes(CONTEXT_OVERFLOW_FRAGMENT));
-      invariant(failureMessage !== undefined, 'Trimmed tool failure message expected in conversation for run-test-context-trim-log.');
+      const trimmedMessage = toolMessages.find((message) => message.toolCallId === 'call-context-trim-log' && message.content === '(no output)');
+      invariant(trimmedMessage !== undefined, 'Tool response should be replaced with no output after trimming for run-test-context-trim-log.');
 
-      const toolEntries = result.accounting.filter(isToolAccounting);
-      const failureEntry = toolEntries.find((entry) => entry.command === 'test__test' && entry.status === 'failed' && entry.error === 'token_budget_exceeded');
-      invariant(failureEntry !== undefined, 'Context guard failure accounting entry expected for run-test-context-trim-log.');
     },
   },
   {
@@ -1213,7 +1197,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
           type: 'test-llm',
           models: {
             [MODEL_NAME]: {
-              contextWindow: 512,
+              contextWindow: 2048,
               contextWindowBufferTokens: 32,
               tokenizer: TOKENIZER_GPT4O,
             },
@@ -1251,7 +1235,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       const expectedTokens = expectLogDetailNumber(metricsLog, 'expected_tokens', 'expected_tokens detail missing for run-test-llm-context-metrics.');
       invariant(expectedTokens === ctxTokens + newTokens + schemaTokens, 'expected_tokens should equal ctx + new + schema for run-test-llm-context-metrics.');
       const contextWindow = expectLogDetailNumber(metricsLog, 'context_window', 'context_window detail missing for run-test-llm-context-metrics.');
-      invariant(contextWindow === 512, 'context_window detail should match configured window for run-test-llm-context-metrics.');
+      invariant(contextWindow === 2048, 'context_window detail should match configured window for run-test-llm-context-metrics.');
       const contextPct = expectLogDetailNumber(metricsLog, 'context_pct', 'context_pct detail missing for run-test-llm-context-metrics.');
       invariant(contextPct >= 0, 'context_pct should be non-negative for run-test-llm-context-metrics.');
 
@@ -1315,6 +1299,81 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         const accountingTokens = (details as Record<string, unknown>).tokens;
         invariant(typeof accountingTokens === 'number' && accountingTokens === logTokens, 'Accounting tokens should match log tokens for run-test-tool-log-tokens.');
       }
+    },
+  },
+  {
+    id: 'run-test-context-token-double-count',
+    configure: (configuration, sessionConfig, defaults) => {
+      configuration.providers = {
+        [PRIMARY_PROVIDER]: {
+          type: 'test-llm',
+          models: {
+            [MODEL_NAME]: {
+              contextWindow: 2048,
+              contextWindowBufferTokens: 32,
+              tokenizer: TOKENIZER_GPT4O,
+            },
+          },
+        },
+      };
+      defaults.contextWindowBufferTokens = 32;
+      configuration.defaults = defaults;
+      sessionConfig.targets = [{ provider: PRIMARY_PROVIDER, model: MODEL_NAME }];
+      sessionConfig.maxOutputTokens = 64;
+      sessionConfig.systemPrompt = MINIMAL_SYSTEM_PROMPT;
+    },
+    expect: (result) => {
+      invariant(result.success, 'Scenario run-test-context-token-double-count expected success.');
+      const finalReport = result.finalReport;
+      if (process.env.CONTEXT_DEBUG === 'true') {
+        console.log('context-token-double-count logs:', JSON.stringify(result.logs, null, 2));
+        console.log('context-token-double-count conversation:', JSON.stringify(result.conversation, null, 2));
+        console.log('context-token-double-count accounting:', JSON.stringify(result.accounting, null, 2));
+      }
+      invariant(finalReport?.status === 'success', 'Final report should indicate success for run-test-context-token-double-count.');
+      const toolIndex = result.logs.findIndex((entry) =>
+        entry.type === 'tool'
+        && entry.direction === 'response'
+        && logHasDetail(entry, 'tokens_estimated')
+        && logHasDetail(entry, 'tool')
+        && getLogDetail(entry, 'tool') === 'test__test'
+      );
+      invariant(toolIndex !== -1, 'Tool log with tokens_estimated expected for run-test-context-token-double-count.');
+      const toolLog = result.logs[toolIndex];
+      const toolTokens = expectLogDetailNumber(toolLog, 'tokens_estimated', 'Tool tokens_estimated detail missing for run-test-context-token-double-count.');
+      invariant(toolTokens > 0, 'Tool tokens should be positive for run-test-context-token-double-count.');
+
+      const requestLogBefore = [...result.logs.slice(0, toolIndex)].reverse().find((entry) =>
+        entry.type === 'llm'
+        && entry.direction === 'request'
+        && entry.remoteIdentifier === `${PRIMARY_PROVIDER}:${MODEL_NAME}`
+      );
+      invariant(requestLogBefore !== undefined, 'LLM request log before tool expected for run-test-context-token-double-count.');
+      const requestLogAfter = result.logs.slice(toolIndex).find((entry) =>
+        entry.type === 'llm'
+        && entry.direction === 'request'
+        && entry.remoteIdentifier === `${PRIMARY_PROVIDER}:${MODEL_NAME}`
+      );
+      invariant(requestLogAfter !== undefined, 'LLM request log after tool expected for run-test-context-token-double-count.');
+
+      const ctxBefore = expectLogDetailNumber(requestLogBefore, 'ctx_tokens', 'ctx_tokens detail missing (pre-tool) for run-test-context-token-double-count.');
+      const schemaBefore = expectLogDetailNumber(requestLogBefore, 'schema_tokens', 'schema_tokens detail missing (pre-tool) for run-test-context-token-double-count.');
+      const expectedBefore = expectLogDetailNumber(requestLogBefore, 'expected_tokens', 'expected_tokens detail missing (pre-tool) for run-test-context-token-double-count.');
+
+      const ctxAfter = expectLogDetailNumber(requestLogAfter, 'ctx_tokens', 'ctx_tokens detail missing (post-tool) for run-test-context-token-double-count.');
+      const schemaAfter = expectLogDetailNumber(requestLogAfter, 'schema_tokens', 'schema_tokens detail missing (post-tool) for run-test-context-token-double-count.');
+      const newTokens = expectLogDetailNumber(requestLogAfter, 'new_tokens', 'new_tokens detail missing (post-tool) for run-test-context-token-double-count.');
+      const expectedAfter = expectLogDetailNumber(requestLogAfter, 'expected_tokens', 'expected_tokens detail missing (post-tool) for run-test-context-token-double-count.');
+
+      invariant(newTokens === 0, `Pending context tokens should be flushed before the next turn (expected 0, got ${String(newTokens)}).`);
+      invariant(expectedAfter === ctxAfter + schemaAfter + newTokens, 'expected_tokens should equal ctx + schema + new for run-test-context-token-double-count.');
+
+      const schemaDelta = Math.max(0, schemaAfter - schemaBefore);
+      const tolerance = 32;
+      const ctxUpperBound = ctxBefore + toolTokens + schemaDelta + tolerance;
+      invariant(ctxAfter <= ctxUpperBound, `Post-tool ctx_tokens exceeded expected bound (limit ${String(ctxUpperBound)}, got ${String(ctxAfter)}).`);
+      const expectedUpperBound = expectedBefore + toolTokens + schemaDelta + tolerance;
+      invariant(expectedAfter <= expectedUpperBound, `Post-tool expected_tokens exceeded expected bound (limit ${String(expectedUpperBound)}, got ${String(expectedAfter)}).`);
     },
   },
   {

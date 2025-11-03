@@ -3676,6 +3676,48 @@ const SCENARIOS: ScenarioDefinition[] = [
       },
     ],
   },
+  {
+    id: 'run-test-context-token-double-count',
+    description: 'Single tool output should contribute tokens once to pending context before next LLM turn.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        response: {
+          kind: 'tool-call',
+          assistantText: 'Gathering concise data before continuing.',
+          toolCalls: [
+            {
+              toolName: TOOL_NAME,
+              callId: 'call-context-double-count',
+              assistantText: 'Requesting small payload for context accounting.',
+              arguments: {
+                text: TOOL_ARGUMENT_SUCCESS,
+              },
+            },
+          ],
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+          finishReason: TOOL_FINISH_REASON,
+        },
+      },
+      {
+        turn: 2,
+        expectedTools: ['agent__final_report'],
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Providing final report after verifying context counters.',
+          reportContent: `${RESULT_HEADING}Final answer delivered with correct context accounting.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_SUCCESS,
+          tokenUsage: {
+            inputTokens: 82,
+            outputTokens: 26,
+            totalTokens: 108,
+          },
+        },
+      },
+    ],
+  },
 ];
 
 const scenarios = new Map<string, ScenarioDefinition>(SCENARIOS.map((scenario) => [scenario.id, scenario] as const));

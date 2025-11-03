@@ -2,7 +2,9 @@
 - Replace snapshot-based budget math with rolling counters (`currentCtxTokens`, `pendingCtxTokens`, `newCtxTokens`) so logs and guards reflect the same numbers.
 - Trim overflowing tool responses before final turns and always let the LLM conclude once budget is safe; only synthesize failure reports if trimming cannot restore headroom.
 - Add deterministic Phase 1 harness coverage for the new context guard telemetry (tool trim warning, LLM context metrics, tokenized tool success logs).
+- Fix regression coverage assumption for `run-test-context-token-double-count`; the guard already folds tool tokens into `currentCtxTokens` at next turn start, so the harness must verify the delta in committed context tokens instead of `new_tokens`.
 
+## Analysis
 - `src/ai-agent.ts:111-152` already defines the three counters, but the runtime still relies on `buildContextSnapshot`, `evaluateContextWithExtras`, and `pendingContextSnapshot`, so the new fields never change and logs stay inconsistent with real usage.
 - LLM request logging in `src/llm-client.ts:548-612` depends on the new counter-backed `contextMetrics`; this now emits `[tokens: ctx …, new …, schema …, expected …, pct]` and stores `ctx_tokens`, `new_tokens`, `schema_tokens`, `context_pct` in `details`.
 - Tool handling (`src/ai-agent.ts:3791-3954`) estimates token cost for each response, logs a success `VRB` entry with `details.tokens`, and on overflow emits a `WRN` log plus an accounting row containing `original_tokens`/`replacement_tokens` before forcing the final turn.
@@ -16,6 +18,7 @@
 - **Tool token estimator**: Plan to reuse each target’s configured tokenizer ID; fallback remains approximate if no tokenizer configured. Okay to keep this behaviour?
 - **Snapshot usage**: Snapshots (`buildContextSnapshot`, `evaluateContextWithExtras`, `pendingContextSnapshot`) must be removed entirely; operational state must come from the live counters with no rebuilds.
 - **New harness scenarios** *(Costa approved 2025-11-03)*: introduce dedicated tests for (1) tool-trim warning log + accounting, (2) LLM request metrics, and (3) successful tool log `details.tokens` instead of extending existing multi-branch cases.
+- **Context delta assertion** *(Costa approved 2025-11-03)*: adjust the double-count regression test to compare the change in `ctx_tokens` between successive LLM requests rather than `new_tokens`, aligning with the counter flush sequence in `executeAgentLoop`.
 
 ## Plan
 1. Remove snapshot/pending-context helpers and wire the three counters into tool callbacks, LLM request preparation, and LLM success handling.
@@ -29,9 +32,20 @@
 9. Add a deterministic harness case later that proves oversized tool payloads are truncated before token accounting and that the new warning log appears, once core behaviour stabilises.
 10. Validate forced-final flow end-to-end: when the guard triggers, ensure schema shrink occurs and the next loop iteration issues the concluding LLM request instead of synthesizing a report; capture this with harness coverage.
 11. Introduce `run-test-context-trim-log` covering the warning log + accounting metadata, using deterministic tool overflow.
-12. Introduce `run-test-llm-context-metrics` verifying `[tokens: …]` request message and `details` fields on both request and response logs.
-13. Introduce `run-test-tool-log-tokens` asserting the happy-path tool completion log includes `details.tokens` alongside accounting consistency.
-14. Re-run `npm run test:phase1`, `npm run lint`, and `npm run build`; update TODO Status once all new harness cases pass.
+12. Introduce `run-test-context-forced-final` to validate forced-final enforcement (extend assertions as more tests land).
+13. Introduce `run-test-llm-context-metrics` verifying `[tokens: …]` request message and `details` fields on both request and response logs.
+14. Introduce `run-test-tool-log-tokens` asserting the happy-path tool completion log includes `details.tokens` alongside accounting consistency.
+15. Fix the tool token double-count (adjust counter flow) and add regression test `context_guard__tool_success_tokens_once`.
+16. Implement Priority 1 regression tests (T0–T9) to lock counter lifecycle and guard thresholds.
+17. Implement Priority 2 regression tests (T10–T17) for multi-provider blocking, truncation flow, accounting/system message coverage.
+18. Implement Priority 3 regression tests (T18–T30) for telemetry calculations, cache tokens, and CONTEXT_DEBUG output assertions.
+19. Re-run `npm run test:phase1`, `npm run lint`, and `npm run build`; update TODO Status once all new harness cases pass.
+
+### Immediate Work (2025-11-03)
+1. Confirm via code review (`src/ai-agent.ts:1408-2174`) that `pendingCtxTokens` and `newCtxTokens` reset at each turn boundary while tool outputs are already folded into `currentCtxTokens`.
+2. Update Phase 1 harness scenario `run-test-context-token-double-count` to assert the `ctx_tokens` delta between consecutive LLM request logs instead of relying on `new_tokens`.
+3. Re-run `CONTEXT_DEBUG=true npm run test:phase1 -- run-test-context-token-double-count` to capture detailed counters while iterating.
+4. Execute full `npm run lint`, `npm run build`, and `npm run test:phase1` before preparing the commit (which must also include the pending documentation deletions).
 
 ## Implied Decisions
 - Keep default context window (131072) and buffer (256) for models lacking explicit overrides.
@@ -41,6 +55,7 @@
 ## Testing Requirements
 - `npm run lint`
 - `npm run build`
+- `npm run test:phase1 -- run-test-context-token-double-count` during regression development.
 - `npm run test:phase1` (ensure new scenarios pass)
 - Manual run: `./neda/web-search.ai --verbose "observability pain points 2025" --override models=vllm/default-model`
 
@@ -56,3 +71,39 @@
 - [x] Harness expectations adjusted; `npm run lint`, `npm run build`, and `npm run test:phase1` pass locally (Nov 02 2025).
 - [x] Per-tool overflow replacements log a `WRN` entry with matching turn/subturn metadata — harness coverage added via `run-test-context-trim-log`.
 - [x] Forced-final guard continues into concluding LLM call — covered by `run-test-context-forced-final` harness scenario.
+- [ ] Fix double-count of tool tokens (pendingCtxTokens vs newCtxTokens) and land regression coverage.
+- [ ] Rework `run-test-context-token-double-count` to assert the context delta across turns instead of pending token bucket.
+- [ ] Implement Priority 1 regression tests (T0–T9) covering counter lifecycle, guard thresholds, overflow handling.
+- [ ] Implement Priority 2 regression tests (T10–T17) for multi-provider blocking, truncation flow, accounting/system message coverage.
+- [ ] Implement Priority 3 regression tests (T18–T30) for telemetry calculations, cache tokens, CONTEXT_DEBUG output.
+
+## 2025-11-03 Review Notes
+- Latest review revalidated the counter-based guard but uncovered residual double-account risk (`pendingCtxTokens` + `newCtxTokens` both include tool tokens). Address via targeted regression test (see Test Plan below) before declaring feature complete.
+- Verified orchestrator callbacks (`reserveToolOutput`, `canExecuteTool`) are the only gate ensuring per-tool budgeting; any refactor that skips wiring them reverts to unbounded tool outputs.
+- Context guard relies on correct computation of `schemaCtxTokens` and the flush path (`newCtxTokens -> pendingCtxTokens -> evaluateContextGuard`). Future splits of `executeSingleTurn` must keep this order intact.
+
+### Critical Preconditions (do not break)
+1. `targetContextConfigs` must be populated for every provider/model pair.
+2. `ToolsOrchestrator` **must** receive `toolBudgetCallbacks` when constructed.
+3. `reserveToolOutput()` must remain atomic (mutex) and adjust `pendingCtxTokens` only on success.
+4. LLM turn loop must flush `newCtxTokens` into `pendingCtxTokens` **before** calling `evaluateContextGuard`.
+5. `enforceContextFinalTurn()` must always inject the final-instruction system message and leave `forcedFinalTurnReason` set to `'context'`.
+
+### Regression Test Plan (add to harness)
+1. `context_guard__tool_success_tokens_once`
+   - Create scenario where two small tool outputs run sequentially.
+   - Assert projected tokens equal prior + tool1 + tool2 (no double count) and guard stays open.
+2. `context_guard__tool_overflow_drop`
+   - Tool output intentionally exceeds headroom.
+   - Expect orchestrator `WRN` log, failure stub in transcript, accounting detail `reason=context_budget_exceeded`, and final-turn enforcement.
+3. `context_guard__post_overflow_tools_skip`
+   - After overflow flag, subsequent tool requests return failure stub without execution (`reason=budget_exceeded_prior_tool`).
+4. `context_guard__schema_tokens_only`
+   - Configure large schema set, minimal conversation.
+   - Ensure guard triggers final turn even before tool outputs; validates `schemaCtxTokens` inclusion.
+5. `context_guard__llm_metrics_logging`
+   - Capture `LLM request prepared` log and assert `ctx`, `new`, `schema`, `expected`, and `%` fields match projected counters.
+6. `context_guard__forced_final_turn_flow`
+   - Simulate guard forcing final turn; assert next turn restricts tools to `agent__final_report` and resulting log indicates enforcement.
+7. `context_guard__multi-target_provider_selection`
+   - Configure two targets with different windows; ensure guard blocks only the saturated target and falls back to alternate provider.
