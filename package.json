@@ -51,7 +51,7 @@
     "@slack/bolt": "^4.6.0",
     "ai": "5.0.86",
     "ajv": "^8.17.1",
-    "async-mutex": "^0.4.1",
+    "async-mutex": "^0.5.0",
     "commander": "^14.0.2",
     "express": "^5.1.0",
     "js-yaml": "^4.1.0",
@@ -79,7 +79,7 @@
     "eslint-plugin-security": "^3.0.1",
     "eslint-plugin-sonarjs": "^3.0.5",
     "eslint-plugin-unicorn": "^62.0.0",
-    "knip": "^5.66.4",
+    "knip": "^5.67.0",
     "prettier": "^3.6.2",
     "typescript": "^5.9.3"
   }
