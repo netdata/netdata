@@ -315,6 +315,28 @@ void ml_dimension_delete(RRDDIM *rd)
     if (!dim)
         return;
 
+    // Wait for any in-progress training to complete before deleting
+    // This prevents use-after-free crashes when training thread accesses dim->rd
+    size_t wait_iterations = 0;
+    const size_t max_wait_iterations = 3000; // 30 seconds max (3000 * 10ms)
+
+    spinlock_lock(&dim->slock);
+    while (dim->training_in_progress && wait_iterations < max_wait_iterations) {
+        spinlock_unlock(&dim->slock);
+        sleep_usec(10000); // Wait 10ms
+        wait_iterations++;
+        spinlock_lock(&dim->slock);
+    }
+
+    if (dim->training_in_progress) {
+        // Training is stuck, but we can't wait forever
+        // Log the issue but proceed with deletion
+        netdata_log_error("ML: Dimension '%s' of chart '%s' is being deleted while training is in progress after waiting %zu ms",
+                          rrddim_id(rd), rrdset_id(rd->rrdset), wait_iterations * 10);
+    }
+
+    spinlock_unlock(&dim->slock);
+
     delete dim;
     rd->ml_dimension = NULL;
 }

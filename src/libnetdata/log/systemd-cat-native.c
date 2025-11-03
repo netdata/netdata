@@ -110,7 +110,7 @@ static inline void buffer_memcat_replacing_newlines(BUFFER *wb, const char *src,
     buffer_memcat(wb, src, key_len);
     buffer_putc(wb, '\n');
 
-    char *length_ptr = &wb->buffer[wb->len];
+    size_t length_offset = wb->len;
     uint64_t le_size = 0;
     buffer_memcat(wb, &le_size, sizeof(le_size));
 
@@ -122,7 +122,7 @@ static inline void buffer_memcat_replacing_newlines(BUFFER *wb, const char *src,
     buffer_putc(wb, '\n');
 
     le_size = htole64(size);
-    memcpy(length_ptr, &le_size, sizeof(le_size));
+    memcpy(&wb->buffer[length_offset], &le_size, sizeof(le_size));
 }
 
 // ----------------------------------------------------------------------------
