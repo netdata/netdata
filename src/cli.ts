@@ -419,7 +419,7 @@ function buildAsciiBanner(): string {
   return banner.split('\n').map((line) => colorLine(line)).join('\n');
 }
 
-async function listMcpTools(targets: string[], options: Record<string, unknown>): Promise<void> {
+async function listMcpTools(targets: string[], promptPath: string | undefined, options: Record<string, unknown>): Promise<void> {
   const configPathValue = typeof options.config === 'string' && options.config.length > 0
     ? options.config
     : undefined;
@@ -428,7 +428,7 @@ async function listMcpTools(targets: string[], options: Record<string, unknown>)
 
   const layers = (() => {
     try {
-      return discoverLayers({ configPath: configPathValue, promptPath: undefined });
+      return discoverLayers({ configPath: configPathValue, promptPath });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       exitWith(1, `failed to discover configuration layers: ${message}`, 'EXIT-LIST-TOOLS-CONFIG');
@@ -1388,7 +1388,7 @@ program
       const listToolsTargets = Array.isArray(options.listTools) ? (options.listTools as string[]) : [];
 
       if (listToolsTargets.length > 0) {
-        await listMcpTools(listToolsTargets, options);
+        await listMcpTools(listToolsTargets, systemPrompt, options);
         return;
       }
 

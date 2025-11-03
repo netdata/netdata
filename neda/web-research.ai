@@ -14,6 +14,7 @@ tools:
 agents:
   - web-search.ai
   - web-fetch.ai
+  - github-search.ai
   - reddit.ai
 llmTimeout: 300000
 toolTimeout: 60000
