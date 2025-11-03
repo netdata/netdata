@@ -519,6 +519,12 @@ function getLogDetail(entry: LogEntry, key: string): LogDetailValue | undefined 
   return details[key];
 }
 
+function expectLogDetailNumber(entry: LogEntry, key: string, message: string): number {
+  const value = getLogDetail(entry, key);
+  invariant(typeof value === 'number' && Number.isFinite(value), message);
+  return value;
+}
+
 function createDeferred<T = void>(): { promise: Promise<T>; resolve: (value: T) => void; reject: (reason?: unknown) => void } {
   let resolveFn: ((value: T) => void) | undefined;
   let rejectFn: ((reason?: unknown) => void) | undefined;
@@ -1082,6 +1088,233 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       invariant(finalTurnLog !== undefined, 'Final turn instruction log expected for retry scenario.');
       const finalReport = result.finalReport;
       invariant(finalReport?.status === 'success', 'Final report should be successful after retry enforcement.');
+    },
+  },
+  {
+    id: 'run-test-context-trim-log',
+    configure: (configuration, sessionConfig, defaults) => {
+      configuration.providers = {
+        [PRIMARY_PROVIDER]: {
+          type: 'test-llm',
+          models: {
+            [MODEL_NAME]: {
+              contextWindow: 512,
+              contextWindowBufferTokens: 32,
+              tokenizer: TOKENIZER_GPT4O,
+            },
+          },
+        },
+      };
+      defaults.contextWindowBufferTokens = 32;
+      configuration.defaults = defaults;
+      sessionConfig.targets = [{ provider: PRIMARY_PROVIDER, model: MODEL_NAME }];
+      sessionConfig.maxOutputTokens = 64;
+      sessionConfig.systemPrompt = MINIMAL_SYSTEM_PROMPT;
+    },
+    expect: (result) => {
+      invariant(result.success, 'Scenario run-test-context-trim-log expected success.');
+      const finalReport = result.finalReport;
+
+      if (process.env.CONTEXT_DEBUG === 'true') {
+        console.log('context-trim-log logs:', JSON.stringify(result.logs, null, 2));
+        console.log('context-trim-log accounting:', JSON.stringify(result.accounting, null, 2));
+        console.log('context-trim-log conversation:', JSON.stringify(result.conversation, null, 2));
+        console.log('context-trim-log finalReport:', JSON.stringify(finalReport, null, 2));
+      }
+
+      invariant(finalReport?.status === 'failure', 'Final report should indicate failure after enforced context guard for run-test-context-trim-log.');
+      invariant(typeof finalReport.content === 'string' && finalReport.content.toLowerCase().includes('context window budget exhausted'), 'Final report content should mention context budget exhaustion for run-test-context-trim-log.');
+
+      const toolWarning = result.logs.find((entry) =>
+        entry.severity === 'WRN'
+        && entry.type === 'tool'
+        && typeof entry.message === 'string'
+        && entry.message.includes("Tool 'test__test' output dropped")
+      );
+      invariant(toolWarning !== undefined, 'Tool drop warning log expected for run-test-context-trim-log.');
+      const tokensEstimated = expectLogDetailNumber(toolWarning, 'tokens_estimated', 'tokens_estimated detail missing for run-test-context-trim-log.');
+      invariant(tokensEstimated > 0, 'tokens_estimated should be positive for run-test-context-trim-log.');
+      const dropReason = getLogDetail(toolWarning, 'reason');
+      invariant(dropReason === 'token_budget_exceeded', 'Drop reason should be token_budget_exceeded for run-test-context-trim-log.');
+
+      const toolMessages = result.conversation.filter((message) => message.role === 'tool');
+      const failureMessage = toolMessages.find((message) => typeof message.content === 'string' && message.content.includes(CONTEXT_OVERFLOW_FRAGMENT));
+      invariant(failureMessage !== undefined, 'Trimmed tool failure message expected in conversation for run-test-context-trim-log.');
+
+      const toolEntries = result.accounting.filter(isToolAccounting);
+      const failureEntry = toolEntries.find((entry) => entry.command === 'test__test' && entry.status === 'failed' && entry.error === 'token_budget_exceeded');
+      invariant(failureEntry !== undefined, 'Context guard failure accounting entry expected for run-test-context-trim-log.');
+    },
+  },
+  {
+    id: 'run-test-context-forced-final',
+    configure: (configuration, sessionConfig, defaults) => {
+      configuration.providers = {
+        [PRIMARY_PROVIDER]: {
+          type: 'test-llm',
+          models: {
+            [MODEL_NAME]: {
+              contextWindow: 320,
+              contextWindowBufferTokens: 32,
+              tokenizer: TOKENIZER_GPT4O,
+            },
+          },
+        },
+      };
+      defaults.contextWindowBufferTokens = 32;
+      configuration.defaults = defaults;
+      sessionConfig.targets = [{ provider: PRIMARY_PROVIDER, model: MODEL_NAME }];
+      sessionConfig.maxOutputTokens = 48;
+      sessionConfig.systemPrompt = MINIMAL_SYSTEM_PROMPT;
+      sessionConfig.conversationHistory = [];
+    },
+    expect: (result) => {
+      invariant(result.success, 'Scenario run-test-context-forced-final expected success.');
+      const finalReport = result.finalReport;
+      invariant(finalReport?.status === 'success', 'Final report should indicate success for run-test-context-forced-final.');
+
+      const contextWarn = result.logs.find((entry) =>
+        entry.remoteIdentifier === CONTEXT_REMOTE
+        && entry.severity === 'WRN'
+        && typeof entry.message === 'string'
+        && entry.message.includes('Forcing final turn')
+      );
+      invariant(contextWarn !== undefined, 'Context guard warning log expected for run-test-context-forced-final.');
+
+      const finalTurnLog = result.logs.find((entry) => entry.remoteIdentifier === FINAL_TURN_REMOTE && entry.severity === 'WRN');
+      expectLlmLogContext(finalTurnLog, 'run-test-context-forced-final', { message: 'Final-turn enforcement log expected.', severity: 'WRN', remote: FINAL_TURN_REMOTE });
+
+      const finalTurnRequest = result.logs.find((entry) =>
+        entry.type === 'llm'
+        && entry.direction === 'request'
+        && entry.remoteIdentifier === `${PRIMARY_PROVIDER}:${MODEL_NAME}`
+        && typeof entry.message === 'string'
+        && entry.message.includes('(final turn)')
+      );
+      invariant(finalTurnRequest !== undefined, 'Final-turn LLM request log expected for run-test-context-forced-final.');
+      const requestDetails = expectRecord(finalTurnRequest.details, 'Final-turn request details missing for run-test-context-forced-final.');
+      invariant(requestDetails.final_turn === true, 'Final-turn request should mark final_turn detail for run-test-context-forced-final.');
+
+      const responseLog = result.logs.find((entry) =>
+        entry.type === 'llm'
+        && entry.direction === 'response'
+        && entry.remoteIdentifier === `${PRIMARY_PROVIDER}:${MODEL_NAME}`
+        && typeof entry.details?.stop_reason === 'string'
+        && entry.details.stop_reason === 'stop'
+      );
+      invariant(responseLog !== undefined, 'Final-turn LLM response log expected for run-test-context-forced-final.');
+    },
+  },
+  {
+    id: 'run-test-llm-context-metrics',
+    configure: (configuration, sessionConfig, defaults) => {
+      configuration.providers = {
+        [PRIMARY_PROVIDER]: {
+          type: 'test-llm',
+          models: {
+            [MODEL_NAME]: {
+              contextWindow: 512,
+              contextWindowBufferTokens: 32,
+              tokenizer: TOKENIZER_GPT4O,
+            },
+          },
+        },
+      };
+      defaults.contextWindowBufferTokens = 32;
+      configuration.defaults = defaults;
+      sessionConfig.targets = [{ provider: PRIMARY_PROVIDER, model: MODEL_NAME }];
+      sessionConfig.maxOutputTokens = 64;
+      sessionConfig.systemPrompt = MINIMAL_SYSTEM_PROMPT;
+    },
+    expect: (result) => {
+      invariant(result.success, 'Scenario run-test-llm-context-metrics expected success.');
+      const finalReport = result.finalReport;
+      invariant(finalReport?.status === 'success', 'Final report should indicate success for run-test-llm-context-metrics.');
+
+      const requestLogs = result.logs.filter((entry) => entry.type === 'llm' && entry.direction === 'request');
+      invariant(requestLogs.length > 0, 'LLM request log expected for run-test-llm-context-metrics.');
+      if (process.env.CONTEXT_DEBUG === 'true') {
+        console.log('llm-context-metrics logs:', JSON.stringify(result.logs, null, 2));
+        console.log('llm-context-metrics accounting:', JSON.stringify(result.accounting, null, 2));
+        console.log('llm-context-metrics conversation:', JSON.stringify(result.conversation, null, 2));
+      }
+      const metricsLog = requestLogs.slice().reverse().find((entry) => typeof entry.message === 'string' && entry.message.includes('[tokens: ctx '));
+      invariant(metricsLog !== undefined, 'Context metrics request log missing for run-test-llm-context-metrics.');
+      invariant(metricsLog.remoteIdentifier === `${PRIMARY_PROVIDER}:${MODEL_NAME}`, 'Unexpected remoteIdentifier for context metrics request log.');
+
+      const ctxTokens = expectLogDetailNumber(metricsLog, 'ctx_tokens', 'ctx_tokens detail missing for run-test-llm-context-metrics.');
+      invariant(ctxTokens > 0, 'ctx_tokens should be positive for run-test-llm-context-metrics.');
+      const newTokens = expectLogDetailNumber(metricsLog, 'new_tokens', 'new_tokens detail missing for run-test-llm-context-metrics.');
+      invariant(newTokens >= 0, 'new_tokens should be non-negative for run-test-llm-context-metrics.');
+      const schemaTokens = expectLogDetailNumber(metricsLog, 'schema_tokens', 'schema_tokens detail missing for run-test-llm-context-metrics.');
+      invariant(schemaTokens > 0, 'schema_tokens should be positive for run-test-llm-context-metrics.');
+      const expectedTokens = expectLogDetailNumber(metricsLog, 'expected_tokens', 'expected_tokens detail missing for run-test-llm-context-metrics.');
+      invariant(expectedTokens === ctxTokens + newTokens + schemaTokens, 'expected_tokens should equal ctx + new + schema for run-test-llm-context-metrics.');
+      const contextWindow = expectLogDetailNumber(metricsLog, 'context_window', 'context_window detail missing for run-test-llm-context-metrics.');
+      invariant(contextWindow === 512, 'context_window detail should match configured window for run-test-llm-context-metrics.');
+      const contextPct = expectLogDetailNumber(metricsLog, 'context_pct', 'context_pct detail missing for run-test-llm-context-metrics.');
+      invariant(contextPct >= 0, 'context_pct should be non-negative for run-test-llm-context-metrics.');
+
+      const responseLog = result.logs.find((entry) => entry.type === 'llm' && entry.direction === 'response' && entry.remoteIdentifier === `${PRIMARY_PROVIDER}:${MODEL_NAME}`);
+      invariant(responseLog !== undefined, 'LLM response log expected for run-test-llm-context-metrics.');
+      const responseCtx = expectLogDetailNumber(responseLog, 'ctx_tokens', 'Response ctx_tokens detail missing for run-test-llm-context-metrics.');
+      invariant(responseCtx >= ctxTokens, 'Response ctx_tokens should be at least request ctx_tokens for run-test-llm-context-metrics.');
+    },
+  },
+  {
+    id: 'run-test-tool-log-tokens',
+    configure: (configuration, sessionConfig, defaults) => {
+      configuration.providers = {
+        [PRIMARY_PROVIDER]: {
+          type: 'test-llm',
+          models: {
+            [MODEL_NAME]: {
+              contextWindow: 1024,
+              contextWindowBufferTokens: 32,
+              tokenizer: TOKENIZER_GPT4O,
+            },
+          },
+        },
+      };
+      defaults.contextWindowBufferTokens = 32;
+      configuration.defaults = defaults;
+      sessionConfig.targets = [{ provider: PRIMARY_PROVIDER, model: MODEL_NAME }];
+      sessionConfig.systemPrompt = MINIMAL_SYSTEM_PROMPT;
+    },
+    expect: (result) => {
+      invariant(result.success, 'Scenario run-test-tool-log-tokens expected success.');
+      const finalReport = result.finalReport;
+      invariant(finalReport?.status === 'success', 'Final report should indicate success for run-test-tool-log-tokens.');
+
+      if (process.env.CONTEXT_DEBUG === 'true') {
+        console.log('tool-log-tokens logs:', JSON.stringify(result.logs, null, 2));
+        console.log('tool-log-tokens accounting:', JSON.stringify(result.accounting, null, 2));
+        console.log('tool-log-tokens conversation:', JSON.stringify(result.conversation, null, 2));
+      }
+
+      const toolLog = result.logs.find((entry) =>
+        entry.type === 'tool'
+        && entry.direction === 'response'
+        && entry.severity === 'VRB'
+        && typeof entry.message === 'string'
+        && entry.message.includes('ok preview')
+        && entry.remoteIdentifier === 'mcp:test:test'
+        && logHasDetail(entry, 'tokens_estimated')
+      );
+      invariant(toolLog !== undefined, 'Tool preview log with token metrics expected for run-test-tool-log-tokens.');
+      const logTokens = expectLogDetailNumber(toolLog, 'tokens_estimated', 'Tool log tokens_estimated detail missing for run-test-tool-log-tokens.');
+      invariant(logTokens > 0, 'Tool log tokens should be positive for run-test-tool-log-tokens.');
+      const dropFlag = getLogDetail(toolLog, 'dropped');
+      invariant(dropFlag === false, 'Tool log should indicate output was not dropped for run-test-tool-log-tokens.');
+
+      const toolEntries = result.accounting.filter(isToolAccounting);
+      const successEntry = toolEntries.find((entry) => entry.command === 'test__test' && entry.status === 'ok');
+      invariant(successEntry !== undefined, 'Successful tool accounting entry expected for run-test-tool-log-tokens.');
+      const details = successEntry.details;
+      if (details !== undefined && Object.prototype.hasOwnProperty.call(details, 'tokens')) {
+        const accountingTokens = (details as Record<string, unknown>).tokens;
+        invariant(typeof accountingTokens === 'number' && accountingTokens === logTokens, 'Accounting tokens should match log tokens for run-test-tool-log-tokens.');
+      }
     },
   },
   {

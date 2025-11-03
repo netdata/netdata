@@ -3508,6 +3508,174 @@ const SCENARIOS: ScenarioDefinition[] = [
       },
     ],
   },
+  {
+    id: 'run-test-context-trim-log',
+    description: 'Context guard trims a single oversized tool payload and emits warning telemetry before final turn.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        response: {
+          kind: 'tool-call',
+          assistantText: 'Collecting a large payload prior to finalising.',
+          toolCalls: [
+            {
+              toolName: TOOL_NAME,
+              callId: 'call-context-trim-log',
+              assistantText: 'Requesting oversized dataset for trim coverage.',
+              arguments: {
+                text: TOOL_ARGUMENT_LONG_OUTPUT,
+              },
+            },
+          ],
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+          finishReason: TOOL_FINISH_REASON,
+        },
+      },
+      {
+        turn: 2,
+        expectedTools: ['agent__final_report'],
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Trim applied; proceeding with final report.',
+          reportContent: `${RESULT_HEADING}Trimmed payload and completed within the context window.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_SUCCESS,
+          tokenUsage: {
+            inputTokens: 84,
+            outputTokens: 28,
+            totalTokens: 112,
+          },
+        },
+      },
+    ],
+  },
+  {
+    id: 'run-test-context-forced-final',
+    description: 'Context guard enforces a forced final turn after trimming cannot restore headroom.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        response: {
+          kind: 'tool-call',
+          assistantText: 'Collecting extensive data before forced final turn.',
+          toolCalls: [
+            {
+              toolName: TOOL_NAME,
+              callId: 'call-context-forced-final',
+              assistantText: 'Aggregating oversized payload that risks the context budget.',
+              arguments: {
+                text: TOOL_ARGUMENT_LONG_OUTPUT,
+              },
+            },
+          ],
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+          finishReason: TOOL_FINISH_REASON,
+        },
+      },
+      {
+        turn: 2,
+        expectedTools: ['agent__final_report'],
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Forced final turn executed after guard intervention.',
+          reportContent: `${RESULT_HEADING}Final answer provided after the context guard forced a concluding turn.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_SUCCESS,
+          tokenUsage: {
+            inputTokens: 82,
+            outputTokens: 26,
+            totalTokens: 108,
+          },
+        },
+      },
+    ],
+  },
+  {
+    id: 'run-test-llm-context-metrics',
+    description: 'LLM request logs expose ctx/new/schema expected metrics before final turn.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        response: {
+          kind: 'tool-call',
+          assistantText: 'Gathering data prior to final report for metrics inspection.',
+          toolCalls: [
+            {
+              toolName: TOOL_NAME,
+              callId: 'call-llm-context-metrics',
+              assistantText: 'Fetching summary payload for metrics coverage.',
+              arguments: {
+                text: TOOL_ARGUMENT_SUCCESS,
+              },
+            },
+          ],
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+          finishReason: TOOL_FINISH_REASON,
+        },
+      },
+      {
+        turn: 2,
+        expectedTools: ['agent__final_report'],
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Returning final report after verifying context metrics.',
+          reportContent: `${RESULT_HEADING}Context metrics telemetry validated successfully.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_SUCCESS,
+          tokenUsage: {
+            inputTokens: 82,
+            outputTokens: 26,
+            totalTokens: 108,
+          },
+        },
+      },
+    ],
+  },
+  {
+    id: 'run-test-tool-log-tokens',
+    description: 'Tool success log records tokenizer estimate for emitted payload.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        response: {
+          kind: 'tool-call',
+          assistantText: 'Invoking test tool to capture token metrics.',
+          toolCalls: [
+            {
+              toolName: TOOL_NAME,
+              callId: 'call-tool-log-tokens',
+              assistantText: 'Executing deterministic tool for token logging coverage.',
+              arguments: {
+                text: TOOL_ARGUMENT_SUCCESS,
+              },
+            },
+          ],
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+          finishReason: TOOL_FINISH_REASON,
+        },
+      },
+      {
+        turn: 2,
+        expectedTools: ['agent__final_report'],
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Tool completed; sharing final report after logging tokens.',
+          reportContent: `${RESULT_HEADING}Tool token metrics captured successfully.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_SUCCESS,
+          tokenUsage: {
+            inputTokens: 80,
+            outputTokens: 24,
+            totalTokens: 104,
+          },
+        },
+      },
+    ],
+  },
 ];
 
 const scenarios = new Map<string, ScenarioDefinition>(SCENARIOS.map((scenario) => [scenario.id, scenario] as const));
