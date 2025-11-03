@@ -5,6 +5,7 @@ import path from 'node:path';
 
 import { SpanKind, SpanStatusCode, type Attributes } from '@opentelemetry/api';
 import Ajv from 'ajv';
+import { Mutex } from 'async-mutex';
 
 import type { OutputFormatId } from './formats.js';
 import type { SessionNode } from './session-tree.js';
@@ -59,7 +60,7 @@ import { AgentProvider } from './tools/agent-provider.js';
 import { InternalToolProvider } from './tools/internal-provider.js';
 import { MCPProvider } from './tools/mcp-provider.js';
 import { RestProvider } from './tools/rest-provider.js';
-import { ToolsOrchestrator } from './tools/tools.js';
+import { ToolsOrchestrator, type ManagedToolResult, type ToolBudgetCallbacks } from './tools/tools.js';
 import { appendCallPathSegment, clampToolName, formatToolRequestCompact, normalizeCallPath, sanitizeToolName, truncateUtf8WithNotice, warn } from './utils.js';
 
 // Immutable session class according to DESIGN.md
@@ -153,6 +154,9 @@ export class AIAgentSession {
   private pendingCtxTokens = 0;
   private newCtxTokens = 0;
   private schemaCtxTokens = 0;
+  private toolBudgetExceeded = false;
+  private readonly toolBudgetMutex = new Mutex();
+  private readonly toolBudgetCallbacks: ToolBudgetCallbacks;
   private forcedFinalTurnReason?: 'context';
   private contextLimitWarningLogged = false;
   // Internal housekeeping notes
@@ -515,6 +519,22 @@ export class AIAgentSession {
         warn(`onProgress callback failed: ${e instanceof Error ? e.message : String(e)}`);
       }
     });
+    this.toolBudgetCallbacks = {
+      reserveToolOutput: async (output: string) => await this.toolBudgetMutex.runExclusive(() => {
+        const tokens = this.estimateTokensForCounters([{ role: 'tool', content: output }]);
+        const guard = this.evaluateContextGuard(tokens);
+        if (guard.blocked.length > 0) {
+          if (!this.toolBudgetExceeded) {
+            this.toolBudgetExceeded = true;
+            this.enforceContextFinalTurn(guard.blocked, 'tool_preflight');
+          }
+          return { ok: false as const, tokens, reason: 'token_budget_exceeded' };
+        }
+        this.pendingCtxTokens += tokens;
+        return { ok: true as const, tokens };
+      }),
+      canExecuteTool: () => !this.toolBudgetExceeded,
+    } satisfies ToolBudgetCallbacks;
     // Begin system preflight turn (turn 0) and log init
     try {
       if (!this.systemTurnBegan) {
@@ -547,7 +567,8 @@ export class AIAgentSession {
       headendId: this.headendId,
       telemetryLabels: this.telemetryLabels,
     },
-    this.progressReporter);
+    this.progressReporter,
+    this.toolBudgetCallbacks);
     orch.register(new MCPProvider('mcp', sessionConfig.config.mcpServers, {
       trace: sessionConfig.traceMCP,
       verbose: sessionConfig.verbose,
@@ -3656,70 +3677,14 @@ export class AIAgentSession {
           const callId = typeof options?.toolCallId === 'string' && options.toolCallId.length > 0
             ? options.toolCallId
             : undefined;
-          const toolTokens = this.estimateTokensForCounters([{ role: 'tool', content: toolOutput }]);
-          const guardEvaluation = this.evaluateContextGuard(toolTokens);
-          if (process.env.CONTEXT_DEBUG === 'true') {
-            const approxTokens = Math.ceil(estimateMessagesBytes([{ role: 'tool', content: toolOutput }]) / 4);
-            let limitTokens: number | undefined;
-            let contextWindow: number | undefined;
-            if (guardEvaluation.blocked.length > 0) {
-              const firstBlocked = guardEvaluation.blocked[0];
-              limitTokens = firstBlocked.limit;
-              contextWindow = firstBlocked.contextWindow;
-            }
-            console.log('context-guard/tool-eval', {
-              toolTokens,
-              approxTokens,
-              contentLength: toolOutput.length,
-              currentCtx: this.currentCtxTokens,
-              pendingCtx: this.pendingCtxTokens,
-              newCtx: this.newCtxTokens,
-              projectedTokens: guardEvaluation.projectedTokens,
-              limitTokens,
-              contextWindow,
-            });
-          }
-          if (guardEvaluation.blocked.length > 0) {
-            const blockedEntries = guardEvaluation.blocked.length > 0
-              ? guardEvaluation.blocked
-              : [{
-                  provider: 'unknown',
-                  model: 'unknown',
-                  contextWindow: AIAgentSession.DEFAULT_CONTEXT_WINDOW_TOKENS,
-                  bufferTokens: AIAgentSession.DEFAULT_CONTEXT_BUFFER_TOKENS,
-                  maxOutputTokens: this.computeMaxOutputTokens(AIAgentSession.DEFAULT_CONTEXT_WINDOW_TOKENS),
-                  limit: 0,
-                  projected: guardEvaluation.projectedTokens,
-                }];
-            const first = blockedEntries[0];
-            const remainingTokens = first.limit > first.projected ? first.limit - first.projected : 0;
-            const warnEntry: LogEntry = {
-              timestamp: Date.now(),
-              severity: 'WRN',
-              turn: currentTurn,
-              subturn: subturnCounter,
-              direction: 'response',
-              type: 'tool',
-              remoteIdentifier: providerLabel,
-              fatal: false,
-              message: `Tool '${effectiveToolName}' output discarded: context window budget exceeded (${String(toolTokens)} tokens, limit ${String(first.limit)}).`,
-              details: {
-                tool: effectiveToolName,
-                provider: providerLabel,
-                tokens_estimated: toolTokens,
-                projected_tokens: guardEvaluation.projectedTokens,
-                limit_tokens: first.limit,
-                remaining_tokens: remainingTokens,
-              },
-            };
-            this.log(warnEntry);
-            const renderedFailure = '(tool failed: context window budget exceeded)';
-            const failureTokens = this.estimateTokensForCounters([{ role: 'tool', content: renderedFailure }]);
+          if (managed.dropped === true) {
+            const failureReason = managed.reason ?? 'context_budget_exceeded';
+            const failureTokens = this.estimateTokensForCounters([{ role: 'tool', content: toolOutput }]);
             this.newCtxTokens += failureTokens;
             if (callId !== undefined) {
-              this.toolFailureMessages.set(callId, renderedFailure);
+              this.toolFailureMessages.set(callId, toolOutput);
             } else {
-              this.toolFailureFallbacks.push(renderedFailure);
+              this.toolFailureFallbacks.push(toolOutput);
             }
             const failureEntry: AccountingEntry = {
               type: 'tool',
@@ -3730,17 +3695,15 @@ export class AIAgentSession {
               command: effectiveToolName,
               charactersIn: managed.charactersIn,
               charactersOut: managed.charactersOut,
-              error: 'context_budget_exceeded',
+              error: failureReason,
               agentId: this.sessionConfig.agentId,
               callPath: this.callPath,
               txnId: this.txnId,
               parentTxnId: this.parentTxnId,
               originTxnId: this.originTxnId,
               details: {
-                projected_tokens: first.projected,
-                limit_tokens: first.limit,
-                remaining_tokens: remainingTokens,
-                original_tokens: toolTokens,
+                reason: failureReason,
+                original_tokens: managed.tokens ?? 0,
                 replacement_tokens: failureTokens,
               },
             };
@@ -3749,14 +3712,133 @@ export class AIAgentSession {
             addSpanEvent('tool.call.failure', {
               'ai.tool.name': effectiveToolName,
               'ai.tool.latency_ms': managed.latency,
-              'ai.tool.failure.reason': 'context_budget_exceeded',
+              'ai.tool.failure.reason': failureReason,
             });
-            this.enforceContextFinalTurn(blockedEntries, 'tool_preflight');
             this.releaseToolSlot();
-            return renderedFailure;
+            return toolOutput;
           }
 
-          this.newCtxTokens += toolTokens;
+          const managedTokens = typeof managed.tokens === 'number' ? managed.tokens : undefined;
+          let toolTokens: number;
+          if (managedTokens === undefined) {
+            toolTokens = this.estimateTokensForCounters([{ role: 'tool', content: toolOutput }]);
+            const guardEvaluation = this.evaluateContextGuard(toolTokens);
+            if (process.env.CONTEXT_DEBUG === 'true') {
+              const approxTokens = Math.ceil(estimateMessagesBytes([{ role: 'tool', content: toolOutput }]) / 4);
+              let limitTokens: number | undefined;
+              let contextWindow: number | undefined;
+              if (guardEvaluation.blocked.length > 0) {
+                const firstBlocked = guardEvaluation.blocked[0];
+                limitTokens = firstBlocked.limit;
+                contextWindow = firstBlocked.contextWindow;
+              }
+              console.log('context-guard/tool-eval', {
+                toolTokens,
+                approxTokens,
+                contentLength: toolOutput.length,
+                currentCtx: this.currentCtxTokens,
+                pendingCtx: this.pendingCtxTokens,
+                newCtx: this.newCtxTokens,
+                projectedTokens: guardEvaluation.projectedTokens,
+                limitTokens,
+                contextWindow,
+              });
+            }
+            if (guardEvaluation.blocked.length > 0) {
+              const blockedEntries = guardEvaluation.blocked.length > 0
+                ? guardEvaluation.blocked
+                : [{
+                    provider: 'unknown',
+                    model: 'unknown',
+                    contextWindow: AIAgentSession.DEFAULT_CONTEXT_WINDOW_TOKENS,
+                    bufferTokens: AIAgentSession.DEFAULT_CONTEXT_BUFFER_TOKENS,
+                    maxOutputTokens: this.computeMaxOutputTokens(AIAgentSession.DEFAULT_CONTEXT_WINDOW_TOKENS),
+                    limit: 0,
+                    projected: guardEvaluation.projectedTokens,
+                  }];
+              const first = blockedEntries[0];
+              const remainingTokens = first.limit > first.projected ? first.limit - first.projected : 0;
+              const warnEntry: LogEntry = {
+                timestamp: Date.now(),
+                severity: 'WRN',
+                turn: currentTurn,
+                subturn: subturnCounter,
+                direction: 'response',
+                type: 'tool',
+                remoteIdentifier: providerLabel,
+                fatal: false,
+                message: `Tool '${effectiveToolName}' output discarded: context window budget exceeded (${String(toolTokens)} tokens, limit ${String(first.limit)}).`,
+                details: {
+                  tool: effectiveToolName,
+                  provider: providerLabel,
+                  tokens_estimated: toolTokens,
+                  projected_tokens: guardEvaluation.projectedTokens,
+                  limit_tokens: first.limit,
+                  remaining_tokens: remainingTokens,
+                },
+              };
+              this.log(warnEntry);
+              const renderedFailure = '(tool failed: context window budget exceeded)';
+              const failureTokens = this.estimateTokensForCounters([{ role: 'tool', content: renderedFailure }]);
+              this.newCtxTokens += failureTokens;
+              if (callId !== undefined) {
+                this.toolFailureMessages.set(callId, renderedFailure);
+              } else {
+                this.toolFailureFallbacks.push(renderedFailure);
+              }
+              const failureEntry: AccountingEntry = {
+                type: 'tool',
+                timestamp: startTime,
+                status: 'failed',
+                latency: managed.latency,
+                mcpServer: providerLabel,
+                command: effectiveToolName,
+                charactersIn: managed.charactersIn,
+                charactersOut: managed.charactersOut,
+                error: 'context_budget_exceeded',
+                agentId: this.sessionConfig.agentId,
+                callPath: this.callPath,
+                txnId: this.txnId,
+                parentTxnId: this.parentTxnId,
+                originTxnId: this.originTxnId,
+                details: {
+                  projected_tokens: first.projected,
+                  limit_tokens: first.limit,
+                  remaining_tokens: remainingTokens,
+                  original_tokens: toolTokens,
+                  replacement_tokens: failureTokens,
+                },
+              };
+              accounting.push(failureEntry);
+              try { this.sessionConfig.callbacks?.onAccounting?.(failureEntry); } catch (e) { warn(`tool accounting callback failed: ${e instanceof Error ? e.message : String(e)}`); }
+              addSpanEvent('tool.call.failure', {
+                'ai.tool.name': effectiveToolName,
+                'ai.tool.latency_ms': managed.latency,
+                'ai.tool.failure.reason': 'context_budget_exceeded',
+              });
+              this.enforceContextFinalTurn(blockedEntries, 'tool_preflight');
+              this.releaseToolSlot();
+              return renderedFailure;
+            }
+            this.newCtxTokens += toolTokens;
+          } else {
+            toolTokens = managedTokens;
+            if (process.env.CONTEXT_DEBUG === 'true') {
+              const approxTokens = Math.ceil(estimateMessagesBytes([{ role: 'tool', content: toolOutput }]) / 4);
+              console.log('context-guard/tool-eval', {
+                toolTokens,
+                approxTokens,
+                contentLength: toolOutput.length,
+                currentCtx: this.currentCtxTokens,
+                pendingCtx: this.pendingCtxTokens,
+                newCtx: this.newCtxTokens,
+                projectedTokens: this.currentCtxTokens + this.pendingCtxTokens + this.newCtxTokens,
+                limitTokens: undefined,
+                contextWindow: undefined,
+              });
+            }
+          }
+
           const successEntry: AccountingEntry = {
             type: 'tool',
             timestamp: startTime,
@@ -3775,24 +3857,26 @@ export class AIAgentSession {
           };
           accounting.push(successEntry);
           try { this.sessionConfig.callbacks?.onAccounting?.(successEntry); } catch (e) { warn(`tool accounting callback failed: ${e instanceof Error ? e.message : String(e)}`); }
-          const toolLog: LogEntry = {
-            timestamp: Date.now(),
-            severity: 'VRB',
-            turn: currentTurn,
-            subturn: subturnCounter,
-            direction: 'response',
-            type: 'tool',
-            remoteIdentifier: providerLabel,
-            fatal: false,
-            message: `Tool '${effectiveToolName}' completed (${String(managed.charactersOut)} bytes, ${String(toolTokens)} tokens).`,
-            details: {
-              latency_ms: managed.latency,
-              characters_in: managed.charactersIn,
-              characters_out: managed.charactersOut,
-              tokens: toolTokens,
-            },
-          };
-          this.log(toolLog);
+          if (managedTokens === undefined) {
+            const toolLog: LogEntry = {
+              timestamp: Date.now(),
+              severity: 'VRB',
+              turn: currentTurn,
+              subturn: subturnCounter,
+              direction: 'response',
+              type: 'tool',
+              remoteIdentifier: providerLabel,
+              fatal: false,
+              message: `Tool '${effectiveToolName}' completed (${String(managed.charactersOut)} bytes, ${String(toolTokens)} tokens).`,
+              details: {
+                latency_ms: managed.latency,
+                characters_in: managed.charactersIn,
+                characters_out: managed.charactersOut,
+                tokens: toolTokens,
+              },
+            };
+            this.log(toolLog);
+          }
           addSpanEvent('tool.call.success', {
             'ai.tool.name': effectiveToolName,
             'ai.tool.latency_ms': managed.latency,
@@ -4211,7 +4295,7 @@ export class AIAgentSession {
         if (!(this.toolsOrchestrator?.hasTool(c.tool) ?? false)) {
           return { id: c.id, tool: c.tool, ok: false, elapsedMs: 0, error: { code: 'UNKNOWN_TOOL', message: `Unknown tool: ${c.tool}` } };
         }
-        const orchestrator = (this.toolsOrchestrator as unknown) as { executeWithManagement: (t: string, a: Record<string, unknown>, ctx: { turn: number; subturn: number }, opts?: { timeoutMs?: number }) => Promise<{ result: string; latency: number; charactersIn: number; charactersOut: number; providerLabel: string }> };
+        const orchestrator = (this.toolsOrchestrator as unknown) as { executeWithManagement: (t: string, a: Record<string, unknown>, ctx: { turn: number; subturn: number }, opts?: { timeoutMs?: number }) => Promise<ManagedToolResult> };
         const managed = await orchestrator.executeWithManagement(c.tool, c.parameters, { turn: currentTurn, subturn: 0 }, { timeoutMs: this.sessionConfig.toolTimeout });
         return { id: c.id, tool: c.tool, ok: true, elapsedMs: managed.latency, output: managed.result };
       } catch (e) {

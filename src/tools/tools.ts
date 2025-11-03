@@ -26,6 +26,31 @@ const toErrorMessage = (value: unknown): string => {
   return 'unknown_error';
 };
 
+export interface ToolBudgetReservation {
+  ok: boolean;
+  tokens?: number;
+  reason?: string;
+}
+
+export interface ToolBudgetCallbacks {
+  reserveToolOutput: (output: string) => Promise<ToolBudgetReservation>;
+  canExecuteTool: () => boolean;
+}
+
+export interface ManagedToolResult {
+  ok: boolean;
+  result: string;
+  providerLabel: string;
+  latency: number;
+  charactersIn: number;
+  charactersOut: number;
+  tokens?: number;
+  dropped?: boolean;
+  reason?: string;
+}
+
+const TOOL_MANAGE_ERROR_EVENT = 'tool.manage.error';
+
 export class ToolsOrchestrator {
   private readonly providers: ToolProvider[] = [];
   private readonly mapping = new Map<string, { provider: ToolProvider; kind: ToolKind }>();
@@ -45,6 +70,7 @@ export class ToolsOrchestrator {
     private readonly onAccounting?: (entry: AccountingEntry) => void,
     sessionInfo?: { agentId?: string; agentPath?: string; callPath?: string; txnId?: string; headendId?: string; telemetryLabels?: Record<string, string> },
     private readonly progress?: SessionProgressReporter,
+    private readonly budgetCallbacks?: ToolBudgetCallbacks,
   ) {
     const normalizedCallPath = sessionInfo?.callPath !== undefined ? normalizeCallPath(sessionInfo.callPath) : undefined;
     const normalizedAgentPath = sessionInfo?.agentPath !== undefined ? normalizeCallPath(sessionInfo.agentPath) : undefined;
@@ -187,7 +213,7 @@ export class ToolsOrchestrator {
     parameters: Record<string, unknown>,
     ctx: ToolExecutionContext,
     opts?: ToolExecuteOptions
-  ): Promise<{ result: string; providerLabel: string; latency: number; charactersIn: number; charactersOut: number }> {
+  ): Promise<ManagedToolResult> {
     if (this.canceled) throw new Error('canceled');
     const bypass = opts?.bypassConcurrency === true;
     if (!bypass) await this.acquireSlot();
@@ -383,6 +409,104 @@ export class ToolsOrchestrator {
       this.onLog(traceReq, { opId });
     }
     const start = Date.now();
+    const serializedParameters = (() => {
+      try { return JSON.stringify(parameters); } catch { return undefined; }
+    })();
+    const charactersIn = serializedParameters !== undefined ? serializedParameters.length : 0;
+    const inputBytes = serializedParameters !== undefined ? Buffer.byteLength(serializedParameters, 'utf8') : 0;
+
+    const STATUS_FAILED = 'failed' as const;
+    const STATUS_ERROR = 'error' as const;
+    const budgetCallbacks = this.budgetCallbacks;
+    if (budgetCallbacks !== undefined && !budgetCallbacks.canExecuteTool()) {
+      const latency = Date.now() - start;
+      const failureReason = 'budget_exceeded_prior_tool';
+      const failureStub = '(tool failed: context window budget exceeded; previous tool overflowed. Session will conclude after this turn.)';
+      const dropDetails: Record<string, LogDetailValue> = {
+        tool: composedToolName,
+        tool_namespace: toolIdentity.namespace,
+        provider: logProviderLabel,
+        tool_kind: kind,
+        input_bytes: inputBytes,
+        reason: failureReason,
+        latency_ms: latency,
+      };
+      if (batchToolSummary !== undefined) dropDetails.batch_tools = batchToolSummary;
+      const dropLog: LogEntry = {
+        timestamp: Date.now(),
+        severity: 'WRN',
+        turn: ctx.turn,
+        subturn: ctx.subturn,
+        direction: 'response',
+        type: 'tool',
+        toolKind: kind,
+        remoteIdentifier,
+        fatal: false,
+        message: `Tool '${composedToolName}' skipped: token budget exceeded by previous tool.`,
+        details: dropDetails,
+      };
+      this.onLog(dropLog, { opId });
+      if (instrumentTool) {
+        const failureMetrics: ProgressMetrics = { latencyMs: latency, charactersIn, charactersOut: 0 };
+        this.progress?.toolFinished({
+          callPath: callPathLabel,
+          agentId: agentIdLabel,
+          agentPath: agentPathLabel,
+          tool: { name: composedToolName, provider: logProviderNamespace },
+          metrics: failureMetrics,
+          error: failureReason,
+          status: STATUS_FAILED,
+        });
+      }
+      const accDrop: AccountingEntry = {
+        type: 'tool',
+        timestamp: start,
+        status: STATUS_FAILED,
+        latency,
+        mcpServer: logProviderNamespace,
+        command: name,
+        charactersIn,
+        charactersOut: 0,
+        error: failureReason,
+      };
+      try { if (opId !== undefined) this.opTree.appendAccounting(opId, accDrop); } catch (e) { warn(`tools accounting append failed: ${toErrorMessage(e)}`); }
+      const errorMetricsDrop = {
+        agentId: agentIdLabel,
+        callPath: callPathLabel,
+        headendId,
+        toolName: composedToolName,
+        toolKind: kind,
+        provider: kind === 'mcp' ? `${kind}:${logProviderNamespace}` : logProviderLabel,
+        status: STATUS_ERROR,
+        errorType: failureReason,
+        latencyMs: latency,
+        inputBytes,
+        outputBytes: 0,
+        ...(sessionTelemetryLabels !== undefined ? { customLabels: sessionTelemetryLabels } : {}),
+      } satisfies ToolMetricsRecord;
+      recordToolMetrics(errorMetricsDrop);
+      addSpanAttributes({ 'ai.tool.status': STATUS_ERROR, 'ai.tool.latency_ms': latency });
+      addSpanEvent(TOOL_MANAGE_ERROR_EVENT, { 'ai.tool.name': composedToolName, 'ai.tool.error': failureReason });
+      recordSpanError(failureReason);
+      try {
+        if (opId !== undefined) {
+          this.opTree.endOp(opId, STATUS_FAILED, { latency, error: failureReason });
+        }
+      } catch (e) { warn(`tools endOp failed: ${toErrorMessage(e)}`); }
+      if (!bypass) this.releaseSlot();
+      return {
+        ok: false,
+        result: failureStub,
+        providerLabel: logProviderNamespace,
+        latency,
+        charactersIn,
+        charactersOut: failureStub.length,
+        tokens: 0,
+        dropped: true,
+        reason: failureReason,
+      };
+    }
+
     const withTimeout = async <T>(p: Promise<T>, timeoutMs?: number): Promise<T> => {
       if (typeof timeoutMs !== 'number' || timeoutMs <= 0) return await p;
       let timer: ReturnType<typeof setTimeout> | undefined;
@@ -432,11 +556,6 @@ export class ToolsOrchestrator {
     }
 
     const latency = Date.now() - start;
-    const serializedParameters = (() => {
-      try { return JSON.stringify(parameters); } catch { return undefined; }
-    })();
-    const charactersIn = serializedParameters !== undefined ? serializedParameters.length : 0;
-    const inputBytes = serializedParameters !== undefined ? Buffer.byteLength(serializedParameters, 'utf8') : 0;
 
     const isFailed = (() => {
       if (exec === undefined) return true;
@@ -538,7 +657,7 @@ export class ToolsOrchestrator {
       } satisfies ToolMetricsRecord;
       recordToolMetrics(errorMetrics);
       addSpanAttributes({ 'ai.tool.status': 'error', 'ai.tool.latency_ms': latency });
-      addSpanEvent('tool.manage.error', { 'ai.tool.name': composedToolName, 'ai.tool.error': msg });
+      addSpanEvent(TOOL_MANAGE_ERROR_EVENT, { 'ai.tool.name': composedToolName, 'ai.tool.error': msg });
       recordSpanError(msg);
       // Accounting is recorded in opTree op context only via attach; keep arrays via SessionManager callbacks
     try {
@@ -546,7 +665,7 @@ export class ToolsOrchestrator {
           this.opTree.endOp(opId, 'failed', { latency, error: msg });
         }
       } catch (e) { warn(`tools endOp failed: ${toErrorMessage(e)}`); }
-      this.releaseSlot();
+      if (!bypass) this.releaseSlot();
       throw new Error(msg);
     }
 
@@ -623,6 +742,105 @@ export class ToolsOrchestrator {
     if (result.length === 0) result = ' ';
     const resultBytes = Buffer.byteLength(result, 'utf8');
 
+    const reservation = budgetCallbacks !== undefined
+      ? await budgetCallbacks.reserveToolOutput(result)
+      : { ok: true as const };
+
+    if (!reservation.ok) {
+      const failureReason = reservation.reason ?? 'token_budget_exceeded';
+      const failureStub = '(tool failed: context window budget exceeded)';
+      const dropDetails: Record<string, LogDetailValue> = {
+        tool: composedToolName,
+        tool_namespace: toolIdentity.namespace,
+        provider: providerField,
+        tool_kind: kind,
+        original_bytes: sizeBytes,
+        final_bytes: resultBytes,
+        tokens_estimated: reservation.tokens ?? 0,
+        reason: failureReason,
+        truncated: result !== raw,
+        latency_ms: latency,
+      };
+      if (batchToolSummary !== undefined) dropDetails.batch_tools = batchToolSummary;
+      const dropLog: LogEntry = {
+        timestamp: Date.now(),
+        severity: 'WRN',
+        turn: ctx.turn,
+        subturn: ctx.subturn,
+        direction: 'response',
+        type: 'tool',
+        toolKind: kind,
+        remoteIdentifier,
+        fatal: false,
+        message: `Tool '${composedToolName}' output dropped after execution`,
+        details: dropDetails,
+      };
+      this.onLog(dropLog, { opId });
+      if (instrumentTool) {
+        const failureMetrics: ProgressMetrics = {
+          latencyMs: latency,
+          charactersIn,
+          charactersOut: failureStub.length,
+        };
+        this.progress?.toolFinished({
+          callPath: callPathLabel,
+          agentId: agentIdLabel,
+          agentPath: agentPathLabel,
+          tool: { name: composedToolName, provider: logProviderNamespace },
+          metrics: failureMetrics,
+          error: failureReason,
+          status: STATUS_FAILED,
+        });
+      }
+      const accDrop: AccountingEntry = {
+        type: 'tool',
+        timestamp: start,
+        status: STATUS_FAILED,
+        latency,
+        mcpServer: providerLabel,
+        command: name,
+        charactersIn,
+        charactersOut: failureStub.length,
+        error: failureReason,
+      };
+      try { if (opId !== undefined) this.opTree.appendAccounting(opId, accDrop); } catch (e) { warn(`tools accounting append failed: ${toErrorMessage(e)}`); }
+      const errorMetricsDrop = {
+        agentId: agentIdLabel,
+        callPath: callPathLabel,
+        headendId,
+        toolName: composedToolName,
+        toolKind: kind,
+        provider: kind === 'mcp' ? `${kind}:${logProviderNamespace}` : logProviderLabel,
+        status: STATUS_ERROR,
+        errorType: failureReason,
+        latencyMs: latency,
+        inputBytes,
+        outputBytes: Buffer.byteLength(failureStub, 'utf8'),
+        ...(sessionTelemetryLabels !== undefined ? { customLabels: sessionTelemetryLabels } : {}),
+      } satisfies ToolMetricsRecord;
+      recordToolMetrics(errorMetricsDrop);
+      addSpanAttributes({ 'ai.tool.status': STATUS_ERROR, 'ai.tool.latency_ms': latency });
+      addSpanEvent(TOOL_MANAGE_ERROR_EVENT, { 'ai.tool.name': composedToolName, 'ai.tool.error': failureReason });
+      recordSpanError(failureReason);
+      try {
+        if (opId !== undefined) {
+          this.opTree.endOp(opId, STATUS_FAILED, { latency, error: failureReason });
+        }
+      } catch (e) { warn(`tools endOp failed: ${toErrorMessage(e)}`); }
+      if (!bypass) this.releaseSlot();
+      return {
+        ok: false,
+        result: failureStub,
+        providerLabel,
+        latency,
+        charactersIn,
+        charactersOut: failureStub.length,
+        tokens: reservation.tokens,
+        dropped: true,
+        reason: failureReason,
+      };
+    }
+
     const responseDetails: Record<string, LogDetailValue> = {
       tool: composedToolName,
       tool_namespace: toolIdentity.namespace,
@@ -635,6 +853,10 @@ export class ToolsOrchestrator {
     if (batchToolSummary !== undefined) {
       responseDetails.batch_tools = batchToolSummary;
     }
+    if (reservation.tokens !== undefined) {
+      responseDetails.tokens_estimated = reservation.tokens;
+    }
+    responseDetails.dropped = false;
     const resPreview = (() => {
       try {
         const jsonified = JSON.stringify(raw);
@@ -741,7 +963,16 @@ export class ToolsOrchestrator {
       'ai.tool.output_bytes': result.length,
       'ai.tool.provider_label': providerLabel,
     });
-    return { result, providerLabel, latency, charactersIn, charactersOut: result.length };
+    return {
+      ok: true,
+      result,
+      providerLabel,
+      latency,
+      charactersIn,
+      charactersOut: result.length,
+      tokens: reservation.tokens,
+      dropped: false,
+    };
   }
 
   private async acquireSlot(): Promise<void> {

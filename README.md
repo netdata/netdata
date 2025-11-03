@@ -8,6 +8,193 @@ AI Agent is a framework that transforms how you build and deploy AI agents. Inst
 
 One simple format (`.ai` files) works as standalone agents, sub-agents, master orchestrators, API services, Slack bots, or web apps. Write once, use everywhere.
 
+## Architecture: Recursive Autonomous Agents
+
+AI Agent implements a **recursive planning agent architecture** where every agent continuously plans, executes, observes, and adapts. Unlike traditional frameworks that separate "orchestrators" from "workers," every agent in this system is both a planner and an executor.
+
+### How It Works: Plan-Execute-Observe-Adapt Loop
+
+Each agent operates autonomously in a continuous reasoning cycle:
+
+1. **Reason & Plan**: The LLM analyzes the task and decides what to do next
+2. **Act**: Executes tools or calls sub-agents based on its reasoning
+3. **Observe**: Receives results and updates its understanding
+4. **Adapt**: Refines its approach based on what it learned
+5. **Repeat** until the goal is achieved
+
+The conversation history acts as a **dynamic task ledger** - a living document showing:
+- What's been tried and in what order
+- What worked and what failed
+- Current understanding of the problem
+- Reasoning behind each decision
+- Next steps being considered
+
+### The Recursive Power: Every Sub-Agent Plans Too
+
+Here's what makes this architecture unique: **every sub-agent is also a full autonomous planning agent**.
+
+**Real-World Example from Production:**
+
+The [Neda CRM system](neda/) is a production multi-agent system serving Netdata's sales and management teams. It demonstrates true recursive autonomy:
+
+```
+Neda (master orchestrator)
+├─ company.ai (company research specialist)
+│  ├─ Plans: "I need official info, then validate with community sources"
+│  ├─ Uses: web-search.ai, web-fetch.ai
+│  └─ Adapts: Stops when new searches yield no new info
+│
+├─ web-research.ai (investigative researcher)
+│  ├─ Plans: Multi-phase research strategy with source prioritization
+│  ├─ Uses: web-search.ai, web-fetch.ai, reddit.ai
+│  └─ Adapts: Refines search terms based on findings, runs parallel searches
+│
+├─ hubspot.ai (CRM data specialist)
+│  ├─ Plans: Query strategy based on available identifiers
+│  ├─ Uses: hubspot MCP tools
+│  └─ Adapts: Follows associations to gather complete picture
+│
+└─ 19 more specialized agents, each autonomous...
+```
+
+**Key Insight:** Notice `web-search.ai` is used by *both* `company.ai` and `web-research.ai`. Each parent agent:
+- Doesn't know it's being called by another agent
+- Makes its own decisions about when to call `web-search.ai`
+- Provides its own context and requirements
+- Evaluates results independently
+- Determines its own success criteria
+
+This is **emergent complexity from simple composition** - sophisticated multi-agent systems arise naturally from combining simple, reusable agents.
+
+### Real Agent Example: Company Research
+
+**`company.ai` (68 lines total):**
+```yaml
+#!/usr/bin/env ai-agent
+---
+description: Company Researcher - rigorous, evidence‑backed prospect intelligence
+models:
+  - anthropic/claude-sonnet-4-5
+  - openai/gpt-5
+agents:
+  - web-fetch.ai    # ← These agents are also full planners!
+  - web-search.ai   # ← They reason and adapt independently
+maxToolTurns: 20
+parallelToolCalls: true
+---
+You are an elite AI company researcher.
+
+## Investigation Mode
+
+**YOUR FOCUS:**
+- Official name, domain, HQ location
+- Employee count, revenue, funding
+- Key executive names
+- Market intel, online reviews
+
+**DO NOT RESEARCH:**
+- Specific persons (there's a contact.ai agent for that)
+- Technology stack (there's a company-tech.ai agent for that)
+
+### Search Strategy
+
+To gather information search the MOST RECENT and authoritative sources.
+
+**CRITICAL:**
+1. Provide context to `web-search` - it needs details
+2. The `web-search` agent performs multiple searches - don't repeat what it already did
+
+### When to Stop
+
+Stop when:
+1. Company is too small to be relevant
+2. Additional searches yield no new information
+
+Provide your report in: ${FORMAT}
+```
+
+**That's it.** No orchestration code. No state management. No error handling. Just:
+- What the agent should know (prompt)
+- What it can do (agents/tools)
+- Its limits and preferences
+
+### The Development Paradigm Shift
+
+**Traditional AI frameworks require you to write orchestration code:**
+
+```python
+# Traditional approach - hundreds of lines of glue code
+class ResearchPipeline:
+    def __init__(self):
+        self.company_agent = CompanyAgent(config)
+        self.search_agent = SearchAgent(config)
+        self.analyzer = AnalysisAgent(config)
+
+    async def research_company(self, company_name):
+        # Manual orchestration logic
+        search_results = await self.search_agent.run(company_name)
+        if not search_results.success:
+            # Retry logic
+            search_results = await self.backup_search(company_name)
+
+        company_data = await self.company_agent.run(search_results.data)
+        if company_data.confidence < 0.8:
+            # More manual coordination
+            additional_data = await self.search_agent.run(
+                self.build_refined_query(company_data.gaps)
+            )
+            company_data = await self.company_agent.run(
+                self.merge(search_results, additional_data)
+            )
+
+        analysis = await self.analyzer.run(company_data)
+        # ... more coordination code
+        return self.format_report(analysis)
+```
+
+**With AI Agent - just prompts and composition:**
+
+Already shown above - `company.ai` is 68 lines including comments and formatting. The complexity is handled by:
+- ✅ LLM reasoning (decides when to call what)
+- ✅ Framework plumbing (retries, state, routing)
+- ✅ Agent autonomy (each adapts independently)
+
+### What You Focus On vs What the Framework Handles
+
+**You focus on:**
+- ✅ What each agent should know (system prompt)
+- ✅ What each agent can do (tools/agents list)
+- ✅ How agents compose (simple frontmatter references)
+- ✅ Resource limits and preferences (timeouts, model choices)
+
+**Framework handles automatically:**
+- ✅ Orchestration logic (LLM reasoning decides the flow)
+- ✅ Retries and fallbacks (built-in with provider switching)
+- ✅ State management (conversation history)
+- ✅ Result routing (tools return to conversation)
+- ✅ Error recovery (graceful degradation)
+- ✅ Token accounting (comprehensive tracking)
+- ✅ Streaming (real-time output)
+- ✅ Logging and observability (structured logs, telemetry)
+
+### Why This Architecture Matters
+
+1. **Radical Reusability**: Write `web-search.ai` once, use it in 10 different agents
+2. **Natural Composition**: Complex systems emerge from simple components
+3. **Easy Maintenance**: Each agent is a single text file with a clear purpose
+4. **Independent Testing**: Test each agent in isolation
+5. **Runtime Flexibility**: Agents adapt their strategy based on actual results
+6. **Zero Boilerplate**: No orchestration code, no state management, no error handling
+7. **Rapid Development**: Build in minutes what traditional frameworks need months for
+
+**Real Impact:**
+- Neda CRM: 22 specialized agents, 2,000 lines of prompts total
+- Traditional equivalent: 20,000+ lines of orchestration code
+- Development time: weeks vs months
+- Maintenance: text file edits vs code refactoring
+
+This is why you can build production-ready multi-agent systems in the time it takes to write a good prompt.
+
 ## Core Features
 
 ### 🚀 **Single-Agent Capabilities**

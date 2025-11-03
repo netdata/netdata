@@ -51,6 +51,7 @@
     "@slack/bolt": "^4.6.0",
     "ai": "5.0.86",
     "ajv": "^8.17.1",
+    "async-mutex": "^0.4.1",
     "commander": "^14.0.2",
     "express": "^5.1.0",
     "js-yaml": "^4.1.0",

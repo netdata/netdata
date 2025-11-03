@@ -38,41 +38,46 @@ function extractToolParams(event: StructuredLogEvent): string {
   if (event.message.includes('(') && event.message.includes(')')) {
     const regex = /\(([^)]+)\)/;
     const match = regex.exec(event.message);
-    if (match?.[1] !== undefined) {
+    if (match !== null) {
       return `(${match[1]})`;
     }
   }
   return '';
 }
 
-function extractMetrics(message: string): string {
+function parseNumericLabel(event: StructuredLogEvent, key: string): number | undefined {
+  if (!Object.prototype.hasOwnProperty.call(event.labels, key)) return undefined;
+  const raw = event.labels[key];
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed)) return undefined;
+  return parsed;
+}
+
+function extractLegacyMetrics(message: string): string[] {
   const metrics: string[] = [];
 
   const latencyRegex = /(\d+(?:\.\d+)?)\s*ms/;
   const latencyMatch = latencyRegex.exec(message);
-  if (latencyMatch?.[1] !== undefined) {
-    metrics.push(`${latencyMatch[1]}ms`);
-  }
-
-  const tokensRegex = /input\s+(\d+).*?output\s+(\d+)/;
-  const tokensMatch = tokensRegex.exec(message);
-  if (tokensMatch !== null) {
-    metrics.push(`tokens:${tokensMatch[1]}/${tokensMatch[2]}`);
-  }
-
-  const costRegex = /\$(\d+\.\d+)/;
-  const costMatch = costRegex.exec(message);
-  if (costMatch?.[1] !== undefined) {
-    metrics.push(`$${costMatch[1]}`);
+  const latency: string | undefined = latencyMatch !== null ? latencyMatch[1] : undefined;
+  if (latency !== undefined) {
+    metrics.push(`${latency}ms`);
   }
 
   const bytesRegex = /(\d+)\s*bytes/;
   const bytesMatch = bytesRegex.exec(message);
-  if (bytesMatch?.[1] !== undefined) {
-    metrics.push(`${bytesMatch[1]}b`);
+  const bytes: string | undefined = bytesMatch !== null ? bytesMatch[1] : undefined;
+  if (bytes !== undefined) {
+    metrics.push(`${bytes} bytes`);
   }
 
-  return metrics.length > 0 ? `: ${metrics.join(', ')}` : '';
+  const tokensRegex = /(\d+)\s*tokens/;
+  const tokensMatch = tokensRegex.exec(message);
+  const tokens: string | undefined = tokensMatch !== null ? tokensMatch[1] : undefined;
+  if (tokens !== undefined) {
+    metrics.push(`${tokens} tokens`);
+  }
+
+  return metrics;
 }
 
 function getKindCode(event: StructuredLogEvent): string {
@@ -187,9 +192,27 @@ function buildContext(event: StructuredLogEvent): { text?: string; highlight: 'l
   }
 
   let context = displayLabel;
-  const metrics = extractMetrics(event.message);
-  if (metrics.length > 0) {
-    context += metrics;
+  const metrics: string[] = [];
+  const latency = parseNumericLabel(event, 'latency_ms');
+  if (typeof latency === 'number') metrics.push(`${String(latency)}ms`);
+  const bytes = parseNumericLabel(event, 'result_bytes')
+    ?? parseNumericLabel(event, 'output_bytes')
+    ?? parseNumericLabel(event, 'characters_out');
+  if (typeof bytes === 'number') metrics.push(`${String(bytes)} bytes`);
+  const tokens = parseNumericLabel(event, 'tokens_estimated') ?? parseNumericLabel(event, 'tokens');
+  if (typeof tokens === 'number') metrics.push(`${String(tokens)} tokens`);
+  const flags: string[] = [];
+  if (event.labels.truncated === 'true') flags.push('truncated');
+  if (event.labels.dropped === 'true') flags.push('overflown');
+  if (metrics.length > 0 || flags.length > 0) {
+    const segments = [...metrics];
+    if (flags.length > 0) segments.push(flags.join('|'));
+    context += ` [${segments.join(', ')}]`;
+  } else {
+    const legacyMetrics = extractLegacyMetrics(event.message);
+    if (legacyMetrics.length > 0) {
+      context += ` [${legacyMetrics.join(', ')}]`;
+    }
   }
   return { text: context, highlight: 'tool' };
 }

@@ -721,7 +721,7 @@ export class InternalToolProvider extends ToolProvider {
         throw new Error(errorMsg);
       }
 
-      interface R { id: string; tool: string; ok: boolean; elapsedMs: number; output?: string; error?: { code: string; message: string } }
+      interface R { id: string; tool: string; ok: boolean; elapsedMs: number; output?: string; error?: { code: string; message: string }; dropped?: boolean; tokens?: number; reason?: string }
       const parentContext: ToolExecutionContext | undefined = (() => {
         if (executionOpts === undefined || typeof executionOpts !== 'object') return undefined;
         if (!Object.prototype.hasOwnProperty.call(executionOpts, 'parentContext')) return undefined;
@@ -751,7 +751,21 @@ export class InternalToolProvider extends ToolProvider {
             { turn: batchTurn, subturn: subturnForCall },
             { timeoutMs: this.opts.toolTimeoutMs, parentContext: { turn: batchTurn, subturn: subturnForCall } }
           );
-          return { id, tool, ok: true, elapsedMs: managed.latency, output: managed.result };
+          const dropped = managed.dropped === true;
+          const item: R = {
+            id,
+            tool,
+            ok: managed.ok,
+            elapsedMs: managed.latency,
+            output: managed.result,
+            dropped,
+            tokens: managed.tokens,
+            reason: managed.reason,
+          };
+          if (dropped && managed.reason !== undefined) {
+            item.error = { code: managed.reason, message: managed.result };
+          }
+          return item;
         } catch (e) {
           const msg = e instanceof Error ? e.message : String(e);
           return { id, tool, ok: false, elapsedMs: Date.now() - t0, error: { code: 'EXECUTION_ERROR', message: msg } };
