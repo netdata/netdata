@@ -18,7 +18,7 @@ tools:
 #  - cloudflare-browser
 agents:
   - web-fetch.ai
-  - gitbub-search.ai
+  - github-search.ai
   - reddit.ai
 llmTimeout: 120000
 toolTimeout: 60000
