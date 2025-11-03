@@ -3718,6 +3718,48 @@ const SCENARIOS: ScenarioDefinition[] = [
       },
     ],
   },
+  {
+    id: 'context_guard__init_counters_from_history',
+    description: 'Conversation history seeds context counters before the first LLM attempt.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        response: {
+          kind: 'tool-call',
+          assistantText: 'Reviewing prior context before fetching new data.',
+          toolCalls: [
+            {
+              toolName: TOOL_NAME,
+              callId: 'call-context-history-seed',
+              assistantText: 'Requesting supplemental insight with history awareness.',
+              arguments: {
+                text: TOOL_ARGUMENT_SUCCESS,
+              },
+            },
+          ],
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+          finishReason: TOOL_FINISH_REASON,
+        },
+      },
+      {
+        turn: 2,
+        expectedTools: ['agent__final_report'],
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Final report generated after validating history-seeded counters.',
+          reportContent: `${RESULT_HEADING}Historical context respected while producing the final answer.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_SUCCESS,
+          tokenUsage: {
+            inputTokens: 82,
+            outputTokens: 26,
+            totalTokens: 108,
+          },
+        },
+      },
+    ],
+  },
 ];
 
 const scenarios = new Map<string, ScenarioDefinition>(SCENARIOS.map((scenario) => [scenario.id, scenario] as const));

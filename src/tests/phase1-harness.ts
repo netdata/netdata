@@ -30,6 +30,7 @@ import { OpenRouterProvider } from '../llm-providers/openrouter.js';
 import { TestLLMProvider } from '../llm-providers/test-llm.js';
 import { formatRichLogLine } from '../logging/rich-format.js';
 import { SubAgentRegistry } from '../subagent-registry.js';
+import { estimateMessagesTokens, resolveTokenizer } from '../tokenizer-registry.js';
 import { MCPProvider } from '../tools/mcp-provider.js';
 import { clampToolName, sanitizeToolName, formatToolRequestCompact, truncateUtf8WithNotice, formatAgentResultHumanReadable, setWarningSink, getWarningSink, warn } from '../utils.js';
 import { createWebSocketTransport } from '../websocket-transport.js';
@@ -53,6 +54,8 @@ const CONTEXT_REMOTE = 'agent:context';
 const CONTEXT_OVERFLOW_FRAGMENT = 'context window budget exceeded';
 const TOKENIZER_GPT4O = 'tiktoken:gpt-4o-mini';
 const MINIMAL_SYSTEM_PROMPT = 'Phase 1 deterministic harness: minimal instructions.';
+const HISTORY_SYSTEM_SEED = 'Historical system directive for counter seeding.';
+const HISTORY_ASSISTANT_SEED = 'Historical assistant summary preserved for context metrics.';
 const BACKING_OFF_FRAGMENT = 'backing off';
 const RUN_TEST_11 = 'run-test-11';
 const RUN_TEST_21 = 'run-test-21';
@@ -163,6 +166,30 @@ const BASE_DEFAULTS = {
 const TMP_PREFIX = 'ai-agent-phase1-';
 const SESSIONS_SUBDIR = 'sessions';
 const BILLING_FILENAME = 'billing.jsonl';
+
+const safeJsonByteLengthLocal = (value: unknown): number => {
+  try {
+    return Buffer.byteLength(JSON.stringify(value), 'utf8');
+  } catch {
+    if (typeof value === 'string') return Buffer.byteLength(value, 'utf8');
+    if (value === null || value === undefined) return 0;
+    if (typeof value === 'object') {
+      let total = 0;
+      Object.values(value as Record<string, unknown>).forEach((nested) => {
+        total += safeJsonByteLengthLocal(nested);
+      });
+      return total;
+    }
+    return 0;
+  }
+};
+
+const estimateMessagesBytesLocal = (messages: readonly ConversationMessage[]): number => {
+  if (messages.length === 0) {
+    return 0;
+  }
+  return messages.reduce((total, message) => total + safeJsonByteLengthLocal(message), 0);
+};
 
 function buildInMemoryConfigLayers(configuration: Configuration): ResolvedConfigLayer[] {
   const jsonClone = JSON.parse(JSON.stringify(configuration)) as Record<string, unknown>;
@@ -1299,6 +1326,75 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         const accountingTokens = (details as Record<string, unknown>).tokens;
         invariant(typeof accountingTokens === 'number' && accountingTokens === logTokens, 'Accounting tokens should match log tokens for run-test-tool-log-tokens.');
       }
+    },
+  },
+  {
+    id: 'context_guard__init_counters_from_history',
+    configure: (configuration, sessionConfig, defaults) => {
+      configuration.providers = {
+        [PRIMARY_PROVIDER]: {
+          type: 'test-llm',
+          models: {
+            [MODEL_NAME]: {
+              contextWindow: 2048,
+              contextWindowBufferTokens: 32,
+              tokenizer: TOKENIZER_GPT4O,
+            },
+          },
+        },
+      };
+      defaults.contextWindowBufferTokens = 32;
+      configuration.defaults = defaults;
+      sessionConfig.targets = [{ provider: PRIMARY_PROVIDER, model: MODEL_NAME }];
+      sessionConfig.maxOutputTokens = 64;
+      sessionConfig.systemPrompt = MINIMAL_SYSTEM_PROMPT;
+      const historyMessages: ConversationMessage[] = [
+        { role: 'system', content: HISTORY_SYSTEM_SEED },
+        { role: 'assistant', content: HISTORY_ASSISTANT_SEED },
+      ];
+      sessionConfig.conversationHistory = historyMessages;
+    },
+    expect: (result) => {
+      invariant(result.success, 'Scenario context_guard__init_counters_from_history expected success.');
+      const firstRequestLog = result.logs.find((entry) =>
+        entry.type === 'llm'
+        && entry.direction === 'request'
+        && entry.remoteIdentifier === `${PRIMARY_PROVIDER}:${MODEL_NAME}`
+      );
+      invariant(firstRequestLog !== undefined, 'Initial LLM request log expected for context_guard__init_counters_from_history.');
+
+      const ctxTokens = expectLogDetailNumber(firstRequestLog, 'ctx_tokens', 'ctx_tokens detail missing for context_guard__init_counters_from_history.');
+      const schemaTokens = expectLogDetailNumber(firstRequestLog, 'schema_tokens', 'schema_tokens detail missing for context_guard__init_counters_from_history.');
+      const newTokens = expectLogDetailNumber(firstRequestLog, 'new_tokens', 'new_tokens detail missing for context_guard__init_counters_from_history.');
+      const expectedTokens = expectLogDetailNumber(firstRequestLog, 'expected_tokens', 'expected_tokens detail missing for context_guard__init_counters_from_history.');
+
+      invariant(expectedTokens === ctxTokens + schemaTokens + newTokens, 'expected_tokens should equal ctx + schema + new for context_guard__init_counters_from_history.');
+      invariant(newTokens === 0, 'new_tokens should be zero before tool execution for context_guard__init_counters_from_history.');
+
+      const firstUserIndex = result.conversation.findIndex((message) => message.role === 'user');
+      invariant(firstUserIndex >= 0, 'Initial user message not found for context_guard__init_counters_from_history.');
+      const initialMessages = result.conversation.slice(0, firstUserIndex + 1);
+      invariant(initialMessages.length === firstUserIndex + 1, 'Initial conversation length mismatch for context_guard__init_counters_from_history.');
+      const tokenizer = resolveTokenizer(TOKENIZER_GPT4O);
+      const tokenizerCtxTokens = estimateMessagesTokens(tokenizer, initialMessages);
+      const approxTokens = Math.ceil(estimateMessagesBytesLocal(initialMessages) / 4);
+      const projectedCtxTokens = Math.max(tokenizerCtxTokens, approxTokens);
+      if (process.env.CONTEXT_DEBUG === 'true') {
+        console.log('context-history initialMessages:', JSON.stringify(initialMessages, null, 2));
+        console.log('context-history logged ctx:', ctxTokens);
+        console.log('context-history tokenizer ctx:', tokenizerCtxTokens);
+        console.log('context-history approx ctx:', approxTokens);
+        console.log('context-history projected ctx:', projectedCtxTokens);
+      }
+      invariant(ctxTokens === projectedCtxTokens, `ctx_tokens should match projected estimate (expected ${String(projectedCtxTokens)}, got ${String(ctxTokens)}).`);
+
+      const historyAssistant = initialMessages.find((message) => message.role === 'assistant');
+      invariant(
+        historyAssistant !== undefined
+        && typeof historyAssistant.content === 'string'
+        && historyAssistant.content === HISTORY_ASSISTANT_SEED,
+        'Assistant history message must be preserved in conversation.',
+      );
     },
   },
   {

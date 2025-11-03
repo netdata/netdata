@@ -47,6 +47,17 @@
 3. Re-run `CONTEXT_DEBUG=true npm run test:phase1 -- run-test-context-token-double-count` to capture detailed counters while iterating.
 4. Execute full `npm run lint`, `npm run build`, and `npm run test:phase1` before preparing the commit (which must also include the pending documentation deletions).
 
+### Priority 1 Regression Tests (T0–T8)
+- **T0 context_guard__init_counters_from_history** (implemented Nov 03 2025): Seed conversation history (system + assistant) and assert first `LLM request prepared` log reports `ctx_tokens` aligning with `estimateTokensForCounters` (tokenizer vs byte approximation).
+- **T1 context_guard__new_tokens_flush_to_pending**: Force a second attempt within the same turn (tool call + retry) and verify the next request log shows `new_tokens` equal to the tool payload tokens while `pending` aggregates before guard evaluation.
+- **T2 context_guard__pending_reset_after_turn**: After a successful turn completes, confirm the next turn's initial request log shows `new_tokens === 0` and `ctx_tokens` reflects the prior turn’s committed tool output.
+- **T3 context_guard__final_reset_after_enforce**: Trigger forced final turn, then assert the subsequent response log reports `pendingCtxTokens` and `schemaCtxTokens` cleared to zero along with the forced-final reason.
+- **T4 context_guard__threshold_below_limit_allows**: Configure context window so projected tokens sit just below the guard limit and assert provider selection proceeds without forced final.
+- **T5 context_guard__threshold_equal_allows**: Tune headroom so projected tokens equal the limit; ensure guard does not trigger and constraints remain relaxed.
+- **T6 context_guard__threshold_above_blocks**: Exceed the limit by one token to verify `evaluateContextGuard` blocks, logging the enforcement event and switching to final turn.
+- **T7 context_guard__schema_only_trigger**: Inflate tool schemas (no tool results) so schema tokens alone cause guard activation; assert forced final turn without tool messages.
+- **T8 context_guard__schema_shrink_effect**: After forced final due to schema overflow, ensure recomputed schema tokens drop (i.e., `schema_tokens` decreases between pre- and post-enforcement logs) and the final-turn instruction is injected once.
+
 ## Implied Decisions
 - Keep default context window (131072) and buffer (256) for models lacking explicit overrides.
 - Retain existing warning wording/log severity, simply updating the numeric fields to the new counters.
@@ -72,7 +83,8 @@
 - [x] Per-tool overflow replacements log a `WRN` entry with matching turn/subturn metadata — harness coverage added via `run-test-context-trim-log`.
 - [x] Forced-final guard continues into concluding LLM call — covered by `run-test-context-forced-final` harness scenario.
 - [ ] Fix double-count of tool tokens (pendingCtxTokens vs newCtxTokens) and land regression coverage.
-- [ ] Rework `run-test-context-token-double-count` to assert the context delta across turns instead of pending token bucket.
+- [x] Rework `run-test-context-token-double-count` to assert the context delta across turns instead of pending token bucket. (Nov 03 2025)
+- [x] Added `context_guard__init_counters_from_history` regression test (T0) to lock ctx-token seeding from conversation history. (Nov 03 2025)
 - [ ] Implement Priority 1 regression tests (T0–T9) covering counter lifecycle, guard thresholds, overflow handling.
 - [ ] Implement Priority 2 regression tests (T10–T17) for multi-provider blocking, truncation flow, accounting/system message coverage.
 - [ ] Implement Priority 3 regression tests (T18–T30) for telemetry calculations, cache tokens, CONTEXT_DEBUG output.
