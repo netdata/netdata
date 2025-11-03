@@ -3760,6 +3760,28 @@ const SCENARIOS: ScenarioDefinition[] = [
       },
     ],
   },
+  {
+    id: 'context_guard__threshold_probe',
+    description: 'Minimal final report to measure context guard thresholds.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Delivering the threshold probe summary.',
+          reportContent: `${RESULT_HEADING}Threshold probe completed without additional tool usage.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_SUCCESS,
+          tokenUsage: {
+            inputTokens: 48,
+            outputTokens: 20,
+            totalTokens: 68,
+          },
+        },
+      },
+    ],
+  },
 ];
 
 const scenarios = new Map<string, ScenarioDefinition>(SCENARIOS.map((scenario) => [scenario.id, scenario] as const));

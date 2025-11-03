@@ -56,6 +56,8 @@ const TOKENIZER_GPT4O = 'tiktoken:gpt-4o-mini';
 const MINIMAL_SYSTEM_PROMPT = 'Phase 1 deterministic harness: minimal instructions.';
 const HISTORY_SYSTEM_SEED = 'Historical system directive for counter seeding.';
 const HISTORY_ASSISTANT_SEED = 'Historical assistant summary preserved for context metrics.';
+const THRESHOLD_SYSTEM_PROMPT = 'Phase 1 deterministic harness: threshold probe instructions.';
+const THRESHOLD_USER_PROMPT = 'Provide a concise status summary for the threshold probe.';
 const BACKING_OFF_FRAGMENT = 'backing off';
 const RUN_TEST_11 = 'run-test-11';
 const RUN_TEST_21 = 'run-test-21';
@@ -166,6 +168,17 @@ const BASE_DEFAULTS = {
 const TMP_PREFIX = 'ai-agent-phase1-';
 const SESSIONS_SUBDIR = 'sessions';
 const BILLING_FILENAME = 'billing.jsonl';
+const THRESHOLD_BUFFER_TOKENS = 8;
+const THRESHOLD_MAX_OUTPUT_TOKENS = 32;
+const THRESHOLD_CONTEXT_WINDOW_BELOW = 750;
+const THRESHOLD_CONTEXT_WINDOW_EQUAL = 695;
+const THRESHOLD_CONTEXT_WINDOW_ABOVE = 690;
+const PREFLIGHT_CONTEXT_WINDOW = 80;
+const PREFLIGHT_BUFFER_TOKENS = 8;
+const PREFLIGHT_MAX_OUTPUT_TOKENS = 16;
+const FORCED_FINAL_CONTEXT_WINDOW = 320;
+const FORCED_FINAL_BUFFER_TOKENS = 32;
+const FORCED_FINAL_MAX_OUTPUT_TOKENS = 48;
 
 const safeJsonByteLengthLocal = (value: unknown): number => {
   try {
@@ -999,17 +1012,17 @@ if (process.env.CONTEXT_DEBUG === 'true') {
           type: 'test-llm',
           models: {
             [MODEL_NAME]: {
-              contextWindow: 80,
-              contextWindowBufferTokens: 8,
+              contextWindow: PREFLIGHT_CONTEXT_WINDOW,
+              contextWindowBufferTokens: PREFLIGHT_BUFFER_TOKENS,
               tokenizer: 'approximate',
             },
           },
         },
       };
-      defaults.contextWindowBufferTokens = 8;
+      defaults.contextWindowBufferTokens = PREFLIGHT_BUFFER_TOKENS;
       configuration.defaults = defaults;
       sessionConfig.targets = [{ provider: PRIMARY_PROVIDER, model: MODEL_NAME }];
-      sessionConfig.maxOutputTokens = 16;
+      sessionConfig.maxOutputTokens = PREFLIGHT_MAX_OUTPUT_TOKENS;
       const longHistory = 'X'.repeat(400);
       sessionConfig.conversationHistory = [
         { role: 'system', content: 'Historical context.' },
@@ -1022,6 +1035,26 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       invariant(contextLogs.length > 0, 'Context guard warning expected for run-test-context-guard-preflight.');
       const llmEntries = result.accounting.filter(isLlmAccounting);
       invariant(llmEntries.length === 1, 'Forced final turn should issue exactly one LLM call for run-test-context-guard-preflight.');
+
+      const nonFinalToolMessages = result.conversation.filter((message) =>
+        message.role === 'tool'
+        && (typeof (message as { toolCallId?: string }).toolCallId !== 'string'
+          || (message as { toolCallId?: string }).toolCallId !== 'agent-final-report')
+      );
+      invariant(nonFinalToolMessages.length === 0, 'Only the agent__final_report tool may appear after preflight enforcement.');
+
+      const requestLog = result.logs.find((entry) =>
+        entry.type === 'llm'
+        && entry.direction === 'request'
+        && entry.remoteIdentifier === `${PRIMARY_PROVIDER}:${MODEL_NAME}`
+      );
+      invariant(requestLog !== undefined, 'LLM request log expected for run-test-context-guard-preflight.');
+      const expectedTokens = expectLogDetailNumber(requestLog, 'expected_tokens', 'expected_tokens detail missing for run-test-context-guard-preflight.');
+      const schemaTokens = expectLogDetailNumber(requestLog, 'schema_tokens', 'schema_tokens detail missing for run-test-context-guard-preflight.');
+      const limitTokens = PREFLIGHT_CONTEXT_WINDOW - PREFLIGHT_BUFFER_TOKENS - PREFLIGHT_MAX_OUTPUT_TOKENS;
+      invariant(schemaTokens > 0, 'Schema tokens should contribute to preflight guard evaluation.');
+      invariant(expectedTokens > limitTokens, `Projected tokens should exceed limit during preflight (expected > ${String(limitTokens)}, got ${String(expectedTokens)}).`);
+
       const finalReport = result.finalReport;
       invariant(finalReport?.status === 'failure', 'Fallback failure final report expected for run-test-context-guard-preflight.');
     },
@@ -1165,17 +1198,17 @@ if (process.env.CONTEXT_DEBUG === 'true') {
           type: 'test-llm',
           models: {
             [MODEL_NAME]: {
-              contextWindow: 320,
-              contextWindowBufferTokens: 32,
+              contextWindow: FORCED_FINAL_CONTEXT_WINDOW,
+              contextWindowBufferTokens: FORCED_FINAL_BUFFER_TOKENS,
               tokenizer: TOKENIZER_GPT4O,
             },
           },
         },
       };
-      defaults.contextWindowBufferTokens = 32;
+      defaults.contextWindowBufferTokens = FORCED_FINAL_BUFFER_TOKENS;
       configuration.defaults = defaults;
       sessionConfig.targets = [{ provider: PRIMARY_PROVIDER, model: MODEL_NAME }];
-      sessionConfig.maxOutputTokens = 48;
+      sessionConfig.maxOutputTokens = FORCED_FINAL_MAX_OUTPUT_TOKENS;
       sessionConfig.systemPrompt = MINIMAL_SYSTEM_PROMPT;
       sessionConfig.conversationHistory = [];
     },
@@ -1205,6 +1238,12 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       invariant(finalTurnRequest !== undefined, 'Final-turn LLM request log expected for run-test-context-forced-final.');
       const requestDetails = expectRecord(finalTurnRequest.details, 'Final-turn request details missing for run-test-context-forced-final.');
       invariant(requestDetails.final_turn === true, 'Final-turn request should mark final_turn detail for run-test-context-forced-final.');
+
+      const finalSchema = expectLogDetailNumber(finalTurnRequest, 'schema_tokens', 'schema_tokens detail missing (final) for run-test-context-forced-final.');
+      const finalNewTokens = expectLogDetailNumber(finalTurnRequest, 'new_tokens', 'new_tokens detail missing (final) for run-test-context-forced-final.');
+      invariant(finalNewTokens === 0, 'Final-turn request should not carry pending tokens for run-test-context-forced-final.');
+      const forcedFinalLimit = FORCED_FINAL_CONTEXT_WINDOW - FORCED_FINAL_BUFFER_TOKENS - FORCED_FINAL_MAX_OUTPUT_TOKENS;
+      invariant(finalSchema <= forcedFinalLimit, `Final-turn schema tokens must respect adjusted limit (expected ≤ ${String(forcedFinalLimit)}, got ${String(finalSchema)}).`);
 
       const responseLog = result.logs.find((entry) =>
         entry.type === 'llm'
@@ -1326,6 +1365,129 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         const accountingTokens = (details as Record<string, unknown>).tokens;
         invariant(typeof accountingTokens === 'number' && accountingTokens === logTokens, 'Accounting tokens should match log tokens for run-test-tool-log-tokens.');
       }
+    },
+  },
+  {
+    id: 'context_guard__threshold_below_limit',
+    configure: (configuration, sessionConfig, defaults) => {
+      configuration.providers = {
+        [PRIMARY_PROVIDER]: {
+          type: 'test-llm',
+          models: {
+            [MODEL_NAME]: {
+              contextWindow: THRESHOLD_CONTEXT_WINDOW_BELOW,
+              contextWindowBufferTokens: THRESHOLD_BUFFER_TOKENS,
+              tokenizer: TOKENIZER_GPT4O,
+            },
+          },
+        },
+      };
+      defaults.contextWindowBufferTokens = THRESHOLD_BUFFER_TOKENS;
+      configuration.defaults = defaults;
+      sessionConfig.targets = [{ provider: PRIMARY_PROVIDER, model: MODEL_NAME }];
+      sessionConfig.maxOutputTokens = THRESHOLD_MAX_OUTPUT_TOKENS;
+      sessionConfig.systemPrompt = THRESHOLD_SYSTEM_PROMPT;
+      sessionConfig.userPrompt = THRESHOLD_USER_PROMPT;
+      sessionConfig.tools = [];
+    },
+    expect: (result) => {
+      const contextWarnings = result.logs.filter((entry) => entry.remoteIdentifier === CONTEXT_REMOTE && entry.severity === 'WRN');
+      invariant(contextWarnings.length === 0, 'No context guard warning expected below threshold.');
+
+      const requestLog = result.logs.find((entry) =>
+        entry.type === 'llm'
+        && entry.direction === 'request'
+        && entry.remoteIdentifier === `${PRIMARY_PROVIDER}:${MODEL_NAME}`
+      );
+      invariant(requestLog !== undefined, 'LLM request log expected for context_guard__threshold_below_limit.');
+      const expectedTokens = expectLogDetailNumber(requestLog, 'expected_tokens', 'expected_tokens detail missing for context_guard__threshold_below_limit.');
+      const limitTokens = THRESHOLD_CONTEXT_WINDOW_BELOW - THRESHOLD_BUFFER_TOKENS - THRESHOLD_MAX_OUTPUT_TOKENS;
+      if (process.env.CONTEXT_DEBUG === 'true') {
+        console.log('threshold-below metrics:', { expectedTokens, limitTokens });
+      }
+      invariant(expectedTokens < limitTokens, `Projected tokens should remain below limit (expected < ${String(limitTokens)}, got ${String(expectedTokens)}).`);
+    },
+  },
+  {
+    id: 'context_guard__threshold_equal_limit',
+    configure: (configuration, sessionConfig, defaults) => {
+      configuration.providers = {
+        [PRIMARY_PROVIDER]: {
+          type: 'test-llm',
+          models: {
+            [MODEL_NAME]: {
+              contextWindow: THRESHOLD_CONTEXT_WINDOW_EQUAL,
+              contextWindowBufferTokens: THRESHOLD_BUFFER_TOKENS,
+              tokenizer: TOKENIZER_GPT4O,
+            },
+          },
+        },
+      };
+      defaults.contextWindowBufferTokens = THRESHOLD_BUFFER_TOKENS;
+      configuration.defaults = defaults;
+      sessionConfig.targets = [{ provider: PRIMARY_PROVIDER, model: MODEL_NAME }];
+      sessionConfig.maxOutputTokens = THRESHOLD_MAX_OUTPUT_TOKENS;
+      sessionConfig.systemPrompt = THRESHOLD_SYSTEM_PROMPT;
+      sessionConfig.userPrompt = THRESHOLD_USER_PROMPT;
+      sessionConfig.tools = [];
+    },
+    expect: (result) => {
+      const contextWarnings = result.logs.filter((entry) => entry.remoteIdentifier === CONTEXT_REMOTE && entry.severity === 'WRN');
+      invariant(contextWarnings.length === 0, 'No context guard warning expected at exact threshold.');
+
+      const requestLog = result.logs.find((entry) =>
+        entry.type === 'llm'
+        && entry.direction === 'request'
+        && entry.remoteIdentifier === `${PRIMARY_PROVIDER}:${MODEL_NAME}`
+      );
+      invariant(requestLog !== undefined, 'LLM request log expected for context_guard__threshold_equal_limit.');
+      const expectedTokens = expectLogDetailNumber(requestLog, 'expected_tokens', 'expected_tokens detail missing for context_guard__threshold_equal_limit.');
+      const limitTokens = THRESHOLD_CONTEXT_WINDOW_EQUAL - THRESHOLD_BUFFER_TOKENS - THRESHOLD_MAX_OUTPUT_TOKENS;
+      if (process.env.CONTEXT_DEBUG === 'true') {
+        console.log('threshold-equal metrics:', { expectedTokens, limitTokens });
+      }
+      invariant(expectedTokens === limitTokens, `Projected tokens should equal limit (expected ${String(limitTokens)}, got ${String(expectedTokens)}).`);
+    },
+  },
+  {
+    id: 'context_guard__threshold_above_limit',
+    configure: (configuration, sessionConfig, defaults) => {
+      configuration.providers = {
+        [PRIMARY_PROVIDER]: {
+          type: 'test-llm',
+          models: {
+            [MODEL_NAME]: {
+              contextWindow: THRESHOLD_CONTEXT_WINDOW_ABOVE,
+              contextWindowBufferTokens: THRESHOLD_BUFFER_TOKENS,
+              tokenizer: TOKENIZER_GPT4O,
+            },
+          },
+        },
+      };
+      defaults.contextWindowBufferTokens = THRESHOLD_BUFFER_TOKENS;
+      configuration.defaults = defaults;
+      sessionConfig.targets = [{ provider: PRIMARY_PROVIDER, model: MODEL_NAME }];
+      sessionConfig.maxOutputTokens = THRESHOLD_MAX_OUTPUT_TOKENS;
+      sessionConfig.systemPrompt = THRESHOLD_SYSTEM_PROMPT;
+      sessionConfig.userPrompt = THRESHOLD_USER_PROMPT;
+      sessionConfig.tools = [];
+    },
+    expect: (result) => {
+      const requestLog = result.logs.find((entry) =>
+        entry.type === 'llm'
+        && entry.direction === 'request'
+        && entry.remoteIdentifier === `${PRIMARY_PROVIDER}:${MODEL_NAME}`
+      );
+      invariant(requestLog !== undefined, 'LLM request log expected for context_guard__threshold_above_limit.');
+      const expectedTokens = expectLogDetailNumber(requestLog, 'expected_tokens', 'expected_tokens detail missing for context_guard__threshold_above_limit.');
+      const limitTokens = THRESHOLD_CONTEXT_WINDOW_ABOVE - THRESHOLD_BUFFER_TOKENS - THRESHOLD_MAX_OUTPUT_TOKENS;
+      if (process.env.CONTEXT_DEBUG === 'true') {
+        console.log('threshold-above metrics:', { expectedTokens, limitTokens });
+      }
+      invariant(expectedTokens > limitTokens, `Projected tokens should exceed limit (expected > ${String(limitTokens)}, got ${String(expectedTokens)}).`);
+
+      const finalReport = result.finalReport;
+      invariant(finalReport?.status === 'failure', 'Final report should indicate failure after exceeding the context limit.');
     },
   },
   {
