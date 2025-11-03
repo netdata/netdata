@@ -1,0 +1,111 @@
+name: Custom Build (Auth Bypass)
+
+on:
+  push:
+    branches:
+      - master  # Build on pushes to master
+      - custom-auth-bypass  # Also allow a dedicated branch
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  build-custom:
+    name: Build Modified Netdata
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Apply authentication bypass patch
+        run: |
+          cat > bypass-auth.patch << 'EOF'
+          --- a/src/database/rrdfunctions-inflight.c
+          +++ b/src/database/rrdfunctions-inflight.c
+          @@ -438,41 +438,6 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s,
+                   return code;
+               }
+
+          -    if(!http_access_user_has_enough_access_level_for_endpoint(user_access, rdcf->access)) {
+          -
+          -        if((rdcf->access & HTTP_ACCESS_SIGNED_ID) && !(user_access & HTTP_ACCESS_SIGNED_ID))
+          -            code = rrd_call_function_error(result_wb,
+          -                                           "You need to be authenticated via Netdata Cloud Single-Sign-On (SSO) "
+          -                                           "to access this feature. Sign-in on this dashboard, "
+          -                                           "or access your Netdata via https://app.netdata.cloud.",
+          -                                           HTTP_ACCESS_PERMISSION_DENIED_HTTP_CODE(user_access));
+          -
+          -        else if((rdcf->access & HTTP_ACCESS_SAME_SPACE) && !(user_access & HTTP_ACCESS_SAME_SPACE))
+          -            code = rrd_call_function_error(result_wb,
+          -                                           "You need to login to the Netdata Cloud space this agent is claimed to, "
+          -                                           "to access this feature.",
+          -                                           HTTP_ACCESS_PERMISSION_DENIED_HTTP_CODE(user_access));
+          -
+          -        else if((rdcf->access & HTTP_ACCESS_COMMERCIAL_SPACE) && !(user_access & HTTP_ACCESS_COMMERCIAL_SPACE))
+          -            code = rrd_call_function_error(result_wb,
+          -                                           "This feature is only available for commercial users and supporters "
+          -                                           "of Netdata. To use it, please upgrade your space. "
+          -                                           "Thank you for supporting Netdata.",
+          -                                           HTTP_ACCESS_PERMISSION_DENIED_HTTP_CODE(user_access));
+          -
+          -        else {
+          -            HTTP_ACCESS missing_access = (~user_access) & rdcf->access;
+          -            char perms_str[1024];
+          -            http_access2txt(perms_str, sizeof(perms_str), ", ", missing_access);
+          -
+          -            char msg[2048];
+          -            snprintfz(msg, sizeof(msg), "This feature requires additional permissions: %s.", perms_str);
+          -
+          -            code = rrd_call_function_error(result_wb, msg,
+          -                                           HTTP_ACCESS_PERMISSION_DENIED_HTTP_CODE(user_access));
+          -        }
+          -
+          -        dictionary_acquired_item_release(host->functions, host_function_acquired);
+          -
+          -        if(result_cb)
+          -            result_cb(result_wb, code, result_cb_data);
+          -
+          -        return code;
+          -    }
+          -
+               if(timeout_s <= 0)
+                   timeout_s = rdcf->timeout;
+          EOF
+
+          patch -p1 < bypass-auth.patch
+      
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            gcc make autoconf autoconf-archive autogen automake \
+            pkg-config curl jq cmake uuid-dev zlib1g-dev libuv1-dev \
+            liblz4-dev libssl-dev libelf-dev libmnl-dev \
+            libprotobuf-dev protobuf-compiler libjson-c-dev libyaml-dev \
+            libsystemd-dev
+      
+      - name: Build Netdata
+        run: |
+          # Modern CMake-based build
+          cmake -S . -B build -G Ninja \
+            -DENABLE_CLOUD=OFF \
+            -DENABLE_ACLK=OFF
+          cmake --build build --parallel $(nproc)
+      
+      - name: Create installation directory
+        run: |
+          mkdir -p netdata-custom
+          DESTDIR=$(pwd)/netdata-custom cmake --install build
+      
+      - name: Package build
+        run: |
+          cd netdata-custom
+          tar -czf ../netdata-custom-build.tar.gz .
+      
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: netdata-custom-build
+          path: netdata-custom-build.tar.gz
+          retention-days: 30
