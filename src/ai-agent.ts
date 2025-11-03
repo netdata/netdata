@@ -1691,8 +1691,45 @@ export class AIAgentSession {
               this.toolFailureFallbacks.length = 0;
             }
 
+            let reasoningHeaderEmitted = false;
+            if (!turnResult.shownThinking) {
+              const reasoningChunks: string[] = [];
+              sanitizedMessages.forEach((message) => {
+                if (message.role !== 'assistant') {
+                  return;
+                }
+                const segments = Array.isArray(message.reasoning) ? message.reasoning : [];
+                segments.forEach((segment) => {
+                  const text = (segment as { text?: unknown }).text;
+                  if (typeof text === 'string' && text.trim().length > 0) {
+                    reasoningChunks.push(text);
+                  }
+                });
+              });
+              if (reasoningChunks.length > 0) {
+                reasoningHeaderEmitted = true;
+                if (lastShownThinkingHeaderTurn !== currentTurn) {
+                  const thinkingHeader: LogEntry = {
+                    timestamp: Date.now(),
+                    severity: 'THK',
+                    turn: currentTurn,
+                    subturn: 0,
+                    direction: 'response',
+                    type: 'llm',
+                    remoteIdentifier: 'thinking',
+                    fatal: false,
+                    message: 'reasoning output stream',
+                  };
+                  this.log(thinkingHeader);
+                }
+                if (this.parentTxnId === undefined) {
+                  this.emitReasoningChunks(reasoningChunks);
+                }
+              }
+            }
+
             // Update tracking if thinking was shown
-            if (turnResult.shownThinking) {
+            if (turnResult.shownThinking || reasoningHeaderEmitted) {
               lastShownThinkingHeaderTurn = currentTurn;
             }
 
@@ -3472,6 +3509,38 @@ export class AIAgentSession {
       return { ...msg, toolCalls: validCalls };
     });
     return { messages: sanitized, dropped };
+  }
+
+  private emitReasoningChunks(chunks: string[]): void {
+    if (this.parentTxnId !== undefined) {
+      return;
+    }
+    chunks.forEach((chunk) => {
+      if (typeof chunk !== 'string') {
+        return;
+      }
+      const trimmed = chunk.trim();
+      if (trimmed.length === 0) {
+        return;
+      }
+      try {
+        this.sessionConfig.callbacks?.onThinking?.(chunk);
+      } catch (e) {
+        warn(`onThinking callback failed: ${e instanceof Error ? e.message : String(e)}`);
+      }
+      try {
+        this.opTree.setLatestStatus(trimmed);
+      } catch (e) {
+        warn(`opTree.setLatestStatus failed: ${e instanceof Error ? e.message : String(e)}`);
+      }
+      try {
+        if (typeof this.currentLlmOpId === 'string') {
+          this.opTree.appendReasoningChunk(this.currentLlmOpId, chunk);
+        }
+      } catch (e) {
+        warn(`appendReasoningChunk failed: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    });
   }
 
   
