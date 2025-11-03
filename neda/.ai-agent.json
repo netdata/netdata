@@ -339,7 +339,20 @@
       },
       "enabled": true,
       "toolsAllowed": ["*"],
-      "toolsDenied": []
+      "toolsDenied": [
+        "create_or_update_file",
+        "create_repository",
+        "push_files",
+        "create_issue",
+        "create_pull_request",
+        "fork_repository",
+        "create_branch",
+        "update_issue",
+        "add_issue_comment",
+        "create_pull_request_review",
+        "merge_pull_request",
+        "update_pull_request_branch"
+      ]
     },
     "context7": {
       "type": "http",
