@@ -18,6 +18,7 @@ tools:
 #  - cloudflare-browser
 agents:
   - web-fetch.ai
+  - gitbub-search.ai
   - reddit.ai
 llmTimeout: 120000
 toolTimeout: 60000
@@ -44,7 +45,7 @@ Always provide detailed reports, linking all your claims and findings with their
 Your final report is the result of your research at which you present all your findings.
 Sumbit your final report with the `agent__final_report` tool. Format: ${FORMAT}
 
-**CRITICAL**: You MUST include the following sections:
+Your report must include the following sections:
 
 1. **TL;DR**: a short summary of the research findings
 
@@ -80,15 +81,16 @@ You the following search providers in this order:
 1. Brave AI: `brave__web_search` for web search
 2. Jina AI: `jina-search__search_web` for web search
 3. Jina Arxiv: `jina-search__search_arxiv` for academic papers
-4. Reddit: `agent__reddit` use only when the requested user reports
+4. Reddit: `agent__reddit` search on Reddit
+5. GitHub: `agent__github-search` search on GitHub (repos, issues, discussions, repos, users)
 
 Use the `agent__batch` tool, to call up to 5 search tools per turn. Request up to 20 results per query.
 
 ## Investigation Mode
-1. Utilize multiple search providers - search engines use independent indexes and may provide different results. To get the complete picture utilize multiple search engines
+1. Use multiple search providers, with rephrased search terms
 2. Use `batch` to perform multiple searches in parallel
-3. Rephrase the search terms, until additional searches do not enrich the results
-4. Stay in research mode, until additional search do not yeld additional insights
+3. Fetch web pages (with the `agent__web-fetch` tool) when you need more information
+4. Stay in research mode, until additional searches do not yeld new insights
 
 ## Conflict Resolution
 When there are contradicting findings:
