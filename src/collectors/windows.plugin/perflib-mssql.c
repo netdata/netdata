@@ -395,7 +395,7 @@ void dict_mssql_fill_instance_transactions(struct mssql_db_instance *mdi)
     }
 
     ret = SQLBindCol(
-            mdi->parent->conn->dbInstanceTransactionSTMT, 1, SQL_C_CHAR, object_name, sizeof(object_name), &col_object_len);
+        mdi->parent->conn->dbInstanceTransactionSTMT, 1, SQL_C_CHAR, object_name, sizeof(object_name), &col_object_len);
     if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
         netdata_MSSQL_error(
             SQL_HANDLE_STMT,
