@@ -151,7 +151,7 @@ public:
         if (AcqRS)
             rrdset_acquired_release(AcqRS);
 
-        if (AcqRD)
+        if (AcqRH)
             rrdhost_acquired_release(AcqRH);
     }
 

@@ -167,6 +167,8 @@
 - Build(deps): bump kenji-miyake/setup-git-cliff from 1 to 2 ([#21247](https://github.com/netdata/netdata/issues/21247))
 - Route dyncfg GET requests through plugin ([#21249](https://github.com/netdata/netdata/issues/21249))
 - Fix(go.d/ping): preserve original ping error by using %w for wrapping ([#21251](https://github.com/netdata/netdata/issues/21251))
+- Improve ML shutdown checks ([#21250](https://github.com/netdata/netdata/issues/21250))
+- Fix systemd-cat-native crash on realloc ([#21254](https://github.com/netdata/netdata/issues/21254))
 
 ## [2.7.0] - 2025-09-25
 
