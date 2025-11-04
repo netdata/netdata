@@ -1586,13 +1586,8 @@ static void *flush_dirty_pages_of_section_tp_worker(struct rrdengine_instance *c
 }
 
 struct mrg_load_thread {
-    int max_threads;
-    ND_THREAD *thread;
     uv_sem_t *sem;
-    int tier;
     struct rrdengine_datafile *datafile;
-    bool busy;
-    bool finished;
     size_t *total;
     size_t *populated_datafiles;
 };
@@ -1605,11 +1600,6 @@ void journalfile_v2_populate_retention_to_mrg_worker(void *arg)
     journalfile_v2_populate_retention_to_mrg(ctx, mlt->datafile->journalfile);
 
     uv_sem_post(mlt->sem);
-}
-
-static void after_tier_mrg_load(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t* uv_work_req __maybe_unused, int status __maybe_unused)
-{
-    ;
 }
 
 static void *tier_mrg_load(
@@ -1646,11 +1636,7 @@ static void *populate_mrg_tp_worker(
     worker_is_busy(UV_EVENT_DBENGINE_POPULATE_MRG);
 
     struct mrg_load_thread *mlt = data;
-    size_t max_threads = mlt->max_threads;
     int tier = ctx->config.tier;
-
-    size_t thread_index = 0;
-    int rc;
 
     netdata_rwlock_rdlock(&ctx->datafiles.rwlock);
 
@@ -1701,7 +1687,6 @@ static void *populate_mrg_tp_worker(
         uv_sem_wait(mlt->sem);
         struct mrg_load_thread *local_mlt = callocz(1, sizeof(struct mrg_load_thread));
         local_mlt->datafile = datafile;
-        local_mlt->tier = tier;
         local_mlt->sem = mlt->sem;
         local_mlt->total = &total;
         local_mlt->populated_datafiles = &populated_datafiles;
@@ -2376,9 +2361,6 @@ void dbengine_event_loop(void* arg) {
     struct mrg_load_thread *mlt = callocz(cpus, sizeof(*mlt));
     for (size_t i = 0; i < cpus; i++) {
         mlt[i].sem = &sem;
-        mlt[i].max_threads = cpus;
-        mlt[i].busy = false;
-        mlt[i].finished = false;
     }
 
 #if defined(OS_WINDOWS)
@@ -2398,8 +2380,7 @@ void dbengine_event_loop(void* arg) {
 
             switch (opcode) {
                 case RRDENG_OPCODE_MRG_LOAD:
-
-                    work_dispatch(NULL, cmd.data, cmd.completion, cmd.opcode, tier_mrg_load, after_tier_mrg_load);
+                    work_dispatch(NULL, cmd.data, cmd.completion, cmd.opcode, tier_mrg_load, NULL);
                     break;
 
                 case RRDENG_OPCODE_PARALLEL_WEIGHT:;
