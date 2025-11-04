@@ -169,6 +169,8 @@
 - Fix(go.d/ping): preserve original ping error by using %w for wrapping ([#21251](https://github.com/netdata/netdata/issues/21251))
 - Improve ML shutdown checks ([#21250](https://github.com/netdata/netdata/issues/21250))
 - Fix systemd-cat-native crash on realloc ([#21254](https://github.com/netdata/netdata/issues/21254))
+- Format code - MSSQL (windows.plugin) ([#21256](https://github.com/netdata/netdata/issues/21256))
+- Build(deps): bump github.com/ibm-messaging/mq-golang/v5 from 5.6.5 to 5.6.6 in /src/go ([#21259](https://github.com/netdata/netdata/issues/21259))
 
 ## [2.7.0] - 2025-09-25
 
