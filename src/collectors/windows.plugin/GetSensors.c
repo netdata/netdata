@@ -73,6 +73,7 @@ REFPROPERTYKEY sensor_keys[] = {
         &SENSOR_DATA_TYPE_ACCELERATION_Y_G,
         &SENSOR_DATA_TYPE_ACCELERATION_Z_G};
 
+static int min_custom = 0;
 
 static struct win_sensor_config {
     const char *title;
@@ -87,105 +88,105 @@ static struct win_sensor_config {
             .units = "Cel",
             .context = "system.hw.sensor.temperature.input",
             .family = "Temperature",
-            .priority = 70000,
+            .priority = NETDATA_CHART_PRIO_SENSORS,
         },
         {
             .title = "Sensor Power",
             .units = "W",
             .context = "system.hw.sensor.power.input",
             .family = "Power",
-            .priority = 70006,
+            .priority = NETDATA_CHART_PRIO_SENSOR_POWER,
         },
         {
             .title = "Sensor Current",
             .units = "A",
             .context = "system.hw.sensor.current.input",
             .family = "Current",
-            .priority = 70003,
+            .priority = NETDATA_CHART_PRIO_SENSOR_CURRENT,
         },
         {
             .title = "Sensor Humidity",
             .units = "%",
             .context = "system.hw.sensor.humidity.input",
             .family = "Humidity",
-            .priority = 70004,
+            .priority = NETDATA_CHART_PRIO_SENSOR_HUMIDITY,
         },
         {
             .title = "Ambient light level",
             .units = "lx",
             .context = "system.hw.sensor.lux.input",
             .family = "illuminance",
-            .priority = 70010,
+            .priority = NETDATA_CHART_PRIO_SENSOR_LUX,
         },
         {
             .title = "Color temperature of light",
             .units = "Cel",
             .context = "system.hw.sensor.color.input",
             .family = "Temperature",
-            .priority = 70011,
+            .priority = NETDATA_CHART_PRIO_SENSOR_TEMPERATURE,
         },
         {
             .title = "Electrical potential.",
             .units = "V",
             .context = "system.hw.sensor.voltage.input",
             .family = "Potential",
-            .priority = 70012,
+            .priority = NETDATA_CHART_PRIO_SENSOR_VOLTAGE,
         },
         {
             .title = "Electrical resistence.",
             .units = "Ohms",
             .context = "system.hw.sensor.resistence.input",
             .family = "Resistence",
-            .priority = 70013,
+            .priority = NETDATA_CHART_PRIO_SENSOR_RESISTENCE,
         },
         {
             .title = "Ambient atmospheric pressure",
             .units = "Pa",
             .context = "system.hw.sensor.pressure.input",
             .family = "Pressure",
-            .priority = 70014,
+            .priority = NETDATA_CHART_PRIO_SENSOR_AMBIENT_PRESSURE,
         },
         {
             .title = "Geographic latitude",
             .units = "Degrees",
             .context = "system.hw.sensor.latitude.input",
             .family = "Location",
-            .priority = 70015,
+            .priority = NETDATA_CHART_PRIO_SENSOR_LATITUDE,
         },
         {
             .title = "Geographic longitude",
             .units = "Degrees",
             .context = "system.hw.sensor.longitude.input",
             .family = "Location",
-            .priority = 70016,
+            .priority = NETDATA_CHART_PRIO_SENSOR_LONGITUDE,
         },
         {
             .title = "Force",
             .units = "N",
             .context = "system.hw.sensor.force.input",
             .family = "Force",
-            .priority = 70017,
+            .priority = NETDATA_CHART_PRIO_SENSOR_FORCE,
         },
         {
             .title = "Gauge Pressure",
             .units = "Pa",
             .context = "system.hw.sensor.gauge_pressure.input",
             .family = "Pressure",
-            .priority = 70018,
+            .priority = NETDATA_CHART_PRIO_SENSOR_GAUGE_PRESSURE,
         },
         {
             .title = "Distance",
             .units = "m",
             .context = "system.hw.sensor.distance.input",
             .family = "Distance",
-            .priority = 70019,
+            .priority = NETDATA_CHART_PRIO_SENSOR_DISTANCE,
         },
         {
             .title = "Acceleration.",
             .units = "g",
             .context = "system.hw.sensor.acceleration.input",
             .family = "Acceleration",
-            .priority = 70022,
+            .priority = NETDATA_CHART_PRIO_SENSOR_ACCELERATION,
         }
 };
 
