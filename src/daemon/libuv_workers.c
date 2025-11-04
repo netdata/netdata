@@ -45,6 +45,7 @@ static void register_libuv_worker_jobs_internal(void) {
     worker_register_job_name(UV_EVENT_DBENGINE_FLUSH_DIRTY, "dbengine flush dirty");
     worker_register_job_name(UV_EVENT_DBENGINE_QUIESCE, "dbengine quiesce");
     worker_register_job_name(UV_EVENT_DBENGINE_SHUTDOWN, "dbengine shutdown");
+    worker_register_job_name(UV_EVENT_DBENGINE_MRG_LOAD, "jv2 mrg load");
 
     // metadata
     worker_register_job_name(UV_EVENT_HOST_CONTEXT_LOAD, "metadata load host context");

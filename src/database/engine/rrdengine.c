@@ -1618,6 +1618,7 @@ static void *tier_mrg_load(
     struct completion *completion,
     uv_work_t *req __maybe_unused)
 {
+    worker_is_busy(UV_EVENT_DBENGINE_MRG_LOAD);
     struct mrg_load_thread *mlt = data;
     journalfile_v2_populate_retention_to_mrg_worker(mlt);
     mlt->datafile->populate_mrg.populated = true;
@@ -1626,6 +1627,7 @@ static void *tier_mrg_load(
     __atomic_add_fetch(mlt->populated_datafiles, 1, __ATOMIC_RELAXED);
     __atomic_sub_fetch(mlt->total, 1, __ATOMIC_RELEASE);
     freez(mlt);
+    worker_is_idle();
     return NULL;
 }
 
