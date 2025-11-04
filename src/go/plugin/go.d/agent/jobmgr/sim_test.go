@@ -13,6 +13,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/pkg/safewriter"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/confgroup"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/dyncfg"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 
 	"github.com/stretchr/testify/assert"
@@ -36,7 +37,7 @@ func (s *runSim) run(t *testing.T) {
 
 	var buf bytes.Buffer
 	mgr := New()
-	mgr.api = netdataapi.New(safewriter.New(&buf))
+	mgr.dyncfgApi = dyncfg.NewResponder(netdataapi.New(safewriter.New(&buf)))
 	mgr.Modules = prepareMockRegistry()
 
 	done := make(chan struct{})
