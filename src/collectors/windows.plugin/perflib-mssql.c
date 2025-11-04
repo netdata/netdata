@@ -815,7 +815,7 @@ int netdata_select_db(SQLHDBC hdbc, const char* database)
     SQLRETURN ret;
 
     ret = SQLAllocHandle(SQL_HANDLE_STMT, hdbc, &hstmt);
-    if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
+    if (netdata_mssql_check_result(ret)) {
         return -1;
     }
 
@@ -823,7 +823,7 @@ int netdata_select_db(SQLHDBC hdbc, const char* database)
     snprintfz(query, sizeof(query), "USE %s", database);
     ret = SQLExecDirect(hstmt, (SQLCHAR*)query, SQL_NTS);
     int result = 0;
-    if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
+    if (netdata_mssql_check_result(ret)) {
         result = -1;
     }
     SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
@@ -847,7 +847,7 @@ void dict_mssql_fill_replication(struct mssql_db_instance *mdi)
     }
 
     SQLRETURN ret = SQLExecDirect(mdi->parent->conn->dbReplicationPublisher, (SQLCHAR *)NETDATA_REPLICATION_MONITOR_QUERY, SQL_NTS);
-    if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
+    if (netdata_mssql_check_result(ret)) {
         mdi->collecting_data = false;
         netdata_MSSQL_error(
                 SQL_HANDLE_STMT, mdi->parent->conn->dbReplicationPublisher, NETDATA_MSSQL_ODBC_QUERY, mdi->parent->instanceID);
@@ -856,7 +856,7 @@ void dict_mssql_fill_replication(struct mssql_db_instance *mdi)
 
     ret = SQLBindCol(
             mdi->parent->conn->dbReplicationPublisher, 1, SQL_C_CHAR, publisher_db, sizeof(publisher_db), &publisherdb_len);
-    if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
+    if (netdata_mssql_check_result(ret)) {
         netdata_MSSQL_error(
                 SQL_HANDLE_STMT, mdi->parent->conn->dbReplicationPublisher, NETDATA_MSSQL_ODBC_PREPARE, mdi->parent->instanceID);
         goto endreplication;
@@ -864,62 +864,62 @@ void dict_mssql_fill_replication(struct mssql_db_instance *mdi)
 
     ret = SQLBindCol(
             mdi->parent->conn->dbReplicationPublisher, 2, SQL_C_CHAR, publication, sizeof(publication), &publication_len);
-    if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
+    if (netdata_mssql_check_result(ret)) {
         netdata_MSSQL_error(
                 SQL_HANDLE_STMT, mdi->parent->conn->dbReplicationPublisher, NETDATA_MSSQL_ODBC_PREPARE, mdi->parent->instanceID);
         goto endreplication;
     }
 
     ret = SQLBindCol(mdi->parent->conn->dbReplicationPublisher, 4, SQL_C_LONG, &type, sizeof(type), &type_len);
-    if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
+    if (netdata_mssql_check_result(ret)) {
         netdata_MSSQL_error(
                 SQL_HANDLE_STMT, mdi->parent->conn->dbReplicationPublisher, NETDATA_MSSQL_ODBC_PREPARE, mdi->parent->instanceID);
         goto endreplication;
     }
 
     ret = SQLBindCol(mdi->parent->conn->dbReplicationPublisher, 5, SQL_C_LONG, &status, sizeof(status), &status_len);
-    if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
+    if (netdata_mssql_check_result(ret)) {
         netdata_MSSQL_error(
                 SQL_HANDLE_STMT, mdi->parent->conn->dbReplicationPublisher, NETDATA_MSSQL_ODBC_PREPARE, mdi->parent->instanceID);
         goto endreplication;
     }
 
     ret = SQLBindCol(mdi->parent->conn->dbReplicationPublisher, 6, SQL_C_LONG, &warning, sizeof(warning), &warning_len);
-    if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
+    if (netdata_mssql_check_result(ret)) {
         netdata_MSSQL_error(
                 SQL_HANDLE_STMT, mdi->parent->conn->dbReplicationPublisher, NETDATA_MSSQL_ODBC_PREPARE, mdi->parent->instanceID);
         goto endreplication;
     }
 
     ret = SQLBindCol(mdi->parent->conn->dbReplicationPublisher, 9, SQL_C_LONG, &avg_latency, sizeof(avg_latency), &avg_latency_len);
-    if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
+    if (netdata_mssql_check_result(ret)) {
         // It is still a NULL value
         avg_latency = 0;
     }
 
     ret = SQLBindCol(mdi->parent->conn->dbReplicationPublisher, 11, SQL_C_LONG, &retention, sizeof(retention), &retention_len);
-    if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
+    if (netdata_mssql_check_result(ret)) {
         netdata_MSSQL_error(
                 SQL_HANDLE_STMT, mdi->parent->conn->dbReplicationPublisher, NETDATA_MSSQL_ODBC_PREPARE, mdi->parent->instanceID);
         goto endreplication;
     }
 
     ret = SQLBindCol(mdi->parent->conn->dbReplicationPublisher, 15, SQL_C_LONG, &subscriptioncount, sizeof(subscriptioncount), &subscriptioncount_len);
-    if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
+    if (netdata_mssql_check_result(ret)) {
         netdata_MSSQL_error(
                 SQL_HANDLE_STMT, mdi->parent->conn->dbReplicationPublisher, NETDATA_MSSQL_ODBC_PREPARE, mdi->parent->instanceID);
         goto endreplication;
     }
 
     ret = SQLBindCol(mdi->parent->conn->dbReplicationPublisher, 16, SQL_C_LONG, &runningdistagentcount, sizeof(runningdistagentcount), &runningagentcount_len);
-    if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
+    if (netdata_mssql_check_result(ret)) {
         netdata_MSSQL_error(
                 SQL_HANDLE_STMT, mdi->parent->conn->dbReplicationPublisher, NETDATA_MSSQL_ODBC_PREPARE, mdi->parent->instanceID);
         goto endreplication;
     }
 
     ret = SQLBindCol(mdi->parent->conn->dbReplicationPublisher, 22, SQL_C_LONG, &average_runspeedPerf, sizeof(average_runspeedPerf), &average_runspeedperf_len);
-    if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
+    if (netdata_mssql_check_result(ret)) {
         netdata_MSSQL_error(
                 SQL_HANDLE_STMT, mdi->parent->conn->dbReplicationPublisher, NETDATA_MSSQL_ODBC_PREPARE, mdi->parent->instanceID);
         goto endreplication;
@@ -927,7 +927,7 @@ void dict_mssql_fill_replication(struct mssql_db_instance *mdi)
 
     ret = SQLBindCol(
             mdi->parent->conn->dbReplicationPublisher, 24, SQL_C_CHAR, publisher, sizeof(publisher), &publisher_len);
-    if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
+    if (netdata_mssql_check_result(ret)) {
         netdata_MSSQL_error(
                 SQL_HANDLE_STMT, mdi->parent->conn->dbReplicationPublisher, NETDATA_MSSQL_ODBC_PREPARE, mdi->parent->instanceID);
         goto endreplication;
@@ -1312,7 +1312,7 @@ static bool netdata_MSSQL_initialize_connection(struct netdata_mssql_conn *nmc)
         }
 
         ret = SQLAllocHandle(SQL_HANDLE_STMT, nmc->netdataSQLHDBc, &nmc->dbReplicationPublisher);
-        if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
+        if (netdata_mssql_check_result(ret)) {
             retConn = FALSE;
             goto endMSSQLInitializationConnection;
         }
