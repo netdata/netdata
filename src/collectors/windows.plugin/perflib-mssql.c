@@ -330,7 +330,8 @@ enum netdata_mssql_odbc_errors {
     NETDATA_MSSQL_ODBC_FETCH
 };
 
-static inline int netdata_mssql_check_result(SQLRETURN ret) {
+static inline int netdata_mssql_check_result(SQLRETURN ret)
+{
     return (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO);
 }
 
@@ -809,7 +810,7 @@ endwait:
     return success;
 }
 
-int netdata_select_db(SQLHDBC hdbc, const char* database)
+int netdata_select_db(SQLHDBC hdbc, const char *database)
 {
     SQLHSTMT hstmt;
     SQLRETURN ret;
@@ -821,7 +822,7 @@ int netdata_select_db(SQLHDBC hdbc, const char* database)
 
     char query[512];
     snprintfz(query, sizeof(query), "USE %s", database);
-    ret = SQLExecDirect(hstmt, (SQLCHAR*)query, SQL_NTS);
+    ret = SQLExecDirect(hstmt, (SQLCHAR *)query, SQL_NTS);
     int result = 0;
     if (netdata_mssql_check_result(ret)) {
         result = -1;
@@ -837,99 +838,153 @@ void dict_mssql_fill_replication(struct mssql_db_instance *mdi)
     char publication[NETDATA_MAX_INSTANCE_OBJECT + 1] = {};
     char key[NETDATA_MAX_INSTANCE_OBJECT * 2 + 2];
     int type = 0, status = 0, warning = 0, avg_latency = 0, retention = 0, subscriptioncount = 0,
-            runningdistagentcount = 0, average_runspeedPerf = 0;
-    SQLLEN publisher_len = 0, publisherdb_len = 0, publication_len = 0, type_len = 0, status_len = 0,
-            warning_len = 0, avg_latency_len = 0, retention_len = 0, subscriptioncount_len = 0, runningagentcount_len = 0,
-            average_runspeedperf_len = 0;
+        runningdistagentcount = 0, average_runspeedPerf = 0;
+    SQLLEN publisher_len = 0, publisherdb_len = 0, publication_len = 0, type_len = 0, status_len = 0, warning_len = 0,
+           avg_latency_len = 0, retention_len = 0, subscriptioncount_len = 0, runningagentcount_len = 0,
+           average_runspeedperf_len = 0;
 
     if (netdata_select_db(mdi->parent->conn->netdataSQLHDBc, NETDATA_REPLICATION_DB)) {
         return;
     }
 
-    SQLRETURN ret = SQLExecDirect(mdi->parent->conn->dbReplicationPublisher, (SQLCHAR *)NETDATA_REPLICATION_MONITOR_QUERY, SQL_NTS);
+    SQLRETURN ret =
+        SQLExecDirect(mdi->parent->conn->dbReplicationPublisher, (SQLCHAR *)NETDATA_REPLICATION_MONITOR_QUERY, SQL_NTS);
     if (netdata_mssql_check_result(ret)) {
         mdi->collecting_data = false;
         netdata_MSSQL_error(
-                SQL_HANDLE_STMT, mdi->parent->conn->dbReplicationPublisher, NETDATA_MSSQL_ODBC_QUERY, mdi->parent->instanceID);
+            SQL_HANDLE_STMT,
+            mdi->parent->conn->dbReplicationPublisher,
+            NETDATA_MSSQL_ODBC_QUERY,
+            mdi->parent->instanceID);
         goto endreplication;
     }
 
     ret = SQLBindCol(
-            mdi->parent->conn->dbReplicationPublisher, 1, SQL_C_CHAR, publisher_db, sizeof(publisher_db), &publisherdb_len);
+        mdi->parent->conn->dbReplicationPublisher, 1, SQL_C_CHAR, publisher_db, sizeof(publisher_db), &publisherdb_len);
     if (netdata_mssql_check_result(ret)) {
         netdata_MSSQL_error(
-                SQL_HANDLE_STMT, mdi->parent->conn->dbReplicationPublisher, NETDATA_MSSQL_ODBC_PREPARE, mdi->parent->instanceID);
+            SQL_HANDLE_STMT,
+            mdi->parent->conn->dbReplicationPublisher,
+            NETDATA_MSSQL_ODBC_PREPARE,
+            mdi->parent->instanceID);
         goto endreplication;
     }
 
     ret = SQLBindCol(
-            mdi->parent->conn->dbReplicationPublisher, 2, SQL_C_CHAR, publication, sizeof(publication), &publication_len);
+        mdi->parent->conn->dbReplicationPublisher, 2, SQL_C_CHAR, publication, sizeof(publication), &publication_len);
     if (netdata_mssql_check_result(ret)) {
         netdata_MSSQL_error(
-                SQL_HANDLE_STMT, mdi->parent->conn->dbReplicationPublisher, NETDATA_MSSQL_ODBC_PREPARE, mdi->parent->instanceID);
+            SQL_HANDLE_STMT,
+            mdi->parent->conn->dbReplicationPublisher,
+            NETDATA_MSSQL_ODBC_PREPARE,
+            mdi->parent->instanceID);
         goto endreplication;
     }
 
     ret = SQLBindCol(mdi->parent->conn->dbReplicationPublisher, 4, SQL_C_LONG, &type, sizeof(type), &type_len);
     if (netdata_mssql_check_result(ret)) {
         netdata_MSSQL_error(
-                SQL_HANDLE_STMT, mdi->parent->conn->dbReplicationPublisher, NETDATA_MSSQL_ODBC_PREPARE, mdi->parent->instanceID);
+            SQL_HANDLE_STMT,
+            mdi->parent->conn->dbReplicationPublisher,
+            NETDATA_MSSQL_ODBC_PREPARE,
+            mdi->parent->instanceID);
         goto endreplication;
     }
 
     ret = SQLBindCol(mdi->parent->conn->dbReplicationPublisher, 5, SQL_C_LONG, &status, sizeof(status), &status_len);
     if (netdata_mssql_check_result(ret)) {
         netdata_MSSQL_error(
-                SQL_HANDLE_STMT, mdi->parent->conn->dbReplicationPublisher, NETDATA_MSSQL_ODBC_PREPARE, mdi->parent->instanceID);
+            SQL_HANDLE_STMT,
+            mdi->parent->conn->dbReplicationPublisher,
+            NETDATA_MSSQL_ODBC_PREPARE,
+            mdi->parent->instanceID);
         goto endreplication;
     }
 
     ret = SQLBindCol(mdi->parent->conn->dbReplicationPublisher, 6, SQL_C_LONG, &warning, sizeof(warning), &warning_len);
     if (netdata_mssql_check_result(ret)) {
         netdata_MSSQL_error(
-                SQL_HANDLE_STMT, mdi->parent->conn->dbReplicationPublisher, NETDATA_MSSQL_ODBC_PREPARE, mdi->parent->instanceID);
+            SQL_HANDLE_STMT,
+            mdi->parent->conn->dbReplicationPublisher,
+            NETDATA_MSSQL_ODBC_PREPARE,
+            mdi->parent->instanceID);
         goto endreplication;
     }
 
-    ret = SQLBindCol(mdi->parent->conn->dbReplicationPublisher, 9, SQL_C_LONG, &avg_latency, sizeof(avg_latency), &avg_latency_len);
+    ret = SQLBindCol(
+        mdi->parent->conn->dbReplicationPublisher, 9, SQL_C_LONG, &avg_latency, sizeof(avg_latency), &avg_latency_len);
     if (netdata_mssql_check_result(ret)) {
         // It is still a NULL value
         avg_latency = 0;
     }
 
-    ret = SQLBindCol(mdi->parent->conn->dbReplicationPublisher, 11, SQL_C_LONG, &retention, sizeof(retention), &retention_len);
+    ret = SQLBindCol(
+        mdi->parent->conn->dbReplicationPublisher, 11, SQL_C_LONG, &retention, sizeof(retention), &retention_len);
     if (netdata_mssql_check_result(ret)) {
         netdata_MSSQL_error(
-                SQL_HANDLE_STMT, mdi->parent->conn->dbReplicationPublisher, NETDATA_MSSQL_ODBC_PREPARE, mdi->parent->instanceID);
-        goto endreplication;
-    }
-
-    ret = SQLBindCol(mdi->parent->conn->dbReplicationPublisher, 15, SQL_C_LONG, &subscriptioncount, sizeof(subscriptioncount), &subscriptioncount_len);
-    if (netdata_mssql_check_result(ret)) {
-        netdata_MSSQL_error(
-                SQL_HANDLE_STMT, mdi->parent->conn->dbReplicationPublisher, NETDATA_MSSQL_ODBC_PREPARE, mdi->parent->instanceID);
-        goto endreplication;
-    }
-
-    ret = SQLBindCol(mdi->parent->conn->dbReplicationPublisher, 16, SQL_C_LONG, &runningdistagentcount, sizeof(runningdistagentcount), &runningagentcount_len);
-    if (netdata_mssql_check_result(ret)) {
-        netdata_MSSQL_error(
-                SQL_HANDLE_STMT, mdi->parent->conn->dbReplicationPublisher, NETDATA_MSSQL_ODBC_PREPARE, mdi->parent->instanceID);
-        goto endreplication;
-    }
-
-    ret = SQLBindCol(mdi->parent->conn->dbReplicationPublisher, 22, SQL_C_LONG, &average_runspeedPerf, sizeof(average_runspeedPerf), &average_runspeedperf_len);
-    if (netdata_mssql_check_result(ret)) {
-        netdata_MSSQL_error(
-                SQL_HANDLE_STMT, mdi->parent->conn->dbReplicationPublisher, NETDATA_MSSQL_ODBC_PREPARE, mdi->parent->instanceID);
+            SQL_HANDLE_STMT,
+            mdi->parent->conn->dbReplicationPublisher,
+            NETDATA_MSSQL_ODBC_PREPARE,
+            mdi->parent->instanceID);
         goto endreplication;
     }
 
     ret = SQLBindCol(
-            mdi->parent->conn->dbReplicationPublisher, 24, SQL_C_CHAR, publisher, sizeof(publisher), &publisher_len);
+        mdi->parent->conn->dbReplicationPublisher,
+        15,
+        SQL_C_LONG,
+        &subscriptioncount,
+        sizeof(subscriptioncount),
+        &subscriptioncount_len);
     if (netdata_mssql_check_result(ret)) {
         netdata_MSSQL_error(
-                SQL_HANDLE_STMT, mdi->parent->conn->dbReplicationPublisher, NETDATA_MSSQL_ODBC_PREPARE, mdi->parent->instanceID);
+            SQL_HANDLE_STMT,
+            mdi->parent->conn->dbReplicationPublisher,
+            NETDATA_MSSQL_ODBC_PREPARE,
+            mdi->parent->instanceID);
+        goto endreplication;
+    }
+
+    ret = SQLBindCol(
+        mdi->parent->conn->dbReplicationPublisher,
+        16,
+        SQL_C_LONG,
+        &runningdistagentcount,
+        sizeof(runningdistagentcount),
+        &runningagentcount_len);
+    if (netdata_mssql_check_result(ret)) {
+        netdata_MSSQL_error(
+            SQL_HANDLE_STMT,
+            mdi->parent->conn->dbReplicationPublisher,
+            NETDATA_MSSQL_ODBC_PREPARE,
+            mdi->parent->instanceID);
+        goto endreplication;
+    }
+
+    ret = SQLBindCol(
+        mdi->parent->conn->dbReplicationPublisher,
+        22,
+        SQL_C_LONG,
+        &average_runspeedPerf,
+        sizeof(average_runspeedPerf),
+        &average_runspeedperf_len);
+    if (netdata_mssql_check_result(ret)) {
+        netdata_MSSQL_error(
+            SQL_HANDLE_STMT,
+            mdi->parent->conn->dbReplicationPublisher,
+            NETDATA_MSSQL_ODBC_PREPARE,
+            mdi->parent->instanceID);
+        goto endreplication;
+    }
+
+    ret = SQLBindCol(
+        mdi->parent->conn->dbReplicationPublisher, 24, SQL_C_CHAR, publisher, sizeof(publisher), &publisher_len);
+    if (netdata_mssql_check_result(ret)) {
+        netdata_MSSQL_error(
+            SQL_HANDLE_STMT,
+            mdi->parent->conn->dbReplicationPublisher,
+            NETDATA_MSSQL_ODBC_PREPARE,
+            mdi->parent->instanceID);
         goto endreplication;
     }
 
@@ -946,7 +1001,7 @@ void dict_mssql_fill_replication(struct mssql_db_instance *mdi)
 
         snprintfz(key, sizeof(key) - 1, "%s:%s", publisher_db, publication);
         struct mssql_publisher_publication *mpp =
-                dictionary_set(mdi->parent->publisher_publication, key, NULL, sizeof(*mpp));
+            dictionary_set(mdi->parent->publisher_publication, key, NULL, sizeof(*mpp));
 
         if (!mpp->publisher) {
             mpp->publisher = strdupz(publisher);
@@ -1193,7 +1248,7 @@ void metdata_mssql_fill_dictionary_from_db(struct mssql_instance *mi)
             mdi->parent = mi;
         }
 
-        if (mi->conn || !strncmp(dbname, NETDATA_REPLICATION_DB, sizeof(NETDATA_REPLICATION_DB)- 1)) {
+        if (mi->conn || !strncmp(dbname, NETDATA_REPLICATION_DB, sizeof(NETDATA_REPLICATION_DB) - 1)) {
             mdi->running_replication = true;
         }
 
@@ -1590,7 +1645,9 @@ void dict_mssql_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *valu
 
     if (!mi->publisher_publication) {
         mi->publisher_publication = dictionary_create_advanced(
-                DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct mssql_publisher_publication));
+            DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
+            NULL,
+            sizeof(struct mssql_publisher_publication));
         dictionary_register_insert_callback(mi->publisher_publication, dict_mssql_insert_replication_cb, NULL);
     }
 
@@ -2629,39 +2686,54 @@ void dict_mssql_replication_status(struct mssql_publisher_publication *mpp, int 
     if (!mpp->st_publisher_status) {
         char id[RRD_ID_LENGTH_MAX + 1];
 
-        snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_replication_%s_%s_status", mpp->parent->instanceID, mpp->publication, mpp->db);
+        snprintfz(
+            id,
+            RRD_ID_LENGTH_MAX,
+            "instance_%s_replication_%s_%s_status",
+            mpp->parent->instanceID,
+            mpp->publication,
+            mpp->db);
         netdata_fix_chart_name(id);
         mpp->st_publisher_status = rrdset_create_localhost(
-                "mssql",
-                id,
-                NULL,
-                "replication",
-                "mssql.replication_status",
-                "Current replication status",
-                "status",
-                PLUGIN_WINDOWS_NAME,
-                "PerflibMSSQL",
-                PRIO_MSSQL_REPLICATION_STATUS,
-                update_every,
-                RRDSET_TYPE_LINE);
+            "mssql",
+            id,
+            NULL,
+            "replication",
+            "mssql.replication_status",
+            "Current replication status",
+            "status",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibMSSQL",
+            PRIO_MSSQL_REPLICATION_STATUS,
+            update_every,
+            RRDSET_TYPE_LINE);
 
-        rrdlabels_add(mpp->st_publisher_status->rrdlabels, "mssql_instance", mpp->parent->instanceID, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(
+            mpp->st_publisher_status->rrdlabels, "mssql_instance", mpp->parent->instanceID, RRDLABEL_SRC_AUTO);
         rrdlabels_add(mpp->st_publisher_status->rrdlabels, "publisher", mpp->publisher, RRDLABEL_SRC_AUTO);
         rrdlabels_add(mpp->st_publisher_status->rrdlabels, "database", mpp->db, RRDLABEL_SRC_AUTO);
         rrdlabels_add(mpp->st_publisher_status->rrdlabels, "publication", mpp->publication, RRDLABEL_SRC_AUTO);
 
-        mpp->rd_publisher_status_started = rrddim_add(mpp->st_publisher_status, "started", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-        mpp->rd_publisher_status_successed = rrddim_add(mpp->st_publisher_status, "successed", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-        mpp->rd_publisher_status_in_progress = rrddim_add(mpp->st_publisher_status, "in_progress", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-        mpp->rd_publisher_status_idle = rrddim_add(mpp->st_publisher_status, "idle", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-        mpp->rd_publisher_status_retrying = rrddim_add(mpp->st_publisher_status, "retrying", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-        mpp->rd_publisher_status_failed = rrddim_add(mpp->st_publisher_status, "failed", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        mpp->rd_publisher_status_started =
+            rrddim_add(mpp->st_publisher_status, "started", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        mpp->rd_publisher_status_successed =
+            rrddim_add(mpp->st_publisher_status, "successed", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        mpp->rd_publisher_status_in_progress =
+            rrddim_add(mpp->st_publisher_status, "in_progress", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        mpp->rd_publisher_status_idle =
+            rrddim_add(mpp->st_publisher_status, "idle", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        mpp->rd_publisher_status_retrying =
+            rrddim_add(mpp->st_publisher_status, "retrying", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        mpp->rd_publisher_status_failed =
+            rrddim_add(mpp->st_publisher_status, "failed", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
 
     int status = mpp->status;
     rrddim_set_by_pointer(mpp->st_publisher_status, mpp->rd_publisher_status_started, (collected_number)(status == 1));
-    rrddim_set_by_pointer(mpp->st_publisher_status, mpp->rd_publisher_status_successed, (collected_number)(status == 2));
-    rrddim_set_by_pointer(mpp->st_publisher_status, mpp->rd_publisher_status_in_progress, (collected_number)(status == 3));
+    rrddim_set_by_pointer(
+        mpp->st_publisher_status, mpp->rd_publisher_status_successed, (collected_number)(status == 2));
+    rrddim_set_by_pointer(
+        mpp->st_publisher_status, mpp->rd_publisher_status_in_progress, (collected_number)(status == 3));
     rrddim_set_by_pointer(mpp->st_publisher_status, mpp->rd_publisher_status_idle, (collected_number)(status == 4));
     rrddim_set_by_pointer(mpp->st_publisher_status, mpp->rd_publisher_status_retrying, (collected_number)(status == 5));
     rrddim_set_by_pointer(mpp->st_publisher_status, mpp->rd_publisher_status_failed, (collected_number)(status == 6));
@@ -2673,21 +2745,27 @@ void dict_mssql_replication_warning(struct mssql_publisher_publication *mpp, int
     if (!mpp->st_warning) {
         char id[RRD_ID_LENGTH_MAX + 1];
 
-        snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_replication_%s_%s_warning", mpp->parent->instanceID, mpp->publication, mpp->db);
+        snprintfz(
+            id,
+            RRD_ID_LENGTH_MAX,
+            "instance_%s_replication_%s_%s_warning",
+            mpp->parent->instanceID,
+            mpp->publication,
+            mpp->db);
         netdata_fix_chart_name(id);
         mpp->st_warning = rrdset_create_localhost(
-                "mssql",
-                id,
-                NULL,
-                "replication",
-                "mssql.replication_warning",
-                "Maximum threshold warning.",
-                "status",
-                PLUGIN_WINDOWS_NAME,
-                "PerflibMSSQL",
-                PRIO_MSSQL_REPLICATION_WARNING,
-                update_every,
-                RRDSET_TYPE_LINE);
+            "mssql",
+            id,
+            NULL,
+            "replication",
+            "mssql.replication_warning",
+            "Maximum threshold warning.",
+            "status",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibMSSQL",
+            PRIO_MSSQL_REPLICATION_WARNING,
+            update_every,
+            RRDSET_TYPE_LINE);
 
         rrdlabels_add(mpp->st_warning->rrdlabels, "mssql_instance", mpp->parent->instanceID, RRDLABEL_SRC_AUTO);
         rrdlabels_add(mpp->st_warning->rrdlabels, "publisher", mpp->publisher, RRDLABEL_SRC_AUTO);
@@ -2696,21 +2774,43 @@ void dict_mssql_replication_warning(struct mssql_publisher_publication *mpp, int
 
         mpp->rd_warning_expiration = rrddim_add(mpp->st_warning, "expiration", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         mpp->rd_warning_latency = rrddim_add(mpp->st_warning, "latency", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-        mpp->rd_warning_mergeeexpiration = rrddim_add(mpp->st_warning, "merge expiration", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-        mpp->rd_warning_mergefastduration = rrddim_add(mpp->st_warning, "fast duration", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-        mpp->rd_warning_mergelowduration = rrddim_add(mpp->st_warning, "low duration", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-        mpp->rd_warning_mergefastrunspeed = rrddim_add(mpp->st_warning, "fast run speed", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-        mpp->rd_warning_mergelowrunspeed = rrddim_add(mpp->st_warning, "low run speed", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        mpp->rd_warning_mergeeexpiration =
+            rrddim_add(mpp->st_warning, "merge expiration", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        mpp->rd_warning_mergefastduration =
+            rrddim_add(mpp->st_warning, "fast duration", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        mpp->rd_warning_mergelowduration =
+            rrddim_add(mpp->st_warning, "low duration", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        mpp->rd_warning_mergefastrunspeed =
+            rrddim_add(mpp->st_warning, "fast run speed", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        mpp->rd_warning_mergelowrunspeed =
+            rrddim_add(mpp->st_warning, "low run speed", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
 
     int warning = mpp->warning;
-    rrddim_set_by_pointer(mpp->st_warning, mpp->rd_warning_expiration, (collected_number)(warning & MSSQL_REPLICATON_EXPIRATION));
-    rrddim_set_by_pointer(mpp->st_warning, mpp->rd_warning_latency, (collected_number)(warning & MSSQL_REPLICATON_LATENCY));
-    rrddim_set_by_pointer(mpp->st_warning, mpp->rd_warning_mergeeexpiration, (collected_number)(warning & MSSQL_REPLICATON_MERGEEXPIRATION));
-    rrddim_set_by_pointer(mpp->st_warning, mpp->rd_warning_mergefastduration, (collected_number)(warning & MSSQL_REPLICATON_MERGEFASTDURATION));
-    rrddim_set_by_pointer(mpp->st_warning, mpp->rd_warning_mergelowduration, (collected_number)(warning & MSSQL_REPLICATON_MERGELOWDURATION));
-    rrddim_set_by_pointer(mpp->st_warning, mpp->rd_warning_mergefastrunspeed, (collected_number)(warning & MSSQL_REPLICATON_MERGEFASTRUNSPEED));
-    rrddim_set_by_pointer(mpp->st_warning, mpp->rd_warning_mergelowrunspeed, (collected_number)(warning & MSSQL_REPLICATON_MERGELOWRUNSPEED));
+    rrddim_set_by_pointer(
+        mpp->st_warning, mpp->rd_warning_expiration, (collected_number)(warning & MSSQL_REPLICATON_EXPIRATION));
+    rrddim_set_by_pointer(
+        mpp->st_warning, mpp->rd_warning_latency, (collected_number)(warning & MSSQL_REPLICATON_LATENCY));
+    rrddim_set_by_pointer(
+        mpp->st_warning,
+        mpp->rd_warning_mergeeexpiration,
+        (collected_number)(warning & MSSQL_REPLICATON_MERGEEXPIRATION));
+    rrddim_set_by_pointer(
+        mpp->st_warning,
+        mpp->rd_warning_mergefastduration,
+        (collected_number)(warning & MSSQL_REPLICATON_MERGEFASTDURATION));
+    rrddim_set_by_pointer(
+        mpp->st_warning,
+        mpp->rd_warning_mergelowduration,
+        (collected_number)(warning & MSSQL_REPLICATON_MERGELOWDURATION));
+    rrddim_set_by_pointer(
+        mpp->st_warning,
+        mpp->rd_warning_mergefastrunspeed,
+        (collected_number)(warning & MSSQL_REPLICATON_MERGEFASTRUNSPEED));
+    rrddim_set_by_pointer(
+        mpp->st_warning,
+        mpp->rd_warning_mergelowrunspeed,
+        (collected_number)(warning & MSSQL_REPLICATON_MERGELOWRUNSPEED));
     rrdset_done(mpp->st_warning);
 }
 
@@ -2719,21 +2819,27 @@ void dict_mssql_replication_avg_latency(struct mssql_publisher_publication *mpp,
     if (!mpp->st_avg_latency) {
         char id[RRD_ID_LENGTH_MAX + 1];
 
-        snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_replication_%s_%s_avg_latency", mpp->parent->instanceID, mpp->publication, mpp->db);
+        snprintfz(
+            id,
+            RRD_ID_LENGTH_MAX,
+            "instance_%s_replication_%s_%s_avg_latency",
+            mpp->parent->instanceID,
+            mpp->publication,
+            mpp->db);
         netdata_fix_chart_name(id);
         mpp->st_avg_latency = rrdset_create_localhost(
-                "mssql",
-                id,
-                NULL,
-                "replication",
-                "mssql.replication_avg_latency",
-                "Average latency for a transactional publication.",
-                "seconds",
-                PLUGIN_WINDOWS_NAME,
-                "PerflibMSSQL",
-                PRIO_MSSQL_REPLICATION_AVG_LATENCY,
-                update_every,
-                RRDSET_TYPE_LINE);
+            "mssql",
+            id,
+            NULL,
+            "replication",
+            "mssql.replication_avg_latency",
+            "Average latency for a transactional publication.",
+            "seconds",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibMSSQL",
+            PRIO_MSSQL_REPLICATION_AVG_LATENCY,
+            update_every,
+            RRDSET_TYPE_LINE);
 
         rrdlabels_add(mpp->st_avg_latency->rrdlabels, "mssql_instance", mpp->parent->instanceID, RRDLABEL_SRC_AUTO);
         rrdlabels_add(mpp->st_avg_latency->rrdlabels, "publisher", mpp->publisher, RRDLABEL_SRC_AUTO);
@@ -2752,31 +2858,40 @@ void dict_mssql_replication_subscription(struct mssql_publisher_publication *mpp
     if (!mpp->st_subscription_count) {
         char id[RRD_ID_LENGTH_MAX + 1];
 
-        snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_replication_%s_%s_subscription", mpp->parent->instanceID, mpp->publication, mpp->db);
+        snprintfz(
+            id,
+            RRD_ID_LENGTH_MAX,
+            "instance_%s_replication_%s_%s_subscription",
+            mpp->parent->instanceID,
+            mpp->publication,
+            mpp->db);
         netdata_fix_chart_name(id);
         mpp->st_subscription_count = rrdset_create_localhost(
-                "mssql",
-                id,
-                NULL,
-                "replication",
-                "mssql.replication_subscription",
-                "Number of subscriptions to a publication.",
-                "subscription",
-                PLUGIN_WINDOWS_NAME,
-                "PerflibMSSQL",
-                PRIO_MSSQL_REPLICATION_SUBSCRIPTION_COUNT,
-                update_every,
-                RRDSET_TYPE_LINE);
+            "mssql",
+            id,
+            NULL,
+            "replication",
+            "mssql.replication_subscription",
+            "Number of subscriptions to a publication.",
+            "subscription",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibMSSQL",
+            PRIO_MSSQL_REPLICATION_SUBSCRIPTION_COUNT,
+            update_every,
+            RRDSET_TYPE_LINE);
 
-        rrdlabels_add(mpp->st_subscription_count->rrdlabels, "mssql_instance", mpp->parent->instanceID, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(
+            mpp->st_subscription_count->rrdlabels, "mssql_instance", mpp->parent->instanceID, RRDLABEL_SRC_AUTO);
         rrdlabels_add(mpp->st_subscription_count->rrdlabels, "publisher", mpp->publisher, RRDLABEL_SRC_AUTO);
         rrdlabels_add(mpp->st_subscription_count->rrdlabels, "database", mpp->db, RRDLABEL_SRC_AUTO);
         rrdlabels_add(mpp->st_subscription_count->rrdlabels, "publication", mpp->publication, RRDLABEL_SRC_AUTO);
 
-        mpp->rd_subscription_count = rrddim_add(mpp->st_subscription_count, "subscription", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        mpp->rd_subscription_count =
+            rrddim_add(mpp->st_subscription_count, "subscription", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
 
-    rrddim_set_by_pointer(mpp->st_subscription_count, mpp->rd_subscription_count, (collected_number)mpp->subscriptioncount);
+    rrddim_set_by_pointer(
+        mpp->st_subscription_count, mpp->rd_subscription_count, (collected_number)mpp->subscriptioncount);
     rrdset_done(mpp->st_subscription_count);
 }
 
@@ -2785,21 +2900,27 @@ void dict_mssql_replication_dist_agent_running(struct mssql_publisher_publicatio
     if (!mpp->st_running_agent) {
         char id[RRD_ID_LENGTH_MAX + 1];
 
-        snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_replication_%s_%s_agent_running", mpp->parent->instanceID, mpp->publication, mpp->db);
+        snprintfz(
+            id,
+            RRD_ID_LENGTH_MAX,
+            "instance_%s_replication_%s_%s_agent_running",
+            mpp->parent->instanceID,
+            mpp->publication,
+            mpp->db);
         netdata_fix_chart_name(id);
         mpp->st_running_agent = rrdset_create_localhost(
-                "mssql",
-                id,
-                NULL,
-                "replication",
-                "mssql.replication_agent_running",
-                "Distribution agents running.",
-                "agents",
-                PLUGIN_WINDOWS_NAME,
-                "PerflibMSSQL",
-                PRIO_MSSQL_REPLICATION_AGENT_RUNNING,
-                update_every,
-                RRDSET_TYPE_LINE);
+            "mssql",
+            id,
+            NULL,
+            "replication",
+            "mssql.replication_agent_running",
+            "Distribution agents running.",
+            "agents",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibMSSQL",
+            PRIO_MSSQL_REPLICATION_AGENT_RUNNING,
+            update_every,
+            RRDSET_TYPE_LINE);
 
         rrdlabels_add(mpp->st_running_agent->rrdlabels, "mssql_instance", mpp->parent->instanceID, RRDLABEL_SRC_AUTO);
         rrdlabels_add(mpp->st_running_agent->rrdlabels, "publisher", mpp->publisher, RRDLABEL_SRC_AUTO);
@@ -2818,35 +2939,45 @@ void dict_mssql_replication_sync_time(struct mssql_publisher_publication *mpp, i
     if (!mpp->st_synchronization_time) {
         char id[RRD_ID_LENGTH_MAX + 1];
 
-        snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_replication_%s_%s_synchronization", mpp->parent->instanceID, mpp->publication, mpp->db);
+        snprintfz(
+            id,
+            RRD_ID_LENGTH_MAX,
+            "instance_%s_replication_%s_%s_synchronization",
+            mpp->parent->instanceID,
+            mpp->publication,
+            mpp->db);
         netdata_fix_chart_name(id);
         mpp->st_synchronization_time = rrdset_create_localhost(
-                "mssql",
-                id,
-                NULL,
-                "replication",
-                "mssql.replication_synchronization",
-                "The shortest synchronization.",
-                "seconds",
-                PLUGIN_WINDOWS_NAME,
-                "PerflibMSSQL",
-                PRIO_MSSQL_REPLICATION_SYNC_TIME,
-                update_every,
-                RRDSET_TYPE_LINE);
+            "mssql",
+            id,
+            NULL,
+            "replication",
+            "mssql.replication_synchronization",
+            "The shortest synchronization.",
+            "seconds",
+            PLUGIN_WINDOWS_NAME,
+            "PerflibMSSQL",
+            PRIO_MSSQL_REPLICATION_SYNC_TIME,
+            update_every,
+            RRDSET_TYPE_LINE);
 
-        rrdlabels_add(mpp->st_synchronization_time->rrdlabels, "mssql_instance", mpp->parent->instanceID, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(
+            mpp->st_synchronization_time->rrdlabels, "mssql_instance", mpp->parent->instanceID, RRDLABEL_SRC_AUTO);
         rrdlabels_add(mpp->st_synchronization_time->rrdlabels, "publisher", mpp->publisher, RRDLABEL_SRC_AUTO);
         rrdlabels_add(mpp->st_synchronization_time->rrdlabels, "database", mpp->db, RRDLABEL_SRC_AUTO);
         rrdlabels_add(mpp->st_synchronization_time->rrdlabels, "publication", mpp->publication, RRDLABEL_SRC_AUTO);
 
-        mpp->rd_synchronization_time = rrddim_add(mpp->st_synchronization_time, "seconds", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+        mpp->rd_synchronization_time =
+            rrddim_add(mpp->st_synchronization_time, "seconds", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
 
-    rrddim_set_by_pointer(mpp->st_synchronization_time, mpp->rd_synchronization_time, (collected_number)mpp->runningdistagentcount);
+    rrddim_set_by_pointer(
+        mpp->st_synchronization_time, mpp->rd_synchronization_time, (collected_number)mpp->runningdistagentcount);
     rrdset_done(mpp->st_synchronization_time);
 }
 
-int dict_mssql_replication_chart_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
+int dict_mssql_replication_chart_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
+{
     struct mssql_publisher_publication *mpp = value;
     int *update_every = data;
 
