@@ -96,7 +96,7 @@
 ## 2025-11-04 Immediate Tasks
 - [x] Add Phase 1 harness scenario that caps a test provider at 1000 tokens, runs two tool calls (first succeeds with ~600 tokens, second overflows and is dropped), and asserts the resulting transcript shows the first tool output verbatim while the second is replaced by the drop stub. This must reproduce the current guard failure.
 - [x] Restore the exact counter update that previously lived at `src/ai-agent.ts` (tool success path): after every successful tool execution—including the branch where `managed.tokens` is defined—execute `this.newCtxTokens += toolTokens;` before logging/accounting so the reservation affects guard projections. Re-run the harness scenario to confirm it now passes.
-- [ ] Investigate and document the original double-count path that prompted the removal, ensuring we identify and cover the alternative accumulation that would resurrect double-counting once the counter update returns.
+- [x] Investigate and document the original double-count path that prompted the removal, ensuring we identify and cover the alternative accumulation that would resurrect double-counting once the counter update returns. (_Finding: commit e69cbeb incremented `pendingCtxTokens` inside `reserveToolOutput`, so each tool reservation was counted once on reservation and again when `newCtxTokens` flushed. Current tree omits that increment; coverage now guards the contract._)
 
 ## Counter Contract
 - `currentCtxTokens`: set after every LLM response to the model-reported token usage (`input + output + cacheRead`). Reflects the committed conversation history through the last turn.

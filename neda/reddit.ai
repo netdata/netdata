@@ -10,8 +10,6 @@ models:
 #  - openrouter/openai/gpt-oss-20b
 tools:
   - reddit
-  - jina
-  - brave
 agents: []
 llmTimeout: 120000
 toolTimeout: 60000
@@ -22,8 +20,8 @@ topP: 1
 maxOutputTokens: 4096
 repeatPenalty: 1.2
 maxRetries: 3
-maxToolTurns: 50
-maxToolCallsPerTurn: 100
+maxToolTurns: 10
+maxToolCallsPerTurn: 10
 parallelToolCalls: true
 ---
 
@@ -43,7 +41,7 @@ You goal is to search reddit for what the user asks.
 
 ## Failure Report
 If you cannot find any relevant comments, or your cannot comply with the request, you MUST provide a failure report.
-Failure reports MUST start with "FAILURE REPORT".
+Failure reports MUST start with "FAILURE REPORT" and you must explain the reasons of failure.
 
 ---
 
