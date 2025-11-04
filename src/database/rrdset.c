@@ -54,7 +54,7 @@ time_t rrdset_first_entry_s(RRDSET *st) {
 }
 
 time_t rrdset_first_entry_s_of_tier(RRDSET *st, size_t tier) {
-    if(unlikely(tier > nd_profile.storage_tiers))
+    if(unlikely(tier >= nd_profile.storage_tiers))
         return 0;
 
     RRDDIM *rd;
