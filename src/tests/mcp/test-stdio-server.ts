@@ -35,6 +35,7 @@ server.registerTool(
 );
 
 const longPayload = '#'.repeat(1024);
+const guardOverflowPayload = '@'.repeat(2000);
 
 server.server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
   const { name, arguments: rawArgs } = request.params;
@@ -56,6 +57,14 @@ server.server.setRequestHandler(CallToolRequestSchema, async (request, extra) =>
       return {
         content: [
           { type: 'text', text: longPayload },
+        ],
+      };
+    }
+
+    if (payload === 'context-guard-600') {
+      return {
+        content: [
+          { type: 'text', text: guardOverflowPayload },
         ],
       };
     }

@@ -85,6 +85,7 @@ const STATUS_FAILURE = 'failure' as const;
 const TOOL_REQUEST_TEXT = 'Requesting test to gather information.';
 const TOOL_ARGUMENT_SUCCESS = 'phase-1-tool-success';
 const TOOL_ARGUMENT_LONG_OUTPUT = 'long-output';
+const TOOL_ARGUMENT_CONTEXT_OVERFLOW = 'context-guard-600';
 const CONCURRENCY_TIMEOUT_ARGUMENT = 'trigger-timeout';
 const CONCURRENCY_SECOND_ARGUMENT = 'concurrency-second';
 const BATCH_INVALID_INPUT_ARGUMENT = 'batch-missing-id';
@@ -3755,6 +3756,347 @@ const SCENARIOS: ScenarioDefinition[] = [
             inputTokens: 82,
             outputTokens: 26,
             totalTokens: 108,
+          },
+        },
+      },
+    ],
+  },
+  {
+    id: 'context_guard__schema_tokens_only',
+    description: 'Context guard forces final turn based solely on schema tokens.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        expectedTools: ['agent__final_report'],
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Schema-only overflow resolved by proceeding directly to final report.',
+          reportContent: `${RESULT_HEADING}Final answer produced after schema guard enforcement.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_SUCCESS,
+          tokenUsage: {
+            inputTokens: 60,
+            outputTokens: 24,
+            totalTokens: 84,
+          },
+        },
+      },
+    ],
+  },
+  {
+    id: 'context_guard__llm_metrics_logging',
+    description: 'LLM request logs expose ctx/new/schema expected metrics before final turn.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        response: {
+          kind: 'tool-call',
+          assistantText: 'Gathering data prior to final report for metrics inspection.',
+          toolCalls: [
+            {
+              toolName: TOOL_NAME,
+              callId: 'call-cg-llm-metrics',
+              assistantText: 'Fetching summary payload for metrics coverage.',
+              arguments: {
+                text: TOOL_ARGUMENT_SUCCESS,
+              },
+            },
+          ],
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+          finishReason: TOOL_FINISH_REASON,
+        },
+      },
+      {
+        turn: 2,
+        expectedTools: ['agent__final_report'],
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Returning final report after verifying context metrics.',
+          reportContent: `${RESULT_HEADING}Context metrics telemetry validated successfully.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_SUCCESS,
+          tokenUsage: {
+            inputTokens: 86,
+            outputTokens: 26,
+            totalTokens: 112,
+          },
+        },
+      },
+    ],
+  },
+  {
+    id: 'context_guard__forced_final_turn_flow',
+    description: 'Context guard enforces a forced final turn after trimming cannot restore headroom.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        response: {
+          kind: 'tool-call',
+          assistantText: 'Collecting extensive data before forced final turn.',
+          toolCalls: [
+            {
+              toolName: TOOL_NAME,
+              callId: 'call-cg-forced-final',
+              assistantText: 'Aggregating oversized payload that risks the context budget.',
+              arguments: {
+                text: TOOL_ARGUMENT_LONG_OUTPUT,
+              },
+            },
+          ],
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+          finishReason: TOOL_FINISH_REASON,
+        },
+      },
+      {
+        turn: 2,
+        expectedTools: ['agent__final_report'],
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Forced final turn executed after guard intervention.',
+          reportContent: `${RESULT_HEADING}Final answer provided after the context guard forced a concluding turn.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_SUCCESS,
+          tokenUsage: {
+            inputTokens: 82,
+            outputTokens: 26,
+            totalTokens: 108,
+          },
+        },
+      },
+    ],
+  },
+  {
+    id: 'context_guard__multi_target_provider_selection',
+    description: 'Context guard skips primary provider and succeeds with secondary.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        response: {
+          kind: 'tool-call',
+          assistantText: 'Primary provider lacks budget; attempting tool call.',
+          toolCalls: [
+            {
+              toolName: TOOL_NAME,
+              callId: 'call-cg-multi-provider',
+              assistantText: 'Requesting expansive payload to test fallback.',
+              arguments: {
+                text: TOOL_ARGUMENT_LONG_OUTPUT,
+              },
+            },
+          ],
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+          finishReason: TOOL_FINISH_REASON,
+        },
+      },
+      {
+        turn: 2,
+        expectedTools: ['agent__final_report'],
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Fallback provider completed final report after guard intervention.',
+          reportContent: `${RESULT_HEADING}Final answer delivered using secondary provider once guard skipped the primary target.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_SUCCESS,
+          tokenUsage: {
+            inputTokens: 88,
+            outputTokens: 28,
+            totalTokens: 116,
+          },
+        },
+      },
+    ],
+  },
+  {
+    id: 'context_guard__tool_success_tokens_once',
+    description: 'Two successful tool outputs in one turn should contribute tokens exactly once.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        response: {
+          kind: 'tool-call',
+          assistantText: 'Gathering multiple datapoints before concluding.',
+          toolCalls: [
+            {
+              toolName: TOOL_NAME,
+              callId: 'call-context-double-success-1',
+              assistantText: 'Collecting first datapoint.',
+              arguments: {
+                text: TOOL_ARGUMENT_SUCCESS,
+              },
+            },
+            {
+              toolName: TOOL_NAME,
+              callId: 'call-context-double-success-2',
+              assistantText: 'Collecting second datapoint.',
+              arguments: {
+                text: `${TOOL_ARGUMENT_SUCCESS}-secondary`,
+              },
+            },
+          ],
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+          finishReason: TOOL_FINISH_REASON,
+        },
+      },
+      {
+        turn: 2,
+        expectedTools: ['agent__final_report'],
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Reporting combined findings from both tool outputs.',
+          reportContent: `${RESULT_HEADING}Aggregated the two tool responses without double counting tokens.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_SUCCESS,
+          tokenUsage: {
+            inputTokens: 84,
+            outputTokens: 28,
+            totalTokens: 112,
+          },
+        },
+      },
+    ],
+  },
+  {
+    id: 'context_guard__tool_drop_after_success',
+    description: 'Second heavy tool output must be dropped once the first reservation consumes the budget.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        response: {
+          kind: 'tool-call',
+          assistantText: 'Requesting two heavy tool outputs to exercise the context guard.',
+          toolCalls: [
+            {
+              toolName: TOOL_NAME,
+              callId: 'call-guard-drop-first',
+              assistantText: 'Issuing first heavy payload.',
+              arguments: {
+                text: TOOL_ARGUMENT_CONTEXT_OVERFLOW,
+              },
+            },
+            {
+              toolName: TOOL_NAME,
+              callId: 'call-guard-drop-second',
+              assistantText: 'Issuing second heavy payload.',
+              arguments: {
+                text: TOOL_ARGUMENT_CONTEXT_OVERFLOW,
+              },
+            },
+          ],
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+          finishReason: TOOL_FINISH_REASON,
+        },
+      },
+      {
+        turn: 2,
+        expectedTools: ['agent__final_report'],
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Final report after context guard drop enforcement.',
+          reportContent: `${RESULT_HEADING}Second heavy tool output dropped after guard enforcement.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_SUCCESS,
+          tokenUsage: {
+            inputTokens: 90,
+            outputTokens: 28,
+            totalTokens: 118,
+          },
+        },
+      },
+    ],
+  },
+  {
+    id: 'context_guard__tool_overflow_drop',
+    description: 'Oversized tool output is dropped and replaced with a failure stub.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        response: {
+          kind: 'tool-call',
+          assistantText: 'Requesting an extended dataset expected to overflow context.',
+          toolCalls: [
+            {
+              toolName: TOOL_NAME,
+              callId: 'call-context-overflow-drop',
+              assistantText: 'Attempting to stream a large payload.',
+              arguments: {
+                text: TOOL_ARGUMENT_LONG_OUTPUT,
+              },
+            },
+          ],
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+          finishReason: TOOL_FINISH_REASON,
+        },
+      },
+      {
+        turn: 2,
+        expectedTools: ['agent__final_report'],
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Proceeding after overflow drop to summarise available data.',
+          reportContent: `${RESULT_HEADING}Context guard trimmed the oversized tool payload and continued safely.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_SUCCESS,
+          tokenUsage: {
+            inputTokens: 90,
+            outputTokens: 30,
+            totalTokens: 120,
+          },
+        },
+      },
+    ],
+  },
+  {
+    id: 'context_guard__post_overflow_tools_skip',
+    description: 'After an overflow, subsequent tool calls are skipped with budget_exceeded_prior_tool.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        response: {
+          kind: 'tool-call',
+          assistantText: 'Issuing two tool calls; the first will overflow the budget.',
+          toolCalls: [
+            {
+              toolName: TOOL_NAME,
+              callId: 'call-context-overflow-first',
+              assistantText: 'Fetching a verbose dataset that should overflow.',
+              arguments: {
+                text: TOOL_ARGUMENT_LONG_OUTPUT,
+              },
+            },
+            {
+              toolName: TOOL_NAME,
+              callId: 'call-context-overflow-second',
+              assistantText: 'Attempting a follow-up query after overflow.',
+              arguments: {
+                text: TOOL_ARGUMENT_SUCCESS,
+              },
+            },
+          ],
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+          finishReason: TOOL_FINISH_REASON,
+        },
+      },
+      {
+        turn: 2,
+        expectedTools: ['agent__final_report'],
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Concluding after overflow prevented additional tool execution.',
+          reportContent: `${RESULT_HEADING}Second tool request was skipped because the budget had already been exceeded.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_SUCCESS,
+          tokenUsage: {
+            inputTokens: 88,
+            outputTokens: 28,
+            totalTokens: 116,
           },
         },
       },

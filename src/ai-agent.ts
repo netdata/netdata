@@ -3888,7 +3888,6 @@ export class AIAgentSession {
               this.releaseToolSlot();
               return renderedFailure;
             }
-            this.newCtxTokens += toolTokens;
           } else {
             toolTokens = managedTokens;
             if (process.env.CONTEXT_DEBUG === 'true') {
@@ -3907,6 +3906,7 @@ export class AIAgentSession {
             }
           }
 
+          this.newCtxTokens += toolTokens;
           const successEntry: AccountingEntry = {
             type: 'tool',
             timestamp: startTime,
