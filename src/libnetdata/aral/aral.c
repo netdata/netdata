@@ -1062,12 +1062,24 @@ void aral_freez_internal(ARAL *ar, void *ptr TRACE_ALLOCATIONS_FUNCTION_DEFINITI
         }
 
         // this is the last page with free items - keep it
-        page->available.list = NULL;
-        page->incoming_partition_bitmap = 0;
-        for(size_t p = 0; p < ARAL_PAGE_INCOMING_PARTITIONS; p++)
-            page->incoming[p].list = NULL;
-
+        // Reset elements_segmented first to prevent new fast-path allocations
         __atomic_store_n(&page->elements_segmented, 0, __ATOMIC_RELEASE);
+
+        // Clear available list under its lock
+        aral_page_available_lock(ar, page);
+        page->available.list = NULL;
+        aral_page_available_unlock(ar, page);
+
+        // Clear incoming partition lists under their respective locks
+        // to synchronize with allocators in aral_get_free_slot___no_lock_required
+        for(size_t p = 0; p < ARAL_PAGE_INCOMING_PARTITIONS; p++) {
+            aral_page_incoming_lock(ar, page, p);
+            page->incoming[p].list = NULL;
+            aral_page_incoming_unlock(ar, page, p);
+        }
+
+        // Clear bitmap last with atomic operation to ensure visibility
+        __atomic_store_n(&page->incoming_partition_bitmap, 0, __ATOMIC_RELEASE);
         __atomic_store_n(&page->refcount, 0, __ATOMIC_RELAXED);
         aral_unlock(ar);
     }
