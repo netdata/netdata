@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Next unused error code: F051B
+# Next unused error code: F051D
 
 # ======================================================================
 # Constants
@@ -68,7 +68,7 @@ NETDATA_AUTO_UPDATES="default"
 NETDATA_CLAIM_URL="https://app.netdata.cloud"
 NETDATA_COMMAND="default"
 NETDATA_INSTALLER_OPTIONS=""
-NETDATA_FORCE_METHOD=""
+NETDATA_REQUESTED_INSTALL_TYPE="auto"
 NETDATA_OFFLINE_INSTALL_SOURCE=""
 NETDATA_WARNINGS=""
 RELEASE_CHANNEL="default"
@@ -84,7 +84,7 @@ fi
 NETDATA_TARBALL_BASEURL="${NETDATA_TARBALL_BASEURL:-https://github.com/netdata/netdata-nightlies/releases}"
 
 if echo "${0}" | grep -q 'kickstart-static64'; then
-  NETDATA_FORCE_METHOD='static'
+  NETDATA_REQUESTED_INSTALL_TYPE='static'
 fi
 
 if [ ! -t 1 ]; then
@@ -195,6 +195,7 @@ USAGE: kickstart.sh [options]
   --native-only                    Only install if native binary packages are available.
   --static-only                    Only install if a static build is available.
   --build-only                     Only install using a local build.
+  --install-type <type>            Specify what installation type to use (native, static, build, auto, or any).
   --install-prefix <path>          Specify an installation prefix for local builds (default: autodetect based on system type).
   --old-install-prefix <path>      Specify an old local builds installation prefix for uninstall/reinstall (if it's not default).
   --install-version <version>      Specify the version of Netdata to install.
@@ -1087,9 +1088,9 @@ handle_existing_install() {
         progress "Found an existing netdata install at ${ndprefix}, but user requested reinstall, continuing."
 
         case "${INSTALL_TYPE}" in
-          binpkg-*) NETDATA_FORCE_METHOD='native' ;;
-          *-build) NETDATA_FORCE_METHOD='build' ;;
-          *-static) NETDATA_FORCE_METHOD='static' ;;
+          binpkg-*) NETDATA_REQUESTED_INSTALL_TYPE='native' ;;
+          *-build) NETDATA_REQUESTED_INSTALL_TYPE='build' ;;
+          *-static) NETDATA_REQUESTED_INSTALL_TYPE='static' ;;
           *)
             if [ "${ACTION}" = "unsafe-reinstall" ]; then
               warning "Reinstalling over top of a ${INSTALL_TYPE} installation may be unsafe, but the user has requested we proceed."
@@ -1198,7 +1199,7 @@ handle_existing_install() {
 }
 
 confirm_install_prefix() {
-  if [ -n "${INSTALL_PREFIX}" ] && [ "${NETDATA_FORCE_METHOD}" != 'build' ]; then
+  if [ -n "${INSTALL_PREFIX}" ] && [ "${NETDATA_REQUESTED_INSTALL_TYPE}" != 'build' ]; then
     fatal "The --install-prefix option is only supported together with the --build-only option." F0204
   fi
 
@@ -1728,13 +1729,21 @@ try_package_install() {
       repoconfig_file="${repoconfig_name}${pkg_vsep}${REPOCONFIG_DEB_VERSION}${pkg_suffix}.${pkg_type}"
       repoconfig_url="${REPOCONFIG_DEB_URL_PREFIX}/${repo_prefix}/${repoconfig_file}"
       ref_check_url="${REPOCONFIG_DEB_URL_PREFIX}"
+      pub_check_url="${REPOCONFIG_DEB_URL_PREFIX}/${repo_prefix}/.currently.published"
       ;;
     rpm)
       repoconfig_file="${repoconfig_name}${pkg_vsep}${REPOCONFIG_RPM_VERSION}${pkg_suffix}.${pkg_type}"
       repoconfig_url="${REPOCONFIG_RPM_URL_PREFIX}/${repo_prefix}/${SYSARCH}/${repoconfig_file}"
       ref_check_url="${REPOCONFIG_RPM_URL_PREFIX}"
+      pub_check_url="${REPOCONFIG_RPM_URL_PREFIX}/${repo_prefix}/${SYSARCH}/.currently.published"
       ;;
   esac
+
+  progress "Checking if native packages are being published for this platform."
+  if ! check_for_remote_file "${pub_check_url}"; then
+    warning "Native packages are not being published for this system."
+    return 3
+  fi
 
   progress "Checking for availability of repository configuration package."
   if ! check_for_remote_file "${ref_check_url}"; then
@@ -1743,7 +1752,7 @@ try_package_install() {
 
   if ! check_for_remote_file "${repoconfig_url}"; then
     warning "No repository configuration package available for ${DISTRO} ${SYSVERSION}. Cannot install native packages on this system."
-    return 2
+    return 3
   fi
 
   if ! download "${repoconfig_url}" "${tmpdir}/${repoconfig_file}"; then
@@ -2125,8 +2134,8 @@ prepare_offline_install_source() {
 
   run cd "${1}" || fatal "Failed to switch to target directory for offline install preparation." F0505
 
-  case "${NETDATA_FORCE_METHOD}" in
-    static|'')
+  case "${NETDATA_REQUESTED_INSTALL_TYPE}" in
+    static|auto|any)
       set_static_archive_urls "${SELECTED_RELEASE_CHANNEL}" "x86_64"
 
       if ! check_for_remote_file "${NETDATA_TARBALL_BASEURL}"; then
@@ -2166,6 +2175,7 @@ prepare_offline_install_source() {
         fatal "Failed to download checksum file. ${BADNET_MSG}." F0506
       fi
       ;;
+    *) fatal "Install type ${NETDATA_REQUESTED_INSTALL_TYPE} is not supported for offline installs." F051B
   esac
 
   if [ "${legacy:-0}" -eq 1 ]; then
@@ -2224,7 +2234,7 @@ prepare_offline_install_source() {
 # Per system-type install logic
 
 install_on_linux() {
-  if [ "${NETDATA_FORCE_METHOD}" != 'static' ] && [ "${NETDATA_FORCE_METHOD}" != 'build' ] && [ -z "${NETDATA_OFFLINE_INSTALL_SOURCE}" ]; then
+  if [ "${NETDATA_REQUESTED_INSTALL_TYPE}" != 'static' ] && [ "${NETDATA_REQUESTED_INSTALL_TYPE}" != 'build' ] && [ -z "${NETDATA_OFFLINE_INSTALL_SOURCE}" ]; then
     SELECTED_INSTALL_METHOD="native"
     try_package_install
 
@@ -2235,15 +2245,20 @@ install_on_linux() {
         ;;
       1) fatal "Unable to install on this system." F0300 ;;
       2)
-        case "${NETDATA_FORCE_METHOD}" in
-          native) fatal "Could not install native binary packages." F0301 ;;
-          *) warning "Could not install native binary packages, falling back to alternative installation method." ;;
+        case "${NETDATA_REQUESTED_INSTALL_TYPE}" in
+          native|auto) fatal "Could not install using native binary packages. If you want to install anyway, re-run this script with the option --install-type=any" F0301 ;;
+          *) warning "Could not using install native binary packages, falling back to alternative installation method." ;;
         esac
         ;;
+      3)
+        case "${NETDATA_REQUESTED_INSTALL_TYPE}" in
+          native) fatal "Native packages are not available for this system, unable to install." F051C ;;
+          *) warning "Native packages are not available for this system, falling back to alternative installation method." ;;
+        esac
     esac
   fi
 
-  if [ "${NETDATA_FORCE_METHOD}" != 'native' ] && [ "${NETDATA_FORCE_METHOD}" != 'build' ] && [ -z "${NETDATA_INSTALL_SUCCESSFUL}" ]; then
+  if [ "${NETDATA_REQUESTED_INSTALL_TYPE}" != 'native' ] && [ "${NETDATA_REQUESTED_INSTALL_TYPE}" != 'build' ] && [ -z "${NETDATA_INSTALL_SUCCESSFUL}" ]; then
     SELECTED_INSTALL_METHOD="static"
     INSTALL_TYPE="kickstart-static"
     try_static_install
@@ -2255,7 +2270,7 @@ install_on_linux() {
         ;;
       1) fatal "Unable to install on this system." F0302 ;;
       2)
-        case "${NETDATA_FORCE_METHOD}" in
+        case "${NETDATA_REQUESTED_INSTALL_TYPE}" in
           static) fatal "Could not install static build." F0303 ;;
           *) warning "Could not install static build, falling back to alternative installation method." ;;
         esac
@@ -2263,7 +2278,7 @@ install_on_linux() {
     esac
   fi
 
-  if [ "${NETDATA_FORCE_METHOD}" != 'native' ] && [ "${NETDATA_FORCE_METHOD}" != 'static' ] && [ -z "${NETDATA_INSTALL_SUCCESSFUL}" ]; then
+  if [ "${NETDATA_REQUESTED_INSTALL_TYPE}" != 'native' ] && [ "${NETDATA_REQUESTED_INSTALL_TYPE}" != 'static' ] && [ -z "${NETDATA_INSTALL_SUCCESSFUL}" ]; then
     SELECTED_INSTALL_METHOD="build"
     INSTALL_TYPE="kickstart-build"
     try_build_install
@@ -2276,7 +2291,7 @@ install_on_linux() {
 }
 
 install_on_macos() {
-  case "${NETDATA_FORCE_METHOD}" in
+  case "${NETDATA_REQUESTED_INSTALL_TYPE}" in
     native) fatal "User requested native package, but native packages are not available for macOS. Try installing without \`--only-native\` option." F0305 ;;
     static) fatal "User requested static build, but static builds are not available for macOS. Try installing without \`--only-static\` option." F0306 ;;
     *)
@@ -2293,7 +2308,7 @@ install_on_macos() {
 }
 
 install_on_freebsd() {
-  case "${NETDATA_FORCE_METHOD}" in
+  case "${NETDATA_REQUESTED_INSTALL_TYPE}" in
     native) fatal "User requested native package, but native packages are not available for FreeBSD. Try installing without \`--only-native\` option." F0308 ;;
     static) fatal "User requested static build, but static builds are not available for FreeBSD. Try installing without \`--only-static\` option." F0309 ;;
     *)
@@ -2349,16 +2364,16 @@ handle_major_version() {
 validate_args() {
   check_claim_opts
 
-  if [ -n "${NETDATA_FORCE_METHOD}" ]; then
-    SELECTED_INSTALL_METHOD="${NETDATA_FORCE_METHOD}"
+  if [ -n "${NETDATA_REQUESTED_INSTALL_TYPE}" ]; then
+    SELECTED_INSTALL_METHOD="${NETDATA_REQUESTED_INSTALL_TYPE}"
   fi
 
-  if [ "${ACTION}" = "repositories-only" ] && [ "${NETDATA_FORCE_METHOD}" != "native" ]; then
+  if [ "${ACTION}" = "repositories-only" ] && [ "${NETDATA_REQUESTED_INSTALL_TYPE}" != "native" ]; then
     fatal "Repositories can only be installed for native installs." F050D
   fi
 
   if [ -n "${NETDATA_OFFLINE_INSTALL_SOURCE}" ]; then
-    case "${NETDATA_FORCE_METHOD}" in
+    case "${NETDATA_REQUESTED_INSTALL_TYPE}" in
       native|build) fatal "Offline installs are only supported for static builds currently." F0502 ;;
     esac
 
@@ -2368,14 +2383,14 @@ validate_args() {
   fi
 
   if [ -n "${LOCAL_BUILD_OPTIONS}" ]; then
-    case "${NETDATA_FORCE_METHOD}" in
+    case "${NETDATA_REQUESTED_INSTALL_TYPE}" in
       build) NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS} ${LOCAL_BUILD_OPTIONS}" ;;
       *) fatal "Specifying local build options is only supported when the --build-only option is also specified." F0401 ;;
     esac
   fi
 
   if [ -n "${STATIC_INSTALL_OPTIONS}" ]; then
-    case "${NETDATA_FORCE_METHOD}" in
+    case "${NETDATA_REQUESTED_INSTALL_TYPE}" in
       static) NETDATA_INSTALLER_OPTIONS="${NETDATA_INSTALLER_OPTIONS} ${STATIC_INSTALL_OPTIONS}" ;;
       *) fatal "Specifying installer options options is only supported when the --static-only option is also specified." F0402 ;;
     esac
@@ -2527,11 +2542,11 @@ parse_args() {
         ;;
       "--repositories-only")
         set_action 'repositories-only'
-        NETDATA_FORCE_METHOD="native"
+        NETDATA_REQUESTED_INSTALL_TYPE="native"
         ;;
-      "--native-only") NETDATA_FORCE_METHOD="native" ;;
-      "--static-only") NETDATA_FORCE_METHOD="static" ;;
-      "--build-only") NETDATA_FORCE_METHOD="build" ;;
+      "--native-only") NETDATA_REQUESTED_INSTALL_TYPE="native" ;;
+      "--static-only") NETDATA_REQUESTED_INSTALL_TYPE="static" ;;
+      "--build-only") NETDATA_REQUESTED_INSTALL_TYPE="build" ;;
       "--claim-"*)
         optname="$(echo "${1}" | cut -d '-' -f 4-)"
         case "${optname}" in
