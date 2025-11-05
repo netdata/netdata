@@ -259,6 +259,17 @@ static struct win_sensor_config {
         }
 };
 
+struct netdata_sensors_extra_config {
+    const char *friendly_name;
+    const char *units;
+    int variables;
+    collected_number *values;
+    int multiplier;
+    bool plot;
+};
+
+static DICTIONARY *sensor_config;
+
 struct sensor_data {
     bool initialized;
     bool first_time;
@@ -498,6 +509,15 @@ void dict_sensor_insert(const DICTIONARY_ITEM *item __maybe_unused, void *value,
     sd->add_factor = 0.0;
 }
 
+void dict_sensor_conf_insert(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
+{
+    struct netdata_sensors_extra_config *sec = value;
+
+    sec->units = NULL;
+    sec->friendly_name = NULL;
+    sec->plot = false;
+}
+
 static int initialize(int update_every)
 {
     // This is an internal plugin, if we initialize these two times, collector will fail. To avoid this
@@ -522,6 +542,10 @@ static int initialize(int update_every)
     sensors = dictionary_create_advanced(
         DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct sensor_data));
     dictionary_register_insert_callback(sensors, dict_sensor_insert, NULL);
+
+    sensor_config = dictionary_create_advanced(
+            DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct netdata_sensors_extra_config));
+    dictionary_register_insert_callback(sensor_config, dict_sensor_conf_insert, NULL);
 
     sensors_thread_update =
         nd_thread_create("sensors_upd", NETDATA_THREAD_OPTION_DEFAULT, netdata_sensors_monitor, &update_every);
