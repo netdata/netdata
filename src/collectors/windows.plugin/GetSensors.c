@@ -262,7 +262,6 @@ struct netdata_sensors_extra_config {
     const char *title;
 
     int multiplier;
-    bool plot;
 
     int variables;
     collected_number *values;
@@ -426,24 +425,22 @@ static struct netdata_sensors_extra_config *netdata_sensors_fill_configuration(c
 {
 #define NETDATA_DEFAULT_SENSOR_SECTION "plugin:windows:GetSensors"
     char section_name[CONFIG_MAX_NAME];
-    struct netdata_sensors_extra_config *sec = mallocz(sizeof(*sec));
-
     snprintfz(section_name, CONFIG_MAX_NAME, "%s:%s", NETDATA_DEFAULT_SENSOR_SECTION, name);
 
-    sec->units = inicfg_get(&netdata_config, section_name, "units", NULL);
-    ;
-    if (unlikely(!sec->units)) {
+    const char *units = inicfg_get(&netdata_config, section_name, "units", NULL);
+
+    if (unlikely(!units)) {
         nd_log(
             NDLS_COLLECTORS,
             NDLP_INFO,
             "No section %s found. Collector will not plot chart for sensor %s",
             section_name,
             name);
-
-        freez(sec);
         return NULL;
     }
 
+    struct netdata_sensors_extra_config *sec = mallocz(sizeof(*sec));
+    sec->units = units;
     sec->multiplier = (int)inicfg_get_number(&netdata_config, section_name, "multiplier", 0);
 
     return sec;
