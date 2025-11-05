@@ -66,9 +66,9 @@ When however we compare Netdata generally against the industry, we MUST state: "
 
 ## [EXACT] SOC 2 Certification
 
-**Must state**: "SOC 2 Type 1 certified and at the final stages for getting SOC 2 Type 2"
+**Must state**: "SOC 2 Type 2 certified"
 
-**Do not say**: "SOC 2 certified" (without specifying Type 1), "SOC 2 compliant" (vague), "working towards SOC 2" (implies not certified yet)
+**Do not say**: "SOC 2 certified" (without specifying Type 2), "SOC 2 compliant" (vague), "working towards SOC 2" (implies not certified yet)
 
 ---
 

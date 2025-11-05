@@ -67,7 +67,7 @@ Unlike traditional centralized solutions, Netdata processes data at the edge wit
 - **10^-36 False Positive Rate**: Most reliable anomaly detection (18 models requiring unanimous agreement)
 
 **Enterprise Grade:**
-- **Security Leader**: SOC 2 Type 1, GDPR/HIPAA/PCI DSS compliant, Forward Secure Sealing for logs
+- **Security Leader**: SOC 2 Type 2, GDPR/HIPAA/PCI DSS compliant, Forward Secure Sealing for logs
 - **Professional Services**: 24/7 enterprise support, architecture design, training programs
 - **Complete Data Sovereignty**: Air-gapped deployments, data never leaves infrastructure
 - **SCIM 2.0 Integration**: Automatic LDAP/AD group mapping

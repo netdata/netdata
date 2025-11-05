@@ -1,6 +1,49 @@
 # Deterministic Sub-Agent Chaining Design
 
-## Background
+## TL;DR
+- Goal remains to support deterministic sub-agent chaining; current code still leaves orchestration entirely to the parent LLM.
+- `SubAgentRegistry` and frontmatter parsing lack any `next` metadata or chain runner logic (`src/subagent-registry.ts`, `src/frontmatter.ts`).
+- Need design confirmations (e.g., mandatory chaining semantics, injected `reason` text, error propagation) before implementing.
+
+## Analysis
+- **Registry model**: `PreloadedSubAgent` / `ChildInfo` contain no `next` or downstream metadata, and `SubAgentRegistry` has no resolution pass (`src/subagent-registry.ts:20-125`).
+- **Execution flow**: `execute()` only validates inputs, runs the child, and returns its output; there is no chained follow-up call (`src/subagent-registry.ts:126-265`).
+- **Prompt metadata**: `parseFrontmatter` still rejects unknown top-level keys; `next` is neither allowed nor normalized today (`src/frontmatter.ts:16-118`).
+- **Reason enforcement**: Registry continues to require a `reason` field for every invocation, meaning any chaining layer must decide what fixed reason text to supply (`src/subagent-registry.ts:60-122`).
+- **Result packaging**: Child runs now preserve accounting/opTree metadata for observability; chaining logic must propagate these structures without breaking existing aggregation (`src/subagent-registry.ts:229-264`).
+
+## Decisions Needed (awaiting Costa)
+1. Confirm whether Phase 1 should still hard-chain only the first `next` entry (no branching/optional hops).
+2. Approve injecting a fixed `reason` string for chained executions vs. forwarding the upstream reason.
+3. Decide how to surface chain failures to the parent: immediate error vs. wrapped diagnostic payload.
+4. Clarify whether chained agents should always honor the downstream `expectedOutput` format, even when the upstream agent declared a different default.
+
+## Plan (pending decisions)
+1. Extend frontmatter parsing/validation to accept `next` (string|string[]) and store it in the loaded agent metadata.
+2. Enhance `SubAgentRegistry` preload to keep `rawNext`/`resolvedNext` data, perform resolution + cycle checks, and capture downstream IO schemas.
+3. Add a chain runner inside `execute()` that aligns upstream output with downstream input, injects the approved reason, executes the next stage, and aggregates accounting/opTree metadata.
+4. Update instrumentation (logs, accounting extras, session tree) and add deterministic harness scenarios covering successful chain, schema mismatch, and downstream failure.
+
+## Implied Decisions
+- Chaining stays opt-in via frontmatter; agents without `next` remain unchanged.
+- Cycle detection must reuse existing ancestor protections to avoid recursion when agents re-import each other.
+- Any automatic JSON parsing implies strict schema validation with actionable Ajv error messages for operators.
+
+## Testing Requirements
+- `npm run lint`, `npm run build`.
+- Phase 1 harness cases exercising chained success, invalid payload, and downstream failure paths.
+- Manual smoke via `./run.sh` with chained agents once implemented.
+
+## Documentation Updates Required
+- Update README and DESIGN once deterministic chaining lands.
+- Append frontmatter template guidance for `next` (and caveats about mandatory execution) to CLI help/docs.
+- Mention deterministic chaining behavior in SPECS whenever the implementation is ready.
+
+---
+
+## Legacy Phase 1 Draft (for reference)
+
+### Background
 - Sub-agents are currently exposed as tools via `SubAgentRegistry` and executed through `SubAgentRegistry.execute` (`src/subagent-registry.ts:240`).
 - Frontmatter parsing disallows unknown keys (`src/frontmatter.ts:54-103`), so new metadata (e.g., `next`) must be registered explicitly.
 - Tool execution contracts: `getTools()` adds a required `reason` field for JSON payloads and wraps text inputs into `{ input, reason }` (`src/subagent-registry.ts:118-177`).

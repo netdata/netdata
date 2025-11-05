@@ -265,7 +265,7 @@ CRITICAL: You MUST NOT use the exact wording on every page - we don't want every
 **The Principle**: Security cannot be an afterthought. TLS by default, zero-trust networking, encrypted communication, data sovereignty, RBAC, SSO, and audit logs must be built-in from day one.
 
 **Why This Matters to You**:
-- **Compliance confidence**: SOC 2 Type 1 certified, GDPR/HIPAA/PCI DSS aligned by design
+- **Compliance confidence**: SOC 2 Type 2 certified, GDPR/HIPAA/PCI DSS aligned by design
 - **Reduced risk**: Security best practices embedded in architecture, not optional add-ons
 - **Audit readiness**: Comprehensive audit logs and access controls satisfy regulatory requirements
 - **Enterprise authentication**: SSO via LDAP/AD, Okta, OIDC with automatic role mapping via SCIM

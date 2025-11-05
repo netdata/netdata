@@ -81,7 +81,7 @@ DevOps engineers, SREs, sysadmins, and 24/7 operations centers needing fast, acc
 
 ## About Netdata
 - Netdata Inc.
-  - SOC 2 Type 1 (Type 2 at its final stage)
+  - SOC 2 Type 2 certified
 
 - [Company Website](https://www.netdata.cloud)
 - [Company Blog](https://www.netdata.cloud/blog/)

@@ -833,7 +833,7 @@ helm install netdata netdata/netdata
 - Certificate-based authentication
 - No metric/log data storage in Cloud
 - Encrypted communication (TLS)
-- SOC 2 Type 1 certified (Type 2 in final stage)
+- SOC 2 Type 2 certified
 
 **Data Sovereignty:**
 - All monitoring data stays local
@@ -844,7 +844,7 @@ helm install netdata netdata/netdata
 ### 11.2 Compliance
 
 **Certifications:**
-- SOC 2 Type 1
+- SOC 2 Type 2
 - OpenSSF Best Practices badge
 - CNCF member
 
