@@ -77,63 +77,62 @@ enum netdata_win_sensor_monitored {
 };
 
 REFPROPERTYKEY sensor_keys[] = {
-        &SENSOR_DATA_TYPE_TEMPERATURE_CELSIUS,
-        &SENSOR_DATA_TYPE_ELECTRICAL_POWER_WATTS,
-        &SENSOR_DATA_TYPE_CURRENT_AMPS,
-        &SENSOR_DATA_TYPE_RELATIVE_HUMIDITY_PERCENT,
-        &SENSOR_DATA_TYPE_LIGHT_LEVEL_LUX,
-        &SENSOR_DATA_TYPE_LIGHT_TEMPERATURE_KELVIN,
-        &SENSOR_DATA_TYPE_VOLTAGE_VOLTS,
-        &SENSOR_DATA_TYPE_RESISTANCE_OHMS,
-        &SENSOR_DATA_TYPE_ATMOSPHERIC_PRESSURE_BAR,
-        &SENSOR_DATA_TYPE_LATITUDE_DEGREES,
-        &SENSOR_DATA_TYPE_LONGITUDE_DEGREES,
-        &SENSOR_DATA_TYPE_FORCE_NEWTONS,
-        &SENSOR_DATA_TYPE_GAUGE_PRESSURE_PASCAL,
+    &SENSOR_DATA_TYPE_TEMPERATURE_CELSIUS,
+    &SENSOR_DATA_TYPE_ELECTRICAL_POWER_WATTS,
+    &SENSOR_DATA_TYPE_CURRENT_AMPS,
+    &SENSOR_DATA_TYPE_RELATIVE_HUMIDITY_PERCENT,
+    &SENSOR_DATA_TYPE_LIGHT_LEVEL_LUX,
+    &SENSOR_DATA_TYPE_LIGHT_TEMPERATURE_KELVIN,
+    &SENSOR_DATA_TYPE_VOLTAGE_VOLTS,
+    &SENSOR_DATA_TYPE_RESISTANCE_OHMS,
+    &SENSOR_DATA_TYPE_ATMOSPHERIC_PRESSURE_BAR,
+    &SENSOR_DATA_TYPE_LATITUDE_DEGREES,
+    &SENSOR_DATA_TYPE_LONGITUDE_DEGREES,
+    &SENSOR_DATA_TYPE_FORCE_NEWTONS,
+    &SENSOR_DATA_TYPE_GAUGE_PRESSURE_PASCAL,
 
-        // Add only one vector axis here
-        &SENSOR_DATA_TYPE_DISTANCE_X_METERS,
-        &SENSOR_DATA_TYPE_ACCELERATION_X_G,
+    // Add only one vector axis here
+    &SENSOR_DATA_TYPE_DISTANCE_X_METERS,
+    &SENSOR_DATA_TYPE_ACCELERATION_X_G,
 
-        // Main loop stop
-        NULL,
+    // Main loop stop
+    NULL,
 
-        // Remaining axis should be added here
-        &SENSOR_DATA_TYPE_DISTANCE_Y_METERS,
-        &SENSOR_DATA_TYPE_DISTANCE_Z_METERS,
-        &SENSOR_DATA_TYPE_ACCELERATION_Y_G,
-        &SENSOR_DATA_TYPE_ACCELERATION_Z_G,
+    // Remaining axis should be added here
+    &SENSOR_DATA_TYPE_DISTANCE_Y_METERS,
+    &SENSOR_DATA_TYPE_DISTANCE_Z_METERS,
+    &SENSOR_DATA_TYPE_ACCELERATION_Y_G,
+    &SENSOR_DATA_TYPE_ACCELERATION_Z_G,
 
-        &SENSOR_DATA_TYPE_CUSTOM_USAGE,
-        &SENSOR_DATA_TYPE_CUSTOM_BOOLEAN_ARRAY,
-        &SENSOR_DATA_TYPE_CUSTOM_VALUE1,
-        &SENSOR_DATA_TYPE_CUSTOM_VALUE2,
-        &SENSOR_DATA_TYPE_CUSTOM_VALUE3,
-        &SENSOR_DATA_TYPE_CUSTOM_VALUE4,
-        &SENSOR_DATA_TYPE_CUSTOM_VALUE5,
-        &SENSOR_DATA_TYPE_CUSTOM_VALUE6,
-        &SENSOR_DATA_TYPE_CUSTOM_VALUE7,
-        &SENSOR_DATA_TYPE_CUSTOM_VALUE8,
-        &SENSOR_DATA_TYPE_CUSTOM_VALUE9,
-        &SENSOR_DATA_TYPE_CUSTOM_VALUE10,
-        &SENSOR_DATA_TYPE_CUSTOM_VALUE11,
-        &SENSOR_DATA_TYPE_CUSTOM_VALUE12,
-        &SENSOR_DATA_TYPE_CUSTOM_VALUE13,
-        &SENSOR_DATA_TYPE_CUSTOM_VALUE14,
-        &SENSOR_DATA_TYPE_CUSTOM_VALUE15,
-        &SENSOR_DATA_TYPE_CUSTOM_VALUE16,
-        &SENSOR_DATA_TYPE_CUSTOM_VALUE17,
-        &SENSOR_DATA_TYPE_CUSTOM_VALUE18,
-        &SENSOR_DATA_TYPE_CUSTOM_VALUE19,
-        &SENSOR_DATA_TYPE_CUSTOM_VALUE20,
-        &SENSOR_DATA_TYPE_CUSTOM_VALUE21,
-        &SENSOR_DATA_TYPE_CUSTOM_VALUE22,
-        &SENSOR_DATA_TYPE_CUSTOM_VALUE23,
-        &SENSOR_DATA_TYPE_CUSTOM_VALUE24,
-        &SENSOR_DATA_TYPE_CUSTOM_VALUE25,
-        &SENSOR_DATA_TYPE_CUSTOM_VALUE26,
-        &SENSOR_DATA_TYPE_CUSTOM_VALUE27
-        };
+    &SENSOR_DATA_TYPE_CUSTOM_USAGE,
+    &SENSOR_DATA_TYPE_CUSTOM_BOOLEAN_ARRAY,
+    &SENSOR_DATA_TYPE_CUSTOM_VALUE1,
+    &SENSOR_DATA_TYPE_CUSTOM_VALUE2,
+    &SENSOR_DATA_TYPE_CUSTOM_VALUE3,
+    &SENSOR_DATA_TYPE_CUSTOM_VALUE4,
+    &SENSOR_DATA_TYPE_CUSTOM_VALUE5,
+    &SENSOR_DATA_TYPE_CUSTOM_VALUE6,
+    &SENSOR_DATA_TYPE_CUSTOM_VALUE7,
+    &SENSOR_DATA_TYPE_CUSTOM_VALUE8,
+    &SENSOR_DATA_TYPE_CUSTOM_VALUE9,
+    &SENSOR_DATA_TYPE_CUSTOM_VALUE10,
+    &SENSOR_DATA_TYPE_CUSTOM_VALUE11,
+    &SENSOR_DATA_TYPE_CUSTOM_VALUE12,
+    &SENSOR_DATA_TYPE_CUSTOM_VALUE13,
+    &SENSOR_DATA_TYPE_CUSTOM_VALUE14,
+    &SENSOR_DATA_TYPE_CUSTOM_VALUE15,
+    &SENSOR_DATA_TYPE_CUSTOM_VALUE16,
+    &SENSOR_DATA_TYPE_CUSTOM_VALUE17,
+    &SENSOR_DATA_TYPE_CUSTOM_VALUE18,
+    &SENSOR_DATA_TYPE_CUSTOM_VALUE19,
+    &SENSOR_DATA_TYPE_CUSTOM_VALUE20,
+    &SENSOR_DATA_TYPE_CUSTOM_VALUE21,
+    &SENSOR_DATA_TYPE_CUSTOM_VALUE22,
+    &SENSOR_DATA_TYPE_CUSTOM_VALUE23,
+    &SENSOR_DATA_TYPE_CUSTOM_VALUE24,
+    &SENSOR_DATA_TYPE_CUSTOM_VALUE25,
+    &SENSOR_DATA_TYPE_CUSTOM_VALUE26,
+    &SENSOR_DATA_TYPE_CUSTOM_VALUE27};
 
 static int min_custom = NETDATA_CHART_PRIO_SENSOR_MIN_CUSTOM;
 
@@ -145,119 +144,118 @@ static struct win_sensor_config {
 
     int priority;
 } configs[] = {
-        {
-            .title = "Sensor Temperature",
-            .units = "Cel",
-            .context = "system.hw.sensor.temperature.input",
-            .family = "Temperature",
-            .priority = NETDATA_CHART_PRIO_SENSORS,
-        },
-        {
-            .title = "Sensor Power",
-            .units = "W",
-            .context = "system.hw.sensor.power.input",
-            .family = "Power",
-            .priority = NETDATA_CHART_PRIO_SENSOR_POWER,
-        },
-        {
-            .title = "Sensor Current",
-            .units = "A",
-            .context = "system.hw.sensor.current.input",
-            .family = "Current",
-            .priority = NETDATA_CHART_PRIO_SENSOR_CURRENT,
-        },
-        {
-            .title = "Sensor Humidity",
-            .units = "%",
-            .context = "system.hw.sensor.humidity.input",
-            .family = "Humidity",
-            .priority = NETDATA_CHART_PRIO_SENSOR_HUMIDITY,
-        },
-        {
-            .title = "Ambient light level",
-            .units = "lx",
-            .context = "system.hw.sensor.lux.input",
-            .family = "illuminance",
-            .priority = NETDATA_CHART_PRIO_SENSOR_LUX,
-        },
-        {
-            .title = "Color temperature of light",
-            .units = "Cel",
-            .context = "system.hw.sensor.color.input",
-            .family = "Temperature",
-            .priority = NETDATA_CHART_PRIO_SENSOR_TEMPERATURE,
-        },
-        {
-            .title = "Electrical potential.",
-            .units = "V",
-            .context = "system.hw.sensor.voltage.input",
-            .family = "Potential",
-            .priority = NETDATA_CHART_PRIO_SENSOR_VOLTAGE,
-        },
-        {
-            .title = "Electrical resistence.",
-            .units = "Ohms",
-            .context = "system.hw.sensor.resistence.input",
-            .family = "Resistence",
-            .priority = NETDATA_CHART_PRIO_SENSOR_RESISTENCE,
-        },
-        {
-            .title = "Ambient atmospheric pressure",
-            .units = "Pa",
-            .context = "system.hw.sensor.pressure.input",
-            .family = "Pressure",
-            .priority = NETDATA_CHART_PRIO_SENSOR_AMBIENT_PRESSURE,
-        },
-        {
-            .title = "Geographic latitude",
-            .units = "Degrees",
-            .context = "system.hw.sensor.latitude.input",
-            .family = "Location",
-            .priority = NETDATA_CHART_PRIO_SENSOR_LATITUDE,
-        },
-        {
-            .title = "Geographic longitude",
-            .units = "Degrees",
-            .context = "system.hw.sensor.longitude.input",
-            .family = "Location",
-            .priority = NETDATA_CHART_PRIO_SENSOR_LONGITUDE,
-        },
-        {
-            .title = "Force",
-            .units = "N",
-            .context = "system.hw.sensor.force.input",
-            .family = "Force",
-            .priority = NETDATA_CHART_PRIO_SENSOR_FORCE,
-        },
-        {
-            .title = "Gauge Pressure",
-            .units = "Pa",
-            .context = "system.hw.sensor.gauge_pressure.input",
-            .family = "Pressure",
-            .priority = NETDATA_CHART_PRIO_SENSOR_GAUGE_PRESSURE,
-        },
-        {
-            .title = "Distance",
-            .units = "m",
-            .context = "system.hw.sensor.distance.input",
-            .family = "Distance",
-            .priority = NETDATA_CHART_PRIO_SENSOR_DISTANCE,
-        },
-        {
-            .title = "Acceleration.",
-            .units = "g",
-            .context = "system.hw.sensor.acceleration.input",
-            .family = "Acceleration",
-            .priority = NETDATA_CHART_PRIO_SENSOR_ACCELERATION,
-        },
-        {
-            .title = "Custom Chart",
-            .units = "nd",
-            .context = "system.hw.sensor.custom",
-            .family = "Custom",
-            .priority = NETDATA_CHART_PRIO_SENSOR_MIN_CUSTOM,
-        }
-};
+    {
+        .title = "Sensor Temperature",
+        .units = "Cel",
+        .context = "system.hw.sensor.temperature.input",
+        .family = "Temperature",
+        .priority = NETDATA_CHART_PRIO_SENSORS,
+    },
+    {
+        .title = "Sensor Power",
+        .units = "W",
+        .context = "system.hw.sensor.power.input",
+        .family = "Power",
+        .priority = NETDATA_CHART_PRIO_SENSOR_POWER,
+    },
+    {
+        .title = "Sensor Current",
+        .units = "A",
+        .context = "system.hw.sensor.current.input",
+        .family = "Current",
+        .priority = NETDATA_CHART_PRIO_SENSOR_CURRENT,
+    },
+    {
+        .title = "Sensor Humidity",
+        .units = "%",
+        .context = "system.hw.sensor.humidity.input",
+        .family = "Humidity",
+        .priority = NETDATA_CHART_PRIO_SENSOR_HUMIDITY,
+    },
+    {
+        .title = "Ambient light level",
+        .units = "lx",
+        .context = "system.hw.sensor.lux.input",
+        .family = "illuminance",
+        .priority = NETDATA_CHART_PRIO_SENSOR_LUX,
+    },
+    {
+        .title = "Color temperature of light",
+        .units = "Cel",
+        .context = "system.hw.sensor.color.input",
+        .family = "Temperature",
+        .priority = NETDATA_CHART_PRIO_SENSOR_TEMPERATURE,
+    },
+    {
+        .title = "Electrical potential.",
+        .units = "V",
+        .context = "system.hw.sensor.voltage.input",
+        .family = "Potential",
+        .priority = NETDATA_CHART_PRIO_SENSOR_VOLTAGE,
+    },
+    {
+        .title = "Electrical resistence.",
+        .units = "Ohms",
+        .context = "system.hw.sensor.resistence.input",
+        .family = "Resistence",
+        .priority = NETDATA_CHART_PRIO_SENSOR_RESISTENCE,
+    },
+    {
+        .title = "Ambient atmospheric pressure",
+        .units = "Pa",
+        .context = "system.hw.sensor.pressure.input",
+        .family = "Pressure",
+        .priority = NETDATA_CHART_PRIO_SENSOR_AMBIENT_PRESSURE,
+    },
+    {
+        .title = "Geographic latitude",
+        .units = "Degrees",
+        .context = "system.hw.sensor.latitude.input",
+        .family = "Location",
+        .priority = NETDATA_CHART_PRIO_SENSOR_LATITUDE,
+    },
+    {
+        .title = "Geographic longitude",
+        .units = "Degrees",
+        .context = "system.hw.sensor.longitude.input",
+        .family = "Location",
+        .priority = NETDATA_CHART_PRIO_SENSOR_LONGITUDE,
+    },
+    {
+        .title = "Force",
+        .units = "N",
+        .context = "system.hw.sensor.force.input",
+        .family = "Force",
+        .priority = NETDATA_CHART_PRIO_SENSOR_FORCE,
+    },
+    {
+        .title = "Gauge Pressure",
+        .units = "Pa",
+        .context = "system.hw.sensor.gauge_pressure.input",
+        .family = "Pressure",
+        .priority = NETDATA_CHART_PRIO_SENSOR_GAUGE_PRESSURE,
+    },
+    {
+        .title = "Distance",
+        .units = "m",
+        .context = "system.hw.sensor.distance.input",
+        .family = "Distance",
+        .priority = NETDATA_CHART_PRIO_SENSOR_DISTANCE,
+    },
+    {
+        .title = "Acceleration.",
+        .units = "g",
+        .context = "system.hw.sensor.acceleration.input",
+        .family = "Acceleration",
+        .priority = NETDATA_CHART_PRIO_SENSOR_ACCELERATION,
+    },
+    {
+        .title = "Custom Chart",
+        .units = "nd",
+        .context = "system.hw.sensor.custom",
+        .family = "Custom",
+        .priority = NETDATA_CHART_PRIO_SENSOR_MIN_CUSTOM,
+    }};
 
 struct netdata_sensors_extra_config {
     const char *units;
@@ -275,6 +273,7 @@ struct sensor_data {
     bool first_time;
     bool enabled;
     enum netdata_win_sensor_monitored sensor_data_type;
+    struct win_sensor_config *config;
 
     const char *type;
     const char *category;
@@ -315,7 +314,8 @@ static void netdata_clsid_to_char(char *output, const GUID *pguid)
     }
 }
 
-static inline char *netdata_convert_guid_to_string(HRESULT hr, GUID *value) {
+static inline char *netdata_convert_guid_to_string(HRESULT hr, GUID *value)
+{
     if (SUCCEEDED(hr)) {
         char cguid[ADDTIONAL_UUID_STR_LEN];
         netdata_clsid_to_char(cguid, value);
@@ -328,14 +328,14 @@ static inline void netdata_fill_sensor_type(struct sensor_data *sd, ISensor *pSe
 {
     GUID type = {0};
     HRESULT hr = pSensor->lpVtbl->GetType(pSensor, &type);
-    sd->type =  netdata_convert_guid_to_string(hr, &type);
+    sd->type = netdata_convert_guid_to_string(hr, &type);
 }
 
 static inline void netdata_fill_sensor_category(struct sensor_data *sd, ISensor *pSensor)
 {
     GUID category = {0};
     HRESULT hr = pSensor->lpVtbl->GetCategory(pSensor, &category);
-    sd->category =  netdata_convert_guid_to_string(hr, &category);
+    sd->category = netdata_convert_guid_to_string(hr, &category);
 }
 
 static inline char *netdata_pvar_to_char(const PROPERTYKEY *key, ISensor *pSensor)
@@ -363,8 +363,7 @@ static void netdata_initialize_sensor_dict(struct sensor_data *sd, ISensor *pSen
     sd->manufacturer = netdata_pvar_to_char(&SENSOR_PROPERTY_MANUFACTURER, pSensor);
 }
 
-static int
-netdata_collect_sensor_data(struct sensor_data *sd, ISensor *pSensor, REFPROPERTYKEY key, int vector_idx)
+static int netdata_collect_sensor_data(struct sensor_data *sd, ISensor *pSensor, REFPROPERTYKEY key, int vector_idx)
 {
     ISensorDataReport *pReport = NULL;
     PROPVARIANT pv = {};
@@ -423,20 +422,23 @@ static void netdata_sensors_get_data(struct sensor_data *sd, ISensor *pSensor)
     sd->first_time = false;
 }
 
-static struct netdata_sensors_extra_config *netdata_sensors_fill_configuration(const char *name) {
+static struct netdata_sensors_extra_config *netdata_sensors_fill_configuration(const char *name)
+{
 #define NETDATA_DEFAULT_SENSOR_SECTION "plugin:windows:GetSensors"
     char section_name[CONFIG_MAX_NAME];
     struct netdata_sensors_extra_config *sec = mallocz(sizeof(*sec));
 
     snprintfz(section_name, CONFIG_MAX_NAME, "%s:%s", NETDATA_DEFAULT_SENSOR_SECTION, name);
 
-    sec->units = inicfg_get(&netdata_config, section_name, "units", NULL);;
+    sec->units = inicfg_get(&netdata_config, section_name, "units", NULL);
+    ;
     if (unlikely(!sec->units)) {
         nd_log(
-                NDLS_COLLECTORS,
-                NDLP_INFO,
-                "No section %s found. Collector will not plot chart for sensor %s",
-                section_name, name);
+            NDLS_COLLECTORS,
+            NDLP_INFO,
+            "No section %s found. Collector will not plot chart for sensor %s",
+            section_name,
+            name);
 
         freez(sec);
         return NULL;
@@ -610,17 +612,18 @@ static inline void sensors_state_chart_loop(struct sensor_data *sd, int update_e
 
 static inline RRDDIM *netdata_add_sensor_dimension(struct sensor_data *sd, char *label, int mult_factor)
 {
-    return rrddim_add(sd->st_sensor_data,
-                      label,
-                      NULL,
-                      (collected_number )mult_factor,
-                      (collected_number )sd->div_factor,
-                      RRD_ALGORITHM_ABSOLUTE);
+    return rrddim_add(
+        sd->st_sensor_data,
+        label,
+        NULL,
+        (collected_number)mult_factor,
+        (collected_number)sd->div_factor,
+        RRD_ALGORITHM_ABSOLUTE);
 }
 
 static inline void netdata_state_chart_set_value(RRDDIM *dim, struct sensor_data *sd, int value_idx)
 {
-    collected_number value = sd->current_data_value[value_idx] + (collected_number )sd->add_factor;
+    collected_number value = sd->current_data_value[value_idx] + (collected_number)sd->add_factor;
     rrddim_set_by_pointer(sd->st_sensor_data, dim, value);
 }
 
@@ -632,34 +635,39 @@ static void sensors_data_chart(struct sensor_data *sd, int update_every)
         netdata_fix_chart_name(id);
         struct netdata_sensors_extra_config *cfg = sd->cfg;
         sd->st_sensor_data = rrdset_create_localhost(
-                "sensors",
-                id,
-                NULL,
-                sd->config->family,
-                sd->config->context,
-                (cfg && cfg->title)? cfg->title: sd->config->title,
-                (cfg && cfg->units)? cfg->units: sd->config->units,
-                PLUGIN_WINDOWS_NAME,
-                "GetSensors",
-                sd->config->priority,
-                update_every,
-                RRDSET_TYPE_LINE);
+            "sensors",
+            id,
+            NULL,
+            sd->config->family,
+            sd->config->context,
+            (cfg && cfg->title) ? cfg->title : sd->config->title,
+            (cfg && cfg->units) ? cfg->units : sd->config->units,
+            PLUGIN_WINDOWS_NAME,
+            "GetSensors",
+            sd->config->priority,
+            update_every,
+            RRDSET_TYPE_LINE);
 
         rrdlabels_add(sd->st_sensor_data->rrdlabels, "name", sd->name, RRDLABEL_SRC_AUTO);
         rrdlabels_add(sd->st_sensor_data->rrdlabels, "manufacturer", sd->manufacturer, RRDLABEL_SRC_AUTO);
         rrdlabels_add(sd->st_sensor_data->rrdlabels, "model", sd->model, RRDLABEL_SRC_AUTO);
 
-        if (sd->sensor_data_type != NETDATA_WIN_SENSOR_TYPE_DISTANCE_X && sd->sensor_data_type != NETDATA_WIN_SENSOR_ACCELERATION_X_G)
+        if (sd->sensor_data_type != NETDATA_WIN_SENSOR_TYPE_DISTANCE_X &&
+            sd->sensor_data_type != NETDATA_WIN_SENSOR_ACCELERATION_X_G)
             sd->rd_sensor_data_0 = netdata_add_sensor_dimension(sd, "input", (cfg) ? cfg->multiplier : sd->mult_factor);
         else {
-            sd->rd_sensor_data_0 = netdata_add_sensor_dimension(sd, "inputX", (cfg) ? cfg->multiplier : sd->mult_factor);
-            sd->rd_sensor_data_1 = netdata_add_sensor_dimension(sd, "inputY", (cfg) ? cfg->multiplier : sd->mult_factor);
-            sd->rd_sensor_data_2 = netdata_add_sensor_dimension(sd, "inputZ", (cfg) ? cfg->multiplier : sd->mult_factor);
+            sd->rd_sensor_data_0 =
+                netdata_add_sensor_dimension(sd, "inputX", (cfg) ? cfg->multiplier : sd->mult_factor);
+            sd->rd_sensor_data_1 =
+                netdata_add_sensor_dimension(sd, "inputY", (cfg) ? cfg->multiplier : sd->mult_factor);
+            sd->rd_sensor_data_2 =
+                netdata_add_sensor_dimension(sd, "inputZ", (cfg) ? cfg->multiplier : sd->mult_factor);
         }
     }
 
     netdata_state_chart_set_value(sd->rd_sensor_data_0, sd, 0);
-    if (sd->sensor_data_type == NETDATA_WIN_SENSOR_TYPE_DISTANCE_X || sd->sensor_data_type == NETDATA_WIN_SENSOR_ACCELERATION_X_G) {
+    if (sd->sensor_data_type == NETDATA_WIN_SENSOR_TYPE_DISTANCE_X ||
+        sd->sensor_data_type == NETDATA_WIN_SENSOR_ACCELERATION_X_G) {
         netdata_state_chart_set_value(sd->rd_sensor_data_1, sd, 1);
         netdata_state_chart_set_value(sd->rd_sensor_data_2, sd, 2);
     }
