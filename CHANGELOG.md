@@ -171,6 +171,11 @@
 - Fix systemd-cat-native crash on realloc ([#21254](https://github.com/netdata/netdata/issues/21254))
 - Format code - MSSQL (windows.plugin) ([#21256](https://github.com/netdata/netdata/issues/21256))
 - Build(deps): bump github.com/ibm-messaging/mq-golang/v5 from 5.6.5 to 5.6.6 in /src/go ([#21259](https://github.com/netdata/netdata/issues/21259))
+- Additional tests to MSSQL (windows.plugin) ([#21255](https://github.com/netdata/netdata/issues/21255))
+- Adjust page cache locking ([#21240](https://github.com/netdata/netdata/issues/21240))
+- Chore(go.d): add shared dyncfg package ([#21263](https://github.com/netdata/netdata/issues/21263))
+- Fix tier check ([#21248](https://github.com/netdata/netdata/issues/21248))
+- Fix aral race condition ([#21258](https://github.com/netdata/netdata/issues/21258))
 
 ## [2.7.0] - 2025-09-25
 
