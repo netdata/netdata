@@ -280,7 +280,7 @@ struct sensor_data {
     const char *name;
     const char *manufacturer;
     const char *model;
-    struct netdata_sensors_extra_config *cfg;
+    struct netdata_sensors_extra_config *external_config;
 
     SensorState current_state;
 
@@ -491,7 +491,7 @@ static void netdata_get_sensors()
 
         if (sd->first_time) {
             netdata_sensors_get_data(sd, pSensor);
-            sd->config = netdata_sensors_fill_configuration(sd->name);
+            sd->external_config = netdata_sensors_fill_configuration(sd->name);
         } else if (likely(sd->enabled)) {
             netdata_collect_sensor_data(sd, pSensor, sensor_keys[sd->sensor_data_type], 0);
             if (sd->sensor_data_type == NETDATA_WIN_SENSOR_TYPE_DISTANCE_X) {
@@ -633,7 +633,7 @@ static void sensors_data_chart(struct sensor_data *sd, int update_every)
         char id[RRD_ID_LENGTH_MAX + 1];
         snprintfz(id, RRD_ID_LENGTH_MAX, "sensors.%s_input", sd->name);
         netdata_fix_chart_name(id);
-        struct netdata_sensors_extra_config *cfg = sd->cfg;
+        struct netdata_sensors_extra_config *cfg = sd->external_config;
         sd->st_sensor_data = rrdset_create_localhost(
             "sensors",
             id,
