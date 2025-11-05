@@ -382,9 +382,14 @@ ALWAYS_INLINE bool mrg_metric_clear_writer(MRG *mrg, METRIC *metric) {
 #endif
 
 inline void mrg_update_metric_retention_and_granularity_by_uuid(
-        MRG *mrg, Word_t section, nd_uuid_t *uuid,
-        time_t first_time_s, time_t last_time_s,
-        uint32_t update_every_s, time_t now_s)
+    MRG *mrg,
+    Word_t section,
+    nd_uuid_t(*uuid),
+    time_t first_time_s,
+    time_t last_time_s,
+    uint32_t update_every_s,
+    time_t now_s,
+    uint64_t *journal_samples)
 {
     if(unlikely(last_time_s > now_s)) {
         nd_log_limit_static_global_var(erl, 1, 0);
@@ -426,7 +431,6 @@ inline void mrg_update_metric_retention_and_granularity_by_uuid(
         metric = mrg_metric_add_and_acquire(mrg, entry, &added);
     }
 
-    struct rrdengine_instance *ctx = (struct rrdengine_instance *) section;
     if (likely(!added)) {
         uint64_t old_samples = 0;
 
@@ -439,13 +443,15 @@ inline void mrg_update_metric_retention_and_granularity_by_uuid(
         if (update_every_s && metric->latest_update_every_s && metric->latest_time_s_clean)
             new_samples = (metric->latest_time_s_clean - metric->first_time_s) / metric->latest_update_every_s;
 
-        __atomic_add_fetch(&ctx->atomic.samples, new_samples - old_samples, __ATOMIC_RELAXED);
+        if (journal_samples)
+            *journal_samples += (new_samples - old_samples);
     }
     else {
         // Newly added
         if (update_every_s) {
             uint64_t samples = (last_time_s - first_time_s) / update_every_s;
-            __atomic_add_fetch(&ctx->atomic.samples, samples, __ATOMIC_RELAXED);
+            if (journal_samples)
+                *journal_samples += samples;
         }
     }
 
