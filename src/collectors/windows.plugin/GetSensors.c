@@ -261,10 +261,13 @@ static struct win_sensor_config {
 
 struct netdata_sensors_extra_config {
     const char *units;
-    int variables;
-    collected_number *values;
+    const char *title;
+
     int multiplier;
     bool plot;
+
+    int variables;
+    collected_number *values;
 };
 
 static DICTIONARY *sensor_config;
@@ -441,7 +444,6 @@ static netdata_sensors_fill_configuration(const char *name) {
     }
 
     sec->multiplier = (int)inicfg_get_number(&netdata_config, section_name, "multiplier", 0);
-    sec->plot = true;
 }
 
 static void netdata_get_sensors()
@@ -536,8 +538,7 @@ void dict_sensor_conf_insert(const DICTIONARY_ITEM *item __maybe_unused, void *v
     struct netdata_sensors_extra_config *sec = value;
 
     sec->units = NULL;
-    sec->friendly_name = NULL;
-    sec->plot = false;
+    sec->title = NULL;
 }
 
 static int initialize(int update_every)
