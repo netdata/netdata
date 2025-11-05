@@ -257,14 +257,17 @@ static struct win_sensor_config {
         .priority = NETDATA_CHART_PRIO_SENSOR_MIN_CUSTOM,
     }};
 
+struct netdata_sensors_extra_values {
+    collected_number value;
+    enum netdata_win_sensor_monitored sensor_data_type;
+    struct netdata_sensors_extra_values *next;
+};
+
 struct netdata_sensors_extra_config {
     const char *units;
     const char *title;
 
     int multiplier;
-
-    int variables;
-    collected_number *values;
 };
 
 struct sensor_data {
@@ -273,6 +276,7 @@ struct sensor_data {
     bool enabled;
     enum netdata_win_sensor_monitored sensor_data_type;
     struct win_sensor_config *config;
+    struct netdata_sensors_extra_config_values *values;
 
     const char *type;
     const char *category;
