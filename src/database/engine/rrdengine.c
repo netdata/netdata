@@ -1605,7 +1605,7 @@ void journalfile_v2_populate_retention_to_mrg_worker(void *arg)
 static void *tier_mrg_load(
     struct rrdengine_instance *ctx __maybe_unused,
     void *data,
-    struct completion *completion,
+    struct completion *completion __maybe_unused,
     uv_work_t *req __maybe_unused)
 {
     worker_is_busy(UV_EVENT_DBENGINE_MRG_LOAD);
