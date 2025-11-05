@@ -270,20 +270,18 @@ struct netdata_sensors_extra_config {
     collected_number *values;
 };
 
-static DICTIONARY *sensor_config;
-
 struct sensor_data {
     bool initialized;
     bool first_time;
     bool enabled;
     enum netdata_win_sensor_monitored sensor_data_type;
-    struct win_sensor_config *config;
 
     const char *type;
     const char *category;
     const char *name;
     const char *manufacturer;
     const char *model;
+    struct netdata_sensors_extra_config *cfg;
 
     SensorState current_state;
 
@@ -425,12 +423,12 @@ static void netdata_sensors_get_data(struct sensor_data *sd, ISensor *pSensor)
     sd->first_time = false;
 }
 
-static netdata_sensors_fill_configuration(const char *name) {
+static struct netdata_sensors_extra_config *netdata_sensors_fill_configuration(const char *name) {
 #define NETDATA_DEFAULT_SENSOR_SECTION "plugin:windows:GetSensors"
     char section_name[CONFIG_MAX_NAME];
-    struct netdata_sensors_extra_config *sec = dictionary_set(sensor_config, name, NULL, sizeof(*sec));
+    struct netdata_sensors_extra_config *sec = mallocz(sizeof(*sec));
 
-    snprintfz(section_name, "%s:%s", NETDATA_DEFAULT_SENSOR_SECTION, name);
+    snprintfz(section_name, CONFIG_MAX_NAME, "%s:%s", NETDATA_DEFAULT_SENSOR_SECTION, name);
 
     sec->units = inicfg_get(&netdata_config, section_name, "units", NULL);;
     if (unlikely(!sec->units)) {
@@ -440,10 +438,13 @@ static netdata_sensors_fill_configuration(const char *name) {
                 "No section %s found. Collector will not plot chart for sensor %s",
                 section_name, name);
 
-        return;
+        freez(sec);
+        return NULL;
     }
 
     sec->multiplier = (int)inicfg_get_number(&netdata_config, section_name, "multiplier", 0);
+
+    return sec;
 }
 
 static void netdata_get_sensors()
@@ -488,7 +489,7 @@ static void netdata_get_sensors()
 
         if (sd->first_time) {
             netdata_sensors_get_data(sd, pSensor);
-            netdata_sensors_fill_configuration(sd->name);
+            sd->config = netdata_sensors_fill_configuration(sd->name);
         } else if (likely(sd->enabled)) {
             netdata_collect_sensor_data(sd, pSensor, sensor_keys[sd->sensor_data_type], 0);
             if (sd->sensor_data_type == NETDATA_WIN_SENSOR_TYPE_DISTANCE_X) {
@@ -533,14 +534,6 @@ void dict_sensor_insert(const DICTIONARY_ITEM *item __maybe_unused, void *value,
     sd->add_factor = 0.0;
 }
 
-void dict_sensor_conf_insert(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
-{
-    struct netdata_sensors_extra_config *sec = value;
-
-    sec->units = NULL;
-    sec->title = NULL;
-}
-
 static int initialize(int update_every)
 {
     // This is an internal plugin, if we initialize these two times, collector will fail. To avoid this
@@ -565,10 +558,6 @@ static int initialize(int update_every)
     sensors = dictionary_create_advanced(
         DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct sensor_data));
     dictionary_register_insert_callback(sensors, dict_sensor_insert, NULL);
-
-    sensor_config = dictionary_create_advanced(
-            DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct netdata_sensors_extra_config));
-    dictionary_register_insert_callback(sensor_config, dict_sensor_conf_insert, NULL);
 
     sensors_thread_update =
         nd_thread_create("sensors_upd", NETDATA_THREAD_OPTION_DEFAULT, netdata_sensors_monitor, &update_every);
