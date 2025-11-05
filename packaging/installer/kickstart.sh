@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Next unused error code: F051F
+# Next unused error code: F0520
 
 # ======================================================================
 # Constants
@@ -2571,6 +2571,13 @@ parse_args() {
       "--native-only") NETDATA_REQUESTED_INSTALL_TYPE="native" ;;
       "--static-only") NETDATA_REQUESTED_INSTALL_TYPE="static" ;;
       "--build-only") NETDATA_REQUESTED_INSTALL_TYPE="build" ;;
+      "--install-type")
+        case "${2}" in
+          native|static|build|auto|any) NETDATA_REQUESTED_INSTALL_TYPE="${2}" ;;
+          *) fatal "${2} is not a recognized install type. Please specify one of native, static, build, auto, or any." F051F ;;
+        esac
+        shift 1
+        ;;
       "--claim-"*)
         optname="$(echo "${1}" | cut -d '-' -f 4-)"
         case "${optname}" in
