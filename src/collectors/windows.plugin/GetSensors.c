@@ -260,7 +260,6 @@ static struct win_sensor_config {
 };
 
 struct netdata_sensors_extra_config {
-    const char *friendly_name;
     const char *units;
     int variables;
     collected_number *values;
@@ -423,6 +422,28 @@ static void netdata_sensors_get_data(struct sensor_data *sd, ISensor *pSensor)
     sd->first_time = false;
 }
 
+static netdata_sensors_fill_configuration(const char *name) {
+#define NETDATA_DEFAULT_SENSOR_SECTION "plugin:windows:GetSensors"
+    char section_name[CONFIG_MAX_NAME];
+    struct netdata_sensors_extra_config *sec = dictionary_set(sensor_config, name, NULL, sizeof(*sec));
+
+    snprintfz(section_name, "%s:%s", NETDATA_DEFAULT_SENSOR_SECTION, name);
+
+    sec->units = inicfg_get(&netdata_config, section_name, "units", NULL);;
+    if (unlikely(!sec->units)) {
+        nd_log(
+                NDLS_COLLECTORS,
+                NDLP_INFO,
+                "No section %s found. Collector will not plot chart for sensor %s",
+                section_name, name);
+
+        return;
+    }
+
+    sec->multiplier = (int)inicfg_get_number(&netdata_config, section_name, "multiplier", 0);
+    sec->plot = true;
+}
+
 static void netdata_get_sensors()
 {
     ISensorCollection *pSensorCollection = NULL;
@@ -463,9 +484,10 @@ static void netdata_get_sensors()
         sd->current_state = SENSOR_STATE_MIN;
         (void)pSensor->lpVtbl->GetState(pSensor, &sd->current_state);
 
-        if (sd->first_time)
+        if (sd->first_time) {
             netdata_sensors_get_data(sd, pSensor);
-        else if (likely(sd->enabled)) {
+            netdata_sensors_fill_configuration(sd->name);
+        } else if (likely(sd->enabled)) {
             netdata_collect_sensor_data(sd, pSensor, sensor_keys[sd->sensor_data_type], 0);
             if (sd->sensor_data_type == NETDATA_WIN_SENSOR_TYPE_DISTANCE_X) {
                 netdata_collect_sensor_data(sd, pSensor, sensor_keys[NETDATA_WIN_SENSOR_TYPE_DISTANCE_Y], 1);
