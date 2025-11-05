@@ -431,7 +431,6 @@ inline void mrg_update_metric_retention_and_granularity_by_uuid(
         metric = mrg_metric_add_and_acquire(mrg, entry, &added);
     }
 
-    struct rrdengine_instance *ctx = (struct rrdengine_instance *) section;
     if (likely(!added)) {
         uint64_t old_samples = 0;
 
