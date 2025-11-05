@@ -1,12 +1,23 @@
 State 0:
-          program ::= * expr
+          program ::= * expr_list
+          expr_list ::= * expr
+          expr_list ::= * expr SEMICOLON
+          expr_list ::= * SEMICOLON expr_list
+          expr_list ::= * expr SEMICOLON expr_list
+          expr ::= * VARIABLE ASSIGN expr
           expr ::= * NUMBER
           expr ::= * VARIABLE
           expr ::= * LPAREN expr RPAREN
           expr ::= * PLUS expr
           expr ::= * MINUS expr
           expr ::= * NOT expr
-          expr ::= * FUNCTION_ABS LPAREN expr RPAREN
+          expr ::= * FUNCTION RPAREN
+          expr ::= * FUNCTION expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr COMMA expr COMMA expr RPAREN
           expr ::= * expr PLUS expr
           expr ::= * expr MINUS expr
           expr ::= * expr MULTIPLY expr
@@ -22,24 +33,174 @@ State 0:
           expr ::= * expr GE expr
           expr ::= * expr QMARK expr COLON expr
 
-                        NUMBER shift-reduce 1      expr ::= NUMBER
-                      VARIABLE shift-reduce 2      expr ::= VARIABLE
-                        LPAREN shift        19     
-                          PLUS shift        17     
-                         MINUS shift        15     
-                           NOT shift        13     
-                  FUNCTION_ABS shift        36     
-                          expr shift        24     
+                     SEMICOLON shift        1      
+                      VARIABLE shift        50     
+                        NUMBER shift-reduce 6      expr ::= NUMBER
+                        LPAREN shift        26     
+                          PLUS shift        24     
+                         MINUS shift        22     
+                           NOT shift        20     
+                      FUNCTION shift        3      
+                          expr shift        37     
+                     expr_list shift        51     
                        program accept
 
 State 1:
+          expr_list ::= * expr
+          expr_list ::= * expr SEMICOLON
+          expr_list ::= * SEMICOLON expr_list
+          expr_list ::= SEMICOLON * expr_list
+          expr_list ::= * expr SEMICOLON expr_list
+          expr ::= * VARIABLE ASSIGN expr
           expr ::= * NUMBER
           expr ::= * VARIABLE
           expr ::= * LPAREN expr RPAREN
           expr ::= * PLUS expr
           expr ::= * MINUS expr
           expr ::= * NOT expr
-          expr ::= * FUNCTION_ABS LPAREN expr RPAREN
+          expr ::= * FUNCTION RPAREN
+          expr ::= * FUNCTION expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr COMMA expr COMMA expr RPAREN
+          expr ::= * expr PLUS expr
+          expr ::= * expr MINUS expr
+          expr ::= * expr MULTIPLY expr
+          expr ::= * expr DIVIDE expr
+          expr ::= * expr MODULO expr
+          expr ::= * expr AND expr
+          expr ::= * expr OR expr
+          expr ::= * expr EQ expr
+          expr ::= * expr NE expr
+          expr ::= * expr LT expr
+          expr ::= * expr LE expr
+          expr ::= * expr GT expr
+          expr ::= * expr GE expr
+          expr ::= * expr QMARK expr COLON expr
+
+                     SEMICOLON shift        1      
+                      VARIABLE shift        50     
+                        NUMBER shift-reduce 6      expr ::= NUMBER
+                        LPAREN shift        26     
+                          PLUS shift        24     
+                         MINUS shift        22     
+                           NOT shift        20     
+                      FUNCTION shift        3      
+                          expr shift        37     
+                     expr_list shift-reduce 3      expr_list ::= SEMICOLON expr_list
+
+State 2:
+          expr_list ::= * expr
+          expr_list ::= * expr SEMICOLON
+      (2) expr_list ::= expr SEMICOLON *
+          expr_list ::= * SEMICOLON expr_list
+          expr_list ::= * expr SEMICOLON expr_list
+          expr_list ::= expr SEMICOLON * expr_list
+          expr ::= * VARIABLE ASSIGN expr
+          expr ::= * NUMBER
+          expr ::= * VARIABLE
+          expr ::= * LPAREN expr RPAREN
+          expr ::= * PLUS expr
+          expr ::= * MINUS expr
+          expr ::= * NOT expr
+          expr ::= * FUNCTION RPAREN
+          expr ::= * FUNCTION expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr COMMA expr COMMA expr RPAREN
+          expr ::= * expr PLUS expr
+          expr ::= * expr MINUS expr
+          expr ::= * expr MULTIPLY expr
+          expr ::= * expr DIVIDE expr
+          expr ::= * expr MODULO expr
+          expr ::= * expr AND expr
+          expr ::= * expr OR expr
+          expr ::= * expr EQ expr
+          expr ::= * expr NE expr
+          expr ::= * expr LT expr
+          expr ::= * expr LE expr
+          expr ::= * expr GT expr
+          expr ::= * expr GE expr
+          expr ::= * expr QMARK expr COLON expr
+
+                     SEMICOLON shift        1      
+                      VARIABLE shift        50     
+                        NUMBER shift-reduce 6      expr ::= NUMBER
+                        LPAREN shift        26     
+                          PLUS shift        24     
+                         MINUS shift        22     
+                           NOT shift        20     
+                      FUNCTION shift        3      
+                          expr shift        37     
+                     expr_list shift-reduce 4      expr_list ::= expr SEMICOLON expr_list
+                     {default} reduce       2      expr_list ::= expr SEMICOLON
+
+State 3:
+          expr ::= * VARIABLE ASSIGN expr
+          expr ::= * NUMBER
+          expr ::= * VARIABLE
+          expr ::= * LPAREN expr RPAREN
+          expr ::= * PLUS expr
+          expr ::= * MINUS expr
+          expr ::= * NOT expr
+          expr ::= * FUNCTION RPAREN
+          expr ::= FUNCTION * RPAREN
+          expr ::= * FUNCTION expr RPAREN
+          expr ::= FUNCTION * expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr RPAREN
+          expr ::= FUNCTION * expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr RPAREN
+          expr ::= FUNCTION * expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr RPAREN
+          expr ::= FUNCTION * expr COMMA expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr COMMA expr RPAREN
+          expr ::= FUNCTION * expr COMMA expr COMMA expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr COMMA expr COMMA expr RPAREN
+          expr ::= FUNCTION * expr COMMA expr COMMA expr COMMA expr COMMA expr COMMA expr RPAREN
+          expr ::= * expr PLUS expr
+          expr ::= * expr MINUS expr
+          expr ::= * expr MULTIPLY expr
+          expr ::= * expr DIVIDE expr
+          expr ::= * expr MODULO expr
+          expr ::= * expr AND expr
+          expr ::= * expr OR expr
+          expr ::= * expr EQ expr
+          expr ::= * expr NE expr
+          expr ::= * expr LT expr
+          expr ::= * expr LE expr
+          expr ::= * expr GT expr
+          expr ::= * expr GE expr
+          expr ::= * expr QMARK expr COLON expr
+
+                      VARIABLE shift        50     
+                        NUMBER shift-reduce 6      expr ::= NUMBER
+                        LPAREN shift        26     
+                        RPAREN shift-reduce 12     expr ::= FUNCTION RPAREN
+                          PLUS shift        24     
+                         MINUS shift        22     
+                           NOT shift        20     
+                      FUNCTION shift        3      
+                          expr shift        33     
+
+State 4:
+          expr ::= * VARIABLE ASSIGN expr
+          expr ::= * NUMBER
+          expr ::= * VARIABLE
+          expr ::= * LPAREN expr RPAREN
+          expr ::= * PLUS expr
+          expr ::= * MINUS expr
+          expr ::= * NOT expr
+          expr ::= * FUNCTION RPAREN
+          expr ::= * FUNCTION expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr COMMA expr COMMA expr RPAREN
           expr ::= * expr PLUS expr
           expr ::= * expr MINUS expr
           expr ::= * expr MULTIPLY expr
@@ -56,23 +217,30 @@ State 1:
           expr ::= * expr QMARK expr COLON expr
           expr ::= expr QMARK expr COLON * expr
 
-                        NUMBER shift-reduce 1      expr ::= NUMBER
-                      VARIABLE shift-reduce 2      expr ::= VARIABLE
-                        LPAREN shift        19     
-                          PLUS shift        17     
-                         MINUS shift        15     
-                           NOT shift        13     
-                  FUNCTION_ABS shift        36     
-                          expr shift        25     
+                      VARIABLE shift        50     
+                        NUMBER shift-reduce 6      expr ::= NUMBER
+                        LPAREN shift        26     
+                          PLUS shift        24     
+                         MINUS shift        22     
+                           NOT shift        20     
+                      FUNCTION shift        3      
+                          expr shift        38     
 
-State 2:
+State 5:
+          expr ::= * VARIABLE ASSIGN expr
           expr ::= * NUMBER
           expr ::= * VARIABLE
           expr ::= * LPAREN expr RPAREN
           expr ::= * PLUS expr
           expr ::= * MINUS expr
           expr ::= * NOT expr
-          expr ::= * FUNCTION_ABS LPAREN expr RPAREN
+          expr ::= * FUNCTION RPAREN
+          expr ::= * FUNCTION expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr COMMA expr COMMA expr RPAREN
           expr ::= * expr PLUS expr
           expr ::= * expr MINUS expr
           expr ::= * expr MULTIPLY expr
@@ -89,23 +257,30 @@ State 2:
           expr ::= * expr QMARK expr COLON expr
           expr ::= expr QMARK * expr COLON expr
 
-                        NUMBER shift-reduce 1      expr ::= NUMBER
-                      VARIABLE shift-reduce 2      expr ::= VARIABLE
-                        LPAREN shift        19     
-                          PLUS shift        17     
-                         MINUS shift        15     
-                           NOT shift        13     
-                  FUNCTION_ABS shift        36     
-                          expr shift        21     
+                      VARIABLE shift        50     
+                        NUMBER shift-reduce 6      expr ::= NUMBER
+                        LPAREN shift        26     
+                          PLUS shift        24     
+                         MINUS shift        22     
+                           NOT shift        20     
+                      FUNCTION shift        3      
+                          expr shift        34     
 
-State 3:
+State 6:
+          expr ::= * VARIABLE ASSIGN expr
           expr ::= * NUMBER
           expr ::= * VARIABLE
           expr ::= * LPAREN expr RPAREN
           expr ::= * PLUS expr
           expr ::= * MINUS expr
           expr ::= * NOT expr
-          expr ::= * FUNCTION_ABS LPAREN expr RPAREN
+          expr ::= * FUNCTION RPAREN
+          expr ::= * FUNCTION expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr COMMA expr COMMA expr RPAREN
           expr ::= * expr PLUS expr
           expr ::= * expr MINUS expr
           expr ::= * expr MULTIPLY expr
@@ -122,23 +297,30 @@ State 3:
           expr ::= expr GE * expr
           expr ::= * expr QMARK expr COLON expr
 
-                        NUMBER shift-reduce 1      expr ::= NUMBER
-                      VARIABLE shift-reduce 2      expr ::= VARIABLE
-                        LPAREN shift        19     
-                          PLUS shift        17     
-                         MINUS shift        15     
-                           NOT shift        13     
-                  FUNCTION_ABS shift        36     
-                          expr shift        30     
+                      VARIABLE shift        50     
+                        NUMBER shift-reduce 6      expr ::= NUMBER
+                        LPAREN shift        26     
+                          PLUS shift        24     
+                         MINUS shift        22     
+                           NOT shift        20     
+                      FUNCTION shift        3      
+                          expr shift        44     
 
-State 4:
+State 7:
+          expr ::= * VARIABLE ASSIGN expr
           expr ::= * NUMBER
           expr ::= * VARIABLE
           expr ::= * LPAREN expr RPAREN
           expr ::= * PLUS expr
           expr ::= * MINUS expr
           expr ::= * NOT expr
-          expr ::= * FUNCTION_ABS LPAREN expr RPAREN
+          expr ::= * FUNCTION RPAREN
+          expr ::= * FUNCTION expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr COMMA expr COMMA expr RPAREN
           expr ::= * expr PLUS expr
           expr ::= * expr MINUS expr
           expr ::= * expr MULTIPLY expr
@@ -155,23 +337,30 @@ State 4:
           expr ::= * expr GE expr
           expr ::= * expr QMARK expr COLON expr
 
-                        NUMBER shift-reduce 1      expr ::= NUMBER
-                      VARIABLE shift-reduce 2      expr ::= VARIABLE
-                        LPAREN shift        19     
-                          PLUS shift        17     
-                         MINUS shift        15     
-                           NOT shift        13     
-                  FUNCTION_ABS shift        36     
-                          expr shift        31     
+                      VARIABLE shift        50     
+                        NUMBER shift-reduce 6      expr ::= NUMBER
+                        LPAREN shift        26     
+                          PLUS shift        24     
+                         MINUS shift        22     
+                           NOT shift        20     
+                      FUNCTION shift        3      
+                          expr shift        45     
 
-State 5:
+State 8:
+          expr ::= * VARIABLE ASSIGN expr
           expr ::= * NUMBER
           expr ::= * VARIABLE
           expr ::= * LPAREN expr RPAREN
           expr ::= * PLUS expr
           expr ::= * MINUS expr
           expr ::= * NOT expr
-          expr ::= * FUNCTION_ABS LPAREN expr RPAREN
+          expr ::= * FUNCTION RPAREN
+          expr ::= * FUNCTION expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr COMMA expr COMMA expr RPAREN
           expr ::= * expr PLUS expr
           expr ::= * expr MINUS expr
           expr ::= * expr MULTIPLY expr
@@ -188,23 +377,30 @@ State 5:
           expr ::= * expr GE expr
           expr ::= * expr QMARK expr COLON expr
 
-                        NUMBER shift-reduce 1      expr ::= NUMBER
-                      VARIABLE shift-reduce 2      expr ::= VARIABLE
-                        LPAREN shift        19     
-                          PLUS shift        17     
-                         MINUS shift        15     
-                           NOT shift        13     
-                  FUNCTION_ABS shift        36     
-                          expr shift        32     
+                      VARIABLE shift        50     
+                        NUMBER shift-reduce 6      expr ::= NUMBER
+                        LPAREN shift        26     
+                          PLUS shift        24     
+                         MINUS shift        22     
+                           NOT shift        20     
+                      FUNCTION shift        3      
+                          expr shift        46     
 
-State 6:
+State 9:
+          expr ::= * VARIABLE ASSIGN expr
           expr ::= * NUMBER
           expr ::= * VARIABLE
           expr ::= * LPAREN expr RPAREN
           expr ::= * PLUS expr
           expr ::= * MINUS expr
           expr ::= * NOT expr
-          expr ::= * FUNCTION_ABS LPAREN expr RPAREN
+          expr ::= * FUNCTION RPAREN
+          expr ::= * FUNCTION expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr COMMA expr COMMA expr RPAREN
           expr ::= * expr PLUS expr
           expr ::= * expr MINUS expr
           expr ::= * expr MULTIPLY expr
@@ -221,23 +417,30 @@ State 6:
           expr ::= * expr GE expr
           expr ::= * expr QMARK expr COLON expr
 
-                        NUMBER shift-reduce 1      expr ::= NUMBER
-                      VARIABLE shift-reduce 2      expr ::= VARIABLE
-                        LPAREN shift        19     
-                          PLUS shift        17     
-                         MINUS shift        15     
-                           NOT shift        13     
-                  FUNCTION_ABS shift        36     
-                          expr shift        33     
+                      VARIABLE shift        50     
+                        NUMBER shift-reduce 6      expr ::= NUMBER
+                        LPAREN shift        26     
+                          PLUS shift        24     
+                         MINUS shift        22     
+                           NOT shift        20     
+                      FUNCTION shift        3      
+                          expr shift        47     
 
-State 7:
+State 10:
+          expr ::= * VARIABLE ASSIGN expr
           expr ::= * NUMBER
           expr ::= * VARIABLE
           expr ::= * LPAREN expr RPAREN
           expr ::= * PLUS expr
           expr ::= * MINUS expr
           expr ::= * NOT expr
-          expr ::= * FUNCTION_ABS LPAREN expr RPAREN
+          expr ::= * FUNCTION RPAREN
+          expr ::= * FUNCTION expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr COMMA expr COMMA expr RPAREN
           expr ::= * expr PLUS expr
           expr ::= * expr MINUS expr
           expr ::= * expr MULTIPLY expr
@@ -254,23 +457,30 @@ State 7:
           expr ::= * expr GE expr
           expr ::= * expr QMARK expr COLON expr
 
-                        NUMBER shift-reduce 1      expr ::= NUMBER
-                      VARIABLE shift-reduce 2      expr ::= VARIABLE
-                        LPAREN shift        19     
-                          PLUS shift        17     
-                         MINUS shift        15     
-                           NOT shift        13     
-                  FUNCTION_ABS shift        36     
-                          expr shift        28     
+                      VARIABLE shift        50     
+                        NUMBER shift-reduce 6      expr ::= NUMBER
+                        LPAREN shift        26     
+                          PLUS shift        24     
+                         MINUS shift        22     
+                           NOT shift        20     
+                      FUNCTION shift        3      
+                          expr shift        42     
 
-State 8:
+State 11:
+          expr ::= * VARIABLE ASSIGN expr
           expr ::= * NUMBER
           expr ::= * VARIABLE
           expr ::= * LPAREN expr RPAREN
           expr ::= * PLUS expr
           expr ::= * MINUS expr
           expr ::= * NOT expr
-          expr ::= * FUNCTION_ABS LPAREN expr RPAREN
+          expr ::= * FUNCTION RPAREN
+          expr ::= * FUNCTION expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr COMMA expr COMMA expr RPAREN
           expr ::= * expr PLUS expr
           expr ::= * expr MINUS expr
           expr ::= * expr MULTIPLY expr
@@ -287,23 +497,30 @@ State 8:
           expr ::= * expr GE expr
           expr ::= * expr QMARK expr COLON expr
 
-                        NUMBER shift-reduce 1      expr ::= NUMBER
-                      VARIABLE shift-reduce 2      expr ::= VARIABLE
-                        LPAREN shift        19     
-                          PLUS shift        17     
-                         MINUS shift        15     
-                           NOT shift        13     
-                  FUNCTION_ABS shift        36     
-                          expr shift        29     
+                      VARIABLE shift        50     
+                        NUMBER shift-reduce 6      expr ::= NUMBER
+                        LPAREN shift        26     
+                          PLUS shift        24     
+                         MINUS shift        22     
+                           NOT shift        20     
+                      FUNCTION shift        3      
+                          expr shift        43     
 
-State 9:
+State 12:
+          expr ::= * VARIABLE ASSIGN expr
           expr ::= * NUMBER
           expr ::= * VARIABLE
           expr ::= * LPAREN expr RPAREN
           expr ::= * PLUS expr
           expr ::= * MINUS expr
           expr ::= * NOT expr
-          expr ::= * FUNCTION_ABS LPAREN expr RPAREN
+          expr ::= * FUNCTION RPAREN
+          expr ::= * FUNCTION expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr COMMA expr COMMA expr RPAREN
           expr ::= * expr PLUS expr
           expr ::= * expr MINUS expr
           expr ::= * expr MULTIPLY expr
@@ -320,23 +537,30 @@ State 9:
           expr ::= * expr GE expr
           expr ::= * expr QMARK expr COLON expr
 
-                        NUMBER shift-reduce 1      expr ::= NUMBER
-                      VARIABLE shift-reduce 2      expr ::= VARIABLE
-                        LPAREN shift        19     
-                          PLUS shift        17     
-                         MINUS shift        15     
-                           NOT shift        13     
-                  FUNCTION_ABS shift        36     
-                          expr shift        26     
+                      VARIABLE shift        50     
+                        NUMBER shift-reduce 6      expr ::= NUMBER
+                        LPAREN shift        26     
+                          PLUS shift        24     
+                         MINUS shift        22     
+                           NOT shift        20     
+                      FUNCTION shift        3      
+                          expr shift        40     
 
-State 10:
+State 13:
+          expr ::= * VARIABLE ASSIGN expr
           expr ::= * NUMBER
           expr ::= * VARIABLE
           expr ::= * LPAREN expr RPAREN
           expr ::= * PLUS expr
           expr ::= * MINUS expr
           expr ::= * NOT expr
-          expr ::= * FUNCTION_ABS LPAREN expr RPAREN
+          expr ::= * FUNCTION RPAREN
+          expr ::= * FUNCTION expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr COMMA expr COMMA expr RPAREN
           expr ::= * expr PLUS expr
           expr ::= * expr MINUS expr
           expr ::= * expr MULTIPLY expr
@@ -353,24 +577,31 @@ State 10:
           expr ::= * expr GE expr
           expr ::= * expr QMARK expr COLON expr
 
-                        NUMBER shift-reduce 1      expr ::= NUMBER
-                      VARIABLE shift-reduce 2      expr ::= VARIABLE
-                        LPAREN shift        19     
-                          PLUS shift        17     
-                         MINUS shift        15     
-                           NOT shift        13     
-                  FUNCTION_ABS shift        36     
-                          expr shift        27     
+                      VARIABLE shift        50     
+                        NUMBER shift-reduce 6      expr ::= NUMBER
+                        LPAREN shift        26     
+                          PLUS shift        24     
+                         MINUS shift        22     
+                           NOT shift        20     
+                      FUNCTION shift        3      
+                          expr shift        41     
 
-State 11:
+State 14:
+          expr ::= * VARIABLE ASSIGN expr
           expr ::= * NUMBER
           expr ::= * VARIABLE
           expr ::= * LPAREN expr RPAREN
           expr ::= * PLUS expr
           expr ::= * MINUS expr
           expr ::= * NOT expr
-          expr ::= * FUNCTION_ABS LPAREN expr RPAREN
-          expr ::= FUNCTION_ABS LPAREN * expr RPAREN
+          expr ::= * FUNCTION RPAREN
+          expr ::= * FUNCTION expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr COMMA expr COMMA expr RPAREN
+          expr ::= FUNCTION expr COMMA expr COMMA expr COMMA expr COMMA expr COMMA * expr RPAREN
           expr ::= * expr PLUS expr
           expr ::= * expr MINUS expr
           expr ::= * expr MULTIPLY expr
@@ -386,23 +617,200 @@ State 11:
           expr ::= * expr GE expr
           expr ::= * expr QMARK expr COLON expr
 
-                        NUMBER shift-reduce 1      expr ::= NUMBER
-                      VARIABLE shift-reduce 2      expr ::= VARIABLE
-                        LPAREN shift        19     
-                          PLUS shift        17     
-                         MINUS shift        15     
-                           NOT shift        13     
-                  FUNCTION_ABS shift        36     
-                          expr shift        22     
+                      VARIABLE shift        50     
+                        NUMBER shift-reduce 6      expr ::= NUMBER
+                        LPAREN shift        26     
+                          PLUS shift        24     
+                         MINUS shift        22     
+                           NOT shift        20     
+                      FUNCTION shift        3      
+                          expr shift        35     
 
-State 12:
+State 15:
+          expr ::= * VARIABLE ASSIGN expr
           expr ::= * NUMBER
           expr ::= * VARIABLE
           expr ::= * LPAREN expr RPAREN
           expr ::= * PLUS expr
           expr ::= * MINUS expr
           expr ::= * NOT expr
-          expr ::= * FUNCTION_ABS LPAREN expr RPAREN
+          expr ::= * FUNCTION RPAREN
+          expr ::= * FUNCTION expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr COMMA expr RPAREN
+          expr ::= FUNCTION expr COMMA expr COMMA expr COMMA expr COMMA * expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr COMMA expr COMMA expr RPAREN
+          expr ::= FUNCTION expr COMMA expr COMMA expr COMMA expr COMMA * expr COMMA expr RPAREN
+          expr ::= * expr PLUS expr
+          expr ::= * expr MINUS expr
+          expr ::= * expr MULTIPLY expr
+          expr ::= * expr DIVIDE expr
+          expr ::= * expr MODULO expr
+          expr ::= * expr AND expr
+          expr ::= * expr OR expr
+          expr ::= * expr EQ expr
+          expr ::= * expr NE expr
+          expr ::= * expr LT expr
+          expr ::= * expr LE expr
+          expr ::= * expr GT expr
+          expr ::= * expr GE expr
+          expr ::= * expr QMARK expr COLON expr
+
+                      VARIABLE shift        50     
+                        NUMBER shift-reduce 6      expr ::= NUMBER
+                        LPAREN shift        26     
+                          PLUS shift        24     
+                         MINUS shift        22     
+                           NOT shift        20     
+                      FUNCTION shift        3      
+                          expr shift        29     
+
+State 16:
+          expr ::= * VARIABLE ASSIGN expr
+          expr ::= * NUMBER
+          expr ::= * VARIABLE
+          expr ::= * LPAREN expr RPAREN
+          expr ::= * PLUS expr
+          expr ::= * MINUS expr
+          expr ::= * NOT expr
+          expr ::= * FUNCTION RPAREN
+          expr ::= * FUNCTION expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr RPAREN
+          expr ::= FUNCTION expr COMMA expr COMMA expr COMMA * expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr COMMA expr RPAREN
+          expr ::= FUNCTION expr COMMA expr COMMA expr COMMA * expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr COMMA expr COMMA expr RPAREN
+          expr ::= FUNCTION expr COMMA expr COMMA expr COMMA * expr COMMA expr COMMA expr RPAREN
+          expr ::= * expr PLUS expr
+          expr ::= * expr MINUS expr
+          expr ::= * expr MULTIPLY expr
+          expr ::= * expr DIVIDE expr
+          expr ::= * expr MODULO expr
+          expr ::= * expr AND expr
+          expr ::= * expr OR expr
+          expr ::= * expr EQ expr
+          expr ::= * expr NE expr
+          expr ::= * expr LT expr
+          expr ::= * expr LE expr
+          expr ::= * expr GT expr
+          expr ::= * expr GE expr
+          expr ::= * expr QMARK expr COLON expr
+
+                      VARIABLE shift        50     
+                        NUMBER shift-reduce 6      expr ::= NUMBER
+                        LPAREN shift        26     
+                          PLUS shift        24     
+                         MINUS shift        22     
+                           NOT shift        20     
+                      FUNCTION shift        3      
+                          expr shift        30     
+
+State 17:
+          expr ::= * VARIABLE ASSIGN expr
+          expr ::= * NUMBER
+          expr ::= * VARIABLE
+          expr ::= * LPAREN expr RPAREN
+          expr ::= * PLUS expr
+          expr ::= * MINUS expr
+          expr ::= * NOT expr
+          expr ::= * FUNCTION RPAREN
+          expr ::= * FUNCTION expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr RPAREN
+          expr ::= FUNCTION expr COMMA expr COMMA * expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr RPAREN
+          expr ::= FUNCTION expr COMMA expr COMMA * expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr COMMA expr RPAREN
+          expr ::= FUNCTION expr COMMA expr COMMA * expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr COMMA expr COMMA expr RPAREN
+          expr ::= FUNCTION expr COMMA expr COMMA * expr COMMA expr COMMA expr COMMA expr RPAREN
+          expr ::= * expr PLUS expr
+          expr ::= * expr MINUS expr
+          expr ::= * expr MULTIPLY expr
+          expr ::= * expr DIVIDE expr
+          expr ::= * expr MODULO expr
+          expr ::= * expr AND expr
+          expr ::= * expr OR expr
+          expr ::= * expr EQ expr
+          expr ::= * expr NE expr
+          expr ::= * expr LT expr
+          expr ::= * expr LE expr
+          expr ::= * expr GT expr
+          expr ::= * expr GE expr
+          expr ::= * expr QMARK expr COLON expr
+
+                      VARIABLE shift        50     
+                        NUMBER shift-reduce 6      expr ::= NUMBER
+                        LPAREN shift        26     
+                          PLUS shift        24     
+                         MINUS shift        22     
+                           NOT shift        20     
+                      FUNCTION shift        3      
+                          expr shift        31     
+
+State 18:
+          expr ::= * VARIABLE ASSIGN expr
+          expr ::= * NUMBER
+          expr ::= * VARIABLE
+          expr ::= * LPAREN expr RPAREN
+          expr ::= * PLUS expr
+          expr ::= * MINUS expr
+          expr ::= * NOT expr
+          expr ::= * FUNCTION RPAREN
+          expr ::= * FUNCTION expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr RPAREN
+          expr ::= FUNCTION expr COMMA * expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr RPAREN
+          expr ::= FUNCTION expr COMMA * expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr RPAREN
+          expr ::= FUNCTION expr COMMA * expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr COMMA expr RPAREN
+          expr ::= FUNCTION expr COMMA * expr COMMA expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr COMMA expr COMMA expr RPAREN
+          expr ::= FUNCTION expr COMMA * expr COMMA expr COMMA expr COMMA expr COMMA expr RPAREN
+          expr ::= * expr PLUS expr
+          expr ::= * expr MINUS expr
+          expr ::= * expr MULTIPLY expr
+          expr ::= * expr DIVIDE expr
+          expr ::= * expr MODULO expr
+          expr ::= * expr AND expr
+          expr ::= * expr OR expr
+          expr ::= * expr EQ expr
+          expr ::= * expr NE expr
+          expr ::= * expr LT expr
+          expr ::= * expr LE expr
+          expr ::= * expr GT expr
+          expr ::= * expr GE expr
+          expr ::= * expr QMARK expr COLON expr
+
+                      VARIABLE shift        50     
+                        NUMBER shift-reduce 6      expr ::= NUMBER
+                        LPAREN shift        26     
+                          PLUS shift        24     
+                         MINUS shift        22     
+                           NOT shift        20     
+                      FUNCTION shift        3      
+                          expr shift        32     
+
+State 19:
+          expr ::= * VARIABLE ASSIGN expr
+          expr ::= * NUMBER
+          expr ::= * VARIABLE
+          expr ::= * LPAREN expr RPAREN
+          expr ::= * PLUS expr
+          expr ::= * MINUS expr
+          expr ::= * NOT expr
+          expr ::= * FUNCTION RPAREN
+          expr ::= * FUNCTION expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr COMMA expr COMMA expr RPAREN
           expr ::= * expr PLUS expr
           expr ::= * expr MINUS expr
           expr ::= * expr MULTIPLY expr
@@ -419,16 +827,17 @@ State 12:
           expr ::= * expr GE expr
           expr ::= * expr QMARK expr COLON expr
 
-                        NUMBER shift-reduce 1      expr ::= NUMBER
-                      VARIABLE shift-reduce 2      expr ::= VARIABLE
-                        LPAREN shift        19     
-                          PLUS shift        17     
-                         MINUS shift        15     
-                           NOT shift        13     
-                  FUNCTION_ABS shift        36     
-                          expr shift-reduce 12     expr ::= expr MODULO expr
+                      VARIABLE shift        50     
+                        NUMBER shift-reduce 6      expr ::= NUMBER
+                        LPAREN shift        26     
+                          PLUS shift        24     
+                         MINUS shift        22     
+                           NOT shift        20     
+                      FUNCTION shift        3      
+                          expr shift-reduce 23     expr ::= expr MODULO expr
 
-State 13:
+State 20:
+          expr ::= * VARIABLE ASSIGN expr
           expr ::= * NUMBER
           expr ::= * VARIABLE
           expr ::= * LPAREN expr RPAREN
@@ -436,7 +845,13 @@ State 13:
           expr ::= * MINUS expr
           expr ::= * NOT expr
           expr ::= NOT * expr
-          expr ::= * FUNCTION_ABS LPAREN expr RPAREN
+          expr ::= * FUNCTION RPAREN
+          expr ::= * FUNCTION expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr COMMA expr COMMA expr RPAREN
           expr ::= * expr PLUS expr
           expr ::= * expr MINUS expr
           expr ::= * expr MULTIPLY expr
@@ -452,23 +867,30 @@ State 13:
           expr ::= * expr GE expr
           expr ::= * expr QMARK expr COLON expr
 
-                        NUMBER shift-reduce 1      expr ::= NUMBER
-                      VARIABLE shift-reduce 2      expr ::= VARIABLE
-                        LPAREN shift        19     
-                          PLUS shift        17     
-                         MINUS shift        15     
-                           NOT shift        13     
-                  FUNCTION_ABS shift        36     
-                          expr shift-reduce 6      expr ::= NOT expr
+                      VARIABLE shift        50     
+                        NUMBER shift-reduce 6      expr ::= NUMBER
+                        LPAREN shift        26     
+                          PLUS shift        24     
+                         MINUS shift        22     
+                           NOT shift        20     
+                      FUNCTION shift        3      
+                          expr shift-reduce 11     expr ::= NOT expr
 
-State 14:
+State 21:
+          expr ::= * VARIABLE ASSIGN expr
           expr ::= * NUMBER
           expr ::= * VARIABLE
           expr ::= * LPAREN expr RPAREN
           expr ::= * PLUS expr
           expr ::= * MINUS expr
           expr ::= * NOT expr
-          expr ::= * FUNCTION_ABS LPAREN expr RPAREN
+          expr ::= * FUNCTION RPAREN
+          expr ::= * FUNCTION expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr COMMA expr COMMA expr RPAREN
           expr ::= * expr PLUS expr
           expr ::= * expr MINUS expr
           expr ::= * expr MULTIPLY expr
@@ -485,16 +907,17 @@ State 14:
           expr ::= * expr GE expr
           expr ::= * expr QMARK expr COLON expr
 
-                        NUMBER shift-reduce 1      expr ::= NUMBER
-                      VARIABLE shift-reduce 2      expr ::= VARIABLE
-                        LPAREN shift        19     
-                          PLUS shift        17     
-                         MINUS shift        15     
-                           NOT shift        13     
-                  FUNCTION_ABS shift        36     
-                          expr shift-reduce 11     expr ::= expr DIVIDE expr
+                      VARIABLE shift        50     
+                        NUMBER shift-reduce 6      expr ::= NUMBER
+                        LPAREN shift        26     
+                          PLUS shift        24     
+                         MINUS shift        22     
+                           NOT shift        20     
+                      FUNCTION shift        3      
+                          expr shift-reduce 22     expr ::= expr DIVIDE expr
 
-State 15:
+State 22:
+          expr ::= * VARIABLE ASSIGN expr
           expr ::= * NUMBER
           expr ::= * VARIABLE
           expr ::= * LPAREN expr RPAREN
@@ -502,7 +925,13 @@ State 15:
           expr ::= * MINUS expr
           expr ::= MINUS * expr
           expr ::= * NOT expr
-          expr ::= * FUNCTION_ABS LPAREN expr RPAREN
+          expr ::= * FUNCTION RPAREN
+          expr ::= * FUNCTION expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr COMMA expr COMMA expr RPAREN
           expr ::= * expr PLUS expr
           expr ::= * expr MINUS expr
           expr ::= * expr MULTIPLY expr
@@ -518,23 +947,30 @@ State 15:
           expr ::= * expr GE expr
           expr ::= * expr QMARK expr COLON expr
 
-                        NUMBER shift-reduce 1      expr ::= NUMBER
-                      VARIABLE shift-reduce 2      expr ::= VARIABLE
-                        LPAREN shift        19     
-                          PLUS shift        17     
-                         MINUS shift        15     
-                           NOT shift        13     
-                  FUNCTION_ABS shift        36     
-                          expr shift-reduce 5      expr ::= MINUS expr
+                      VARIABLE shift        50     
+                        NUMBER shift-reduce 6      expr ::= NUMBER
+                        LPAREN shift        26     
+                          PLUS shift        24     
+                         MINUS shift        22     
+                           NOT shift        20     
+                      FUNCTION shift        3      
+                          expr shift-reduce 10     expr ::= MINUS expr
 
-State 16:
+State 23:
+          expr ::= * VARIABLE ASSIGN expr
           expr ::= * NUMBER
           expr ::= * VARIABLE
           expr ::= * LPAREN expr RPAREN
           expr ::= * PLUS expr
           expr ::= * MINUS expr
           expr ::= * NOT expr
-          expr ::= * FUNCTION_ABS LPAREN expr RPAREN
+          expr ::= * FUNCTION RPAREN
+          expr ::= * FUNCTION expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr COMMA expr COMMA expr RPAREN
           expr ::= * expr PLUS expr
           expr ::= * expr MINUS expr
           expr ::= * expr MULTIPLY expr
@@ -551,16 +987,17 @@ State 16:
           expr ::= * expr GE expr
           expr ::= * expr QMARK expr COLON expr
 
-                        NUMBER shift-reduce 1      expr ::= NUMBER
-                      VARIABLE shift-reduce 2      expr ::= VARIABLE
-                        LPAREN shift        19     
-                          PLUS shift        17     
-                         MINUS shift        15     
-                           NOT shift        13     
-                  FUNCTION_ABS shift        36     
-                          expr shift-reduce 10     expr ::= expr MULTIPLY expr
+                      VARIABLE shift        50     
+                        NUMBER shift-reduce 6      expr ::= NUMBER
+                        LPAREN shift        26     
+                          PLUS shift        24     
+                         MINUS shift        22     
+                           NOT shift        20     
+                      FUNCTION shift        3      
+                          expr shift-reduce 21     expr ::= expr MULTIPLY expr
 
-State 17:
+State 24:
+          expr ::= * VARIABLE ASSIGN expr
           expr ::= * NUMBER
           expr ::= * VARIABLE
           expr ::= * LPAREN expr RPAREN
@@ -568,7 +1005,13 @@ State 17:
           expr ::= PLUS * expr
           expr ::= * MINUS expr
           expr ::= * NOT expr
-          expr ::= * FUNCTION_ABS LPAREN expr RPAREN
+          expr ::= * FUNCTION RPAREN
+          expr ::= * FUNCTION expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr COMMA expr COMMA expr RPAREN
           expr ::= * expr PLUS expr
           expr ::= * expr MINUS expr
           expr ::= * expr MULTIPLY expr
@@ -584,23 +1027,30 @@ State 17:
           expr ::= * expr GE expr
           expr ::= * expr QMARK expr COLON expr
 
-                        NUMBER shift-reduce 1      expr ::= NUMBER
-                      VARIABLE shift-reduce 2      expr ::= VARIABLE
-                        LPAREN shift        19     
-                          PLUS shift        17     
-                         MINUS shift        15     
-                           NOT shift        13     
-                  FUNCTION_ABS shift        36     
-                          expr shift-reduce 4      expr ::= PLUS expr
+                      VARIABLE shift        50     
+                        NUMBER shift-reduce 6      expr ::= NUMBER
+                        LPAREN shift        26     
+                          PLUS shift        24     
+                         MINUS shift        22     
+                           NOT shift        20     
+                      FUNCTION shift        3      
+                          expr shift-reduce 9      expr ::= PLUS expr
 
-State 18:
+State 25:
+          expr ::= * VARIABLE ASSIGN expr
           expr ::= * NUMBER
           expr ::= * VARIABLE
           expr ::= * LPAREN expr RPAREN
           expr ::= * PLUS expr
           expr ::= * MINUS expr
           expr ::= * NOT expr
-          expr ::= * FUNCTION_ABS LPAREN expr RPAREN
+          expr ::= * FUNCTION RPAREN
+          expr ::= * FUNCTION expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr COMMA expr COMMA expr RPAREN
           expr ::= * expr PLUS expr
           expr ::= * expr MINUS expr
           expr ::= expr MINUS * expr
@@ -617,16 +1067,17 @@ State 18:
           expr ::= * expr GE expr
           expr ::= * expr QMARK expr COLON expr
 
-                        NUMBER shift-reduce 1      expr ::= NUMBER
-                      VARIABLE shift-reduce 2      expr ::= VARIABLE
-                        LPAREN shift        19     
-                          PLUS shift        17     
-                         MINUS shift        15     
-                           NOT shift        13     
-                  FUNCTION_ABS shift        36     
-                          expr shift        35     
+                      VARIABLE shift        50     
+                        NUMBER shift-reduce 6      expr ::= NUMBER
+                        LPAREN shift        26     
+                          PLUS shift        24     
+                         MINUS shift        22     
+                           NOT shift        20     
+                      FUNCTION shift        3      
+                          expr shift        49     
 
-State 19:
+State 26:
+          expr ::= * VARIABLE ASSIGN expr
           expr ::= * NUMBER
           expr ::= * VARIABLE
           expr ::= * LPAREN expr RPAREN
@@ -634,7 +1085,13 @@ State 19:
           expr ::= * PLUS expr
           expr ::= * MINUS expr
           expr ::= * NOT expr
-          expr ::= * FUNCTION_ABS LPAREN expr RPAREN
+          expr ::= * FUNCTION RPAREN
+          expr ::= * FUNCTION expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr COMMA expr COMMA expr RPAREN
           expr ::= * expr PLUS expr
           expr ::= * expr MINUS expr
           expr ::= * expr MULTIPLY expr
@@ -650,23 +1107,30 @@ State 19:
           expr ::= * expr GE expr
           expr ::= * expr QMARK expr COLON expr
 
-                        NUMBER shift-reduce 1      expr ::= NUMBER
-                      VARIABLE shift-reduce 2      expr ::= VARIABLE
-                        LPAREN shift        19     
-                          PLUS shift        17     
-                         MINUS shift        15     
-                           NOT shift        13     
-                  FUNCTION_ABS shift        36     
-                          expr shift        23     
+                      VARIABLE shift        50     
+                        NUMBER shift-reduce 6      expr ::= NUMBER
+                        LPAREN shift        26     
+                          PLUS shift        24     
+                         MINUS shift        22     
+                           NOT shift        20     
+                      FUNCTION shift        3      
+                          expr shift        36     
 
-State 20:
+State 27:
+          expr ::= * VARIABLE ASSIGN expr
           expr ::= * NUMBER
           expr ::= * VARIABLE
           expr ::= * LPAREN expr RPAREN
           expr ::= * PLUS expr
           expr ::= * MINUS expr
           expr ::= * NOT expr
-          expr ::= * FUNCTION_ABS LPAREN expr RPAREN
+          expr ::= * FUNCTION RPAREN
+          expr ::= * FUNCTION expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr COMMA expr COMMA expr RPAREN
           expr ::= * expr PLUS expr
           expr ::= expr PLUS * expr
           expr ::= * expr MINUS expr
@@ -683,16 +1147,241 @@ State 20:
           expr ::= * expr GE expr
           expr ::= * expr QMARK expr COLON expr
 
-                        NUMBER shift-reduce 1      expr ::= NUMBER
-                      VARIABLE shift-reduce 2      expr ::= VARIABLE
-                        LPAREN shift        19     
-                          PLUS shift        17     
-                         MINUS shift        15     
-                           NOT shift        13     
-                  FUNCTION_ABS shift        36     
-                          expr shift        34     
+                      VARIABLE shift        50     
+                        NUMBER shift-reduce 6      expr ::= NUMBER
+                        LPAREN shift        26     
+                          PLUS shift        24     
+                         MINUS shift        22     
+                           NOT shift        20     
+                      FUNCTION shift        3      
+                          expr shift        48     
 
-State 21:
+State 28:
+          expr ::= * VARIABLE ASSIGN expr
+          expr ::= VARIABLE ASSIGN * expr
+          expr ::= * NUMBER
+          expr ::= * VARIABLE
+          expr ::= * LPAREN expr RPAREN
+          expr ::= * PLUS expr
+          expr ::= * MINUS expr
+          expr ::= * NOT expr
+          expr ::= * FUNCTION RPAREN
+          expr ::= * FUNCTION expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr COMMA expr RPAREN
+          expr ::= * FUNCTION expr COMMA expr COMMA expr COMMA expr COMMA expr COMMA expr RPAREN
+          expr ::= * expr PLUS expr
+          expr ::= * expr MINUS expr
+          expr ::= * expr MULTIPLY expr
+          expr ::= * expr DIVIDE expr
+          expr ::= * expr MODULO expr
+          expr ::= * expr AND expr
+          expr ::= * expr OR expr
+          expr ::= * expr EQ expr
+          expr ::= * expr NE expr
+          expr ::= * expr LT expr
+          expr ::= * expr LE expr
+          expr ::= * expr GT expr
+          expr ::= * expr GE expr
+          expr ::= * expr QMARK expr COLON expr
+
+                      VARIABLE shift        50     
+                        NUMBER shift-reduce 6      expr ::= NUMBER
+                        LPAREN shift        26     
+                          PLUS shift        24     
+                         MINUS shift        22     
+                           NOT shift        20     
+                      FUNCTION shift        3      
+                          expr shift        39     
+
+State 29:
+          expr ::= FUNCTION expr COMMA expr COMMA expr COMMA expr COMMA expr * RPAREN
+          expr ::= FUNCTION expr COMMA expr COMMA expr COMMA expr COMMA expr * COMMA expr RPAREN
+          expr ::= expr * PLUS expr
+          expr ::= expr * MINUS expr
+          expr ::= expr * MULTIPLY expr
+          expr ::= expr * DIVIDE expr
+          expr ::= expr * MODULO expr
+          expr ::= expr * AND expr
+          expr ::= expr * OR expr
+          expr ::= expr * EQ expr
+          expr ::= expr * NE expr
+          expr ::= expr * LT expr
+          expr ::= expr * LE expr
+          expr ::= expr * GT expr
+          expr ::= expr * GE expr
+          expr ::= expr * QMARK expr COLON expr
+
+                        RPAREN shift-reduce 17     expr ::= FUNCTION expr COMMA expr COMMA expr COMMA expr COMMA expr RPAREN
+                          PLUS shift        27     
+                         MINUS shift        25     
+                         COMMA shift        14     
+                      MULTIPLY shift        23     
+                        DIVIDE shift        21     
+                        MODULO shift        19     
+                           AND shift        13     
+                            OR shift        12     
+                            EQ shift        11     
+                            NE shift        10     
+                            LT shift        9      
+                            LE shift        8      
+                            GT shift        7      
+                            GE shift        6      
+                         QMARK shift        5      
+
+State 30:
+          expr ::= FUNCTION expr COMMA expr COMMA expr COMMA expr * RPAREN
+          expr ::= FUNCTION expr COMMA expr COMMA expr COMMA expr * COMMA expr RPAREN
+          expr ::= FUNCTION expr COMMA expr COMMA expr COMMA expr * COMMA expr COMMA expr RPAREN
+          expr ::= expr * PLUS expr
+          expr ::= expr * MINUS expr
+          expr ::= expr * MULTIPLY expr
+          expr ::= expr * DIVIDE expr
+          expr ::= expr * MODULO expr
+          expr ::= expr * AND expr
+          expr ::= expr * OR expr
+          expr ::= expr * EQ expr
+          expr ::= expr * NE expr
+          expr ::= expr * LT expr
+          expr ::= expr * LE expr
+          expr ::= expr * GT expr
+          expr ::= expr * GE expr
+          expr ::= expr * QMARK expr COLON expr
+
+                        RPAREN shift-reduce 16     expr ::= FUNCTION expr COMMA expr COMMA expr COMMA expr RPAREN
+                          PLUS shift        27     
+                         MINUS shift        25     
+                         COMMA shift        15     
+                      MULTIPLY shift        23     
+                        DIVIDE shift        21     
+                        MODULO shift        19     
+                           AND shift        13     
+                            OR shift        12     
+                            EQ shift        11     
+                            NE shift        10     
+                            LT shift        9      
+                            LE shift        8      
+                            GT shift        7      
+                            GE shift        6      
+                         QMARK shift        5      
+
+State 31:
+          expr ::= FUNCTION expr COMMA expr COMMA expr * RPAREN
+          expr ::= FUNCTION expr COMMA expr COMMA expr * COMMA expr RPAREN
+          expr ::= FUNCTION expr COMMA expr COMMA expr * COMMA expr COMMA expr RPAREN
+          expr ::= FUNCTION expr COMMA expr COMMA expr * COMMA expr COMMA expr COMMA expr RPAREN
+          expr ::= expr * PLUS expr
+          expr ::= expr * MINUS expr
+          expr ::= expr * MULTIPLY expr
+          expr ::= expr * DIVIDE expr
+          expr ::= expr * MODULO expr
+          expr ::= expr * AND expr
+          expr ::= expr * OR expr
+          expr ::= expr * EQ expr
+          expr ::= expr * NE expr
+          expr ::= expr * LT expr
+          expr ::= expr * LE expr
+          expr ::= expr * GT expr
+          expr ::= expr * GE expr
+          expr ::= expr * QMARK expr COLON expr
+
+                        RPAREN shift-reduce 15     expr ::= FUNCTION expr COMMA expr COMMA expr RPAREN
+                          PLUS shift        27     
+                         MINUS shift        25     
+                         COMMA shift        16     
+                      MULTIPLY shift        23     
+                        DIVIDE shift        21     
+                        MODULO shift        19     
+                           AND shift        13     
+                            OR shift        12     
+                            EQ shift        11     
+                            NE shift        10     
+                            LT shift        9      
+                            LE shift        8      
+                            GT shift        7      
+                            GE shift        6      
+                         QMARK shift        5      
+
+State 32:
+          expr ::= FUNCTION expr COMMA expr * RPAREN
+          expr ::= FUNCTION expr COMMA expr * COMMA expr RPAREN
+          expr ::= FUNCTION expr COMMA expr * COMMA expr COMMA expr RPAREN
+          expr ::= FUNCTION expr COMMA expr * COMMA expr COMMA expr COMMA expr RPAREN
+          expr ::= FUNCTION expr COMMA expr * COMMA expr COMMA expr COMMA expr COMMA expr RPAREN
+          expr ::= expr * PLUS expr
+          expr ::= expr * MINUS expr
+          expr ::= expr * MULTIPLY expr
+          expr ::= expr * DIVIDE expr
+          expr ::= expr * MODULO expr
+          expr ::= expr * AND expr
+          expr ::= expr * OR expr
+          expr ::= expr * EQ expr
+          expr ::= expr * NE expr
+          expr ::= expr * LT expr
+          expr ::= expr * LE expr
+          expr ::= expr * GT expr
+          expr ::= expr * GE expr
+          expr ::= expr * QMARK expr COLON expr
+
+                        RPAREN shift-reduce 14     expr ::= FUNCTION expr COMMA expr RPAREN
+                          PLUS shift        27     
+                         MINUS shift        25     
+                         COMMA shift        17     
+                      MULTIPLY shift        23     
+                        DIVIDE shift        21     
+                        MODULO shift        19     
+                           AND shift        13     
+                            OR shift        12     
+                            EQ shift        11     
+                            NE shift        10     
+                            LT shift        9      
+                            LE shift        8      
+                            GT shift        7      
+                            GE shift        6      
+                         QMARK shift        5      
+
+State 33:
+          expr ::= FUNCTION expr * RPAREN
+          expr ::= FUNCTION expr * COMMA expr RPAREN
+          expr ::= FUNCTION expr * COMMA expr COMMA expr RPAREN
+          expr ::= FUNCTION expr * COMMA expr COMMA expr COMMA expr RPAREN
+          expr ::= FUNCTION expr * COMMA expr COMMA expr COMMA expr COMMA expr RPAREN
+          expr ::= FUNCTION expr * COMMA expr COMMA expr COMMA expr COMMA expr COMMA expr RPAREN
+          expr ::= expr * PLUS expr
+          expr ::= expr * MINUS expr
+          expr ::= expr * MULTIPLY expr
+          expr ::= expr * DIVIDE expr
+          expr ::= expr * MODULO expr
+          expr ::= expr * AND expr
+          expr ::= expr * OR expr
+          expr ::= expr * EQ expr
+          expr ::= expr * NE expr
+          expr ::= expr * LT expr
+          expr ::= expr * LE expr
+          expr ::= expr * GT expr
+          expr ::= expr * GE expr
+          expr ::= expr * QMARK expr COLON expr
+
+                        RPAREN shift-reduce 13     expr ::= FUNCTION expr RPAREN
+                          PLUS shift        27     
+                         MINUS shift        25     
+                         COMMA shift        18     
+                      MULTIPLY shift        23     
+                        DIVIDE shift        21     
+                        MODULO shift        19     
+                           AND shift        13     
+                            OR shift        12     
+                            EQ shift        11     
+                            NE shift        10     
+                            LT shift        9      
+                            LE shift        8      
+                            GT shift        7      
+                            GE shift        6      
+                         QMARK shift        5      
+
+State 34:
           expr ::= expr * PLUS expr
           expr ::= expr * MINUS expr
           expr ::= expr * MULTIPLY expr
@@ -709,24 +1398,24 @@ State 21:
           expr ::= expr * QMARK expr COLON expr
           expr ::= expr QMARK expr * COLON expr
 
-                          PLUS shift        20     
-                         MINUS shift        18     
-                      MULTIPLY shift        16     
-                        DIVIDE shift        14     
-                        MODULO shift        12     
-                           AND shift        10     
-                            OR shift        9      
-                            EQ shift        8      
-                            NE shift        7      
-                            LT shift        6      
-                            LE shift        5      
-                            GT shift        4      
-                            GE shift        3      
-                         QMARK shift        2      
-                         COLON shift        1      
+                          PLUS shift        27     
+                         MINUS shift        25     
+                      MULTIPLY shift        23     
+                        DIVIDE shift        21     
+                        MODULO shift        19     
+                           AND shift        13     
+                            OR shift        12     
+                            EQ shift        11     
+                            NE shift        10     
+                            LT shift        9      
+                            LE shift        8      
+                            GT shift        7      
+                            GE shift        6      
+                         QMARK shift        5      
+                         COLON shift        4      
 
-State 22:
-          expr ::= FUNCTION_ABS LPAREN expr * RPAREN
+State 35:
+          expr ::= FUNCTION expr COMMA expr COMMA expr COMMA expr COMMA expr COMMA expr * RPAREN
           expr ::= expr * PLUS expr
           expr ::= expr * MINUS expr
           expr ::= expr * MULTIPLY expr
@@ -742,23 +1431,23 @@ State 22:
           expr ::= expr * GE expr
           expr ::= expr * QMARK expr COLON expr
 
-                        RPAREN shift-reduce 7      expr ::= FUNCTION_ABS LPAREN expr RPAREN
-                          PLUS shift        20     
-                         MINUS shift        18     
-                      MULTIPLY shift        16     
-                        DIVIDE shift        14     
-                        MODULO shift        12     
-                           AND shift        10     
-                            OR shift        9      
-                            EQ shift        8      
-                            NE shift        7      
-                            LT shift        6      
-                            LE shift        5      
-                            GT shift        4      
-                            GE shift        3      
-                         QMARK shift        2      
+                        RPAREN shift-reduce 18     expr ::= FUNCTION expr COMMA expr COMMA expr COMMA expr COMMA expr COMMA expr RPAREN
+                          PLUS shift        27     
+                         MINUS shift        25     
+                      MULTIPLY shift        23     
+                        DIVIDE shift        21     
+                        MODULO shift        19     
+                           AND shift        13     
+                            OR shift        12     
+                            EQ shift        11     
+                            NE shift        10     
+                            LT shift        9      
+                            LE shift        8      
+                            GT shift        7      
+                            GE shift        6      
+                         QMARK shift        5      
 
-State 23:
+State 36:
           expr ::= LPAREN expr * RPAREN
           expr ::= expr * PLUS expr
           expr ::= expr * MINUS expr
@@ -775,24 +1464,26 @@ State 23:
           expr ::= expr * GE expr
           expr ::= expr * QMARK expr COLON expr
 
-                        RPAREN shift-reduce 3      expr ::= LPAREN expr RPAREN
-                          PLUS shift        20     
-                         MINUS shift        18     
-                      MULTIPLY shift        16     
-                        DIVIDE shift        14     
-                        MODULO shift        12     
-                           AND shift        10     
-                            OR shift        9      
-                            EQ shift        8      
-                            NE shift        7      
-                            LT shift        6      
-                            LE shift        5      
-                            GT shift        4      
-                            GE shift        3      
-                         QMARK shift        2      
+                        RPAREN shift-reduce 8      expr ::= LPAREN expr RPAREN
+                          PLUS shift        27     
+                         MINUS shift        25     
+                      MULTIPLY shift        23     
+                        DIVIDE shift        21     
+                        MODULO shift        19     
+                           AND shift        13     
+                            OR shift        12     
+                            EQ shift        11     
+                            NE shift        10     
+                            LT shift        9      
+                            LE shift        8      
+                            GT shift        7      
+                            GE shift        6      
+                         QMARK shift        5      
 
-State 24:
-      (0) program ::= expr *
+State 37:
+      (1) expr_list ::= expr *
+          expr_list ::= expr * SEMICOLON
+          expr_list ::= expr * SEMICOLON expr_list
           expr ::= expr * PLUS expr
           expr ::= expr * MINUS expr
           expr ::= expr * MULTIPLY expr
@@ -808,23 +1499,24 @@ State 24:
           expr ::= expr * GE expr
           expr ::= expr * QMARK expr COLON expr
 
-                             $ reduce       0      program ::= expr
-                          PLUS shift        20     
-                         MINUS shift        18     
-                      MULTIPLY shift        16     
-                        DIVIDE shift        14     
-                        MODULO shift        12     
-                           AND shift        10     
-                            OR shift        9      
-                            EQ shift        8      
-                            NE shift        7      
-                            LT shift        6      
-                            LE shift        5      
-                            GT shift        4      
-                            GE shift        3      
-                         QMARK shift        2      
+                     SEMICOLON shift        2      
+                          PLUS shift        27     
+                         MINUS shift        25     
+                      MULTIPLY shift        23     
+                        DIVIDE shift        21     
+                        MODULO shift        19     
+                           AND shift        13     
+                            OR shift        12     
+                            EQ shift        11     
+                            NE shift        10     
+                            LT shift        9      
+                            LE shift        8      
+                            GT shift        7      
+                            GE shift        6      
+                         QMARK shift        5      
+                     {default} reduce       1      expr_list ::= expr
 
-State 25:
+State 38:
           expr ::= expr * PLUS expr
           expr ::= expr * MINUS expr
           expr ::= expr * MULTIPLY expr
@@ -839,239 +1531,27 @@ State 25:
           expr ::= expr * GT expr
           expr ::= expr * GE expr
           expr ::= expr * QMARK expr COLON expr
-     (21) expr ::= expr QMARK expr COLON expr *
+     (32) expr ::= expr QMARK expr COLON expr *
 
-                          PLUS shift        20     
-                         MINUS shift        18     
-                      MULTIPLY shift        16     
-                        DIVIDE shift        14     
-                        MODULO shift        12     
-                           AND shift        10     
-                            OR shift        9      
-                            EQ shift        8      
-                            NE shift        7      
-                            LT shift        6      
-                            LE shift        5      
-                            GT shift        4      
-                            GE shift        3      
-                         QMARK shift        2      
-                     {default} reduce       21     expr ::= expr QMARK expr COLON expr
+                          PLUS shift        27     
+                         MINUS shift        25     
+                      MULTIPLY shift        23     
+                        DIVIDE shift        21     
+                        MODULO shift        19     
+                           AND shift        13     
+                            OR shift        12     
+                            EQ shift        11     
+                            NE shift        10     
+                            LT shift        9      
+                            LE shift        8      
+                            GT shift        7      
+                            GE shift        6      
+                         QMARK shift        5      
+                     {default} reduce       32     expr ::= expr QMARK expr COLON expr
 
-State 26:
+State 39:
+      (5) expr ::= VARIABLE ASSIGN expr *
           expr ::= expr * PLUS expr
-          expr ::= expr * MINUS expr
-          expr ::= expr * MULTIPLY expr
-          expr ::= expr * DIVIDE expr
-          expr ::= expr * MODULO expr
-          expr ::= expr * AND expr
-          expr ::= expr * OR expr
-     (14) expr ::= expr OR expr *
-          expr ::= expr * EQ expr
-          expr ::= expr * NE expr
-          expr ::= expr * LT expr
-          expr ::= expr * LE expr
-          expr ::= expr * GT expr
-          expr ::= expr * GE expr
-          expr ::= expr * QMARK expr COLON expr
-
-                          PLUS shift        20     
-                         MINUS shift        18     
-                      MULTIPLY shift        16     
-                        DIVIDE shift        14     
-                        MODULO shift        12     
-                            EQ shift        8      
-                            NE shift        7      
-                            LT shift        6      
-                            LE shift        5      
-                            GT shift        4      
-                            GE shift        3      
-                     {default} reduce       14     expr ::= expr OR expr
-
-State 27:
-          expr ::= expr * PLUS expr
-          expr ::= expr * MINUS expr
-          expr ::= expr * MULTIPLY expr
-          expr ::= expr * DIVIDE expr
-          expr ::= expr * MODULO expr
-          expr ::= expr * AND expr
-     (13) expr ::= expr AND expr *
-          expr ::= expr * OR expr
-          expr ::= expr * EQ expr
-          expr ::= expr * NE expr
-          expr ::= expr * LT expr
-          expr ::= expr * LE expr
-          expr ::= expr * GT expr
-          expr ::= expr * GE expr
-          expr ::= expr * QMARK expr COLON expr
-
-                          PLUS shift        20     
-                         MINUS shift        18     
-                      MULTIPLY shift        16     
-                        DIVIDE shift        14     
-                        MODULO shift        12     
-                            EQ shift        8      
-                            NE shift        7      
-                            LT shift        6      
-                            LE shift        5      
-                            GT shift        4      
-                            GE shift        3      
-                     {default} reduce       13     expr ::= expr AND expr
-
-State 28:
-          expr ::= expr * PLUS expr
-          expr ::= expr * MINUS expr
-          expr ::= expr * MULTIPLY expr
-          expr ::= expr * DIVIDE expr
-          expr ::= expr * MODULO expr
-          expr ::= expr * AND expr
-          expr ::= expr * OR expr
-          expr ::= expr * EQ expr
-          expr ::= expr * NE expr
-     (16) expr ::= expr NE expr *
-          expr ::= expr * LT expr
-          expr ::= expr * LE expr
-          expr ::= expr * GT expr
-          expr ::= expr * GE expr
-          expr ::= expr * QMARK expr COLON expr
-
-                          PLUS shift        20     
-                         MINUS shift        18     
-                      MULTIPLY shift        16     
-                        DIVIDE shift        14     
-                        MODULO shift        12     
-                            LT shift        6      
-                            LE shift        5      
-                            GT shift        4      
-                            GE shift        3      
-                     {default} reduce       16     expr ::= expr NE expr
-
-State 29:
-          expr ::= expr * PLUS expr
-          expr ::= expr * MINUS expr
-          expr ::= expr * MULTIPLY expr
-          expr ::= expr * DIVIDE expr
-          expr ::= expr * MODULO expr
-          expr ::= expr * AND expr
-          expr ::= expr * OR expr
-          expr ::= expr * EQ expr
-     (15) expr ::= expr EQ expr *
-          expr ::= expr * NE expr
-          expr ::= expr * LT expr
-          expr ::= expr * LE expr
-          expr ::= expr * GT expr
-          expr ::= expr * GE expr
-          expr ::= expr * QMARK expr COLON expr
-
-                          PLUS shift        20     
-                         MINUS shift        18     
-                      MULTIPLY shift        16     
-                        DIVIDE shift        14     
-                        MODULO shift        12     
-                            LT shift        6      
-                            LE shift        5      
-                            GT shift        4      
-                            GE shift        3      
-                     {default} reduce       15     expr ::= expr EQ expr
-
-State 30:
-          expr ::= expr * PLUS expr
-          expr ::= expr * MINUS expr
-          expr ::= expr * MULTIPLY expr
-          expr ::= expr * DIVIDE expr
-          expr ::= expr * MODULO expr
-          expr ::= expr * AND expr
-          expr ::= expr * OR expr
-          expr ::= expr * EQ expr
-          expr ::= expr * NE expr
-          expr ::= expr * LT expr
-          expr ::= expr * LE expr
-          expr ::= expr * GT expr
-          expr ::= expr * GE expr
-     (20) expr ::= expr GE expr *
-          expr ::= expr * QMARK expr COLON expr
-
-                          PLUS shift        20     
-                         MINUS shift        18     
-                      MULTIPLY shift        16     
-                        DIVIDE shift        14     
-                        MODULO shift        12     
-                     {default} reduce       20     expr ::= expr GE expr
-
-State 31:
-          expr ::= expr * PLUS expr
-          expr ::= expr * MINUS expr
-          expr ::= expr * MULTIPLY expr
-          expr ::= expr * DIVIDE expr
-          expr ::= expr * MODULO expr
-          expr ::= expr * AND expr
-          expr ::= expr * OR expr
-          expr ::= expr * EQ expr
-          expr ::= expr * NE expr
-          expr ::= expr * LT expr
-          expr ::= expr * LE expr
-          expr ::= expr * GT expr
-     (19) expr ::= expr GT expr *
-          expr ::= expr * GE expr
-          expr ::= expr * QMARK expr COLON expr
-
-                          PLUS shift        20     
-                         MINUS shift        18     
-                      MULTIPLY shift        16     
-                        DIVIDE shift        14     
-                        MODULO shift        12     
-                     {default} reduce       19     expr ::= expr GT expr
-
-State 32:
-          expr ::= expr * PLUS expr
-          expr ::= expr * MINUS expr
-          expr ::= expr * MULTIPLY expr
-          expr ::= expr * DIVIDE expr
-          expr ::= expr * MODULO expr
-          expr ::= expr * AND expr
-          expr ::= expr * OR expr
-          expr ::= expr * EQ expr
-          expr ::= expr * NE expr
-          expr ::= expr * LT expr
-          expr ::= expr * LE expr
-     (18) expr ::= expr LE expr *
-          expr ::= expr * GT expr
-          expr ::= expr * GE expr
-          expr ::= expr * QMARK expr COLON expr
-
-                          PLUS shift        20     
-                         MINUS shift        18     
-                      MULTIPLY shift        16     
-                        DIVIDE shift        14     
-                        MODULO shift        12     
-                     {default} reduce       18     expr ::= expr LE expr
-
-State 33:
-          expr ::= expr * PLUS expr
-          expr ::= expr * MINUS expr
-          expr ::= expr * MULTIPLY expr
-          expr ::= expr * DIVIDE expr
-          expr ::= expr * MODULO expr
-          expr ::= expr * AND expr
-          expr ::= expr * OR expr
-          expr ::= expr * EQ expr
-          expr ::= expr * NE expr
-          expr ::= expr * LT expr
-     (17) expr ::= expr LT expr *
-          expr ::= expr * LE expr
-          expr ::= expr * GT expr
-          expr ::= expr * GE expr
-          expr ::= expr * QMARK expr COLON expr
-
-                          PLUS shift        20     
-                         MINUS shift        18     
-                      MULTIPLY shift        16     
-                        DIVIDE shift        14     
-                        MODULO shift        12     
-                     {default} reduce       17     expr ::= expr LT expr
-
-State 34:
-          expr ::= expr * PLUS expr
-      (8) expr ::= expr PLUS expr *
           expr ::= expr * MINUS expr
           expr ::= expr * MULTIPLY expr
           expr ::= expr * DIVIDE expr
@@ -1086,15 +1566,238 @@ State 34:
           expr ::= expr * GE expr
           expr ::= expr * QMARK expr COLON expr
 
-                      MULTIPLY shift        16     
-                        DIVIDE shift        14     
-                        MODULO shift        12     
-                     {default} reduce       8      expr ::= expr PLUS expr
+                          PLUS shift        27     
+                         MINUS shift        25     
+                      MULTIPLY shift        23     
+                        DIVIDE shift        21     
+                        MODULO shift        19     
+                           AND shift        13     
+                            OR shift        12     
+                            EQ shift        11     
+                            NE shift        10     
+                            LT shift        9      
+                            LE shift        8      
+                            GT shift        7      
+                            GE shift        6      
+                         QMARK shift        5      
+                     {default} reduce       5      expr ::= VARIABLE ASSIGN expr
 
-State 35:
+State 40:
           expr ::= expr * PLUS expr
           expr ::= expr * MINUS expr
-      (9) expr ::= expr MINUS expr *
+          expr ::= expr * MULTIPLY expr
+          expr ::= expr * DIVIDE expr
+          expr ::= expr * MODULO expr
+          expr ::= expr * AND expr
+          expr ::= expr * OR expr
+     (25) expr ::= expr OR expr *
+          expr ::= expr * EQ expr
+          expr ::= expr * NE expr
+          expr ::= expr * LT expr
+          expr ::= expr * LE expr
+          expr ::= expr * GT expr
+          expr ::= expr * GE expr
+          expr ::= expr * QMARK expr COLON expr
+
+                          PLUS shift        27     
+                         MINUS shift        25     
+                      MULTIPLY shift        23     
+                        DIVIDE shift        21     
+                        MODULO shift        19     
+                            EQ shift        11     
+                            NE shift        10     
+                            LT shift        9      
+                            LE shift        8      
+                            GT shift        7      
+                            GE shift        6      
+                     {default} reduce       25     expr ::= expr OR expr
+
+State 41:
+          expr ::= expr * PLUS expr
+          expr ::= expr * MINUS expr
+          expr ::= expr * MULTIPLY expr
+          expr ::= expr * DIVIDE expr
+          expr ::= expr * MODULO expr
+          expr ::= expr * AND expr
+     (24) expr ::= expr AND expr *
+          expr ::= expr * OR expr
+          expr ::= expr * EQ expr
+          expr ::= expr * NE expr
+          expr ::= expr * LT expr
+          expr ::= expr * LE expr
+          expr ::= expr * GT expr
+          expr ::= expr * GE expr
+          expr ::= expr * QMARK expr COLON expr
+
+                          PLUS shift        27     
+                         MINUS shift        25     
+                      MULTIPLY shift        23     
+                        DIVIDE shift        21     
+                        MODULO shift        19     
+                            EQ shift        11     
+                            NE shift        10     
+                            LT shift        9      
+                            LE shift        8      
+                            GT shift        7      
+                            GE shift        6      
+                     {default} reduce       24     expr ::= expr AND expr
+
+State 42:
+          expr ::= expr * PLUS expr
+          expr ::= expr * MINUS expr
+          expr ::= expr * MULTIPLY expr
+          expr ::= expr * DIVIDE expr
+          expr ::= expr * MODULO expr
+          expr ::= expr * AND expr
+          expr ::= expr * OR expr
+          expr ::= expr * EQ expr
+          expr ::= expr * NE expr
+     (27) expr ::= expr NE expr *
+          expr ::= expr * LT expr
+          expr ::= expr * LE expr
+          expr ::= expr * GT expr
+          expr ::= expr * GE expr
+          expr ::= expr * QMARK expr COLON expr
+
+                          PLUS shift        27     
+                         MINUS shift        25     
+                      MULTIPLY shift        23     
+                        DIVIDE shift        21     
+                        MODULO shift        19     
+                            LT shift        9      
+                            LE shift        8      
+                            GT shift        7      
+                            GE shift        6      
+                     {default} reduce       27     expr ::= expr NE expr
+
+State 43:
+          expr ::= expr * PLUS expr
+          expr ::= expr * MINUS expr
+          expr ::= expr * MULTIPLY expr
+          expr ::= expr * DIVIDE expr
+          expr ::= expr * MODULO expr
+          expr ::= expr * AND expr
+          expr ::= expr * OR expr
+          expr ::= expr * EQ expr
+     (26) expr ::= expr EQ expr *
+          expr ::= expr * NE expr
+          expr ::= expr * LT expr
+          expr ::= expr * LE expr
+          expr ::= expr * GT expr
+          expr ::= expr * GE expr
+          expr ::= expr * QMARK expr COLON expr
+
+                          PLUS shift        27     
+                         MINUS shift        25     
+                      MULTIPLY shift        23     
+                        DIVIDE shift        21     
+                        MODULO shift        19     
+                            LT shift        9      
+                            LE shift        8      
+                            GT shift        7      
+                            GE shift        6      
+                     {default} reduce       26     expr ::= expr EQ expr
+
+State 44:
+          expr ::= expr * PLUS expr
+          expr ::= expr * MINUS expr
+          expr ::= expr * MULTIPLY expr
+          expr ::= expr * DIVIDE expr
+          expr ::= expr * MODULO expr
+          expr ::= expr * AND expr
+          expr ::= expr * OR expr
+          expr ::= expr * EQ expr
+          expr ::= expr * NE expr
+          expr ::= expr * LT expr
+          expr ::= expr * LE expr
+          expr ::= expr * GT expr
+          expr ::= expr * GE expr
+     (31) expr ::= expr GE expr *
+          expr ::= expr * QMARK expr COLON expr
+
+                          PLUS shift        27     
+                         MINUS shift        25     
+                      MULTIPLY shift        23     
+                        DIVIDE shift        21     
+                        MODULO shift        19     
+                     {default} reduce       31     expr ::= expr GE expr
+
+State 45:
+          expr ::= expr * PLUS expr
+          expr ::= expr * MINUS expr
+          expr ::= expr * MULTIPLY expr
+          expr ::= expr * DIVIDE expr
+          expr ::= expr * MODULO expr
+          expr ::= expr * AND expr
+          expr ::= expr * OR expr
+          expr ::= expr * EQ expr
+          expr ::= expr * NE expr
+          expr ::= expr * LT expr
+          expr ::= expr * LE expr
+          expr ::= expr * GT expr
+     (30) expr ::= expr GT expr *
+          expr ::= expr * GE expr
+          expr ::= expr * QMARK expr COLON expr
+
+                          PLUS shift        27     
+                         MINUS shift        25     
+                      MULTIPLY shift        23     
+                        DIVIDE shift        21     
+                        MODULO shift        19     
+                     {default} reduce       30     expr ::= expr GT expr
+
+State 46:
+          expr ::= expr * PLUS expr
+          expr ::= expr * MINUS expr
+          expr ::= expr * MULTIPLY expr
+          expr ::= expr * DIVIDE expr
+          expr ::= expr * MODULO expr
+          expr ::= expr * AND expr
+          expr ::= expr * OR expr
+          expr ::= expr * EQ expr
+          expr ::= expr * NE expr
+          expr ::= expr * LT expr
+          expr ::= expr * LE expr
+     (29) expr ::= expr LE expr *
+          expr ::= expr * GT expr
+          expr ::= expr * GE expr
+          expr ::= expr * QMARK expr COLON expr
+
+                          PLUS shift        27     
+                         MINUS shift        25     
+                      MULTIPLY shift        23     
+                        DIVIDE shift        21     
+                        MODULO shift        19     
+                     {default} reduce       29     expr ::= expr LE expr
+
+State 47:
+          expr ::= expr * PLUS expr
+          expr ::= expr * MINUS expr
+          expr ::= expr * MULTIPLY expr
+          expr ::= expr * DIVIDE expr
+          expr ::= expr * MODULO expr
+          expr ::= expr * AND expr
+          expr ::= expr * OR expr
+          expr ::= expr * EQ expr
+          expr ::= expr * NE expr
+          expr ::= expr * LT expr
+     (28) expr ::= expr LT expr *
+          expr ::= expr * LE expr
+          expr ::= expr * GT expr
+          expr ::= expr * GE expr
+          expr ::= expr * QMARK expr COLON expr
+
+                          PLUS shift        27     
+                         MINUS shift        25     
+                      MULTIPLY shift        23     
+                        DIVIDE shift        21     
+                        MODULO shift        19     
+                     {default} reduce       28     expr ::= expr LT expr
+
+State 48:
+          expr ::= expr * PLUS expr
+     (19) expr ::= expr PLUS expr *
+          expr ::= expr * MINUS expr
           expr ::= expr * MULTIPLY expr
           expr ::= expr * DIVIDE expr
           expr ::= expr * MODULO expr
@@ -1108,73 +1811,117 @@ State 35:
           expr ::= expr * GE expr
           expr ::= expr * QMARK expr COLON expr
 
-                      MULTIPLY shift        16     
-                        DIVIDE shift        14     
-                        MODULO shift        12     
-                     {default} reduce       9      expr ::= expr MINUS expr
+                      MULTIPLY shift        23     
+                        DIVIDE shift        21     
+                        MODULO shift        19     
+                     {default} reduce       19     expr ::= expr PLUS expr
 
-State 36:
-          expr ::= FUNCTION_ABS * LPAREN expr RPAREN
+State 49:
+          expr ::= expr * PLUS expr
+          expr ::= expr * MINUS expr
+     (20) expr ::= expr MINUS expr *
+          expr ::= expr * MULTIPLY expr
+          expr ::= expr * DIVIDE expr
+          expr ::= expr * MODULO expr
+          expr ::= expr * AND expr
+          expr ::= expr * OR expr
+          expr ::= expr * EQ expr
+          expr ::= expr * NE expr
+          expr ::= expr * LT expr
+          expr ::= expr * LE expr
+          expr ::= expr * GT expr
+          expr ::= expr * GE expr
+          expr ::= expr * QMARK expr COLON expr
 
-                        LPAREN shift        11     
+                      MULTIPLY shift        23     
+                        DIVIDE shift        21     
+                        MODULO shift        19     
+                     {default} reduce       20     expr ::= expr MINUS expr
+
+State 50:
+          expr ::= VARIABLE * ASSIGN expr
+      (7) expr ::= VARIABLE *
+
+                        ASSIGN shift        28     
+                     {default} reduce       7      expr ::= VARIABLE
+
+State 51:
+      (0) program ::= expr_list *
+
+                             $ reduce       0      program ::= expr_list
 
 ----------------------------------------------------
 Symbols:
 The first-set of non-terminals is shown after the name.
 
     0: $:
-    1: NUMBER
+    1: SEMICOLON (precedence=1)
     2: VARIABLE
-    3: LPAREN
-    4: RPAREN
-    5: PLUS (precedence=5)
-    6: UPLUS (precedence=7)
-    7: MINUS (precedence=5)
-    8: UMINUS (precedence=7)
-    9: NOT (precedence=7)
-   10: FUNCTION_ABS
-   11: MULTIPLY (precedence=6)
-   12: DIVIDE (precedence=6)
-   13: MODULO (precedence=6)
-   14: AND (precedence=2)
-   15: OR (precedence=2)
-   16: EQ (precedence=3)
-   17: NE (precedence=3)
-   18: LT (precedence=4)
-   19: LE (precedence=4)
-   20: GT (precedence=4)
-   21: GE (precedence=4)
-   22: QMARK (precedence=1)
-   23: COLON (precedence=1)
-   24: expr: NUMBER VARIABLE LPAREN PLUS MINUS NOT FUNCTION_ABS
-   25: program: NUMBER VARIABLE LPAREN PLUS MINUS NOT FUNCTION_ABS
+    3: ASSIGN (precedence=3)
+    4: NUMBER
+    5: LPAREN
+    6: RPAREN
+    7: PLUS (precedence=8)
+    8: UPLUS (precedence=10)
+    9: MINUS (precedence=8)
+   10: UMINUS (precedence=10)
+   11: NOT (precedence=10)
+   12: FUNCTION
+   13: COMMA (precedence=2)
+   14: MULTIPLY (precedence=9)
+   15: DIVIDE (precedence=9)
+   16: MODULO (precedence=9)
+   17: AND (precedence=5)
+   18: OR (precedence=5)
+   19: EQ (precedence=6)
+   20: NE (precedence=6)
+   21: LT (precedence=7)
+   22: LE (precedence=7)
+   23: GT (precedence=7)
+   24: GE (precedence=7)
+   25: QMARK (precedence=4)
+   26: COLON (precedence=4)
+   27: expr: VARIABLE NUMBER LPAREN PLUS MINUS NOT FUNCTION
+   28: expr_list: SEMICOLON VARIABLE NUMBER LPAREN PLUS MINUS NOT FUNCTION
+   29: program: SEMICOLON VARIABLE NUMBER LPAREN PLUS MINUS NOT FUNCTION
 ----------------------------------------------------
 Syntax-only Symbols:
 The following symbols never carry semantic content.
 
-$ LPAREN RPAREN PLUS UPLUS MINUS UMINUS NOT FUNCTION_ABS MULTIPLY DIVIDE
-MODULO AND OR EQ NE LT LE GT GE QMARK COLON program
+$ SEMICOLON ASSIGN LPAREN RPAREN PLUS UPLUS MINUS UMINUS NOT COMMA MULTIPLY
+DIVIDE MODULO AND OR EQ NE LT LE GT GE QMARK COLON program
 ----------------------------------------------------
 Rules:
-   0: program ::= expr.
-   1: expr ::= NUMBER.
-   2: expr ::= VARIABLE.
-   3: expr ::= LPAREN expr RPAREN.
-   4: expr ::= PLUS expr. [UPLUS precedence=7]
-   5: expr ::= MINUS expr. [UMINUS precedence=7]
-   6: expr ::= NOT expr. [NOT precedence=7]
-   7: expr ::= FUNCTION_ABS LPAREN expr RPAREN.
-   8: expr ::= expr PLUS expr. [PLUS precedence=5]
-   9: expr ::= expr MINUS expr. [MINUS precedence=5]
-  10: expr ::= expr MULTIPLY expr. [MULTIPLY precedence=6]
-  11: expr ::= expr DIVIDE expr. [DIVIDE precedence=6]
-  12: expr ::= expr MODULO expr. [MODULO precedence=6]
-  13: expr ::= expr AND expr. [AND precedence=2]
-  14: expr ::= expr OR expr. [OR precedence=2]
-  15: expr ::= expr EQ expr. [EQ precedence=3]
-  16: expr ::= expr NE expr. [NE precedence=3]
-  17: expr ::= expr LT expr. [LT precedence=4]
-  18: expr ::= expr LE expr. [LE precedence=4]
-  19: expr ::= expr GT expr. [GT precedence=4]
-  20: expr ::= expr GE expr. [GE precedence=4]
-  21: expr ::= expr QMARK expr COLON expr. [QMARK precedence=1]
+   0: program ::= expr_list.
+   1: expr_list ::= expr.
+   2: expr_list ::= expr SEMICOLON. [SEMICOLON precedence=1]
+   3: expr_list ::= SEMICOLON expr_list. [SEMICOLON precedence=1]
+   4: expr_list ::= expr SEMICOLON expr_list. [SEMICOLON precedence=1]
+   5: expr ::= VARIABLE ASSIGN expr. [ASSIGN precedence=3]
+   6: expr ::= NUMBER.
+   7: expr ::= VARIABLE.
+   8: expr ::= LPAREN expr RPAREN.
+   9: expr ::= PLUS expr. [UPLUS precedence=10]
+  10: expr ::= MINUS expr. [UMINUS precedence=10]
+  11: expr ::= NOT expr. [NOT precedence=10]
+  12: expr ::= FUNCTION RPAREN.
+  13: expr ::= FUNCTION expr RPAREN.
+  14: expr ::= FUNCTION expr COMMA expr RPAREN. [COMMA precedence=2]
+  15: expr ::= FUNCTION expr COMMA expr COMMA expr RPAREN. [COMMA precedence=2]
+  16: expr ::= FUNCTION expr COMMA expr COMMA expr COMMA expr RPAREN. [COMMA precedence=2]
+  17: expr ::= FUNCTION expr COMMA expr COMMA expr COMMA expr COMMA expr RPAREN. [COMMA precedence=2]
+  18: expr ::= FUNCTION expr COMMA expr COMMA expr COMMA expr COMMA expr COMMA expr RPAREN. [COMMA precedence=2]
+  19: expr ::= expr PLUS expr. [PLUS precedence=8]
+  20: expr ::= expr MINUS expr. [MINUS precedence=8]
+  21: expr ::= expr MULTIPLY expr. [MULTIPLY precedence=9]
+  22: expr ::= expr DIVIDE expr. [DIVIDE precedence=9]
+  23: expr ::= expr MODULO expr. [MODULO precedence=9]
+  24: expr ::= expr AND expr. [AND precedence=5]
+  25: expr ::= expr OR expr. [OR precedence=5]
+  26: expr ::= expr EQ expr. [EQ precedence=6]
+  27: expr ::= expr NE expr. [NE precedence=6]
+  28: expr ::= expr LT expr. [LT precedence=7]
+  29: expr ::= expr LE expr. [LE precedence=7]
+  30: expr ::= expr GT expr. [GT precedence=7]
+  31: expr ::= expr GE expr. [GE precedence=7]
+  32: expr ::= expr QMARK expr COLON expr. [QMARK precedence=4]

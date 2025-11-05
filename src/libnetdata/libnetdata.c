@@ -539,3 +539,8 @@ int netdata_base64_encode(unsigned char *encoded, const unsigned char *input, si
 //     decoded[count] = '\0'; // Null terminate the output string
 //     return count;
 // }
+
+void libnetdata_init(void) {
+    string_init();
+    eval_functions_init();
+}

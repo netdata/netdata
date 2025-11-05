@@ -8,6 +8,8 @@
 typedef union {
     NETDATA_DOUBLE dval;
     char *strval;
+    EVAL_NODE *node;  // Added for handling node pointers
+    EVAL_OPERATOR op; // Operator ID for dynamic functions
 } YYSTYPE;
 
 // Scanner structure definition
@@ -18,6 +20,7 @@ typedef struct {
     const char *limit;
     int line;
     int error;  // Flag to indicate a lexer error occurred
+    int in_assignment; // Flag to indicate if we are in an assignment context
 } Scanner;
 
 // Function declarations for the scanner

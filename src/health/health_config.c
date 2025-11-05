@@ -746,7 +746,7 @@ int health_readfile(const char *filename, void *data __maybe_unused, bool stock_
         }
         else if(hash == hash_calc && !strcasecmp(key, HEALTH_CALC_KEY)) {
             const char *failed_at = NULL;
-            int error = 0;
+            EVAL_ERROR error = 0;
             ac->calculation = expression_parse(value, &failed_at, &error);
             if(!ac->calculation) {
                 netdata_log_error(
@@ -758,7 +758,7 @@ int health_readfile(const char *filename, void *data __maybe_unused, bool stock_
         }
         else if(hash == hash_warn && !strcasecmp(key, HEALTH_WARN_KEY)) {
             const char *failed_at = NULL;
-            int error = 0;
+            EVAL_ERROR error = 0;
             ac->warning = expression_parse(value, &failed_at, &error);
             if(!ac->warning) {
                 netdata_log_error(
@@ -770,7 +770,7 @@ int health_readfile(const char *filename, void *data __maybe_unused, bool stock_
         }
         else if(hash == hash_crit && !strcasecmp(key, HEALTH_CRIT_KEY)) {
             const char *failed_at = NULL;
-            int error = 0;
+            EVAL_ERROR error = 0;
             ac->critical = expression_parse(value, &failed_at, &error);
             if(!ac->critical) {
                 netdata_log_error(

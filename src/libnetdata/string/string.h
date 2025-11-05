@@ -44,12 +44,12 @@ void string_statistics(size_t *inserts, size_t *deletes, size_t *searches, size_
 
 int string_unittest(size_t entries);
 
-void string_init(void);
-
 static inline void cleanup_string_pp(STRING **stringpp) {
     if(stringpp)
         string_freez(*stringpp);
 }
+
+void string_init(void);
 
 #define CLEAN_STRING _cleanup_(cleanup_string_pp) STRING
 
