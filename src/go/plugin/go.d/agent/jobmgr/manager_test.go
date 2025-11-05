@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/confgroup"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/dyncfg"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/functions"
 )
 
@@ -61,7 +62,7 @@ CONFIG test:collector:success:name delete
 					},
 					wantDiscovered: []confgroup.Config{cfg},
 					wantSeen: []seenConfig{
-						{cfg: cfg, status: dyncfgFailed},
+						{cfg: cfg, status: dyncfg.StatusFailed},
 					},
 					wantExposed: nil,
 					wantRunning: nil,
@@ -267,13 +268,13 @@ CONFIG test:collector:fail:name delete
 						discCfg,
 					},
 					wantSeen: []seenConfig{
-						{cfg: stockCfg, status: dyncfgFailed},
-						{cfg: discCfg, status: dyncfgFailed},
-						{cfg: userCfg, status: dyncfgFailed},
+						{cfg: stockCfg, status: dyncfg.StatusFailed},
+						{cfg: discCfg, status: dyncfg.StatusFailed},
+						{cfg: userCfg, status: dyncfg.StatusFailed},
 					},
 					wantExposed: []seenConfig{
-						{cfg: discCfg, status: dyncfgFailed},
-						{cfg: userCfg, status: dyncfgFailed},
+						{cfg: discCfg, status: dyncfg.StatusFailed},
+						{cfg: userCfg, status: dyncfg.StatusFailed},
 					},
 					wantRunning: nil,
 					wantDyncfg: `
@@ -336,12 +337,12 @@ CONFIG test:collector:fail:user status failed
 						discCfg,
 					},
 					wantSeen: []seenConfig{
-						{cfg: stockCfg, status: dyncfgFailed},
-						{cfg: discCfg, status: dyncfgFailed},
-						{cfg: userCfg, status: dyncfgFailed},
+						{cfg: stockCfg, status: dyncfg.StatusFailed},
+						{cfg: discCfg, status: dyncfg.StatusFailed},
+						{cfg: userCfg, status: dyncfg.StatusFailed},
 					},
 					wantExposed: []seenConfig{
-						{cfg: userCfg, status: dyncfgFailed},
+						{cfg: userCfg, status: dyncfg.StatusFailed},
 					},
 					wantRunning: nil,
 					wantDyncfg: `
@@ -459,12 +460,12 @@ CONFIG test:collector:fail:name delete
 						discCfg,
 					},
 					wantSeen: []seenConfig{
-						{cfg: userCfg, status: dyncfgFailed},
+						{cfg: userCfg, status: dyncfg.StatusFailed},
 						{cfg: discCfg},
 						{cfg: stockCfg},
 					},
 					wantExposed: []seenConfig{
-						{cfg: userCfg, status: dyncfgFailed},
+						{cfg: userCfg, status: dyncfg.StatusFailed},
 					},
 					wantRunning: nil,
 					wantDyncfg: `
@@ -578,10 +579,10 @@ FUNCTION_RESULT_END
 					},
 					wantDiscovered: nil,
 					wantSeen: []seenConfig{
-						{cfg: cfg, status: dyncfgAccepted},
+						{cfg: cfg, status: dyncfg.StatusAccepted},
 					},
 					wantExposed: []seenConfig{
-						{cfg: cfg, status: dyncfgAccepted},
+						{cfg: cfg, status: dyncfg.StatusAccepted},
 					},
 					wantRunning: nil,
 					wantDyncfg: `
@@ -692,10 +693,10 @@ func TestManager_Run_Dyncfg_Add(t *testing.T) {
 					},
 					wantDiscovered: nil,
 					wantSeen: []seenConfig{
-						{cfg: cfg, status: dyncfgAccepted},
+						{cfg: cfg, status: dyncfg.StatusAccepted},
 					},
 					wantExposed: []seenConfig{
-						{cfg: cfg, status: dyncfgAccepted},
+						{cfg: cfg, status: dyncfg.StatusAccepted},
 					},
 					wantRunning: nil,
 					wantDyncfg: `
@@ -724,10 +725,10 @@ CONFIG test:collector:success:test create accepted job /collectors/test/Jobs dyn
 					},
 					wantDiscovered: nil,
 					wantSeen: []seenConfig{
-						{cfg: cfg, status: dyncfgAccepted},
+						{cfg: cfg, status: dyncfg.StatusAccepted},
 					},
 					wantExposed: []seenConfig{
-						{cfg: cfg, status: dyncfgAccepted},
+						{cfg: cfg, status: dyncfg.StatusAccepted},
 					},
 					wantRunning: nil,
 					wantDyncfg: `
@@ -762,10 +763,10 @@ CONFIG test:collector:fail:test create accepted job /collectors/test/Jobs dyncfg
 					},
 					wantDiscovered: nil,
 					wantSeen: []seenConfig{
-						{cfg: cfg, status: dyncfgAccepted},
+						{cfg: cfg, status: dyncfg.StatusAccepted},
 					},
 					wantExposed: []seenConfig{
-						{cfg: cfg, status: dyncfgAccepted},
+						{cfg: cfg, status: dyncfg.StatusAccepted},
 					},
 					wantRunning: nil,
 					wantDyncfg: `
@@ -842,10 +843,10 @@ FUNCTION_RESULT_END
 					},
 					wantDiscovered: nil,
 					wantSeen: []seenConfig{
-						{cfg: cfg, status: dyncfgRunning},
+						{cfg: cfg, status: dyncfg.StatusRunning},
 					},
 					wantExposed: []seenConfig{
-						{cfg: cfg, status: dyncfgRunning},
+						{cfg: cfg, status: dyncfg.StatusRunning},
 					},
 					wantRunning: []string{cfg.FullName()},
 					wantDyncfg: `
@@ -888,10 +889,10 @@ CONFIG test:collector:success:test status running
 					},
 					wantDiscovered: nil,
 					wantSeen: []seenConfig{
-						{cfg: cfg, status: dyncfgRunning},
+						{cfg: cfg, status: dyncfg.StatusRunning},
 					},
 					wantExposed: []seenConfig{
-						{cfg: cfg, status: dyncfgRunning},
+						{cfg: cfg, status: dyncfg.StatusRunning},
 					},
 					wantRunning: []string{cfg.FullName()},
 					wantDyncfg: `
@@ -936,10 +937,10 @@ CONFIG test:collector:success:test status running
 					},
 					wantDiscovered: nil,
 					wantSeen: []seenConfig{
-						{cfg: cfg, status: dyncfgFailed},
+						{cfg: cfg, status: dyncfg.StatusFailed},
 					},
 					wantExposed: []seenConfig{
-						{cfg: cfg, status: dyncfgFailed},
+						{cfg: cfg, status: dyncfg.StatusFailed},
 					},
 					wantRunning: nil,
 					wantDyncfg: `
@@ -982,10 +983,10 @@ CONFIG test:collector:fail:test status failed
 					},
 					wantDiscovered: nil,
 					wantSeen: []seenConfig{
-						{cfg: cfg, status: dyncfgFailed},
+						{cfg: cfg, status: dyncfg.StatusFailed},
 					},
 					wantExposed: []seenConfig{
-						{cfg: cfg, status: dyncfgFailed},
+						{cfg: cfg, status: dyncfg.StatusFailed},
 					},
 					wantRunning: nil,
 					wantDyncfg: `
@@ -1068,10 +1069,10 @@ FUNCTION_RESULT_END
 					},
 					wantDiscovered: nil,
 					wantSeen: []seenConfig{
-						{cfg: cfg, status: dyncfgDisabled},
+						{cfg: cfg, status: dyncfg.StatusDisabled},
 					},
 					wantExposed: []seenConfig{
-						{cfg: cfg, status: dyncfgDisabled},
+						{cfg: cfg, status: dyncfg.StatusDisabled},
 					},
 					wantRunning: nil,
 					wantDyncfg: `
@@ -1114,10 +1115,10 @@ CONFIG test:collector:success:test status disabled
 					},
 					wantDiscovered: nil,
 					wantSeen: []seenConfig{
-						{cfg: cfg, status: dyncfgDisabled},
+						{cfg: cfg, status: dyncfg.StatusDisabled},
 					},
 					wantExposed: []seenConfig{
-						{cfg: cfg, status: dyncfgDisabled},
+						{cfg: cfg, status: dyncfg.StatusDisabled},
 					},
 					wantRunning: nil,
 					wantDyncfg: `
@@ -1162,10 +1163,10 @@ CONFIG test:collector:success:test status disabled
 					},
 					wantDiscovered: nil,
 					wantSeen: []seenConfig{
-						{cfg: cfg, status: dyncfgDisabled},
+						{cfg: cfg, status: dyncfg.StatusDisabled},
 					},
 					wantExposed: []seenConfig{
-						{cfg: cfg, status: dyncfgDisabled},
+						{cfg: cfg, status: dyncfg.StatusDisabled},
 					},
 					wantRunning: nil,
 					wantDyncfg: `
@@ -1208,10 +1209,10 @@ CONFIG test:collector:fail:test status disabled
 					},
 					wantDiscovered: nil,
 					wantSeen: []seenConfig{
-						{cfg: cfg, status: dyncfgDisabled},
+						{cfg: cfg, status: dyncfg.StatusDisabled},
 					},
 					wantExposed: []seenConfig{
-						{cfg: cfg, status: dyncfgDisabled},
+						{cfg: cfg, status: dyncfg.StatusDisabled},
 					},
 					wantRunning: nil,
 					wantDyncfg: `
@@ -1294,10 +1295,10 @@ FUNCTION_RESULT_END
 					},
 					wantDiscovered: nil,
 					wantSeen: []seenConfig{
-						{cfg: cfg, status: dyncfgAccepted},
+						{cfg: cfg, status: dyncfg.StatusAccepted},
 					},
 					wantExposed: []seenConfig{
-						{cfg: cfg, status: dyncfgAccepted},
+						{cfg: cfg, status: dyncfg.StatusAccepted},
 					},
 					wantRunning: nil,
 					wantDyncfg: `
@@ -1340,10 +1341,10 @@ CONFIG test:collector:success:test status accepted
 					},
 					wantDiscovered: nil,
 					wantSeen: []seenConfig{
-						{cfg: cfg, status: dyncfgRunning},
+						{cfg: cfg, status: dyncfg.StatusRunning},
 					},
 					wantExposed: []seenConfig{
-						{cfg: cfg, status: dyncfgRunning},
+						{cfg: cfg, status: dyncfg.StatusRunning},
 					},
 					wantRunning: []string{cfg.FullName()},
 					wantDyncfg: `
@@ -1392,10 +1393,10 @@ CONFIG test:collector:success:test status running
 					},
 					wantDiscovered: nil,
 					wantSeen: []seenConfig{
-						{cfg: cfg, status: dyncfgDisabled},
+						{cfg: cfg, status: dyncfg.StatusDisabled},
 					},
 					wantExposed: []seenConfig{
-						{cfg: cfg, status: dyncfgDisabled},
+						{cfg: cfg, status: dyncfg.StatusDisabled},
 					},
 					wantRunning: nil,
 					wantDyncfg: `
@@ -1448,10 +1449,10 @@ CONFIG test:collector:success:test status disabled
 					},
 					wantDiscovered: nil,
 					wantSeen: []seenConfig{
-						{cfg: cfg, status: dyncfgRunning},
+						{cfg: cfg, status: dyncfg.StatusRunning},
 					},
 					wantExposed: []seenConfig{
-						{cfg: cfg, status: dyncfgRunning},
+						{cfg: cfg, status: dyncfg.StatusRunning},
 					},
 					wantRunning: []string{cfg.FullName()},
 					wantDyncfg: `
@@ -1566,14 +1567,14 @@ FUNCTION_RESULT_END
 						discCfg,
 					},
 					wantSeen: []seenConfig{
-						{cfg: stockCfg, status: dyncfgRunning},
-						{cfg: userCfg, status: dyncfgRunning},
-						{cfg: discCfg, status: dyncfgRunning},
+						{cfg: stockCfg, status: dyncfg.StatusRunning},
+						{cfg: userCfg, status: dyncfg.StatusRunning},
+						{cfg: discCfg, status: dyncfg.StatusRunning},
 					},
 					wantExposed: []seenConfig{
-						{cfg: stockCfg, status: dyncfgRunning},
-						{cfg: userCfg, status: dyncfgRunning},
-						{cfg: discCfg, status: dyncfgRunning},
+						{cfg: stockCfg, status: dyncfg.StatusRunning},
+						{cfg: userCfg, status: dyncfg.StatusRunning},
+						{cfg: discCfg, status: dyncfg.StatusRunning},
 					},
 					wantRunning: []string{stockCfg.FullName(), userCfg.FullName(), discCfg.FullName()},
 					wantDyncfg: `
@@ -1771,10 +1772,10 @@ FUNCTION_RESULT_END
 					},
 					wantDiscovered: nil,
 					wantSeen: []seenConfig{
-						{cfg: updCfg, status: dyncfgRunning},
+						{cfg: updCfg, status: dyncfg.StatusRunning},
 					},
 					wantExposed: []seenConfig{
-						{cfg: updCfg, status: dyncfgRunning},
+						{cfg: updCfg, status: dyncfg.StatusRunning},
 					},
 					wantRunning: []string{updCfg.FullName()},
 					wantDyncfg: `
@@ -1830,10 +1831,10 @@ CONFIG test:collector:success:test status running
 					},
 					wantDiscovered: nil,
 					wantSeen: []seenConfig{
-						{cfg: updCfg, status: dyncfgDisabled},
+						{cfg: updCfg, status: dyncfg.StatusDisabled},
 					},
 					wantExposed: []seenConfig{
-						{cfg: updCfg, status: dyncfgDisabled},
+						{cfg: updCfg, status: dyncfg.StatusDisabled},
 					},
 					wantRunning: nil,
 					wantDyncfg: `

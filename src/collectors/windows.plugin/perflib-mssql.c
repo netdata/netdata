@@ -1028,9 +1028,8 @@ void dict_mssql_fill_replication(struct mssql_db_instance *mdi)
         mpp->average_runspeedPerf = average_runspeedPerf;
     } while (true);
 
-    (void)netdata_select_db(mdi->parent->conn->netdataSQLHDBc, "master");
-
 endreplication:
+    (void)netdata_select_db(mdi->parent->conn->netdataSQLHDBc, "master");
     netdata_MSSQL_release_results(mdi->parent->conn->dbReplicationPublisher);
 }
 int dict_mssql_databases_run_queries(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
@@ -1248,7 +1247,7 @@ void metdata_mssql_fill_dictionary_from_db(struct mssql_instance *mi)
             mdi->parent = mi;
         }
 
-        if (mi->conn || !strncmp(dbname, NETDATA_REPLICATION_DB, sizeof(NETDATA_REPLICATION_DB) - 1)) {
+        if (mi->conn && !strncmp(dbname, NETDATA_REPLICATION_DB, sizeof(NETDATA_REPLICATION_DB) - 1)) {
             mdi->running_replication = true;
         }
 
@@ -2717,7 +2716,7 @@ void dict_mssql_replication_status(struct mssql_publisher_publication *mpp, int 
         mpp->rd_publisher_status_started =
             rrddim_add(mpp->st_publisher_status, "started", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         mpp->rd_publisher_status_successed =
-            rrddim_add(mpp->st_publisher_status, "successed", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            rrddim_add(mpp->st_publisher_status, "succeeded", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         mpp->rd_publisher_status_in_progress =
             rrddim_add(mpp->st_publisher_status, "in_progress", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
         mpp->rd_publisher_status_idle =

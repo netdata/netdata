@@ -2129,7 +2129,7 @@ modules:
                 GO
                 ```
 
-              4 . **Enable Query replication stored procedure**
+              4. **Enable Query replication stored procedure**
 
                  Connect to your database and add `netdata_user` to `replmonitor`:
 
@@ -2568,7 +2568,7 @@ modules:
               chart_type: line
               dimensions:
                 - name: started
-                - name: successed
+                - name: succeeded
                 - name: in_progress
                 - name: idle
                 - name: retrying

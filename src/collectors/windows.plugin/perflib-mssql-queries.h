@@ -7,8 +7,6 @@
 #define NETDATA_QUERY_LOCKS_MASK                                                                                       \
     "SELECT resource_type, count(*) FROM %s.sys.dm_tran_locks WHERE DB_NAME(resource_database_id) = '%s' group by resource_type;"
 
-#define NETDATA_QUERY_LIST_DB "SELECT name FROM sys.databases;"
-
 #define NETDATA_REPLICATION_DB "distribution"
 
 #define NETDATA_REPLICATION_MONITOR_QUERY "EXEC sp_replmonitorhelppublication;"
