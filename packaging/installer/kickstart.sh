@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Next unused error code: F051D
+# Next unused error code: F051F
 
 # ======================================================================
 # Constants
@@ -53,8 +53,9 @@ INSTALL_DOC_URL="https://learn.netdata.cloud/docs/install-the-netdata-agent/one-
 PACKAGES_SCRIPT="https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/install-required-packages.sh"
 PUBLIC_CLOUD_URL="https://app.netdata.cloud"
 RELEASE_INFO_URL="https://repo.netdata.cloud/releases"
-REPOCONFIG_DEB_URL_PREFIX="https://repo.netdata.cloud/repos/repoconfig"
-REPOCONFIG_RPM_URL_PREFIX="https://repo.netdata.cloud/repos/repoconfig"
+STABLE_REPO_URL_PREFIX="https://repository.netdata.cloud/repos/stable"
+NIGHTLY_REPO_URL_PREFIX="https://repository.netdata.cloud/repos/edge"
+REPOCONFIG_URL_PREFIX="https://repository.netdata.cloud/repos/repoconfig"
 TELEMETRY_URL="https://us-east1-netdata-analytics-bi.cloudfunctions.net/ingest_agent_events"
 
 # ======================================================================
@@ -1724,20 +1725,31 @@ try_package_install() {
 
   repoconfig_name="netdata-repo${release}"
 
+  case "${SELECTED_RELEASE_CHANNEL}" in
+    stable) REPO_URL_PREFIX="${STABLE_REPO_URL_PREFIX}" ;;
+    nightly) REPO_URL_PREFIX="${NIGHTLY_REPO_URL_PREFIX}" ;;
+  esac
+
   case "${pkg_type}" in
     deb)
       repoconfig_file="${repoconfig_name}${pkg_vsep}${REPOCONFIG_DEB_VERSION}${pkg_suffix}.${pkg_type}"
-      repoconfig_url="${REPOCONFIG_DEB_URL_PREFIX}/${repo_prefix}/${repoconfig_file}"
-      ref_check_url="${REPOCONFIG_DEB_URL_PREFIX}"
-      pub_check_url="${REPOCONFIG_DEB_URL_PREFIX}/${repo_prefix}/.currently.published"
+      repoconfig_url="${REPOCONFIG_URL_PREFIX}/${repo_prefix}/${repoconfig_file}"
+      ref_check_url="${REPOCONFIG_URL_PREFIX}"
+      pub_check_url="${REPO_URL_PREFIX}/${repo_prefix}/.currently.published"
+      pkg_meta_url="${REPO_URL_PREFIX}/${repo_prefix}/InRelease"
       ;;
     rpm)
       repoconfig_file="${repoconfig_name}${pkg_vsep}${REPOCONFIG_RPM_VERSION}${pkg_suffix}.${pkg_type}"
-      repoconfig_url="${REPOCONFIG_RPM_URL_PREFIX}/${repo_prefix}/${SYSARCH}/${repoconfig_file}"
-      ref_check_url="${REPOCONFIG_RPM_URL_PREFIX}"
-      pub_check_url="${REPOCONFIG_RPM_URL_PREFIX}/${repo_prefix}/${SYSARCH}/.currently.published"
+      repoconfig_url="${REPOCONFIG_URL_PREFIX}/${repo_prefix}/${SYSARCH}/${repoconfig_file}"
+      ref_check_url="${REPOCONFIG_URL_PREFIX}"
+      pub_check_url="${REPO_URL_PREFIX}/${repo_prefix}/${SYSARCH}/.currently.published"
+      pkg_meta_url="${REPO_URL_PREFIX}/${repo_prefix}/${SYSARCH}/repodata/repomd.xml"
       ;;
   esac
+
+  if ! check_for_remote_file "${ref_check_url}"; then
+    NETDATA_ASSUME_REMOTE_FILES_ARE_PRESENT=1
+  fi
 
   progress "Checking if native packages are being published for this platform."
   if ! check_for_remote_file "${pub_check_url}"; then
@@ -1745,11 +1757,12 @@ try_package_install() {
     return 3
   fi
 
-  progress "Checking for availability of repository configuration package."
-  if ! check_for_remote_file "${ref_check_url}"; then
-    NETDATA_ASSUME_REMOTE_FILES_ARE_PRESENT=1
+  if ! check_for_remote_file "${pkg_meta_url}"; then
+    warning "Native packages have not yet been published for this system."
+    return 4
   fi
 
+  progress "Checking for availability of repository configuration package."
   if ! check_for_remote_file "${repoconfig_url}"; then
     warning "No repository configuration package available for ${DISTRO} ${SYSVERSION}. Cannot install native packages on this system."
     return 3
@@ -2247,12 +2260,23 @@ install_on_linux() {
       2)
         case "${NETDATA_REQUESTED_INSTALL_TYPE}" in
           native|auto) fatal "Could not install using native binary packages. If you want to install anyway, re-run this script with the option --install-type=any" F0301 ;;
-          *) warning "Could not using install native binary packages, falling back to alternative installation method." ;;
+          *) warning "Could not install using native binary packages, falling back to alternative installation method." ;;
         esac
         ;;
       3)
         case "${NETDATA_REQUESTED_INSTALL_TYPE}" in
           native) fatal "Native packages are not available for this system, unable to install." F051C ;;
+          *) warning "Native packages are not available for this system, falling back to alternative installation method." ;;
+        esac
+        ;;
+      4)
+        case "${NETDATA_REQUESTED_INSTALL_TYPE}" in
+          native|auto)
+            case "${SELECTED_RELEASE_CHANNEL}" in
+              stable) fatal "A stable build with native packages has not yet been published for this system, but is expected to be published within hte next few weeks. If you need to install now, you should be able to do so either by using a nightly build (add --release-channel=nightly to the options passed to this script) or by using a static build (add --install-type=static to the options passed to this script). Note that if you use a static build, you may have to reinstall once a stable build is published with native packages for this system to get full support." F051D ;;
+              nightly) fatal "A nightly build with native packages has not yet been published for this system, but is expected to be published at 01:00 UTC tomorrow. Please try again tomorrow." F051E ;;
+            esac
+            ;;
           *) warning "Native packages are not available for this system, falling back to alternative installation method." ;;
         esac
     esac
