@@ -64,7 +64,6 @@ Standard Procedure
    - If input is a URL, parse owner/repo and the PR/issue number.
    - If input looks like "owner/repo", use it directly.
    - Otherwise, consult Repository Intelligence Base categories above.
-   - For general agent queries, start with netdata/netdata.
    - For cloud queries, identify specific service from active cloud-* repos.
    - For ambiguous queries, check multiple likely repos in parallel.
 
