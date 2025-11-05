@@ -608,12 +608,12 @@ static inline void sensors_state_chart_loop(struct sensor_data *sd, int update_e
     rrdset_done(sd->st_sensor_state);
 }
 
-static inline RRDDIM *netdata_add_sensor_dimension(struct sensor_data *sd, char *label)
+static inline RRDDIM *netdata_add_sensor_dimension(struct sensor_data *sd, char *label, int mult_factor)
 {
     return rrddim_add(sd->st_sensor_data,
                       label,
                       NULL,
-                      (collected_number )sd->mult_factor,
+                      (collected_number )mult_factor,
                       (collected_number )sd->div_factor,
                       RRD_ALGORITHM_ABSOLUTE);
 }
@@ -630,14 +630,15 @@ static void sensors_data_chart(struct sensor_data *sd, int update_every)
         char id[RRD_ID_LENGTH_MAX + 1];
         snprintfz(id, RRD_ID_LENGTH_MAX, "sensors.%s_input", sd->name);
         netdata_fix_chart_name(id);
+        struct netdata_sensors_extra_config *cfg = sd->cfg;
         sd->st_sensor_data = rrdset_create_localhost(
                 "sensors",
                 id,
                 NULL,
                 sd->config->family,
                 sd->config->context,
-                sd->config->title,
-                sd->config->units,
+                (cfg && cfg->title)? cfg->title: sd->config->title,
+                (cfg && cfg->units)? cfg->units: sd->config->units,
                 PLUGIN_WINDOWS_NAME,
                 "GetSensors",
                 sd->config->priority,
@@ -649,11 +650,11 @@ static void sensors_data_chart(struct sensor_data *sd, int update_every)
         rrdlabels_add(sd->st_sensor_data->rrdlabels, "model", sd->model, RRDLABEL_SRC_AUTO);
 
         if (sd->sensor_data_type != NETDATA_WIN_SENSOR_TYPE_DISTANCE_X && sd->sensor_data_type != NETDATA_WIN_SENSOR_ACCELERATION_X_G)
-            sd->rd_sensor_data_0 = netdata_add_sensor_dimension(sd, "input");
+            sd->rd_sensor_data_0 = netdata_add_sensor_dimension(sd, "input", (cfg) ? cfg->multiplier : sd->mult_factor);
         else {
-            sd->rd_sensor_data_0 = netdata_add_sensor_dimension(sd, "inputX");
-            sd->rd_sensor_data_1 = netdata_add_sensor_dimension(sd, "inputY");
-            sd->rd_sensor_data_2 = netdata_add_sensor_dimension(sd, "inputZ");
+            sd->rd_sensor_data_0 = netdata_add_sensor_dimension(sd, "inputX", (cfg) ? cfg->multiplier : sd->mult_factor);
+            sd->rd_sensor_data_1 = netdata_add_sensor_dimension(sd, "inputY", (cfg) ? cfg->multiplier : sd->mult_factor);
+            sd->rd_sensor_data_2 = netdata_add_sensor_dimension(sd, "inputZ", (cfg) ? cfg->multiplier : sd->mult_factor);
         }
     }
 
