@@ -182,6 +182,12 @@ Need additional security configurations? Contact Netdata Support.
 
 ## Standards Alignment
 
+:::tip
+
+View Netdata's security certifications, compliance reports, and audit documentation at our [Trust Center](https://trust.netdata.cloud/).
+
+:::
+
 ### PCI DSS Alignment
 
 Netdata applies practices that align with PCI DSS security principles:
