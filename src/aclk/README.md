@@ -302,7 +302,6 @@ Check your logs at `/var/log/netdata/error.log` for specific error messages.
 
 </details>
 
-
 <details>
 <summary>Can I use a custom Cloud URL?</summary>
 
