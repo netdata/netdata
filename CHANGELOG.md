@@ -176,6 +176,10 @@
 - Chore(go.d): add shared dyncfg package ([#21263](https://github.com/netdata/netdata/issues/21263))
 - Fix tier check ([#21248](https://github.com/netdata/netdata/issues/21248))
 - Fix aral race condition ([#21258](https://github.com/netdata/netdata/issues/21258))
+- Update documentation to reflect SOC 2 Type 2 certification ([#21265](https://github.com/netdata/netdata/issues/21265))
+- Improve agent startup ([#21260](https://github.com/netdata/netdata/issues/21260))
+- Add missing modulo operator to alerts ([#21267](https://github.com/netdata/netdata/issues/21267))
+- Improve websocket thread shutdown ([#21264](https://github.com/netdata/netdata/issues/21264))
 
 ## [2.7.0] - 2025-09-25
 
