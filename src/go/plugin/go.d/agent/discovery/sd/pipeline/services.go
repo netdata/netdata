@@ -79,7 +79,7 @@ func (s *serviceEngine) compose(tgt model.Target) []confgroup.Config {
 
 		// No config_template => drop
 		if r.tmpl == nil {
-			continue
+			break
 		}
 
 		s.buf.Reset()
