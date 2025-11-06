@@ -24,29 +24,40 @@ func New(cfg Config) (*Pipeline, error) {
 		return nil, err
 	}
 
-	clr, err := newTargetClassificator(cfg.Classify)
-	if err != nil {
-		return nil, fmt.Errorf("classify rules: %v", err)
-	}
-
-	cmr, err := newConfigComposer(cfg.Compose)
-	if err != nil {
-		return nil, fmt.Errorf("compose rules: %v", err)
-	}
-
 	p := &Pipeline{
 		Logger: logger.New().With(
 			slog.String("component", "service discovery"),
 			slog.String("pipeline", cfg.Name),
 		),
 		configDefaults: cfg.ConfigDefaults,
-		clr:            clr,
-		cmr:            cmr,
 		accum:          newAccumulator(),
 		discoverers:    make([]model.Discoverer, 0),
 		configs:        make(map[string]map[uint64][]confgroup.Config),
 	}
+
 	p.accum.Logger = p.Logger
+
+	if len(cfg.Services) > 0 {
+		svr, err := newServiceEngine(cfg.Services)
+		if err != nil {
+			return nil, fmt.Errorf("services rules: %v", err)
+		}
+		p.svr = svr
+		svr.Logger = p.Logger
+	} else {
+		// Legacy path
+		clr, err := newTargetClassificator(cfg.Classify)
+		if err != nil {
+			return nil, fmt.Errorf("classify rules: %v", err)
+		}
+		cmr, err := newConfigComposer(cfg.Compose)
+		if err != nil {
+			return nil, fmt.Errorf("compose rules: %v", err)
+		}
+		p.clr, p.cmr = clr, cmr
+		clr.Logger = p.Logger
+		cmr.Logger = p.Logger
+	}
 
 	if err := p.registerDiscoverers(cfg); err != nil {
 		return nil, err
@@ -62,9 +73,15 @@ type (
 		configDefaults confgroup.Registry
 		discoverers    []model.Discoverer
 		accum          *accumulator
-		clr            classificator
-		cmr            composer
-		configs        map[string]map[uint64][]confgroup.Config // [targetSource][targetHash]
+
+		configs map[string]map[uint64][]confgroup.Config // [targetSource][targetHash]
+
+		// new
+		svr composer
+
+		// legacy
+		clr classificator
+		cmr composer
 	}
 	classificator interface {
 		classify(model.Target) model.Tags
@@ -201,6 +218,23 @@ func (p *Pipeline) processGroup(tgg model.TargetGroup) *confgroup.Group {
 
 		targetsCache[hash] = nil
 
+		if p.svr != nil {
+			if cfgs := p.svr.compose(tgt); len(cfgs) > 0 {
+				targetsCache[hash] = cfgs
+				changed = true
+				for _, cfg := range cfgs {
+					cfg.SetProvider(tgg.Provider())
+					cfg.SetSource(tgg.Source())
+					cfg.SetSourceType(confgroup.TypeDiscovered)
+					if def, ok := p.configDefaults.Lookup(cfg.Module()); ok {
+						cfg.ApplyDefaults(def)
+					}
+				}
+			}
+			continue
+		}
+
+		// Legacy:
 		if tags := p.clr.classify(tgt); len(tags) > 0 {
 			tgt.Tags().Merge(tags)
 
@@ -218,6 +252,7 @@ func (p *Pipeline) processGroup(tgg model.TargetGroup) *confgroup.Group {
 				}
 			}
 		}
+
 	}
 
 	for hash := range targetsCache {

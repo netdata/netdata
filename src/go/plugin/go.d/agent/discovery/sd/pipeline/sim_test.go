@@ -23,6 +23,9 @@ type discoverySim struct {
 	wantClassifyCalls int
 	wantComposeCalls  int
 	wantConfGroups    []*confgroup.Group
+
+	// New: when true (or when cfg.Services is non-empty), run with services engine only.
+	useServices bool
 }
 
 func (sim discoverySim) run(t *testing.T) {
@@ -32,6 +35,39 @@ func (sim discoverySim) run(t *testing.T) {
 	err := yaml.Unmarshal([]byte(sim.config), &cfg)
 	require.Nilf(t, err, "cfg unmarshal")
 
+	accum := newAccumulator()
+	accum.sendEvery = time.Second * 2
+
+	pl := &Pipeline{
+		Logger:      logger.New(),
+		discoverers: sim.discoverers,
+		accum:       accum,
+		configs:     make(map[string]map[uint64][]confgroup.Config),
+	}
+	pl.accum.Logger = pl.Logger
+
+	// Prefer services when either explicitly requested or present in config.
+	if sim.useServices || len(cfg.Services) > 0 {
+		// --- services-only path ---
+		svr, err := newServiceEngine(cfg.Services)
+		require.Nil(t, err, "newServiceEngine")
+
+		mockSvr := &mockComposer{cmr: svr} // reuse mock to count compose()
+		pl.svr = mockSvr                   // set services engine
+		svr.Logger = pl.Logger
+
+		groups := sim.collectGroups(t, pl)
+		sortConfigGroups(groups)
+		sortConfigGroups(sim.wantConfGroups)
+
+		assert.Equal(t, sim.wantConfGroups, groups)
+		// When services is used, classify is not called.
+		assert.Equalf(t, 0, sim.wantClassifyCalls, "classify calls should be zero in services mode")
+		assert.Equalf(t, sim.wantComposeCalls, mockSvr.calls, "compose (services) calls")
+		return
+	}
+
+	// --- legacy path  ---
 	clr, err := newTargetClassificator(cfg.Classify)
 	require.Nil(t, err, "newTargetClassificator")
 
@@ -41,19 +77,9 @@ func (sim discoverySim) run(t *testing.T) {
 	mockClr := &mockClassificator{clr: clr}
 	mockCmr := &mockComposer{cmr: cmr}
 
-	accum := newAccumulator()
-	accum.sendEvery = time.Second * 2
+	pl.clr = mockClr
+	pl.cmr = mockCmr
 
-	pl := &Pipeline{
-		Logger:      logger.New(),
-		discoverers: sim.discoverers,
-		accum:       accum,
-		clr:         mockClr,
-		cmr:         mockCmr,
-		configs:     make(map[string]map[uint64][]confgroup.Config),
-	}
-
-	pl.accum.Logger = pl.Logger
 	clr.Logger = pl.Logger
 	cmr.Logger = pl.Logger
 
@@ -109,7 +135,7 @@ func (m *mockClassificator) classify(tgt model.Target) model.Tags {
 
 type mockComposer struct {
 	calls int
-	cmr   *configComposer
+	cmr   composer
 }
 
 func (m *mockComposer) compose(tgt model.Target) []confgroup.Config {
