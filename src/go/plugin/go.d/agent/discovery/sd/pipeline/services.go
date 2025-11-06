@@ -97,6 +97,12 @@ func (s *serviceEngine) compose(tgt model.Target) []confgroup.Config {
 			continue
 		}
 
+		for _, cfg := range cfgs {
+			if cfg.Module() == "" {
+				cfg.SetModule(r.id)
+			}
+		}
+
 		out = append(out, cfgs...)
 	}
 
