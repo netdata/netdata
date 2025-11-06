@@ -366,7 +366,7 @@ static void netdata_initialize_sensor_dict(struct sensor_data *sd, ISensor *pSen
     sd->manufacturer = netdata_pvar_to_char(&SENSOR_PROPERTY_MANUFACTURER, pSensor);
 }
 
-static int netdata_collect_sensor_data(struct sensor_data *sd, ISensor *pSensor, REFPROPERTYKEY key, int vector_idx)
+static int netdata_collect_sensor_data(collected_number *value, ISensor *pSensor, REFPROPERTYKEY key, NETDATA_DOUBLE div_factor)
 {
     ISensorDataReport *pReport = NULL;
     PROPVARIANT pv = {};
@@ -380,13 +380,13 @@ static int netdata_collect_sensor_data(struct sensor_data *sd, ISensor *pSensor,
         if (SUCCEEDED(hr) && (pv.vt == VT_R4 || pv.vt == VT_R8 || pv.vt == VT_UI4)) {
             switch (pv.vt) {
                 case VT_UI4:
-                    sd->current_data_value[vector_idx] = (collected_number)(pv.ulVal * 100);
+                    *value = (collected_number)(pv.ulVal * 100);
                     break;
                 case VT_R4:
-                    sd->current_data_value[vector_idx] = (collected_number)(pv.fltVal * sd->div_factor);
+                    *value = (collected_number)(pv.fltVal * div_factor);
                     break;
                 case VT_R8:
-                    sd->current_data_value[vector_idx] = (collected_number)(pv.dblVal * sd->div_factor);
+                    *value = (collected_number)(pv.dblVal * div_factor);
                     break;
             }
             defined = 1;
@@ -394,7 +394,7 @@ static int netdata_collect_sensor_data(struct sensor_data *sd, ISensor *pSensor,
         PropVariantClear(&pv);
         pReport->lpVtbl->Release(pReport);
     } else {
-        sd->current_data_value[vector_idx] = 0;
+        *value = 0;
     }
 
     return defined;
@@ -403,17 +403,29 @@ static int netdata_collect_sensor_data(struct sensor_data *sd, ISensor *pSensor,
 static void netdata_sensors_get_data(struct sensor_data *sd, ISensor *pSensor)
 {
     for (int i = 0; sensor_keys[i]; i++) {
-        if (netdata_collect_sensor_data(sd, pSensor, sensor_keys[i], 0)) {
+        if (netdata_collect_sensor_data(&sd->current_data_value[0], pSensor, sensor_keys[i], sd->div_factor)) {
             sd->sensor_data_type = i;
             sd->config = &configs[i];
             sd->enabled = true;
 
             if (i == NETDATA_WIN_SENSOR_TYPE_DISTANCE_X) {
-                netdata_collect_sensor_data(sd, pSensor, sensor_keys[NETDATA_WIN_SENSOR_TYPE_DISTANCE_Y], 1);
-                netdata_collect_sensor_data(sd, pSensor, sensor_keys[NETDATA_WIN_SENSOR_TYPE_DISTANCE_Z], 2);
+                netdata_collect_sensor_data(&sd->current_data_value[1],
+                                            pSensor,
+                                            sensor_keys[NETDATA_WIN_SENSOR_TYPE_DISTANCE_Y],
+                                            sd->div_factor);
+                netdata_collect_sensor_data(&sd->current_data_value[2],
+                                            pSensor,
+                                            sensor_keys[NETDATA_WIN_SENSOR_TYPE_DISTANCE_Z],
+                                            sd->div_factor);
             } else if (i == NETDATA_WIN_SENSOR_ACCELERATION_X_G) {
-                netdata_collect_sensor_data(sd, pSensor, sensor_keys[NETDATA_WIN_SENSOR_ACCELERATION_Y_G], 1);
-                netdata_collect_sensor_data(sd, pSensor, sensor_keys[NETDATA_WIN_SENSOR_ACCELERATION_Z_G], 2);
+                netdata_collect_sensor_data(&sd->current_data_value[1],
+                                            pSensor,
+                                            sensor_keys[NETDATA_WIN_SENSOR_ACCELERATION_Y_G],
+                                            sd->div_factor);
+                netdata_collect_sensor_data(&sd->current_data_value[2],
+                                            pSensor,
+                                            sensor_keys[NETDATA_WIN_SENSOR_ACCELERATION_Z_G],
+                                            sd->div_factor);
             } else if (i == NETDATA_WIN_SENSOR_DATA_TYPE_LIGHT_TEMPERATURE) {
                 sd->div_factor = 100.0;
                 sd->add_factor = -27315.0; // 273.15 * 100.0
@@ -494,13 +506,28 @@ static void netdata_get_sensors()
             netdata_sensors_get_data(sd, pSensor);
             sd->external_config = netdata_sensors_fill_configuration(sd->name);
         } else if (likely(sd->enabled)) {
-            netdata_collect_sensor_data(sd, pSensor, sensor_keys[sd->sensor_data_type], 0);
+            netdata_collect_sensor_data(&sd->current_data_value[0],
+                                        pSensor,
+                                        sensor_keys[sd->sensor_data_type],
+                                        sd->div_factor);
             if (sd->sensor_data_type == NETDATA_WIN_SENSOR_TYPE_DISTANCE_X) {
-                netdata_collect_sensor_data(sd, pSensor, sensor_keys[NETDATA_WIN_SENSOR_TYPE_DISTANCE_Y], 1);
-                netdata_collect_sensor_data(sd, pSensor, sensor_keys[NETDATA_WIN_SENSOR_TYPE_DISTANCE_Z], 2);
+                netdata_collect_sensor_data(&sd->current_data_value[1],
+                                            pSensor,
+                                            sensor_keys[NETDATA_WIN_SENSOR_TYPE_DISTANCE_Y],
+                                            sd->div_factor);
+                netdata_collect_sensor_data(&sd->current_data_value[2],
+                                            pSensor,
+                                            sensor_keys[NETDATA_WIN_SENSOR_TYPE_DISTANCE_Z],
+                                            sd->div_factor);
             } else if (sd->sensor_data_type == NETDATA_WIN_SENSOR_ACCELERATION_X_G) {
-                netdata_collect_sensor_data(sd, pSensor, sensor_keys[NETDATA_WIN_SENSOR_ACCELERATION_Y_G], 1);
-                netdata_collect_sensor_data(sd, pSensor, sensor_keys[NETDATA_WIN_SENSOR_ACCELERATION_Z_G], 2);
+                netdata_collect_sensor_data(&sd->current_data_value[1],
+                                            pSensor,
+                                            sensor_keys[NETDATA_WIN_SENSOR_ACCELERATION_Y_G],
+                                            sd->div_factor);
+                netdata_collect_sensor_data(&sd->current_data_value[2],
+                                            pSensor,
+                                            sensor_keys[NETDATA_WIN_SENSOR_ACCELERATION_Z_G],
+                                            sd->div_factor);
             }
         }
 
