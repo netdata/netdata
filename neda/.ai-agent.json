@@ -23,6 +23,7 @@
       "headers": {},
       "custom": {},
       "mergeStrategy": "overlay",
+      "contextWindow": 400000,
       "stringSchemaFormatsAllowed": ["*"],
       "stringSchemaFormatsDenied": []
     },
@@ -33,6 +34,7 @@
       "headers": {},
       "custom": {},
       "mergeStrategy": "overlay",
+      "contextWindow": 200000,
       "stringSchemaFormatsAllowed": ["*"],
       "stringSchemaFormatsDenied": [],
       "models": {
