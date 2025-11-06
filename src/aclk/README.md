@@ -304,7 +304,6 @@ Check your logs at `/var/log/netdata/error.log` for specific error messages.
 
 
 
-```
 
 Then restart Netdata: `sudo systemctl restart netdata`
 
