@@ -303,7 +303,6 @@ Check your logs at `/var/log/netdata/error.log` for specific error messages.
 </details>
 
 
-Edit `/etc/netdata/netdata.conf`:
 
 ```ini
 [plugins]
