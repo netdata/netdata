@@ -210,7 +210,7 @@ services:
 			wantComposeCalls:  2,    // compose called per target (2 targets)
 			wantConfGroups: []*confgroup.Group{
 				// same expected configs as the legacy "new group with targets"
-				prepareDiscoveredGroup("mock1-foobar1", "mock2-foobar2"),
+				prepareDiscoveredGroupWithModule("mock1-foobar1", "svc-foobar1", "mock2-foobar2", "svc-foobar2"),
 			},
 		},
 	}
@@ -231,6 +231,27 @@ func prepareDiscoveredGroup(configNames ...string) *confgroup.Group {
 			SetSourceType(confgroup.TypeDiscovered).
 			SetSource("test").
 			SetName(name))
+	}
+
+	return &confgroup.Group{
+		Source:  "test",
+		Configs: configs,
+	}
+}
+
+func prepareDiscoveredGroupWithModule(values ...string) *confgroup.Group {
+	var configs []confgroup.Config
+
+	for i := 0; i < len(values); i += 2 {
+		cfgName := values[i]
+		modName := values[i+1]
+		configs = append(configs, confgroup.Config{}.
+			SetProvider("mock").
+			SetSourceType(confgroup.TypeDiscovered).
+			SetSource("test").
+			SetName(cfgName).
+			SetModule(modName),
+		)
 	}
 
 	return &confgroup.Group{
