@@ -36,13 +36,15 @@ enum netdata_win_sensor_monitored {
     NETDATA_WIN_SENSOR_TYPE_DISTANCE_X,
     NETDATA_WIN_SENSOR_ACCELERATION_X_G,
 
-    NETDATA_WIN_SENSOR_NEVER_USE_ME,
+    NETDATA_WIN_SENSOR_LAST_WELL_DEFINED,
 
     // Remaining axis should be added here
     NETDATA_WIN_SENSOR_TYPE_DISTANCE_Y,
     NETDATA_WIN_SENSOR_TYPE_DISTANCE_Z,
     NETDATA_WIN_SENSOR_ACCELERATION_Y_G,
     NETDATA_WIN_SENSOR_ACCELERATION_Z_G,
+
+    NETDATA_WIN_SENSOR_NEVER_USE_ME,
 
     // Custom sensors
     NETDATA_WIN_SENSOR_TYPE_CUSTOM_USAGE,
@@ -103,6 +105,9 @@ REFPROPERTYKEY sensor_keys[] = {
     &SENSOR_DATA_TYPE_DISTANCE_Z_METERS,
     &SENSOR_DATA_TYPE_ACCELERATION_Y_G,
     &SENSOR_DATA_TYPE_ACCELERATION_Z_G,
+
+    // Stop additional
+    NULL,
 
     &SENSOR_DATA_TYPE_CUSTOM_USAGE,
     &SENSOR_DATA_TYPE_CUSTOM_BOOLEAN_ARRAY,
@@ -437,6 +442,18 @@ static void netdata_sensors_get_data(struct sensor_data *sd, ISensor *pSensor)
     sd->first_time = false;
 }
 
+static void netdata_sensors_get_custom_data(struct sensor_data *sd, ISensor *pSensor)
+{
+    for (int i = NETDATA_WIN_SENSOR_TYPE_CUSTOM_VALUE1; i <= NETDATA_WIN_SENSOR_TYPE_CUSTOM_VALUE27; i++) {
+        if (netdata_collect_sensor_data(&sd->current_data_value[0], pSensor, sensor_keys[i], sd->div_factor)) {
+            sd->sensor_data_type = i;
+            sd->config = &configs[NETDATA_WIN_SENSOR_LAST_WELL_DEFINED];
+            sd->enabled = true;
+            break;
+        }
+    }
+}
+
 static struct netdata_sensors_extra_config *netdata_sensors_fill_configuration(const char *name)
 {
 #define NETDATA_DEFAULT_SENSOR_SECTION "plugin:windows:GetSensors"
@@ -505,6 +522,8 @@ static void netdata_get_sensors()
         if (sd->first_time) {
             netdata_sensors_get_data(sd, pSensor);
             sd->external_config = netdata_sensors_fill_configuration(sd->name);
+            if (unlikely(!sd->enabled))
+                netdata_sensors_get_custom_data(sd, pSensor);
         } else if (likely(sd->enabled)) {
             netdata_collect_sensor_data(&sd->current_data_value[0],
                                         pSensor,
