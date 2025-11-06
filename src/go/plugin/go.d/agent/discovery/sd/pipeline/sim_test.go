@@ -67,7 +67,7 @@ func (sim discoverySim) run(t *testing.T) {
 		return
 	}
 
-	// --- legacy path  ---
+	// --- legacy path ---
 	clr, err := newTargetClassificator(cfg.Classify)
 	require.Nil(t, err, "newTargetClassificator")
 
