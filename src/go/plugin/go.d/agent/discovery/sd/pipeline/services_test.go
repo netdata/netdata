@@ -79,24 +79,24 @@ func TestServiceEngine_compose(t *testing.T) {
 			configYAML: configA,
 			target:     newMockTarget("mock1"),
 			wantConfigs: []confgroup.Config{
-				{"name": "mock1-1"},
+				{"name": "mock1-1", "module": "rule1"},
 			},
 		},
 		"one rule -> two configs (YAML list)": {
 			configYAML: configA,
 			target:     newMockTarget("mock2"),
 			wantConfigs: []confgroup.Config{
-				{"name": "mock2-2"},
-				{"name": "mock2-3"},
+				{"name": "mock2-2", "module": "rule2"},
+				{"name": "mock2-3", "module": "rule2"},
 			},
 		},
 		"multiple rules aggregated (no drop before)": {
 			configYAML: configA,
 			target:     newMockTarget("mock3"),
 			wantConfigs: []confgroup.Config{
-				{"name": "mock3-2"},
-				{"name": "mock3-3"},
-				{"name": "mock3-4"},
+				{"name": "mock3-2", "module": "rule2"},
+				{"name": "mock3-3", "module": "rule2"},
+				{"name": "mock3-4", "module": "rule3"},
 			},
 		},
 		"hard drop stops further evaluation": {
