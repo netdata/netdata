@@ -139,8 +139,6 @@ REFPROPERTYKEY sensor_keys[] = {
     &SENSOR_DATA_TYPE_CUSTOM_VALUE26,
     &SENSOR_DATA_TYPE_CUSTOM_VALUE27};
 
-static int min_custom = NETDATA_CHART_PRIO_SENSOR_MIN_CUSTOM;
-
 static struct win_sensor_config {
     const char *title;
     const char *units;
@@ -265,6 +263,8 @@ static struct win_sensor_config {
 struct netdata_sensors_extra_values {
     collected_number value;
     enum netdata_win_sensor_monitored sensor_data_type;
+    RRDDIM *rd_value;
+
     struct netdata_sensors_extra_values *next;
 };
 
@@ -281,7 +281,7 @@ struct sensor_data {
     bool enabled;
     enum netdata_win_sensor_monitored sensor_data_type;
     struct win_sensor_config *config;
-    struct netdata_sensors_extra_config_values *values;
+    struct netdata_sensors_extra_values *values;
 
     const char *type;
     const char *category;
@@ -444,12 +444,21 @@ static void netdata_sensors_get_data(struct sensor_data *sd, ISensor *pSensor)
 
 static void netdata_sensors_get_custom_data(struct sensor_data *sd, ISensor *pSensor)
 {
+    collected_number current;
     for (int i = NETDATA_WIN_SENSOR_TYPE_CUSTOM_VALUE1; i <= NETDATA_WIN_SENSOR_TYPE_CUSTOM_VALUE27; i++) {
-        if (netdata_collect_sensor_data(&sd->current_data_value[0], pSensor, sensor_keys[i], sd->div_factor)) {
-            sd->sensor_data_type = i;
-            sd->config = &configs[NETDATA_WIN_SENSOR_LAST_WELL_DEFINED];
-            sd->enabled = true;
-            break;
+        if (netdata_collect_sensor_data(&current, pSensor, sensor_keys[i], sd->div_factor)) {
+            if (unlikely(!sd->sensor_data_type)) {
+                sd->sensor_data_type = i;
+                sd->config = &configs[NETDATA_WIN_SENSOR_LAST_WELL_DEFINED];
+                sd->enabled = true;
+                sd->current_data_value[0] = current;
+            } else {
+                if (unlikely(!sd->values)) {
+                    sd->values = mallocz(sizeof(*sd->values));
+                    sd->values->sensor_data_type = i;
+                    sd->values->value = current;
+                }
+            }
         }
     }
 }
@@ -677,21 +686,33 @@ static inline void netdata_state_chart_set_value(RRDDIM *dim, struct sensor_data
 static void sensors_data_chart(struct sensor_data *sd, int update_every)
 {
     if (!sd->st_sensor_data) {
+        static int min_custom = NETDATA_CHART_PRIO_SENSOR_MIN_CUSTOM;
+
         char id[RRD_ID_LENGTH_MAX + 1];
+        char ctx[RRD_ID_LENGTH_MAX + 1];
+        int priority = sd->config->priority;
+
         snprintfz(id, RRD_ID_LENGTH_MAX, "sensors.%s_input", sd->name);
         netdata_fix_chart_name(id);
         struct netdata_sensors_extra_config *cfg = sd->external_config;
+        if (sd->sensor_data_type > NETDATA_WIN_SENSOR_TYPE_CUSTOM_USAGE) {
+            static int custom_input = 1;
+            snprintfz(ctx, RRD_ID_LENGTH_MAX, "%s%d.input", sd->config->context, custom_input++);
+            priority = min_custom++;
+        } else {
+            ctx[0] = '\0';
+        }
         sd->st_sensor_data = rrdset_create_localhost(
             "sensors",
             id,
             NULL,
             sd->config->family,
-            sd->config->context,
+            (unlikely(!ctx[0])) ? sd->config->context: ctx,
             (cfg && cfg->title) ? cfg->title : sd->config->title,
             (cfg && cfg->units) ? cfg->units : sd->config->units,
             PLUGIN_WINDOWS_NAME,
             "GetSensors",
-            sd->config->priority,
+            priority,
             update_every,
             RRDSET_TYPE_LINE);
 
@@ -700,9 +721,9 @@ static void sensors_data_chart(struct sensor_data *sd, int update_every)
         rrdlabels_add(sd->st_sensor_data->rrdlabels, "model", sd->model, RRDLABEL_SRC_AUTO);
 
         if (sd->sensor_data_type != NETDATA_WIN_SENSOR_TYPE_DISTANCE_X &&
-            sd->sensor_data_type != NETDATA_WIN_SENSOR_ACCELERATION_X_G)
+            sd->sensor_data_type != NETDATA_WIN_SENSOR_ACCELERATION_X_G) {
             sd->rd_sensor_data_0 = netdata_add_sensor_dimension(sd, "input", (cfg) ? cfg->multiplier : sd->mult_factor);
-        else {
+        } else {
             sd->rd_sensor_data_0 =
                 netdata_add_sensor_dimension(sd, "inputX", (cfg) ? cfg->multiplier : sd->mult_factor);
             sd->rd_sensor_data_1 =
