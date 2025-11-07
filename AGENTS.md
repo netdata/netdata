@@ -7,6 +7,7 @@
 - docs/TESTING.md for deterministic harness usage and coverage guidance.
 - docs/docs/AI-AGENT-INTERNAL-API.md current status of the ai-agent internal agent API.
 - README.md for end-user documentation of the application.
+- docs/AI-AGENT-GUIDE.md for the AI-facing source of truth covering prompts, configs, headends, snapshots, and operational defaults. **Every code change that affects runtime behavior, defaults, schemas, or tooling MUST update this guide in the same change.**
 
 The application source code is in the root directory (src/, package.json, etc).
 
