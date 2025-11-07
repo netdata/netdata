@@ -24,6 +24,10 @@ typedef struct {
 
     std::vector<ml_model_info_t> pending_model_info;
 
+    // Reusable buffers for streaming kmeans models
+    BUFFER *stream_payload_buffer;
+    BUFFER *stream_wb_buffer;
+
     RRDSET *queue_stats_rs;
     RRDDIM *queue_stats_num_create_new_model_requests_rd;
     RRDDIM *queue_stats_num_add_existing_model_requests_rd;
