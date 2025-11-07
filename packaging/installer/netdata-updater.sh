@@ -1182,11 +1182,10 @@ update_binpkg() {
       error ""
       error "A newer version of Netdata is available, but the system package manager does not appear to have updated to that version."
       error ""
-      error "Most likely, your system is not up to date, and you have it configured in a way that prevents updating Netdata from updating any of Netdata's dependencies."
+      error "Most likely, your system is not up to date, and you have it configured in a way that prevents updating one or more of Netdata's dependencies."
       error "Please try updating your system manually and then re-running the Netdata updater before reporting an issue with the update process."
       error ""
       fatal "Package manager did not fully update Netdata despite not reporting a failure." U001D
-      exit 1
     fi
   fi
 
