@@ -896,6 +896,7 @@ void commands_init(void)
 
 after_error:
     netdata_log_error("Failed to initialize command server. The netdata cli tool will be unable to send commands.");
+    command_server_initialized = CMD_INIT_STATUS_OFF;
 }
 
 void commands_exit(void)
