@@ -184,6 +184,8 @@
 - Security and Privacy ([#21271](https://github.com/netdata/netdata/issues/21271))
 - Improve(go.d/sd/pipeline): add `services` config ([#21269](https://github.com/netdata/netdata/issues/21269))
 - Chore(go.d/sd): make module optional in the template ([#21273](https://github.com/netdata/netdata/issues/21273))
+- Compute timestamps needed for status file ([#21272](https://github.com/netdata/netdata/issues/21272))
+- Detect netdata CLI initialization failure ([#21275](https://github.com/netdata/netdata/issues/21275))
 
 ## [2.7.0] - 2025-09-25
 
