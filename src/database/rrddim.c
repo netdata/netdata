@@ -439,7 +439,7 @@ time_t rrddim_last_entry_s_of_tier(RRDDIM *rd, size_t tier) {
     if(unlikely(!rd))
         return 0;
 
-    if(unlikely(tier > nd_profile.storage_tiers || !rd->tiers[tier].smh))
+    if(unlikely(tier >= nd_profile.storage_tiers || !rd->tiers[tier].smh))
         return 0;
 
     return storage_engine_latest_time_s(rd->tiers[tier].seb, rd->tiers[tier].smh);
@@ -467,7 +467,7 @@ time_t rrddim_first_entry_s_of_tier(RRDDIM *rd, size_t tier) {
     if(unlikely(!rd))
         return 0;
 
-    if(unlikely(tier > nd_profile.storage_tiers || !rd->tiers[tier].smh))
+    if(unlikely(tier >= nd_profile.storage_tiers || !rd->tiers[tier].smh))
         return 0;
 
     return storage_engine_oldest_time_s(rd->tiers[tier].seb, rd->tiers[tier].smh);

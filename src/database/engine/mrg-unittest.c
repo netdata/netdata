@@ -38,12 +38,7 @@ static void mrg_stress(void *ptr) {
             time_t before = __atomic_add_fetch(&e->before, 1, __ATOMIC_RELAXED);
 
             mrg_update_metric_retention_and_granularity_by_uuid(
-                mrg, 0x01,
-                &e->uuid,
-                after,
-                before,
-                1,
-                before);
+                mrg, 0x01, &e->uuid, after, before, 1, before, NULL);
 
             __atomic_add_fetch(&t->updates, 1, __ATOMIC_RELAXED);
         }
@@ -160,7 +155,7 @@ int mrg_unittest(void) {
                 e->after,
                 e->before,
                 1,
-                e->before);
+                e->before, NULL);
         }
     }
     netdata_log_info("stress test ready to run...");
