@@ -354,7 +354,8 @@ static inline char *netdata_pvar_to_char(const PROPERTYKEY *key, ISensor *pSenso
     if (SUCCEEDED(hr) && pv.vt == VT_LPWSTR) {
         char value[8192];
         size_t len = wcslen(pv.pwszVal);
-        wcstombs(value, pv.pwszVal, len);
+        len = wcstombs(value, pv.pwszVal, len);
+        value[len] = '\0';
         PropVariantClear(&pv);
         return strdupz(value);
     }
@@ -686,8 +687,6 @@ static inline void netdata_state_chart_set_value(RRDDIM *dim, struct sensor_data
 static void sensors_data_chart(struct sensor_data *sd, int update_every)
 {
     if (!sd->st_sensor_data) {
-        static int min_custom = NETDATA_CHART_PRIO_SENSOR_MIN_CUSTOM;
-
         char id[RRD_ID_LENGTH_MAX + 1];
         char ctx[RRD_ID_LENGTH_MAX + 1];
         int priority = sd->config->priority;
@@ -696,7 +695,9 @@ static void sensors_data_chart(struct sensor_data *sd, int update_every)
         netdata_fix_chart_name(id);
         struct netdata_sensors_extra_config *cfg = sd->external_config;
         if (sd->sensor_data_type > NETDATA_WIN_SENSOR_TYPE_CUSTOM_USAGE) {
+            static int min_custom = NETDATA_CHART_PRIO_SENSOR_MIN_CUSTOM;
             static int custom_input = 1;
+
             snprintfz(ctx, RRD_ID_LENGTH_MAX, "%s%d.input", sd->config->context, custom_input++);
             priority = min_custom++;
         } else {
