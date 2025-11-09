@@ -1356,6 +1356,12 @@ modules:
                 - name: initializing
                 - name: access_denied
                 - name: error
+            - name: system.hw.sensor.custom
+              description: Custom Chart
+              unit: "nd"
+              chart_type: line
+              dimensions:
+                - name: inputN
   - meta:
       plugin_name: windows.plugin
       module_name: PerflibWebService
