@@ -140,7 +140,6 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
       temperature: request.temperature ?? null,
       topP: request.topP ?? null,
       maxOutputTokens: request.maxOutputTokens ?? null,
-      parallelToolCalls: request.parallelToolCalls ?? null,
       reasoningLevel: request.reasoningLevel ?? null,
       reasoningValue: request.reasoningValue ?? null,
       toolChoice: toolChoice ?? null,

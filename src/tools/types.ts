@@ -5,9 +5,6 @@ export type ToolKind = 'mcp' | 'rest' | 'agent';
 
 export interface ToolExecuteOptions {
   timeoutMs?: number;
-  slot?: number;
-  // When true, do not acquire/release a concurrency slot in the orchestrator
-  // Useful for control-plane tools like agent__batch to avoid deadlocks.
   bypassConcurrency?: boolean;
   // When true, skip the orchestrator-level timeout wrapper (provider handles timing internally).
   disableGlobalTimeout?: boolean;
@@ -46,6 +43,9 @@ export abstract class ToolProvider {
   }
   resolveToolIdentity(name: string): { namespace: string; tool: string } {
     return { namespace: this.namespace, tool: name };
+  }
+  resolveQueueName(_name: string): string | undefined {
+    return undefined;
   }
 }
 

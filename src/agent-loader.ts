@@ -17,6 +17,7 @@ import { isReservedAgentName } from './internal-tools.js';
 import { resolveEffectiveOptions } from './options-resolver.js';
 import { buildEffectiveOptionsSchema } from './options-schema.js';
 import { openApiToRestTools, parseOpenAPISpec } from './tools/openapi-importer.js';
+import { queueManager } from './tools/queue-manager.js';
 import { clampToolName, sanitizeToolName } from './utils.js';
 import { mergeCallbacksWithPersistence } from './persistence.js';
 
@@ -69,8 +70,6 @@ export interface LoadedAgent {
     maxToolCallsPerTurn: number;
     toolResponseMaxBytes: number;
     stream: boolean;
-    parallelToolCalls: boolean;
-    maxConcurrentTools: number;
     traceLLM: boolean;
     traceMCP: boolean;
     traceSdk: boolean;
@@ -144,10 +143,8 @@ export interface GlobalOverrides {
   maxRetries?: number;
   maxToolTurns?: number;
   maxToolCallsPerTurn?: number;
-  maxConcurrentTools?: number;
   toolResponseMaxBytes?: number;
   stream?: boolean;
-  parallelToolCalls?: boolean;
   mcpInitConcurrency?: number;
   reasoning?: 'minimal' | 'low' | 'medium' | 'high';
   reasoningValue?: ProviderReasoningValue | null;
@@ -165,11 +162,9 @@ export interface LoadAgentOptions {
   globalOverrides?: GlobalOverrides;
   // Optional overrides (CLI precedence) for runtime knobs
   stream?: boolean;
-  parallelToolCalls?: boolean;
   maxRetries?: number;
   maxToolTurns?: number;
   maxToolCallsPerTurn?: number;
-  maxConcurrentTools?: number;
   llmTimeout?: number;
   toolTimeout?: number;
   temperature?: number;
@@ -195,9 +190,7 @@ export interface LoadAgentOptions {
     toolTimeout?: number;
     maxRetries?: number;
     maxToolTurns?: number;
-    maxConcurrentTools?: number;
     toolResponseMaxBytes?: number;
-    parallelToolCalls?: boolean;
     maxToolCallsPerTurn?: number;
     reasoning?: 'minimal' | 'low' | 'medium' | 'high';
     reasoningValue?: ProviderReasoningValue | null;
@@ -286,6 +279,33 @@ function validateNoPlaceholders(config: Configuration): void {
   });
   if (config.accounting?.file !== undefined && containsPlaceholder(config.accounting.file)) {
     throw new Error('Unresolved placeholders remain in accounting.file');
+  }
+}
+
+function validateQueueBindings(config: Configuration): void {
+  const queues = config.queues ?? {};
+  if (queues.default === undefined) {
+    throw new Error('Configuration must define a queues.default entry.');
+  }
+  const known = new Set(Object.keys(queues));
+  const ensure = (queueName: string | undefined, origin: string): void => {
+    if (queueName === undefined) return;
+    if (!known.has(queueName)) {
+      throw new Error(`${origin} references unknown queue '${queueName}'. Add it under configuration.queues.`);
+    }
+  };
+  Object.entries(config.mcpServers).forEach(([name, server]) => {
+    ensure(server.queue, `MCP server '${name}'`);
+  });
+  if (config.restTools !== undefined) {
+    Object.entries(config.restTools).forEach(([name, tool]) => {
+      ensure(tool.queue, `REST tool '${name}'`);
+    });
+  }
+  if (config.openapiSpecs !== undefined) {
+    Object.entries(config.openapiSpecs).forEach(([name, spec]) => {
+      ensure(spec.queue, `OpenAPI provider '${name}'`);
+    });
   }
 }
 
@@ -398,11 +418,9 @@ function constructLoadedAgent(args: ConstructAgentArgs): LoadedAgent {
   const eff = resolveEffectiveOptions({
     cli: {
       stream: options?.stream,
-      parallelToolCalls: options?.parallelToolCalls,
       maxRetries: options?.maxRetries,
       maxToolTurns: options?.maxToolTurns,
       maxToolCallsPerTurn: options?.maxToolCallsPerTurn,
-      maxConcurrentTools: options?.maxConcurrentTools,
       llmTimeout: options?.llmTimeout,
       toolTimeout: options?.toolTimeout,
       temperature: options?.temperature,
@@ -531,6 +549,7 @@ function constructLoadedAgent(args: ConstructAgentArgs): LoadedAgent {
         baseUrlOverride: specCfg.baseUrl,
         includeMethods: specCfg.includeMethods,
         tagFilter: specCfg.tagFilter,
+        queue: specCfg.queue,
       });
       const defaultHeadersRaw = specCfg.headers ?? {};
       const defaultHeaders: Record<string, string> = {};
@@ -559,6 +578,9 @@ function constructLoadedAgent(args: ConstructAgentArgs): LoadedAgent {
   }
 
   const agentName = path.basename(promptPath).replace(/\.[^.]+$/, '');
+
+  validateQueueBindings(config);
+  queueManager.configureQueues(config.queues);
 
   const createSession = (
     systemPrompt: string,
@@ -592,10 +614,8 @@ function constructLoadedAgent(args: ConstructAgentArgs): LoadedAgent {
       maxRetries: eff.maxRetries,
       maxTurns: eff.maxToolTurns,
       maxToolCallsPerTurn: eff.maxToolCallsPerTurn,
-      maxConcurrentTools: eff.maxConcurrentTools,
       llmTimeout: eff.llmTimeout,
       toolTimeout: eff.toolTimeout,
-      parallelToolCalls: eff.parallelToolCalls,
       stream: eff.stream,
       traceLLM: eff.traceLLM,
       traceMCP: eff.traceMCP,
@@ -701,8 +721,6 @@ function constructLoadedAgent(args: ConstructAgentArgs): LoadedAgent {
       maxToolCallsPerTurn: eff.maxToolCallsPerTurn,
       toolResponseMaxBytes: eff.toolResponseMaxBytes,
       stream: eff.stream,
-      parallelToolCalls: eff.parallelToolCalls,
-      maxConcurrentTools: eff.maxConcurrentTools,
       traceLLM: eff.traceLLM,
       traceMCP: eff.traceMCP,
       traceSdk: eff.traceSdk,

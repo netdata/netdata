@@ -1008,7 +1008,7 @@ sudo systemctl start neda
 - Note: Stripe often uses finance@, payments@, accounts@ emails
 
 #### Performance Issues
-- Adjust `maxConcurrentTools` in .ai-agent.json
+- Tune the `queues` block in `.ai-agent.json` (e.g., `fetcher.concurrent`) to protect heavy MCP servers such as Playwright/fetcher.
 - Increase `llmTimeout` and `toolTimeout` for slow operations
 - Monitor token usage with accounting logs
 

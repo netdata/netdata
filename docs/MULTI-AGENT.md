@@ -63,7 +63,7 @@ Required:
 Recommended for sub‑agent tools:
 - `toolName`: Stable identifier exposed to the parent LLM.
 - `input`: `{ format: text|json, schema?: object }` — define JSON schema for structured inputs when possible.
-- `limits`: `{ maxToolTurns, llmTimeout, toolTimeout, maxRetries, parallelToolCalls }` — per‑subagent call overrides.
+- `limits`: `{ maxToolTurns, llmTimeout, toolTimeout, maxRetries }` — per‑subagent call overrides.
 
 Example:
 ```yaml
@@ -86,7 +86,6 @@ limits:
   llmTimeout: 120000
   toolTimeout: 60000
   maxRetries: 2
-  parallelToolCalls: true
 ---
 ```
 

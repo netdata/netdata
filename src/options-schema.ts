@@ -15,8 +15,6 @@ const EFFECTIVE_KEYS = [
   'maxToolCallsPerTurn',
   'toolResponseMaxBytes',
   'stream',
-  'parallelToolCalls',
-  'maxConcurrentTools',
   'traceLLM',
   'traceMCP',
   'traceSlack',

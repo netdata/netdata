@@ -18,7 +18,6 @@ tools:
   - batch
   - cloudflare-browser
 maxToolTurns: 20
-maxConcurrentTools: 3
 maxOutputTokens: 8192
 repeatPenalty: 1.1
 ---

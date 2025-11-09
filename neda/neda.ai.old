@@ -24,14 +24,12 @@ agents:
 llmTimeout: 180000
 toolTimeout: 180000
 toolResponseMaxBytes: 40000
-maxConcurrentTools: 10
 temperature: 0.7
 topP: 1
 maxOutputTokens: 8192
 repeatPenalty: 1.1
 maxRetries: 3
 maxToolTurns: 15
-parallelToolCalls: true
 ---
 You are a Neda (female), made by Netdata, an elite AI CRM agent.
 

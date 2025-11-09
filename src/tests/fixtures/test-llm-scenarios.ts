@@ -1213,6 +1213,101 @@ const SCENARIOS: ScenarioDefinition[] = [
     ],
   },
   {
+    id: 'run-test-queue-cancel',
+    description: 'Tool queue cancellation path (abort while waiting).',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        expectedTools: [TOOL_NAME],
+        response: {
+          kind: 'tool-call',
+          assistantText: 'Issue two MCP calls so the second waits on the queue.',
+          toolCalls: [
+            {
+              toolName: TOOL_NAME,
+              callId: 'call-queue-cancel-1',
+              assistantText: 'First call triggers the timeout payload.',
+              arguments: {
+                text: CONCURRENCY_TIMEOUT_ARGUMENT,
+              },
+            },
+            {
+              toolName: TOOL_NAME,
+              callId: 'call-queue-cancel-2',
+              assistantText: 'Second call should be queued until cancellation.',
+              arguments: {
+                text: CONCURRENCY_SECOND_ARGUMENT,
+              },
+            },
+          ],
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+          finishReason: TOOL_FINISH_REASON,
+        },
+      },
+      {
+        turn: 2,
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Cancellation path still reports queued work.',
+          reportContent: `${RESULT_HEADING}Queued tool execution canceled mid-flight.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_FAILURE,
+          tokenUsage: {
+            inputTokens: 80,
+            outputTokens: 26,
+            totalTokens: 106,
+          },
+        },
+      },
+    ],
+  },
+  {
+    id: 'run-test-queue-isolation',
+    description: 'Batch call saturates default queue while fast queue remains free.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        expectedTools: ['agent__batch'],
+        response: {
+          kind: 'tool-call',
+          assistantText: 'Batch call mixes slow and fast queues.',
+          toolCalls: [
+            {
+              toolName: 'agent__batch',
+              callId: 'call-queue-isolation',
+              arguments: {
+                calls: [
+                  { id: 'slow-1', tool: 'slow__test', parameters: { text: CONCURRENCY_TIMEOUT_ARGUMENT } },
+                  { id: 'slow-2', tool: 'slow__test', parameters: { text: CONCURRENCY_SECOND_ARGUMENT } },
+                  { id: 'fast-1', tool: 'fast__test', parameters: { text: 'fast-call' } },
+                ],
+              },
+            },
+          ],
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+          finishReason: TOOL_FINISH_REASON,
+        },
+      },
+      {
+        turn: 2,
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Batch execution completed with isolated queues.',
+          reportContent: `${RESULT_HEADING}Slow queue congestion did not affect the fast queue.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_SUCCESS,
+          tokenUsage: {
+            inputTokens: 90,
+            outputTokens: 32,
+            totalTokens: 122,
+          },
+        },
+      },
+    ],
+  },
+  {
     id: 'run-test-26',
     description: 'Batch invalid input detection (missing id).',
     systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],

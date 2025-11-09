@@ -6,8 +6,19 @@ import type { ToolMetricsRecord } from '../telemetry/index.js';
 import type { MCPTool, LogEntry, AccountingEntry, ProgressMetrics, LogDetailValue } from '../types.js';
 import type { ToolExecuteOptions, ToolExecuteResult, ToolKind, ToolProvider, ToolExecutionContext } from './types.js';
 
-import { recordToolMetrics, runWithSpan, addSpanAttributes, addSpanEvent, recordSpanError } from '../telemetry/index.js';
+import { recordToolMetrics, runWithSpan, addSpanAttributes, addSpanEvent, recordSpanError, recordQueueDepthMetrics, recordQueueWaitMetrics } from '../telemetry/index.js';
 import { appendCallPathSegment, formatToolRequestCompact, normalizeCallPath, sanitizeToolName, truncateUtf8WithNotice, warn } from '../utils.js';
+
+import { queueManager, type AcquireResult } from './queue-manager.js';
+
+queueManager.setListeners({
+  onDepthChange: (queue, info) => {
+    recordQueueDepthMetrics({ queue, capacity: info.capacity, inUse: info.inUse, waiting: info.waiting });
+  },
+  onWaitComplete: (queue, waitMs) => {
+    recordQueueWaitMetrics({ queue, waitMs });
+  },
+});
 
 const toErrorMessage = (value: unknown): string => {
   if (value instanceof Error && typeof value.message === 'string') return value.message;
@@ -53,16 +64,15 @@ const TOOL_MANAGE_ERROR_EVENT = 'tool.manage.error';
 
 export class ToolsOrchestrator {
   private readonly providers: ToolProvider[] = [];
-  private readonly mapping = new Map<string, { provider: ToolProvider; kind: ToolKind }>();
+  private readonly mapping = new Map<string, { provider: ToolProvider; kind: ToolKind; queueName?: string }>();
   // Minimal alias support to smooth tool naming mismatches across prompts/providers
   private readonly aliases = new Map<string, string>();
-  private slotsInUse = 0;
-  private waiters: (() => void)[] = [];
   private canceled = false;
+  private readonly pendingQueueControllers = new Set<AbortController>();
   private readonly sessionInfo: { agentId?: string; agentPath?: string; callPath?: string; txnId?: string; headendId?: string; telemetryLabels?: Record<string, string> };
 
   constructor(
-    private readonly opts: { toolTimeout?: number; toolResponseMaxBytes?: number; maxConcurrentTools?: number; parallelToolCalls?: boolean; traceTools?: boolean },
+    private readonly opts: { toolTimeout?: number; toolResponseMaxBytes?: number; traceTools?: boolean },
     private readonly opTree: SessionTreeBuilder,
     private readonly onOpTreeSnapshot: (tree: SessionNode) => void,
     // Unified logger: session-level log() (must never throw)
@@ -141,10 +151,11 @@ export class ToolsOrchestrator {
     this.mapping.clear();
     this.providers.forEach((p) => {
       p.listTools().forEach((t) => {
-        this.mapping.set(t.name, { provider: p, kind: p.kind });
+        const queueName = p.resolveQueueName(t.name) ?? t.queue ?? 'default';
+        this.mapping.set(t.name, { provider: p, kind: p.kind, queueName });
         const sanitized = sanitizeToolName(t.name);
         if (!this.mapping.has(sanitized)) {
-          this.mapping.set(sanitized, { provider: p, kind: p.kind });
+          this.mapping.set(sanitized, { provider: p, kind: p.kind, queueName });
         }
       });
     });
@@ -216,7 +227,6 @@ export class ToolsOrchestrator {
   ): Promise<ManagedToolResult> {
     if (this.canceled) throw new Error('canceled');
     const bypass = opts?.bypassConcurrency === true;
-    if (!bypass) await this.acquireSlot();
     if (this.mapping.size === 0) { this.listTools(); }
     const effective = this.resolveName(name);
     const entry = this.mapping.get(effective);
@@ -224,7 +234,36 @@ export class ToolsOrchestrator {
 
     const provider = entry.provider;
     const kind = entry.kind;
-    const toolIdentity = (() => {
+    let queueName: string | undefined;
+    let queueResult: AcquireResult | undefined;
+    let queueController: AbortController | undefined;
+    let acquiredQueue = false;
+    if (!bypass && this.shouldQueue(kind)) {
+      queueName = entry.queueName ?? 'default';
+      queueController = new AbortController();
+      this.pendingQueueControllers.add(queueController);
+      try {
+        queueResult = await queueManager.acquire(queueName, { signal: queueController.signal, agentId: this.sessionInfo.agentId, toolName: effective });
+        this.pendingQueueControllers.delete(queueController);
+        queueController = undefined;
+        acquiredQueue = true;
+        if (queueResult.queued) {
+          this.logQueued(queueName, queueResult, ctx, kind);
+        }
+      } catch (error) {
+        if (queueController !== undefined) {
+          this.pendingQueueControllers.delete(queueController);
+          queueController = undefined;
+        }
+        if (error instanceof DOMException && error.name === 'AbortError') {
+          throw new Error('canceled');
+        }
+        throw error;
+      }
+    }
+
+    try {
+      const toolIdentity = (() => {
       try {
         return provider.resolveToolIdentity(effective);
       } catch {
@@ -493,7 +532,6 @@ export class ToolsOrchestrator {
           this.opTree.endOp(opId, STATUS_FAILED, { latency, error: failureReason });
         }
       } catch (e) { warn(`tools endOp failed: ${toErrorMessage(e)}`); }
-      if (!bypass) this.releaseSlot();
       return {
         ok: false,
         result: failureStub,
@@ -665,7 +703,6 @@ export class ToolsOrchestrator {
           this.opTree.endOp(opId, 'failed', { latency, error: msg });
         }
       } catch (e) { warn(`tools endOp failed: ${toErrorMessage(e)}`); }
-      if (!bypass) this.releaseSlot();
       throw new Error(msg);
     }
 
@@ -827,7 +864,6 @@ export class ToolsOrchestrator {
           this.opTree.endOp(opId, STATUS_FAILED, { latency, error: failureReason });
         }
       } catch (e) { warn(`tools endOp failed: ${toErrorMessage(e)}`); }
-      if (!bypass) this.releaseSlot();
       return {
         ok: false,
         result: failureStub,
@@ -941,7 +977,6 @@ export class ToolsOrchestrator {
         } catch (e) { warn(`tools onOpTreeSnapshot failed: ${toErrorMessage(e)}`); }
       }
     } catch (e) { warn(`tools finalize failed: ${toErrorMessage(e)}`); }
-    if (!bypass) this.releaseSlot();
     const successMetrics = {
       agentId: agentIdLabel,
       callPath: callPathLabel,
@@ -973,24 +1008,15 @@ export class ToolsOrchestrator {
       tokens: reservation.tokens,
       dropped: false,
     };
-  }
-
-  private async acquireSlot(): Promise<void> {
-    const cap = Math.max(1, this.opts.maxConcurrentTools ?? 1);
-    const effectiveCap = (this.opts.parallelToolCalls === false) ? 1 : cap;
-    if (this.canceled) throw new Error('canceled');
-    if (this.slotsInUse < effectiveCap) {
-      this.slotsInUse += 1;
-      return;
+    } finally {
+      if (acquiredQueue && queueName !== undefined) {
+        queueManager.release(queueName);
+      }
+      if (queueController !== undefined) {
+        this.pendingQueueControllers.delete(queueController);
+        try { queueController.abort(); } catch (e) { warn(`queue abort failed: ${toErrorMessage(e)}`); }
+      }
     }
-    await new Promise<void>((resolve, reject) => { this.waiters.push(() => { if (this.canceled) reject(new Error('canceled')); else resolve(); }); });
-    this.slotsInUse += 1;
-  }
-
-  private releaseSlot(): void {
-    this.slotsInUse = Math.max(0, this.slotsInUse - 1);
-    const next = this.waiters.shift();
-    if (next !== undefined) { try { next(); } catch (e) { warn(`releaseSlot waiter failed: ${toErrorMessage(e)}`); } }
   }
 
   // Aggregate instructions across providers
@@ -1027,8 +1053,7 @@ export class ToolsOrchestrator {
 
   async cleanup(): Promise<void> {
     this.canceled = true;
-    // release all waiters
-    try { this.waiters.splice(0).forEach((w) => { try { w(); } catch (e) { warn(`cleanup waiter failed: ${toErrorMessage(e)}`); } }); } catch (e) { warn(`cleanup waiters failed: ${toErrorMessage(e)}`); }
+    this.abortAllQueueControllers();
     // eslint-disable-next-line functional/no-loop-statements
     for (const p of this.providers) {
       const maybe = p as unknown as { cleanup?: () => Promise<void> };
@@ -1041,8 +1066,41 @@ export class ToolsOrchestrator {
   // Explicit cancel entrypoint to abort queue and tear down providers
   cancel(): void {
     this.canceled = true;
-    try { this.waiters.splice(0).forEach((w) => { try { w(); } catch (e) { warn(`cancel waiter failed: ${toErrorMessage(e)}`); } }); } catch (e) { warn(`cancel waiters failed: ${toErrorMessage(e)}`); }
+    this.abortAllQueueControllers();
     // Best-effort async cleanup; do not await here to avoid blocking callers
     void this.cleanup();
+  }
+
+  private shouldQueue(kind: ToolKind): boolean {
+    return kind === 'mcp' || kind === 'rest';
+  }
+
+  private logQueued(queueName: string, result: AcquireResult, ctx: ToolExecutionContext, kind: ToolKind): void {
+    const entry: LogEntry = {
+      timestamp: Date.now(),
+      severity: 'VRB',
+      turn: ctx.turn,
+      subturn: ctx.subturn,
+      direction: 'request',
+      type: 'tool',
+      toolKind: kind,
+      remoteIdentifier: `queue:${queueName}`,
+      fatal: false,
+      message: 'queued',
+      details: {
+        queue: queueName,
+        wait_ms: result.waitMs,
+        queued_depth: result.queuedDepth,
+        queue_capacity: result.capacity,
+      },
+    };
+    this.onLog(entry);
+  }
+
+  private abortAllQueueControllers(): void {
+    this.pendingQueueControllers.forEach((controller) => {
+      try { controller.abort(); } catch (e) { warn(`queue controller abort failed: ${toErrorMessage(e)}`); }
+    });
+    this.pendingQueueControllers.clear();
   }
 }

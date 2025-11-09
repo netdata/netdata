@@ -32,6 +32,7 @@ import { formatRichLogLine } from '../logging/rich-format.js';
 import { SubAgentRegistry } from '../subagent-registry.js';
 import { estimateMessagesTokens, resolveTokenizer } from '../tokenizer-registry.js';
 import { MCPProvider } from '../tools/mcp-provider.js';
+import { queueManager } from '../tools/queue-manager.js';
 import { clampToolName, sanitizeToolName, formatToolRequestCompact, truncateUtf8WithNotice, formatAgentResultHumanReadable, setWarningSink, getWarningSink, warn } from '../utils.js';
 import { createWebSocketTransport } from '../websocket-transport.js';
 
@@ -68,6 +69,7 @@ const RUN_TEST_37 = 'run-test-37';
 const RUN_TEST_MAX_TURN_LIMIT = 'run-test-max-turn-limit';
 const TOOL_OVERFLOW_PAYLOAD = '@'.repeat(2000);
 const TOOL_DROP_STUB = `(tool failed: ${CONTEXT_OVERFLOW_FRAGMENT})`;
+const TEST_STDIO_SERVER_PATH = path.resolve(__dirname, 'mcp/test-stdio-server.js');
 
 const toError = (value: unknown): Error => (value instanceof Error ? value : new Error(String(value)));
 const toErrorMessage = (value: unknown): string => (value instanceof Error ? value.message : String(value));
@@ -580,7 +582,7 @@ function createDeferred<T = void>(): { promise: Promise<T>; resolve: (value: T) 
   return { promise, resolve, reject };
 }
 
-function createParentSessionStub(configuration: Configuration): Pick<AIAgentSessionConfig, 'config' | 'callbacks' | 'stream' | 'traceLLM' | 'traceMCP' | 'traceSdk' | 'verbose' | 'temperature' | 'topP' | 'llmTimeout' | 'toolTimeout' | 'maxRetries' | 'maxTurns' | 'toolResponseMaxBytes' | 'parallelToolCalls' | 'targets'> {
+function createParentSessionStub(configuration: Configuration): Pick<AIAgentSessionConfig, 'config' | 'callbacks' | 'stream' | 'traceLLM' | 'traceMCP' | 'traceSdk' | 'verbose' | 'temperature' | 'topP' | 'llmTimeout' | 'toolTimeout' | 'maxRetries' | 'maxTurns' | 'toolResponseMaxBytes' | 'targets'> {
   return {
     config: configuration,
     callbacks: undefined,
@@ -596,7 +598,6 @@ function createParentSessionStub(configuration: Configuration): Pick<AIAgentSess
     maxRetries: 2,
     maxTurns: 10,
     toolResponseMaxBytes: 65_536,
-    parallelToolCalls: false,
     targets: [{ provider: PRIMARY_PROVIDER, model: MODEL_NAME }],
   };
 }
@@ -616,6 +617,7 @@ function makeBasicConfiguration(): Configuration {
       },
     },
     mcpServers: {},
+    queues: { default: { concurrent: 32 } },
   };
 }
 
@@ -677,11 +679,9 @@ const overrideLLMExpected = {
   maxRetries: 5,
   maxToolTurns: 11,
   maxToolCallsPerTurn: 4,
-  maxConcurrentTools: 2,
   toolResponseMaxBytes: 777,
   mcpInitConcurrency: 6,
   stream: true,
-  parallelToolCalls: true,
 };
 
 const TEST_SCENARIOS: HarnessTest[] = [
@@ -891,8 +891,6 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     id: 'run-test-13',
     configure: (configuration, sessionConfig) => {
       sessionConfig.tools = ['test', 'batch'];
-      configuration.defaults = { ...configuration.defaults, parallelToolCalls: true };
-      sessionConfig.parallelToolCalls = true;
     },
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-13 expected success.');
@@ -905,23 +903,6 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       const batchResult = result.conversation.find((message) => message.role === 'tool' && message.toolCallId === 'call-batch-success');
       const hasBatchResult = batchResult?.content.includes('batch-success') ?? false;
       invariant(hasBatchResult, 'Batch result should include test payload for run-test-13.');
-    },
-  },
-  {
-    id: 'run-test-14',
-    configure: (configuration, sessionConfig) => {
-      sessionConfig.tools = ['test', 'batch'];
-      configuration.defaults = { ...configuration.defaults, parallelToolCalls: false };
-      sessionConfig.parallelToolCalls = false;
-    },
-    expect: (result) => {
-      invariant(result.success, 'Scenario run-test-14 should conclude with failure report.');
-      const finalReport = result.finalReport;
-      invariant(finalReport?.status === 'failure', 'Final report should mark failure for run-test-14.');
-      const log = result.logs.find((entry) => typeof entry.message === 'string' && entry.message.includes('error agent__batch'));
-      invariant(log !== undefined, 'Batch execution failure log expected for run-test-14.');
-      const batchAccounting = result.accounting.filter(isToolAccounting).find((entry) => entry.command === 'agent__batch');
-      invariant(batchAccounting?.status === 'failed', 'Batch accounting must record failure for run-test-14.');
     },
   },
   {
@@ -2289,10 +2270,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
   },
   {
     id: 'run-test-25',
-    configure: (configuration, sessionConfig) => {
-      configuration.defaults = { ...configuration.defaults, parallelToolCalls: true, maxConcurrentTools: 1 };
-      sessionConfig.parallelToolCalls = true;
-      sessionConfig.maxConcurrentTools = 1;
+    configure: (configuration) => {
+      configuration.queues = { ...configuration.queues, default: { concurrent: 1 } };
     },
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-25 expected success.');
@@ -2340,13 +2319,69 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       );
       invariant(secondRequestIndex !== -1, 'Second tool request log missing for run-test-25.');
       invariant(secondRequestIndex > firstResponseIndex, 'Second tool request should occur after first tool response for run-test-25.');
+      const queuedLog = logs.find((entry) => entry.message === 'queued' && entry.remoteIdentifier.startsWith('queue:'));
+      invariant(queuedLog !== undefined, 'Queued log entry missing for run-test-25.');
+      invariant(queuedLog.details?.queue === 'default', 'Queued log should reference default queue for run-test-25.');
+    },
+  },
+  {
+    id: 'run-test-queue-cancel',
+    description: 'Abort the session while a tool waits for queue capacity.',
+    configure: (configuration) => {
+      configuration.queues = { ...configuration.queues, default: { concurrent: 1 } };
+    },
+    execute: async (_configuration, sessionConfig) => {
+      const abort = new AbortController();
+      sessionConfig.abortSignal = abort.signal;
+      const session = AIAgentSession.create(sessionConfig);
+      const timer = setTimeout(() => {
+        try { abort.abort(); } catch { /* ignore */ }
+      }, 75);
+      try {
+        return await session.run();
+      } finally {
+        clearTimeout(timer);
+      }
+    },
+    expect: (result) => {
+      invariant(!result.success, 'Scenario run-test-queue-cancel expected cancellation.');
+      invariant(result.error === 'canceled', 'Cancellation must propagate error for run-test-queue-cancel.');
+      const queuedLog = result.logs.find((entry) => entry.message === 'queued' && entry.remoteIdentifier.startsWith('queue:'));
+      invariant(queuedLog !== undefined, 'Queued log entry missing for run-test-queue-cancel.');
+      invariant(queuedLog.details?.queue === 'default', 'Queued log should reference default queue for run-test-queue-cancel.');
+    },
+  },
+  {
+    id: 'run-test-queue-isolation',
+    configure: (configuration, sessionConfig) => {
+      configuration.queues = { default: { concurrent: 1 }, fast: { concurrent: 1 } };
+      configuration.mcpServers = {
+        slow: {
+          type: 'stdio',
+          command: process.execPath,
+          args: [TEST_STDIO_SERVER_PATH],
+          queue: 'default',
+        },
+        fast: {
+          type: 'stdio',
+          command: process.execPath,
+          args: [TEST_STDIO_SERVER_PATH],
+          queue: 'fast',
+        },
+      } satisfies Record<string, MCPServerConfig>;
+      sessionConfig.tools = ['slow', 'fast', 'batch'];
+    },
+    expect: (result) => {
+      invariant(result.success, 'Scenario run-test-queue-isolation expected success.');
+      const queuedDefault = result.logs.some((entry) => entry.message === 'queued' && entry.details?.queue === 'default');
+      invariant(queuedDefault, 'Default queue should log a queued entry in run-test-queue-isolation.');
+      const queuedFast = result.logs.some((entry) => entry.message === 'queued' && entry.details?.queue === 'fast');
+      invariant(!queuedFast, 'Fast queue must not log a queued entry in run-test-queue-isolation.');
     },
   },
   {
     id: 'run-test-26',
     configure: (configuration, sessionConfig) => {
-      configuration.defaults = { ...configuration.defaults, parallelToolCalls: true };
-      sessionConfig.parallelToolCalls = true;
       sessionConfig.tools = ['test', 'batch'];
     },
     expect: (result) => {
@@ -2365,8 +2400,6 @@ if (process.env.CONTEXT_DEBUG === 'true') {
   {
     id: 'run-test-27',
     configure: (configuration, sessionConfig) => {
-      configuration.defaults = { ...configuration.defaults, parallelToolCalls: true };
-      sessionConfig.parallelToolCalls = true;
       sessionConfig.tools = ['test', 'batch'];
     },
     expect: (result) => {
@@ -2385,8 +2418,6 @@ if (process.env.CONTEXT_DEBUG === 'true') {
   {
     id: 'run-test-28',
     configure: (configuration, sessionConfig) => {
-      configuration.defaults = { ...configuration.defaults, parallelToolCalls: true };
-      sessionConfig.parallelToolCalls = true;
       sessionConfig.tools = ['test', 'batch'];
     },
     expect: (result) => {
@@ -2508,8 +2539,6 @@ if (process.env.CONTEXT_DEBUG === 'true') {
   {
     id: 'run-test-34',
     configure: (configuration, sessionConfig) => {
-      configuration.defaults = { ...configuration.defaults, parallelToolCalls: true };
-      sessionConfig.parallelToolCalls = true;
       sessionConfig.tools = ['test', 'batch'];
     },
     expect: (result) => {
@@ -2525,8 +2554,6 @@ if (process.env.CONTEXT_DEBUG === 'true') {
   {
     id: 'run-test-35',
     configure: (configuration, sessionConfig) => {
-      configuration.defaults = { ...configuration.defaults, parallelToolCalls: true };
-      sessionConfig.parallelToolCalls = true;
       sessionConfig.tools = ['test', 'batch'];
     },
     expect: (result) => {
@@ -2540,8 +2567,6 @@ if (process.env.CONTEXT_DEBUG === 'true') {
   {
     id: 'run-test-36',
     configure: (configuration, sessionConfig) => {
-      configuration.defaults = { ...configuration.defaults, parallelToolCalls: true };
-      sessionConfig.parallelToolCalls = true;
       sessionConfig.tools = ['test', 'batch'];
     },
     expect: (result) => {
@@ -2594,10 +2619,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
   },
   {
     id: 'run-test-46',
-    configure: (configuration, sessionConfig, defaults) => {
-      defaults.maxConcurrentTools = 1;
-      configuration.defaults = defaults;
-      sessionConfig.maxConcurrentTools = 1;
+    configure: (configuration, sessionConfig, _defaults) => {
       sessionConfig.tools = ['test'];
     },
     expect: (result) => {
@@ -3597,8 +3619,6 @@ if (process.env.CONTEXT_DEBUG === 'true') {
   {
     id: 'run-test-59',
     configure: (configuration, sessionConfig) => {
-      configuration.defaults = { ...configuration.defaults, parallelToolCalls: true };
-      sessionConfig.parallelToolCalls = true;
       sessionConfig.tools = ['test', 'batch'];
       sessionConfig.toolResponseMaxBytes = 120;
     },
@@ -4354,17 +4374,16 @@ if (process.env.CONTEXT_DEBUG === 'true') {
             temperature: 0.11,
             topP: 0.21,
             maxOutputTokens: 999,
-            repeatPenalty: 1.01,
-            maxRetries: 2,
-            maxToolTurns: 3,
-            maxToolCallsPerTurn: 4,
-            parallelToolCalls: false,
-            maxConcurrentTools: 5,
-            toolResponseMaxBytes: 5_555,
-            stream: false,
-            mcpInitConcurrency: 6,
-          },
-        };
+          repeatPenalty: 1.01,
+          maxRetries: 2,
+          maxToolTurns: 3,
+          maxToolCallsPerTurn: 4,
+          toolResponseMaxBytes: 5_555,
+          stream: false,
+          mcpInitConcurrency: 6,
+        },
+        queues: { default: { concurrent: 32 } },
+      };
         fs.writeFileSync(configPath, JSON.stringify(configData, null, 2), 'utf-8');
         const promptContent = [
           '---',
@@ -4378,8 +4397,6 @@ if (process.env.CONTEXT_DEBUG === 'true') {
           'maxRetries: 7',
           'maxToolTurns: 8',
           'maxToolCallsPerTurn: 9',
-          'maxConcurrentTools: 10',
-          'parallelToolCalls: true',
           'temperature: 0.31',
           'topP: 0.41',
           'maxOutputTokens: 1234',
@@ -4401,11 +4418,9 @@ if (process.env.CONTEXT_DEBUG === 'true') {
           baseDir: tempDir,
           configPath,
           stream: true,
-          parallelToolCalls: false,
           maxRetries: 11,
           maxToolTurns: 12,
           maxToolCallsPerTurn: 16,
-          maxConcurrentTools: 13,
           llmTimeout: 5_555,
           toolTimeout: 6_666,
           temperature: 0.51,
@@ -4499,11 +4514,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         invariant(cfg.maxRetries === 11, 'maxRetries override mismatch for run-test-73.');
         invariant(cfg.maxTurns === 12, 'maxTurns override mismatch for run-test-73.');
         invariant(cfg.maxToolCallsPerTurn === 16, 'maxToolCallsPerTurn mismatch for run-test-73.');
-        invariant(cfg.maxConcurrentTools === 13, 'maxConcurrentTools override mismatch for run-test-73.');
         invariant(cfg.llmTimeout === 5_555, 'llmTimeout override mismatch for run-test-73.');
         invariant(cfg.toolTimeout === 6_666, 'toolTimeout override mismatch for run-test-73.');
-        invariant(cfg.parallelToolCalls !== undefined, 'parallelToolCalls undefined for run-test-73.');
-        invariant(!cfg.parallelToolCalls, 'parallelToolCalls override mismatch for run-test-73.');
         invariant(cfg.stream !== undefined, 'stream undefined for run-test-73.');
         invariant(cfg.stream, 'stream override mismatch for run-test-73.');
         invariant(cfg.traceLLM !== undefined, 'traceLLM undefined for run-test-73.');
@@ -4534,6 +4546,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
             [PRIMARY_PROVIDER]: { type: 'test-llm' },
           },
           mcpServers: {},
+          queues: { default: { concurrent: 32 } },
         } satisfies Configuration;
         fs.writeFileSync(configPath, JSON.stringify(configData, null, 2), 'utf-8');
 
@@ -4574,11 +4587,9 @@ if (process.env.CONTEXT_DEBUG === 'true') {
           maxRetries: overrideLLMExpected.maxRetries,
           maxToolTurns: overrideLLMExpected.maxToolTurns,
           maxToolCallsPerTurn: overrideLLMExpected.maxToolCallsPerTurn,
-          maxConcurrentTools: overrideLLMExpected.maxConcurrentTools,
           toolResponseMaxBytes: overrideLLMExpected.toolResponseMaxBytes,
           mcpInitConcurrency: overrideLLMExpected.mcpInitConcurrency,
           stream: overrideLLMExpected.stream,
-          parallelToolCalls: overrideLLMExpected.parallelToolCalls,
         };
 
         const registry = new AgentRegistry([], { configPath, globalOverrides: overrides });
@@ -4620,11 +4631,9 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       invariant(overrideParentLoaded.effective.toolTimeout === overrideLLMExpected.toolTimeout, 'Parent toolTimeout should follow overrides.');
       invariant(overrideParentLoaded.effective.maxToolTurns === overrideLLMExpected.maxToolTurns, 'Parent maxToolTurns should follow overrides.');
       invariant(overrideParentLoaded.effective.maxToolCallsPerTurn === overrideLLMExpected.maxToolCallsPerTurn, 'Parent maxToolCallsPerTurn should follow overrides.');
-      invariant(overrideParentLoaded.effective.maxConcurrentTools === overrideLLMExpected.maxConcurrentTools, 'Parent maxConcurrentTools should follow overrides.');
       invariant(overrideParentLoaded.effective.toolResponseMaxBytes === overrideLLMExpected.toolResponseMaxBytes, 'Parent toolResponseMaxBytes should follow overrides.');
       invariant(overrideParentLoaded.effective.mcpInitConcurrency === overrideLLMExpected.mcpInitConcurrency, 'Parent mcpInitConcurrency should follow overrides.');
       invariant(overrideParentLoaded.effective.stream === overrideLLMExpected.stream, 'Parent stream flag should follow overrides.');
-      invariant(overrideParentLoaded.effective.parallelToolCalls === overrideLLMExpected.parallelToolCalls, 'Parent parallelToolCalls should follow overrides.');
       invariant(overrideChildLoaded !== undefined, 'Child loaded agent missing for global override test.');
       invariant(overrideChildLoaded.targets === overrideTargetsRef, 'Child targets reference mismatch for global override test.');
       invariant(overrideChildLoaded.targets.every((entry) => entry.provider === PRIMARY_PROVIDER && entry.model === MODEL_NAME), 'Child targets should be overridden to primary provider/model.');
@@ -4637,11 +4646,9 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       invariant(overrideChildLoaded.effective.toolTimeout === overrideLLMExpected.toolTimeout, 'Child toolTimeout should follow overrides.');
       invariant(overrideChildLoaded.effective.maxToolTurns === overrideLLMExpected.maxToolTurns, 'Child maxToolTurns should follow overrides.');
       invariant(overrideChildLoaded.effective.maxToolCallsPerTurn === overrideLLMExpected.maxToolCallsPerTurn, 'Child maxToolCallsPerTurn should follow overrides.');
-      invariant(overrideChildLoaded.effective.maxConcurrentTools === overrideLLMExpected.maxConcurrentTools, 'Child maxConcurrentTools should follow overrides.');
       invariant(overrideChildLoaded.effective.toolResponseMaxBytes === overrideLLMExpected.toolResponseMaxBytes, 'Child toolResponseMaxBytes should follow overrides.');
       invariant(overrideChildLoaded.effective.mcpInitConcurrency === overrideLLMExpected.mcpInitConcurrency, 'Child mcpInitConcurrency should follow overrides.');
       invariant(overrideChildLoaded.effective.stream === overrideLLMExpected.stream, 'Child stream flag should follow overrides.');
-      invariant(overrideChildLoaded.effective.parallelToolCalls === overrideLLMExpected.parallelToolCalls, 'Child parallelToolCalls should follow overrides.');
     },
   },
 
@@ -4659,6 +4666,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         const configData = {
           providers: { [PRIMARY_PROVIDER]: { type: 'test-llm' } },
           mcpServers: {},
+          queues: { default: { concurrent: 32 } },
         } satisfies Configuration;
         fs.writeFileSync(configPath, JSON.stringify(configData, null, 2), 'utf-8');
         const agentPath = path.join(tempDir, 'spawn-parent.ai');
@@ -4712,6 +4720,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         const configData = {
           providers: { [PRIMARY_PROVIDER]: { type: 'test-llm' } },
           mcpServers: {},
+          queues: { default: { concurrent: 32 } },
         } satisfies Configuration;
         fs.writeFileSync(configPath, JSON.stringify(configData, null, 2), 'utf-8');
         const childPath = path.join(tempDir, 'child.ai');
@@ -6215,8 +6224,6 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     id: 'run-test-91',
     configure: (configuration, sessionConfig) => {
       sessionConfig.tools = ['test', 'batch'];
-      configuration.defaults = { ...configuration.defaults, parallelToolCalls: true };
-      sessionConfig.parallelToolCalls = true;
     },
     expect: (result) => {
       invariant(result.success, 'Scenario run-test-91 expected success.');
@@ -6889,6 +6896,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
           },
         },
         mcpServers: {},
+        queues: { default: { concurrent: 32 } },
       };
       Reflect.set(session as unknown as Record<string, unknown>, 'sessionConfig', { config: configuration });
       const resolver = getPrivateMethod(session, 'resolveToolChoice') as (provider: string, model: string) => ToolChoiceMode | undefined;
@@ -7335,7 +7343,6 @@ if (process.env.CONTEXT_DEBUG === 'true') {
           userPrompt: DEFAULT_PROMPT_SCENARIO,
           outputFormat: 'markdown',
           stream: false,
-          parallelToolCalls: false,
           maxTurns: 1,
           toolTimeout: defaults.toolTimeout,
           llmTimeout: defaults.llmTimeout,
@@ -7527,7 +7534,6 @@ if (process.env.CONTEXT_DEBUG === 'true') {
 
 async function runScenario(test: HarnessTest): Promise<AIAgentResult> {
   const { id: prompt, configure, execute } = test;
-  const serverPath = path.resolve(__dirname, 'mcp/test-stdio-server.js');
   const effectiveTimeout = getEffectiveTimeoutMs(test);
   const abortController = new AbortController();
 
@@ -7541,15 +7547,18 @@ async function runScenario(test: HarnessTest): Promise<AIAgentResult> {
       test: {
         type: 'stdio',
         command: process.execPath,
-        args: [serverPath],
+        args: [TEST_STDIO_SERVER_PATH],
       },
     },
+    queues: { default: { concurrent: 32 } },
     defaults: { ...BASE_DEFAULTS },
   };
 
   const configuration: Configuration = JSON.parse(JSON.stringify(baseConfiguration)) as Configuration;
   configuration.defaults = { ...BASE_DEFAULTS, ...(configuration.defaults ?? {}) };
   const defaults = configuration.defaults;
+  queueManager.reset();
+  queueManager.configureQueues(configuration.queues);
 
   const baseSession: AIAgentSessionConfig = {
     config: configuration,
@@ -7559,7 +7568,6 @@ async function runScenario(test: HarnessTest): Promise<AIAgentResult> {
     userPrompt: prompt,
     outputFormat: 'markdown',
     stream: false,
-    parallelToolCalls: false,
     maxTurns: 3,
     toolTimeout: defaults.toolTimeout,
     llmTimeout: defaults.llmTimeout,

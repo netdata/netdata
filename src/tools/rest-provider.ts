@@ -74,7 +74,7 @@ export class RestProvider extends ToolProvider {
   listTools(): MCPTool[] {
     const out: MCPTool[] = [];
     this.tools.forEach((cfg, name) => {
-      out.push({ name: this.exposedName(name), description: cfg.description, inputSchema: cfg.parametersSchema });
+      out.push({ name: this.exposedName(name), description: cfg.description, inputSchema: cfg.parametersSchema, queue: cfg.queue });
     });
     return out;
   }
@@ -83,6 +83,11 @@ export class RestProvider extends ToolProvider {
 
   override resolveToolIdentity(exposed: string): { namespace: string; tool: string } {
     return { namespace: this.namespace, tool: this.internalName(exposed) };
+  }
+
+  override resolveQueueName(exposed: string): string | undefined {
+    const cfg = this.tools.get(this.internalName(exposed));
+    return cfg?.queue ?? 'default';
   }
 
   async execute(exposed: string, parameters: Record<string, unknown>, opts?: ToolExecuteOptions): Promise<ToolExecuteResult> {

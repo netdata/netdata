@@ -17,7 +17,6 @@ llmTimeout: 300000
 toolTimeout: 60000
 maxRetries: 5
 maxToolTurns: 10
-maxConcurrentTools: 2
 toolResponseMaxBytes: 80000
 maxOutputTokens: 32000
 repeatPenalty: 1

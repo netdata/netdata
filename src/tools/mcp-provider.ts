@@ -23,6 +23,7 @@ export class MCPProvider extends ToolProvider {
   private failedServers = new Set<string>();
   private processes = new Map<string, ChildProcess>();
   private toolNameMap = new Map<string, { serverName: string; originalName: string }>();
+  private toolQueue = new Map<string, string>();
   private initialized = false;
   private initializationPromise?: Promise<void>;
   private trace = false;
@@ -304,7 +305,12 @@ export class MCPProvider extends ToolProvider {
       this.log('TRC', `listTools('${name}') -> ${String(tools.length)} tools [${names}]`, `mcp:${name}`);
     }
     const ns = this.sanitizeNamespace(name);
-    tools.forEach((t) => { this.toolNameMap.set(`${ns}__${t.name}`, { serverName: name, originalName: t.name }); });
+    const queueName = typeof config.queue === 'string' && config.queue.length > 0 ? config.queue : 'default';
+    tools.forEach((t) => {
+      const exposed = `${ns}__${t.name}`;
+      this.toolNameMap.set(exposed, { serverName: name, originalName: t.name });
+      this.toolQueue.set(exposed, queueName);
+    });
 
     // Optional prompts
     let instructions = initInstructions;
@@ -367,9 +373,13 @@ export class MCPProvider extends ToolProvider {
   }
 
   hasTool(name: string): boolean {
-     
+
     if (!this.initialized) { void this.ensureInitialized(); }
     return this.toolNameMap.has(name);
+  }
+
+  override resolveQueueName(name: string): string | undefined {
+    return this.toolQueue.get(name);
   }
 
   async execute(name: string, parameters: Record<string, unknown>, _opts?: ToolExecuteOptions): Promise<ToolExecuteResult> {
@@ -461,6 +471,7 @@ ${trimmedTool}`);
     this.processes.clear();
     this.servers.clear();
     this.toolNameMap.clear();
+    this.toolQueue.clear();
     this.initialized = false;
   }
 }

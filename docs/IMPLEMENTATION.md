@@ -21,7 +21,7 @@ Architecture
   - `providers[providerName]`: `{ apiKey?: string; baseUrl?: string }`
   - `providers[providerName].models[modelName]`: `{ contextWindow?: number; tokenizer?: string; contextWindowBufferTokens?: number; overrides?: ... }`
   - `mcpServers[name]`: `{ type: 'stdio'|'websocket'|'http'|'sse', command?: string|[string,...], args?: string[], url?: string, headers?: Record<string,string>, env?: Record<string,string>, enabled?: boolean }`
-  - `defaults`: `{ llmTimeout?: number; toolTimeout?: number; temperature?: number; topP?: number; parallelToolCalls?: boolean; contextWindowBufferTokens?: number }`
+  - `defaults`: `{ llmTimeout?: number; toolTimeout?: number; temperature?: number; topP?: number; contextWindowBufferTokens?: number }`
 
 2) MCP client layer (libs/typescript-sdk)
 
@@ -86,7 +86,6 @@ Architecture
     - `messages`: conversation history + current user message.
     - `temperature`, `topP`: taken from config/CLI.
     - `providerOptions`:
-      - `openai.parallelToolCalls?: boolean` — controls parallel function calls for OpenAI/OpenRouter providers. Default true in config; toggleable via CLI flags.
   - Outputs:
     - `textStream` (async iterable of stream parts): we stream only `text-delta` to stdout to honor I/O rules.
     - `usage` (Promise): token usage object; providers differ (`inputTokens/promptTokens`, `outputTokens/completionTokens`, `cachedTokens`, etc.).
@@ -157,7 +156,7 @@ AI SDK (provider + stream)
 - Providers
   - `createOpenAI({ apiKey, baseURL?, headers?, name?, fetch? })`
     - Returned function is callable with a model id; `.chat(model)` forces Chat Completions when needed (OpenRouter).
-    - ProviderOptions for tool calls: `{ openai: { parallelToolCalls?: boolean } }`.
+    - ProviderOptions for tool calls: `{ openai: { toolChoice?: "auto"|"required" } }`.
   - `createAnthropic({ apiKey, baseURL?, headers?, fetch? })`
   - `createGoogleGenerativeAI({ apiKey, baseURL?, headers?, fetch? })`
 
@@ -184,7 +183,13 @@ Alternative designs considered
   - Cons: increases prompt length, decreases clarity, and bypasses automatic argument validation. Provider tool interfaces are designed to receive schemas out‑of‑band.
 
 - Always sequential tool calls
-  - Cons: slower for providers/models that natively support parallel calls. We expose `parallelToolCalls` for OpenAI‑compatible providers and default to true.
+- Cons: queue slots can delay eager providers when the process is already at capacity. Administrators should size queues to match available MCP server resources.
+
+- The **queue manager** enforces tool concurrency:
+  - `queue-manager.ts` owns a process-wide map of named queues populated from `.ai-agent.json` at load time.
+  - MCP and REST providers expose `tool.queue` metadata so `ToolsOrchestrator` can acquire/releases slots per call. Internal helpers never acquire slots.
+  - Waiting executions emit `queued` log entries (with wait duration/capacity) and queue listeners update telemetry (`ai_agent_queue_depth`, `ai_agent_queue_wait_duration_ms`).
+  - Cancelation propagates via `AbortSignal`; when a session ends we abort any queued waiters so the slot counter never leaks.
 
 ## Headend Surfaces
 
@@ -217,7 +222,7 @@ Implementation checklist (end‑to‑end)
   - Build tool→server mapping
 - Build AI SDK tools: for each MCP tool, `jsonSchema(inputSchema)` + `execute` that delegates to MCP `callTool`.
 - Enhance system prompt with instructions once.
-- Execute `streamText` with model, tools, system, messages, temperature/topP, and OpenAI `parallelToolCalls` option when applicable.
+- Execute `streamText` with model, tools, system, messages, temperature/topP, and any provider-specific tool-choice hints when applicable.
 - Stream `text-delta` to stdout; on finish, record usage and append response messages to conversation with metadata.
 - Emit accounting entries for LLM and tools; write JSONL when configured.
 - Cleanup MCP clients and spawned processes.

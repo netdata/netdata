@@ -1,7 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import type { Configuration, MCPServerConfig, ProviderConfig, RestToolConfig, OpenAPISpecConfig, TelemetryConfig } from './types.js';
+import type { Configuration, MCPServerConfig, ProviderConfig, RestToolConfig, OpenAPISpecConfig, TelemetryConfig, QueueConfig } from './types.js';
+import { DEFAULT_QUEUE_CONCURRENCY } from './config.js';
 
 import { warn } from './utils.js';
 
@@ -278,9 +279,7 @@ export function resolveDefaults(layers: ResolvedConfigLayer[]): NonNullable<Conf
     'maxOutputTokens',
     'repeatPenalty',
     'stream',
-    'parallelToolCalls',
     'maxToolTurns',
-    'maxConcurrentTools',
     'maxRetries',
     'toolResponseMaxBytes',
     'mcpInitConcurrency'
@@ -296,6 +295,39 @@ export function resolveDefaults(layers: ResolvedConfigLayer[]): NonNullable<Conf
       if (dfl !== undefined && Object.prototype.hasOwnProperty.call(dfl, k)) (out as Record<string, unknown>)[k] = dfl[k];
     }
   });
+  return out;
+}
+
+function resolveQueues(layers: ResolvedConfigLayer[]): Record<string, QueueConfig> {
+  const out: Record<string, QueueConfig> = {};
+  layers.forEach((layer) => {
+    const j = layer.json as { queues?: Record<string, unknown> } | undefined;
+    const queues = j?.queues;
+    if (queues === undefined) return;
+    const env = layer.env ?? {};
+    Object.entries(queues).forEach(([name, raw]) => {
+      const expanded = expandPlaceholders(raw, (varName: string) => {
+        const envVal = Object.prototype.hasOwnProperty.call(env, varName) ? env[varName] : undefined;
+        const v = envVal ?? process.env[varName];
+        if (v === undefined) throw buildMissingVarError('defaults', name, layer.origin, varName);
+        return v;
+      }) as { concurrent?: unknown };
+      const value = expanded?.concurrent;
+      if (value === undefined) {
+        throw new Error(`Queue '${name}' in ${layer.origin} config is missing 'concurrent'.`);
+      }
+      const num = typeof value === 'number' ? value : Number(value);
+      if (!Number.isFinite(num) || num <= 0) {
+        throw new Error(`Queue '${name}' in ${layer.origin} config must have a positive numeric 'concurrent' value.`);
+      }
+      const bounded = Math.trunc(num);
+      const prev = out[name];
+      out[name] = { concurrent: prev === undefined ? bounded : Math.max(prev.concurrent, bounded) };
+    });
+  });
+  if (out.default === undefined) {
+    out.default = { concurrent: DEFAULT_QUEUE_CONCURRENCY };
+  }
   return out;
 }
 
@@ -393,6 +425,7 @@ export function buildUnifiedConfiguration(
   const accounting = resolveAccounting(layers, opts);
   const pricing = resolvePricing(layers);
   const telemetry = resolveTelemetry(layers);
+  const queues = resolveQueues(layers);
 
-  return { providers, mcpServers, restTools, openapiSpecs, defaults, accounting, pricing, telemetry } as Configuration;
+  return { providers, mcpServers, restTools, openapiSpecs, queues, defaults, accounting, pricing, telemetry } as Configuration;
 }

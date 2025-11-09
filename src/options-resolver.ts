@@ -3,11 +3,9 @@ import type { Configuration, ReasoningLevel, ProviderReasoningValue, CachingMode
 
 interface CLIOverrides {
   stream?: boolean;
-  parallelToolCalls?: boolean;
   maxRetries?: number;
   maxToolTurns?: number;
   maxToolCallsPerTurn?: number;
-  maxConcurrentTools?: number;
   llmTimeout?: number;
   toolTimeout?: number;
   temperature?: number;
@@ -28,11 +26,9 @@ interface CLIOverrides {
 
 interface GlobalLLMOverrides {
   stream?: boolean;
-  parallelToolCalls?: boolean;
   maxRetries?: number;
   maxToolTurns?: number;
   maxToolCallsPerTurn?: number;
-  maxConcurrentTools?: number;
   llmTimeout?: number;
   toolTimeout?: number;
   temperature?: number;
@@ -56,9 +52,7 @@ interface DefaultsForUndefined {
   maxRetries?: number;
   maxToolTurns?: number;
   maxToolCallsPerTurn?: number;
-  maxConcurrentTools?: number;
   toolResponseMaxBytes?: number;
-  parallelToolCalls?: boolean;
   reasoning?: ReasoningLevel;
   reasoningValue?: ProviderReasoningValue | null;
   caching?: CachingMode;
@@ -76,8 +70,6 @@ interface ResolvedEffectiveOptions {
   maxToolCallsPerTurn: number;
   toolResponseMaxBytes: number;
   stream: boolean;
-  parallelToolCalls: boolean;
-  maxConcurrentTools: number;
   traceLLM: boolean;
   traceMCP: boolean;
   traceSlack: boolean;
@@ -200,19 +192,6 @@ export function resolveEffectiveOptions(args: {
     return fallback;
   };
 
-  const readBool = (name: string, fmVal: unknown, fallback: boolean): boolean => {
-    const globalVal = getGlobalVal(name);
-    if (typeof globalVal === 'boolean') return globalVal;
-    const cliVal = getCliVal(name);
-    if (typeof cliVal === 'boolean') return cliVal;
-    if (typeof fmVal === 'boolean') return fmVal;
-    const def = getDefUndef(name);
-    if (typeof def === 'boolean') return def;
-    const dv = getCfgDefault(name);
-    if (typeof dv === 'boolean') return dv;
-    return fallback;
-  };
-
   const out: ResolvedEffectiveOptions = {
     temperature: readNum('temperature', fm?.temperature, 0.7),
     topP: readNum('topP', fm?.topP, 1.0),
@@ -238,8 +217,6 @@ export function resolveEffectiveOptions(args: {
       if (typeof dv === 'boolean') return dv;
       return false;
     })(),
-    parallelToolCalls: readBool('parallelToolCalls', fm?.parallelToolCalls, false),
-    maxConcurrentTools: readNum('maxConcurrentTools', (fm as { maxConcurrentTools?: number } | undefined)?.maxConcurrentTools, 3),
     traceLLM: cli?.traceLLM === true,
     traceMCP: cli?.traceMCP === true,
     traceSlack: cli?.traceSlack === true,

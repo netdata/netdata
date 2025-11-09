@@ -24,8 +24,6 @@ agents:
 llmTimeout: 600000
 toolTimeout: 300000
 toolResponseMaxBytes: 100000
-maxConcurrentTools: 5
-parallelToolCalls: true
 temperature: 0.3
 topP: 0.95
 maxOutputTokens: 32768

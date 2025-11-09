@@ -6,6 +6,8 @@ import { z } from 'zod';
 
 import type { Configuration } from './types.js';
 
+export const DEFAULT_QUEUE_CONCURRENCY = 64;
+
 const ProviderModelOverridesSchema = z.object({
   temperature: z.number().min(0).max(2).nullable().optional(),
   topP: z.number().min(0).max(1).nullable().optional(),
@@ -185,6 +187,7 @@ const TelemetrySchema = z.object({
 const ConfigurationSchema = z.object({
   providers: z.record(z.string(), ProviderConfigSchema),
   mcpServers: z.record(z.string(), MCPServerConfigSchema),
+  queues: z.record(z.string(), z.object({ concurrent: z.number().int().positive() })),
   accounting: z.object({ file: z.string() }).optional(),
   pricing: z
     .record(
@@ -209,7 +212,6 @@ const ConfigurationSchema = z.object({
       temperature: z.number().min(0).max(2).optional(),
       topP: z.number().min(0).max(1).optional(),
       stream: z.boolean().optional(),
-      parallelToolCalls: z.boolean().optional(),
       maxToolTurns: z.number().int().positive().optional(),
       maxToolCallsPerTurn: z.number().int().positive().optional(),
       maxRetries: z.number().int().positive().optional(),
@@ -282,7 +284,7 @@ export function loadConfiguration(configPath?: string): Configuration {
     throw new Error(`Environment variable expansion failed in ${resolved}: ${e instanceof Error ? e.message : String(e)}`);
   }
   // Normalize MCP server configs to internal schema (without using any)
-  let expandedNormalized: unknown = expanded;
+  let expandedNormalized = expanded as Record<string, unknown>;
   if (hasMcpServers(expanded)) {
     const srcServers = expanded.mcpServers as Record<string, unknown> | undefined;
     const serversObj = srcServers ?? {};
@@ -323,7 +325,10 @@ export function loadConfiguration(configPath?: string): Configuration {
         return [name, out];
       })
     );
-    expandedNormalized = { ...(expanded as Record<string, unknown>), mcpServers: normalizedServers };
+    expandedNormalized = { ...expanded, mcpServers: normalizedServers } as Record<string, unknown>;
+  }
+  if (expandedNormalized.queues === undefined) {
+    expandedNormalized = { ...expandedNormalized, queues: { default: { concurrent: DEFAULT_QUEUE_CONCURRENCY } } };
   }
   const parsed = ConfigurationSchema.safeParse(expandedNormalized);
   if (!parsed.success) {

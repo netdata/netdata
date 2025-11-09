@@ -2,6 +2,7 @@ import type { ToolExecuteOptions, ToolExecuteResult, ToolKind } from '../tools/t
 import type { MCPTool, LogEntry } from '../types.js';
 
 import { SessionTreeBuilder } from '../session-tree.js';
+import { queueManager } from '../tools/queue-manager.js';
 import { ToolsOrchestrator } from '../tools/tools.js';
 import { ToolProvider } from '../tools/types.js';
 
@@ -32,7 +33,9 @@ async function run(): Promise<void> {
     tree.appendLog(opId, entry);
     logs.push(entry);
   };
-  const orch = new ToolsOrchestrator({ toolTimeout: 2000, toolResponseMaxBytes: 1024, maxConcurrentTools: 2, parallelToolCalls: true, traceTools: true }, tree, (tr) => { void tr; }, onLog, undefined, { agentId: 'agent', callPath: 'agent' });
+  queueManager.reset();
+  queueManager.configureQueues({ default: { concurrent: 8 } });
+  const orch = new ToolsOrchestrator({ toolTimeout: 2000, toolResponseMaxBytes: 1024, traceTools: true }, tree, (tr) => { void tr; }, onLog, undefined, { agentId: 'agent', callPath: 'agent' });
   orch.register(new FakeRestProvider());
 
   // Success path

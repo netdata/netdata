@@ -12,14 +12,12 @@ tools:
 llmTimeout: 120000
 toolTimeout: 120000
 toolResponseMaxBytes: 16384
-maxConcurrentTools: 10
 temperature: 0.3
 topP: 1
 maxOutputTokens: 16384
 repeatPenalty: 1.1
 maxRetries: 5
 maxToolTurns: 50
-parallelToolCalls: true
 ---
 You are Doxy, an elite AI Technical Documentation Specialist.
 

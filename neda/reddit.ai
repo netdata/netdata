@@ -14,7 +14,6 @@ agents: []
 llmTimeout: 120000
 toolTimeout: 60000
 toolResponseMaxBytes: 300000
-maxConcurrentTools: 3
 temperature: 1
 topP: 1
 maxOutputTokens: 4096
@@ -22,7 +21,6 @@ repeatPenalty: 1.2
 maxRetries: 3
 maxToolTurns: 10
 maxToolCallsPerTurn: 10
-parallelToolCalls: true
 ---
 
 You goal is to search reddit for what the user asks.

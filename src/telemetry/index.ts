@@ -86,6 +86,18 @@ export interface ToolMetricsRecord {
   customLabels?: Record<string, string>;
 }
 
+export interface QueueDepthRecord {
+  queue: string;
+  capacity: number;
+  inUse: number;
+  waiting: number;
+}
+
+export interface QueueWaitRecord {
+  queue: string;
+  waitMs: number;
+}
+
 export interface ContextGuardMetricsRecord {
   agentId?: string;
   callPath?: string;
@@ -104,6 +116,8 @@ interface TelemetryRecorder {
   recordLlmMetrics: (record: LlmMetricsRecord) => void;
   recordToolMetrics: (record: ToolMetricsRecord) => void;
   recordContextGuardMetrics: (record: ContextGuardMetricsRecord) => void;
+  recordQueueDepth: (record: QueueDepthRecord) => void;
+  recordQueueWait: (record: QueueWaitRecord) => void;
   shutdown: () => Promise<void>;
 }
 
@@ -113,6 +127,10 @@ class NoopRecorder implements TelemetryRecorder {
   recordToolMetrics = (_record: ToolMetricsRecord): void => { /* noop */ };
 
   recordContextGuardMetrics = (_record: ContextGuardMetricsRecord): void => { /* noop */ };
+
+  recordQueueDepth = (_record: QueueDepthRecord): void => { /* noop */ };
+
+  recordQueueWait = (_record: QueueWaitRecord): void => { /* noop */ };
 
   shutdown = async (): Promise<void> => {
     // noop
@@ -252,6 +270,14 @@ export function recordLlmMetrics(record: LlmMetricsRecord): void {
 
 export function recordToolMetrics(record: ToolMetricsRecord): void {
   recorder.recordToolMetrics(record);
+}
+
+export function recordQueueDepthMetrics(record: QueueDepthRecord): void {
+  recorder.recordQueueDepth(record);
+}
+
+export function recordQueueWaitMetrics(record: QueueWaitRecord): void {
+  recorder.recordQueueWait(record);
 }
 
 export function recordContextGuardMetrics(record: ContextGuardMetricsRecord): void {
@@ -552,6 +578,14 @@ class OtelMetricsRecorder implements TelemetryRecorder {
     remainingGauge: ObservableGaugeInstrument;
   };
   private readonly contextGuardGaugeValues = new Map<string, { labels: Attributes; value: number }>();
+  private readonly queue: {
+    depthGauge: ObservableGaugeInstrument;
+    inUseGauge: ObservableGaugeInstrument;
+    waitGauge: ObservableGaugeInstrument;
+    waitHistogram: HistogramInstrument;
+  };
+  private readonly queueDepthValues = new Map<string, { labels: Attributes; waiting: number; inUse: number }>();
+  private readonly queueWaitGaugeValues = new Map<string, { labels: Attributes; value: number }>();
   private readonly deps: OtelDependencies;
 
   constructor(params: {
@@ -600,6 +634,37 @@ class OtelMetricsRecorder implements TelemetryRecorder {
 
     this.contextGuard.remainingGauge.addCallback((observable) => {
       this.contextGuardGaugeValues.forEach((entry) => {
+        observable.observe(entry.value, entry.labels);
+      });
+    });
+
+    this.queue = {
+      depthGauge: this.meter.createObservableGauge('ai_agent_queue_depth', {
+        description: 'Number of queued tool executions awaiting a slot',
+      }),
+      inUseGauge: this.meter.createObservableGauge('ai_agent_queue_in_use', {
+        description: 'Number of active tool executions consuming queue capacity',
+      }),
+      waitGauge: this.meter.createObservableGauge('ai_agent_queue_last_wait_ms', {
+        description: 'Most recent observed wait duration per queue (milliseconds)',
+      }),
+      waitHistogram: this.meter.createHistogram('ai_agent_queue_wait_duration_ms', {
+        description: 'Latency between enqueue and start time for queued tool executions (milliseconds)',
+      }),
+    };
+
+    this.queue.depthGauge.addCallback((observable) => {
+      this.queueDepthValues.forEach((entry) => {
+        observable.observe(entry.waiting, entry.labels);
+      });
+    });
+    this.queue.inUseGauge.addCallback((observable) => {
+      this.queueDepthValues.forEach((entry) => {
+        observable.observe(entry.inUse, entry.labels);
+      });
+    });
+    this.queue.waitGauge.addCallback((observable) => {
+      this.queueWaitGaugeValues.forEach((entry) => {
         observable.observe(entry.value, entry.labels);
       });
     });
@@ -681,6 +746,25 @@ class OtelMetricsRecorder implements TelemetryRecorder {
     } else {
       this.contextGuardGaugeValues.delete(key);
     }
+  }
+
+  recordQueueDepth(record: QueueDepthRecord): void {
+    const baseLabels = buildLabelSet({
+      queue: record.queue,
+      capacity: String(record.capacity),
+    }, this.labels);
+    const attrLabels: Attributes = baseLabels;
+    const waiting = Number.isFinite(record.waiting) ? Math.max(0, record.waiting) : 0;
+    const inUse = Number.isFinite(record.inUse) ? Math.max(0, record.inUse) : 0;
+    this.queueDepthValues.set(record.queue, { labels: attrLabels, waiting, inUse });
+  }
+
+  recordQueueWait(record: QueueWaitRecord): void {
+    const latency = Number.isFinite(record.waitMs) ? Math.max(0, record.waitMs) : 0;
+    const labels = buildLabelSet({ queue: record.queue }, this.labels);
+    this.queue.waitHistogram.record(latency, labels);
+    const attrLabels: Attributes = labels;
+    this.queueWaitGaugeValues.set(record.queue, { labels: attrLabels, value: latency });
   }
 
   async shutdown(): Promise<void> {

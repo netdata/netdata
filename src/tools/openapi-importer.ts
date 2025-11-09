@@ -23,6 +23,7 @@ interface OpenAPIImportOptions {
   toolNamePrefix?: string;
   includeMethods?: ('get'|'post'|'put'|'patch'|'delete')[];
   tagFilter?: string[]; // include only operations with any of these tags
+  queue?: string;
 }
 
 export function parseOpenAPISpec(input: string | UnknownRecord): UnknownRecord {
@@ -198,6 +199,7 @@ export function openApiToRestTools(specIn: string | UnknownRecord, opts?: OpenAP
         description: summary,
         method: m.toUpperCase() as RestToolConfig['method'],
         url,
+        queue: opts?.queue,
         headers: Object.keys(headers).length > 0 ? headers : undefined,
         parametersSchema,
       };

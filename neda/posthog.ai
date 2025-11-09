@@ -18,14 +18,12 @@ tools:
 llmTimeout: 180000
 toolTimeout: 60000
 toolResponseMaxBytes: 65536
-maxConcurrentTools: 2
 temperature: 0.7
 topP: 1
 maxOutputTokens: 16384
 repeatPenalty: 1.1
 maxRetries: 5
 maxToolTurns: 30
-parallelToolCalls: false
 ---
 Your Mission: Track in-app engagement to distinguish active users from tire-kickers and identify expansion signals.
 

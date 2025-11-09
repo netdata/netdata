@@ -18,14 +18,12 @@ tools:
 llmTimeout: 120000
 toolTimeout: 60000
 toolResponseMaxBytes: 200000
-maxConcurrentTools: 2
 temperature: 0.3
 topP: 0.95
 maxOutputTokens: 16384
 repeatPenalty: 1.1
 maxRetries: 5
 maxToolTurns: 20
-parallelToolCalls: true
 reasoning: high
 ---
 Your Mission: Extract deal signals from meeting transcripts to assess opportunity quality and progression.

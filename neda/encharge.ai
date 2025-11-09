@@ -19,14 +19,12 @@ tools:
 llmTimeout: 180000
 toolTimeout: 120000
 toolResponseMaxBytes: 20000
-maxConcurrentTools: 3
 temperature: 0.3
 topP: 1
 maxOutputTokens: 16384
 repeatPenalty: 1.1
 maxRetries: 5
 maxToolTurns: 100
-parallelToolCalls: true
 ---
 You are an AI assistant that answers questions based on Encharge email marketing data.
 

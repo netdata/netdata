@@ -18,14 +18,12 @@ tools:
 llmTimeout: 180000
 toolTimeout: 60000
 toolResponseMaxBytes: 100000
-maxConcurrentTools: 2
 temperature: 0.3
 topP: 1
 maxOutputTokens: 16384
 repeatPenalty: 1.1
 maxRetries: 5
 maxToolTurns: 30
-parallelToolCalls: true
 ---
 You are an AI assistant that answers questions based on Netdata's Stripe data.
 

@@ -102,7 +102,7 @@ function addOptionsFromRegistry(prog: Command): void {
     if (type === 'boolean') return '';
     if (key.endsWith('Timeout')) return ' <ms>';
     if (key.endsWith('Bytes')) return ' <n>';
-    if (key === 'maxRetries' || key === 'maxToolTurns' || key === 'maxConcurrentTools' || key === 'topP' || key === 'temperature') return ' <n>';
+    if (key === 'maxRetries' || key === 'maxToolTurns' || key === 'topP' || key === 'temperature') return ' <n>';
     if (key === 'models' || key === 'tools' || key === 'agents') return ' <list>';
     if (key === 'config' || key === 'accounting' || key === 'save' || key === 'load') return ' <filename>';
     return ' <value>';
@@ -602,14 +602,6 @@ function buildResolvedDefaultsHelp(): string {
       if (typeof cv === 'number' && Number.isFinite(cv)) return cv;
       return fallback;
     };
-    const readBool = (key: keyof FrontmatterOptions, ckey: string, fallback: boolean): boolean => {
-      const fmv = fmOptions !== undefined ? (fmOptions[key] as unknown) : undefined;
-      if (typeof fmv === 'boolean') return fmv;
-      const cv = (configDefaults as Record<string, unknown>)[ckey];
-      if (typeof cv === 'boolean') return cv;
-      return fallback;
-    };
-
     const defaultOf = (key: string): number | boolean => {
       const def = OPTIONS_REGISTRY.find((o) => o.key === key)?.default;
       return (typeof def === 'number' || typeof def === 'boolean') ? def : 0;
@@ -621,8 +613,6 @@ function buildResolvedDefaultsHelp(): string {
     const maxRetries = readNum('maxRetries', 'maxRetries', defaultOf('maxRetries') as number);
     const maxToolTurns = readNum('maxToolTurns', 'maxToolTurns', defaultOf('maxToolTurns') as number);
     const toolResponseMaxBytes = readNum('toolResponseMaxBytes', 'toolResponseMaxBytes', defaultOf('toolResponseMaxBytes') as number);
-    const maxConcurrentTools = readNum('maxConcurrentTools', 'maxConcurrentTools', defaultOf('maxConcurrentTools') as number);
-    const parallelToolCalls = readBool('parallelToolCalls', 'parallelToolCalls', defaultOf('parallelToolCalls') as boolean);
 
     const inv = (typeof candidate === 'string' && candidate.length > 0) ? candidate : 'ai-agent';
 
@@ -685,11 +675,9 @@ function buildResolvedDefaultsHelp(): string {
         toolResponseMaxBytes,
         maxRetries,
         maxToolTurns,
-        maxConcurrentTools,
       },
       booleans: {
         stream: false,
-        parallelToolCalls,
         traceLLM: false,
         traceMCP: false,
         traceSdk: false,
@@ -946,13 +934,9 @@ const buildGlobalOverrides = (entries: readonly string[]): LoadAgentOptions['glo
       'max-tool-turns': 'maxToolTurns',
       maxToolCallsPerTurn: 'maxToolCallsPerTurn',
       'max-tool-calls-per-turn': 'maxToolCallsPerTurn',
-      maxConcurrentTools: 'maxConcurrentTools',
-      'max-concurrent-tools': 'maxConcurrentTools',
       toolResponseMaxBytes: 'toolResponseMaxBytes',
       'tool-response-max-bytes': 'toolResponseMaxBytes',
       stream: 'stream',
-      parallelToolCalls: 'parallelToolCalls',
-      'parallel-tool-calls': 'parallelToolCalls',
       mcpInitConcurrency: 'mcpInitConcurrency',
       'mcp-init-concurrency': 'mcpInitConcurrency',
       reasoning: 'reasoning',
@@ -1033,9 +1017,6 @@ const buildGlobalOverrides = (entries: readonly string[]): LoadAgentOptions['glo
       case 'maxToolCallsPerTurn':
         overrides.maxToolCallsPerTurn = parseInteger('maxToolCallsPerTurn', value);
         break;
-      case 'maxConcurrentTools':
-        overrides.maxConcurrentTools = parseInteger('maxConcurrentTools', value);
-        break;
       case 'toolResponseMaxBytes':
         overrides.toolResponseMaxBytes = parseInteger('toolResponseMaxBytes', value);
         break;
@@ -1044,9 +1025,6 @@ const buildGlobalOverrides = (entries: readonly string[]): LoadAgentOptions['glo
         break;
       case 'stream':
         overrides.stream = parseBoolean('stream', value);
-        break;
-      case 'parallelToolCalls':
-        overrides.parallelToolCalls = parseBoolean('parallelToolCalls', value);
         break;
       case 'reasoning': {
         overrides.reasoning = parseReasoningLevelStrict(value);
@@ -1564,14 +1542,6 @@ program
         maxRetries: optSrc('maxRetries') === 'cli' ? Number(options.maxRetries) : undefined,
         maxToolTurns: optSrc('maxToolTurns') === 'cli' ? Number(options.maxToolTurns) : undefined,
         toolResponseMaxBytes: (optSrc('toolResponseMaxBytes') === 'cli' || optSrc('tool-response-max-bytes') === 'cli') ? Number(options.toolResponseMaxBytes ?? options['tool-response-max-bytes']) : undefined,
-        maxConcurrentTools: (optSrc('maxConcurrentTools') === 'cli' || optSrc('max-concurrent-tools') === 'cli')
-          ? (() => {
-              const o = options as Record<string, unknown> & { maxConcurrentTools?: unknown };
-              const v = o.maxConcurrentTools ?? o['max-concurrent-tools'];
-              return Number(v);
-            })()
-          : undefined,
-        parallelToolCalls: typeof options.parallelToolCalls === 'boolean' ? options.parallelToolCalls : undefined,
         stream: typeof options.stream === 'boolean' ? options.stream : undefined,
         traceLLM: options.traceLlm === true ? true : undefined,
         traceMCP: options.traceMcp === true ? true : undefined,

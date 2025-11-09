@@ -252,6 +252,7 @@ export interface MCPServerConfig {
   toolSchemas?: Record<string, unknown>;
   toolsAllowed?: string[];
   toolsDenied?: string[];
+  queue?: string;
 }
 
 export interface MCPTool {
@@ -259,6 +260,7 @@ export interface MCPTool {
   description: string;
   inputSchema: Record<string, unknown>;
   instructions?: string;
+  queue?: string;
 }
 
 export interface MCPServer {
@@ -351,9 +353,14 @@ export interface TelemetryConfig {
   logging?: TelemetryLoggingConfig;
 }
 
+export interface QueueConfig {
+  concurrent: number;
+}
+
 export interface Configuration {
   providers: Record<string, ProviderConfig>;
   mcpServers: Record<string, MCPServerConfig>;
+  queues: Record<string, QueueConfig>;
   // Optional REST tools registry (manifest-driven)
   restTools?: Record<string, RestToolConfig>;
   // Optional OpenAPI specs to auto-generate REST tools
@@ -380,7 +387,6 @@ export interface Configuration {
     toolTimeout?: number;
     temperature?: number;
     topP?: number;
-    parallelToolCalls?: boolean;
     maxToolTurns?: number;
     maxToolCallsPerTurn?: number;
     stream?: boolean;
@@ -388,7 +394,6 @@ export interface Configuration {
     // Maximum allowed MCP tool response size in bytes. If exceeded, a tool error is injected.
     toolResponseMaxBytes?: number;
     mcpInitConcurrency?: number;
-    maxConcurrentTools?: number;
     outputFormat?: 'markdown' | 'markdown+mermaid' | 'slack-block-kit' | 'tty' | 'pipe' | 'json' | 'sub-agent';
     formats?: {
       cli?: 'markdown' | 'markdown+mermaid' | 'slack-block-kit' | 'tty' | 'pipe' | 'json' | 'sub-agent';
@@ -459,6 +464,7 @@ export interface RestToolConfig {
   method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
   url: string;
   headers?: Record<string, string>;
+  queue?: string;
   // JSON Schema for parameters (Ajv-compatible)
   parametersSchema: Record<string, unknown>;
   // Templated JSON body for POST/PUT/PATCH (substitute ${parameters.*})
@@ -485,6 +491,7 @@ export interface OpenAPISpecConfig {
   baseUrl?: string;
   // Default headers applied to every tool generated (supports ${VAR} expansion)
   headers?: Record<string, string>;
+  queue?: string;
   // Optional filters
   includeMethods?: ('get'|'post'|'put'|'patch'|'delete')[];
   tagFilter?: string[];
@@ -548,9 +555,7 @@ export interface AIAgentSessionConfig {
   maxToolCallsPerTurn?: number;
   llmTimeout?: number;
   toolTimeout?: number;
-  parallelToolCalls?: boolean;
   stream?: boolean;
-  maxConcurrentTools?: number;
   callbacks?: AIAgentCallbacks;
   traceLLM?: boolean;
   traceMCP?: boolean;
@@ -669,11 +674,9 @@ export interface TurnRequest {
   topP?: number;
   maxOutputTokens?: number;
   repeatPenalty?: number;
-  parallelToolCalls?: boolean;
   stream?: boolean;
   toolChoiceRequired?: boolean;
   toolChoice?: ToolChoiceMode;
-  maxConcurrentTools?: number;
   isFinalTurn?: boolean;
   llmTimeout?: number;
   turnMetadata?: {
@@ -723,7 +726,6 @@ export interface AIAgentOptions {
   traceLLM?: boolean;
   traceMCP?: boolean;
   traceSdk?: boolean;
-  parallelToolCalls?: boolean;
   maxToolTurns?: number;
   verbose?: boolean;
   // Optional pre-set session title (does not consume a tool turn)

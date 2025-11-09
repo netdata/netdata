@@ -18,14 +18,12 @@ tools:
 llmTimeout: 180000
 toolTimeout: 120000
 toolResponseMaxBytes: 100000
-maxConcurrentTools: 2
 temperature: 0.3
 topP: 1
 maxOutputTokens: 16384
 repeatPenalty: 1.1
 maxRetries: 5
 maxToolTurns: 100
-parallelToolCalls: false
 ---
 You are an AI assistant that answers questions based on Google Analytics (GA4) data.
 

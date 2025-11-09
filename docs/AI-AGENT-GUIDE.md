@@ -47,11 +47,9 @@
 
 | Key | Type | Default | Notes |
 | --- | --- | --- | --- |
-| `parallelToolCalls` | boolean | `false` | `true` enables provider-native parallel tool calls. |
 | `maxToolTurns` | int | `10` | Total LLM turns with tool access. |
 | `maxToolCallsPerTurn` | int | `10` | Caps tool invocations per turn. |
 | `maxRetries` | int | `3` | Provider/model attempts per turn. |
-| `maxConcurrentTools` | int | `3` | `ToolsOrchestrator` semaphore. |
 | `llmTimeout` | ms | `600000` | Reset per streamed chunk. |
 | `toolTimeout` | ms | `300000` | Per tool call timeout. |
 | `temperature` | number | `0.7` | Clamped `0-2`. |
@@ -84,7 +82,6 @@ input:
 output:
   format: markdown
 maxToolTurns: 8
-parallelToolCalls: true
 ---
 You synthesize research data into concise briefs. Answer in ${FORMAT}.
 ```
@@ -172,7 +169,7 @@ You synthesize research data into concise briefs. Answer in ${FORMAT}.
 - **toolName discipline**: Every sub-agent must set `toolName`; it becomes the callable identifier exposed to parent LLMs. Missing `toolName` defaults to sanitized filename but explicit names are safer.
 - **Input validation**: Parents pass arguments that must satisfy the child’s `input` schema. Invalid payloads bubble up as `tool` errors.
 - **Isolation guarantees**: Each sub-agent run gets a new `AIAgentSession` with its own MCP clients, accounting, and context counters. Environment overlays come from the same merged config but no mutable state is shared.
-- **Recursion controls**: Parents inherit `maxToolTurns`, `maxRetries`, `parallelToolCalls`, etc., to children unless the child frontmatter overrides them. The orchestrator enforces `maxConcurrentTools` across both MCP tools and sub-agents.
+- **Recursion controls**: Parents inherit `maxToolTurns`, `maxRetries`, etc., to children unless the child frontmatter overrides them. The queue manager enforces process-wide limits across both MCP tools and sub-agents based on the queue each tool binds to.
 - **Workflow**:
   1. Parent .ai file lists `agents` (paths) and adds child `toolName` instructions in the prompt.
   2. Run headend/CLI with `--agent parent.ai` so the registry knows about the tree.
@@ -207,7 +204,8 @@ Use the research agent whenever you need canonical company data; use the sweeps 
   - Fields: `type` (`stdio|websocket|http|sse`), `command` + `args` (for stdio), `url`, `headers`, `env`, `enabled`, `toolSchemas`, `toolsAllowed/Denied`.
   - Legacy aliases `type=local/remote` auto-normalize.
 - **REST tools (`restTools`)**: Each entry names a tool (prefixed `rest__` at runtime) with HTTP metadata imported directly or via `openapiSpecs`.
-- **Defaults**: Under `defaults`, you may set the same knobs as frontmatter/CLI (timeouts, sampling, stream, parallelToolCalls, tool limits, contextWindowBufferTokens, default output format, per-surface format preferences).
+- **Defaults**: Under `defaults`, you may set the same knobs as frontmatter/CLI (timeouts, sampling, stream, tool limits, contextWindowBufferTokens, default output format, per-surface format preferences).
+- **Queues**: Declare process-wide concurrency in `queues.{name}.concurrent`. Every MCP/REST tool binds to a queue via `queue: name` (falling back to `default`). Use small queues (e.g., `fetcher`) to throttle heavy MCP servers like Playwright; internal tools never consume slots so deadlocks are impossible.
 - **Telemetry**: `telemetry` block controls OTLP exporters, Prometheus endpoint, trace sampler (`always_on|always_off|parent|ratio`), log formats (`journald|logfmt|json|none`), and extra sinks (`otlp`).
 - **Slack/API**: `slack` toggles bot behavior (see Section 10). `api` controls built-in REST headend defaults (`enabled`, `port`, `bearerKeys`).
 - **Pricing**: Optional cost tables keyed by provider/model with per-1k or per-1M token rates for prompt/completion/cache hits.
@@ -401,7 +399,7 @@ Values can be strings (Anthropic effort labels) or integers (token budgets). Use
 | 2 | `globalOverrides` passed to registry/headends | Applies to every agent/sub-agent (headend manager uses same object). |
 | 3 | Agent frontmatter | Agent-specific; overrides config defaults for that file + sub-agents loaded beneath it (unless child overrides). |
 | 4 | `.ai-agent.json` defaults | Resolved per config layer (Section 4). |
-| 5 | Internal hardcoded defaults | Temperature 0.7, topP 1.0, llmTimeout 600 000 ms, toolTimeout 300 000 ms, maxRetries 3, maxToolTurns 10, maxToolCallsPerTurn 10, toolResponseMaxBytes 12 288 bytes, maxConcurrentTools 3, parallelToolCalls false, stream false.
+| 5 | Internal hardcoded defaults | Temperature 0.7, topP 1.0, llmTimeout 600 000 ms, toolTimeout 300 000 ms, maxRetries 3, maxToolTurns 10, maxToolCallsPerTurn 10, toolResponseMaxBytes 12 288 bytes, stream false.
 
 - **Sub-agent propagation**: Parent sessions pass effective options (post-override) when launching child sessions unless the child frontmatter/CLI overrides them. `defaultsForUndefined` ensures missing knobs inherit the parent’s resolved values.
 - **Runtime overrides**: `--override key=value` (applies to all agents) and `--models`/`--tools` CLI args feed `globalOverrides`. Use sparingly.
@@ -499,8 +497,6 @@ Values can be strings (Anthropic effort labels) or integers (token budgets). Use
 | `maxToolTurns` | `10` |
 | `maxToolCallsPerTurn` | `10` |
 | `toolResponseMaxBytes` | `12288` bytes |
-| `maxConcurrentTools` | `3` |
-| `parallelToolCalls` | `false` |
 | `stream` | `false` |
 
 - **Troubleshooting cues**:

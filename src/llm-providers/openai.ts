@@ -50,7 +50,6 @@ export class OpenAIProvider extends BaseLLMProvider {
       const providerOptions = (() => {
         const base: Record<string, unknown> = { openai: { toolChoice: 'required' } };
         const o = (base.openai as Record<string, unknown>);
-        if (request.parallelToolCalls !== undefined) o.parallelToolCalls = request.parallelToolCalls;
         if (typeof request.maxOutputTokens === 'number' && Number.isFinite(request.maxOutputTokens)) o.maxTokens = Math.trunc(request.maxOutputTokens);
         if (typeof request.repeatPenalty === 'number' && Number.isFinite(request.repeatPenalty)) o.frequencyPenalty = request.repeatPenalty;
         if (request.reasoningValue !== undefined && request.reasoningValue !== null) {

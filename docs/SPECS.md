@@ -124,8 +124,13 @@ All string values in the configuration support environment variable expansion us
       "url": "https://api.example.com/mcp",
       "headers": {
         "X-API-Key": "${REMOTE_API_KEY}"
-      }
+      },
+      "queue": "fetcher"
     }
+  },
+  "queues": {
+    "default": { "concurrent": 32 },
+    "fetcher": { "concurrent": 4 }
   },
   "accounting": {
     "file": "${HOME}/ai-agent-accounting.jsonl"
@@ -135,11 +140,17 @@ All string values in the configuration support environment variable expansion us
     "toolTimeout": 60000,
     "temperature": 0.7,
     "topP": 1.0,
-    "parallelToolCalls": true,
     "stream": true
   }
 }
 ```
+
+### Tool Queue Configuration
+
+- Define process-wide concurrency by declaring `queues` in `.ai-agent.json`. Each queue specifies a `concurrent` slot count and the agent automatically injects a `default` queue if omitted.
+- MCP servers, REST tools, and OpenAPI generated operations can bind to a queue by setting `queue: "name"`. When omitted they fall back to `default`.
+- Only external tools participate in queueing; internal agent helpers (`agent__final_report`, `progress_report`, `agent__batch`) bypass queues so they never deadlock against their parents.
+- Every tool execution is routed through the queue manager. When a tool must wait for a slot the agent logs a `queued` entry and emits telemetry via `ai_agent_queue_depth` (gauge of in-use/waiting slots) and `ai_agent_queue_wait_duration_ms` (histogram + last-wait gauge).
 
 ### Context Window Configuration
 
@@ -228,7 +239,7 @@ Notes:
    - If no tools requested: Stream output to stdout in real time and exit with code 0
    - If tools requested: Stream any assistant text to stdout, then proceed to tool execution
 4. **Tool Execution**:
-  - Tool selection and execution are handled by the provider/AI SDK; the application does not impose a tool count limit. Parallel tool calls can be toggled via `parallelToolCalls` for OpenAI‑compatible providers (default true).
+- Tool selection and execution are handled by the provider/AI SDK; the application does not impose a tool count limit. Concurrency is enforced by the queue manager (`queues` + `queue` bindings) rather than per-session flags, so heavy MCP servers can be throttled globally regardless of how many agents spawn them.
   - Never retry a tool call
   - Wait for all tools to complete (successful or failed)
   - Record each tool result in message history in the exact order specified by the LLM

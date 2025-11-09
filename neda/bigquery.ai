@@ -19,14 +19,12 @@ tools:
 llmTimeout: 120000
 toolTimeout: 30000
 toolResponseMaxBytes: 16384
-maxConcurrentTools: 2
 temperature: 0.3
 topP: 1
 maxOutputTokens: 16384
 repeatPenalty: 1.1
 maxRetries: 5
 maxToolTurns: 50
-parallelToolCalls: true
 ---
 Your Mission: Query production data to validate infrastructure claims, analyze space activity, and identify ARR/MRR and expansion signals.
 

@@ -80,7 +80,6 @@ agents:
   - web-fetch.ai    # ← These agents are also full planners!
   - web-search.ai   # ← They reason and adapt independently
 maxToolTurns: 20
-parallelToolCalls: true
 ---
 You are an elite AI company researcher.
 
@@ -478,6 +477,25 @@ Example `.ai-agent.json` (safe to commit):
   }
 }
 ```
+
+Add a `queues` block whenever you need to throttle heavy MCP servers (Playwright/fetcher, OpenAPI imports, etc.):
+
+```json
+"queues": {
+  "default": { "concurrent": 32 },
+  "fetcher": { "concurrent": 4 }
+},
+"mcpServers": {
+  "fetcher": {
+    "type": "stdio",
+    "command": "npx",
+    "args": ["-y", "fetcher-mcp"],
+    "queue": "fetcher"
+  }
+}
+```
+
+All REST/OpenAPI tools accept the same `queue` field and fall back to `default` when omitted. The queue manager logs whenever a tool waits for a slot (`queued` log entries) and exports telemetry gauges/histograms (`ai_agent_queue_depth`, `ai_agent_queue_wait_duration_ms`).
 
 Example `.ai-agent.env` (NEVER commit):
 ```bash

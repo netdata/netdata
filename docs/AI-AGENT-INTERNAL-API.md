@@ -24,7 +24,7 @@ The library performs no direct I/O (no stdout/stderr/file writes). All output, l
   - `userPrompt: string`
   - `conversationHistory?: ConversationMessage[]`
   - Output contract: `expectedOutput?: { format: 'json' | 'markdown' | 'text'; schema?: Record<string, unknown> }`
-  - Execution controls (optional): `temperature`, `topP`, `maxRetries`, `maxTurns`, `llmTimeout`, `toolTimeout`, `parallelToolCalls`, `stream`
+  - Execution controls (optional): `temperature`, `topP`, `maxRetries`, `maxTurns`, `llmTimeout`, `toolTimeout`, `stream`
   - UX flags (optional): `traceLLM`, `traceMCP`, `verbose`
   - Tool response cap (optional): `toolResponseMaxBytes` (bytes)
   - `callbacks?: AIAgentCallbacks`

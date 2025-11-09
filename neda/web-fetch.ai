@@ -58,8 +58,6 @@ output:
 llmTimeout: 300000
 toolTimeout: 180000
 toolResponseMaxBytes: 300000
-maxConcurrentTools: 1
-parallelToolCalls: false
 temperature: 0.1
 topP: 0.95
 maxOutputTokens: 8192

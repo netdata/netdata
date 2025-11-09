@@ -124,6 +124,10 @@
       "stringSchemaFormatsDenied": []
     }
   },
+  "queues": {
+    "default": { "concurrent": 64 },
+    "fetcher": { "concurrent": 4 }
+  },
   "restTools": {
     "posthog-query": {
       "description": "Run a HogQL query via PostHog Query API and return raw results.",
@@ -200,10 +204,8 @@
     "maxOutputTokens": 8192,
     "repeatPenalty": 1.1,
     "stream": false,
-    "parallelToolCalls": true,
     "maxToolTurns": 10,
     "mcpInitConcurrency": 10,
-    "maxConcurrentTools": 3,
     "maxRetries": 3,
     "toolResponseMaxBytes": 32768
   },
@@ -474,6 +476,7 @@
         "fetcher-mcp"
       ],
       "enabled": true,
+      "queue": "fetcher",
       "toolsAllowed": ["*"],
       "toolsDenied": []
     },

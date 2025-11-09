@@ -11,11 +11,9 @@ tools:
 llmTimeout: 180000
 toolTimeout: 60000
 toolResponseMaxBytes: 100000
-maxConcurrentTools: 2
 temperature: 0.3
 maxOutputTokens: 8192
 maxToolTurns: 30
-parallelToolCalls: true
 ---
 You are a helpful AI customer support intelligence assistant.
 
