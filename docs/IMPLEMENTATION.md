@@ -52,10 +52,11 @@ Architecture
         - `isError?: boolean` (tool‑level failure for model visibility; protocol errors are separate)
 
 - Implementation notes:
-  - Headers/env resolution: `${VAR}` placeholders resolved from current process env; empty values are omitted.
-  - Stdio server scoping: only explicitly configured `env` keys are passed to child process; no leakage across tools.
-  - Tracing: a single `[mcp]` sink logs connect, stderr lines, tools/prompts requests and responses, and callTool requests/results.
-  - Cleanup: close clients; terminate any spawned processes with SIGTERM then SIGKILL after grace period.
+- Headers/env resolution: `${VAR}` placeholders resolved from current process env; empty values are omitted.
+- Stdio server scoping: only explicitly configured `env` keys are passed to child process; no leakage across tools.
+- Tracing: a single `[mcp]` sink logs connect, stderr lines, tools/prompts requests and responses, and callTool requests/results.
+- Cleanup: close clients; terminate any spawned processes with SIGTERM then SIGKILL after grace period.
+- Server naming: `MCPProvider` validates each configured server key with `[A-Za-z0-9_-]+` (whitespace trimmed). Invalid names throw during initialization instead of being auto-sanitized, so run-time telemetry always matches user configuration exactly.
 
 3) Tool exposure to the AI SDK (libs/ai)
 

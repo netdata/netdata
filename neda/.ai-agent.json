@@ -578,6 +578,50 @@
       "enabled": true,
       "toolsAllowed": ["*"],
       "toolsDenied": []
+    },
+    "duckduckgo": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "duckduckgo-mcp-server"],
+      "enabled": true,
+      "toolsAllowed": ["*"],
+      "toolsDenied": []
+    },
+    "serper-search": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "serper-search-scrape-mcp-server"],
+      "env": {
+        "SERPER_API_KEY": "${SERPER_API_KEY}"
+      },
+      "enabled": true,
+      "toolsAllowed": ["google_search"],
+      "toolsDenied": []
+    },
+    "serper-scrape": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "serper-search-scrape-mcp-server"],
+      "env": {
+        "SERPER_API_KEY": "${SERPER_API_KEY}"
+      },
+      "enabled": true,
+      "toolsAllowed": ["scrape"],
+      "toolsDenied": []
+    },
+    "firecrawl-fetch": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "firecrawl-mcp"],
+      "env": {
+        "FIRECRAWL_API_URL": "http://10.20.1.106:9910"
+      },
+      "enabled": true,
+      "toolsAllowed": [
+        "firecrawl_scrape",
+        "firecrawl_extract"
+      ],
+      "toolsDenied": []
     }
   },
   "slack": {

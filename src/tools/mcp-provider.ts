@@ -72,11 +72,17 @@ export class MCPProvider extends ToolProvider {
   }
 
   private sanitizeNamespace(name: string): string {
-    return name
-      .replace(/[^A-Za-z0-9]/g, '_')
-      .replace(/_+/g, '_')
-      .replace(/^_+|_+$/g, '')
-      .toLowerCase();
+    if (typeof name !== 'string') {
+      throw new Error('MCP server names must be strings.');
+    }
+    const trimmed = name.trim();
+    if (trimmed.length === 0) {
+      throw new Error('MCP server names must be non-empty strings.');
+    }
+    if (!/^[A-Za-z0-9_-]+$/.test(trimmed)) {
+      throw new Error(`MCP server names may only contain letters, digits, '-' or '_': ${name}`);
+    }
+    return trimmed;
   }
 
   private async ensureInitialized(): Promise<void> {

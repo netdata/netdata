@@ -296,6 +296,7 @@ Notes:
   - `## TOOLS' INSTRUCTIONS`
   - `## TOOL {name} INSTRUCTIONS`
   Schemas are NOT appended to the system prompt; they are exposed to the LLM via the request's tool definitions.
+- **Server Name Constraints**: MCP server keys must match the regex `[A-Za-z0-9_-]+`. Names containing any other character (spaces, punctuation, etc.) are rejected during initialization so misconfigured servers fail loudly instead of being silently renamed.
 
 #### Per‑Tool Environment Scoping
 For `stdio` servers, only the environment variables explicitly configured for that MCP tool are passed to the spawned process. `${VAR}` placeholders are resolved from the current process environment. Variables are not leaked across tools.

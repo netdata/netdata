@@ -89,7 +89,8 @@ parallelToolCalls: true
 You synthesize research data into concise briefs. Answer in ${FORMAT}.
 ```
 - **Tool references**: The `tools` array in frontmatter accepts **configuration keys**:
-  - MCP servers by name (e.g., `filesystem` when `.ai-agent.json` defines `"mcpServers": { "filesystem": { ... } }`). Listing the server exposes every tool the server returns, subject to `toolsAllowed/toolsDenied` filters.
+- MCP servers by name (e.g., `filesystem` when `.ai-agent.json` defines `"mcpServers": { "filesystem": { ... } }`). Listing the server exposes every tool the server returns, subject to `toolsAllowed/toolsDenied` filters.
+- Server naming rules: `mcpServers.<name>` keys must match `[A-Za-z0-9_-]+`. The agent no longer auto-sanitizes names; invalid characters trigger a configuration error during MCP initialization so telemetry/logs always match your config exactly.
   - Individually named REST imports (prefixed `rest__` internally). Declare `rest__catalog_listItems` directly.
   - Literal tool IDs emitted by other entry points (rare; typically only `agent__*` or `rest__*`).
   - Sub-agents must live under `agents`, not `tools`; their callable handles (`agent__childName`) are inserted automatically.
@@ -102,41 +103,63 @@ You synthesize research data into concise briefs. Answer in ${FORMAT}.
 - [ ] Reference `${FORMAT}` in the prompt body so headends can inject target instructions.
 
 ## 3. Prompt Variable Expansion & Includes
-- **Include directives**: `${include:relative/path}` or `{{include:relative/path}}` inline the referenced file before frontmatter parsing. Resolution rules (src/include-resolver.ts):
-  - Base directory = prompt file’s directory (or supplied `baseDir`).
-  - Recursion depth limit = 8; exceeding it throws.
-  - `.env` files are forbidden targets.
-  - Nested includes resolve relative to the included file’s directory.
-- **Variable expansion order**: After includes are flattened and frontmatter stripped, `buildPromptVars` + CLI `buildPromptVariables` expand placeholders in both system and user prompts.
-- **Supported placeholders** (case-sensitive):
+- **Include directives**: `${include:relative/path}` or `{{include:relative/path}}` inline files **before** frontmatter parsing (implementation: `src/include-resolver.ts`).
+  - Base directory = the current file’s directory; nested includes re-root relative to the file that invoked them.
+  - Maximum depth is 8. Exceeding the limit throws to prevent recursive loops.
+  - `.env` and other hidden secrets cannot be included; attempting to do so aborts load.
+  - Use includes for reusable instructions (e.g., safety preambles) so every agent shares the same canonical text.
+- **Expansion phases**:
+  1. Resolve every include until a single prompt body exists.
+  2. Strip/parse frontmatter.
+  3. Run `applyFormat` to inject `${FORMAT}` / `{{FORMAT}}` placeholders.
+  4. Run `expandVars` with the active placeholder map. `${VAR}` and `{{VAR}}` are equivalent; casing must match.
+- **`.ai` prompt placeholders** (from `buildPromptVars` + per-session extras):
 
-| Placeholder | Source |
+| Placeholder | Description | Source |
+| --- | --- | --- |
+| `${DATETIME}` | Current local timestamp in RFC 3339 format. | `buildPromptVars()`
+| `${DAY}` | Local weekday name (e.g., “Friday”). | `buildPromptVars()`
+| `${TIMEZONE}` | Olson timezone ID (`America/Los_Angeles` fallback `TZ`/`UTC`). | `buildPromptVars()`
+| `${MAX_TURNS}` | Effective `maxToolTurns` after overrides. | Injected in `AIAgentSession`
+| `${FORMAT}` / `{{FORMAT}}` | Target output instructions (“Markdown with tables”, “JSON matching schema X”). | `applyFormat()`
+
+- **CLI inline prompt placeholders** (`ai-agent "sys" "user"` mode only): same as above **plus** the host metadata shown below (see `buildPromptVariables` in `src/cli.ts`). These extras are *not* injected when running `.ai` files via headends.
+
+| Placeholder | Description |
 | --- | --- |
-| `${DATETIME}` | Local RFC3339 timestamp. |
-| `${DAY}` | Local weekday. |
-| `${TIMEZONE}` | `Intl.DateTimeFormat().resolvedOptions().timeZone` fallback `TZ`/`UTC`. |
-| `${MAX_TURNS}` | Effective `maxToolTurns`. |
-| `${OS}` | `/etc/os-release PRETTY_NAME (kernel …)` fallback `os.type() os.release()`. |
+| `${OS}` | `/etc/os-release PRETTY_NAME` + kernel fallback `os.type() os.release()`. |
 | `${ARCH}` | `process.arch`. |
-| `${KERNEL}` | `os.type() os.release()`. |
-| `${CD}` | `process.cwd()`. |
+| `${KERNEL}` | `os.type()` + `os.release()`. |
+| `${CD}` | `process.cwd()` when the CLI command started. |
 | `${HOSTNAME}` | `os.hostname()`. |
-| `${USER}` | `os.userInfo().username` fallback `USER`/`USERNAME`. |
-| `${FORMAT}` | Replaced via `applyFormat` with target output description (e.g., “Markdown with tables”). |
+| `${USER}` | `os.userInfo().username` fallback `$USER`/`$USERNAME`. |
 
-- **Best practices**: Use `${MAX_TURNS}` in prompts to remind downstream agents of tool budgets; embed `${FORMAT}` wherever the output contract should appear.
+- **Why `${FORMAT}` matters**: Headends/CLI compute a final format string (Markdown vs JSON vs Slack Block Kit) and *replace* `${FORMAT}` with explicit instructions (“Respond in JSON that validates against …”). Omit the placeholder and downstream clients may answer in the wrong format.
+- **Worked example**:
+  ```markdown
+  ## Operating Context
+  - Today is ${DAY} (${DATETIME} in ${TIMEZONE}).
+  - You have up to ${MAX_TURNS} tool turns; prioritize the highest-signal tools.
+  - Deliver the final response in ${FORMAT}.
+  ```
+- **Best practices**:
+  - Always mention `${MAX_TURNS}` so sub-agents understand remaining budget.
+  - Keep include files small and composable; avoid bringing in secrets.
+  - Prefer `${FORMAT}` over hard-coding “Answer in Markdown” so headends remain authoritative.
 
 **Checklist**
 - [ ] Resolve all include directives (no `${include:…}` remains in flattened prompt).
-- [ ] Use `${VAR}` placeholders exactly as listed; casing matters.
-- [ ] Avoid sensitive includes (e.g., `.env` will throw).
-- [ ] Keep recursion ≤ 8 levels to prevent build failures.
+- [ ] Use only the placeholders listed above; casing matters and undefined names pass through literally.
+- [ ] Add `${FORMAT}` in every prompt body unless the system intentionally lets the LLM choose the format.
+- [ ] Keep include depth ≤ 8 and never target `.env` files.
 
 ## 4. Configuration Search vs Prompt Paths
 - `discoverLayers` loads `.ai-agent.json/.ai-agent.env` in priority order (highest first): `--config` explicit path → current working directory → prompt file directory (if different) → binary directory → `~/.ai-agent/` → `/etc/ai-agent/`.
 - Each layer contributes JSON + env variables; higher layers override lower ones field-by-field.
 - Prompt-relative configs: when running `ai-agent ./agents/researcher.ai`, the loader automatically checks `./agents/.ai-agent.json` before falling back to binary/home/system defaults.
 - `.ai-agent.env` sits next to each JSON file; values found there override process env **only** for that layer during placeholder expansion.
+- Placeholder expansion walks every string via `expandPlaceholders`: `${NAME}` is replaced with the first value found in the layer’s `.ai-agent.env`, otherwise the value from `process.env`. If neither exists, `resolveProvider/resolveMCPServer` throws `Unresolved variable ${NAME} for <scope> '<id>' at <origin>` so missing secrets fail fast.
+- Layers never merge `.ai-agent.env` contents. A provider defined in the home directory can only see `~/.ai-agent/ai-agent.env` (or OS env); it will not pick up secrets from `/etc/ai-agent/ai-agent.env`.
 - CLI `--config` short-circuits discovery (only that file + its `.env` are considered before falling through to lower-priority shared layers).
 
 **Checklist**
@@ -210,6 +233,37 @@ Use the research agent whenever you need canonical company data; use the sweeps 
 - `env` only passes the listed keys to the child process; secrets should live in `.ai-agent.env`.
 - `toolsAllowed`/`toolsDenied` accept arrays of case-insensitive names. `"*"`/`"any"` = wildcard. Filtering happens server-side before tools reach the LLM.
 - `toolSchemas` exists for future manual overrides and is currently ignored—leave it unset.
+
+#### AI-agent placeholders vs MCP runtime env
+| Scope | Defined in | Resolution moment | Consumer | Notes |
+| --- | --- | --- | --- | --- |
+| Agent-level placeholders | `.ai-agent.env` next to each JSON layer or `process.env` | During config load via `expandPlaceholders` | Provider entries, MCP `command/args/url/headers/env`, REST/OpenAPI config, telemetry | Once replaced, values are plain strings; they are not re-resolved later. |
+| MCP stdio runtime env | `mcpServers.<name>.env` after placeholder expansion | When `MCPProvider` launches the stdio binary | `child_process.spawn` environment | The map replaces the entire env for the child. Add `PATH`, `HOME`, etc., explicitly if the server needs them. |
+| MCP remote auth headers | `mcpServers.<name>.headers` (placeholders allowed) | When HTTP/WS/SSE transports send requests | Remote MCP endpoint | Use headers (or query params) for API keys when the server lives elsewhere; the `env` block is ignored for remote transports. |
+
+- Bridge secrets explicitly: declare them once in `.ai-agent.env`, reference them wherever needed in `.ai-agent.json`, and let placeholder expansion copy the value into both providers and MCP servers.
+  ```env
+  # .ai-agent.env
+  OPENAI_API_KEY=sk-live...
+  CODEBASE_TOKEN=ghp_...
+  MCP_ROOT=/home/ai/repos/project
+  ```
+  ```json
+  "providers": { "openai": { "type": "openai", "apiKey": "${OPENAI_API_KEY}" } },
+  "mcpServers": {
+    "codebase": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["./servers/codebase.js"],
+      "env": {
+        "TOKEN": "${CODEBASE_TOKEN}",
+        "ROOT": "${MCP_ROOT}"
+      }
+    }
+  }
+  ```
+- `MCP_ROOT` has a safety net: if the resolved value is empty/blank, the resolver swaps in `process.cwd()` (and emits a verbose log when enabled) so filesystem servers always receive a root path.
+- MCP tool inputs remain pure JSON arguments supplied by the LLM. `.ai-agent.env` values are never injected into tool parameters automatically—encode defaults inside the MCP server or prompt the LLM to pass them explicitly.
 
 ### REST tool definitions & OpenAPI imports
 Direct declaration:
@@ -306,14 +360,39 @@ Values can be strings (Anthropic effort labels) or integers (token budgets). Use
 - [ ] Store secrets via `${VAR}` placeholders to be resolved from `.ai-agent.env`.
 
 ## 7. `.ai-agent.env` Handling
-- Plain text lines `KEY=value`. Leading `export` is allowed; quotes are stripped; `#` starts a comment. Empty lines ignored.
-- Each `.env` file only affects its sibling `.ai-agent.json`. Placeholder expansion order: local `.ai-agent.env` → process env (`process.env`) → empty string.
-- Security: `.ai-agent.env` must stay untracked; `parseEnvFile` never loads files outside the config directory.
+- Plain text lines `KEY=value`. Optional `export KEY=value` works; wrapping quotes are stripped; `#` starts a comment. Blank lines are skipped.
+- Scope is per-layer: the `.ai-agent.env` that sits next to a JSON file is the **only** overlay consulted when resolving placeholders inside that JSON. There is no cascading of env files between system/home/cwd layers.
+- Resolution pipeline for every `${NAME}`:
+  1. Look for `NAME` inside the layer’s `.ai-agent.env` map.
+  2. Fallback to `process.env.NAME`.
+  3. If still missing, throw `Unresolved variable ${NAME} for <scope> '<id>' at <origin>` and abort load (the lone exception is `MCP_ROOT`, which defaults to `process.cwd()` if blank—see Section 6).
+- The resulting value is written into the merged configuration immediately; runtime components never “re-expand” placeholders later.
+- `.ai-agent.env` values are distinct from MCP runtime env values. To hand secrets to a stdio MCP server you **must** reference them in `mcpServers.<name>.env` (or `headers` for remote servers) so the resolver copies them across.
+- Example:
+  ```env
+  OPENAI_API_KEY=sk-live...
+  FILESERVER_TOKEN=fs-secret
+  ```
+  ```json
+  "providers": {
+    "openai": { "type": "openai", "apiKey": "${OPENAI_API_KEY}" }
+  },
+  "mcpServers": {
+    "files": {
+      "type": "stdio",
+      "command": "python",
+      "args": ["mcp_files.py"],
+      "env": { "TOKEN": "${FILESERVER_TOKEN}" }
+    }
+  }
+  ```
+- Security: keep each `.ai-agent.env` git-ignored and restrict permissions (`chmod 600`). `parseEnvFile` only reads sibling files, preventing accidental traversal.
 
 **Checklist**
-- [ ] Mirror every `${VAR}` in JSON with a `.ai-agent.env` entry or OS environment variable.
-- [ ] Use quotes when values contain spaces.
-- [ ] Ensure file permissions restrict secrets (e.g., `chmod 600`).
+- [ ] Mirror every `${VAR}` referenced in `.ai-agent.json` with an entry in the same directory’s `.ai-agent.env` or a real OS env var.
+- [ ] When passing secrets to MCP servers, explicitly include them inside the server’s `env` or `headers` block after placeholder substitution.
+- [ ] Use quotes when values contain spaces or shell-sensitive characters.
+- [ ] Lock down file permissions so secrets remain local.
 
 ## 8. Parameter Inheritance & Override Matrix
 | Priority (high→low) | Source | Notes |

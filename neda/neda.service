@@ -23,6 +23,9 @@ ExecStart=/opt/neda/bin/neda \
   --mcp ws:8803 \
   --openai-completions 8804 \
   --anthropic-completions 8805 \
+  --telemetry-enabled \
+  --telemetry-prometheus-enabled \
+  --telemetry-prometheus-port 8806 \
   --verbose
 
 # Restart policy

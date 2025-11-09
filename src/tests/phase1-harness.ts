@@ -3917,7 +3917,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     };
   })(),
   (() => {
-    const captured: { namespace: string; filtered: string[]; stdioError?: string; combined?: string } = { namespace: '', filtered: [] };
+    const captured: { namespace?: string; namespaceError?: string; filtered: string[]; stdioError?: string; combined?: string } = { filtered: [] };
     return {
       id: 'run-test-65',
       description: 'MCP provider filtering and logging coverage.',
@@ -3930,7 +3930,11 @@ if (process.env.CONTEXT_DEBUG === 'true') {
           createStdioTransport: (name: string, config: MCPServerConfig) => unknown;
           log: (severity: 'VRB' | 'WRN' | 'ERR' | 'TRC', message: string, remoteIdentifier: string, fatal?: boolean) => void;
         };
-        captured.namespace = exposed.sanitizeNamespace('Alpha-Server!!');
+        try {
+          captured.namespace = exposed.sanitizeNamespace('Alpha-Server!!');
+        } catch (error: unknown) {
+          captured.namespaceError = toErrorMessage(error);
+        }
         const toolList: MCPTool[] = [
           { name: 'alphaTool', description: 'primary', inputSchema: {} },
           { name: 'betaTool', description: 'secondary', inputSchema: {} },
@@ -3974,10 +3978,13 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       expect: (result: AIAgentResult) => {
         invariant(result.success, 'Scenario run-test-65 expected success.');
         const data = result.finalReport?.content_json as
-          | { namespace: string; filtered: string[]; stdioError?: string; combined?: string }
+          | { namespace?: string; namespaceError?: string; filtered: string[]; stdioError?: string; combined?: string }
           | undefined;
         invariant(data !== undefined, 'Combined data expected for run-test-65.');
-        invariant(data.namespace === 'alpha_server', 'Namespace sanitization mismatch for run-test-65.');
+        invariant(
+          typeof data.namespaceError === 'string' && data.namespaceError.includes("letters, digits, '-' or '_'"),
+          'Namespace validation mismatch for run-test-65.'
+        );
         invariant(
           data.filtered.length === 2 && data.filtered.includes('alphaTool') && data.filtered.includes('gammaTool'),
           'Tool filtering mismatch for run-test-65.'
