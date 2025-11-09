@@ -4106,6 +4106,115 @@ const SCENARIOS: ScenarioDefinition[] = [
     ],
   },
   {
+    id: 'context_guard__progress_passthrough',
+    description: 'Progress updates must still execute even after the context guard drops another tool.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        response: {
+          kind: 'tool-call',
+          assistantText: 'Requesting a heavy tool output followed by a progress update.',
+          toolCalls: [
+            {
+              toolName: TOOL_NAME,
+              callId: 'call-progress-guard-heavy',
+              assistantText: 'Issuing heavy payload before progress update.',
+              arguments: {
+                text: TOOL_ARGUMENT_CONTEXT_OVERFLOW,
+              },
+            },
+            {
+              toolName: 'agent__progress_report',
+              callId: 'call-progress-guard-status',
+              assistantText: 'Streaming progress after guard activation.',
+              arguments: {
+                progress: 'Still collecting GitHub issues despite guard pressure.',
+              },
+            },
+          ],
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+          finishReason: TOOL_FINISH_REASON,
+        },
+      },
+      {
+        turn: 2,
+        expectedTools: ['agent__final_report'],
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Summarizing after guard enforcement and progress update.',
+          reportContent: `${RESULT_HEADING}Progress report streamed successfully even though the guard trimmed other tools.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_SUCCESS,
+          tokenUsage: {
+            inputTokens: 90,
+            outputTokens: 28,
+            totalTokens: 118,
+          },
+        },
+      },
+    ],
+  },
+  {
+    id: 'context_guard__batch_passthrough',
+    description: 'Batch wrapper response should never be dropped; only nested calls are budgeted.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        expectedTools: ['agent__batch'],
+        response: {
+          kind: 'tool-call',
+          assistantText: 'Executing batched heavy requests.',
+          toolCalls: [
+            {
+              toolName: 'agent__batch',
+              callId: 'call-batch-guard',
+              assistantText: 'Batch issues multiple heavy calls.',
+              arguments: {
+                calls: [
+                  {
+                    id: '1',
+                    tool: TOOL_NAME,
+                    parameters: { text: TOOL_ARGUMENT_CONTEXT_OVERFLOW },
+                  },
+                  {
+                    id: '2',
+                    tool: TOOL_NAME,
+                    parameters: { text: TOOL_ARGUMENT_CONTEXT_OVERFLOW },
+                  },
+                  {
+                    id: '3',
+                    tool: TOOL_NAME,
+                    parameters: { text: TOOL_ARGUMENT_CONTEXT_OVERFLOW },
+                  },
+                ],
+              },
+            },
+          ],
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+          finishReason: TOOL_FINISH_REASON,
+        },
+      },
+      {
+        turn: 2,
+        expectedTools: ['agent__final_report'],
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Summarizing batched heavy outputs.',
+          reportContent: `${RESULT_HEADING}Batch response remained available even after guard activation.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_SUCCESS,
+          tokenUsage: {
+            inputTokens: 92,
+            outputTokens: 30,
+            totalTokens: 122,
+          },
+        },
+      },
+    ],
+  },
+  {
     id: 'context_guard__tool_overflow_drop',
     description: 'Oversized tool output is dropped and replaced with a failure stub.',
     systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],

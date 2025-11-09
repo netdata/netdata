@@ -1528,7 +1528,7 @@ export class AIAgentSession {
               type: 'llm',
               remoteIdentifier: AIAgentSession.REMOTE_CONTEXT,
               fatal: false,
-              message: `Skipping provider ${provider}:${model} due to projected context size ${String(blocked.projected)} tokens exceeding limit ${String(blocked.limit)}.`,
+              message: `Projected context size ${String(blocked.projected)} tokens exceeds limit ${String(blocked.limit)} for ${provider}:${model}; continuing turn but guard will enforce finalization.`,
               details: {
                 projected_tokens: blocked.projected,
                 limit_tokens: limitTokens,
@@ -1537,7 +1537,6 @@ export class AIAgentSession {
             };
             this.log(warnEntry);
           }
-          continue;
         }
 
           try {
@@ -3749,105 +3748,108 @@ export class AIAgentSession {
           }
 
           const managedTokens = typeof managed.tokens === 'number' ? managed.tokens : undefined;
+          const isInternalProvider = providerLabel === 'agent';
           let toolTokens: number;
           if (managedTokens === undefined) {
             toolTokens = this.estimateTokensForCounters([{ role: 'tool', content: toolOutput }]);
-            const guardEvaluation = this.evaluateContextGuard(toolTokens);
-            if (process.env.CONTEXT_DEBUG === 'true') {
-              const approxTokens = Math.ceil(estimateMessagesBytes([{ role: 'tool', content: toolOutput }]) / 4);
-              let limitTokens: number | undefined;
-              let contextWindow: number | undefined;
+            if (!isInternalProvider) {
+              const guardEvaluation = this.evaluateContextGuard(toolTokens);
+              if (process.env.CONTEXT_DEBUG === 'true') {
+                const approxTokens = Math.ceil(estimateMessagesBytes([{ role: 'tool', content: toolOutput }]) / 4);
+                let limitTokens: number | undefined;
+                let contextWindow: number | undefined;
+                if (guardEvaluation.blocked.length > 0) {
+                  const firstBlocked = guardEvaluation.blocked[0];
+                  limitTokens = firstBlocked.limit;
+                  contextWindow = firstBlocked.contextWindow;
+                }
+                console.log('context-guard/tool-eval', {
+                  toolTokens,
+                  approxTokens,
+                  contentLength: toolOutput.length,
+                  currentCtx: this.currentCtxTokens,
+                  pendingCtx: this.pendingCtxTokens,
+                  newCtx: this.newCtxTokens,
+                  projectedTokens: guardEvaluation.projectedTokens,
+                  limitTokens,
+                  contextWindow,
+                });
+              }
               if (guardEvaluation.blocked.length > 0) {
-                const firstBlocked = guardEvaluation.blocked[0];
-                limitTokens = firstBlocked.limit;
-                contextWindow = firstBlocked.contextWindow;
+                const blockedEntries = guardEvaluation.blocked.length > 0
+                  ? guardEvaluation.blocked
+                  : [{
+                      provider: 'unknown',
+                      model: 'unknown',
+                      contextWindow: AIAgentSession.DEFAULT_CONTEXT_WINDOW_TOKENS,
+                      bufferTokens: AIAgentSession.DEFAULT_CONTEXT_BUFFER_TOKENS,
+                      maxOutputTokens: this.computeMaxOutputTokens(AIAgentSession.DEFAULT_CONTEXT_WINDOW_TOKENS),
+                      limit: 0,
+                      projected: guardEvaluation.projectedTokens,
+                    }];
+                const first = blockedEntries[0];
+                const remainingTokens = first.limit > first.projected ? first.limit - first.projected : 0;
+                const warnEntry: LogEntry = {
+                  timestamp: Date.now(),
+                  severity: 'WRN',
+                  turn: currentTurn,
+                  subturn: subturnCounter,
+                  direction: 'response',
+                  type: 'tool',
+                  remoteIdentifier: providerLabel,
+                  fatal: false,
+                  message: `Tool '${effectiveToolName}' output discarded: context window budget exceeded (${String(toolTokens)} tokens, limit ${String(first.limit)}).`,
+                  details: {
+                    tool: effectiveToolName,
+                    provider: providerLabel,
+                    tokens_estimated: toolTokens,
+                    projected_tokens: guardEvaluation.projectedTokens,
+                    limit_tokens: first.limit,
+                    remaining_tokens: remainingTokens,
+                  },
+                };
+                this.log(warnEntry);
+                const renderedFailure = '(tool failed: context window budget exceeded)';
+                const failureTokens = this.estimateTokensForCounters([{ role: 'tool', content: renderedFailure }]);
+                this.newCtxTokens += failureTokens;
+                if (callId !== undefined) {
+                  this.toolFailureMessages.set(callId, renderedFailure);
+                } else {
+                  this.toolFailureFallbacks.push(renderedFailure);
+                }
+                const failureEntry: AccountingEntry = {
+                  type: 'tool',
+                  timestamp: startTime,
+                  status: 'failed',
+                  latency: managed.latency,
+                  mcpServer: providerLabel,
+                  command: effectiveToolName,
+                  charactersIn: managed.charactersIn,
+                  charactersOut: managed.charactersOut,
+                  error: 'context_budget_exceeded',
+                  agentId: this.sessionConfig.agentId,
+                  callPath: this.callPath,
+                  txnId: this.txnId,
+                  parentTxnId: this.parentTxnId,
+                  originTxnId: this.originTxnId,
+                  details: {
+                    projected_tokens: first.projected,
+                    limit_tokens: first.limit,
+                    remaining_tokens: remainingTokens,
+                    original_tokens: toolTokens,
+                    replacement_tokens: failureTokens,
+                  },
+                };
+                accounting.push(failureEntry);
+                try { this.sessionConfig.callbacks?.onAccounting?.(failureEntry); } catch (e) { warn(`tool accounting callback failed: ${e instanceof Error ? e.message : String(e)}`); }
+                addSpanEvent('tool.call.failure', {
+                  'ai.tool.name': effectiveToolName,
+                  'ai.tool.latency_ms': managed.latency,
+                  'ai.tool.failure.reason': 'context_budget_exceeded',
+                });
+                this.enforceContextFinalTurn(blockedEntries, 'tool_preflight');
+                return renderedFailure;
               }
-              console.log('context-guard/tool-eval', {
-                toolTokens,
-                approxTokens,
-                contentLength: toolOutput.length,
-                currentCtx: this.currentCtxTokens,
-                pendingCtx: this.pendingCtxTokens,
-                newCtx: this.newCtxTokens,
-                projectedTokens: guardEvaluation.projectedTokens,
-                limitTokens,
-                contextWindow,
-              });
-            }
-            if (guardEvaluation.blocked.length > 0) {
-              const blockedEntries = guardEvaluation.blocked.length > 0
-                ? guardEvaluation.blocked
-                : [{
-                    provider: 'unknown',
-                    model: 'unknown',
-                    contextWindow: AIAgentSession.DEFAULT_CONTEXT_WINDOW_TOKENS,
-                    bufferTokens: AIAgentSession.DEFAULT_CONTEXT_BUFFER_TOKENS,
-                    maxOutputTokens: this.computeMaxOutputTokens(AIAgentSession.DEFAULT_CONTEXT_WINDOW_TOKENS),
-                    limit: 0,
-                    projected: guardEvaluation.projectedTokens,
-                  }];
-              const first = blockedEntries[0];
-              const remainingTokens = first.limit > first.projected ? first.limit - first.projected : 0;
-              const warnEntry: LogEntry = {
-                timestamp: Date.now(),
-                severity: 'WRN',
-                turn: currentTurn,
-                subturn: subturnCounter,
-                direction: 'response',
-                type: 'tool',
-                remoteIdentifier: providerLabel,
-                fatal: false,
-                message: `Tool '${effectiveToolName}' output discarded: context window budget exceeded (${String(toolTokens)} tokens, limit ${String(first.limit)}).`,
-                details: {
-                  tool: effectiveToolName,
-                  provider: providerLabel,
-                  tokens_estimated: toolTokens,
-                  projected_tokens: guardEvaluation.projectedTokens,
-                  limit_tokens: first.limit,
-                  remaining_tokens: remainingTokens,
-                },
-              };
-              this.log(warnEntry);
-              const renderedFailure = '(tool failed: context window budget exceeded)';
-              const failureTokens = this.estimateTokensForCounters([{ role: 'tool', content: renderedFailure }]);
-              this.newCtxTokens += failureTokens;
-              if (callId !== undefined) {
-                this.toolFailureMessages.set(callId, renderedFailure);
-              } else {
-                this.toolFailureFallbacks.push(renderedFailure);
-              }
-              const failureEntry: AccountingEntry = {
-                type: 'tool',
-                timestamp: startTime,
-                status: 'failed',
-                latency: managed.latency,
-                mcpServer: providerLabel,
-                command: effectiveToolName,
-                charactersIn: managed.charactersIn,
-                charactersOut: managed.charactersOut,
-                error: 'context_budget_exceeded',
-                agentId: this.sessionConfig.agentId,
-                callPath: this.callPath,
-                txnId: this.txnId,
-                parentTxnId: this.parentTxnId,
-                originTxnId: this.originTxnId,
-                details: {
-                  projected_tokens: first.projected,
-                  limit_tokens: first.limit,
-                  remaining_tokens: remainingTokens,
-                  original_tokens: toolTokens,
-                  replacement_tokens: failureTokens,
-                },
-              };
-              accounting.push(failureEntry);
-              try { this.sessionConfig.callbacks?.onAccounting?.(failureEntry); } catch (e) { warn(`tool accounting callback failed: ${e instanceof Error ? e.message : String(e)}`); }
-              addSpanEvent('tool.call.failure', {
-                'ai.tool.name': effectiveToolName,
-                'ai.tool.latency_ms': managed.latency,
-                'ai.tool.failure.reason': 'context_budget_exceeded',
-              });
-              this.enforceContextFinalTurn(blockedEntries, 'tool_preflight');
-              return renderedFailure;
             }
           } else {
             toolTokens = managedTokens;

@@ -69,6 +69,7 @@ const RUN_TEST_37 = 'run-test-37';
 const RUN_TEST_MAX_TURN_LIMIT = 'run-test-max-turn-limit';
 const TOOL_OVERFLOW_PAYLOAD = '@'.repeat(2000);
 const TOOL_DROP_STUB = `(tool failed: ${CONTEXT_OVERFLOW_FRAGMENT})`;
+const SECOND_TURN_FINAL_ANSWER = 'Second turn final answer.';
 const TEST_STDIO_SERVER_PATH = path.resolve(__dirname, 'mcp/test-stdio-server.js');
 
 const toError = (value: unknown): Error => (value instanceof Error ? value : new Error(String(value)));
@@ -1083,12 +1084,16 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       invariant(result.success, 'Scenario run-test-context-multi-provider expected success.');
       const finalReport = result.finalReport;
       invariant(finalReport?.status === 'success', 'Final report should succeed after provider fallback.');
-      const skipLog = result.logs.find((entry) => entry.remoteIdentifier === CONTEXT_REMOTE && typeof entry.message === 'string' && entry.message.includes(`Skipping provider ${PRIMARY_PROVIDER}:${MODEL_NAME}`));
-      invariant(skipLog !== undefined, 'Expected context skip log for primary provider.');
+      const warnLog = result.logs.find((entry) =>
+        entry.remoteIdentifier === CONTEXT_REMOTE
+        && typeof entry.message === 'string'
+        && entry.message.includes(`Projected context size`)
+        && entry.message.includes(`${PRIMARY_PROVIDER}:${MODEL_NAME}`)
+        && entry.message.includes('continuing turn'));
+      invariant(warnLog !== undefined, 'Expected context warning log indicating continued execution for primary provider.');
       const llmEntries = result.accounting.filter(isLlmAccounting);
-      invariant(llmEntries.length > 0, 'LLM accounting entries expected for provider fallback.');
-      invariant(llmEntries.some((entry) => entry.provider === SECONDARY_PROVIDER), 'Expected LLM attempt on secondary provider.');
-      invariant(llmEntries.every((entry) => entry.provider !== PRIMARY_PROVIDER), 'Primary provider should have no LLM attempts when skipped.');
+      invariant(llmEntries.length > 0, 'LLM accounting entries expected after warning.');
+      invariant(llmEntries.some((entry) => entry.provider === PRIMARY_PROVIDER), 'Primary provider should still be attempted with a warning.');
     },
   },
   {
@@ -1591,6 +1596,109 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         console.log('context_guard__tool_drop_after_success failed accounting entry', failedEntry);
       }
       invariant(failedEntry.error === 'token_budget_exceeded', 'Failed tool accounting entry should indicate token_budget_exceeded.');
+
+      const finalReportAccounting = accountingEntries.find((entry) => entry.command === 'agent__final_report');
+      invariant(finalReportAccounting?.status === 'ok', 'Final report accounting must succeed after guard drop.');
+      const finalReportSkipLog = result.logs.find((entry) =>
+        entry.type === 'tool'
+        && entry.severity === 'WRN'
+        && typeof entry.message === 'string'
+        && entry.message.includes("Tool 'agent__final_report' skipped"));
+      invariant(finalReportSkipLog === undefined, 'Final report must not be skipped after guard drop.');
+    },
+  },
+  {
+    id: 'context_guard__progress_passthrough',
+    configure: (configuration, sessionConfig, defaults) => {
+      configuration.providers = {
+        [PRIMARY_PROVIDER]: {
+          type: 'test-llm',
+          models: {
+            [MODEL_NAME]: {
+              contextWindow: 1000,
+              contextWindowBufferTokens: 0,
+              tokenizer: TOKENIZER_GPT4O,
+            },
+          },
+        },
+      };
+      defaults.contextWindowBufferTokens = 0;
+      configuration.defaults = defaults;
+      sessionConfig.targets = [{ provider: PRIMARY_PROVIDER, model: MODEL_NAME }];
+      sessionConfig.maxOutputTokens = 64;
+      sessionConfig.systemPrompt = MINIMAL_SYSTEM_PROMPT;
+      sessionConfig.tools = ['test'];
+    },
+    expect: (result) => {
+      invariant(result.success, 'Scenario context_guard__progress_passthrough expected success.');
+      const finalReport = result.finalReport;
+      invariant(finalReport?.status === 'success', 'Final report should complete after progress passthrough.');
+      if (process.env.CONTEXT_DEBUG === 'true') {
+        console.log('progress_passthrough conversation:', JSON.stringify(result.conversation, null, 2));
+        console.log('progress_passthrough logs:', JSON.stringify(result.logs, null, 2));
+      }
+
+      const progressTool = result.conversation.find((message) =>
+        message.role === 'tool'
+        && (message as { toolCallId?: string }).toolCallId === 'call-progress-guard-status');
+      invariant(progressTool !== undefined, 'Progress tool response missing for context_guard__progress_passthrough.');
+      invariant(progressTool.content === '{"ok":true}', 'Progress tool output should remain intact after guard enforcement.');
+
+      const progressSkipLog = result.logs.find((entry) =>
+        entry.type === 'tool'
+        && entry.severity === 'WRN'
+        && typeof entry.message === 'string'
+        && entry.message.includes("Tool 'agent__progress_report' skipped"));
+      invariant(progressSkipLog === undefined, 'Progress tool must not be skipped after guard activation.');
+    },
+  },
+  {
+    id: 'context_guard__batch_passthrough',
+    configure: (configuration, sessionConfig, defaults) => {
+      configuration.providers = {
+        [PRIMARY_PROVIDER]: {
+          type: 'test-llm',
+          models: {
+            [MODEL_NAME]: {
+              contextWindow: 1200,
+              contextWindowBufferTokens: 0,
+              tokenizer: TOKENIZER_GPT4O,
+            },
+          },
+        },
+      };
+      defaults.contextWindowBufferTokens = 0;
+      configuration.defaults = defaults;
+      sessionConfig.targets = [{ provider: PRIMARY_PROVIDER, model: MODEL_NAME }];
+      sessionConfig.maxOutputTokens = 80;
+      sessionConfig.systemPrompt = MINIMAL_SYSTEM_PROMPT;
+      sessionConfig.tools = ['test', 'batch'];
+    },
+    expect: (result) => {
+      invariant(result.success, 'Scenario context_guard__batch_passthrough expected success.');
+      const finalReport = result.finalReport;
+      invariant(finalReport?.status === 'success', 'Final report should succeed for context_guard__batch_passthrough.');
+      if (process.env.CONTEXT_DEBUG === 'true') {
+        console.log('batch_passthrough conversation:', JSON.stringify(result.conversation, null, 2));
+        console.log('batch_passthrough logs:', JSON.stringify(result.logs, null, 2));
+        console.log('batch_passthrough accounting:', JSON.stringify(result.accounting, null, 2));
+      }
+
+      const batchResult = result.conversation.find((message) =>
+        message.role === 'tool'
+        && (message as { toolCallId?: string }).toolCallId === 'call-batch-guard');
+      invariant(batchResult !== undefined, 'Batch response missing for context_guard__batch_passthrough.');
+      invariant(typeof batchResult.content === 'string' && batchResult.content.includes('"results"'), 'Batch response should retain aggregated JSON payload.');
+
+      const batchSkipLog = result.logs.find((entry) =>
+        entry.type === 'tool'
+        && entry.severity === 'WRN'
+        && typeof entry.message === 'string'
+        && entry.message.includes("Tool 'agent__batch' output dropped"));
+      invariant(batchSkipLog === undefined, 'Batch output must not be dropped by the context guard.');
+
+      const batchAccounting = result.accounting.filter(isToolAccounting).find((entry) => entry.command === 'agent__batch');
+      invariant(batchAccounting?.status === 'ok', 'Batch accounting entry should be ok after guard passthrough.');
     },
   },
   {
@@ -1796,13 +1904,16 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       const finalReport = result.finalReport;
       invariant(finalReport?.status === 'success', 'Final report should succeed after provider fallback.');
 
-      const skipLog = result.logs.find((entry) => entry.remoteIdentifier === CONTEXT_REMOTE && typeof entry.message === 'string' && entry.message.includes(`Skipping provider ${PRIMARY_PROVIDER}:${MODEL_NAME}`));
-      invariant(skipLog !== undefined, 'Expected context skip log for primary provider in context_guard__multi_target_provider_selection.');
+      const warnLog = result.logs.find((entry) =>
+        entry.remoteIdentifier === CONTEXT_REMOTE
+        && typeof entry.message === 'string'
+        && entry.message.includes(`${PRIMARY_PROVIDER}:${MODEL_NAME}`)
+        && entry.message.includes('continuing turn'));
+      invariant(warnLog !== undefined, 'Expected context warning log for primary provider in context_guard__multi_target_provider_selection.');
 
       const llmEntries = result.accounting.filter(isLlmAccounting);
       invariant(llmEntries.length > 0, 'LLM accounting entries expected for provider fallback.');
-      invariant(llmEntries.some((entry) => entry.provider === SECONDARY_PROVIDER), 'Expected LLM attempt on secondary provider.');
-      invariant(llmEntries.every((entry) => entry.provider !== PRIMARY_PROVIDER), 'Primary provider should have no LLM attempts when skipped.');
+      invariant(llmEntries.some((entry) => entry.provider === PRIMARY_PROVIDER), 'Primary provider should be attempted despite warning.');
     },
   },
   // NOTE: context_guard__tool_overflow_drop and context_guard__post_overflow_tools_skip
@@ -1991,10 +2102,18 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         console.log('bulk-tools raw result:' + JSON.stringify({ success: result.success, accounting: result.accounting, logs: result.logs, conversation: result.conversation }));
       }
       invariant(result.success, 'Scenario run-test-context-bulk-tools expected success.');
-      const toolMessages = result.conversation.filter((message) => message.role === 'tool');
-      const trimmedIndex = toolMessages.findIndex((message) => typeof message.content === 'string' && message.content.includes(CONTEXT_OVERFLOW_FRAGMENT));
-      invariant(trimmedIndex !== -1, 'Bulk tool scenario should include trimmed tool output.');
-      invariant(toolMessages.length >= 1, 'Bulk tool scenario should record at least one tool message.');
+      const toolMessages = result.conversation.filter((message) => {
+        if (message.role !== 'tool') return false;
+        const callId = (message as { toolCallId?: string }).toolCallId;
+        return callId !== 'agent-final-report';
+      });
+      invariant(toolMessages.length === 0, 'Bulk tool scenario should transition directly to final turn when preflight exhausts budget.');
+      const warnLog = result.logs.find((entry) =>
+        entry.remoteIdentifier === CONTEXT_REMOTE
+        && entry.severity === 'WRN'
+        && typeof entry.message === 'string'
+        && entry.message.includes('post-shrink'));
+      invariant(warnLog !== undefined, 'Context guard warning expected for bulk tool scenario.');
       invariant(result.finalReport?.status === 'success', 'Final report should succeed after bulk trimming.');
     },
   },
@@ -6696,7 +6815,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         const finalCallId = 'call-final-turn-started';
         const assistantMessage: ConversationMessage = {
           role: 'assistant',
-          content: 'Second turn final answer.',
+          content: SECOND_TURN_FINAL_ANSWER,
           toolCalls: [
             {
               id: finalCallId,
@@ -6704,7 +6823,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
               parameters: {
                 status: 'success',
                 report_format: 'markdown',
-                report_content: 'Second turn final answer.',
+                report_content: SECOND_TURN_FINAL_ANSWER,
               },
             },
           ],
@@ -6739,7 +6858,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       invariant(Array.isArray(observed), 'run-test-107 expects observed turn tracking.');
       invariant(observed.length === 2 && observed[0] === 1 && observed[1] === 2, 'onTurnStarted must fire once per turn for run-test-107.');
       const finalReport = result.finalReport;
-      invariant(finalReport?.status === 'success' && finalReport.content === 'Second turn final answer.', 'run-test-107 should produce the final report.');
+      invariant(finalReport?.status === 'success' && finalReport.content === SECOND_TURN_FINAL_ANSWER, 'run-test-107 should produce the final report.');
     },
   },
   {

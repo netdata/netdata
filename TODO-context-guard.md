@@ -41,6 +41,27 @@
 18. Implement Priority 3 regression tests (T18–T30) for telemetry calculations, cache tokens, and CONTEXT_DEBUG output assertions.
 19. Re-run `npm run test:phase1`, `npm run lint`, and `npm run build`; update TODO Status once all new harness cases pass.
 
+## Canonical Rules (Nov 9, 2025)
+1. **Prevent overflow, never block turns** – context guard exists solely to prune tool payloads before they enter `conversation`; it must not cancel LLM turns.
+2. **Tool responses only** – guards operate exclusively on tool outputs (MCP/REST/sub-agent). LLM/user/system messages bypass the guard entirely.
+3. **Internal tools exempt** – `agent__progress_report`, `agent__final_report`, `agent__batch`, and any other internal helpers must never be dropped, truncated, or refused by budgeting.
+4. **Batch handled per call** – the batch wrapper always completes; budgeting may drop individual nested tool calls but never the aggregate response.
+5. **Progress & final reports inviolate** – progress updates always stream; final-report execution is mandatory even under severe budget pressure.
+6. **First drop ⇒ final turn** – once any non-internal tool output is rejected, immediately enter forced final turn (tools restricted to `agent__final_report`).
+7. **Turns always run** – even if a preflight estimate exceeds the window, the turn still executes; guard actions are limited to trimming tool outputs afterward.
+8. **Preflight warnings are informational** – context budget warnings prior to tool execution/turn start are logs only; they must not mutate state beyond diagnostics.
+9. **Tests for every rule** – each invariant above requires deterministic harness coverage.
+
+## Compliance Checklist
+- [ ] `reserveToolOutput` short-circuits for internal tools (progress, final report, batch wrapper) while still applying to nested non-internal calls.
+- [ ] `ToolsOrchestrator` never emits "Tool … output dropped" for internal tools; only external/sub-agent outputs are eligible.
+- [ ] Batch orchestration applies budgeting per inner call, not to the overall batch blob.
+- [ ] `enforceContextFinalTurn` runs exactly once per overflow and only after the first drop; it never blocks the in-flight turn.
+- [ ] `evaluateContextForProvider`/`evaluateContextGuard` log advisories but do not skip provider/model attempts.
+- [ ] Final-report execution path bypasses budgeting so it cannot be rejected; progress tool is always sent through even when the guard is active.
+- [ ] Harness scenarios explicitly cover: (a) batch drop-per-call, (b) progress+final report survival, (c) forced final turn after first drop, (d) turns proceeding despite projected overflow, and (e) no duplicate forced-final triggers.
+- [ ] Specs/Guides document the invariants so future contributors cannot reintroduce blocking behaviour.
+
 ### Immediate Work (2025-11-03)
 1. Confirm via code review (`src/ai-agent.ts:1408-2174`) that `pendingCtxTokens` and `newCtxTokens` reset at each turn boundary while tool outputs are already folded into `currentCtxTokens`.
 2. Update Phase 1 harness scenario `run-test-context-token-double-count` to assert the `ctx_tokens` delta between consecutive LLM request logs instead of relying on `new_tokens`.

@@ -459,8 +459,9 @@ export class ToolsOrchestrator {
 
     const STATUS_FAILED = 'failed' as const;
     const STATUS_ERROR = 'error' as const;
+    const isInternalAgentTool = kind === 'agent' && provider.namespace === 'agent';
     const budgetCallbacks = this.budgetCallbacks;
-    if (budgetCallbacks !== undefined && !budgetCallbacks.canExecuteTool()) {
+    if (budgetCallbacks !== undefined && !isInternalAgentTool && !budgetCallbacks.canExecuteTool()) {
       const latency = Date.now() - start;
       const failureReason = 'budget_exceeded_prior_tool';
       const failureStub = '(tool failed: context window budget exceeded; previous tool overflowed. Session will conclude after this turn.)';
@@ -783,9 +784,9 @@ export class ToolsOrchestrator {
     if (result.length === 0) result = ' ';
     const resultBytes = Buffer.byteLength(result, 'utf8');
 
-    const reservation = budgetCallbacks !== undefined
+    const reservation: ToolBudgetReservation = (!isInternalAgentTool && budgetCallbacks !== undefined)
       ? await budgetCallbacks.reserveToolOutput(result)
-      : { ok: true as const };
+      : { ok: true };
 
     if (!reservation.ok) {
       const failureReason = reservation.reason ?? 'token_budget_exceeded';
