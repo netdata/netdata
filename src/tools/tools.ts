@@ -9,7 +9,7 @@ import type { ToolExecuteOptions, ToolExecuteResult, ToolKind, ToolProvider, Too
 import { recordToolMetrics, runWithSpan, addSpanAttributes, addSpanEvent, recordSpanError, recordQueueDepthMetrics, recordQueueWaitMetrics } from '../telemetry/index.js';
 import { appendCallPathSegment, formatToolRequestCompact, normalizeCallPath, sanitizeToolName, truncateUtf8WithNotice, warn } from '../utils.js';
 
-import { queueManager, type AcquireResult } from './queue-manager.js';
+import { queueManager, type AcquireResult, QueueAbortError } from './queue-manager.js';
 
 queueManager.setListeners({
   onDepthChange: (queue, info) => {
@@ -254,6 +254,9 @@ export class ToolsOrchestrator {
         if (queueController !== undefined) {
           this.pendingQueueControllers.delete(queueController);
           queueController = undefined;
+        }
+        if (queueName !== undefined && error instanceof QueueAbortError) {
+          this.logQueued(queueName, error.info, ctx, kind);
         }
         if (error instanceof DOMException && error.name === 'AbortError') {
           throw new Error('canceled');

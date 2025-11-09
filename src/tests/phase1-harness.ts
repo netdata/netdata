@@ -7557,8 +7557,6 @@ async function runScenario(test: HarnessTest): Promise<AIAgentResult> {
   const configuration: Configuration = JSON.parse(JSON.stringify(baseConfiguration)) as Configuration;
   configuration.defaults = { ...BASE_DEFAULTS, ...(configuration.defaults ?? {}) };
   const defaults = configuration.defaults;
-  queueManager.reset();
-  queueManager.configureQueues(configuration.queues);
 
   const baseSession: AIAgentSessionConfig = {
     config: configuration,
@@ -7576,6 +7574,9 @@ async function runScenario(test: HarnessTest): Promise<AIAgentResult> {
   };
 
   configure?.(configuration, baseSession, defaults);
+
+  queueManager.reset();
+  queueManager.configureQueues(configuration.queues);
 
   let abortOnTimeout: (() => void) | undefined;
   if (baseSession.abortSignal === undefined) {

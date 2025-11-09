@@ -42,6 +42,12 @@ interface QueueListeners {
   onWaitComplete?: (queue: string, waitMs: number) => void;
 }
 
+export class QueueAbortError extends DOMException {
+  constructor(public readonly info: AcquireResult) {
+    super('Queue wait aborted', 'AbortError');
+  }
+}
+
 class QueueManagerImpl {
   private queues = new Map<string, QueueState>();
   private listeners: QueueListeners = {};
@@ -96,8 +102,17 @@ class QueueManagerImpl {
       const signal = ctx?.signal;
       if (signal !== undefined) {
         const listener = () => {
-          this.removeWaiter(queueName, waiter);
-          reject(abortError());
+          this.removeWaiter(queueName, waiter, true);
+          const waitMs = Date.now() - waiter.startTs;
+          const stateAfterRemoval = this.queues.get(queueName);
+          const depth = stateAfterRemoval?.waiters.length ?? 0;
+          reject(new QueueAbortError({
+            queued: true,
+            waitMs,
+            depth,
+            capacity: stateAfterRemoval?.capacity ?? DEFAULT_QUEUE_CONCURRENCY,
+            queuedDepth: waiter.queuedDepth,
+          }));
         };
         signal.addEventListener('abort', listener, { once: true });
         waiter.signal = signal;
@@ -168,13 +183,13 @@ class QueueManagerImpl {
     this.emitDepth(queueName);
   }
 
-  private removeWaiter(queueName: string, waiter: Waiter): void {
+  private removeWaiter(queueName: string, waiter: Waiter, skipEmit?: boolean): void {
     const state = this.queues.get(queueName);
     if (state === undefined) return;
     const idx = state.waiters.indexOf(waiter);
     if (idx >= 0) {
       state.waiters.splice(idx, 1);
-      this.emitDepth(queueName);
+      if (skipEmit !== true) this.emitDepth(queueName);
     }
     this.clearAbort(waiter);
   }
