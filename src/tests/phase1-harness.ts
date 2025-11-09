@@ -1024,7 +1024,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       const nonFinalToolMessages = result.conversation.filter((message) =>
         message.role === 'tool'
         && (typeof (message as { toolCallId?: string }).toolCallId !== 'string'
-          || (message as { toolCallId?: string }).toolCallId !== 'agent-final-report')
+          || (message as { toolCallId?: string }).toolCallId !== FINAL_REPORT_TOOL_CALL_ID)
       );
       invariant(nonFinalToolMessages.length === 0, 'Only the agent__final_report tool may appear after preflight enforcement.');
 
@@ -2105,7 +2105,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       const toolMessages = result.conversation.filter((message) => {
         if (message.role !== 'tool') return false;
         const callId = (message as { toolCallId?: string }).toolCallId;
-        return callId !== 'agent-final-report';
+        return callId !== FINAL_REPORT_TOOL_CALL_ID;
       });
       invariant(toolMessages.length === 0, 'Bulk tool scenario should transition directly to final turn when preflight exhausts budget.');
       const warnLog = result.logs.find((entry) =>
