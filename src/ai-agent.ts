@@ -117,8 +117,6 @@ interface ContextGuardEvaluation {
 
 export class AIAgentSession {
   // Log identifiers (avoid duplicate string literals)
-  private static readonly REMOTE_CONC_SLOT = 'agent:concurrency-slot';
-  private static readonly REMOTE_CONC_HINT = 'agent:concurrency-hint';
   private static readonly REMOTE_AGENT_TOOLS = 'agent:tools';
   private static readonly REMOTE_FINAL_TURN = 'agent:final-turn';
   private static readonly REMOTE_CONTEXT = 'agent:context';
@@ -198,10 +196,6 @@ export class AIAgentSession {
     ts: number;
   };
   private pendingRetryMessages: string[] = [];
-
-  // Concurrency gate for tool executions
-  private toolSlotsInUse = 0;
-  private toolWaiters: (() => void)[] = [];
 
   // Counters for summary
   private llmAttempts = 0;
@@ -550,8 +544,6 @@ export class AIAgentSession {
     const orch = new ToolsOrchestrator({
       toolTimeout: sessionConfig.toolTimeout,
       toolResponseMaxBytes: sessionConfig.toolResponseMaxBytes,
-      maxConcurrentTools: sessionConfig.maxConcurrentTools,
-      parallelToolCalls: sessionConfig.parallelToolCalls,
       traceTools: sessionConfig.traceMCP === true,
     },
     this.opTree,
@@ -725,7 +717,6 @@ export class AIAgentSession {
           maxRetries: this.sessionConfig.maxRetries,
           maxTurns: this.sessionConfig.maxTurns,
           toolResponseMaxBytes: this.sessionConfig.toolResponseMaxBytes,
-          parallelToolCalls: this.sessionConfig.parallelToolCalls,
           // propagate control signals so children can stop/abort
           abortSignal: this.abortSignal,
           stopRef: this.stopRef,
@@ -797,11 +788,6 @@ export class AIAgentSession {
         turnPath: sessionConfig.trace?.turnPath ?? inferredTurnPathPrefix,
       },
     };
-
-    // Apply sensible defaults for runtime concurrency if undefined
-    if (typeof enrichedSessionConfig.maxConcurrentTools !== 'number' || !Number.isFinite(enrichedSessionConfig.maxConcurrentTools)) {
-      enrichedSessionConfig.maxConcurrentTools = 3;
-    }
 
     // External log relay placeholder; bound after session instantiation to tree
     let externalLogRelay: (entry: LogEntry) => void = (e: LogEntry) => { void e; };
@@ -1116,9 +1102,7 @@ export class AIAgentSession {
           toolTimeout: this.sessionConfig.toolTimeout,
           maxRetries: this.sessionConfig.maxRetries,
           maxTurns: this.sessionConfig.maxTurns,
-          maxConcurrentTools: this.sessionConfig.maxConcurrentTools,
           stream: this.sessionConfig.stream,
-          parallelToolCalls: this.sessionConfig.parallelToolCalls,
           traceLLM: this.sessionConfig.traceLLM,
           traceMCP: this.sessionConfig.traceMCP,
           traceSdk: this.sessionConfig.traceSdk,
@@ -3542,28 +3526,6 @@ export class AIAgentSession {
     });
   }
 
-  
-  private async acquireToolSlot(): Promise<number> {
-    const cap = Math.max(1, this.sessionConfig.maxConcurrentTools ?? 1);
-    const effectiveCap = (this.sessionConfig.parallelToolCalls === false) ? 1 : cap;
-    if (this.toolSlotsInUse < effectiveCap) {
-      this.toolSlotsInUse += 1;
-    // No per-slot verbose log; slot is shown on MCP request lines via slot=N
-      return this.toolSlotsInUse;
-    }
-    await new Promise<void>((resolve) => { this.toolWaiters.push(resolve); });
-    this.toolSlotsInUse += 1;
-    // No per-slot verbose log; slot is shown on MCP request lines via slot=N
-    return this.toolSlotsInUse;
-  }
-
-  private releaseToolSlot(): void {
-    this.toolSlotsInUse = Math.max(0, this.toolSlotsInUse - 1);
-    const next = this.toolWaiters.shift();
-    // No per-slot verbose log
-    if (next !== undefined) { try { next(); } catch { } }
-  }
-
   private async executeSingleTurn(
     conversation: ConversationMessage[],
     provider: string,
@@ -3782,7 +3744,6 @@ export class AIAgentSession {
               'ai.tool.latency_ms': managed.latency,
               'ai.tool.failure.reason': failureReason,
             });
-            this.releaseToolSlot();
             return toolOutput;
           }
 
@@ -3885,7 +3846,6 @@ export class AIAgentSession {
                 'ai.tool.failure.reason': 'context_budget_exceeded',
               });
               this.enforceContextFinalTurn(blockedEntries, 'tool_preflight');
-              this.releaseToolSlot();
               return renderedFailure;
             }
           } else {
@@ -3988,7 +3948,6 @@ export class AIAgentSession {
         }
 
         // Return error message instead of throwing - ensures LLM always gets valid tool output
-        this.releaseToolSlot();
         const limitMessage = `execution not allowed because the per-turn tool limit (${String(maxToolCallsPerTurn)}) was reached; retry this tool on the next turn if available.`;
         const failureDetail = errorMsg === 'tool_calls_per_turn_limit_exceeded' ? limitMessage : errorMsg;
         const renderedFailure = `(tool failed: ${failureDetail})`;
@@ -4101,7 +4060,6 @@ export class AIAgentSession {
       topP: effectiveTopP,
       maxOutputTokens: targetMaxOutputTokens,
       repeatPenalty: this.sessionConfig.repeatPenalty,
-      parallelToolCalls: this.sessionConfig.parallelToolCalls,
       stream: effectiveStream,
       isFinalTurn,
       llmTimeout: this.sessionConfig.llmTimeout,
