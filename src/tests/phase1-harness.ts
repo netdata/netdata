@@ -6647,6 +6647,102 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     },
   },
   {
+    id: 'run-test-107',
+    description: 'Emits onTurnStarted for every LLM turn even if no thinking stream is emitted.',
+    execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+      sessionConfig.maxTurns = 2;
+      sessionConfig.maxRetries = 1;
+      sessionConfig.targets = [{ provider: PRIMARY_PROVIDER, model: MODEL_NAME }];
+      const originalCallbacks = sessionConfig.callbacks;
+      const observedTurns: number[] = [];
+      sessionConfig.callbacks = {
+        ...originalCallbacks,
+        onTurnStarted: (turnIndex) => {
+          observedTurns.push(turnIndex);
+          originalCallbacks?.onTurnStarted?.(turnIndex);
+        },
+      };
+      // eslint-disable-next-line @typescript-eslint/unbound-method
+      const originalExecuteTurn = LLMClient.prototype.executeTurn;
+      let invocation = 0;
+      LLMClient.prototype.executeTurn = function(this: LLMClient, _request: TurnRequest): Promise<TurnResult> {
+        invocation += 1;
+        if (invocation === 1) {
+          const progressCallId = 'call-turn-started-progress';
+          const interimAssistant: ConversationMessage = {
+            role: 'assistant',
+            content: 'Working on it.',
+            toolCalls: [
+              {
+                id: progressCallId,
+                name: 'agent__progress_report',
+                parameters: { progress: 'Setting up analysis.' },
+              },
+            ],
+          };
+          const interimTool: ConversationMessage = {
+            role: 'tool',
+            toolCallId: progressCallId,
+            content: 'ok',
+          };
+          return Promise.resolve({
+            status: { type: 'success', hasToolCalls: true, finalAnswer: false },
+            latencyMs: 6,
+            messages: [interimAssistant, interimTool],
+            tokens: { inputTokens: 9, outputTokens: 3, totalTokens: 12 },
+            response: interimAssistant.content,
+          });
+        }
+        const finalCallId = 'call-final-turn-started';
+        const assistantMessage: ConversationMessage = {
+          role: 'assistant',
+          content: 'Second turn final answer.',
+          toolCalls: [
+            {
+              id: finalCallId,
+              name: 'agent__final_report',
+              parameters: {
+                status: 'success',
+                report_format: 'markdown',
+                report_content: 'Second turn final answer.',
+              },
+            },
+          ],
+        };
+        const toolMessage: ConversationMessage = {
+          role: 'tool',
+          toolCallId: finalCallId,
+          content: TOOL_OK_JSON,
+        };
+        return Promise.resolve({
+          status: { type: 'success', hasToolCalls: true, finalAnswer: true },
+          latencyMs: 7,
+          messages: [assistantMessage, toolMessage],
+          tokens: { inputTokens: 10, outputTokens: 6, totalTokens: 16 },
+          response: '',
+          stopReason: STOP_REASON_TOOL_CALLS,
+        });
+      };
+      try {
+        const session = AIAgentSession.create(sessionConfig);
+        const result = await session.run();
+        (result as { __observedTurns?: number[] }).__observedTurns = observedTurns;
+        return result;
+      } finally {
+        LLMClient.prototype.executeTurn = originalExecuteTurn;
+        sessionConfig.callbacks = originalCallbacks;
+      }
+    },
+    expect: (result: AIAgentResult & { __observedTurns?: number[] }) => {
+      invariant(result.success, 'run-test-107 should succeed.');
+      const observed = result.__observedTurns;
+      invariant(Array.isArray(observed), 'run-test-107 expects observed turn tracking.');
+      invariant(observed.length === 2 && observed[0] === 1 && observed[1] === 2, 'onTurnStarted must fire once per turn for run-test-107.');
+      const finalReport = result.finalReport;
+      invariant(finalReport?.status === 'success' && finalReport.content === 'Second turn final answer.', 'run-test-107 should produce the final report.');
+    },
+  },
+  {
     id: 'run-test-101',
     description: 'Synthesizes a failure final report when tools keep failing on the final turn.',
     execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {

@@ -758,9 +758,10 @@ export class ToolsOrchestrator {
       if (batchToolSummary !== undefined) {
         warnDetails.batch_tools = batchToolSummary;
       }
+      const sizeDescriptor = `actual ${String(sizeBytes)} B > limit ${String(limit)} B`;
       const warnMessage = batchToolSummary !== undefined
-        ? `Tool response exceeded max size (calls: ${batchToolSummary})`
-        : 'Tool response exceeded max size';
+        ? `Tool response exceeded max size (${sizeDescriptor}; calls: ${batchToolSummary})`
+        : `Tool response exceeded max size (${sizeDescriptor})`;
       const warnLog: LogEntry = {
         timestamp: Date.now(),
         severity: 'WRN',

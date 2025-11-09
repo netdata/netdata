@@ -423,6 +423,14 @@ export class AnthropicCompletionsHeadend implements Headend {
       expectingNewTurn = false;
       flushReasoning();
     };
+    const ensureTurnIndex = (target: number): void => {
+      if (!Number.isFinite(target) || target <= 0) return;
+      // eslint-disable-next-line functional/no-loop-statements -- deterministic numbering
+      while (turnCounter < target) {
+        startNextTurn();
+      }
+      expectingNewTurn = false;
+    };
     const appendThinkingChunk = (chunk: string): void => {
       if (chunk.length === 0) return;
       const turn = ensureTurn();
@@ -561,6 +569,10 @@ export class AnthropicCompletionsHeadend implements Headend {
           expectingNewTurn = false;
         }
         appendThinkingChunk(chunk);
+      },
+      onTurnStarted: (turnIndex) => {
+        ensureHeader(undefined, rootCallPath ?? agent.id);
+        ensureTurnIndex(turnIndex);
       },
       onProgress: (event) => { handleProgressEvent(event); },
       onLog: (entry) => {

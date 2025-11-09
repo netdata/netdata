@@ -1421,6 +1421,7 @@ export class AIAgentSession {
         return this.finalizeGracefulStopSession(conversation, logs, accounting);
       }
       this._currentTurn = currentTurn;
+      try { this.sessionConfig.callbacks?.onTurnStarted?.(currentTurn); } catch (e) { warn(`onTurnStarted callback failed: ${e instanceof Error ? e.message : String(e)}`); }
       try {
         // Capture effective prompts for this turn (post expansion/enhancement)
         const turnAttrs = {

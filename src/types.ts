@@ -518,6 +518,7 @@ export interface AIAgentCallbacks {
   onLog?: (entry: LogEntry) => void;
   onOutput?: (text: string) => void;
   onThinking?: (text: string) => void;
+  onTurnStarted?: (turn: number) => void;
   onAccounting?: (entry: AccountingEntry) => void;
   onSessionSnapshot?: (payload: SessionSnapshotPayload) => void | Promise<void>;
   onAccountingFlush?: (payload: AccountingFlushPayload) => void | Promise<void>;

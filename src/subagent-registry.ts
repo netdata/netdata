@@ -246,6 +246,7 @@ export class SubAgentRegistry {
         },
         onOutput: (t) => { orig.onOutput?.(t); },
         onThinking: (_t) => { /* Suppress sub-agent reasoning for external consumers */ },
+        onTurnStarted: (_turn) => { /* Sub-agent turns should not affect parent */ },
         onAccounting: (a) => { orig.onAccounting?.(a); },
         onProgress: (event) => { orig.onProgress?.(event); },
         onOpTree: (tree) => {

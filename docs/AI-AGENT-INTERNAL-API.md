@@ -32,6 +32,7 @@ The library performs no direct I/O (no stdout/stderr/file writes). All output, l
   - `onLog(entry: LogEntry)` – structured logs (see below)
   - `onOutput(text: string)` – assistant output stream
   - `onThinking(text: string)` – “thinking”/reasoning stream
+  - `onTurnStarted(turn: number)` – fired at the beginning of every LLM turn (1-indexed) before any reasoning/output
   - `onAccounting(entry: AccountingEntry)` – accounting events
 - `AIAgentResult`
   - `success: boolean`
@@ -94,7 +95,7 @@ Type `tool` (MCP tool calls and internal tools):
 Emission timing (tool): Immediately after each tool execution completes or fails:
 - Internal tools `agent__progress_report`, `agent__final_report`: `status: 'ok'`, `mcpServer: 'agent'`, fixed `charactersOut` (15 and 12 respectively), `charactersIn` reflects parameter size.
 - External MCP tools: `status: 'ok'` with the resolved `mcpServer` on success; `status: 'failed'`, `mcpServer: 'unknown'`, and `charactersOut: 0` on error.
-- Truncation: If the tool response exceeds `toolResponseMaxBytes`, the library prefixes a truncation notice and trims the content to the limit; `charactersOut` reflects the returned (prefixed + truncated) content length.
+- Truncation: If the tool response exceeds `toolResponseMaxBytes`, the library prefixes a truncation notice and trims the content to the limit; `charactersOut` reflects the returned (prefixed + truncated) content length. The emitted warning always includes the actual byte size and the configured limit (e.g., `Tool response exceeded max size (actual 16384 B > limit 12288 B)`).
 - Context overflow: If projecting a tool result would overflow the configured `contextWindow`, the agent injects `(tool failed: context window budget exceeded)`, records an accounting entry with `error: 'context_budget_exceeded'`, and populates `details` with `projected_tokens`, `limit_tokens`, and `remaining_tokens`.
 - Telemetry: every guard activation increments `ai_agent_context_guard_events_total{provider,model,trigger,outcome}` and updates the observable gauge `ai_agent_context_guard_remaining_tokens{provider,model,trigger,outcome}` so integrators can monitor how close sessions are to exhausting their budgets.
 
