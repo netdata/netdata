@@ -186,6 +186,7 @@
 - Chore(go.d/sd): make module optional in the template ([#21273](https://github.com/netdata/netdata/issues/21273))
 - Compute timestamps needed for status file ([#21272](https://github.com/netdata/netdata/issues/21272))
 - Detect netdata CLI initialization failure ([#21275](https://github.com/netdata/netdata/issues/21275))
+- Doc: add SNMP to snmp profile format doc title ([#21277](https://github.com/netdata/netdata/issues/21277))
 
 ## [2.7.0] - 2025-09-25
 
