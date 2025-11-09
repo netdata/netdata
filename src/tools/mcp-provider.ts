@@ -270,6 +270,7 @@ export class MCPProvider extends ToolProvider {
           Object.entries(resolvedHeaders).forEach(([k, v]) => { headers.set(k, v); });
           return fetch(input, { ...init, headers });
         };
+        // eslint-disable-next-line @typescript-eslint/no-deprecated -- SSE client transport kept for backwards compatibility with legacy MCP servers
         transport = new SSEClientTransport(new URL(config.url), { eventSourceInit: { fetch: customFetch }, requestInit: { headers: resolvedHeaders as HeadersInit }, fetch: customFetch });
         break;
       }

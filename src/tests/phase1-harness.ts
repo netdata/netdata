@@ -154,7 +154,7 @@ const COVERAGE_ALIAS_BASENAME = 'parent.ai';
 const TRUNCATION_NOTICE = '[TRUNCATED]';
 const CONFIG_FILE_NAME = 'config.json';
 const INCLUDE_DIRECTIVE_TOKEN = '${include:';
-const FINAL_REPORT_CALL_ID = 'call-final-report';
+const FINAL_REPORT_CALL_ID = 'agent-final-report';
 const RATE_LIMIT_FINAL_CONTENT = 'Final report after rate limit.';
 const ADOPTED_FINAL_CONTENT = 'Adopted final report content.';
 const ADOPTION_METADATA_ORIGIN = 'text-adoption';
@@ -1015,6 +1015,11 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       ];
     },
     expect: (result) => {
+      if (process.env.CONTEXT_DEBUG === 'true') {
+        console.log('context-guard-preflight logs:', JSON.stringify(result.logs, null, 2));
+        console.log('context-guard-preflight conversation:', JSON.stringify(result.conversation, null, 2));
+        console.log('context-guard-preflight finalReport:', JSON.stringify(result.finalReport, null, 2));
+      }
       invariant(result.success, 'Scenario run-test-context-guard-preflight should synthesize a fallback final report.');
       const contextLogs = result.logs.filter((entry) => entry.remoteIdentifier === CONTEXT_REMOTE);
       invariant(contextLogs.length > 0, 'Context guard warning expected for run-test-context-guard-preflight.');
@@ -1024,7 +1029,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       const nonFinalToolMessages = result.conversation.filter((message) =>
         message.role === 'tool'
         && (typeof (message as { toolCallId?: string }).toolCallId !== 'string'
-          || (message as { toolCallId?: string }).toolCallId !== FINAL_REPORT_TOOL_CALL_ID)
+          || (message as { toolCallId?: string }).toolCallId !== FINAL_REPORT_CALL_ID)
       );
       invariant(nonFinalToolMessages.length === 0, 'Only the agent__final_report tool may appear after preflight enforcement.');
 
@@ -1742,7 +1747,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
 
       const toolMessages = result.conversation.filter((message) =>
         message.role === 'tool'
-        && message.toolCallId !== 'agent-final-report'
+        && message.toolCallId !== FINAL_REPORT_CALL_ID
       );
       invariant(toolMessages.length === 0, 'No non-final tool messages should appear when schema alone triggers the guard.');
 
@@ -2105,7 +2110,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       const toolMessages = result.conversation.filter((message) => {
         if (message.role !== 'tool') return false;
         const callId = (message as { toolCallId?: string }).toolCallId;
-        return callId !== FINAL_REPORT_TOOL_CALL_ID;
+        return callId !== FINAL_REPORT_CALL_ID;
       });
       invariant(toolMessages.length === 0, 'Bulk tool scenario should transition directly to final turn when preflight exhausts budget.');
       const warnLog = result.logs.find((entry) =>

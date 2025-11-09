@@ -93,6 +93,7 @@ export class McpHeadend implements Headend {
   private httpServer?: http.Server;
   private readonly httpContexts = new Map<string, { transport: StreamableHTTPServerTransport; server: McpServer; release?: () => void }>();
   private sseServer?: http.Server;
+  // eslint-disable-next-line @typescript-eslint/no-deprecated -- SSE transport kept for backwards compatibility with legacy MCP clients
   private readonly sseContexts = new Map<string, { transport: SSEServerTransport; server: McpServer; release?: () => void }>();
   private wsServer?: WebSocketServer;
   private readonly wsContexts = new Map<string, { transport: McpWebSocketServerTransport; server: McpServer; release?: () => void }>();
@@ -285,6 +286,7 @@ export class McpHeadend implements Headend {
     metadataList.forEach((meta) => {
       const normalized = this.reserveToolName(meta, usedNames);
       const description = meta.description ?? meta.usage ?? `Agent ${meta.id}`;
+      const title = meta.description ?? meta.usage ?? meta.id;
       const promptDescription = meta.usage ?? 'User prompt for the agent';
       const formatDetails = formatValues
         .map((id) => `${id}: ${describeFormat(id)}`)
@@ -303,12 +305,12 @@ export class McpHeadend implements Headend {
           const payloadField = sdkZ
             .record(sdkZ.string(), sdkZ.unknown())
             .describe(`${promptDescription}. Provide the JSON payload matching the agent's input schema.`);
-          const shape = {
+          const schema = sdkZ.object({
             format: formatField,
             payload: payloadField,
             schema: responseSchemaField,
-          } as const;
-          return { paramsShape: shape, paramsSchema: sdkZ.object(shape) };
+          } as const);
+          return { paramsShape: schema.shape, paramsSchema: schema };
         }
 
         const promptField = sdkZ
@@ -319,21 +321,30 @@ export class McpHeadend implements Headend {
           .record(sdkZ.string(), sdkZ.unknown())
           .describe('Optional extra parameters forwarded unchanged to the agent')
           .optional();
-        const shape = {
+        const schema = sdkZ.object({
           format: formatField,
           prompt: promptField,
           payload: extrasField,
           schema: responseSchemaField,
-        } as const;
-        return { paramsShape: shape, paramsSchema: sdkZ.object(shape) };
+        } as const);
+        return { paramsShape: schema.shape, paramsSchema: schema };
       })();
 
-      server.tool(normalized, description, paramsShape, async (rawArgs, extra) => {
-        const requestId = randomUUID();
-        const parsed = paramsSchema.safeParse(rawArgs);
-        if (!parsed.success) {
-          const message = parsed.error.issues.map((issue) => issue.message).join('; ');
-          throw new Error(message);
+      const toolConfig = {
+        title,
+        description,
+        inputSchema: paramsShape,
+      } as unknown as Parameters<typeof server.registerTool>[1];
+
+      server.registerTool(
+        normalized,
+        toolConfig,
+        async (rawArgs, extra) => {
+          const requestId = randomUUID();
+          const parsed = paramsSchema.safeParse(rawArgs);
+          if (!parsed.success) {
+            const message = parsed.error.issues.map((issue) => issue.message).join('; ');
+            throw new Error(message);
         }
         const { format } = parsed.data as { format: typeof formatValues[number] };
         let rawPayload: Record<string, unknown> | undefined;
@@ -435,7 +446,8 @@ export class McpHeadend implements Headend {
             content: [{ type: 'text' as const, text: message }],
           };
         }
-      });
+        }
+      );
     });
   }
 
@@ -859,6 +871,7 @@ export class McpHeadend implements Headend {
         }
       }
       const serverInstance = this.createServerInstance();
+      // eslint-disable-next-line @typescript-eslint/no-deprecated -- SSE transport kept for backwards compatibility with legacy MCP clients
       const transport = new SSEServerTransport('/mcp/sse/message', res);
       const sessionId = transport.sessionId;
       this.sseContexts.set(sessionId, { transport, server: serverInstance, release });
