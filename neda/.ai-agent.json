@@ -1,9 +1,25 @@
 {
   "providers": {
-    "vllm": {
+    "nova": {
+      "type": "openai",
+      "apiKey": "sk-litellm-master-key",
+      "baseUrl": "http://nova:8090/v1",
+      "openaiMode": "chat",
+      "stringSchemaFormatsAllowed": ["*"],
+      "stringSchemaFormatsDenied": [ "uri" ]
+    },
+    "vllm1": {
       "type": "openai",
       "apiKey": "vllm",
       "baseUrl": "http://nova:8345/v1",
+      "openaiMode": "chat",
+      "stringSchemaFormatsAllowed": ["*"],
+      "stringSchemaFormatsDenied": [ "uri" ]
+    },
+    "vllm2": {
+      "type": "openai",
+      "apiKey": "vllm",
+      "baseUrl": "http://nova:8346/v1",
       "openaiMode": "chat",
       "stringSchemaFormatsAllowed": ["*"],
       "stringSchemaFormatsDenied": [ "uri" ]
