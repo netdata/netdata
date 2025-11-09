@@ -455,7 +455,7 @@ static void netdata_sensors_get_custom_data(struct sensor_data *sd, ISensor *pSe
                 sd->current_data_value[0] = current;
             } else {
                 if (unlikely(!sd->values)) {
-                    sd->values = mallocz(sizeof(*sd->values));
+                    sd->values = callocz(1, sizeof(*sd->values));
                     sd->values->sensor_data_type = i;
                     sd->values->value = current;
                 }
@@ -723,7 +723,17 @@ static void sensors_data_chart(struct sensor_data *sd, int update_every)
 
         if (sd->sensor_data_type != NETDATA_WIN_SENSOR_TYPE_DISTANCE_X &&
             sd->sensor_data_type != NETDATA_WIN_SENSOR_ACCELERATION_X_G) {
-            sd->rd_sensor_data_0 = netdata_add_sensor_dimension(sd, "input", (cfg) ? cfg->multiplier : sd->mult_factor);
+            sd->rd_sensor_data_0 = netdata_add_sensor_dimension(sd,
+                                                                (unlikely(!ctx[0])) ? "input" : "input0",
+                                                                (cfg) ? cfg->multiplier : sd->mult_factor);
+            if (likely(sd->values)) {
+                int i;
+                struct netdata_sensors_extra_values *move;
+                for (move = sd->values, i = 1; move->next; move = sd->values->next, i++) {
+                    snprintfz(id, RRD_ID_LENGTH_MAX, "input%d", i);
+                    move->rd_value = netdata_add_sensor_dimension(sd, id, (cfg) ? cfg->multiplier : sd->mult_factor);
+                }
+            }
         } else {
             sd->rd_sensor_data_0 =
                 netdata_add_sensor_dimension(sd, "inputX", (cfg) ? cfg->multiplier : sd->mult_factor);
@@ -739,6 +749,11 @@ static void sensors_data_chart(struct sensor_data *sd, int update_every)
         sd->sensor_data_type == NETDATA_WIN_SENSOR_ACCELERATION_X_G) {
         netdata_state_chart_set_value(sd->rd_sensor_data_1, sd, 1);
         netdata_state_chart_set_value(sd->rd_sensor_data_2, sd, 2);
+    } else if (likely(sd->values)) {
+        struct netdata_sensors_extra_values *move;
+        for (move = sd->values; move->next; move = sd->values->next) {
+            rrddim_set_by_pointer(sd->st_sensor_data, move->rd_value, move->value);
+        }
     }
     rrdset_done(sd->st_sensor_data);
 }
