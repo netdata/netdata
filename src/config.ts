@@ -6,7 +6,24 @@ import { z } from 'zod';
 
 import type { Configuration } from './types.js';
 
-export const DEFAULT_QUEUE_CONCURRENCY = 64;
+const computeDefaultQueueConcurrency = (): number => {
+  try {
+    const available = typeof os.availableParallelism === 'function' ? os.availableParallelism() : undefined;
+    const coreCount = typeof available === 'number' && Number.isFinite(available) && available > 0
+      ? available
+      : (() => {
+          const list = os.cpus();
+          if (Array.isArray(list) && list.length > 0) return list.length;
+          return 1;
+        })();
+    const desired = coreCount * 2;
+    return Math.min(64, Math.max(1, desired));
+  } catch {
+    return 64;
+  }
+};
+
+export const DEFAULT_QUEUE_CONCURRENCY = computeDefaultQueueConcurrency();
 
 const ProviderModelOverridesSchema = z.object({
   temperature: z.number().min(0).max(2).nullable().optional(),

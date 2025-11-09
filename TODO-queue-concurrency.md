@@ -14,7 +14,7 @@ We must replace the per-session concurrency guard in `ToolsOrchestrator` with a 
 
 ## Requirements Agreed With Costa
 1. Only MCP and REST tools participate in queues. Agents, sub-agents, and internal tools (progress, batch, final report, etc.) bypass queues entirely.
-2. `.ai-agent.json` defines queues in a map: `"queues": { "fetcher": { "concurrent": 4 }, "default": { "concurrent": 64 } }`. Every tool must reference a queue via `queue: "name"`; omit means `default`.
+2. `.ai-agent.json` defines queues in a map: `"queues": { "fetcher": { "concurrent": 4 }, "default": { "concurrent": <auto> } }`. Every tool must reference a queue via `queue: "name"`; omit means `default`. When not specified, `default.concurrent` auto-injects to `min(64, 2 * cpu_cores)` (falling back to 64 if the system core count cannot be determined).
    - When several configs provide the same queue name, the resolver must merge them by keeping the maximum `concurrent` value per name before handing them to the runtime.
 3. A queue is always used (default ensures this). No separate timeouts—the tool’s own timeout bounds slot occupancy.
 4. Remove `maxConcurrentTools`, `parallelToolCalls`, and any related flags/options from config/CLI/frontmatter/runtime. Tools always run “in parallel” subject only to queue capacity.
@@ -24,7 +24,7 @@ We must replace the per-session concurrency guard in `ToolsOrchestrator` with a 
 
 ## Implementation Plan
 0. **Bootstrap & Migration**
-   - When loading config layers, if `queues` is missing, inject `{ default: { concurrent: DEFAULT_QUEUE_CAPACITY } }` where `DEFAULT_QUEUE_CAPACITY = 64` so existing configs continue to work. Per Costa’s direction, we will not ship any additional backward-compat shims beyond this auto-injection and updating the Netdata configs.
+   - When loading config layers, if `queues` is missing, inject `{ default: { concurrent: DEFAULT_QUEUE_CAPACITY } }` where `DEFAULT_QUEUE_CAPACITY = min(64, 2 * cpu_cores)` (falling back to 64 when core count is unavailable). Per Costa’s direction, we will not ship any additional backward-compat shims beyond this auto-injection and updating the Netdata configs.
    - Immediately after merging config layers (before provider initialization) validate every referenced queue name (MCP server, REST tool, OpenAPI-generated tool) and throw a descriptive error if any queue is missing.
    - Document migration guidance in README/docs (see Documentation section) and explicitly note that `maxConcurrentTools` / `parallelToolCalls` frontmatter/CLI keys were intentionally removed.
 

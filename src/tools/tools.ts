@@ -255,8 +255,8 @@ export class ToolsOrchestrator {
           this.pendingQueueControllers.delete(queueController);
           queueController = undefined;
         }
-        if (queueName !== undefined && error instanceof QueueAbortError) {
-          this.logQueued(queueName, error.info, ctx, kind);
+        if (error instanceof QueueAbortError) {
+          this.logQueued(error.queueName, error.info, ctx, kind);
         }
         if (error instanceof DOMException && error.name === 'AbortError') {
           throw new Error('canceled');

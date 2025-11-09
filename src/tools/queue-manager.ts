@@ -43,7 +43,7 @@ interface QueueListeners {
 }
 
 export class QueueAbortError extends DOMException {
-  constructor(public readonly info: AcquireResult) {
+  constructor(public readonly queueName: string, public readonly info: AcquireResult) {
     super('Queue wait aborted', 'AbortError');
   }
 }
@@ -106,7 +106,7 @@ class QueueManagerImpl {
           const waitMs = Date.now() - waiter.startTs;
           const stateAfterRemoval = this.queues.get(queueName);
           const depth = stateAfterRemoval?.waiters.length ?? 0;
-          reject(new QueueAbortError({
+          reject(new QueueAbortError(queueName, {
             queued: true,
             waitMs,
             depth,
