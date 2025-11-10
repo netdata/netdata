@@ -65,7 +65,6 @@ Run Netdata in containers for quick testing. Note: Some features are limited com
 - **Kubernetes**: Always use our Helm chart. Direct host installation won't have access to K8s API for pod metadata and service discovery.
 - **Docker**: Requires specific privileges (SYS_PTRACE, SYS_ADMIN) and host mounts for full functionality. Rootless Docker has limited container network monitoring. Best for testing; production deployments should use host installation or Kubernetes Helm chart.
 - **Production**: Parent-Child is recommended regardless of cluster size for better reliability and data persistence.
-- **Enterprise Scale**: For deployments over 1000 nodes, see our [Enterprise Deployment Guide](/docs/deployment-guides/enterprise-deployment.md) for architecture patterns and resource planning.
 
 :::
 
