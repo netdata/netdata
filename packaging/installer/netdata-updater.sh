@@ -809,15 +809,18 @@ update_available() {
   info "Current Version: ${current_version}"
   info "Latest Version: ${latest_version}"
 
-  if [ "${latest_version}" -gt 0 ] && [ "${current_version}" -gt 0 ] && [ "${current_version}" -ge "${latest_version}" ]; then
+  if [ -z "${latest_version}" ] || [ -z "${current_version}" ] ; then
+    info "Unable to compare versions for update check, assuming an update is required."
+    return 0
+  elif [ "${latest_version}" -gt 0 ] && [ "${current_version}" -gt 0 ] && [ "${current_version}" -ge "${latest_version}" ]; then
     info "Newest version (current=${current_version} >= latest=${latest_version}) is already installed"
     return 1
   else
     info "Update available"
 
     if [ "${current_version}" -ne 0 ] && [ "${latest_version}" -ne 0 ]; then
-      current_major="$(${ndbinary} -v | cut -f 2 -d ' ' | cut -f 1 -d '.' | tr -d 'v')"
-      latest_major="$(echo "${latest_tag}" | cut -f 1 -d '.' | tr -d 'v')"
+      current_major="$(echo "${current_version}" | head -c 3)"
+      latest_major="$(echo "${latest_version}" | head -c 3)"
 
       if [ "${current_major}" -ne "${latest_major}" ]; then
         update_safe=0
@@ -1008,7 +1011,8 @@ update_static() {
     cd "${PREVDIR}"
   fi
   [ -n "${logfile}" ] && rm "${logfile}" && logfile=
-  exit 0
+
+  return 0
 }
 
 get_new_binpkg_major() {
