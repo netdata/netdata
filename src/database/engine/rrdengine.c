@@ -692,8 +692,12 @@ extent_flush_to_open(struct rrdengine_instance *ctx, struct extent_io_descriptor
 
     bool still_running = ctx_is_available_for_queries(ctx);
 
+    usec_t max_end_time_ut = 0;
     for (i = 0 ; i < xt_io_descr->descr_count ; ++i) {
         descr = xt_io_descr->descr_array[i];
+
+        if (descr->end_time_ut > max_end_time_ut)
+            max_end_time_ut = descr->end_time_ut;
 
         if (likely(still_running && !have_error))
             pgc_open_add_hot_page(
@@ -707,6 +711,18 @@ extent_flush_to_open(struct rrdengine_instance *ctx, struct extent_io_descriptor
                 xt_io_descr->bytes);
 
         page_descriptor_release(descr);
+    }
+
+    if (!have_error) {
+        if (max_end_time_ut > 0) {
+            time_t new_last_time_s = (time_t)(max_end_time_ut / USEC_PER_SEC);
+
+            // Atomically update to keep the maximum
+            spinlock_lock(&datafile->journalfile->data_spinlock);
+            if (new_last_time_s > datafile->journalfile->v2.last_time_s)
+                datafile->journalfile->v2.last_time_s = new_last_time_s;
+            spinlock_unlock(&datafile->journalfile->data_spinlock);
+        }
     }
 
     posix_memalign_freez(xt_io_descr->buf);
@@ -1792,23 +1808,6 @@ uint64_t rrdeng_target_data_file_size(struct rrdengine_instance *ctx) {
     return target_size;
 }
 
-time_t get_datafile_end_time(struct rrdengine_instance *ctx)
-{
-    time_t last_time_s = 0;
-
-    netdata_rwlock_rdlock(&ctx->datafiles.rwlock);
-    struct rrdengine_datafile *datafile = get_last_ctx_datafile(ctx, true);
-
-    if (datafile) {
-        last_time_s = datafile->journalfile->v2.last_time_s;
-        if (!last_time_s)
-            last_time_s = datafile->journalfile->v2.first_time_s;
-    }
-
-    netdata_rwlock_rdunlock(&ctx->datafiles.rwlock);
-    return last_time_s;
-}
-
 /* return 0 on success */
 int init_rrd_files(struct rrdengine_instance *ctx)
 {
@@ -2079,23 +2078,12 @@ uint64_t rrdeng_get_used_disk_space(struct rrdengine_instance *ctx, bool having_
     return estimated_disk_space;
 }
 
-static time_t get_tier_retention(struct rrdengine_instance *ctx)
-{
-    time_t retention = 0;
-    if (localhost) {
-        STORAGE_ENGINE *eng = localhost->db[ctx->config.tier].eng;
-        if (eng) {
-            time_t first_time_s = get_datafile_end_time(ctx);
-            if (first_time_s)
-                retention = now_realtime_sec() - first_time_s;
-        }
-    }
-    return retention;
-}
-
 // Check if disk or retention time cap reached
 bool rrdeng_ctx_tier_cap_exceeded(struct rrdengine_instance *ctx)
 {
+    bool trigger_time_retention = false;
+    uint64_t estimated_disk_space = 0;
+
     netdata_rwlock_rdlock(&ctx->datafiles.rwlock);
     struct rrdengine_datafile *first_datafile = get_first_ctx_datafile(ctx, true);
 
@@ -2104,16 +2092,25 @@ bool rrdeng_ctx_tier_cap_exceeded(struct rrdengine_instance *ctx)
         return false;
     }
 
-    uint64_t estimated_disk_space = rrdeng_get_used_disk_space(ctx, true);
+    if (ctx->config.max_retention_s) {
+        time_t last_time_s = first_datafile->journalfile->v2.last_time_s;
+        if (!last_time_s)
+            last_time_s = first_datafile->journalfile->v2.first_time_s;
+
+        time_t cutoff_before_time_s = now_realtime_sec() - ctx->config.max_retention_s;
+        trigger_time_retention = (last_time_s && last_time_s <= cutoff_before_time_s);
+    }
+
+    // avoid disk calculation if we will trigger time retention
+    // calculate estimated disk space only if we have a disk cap
+    if (false == trigger_time_retention && ctx->config.max_disk_space)
+        estimated_disk_space = rrdeng_get_used_disk_space(ctx, true);
 
     netdata_rwlock_rdunlock(&ctx->datafiles.rwlock);
 
-    if (ctx->config.max_retention_s) {
-        time_t retention = get_tier_retention(ctx);
-        if (retention > ctx->config.max_retention_s) {
-            __atomic_store_n(&ctx->datafiles.disk_time, false, __ATOMIC_RELAXED);
-            return true;
-        }
+    if (trigger_time_retention) {
+        __atomic_store_n(&ctx->datafiles.disk_time, false, __ATOMIC_RELAXED);
+        return true;
     }
 
     if (ctx->config.max_disk_space && estimated_disk_space > ctx->config.max_disk_space) {
