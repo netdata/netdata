@@ -7,6 +7,10 @@
 #define NETDATA_QUERY_LOCKS_MASK                                                                                       \
     "SELECT resource_type, count(*) FROM %s.sys.dm_tran_locks WHERE DB_NAME(resource_database_id) = '%s' group by resource_type;"
 
+#define NETDATA_REPLICATION_DB "distribution"
+
+#define NETDATA_REPLICATION_MONITOR_QUERY "EXEC sp_replmonitorhelppublication;"
+
 #define NETDATA_QUERY_LIST_DB "SELECT name FROM sys.databases;"
 
 // https://learn.microsoft.com/en-us/sql/relational-databases/system-catalog-views/sys-database-files-transact-sql?view=sql-server-ver16

@@ -2129,7 +2129,18 @@ modules:
                 GO
                 ```
 
-              4. **Configure SQL Server Network Settings**
+              4. **Enable Query replication stored procedure**
+
+                 Connect to your database and add `netdata_user` to `replmonitor`:
+
+                ```tsql
+                USE distribution;
+                GO
+                EXEC sp_addrolemember 'replmonitor', 'netdata_user';
+                GO
+                ```
+
+              5. **Configure SQL Server Network Settings**
 
                  Enable SQL Server to accept TCP connections:
 
@@ -2142,7 +2153,7 @@ modules:
                   - Enter a port number in the `TCP Port` field (default is `1433`)
                 - Select `SQL Server Services` and restart your SQL Server instance
 
-              5. **Configure SQL Server Authentication (Optional)**
+              6. **Configure SQL Server Authentication (Optional)**
 
                  If you're using SQL Server authentication (rather than Windows authentication):
 
@@ -2539,6 +2550,65 @@ modules:
               chart_type: line
               dimensions:
                 - name: size
+        - name: MSSQL Replication
+          description: "These metrics refer to the Microsoft SQL Servers replication on host."
+          labels:
+            - name: mssql_instance
+              description: The instance name.
+            - name: publisher
+              description: The SQL server publisher name.
+            - name: database
+              description: The database being replicated.
+            - name: publication
+              description: The publication name.
+          metrics:
+            - name: mssql.replication_status
+              description: Current replication status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: started
+                - name: succeeded
+                - name: in_progress
+                - name: idle
+                - name: retrying
+                - name: failed
+            - name: mssql.replication_warning
+              description: Maximum threshold warning.
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: expiration
+                - name: latency
+                - name: merge expiration
+                - name: fast duration
+                - name: low duration
+                - name: fast run speed
+                - name: low run speed
+            - name: mssql.replication_avg_latency
+              description: Average latency for a transactional publication.
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: latency
+            - name: mssql.replication_subscription
+              description: Number of subscriptions to a publication.
+              unit: subscription
+              chart_type: line
+              dimensions:
+                - name: subscription
+            - name: mssql.replication_agent_running
+              description: Distribution agents running.
+              unit: agents
+              chart_type: line
+              dimensions:
+                - name: agents
+            - name: mssql.replication_synchronization
+              description: The shortest synchronization.
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: seconds
   - meta:
       plugin_name: windows.plugin
       module_name: PerflibNetFramework
