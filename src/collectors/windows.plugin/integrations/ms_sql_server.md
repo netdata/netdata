@@ -181,6 +181,30 @@ Metrics:
 | mssql.database_log_flushed | flushed | bytes/s |
 | mssql.database_data_files_size | size | bytes |
 
+### Per MSSQL Replication
+
+These metrics refer to the Microsoft SQL Servers replication on host.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| mssql_instance | The instance name. |
+| publisher | The SQL server publisher name. |
+| database | The database being replicated. |
+| publication | The publication name. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| mssql.replication_status | started, succeeded, in_progress, idle, retrying, failed | status |
+| mssql.replication_warning | expiration, latency, merge expiration, fast duration, low duration, fast run speed, low run speed | status |
+| mssql.replication_avg_latency | latency | seconds |
+| mssql.replication_subscription | subscription | subscription |
+| mssql.replication_agent_running | agents | agents |
+| mssql.replication_synchronization | seconds | seconds |
+
 
 
 ## Alerts
@@ -243,7 +267,18 @@ For **each SQL Server** instance you want to monitor, complete the following ste
   GO
   ```
 
-4. **Configure SQL Server Network Settings**
+4. **Enable Query replication stored procedure**
+
+   Connect to your database and add `netdata_user` to `replmonitor`:
+
+  ```tsql
+  USE distribution;
+  GO
+  EXEC sp_addrolemember 'replmonitor', 'netdata_user';
+  GO
+  ```
+
+5. **Configure SQL Server Network Settings**
 
    Enable SQL Server to accept TCP connections:
 
@@ -256,7 +291,7 @@ For **each SQL Server** instance you want to monitor, complete the following ste
     - Enter a port number in the `TCP Port` field (default is `1433`)
   - Select `SQL Server Services` and restart your SQL Server instance
 
-5. **Configure SQL Server Authentication (Optional)**
+6. **Configure SQL Server Authentication (Optional)**
 
    If you're using SQL Server authentication (rather than Windows authentication):
 
