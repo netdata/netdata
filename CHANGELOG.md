@@ -187,6 +187,7 @@
 - Compute timestamps needed for status file ([#21272](https://github.com/netdata/netdata/issues/21272))
 - Detect netdata CLI initialization failure ([#21275](https://github.com/netdata/netdata/issues/21275))
 - Doc: add SNMP to snmp profile format doc title ([#21277](https://github.com/netdata/netdata/issues/21277))
+- Build(deps): bump golang.org/x/sync from 0.17.0 to 0.18.0 in /src/go ([#21278](https://github.com/netdata/netdata/issues/21278))
 
 ## [2.7.0] - 2025-09-25
 
