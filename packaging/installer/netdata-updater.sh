@@ -734,7 +734,7 @@ parse_version() {
   if [ "${r}" = "latest" ]; then
     # If we get ‘latest’ as a version, return the largest possible
     # version value.
-    printf "99999999999999"
+    printf "999999999999999"
     return 0
   elif echo "${r}" | grep -q '^v.*'; then
     # shellcheck disable=SC2001
@@ -755,7 +755,7 @@ parse_version() {
 
   rm -f "${tmpfile}"
 
-  printf "%03d%03d%03d%05d" "${maj}" "${min}" "${patch}" "${b}"
+  printf "%04d%03d%03d%05d" "${maj}" "${min}" "${patch}" "${b}"
 }
 
 get_latest_tag() {
@@ -819,8 +819,8 @@ update_available() {
     info "Update available"
 
     if [ "${current_version}" -ne 0 ] && [ "${latest_version}" -ne 0 ]; then
-      current_major="$(echo "${current_version}" | head -c 3)"
-      latest_major="$(echo "${latest_version}" | head -c 3)"
+      current_major="$(echo "${current_version}" | head -c 4)"
+      latest_major="$(echo "${latest_version}" | head -c 4)"
 
       if [ "${current_major}" -ne "${latest_major}" ]; then
         update_safe=0
