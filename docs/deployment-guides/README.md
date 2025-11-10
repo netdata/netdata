@@ -58,7 +58,6 @@ Run Netdata in containers for quick testing. Note: Some features are limited com
 | **Kubernetes**          | [Helm Chart](https://github.com/netdata/helmchart#netdata-helm-chart-for-kubernetes-deployments)                                                                   | Required for K8s API access and pod metadata collection             |
 | **Testing/Development** | [Standalone](/docs/deployment-guides/standalone-deployment.md) or [Docker](/packaging/docker/README.md)                                                            | Quick setup, easy to remove                                         |
 | **Single server**       | [Standalone](/docs/deployment-guides/standalone-deployment.md) (upgrade to [Parent-Child](/docs/deployment-guides/deployment-with-centralization-points.md) later) | Start simple, upgrade when ready for production                     |
-| **Enterprise scale (1000+ nodes)** | [Parent-Child with clustering](/docs/deployment-guides/enterprise-deployment.md) | Multi-tier architecture, high availability, resource optimization |
 
 :::warning Important Notes
 
