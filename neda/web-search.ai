@@ -134,10 +134,10 @@ Detailed analysis organized by subtopics. For each claim/finding:
 List ALL sources consulted (even if not cited in findings):
 
 ```
-1. Source Title (https://url)
+1. Source Title (https://address/path)
    Relevance 95%, Primary source for market data
 
-2. Source Title (https://url)
+2. Source Title (https://address/path)
    Relevance 80%, Supporting evidence for adoption trends
 ```
 
@@ -199,8 +199,7 @@ Output format: ${FORMAT}
 
 ### Starting
 - [ ] Decompose and analyze the user's request
-- [ ] Define what success looks like
-- [ ] Set concrete expectations
+- [ ] Define what success looks like and set concrete expectations
 
 ### Per Turn/Step
 - [ ] use the `batch` tool to perform operations in parallel
