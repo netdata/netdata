@@ -1606,7 +1606,7 @@ int journalfile_load(struct rrdengine_instance *ctx, struct rrdengine_journalfil
 
     bool is_last_file = (ctx_last_fileno_get(ctx) == journalfile->datafile->fileno);
     bool has_old_data = false;
-    if (ctx->config.tier == 0)
+    if (ctx->config.tier == 0 && journalfile->v2.last_time_s > 0)
         has_old_data = (now_realtime_sec() - journalfile->v2.last_time_s) > 86400;
 
     if (is_last_file && journalfile->datafile->pos <= rrdeng_target_data_file_size(ctx) / 3 && !has_old_data) {
