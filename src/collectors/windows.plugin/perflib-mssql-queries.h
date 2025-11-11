@@ -958,4 +958,27 @@ enum netdata_mssql_odbc_errors {
     NETDATA_MSSQL_ODBC_FETCH
 };
 
+static inline PERF_DATA_BLOCK *
+netdata_mssql_get_perf_data_block(bool *collect_perflib, struct mssql_instance *mi, DWORD idx)
+{
+    DWORD id = RegistryFindIDByName(mi->objectName[idx]);
+    if (id == PERFLIB_REGISTRY_NAME_NOT_FOUND) {
+        collect_perflib[idx] = false;
+        return NULL;
+    }
+
+    PERF_DATA_BLOCK *pDataBlock = perflibGetPerformanceData(id);
+    if (!pDataBlock) {
+        collect_perflib[idx] = true;
+        return NULL;
+    }
+
+    return pDataBlock;
+}
+
+void do_mssql_general_stats(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *mi, int update_every);
+void do_mssql_errors(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *mi, int update_every);
+void do_mssql_memory_mgr(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *mi, int update_every);
+void do_mssql_statistics_perflib(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *mi, int update_every);
+void do_mssql_access_methods(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *mi, int update_every);
 #endif
