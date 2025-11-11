@@ -1,4 +1,4 @@
-# SNMP Profile Format
+# Profile Format
 
 ## Overview
 
