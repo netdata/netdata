@@ -3474,12 +3474,21 @@ install(FILES
         COMPONENT netdata
         DESTINATION usr/lib/netdata/system/systemd)
 
+configure_file(system/systemd/sysusers.conf.in system/systemd/sysusers/netdata.conf @ONLY)
+install(FILES
+        ${CMAKE_BINARY_DIR}/system/systemd/sysusers/netdata.conf
+        COMPONENT netdata
+        DESTINATION usr/lib/netdata/system/systemd/sysusers)
 
 if(BUILD_FOR_PACKAGING)
         install(FILES
                 ${CMAKE_BINARY_DIR}/system/systemd/netdata.service
                 COMPONENT netdata
                 DESTINATION lib/systemd/system)
+        install(FILES
+                ${CMAKE_BINARY_DIR}/system/systemd/sysusers/netdata.conf
+                COMPONENT user
+                DESTINATION usr/lib/sysusers.d)
         install(DIRECTORY
                 COMPONENT netdata
                 DESTINATION usr/lib/systemd/journald@netdata.conf.d)
