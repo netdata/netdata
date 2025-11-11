@@ -602,7 +602,8 @@ cmd_status_t execute_command(cmd_t idx, char *args, char **message)
     if (command_server_initialized >= command_info_array[idx].init_status)
         status = command_info_array[idx].func(args, message);
     else {
-        *message = strdupz("Agent is initializing");
+        if (message)
+            *message = strdupz("Agent is initializing");
         status = CMD_STATUS_SUCCESS;
     }
     cmd_unlock_by_type[type](idx);
