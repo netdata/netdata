@@ -477,20 +477,14 @@ static struct netdata_sensors_extra_config *netdata_sensors_fill_configuration(c
     snprintfz(section_name, CONFIG_MAX_NAME, "%s:%s", NETDATA_DEFAULT_SENSOR_SECTION, name);
 
     const char *units = inicfg_get(&netdata_config, section_name, "units", NULL);
-
     if (unlikely(!units)) {
-        nd_log(
-            NDLS_COLLECTORS,
-            NDLP_INFO,
-            "No section %s found. Collector will not plot chart for sensor %s",
-            section_name,
-            name);
         return NULL;
     }
 
-    struct netdata_sensors_extra_config *sec = mallocz(sizeof(*sec));
+    struct netdata_sensors_extra_config *sec = callocz(sizeof(struct netdata_sensors_extra_config), 1);
     sec->units = units;
-    sec->multiplier = (int)inicfg_get_number(&netdata_config, section_name, "multiplier", 0);
+    sec->title = inicfg_get(&netdata_config, section_name, "title", NULL);;
+    sec->multiplier = (int)inicfg_get_number(&netdata_config, section_name, "multiplier", 1);
 
     return sec;
 }
