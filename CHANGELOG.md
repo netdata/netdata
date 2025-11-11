@@ -188,6 +188,11 @@
 - Detect netdata CLI initialization failure ([#21275](https://github.com/netdata/netdata/issues/21275))
 - Doc: add SNMP to snmp profile format doc title ([#21277](https://github.com/netdata/netdata/issues/21277))
 - Build(deps): bump golang.org/x/sync from 0.17.0 to 0.18.0 in /src/go ([#21278](https://github.com/netdata/netdata/issues/21278))
+- Add openSUSE Tumbleweed to CI and package builds. ([#21276](https://github.com/netdata/netdata/issues/21276))
+- MSSQL Replication - Publisher (Windows.plugin) ([#21235](https://github.com/netdata/netdata/issues/21235))
+- Initialize reusable buffers when streaming ML to parent ([#21279](https://github.com/netdata/netdata/issues/21279))
+- Improve forced new datafile on startup ([#21282](https://github.com/netdata/netdata/issues/21282))
+- Adjust tier retention calculation ([#21280](https://github.com/netdata/netdata/issues/21280))
 
 ## [2.7.0] - 2025-09-25
 
