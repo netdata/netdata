@@ -22,7 +22,7 @@
 #  - TMPDIR (set to a usable temporary directory)
 #  - NETDATA_NIGHTLIES_BASEURL (set the base url for downloading the dist tarball)
 
-# Next unused error code: U001E
+# Next unused error code: U001F
 
 set -e
 
@@ -30,6 +30,8 @@ PACKAGES_SCRIPT="https://raw.githubusercontent.com/netdata/netdata/master/packag
 
 NETDATA_STABLE_BASE_URL="${NETDATA_BASE_URL:-https://github.com/netdata/netdata/releases}"
 NETDATA_NIGHTLY_BASE_URL="${NETDATA_BASE_URL:-https://github.com/netdata/netdata-nightlies/releases}"
+NETDATA_STABLE_REPO_URL="${NETDATA_BASE_URL:-https://repository.netdata.cloud/repos/stable}"
+NETDATA_NIGHTLY_REPO_URL="${NETDATA_BASE_URL:-https://repository.netdata.cloud/repos/edge}"
 NETDATA_DEFAULT_ACCEPT_MAJOR_VERSIONS="1 2"
 
 # Following variables are intended to be overridden by the updater config file.
@@ -602,8 +604,10 @@ download() {
   url="${1}"
   dest="${2}"
 
+  set +e
   _safe_download "${url}" "${dest}"
   ret=$?
+  set -e
 
   if [ ${ret} -eq 0 ]; then
     return 0
@@ -1083,6 +1087,9 @@ update_binpkg() {
       repo_update_opts="${interactive_opts}"
       pkg_installed_check="dpkg-query -s"
       INSTALL_TYPE="binpkg-deb"
+      if [ -n "${VERSION_CODENAME}" ]; then
+        repo_path="${DISTRO_COMPAT_NAME}/${VERSION_CODENAME}"
+      fi
       ;;
     centos|fedora|ol|amzn)
       if [ "${INTERACTIVE}" = "0" ]; then
@@ -1102,6 +1109,7 @@ update_binpkg() {
       repo_update_opts="${interactive_opts}"
       pkg_installed_check="rpm -q"
       INSTALL_TYPE="binpkg-rpm"
+      repo_path="${DISTRO_COMPAT_NAME}/${SYSVERSION}/$(uname -m)"
       ;;
     opensuse)
       if [ "${INTERACTIVE}" = "0" ]; then
@@ -1117,6 +1125,7 @@ update_binpkg() {
       repo_update_opts=""
       pkg_installed_check="rpm -q"
       INSTALL_TYPE="binpkg-rpm"
+      repo_path="${DISTRO_COMPAT_NAME}/${SYSVERSION}/$(uname -m)"
       ;;
     *)
       warning "We do not provide native packages for ${DISTRO}."
@@ -1125,24 +1134,70 @@ update_binpkg() {
   esac
 
   initial_version="$(get_current_version)"
+  nd_version="$(netdata -V | cut -f 2 -d ' ')"
 
   if [ -n "${repo_subcmd}" ]; then
     # shellcheck disable=SC2086
     env ${env} ${pm_cmd} ${repo_subcmd} ${repo_update_opts} >&3 2>&3 || fatal "Failed to update repository metadata." U000C
   fi
 
-  for repopkg in netdata-repo netdata-repo-edge; do
-    if ${pkg_installed_check} ${repopkg} > /dev/null 2>&1; then
-      # shellcheck disable=SC2086
-      env ${env} ${pm_cmd} ${upgrade_subcmd} ${pkg_install_opts} ${repopkg} >&3 2>&3 || fatal "Failed to update Netdata repository config." U000D
-      # shellcheck disable=SC2086
-      if [ -n "${repo_subcmd}" ]; then
-        env ${env} ${pm_cmd} ${repo_subcmd} ${repo_update_opts} >&3 2>&3 || fatal "Failed to update repository metadata." U000E
-      fi
-    fi
-  done
+  if ${pkg_installed_check} netdata-repo; then
+    NETDATA_RELEASE_CHANNEL="stable"
+    repopkg="netdata-repo"
+  elif ${pkg_installed_check} netdata-repo-edge; then
+    NETDATA_RELEASE_CHANNEL="nightly"
+    repopkg="netdata-repo-edge"
+  elif echo "${nd_version}" | grep -Eq -- 'v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'; then
+    NETDATA_RELEASE_CHANNEL="stable"
+  elif echo "${nd_version}" | grep -Eq -- '-nightly$'; then
+    NETDATA_RELEASE_CHANNEL="nightly"
+  else
+    NETDATA_RELEASE_CHANNEL="none"
+    warning "Unable to determine which release channel is being used on this system, cannot check if packages are still being published."
+  fi
 
-  current_major="$(netdata -v | cut -f 2 -d ' ' | cut -f 1 -d '.' | tr -d 'v')"
+  if [ -n "${repo_path}" ]; then
+    case "${NETDATA_RELEASE_CHANNEL}" in
+      stable) check_url="${NETDATA_STABLE_REPO_URL}/${repo_path}/.currently.published" ;;
+      nightly) check_url="${NETDATA_NIGHTLY_REPO_URL}/${repo_path}/.currently.published" ;;
+    esac
+  fi
+
+  if [ -n "${check_url}" ]; then
+    info "Checking if native packages are still being published for this platform."
+
+    set +e
+    _safe_download "${check_url}" /dev/null
+    ret=$?
+    set -e
+
+    case "$?" in
+      0) info "Native packages are still being published for this platform." ;;
+      1)
+        error ""
+        error "NETDATA CANNOT BE UPDATED ON THIS SYSTEM!"
+        error ""
+        error "Native packages are no longer being published for this platform."
+        error ""
+        error "To update to the latest version of Netdata, you will need to switch to a different install type."
+        error "For details on how to do so, see https://learn.netdata.cloud/docs/netdata-agent/installation/linux/switch-install-types-and-release-channels"
+        error ""
+        fatal "Unable to update due to native packages no longer being published for this platform" U001E
+        ;;
+      255) warning "Unable to check whether native packages are being published, wget or curl is required." ;;
+    esac
+  fi
+
+  if [ -n "${repopkg}" ]; then
+    # shellcheck disable=SC2086
+    env ${env} ${pm_cmd} ${upgrade_subcmd} ${pkg_install_opts} ${repopkg} >&3 2>&3 || fatal "Failed to update Netdata repository config." U000D
+    # shellcheck disable=SC2086
+    if [ -n "${repo_subcmd}" ]; then
+      env ${env} ${pm_cmd} ${repo_subcmd} ${repo_update_opts} >&3 2>&3 || fatal "Failed to update repository metadata." U000E
+    fi
+  fi
+
+  current_major="$(echo "${nd_version}" | cut -f 1 -d '.' | tr -d 'v')"
   latest_major="$(get_new_binpkg_major)"
 
   if [ -n "${latest_major}" ] && [ "${latest_major}" -ne "${current_major}" ]; then
