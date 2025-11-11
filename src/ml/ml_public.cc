@@ -408,6 +408,10 @@ void ml_init()
         worker->queue = ml_queue_init();
         worker->pending_model_info.reserve(Cfg.flush_models_batch_size);
         netdata_mutex_init(&worker->nd_mutex);
+
+        // Initialize reusable buffers for streaming kmeans models
+        worker->stream_payload_buffer = buffer_create(0, NULL);
+        worker->stream_wb_buffer = buffer_create(0, NULL);
     }
 
     // open sqlite db
@@ -509,6 +513,10 @@ void ml_stop_threads()
         delete[] worker->scratch_training_cns;
         ml_queue_destroy(worker->queue);
         netdata_mutex_destroy(&worker->nd_mutex);
+
+        // Free reusable buffers
+        buffer_free(worker->stream_payload_buffer);
+        buffer_free(worker->stream_wb_buffer);
     }
 }
 
