@@ -448,20 +448,20 @@ static void netdata_sensors_get_custom_data(struct sensor_data *sd, ISensor *pSe
     collected_number current;
     for (int i = NETDATA_WIN_SENSOR_TYPE_CUSTOM_VALUE1; i <= NETDATA_WIN_SENSOR_TYPE_CUSTOM_VALUE27; i++) {
         if (netdata_collect_sensor_data(&current, pSensor, sensor_keys[i], sd->div_factor)) {
-            if (unlikely(!sd->sensor_data_type)) {
+            if (unlikely(!sd->enabled)) {
                 sd->sensor_data_type = i;
                 sd->config = &configs[NETDATA_WIN_SENSOR_LAST_WELL_DEFINED];
                 sd->enabled = true;
                 sd->current_data_value[0] = current;
-            } else {
+            }  else {
                 if (unlikely(!sd->values)) {
-                    sd->values = callocz(1, sizeof(*sd->values));
+                    sd->values = callocz(sizeof(struct netdata_sensors_extra_values), 1);
                     sd->values->sensor_data_type = i;
                     sd->values->value = current;
                 } else {
                     struct netdata_sensors_extra_values *move;
                     for (move = sd->values; move->next; move = move->next);
-                    move->next = callocz(1, sizeof(*sd->values));
+                    move->next = callocz(sizeof(struct netdata_sensors_extra_values), 1);
                     move->next->sensor_data_type = i;
                     move->next->value = current;
                 }
