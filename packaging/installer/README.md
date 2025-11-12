@@ -19,49 +19,49 @@ You can also install Netdata directly without connecting to Netdata Cloud. Choos
 ### Operating Systems
 
 **Linux** - Install on any Linux distribution
-[→ Install on Linux](/docs/netdata-agent/installation/linux/)
+[→ Install on Linux](/packaging/installer/methods/kickstart.md)
 
 **Windows** - Native Windows monitoring agent
-[→ Install on Windows](/docs/netdata-agent/installation/windows/)
+[→ Install on Windows](/packaging/windows/WINDOWS_INSTALLER.md)
 
 **macOS** - Monitor your Mac systems
-[→ Install on macOS](/docs/netdata-agent/installation/macos)
+[→ Install on macOS](/packaging/installer/methods/macos.md)
 
 **FreeBSD** - Install on FreeBSD systems
-[→ Install on FreeBSD](/docs/netdata-agent/installation/freebsd)
+[→ Install on FreeBSD](/packaging/installer/methods/freebsd.md)
 
 ### Containerized Environments
 
 **Docker** - Run Netdata in Docker containers
-[→ Install with Docker](/docs/netdata-agent/installation/docker)
+[→ Install with Docker](/packaging/docker/README.md)
 
 **Kubernetes** - Deploy across Kubernetes clusters
-[→ Install on Kubernetes](/docs/netdata-agent/installation/kubernetes)
+[→ Install on Kubernetes](/packaging/installer/methods/kubernetes.md)
 
 ### Network Appliances
 
 **pfSense** - Monitor pfSense firewalls
-[→ Install on pfSense](/docs/netdata-agent/installation/pfsense)
+[→ Install on pfSense](/packaging/installer/methods/pfsense.md)
 
 **Synology** - Install on Synology NAS devices
-[→ Install on Synology](/docs/netdata-agent/installation/synology)
+[→ Install on Synology](/packaging/installer/methods/synology.md)
 
 ### Automation & Cloud Platforms
 
 **Ansible** - Automate deployment with Ansible
-[→ Install with Ansible](/docs/netdata-agent/installation/ansible)
+[→ Install with Ansible](/packaging/installer/methods/ansible.md)
 
 **AWS** - Deploy on Amazon Web Services
-[→ Install on AWS](/docs/netdata-agent/installation/aws)
+[→ Install on AWS](/packaging/installer/methods/aws.md)
 
 **Azure** - Deploy on Microsoft Azure
-[→ Install on Azure](/docs/netdata-agent/installation/azure)
+[→ Install on Azure](/packaging/installer/methods/azure.md)
 
 **GCP** - Deploy on Google Cloud Platform
-[→ Install on GCP](/docs/netdata-agent/installation/gcp)
+[→ Install on GCP](/packaging/installer/methods/gcp.md)
 
 ## What can I monitor with Netdata?
 
 Netdata can monitor virtually any system, application, or service. Discover what you can monitor and explore our extensive integrations catalog.
 
-[→ Explore what Netdata can monitor](/docs/welcome-to-netdata/monitor-anything)
+[→ Explore what Netdata can monitor](/src/collectors/COLLECTORS.md)
