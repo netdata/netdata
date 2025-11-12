@@ -20,8 +20,8 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/ids"
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/output"
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/spec"
-	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/units"
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/timeperiod"
+	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/units"
 )
 
 // SchedulerConfig drives the construction of the async scheduler/executor pair.
