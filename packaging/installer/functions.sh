@@ -379,6 +379,7 @@ prepare_cmake_options() {
   enable_feature PLUGIN_APPS "${ENABLE_APPS:-1}"
   enable_feature PLUGIN_OTEL "${ENABLE_OTEL:-0}"
   enable_feature PLUGIN_IBM "${ENABLE_IBM:-0}"
+  enable_feature PLUGIN_SCRIPTS "${ENABLE_SCRIPTS:-0}"
 
   check_for_feature EXPORTER_PROMETHEUS_REMOTE_WRITE "${EXPORTER_PROMETHEUS}" snappy
   check_for_feature EXPORTER_MONGODB "${EXPORTER_MONGODB}" libmongoc-1.0
