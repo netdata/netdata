@@ -101,20 +101,6 @@ ACLK writes logs to your Netdata log directory:
 grep "log directory" /etc/netdata/netdata.conf
 ```
 
-### Enable debug logging
-
-To enable ACLK debug logging, edit `/etc/netdata/netdata.conf`:
-
-```ini
-[logs]
-    debug flags = 0x0000000000000800  # D_ACLK flag
-```
-
-Then restart Netdata:
-```bash
-sudo systemctl restart netdata
-```
-
 ### Common error messages
 
 | Error Message | Cause | Solution |
