@@ -298,7 +298,7 @@ Common causes include:
 - Proxy issues with WebSocket protocols
 - SSL/TLS handshake failures
 
-Check your logs at `/var/log/netdata/error.log` for specific error messages.
+Check your logs at `/var/log/netdata/daemon.log` for specific error messages.
 
 </details>
 <details>
