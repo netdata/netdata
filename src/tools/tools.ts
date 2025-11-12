@@ -549,19 +549,48 @@ export class ToolsOrchestrator {
       };
     }
 
-    const withTimeout = async <T>(p: Promise<T>, timeoutMs?: number): Promise<T> => {
+    const withTimeout = async <T>(p: Promise<T>, timeoutMs: number | undefined, onTimeout?: () => void | Promise<void>): Promise<T> => {
       if (typeof timeoutMs !== 'number' || timeoutMs <= 0) return await p;
-      let timer: ReturnType<typeof setTimeout> | undefined;
-      try {
-        return await Promise.race([
-          p,
-          new Promise<T>((_resolve, reject) => {
-            timer = setTimeout(() => { reject(new Error('Tool execution timed out')); }, timeoutMs);
-          })
-        ]);
-      } finally {
-        if (timer !== undefined) clearTimeout(timer);
-      }
+      return await new Promise<T>((resolve, reject) => {
+        let settled = false;
+        let timer: ReturnType<typeof setTimeout>;
+        const finalize = (action: () => void): void => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          action();
+        };
+        const rejectWith = (error: unknown): void => {
+          const normalized = error instanceof Error ? error : new Error(toErrorMessage(error));
+          finalize(() => { reject(normalized); });
+        };
+        timer = setTimeout(() => {
+          if (settled) return;
+          if (onTimeout === undefined) {
+            rejectWith(new Error('Tool execution timed out'));
+            return;
+          }
+          try {
+            Promise.resolve(onTimeout())
+              .then(() => {
+                rejectWith(new Error('Tool execution timed out'));
+              })
+              .catch((err: unknown) => {
+                warn(`provider cancelTool failed: ${toErrorMessage(err)}`);
+                rejectWith(err);
+              });
+          } catch (err: unknown) {
+            warn(`provider cancelTool threw: ${toErrorMessage(err)}`);
+            rejectWith(err);
+          }
+        }, timeoutMs);
+
+        p.then((value) => {
+          finalize(() => { resolve(value); });
+        }).catch((error: unknown) => {
+          rejectWith(error);
+        });
+      });
     };
 
     let exec: ToolExecuteResult | undefined;
@@ -590,7 +619,8 @@ export class ToolsOrchestrator {
         if (opts?.disableGlobalTimeout === true) {
           exec = await execPromise;
         } else {
-          exec = await withTimeout(execPromise, this.opts.toolTimeout);
+          const timeoutCallback = (): Promise<void> => provider.cancelTool(effective, { reason: 'timeout', context: ctx });
+          exec = await withTimeout(execPromise, this.opts.toolTimeout, timeoutCallback);
         }
       }
     } catch (e) {

@@ -29,6 +29,11 @@ export interface ToolExecuteResult {
   extras?: Record<string, unknown>;
 }
 
+export interface ToolCancelOptions {
+  reason: 'timeout' | 'abort';
+  context?: ToolExecutionContext;
+}
+
 export abstract class ToolProvider {
   abstract readonly kind: ToolKind;
   abstract readonly namespace: string; // provider namespace (e.g., 'rest', server namespace)
@@ -37,6 +42,7 @@ export abstract class ToolProvider {
   abstract execute(name: string, parameters: Record<string, unknown>, opts?: ToolExecuteOptions): Promise<ToolExecuteResult>;
   // Optional warmup hook for providers that need async initialization (e.g., MCP)
   async warmup(): Promise<void> { /* default no-op */ }
+  async cancelTool(_name: string, _opts?: ToolCancelOptions): Promise<void> { /* default no-op */ }
   getInstructions(): string { return ''; }
   resolveLogProvider(_name: string): string {
     return this.namespace;

@@ -560,10 +560,17 @@ export class AIAgentSession {
     },
     this.progressReporter,
     this.toolBudgetCallbacks);
+    const providerRequestTimeout = (() => {
+      const raw = sessionConfig.toolTimeout;
+      if (typeof raw !== 'number' || !Number.isFinite(raw) || raw <= 0) return undefined;
+      const scaled = Math.trunc(raw * 1.5);
+      const buffered = raw + 1000;
+      return Math.max(scaled, buffered);
+    })();
     orch.register(new MCPProvider('mcp', sessionConfig.config.mcpServers, {
       trace: sessionConfig.traceMCP,
       verbose: sessionConfig.verbose,
-      requestTimeoutMs: sessionConfig.toolTimeout,
+      requestTimeoutMs: providerRequestTimeout,
       onLog: (e) => { this.log(e); },
       initConcurrency: sessionConfig.mcpInitConcurrency
     }));
@@ -1447,6 +1454,9 @@ export class AIAgentSession {
       let maxRateLimitWaitMs = 0;
       // eslint-disable-next-line functional/no-loop-statements
       while (attempts < maxRetries && !turnSuccessful) {
+        if (Boolean(this.stopRef?.stopping)) {
+          return this.finalizeGracefulStopSession(conversation, logs, accounting);
+        }
         // Emit the same startup verbose line also when the master LLM runs (once per session)
         if (!this.masterLlmStartLogged && this.parentTxnId === undefined) {
           try {
@@ -2473,7 +2483,8 @@ export class AIAgentSession {
 
               if (cycleComplete) {
                 const allRateLimited = rateLimitedInCycle >= pairs.length;
-                if (allRateLimited && attempts < maxRetries && maxRateLimitWaitMs > 0) {
+                const hasStopRef = this.stopRef !== undefined;
+                if (allRateLimited && maxRateLimitWaitMs > 0 && (attempts < maxRetries || hasStopRef)) {
                   const waitLog: LogEntry = {
                     timestamp: Date.now(),
                     severity: 'WRN',
@@ -2598,6 +2609,9 @@ export class AIAgentSession {
       }
 
       if (!turnSuccessful) {
+        if (Boolean(this.stopRef?.stopping)) {
+          return this.finalizeGracefulStopSession(conversation, logs, accounting);
+        }
         if (this.forcedFinalTurnReason === 'context') {
           const fallbackFormatCandidate = this.resolvedFormat ?? 'text';
           const fallbackFormat = FINAL_REPORT_FORMAT_VALUES.find((value) => value === fallbackFormatCandidate) ?? 'text';

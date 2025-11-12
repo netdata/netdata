@@ -10,7 +10,9 @@ import type { LoadAgentOptions, LoadedAgent } from '../agent-loader.js';
 import type { ResolvedConfigLayer } from '../config-resolver.js';
 import type { StructuredLogEvent } from '../logging/structured-log-event.js';
 import type { PreloadedSubAgent } from '../subagent-registry.js';
-import type { AIAgentCallbacks, AIAgentResult, AIAgentSessionConfig, AccountingEntry, AgentFinishedEvent, Configuration, ConversationMessage, LogDetailValue, LogEntry, LogPayload, MCPServerConfig, MCPTool, ProviderConfig, TokenUsage, TurnRequest, TurnResult, TurnStatus, ToolChoiceMode } from '../types.js';
+import type { MCPRestartFailedError, LogFn, SharedAcquireOptions, SharedRegistry, SharedRegistryHandle } from '../tools/mcp-provider.js';
+import type { ToolExecuteResult } from '../tools/types.js';
+import type { AIAgentCallbacks, AIAgentResult, AIAgentSessionConfig, AccountingEntry, AgentFinishedEvent, Configuration, ConversationMessage, LogDetailValue, LogEntry, LogPayload, MCPServer, MCPServerConfig, MCPTool, ProviderConfig, TokenUsage, TurnRequest, TurnResult, TurnStatus, ToolChoiceMode } from '../types.js';
 import type { JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js';
 import type { ModelMessage, LanguageModel, ToolSet } from 'ai';
 import type { ChildProcess } from 'node:child_process';
@@ -31,7 +33,7 @@ import { TestLLMProvider } from '../llm-providers/test-llm.js';
 import { formatRichLogLine } from '../logging/rich-format.js';
 import { SubAgentRegistry } from '../subagent-registry.js';
 import { estimateMessagesTokens, resolveTokenizer } from '../tokenizer-registry.js';
-import { MCPProvider } from '../tools/mcp-provider.js';
+import { MCPProvider, forceRemoveSharedRegistryEntry } from '../tools/mcp-provider.js';
 import { queueManager } from '../tools/queue-manager.js';
 import { clampToolName, sanitizeToolName, formatToolRequestCompact, truncateUtf8WithNotice, formatAgentResultHumanReadable, setWarningSink, getWarningSink, warn } from '../utils.js';
 import { createWebSocketTransport } from '../websocket-transport.js';
@@ -69,8 +71,39 @@ const RUN_TEST_37 = 'run-test-37';
 const RUN_TEST_MAX_TURN_LIMIT = 'run-test-max-turn-limit';
 const TOOL_OVERFLOW_PAYLOAD = '@'.repeat(2000);
 const TOOL_DROP_STUB = `(tool failed: ${CONTEXT_OVERFLOW_FRAGMENT})`;
+const SHARED_REGISTRY_RESULT = 'shared-response';
 const SECOND_TURN_FINAL_ANSWER = 'Second turn final answer.';
+const RESTART_TRIGGER_PAYLOAD = 'restart-cycle';
+const RESTART_POST_PAYLOAD = 'post-restart';
+const FIXTURE_PREEMPT_REASON = 'fixture-preempt';
 const TEST_STDIO_SERVER_PATH = path.resolve(__dirname, 'mcp/test-stdio-server.js');
+const delay = (ms: number): Promise<void> => new Promise((resolve) => { setTimeout(resolve, ms); });
+
+interface RestartFixtureState {
+  phase: string;
+  failOnStart?: boolean;
+  remainingRestartFails?: number;
+  remainingInitFails?: number;
+}
+
+const createRestartFixtureStateFile = (): string => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ai-agent-restart-'));
+  const file = path.join(dir, 'state.json');
+  const initial: RestartFixtureState = { phase: 'initial' };
+  fs.writeFileSync(file, JSON.stringify(initial), 'utf8');
+  return file;
+};
+
+const readRestartFixtureState = (file: string): RestartFixtureState => {
+  const raw = fs.readFileSync(file, 'utf8');
+  return JSON.parse(raw) as RestartFixtureState;
+};
+
+const updateRestartFixtureState = (file: string, updater: (prev: RestartFixtureState) => RestartFixtureState): void => {
+  const prev = readRestartFixtureState(file);
+  const next = updater(prev);
+  fs.writeFileSync(file, JSON.stringify(next), 'utf8');
+};
 
 const toError = (value: unknown): Error => (value instanceof Error ? value : new Error(String(value)));
 const toErrorMessage = (value: unknown): string => (value instanceof Error ? value.message : String(value));
@@ -82,6 +115,69 @@ const defaultHarnessWarningSink = (message: string): void => {
 };
 
 setWarningSink(defaultHarnessWarningSink);
+
+class HarnessSharedRegistry implements SharedRegistry {
+  acquireCount = 0;
+  timeoutCalls: string[] = [];
+  restartCalls = 0;
+  releaseCount = 0;
+  cancelReasons: ('timeout' | 'abort')[] = [];
+  callResults: unknown[] = [];
+  probeResults: boolean[] = [];
+  lastHandle?: HarnessSharedHandle;
+
+  acquire(serverName: string, config: MCPServerConfig, opts: SharedAcquireOptions): Promise<SharedRegistryHandle> {
+    this.acquireCount += 1;
+    const baseTools: MCPTool[] = [{ name: 'mock_tool', description: 'mock', inputSchema: {} }];
+    const tools = opts.filterTools(baseTools);
+    const server: MCPServer = { name: serverName, config, tools, instructions: 'mock instructions' };
+    const handle = new HarnessSharedHandle(this, server);
+    handle.callResults = this.callResults;
+    handle.probeResults = this.probeResults;
+    handle.cancelStore = this.cancelReasons;
+    this.lastHandle = handle;
+    return Promise.resolve(handle);
+  }
+
+  getRestartError(): MCPRestartFailedError | undefined {
+    return undefined;
+  }
+}
+
+class HarnessSharedHandle implements SharedRegistryHandle {
+  public callResults: unknown[] = [];
+  public probeResults: boolean[] = [];
+  public cancelStore: ('timeout' | 'abort')[] = [];
+  public callCount = 0;
+  public released = false;
+
+  constructor(private registry: HarnessSharedRegistry, public server: MCPServer) {}
+
+  callTool(): Promise<unknown> {
+    this.callCount += 1;
+    return Promise.resolve(this.callResults.shift() ?? { content: 'mock-result' });
+  }
+
+  handleCancel(reason: 'timeout' | 'abort', logger: LogFn): Promise<void> {
+    this.cancelStore.push(reason);
+    if (reason !== 'timeout') return Promise.resolve();
+    this.registry.timeoutCalls.push(this.server.name);
+    const nextProbe = this.probeResults.shift();
+    const healthy = nextProbe ?? true;
+    if (!healthy) {
+      this.registry.restartCalls += 1;
+      logger('WRN', `mock restart for '${this.server.name}'`, `mcp:${this.server.name}`);
+    }
+    return Promise.resolve();
+  }
+
+  release(): void {
+    if (!this.released) {
+      this.released = true;
+      this.registry.releaseCount += 1;
+    }
+  }
+}
 
 const defaultPersistenceCallbacks = (configuration: Configuration, existing?: AIAgentCallbacks): AIAgentCallbacks => {
   const callbacks = existing ?? {};
@@ -155,6 +251,7 @@ const TRUNCATION_NOTICE = '[TRUNCATED]';
 const CONFIG_FILE_NAME = 'config.json';
 const INCLUDE_DIRECTIVE_TOKEN = '${include:';
 const FINAL_REPORT_CALL_ID = 'agent-final-report';
+const MCP_TEST_REMOTE = 'mcp:test:test';
 const RATE_LIMIT_FINAL_CONTENT = 'Final report after rate limit.';
 const ADOPTED_FINAL_CONTENT = 'Adopted final report content.';
 const ADOPTION_METADATA_ORIGIN = 'text-adoption';
@@ -685,7 +782,7 @@ const overrideLLMExpected = {
   stream: true,
 };
 
-const TEST_SCENARIOS: HarnessTest[] = [
+const BASE_TEST_SCENARIOS: HarnessTest[] = [
   {
     id: DEFAULT_PROMPT_SCENARIO,
     expect: (result) => {
@@ -1358,7 +1455,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         && entry.severity === 'VRB'
         && typeof entry.message === 'string'
         && entry.message.includes('ok preview')
-        && entry.remoteIdentifier === 'mcp:test:test'
+        && entry.remoteIdentifier === MCP_TEST_REMOTE
         && logHasDetail(entry, 'tokens_estimated')
       );
       invariant(toolLog !== undefined, 'Tool preview log with token metrics expected for run-test-tool-log-tokens.');
@@ -1526,7 +1623,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       const toolLogs = result.logs.filter((entry) =>
         entry.type === 'tool'
         && entry.direction === 'response'
-        && entry.remoteIdentifier === 'mcp:test:test'
+        && entry.remoteIdentifier === MCP_TEST_REMOTE
         && entry.severity === 'VRB'
         && getLogDetail(entry, 'tool') === 'test__test'
         && logHasDetail(entry, 'tokens_estimated')
@@ -2035,17 +2132,29 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       const toolTokens = expectLogDetailNumber(toolLog, 'tokens_estimated', 'Tool tokens_estimated detail missing for run-test-context-token-double-count.');
       invariant(toolTokens > 0, 'Tool tokens should be positive for run-test-context-token-double-count.');
 
-      const responseLogBefore = [...result.logs.slice(0, toolIndex)].reverse().find((entry) =>
-        entry.type === 'llm'
-        && entry.direction === 'response'
-        && entry.remoteIdentifier === `${PRIMARY_PROVIDER}:${MODEL_NAME}`
-      );
-      const requestLogBeforeFallback = responseLogBefore === undefined
-        ? [...result.logs.slice(0, toolIndex)].reverse().find((entry) =>
-          entry.type === 'llm'
-          && entry.direction === 'request'
-          && entry.remoteIdentifier === `${PRIMARY_PROVIDER}:${MODEL_NAME}`)
-        : undefined;
+      const remoteId = `${PRIMARY_PROVIDER}:${MODEL_NAME}`;
+      const toolTurn = typeof toolLog.turn === 'number' ? toolLog.turn : Number.POSITIVE_INFINITY;
+      const toolSubturn = typeof toolLog.subturn === 'number' ? toolLog.subturn : Number.POSITIVE_INFINITY;
+      let responseLogBefore: LogEntry | undefined;
+      let requestLogBeforeFallback: LogEntry | undefined;
+      result.logs.forEach((entry) => {
+        if (entry.type !== 'llm') return;
+        if (entry.remoteIdentifier !== remoteId) return;
+        const entryTurn = typeof entry.turn === 'number' ? entry.turn : Number.NEGATIVE_INFINITY;
+        const entrySubturn = typeof entry.subturn === 'number' ? entry.subturn : Number.NEGATIVE_INFINITY;
+        const occursBeforeTool = entryTurn < toolTurn || (entryTurn === toolTurn && entrySubturn <= toolSubturn);
+        if (!occursBeforeTool) return;
+        switch (entry.direction) {
+          case 'response':
+            responseLogBefore = entry;
+            break;
+          case 'request':
+            requestLogBeforeFallback = entry;
+            break;
+          default:
+            break;
+        }
+      });
       invariant(responseLogBefore !== undefined || requestLogBeforeFallback !== undefined, 'LLM response/request log before tool expected for run-test-context-token-double-count.');
       const requestLogAfter = result.logs.slice(toolIndex).find((entry) =>
         entry.type === 'llm'
@@ -4149,6 +4258,582 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         );
       },
     };
+  })(),
+  (() => {
+    return {
+      id: 'run-test-66-shared',
+      description: 'Shared MCP registry pooling, timeout probe, and cancel semantics.',
+      execute: async () => {
+        const registry = new HarnessSharedRegistry();
+        registry.callResults = [{ content: SHARED_REGISTRY_RESULT }];
+        registry.probeResults = [true, false];
+        const logs: LogEntry[] = [];
+        const config: Record<string, MCPServerConfig> = {
+          sharedServer: { type: 'stdio', command: 'mock', shared: true },
+        } as Record<string, MCPServerConfig>;
+        const provider = new MCPProvider('mcp', config, { sharedRegistry: registry, onLog: (entry) => { logs.push(entry); } });
+        await (provider as unknown as { ensureInitialized: () => Promise<void> }).ensureInitialized();
+        const exec = await provider.execute('sharedServer__mock_tool', {});
+        await provider.cancelTool('sharedServer__mock_tool', { reason: 'timeout' });
+        await provider.cancelTool('sharedServer__mock_tool', { reason: 'timeout' });
+        await provider.cancelTool('sharedServer__mock_tool', { reason: 'abort' });
+        await provider.cleanup();
+        if (process.env.RESTART_DEBUG === 'true') {
+          console.log('run-test-73 logs', logs.map((entry) => ({ message: entry.message, severity: entry.severity, remote: entry.remoteIdentifier })));
+        }
+        return {
+          success: true,
+          conversation: [],
+          logs,
+          accounting: [],
+          finalReport: {
+            status: 'success',
+            format: 'json',
+            content_json: {
+              result: exec.result,
+              acquireCount: registry.acquireCount,
+              callCount: registry.lastHandle?.callCount ?? 0,
+              timeoutCalls: registry.timeoutCalls,
+              restartCalls: registry.restartCalls,
+              cancelReasons: registry.cancelReasons,
+              releaseCount: registry.releaseCount,
+            },
+            ts: Date.now(),
+          },
+        } satisfies AIAgentResult;
+      },
+      expect: (result: AIAgentResult) => {
+        invariant(result.success, 'run-test-66-shared expected success.');
+        const data = result.finalReport?.content_json as {
+          result: string;
+          acquireCount: number;
+          callCount: number;
+          timeoutCalls: string[];
+          restartCalls: number;
+          cancelReasons: ('timeout' | 'abort')[];
+          releaseCount: number;
+        } | undefined;
+        invariant(data !== undefined, 'final report payload expected for run-test-66-shared.');
+        invariant(data.result === SHARED_REGISTRY_RESULT, 'shared execute result mismatch for run-test-66-shared.');
+        invariant(data.acquireCount === 1, 'shared registry should acquire once for run-test-66-shared.');
+        invariant(data.callCount === 1, 'shared handle call count mismatch for run-test-66-shared.');
+        invariant(data.timeoutCalls.length === 2, 'timeout count mismatch for run-test-66-shared.');
+        invariant(data.restartCalls === 1, 'restart count mismatch for run-test-66-shared.');
+        const timeoutReasonCount = data.cancelReasons.filter((reason) => reason === 'timeout').length;
+        invariant(timeoutReasonCount === 2, 'Timeout cancel reasons mismatch for run-test-66-shared.');
+        invariant(data.cancelReasons.includes('abort'), 'Abort reason should be recorded in run-test-66-shared.');
+        invariant(data.releaseCount === 1, 'Release count mismatch for run-test-66-shared.');
+      },
+    };
+  })(),
+  (() => {
+    return {
+      id: 'run-test-66-shared-http',
+      description: 'Non-stdio MCP transports also use the shared registry path.',
+      execute: async () => {
+        const registry = new HarnessSharedRegistry();
+        registry.callResults = [{ content: SHARED_REGISTRY_RESULT }];
+        registry.probeResults = [true, false];
+        const logs: LogEntry[] = [];
+        const config: Record<string, MCPServerConfig> = {
+          sharedHttp: { type: 'http', url: 'https://example.com/mock', shared: true },
+        } as Record<string, MCPServerConfig>;
+        const provider = new MCPProvider('mcp', config, { sharedRegistry: registry, onLog: (entry) => { logs.push(entry); } });
+        await (provider as unknown as { ensureInitialized: () => Promise<void> }).ensureInitialized();
+        const exec = await provider.execute('sharedHttp__mock_tool', {});
+        await provider.cancelTool('sharedHttp__mock_tool', { reason: 'timeout' });
+        await provider.cancelTool('sharedHttp__mock_tool', { reason: 'timeout' });
+        await provider.cancelTool('sharedHttp__mock_tool', { reason: 'abort' });
+        await provider.cleanup();
+        return {
+          success: true,
+          conversation: [],
+          logs,
+          accounting: [],
+          finalReport: {
+            status: 'success',
+            format: 'json',
+            content_json: {
+              result: exec.result,
+              serverType: registry.lastHandle?.server.config.type,
+              acquireCount: registry.acquireCount,
+              callCount: registry.lastHandle?.callCount ?? 0,
+              timeoutCalls: registry.timeoutCalls,
+              restartCalls: registry.restartCalls,
+              cancelReasons: registry.cancelReasons,
+              releaseCount: registry.releaseCount,
+            },
+            ts: Date.now(),
+          },
+        } satisfies AIAgentResult;
+      },
+      expect: (result: AIAgentResult) => {
+        invariant(result.success, 'run-test-66-shared-http expected success.');
+        const data = result.finalReport?.content_json as {
+          result: string;
+          serverType?: string;
+          acquireCount: number;
+          callCount: number;
+          timeoutCalls: string[];
+          restartCalls: number;
+          cancelReasons: ('timeout' | 'abort')[];
+          releaseCount: number;
+        } | undefined;
+        invariant(data !== undefined, 'final report payload expected for run-test-66-shared-http.');
+        invariant(data.serverType === 'http', 'Shared HTTP server type mismatch for run-test-66-shared-http.');
+        invariant(data.result === SHARED_REGISTRY_RESULT, 'shared execute result mismatch for run-test-66-shared-http.');
+        invariant(data.acquireCount === 1, 'shared registry should acquire once for run-test-66-shared-http.');
+        invariant(data.callCount === 1, 'shared handle call count mismatch for run-test-66-shared-http.');
+        invariant(data.timeoutCalls.length === 2, 'timeout count mismatch for run-test-66-shared-http.');
+        invariant(data.restartCalls === 1, 'restart count mismatch for run-test-66-shared-http.');
+        const timeoutReasonCount = data.cancelReasons.filter((reason) => reason === 'timeout').length;
+        invariant(timeoutReasonCount === 2, 'Timeout cancel reasons mismatch for run-test-66-shared-http.');
+        invariant(data.cancelReasons.includes('abort'), 'Abort reason should be recorded in run-test-66-shared-http.');
+        invariant(data.releaseCount === 1, 'Release count mismatch for run-test-66-shared-http.');
+      },
+    };
+  })(),
+  (() => {
+    return {
+      id: 'run-test-67-private',
+      description: 'Private MCP timeout invokes restartServer while abort does not.',
+      execute: async () => {
+        const config: Record<string, MCPServerConfig> = {
+          privateServer: { type: 'stdio', command: 'mock', shared: false },
+        } as Record<string, MCPServerConfig>;
+        const provider = new MCPProvider('mcp', config);
+        const providerAny = provider as unknown as {
+          toolNameMap: Map<string, { serverName: string; originalName: string }>;
+          servers: Map<string, MCPServer>;
+          restartServer: (serverName: string, reason: string) => Promise<void>;
+        };
+        providerAny.toolNameMap.set('privateServer__ping', { serverName: 'privateServer', originalName: 'ping' });
+        providerAny.servers.set('privateServer', {
+          name: 'privateServer',
+          config: config.privateServer,
+          tools: [{ name: 'ping', description: 'Ping', inputSchema: {} }],
+          instructions: 'Private instructions',
+        } as MCPServer);
+        const restartLog: string[] = [];
+        providerAny.restartServer = (serverName: string, reason: string) => {
+          restartLog.push(`${serverName}:${reason}`);
+          return Promise.resolve();
+        };
+        await provider.cancelTool('privateServer__ping', { reason: 'timeout' });
+        await provider.cancelTool('privateServer__ping', { reason: 'abort' });
+        return {
+          success: true,
+          conversation: [],
+          logs: [],
+          accounting: [],
+          finalReport: {
+            status: 'success',
+            format: 'json',
+            content_json: { restartLog },
+            ts: Date.now(),
+          },
+        } satisfies AIAgentResult;
+      },
+      expect: (result: AIAgentResult) => {
+        invariant(result.success, 'run-test-67-private expected success.');
+        const data = result.finalReport?.content_json as { restartLog: string[] } | undefined;
+        invariant(data !== undefined, 'final report payload expected for run-test-67-private.');
+        invariant(data.restartLog.length === 1 && data.restartLog[0] === 'privateServer:timeout', 'Private restart log mismatch for run-test-67-private.');
+      },
+    };
+  })(),
+  (() => {
+    return {
+      id: 'run-test-71-restart-success',
+      description: 'Shared registry restarts hung stdio servers and gates concurrent callers.',
+      execute: async () => {
+        const stateFile = createRestartFixtureStateFile();
+        const restartFixtureName = 'restartFixture';
+        const restartFixtureTool = `${restartFixtureName}__test`;
+        const config: Record<string, MCPServerConfig> = {
+          [restartFixtureName]: {
+            type: 'stdio',
+            command: process.execPath,
+            args: [TEST_STDIO_SERVER_PATH],
+            shared: true,
+            env: {
+              MCP_FIXTURE_MODE: 'restart',
+              MCP_FIXTURE_STATE_FILE: stateFile,
+              MCP_FIXTURE_HANG_MS: '4000',
+              MCP_FIXTURE_EXIT_DELAY_MS: '150',
+            },
+          },
+        } as Record<string, MCPServerConfig>;
+        const provider = new MCPProvider('mcp', config, { requestTimeoutMs: 2000 });
+        await provider.warmup();
+        const toolName = restartFixtureTool;
+        const hangingPromise = (async () => {
+          try {
+            return await provider.execute(toolName, { text: RESTART_TRIGGER_PAYLOAD }, { timeoutMs: 10000 });
+          } catch (error) {
+            return toError(error);
+          }
+        })();
+        await delay(50);
+        await delay(200);
+        const registryAccessor = provider as unknown as { sharedRegistry: SharedRegistry };
+        const restartRegistry = registryAccessor.sharedRegistry as unknown as { handleTimeout: (name: string, logger: LogFn) => Promise<void> };
+        const waitStart = Date.now();
+        try {
+          await restartRegistry.handleTimeout(restartFixtureName, (severity, message, remoteIdentifier, fatal) => {
+            void severity;
+            void message;
+            void remoteIdentifier;
+            void fatal;
+          });
+        } catch (error) {
+          void error;
+        }
+        let restartComplete = false;
+        let second!: ToolExecuteResult;
+        // eslint-disable-next-line functional/no-loop-statements
+        for (;;) {
+          try {
+            second = await provider.execute(toolName, { text: RESTART_POST_PAYLOAD }, { timeoutMs: 5000 });
+            restartComplete = true;
+            break;
+          } catch (error) {
+            const err = toError(error);
+            const code = (err as { code?: string }).code ?? '';
+            if (code.startsWith('mcp_restart')) {
+              await delay(200);
+              continue;
+            }
+            throw err;
+          }
+        }
+        const waitedMs = Date.now() - waitStart;
+        await provider.cleanup();
+        await hangingPromise;
+        const finalState = readRestartFixtureState(stateFile);
+        fs.rmSync(path.dirname(stateFile), { recursive: true, force: true });
+        return {
+          success: true,
+          conversation: [],
+          logs: [],
+          accounting: [],
+          finalReport: {
+            status: 'success',
+            format: 'json',
+            content_json: { waitedMs, result: second.result, state: finalState, restartComplete },
+            ts: Date.now(),
+          },
+        } satisfies AIAgentResult;
+      },
+      expect: (result: AIAgentResult) => {
+        invariant(result.success, 'run-test-71-restart-success expected success.');
+        const data = result.finalReport?.content_json as { waitedMs?: number; result?: string; state?: RestartFixtureState; restartComplete?: boolean } | undefined;
+        invariant(data !== undefined, 'final report payload expected for run-test-71-restart-success.');
+        invariant(data.restartComplete === true, 'Second call should only complete after restart finishes for run-test-71-restart-success.');
+        invariant(typeof data.result === 'string' && data.result.includes('recovered'), 'Recovered payload mismatch for run-test-71-restart-success.');
+        invariant(data.state?.phase === 'recovered', 'Fixture state should be recovered for run-test-71-restart-success.');
+      },
+    };
+  })(),
+  (() => {
+    return {
+      id: 'run-test-73-shared-restart-backoff',
+      description: 'Shared restart uses exponential retries until success.',
+      execute: async () => {
+        const stateFile = createRestartFixtureStateFile();
+        updateRestartFixtureState(stateFile, () => ({ phase: 'initial', remainingRestartFails: 2 }));
+        const logs: LogEntry[] = [];
+        const serverName = 'restartBackoff';
+        const toolName = `${serverName}__test`;
+        const restartAttemptMarker = 'shared restart attempt';
+        const restartFailureMarker = 'shared restart failed';
+        const restartDecisionMarker = 'shared probe failed';
+        const config: Record<string, MCPServerConfig> = {
+          [serverName]: {
+            type: 'stdio',
+            command: process.execPath,
+            args: [TEST_STDIO_SERVER_PATH],
+            shared: true,
+            env: {
+              MCP_FIXTURE_MODE: 'restart',
+              MCP_FIXTURE_STATE_FILE: stateFile,
+              MCP_FIXTURE_HANG_MS: '200',
+              MCP_FIXTURE_EXIT_DELAY_MS: '50',
+            },
+          },
+        } as Record<string, MCPServerConfig>;
+        const provider = new MCPProvider('mcp', config, {
+          requestTimeoutMs: 500,
+          onLog: (entry) => { logs.push(entry); },
+        });
+        await provider.warmup();
+        const hangingPromise = (async () => {
+          try {
+            return await provider.execute(toolName, { text: RESTART_TRIGGER_PAYLOAD }, { timeoutMs: 2000 });
+          } catch (error) {
+            return toError(error);
+          }
+        })();
+        // Allow the fixture to transition into the exited phase (exitDelayMs=50ms) before probing.
+        await delay(150);
+        const registryAccessor = provider as unknown as { sharedRegistry: SharedRegistry };
+        const restartRegistry = registryAccessor.sharedRegistry as unknown as { handleTimeout: (name: string, logger: LogFn) => Promise<void> };
+        try {
+          await restartRegistry.handleTimeout(serverName, (severity, message, remoteIdentifier, fatal = false) => {
+            logs.push({
+              timestamp: Date.now(),
+              severity,
+              turn: 0,
+              subturn: 0,
+              direction: 'response',
+              type: 'tool',
+              remoteIdentifier,
+              fatal,
+              message,
+            });
+          });
+        } catch (error) {
+          // Expected when the first restart attempt fails; the shared loop continues running in the background.
+          void error;
+        }
+        // Allow the shared restart loop (0s, 1s, 2s delays) to complete before issuing the next tool call.
+        await delay(3500);
+        const secondResult = await provider.execute(toolName, { text: RESTART_POST_PAYLOAD }, { timeoutMs: 5000 });
+        await provider.cleanup();
+        await hangingPromise;
+        const finalState = readRestartFixtureState(stateFile);
+        fs.rmSync(path.dirname(stateFile), { recursive: true, force: true });
+        const attemptLogs = logs.filter((entry) => entry.message.includes(restartAttemptMarker));
+        const failureLogs = logs.filter((entry) => entry.message.includes(restartFailureMarker));
+        const decisionLogs = logs.filter((entry) => entry.message.includes(restartDecisionMarker));
+        return {
+          success: true,
+          conversation: [],
+          logs,
+          accounting: [],
+          finalReport: {
+            status: 'success',
+            format: 'json',
+            content_json: {
+              attempts: attemptLogs.length,
+              failures: failureLogs.length,
+              decisions: decisionLogs.length,
+              finalState,
+              toolResult: secondResult.result,
+            },
+            ts: Date.now(),
+          },
+        } satisfies AIAgentResult;
+      },
+      expect: (result: AIAgentResult) => {
+        invariant(result.success, 'run-test-73-shared-restart-backoff expected success.');
+        const data = result.finalReport?.content_json as {
+          attempts?: number;
+          failures?: number;
+          decisions?: number;
+          finalState?: RestartFixtureState;
+          toolResult?: string;
+        } | undefined;
+        invariant(data !== undefined, 'final report payload expected for run-test-73-shared-restart-backoff.');
+        invariant((data.decisions ?? 0) === 1, 'Exactly one restart decision log expected for run-test-73-shared-restart-backoff.');
+        invariant((data.failures ?? 0) >= 2, 'At least two restart failures expected for run-test-73-shared-restart-backoff.');
+        invariant((data.attempts ?? 0) >= 3, 'At least three restart attempts expected for run-test-73-shared-restart-backoff.');
+        invariant(data.finalState?.phase === 'recovered', 'Fixture state should reach recovered for run-test-73-shared-restart-backoff.');
+        invariant(typeof data.toolResult === 'string' && data.toolResult.includes(RESTART_POST_PAYLOAD), 'Tool result mismatch for run-test-73-shared-restart-backoff.');
+      },
+    };
+  })(),
+  (() => {
+    return {
+      id: 'run-test-72-restart-failure',
+      description: 'Structured restart errors propagate when the restart window blows up.',
+      execute: async () => {
+        const stateFile = createRestartFixtureStateFile();
+        const serverName = 'restartFixtureFail';
+        const config: Record<string, MCPServerConfig> = {
+          [serverName]: {
+            type: 'stdio',
+            command: process.execPath,
+            args: [TEST_STDIO_SERVER_PATH],
+            shared: true,
+            env: {
+              MCP_FIXTURE_MODE: 'restart',
+              MCP_FIXTURE_STATE_FILE: stateFile,
+              MCP_FIXTURE_HANG_MS: '4000',
+              MCP_FIXTURE_EXIT_DELAY_MS: '150',
+            },
+          },
+        } as Record<string, MCPServerConfig>;
+        const provider = new MCPProvider('mcp', config, { requestTimeoutMs: 2000 });
+        await provider.warmup();
+        const toolName = `${serverName}__test`;
+        const hangingPromise = (async () => {
+          try {
+            return await provider.execute(toolName, { text: RESTART_TRIGGER_PAYLOAD }, { timeoutMs: 10000 });
+          } catch (error) {
+            return toError(error);
+          }
+        })();
+        const providerInternals = provider as unknown as { killTrackedProcess: (serverName: string, reason: string) => Promise<void> };
+        await delay(50);
+        await providerInternals.killTrackedProcess(serverName, FIXTURE_PREEMPT_REASON);
+        updateRestartFixtureState(stateFile, (prev) => ({ ...prev, phase: 'exited', failOnStart: true }));
+        await delay(200);
+        const registryAccessor = provider as unknown as { sharedRegistry: SharedRegistry };
+        const restartRegistry = registryAccessor.sharedRegistry as unknown as { handleTimeout: (name: string, logger: LogFn) => Promise<void> };
+        let restartError: string | undefined;
+        try {
+          await restartRegistry.handleTimeout(serverName, (severity, message, remoteIdentifier, fatal) => {
+            void severity;
+            void message;
+            void remoteIdentifier;
+            void fatal;
+          });
+        } catch (error: unknown) {
+          restartError = toErrorMessage(error);
+        }
+        const finalError = restartError ?? 'no_error';
+        await provider.cleanup();
+        await hangingPromise;
+        fs.rmSync(path.dirname(stateFile), { recursive: true, force: true });
+        return {
+          success: true,
+          conversation: [],
+          logs: [],
+          accounting: [],
+          finalReport: {
+            status: 'success',
+            format: 'json',
+            content_json: { errorMessage: finalError },
+            ts: Date.now(),
+          },
+        } satisfies AIAgentResult;
+      },
+      expect: (result: AIAgentResult) => {
+        invariant(result.success, 'run-test-72-restart-failure expected success result wrapper.');
+        const data = result.finalReport?.content_json as { errorMessage?: string } | undefined;
+        invariant(typeof data?.errorMessage === 'string', 'Error message expected for run-test-72-restart-failure.');
+        invariant(data.errorMessage.includes('mcp_restart_failed'), 'Structured error missing for run-test-72-restart-failure.');
+      },
+    };
+  })(),
+  (() => {
+    const restartServerName = 'test';
+    return {
+      id: 'run-test-72-shared-restart-error',
+      description: 'Shared MCP restart failure surfaces structured error codes in tool logs and accounting.',
+      execute: async () => {
+        const stateFile = createRestartFixtureStateFile();
+        let failFlagged = false;
+        const failTask = (async () => {
+          const deadline = Date.now() + 10000;
+          // eslint-disable-next-line functional/no-loop-statements
+          while (Date.now() < deadline) {
+            const state = readRestartFixtureState(stateFile);
+            if (state.phase === 'hang-started' && state.failOnStart !== true) {
+              updateRestartFixtureState(stateFile, (prev) => ({ ...prev, failOnStart: true }));
+              failFlagged = true;
+              break;
+            }
+            await delay(25);
+          }
+        })();
+        forceRemoveSharedRegistryEntry(restartServerName);
+        const innerScenario: HarnessTest = {
+          id: DEFAULT_PROMPT_SCENARIO,
+          configure: (configuration, sessionConfig, defaults) => {
+            configuration.mcpServers[restartServerName] = {
+              type: 'stdio',
+              command: process.execPath,
+              args: [TEST_STDIO_SERVER_PATH],
+              shared: true,
+              healthProbe: 'listTools',
+              env: {
+                MCP_FIXTURE_MODE: 'restart',
+                MCP_FIXTURE_STATE_FILE: stateFile,
+                MCP_FIXTURE_HANG_MS: '4000',
+                MCP_FIXTURE_EXIT_DELAY_MS: '6000',
+                MCP_FIXTURE_BLOCK_EVENT_LOOP: '1',
+              },
+            } satisfies MCPServerConfig;
+            defaults.toolTimeout = 1000;
+            configuration.defaults = defaults;
+            sessionConfig.toolTimeout = 1000;
+            sessionConfig.tools = [restartServerName];
+            sessionConfig.maxRetries = 1;
+          },
+          expect: (innerResult) => { void innerResult; },
+        };
+
+        const result = await runScenario(innerScenario);
+        await failTask.catch(() => undefined);
+        invariant(failFlagged, 'Failed to flag restart fixture for failure in run-test-72-shared-restart-error.');
+        try {
+          fs.rmSync(path.dirname(stateFile), { recursive: true, force: true });
+        } catch { /* ignore cleanup errors */ }
+        return result;
+      },
+      expect: (result) => {
+        invariant(result.success, 'Scenario run-test-72-shared-restart-error should still complete successfully.');
+        const expectedCommand = 'test__test';
+        const toolEntry = result.accounting.filter(isToolAccounting).find((entry) => entry.command === expectedCommand);
+        invariant(toolEntry !== undefined, 'Tool accounting entry missing for run-test-72-shared-restart-error.');
+        invariant(toolEntry.status === 'failed', 'Tool accounting should record failure for run-test-72-shared-restart-error.');
+        invariant(typeof toolEntry.error === 'string' && toolEntry.error.includes('mcp_restart_failed'), 'Accounting error must reference mcp_restart_failed for run-test-72-shared-restart-error.');
+      },
+    } satisfies HarnessTest;
+  })(),
+  (() => {
+    const restartServerName = 'test';
+    return {
+      id: 'run-test-72-probe-success-no-restart',
+      description: 'Shared MCP timeout with healthy probe keeps the server running (no restart).',
+      execute: async () => {
+        const stateFile = createRestartFixtureStateFile();
+        forceRemoveSharedRegistryEntry(restartServerName);
+        const innerScenario: HarnessTest = {
+          id: DEFAULT_PROMPT_SCENARIO,
+          configure: (configuration, sessionConfig, defaults) => {
+            configuration.mcpServers[restartServerName] = {
+              type: 'stdio',
+              command: process.execPath,
+              args: [TEST_STDIO_SERVER_PATH],
+              shared: true,
+              healthProbe: 'listTools',
+              env: {
+                MCP_FIXTURE_MODE: 'restart',
+                MCP_FIXTURE_STATE_FILE: stateFile,
+                MCP_FIXTURE_HANG_MS: '4000',
+                MCP_FIXTURE_EXIT_DELAY_MS: '150',
+                MCP_FIXTURE_BLOCK_EVENT_LOOP: '0',
+                MCP_FIXTURE_SKIP_EXIT: '1',
+              },
+            } satisfies MCPServerConfig;
+            defaults.toolTimeout = 1000;
+            configuration.defaults = defaults;
+            sessionConfig.toolTimeout = 1000;
+            sessionConfig.tools = [restartServerName];
+            sessionConfig.maxRetries = 1;
+          },
+          expect: (innerResult) => { void innerResult; },
+        } satisfies HarnessTest;
+        const result = await runScenario(innerScenario);
+        try {
+          fs.rmSync(path.dirname(stateFile), { recursive: true, force: true });
+        } catch { /* ignore cleanup errors */ }
+        return result;
+      },
+      expect: (result) => {
+        invariant(result.success, 'Scenario run-test-72-probe-success-no-restart should still complete successfully.');
+        const expectedCommand = 'test__test';
+        const toolEntry = result.accounting.filter(isToolAccounting).find((entry) => entry.command === expectedCommand);
+        invariant(toolEntry !== undefined, 'Tool accounting entry missing for run-test-72-probe-success-no-restart.');
+        invariant(toolEntry.status === 'failed', 'Tool accounting should record failure for run-test-72-probe-success-no-restart.');
+        invariant(typeof toolEntry.error === 'string' && toolEntry.error.includes('Tool execution timed out'), 'Probe-success timeout should bubble the generic timeout error.');
+        const restartLog = result.logs.find((entry) => typeof entry.message === 'string' && entry.message.includes('mcp_restart_failed'));
+        invariant(restartLog === undefined, 'Probe-success timeout must not emit mcp_restart_failed logs.');
+      },
+    } satisfies HarnessTest;
   })(),
   (() => {
     return {
@@ -7858,6 +8543,45 @@ function formatFailureHint(result: AIAgentResult): string {
   }
   return hints.length > 0 ? ` (${hints.join(' | ')})` : '';
 }
+
+const parseScenarioFilter = (raw?: string): string[] => {
+  if (typeof raw !== 'string') return [];
+  return raw.split(',').map((value) => value.trim()).filter((value) => value.length > 0);
+};
+
+const CI_TRUE_VALUES = new Set(['1', 'true', 'yes']);
+const isCIEnvironment = (() => {
+  const raw = process.env.CI?.toLowerCase();
+  return raw !== undefined && CI_TRUE_VALUES.has(raw);
+})();
+
+const scenarioFilterIds = (() => {
+  const raw = process.env.PHASE1_ONLY_SCENARIO;
+  const parsed = parseScenarioFilter(raw);
+  if (parsed.length === 0) return parsed;
+  if (isCIEnvironment) {
+    console.warn('[warn] PHASE1_ONLY_SCENARIO is ignored in CI; running full suite.');
+    return [];
+  }
+  return parsed;
+})();
+
+const TEST_SCENARIOS: HarnessTest[] = (() => {
+  if (scenarioFilterIds.length === 0) return BASE_TEST_SCENARIOS;
+  const requestedIds = new Set(scenarioFilterIds);
+  const filtered = BASE_TEST_SCENARIOS.filter((scenario) => requestedIds.has(scenario.id));
+  const missing = scenarioFilterIds.filter((id) => !BASE_TEST_SCENARIOS.some((scenario) => scenario.id === id));
+  if (missing.length > 0) {
+    console.warn(`[warn] PHASE1_ONLY_SCENARIO references unknown scenario(s): ${missing.join(', ')}.`);
+  }
+  if (filtered.length === 0) {
+    console.warn('[warn] PHASE1_ONLY_SCENARIO matched no known scenarios; running the full suite instead.');
+    return BASE_TEST_SCENARIOS;
+  }
+  const label = filtered.map((scenario) => scenario.id).join(', ');
+  console.log(`[info] Running filtered Phase 1 scenarios: ${label}`);
+  return filtered;
+})();
 
 async function runPhaseOne(): Promise<void> {
   validateRichFormatterParity();

@@ -253,6 +253,9 @@ export interface MCPServerConfig {
   toolsAllowed?: string[];
   toolsDenied?: string[];
   queue?: string;
+  shared?: boolean;
+  healthProbe?: 'ping' | 'listTools';
+  requestTimeoutMs?: number;
 }
 
 export interface MCPTool {

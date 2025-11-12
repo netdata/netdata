@@ -10,6 +10,22 @@
 - Execute all deterministic scenarios with `npm run test:phase1` (the script rebuilds automatically).
 - Expect three informational warnings when scenario `run-test-20` simulates persistence write failures; no manual cleanup is needed.
 - Scenario coverage currently spans fallback routing, MCP timeouts, retry exhaustion, persistence artifacts, pricing/sub-agent flows, and rate-limit backoff.
+- Local filtering: set `PHASE1_ONLY_SCENARIO=run-test-1,run-test-2` to run a subset while debugging. The harness automatically ignores this variable when `CI` is set (`CI=1|true|yes`), ensuring automation always runs the full suite even if the environment leaks the filter.
+
+### Restart Fixture Controls
+The deterministic stdio MCP server exposes several environment knobs so restart scenarios stay reproducible:
+
+| Variable | Effect |
+| --- | --- |
+| `MCP_FIXTURE_MODE=restart` | Enables the restart fixture behavior (hang, exit, recover). |
+| `MCP_FIXTURE_STATE_FILE=/tmp/.../state.json` | Shared state file that tracks phases between process restarts. The harness auto-creates this under `os.tmpdir()`. |
+| `MCP_FIXTURE_HANG_MS` / `MCP_FIXTURE_EXIT_DELAY_MS` | Milliseconds to busy-wait/sleep before exiting the child process and how long to wait before actually calling `process.exit`. Defaults: 4000 ms hang, 2000 ms exit delay. |
+| `MCP_FIXTURE_BLOCK_EVENT_LOOP=1` | Forces a CPU-bound busy wait instead of `setTimeout`, simulating an event-loop stall. |
+| `MCP_FIXTURE_SKIP_EXIT=1` | Prevents the fixture from calling `process.exit`, letting tests simulate a hung process that never dies. |
+| `MCP_FIXTURE_FAIL_INIT_ATTEMPTS=N` | Causes the fixture to terminate during startup `N` times before allowing a successful boot (used to test initialization retries). |
+| `MCP_FIXTURE_FAIL_RESTART_ATTEMPTS=N` | After the fixture has exited once, it will crash `N` additional times during restart before allowing a successful recovery. |
+
+Use these knobs in new scenarios whenever you need deterministic combinations of hangs, exits, and restart delays; see `run-test-71`, `run-test-72`, and `run-test-73` for examples.
 
 ## Phase 2 Integration Runs (Live Only)
 - Phase 2 uses the runner in `src/tests/phase2-runner.ts` to execute real-provider scenarios (`basic-llm`, `multi-turn`) in both streaming and non-streaming modes. There is no fixture replay path.

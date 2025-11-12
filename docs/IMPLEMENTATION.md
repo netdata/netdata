@@ -55,7 +55,15 @@ Architecture
 - Headers/env resolution: `${VAR}` placeholders resolved from current process env; empty values are omitted.
 - Stdio server scoping: only explicitly configured `env` keys are passed to child process; no leakage across tools.
 - Tracing: a single `[mcp]` sink logs connect, stderr lines, tools/prompts requests and responses, and callTool requests/results.
-- Cleanup: close clients; terminate any spawned processes with SIGTERM then SIGKILL after grace period.
+- Shared MCP lifecycle:
+  - Servers with `shared !== false` are managed by a process-wide registry. The first session to request a server spawns the stdio process (when applicable) or opens a remote transport client, then records the metadata. Subsequent sessions get a lightweight handle that multiplexes calls over the same JSON-RPC connection.
+  - MCP clients default `requestTimeoutMs` is padded (≥150 % of the tool timeout, minimum +1 s) so AI-agent’s watchdog fires first; this guarantees we control whether to restart rather than surfacing SDK-level timeouts.
+  - When a tool call times out, `cancelTool` notifies the registry, which runs the configured health probe (`ping` → `listTools`). Only when the probe fails do we recycle the PID (stdio) or drop/reconnect the remote transport; otherwise we leave the server running. This prevents a single slow query/fetch from killing a healthy async server that is busy handling other tasks. User aborts still bypass the restart path.
+  - If a shared server fails to initialize or a restart attempt blows up, the registry immediately schedules another attempt using the exponential backoff sequence `[0, 1, 2, 5, 10, 30, 60]` seconds (values cap at 60 s and loop forever). Every restart decision and failure is logged as `ERR`. The loop never stops unless you remove/disable the server and restart ai-agent. Private servers intentionally keep the single-retry behavior.
+  - `ping` is a lightweight protocol heartbeat handled by the SDK. If your server can answer `ping` even while its tool handlers are blocked, set `healthProbe: 'listTools'` (or another request) so we only restart when “real work” fails.
+  - Servers declared with `shared: false` continue to use the legacy per-session lifecycle: spawn in `initializeServer`, kill on timeout/cleanup.
+  - If a restart ultimately fails (new process never boots or exceeds the restart window), the registry records the failure and future tool calls immediately fail with `mcp_restart_failed`, giving the orchestrator a precise error reason.
+- Cleanup: private clients are closed in-session; shared handles simply release their reference. The shared registry keeps processes alive between sessions until explicitly restarted or the agent shuts down.
 - Server naming: `MCPProvider` validates each configured server key with `[A-Za-z0-9_-]+` (whitespace trimmed). Invalid names throw during initialization instead of being auto-sanitized, so run-time telemetry always matches user configuration exactly.
 
 3) Tool exposure to the AI SDK (libs/ai)
@@ -274,4 +282,5 @@ Tool-calling
 
 - Full agentic loop: assistant tool_calls and tool messages are preserved and returned to Ollama in the next turn. No synthetic user messages are used for tool results.
 - On the final allowed turn, tools are disabled for the request and a single user message instructs the model to conclude using existing tool outputs.
+- `stopRef` plumbing: `AIAgentSession` checks `stopRef.stopping` before each provider retry, during rate-limit backoff waits, and immediately before surfacing a failure. When all providers respond with `rate_limit`, the agent still sleeps for the recommended backoff interval whenever a `stopRef` is present, even if `maxRetries` has been reached, so late stop requests can exit gracefully without emitting a rate-limit error.
 - Tool-choice overrides: `.ai-agent.json` supports `providers.<name>.toolChoice` and per-model `providers.<name>.models.<model>.toolChoice` (`"auto" | "required"`). The resolved value is injected into both the AI SDK request and provider-specific payloads (e.g., OpenRouter’s OpenAI shim) so routed vendors that reject `tool_choice="required"` stay compatible.

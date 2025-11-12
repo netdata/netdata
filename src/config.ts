@@ -87,6 +87,9 @@ const MCPServerConfigSchema = z.object({
   toolSchemas: z.record(z.string(), z.unknown()).optional(),
   toolsAllowed: z.array(z.string()).optional(),
   toolsDenied: z.array(z.string()).optional(),
+  queue: z.string().optional(),
+  shared: z.boolean().optional(),
+  healthProbe: z.enum(['ping','listTools']).optional(),
 });
 
 const EngageEnum = z.enum(['mentions','channel-posts','dms']);

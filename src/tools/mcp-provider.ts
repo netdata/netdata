@@ -4,16 +4,578 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 
-import type { ChildProcess } from 'node:child_process';
 import { performance } from 'node:perf_hooks';
 
 import type { MCPServerConfig, MCPTool, MCPServer, LogEntry } from '../types.js';
-import type { ToolExecuteOptions, ToolExecuteResult } from './types.js';
+import type { ToolCancelOptions, ToolExecuteOptions, ToolExecuteResult } from './types.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 
 import { createWebSocketTransport } from '../websocket-transport.js';
 import { warn } from '../utils.js';
 import { ToolProvider } from './types.js';
+import { killProcessTree } from '../utils/process-tree.js';
+
+interface MCPProcessHandle {
+  pid: number;
+  command: string;
+  args: string[];
+  startedAt: number;
+}
+
+type LogSeverity = 'VRB' | 'WRN' | 'ERR' | 'TRC';
+export type LogFn = (severity: LogSeverity, message: string, remoteIdentifier: string, fatal?: boolean) => void;
+
+interface MCPRestartErrorOptions {
+  serverName: string;
+  message: string;
+}
+
+export class MCPRestartError extends Error {
+  readonly code: 'mcp_restart_failed' | 'mcp_restart_in_progress';
+
+  constructor(code: 'mcp_restart_failed' | 'mcp_restart_in_progress', opts: MCPRestartErrorOptions) {
+    super(opts.message);
+    this.name = 'MCPRestartError';
+    this.code = code;
+  }
+}
+
+export class MCPRestartFailedError extends MCPRestartError {
+  constructor(serverName: string, details: string) {
+    super('mcp_restart_failed', { serverName, message: `mcp_restart_failed:${serverName}: ${details}` });
+  }
+}
+
+export class MCPRestartInProgressError extends MCPRestartError {
+  constructor(serverName: string, details: string) {
+    super('mcp_restart_in_progress', { serverName, message: `mcp_restart_in_progress:${serverName}: ${details}` });
+  }
+}
+
+export interface SharedAcquireOptions {
+  trace: boolean;
+  verbose: boolean;
+  requestTimeoutMs?: number;
+  log: LogFn;
+  filterTools: (raw: MCPTool[]) => MCPTool[];
+}
+
+interface SharedServerEntry {
+  serverName: string;
+  config: MCPServerConfig;
+  client: Client;
+  transport: Transport;
+  pid: number | null;
+  server: MCPServer;
+  refCount: number;
+  healthProbe: 'ping' | 'listTools';
+  restartPromise?: Promise<void>;
+  restartAttempt?: { promise: Promise<boolean>; resolve: (value: boolean) => void };
+  restartError?: MCPRestartFailedError;
+  trace: boolean;
+  verbose: boolean;
+  requestTimeoutMs?: number;
+  log: LogFn;
+  filterTools: (raw: MCPTool[]) => MCPTool[];
+}
+
+export interface SharedRegistryHandle {
+  server: MCPServer;
+  callTool: (name: string, parameters: Record<string, unknown>, requestOptions: Record<string, unknown> | undefined) => Promise<unknown>;
+  handleCancel: (reason: 'timeout' | 'abort', logger: LogFn) => Promise<void>;
+  release: () => void;
+}
+
+export interface SharedRegistry {
+  acquire: (serverName: string, config: MCPServerConfig, opts: SharedAcquireOptions) => Promise<SharedRegistryHandle>;
+  getRestartError?: (serverName: string) => MCPRestartFailedError | undefined;
+}
+
+const DEFAULT_HEALTH_PROBE = 'ping' as const;
+const PROBE_TIMEOUT_MS = 3000;
+const SHARED_RESTART_BACKOFF_MS = [0, 1000, 2000, 5000, 10000, 30000, 60000] as const;
+
+class SharedServerHandle implements SharedRegistryHandle {
+  constructor(private registry: MCPSharedRegistry, private key: string, private entry: SharedServerEntry) {}
+
+  get server(): MCPServer {
+    return this.entry.server;
+  }
+
+  async callTool(name: string, parameters: Record<string, unknown>, requestOptions: Record<string, unknown> | undefined): Promise<unknown> {
+    this.registry.ensureReadyForCall(this.entry);
+    try {
+      return await this.entry.client.callTool({ name, arguments: parameters }, undefined, requestOptions);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : undefined;
+      const looksLikeTimeout = typeof message === 'string' && message.toLowerCase().includes('request timed out');
+      if (looksLikeTimeout) {
+        try {
+          await this.registry.handleTimeout(this.key, this.entry.log);
+        } catch (restartError) {
+          throw restartError;
+        }
+      }
+      this.registry.ensureReadyForCall(this.entry);
+      throw error;
+    }
+  }
+
+  async handleCancel(reason: 'timeout' | 'abort', logger: LogFn): Promise<void> {
+    if (reason !== 'timeout') return;
+    await this.registry.handleTimeout(this.key, logger);
+  }
+
+  release(): void {
+    this.registry.release(this.key);
+  }
+}
+
+class MCPSharedRegistry {
+  private entries = new Map<string, SharedServerEntry>();
+
+  async acquire(serverName: string, config: MCPServerConfig, opts: SharedAcquireOptions): Promise<SharedServerHandle> {
+    let entry = this.entries.get(serverName);
+    if (entry === undefined) {
+      entry = await this.initializeEntry(serverName, config, opts);
+      this.entries.set(serverName, entry);
+    }
+    entry.refCount += 1;
+    return new SharedServerHandle(this, serverName, entry);
+  }
+
+  release(serverName: string): void {
+    const entry = this.entries.get(serverName);
+    if (entry === undefined) return;
+    entry.refCount = Math.max(0, entry.refCount - 1);
+  }
+
+  forceRemove(serverName: string): void {
+    this.entries.delete(serverName);
+  }
+
+  getRestartError(serverName: string): MCPRestartFailedError | undefined {
+    return this.entries.get(serverName)?.restartError;
+  }
+
+  async handleTimeout(serverName: string, logger: LogFn): Promise<void> {
+    const entry = this.entries.get(serverName);
+    if (entry === undefined) return;
+    const healthy = await this.runProbe(entry, logger).catch(() => false);
+    if (healthy) {
+      logger('VRB', `shared probe succeeded for '${serverName}'`, `mcp:${serverName}`);
+      return;
+    }
+    logger('ERR', `shared probe failed for '${serverName}', scheduling restart sequence`, `mcp:${serverName}`, true);
+    const firstAttemptSuccess = await this.startRestartLoop(entry, logger, 'probe-failure');
+    if (!firstAttemptSuccess) {
+      const err = entry.restartError ?? new MCPRestartFailedError(serverName, 'restart attempt failed');
+      throw err;
+    }
+  }
+  
+  private createAttemptLatch(): { promise: Promise<boolean>; resolve: (value: boolean) => void } {
+    let resolveFn!: (value: boolean) => void;
+    const promise = new Promise<boolean>((resolve) => {
+      resolveFn = resolve;
+    });
+    return { promise, resolve: resolveFn };
+  }
+
+  private async startRestartLoop(entry: SharedServerEntry, logger: LogFn, reason: string): Promise<boolean> {
+    if (entry.restartPromise === undefined) {
+      entry.restartAttempt = this.createAttemptLatch();
+      entry.restartPromise = (async () => {
+        try {
+          await this.runRestartLoop(entry, logger, reason);
+        } finally {
+          entry.restartPromise = undefined;
+        }
+      })();
+    }
+    const latch = entry.restartAttempt;
+    if (latch === undefined) {
+      return entry.restartError === undefined;
+    }
+    return await latch.promise;
+  }
+
+  private runRestartLoop(entry: SharedServerEntry, logger: LogFn, reason: string): Promise<void> {
+    return (async () => {
+      let attempt = 0;
+      // eslint-disable-next-line functional/no-loop-statements -- shared restart policy requires iterative retries.
+      for (;;) {
+        const backoffMs = SHARED_RESTART_BACKOFF_MS[Math.min(attempt, SHARED_RESTART_BACKOFF_MS.length - 1)];
+        if (attempt > 0 && backoffMs > 0) {
+          await delay(backoffMs);
+        }
+        const attemptLabel = attempt + 1;
+        logger('ERR', `shared restart attempt ${String(attemptLabel)} for '${entry.serverName}' (${reason})`, `mcp:${entry.serverName}`, true);
+        entry.restartError = undefined;
+        try {
+          await this.performRestartAttempt(entry, logger);
+          logger('VRB', `shared restart succeeded for '${entry.serverName}' on attempt ${String(attemptLabel)}`, `mcp:${entry.serverName}`);
+          const latch = entry.restartAttempt;
+          if (latch !== undefined) {
+            latch.resolve(true);
+            entry.restartAttempt = undefined;
+          }
+          entry.restartError = undefined;
+          return;
+        } catch (error) {
+          const err = error instanceof MCPRestartFailedError
+            ? error
+            : new MCPRestartFailedError(entry.serverName, error instanceof Error ? error.message : String(error));
+          entry.restartError = err;
+          logger('ERR', `shared restart failed for '${entry.serverName}' (attempt ${String(attemptLabel)}): ${err.message}`, `mcp:${entry.serverName}`, true);
+          const latch = entry.restartAttempt;
+          if (latch !== undefined) {
+            latch.resolve(false);
+            entry.restartAttempt = undefined;
+          }
+          attempt += 1;
+        }
+      }
+    })();
+  }
+
+  private async performRestartAttempt(entry: SharedServerEntry, logger: LogFn): Promise<void> {
+    try {
+      if (entry.pid !== null) {
+        await killProcessTree(entry.pid, { gracefulMs: 1000, logger: (message) => { logger('WRN', message, `mcp:${entry.serverName}`); } });
+      }
+    } catch (e) {
+      logger('WRN', `failed to kill shared pid for '${entry.serverName}': ${e instanceof Error ? e.message : String(e)}`, `mcp:${entry.serverName}`);
+    }
+    try {
+      await entry.client.close();
+    } catch { /* ignore */ }
+    try {
+      if (typeof entry.transport.close === 'function') {
+        await entry.transport.close();
+      }
+    } catch { /* ignore */ }
+    await this.reinitializeEntry(entry, logger);
+  }
+
+  private async initializeEntry(serverName: string, config: MCPServerConfig, opts: SharedAcquireOptions): Promise<SharedServerEntry> {
+    let attempt = 0;
+    // eslint-disable-next-line functional/no-loop-statements -- shared initialization retries until success per spec.
+    for (;;) {
+      if (attempt > 0) {
+        const backoffMs = SHARED_RESTART_BACKOFF_MS[Math.min(attempt, SHARED_RESTART_BACKOFF_MS.length - 1)];
+        const delayLabel = `${String(backoffMs)}ms`;
+        const retryMsg = `shared server '${serverName}' initialization retry (attempt ${String(attempt + 1)}) in ${delayLabel}`;
+        opts.log('ERR', retryMsg, `mcp:${serverName}`, true);
+        if (backoffMs > 0) {
+          await delay(backoffMs);
+        }
+      }
+      try {
+        return await this.tryInitializeEntry(serverName, config, opts);
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+        opts.log('ERR', `shared server '${serverName}' initialization failed: ${msg}`, `mcp:${serverName}`, true);
+        attempt += 1;
+      }
+    }
+  }
+
+  private async tryInitializeEntry(serverName: string, config: MCPServerConfig, opts: SharedAcquireOptions): Promise<SharedServerEntry> {
+    const client = new Client(
+      { name: 'ai-agent', version: '1.0.0' },
+      { capabilities: { tools: {} }, ...(opts.requestTimeoutMs !== undefined ? { requestTimeoutMs: opts.requestTimeoutMs } : {}) } as unknown as Record<string, unknown>
+    );
+    let transport: Transport | undefined;
+    let pid: number | null = null;
+    try {
+      const built = await this.createTransportForConfig(serverName, config, opts.log);
+      transport = built.transport;
+      pid = built.pid;
+      await client.connect(transport);
+      const server = await this.buildServerDescriptor(serverName, config, client, opts);
+      return {
+        serverName,
+        config,
+        client,
+        transport,
+        pid,
+        server,
+        refCount: 0,
+        healthProbe: config.healthProbe ?? DEFAULT_HEALTH_PROBE,
+        restartPromise: undefined,
+        trace: opts.trace,
+        verbose: opts.verbose,
+        requestTimeoutMs: opts.requestTimeoutMs,
+        log: opts.log,
+        filterTools: opts.filterTools,
+      };
+    } catch (error) {
+      try { await client.close(); } catch { /* ignore */ }
+      if (transport !== undefined && typeof (transport as { close?: () => Promise<void> }).close === 'function') {
+        try { await (transport as { close: () => Promise<void> }).close(); } catch { /* ignore */ }
+      }
+      if (pid !== null) {
+        try {
+          await killProcessTree(pid, { gracefulMs: 1000, logger: (message) => { opts.log('WRN', message, `mcp:${serverName}`); } });
+        } catch { /* ignore */ }
+      }
+      throw error;
+    }
+  }
+
+  private async reinitializeEntry(entry: SharedServerEntry, logger: LogFn): Promise<void> {
+    const client = new Client(
+      { name: 'ai-agent', version: '1.0.0' },
+      { capabilities: { tools: {} }, ...(entry.requestTimeoutMs !== undefined ? { requestTimeoutMs: entry.requestTimeoutMs } : {}) } as unknown as Record<string, unknown>
+    );
+    let transport: Transport | undefined;
+    let pid: number | null = null;
+    try {
+      const built = await this.createTransportForConfig(entry.serverName, entry.config, logger);
+      transport = built.transport;
+      pid = built.pid;
+      await client.connect(transport);
+      const server = await this.buildServerDescriptor(entry.serverName, entry.config, client, {
+        trace: entry.trace,
+        verbose: entry.verbose,
+        requestTimeoutMs: entry.requestTimeoutMs,
+        log: entry.log,
+        filterTools: entry.filterTools,
+      });
+      entry.client = client;
+      entry.transport = transport;
+      entry.pid = pid;
+      entry.server = server;
+      entry.restartError = undefined;
+    } catch (error) {
+      try { await client.close(); } catch { /* ignore */ }
+      if (transport !== undefined && typeof (transport as { close?: () => Promise<void> }).close === 'function') {
+        try { await (transport as { close: () => Promise<void> }).close(); } catch { /* ignore */ }
+      }
+      if (pid !== null) {
+        try {
+          await killProcessTree(pid, { gracefulMs: 1000, logger: (message) => { logger('WRN', message, `mcp:${entry.serverName}`); } });
+        } catch { /* ignore */ }
+      }
+      throw error;
+    }
+  }
+
+  private async createTransportForConfig(
+    serverName: string,
+    config: MCPServerConfig,
+    logFn: LogFn
+  ): Promise<{ transport: Transport; pid: number | null }> {
+    switch (config.type) {
+      case 'stdio': {
+        const transport = createStdioTransport(serverName, config, logFn);
+        return { transport, pid: transport.pid ?? null };
+      }
+      case 'websocket': {
+        if (config.url == null || config.url.length === 0) {
+          throw new Error(`WebSocket MCP server '${serverName}' requires a 'url'`);
+        }
+        const transport = await createWebSocketTransport(config.url, config.headers);
+        return { transport, pid: null };
+      }
+      case 'http': {
+        if (config.url == null || config.url.length === 0) {
+          throw new Error(`HTTP MCP server '${serverName}' requires a 'url'`);
+        }
+        const { StreamableHTTPClientTransport } = await import('@modelcontextprotocol/sdk/client/streamableHttp.js');
+        const reqInit: RequestInit = { headers: (config.headers ?? {}) as HeadersInit };
+        const transport = new StreamableHTTPClientTransport(new URL(config.url), { requestInit: reqInit });
+        return { transport, pid: null };
+      }
+      case 'sse': {
+        if (config.url == null || config.url.length === 0) {
+          throw new Error(`SSE MCP server '${serverName}' requires a 'url'`);
+        }
+        const resolvedHeaders = config.headers ?? {};
+        const customFetch: typeof fetch = async (input, init) => {
+          const headers = new Headers(init?.headers);
+          Object.entries(resolvedHeaders).forEach(([k, v]) => { headers.set(k, v); });
+          return fetch(input, { ...init, headers });
+        };
+        // eslint-disable-next-line @typescript-eslint/no-deprecated -- SSE transport kept for backwards compatibility.
+        const transport = new SSEClientTransport(new URL(config.url), {
+          eventSourceInit: { fetch: customFetch },
+          requestInit: { headers: resolvedHeaders as HeadersInit },
+          fetch: customFetch,
+        });
+        return { transport, pid: null };
+      }
+      default:
+        throw new Error(`Unsupported MCP transport: ${config.type as string}`);
+    }
+  }
+
+  ensureReadyForCall(entry: SharedServerEntry): void {
+    if (entry.restartPromise !== undefined) {
+      if (entry.restartError !== undefined) {
+        throw entry.restartError;
+      }
+      throw new MCPRestartInProgressError(entry.serverName, 'restart still running');
+    }
+    if (entry.restartError !== undefined) {
+      throw entry.restartError;
+    }
+  }
+
+  private async buildServerDescriptor(serverName: string, config: MCPServerConfig, client: Client, opts: SharedAcquireOptions): Promise<MCPServer> {
+    const initInstructions = client.getInstructions() ?? '';
+    if (opts.trace) {
+      const len = initInstructions.length;
+      opts.log('TRC', `instructions length for '${serverName}': ${String(len)}`, `mcp:${serverName}`);
+    }
+    const toolsResponse = await client.listTools();
+    interface ToolItem { name: string; description?: string; inputSchema?: unknown; parameters?: unknown; instructions?: string }
+    const rawTools: MCPTool[] = (toolsResponse.tools as ToolItem[]).map((t) => ({
+      name: t.name,
+      description: t.description ?? '',
+      inputSchema: (t.inputSchema ?? t.parameters ?? {}) as Record<string, unknown>,
+      instructions: t.instructions,
+    }));
+    const tools = opts.filterTools(rawTools);
+    if (opts.trace) {
+      const names = tools.map((t) => t.name).join(', ');
+      opts.log('TRC', `listTools('${serverName}') -> ${String(tools.length)} tools [${names}]`, `mcp:${serverName}`);
+    }
+    let instructions = initInstructions;
+    try {
+      const pr = await client.listPrompts();
+      const arr = (pr as { prompts?: { name: string; description?: string }[] } | undefined)?.prompts;
+      const list = Array.isArray(arr) ? arr : [];
+      if (list.length > 0) {
+        const promptText = list.map((p) => `${p.name}: ${p.description ?? ''}`).join('\n');
+        instructions = instructions.length > 0 ? `${instructions}\n${promptText}` : promptText;
+      }
+    } catch (e) {
+      if (opts.trace) {
+        const msg = e instanceof Error ? e.message : String(e);
+        opts.log('WRN', `listPrompts failed for '${serverName}': ${msg}`, `mcp:${serverName}`);
+      }
+    }
+    return { name: serverName, config, tools, instructions };
+  }
+
+  private async runProbe(entry: SharedServerEntry, logger: LogFn): Promise<boolean> {
+    const mode = entry.healthProbe;
+    if (mode === 'ping' && typeof entry.client.ping === 'function') {
+      try {
+        await withTimeout(entry.client.ping(), PROBE_TIMEOUT_MS);
+        return true;
+      } catch {
+        // fall through
+      }
+    }
+    try {
+      await withTimeout(entry.client.listTools(), PROBE_TIMEOUT_MS);
+      return true;
+    } catch (e) {
+      logger('WRN', `shared probe exception for '${entry.serverName}': ${e instanceof Error ? e.message : String(e)}`, `mcp:${entry.serverName}`);
+      return false;
+    }
+  }
+}
+
+function filterToolsForServer(serverName: string, config: MCPServerConfig, tools: MCPTool[], verbose: boolean, logFn: LogFn): MCPTool[] {
+  const allowedRaw = Array.isArray(config.toolsAllowed) && config.toolsAllowed.length > 0 ? config.toolsAllowed : ['*'];
+  const deniedRaw = Array.isArray(config.toolsDenied) ? config.toolsDenied : [];
+  const normalize = (values: string[]): { entries: Set<string>; wildcard: boolean } => {
+    let wildcard = false;
+    const entries = new Set<string>();
+    values.forEach((item) => {
+      if (typeof item !== 'string') return;
+      const trimmed = item.trim();
+      if (trimmed.length === 0) return;
+      const lower = trimmed.toLowerCase();
+      if (lower === '*' || lower === 'any') {
+        wildcard = true;
+        return;
+      }
+      entries.add(lower);
+    });
+    return { entries, wildcard };
+  };
+  const allowed = normalize(allowedRaw);
+  const denied = normalize(deniedRaw);
+  const isAllowed = (toolName: string): boolean => {
+    const key = toolName.toLowerCase();
+    if (allowed.wildcard) return true;
+    return allowed.entries.has(key);
+  };
+  const isDenied = (toolName: string): boolean => {
+    const key = toolName.toLowerCase();
+    if (denied.wildcard) return true;
+    return denied.entries.has(key);
+  };
+  const initialCount = tools.length;
+  const filtered = tools.filter((tool) => {
+    if (!isAllowed(tool.name)) return false;
+    if (isDenied(tool.name)) return false;
+    return true;
+  });
+  if (verbose && initialCount !== filtered.length) {
+    const removedNames = tools
+      .filter((tool) => !filtered.includes(tool))
+      .map((tool) => tool.name)
+      .join(', ');
+    const msg = removedNames.length > 0
+      ? `filtered tools for '${serverName}': removed [${removedNames}]`
+      : `filtered tools for '${serverName}': no tools removed`;
+    logFn('VRB', msg, `mcp:${serverName}`);
+  }
+  return filtered;
+}
+
+function createStdioTransport(name: string, config: MCPServerConfig, logFn: LogFn): StdioClientTransport {
+  if (typeof config.command !== 'string' || config.command.length === 0) {
+    throw new Error(`Stdio MCP server '${name}' requires a string 'command'`);
+  }
+  const env: Record<string, string> = { ...(config.env ?? {}) };
+  const transport = new StdioClientTransport({ command: config.command, args: config.args ?? [], env, stderr: 'pipe' });
+  try {
+    if (transport.stderr != null) {
+      transport.stderr.on('data', (chunk: Buffer) => {
+        try {
+          const s = chunk.toString('utf8');
+          logFn('ERR', `stderr '${name}': ${s.trim()}`, `mcp:${name}`);
+        } catch (e) { warn(`mcp stdio stderr relay failed: ${e instanceof Error ? e.message : String(e)}`); }
+      });
+    }
+  } catch (e) { warn(`mcp stdio transport setup failed: ${e instanceof Error ? e.message : String(e)}`); }
+  return transport;
+}
+
+const delay = (ms: number): Promise<void> => new Promise((resolve) => {
+  if (ms <= 0) {
+    resolve();
+    return;
+  }
+  setTimeout(resolve, ms);
+});
+
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  let timeout: NodeJS.Timeout | undefined;
+  const timerPromise = new Promise<never>((_, reject) => {
+    timeout = setTimeout(() => {
+      reject(new Error('timeout'));
+    }, timeoutMs);
+  });
+  try {
+    return await Promise.race([promise, timerPromise]);
+  } finally {
+    if (timeout !== undefined) clearTimeout(timeout);
+  }
+}
+
+const defaultSharedRegistry: SharedRegistry = new MCPSharedRegistry();
+
+export const forceRemoveSharedRegistryEntry = (serverName: string): void => {
+  (defaultSharedRegistry as MCPSharedRegistry).forceRemove(serverName);
+};
 
 export class MCPProvider extends ToolProvider {
   readonly kind = 'mcp' as const;
@@ -21,7 +583,9 @@ export class MCPProvider extends ToolProvider {
   private clients = new Map<string, Client>();
   private servers = new Map<string, MCPServer>();
   private failedServers = new Set<string>();
-  private processes = new Map<string, ChildProcess>();
+  private processes = new Map<string, MCPProcessHandle>();
+  private sharedHandles = new Map<string, SharedRegistryHandle>();
+  private serverInitPromises = new Map<string, Promise<void>>();
   private toolNameMap = new Map<string, { serverName: string; originalName: string }>();
   private toolQueue = new Map<string, string>();
   private initialized = false;
@@ -31,8 +595,13 @@ export class MCPProvider extends ToolProvider {
   private requestTimeoutMs?: number;
   private onLog?: (entry: LogEntry) => void;
   private initConcurrency?: number;
+  private readonly sharedRegistry: SharedRegistry;
 
-  constructor(public readonly namespace: string, servers: Record<string, MCPServerConfig>, opts?: { trace?: boolean; verbose?: boolean; requestTimeoutMs?: number; onLog?: (entry: LogEntry) => void; initConcurrency?: number }) {
+  constructor(
+    public readonly namespace: string,
+    servers: Record<string, MCPServerConfig>,
+    opts?: { trace?: boolean; verbose?: boolean; requestTimeoutMs?: number; onLog?: (entry: LogEntry) => void; initConcurrency?: number; sharedRegistry?: SharedRegistry }
+  ) {
     super();
     this.serversConfig = servers;
     this.trace = opts?.trace === true;
@@ -46,6 +615,7 @@ export class MCPProvider extends ToolProvider {
     if (typeof limit === 'number' && Number.isFinite(limit) && limit > 0) {
       this.initConcurrency = Math.trunc(limit);
     }
+    this.sharedRegistry = opts?.sharedRegistry ?? defaultSharedRegistry;
   }
 
   override getInstructions(): string {
@@ -84,6 +654,10 @@ export class MCPProvider extends ToolProvider {
       throw new Error(`MCP server names may only contain letters, digits, '-' or '_': ${name}`);
     }
     return trimmed;
+  }
+
+  private shouldShareServer(config: MCPServerConfig): boolean {
+    return config.shared !== false;
   }
 
   private async ensureInitialized(): Promise<void> {
@@ -182,64 +756,30 @@ export class MCPProvider extends ToolProvider {
     await this.ensureInitialized();
   }
 
-  private filterToolsForServer(serverName: string, config: MCPServerConfig, tools: MCPTool[]): MCPTool[] {
-    const allowedRaw = Array.isArray(config.toolsAllowed) && config.toolsAllowed.length > 0 ? config.toolsAllowed : ['*'];
-    const deniedRaw = Array.isArray(config.toolsDenied) ? config.toolsDenied : [];
-
-    const normalize = (values: string[]): { entries: Set<string>; wildcard: boolean } => {
-      let wildcard = false;
-      const entries = new Set<string>();
-      values.forEach((item) => {
-        if (typeof item !== 'string') return;
-        const trimmed = item.trim();
-        if (trimmed.length === 0) return;
-        const lower = trimmed.toLowerCase();
-        if (lower === '*' || lower === 'any') {
-          wildcard = true;
-          return;
-        }
-        entries.add(lower);
+  private async initializeServer(name: string, config: MCPServerConfig): Promise<MCPServer> {
+    if (this.shouldShareServer(config)) {
+      const handle = await this.sharedRegistry.acquire(name, config, {
+        trace: this.trace,
+        verbose: this.verbose,
+        requestTimeoutMs: this.requestTimeoutMs,
+        log: (severity, message, remoteIdentifier, fatal = false) => {
+          this.log(severity, message, remoteIdentifier, fatal);
+        },
+        filterTools: (raw) => this.filterToolsForServer(name, config, raw),
       });
-      return { entries, wildcard };
-    };
-
-    const allowed = normalize(allowedRaw);
-    const denied = normalize(deniedRaw);
-
-    const isAllowed = (toolName: string): boolean => {
-      const key = toolName.toLowerCase();
-      if (allowed.wildcard) return true;
-      return allowed.entries.has(key);
-    };
-
-    const isDenied = (toolName: string): boolean => {
-      const key = toolName.toLowerCase();
-      if (denied.wildcard) return true;
-      return denied.entries.has(key);
-    };
-
-    const initialCount = tools.length;
-    const filtered = tools.filter((tool) => {
-      if (!isAllowed(tool.name)) return false;
-      if (isDenied(tool.name)) return false;
-      return true;
-    });
-
-    if (this.verbose && initialCount !== filtered.length) {
-      const removedNames = tools
-        .filter((tool) => !filtered.includes(tool))
-        .map((tool) => tool.name)
-        .join(', ');
-      const msg = removedNames.length > 0
-        ? `filtered tools for '${serverName}': removed [${removedNames}]`
-        : `filtered tools for '${serverName}': no tools removed`;
-      this.log('VRB', msg, `mcp:${serverName}`);
+      this.sharedHandles.set(name, handle);
+      const server = handle.server;
+      this.servers.set(name, server);
+      const ns = this.sanitizeNamespace(name);
+      const queueName = typeof config.queue === 'string' && config.queue.length > 0 ? config.queue : 'default';
+      server.tools.forEach((t) => {
+        const exposed = `${ns}__${t.name}`;
+        this.toolNameMap.set(exposed, { serverName: name, originalName: t.name });
+        this.toolQueue.set(exposed, queueName);
+      });
+      return server;
     }
 
-    return filtered;
-  }
-
-  private async initializeServer(name: string, config: MCPServerConfig): Promise<MCPServer> {
     const client = new Client(
       { name: 'ai-agent', version: '1.0.0' },
       // Pass extended options if supported by SDK; unknown keys are ignored gracefully
@@ -279,6 +819,11 @@ export class MCPProvider extends ToolProvider {
     }
     try {
       await client.connect(transport);
+      if (transport instanceof StdioClientTransport && config.type === 'stdio') {
+        this.trackProcessHandle(name, transport, config);
+      } else {
+        this.processes.delete(name);
+      }
       this.log('TRC', `connected to '${name}'`, `mcp:${name}`);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -334,23 +879,31 @@ export class MCPProvider extends ToolProvider {
     return { name, config, tools, instructions };
   }
 
-  private createStdioTransport(name: string, config: MCPServerConfig): StdioClientTransport {
-    if (typeof config.command !== 'string' || config.command.length === 0) {
-      throw new Error(`Stdio MCP server '${name}' requires a string 'command'`);
+  private trackProcessHandle(name: string, transport: StdioClientTransport, config: MCPServerConfig): void {
+    const pid = transport.pid;
+    if (pid === null) return;
+    const args = Array.isArray(config.args) ? [...config.args] : [];
+    this.processes.set(name, { pid, command: config.command ?? '<unknown>', args, startedAt: Date.now() });
+    if (this.trace) {
+      const cmd = `${config.command ?? '<unknown>'} ${args.join(' ')}`.trim();
+      this.log('TRC', `tracking stdio pid=${pid.toString()} '${cmd}'`, `mcp:${name}`);
     }
-    const env: Record<string, string> = { ...(config.env ?? {}) };
-    const transport = new StdioClientTransport({ command: config.command, args: config.args ?? [], env, stderr: 'pipe' });
-    try {
-      if (transport.stderr != null) {
-        transport.stderr.on('data', (chunk: Buffer) => {
-          try {
-            const s = chunk.toString('utf8');
-            this.log('ERR', `stderr '${name}': ${s.trim()}`, `mcp:${name}`);
-          } catch (e) { warn(`mcp stdio stderr relay failed: ${e instanceof Error ? e.message : String(e)}`); }
-        });
-      }
-    } catch (e) { warn(`mcp stdio transport setup failed: ${e instanceof Error ? e.message : String(e)}`); }
-    return transport;
+  }
+
+  filterToolsForServer(name: string, config: MCPServerConfig, tools: MCPTool[]): MCPTool[] {
+    return filterToolsForServer(name, config, tools, this.verbose, (severity, message, remoteIdentifier) => {
+      this.log(severity, message, remoteIdentifier);
+    });
+  }
+
+  createStdioTransport(name: string, config: MCPServerConfig): StdioClientTransport {
+    return createStdioTransport(name, config, (severity, message, remoteIdentifier, fatal = false) => {
+      this.log(severity, message, remoteIdentifier, fatal);
+    });
+  }
+
+  private hasServerConfig(name: string): boolean {
+    return Object.prototype.hasOwnProperty.call(this.serversConfig, name);
   }
 
   private log(severity: 'VRB' | 'WRN' | 'ERR' | 'TRC', message: string, remoteIdentifier: string, fatal = false): void {
@@ -358,6 +911,64 @@ export class MCPProvider extends ToolProvider {
       timestamp: Date.now(), severity, turn: 0, subturn: 0, direction: 'response', type: 'tool', toolKind: 'mcp', remoteIdentifier, fatal, message,
     };
     try { this.onLog?.(entry); } catch (e) { warn(`mcp onLog failed: ${e instanceof Error ? e.message : String(e)}`); }
+  }
+
+  private async closeClient(serverName: string): Promise<void> {
+    const client = this.clients.get(serverName);
+    if (client === undefined) return;
+    try {
+      await client.close();
+    } catch (e) {
+      warn(`mcp client close failed for '${serverName}': ${e instanceof Error ? e.message : String(e)}`);
+    }
+    this.clients.delete(serverName);
+  }
+
+  private async killTrackedProcess(serverName: string, reason: string): Promise<void> {
+    const handle = this.processes.get(serverName);
+    if (handle === undefined) return;
+    this.log('WRN', `terminating '${serverName}' pid=${handle.pid.toString()} (${reason})`, `mcp:${serverName}`);
+    try {
+      const outcome = await killProcessTree(handle.pid, {
+        gracefulMs: 2000,
+        logger: (msg) => { if (this.trace) this.log('TRC', msg, `mcp:${serverName}`); }
+      });
+      if (outcome.stillRunning.length > 0) {
+        this.log('ERR', `pid(s) still alive after kill for '${serverName}': ${outcome.stillRunning.join(', ')}`, `mcp:${serverName}`);
+      }
+    } catch (e) {
+      this.log('ERR', `failed to terminate '${serverName}': ${e instanceof Error ? e.message : String(e)}`, `mcp:${serverName}`);
+    } finally {
+      this.processes.delete(serverName);
+    }
+  }
+
+  private async restartServer(serverName: string, reason: string): Promise<void> {
+    if (!this.hasServerConfig(serverName)) return;
+    await this.closeClient(serverName);
+    await this.killTrackedProcess(serverName, reason);
+    await this.ensureServerReady(serverName);
+  }
+
+  private async ensureServerReady(serverName: string): Promise<void> {
+    if (this.sharedHandles.has(serverName)) return;
+    if (this.clients.has(serverName)) return;
+    let pending = this.serverInitPromises.get(serverName);
+    if (pending !== undefined) {
+      await pending;
+      return;
+    }
+    if (!this.hasServerConfig(serverName)) {
+      throw new Error(`No MCP server config found for '${serverName}'`);
+    }
+    const config = this.serversConfig[serverName];
+    const promise = (async () => { await this.initializeServer(serverName, config); })();
+    this.serverInitPromises.set(serverName, promise);
+    try {
+      await promise;
+    } finally {
+      this.serverInitPromises.delete(serverName);
+    }
   }
 
   listTools(): MCPTool[] {
@@ -383,30 +994,81 @@ export class MCPProvider extends ToolProvider {
     return this.toolQueue.get(name);
   }
 
+  override async cancelTool(name: string, opts?: ToolCancelOptions): Promise<void> {
+    const mapping = this.toolNameMap.get(name);
+    if (mapping === undefined) return;
+    if (!this.hasServerConfig(mapping.serverName)) return;
+    const config = this.serversConfig[mapping.serverName];
+    const reason = opts?.reason ?? 'timeout';
+    const sharedHandle = this.sharedHandles.get(mapping.serverName);
+    if (sharedHandle !== undefined) {
+      await sharedHandle.handleCancel(reason, (severity, message, remoteIdentifier, fatal = false) => {
+        this.log(severity, message, remoteIdentifier, fatal);
+      });
+      return;
+    }
+    if (config.type !== 'stdio' || reason !== 'timeout') return;
+    try {
+      await this.restartServer(mapping.serverName, reason);
+    } catch (e) {
+      this.log('ERR', `failed to restart '${mapping.serverName}' after ${reason}: ${e instanceof Error ? e.message : String(e)}`, `mcp:${mapping.serverName}`);
+    }
+  }
+
   async execute(name: string, parameters: Record<string, unknown>, _opts?: ToolExecuteOptions): Promise<ToolExecuteResult> {
     await this.ensureInitialized();
     const mapping = this.toolNameMap.get(name);
     if (mapping === undefined) throw new Error(`No server found for tool: ${name}`);
     const { serverName, originalName } = mapping;
     const sanitizedNamespace = name.includes('__') ? name.split('__')[0] : this.sanitizeNamespace(serverName);
-    const client = this.clients.get(serverName);
-    if (client === undefined) throw new Error(`MCP server not ready: ${serverName}`);
+    const sharedHandle = this.sharedHandles.get(serverName);
+    if (sharedHandle === undefined) {
+      let client = this.clients.get(serverName);
+      if (client === undefined) {
+        await this.ensureServerReady(serverName);
+        client = this.clients.get(serverName);
+      }
+      if (client === undefined) {
+        throw new Error(`MCP server not ready: ${serverName}`);
+      }
+      const resolvedClient = client;
+      const start = Date.now();
+      const requestOptions = ((): Record<string, unknown> | undefined => {
+        const t = _opts?.timeoutMs;
+        const has = typeof t === 'number' && Number.isFinite(t) && t > 0;
+        return has ? { timeout: Math.trunc(t), resetTimeoutOnProgress: true, maxTotalTimeout: Math.trunc(t) } : undefined;
+      })();
+      const res = await resolvedClient.callTool({ name: originalName, arguments: parameters }, undefined, requestOptions);
+      return this.normalizeToolResult(res, parameters, sanitizedNamespace, start);
+    }
+
     const start = Date.now();
-    // Use official SDK signature: client.callTool({ name, arguments })
-    const requestOptions = ((): Record<string, unknown> => {
+    const requestOptions = ((): Record<string, unknown> | undefined => {
       const t = _opts?.timeoutMs;
       const has = typeof t === 'number' && Number.isFinite(t) && t > 0;
-      return has ? { timeout: Math.trunc(t), resetTimeoutOnProgress: true, maxTotalTimeout: Math.trunc(t) } : {};
+      return has ? { timeout: Math.trunc(t), resetTimeoutOnProgress: true, maxTotalTimeout: Math.trunc(t) } : undefined;
     })();
-    // Pass per-call timeout options so we don't hit the SDK's 60s default
-    const res = await client.callTool({ name: originalName, arguments: parameters }, undefined as unknown as never, requestOptions as never);
+    try {
+      const res = await sharedHandle.callTool(originalName, parameters, requestOptions);
+      return this.normalizeToolResult(res, parameters, sanitizedNamespace, start);
+    } catch (error) {
+      const restartError = typeof this.sharedRegistry.getRestartError === 'function'
+        ? this.sharedRegistry.getRestartError(serverName)
+        : undefined;
+      if (restartError !== undefined) {
+        throw restartError;
+      }
+      throw error;
+    }
+  }
+
+  private normalizeToolResult(res: unknown, parameters: Record<string, unknown>, namespace: string, start: number): ToolExecuteResult {
     const latency = Date.now() - start;
-    // Try to normalize the result to a string for downstream handling
     const isRecord = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);
     const text = (() => {
       let content: unknown;
       if (isRecord(res) && Object.prototype.hasOwnProperty.call(res, 'content')) {
-        content = (res as Record<string, unknown>).content;
+        content = res.content;
       }
       if (typeof content === 'string') return content;
       if (Array.isArray(content)) {
@@ -424,7 +1086,7 @@ export class MCPProvider extends ToolProvider {
       result: text,
       latencyMs: latency,
       kind: this.kind,
-      namespace: sanitizedNamespace,
+      namespace,
       extras: { rawResponse: rawJson, rawRequest: rawReq }
     };
   }
@@ -459,20 +1121,31 @@ ${trimmedTool}`);
   }
 
   async cleanup(): Promise<void> {
-    await Promise.all(Array.from(this.clients.values()).map(async (c) => { try { await c.close(); } catch (e) { warn(`mcp client close failed: ${e instanceof Error ? e.message : String(e)}`); } }));
-    await Promise.all(Array.from(this.processes.values()).map((proc) => new Promise<void>((resolve) => {
+    await Promise.all(Array.from(this.clients.entries()).map(async ([serverName, client]) => {
       try {
-        if (proc.killed || proc.exitCode !== null) { resolve(); return; }
-        const timeout = setTimeout(() => { try { if (!proc.killed && proc.exitCode === null) proc.kill('SIGKILL'); } catch { } }, 2000);
-        proc.once('exit', () => { clearTimeout(timeout); resolve(); });
-        proc.kill('SIGTERM');
-      } catch { resolve(); }
-    })));
+        await client.close();
+      } catch (e) {
+        warn(`mcp client close failed for '${serverName}': ${e instanceof Error ? e.message : String(e)}`);
+      }
+    }));
+    Array.from(this.sharedHandles.entries()).forEach(([serverName, handle]) => {
+      try {
+        handle.release();
+      } catch (e) {
+        warn(`shared mcp handle release failed for '${serverName}': ${e instanceof Error ? e.message : String(e)}`);
+      }
+    });
+    const serversWithProcesses = Array.from(this.processes.keys());
+    await Promise.all(serversWithProcesses.map(async (serverName) => {
+      await this.killTrackedProcess(serverName, 'cleanup');
+    }));
     this.clients.clear();
+    this.sharedHandles.clear();
     this.processes.clear();
     this.servers.clear();
     this.toolNameMap.clear();
     this.toolQueue.clear();
+    this.serverInitPromises.clear();
     this.initialized = false;
   }
 }
