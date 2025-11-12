@@ -256,7 +256,7 @@ static struct win_sensor_config {
         .title = "Custom Chart",
         .units = "nd",
         .context = "system.hw.sensor.custom",
-        .family = "Custom",
+        .family = "sensors",
         .priority = NETDATA_CHART_PRIO_SENSOR_MIN_CUSTOM,
     }};
 
@@ -446,7 +446,8 @@ static void netdata_sensors_get_data(struct sensor_data *sd, ISensor *pSensor)
 static void netdata_sensors_get_custom_data(struct sensor_data *sd, ISensor *pSensor)
 {
     collected_number current;
-    for (int i = NETDATA_WIN_SENSOR_TYPE_CUSTOM_VALUE1; i <= NETDATA_WIN_SENSOR_TYPE_CUSTOM_VALUE27; i++) {
+    // Last two values have been constant through all collections. One of the values are always negative.
+    for (int i = NETDATA_WIN_SENSOR_TYPE_CUSTOM_VALUE1; i < NETDATA_WIN_SENSOR_TYPE_CUSTOM_VALUE25; i++) {
         if (netdata_collect_sensor_data(&current, pSensor, sensor_keys[i], sd->div_factor)) {
             if (unlikely(!sd->enabled)) {
                 sd->sensor_data_type = i;
