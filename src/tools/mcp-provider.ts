@@ -133,12 +133,25 @@ class SharedServerHandle implements SharedRegistryHandle {
 
 class MCPSharedRegistry {
   private entries = new Map<string, SharedServerEntry>();
+  private initializing = new Map<string, Promise<SharedServerEntry>>();
 
   async acquire(serverName: string, config: MCPServerConfig, opts: SharedAcquireOptions): Promise<SharedServerHandle> {
     let entry = this.entries.get(serverName);
     if (entry === undefined) {
-      entry = await this.initializeEntry(serverName, config, opts);
-      this.entries.set(serverName, entry);
+      let pending = this.initializing.get(serverName);
+      if (pending === undefined) {
+        pending = (async () => {
+          try {
+            const created = await this.initializeEntry(serverName, config, opts);
+            this.entries.set(serverName, created);
+            return created;
+          } finally {
+            this.initializing.delete(serverName);
+          }
+        })();
+        this.initializing.set(serverName, pending);
+      }
+      entry = await pending;
     }
     entry.refCount += 1;
     return new SharedServerHandle(this, serverName, entry);
