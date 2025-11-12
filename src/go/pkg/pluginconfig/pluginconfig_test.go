@@ -18,13 +18,12 @@ func mkdir(t *testing.T, p string) {
 	require.NoError(t, os.MkdirAll(p, 0o755))
 }
 
-const (
-	testPluginName = "test.plugin"
-	testExecDir    = "/opt/netdata/bin"
-)
+const testPluginName = "test.plugin"
 
 func TestDirectoriesBuild(t *testing.T) {
 	tmp := t.TempDir()
+	execDir := filepath.Join(tmp, "root", "opt", "netdata", "bin")
+	mkdir(t, execDir)
 
 	// Probe locations (used ONLY when build() falls back to cygwinBase discovery).
 	// These dirs must exist for probe-based selection to succeed; otherwise,
@@ -98,14 +97,14 @@ func TestDirectoriesBuild(t *testing.T) {
 		"fallback_dirs_when_no_config": {
 			opts: &cli.Option{},
 			env:  envData{},
-			// build-relative fallback from testExecDir
+			// build-relative fallback from execDir
 			want: directories{
-				userConfigDirs:     []string{filepath.Join(testExecDir, "..", "..", "..", "..", "etc", "netdata")},
-				stockConfigDir:     filepath.Join(testExecDir, "..", "..", "..", "..", "usr", "lib", "netdata", "conf.d"),
-				collectorsUserDirs: []string{filepath.Join(testExecDir, "..", "..", "..", "..", "etc", "netdata", testPluginName)},
-				collectorsStockDir: filepath.Join(testExecDir, "..", "..", "..", "..", "usr", "lib", "netdata", "conf.d", testPluginName),
-				sdUserDirs:         []string{filepath.Join(testExecDir, "..", "..", "..", "..", "etc", "netdata", testPluginName, "sd")},
-				sdStockDir:         filepath.Join(testExecDir, "..", "..", "..", "..", "usr", "lib", "netdata", "conf.d", testPluginName, "sd"),
+				userConfigDirs:     []string{filepath.Join(execDir, "..", "..", "..", "..", "etc", "netdata")},
+				stockConfigDir:     filepath.Join(execDir, "..", "..", "..", "..", "usr", "lib", "netdata", "conf.d"),
+				collectorsUserDirs: []string{filepath.Join(execDir, "..", "..", "..", "..", "etc", "netdata", testPluginName)},
+				collectorsStockDir: filepath.Join(execDir, "..", "..", "..", "..", "usr", "lib", "netdata", "conf.d", testPluginName),
+				sdUserDirs:         []string{filepath.Join(execDir, "..", "..", "..", "..", "etc", "netdata", testPluginName, "sd")},
+				sdStockDir:         filepath.Join(execDir, "..", "..", "..", "..", "usr", "lib", "netdata", "conf.d", testPluginName, "sd"),
 				collectorsWatch:    []string{},
 				varLibDir:          "",
 			},
@@ -244,7 +243,7 @@ func TestDirectoriesBuild(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel() // safe: build() uses only inputs, no globals
 			var got directories
-			err := got.build(tc.opts, tc.env, testPluginName, testExecDir)
+			err := got.build(tc.opts, tc.env, testPluginName, execDir)
 
 			if tc.wantErr {
 				require.Error(t, err)
