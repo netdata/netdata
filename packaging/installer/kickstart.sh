@@ -1618,12 +1618,12 @@ try_package_install() {
 
   if [ -z "${DISTRO_COMPAT_NAME}" ] || [ "${DISTRO_COMPAT_NAME}" = "unknown" ]; then
     warning "Unable to determine Linux distribution for native packages."
-    return 2
+    return 3
   elif [ -z "${SYSCODENAME}" ]; then
     case "${DISTRO_COMPAT_NAME}" in
       debian|ubuntu)
         warning "Release codename not set. Unable to check availability of native packages for this system."
-        return 2
+        return 3
         ;;
     esac
   fi
@@ -1705,7 +1705,7 @@ try_package_install() {
       ;;
     *)
       warning "We do not provide native packages for ${DISTRO}."
-      return 2
+      return 3
       ;;
   esac
 
@@ -1805,7 +1805,7 @@ try_package_install() {
     deferred_warnings
     cleanup
     trap - EXIT
-    exit 1
+    exit 0
   fi
 
   if ! check_special_native_deps; then
