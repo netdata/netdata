@@ -31,9 +31,9 @@ func extractUsage(ps *os.ProcessState) ResourceUsage {
 		if ru, ok := sys.(*syscall.Rusage); ok && ru != nil {
 			usage.User = time.Duration(ru.Utime.Sec)*time.Second + time.Duration(ru.Utime.Usec)*time.Microsecond
 			usage.System = time.Duration(ru.Stime.Sec)*time.Second + time.Duration(ru.Stime.Usec)*time.Microsecond
-			usage.MaxRSSBytes = convertMaxRSS(ru.Maxrss)
-			usage.ReadBytes = blocksToBytes(ru.Inblock)
-			usage.WriteBytes = blocksToBytes(ru.Oublock)
+			usage.MaxRSSBytes = convertMaxRSS(int64(ru.Maxrss))
+			usage.ReadBytes = blocksToBytes(int64(ru.Inblock))
+			usage.WriteBytes = blocksToBytes(int64(ru.Oublock))
 		}
 	}
 	return usage

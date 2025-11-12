@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"math/rand"
 	"os"
 	"sort"
 	"strings"
@@ -57,35 +58,39 @@ type Scheduler struct {
 	emitter          ResultEmitter
 	registerPerfdata func(spec.JobSpec, string)
 	periods          *timeperiod.Set
+	rand             *rand.Rand
+	randMu           sync.Mutex
 }
 
 type jobState struct {
-	runtime       JobRuntime
-	period        *timeperiod.Period
-	nextRun       time.Time
-	timer         *time.Timer
-	attempt       int
-	running       bool
-	lastDuration  time.Duration
-	lastCPU       time.Duration
-	lastRSS       int64
-	lastDiskRead  int64
-	lastDiskWrite int64
-	skipped       uint64
-	state         string
-	retrying      bool
-	periodSkipped bool
-	chartJobName  string
-	softAttempts  int
-	hardState     string
-	softState     string
-	checkInterval time.Duration
-	retryInterval time.Duration
-	maxAttempts   int
-	timeoutState  string
-	perfdata      map[string]output.PerfDatum
-	statusLine    string
-	longOutput    string
+	runtime         JobRuntime
+	period          *timeperiod.Period
+	nextAnniversary time.Time
+	nextRun         time.Time
+	timer           *time.Timer
+	attempt         int
+	running         bool
+	lastDuration    time.Duration
+	lastCPU         time.Duration
+	lastRSS         int64
+	lastDiskRead    int64
+	lastDiskWrite   int64
+	skipped         uint64
+	state           string
+	retrying        bool
+	periodSkipped   bool
+	chartJobName    string
+	softAttempts    int
+	hardState       string
+	softState       string
+	checkInterval   time.Duration
+	retryInterval   time.Duration
+	maxAttempts     int
+	timeoutState    string
+	perfdata        map[string]output.PerfDatum
+	statusLine      string
+	longOutput      string
+	jitterRange     time.Duration
 }
 
 // NewScheduler initialises the scheduler structures but does not start timers/workers.
@@ -125,6 +130,7 @@ func NewScheduler(cfg SchedulerConfig) (*Scheduler, error) {
 		emitter:          cfg.Emitter,
 		registerPerfdata: cfg.RegisterPerfdata,
 		periods:          cfg.Periods,
+		rand:             rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
 
 	workFn := func(ctx context.Context, job JobRuntime) ExecutionResult {
@@ -157,22 +163,26 @@ func NewScheduler(cfg SchedulerConfig) (*Scheduler, error) {
 				return nil, err
 			}
 		}
+		baseline := now.Add(time.Duration(idx%len(cfg.Jobs)) * time.Second)
 		js := &jobState{
-			runtime:       jr,
-			period:        period,
-			nextRun:       now.Add(time.Duration(idx%len(cfg.Jobs)) * time.Second),
-			state:         "UNKNOWN",
-			softState:     "UNKNOWN",
-			hardState:     "UNKNOWN",
-			chartJobName:  ids.Sanitize(sp.Name),
-			checkInterval: intervalOrDefault(sp.CheckInterval),
-			retryInterval: intervalOrDefault(sp.RetryInterval),
-			maxAttempts:   maxInt(sp.MaxCheckAttempts, 1),
-			timeoutState:  normalizeState(sp.TimeoutState),
+			runtime:         jr,
+			period:          period,
+			nextAnniversary: baseline,
+			nextRun:         baseline,
+			state:           "UNKNOWN",
+			softState:       "UNKNOWN",
+			hardState:       "UNKNOWN",
+			chartJobName:    ids.Sanitize(sp.Name),
+			checkInterval:   intervalOrDefault(sp.CheckInterval),
+			retryInterval:   intervalOrDefault(sp.RetryInterval),
+			maxAttempts:     maxInt(sp.MaxCheckAttempts, 1),
+			timeoutState:    normalizeState(sp.TimeoutState),
+			jitterRange:     sp.InterCheckJitter,
 		}
 		if js.retryInterval <= 0 {
 			js.retryInterval = js.checkInterval
 		}
+		js.nextRun = s.applyJitter(js.nextAnniversary, js.jitterRange)
 		s.jobs[jr.ID] = js
 	}
 
@@ -245,17 +255,19 @@ func (s *Scheduler) handleTimer(jobID string) {
 	now := time.Now()
 	if js.period != nil && !js.period.Allows(now) {
 		js.periodSkipped = true
-		nextAllowed := js.period.NextAllowed(now.Add(time.Minute))
+		nextAllowed := js.period.NextAllowed(now)
 		if nextAllowed.IsZero() {
 			nextAllowed = now.Add(js.checkInterval)
 		}
-		js.nextRun = nextAllowed
+		js.nextAnniversary = nextAllowed
+		js.nextRun = s.applyJitter(nextAllowed, js.jitterRange)
 		s.jobMu.Unlock()
 		s.armTimer(js)
 		return
 	}
 	js.periodSkipped = false
-	js.nextRun = now.Add(js.checkInterval)
+	js.nextAnniversary = s.advanceAnniversary(js.nextAnniversary, js.checkInterval, now)
+	js.nextRun = s.applyJitter(js.nextAnniversary, js.jitterRange)
 	s.jobMu.Unlock()
 
 	s.armTimer(js)
@@ -295,7 +307,9 @@ func (s *Scheduler) handleResult(res ExecutionResult) {
 		js.recordResult(res.State)
 		js.periodSkipped = false
 		if js.retrying {
-			js.nextRun = time.Now().Add(js.retryInterval)
+			base := time.Now()
+			js.nextAnniversary = s.advanceAnniversary(base, js.retryInterval, base)
+			js.nextRun = s.applyJitter(js.nextAnniversary, js.jitterRange)
 			scheduleRetry = true
 		}
 		snapshot = JobSnapshot{
@@ -472,6 +486,36 @@ func boolToInt(v bool) int64 {
 
 func metricValue(v float64) int64 {
 	return int64(math.Round(v))
+}
+
+func (s *Scheduler) advanceAnniversary(current time.Time, interval time.Duration, now time.Time) time.Time {
+	interval = intervalOrDefault(interval)
+	if current.IsZero() {
+		current = now
+	}
+	next := current.Add(interval)
+	if !next.After(now) {
+		diff := now.Sub(next)
+		steps := diff/interval + 1
+		next = next.Add(time.Duration(steps) * interval)
+	}
+	return next
+}
+
+func (s *Scheduler) applyJitter(base time.Time, jitter time.Duration) time.Time {
+	if jitter <= 0 {
+		return base
+	}
+	if s.rand == nil {
+		return base
+	}
+	s.randMu.Lock()
+	val := s.rand.Float64()
+	s.randMu.Unlock()
+	if val <= 0 {
+		return base
+	}
+	return base.Add(time.Duration(val * float64(jitter)))
 }
 
 func (s *Scheduler) setRangeMetrics(metrics map[string]int64, jobName, suffix, kind string, rng *output.ThresholdRange) {
