@@ -28,7 +28,7 @@ You can also install Netdata directly without connecting to Netdata Cloud. Choos
 [→ Install on macOS](/docs/netdata-agent/installation/macos)
 
 **FreeBSD** - Install on FreeBSD systems
-[→ Install on FreeBSD](/docs/netdata-agent/installation/freebsd/)
+[→ Install on FreeBSD](/docs/netdata-agent/installation/freebsd)
 
 ### Containerized Environments
 
