@@ -1141,10 +1141,10 @@ update_binpkg() {
     env ${env} ${pm_cmd} ${repo_subcmd} ${repo_update_opts} >&3 2>&3 || fatal "Failed to update repository metadata." U000C
   fi
 
-  if ${pkg_installed_check} netdata-repo; then
+  if ${pkg_installed_check} netdata-repo > /dev/null 2>&1; then
     NETDATA_RELEASE_CHANNEL="stable"
     repopkg="netdata-repo"
-  elif ${pkg_installed_check} netdata-repo-edge; then
+  elif ${pkg_installed_check} netdata-repo-edge > /dev/null 2>&1; then
     NETDATA_RELEASE_CHANNEL="nightly"
     repopkg="netdata-repo-edge"
   elif echo "${nd_version}" | grep -Eq -- 'v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'; then
@@ -1171,7 +1171,7 @@ update_binpkg() {
     ret=$?
     set -e
 
-    case "$?" in
+    case "${ret}" in
       0) info "Native packages are still being published for this platform." ;;
       1)
         error ""
