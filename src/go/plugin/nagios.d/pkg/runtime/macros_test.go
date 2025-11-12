@@ -23,8 +23,9 @@ func TestBuildMacroSet(t *testing.T) {
 			Address:  "192.0.2.10",
 			Alias:    "web-node",
 			Custom:   map[string]string{"DATACENTER": "us-east-1"},
+			Labels:   map[string]string{"role": "frontend"},
 		},
-		State: StateInfo{ServiceState: "OK"},
+		State: StateInfo{ServiceState: "OK", ServiceAttempt: 2, ServiceMaxAttempts: 5, HostState: "UP", HostStateID: "0"},
 	}
 
 	s := BuildMacroSet(ctx)
@@ -47,5 +48,17 @@ func TestBuildMacroSet(t *testing.T) {
 	}
 	if got := s.Env["NAGIOS_ARG1"]; got != "8080" {
 		t.Fatalf("arg macro missing: %s", got)
+	}
+	if got := s.Env["NAGIOS_SERVICEATTEMPT"]; got != "2" {
+		t.Fatalf("service attempt macro missing: %s", got)
+	}
+	if got := s.Env["NAGIOS_MAXSERVICEATTEMPTS"]; got != "5" {
+		t.Fatalf("max attempts macro missing: %s", got)
+	}
+	if got := s.Env["NAGIOS_HOSTSTATE"]; got != "UP" {
+		t.Fatalf("host state macro missing: %s", got)
+	}
+	if got := s.Env["NAGIOS__HOSTLABEL_ROLE"]; got != "frontend" {
+		t.Fatalf("host label macro missing: %s", got)
 	}
 }

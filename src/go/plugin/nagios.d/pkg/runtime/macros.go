@@ -30,7 +30,11 @@ type VnodeInfo struct {
 
 // StateInfo contains runtime state variables for macros (SERVICESTATE, etc.).
 type StateInfo struct {
-	ServiceState string
+	ServiceState       string
+	ServiceAttempt     int
+	ServiceMaxAttempts int
+	HostState          string
+	HostStateID        string
 }
 
 // MacroSet holds the resolved string replacements consumed by argument and
@@ -59,6 +63,14 @@ func BuildMacroSet(ctx MacroContext) MacroSet {
 	set("NAGIOS_SERVICEDESC", ctx.Job.Name)
 	set("NAGIOS_SERVICESTATE", ctx.State.ServiceState)
 	set("NAGIOS_SERVICESTATEID", stateID(ctx.State.ServiceState))
+	if ctx.State.ServiceAttempt > 0 {
+		set("NAGIOS_SERVICEATTEMPT", fmt.Sprintf("%d", ctx.State.ServiceAttempt))
+	}
+	if ctx.State.ServiceMaxAttempts > 0 {
+		set("NAGIOS_MAXSERVICEATTEMPTS", fmt.Sprintf("%d", ctx.State.ServiceMaxAttempts))
+	}
+	set("NAGIOS_HOSTSTATE", ctx.State.HostState)
+	set("NAGIOS_HOSTSTATEID", ctx.State.HostStateID)
 	set("NAGIOS_LONGDATETIME", now.Format(time.RFC1123))
 	set("NAGIOS_SHORTDATETIME", now.Format("2006-01-02 15:04"))
 	set("NAGIOS_DATE", now.Format("2006-01-02"))
@@ -74,6 +86,10 @@ func BuildMacroSet(ctx MacroContext) MacroSet {
 
 	for k, v := range ctx.Vnode.Custom {
 		key := fmt.Sprintf("NAGIOS__HOST%s", strings.ToUpper(k))
+		env[key] = v
+	}
+	for k, v := range ctx.Vnode.Labels {
+		key := fmt.Sprintf("NAGIOS__HOSTLABEL_%s", strings.ToUpper(k))
 		env[key] = v
 	}
 	for k, v := range ctx.Job.CustomVars {

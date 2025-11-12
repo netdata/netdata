@@ -147,7 +147,12 @@
             "endpoint": {"type": "string"},
             "timeout": {"type": "string", "pattern": "^([0-9]+(\.[0-9]+)?(ns|us|ms|s|m|h|d))+$"},
             "insecure": {"type": "boolean"},
-            "headers": {"type": "object", "additionalProperties": {"type": "string"}}
+            "headers": {"type": "object", "additionalProperties": {"type": "string"}},
+            "ca_file": {"type": "string"},
+            "cert_file": {"type": "string"},
+            "key_file": {"type": "string"},
+            "server_name": {"type": "string"},
+            "insecure_skip_verify": {"type": "boolean"}
           }
         }
       }

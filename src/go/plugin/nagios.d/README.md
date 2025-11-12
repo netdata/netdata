@@ -1,12 +1,12 @@
 # nagios.d.plugin (preview)
 
-`nagios.d.plugin` executes stock Nagios checks inside Netdata without modifying the
-original plugins. The current codebase focuses on scaffolding: building the
-binary, parsing configuration, and normalizing Nagios job definitions so that
-future scheduler/executor work can plug in.
+`nagios.d.plugin` runs stock Nagios checks inside Netdata without modifying the
+original plugins. Jobs are executed through a dedicated scheduler/executor,
+perfdata metrics become native Netdata charts, and every run emits structured
+logs (stdout/stderr/state transitions) over OTLP.
 
-> **Status:** experimental scaffolding. Jobs are parsed and validated but not yet
-> executed.
+> **Status:** preview. The core execution pipeline, charts, and logging are in
+> place, but configuration options and documentation may still change before GA.
 
 ## Configuration overview
 
@@ -47,6 +47,13 @@ jobs:
 Each shard is loaded by go.d's file discovery, normalized into `JobSpec`
 structures (including directory expansions), and will eventually register with
 the async scheduler.
+
+#### Autodetection retry
+
+If a shard fails the initial `Init`/`Check` cycle (missing plugin, bad
+permissions, etc.), go.d re-runs autodetection after a delay. Set
+`autodetection_retry` (seconds) at the shard level to control that cadence; the
+default is 60 s, and `0` disables retries entirely.
 
 ### Argument macros
 
@@ -90,6 +97,32 @@ The `logging` block enables OTLP log forwarding to Netdata's `otel.plugin`
 instance. By default the plugin emits to `127.0.0.1:4317` over insecure gRPC;
 adjust the endpoint, TLS mode, timeout, or headers if your OTLP pipeline lives
 elsewhere or requires authentication.
+
+### Scheduling semantics & skip behavior
+
+Every job owns a dedicated timer. When the timer fires the scheduler enqueues
+the job unless it is already queued or executing—matching Nagios Core's
+"single-flight" behavior. If a run is skipped this way, the skip counter for
+that job increases and the next run occurs at the normal cadence (there is no
+catch-up burst). Use the `nagios.runtime` chart's `skipped` dimension or the
+stock `health.d/nagios_skipped.conf` rule to monitor how frequently this happens
+and to page when a job repeatedly overlaps.
+
+### Logging over OTLP (TLS support)
+
+Structured logs are forwarded to OTEL via `logging.otlp`. Besides `endpoint`,
+`timeout`, `insecure`, and `headers`, you can now set:
+
+- `ca_file`: custom CA bundle for the collector
+- `cert_file` / `key_file`: client certificate pair for mutual TLS
+- `server_name`: override the TLS SNI when the collector name differs from the
+  endpoint host
+- `insecure_skip_verify`: disable server certificate verification (not
+  recommended outside of lab environments)
+
+When `insecure` is `false`, the plugin automatically establishes a TLS 1.2
+connection using these settings; otherwise it falls back to insecure gRPC (the
+default for `127.0.0.1:4317`).
 
 ## Building
 

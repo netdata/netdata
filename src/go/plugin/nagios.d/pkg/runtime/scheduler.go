@@ -365,12 +365,7 @@ func (s *Scheduler) runJob(ctx context.Context, job JobRuntime) ExecutionResult 
 		timeout = time.Minute
 	}
 
-	macroCtx := MacroContext{
-		Job:        job.Spec,
-		UserMacros: s.userMacros,
-		Vnode:      job.Vnode,
-		State:      StateInfo{ServiceState: s.currentState(job.ID)},
-	}
+	macroCtx := s.buildMacroContext(job)
 	macroSet := BuildMacroSet(macroCtx)
 	args := macroSet.CommandArgs
 	if len(args) == 0 {
@@ -393,6 +388,22 @@ func (s *Scheduler) runJob(ctx context.Context, job JobRuntime) ExecutionResult 
 	res.Usage = usage
 
 	return res
+}
+
+func (s *Scheduler) buildMacroContext(job JobRuntime) MacroContext {
+	state := StateInfo{
+		ServiceState:       s.currentState(job.ID),
+		ServiceAttempt:     s.currentAttempt(job.ID),
+		ServiceMaxAttempts: maxInt(job.Spec.MaxCheckAttempts, 1),
+		HostState:          "UP",
+		HostStateID:        "0",
+	}
+	return MacroContext{
+		Job:        job.Spec,
+		UserMacros: s.userMacros,
+		Vnode:      job.Vnode,
+		State:      state,
+	}
 }
 
 func (s *Scheduler) markRunning(jobID string, running bool) {
@@ -428,6 +439,8 @@ func (s *Scheduler) CollectMetrics() map[string]int64 {
 		metrics[charts.MetricKey(s.shard, jobName, "state", "warning")] = boolToInt(strings.EqualFold(js.state, "WARNING"))
 		metrics[charts.MetricKey(s.shard, jobName, "state", "critical")] = boolToInt(strings.EqualFold(js.state, "CRITICAL"))
 		metrics[charts.MetricKey(s.shard, jobName, "state", "unknown")] = boolToInt(strings.EqualFold(js.state, "UNKNOWN"))
+		metrics[charts.MetricKey(s.shard, jobName, "state", "attempt")] = int64(js.currentAttempt())
+		metrics[charts.MetricKey(s.shard, jobName, "state", "max_attempts")] = int64(js.maxAttempts)
 		metrics[charts.MetricKey(s.shard, jobName, "runtime", "running")] = boolToInt(js.running)
 		metrics[charts.MetricKey(s.shard, jobName, "runtime", "retrying")] = boolToInt(js.retrying)
 		metrics[charts.MetricKey(s.shard, jobName, "runtime", "skipped")] = boolToInt(js.periodSkipped)
@@ -640,6 +653,15 @@ func (s *Scheduler) currentState(jobID string) string {
 	return "UNKNOWN"
 }
 
+func (s *Scheduler) currentAttempt(jobID string) int {
+	s.jobMu.RLock()
+	defer s.jobMu.RUnlock()
+	if js, ok := s.jobs[jobID]; ok {
+		return js.currentAttempt()
+	}
+	return 1
+}
+
 func (s *Scheduler) buildEnv(jobEnv map[string]string, macroEnv map[string]string) []string {
 	merged := make(map[string]string)
 	for _, kv := range os.Environ() {
@@ -698,4 +720,24 @@ func (js *jobState) updatePerfdata(perf []output.PerfDatum) {
 		mp[labelID] = datum
 	}
 	js.perfdata = mp
+}
+
+func (js *jobState) currentAttempt() int {
+	if js == nil {
+		return 1
+	}
+	if strings.EqualFold(js.state, "OK") || js.state == "" {
+		return 1
+	}
+	attempt := js.softAttempts
+	if attempt <= 0 {
+		attempt = 1
+	}
+	if js.retrying {
+		attempt++
+	}
+	if attempt > js.maxAttempts {
+		return js.maxAttempts
+	}
+	return attempt
 }

@@ -33,6 +33,8 @@ func StateChart(shard, job string, priority int) *module.Chart {
 		{ID: "warning", Name: "WARNING", Algo: module.Absolute, Div: 1},
 		{ID: "critical", Name: "CRITICAL", Algo: module.Absolute, Div: 1},
 		{ID: "unknown", Name: "UNKNOWN", Algo: module.Absolute, Div: 1},
+		{ID: "attempt", Name: "attempt", Algo: module.Absolute, DimOpts: module.DimOpts{Hidden: true}},
+		{ID: "max_attempts", Name: "max_attempts", Algo: module.Absolute, DimOpts: module.DimOpts{Hidden: true}},
 	}
 	chart.Opts.Detail = true
 	return &chart

@@ -26,5 +26,9 @@ func jobChartBase(shard, jobName string) module.Chart {
 		Fam:  "nagios",
 		Ctx:  fmt.Sprintf("%s.%s", ctxPrefix, shard),
 		Type: module.Line,
+		Labels: []module.Label{
+			{Key: "nagios_job", Value: jobName, Source: module.LabelSourceConf},
+			{Key: "nagios_shard", Value: shard, Source: module.LabelSourceConf},
+		},
 	}
 }

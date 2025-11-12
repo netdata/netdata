@@ -30,8 +30,11 @@ var configSchema string
 func init() {
 	module.Register("nagios", module.Creator{
 		JobConfigSchema: configSchema,
-		Create:          func() module.Module { return New() },
-		Config:          func() any { return &Config{} },
+		Defaults: module.Defaults{
+			AutoDetectionRetry: 60,
+		},
+		Create: func() module.Module { return New() },
+		Config: func() any { return &Config{} },
 	})
 }
 
@@ -57,10 +60,15 @@ type LoggingConfig struct {
 }
 
 type OTLPLoggingConfig struct {
-	Endpoint string            `yaml:"endpoint,omitempty" json:"endpoint"`
-	Timeout  confopt.Duration  `yaml:"timeout,omitempty" json:"timeout"`
-	Insecure bool              `yaml:"insecure,omitempty" json:"insecure"`
-	Headers  map[string]string `yaml:"headers,omitempty" json:"headers"`
+	Endpoint           string            `yaml:"endpoint,omitempty" json:"endpoint"`
+	Timeout            confopt.Duration  `yaml:"timeout,omitempty" json:"timeout"`
+	Insecure           bool              `yaml:"insecure,omitempty" json:"insecure"`
+	Headers            map[string]string `yaml:"headers,omitempty" json:"headers"`
+	CAFile             string            `yaml:"ca_file,omitempty" json:"ca_file"`
+	CertFile           string            `yaml:"cert_file,omitempty" json:"cert_file"`
+	KeyFile            string            `yaml:"key_file,omitempty" json:"key_file"`
+	ServerName         string            `yaml:"server_name,omitempty" json:"server_name"`
+	InsecureSkipVerify bool              `yaml:"insecure_skip_verify,omitempty" json:"insecure_skip_verify"`
 }
 
 func (l *LoggingConfig) setDefaults() {
@@ -83,10 +91,15 @@ func (l *LoggingConfig) setDefaults() {
 
 func (l LoggingConfig) emitterConfig() runtime.OTLPEmitterConfig {
 	return runtime.OTLPEmitterConfig{
-		Endpoint: l.OTLP.Endpoint,
-		Timeout:  time.Duration(l.OTLP.Timeout),
-		Insecure: l.OTLP.Insecure,
-		Headers:  l.OTLP.Headers,
+		Endpoint:           l.OTLP.Endpoint,
+		Timeout:            time.Duration(l.OTLP.Timeout),
+		Insecure:           l.OTLP.Insecure,
+		Headers:            l.OTLP.Headers,
+		CAFile:             l.OTLP.CAFile,
+		CertFile:           l.OTLP.CertFile,
+		KeyFile:            l.OTLP.KeyFile,
+		ServerName:         l.OTLP.ServerName,
+		InsecureSkipVerify: l.OTLP.InsecureSkipVerify,
 	}
 }
 
