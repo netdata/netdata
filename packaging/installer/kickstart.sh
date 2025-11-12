@@ -2259,7 +2259,7 @@ install_on_linux() {
       1) fatal "Unable to install on this system." F0300 ;;
       2)
         case "${NETDATA_REQUESTED_INSTALL_TYPE}" in
-          native|auto) fatal "Could not install using native binary packages even though they appear to be available. This usually means something is wrong with your system package manager that requires manual intervention to fix. If you want to install anyway without using native packages, re-run this script with the option --install-type=any" F0301 ;;
+          native|auto) fatal "Could not install using native binary packages even though they appear to be available. This usually means something is wrong with your system package manager that requires manual intervention to fix. If you want to install anyway without using native packages, re-run this script with the option '--install-type any'" F0301 ;;
           *) warning "Could not install using native binary packages, falling back to alternative installation method." ;;
         esac
         ;;
