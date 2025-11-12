@@ -2,7 +2,11 @@
 
 package ids
 
-import "strings"
+import (
+	"crypto/sha1"
+	"fmt"
+	"strings"
+)
 
 // Sanitize converts a job name into a lowercase alphanumeric identifier with underscores.
 func Sanitize(name string) string {
@@ -28,7 +32,12 @@ func Sanitize(name string) string {
 			lastUnderscore = true
 		}
 	}
-	return strings.Trim(b.String(), "_")
+	result := strings.Trim(b.String(), "_")
+	if result != "" {
+		return result
+	}
+	sum := sha1.Sum([]byte(name))
+	return fmt.Sprintf("id_%x", sum[:6])
 }
 
 func isWhitespace(r rune) bool {

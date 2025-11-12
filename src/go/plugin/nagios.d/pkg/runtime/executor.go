@@ -64,8 +64,9 @@ type Executor struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
-	queue   chan JobRuntime
-	results chan ExecutionResult
+	queue       chan JobRuntime
+	results     chan ExecutionResult
+	resetNeeded bool
 
 	waitingMu sync.Mutex
 	waiting   map[string]struct{}
@@ -98,19 +99,27 @@ func NewExecutor(cfg ExecutorConfig) (*Executor, error) {
 
 	exec := &Executor{
 		cfg:       cfg,
-		queue:     make(chan JobRuntime, cfg.QueueCapacity),
-		results:   make(chan ExecutionResult, cfg.QueueCapacity),
 		waiting:   make(map[string]struct{}),
 		executing: make(map[string]struct{}),
 	}
+	exec.resetChannels()
 
 	return exec, nil
+}
+
+func (e *Executor) resetChannels() {
+	e.queue = make(chan JobRuntime, e.cfg.QueueCapacity)
+	e.results = make(chan ExecutionResult, e.cfg.QueueCapacity)
 }
 
 // Start initializes the worker pool and begins draining the waiting queue.
 func (e *Executor) Start(ctx context.Context) {
 	if e.ctx != nil {
 		return
+	}
+	if e.resetNeeded {
+		e.resetChannels()
+		e.resetNeeded = false
 	}
 	e.ctx, e.cancel = context.WithCancel(ctx)
 	for i := 0; i < e.cfg.Workers; i++ {
@@ -129,6 +138,7 @@ func (e *Executor) Stop() {
 	close(e.results)
 	e.cancel = nil
 	e.ctx = nil
+	e.resetNeeded = true
 }
 
 // Enqueue schedules a job for execution respecting single-flight semantics.

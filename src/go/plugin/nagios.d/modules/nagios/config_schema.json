@@ -32,12 +32,12 @@
       "description": "Global defaults applied to every job (explicit or directory-generated)",
       "additionalProperties": false,
       "properties": {
-        "timeout": {"type": "string", "pattern": "^[0-9]+(ns|us|ms|s|m|h)$"},
+        "timeout": {"type": "string", "pattern": "^([0-9]+(\.[0-9]+)?(ns|us|ms|s|m|h|d))+$"},
         "timeout_state": {"type": "string", "enum": ["critical", "warning", "unknown"]},
-        "check_interval": {"type": "string", "pattern": "^[0-9]+(ns|us|ms|s|m|h)$"},
-        "retry_interval": {"type": "string", "pattern": "^[0-9]+(ns|us|ms|s|m|h)$"},
+        "check_interval": {"type": "string", "pattern": "^([0-9]+(\.[0-9]+)?(ns|us|ms|s|m|h|d))+$"},
+        "retry_interval": {"type": "string", "pattern": "^([0-9]+(\.[0-9]+)?(ns|us|ms|s|m|h|d))+$"},
         "max_check_attempts": {"type": "integer", "minimum": 1},
-        "inter_check_jitter": {"type": "string", "pattern": "^[0-9]+(ns|us|ms|s|m|h)$"},
+        "inter_check_jitter": {"type": "string", "pattern": "^([0-9]+(\.[0-9]+)?(ns|us|ms|s|m|h|d))+$"},
         "working_directory": {"type": "string"},
         "check_period": {"type": "string", "description": "Name of a time_period defined below"}
       }
@@ -61,12 +61,12 @@
           "arg_values": {"type": "array", "items": {"type": "string"}, "maxItems": 32, "description": "Values bound to $ARGn$ macros"},
           "environment": {"type": "object", "additionalProperties": {"type": "string"}},
           "custom_vars": {"type": "object", "additionalProperties": {"type": "string"}},
-          "timeout": {"type": "string", "pattern": "^[0-9]+(ns|us|ms|s|m|h)$"},
+          "timeout": {"type": "string", "pattern": "^([0-9]+(\.[0-9]+)?(ns|us|ms|s|m|h|d))+$"},
           "timeout_state": {"type": "string", "enum": ["critical", "warning", "unknown"]},
-          "check_interval": {"type": "string", "pattern": "^[0-9]+(ns|us|ms|s|m|h)$"},
-          "retry_interval": {"type": "string", "pattern": "^[0-9]+(ns|us|ms|s|m|h)$"},
+          "check_interval": {"type": "string", "pattern": "^([0-9]+(\.[0-9]+)?(ns|us|ms|s|m|h|d))+$"},
+          "retry_interval": {"type": "string", "pattern": "^([0-9]+(\.[0-9]+)?(ns|us|ms|s|m|h|d))+$"},
           "max_check_attempts": {"type": "integer", "minimum": 1},
-          "inter_check_jitter": {"type": "string", "pattern": "^[0-9]+(ns|us|ms|s|m|h)$"},
+          "inter_check_jitter": {"type": "string", "pattern": "^([0-9]+(\.[0-9]+)?(ns|us|ms|s|m|h|d))+$"},
           "working_directory": {"type": "string"},
           "check_period": {"type": "string"}
         },
@@ -92,12 +92,12 @@
             "type": "object",
             "additionalProperties": false,
             "properties": {
-              "timeout": {"type": "string", "pattern": "^[0-9]+(ns|us|ms|s|m|h)$"},
+              "timeout": {"type": "string", "pattern": "^([0-9]+(\.[0-9]+)?(ns|us|ms|s|m|h|d))+$"},
               "timeout_state": {"type": "string", "enum": ["critical", "warning", "unknown"]},
-              "check_interval": {"type": "string", "pattern": "^[0-9]+(ns|us|ms|s|m|h)$"},
-              "retry_interval": {"type": "string", "pattern": "^[0-9]+(ns|us|ms|s|m|h)$"},
+              "check_interval": {"type": "string", "pattern": "^([0-9]+(\.[0-9]+)?(ns|us|ms|s|m|h|d))+$"},
+              "retry_interval": {"type": "string", "pattern": "^([0-9]+(\.[0-9]+)?(ns|us|ms|s|m|h|d))+$"},
               "max_check_attempts": {"type": "integer", "minimum": 1},
-              "inter_check_jitter": {"type": "string", "pattern": "^[0-9]+(ns|us|ms|s|m|h)$"},
+              "inter_check_jitter": {"type": "string", "pattern": "^([0-9]+(\.[0-9]+)?(ns|us|ms|s|m|h|d))+$"},
               "working_directory": {"type": "string"},
               "check_period": {"type": "string"}
             }
@@ -145,7 +145,7 @@
           "additionalProperties": false,
           "properties": {
             "endpoint": {"type": "string"},
-            "timeout": {"type": "string", "pattern": "^[0-9]+(ns|us|ms|s|m|h|d)$"},
+            "timeout": {"type": "string", "pattern": "^([0-9]+(\.[0-9]+)?(ns|us|ms|s|m|h|d))+$"},
             "insecure": {"type": "boolean"},
             "headers": {"type": "object", "additionalProperties": {"type": "string"}}
           }

@@ -3,6 +3,7 @@
 package output
 
 import (
+	"math"
 	"strconv"
 	"strings"
 	"unicode"
@@ -20,10 +21,23 @@ type PerfDatum struct {
 	Label string
 	Unit  string
 	Value float64
-	Warn  *float64
-	Crit  *float64
+	Warn  *ThresholdRange
+	Crit  *ThresholdRange
 	Min   *float64
 	Max   *float64
+}
+
+// ThresholdRange captures the Nagios range grammar semantics.
+type ThresholdRange struct {
+	Raw       string
+	Inclusive bool
+	Low       *float64
+	High      *float64
+}
+
+// Defined reports whether the range field was present (non-empty and not U).
+func (r *ThresholdRange) Defined() bool {
+	return r != nil
 }
 
 // Parse converts raw plugin output into status, long output, and perfdata sections.
@@ -130,8 +144,8 @@ func parsePerfToken(token string) (PerfDatum, bool) {
 		Label: label,
 		Unit:  unit,
 		Value: val,
-		Warn:  parseFloatPtr(warnStr),
-		Crit:  parseFloatPtr(critStr),
+		Warn:  parseRange(warnStr),
+		Crit:  parseRange(critStr),
 		Min:   parseFloatPtr(minStr),
 		Max:   parseFloatPtr(maxStr),
 	}
@@ -172,7 +186,7 @@ func parseValueUnit(value string) (float64, string, bool) {
 
 func parseFloatPtr(val string) *float64 {
 	val = strings.TrimSpace(val)
-	if val == "" {
+	if val == "" || strings.EqualFold(val, "u") {
 		return nil
 	}
 	v, err := strconv.ParseFloat(val, 64)
@@ -180,6 +194,69 @@ func parseFloatPtr(val string) *float64 {
 		return nil
 	}
 	return &v
+}
+
+func parseRange(val string) *ThresholdRange {
+	s := strings.TrimSpace(val)
+	if s == "" || strings.EqualFold(s, "u") {
+		return nil
+	}
+	rng := &ThresholdRange{Raw: s}
+	if strings.HasPrefix(s, "@") {
+		rng.Inclusive = true
+		s = strings.TrimSpace(s[1:])
+	}
+	if s == "" {
+		return nil
+	}
+	if strings.Contains(s, ":") {
+		parts := strings.SplitN(s, ":", 2)
+		start := strings.TrimSpace(parts[0])
+		end := strings.TrimSpace(parts[1])
+		if start == "" {
+			zero := 0.0
+			rng.Low = &zero
+		} else if start != "~" {
+			if v, ok := parseRangeNumber(start); ok {
+				rng.Low = &v
+			} else {
+				return nil
+			}
+		}
+		if end != "" && end != "~" {
+			if v, ok := parseRangeNumber(end); ok {
+				rng.High = &v
+			} else {
+				return nil
+			}
+		}
+	} else {
+		v, ok := parseRangeNumber(s)
+		if !ok {
+			return nil
+		}
+		zero := 0.0
+		rng.Low = &zero
+		rng.High = &v
+	}
+	return rng
+}
+
+func parseRangeNumber(val string) (float64, bool) {
+	if val == "" {
+		return 0, false
+	}
+	switch strings.ToLower(val) {
+	case "inf", "+inf", "infinity":
+		return math.Inf(1), true
+	case "-inf":
+		return math.Inf(-1), true
+	}
+	v, err := strconv.ParseFloat(val, 64)
+	if err != nil {
+		return 0, false
+	}
+	return v, true
 }
 
 func isNumberChar(b byte) bool {

@@ -66,7 +66,7 @@ func main() {
 	}
 
 	proxyCfg := httpproxy.FromEnvironment()
-	a.Infof("env HTTP_PROXY '%s', HTTPS_PROXY '%s'", proxyCfg.HTTPProxy, proxyCfg.HTTPSProxy)
+	a.Infof("env proxy settings: HTTP_PROXY set=%t, HTTPS_PROXY set=%t", proxyCfg.HTTPProxy != "", proxyCfg.HTTPSProxy != "")
 
 	a.Infof("directories → config: %s | collectors: %s | varlib: %s",
 		a.ConfigDir, a.CollectorsConfDir, a.VarLibDir)

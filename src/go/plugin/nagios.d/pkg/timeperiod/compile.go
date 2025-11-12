@@ -260,9 +260,19 @@ func (s *Set) Resolve(name string) (*Period, error) {
 
 // Allows determines whether the time falls inside the period (excluding child exclusions).
 func (p *Period) Allows(t time.Time) bool {
+	return p.allows(t, make(map[*Period]bool))
+}
+
+func (p *Period) allows(t time.Time, stack map[*Period]bool) bool {
 	if p == nil {
 		return true
 	}
+	if stack[p] {
+		return false
+	}
+	stack[p] = true
+	defer delete(stack, p)
+
 	allowed := false
 	for _, r := range p.rules {
 		if r.Allows(t) {
@@ -274,7 +284,10 @@ func (p *Period) Allows(t time.Time) bool {
 		return false
 	}
 	for _, ex := range p.excludes {
-		if ex != nil && ex.Allows(t) {
+		if ex == nil || ex == p {
+			continue
+		}
+		if ex.allows(t, stack) {
 			return false
 		}
 	}

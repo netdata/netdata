@@ -437,6 +437,8 @@ func (s *Scheduler) CollectMetrics() map[string]int64 {
 				if datum.Max != nil {
 					metrics[charts.MetricKey(s.shard, jobName, suffix, "max")] = metricValue(*datum.Max)
 				}
+				s.setRangeMetrics(metrics, jobName, suffix, "warn", datum.Warn)
+				s.setRangeMetrics(metrics, jobName, suffix, "crit", datum.Crit)
 			}
 		}
 	}
@@ -470,6 +472,50 @@ func boolToInt(v bool) int64 {
 
 func metricValue(v float64) int64 {
 	return int64(math.Round(v))
+}
+
+func (s *Scheduler) setRangeMetrics(metrics map[string]int64, jobName, suffix, kind string, rng *output.ThresholdRange) {
+	definedKey := charts.MetricKey(s.shard, jobName, suffix, kind+"_defined")
+	inclusiveKey := charts.MetricKey(s.shard, jobName, suffix, kind+"_inclusive")
+	lowKey := charts.MetricKey(s.shard, jobName, suffix, kind+"_low")
+	highKey := charts.MetricKey(s.shard, jobName, suffix, kind+"_high")
+	lowDefinedKey := charts.MetricKey(s.shard, jobName, suffix, kind+"_low_defined")
+	highDefinedKey := charts.MetricKey(s.shard, jobName, suffix, kind+"_high_defined")
+	if rng == nil {
+		metrics[definedKey] = 0
+		metrics[inclusiveKey] = 0
+		metrics[lowKey] = 0
+		metrics[highKey] = 0
+		metrics[lowDefinedKey] = 0
+		metrics[highDefinedKey] = 0
+		return
+	}
+	metrics[definedKey] = 1
+	metrics[inclusiveKey] = boolToInt(rng.Inclusive)
+	if v, ok := rangeBoundMetric(rng.Low); ok {
+		metrics[lowKey] = v
+		metrics[lowDefinedKey] = 1
+	} else {
+		metrics[lowKey] = 0
+		metrics[lowDefinedKey] = 0
+	}
+	if v, ok := rangeBoundMetric(rng.High); ok {
+		metrics[highKey] = v
+		metrics[highDefinedKey] = 1
+	} else {
+		metrics[highKey] = 0
+		metrics[highDefinedKey] = 0
+	}
+}
+
+func rangeBoundMetric(val *float64) (int64, bool) {
+	if val == nil {
+		return 0, false
+	}
+	if math.IsNaN(*val) || math.IsInf(*val, 0) {
+		return 0, false
+	}
+	return metricValue(*val), true
 }
 
 func (s *Scheduler) registerPerfdataCharts(job spec.JobSpec, perf []output.PerfDatum) {

@@ -152,8 +152,24 @@ func PerfdataChart(shard, job, label string, priority int) *module.Chart {
 		{ID: "value", Name: "value", Algo: module.Absolute},
 		{ID: "min", Name: "min", Algo: module.Absolute, DimOpts: module.DimOpts{Hidden: true}},
 		{ID: "max", Name: "max", Algo: module.Absolute, DimOpts: module.DimOpts{Hidden: true}},
+		{ID: "warn_low", Name: "warn_low", Algo: module.Absolute, DimOpts: module.DimOpts{Hidden: true}},
+		{ID: "warn_high", Name: "warn_high", Algo: module.Absolute, DimOpts: module.DimOpts{Hidden: true}},
+		{ID: "warn_low_defined", Name: "warn_low_defined", Algo: module.Absolute, DimOpts: module.DimOpts{Hidden: true}},
+		{ID: "warn_high_defined", Name: "warn_high_defined", Algo: module.Absolute, DimOpts: module.DimOpts{Hidden: true}},
+		{ID: "warn_defined", Name: "warn_defined", Algo: module.Absolute, DimOpts: module.DimOpts{Hidden: true}},
+		{ID: "warn_inclusive", Name: "warn_inclusive", Algo: module.Absolute, DimOpts: module.DimOpts{Hidden: true}},
+		{ID: "crit_low", Name: "crit_low", Algo: module.Absolute, DimOpts: module.DimOpts{Hidden: true}},
+		{ID: "crit_high", Name: "crit_high", Algo: module.Absolute, DimOpts: module.DimOpts{Hidden: true}},
+		{ID: "crit_low_defined", Name: "crit_low_defined", Algo: module.Absolute, DimOpts: module.DimOpts{Hidden: true}},
+		{ID: "crit_high_defined", Name: "crit_high_defined", Algo: module.Absolute, DimOpts: module.DimOpts{Hidden: true}},
+		{ID: "crit_defined", Name: "crit_defined", Algo: module.Absolute, DimOpts: module.DimOpts{Hidden: true}},
+		{ID: "crit_inclusive", Name: "crit_inclusive", Algo: module.Absolute, DimOpts: module.DimOpts{Hidden: true}},
 	}
-	chart.Labels = append(chart.Labels, module.Label{Key: "perf_label", Value: label, Source: module.LabelSourceConf})
+	chart.Labels = append(chart.Labels,
+		module.Label{Key: "perf_label", Value: label, Source: module.LabelSourceConf},
+		module.Label{Key: "nagios_job", Value: job, Source: module.LabelSourceConf},
+		module.Label{Key: "nagios_shard", Value: shard, Source: module.LabelSourceConf},
+	)
 	chart.Opts.Detail = true
 	return &chart
 }

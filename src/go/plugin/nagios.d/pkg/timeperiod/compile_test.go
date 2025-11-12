@@ -41,3 +41,35 @@ func TestWeeklyRule(t *testing.T) {
 		t.Fatalf("expected sunday to be disallowed")
 	}
 }
+
+func TestExcludeCycles(t *testing.T) {
+	cfgs := []Config{
+		{
+			Name:    "self",
+			Rules:   []RuleConfig{{Type: "weekly", Ranges: []string{"00:00-24:00"}}},
+			Exclude: []string{"self"},
+		},
+		{
+			Name:    "a",
+			Rules:   []RuleConfig{{Type: "weekly", Ranges: []string{"00:00-24:00"}}},
+			Exclude: []string{"b"},
+		},
+		{
+			Name:    "b",
+			Rules:   []RuleConfig{{Type: "weekly", Ranges: []string{"00:00-24:00"}}},
+			Exclude: []string{"a"},
+		},
+	}
+	set, err := Compile(cfgs)
+	if err != nil {
+		t.Fatalf("compile: %v", err)
+	}
+	self, _ := set.Resolve("self")
+	if !self.Allows(time.Now()) {
+		t.Fatalf("self-excluding period should still evaluate without errors")
+	}
+	a, _ := set.Resolve("a")
+	if a.Allows(time.Now()) {
+		t.Fatalf("mutually excluding periods should not allow any time")
+	}
+}
