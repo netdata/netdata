@@ -14,9 +14,27 @@
         "description": "Uniquely identifies the node. Must be in [UUID format](https://www.guidgen.com/). Changing this value will result in creating a **new Virtual Node** - the existing Virtual Node and its history will not be modified.",
         "type": "string"
       },
+      "address": {
+        "title": "Address",
+        "description": "Optional IP address or DNS name that plugins can use for $HOSTADDRESS$ macros.",
+        "type": ["string", "null"]
+      },
+      "alias": {
+        "title": "Alias",
+        "description": "Optional human-readable alias exposed via $HOSTALIAS$.",
+        "type": ["string", "null"]
+      },
       "labels": {
         "title": "Labels",
         "description": "Optional key-value pairs that help categorize and organize virtual nodes.",
+        "type": [
+          "object",
+          "null"
+        ]
+      },
+      "custom_vars": {
+        "title": "Custom host variables",
+        "description": "Optional key-value pairs exposed to plugins as $_HOSTVAR$ macros.",
         "type": [
           "object",
           "null"

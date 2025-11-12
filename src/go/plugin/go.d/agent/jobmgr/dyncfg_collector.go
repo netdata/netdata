@@ -589,6 +589,7 @@ func (m *Manager) dyncfgConfigAdd(fn functions.Function) {
 
 	m.dyncfgApi.SendCodef(fn, 202, "")
 	m.dyncfgCollectorJobCreate(ecfg.cfg, ecfg.status)
+	m.requestCollectorReload(mn)
 }
 
 func (m *Manager) dyncfgConfigRemove(fn functions.Function) {
@@ -625,6 +626,7 @@ func (m *Manager) dyncfgConfigRemove(fn functions.Function) {
 
 	m.dyncfgApi.SendCodef(fn, 200, "")
 	m.dyncfgJobRemove(ecfg.cfg)
+	m.requestCollectorReload(mn)
 }
 
 func (m *Manager) dyncfgConfigUpdate(fn functions.Function) {
@@ -697,6 +699,7 @@ func (m *Manager) dyncfgConfigUpdate(fn functions.Function) {
 
 		m.dyncfgApi.SendCodef(fn, 200, "")
 		m.dyncfgJobStatus(cfg, scfg.status)
+		m.requestCollectorReload(mn)
 		return
 	}
 
@@ -717,6 +720,7 @@ func (m *Manager) dyncfgConfigUpdate(fn functions.Function) {
 
 	m.dyncfgApi.SendCodef(fn, 200, "")
 	m.dyncfgJobStatus(scfg.cfg, scfg.status)
+	m.requestCollectorReload(mn)
 }
 
 func (m *Manager) dyncfgSetConfigMeta(cfg confgroup.Config, module, name string, fn functions.Function) {

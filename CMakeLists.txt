@@ -130,6 +130,7 @@ mark_as_advanced(ENABLE_DASHBOARD)
 
 # Data collection plugins
 option(ENABLE_PLUGIN_GO "Enable metric collectors written in Go" ${DEFAULT_FEATURE_STATE})
+option(ENABLE_PLUGIN_SCRIPTS "Enable the experimental scripts plugin (Nagios compatibility module)" OFF)
 option(ENABLE_PLUGIN_OTEL "Enable collection of OpenTelemetry metrics and logs" ${DEFAULT_FEATURE_STATE})
 option(ENABLE_PLUGIN_PYTHON "Enable metric collectors written in Python" ${DEFAULT_FEATURE_STATE})
 
@@ -284,7 +285,7 @@ if(ENABLE_JEMALLOC)
     endif()
 endif()
 
-if(ENABLE_PLUGIN_GO OR ENABLE_PLUGIN_IBM)
+if(ENABLE_PLUGIN_GO OR ENABLE_PLUGIN_IBM OR ENABLE_PLUGIN_SCRIPTS)
     include(NetdataGoTools)
 
     find_min_go_version("${CMAKE_SOURCE_DIR}/src/go")
@@ -292,7 +293,7 @@ if(ENABLE_PLUGIN_GO OR ENABLE_PLUGIN_IBM)
     find_package(Go "${MIN_GO_VERSION}" REQUIRED)
 endif()
 
-if(ENABLE_PLUGIN_GO)
+if(ENABLE_PLUGIN_GO OR ENABLE_PLUGIN_SCRIPTS)
     set(NEED_NDSUDO TRUE)
 else()
     set(NEED_NDSUDO FALSE)
@@ -3188,6 +3189,33 @@ if(ENABLE_PLUGIN_GO)
             ${CMAKE_BINARY_DIR}/${ND_MCP_NAME}
             COMPONENT plugin-go
             DESTINATION "${BINDIR}")
+endif()
+
+#
+# Build scripts.d.plugin
+#
+
+if(ENABLE_PLUGIN_SCRIPTS)
+    if (OS_WINDOWS)
+        set(SCRIPTS_PLUGIN_BIN scripts.d.plugin.exe)
+    else()
+        set(SCRIPTS_PLUGIN_BIN scripts.d.plugin)
+    endif()
+
+    add_go_target(scripts-plugin ${SCRIPTS_PLUGIN_BIN} src/go cmd/scriptsdplugin)
+
+    install(PROGRAMS ${CMAKE_BINARY_DIR}/${SCRIPTS_PLUGIN_BIN}
+            COMPONENT plugin-scripts
+            DESTINATION usr/libexec/netdata/plugins.d)
+
+    install(FILES src/go/plugin/scripts.d/config/scripts.d.conf
+            COMPONENT plugin-scripts
+            DESTINATION usr/lib/netdata/conf.d)
+
+    install(DIRECTORY src/go/plugin/scripts.d/config/scripts.d
+            COMPONENT plugin-scripts
+            DESTINATION usr/lib/netdata/conf.d
+            FILES_MATCHING PATTERN "*.conf")
 endif()
 
 #

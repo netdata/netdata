@@ -280,6 +280,30 @@ func (m *Manager) stopRunningJob(name string) {
 	}
 }
 
+func (m *Manager) requestCollectorReload(moduleName string) {
+	if moduleName == "" {
+		return
+	}
+	m.runningJobs.lock()
+	reloaders := make(map[module.Reloadable]struct{})
+	m.runningJobs.forEach(func(_ string, job *module.Job) {
+		if job.ModuleName() != moduleName {
+			return
+		}
+		if r, ok := job.Module().(module.Reloadable); ok {
+			reloaders[r] = struct{}{}
+		}
+	})
+	m.runningJobs.unlock()
+	if len(reloaders) == 0 {
+		return
+	}
+	for r := range reloaders {
+		go r.RequestReload()
+	}
+	m.Infof("dyncfg: requested reload for module '%s'", moduleName)
+}
+
 func (m *Manager) cleanup() {
 	m.FnReg.UnregisterPrefix("config", m.dyncfgCollectorPrefixValue())
 	m.FnReg.UnregisterPrefix("config", m.dyncfgVnodePrefixValue())
