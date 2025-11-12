@@ -7,6 +7,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/ids"
+	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/units"
 )
 
 const (
@@ -21,13 +22,13 @@ const (
 	chartSchedulerNext  = "scheduler_next"
 )
 
-func StateChart(shard, job string, priority int) *module.Chart {
-	chart := jobChartBase(shard, job)
-	chart.ID = ChartID(shard, job, chartState)
-	chart.Title = job + " state"
+func StateChart(meta JobIdentity, priority int) *module.Chart {
+	chart := jobChartBase(meta)
+	chart.ID = meta.ChartID(chartState)
+	chart.Title = fmt.Sprintf("Nagios %s state", meta.ScriptTitle)
 	chart.Units = "state"
 	chart.Priority = priority
-	chart.Ctx = ctxPrefix + ".state"
+	chart.Ctx = fmt.Sprintf("%s.%s.%s", ctxPrefix, meta.ScriptKey, chartState)
 	chart.Dims = module.Dims{
 		{ID: "ok", Name: "OK", Algo: module.Absolute, Div: 1},
 		{ID: "warning", Name: "WARNING", Algo: module.Absolute, Div: 1},
@@ -40,13 +41,13 @@ func StateChart(shard, job string, priority int) *module.Chart {
 	return &chart
 }
 
-func RuntimeChart(shard, job string, priority int) *module.Chart {
-	chart := jobChartBase(shard, job)
-	chart.ID = ChartID(shard, job, chartRuntime)
-	chart.Title = job + " runtime state"
+func RuntimeChart(meta JobIdentity, priority int) *module.Chart {
+	chart := jobChartBase(meta)
+	chart.ID = meta.ChartID(chartRuntime)
+	chart.Title = fmt.Sprintf("Nagios %s runtime state", meta.ScriptTitle)
 	chart.Units = "boolean"
 	chart.Priority = priority
-	chart.Ctx = ctxPrefix + ".runtime"
+	chart.Ctx = fmt.Sprintf("%s.%s.%s", ctxPrefix, meta.ScriptKey, chartRuntime)
 	chart.Dims = module.Dims{
 		{ID: "running", Name: "running", Algo: module.Absolute},
 		{ID: "retrying", Name: "retrying", Algo: module.Absolute},
@@ -56,46 +57,46 @@ func RuntimeChart(shard, job string, priority int) *module.Chart {
 	return &chart
 }
 
-func LatencyChart(shard, job string, priority int) *module.Chart {
-	chart := jobChartBase(shard, job)
-	chart.ID = ChartID(shard, job, chartLatency)
-	chart.Title = job + " latency"
-	chart.Units = "milliseconds"
+func LatencyChart(meta JobIdentity, priority int) *module.Chart {
+	chart := jobChartBase(meta)
+	chart.ID = meta.ChartID(chartLatency)
+	chart.Title = fmt.Sprintf("Nagios %s latency", meta.ScriptTitle)
+	chart.Units = "seconds"
 	chart.Priority = priority
-	chart.Ctx = ctxPrefix + ".latency"
-	chart.Dims = module.Dims{{ID: "duration", Name: "duration", Algo: module.Absolute}}
+	chart.Ctx = fmt.Sprintf("%s.%s.%s", ctxPrefix, meta.ScriptKey, chartLatency)
+	chart.Dims = module.Dims{{ID: "duration", Name: "duration", Algo: module.Absolute, Div: 1_000_000_000}}
 	return &chart
 }
 
-func CPUChart(shard, job string, priority int) *module.Chart {
-	chart := jobChartBase(shard, job)
-	chart.ID = ChartID(shard, job, chartCPU)
-	chart.Title = job + " CPU"
-	chart.Units = "milliseconds"
+func CPUChart(meta JobIdentity, priority int) *module.Chart {
+	chart := jobChartBase(meta)
+	chart.ID = meta.ChartID(chartCPU)
+	chart.Title = fmt.Sprintf("Nagios %s CPU", meta.ScriptTitle)
+	chart.Units = "seconds"
 	chart.Priority = priority
-	chart.Ctx = ctxPrefix + ".cpu"
-	chart.Dims = module.Dims{{ID: "cpu_time", Name: "cpu", Algo: module.Absolute}}
+	chart.Ctx = fmt.Sprintf("%s.%s.%s", ctxPrefix, meta.ScriptKey, chartCPU)
+	chart.Dims = module.Dims{{ID: "cpu_time", Name: "cpu", Algo: module.Absolute, Div: 1_000_000_000}}
 	return &chart
 }
 
-func MemoryChart(shard, job string, priority int) *module.Chart {
-	chart := jobChartBase(shard, job)
-	chart.ID = ChartID(shard, job, chartMemory)
-	chart.Title = job + " memory"
+func MemoryChart(meta JobIdentity, priority int) *module.Chart {
+	chart := jobChartBase(meta)
+	chart.ID = meta.ChartID(chartMemory)
+	chart.Title = fmt.Sprintf("Nagios %s memory", meta.ScriptTitle)
 	chart.Units = "bytes"
 	chart.Priority = priority
-	chart.Ctx = ctxPrefix + ".mem"
+	chart.Ctx = fmt.Sprintf("%s.%s.%s", ctxPrefix, meta.ScriptKey, chartMemory)
 	chart.Dims = module.Dims{{ID: "rss", Name: "rss", Algo: module.Absolute}}
 	return &chart
 }
 
-func DiskChart(shard, job string, priority int) *module.Chart {
-	chart := jobChartBase(shard, job)
-	chart.ID = ChartID(shard, job, chartDisk)
-	chart.Title = job + " disk IO"
+func DiskChart(meta JobIdentity, priority int) *module.Chart {
+	chart := jobChartBase(meta)
+	chart.ID = meta.ChartID(chartDisk)
+	chart.Title = fmt.Sprintf("Nagios %s disk IO", meta.ScriptTitle)
 	chart.Units = "bytes"
 	chart.Priority = priority
-	chart.Ctx = ctxPrefix + ".disk"
+	chart.Ctx = fmt.Sprintf("%s.%s.%s", ctxPrefix, meta.ScriptKey, chartDisk)
 	chart.Dims = module.Dims{
 		{ID: "read", Name: "read", Algo: module.Absolute},
 		{ID: "write", Name: "write", Algo: module.Absolute},
@@ -104,8 +105,8 @@ func DiskChart(shard, job string, priority int) *module.Chart {
 }
 
 func SchedulerQueueChart(shard string, priority int) *module.Chart {
-	chart := jobChartBase(shard, "scheduler")
-	chart.ID = ChartID(shard, "scheduler", chartSchedulerQueue)
+	chart := schedulerChartBase(shard)
+	chart.ID = ChartIDFromParts(shard, "scheduler", chartSchedulerQueue)
 	chart.Title = "nagios scheduler queue"
 	chart.Units = "jobs"
 	chart.Priority = priority
@@ -119,8 +120,8 @@ func SchedulerQueueChart(shard string, priority int) *module.Chart {
 }
 
 func SchedulerSkippedChart(shard string, priority int) *module.Chart {
-	chart := jobChartBase(shard, "scheduler")
-	chart.ID = ChartID(shard, "scheduler", chartSchedulerSkip)
+	chart := schedulerChartBase(shard)
+	chart.ID = ChartIDFromParts(shard, "scheduler", chartSchedulerSkip)
 	chart.Title = "nagios scheduler skipped"
 	chart.Units = "count"
 	chart.Priority = priority
@@ -131,37 +132,45 @@ func SchedulerSkippedChart(shard string, priority int) *module.Chart {
 }
 
 func SchedulerNextRunChart(shard string, priority int) *module.Chart {
-	chart := jobChartBase(shard, "scheduler")
-	chart.ID = ChartID(shard, "scheduler", chartSchedulerNext)
+	chart := schedulerChartBase(shard)
+	chart.ID = ChartIDFromParts(shard, "scheduler", chartSchedulerNext)
 	chart.Title = "nagios scheduler next run"
-	chart.Units = "milliseconds"
+	chart.Units = "seconds"
 	chart.Priority = priority
 	chart.Ctx = ctxPrefix + ".scheduler.next"
-	chart.Dims = module.Dims{{ID: "next_ms", Name: "next", Algo: module.Absolute}}
+	chart.Dims = module.Dims{{ID: "next", Name: "next", Algo: module.Absolute, Div: 1_000_000_000}}
 	chart.Opts.Detail = true
 	return &chart
 }
 
-func PerfdataChart(shard, job, label string, priority int) *module.Chart {
-	chart := jobChartBase(shard, job)
-	suffix := fmt.Sprintf("perf.%s", ids.Sanitize(label))
-	chart.ID = ChartID(shard, job, suffix)
-	chart.Title = fmt.Sprintf("%s %s", job, label)
-	chart.Units = "value"
+func PerfdataChart(meta JobIdentity, label string, scale units.Scale, priority int) *module.Chart {
+	chart := jobChartBase(meta)
+	labelID := ids.Sanitize(label)
+	if labelID == "" {
+		labelID = "metric"
+	}
+	suffix := fmt.Sprintf("perf.%s", labelID)
+	chart.ID = meta.ChartID(suffix)
+	chart.Title = fmt.Sprintf("Nagios %s %s", meta.ScriptTitle, label)
+	chart.Units = canonicalUnit(scale, label)
 	chart.Priority = priority
-	chart.Ctx = ctxPrefix + ".perfdata"
+	chart.Ctx = fmt.Sprintf("%s.%s.%s", ctxPrefix, meta.ScriptKey, labelID)
+	div := scale.Divisor
+	if div <= 0 {
+		div = 1
+	}
 	chart.Dims = module.Dims{
-		{ID: "value", Name: "value", Algo: module.Absolute},
-		{ID: "min", Name: "min", Algo: module.Absolute, DimOpts: module.DimOpts{Hidden: true}},
-		{ID: "max", Name: "max", Algo: module.Absolute, DimOpts: module.DimOpts{Hidden: true}},
-		{ID: "warn_low", Name: "warn_low", Algo: module.Absolute, DimOpts: module.DimOpts{Hidden: true}},
-		{ID: "warn_high", Name: "warn_high", Algo: module.Absolute, DimOpts: module.DimOpts{Hidden: true}},
+		{ID: "value", Name: "value", Algo: module.Absolute, Div: div},
+		{ID: "min", Name: "min", Algo: module.Absolute, Div: div, DimOpts: module.DimOpts{Hidden: true}},
+		{ID: "max", Name: "max", Algo: module.Absolute, Div: div, DimOpts: module.DimOpts{Hidden: true}},
+		{ID: "warn_low", Name: "warn_low", Algo: module.Absolute, Div: div, DimOpts: module.DimOpts{Hidden: true}},
+		{ID: "warn_high", Name: "warn_high", Algo: module.Absolute, Div: div, DimOpts: module.DimOpts{Hidden: true}},
 		{ID: "warn_low_defined", Name: "warn_low_defined", Algo: module.Absolute, DimOpts: module.DimOpts{Hidden: true}},
 		{ID: "warn_high_defined", Name: "warn_high_defined", Algo: module.Absolute, DimOpts: module.DimOpts{Hidden: true}},
 		{ID: "warn_defined", Name: "warn_defined", Algo: module.Absolute, DimOpts: module.DimOpts{Hidden: true}},
 		{ID: "warn_inclusive", Name: "warn_inclusive", Algo: module.Absolute, DimOpts: module.DimOpts{Hidden: true}},
-		{ID: "crit_low", Name: "crit_low", Algo: module.Absolute, DimOpts: module.DimOpts{Hidden: true}},
-		{ID: "crit_high", Name: "crit_high", Algo: module.Absolute, DimOpts: module.DimOpts{Hidden: true}},
+		{ID: "crit_low", Name: "crit_low", Algo: module.Absolute, Div: div, DimOpts: module.DimOpts{Hidden: true}},
+		{ID: "crit_high", Name: "crit_high", Algo: module.Absolute, Div: div, DimOpts: module.DimOpts{Hidden: true}},
 		{ID: "crit_low_defined", Name: "crit_low_defined", Algo: module.Absolute, DimOpts: module.DimOpts{Hidden: true}},
 		{ID: "crit_high_defined", Name: "crit_high_defined", Algo: module.Absolute, DimOpts: module.DimOpts{Hidden: true}},
 		{ID: "crit_defined", Name: "crit_defined", Algo: module.Absolute, DimOpts: module.DimOpts{Hidden: true}},
@@ -169,9 +178,27 @@ func PerfdataChart(shard, job, label string, priority int) *module.Chart {
 	}
 	chart.Labels = append(chart.Labels,
 		module.Label{Key: "perf_label", Value: label, Source: module.LabelSourceConf},
-		module.Label{Key: "nagios_job", Value: job, Source: module.LabelSourceConf},
-		module.Label{Key: "nagios_shard", Value: shard, Source: module.LabelSourceConf},
 	)
 	chart.Opts.Detail = true
 	return &chart
+}
+
+func canonicalUnit(scale units.Scale, fallback string) string {
+	if scale.CanonicalUnit != "" {
+		return scale.CanonicalUnit
+	}
+	return fallback
+}
+
+func schedulerChartBase(shard string) module.Chart {
+	return module.Chart{
+		Fam:  "nagios_scheduler",
+		Ctx:  fmt.Sprintf("%s.scheduler", ctxPrefix),
+		Type: module.Line,
+		Labels: []module.Label{
+			{Key: "nagios_job", Value: "scheduler", Source: module.LabelSourceConf},
+			{Key: "nagios_shard", Value: shard, Source: module.LabelSourceConf},
+			{Key: "nagios_cmdline", Value: "scheduler", Source: module.LabelSourceConf},
+		},
+	}
 }

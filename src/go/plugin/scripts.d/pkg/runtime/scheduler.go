@@ -20,6 +20,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/ids"
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/output"
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/spec"
+	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/units"
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/timeperiod"
 )
 
@@ -33,7 +34,7 @@ type SchedulerConfig struct {
 	UserMacros       map[string]string
 	VnodeLookup      func(spec.JobSpec) VnodeInfo
 	Emitter          ResultEmitter
-	RegisterPerfdata func(spec.JobSpec, string)
+	RegisterPerfdata func(spec.JobSpec, output.PerfDatum)
 }
 
 // Scheduler wires the per-job timers, executor, and result collection loops.
@@ -56,7 +57,7 @@ type Scheduler struct {
 	vnodeLookup      func(spec.JobSpec) VnodeInfo
 	shard            string
 	emitter          ResultEmitter
-	registerPerfdata func(spec.JobSpec, string)
+	registerPerfdata func(spec.JobSpec, output.PerfDatum)
 	periods          *timeperiod.Set
 	rand             *rand.Rand
 	randMu           sync.Mutex
@@ -79,7 +80,7 @@ type jobState struct {
 	state           string
 	retrying        bool
 	periodSkipped   bool
-	chartJobName    string
+	identity        charts.JobIdentity
 	softAttempts    int
 	hardState       string
 	softState       string
@@ -164,6 +165,7 @@ func NewScheduler(cfg SchedulerConfig) (*Scheduler, error) {
 			}
 		}
 		baseline := now.Add(time.Duration(idx%len(cfg.Jobs)) * time.Second)
+		identity := charts.NewJobIdentity(cfg.Shard, sp)
 		js := &jobState{
 			runtime:         jr,
 			period:          period,
@@ -172,7 +174,7 @@ func NewScheduler(cfg SchedulerConfig) (*Scheduler, error) {
 			state:           "UNKNOWN",
 			softState:       "UNKNOWN",
 			hardState:       "UNKNOWN",
-			chartJobName:    ids.Sanitize(sp.Name),
+			identity:        identity,
 			checkInterval:   intervalOrDefault(sp.CheckInterval),
 			retryInterval:   intervalOrDefault(sp.RetryInterval),
 			maxAttempts:     maxInt(sp.MaxCheckAttempts, 1),
@@ -425,47 +427,48 @@ func buildJobID(sp spec.JobSpec, idx int) string {
 func (s *Scheduler) CollectMetrics() map[string]int64 {
 	metrics := make(map[string]int64)
 	stats := s.executor.Stats()
-	metrics[charts.MetricKey(s.shard, "scheduler", "scheduler_queue", "queue_depth")] = int64(stats.QueueDepth)
-	metrics[charts.MetricKey(s.shard, "scheduler", "scheduler_queue", "waiting")] = int64(stats.Waiting)
-	metrics[charts.MetricKey(s.shard, "scheduler", "scheduler_queue", "executing")] = int64(stats.Executing)
-	metrics[charts.MetricKey(s.shard, "scheduler", "scheduler_skipped", "skipped")] = int64(stats.SkippedEnqueue)
-	metrics[charts.MetricKey(s.shard, "scheduler", "scheduler_next", "next_ms")] = s.nextRunMs()
+	metrics[charts.MetricKeyFromParts(s.shard, "scheduler", "scheduler_queue", "queue_depth")] = int64(stats.QueueDepth)
+	metrics[charts.MetricKeyFromParts(s.shard, "scheduler", "scheduler_queue", "waiting")] = int64(stats.Waiting)
+	metrics[charts.MetricKeyFromParts(s.shard, "scheduler", "scheduler_queue", "executing")] = int64(stats.Executing)
+	metrics[charts.MetricKeyFromParts(s.shard, "scheduler", "scheduler_skipped", "skipped")] = int64(stats.SkippedEnqueue)
+	metrics[charts.MetricKeyFromParts(s.shard, "scheduler", "scheduler_next", "next")] = s.nextRunDelay().Nanoseconds()
 
 	s.jobMu.RLock()
 	defer s.jobMu.RUnlock()
 	for _, js := range s.jobs {
-		jobName := js.chartJobName
-		metrics[charts.MetricKey(s.shard, jobName, "state", "ok")] = boolToInt(strings.EqualFold(js.state, "OK"))
-		metrics[charts.MetricKey(s.shard, jobName, "state", "warning")] = boolToInt(strings.EqualFold(js.state, "WARNING"))
-		metrics[charts.MetricKey(s.shard, jobName, "state", "critical")] = boolToInt(strings.EqualFold(js.state, "CRITICAL"))
-		metrics[charts.MetricKey(s.shard, jobName, "state", "unknown")] = boolToInt(strings.EqualFold(js.state, "UNKNOWN"))
-		metrics[charts.MetricKey(s.shard, jobName, "state", "attempt")] = int64(js.currentAttempt())
-		metrics[charts.MetricKey(s.shard, jobName, "state", "max_attempts")] = int64(js.maxAttempts)
-		metrics[charts.MetricKey(s.shard, jobName, "runtime", "running")] = boolToInt(js.running)
-		metrics[charts.MetricKey(s.shard, jobName, "runtime", "retrying")] = boolToInt(js.retrying)
-		metrics[charts.MetricKey(s.shard, jobName, "runtime", "skipped")] = boolToInt(js.periodSkipped)
-		metrics[charts.MetricKey(s.shard, jobName, "latency", "duration")] = int64(js.lastDuration / time.Millisecond)
-		cpuMs := int64(js.lastCPU / time.Millisecond)
-		if cpuMs == 0 {
-			cpuMs = int64(js.lastDuration / time.Millisecond)
+		id := js.identity
+		metrics[id.MetricID("state", "ok")] = boolToInt(strings.EqualFold(js.state, "OK"))
+		metrics[id.MetricID("state", "warning")] = boolToInt(strings.EqualFold(js.state, "WARNING"))
+		metrics[id.MetricID("state", "critical")] = boolToInt(strings.EqualFold(js.state, "CRITICAL"))
+		metrics[id.MetricID("state", "unknown")] = boolToInt(strings.EqualFold(js.state, "UNKNOWN"))
+		metrics[id.MetricID("state", "attempt")] = int64(js.currentAttempt())
+		metrics[id.MetricID("state", "max_attempts")] = int64(js.maxAttempts)
+		metrics[id.MetricID("runtime", "running")] = boolToInt(js.running)
+		metrics[id.MetricID("runtime", "retrying")] = boolToInt(js.retrying)
+		metrics[id.MetricID("runtime", "skipped")] = boolToInt(js.periodSkipped)
+		metrics[id.MetricID("latency", "duration")] = js.lastDuration.Nanoseconds()
+		cpuNs := js.lastCPU.Nanoseconds()
+		if cpuNs == 0 {
+			cpuNs = js.lastDuration.Nanoseconds()
 		}
-		metrics[charts.MetricKey(s.shard, jobName, "cpu", "cpu_time")] = cpuMs
-		metrics[charts.MetricKey(s.shard, jobName, "mem", "rss")] = js.lastRSS
-		metrics[charts.MetricKey(s.shard, jobName, "disk", "read")] = js.lastDiskRead
-		metrics[charts.MetricKey(s.shard, jobName, "disk", "write")] = js.lastDiskWrite
+		metrics[id.MetricID("cpu", "cpu_time")] = cpuNs
+		metrics[id.MetricID("mem", "rss")] = js.lastRSS
+		metrics[id.MetricID("disk", "read")] = js.lastDiskRead
+		metrics[id.MetricID("disk", "write")] = js.lastDiskWrite
 
 		if len(js.perfdata) > 0 {
 			for labelID, datum := range js.perfdata {
 				suffix := fmt.Sprintf("perf.%s", labelID)
-				metrics[charts.MetricKey(s.shard, jobName, suffix, "value")] = metricValue(datum.Value)
+				scale := units.NewScale(datum.Unit)
+				metrics[id.MetricID(suffix, "value")] = scale.Apply(datum.Value)
 				if datum.Min != nil {
-					metrics[charts.MetricKey(s.shard, jobName, suffix, "min")] = metricValue(*datum.Min)
+					metrics[id.MetricID(suffix, "min")] = scale.Apply(*datum.Min)
 				}
 				if datum.Max != nil {
-					metrics[charts.MetricKey(s.shard, jobName, suffix, "max")] = metricValue(*datum.Max)
+					metrics[id.MetricID(suffix, "max")] = scale.Apply(*datum.Max)
 				}
-				s.setRangeMetrics(metrics, jobName, suffix, "warn", datum.Warn)
-				s.setRangeMetrics(metrics, jobName, suffix, "crit", datum.Crit)
+				s.setRangeMetrics(metrics, id, suffix, "warn", datum.Warn, scale)
+				s.setRangeMetrics(metrics, id, suffix, "crit", datum.Crit, scale)
 			}
 		}
 	}
@@ -473,8 +476,8 @@ func (s *Scheduler) CollectMetrics() map[string]int64 {
 	return metrics
 }
 
-func (s *Scheduler) nextRunMs() int64 {
-	min := time.Hour * 24
+func (s *Scheduler) nextRunDelay() time.Duration {
+	min := 24 * time.Hour
 	if len(s.jobs) == 0 {
 		return 0
 	}
@@ -487,7 +490,7 @@ func (s *Scheduler) nextRunMs() int64 {
 			min = delta
 		}
 	}
-	return int64(min / time.Millisecond)
+	return min
 }
 
 func boolToInt(v bool) int64 {
@@ -495,10 +498,6 @@ func boolToInt(v bool) int64 {
 		return 1
 	}
 	return 0
-}
-
-func metricValue(v float64) int64 {
-	return int64(math.Round(v))
 }
 
 func (s *Scheduler) advanceAnniversary(current time.Time, interval time.Duration, now time.Time) time.Time {
@@ -531,13 +530,13 @@ func (s *Scheduler) applyJitter(base time.Time, jitter time.Duration) time.Time 
 	return base.Add(time.Duration(val * float64(jitter)))
 }
 
-func (s *Scheduler) setRangeMetrics(metrics map[string]int64, jobName, suffix, kind string, rng *output.ThresholdRange) {
-	definedKey := charts.MetricKey(s.shard, jobName, suffix, kind+"_defined")
-	inclusiveKey := charts.MetricKey(s.shard, jobName, suffix, kind+"_inclusive")
-	lowKey := charts.MetricKey(s.shard, jobName, suffix, kind+"_low")
-	highKey := charts.MetricKey(s.shard, jobName, suffix, kind+"_high")
-	lowDefinedKey := charts.MetricKey(s.shard, jobName, suffix, kind+"_low_defined")
-	highDefinedKey := charts.MetricKey(s.shard, jobName, suffix, kind+"_high_defined")
+func (s *Scheduler) setRangeMetrics(metrics map[string]int64, id charts.JobIdentity, suffix, kind string, rng *output.ThresholdRange, scale units.Scale) {
+	definedKey := id.MetricID(suffix, kind+"_defined")
+	inclusiveKey := id.MetricID(suffix, kind+"_inclusive")
+	lowKey := id.MetricID(suffix, kind+"_low")
+	highKey := id.MetricID(suffix, kind+"_high")
+	lowDefinedKey := id.MetricID(suffix, kind+"_low_defined")
+	highDefinedKey := id.MetricID(suffix, kind+"_high_defined")
 	if rng == nil {
 		metrics[definedKey] = 0
 		metrics[inclusiveKey] = 0
@@ -549,14 +548,14 @@ func (s *Scheduler) setRangeMetrics(metrics map[string]int64, jobName, suffix, k
 	}
 	metrics[definedKey] = 1
 	metrics[inclusiveKey] = boolToInt(rng.Inclusive)
-	if v, ok := rangeBoundMetric(rng.Low); ok {
+	if v, ok := rangeBoundMetric(scale, rng.Low); ok {
 		metrics[lowKey] = v
 		metrics[lowDefinedKey] = 1
 	} else {
 		metrics[lowKey] = 0
 		metrics[lowDefinedKey] = 0
 	}
-	if v, ok := rangeBoundMetric(rng.High); ok {
+	if v, ok := rangeBoundMetric(scale, rng.High); ok {
 		metrics[highKey] = v
 		metrics[highDefinedKey] = 1
 	} else {
@@ -565,14 +564,14 @@ func (s *Scheduler) setRangeMetrics(metrics map[string]int64, jobName, suffix, k
 	}
 }
 
-func rangeBoundMetric(val *float64) (int64, bool) {
+func rangeBoundMetric(scale units.Scale, val *float64) (int64, bool) {
 	if val == nil {
 		return 0, false
 	}
 	if math.IsNaN(*val) || math.IsInf(*val, 0) {
 		return 0, false
 	}
-	return metricValue(*val), true
+	return scale.Apply(*val), true
 }
 
 func (s *Scheduler) registerPerfdataCharts(job spec.JobSpec, perf []output.PerfDatum) {
@@ -584,7 +583,7 @@ func (s *Scheduler) registerPerfdataCharts(job spec.JobSpec, perf []output.PerfD
 		if label == "" {
 			continue
 		}
-		s.registerPerfdata(job, label)
+		s.registerPerfdata(job, datum)
 	}
 }
 

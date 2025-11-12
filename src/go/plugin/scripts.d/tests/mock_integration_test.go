@@ -4,6 +4,7 @@ package tests
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
@@ -13,6 +14,8 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/buildinfo"
 	ndexec "github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/charts"
+	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/ids"
+	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/output"
 	runtimepkg "github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/runtime"
 	specpkg "github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/spec"
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/timeperiod"
@@ -26,7 +29,7 @@ const (
 )
 
 func TestMockPluginsProduceExpectedStatesAndPerfdata(t *testing.T) {
-	sched, emitter := startTestScheduler(t, []specpkg.JobSpec{
+	sched, emitter, metas := startTestScheduler(t, []specpkg.JobSpec{
 		newJobSpec(t, "mock_ok", "check_mock_ok.sh", nil),
 		newJobSpec(t, "mock_warn", "check_mock_warn.sh", func(sp *specpkg.JobSpec) { sp.MaxCheckAttempts = 1 }),
 		newJobSpec(t, "mock_crit", "check_mock_crit.sh", func(sp *specpkg.JobSpec) { sp.MaxCheckAttempts = 1 }),
@@ -34,12 +37,13 @@ func TestMockPluginsProduceExpectedStatesAndPerfdata(t *testing.T) {
 	waitForJobs(t, emitter, []string{"mock_ok", "mock_warn", "mock_crit"})
 
 	metrics := sched.CollectMetrics()
-	assertMetricEquals(t, metrics, "mock_ok", "state", "ok", 1)
-	assertMetricEquals(t, metrics, "mock_warn", "state", "warning", 1)
-	assertMetricEquals(t, metrics, "mock_crit", "state", "critical", 1)
+	assertMetricEquals(t, metrics, metas["mock_ok"], "state", "ok", 1)
+	assertMetricEquals(t, metrics, metas["mock_warn"], "state", "warning", 1)
+	assertMetricEquals(t, metrics, metas["mock_crit"], "state", "critical", 1)
 
 	// perfdata hidden dims exist
-	ck := charts.MetricKey(testShard, "mock_ok", "perf.value", "warn_defined")
+	perfSuffix := fmt.Sprintf("perf.%s", ids.Sanitize("value"))
+	ck := metas["mock_ok"].MetricID(perfSuffix, "warn_defined")
 	require.Equal(t, int64(1), metrics[ck], "warn metadata missing")
 }
 
@@ -52,7 +56,7 @@ func TestMockPluginMacrosExposeExpectedValues(t *testing.T) {
 	if spec.Vnode == "" {
 		t.Fatalf("vnode not set on job spec")
 	}
-	_, emitter := startTestScheduler(t, []specpkg.JobSpec{spec})
+	_, emitter, _ := startTestScheduler(t, []specpkg.JobSpec{spec})
 	results := waitForResults(t, emitter, 1)
 	require.NoError(t, results[0].Err)
 	output := string(results[0].Output)
@@ -67,7 +71,7 @@ func TestMockPluginMacrosExposeExpectedValues(t *testing.T) {
 }
 
 func TestMockPluginHandlesLongOutputAndLogs(t *testing.T) {
-	_, emitter := startTestScheduler(t, []specpkg.JobSpec{newJobSpec(t, "mock_long", "check_mock_long.sh", nil)})
+	_, emitter, _ := startTestScheduler(t, []specpkg.JobSpec{newJobSpec(t, "mock_long", "check_mock_long.sh", nil)})
 	results := waitForResults(t, emitter, 1)
 	longOut := results[0].Parsed.LongOutput
 	require.Contains(t, longOut, "line-one details")
@@ -80,10 +84,10 @@ func TestMockSlowPluginRaisesSkipMetric(t *testing.T) {
 		sp.CheckInterval = 200 * time.Millisecond
 		sp.RetryInterval = 200 * time.Millisecond
 	})
-	sched, _ := startTestScheduler(t, []specpkg.JobSpec{spec})
+	sched, _, _ := startTestScheduler(t, []specpkg.JobSpec{spec})
 	time.Sleep(2500 * time.Millisecond)
 	metrics := sched.CollectMetrics()
-	key := charts.MetricKey(testShard, "scheduler", "scheduler_skipped", "skipped")
+	key := charts.MetricKeyFromParts(testShard, "scheduler", "scheduler_skipped", "skipped")
 	if metrics[key] == 0 {
 		t.Fatalf("scheduler skip counter not incremented: %d", metrics[key])
 	}
@@ -175,7 +179,7 @@ func findResult(t *testing.T, results []runtimepkg.ExecutionResult, jobName stri
 	return runtimepkg.ExecutionResult{}
 }
 
-func startTestScheduler(t *testing.T, jobs []specpkg.JobSpec) (*runtimepkg.Scheduler, *recordingEmitter) {
+func startTestScheduler(t *testing.T, jobs []specpkg.JobSpec) (*runtimepkg.Scheduler, *recordingEmitter, map[string]charts.JobIdentity) {
 	t.Helper()
 	ensureNdRun(t)
 	emitter := newRecordingEmitter()
@@ -183,6 +187,10 @@ func startTestScheduler(t *testing.T, jobs []specpkg.JobSpec) (*runtimepkg.Sched
 	workers := len(jobs)
 	if workers == 0 {
 		workers = 1
+	}
+	identities := make(map[string]charts.JobIdentity, len(jobs))
+	for _, job := range jobs {
+		identities[job.Name] = charts.NewJobIdentity(testShard, job)
 	}
 	sched, err := runtimepkg.NewScheduler(runtimepkg.SchedulerConfig{
 		Jobs:             jobs,
@@ -192,7 +200,7 @@ func startTestScheduler(t *testing.T, jobs []specpkg.JobSpec) (*runtimepkg.Sched
 		Periods:          periods,
 		UserMacros:       map[string]string{"USER1": "/usr/lib/nagios/plugins"},
 		VnodeLookup:      vnodeLookup,
-		RegisterPerfdata: func(specpkg.JobSpec, string) {},
+		RegisterPerfdata: func(specpkg.JobSpec, output.PerfDatum) {},
 	})
 	require.NoError(t, err)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -202,7 +210,7 @@ func startTestScheduler(t *testing.T, jobs []specpkg.JobSpec) (*runtimepkg.Sched
 		cancel()
 		sched.Stop()
 	})
-	return sched, emitter
+	return sched, emitter, identities
 }
 
 func vnodeLookup(spec specpkg.JobSpec) runtimepkg.VnodeInfo {
@@ -273,8 +281,8 @@ func ensureNdRun(t *testing.T) {
 	})
 }
 
-func assertMetricEquals(t *testing.T, metrics map[string]int64, job, chart, dim string, want int64) {
-	key := charts.MetricKey(testShard, job, chart, dim)
+func assertMetricEquals(t *testing.T, metrics map[string]int64, meta charts.JobIdentity, chart, dim string, want int64) {
+	key := meta.MetricID(chart, dim)
 	got := metrics[key]
 	if got != want {
 		t.Fatalf("metric %s = %d, want %d (metrics=%v)", key, got, want, metrics)

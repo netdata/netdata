@@ -108,6 +108,49 @@ catch-up burst). Use the `nagios.runtime` chart's `skipped` dimension or the
 stock `health.d/nagios_skipped.conf` rule to monitor how frequently this happens
 and to page when a job repeatedly overlaps.
 
+### Charts, labels, and units
+
+Each job now derives a deterministic chart identity from the shard plus the full
+plugin command line (path + arguments). That signature feeds every chart ID and
+context, so different executions of the same script (for different URLs, hosts,
+etc.) keep separate time-series across restarts.
+
+- **Contexts & families** – job charts live under `nagios.<script>.<measurement>`
+  (for example `nagios.http_check.latency`). This keeps “apples with apples” in
+  the Netdata menu even when multiple jobs share a script.
+- **Labels** – all charts share the same label set: `nagios_job`, `nagios_shard`,
+  and `nagios_cmdline` (the fully expanded plugin invocation). Perfdata charts
+  add `perf_label`. The uniform labels make filtering dashboards and health
+  alerts straightforward.
+- **Titles** – chart titles describe the script + measurement (e.g. “Nagios
+  http_check response time”) rather than the monitored endpoint, so all charts
+  with a shared context render cleanly in the UI.
+
+#### Unit normalization & scaling
+
+Netdata stores integers, so scripts.d.plugin normalizes perfdata to base units
+before emitting metrics:
+
+| Input unit                    | Canonical unit | Scaling behaviour                                |
+|------------------------------|----------------|---------------------------------------------------|
+| Bytes, KB, MB, GB, TB        | bytes          | Converted to raw bytes, divider = 1               |
+| Bytes per second (KB/s …)    | bytes/s        | Converted to bytes/s, divider = 1                 |
+| Seconds, ms, µs, ns          | seconds        | Stored as nanoseconds, divider = 1 000 000 000    |
+| Percent (`%`)                | %              | Value ×1000, divider = 1000                       |
+| Counters (`c`)               | c              | Stored as-is                                      |
+| Any other unit or unitless   | original text  | Value ×1000, divider = 1000                       |
+
+When a plugin flips between `KB` and `MB` (or `ms` and `s`) the collector still
+publishes a single chart in base units, so there are no spurious RRD resets. If
+a metric genuinely changes semantics (for example, from bytes to seconds) or a
+job’s cadence changes, scripts.d.plugin re-sends the CHART definition so Netdata
+can flush/recreate the series with the new metadata.
+
+The scheduler also exposes a shard-level `nagios.scheduler.next` chart showing
+“time until the next job fires” in seconds (nanosecond precision). Expect it to
+track the configured intervals; spikes indicate the executor is falling behind
+(worker starvation, very long-running checks, etc.).
+
 ### Logging over OTLP (TLS support)
 
 Structured logs are forwarded to OTEL via `logging.otlp`. Besides `endpoint`,

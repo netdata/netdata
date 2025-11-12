@@ -19,9 +19,11 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/charts"
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/config"
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/ids"
+	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/output"
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/runtime"
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/spec"
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/timeperiod"
+	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/units"
 )
 
 //go:embed config_schema.json
@@ -115,7 +117,7 @@ type Collector struct {
 	chartMu      sync.RWMutex
 	schedulerMu  sync.RWMutex
 	reloadMu     sync.Mutex
-	perfCharts   map[string]struct{}
+	perfCharts   map[string]perfChartMeta
 	reloadCh     chan struct{}
 	reloadCancel context.CancelFunc
 	reloadWG     sync.WaitGroup
@@ -124,6 +126,10 @@ type Collector struct {
 	periods      *timeperiod.Set
 	vnodeInfo    map[string]runtime.VnodeInfo
 	missingVnode map[string]struct{}
+}
+
+type perfChartMeta struct {
+	Scale units.Scale
 }
 
 // New returns a collector with sensible defaults so the module registry can instantiate jobs.
@@ -146,7 +152,7 @@ func New() *Collector {
 			},
 		},
 		charts:     &module.Charts{},
-		perfCharts: make(map[string]struct{}),
+		perfCharts: make(map[string]perfChartMeta),
 	}
 }
 
@@ -294,7 +300,8 @@ func (c *Collector) warnMissingVnode(name string) {
 func (c *Collector) initCharts() error {
 	var defs []*module.Chart
 	for idx, job := range c.jobSpecs {
-		defs = append(defs, charts.BuildJobCharts(c.Name, job.Name, 100+idx*10)...)
+		meta := charts.NewJobIdentity(c.Name, job)
+		defs = append(defs, charts.BuildJobCharts(meta, 100+idx*10)...)
 	}
 	defs = append(defs, charts.BuildSchedulerCharts(c.Name, 10)...)
 	newCharts := module.Charts{}
@@ -307,21 +314,36 @@ func (c *Collector) initCharts() error {
 	return nil
 }
 
-func (c *Collector) registerPerfdataChart(job spec.JobSpec, label string) {
-	key := fmt.Sprintf("%s|%s", ids.Sanitize(job.Name), ids.Sanitize(label))
-	c.chartMu.Lock()
-	if _, ok := c.perfCharts[key]; ok {
-		c.chartMu.Unlock()
+func (c *Collector) registerPerfdataChart(job spec.JobSpec, datum output.PerfDatum) {
+	label := strings.TrimSpace(datum.Label)
+	if label == "" {
 		return
 	}
-	chart := charts.PerfdataChart(c.Name, job.Name, label, 200)
+	meta := charts.NewJobIdentity(c.Name, job)
+	labelID := ids.Sanitize(label)
+	scale := units.NewScale(datum.Unit)
+	key := fmt.Sprintf("%s|%s", meta.ChartKey, labelID)
+	c.chartMu.Lock()
+	defer c.chartMu.Unlock()
+	if existing, ok := c.perfCharts[key]; ok {
+		if sameScale(existing.Scale, scale) {
+			return
+		}
+		chartID := meta.ChartID(fmt.Sprintf("perf.%s", labelID))
+		if chart := c.charts.Get(chartID); chart != nil {
+			chart.MarkRemove()
+		}
+	}
+	chart := charts.PerfdataChart(meta, label, scale, 200)
 	if err := c.charts.Add(chart); err != nil {
-		c.chartMu.Unlock()
 		c.Errorf("failed to add perfdata chart for job %s label %s: %v", job.Name, label, err)
 		return
 	}
-	c.perfCharts[key] = struct{}{}
-	c.chartMu.Unlock()
+	c.perfCharts[key] = perfChartMeta{Scale: scale}
+}
+
+func sameScale(a, b units.Scale) bool {
+	return a.Divisor == b.Divisor && a.CanonicalUnit == b.CanonicalUnit
 }
 
 func (c *Collector) rebuildRuntime(ctx context.Context, jobs []spec.JobSpec) error {
@@ -331,7 +353,7 @@ func (c *Collector) rebuildRuntime(ctx context.Context, jobs []spec.JobSpec) err
 	if err := c.initCharts(); err != nil {
 		return err
 	}
-	c.perfCharts = make(map[string]struct{})
+	c.perfCharts = make(map[string]perfChartMeta)
 	userMacros := c.copyUserMacros()
 	emitter := c.buildEmitter()
 	scheduler, err := runtime.NewScheduler(runtime.SchedulerConfig{
@@ -343,8 +365,8 @@ func (c *Collector) rebuildRuntime(ctx context.Context, jobs []spec.JobSpec) err
 		UserMacros:  userMacros,
 		Periods:     c.periods,
 		VnodeLookup: c.vnodeInfoFor,
-		RegisterPerfdata: func(job spec.JobSpec, label string) {
-			c.registerPerfdataChart(job, label)
+		RegisterPerfdata: func(job spec.JobSpec, datum output.PerfDatum) {
+			c.registerPerfdataChart(job, datum)
 		},
 	})
 	if err != nil {
