@@ -103,6 +103,17 @@ func RunUnprivilegedWithOptionsUsage(log *logger.Logger, timeout time.Duration, 
 	return defaultRunner.run(log, timeout, opts.Dir, defaultRunner.ndRunPath, "RunUnprivileged", opts.Env, argv...)
 }
 
+// SetRunnerPathsForTests overrides the nd-run and ndsudo helper paths.
+// It is intended for test environments that need to stub the helpers.
+func SetRunnerPathsForTests(ndRunPath, ndSudoPath string) {
+	if ndRunPath != "" {
+		defaultRunner.ndRunPath = ndRunPath
+	}
+	if ndSudoPath != "" {
+		defaultRunner.ndSudoPath = ndSudoPath
+	}
+}
+
 func (r *runner) run(log *logger.Logger, timeout time.Duration, dir string, helperPath, label string, env []string, argv ...string) ([]byte, string, ResourceUsage, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()

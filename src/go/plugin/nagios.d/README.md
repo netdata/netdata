@@ -124,6 +124,21 @@ When `insecure` is `false`, the plugin automatically establishes a TLS 1.2
 connection using these settings; otherwise it falls back to insecure gRPC (the
 default for `127.0.0.1:4317`).
 
+### Mock integration tests
+
+A small suite of mock Nagios plugins lives under `tests/plugins/`. They exercise
+state handling, perfdata parsing, macro substitution, long output logging, and
+skip semantics without requiring external services. Run them with:
+
+```bash
+cd src/go
+go test ./plugin/nagios.d/tests
+```
+
+The tests stub `nd-run`, execute the mock scripts through the scheduler, and
+assert the emitted metrics/logs. Extend this suite whenever you add new
+collector features so we keep a fast end-to-end signal in CI.
+
 ## Building
 
 Enable the plugin during CMake configuration:
