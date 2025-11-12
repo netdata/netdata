@@ -811,7 +811,6 @@ void metdata_mssql_fill_mssql_status(struct mssql_instance *mi)
         goto enddbstate;
     }
 
-    int i = 0;
     do {
         ret = SQLFetch(mi->conn->dbSQLState);
         if (netdata_mssql_check_result(ret)) {
