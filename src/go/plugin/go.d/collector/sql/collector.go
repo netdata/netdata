@@ -31,22 +31,6 @@ func New() *Collector {
 			DSN:             "root:my-secret-pw@tcp(10.10.10.20:3306)/",
 			Timeout:         confopt.Duration(time.Second * 5),
 			ConnMaxLifetime: confopt.Duration(time.Minute * 10),
-			Queries: []QueryConfig{
-				{
-					Name:   "qq",
-					Query:  `SHOW GLOBAL VARIABLES WHERE Variable_name LIKE 'max_connections';`,
-					Labels: []string{"Variable_name"},
-					Values: []string{"Value"},
-					ChartMeta: ChartMetaConfig{
-						Context:     "max_connections",
-						Description: "Maximum number of connections to the database.",
-						Family:      "aaa/bbb/ccc/ddd",
-						Units:       "connections",
-						Type:        "",
-						Algorithm:   "",
-					},
-				},
-			},
 		},
 		charts:     &module.Charts{},
 		seenCharts: make(map[string]bool),
@@ -75,7 +59,7 @@ func (c *Collector) Charts() *module.Charts {
 }
 
 func (c *Collector) Init(context.Context) error {
-	return c.verifyConfig()
+	return c.validateConfig()
 }
 
 func (c *Collector) Check(ctx context.Context) error {

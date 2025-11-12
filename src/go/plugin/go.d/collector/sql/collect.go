@@ -8,103 +8,110 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"time"
 )
 
 func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
+	// Ensure DB connection (safe if already open)
 	if c.db == nil {
 		if err := c.openConnection(); err != nil {
 			return nil, err
 		}
 	}
 
-	mx := make(map[string]int64)
+	// 1) Run reusable queries (queries:)
+	qcache, _, err := c.execReusableQueries(ctx)
+	if err != nil {
+		return nil, err
+	}
 
-	for _, q := range c.Queries {
-		if _, err := c.collectQuery(ctx, q, mx); err != nil {
-			return nil, fmt.Errorf("query %q failed: %w", q.Name, err)
-		}
+	// 2) Resolve & execute metric queries (metrics: with query_ref or inline)
+	mcache, _, err := c.execMetricQueries(ctx, qcache)
+	if err != nil {
+		return nil, err
+	}
+
+	// 3) Process metrics: populate the samples map (charts/dims wiring next)
+	mx := make(map[string]int64)
+	if err := c.collectMetrics(mx, mcache); err != nil {
+		return nil, err
 	}
 
 	return mx, nil
 }
 
-func (c *Collector) collectQuery(ctx context.Context, queryCfg QueryConfig, mx map[string]int64) (duration int64, err error) {
-	ctx, cancel := context.WithTimeout(ctx, c.Timeout.Duration())
-	defer cancel()
-
-	start := time.Now()
-
-	rows, err := c.db.QueryContext(ctx, queryCfg.Query)
-	if err != nil {
-		return 0, err
-	}
-
-	duration = time.Since(start).Milliseconds()
-	defer func() { _ = rows.Close() }()
-
-	columns, err := rows.Columns()
-	if err != nil {
-		return duration, err
-	}
-
-	values := makeRawBytesSlice(len(columns))
-	row := make(map[string]string, len(columns))
-
-	for rows.Next() {
-		if err := rows.Scan(values...); err != nil {
-			return duration, err
+func (c *Collector) collectMetrics(mx map[string]int64, mcache QueryRowsCache) error {
+	for i, m := range c.Metrics {
+		rows, ok := mcache[m.ID]
+		if !ok {
+			// No result set for this metric; skip silently.
+			continue
 		}
-		clear(row)
-		for i, l := 0, len(values); i < l; i++ {
-			row[columns[i]] = rawBytesToString(values[i])
-		}
-		c.collectRow(row, queryCfg, mx)
-	}
 
-	return duration, rows.Err()
+		switch strings.ToLower(m.Mode) {
+		case "columns":
+			if err := c.collectMetricsModeColumns(mx, m, rows); err != nil {
+				return fmt.Errorf("metric %q (index %d) columns: %w", m.ID, i, err)
+			}
+		case "kv":
+			if err := c.collectMetricsModeKV(mx, m, rows); err != nil {
+				return fmt.Errorf("metric %q (index %d) kv: %w", m.ID, i, err)
+			}
+		default:
+			// Should be prevented by validateConfig(); keep a guard anyway.
+			return fmt.Errorf("metric %q (index %d) unknown mode %q", m.ID, i, m.Mode)
+		}
+	}
+	return nil
 }
 
-func (c *Collector) collectRow(row map[string]string, queryCfg QueryConfig, mx map[string]int64) {
-	var baseID strings.Builder
-	baseID.Grow(128)
-
-	baseID.WriteString(queryCfg.Name)
-	for _, lbl := range queryCfg.Labels {
-		if v, ok := row[lbl]; ok {
-			baseID.WriteString("_" + v)
+func (c *Collector) evalStatusWhen(sw *ConfigStatusWhen, value string) (bool, error) {
+	switch {
+	case sw.Equals != "":
+		return value == sw.Equals, nil
+	case len(sw.In) > 0:
+		for _, v := range sw.In {
+			if v == value {
+				return true, nil
+			}
 		}
+		return false, nil
+	case sw.re != nil:
+		return sw.re.MatchString(value), nil
+	default:
+		return false, fmt.Errorf("invalid status_when configuration")
 	}
+}
 
-	base := strings.ToLower(baseID.String())
+func btoi(b bool) int64 {
+	if b {
+		return 1
+	}
+	return 0
+}
 
-	for _, queryValue := range queryCfg.Values {
-		valID := queryCfg.Name + "_" + queryValue
-		if c.skipValues[valID] {
-			continue
-		}
+// Stringify config values for comparison with raw row strings.
+func asString(v any) string { return fmt.Sprint(v) }
 
-		strVal, ok := row[queryValue]
+func (c *Collector) chartInstanceID(m ConfigMetricBlock, ch ConfigChartConfig, row map[string]string) string {
+	var b strings.Builder
+	b.Grow(128)
+
+	// base: metric ID + chart context
+	b.WriteString(m.ID)
+	b.WriteString("_")
+	b.WriteString(ch.Context)
+
+	// append label values from the row
+	for _, lf := range m.LabelsFromRow {
+		v, ok := row[lf.Source]
 		if !ok {
-			continue
+			// missing label column — cannot form full ID
+			return ""
 		}
-
-		v, err := strconv.ParseFloat(strVal, 64)
-		if err != nil {
-			c.skipValues[valID] = true
-			c.Warningf("invalid value %q for %s.%s: %v", strVal, queryCfg.Name, queryValue, err)
-			continue
-		}
-
-		id := strings.ToLower(base + "_" + queryValue)
-
-		if !c.seenCharts[id] {
-			c.seenCharts[id] = true
-			c.addQueryChart(row, queryCfg, id, queryValue)
-		}
-
-		mx[id] = int64(v)
+		b.WriteString("_" + v)
 	}
+
+	return strings.ToLower(b.String())
 }
 
 func (c *Collector) openConnection() error {
@@ -188,4 +195,28 @@ func rawBytesToString(value any) string {
 		return string(*rb)
 	}
 	return ""
+}
+
+func dimID(chartID, dimName string) string {
+	return strings.ToLower(chartID + "." + dimName)
+}
+
+// local parser: int -> float -> bool -> 0
+func toInt64(s string) int64 {
+	if s == "" {
+		return 0
+	}
+	if i, err := strconv.ParseInt(s, 10, 64); err == nil {
+		return i
+	}
+	if f, err := strconv.ParseFloat(s, 64); err == nil {
+		return int64(f)
+	}
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case "true", "t", "yes", "y", "on", "up":
+		return 1
+	case "false", "f", "no", "n", "off", "down":
+		return 0
+	}
+	return 0
 }
