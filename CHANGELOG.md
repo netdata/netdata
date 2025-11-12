@@ -193,6 +193,11 @@
 - Initialize reusable buffers when streaming ML to parent ([#21279](https://github.com/netdata/netdata/issues/21279))
 - Improve forced new datafile on startup ([#21282](https://github.com/netdata/netdata/issues/21282))
 - Adjust tier retention calculation ([#21280](https://github.com/netdata/netdata/issues/21280))
+- Regenerate integrations docs ([#21284](https://github.com/netdata/netdata/issues/21284))
+- Report failures to update native packages. ([#21144](https://github.com/netdata/netdata/issues/21144))
+- Update our user/group account handling to use sysusers.d when possible. ([#21162](https://github.com/netdata/netdata/issues/21162))
+- Additional check when executing a CLI command ([#21286](https://github.com/netdata/netdata/issues/21286))
+- Always set ephemerality label with the correct value ([#21274](https://github.com/netdata/netdata/issues/21274))
 
 ## [2.7.0] - 2025-09-25
 
