@@ -317,6 +317,26 @@ set(CPACK_DEBIAN_PLUGIN-GO_PACKAGE_CONTROL_EXTRA
 set(CPACK_DEBIAN_PLUGIN-GO_DEBUGINFO_PACKAGE Off)
 
 #
+# nagios.d.plugin
+#
+
+set(CPACK_COMPONENT_PLUGIN-NAGIOS_DEPENDS "netdata")
+set(CPACK_COMPONENT_PLUGIN-NAGIOS_DESCRIPTION
+		"The experimental Nagios compatibility plugin for the Netdata Agent
+ This plugin executes stock Nagios checks via go.d's runtime so users can
+ migrate existing Nagios estates into Netdata with minimal changes.")
+
+set(CPACK_DEBIAN_PLUGIN-NAGIOS_PACKAGE_NAME "netdata-plugin-nagios")
+set(CPACK_DEBIAN_PLUGIN-NAGIOS_PACKAGE_SECTION "net")
+set(CPACK_DEBIAN_PLUGIN-NAGIOS_PACKAGE_CONFLICTS "netdata (<< 1.46)")
+set(CPACK_DEBIAN_PLUGIN-NAGIOS_PACKAGE_PREDEPENDS "netdata-user")
+
+set(CPACK_DEBIAN_PLUGIN-NAGIOS_PACKAGE_CONTROL_EXTRA
+	  "${PKG_FILES_PATH}/deb/plugin-nagios/postinst")
+
+set(CPACK_DEBIAN_PLUGIN-NAGIOS_DEBUGINFO_PACKAGE Off)
+
+#
 # ibm.plugin
 #
 
@@ -571,6 +591,9 @@ endif()
 if(ENABLE_PLUGIN_IBM)
   list(APPEND CPACK_COMPONENTS_ALL "plugin-ibm")
   list(APPEND CPACK_COMPONENTS_ALL "plugin-ibm-libs")
+endif()
+if(ENABLE_PLUGIN_NAGIOS)
+  list(APPEND CPACK_COMPONENTS_ALL "plugin-nagios")
 endif()
 if(ENABLE_PLUGIN_NETWORK_VIEWER)
         list(APPEND CPACK_COMPONENTS_ALL "plugin-network-viewer")

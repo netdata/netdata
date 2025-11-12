@@ -218,6 +218,11 @@ func (j *Job) Vnode() vnodes.VirtualNode {
 	return j.vnode
 }
 
+// Module returns the underlying collector module instance.
+func (j *Job) Module() Module {
+	return j.module
+}
+
 // AutoDetection invokes init, check and postCheck. It handles panic.
 func (j *Job) AutoDetection() (err error) {
 	defer func() {
