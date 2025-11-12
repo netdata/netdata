@@ -675,8 +675,6 @@ struct netdata_mssql_conn {
     BOOL is_connected;
 };
 
-DICTIONARY *conn_options;
-
 enum netdata_mssql_metrics {
     NETDATA_MSSQL_GENERAL_STATS,
     NETDATA_MSSQL_SQL_ERRORS,
