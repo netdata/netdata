@@ -6,11 +6,16 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
+	"maps"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
+	"github.com/netdata/netdata/go/plugins/pkg/multipath"
+	"github.com/netdata/netdata/go/plugins/pkg/pluginconfig"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/vnodes"
 	"github.com/netdata/netdata/go/plugins/plugin/nagios.d/charts"
 	"github.com/netdata/netdata/go/plugins/plugin/nagios.d/pkg/config"
 	"github.com/netdata/netdata/go/plugins/plugin/nagios.d/pkg/ids"
@@ -104,6 +109,8 @@ type Collector struct {
 	dirWatchers  []*directoryWatcher
 	runCtx       context.Context
 	periods      *timeperiod.Set
+	vnodeInfo    map[string]runtime.VnodeInfo
+	missingVnode map[string]struct{}
 }
 
 // New returns a collector with sensible defaults so the module registry can instantiate jobs.
@@ -158,6 +165,7 @@ func (c *Collector) Init(ctx context.Context) error {
 	if err := c.compileTimePeriods(); err != nil {
 		return err
 	}
+	c.refreshVnodeInfo()
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -243,9 +251,31 @@ func (c *Collector) expandJobSpecs() ([]spec.JobSpec, error) {
 }
 
 func (c *Collector) vnodeInfoFor(job spec.JobSpec) runtime.VnodeInfo {
-	return runtime.VnodeInfo{
-		Hostname: job.Vnode,
+	key := strings.ToLower(strings.TrimSpace(job.Vnode))
+	if key == "" {
+		return runtime.VnodeInfo{}
 	}
+	if info, ok := c.vnodeInfo[key]; ok {
+		return cloneVnodeInfo(info)
+	}
+	c.warnMissingVnode(job.Vnode)
+	return runtime.VnodeInfo{Hostname: job.Vnode}
+}
+
+func (c *Collector) warnMissingVnode(name string) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return
+	}
+	if c.missingVnode == nil {
+		c.missingVnode = make(map[string]struct{})
+	}
+	key := strings.ToLower(name)
+	if _, seen := c.missingVnode[key]; seen {
+		return
+	}
+	c.missingVnode[key] = struct{}{}
+	c.Warningf("nagios: vnode '%s' not found; macros fallback to literal hostname", name)
 }
 
 func (c *Collector) initCharts() error {
@@ -283,6 +313,7 @@ func (c *Collector) registerPerfdataChart(job spec.JobSpec, label string) {
 
 func (c *Collector) rebuildRuntime(ctx context.Context, jobs []spec.JobSpec) error {
 	c.stopScheduler()
+	c.refreshVnodeInfo()
 	c.jobSpecs = jobs
 	if err := c.initCharts(); err != nil {
 		return err
@@ -412,6 +443,75 @@ func (c *Collector) copyUserMacros() map[string]string {
 		userMacros[k] = v
 	}
 	return userMacros
+}
+
+func (c *Collector) refreshVnodeInfo() {
+	configDirs := pluginconfig.ConfigDir()
+	if len(configDirs) == 0 {
+		c.vnodeInfo = nil
+		c.missingVnode = nil
+		return
+	}
+	path, err := configDirs.Find("vnodes")
+	if err != nil {
+		if !multipath.IsNotFound(err) {
+			c.Warningf("nagios: failed to locate vnodes directory: %v", err)
+		}
+		c.vnodeInfo = nil
+		c.missingVnode = nil
+		return
+	}
+	registry := vnodes.Load(path)
+	if len(registry) == 0 {
+		c.vnodeInfo = nil
+		c.missingVnode = nil
+		return
+	}
+	info := make(map[string]runtime.VnodeInfo, len(registry)*3)
+	for key, vnode := range registry {
+		if vnode == nil {
+			continue
+		}
+		converted := runtime.VnodeInfo{
+			Hostname: firstNonEmpty(vnode.Hostname, vnode.Name, key),
+			Alias:    firstNonEmpty(vnode.Alias, vnode.Name, key),
+			Address:  firstNonEmpty(vnode.Address, vnode.Labels["address"], vnode.Labels["_net_default_iface_ip"]),
+			Labels:   maps.Clone(vnode.Labels),
+			Custom:   maps.Clone(vnode.Custom),
+		}
+		for _, alias := range []string{key, vnode.Hostname, vnode.Name, vnode.GUID} {
+			if alias == "" {
+				continue
+			}
+			info[strings.ToLower(alias)] = cloneVnodeInfo(converted)
+		}
+	}
+	c.vnodeInfo = info
+	c.missingVnode = make(map[string]struct{})
+}
+
+func cloneVnodeInfo(src runtime.VnodeInfo) runtime.VnodeInfo {
+	clone := src
+	if len(src.Labels) > 0 {
+		clone.Labels = maps.Clone(src.Labels)
+	} else {
+		clone.Labels = nil
+	}
+	if len(src.Custom) > 0 {
+		clone.Custom = maps.Clone(src.Custom)
+	} else {
+		clone.Custom = nil
+	}
+	return clone
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, v := range values {
+		if strings.TrimSpace(v) != "" {
+			return v
+		}
+	}
+	return ""
 }
 
 func (c *Collector) compileTimePeriods() error {

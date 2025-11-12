@@ -18,8 +18,13 @@ func TestBuildMacroSet(t *testing.T) {
 			},
 		},
 		UserMacros: map[string]string{"USER1": "/usr/lib/nagios/plugins"},
-		Vnode:      VnodeInfo{Hostname: "web1", Address: "192.0.2.10", Alias: "web-node"},
-		State:      StateInfo{ServiceState: "OK"},
+		Vnode: VnodeInfo{
+			Hostname: "web1",
+			Address:  "192.0.2.10",
+			Alias:    "web-node",
+			Custom:   map[string]string{"DATACENTER": "us-east-1"},
+		},
+		State: StateInfo{ServiceState: "OK"},
 	}
 
 	s := BuildMacroSet(ctx)
@@ -29,6 +34,9 @@ func TestBuildMacroSet(t *testing.T) {
 	}
 	if got := s.Env["NAGIOS__SERVICEENDPOINT"]; got != "/health" {
 		t.Fatalf("service custom var missing: %s", got)
+	}
+	if got := s.Env["NAGIOS__HOSTDATACENTER"]; got != "us-east-1" {
+		t.Fatalf("host custom var missing: %s", got)
 	}
 
 	if len(s.CommandArgs) != len(ctx.Job.Args) {
