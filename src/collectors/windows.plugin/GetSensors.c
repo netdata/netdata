@@ -558,6 +558,15 @@ static void netdata_get_sensors()
                                             sensor_keys[NETDATA_WIN_SENSOR_ACCELERATION_Z_G],
                                             sd->div_factor);
             }
+            if (likely(sd->values)) {
+                struct netdata_sensors_extra_values *move;
+                for (move = sd->values; move; move = move->next) {
+                    netdata_collect_sensor_data(&move->value,
+                                                pSensor,
+                                                sensor_keys[move->sensor_data_type],
+                                                sd->div_factor);
+                }
+            }
         }
 
         pSensor->lpVtbl->Release(pSensor);
@@ -729,7 +738,7 @@ static void sensors_data_chart(struct sensor_data *sd, int update_every)
             if (likely(sd->values)) {
                 int i;
                 struct netdata_sensors_extra_values *move;
-                for (move = sd->values, i = 1; move->next; move = move->next, i++) {
+                for (move = sd->values, i = 1; move; move = move->next, i++) {
                     snprintfz(id, RRD_ID_LENGTH_MAX, "input%d", i);
                     move->rd_value = netdata_add_sensor_dimension(sd, id, (cfg) ? cfg->multiplier : sd->mult_factor);
                 }
@@ -751,7 +760,7 @@ static void sensors_data_chart(struct sensor_data *sd, int update_every)
         netdata_state_chart_set_value(sd->rd_sensor_data_2, sd, 2);
     } else if (likely(sd->values)) {
         struct netdata_sensors_extra_values *move;
-        for (move = sd->values; move->next; move = move->next) {
+        for (move = sd->values; move; move = move->next) {
             rrddim_set_by_pointer(sd->st_sensor_data, move->rd_value, move->value);
         }
     }
