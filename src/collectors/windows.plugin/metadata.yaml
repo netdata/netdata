@@ -1218,9 +1218,18 @@ modules:
               required: false
         examples:
           folding:
-            enabled: false
+            enabled: true
             title: ""
-          list: []
+          list:
+            - name: Specific Sensors
+              description: You can add custom sensor information by creating a dedicated sensor section.
+              folding:
+                enabled: false
+              config: |
+                [plugin:windows:GetSensors:Your Sensor Name]
+                  units = Speed
+                  multiplier = 100
+                  title = Current speed.
     troubleshooting:
       problems:
         list: []
@@ -1347,6 +1356,12 @@ modules:
                 - name: initializing
                 - name: access_denied
                 - name: error
+            - name: system.hw.sensor.custom
+              description: Custom Chart
+              unit: "nd"
+              chart_type: line
+              dimensions:
+                - name: inputN
   - meta:
       plugin_name: windows.plugin
       module_name: PerflibWebService
