@@ -298,6 +298,9 @@ func (s *Scheduler) handleTimer(jobID string) {
 
 func (s *Scheduler) handleResult(res ExecutionResult) {
 	parsed := output.Parse(res.Output)
+	if s.log != nil {
+		s.log.Debugf("nagios: parsed perfdata entries=%d for job=%s", len(parsed.Perfdata), res.Job.Spec.Name)
+	}
 	res.Parsed = parsed
 
 	s.jobMu.Lock()
@@ -398,6 +401,9 @@ func (s *Scheduler) runJob(ctx context.Context, job JobRuntime) ExecutionResult 
 	}
 
 	output, cmdStr, usage, err := ndexec.RunUnprivilegedWithOptionsUsage(s.log, timeout, opts, job.Spec.Plugin, args...)
+	if s.log != nil {
+		s.log.Debugf("nagios: raw plugin output job=%s output=%q", job.Spec.Name, string(output))
+	}
 	res.Output = output
 	res.Err = err
 	res.Command = cmdStr

@@ -145,7 +145,7 @@ func (r *runner) run(log *logger.Logger, timeout time.Duration, dir string, help
 			err = ctx.Err()
 		}
 
-		return nil, cmdStr, usage, fmt.Errorf("%s: %v: %w (stderr: %s)", label, ex, err, strings.TrimSpace(s))
+		return out, cmdStr, usage, fmt.Errorf("%s: %v: %w (stderr: %s)", label, ex, err, strings.TrimSpace(s))
 	}
 
 	return out, cmdStr, usage, nil
