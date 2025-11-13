@@ -1,0 +1,440 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-sql
+      plugin_name: go.d.plugin
+      module_name: sql
+      monitored_instance:
+        name: SQL databases (generic)
+        link: https://en.wikipedia.org/wiki/SQL
+        categories:
+          - data-collection.database-servers
+        icon_filename: sql.svg
+      related_resources:
+        integrations:
+          list:
+            - plugin_name: apps.plugin
+              module_name: apps
+            - plugin_name: cgroups.plugin
+              module_name: cgroups
+      alternative_monitored_instances: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - db
+        - database
+        - sql
+        - mysql
+        - postgres
+        - postgresql
+        - oracle
+        - generic
+      most_popular: false
+    overview:
+      multi_instance: true
+      data_collection:
+        metrics_description: |
+          This collector is a generic SQL integration that lets you define custom queries
+          and map their results to Netdata charts and dimensions.
+
+          It supports multiple SQL drivers (MySQL, PostgreSQL, Oracle) and can collect
+          any numeric or status-like values you can expose via SQL.
+        method_description: |
+          The collector establishes a connection to the target database using Go's
+          database/sql package and the configured driver (mysql, postgres, oracle).
+          For each configured metric block it executes a query (or reuses the results
+          of a reusable query), then:
+          
+          - In columns mode, it treats selected columns as metric values.
+          - In kv mode, it treats one column as a "name" (key) and another as the
+            associated numeric or status value.
+          
+          The results are then grouped into charts and dimensions according to the
+          configuration.
+      default_behavior:
+        auto_detection:
+          description: |
+            This is a generic collector and does not perform automatic detection.
+            
+            By default, no jobs are created. You must add at least one job to go.d/sql.conf
+            and specify:
+            
+            - driver
+            - dsn
+            - metrics (and optionally reusable queries)
+        limits:
+          description: |
+            There are no built-in limits on the number of queries or rows processed.
+            However, each metric block must define at least one chart, and each chart
+            must define at least one dimension.
+            
+            Keep your queries lightweight and scoped to the data you actually need
+            to avoid adding load on the database server.
+        performance_impact:
+          description: |
+            Performance impact depends entirely on the queries you configure and the
+            collection frequency (update_every).
+            
+            Prefer indexed reads, avoid full table scans or heavy aggregations, and
+            consider using database views tailored for monitoring.
+      additional_permissions:
+        description: |
+          Create a read-only user for Netdata with permission to execute the queries
+          you configure. Typically, this means granting SELECT on:
+          
+          - the system views/tables that expose performance metrics, or
+          - custom views you create specifically for monitoring.
+          
+          The collector does not require write access.
+      supported_platforms:
+        include: []
+        exclude: []
+    setup:
+      prerequisites:
+        list:
+          - title: Create a read-only database user
+            description: |
+              Create a dedicated user for Netdata with read-only privileges on the
+              views/tables used in your monitoring queries.
+              
+              For example, on a typical RDBMS you would:
+              
+              - Create a user.
+              - Grant SELECT on system metrics views or monitoring views.
+              
+              After creating the user and updating the configuration, restart the
+              Netdata Agent with `sudo systemctl restart netdata`, or the appropriate
+              method for your system.
+          - title: Allow Netdata to connect to the database
+            description: |
+              Ensure the Netdata host can reach the database via the configured DSN,
+              either using:
+              
+              - a local UNIX/TCP socket, or
+              - a network connection (hostname/IP and port).
+              
+              If the database is remote, make sure any firewalls or security groups
+              allow connections from the Netdata node.
+      configuration:
+        file:
+          name: go.d/sql.conf
+        options:
+          description: |
+            The following options can be defined globally or per job. Most configuration
+            is done inside jobs, using the `queries` and `metrics` sections to define
+            how SQL results are converted into Netdata charts and dimensions.
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection interval (seconds).
+              default_value: 1
+              required: false
+              group: Collection
+            - name: autodetection_retry
+              description: Autodetection retry interval (seconds). Not used for this collector. Set 0 to disable.
+              default_value: 0
+              required: false
+              group: Collection
+
+            - name: driver
+              description: >
+                SQL driver to use. Supported values: mysql, postgres, oracle.
+              default_value: mysql
+              required: true
+              group: Connection
+            - name: dsn
+              description: >
+                Database connection string (DSN). The format depends on the selected driver
+                (for example: Go MySQL DSN, PostgreSQL URL/keywords, Oracle DSN).
+              default_value: root:my-secret-pw@tcp(10.10.10.20:3306)/
+              required: true
+              group: Connection
+            - name: timeout
+              description: Query and connection check timeout (seconds).
+              default_value: 5
+              required: false
+              group: Connection
+            - name: max_open_conns
+              description: Maximum number of open connections. 0 means use the driver default.
+              default_value: 0
+              required: false
+              group: Connection
+            - name: max_idle_conns
+              description: Maximum number of idle connections in the pool. 0 means use the driver default.
+              default_value: 0
+              required: false
+              group: Connection
+            - name: conn_max_lifetime
+              description: Maximum lifetime of a connection (seconds). 0 means no limit.
+              default_value: 600
+              required: false
+              group: Connection
+
+            - name: static_labels
+              description: >
+                A map of static labels added to every chart created by this job.
+                Useful for tagging charts with environment, region, or role.
+              default_value: "{}"
+              required: false
+              group: Labels
+
+            - name: queries
+              description: >
+                A list of reusable queries. Each entry has:
+                  - id: unique identifier
+                  - query: SQL string to execute
+                Metric blocks can reference these via `query_ref` to avoid repeating SQL.
+              default_value: "[]"
+              required: false
+              group: Queries & Metrics
+            - name: metrics
+              description: >
+                A list of metric blocks. Each block defines:
+                  - id: metric block id
+                  - query_ref or query: source of data
+                  - mode: columns | kv
+                  - kv_mode: optional KV mode config (name_col, value_col)
+                  - labels_from_row: how to turn columns into chart labels
+                  - charts: one or more Netdata charts (title, context, units, type, dims...)
+              default_value: "[]"
+              required: true
+              group: Queries & Metrics
+
+            - name: vnode
+              description: Associates this data collection job with a Virtual Node.
+              default_value: ""
+              required: false
+              group: Virtual Node
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Minimal MySQL example (single chart)
+              description: |
+                Collect the number of connected MySQL threads using a simple inline query
+                in columns mode. The DSN format follows the Go MySQL driver.
+              folding:
+                enabled: false
+              config: |
+                jobs:
+                  - name: mysql_threads
+                    driver: mysql
+                    dsn: 'netdata:strong-password@tcp(127.0.0.1:3306)/information_schema'
+                    timeout: 5
+
+                    metrics:
+                      - id: threads_connected
+                        mode: columns
+                        query: |
+                          SELECT
+                            VARIABLE_VALUE AS threads_connected
+                          FROM information_schema.GLOBAL_STATUS
+                          WHERE VARIABLE_NAME = 'Threads_connected'
+                        charts:
+                          - title: MySQL threads connected
+                            context: sql.mysql_threads_connected
+                            family: connections
+                            type: line
+                            units: connections
+                            algorithm: absolute
+                            dims:
+                              - name: threads_connected
+                                source: threads_connected
+            - name: PostgreSQL example with reusable query (kv mode)
+              description: |
+                Collect PostgreSQL connection states using a reusable query and kv mode.
+                The DSN format follows the pgx stdlib (PostgreSQL URL).
+              config: |
+                jobs:
+                  - name: postgres_activity
+                    driver: postgres
+                    dsn: 'postgresql://netdata:strong-password@127.0.0.1:5432/postgres'
+                    timeout: 5
+
+                    # Reusable queries
+                    queries:
+                      - id: activity_states
+                        query: |
+                          SELECT
+                            state,
+                            count(*) AS cnt
+                          FROM pg_stat_activity
+                          GROUP BY state
+
+                    # Metric blocks
+                    metrics:
+                      - id: activity_states
+                        mode: kv
+                        query_ref: activity_states
+                        kv_mode:
+                          name_col: state
+                          value_col: cnt
+                        charts:
+                          - title: PostgreSQL connection states
+                            context: sql.pg_activity_states
+                            family: connections
+                            type: stacked
+                            units: connections
+                            algorithm: absolute
+                            dims:
+                              - name: active
+                                source: active
+                              - name: idle
+                                source: idle
+                              - name: idle_in_transaction
+                                source: 'idle in transaction'
+                              - name: idle_in_transaction_aborted
+                                source: 'idle in transaction (aborted)'
+                              - name: disabled
+                                source: disabled
+            - name: Oracle example (basic columns mode)
+              description: |
+                Collect Oracle session count using a simple columns-mode query.
+                The DSN format follows the go-ora driver.
+              config: |
+                jobs:
+                  - name: oracle_sessions
+                    driver: oracle
+                    dsn: 'oracle://netdata:strong-password@db-host:1521/ORCLPDB1'
+                    timeout: 5
+
+                    metrics:
+                      - id: sessions
+                        mode: columns
+                        query: |
+                          SELECT COUNT(*) AS active_sessions
+                          FROM v$session
+                          WHERE status = 'ACTIVE'
+                        charts:
+                          - title: Oracle active sessions
+                            context: sql.oracle_active_sessions
+                            family: sessions
+                            type: line
+                            units: sessions
+                            algorithm: absolute
+                            dims:
+                              - name: active_sessions
+                                source: active_sessions
+            - name: Columns mode with labels from row
+              description: |
+                Example where a label is taken from a column and used to create
+                chart instances per database/schema.
+              config: |
+                jobs:
+                  - name: pg_conflicts_per_db
+                    driver: postgres
+                    dsn: 'postgresql://netdata:strong-password@127.0.0.1:5432/postgres'
+                    timeout: 5
+
+                    metrics:
+                      - id: conflicts
+                        mode: columns
+                        query: |
+                          SELECT
+                            datname,
+                            confl_tablespace,
+                            confl_lock,
+                            confl_snapshot,
+                            confl_bufferpin,
+                            confl_deadlock
+                          FROM pg_stat_database_conflicts
+                        labels_from_row:
+                          - source: datname
+                            name: database
+                        charts:
+                          - title: PostgreSQL conflicts
+                            context: sql.pg_db_conflicts
+                            family: conflicts
+                            type: line
+                            units: conflicts
+                            algorithm: absolute
+                            dims:
+                              - name: tablespace
+                                source: confl_tablespace
+                              - name: lock
+                                source: confl_lock
+                              - name: snapshot
+                                source: confl_snapshot
+                              - name: bufferpin
+                                source: confl_bufferpin
+                              - name: deadlock
+                                source: confl_deadlock
+            - name: Multi-instance (MySQL and PostgreSQL)
+              description: |
+                Monitor multiple databases (different drivers) from the same agent.
+                Job names must be unique.
+              config: |
+                jobs:
+                  - name: mysql_local
+                    driver: mysql
+                    dsn: 'netdata:strong-password@tcp(127.0.0.1:3306)/information_schema'
+                    timeout: 5
+                    static_labels:
+                      env: production
+                      role: primary
+
+                    metrics:
+                      - id: mysql_threads
+                        mode: columns
+                        query: |
+                          SELECT
+                            VARIABLE_VALUE AS threads_connected
+                          FROM information_schema.GLOBAL_STATUS
+                          WHERE VARIABLE_NAME = 'Threads_connected'
+                        charts:
+                          - title: MySQL threads connected
+                            context: sql.mysql_threads_connected
+                            family: connections
+                            type: line
+                            units: connections
+                            algorithm: absolute
+                            dims:
+                              - name: threads_connected
+                                source: threads_connected
+
+                  - name: postgres_local
+                    driver: postgres
+                    dsn: 'postgresql://netdata:strong-password@127.0.0.1:5432/postgres'
+                    timeout: 5
+                    static_labels:
+                      env: production
+                      role: reporting
+
+                    metrics:
+                      - id: pg_uptime
+                        mode: columns
+                        query: |
+                          SELECT
+                            EXTRACT(EPOCH FROM (now() - pg_postmaster_start_time())) AS uptime_seconds
+                        charts:
+                          - title: PostgreSQL uptime
+                            context: sql.pg_uptime
+                            family: uptime
+                            type: line
+                            units: seconds
+                            algorithm: absolute
+                            dims:
+                              - name: uptime
+                                source: uptime_seconds
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: |
+        Metrics and charts are **defined by your SQL queries and metric blocks** at runtime. They differ by database engine, schema, and configuration, and may include, for example, connection counts, cache hit ratios, row throughput, lock statistics, or custom business KPIs. Use the **Metrics** tab on the job’s dashboard to see exactly what is collected for that job.
+
+        :::tip
+
+         To change what is collected, edit the `metrics` (and optionally `queries`) sections in `go.d/sql.conf` for the corresponding job. Each change is reflected in Netdata charts after the next data collection.
+
+        :::
+
+      availability: []
+      scopes: []

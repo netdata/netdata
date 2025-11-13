@@ -6,31 +6,30 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
 )
 
 func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
-	// Ensure DB connection (safe if already open)
 	if c.db == nil {
 		if err := c.openConnection(); err != nil {
 			return nil, err
 		}
 	}
 
-	// 1) Run reusable queries (queries:)
 	qcache, _, err := c.execReusableQueries(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	// 2) Resolve & execute metric queries (metrics: with query_ref or inline)
 	mcache, _, err := c.execMetricQueries(ctx, qcache)
 	if err != nil {
 		return nil, err
 	}
 
-	// 3) Process metrics: populate the samples map (charts/dims wiring next)
 	mx := make(map[string]int64)
 	if err := c.collectMetrics(mx, mcache); err != nil {
 		return nil, err
@@ -43,7 +42,6 @@ func (c *Collector) collectMetrics(mx map[string]int64, mcache QueryRowsCache) e
 	for i, m := range c.Metrics {
 		rows, ok := mcache[m.ID]
 		if !ok {
-			// No result set for this metric; skip silently.
 			continue
 		}
 
@@ -57,61 +55,91 @@ func (c *Collector) collectMetrics(mx map[string]int64, mcache QueryRowsCache) e
 				return fmt.Errorf("metric %q (index %d) kv: %w", m.ID, i, err)
 			}
 		default:
-			// Should be prevented by validateConfig(); keep a guard anyway.
 			return fmt.Errorf("metric %q (index %d) unknown mode %q", m.ID, i, m.Mode)
 		}
 	}
 	return nil
 }
 
-func (c *Collector) evalStatusWhen(sw *ConfigStatusWhen, value string) (bool, error) {
-	switch {
-	case sw.Equals != "":
-		return value == sw.Equals, nil
-	case len(sw.In) > 0:
-		for _, v := range sw.In {
-			if v == value {
-				return true, nil
+func (c *Collector) collectMetricsModeColumns(mx map[string]int64, m ConfigMetricBlock, rows []map[string]string) error {
+	for _, ch := range m.Charts {
+		for _, row := range rows {
+			chartID := buildChartID(m, ch, row)
+			if chartID == "" {
+				continue
+			}
+			c.createChart(chartID, m, ch, row)
+
+			for _, d := range ch.Dims {
+				raw, ok := row[d.Source]
+				if !ok {
+					continue
+				}
+				id := buildDimID(chartID, d.Name)
+
+				if d.StatusWhen == nil {
+					mx[id] += toInt64(raw)
+				} else if v, ok := mx[id]; !ok || v == 0 {
+					mx[id] = metrix.Bool(c.evalStatusWhen(d.StatusWhen, raw))
+				}
 			}
 		}
-		return false, nil
-	case sw.re != nil:
-		return sw.re.MatchString(value), nil
-	default:
-		return false, fmt.Errorf("invalid status_when configuration")
 	}
+
+	return nil
 }
 
-func btoi(b bool) int64 {
-	if b {
-		return 1
+func (c *Collector) collectMetricsModeKV(mx map[string]int64, m ConfigMetricBlock, rows []map[string]string) error {
+	if m.KVMode == nil {
+		return nil
 	}
-	return 0
-}
 
-// Stringify config values for comparison with raw row strings.
-func asString(v any) string { return fmt.Sprint(v) }
+	nameCol := m.KVMode.NameCol
+	valCol := m.KVMode.ValueCol
 
-func (c *Collector) chartInstanceID(m ConfigMetricBlock, ch ConfigChartConfig, row map[string]string) string {
-	var b strings.Builder
-	b.Grow(128)
+	for _, ch := range m.Charts {
+		for _, row := range rows {
+			chartID := buildChartID(m, ch, row)
+			if chartID == "" {
+				continue
+			}
+			c.createChart(chartID, m, ch, row)
 
-	// base: metric ID + chart context
-	b.WriteString(m.ID)
-	b.WriteString("_")
-	b.WriteString(ch.Context)
+			k, ok1 := row[nameCol]
+			vraw, ok2 := row[valCol]
+			if !ok1 || !ok2 {
+				continue
+			}
 
-	// append label values from the row
-	for _, lf := range m.LabelsFromRow {
-		v, ok := row[lf.Source]
-		if !ok {
-			// missing label column — cannot form full ID
-			return ""
+			for _, d := range ch.Dims {
+				if d.Source != k {
+					continue
+				}
+				id := buildDimID(chartID, d.Name)
+
+				if d.StatusWhen == nil {
+					mx[id] += toInt64(vraw)
+				} else if v, ok := mx[id]; !ok || v == 0 {
+					mx[id] = metrix.Bool(c.evalStatusWhen(d.StatusWhen, vraw))
+				}
+			}
 		}
-		b.WriteString("_" + v)
 	}
 
-	return strings.ToLower(b.String())
+	return nil
+}
+
+func (c *Collector) evalStatusWhen(sw *ConfigStatusWhen, value string) bool {
+	switch {
+	case sw.Equals != "":
+		return value == sw.Equals
+	case len(sw.In) > 0:
+		return slices.Contains(sw.In, value)
+	case sw.re != nil:
+		return sw.re.MatchString(value)
+	default:
+		return false
+	}
 }
 
 func (c *Collector) openConnection() error {
@@ -141,6 +169,34 @@ func (c *Collector) openConnection() error {
 	c.db = db
 
 	return nil
+}
+
+func buildChartID(m ConfigMetricBlock, ch ConfigChartConfig, row map[string]string) string {
+	var b strings.Builder
+	b.Grow(128)
+
+	b.WriteString(m.ID)
+	b.WriteString("_")
+	b.WriteString(ch.Context)
+
+	for _, lf := range m.LabelsFromRow {
+		v, ok := row[lf.Source]
+		if !ok {
+			return ""
+		}
+		b.WriteString("_" + v)
+	}
+
+	return normalizeID(b.String())
+}
+
+func buildDimID(chartID, dimName string) string {
+	return normalizeID(chartID + "." + dimName)
+}
+
+func normalizeID(id string) string {
+	r := strings.NewReplacer(" ", "_", ".", "_")
+	return strings.ToLower(r.Replace(id))
 }
 
 func redactDSN(dsn string) string {
@@ -195,10 +251,6 @@ func rawBytesToString(value any) string {
 		return string(*rb)
 	}
 	return ""
-}
-
-func dimID(chartID, dimName string) string {
-	return strings.ToLower(chartID + "." + dimName)
 }
 
 // local parser: int -> float -> bool -> 0

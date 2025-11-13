@@ -73,9 +73,9 @@ type ConfigDimConfig struct {
 }
 
 type ConfigStatusWhen struct {
-	Equals any    `yaml:"equals,omitempty" json:"equals,omitempty"`
-	In     []any  `yaml:"in,omitempty" json:"in,omitempty"`
-	Match  string `yaml:"match,omitempty" json:"match,omitempty"`
+	Equals string   `yaml:"equals,omitempty" json:"equals,omitempty"`
+	In     []string `yaml:"in,omitempty" json:"in,omitempty"`
+	Match  string   `yaml:"match,omitempty" json:"match,omitempty"`
 
 	re *regexp.Regexp
 }
@@ -187,7 +187,7 @@ func (c *Collector) validateConfig() error {
 
 				if dm.StatusWhen != nil {
 					count := 0
-					if dm.StatusWhen.Equals != nil {
+					if dm.StatusWhen.Equals != "" {
 						count++
 					}
 					if len(dm.StatusWhen.In) > 0 {

@@ -1,0 +1,63 @@
+{
+  "driver": "postgres",
+  "dsn": "host=localhost port=5432 user=netdata dbname=metrics sslmode=disable",
+  "timeout": 5,
+  "max_open_conns": 10,
+  "max_idle_conns": 5,
+  "conn_max_lifetime": 3600,
+  "static_labels": {
+    "env": "prod",
+    "region": "eu-west"
+  },
+  "queries": [
+    {
+      "id": "get_users",
+      "query": "SELECT id, name FROM users"
+    }
+  ],
+  "metrics": [
+    {
+      "id": "users_metrics",
+      "query_ref": "get_users",
+      "query": "",
+      "mode": "columns",
+      "kv_mode": {
+        "name_col": "metric_name",
+        "value_col": "metric_value"
+      },
+      "labels_from_row": [
+        {
+          "source": "status",
+          "name": "state",
+          "value_map": {
+            "0": "inactive",
+            "1": "active"
+          }
+        }
+      ],
+      "charts": [
+        {
+          "title": "User Count",
+          "context": "app.users",
+          "family": "users",
+          "type": "line",
+          "units": "count",
+          "algorithm": "absolute",
+          "dims": [
+            {
+              "name": "users_total",
+              "source": "id",
+              "status_when": {
+                "equals": "equals",
+                "in": [
+                  "in"
+                ],
+                "match": "match"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
