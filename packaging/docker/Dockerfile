@@ -29,7 +29,7 @@ RUN chmod +x netdata-installer.sh && \
    /bin/echo -e "INSTALL_TYPE='oci'\nPREBUILT_ARCH='$(uname -m)'" > ./system/.install-type && \
    CFLAGS="$(packaging/docker/gen-cflags.sh)" \
    LDFLAGS="-Wl,--gc-sections" \
-   NETDATA_CMAKE_OPTIONS="-DBUILD_FOR_PACKAGING=On, DPACKAGE_TYPE=docker" \
+   NETDATA_CMAKE_OPTIONS="-DBUILD_FOR_PACKAGING=On -DPACKAGE_TYPE=docker" \
    ./netdata-installer.sh \
    --dont-wait \
    --dont-start-it \
