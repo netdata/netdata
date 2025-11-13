@@ -77,6 +77,7 @@ interface SharedServerEntry {
   requestTimeoutMs?: number;
   log: LogFn;
   filterTools: (raw: MCPTool[]) => MCPTool[];
+  transportClosing: boolean;
 }
 
 export interface SharedRegistryHandle {
@@ -179,11 +180,34 @@ class MCPSharedRegistry {
       logger('VRB', `shared probe succeeded for '${serverName}'`, `mcp:${serverName}`);
       return;
     }
-    logger('ERR', `shared probe failed for '${serverName}', scheduling restart sequence`, `mcp:${serverName}`, true);
+    logger('WRN', `shared probe failed for '${serverName}', scheduling restart sequence`, `mcp:${serverName}`);
     const firstAttemptSuccess = await this.startRestartLoop(entry, logger, 'probe-failure');
     if (!firstAttemptSuccess) {
       const err = entry.restartError ?? new MCPRestartFailedError(serverName, 'restart attempt failed');
       throw err;
+    }
+  }
+
+  private attachClientLifecycleHandlers(entry: SharedServerEntry): void {
+    entry.client.onclose = () => {
+      void this.handleTransportExit(entry);
+    };
+  }
+
+  private async handleTransportExit(entry: SharedServerEntry): Promise<void> {
+    if (this.entries.get(entry.serverName) !== entry) {
+      return;
+    }
+    if (entry.transportClosing) {
+      entry.log('VRB', `shared transport closed for '${entry.serverName}' during managed restart`, `mcp:${entry.serverName}`);
+      return;
+    }
+    entry.log('WRN', `shared transport closed for '${entry.serverName}', scheduling restart sequence`, `mcp:${entry.serverName}`);
+    try {
+      await this.startRestartLoop(entry, entry.log, 'transport-exit');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      entry.log('ERR', `shared restart scheduling failed for '${entry.serverName}' after transport exit: ${message}`, `mcp:${entry.serverName}`, true);
     }
   }
   
@@ -223,7 +247,7 @@ class MCPSharedRegistry {
           await delay(backoffMs);
         }
         const attemptLabel = attempt + 1;
-        logger('ERR', `shared restart attempt ${String(attemptLabel)} for '${entry.serverName}' (${reason})`, `mcp:${entry.serverName}`, true);
+        logger('WRN', `shared restart attempt ${String(attemptLabel)} for '${entry.serverName}' (${reason})`, `mcp:${entry.serverName}`);
         entry.restartError = undefined;
         try {
           await this.performRestartAttempt(entry, logger);
@@ -253,6 +277,7 @@ class MCPSharedRegistry {
   }
 
   private async performRestartAttempt(entry: SharedServerEntry, logger: LogFn): Promise<void> {
+    entry.transportClosing = true;
     try {
       if (entry.pid !== null) {
         await killProcessTree(entry.pid, { gracefulMs: 1000, logger: (message) => { logger('WRN', message, `mcp:${entry.serverName}`); } });
@@ -268,7 +293,11 @@ class MCPSharedRegistry {
         await entry.transport.close();
       }
     } catch { /* ignore */ }
-    await this.reinitializeEntry(entry, logger);
+    try {
+      await this.reinitializeEntry(entry, logger);
+    } finally {
+      entry.transportClosing = false;
+    }
   }
 
   private async initializeEntry(serverName: string, config: MCPServerConfig, opts: SharedAcquireOptions): Promise<SharedServerEntry> {
@@ -279,7 +308,7 @@ class MCPSharedRegistry {
         const backoffMs = SHARED_RESTART_BACKOFF_MS[Math.min(attempt, SHARED_RESTART_BACKOFF_MS.length - 1)];
         const delayLabel = `${String(backoffMs)}ms`;
         const retryMsg = `shared server '${serverName}' initialization retry (attempt ${String(attempt + 1)}) in ${delayLabel}`;
-        opts.log('ERR', retryMsg, `mcp:${serverName}`, true);
+        opts.log('WRN', retryMsg, `mcp:${serverName}`);
         if (backoffMs > 0) {
           await delay(backoffMs);
         }
@@ -307,7 +336,7 @@ class MCPSharedRegistry {
       pid = built.pid;
       await client.connect(transport);
       const server = await this.buildServerDescriptor(serverName, config, client, opts);
-      return {
+      const entry: SharedServerEntry = {
         serverName,
         config,
         client,
@@ -322,7 +351,10 @@ class MCPSharedRegistry {
         requestTimeoutMs: opts.requestTimeoutMs,
         log: opts.log,
         filterTools: opts.filterTools,
+        transportClosing: false,
       };
+      this.attachClientLifecycleHandlers(entry);
+      return entry;
     } catch (error) {
       try { await client.close(); } catch { /* ignore */ }
       if (transport !== undefined && typeof (transport as { close?: () => Promise<void> }).close === 'function') {
@@ -361,6 +393,8 @@ class MCPSharedRegistry {
       entry.pid = pid;
       entry.server = server;
       entry.restartError = undefined;
+      entry.transportClosing = false;
+      this.attachClientLifecycleHandlers(entry);
     } catch (error) {
       try { await client.close(); } catch { /* ignore */ }
       if (transport !== undefined && typeof (transport as { close?: () => Promise<void> }).close === 'function') {

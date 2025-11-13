@@ -4645,6 +4645,107 @@ if (process.env.CONTEXT_DEBUG === 'true') {
   })(),
   (() => {
     return {
+      id: 'run-test-74-idle-exit-restart',
+      description: 'Shared registry detects transport exits between tool invocations and restarts automatically.',
+      execute: async () => {
+        const stateFile = createRestartFixtureStateFile();
+        const logs: LogEntry[] = [];
+        const serverName = 'idleExitFixture';
+        const toolName = `${serverName}__test`;
+        const config: Record<string, MCPServerConfig> = {
+          [serverName]: {
+            type: 'stdio',
+            command: process.execPath,
+            args: [TEST_STDIO_SERVER_PATH],
+            shared: true,
+            env: {
+              MCP_FIXTURE_MODE: 'restart',
+              MCP_FIXTURE_STATE_FILE: stateFile,
+              MCP_FIXTURE_HANG_MS: '2000',
+              MCP_FIXTURE_EXIT_DELAY_MS: '100',
+            },
+          },
+        } as Record<string, MCPServerConfig>;
+        const provider = new MCPProvider('mcp', config, { requestTimeoutMs: 2000, onLog: (entry) => { logs.push(entry); } });
+        await provider.warmup();
+        const firstCall = await (async (): Promise<{ success: true } | { success: false; error: Error }> => {
+          try {
+            await provider.execute(toolName, { text: RESTART_TRIGGER_PAYLOAD }, { timeoutMs: 8000 });
+            return { success: true as const };
+          } catch (error: unknown) {
+            return { success: false as const, error: toError(error) };
+          }
+        })();
+        if (firstCall.success) {
+          invariant(false, 'First call must fail when transport exits for run-test-74-idle-exit-restart.');
+        }
+        const firstErrorMessage = toErrorMessage(firstCall.error);
+        let recovered: ToolExecuteResult | undefined;
+        let restartInProgressErrors = 0;
+        const deadline = Date.now() + 10000;
+        // eslint-disable-next-line functional/no-loop-statements -- deterministic retry while restart completes.
+        while (Date.now() < deadline) {
+          try {
+            recovered = await provider.execute(toolName, { text: RESTART_POST_PAYLOAD }, { timeoutMs: 5000 });
+            break;
+          } catch (error) {
+            const err = toError(error);
+            const code = (err as { code?: string }).code ?? '';
+            if (code === 'mcp_restart_in_progress') {
+              restartInProgressErrors += 1;
+              await delay(100);
+              continue;
+            }
+            throw err;
+          }
+        }
+        invariant(recovered !== undefined, 'Recovered response missing for run-test-74-idle-exit-restart.');
+        const recoveredResultText = recovered.result;
+        await provider.cleanup();
+        const finalState = readRestartFixtureState(stateFile);
+        fs.rmSync(path.dirname(stateFile), { recursive: true, force: true });
+        return {
+          success: true,
+          conversation: [],
+          logs,
+          accounting: [],
+          finalReport: {
+            status: 'success',
+            format: 'json',
+            content_json: {
+              firstError: firstErrorMessage,
+              recoveredResult: recoveredResultText,
+              state: finalState,
+              transportExitLogs: logs.filter((entry) => entry.message.includes('shared transport closed')).length,
+              restartSuccessLogs: logs.filter((entry) => entry.message.includes('shared restart succeeded')).length,
+              restartInProgressErrors,
+            },
+            ts: Date.now(),
+          },
+        } satisfies AIAgentResult;
+      },
+      expect: (result: AIAgentResult) => {
+        invariant(result.success, 'run-test-74-idle-exit-restart expected success.');
+        const data = result.finalReport?.content_json as {
+          firstError?: string;
+          recoveredResult?: string;
+          state?: RestartFixtureState;
+          transportExitLogs?: number;
+          restartSuccessLogs?: number;
+          restartInProgressErrors?: number;
+        } | undefined;
+        invariant(data !== undefined, 'Final report payload required for run-test-74-idle-exit-restart.');
+        invariant(typeof data.firstError === 'string' && data.firstError.length > 0, 'First call error missing for run-test-74-idle-exit-restart.');
+        invariant(typeof data.recoveredResult === 'string' && data.recoveredResult.includes('recovered'), 'Recovered payload mismatch for run-test-74-idle-exit-restart.');
+        invariant(data.state?.phase === 'recovered', 'Fixture state must reach recovered for run-test-74-idle-exit-restart.');
+        invariant((data.transportExitLogs ?? 0) >= 1, 'Transport exit log not detected for run-test-74-idle-exit-restart.');
+        invariant((data.restartSuccessLogs ?? 0) >= 1, 'Restart success log missing for run-test-74-idle-exit-restart.');
+        invariant((data.restartInProgressErrors ?? 0) >= 0, 'Restart error counter should be defined for run-test-74-idle-exit-restart.');
+      },
+    } satisfies HarnessTest;
+  })(),
+  (() => {
+    return {
       id: 'run-test-72-restart-failure',
       description: 'Structured restart errors propagate when the restart window blows up.',
       execute: async () => {
