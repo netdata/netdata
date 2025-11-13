@@ -25,11 +25,12 @@ import (
 
 // OTLPEmitterConfig configures the OTLP emitter.
 type OTLPEmitterConfig struct {
-	Endpoint  string
-	Timeout   time.Duration
-	UseTLS    bool
-	Headers   map[string]string
-	TLSConfig tlscfg.TLSConfig
+	Endpoint   string
+	Timeout    time.Duration
+	UseTLS     bool
+	Headers    map[string]string
+	TLSConfig  tlscfg.TLSConfig
+	ServerName string
 }
 
 const (
@@ -74,7 +75,9 @@ func NewOTLPEmitter(cfg OTLPEmitterConfig, log *logger.Logger) (ResultEmitter, e
 			tlsConf.MinVersion = tls.VersionTLS12
 		}
 		if tlsConf.ServerName == "" {
-			if host, _, err := net.SplitHostPort(endpoint); err == nil {
+			if cfg.ServerName != "" {
+				tlsConf.ServerName = cfg.ServerName
+			} else if host, _, err := net.SplitHostPort(endpoint); err == nil {
 				tlsConf.ServerName = host
 			} else {
 				tlsConf.ServerName = endpoint

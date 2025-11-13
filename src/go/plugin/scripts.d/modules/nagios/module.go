@@ -69,6 +69,7 @@ type OTLPLoggingConfig struct {
 	Timeout          confopt.Duration  `yaml:"timeout,omitempty" json:"timeout"`
 	TLS              *bool             `yaml:"tls,omitempty" json:"tls"`
 	Headers          map[string]string `yaml:"headers,omitempty" json:"headers"`
+	TLSServerName    string            `yaml:"tls_server_name,omitempty" json:"tls_server_name,omitempty"`
 	tlscfg.TLSConfig `yaml:",inline" json:",inline"`
 }
 
@@ -96,11 +97,12 @@ func (l *LoggingConfig) setDefaults() {
 
 func (l LoggingConfig) emitterConfig() runtime.OTLPEmitterConfig {
 	return runtime.OTLPEmitterConfig{
-		Endpoint:  l.OTLP.Endpoint,
-		Timeout:   time.Duration(l.OTLP.Timeout),
-		UseTLS:    l.OTLP.tlsEnabled(),
-		Headers:   l.OTLP.Headers,
-		TLSConfig: l.OTLP.TLSConfig,
+		Endpoint:   l.OTLP.Endpoint,
+		Timeout:    time.Duration(l.OTLP.Timeout),
+		UseTLS:     l.OTLP.tlsEnabled(),
+		Headers:    l.OTLP.Headers,
+		TLSConfig:  l.OTLP.TLSConfig,
+		ServerName: l.OTLP.TLSServerName,
 	}
 }
 

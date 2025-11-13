@@ -22,24 +22,17 @@ type TLSConfig struct {
 
 	// InsecureSkipVerify controls whether a client verifies the server's certificate chain and host name.
 	InsecureSkipVerify bool `yaml:"tls_skip_verify,omitempty" json:"tls_skip_verify"`
-
-	// TLSServerName overrides the name used for TLS SNI/verification.
-	TLSServerName string `yaml:"tls_server_name,omitempty" json:"tls_server_name"`
 }
 
 // NewTLSConfig creates a tls.Config, may be nil without an error if TLS is not configured.
 func NewTLSConfig(cfg TLSConfig) (*tls.Config, error) {
-	if cfg.TLSCA == "" && cfg.TLSKey == "" && cfg.TLSCert == "" && !cfg.InsecureSkipVerify && cfg.TLSServerName == "" {
+	if cfg.TLSCA == "" && cfg.TLSKey == "" && cfg.TLSCert == "" && !cfg.InsecureSkipVerify {
 		return nil, nil
 	}
 
 	tlsConfig := &tls.Config{
 		InsecureSkipVerify: cfg.InsecureSkipVerify,
 		Renegotiation:      tls.RenegotiateNever,
-	}
-
-	if cfg.TLSServerName != "" {
-		tlsConfig.ServerName = cfg.TLSServerName
 	}
 
 	if cfg.TLSCA != "" {
