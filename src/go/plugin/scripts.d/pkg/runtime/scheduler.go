@@ -76,6 +76,7 @@ type jobState struct {
 	lastRSS         int64
 	lastDiskRead    int64
 	lastDiskWrite   int64
+	cpuMeasured     bool
 	skipped         uint64
 	state           string
 	retrying        bool
@@ -294,11 +295,14 @@ func (s *Scheduler) handleResult(res ExecutionResult) {
 	var jobSpec spec.JobSpec
 	var snapshot JobSnapshot
 	var scheduleRetry bool
+	var measured bool
 	if ok {
 		jobSpec = js.runtime.Spec
 		js.running = false
 		js.lastDuration = res.Duration
 		js.lastCPU = res.Usage.User + res.Usage.System
+		measured = res.Usage.User != 0 || res.Usage.System != 0 || res.Duration == 0
+		js.cpuMeasured = measured
 		js.lastRSS = res.Usage.MaxRSSBytes
 		js.lastDiskRead = res.Usage.ReadBytes
 		js.lastDiskWrite = res.Usage.WriteBytes
@@ -329,6 +333,9 @@ func (s *Scheduler) handleResult(res ExecutionResult) {
 	if ok {
 		if scheduleRetry {
 			s.armTimer(js)
+		}
+		if !measured && res.Duration > 0 && s.log != nil {
+			s.log.Debugf("nagios job %s completed without CPU usage data; emitting zero", res.Job.Spec.Name)
 		}
 		s.registerPerfdataCharts(jobSpec, parsed.Perfdata)
 		s.emitter.Emit(res.Job, res, snapshot)
@@ -445,12 +452,11 @@ func (s *Scheduler) CollectMetrics() map[string]int64 {
 		metrics[id.MetricID("state", "max_attempts")] = int64(js.maxAttempts)
 		metrics[id.MetricID("runtime", "running")] = boolToInt(js.running)
 		metrics[id.MetricID("runtime", "retrying")] = boolToInt(js.retrying)
+		missingCPU := !js.cpuMeasured && js.lastDuration > 0
 		metrics[id.MetricID("runtime", "skipped")] = boolToInt(js.periodSkipped)
+		metrics[id.MetricID("runtime", "cpu_missing")] = boolToInt(missingCPU)
 		metrics[id.MetricID("latency", "duration")] = js.lastDuration.Nanoseconds()
 		cpuNs := js.lastCPU.Nanoseconds()
-		if cpuNs == 0 {
-			cpuNs = js.lastDuration.Nanoseconds()
-		}
 		metrics[id.MetricID("cpu", "cpu_time")] = cpuNs
 		metrics[id.MetricID("mem", "rss")] = js.lastRSS
 		metrics[id.MetricID("disk", "read")] = js.lastDiskRead

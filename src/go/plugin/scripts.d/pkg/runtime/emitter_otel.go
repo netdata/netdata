@@ -5,15 +5,14 @@ package runtime
 import (
 	"context"
 	"crypto/tls"
-	"crypto/x509"
 	"fmt"
 	"net"
-	"os"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/pkg/tlscfg"
 	collectorlogs "go.opentelemetry.io/proto/otlp/collector/logs/v1"
 	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
 	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
@@ -26,15 +25,11 @@ import (
 
 // OTLPEmitterConfig configures the OTLP emitter.
 type OTLPEmitterConfig struct {
-	Endpoint           string
-	Timeout            time.Duration
-	Insecure           bool
-	Headers            map[string]string
-	CAFile             string
-	CertFile           string
-	KeyFile            string
-	ServerName         string
-	InsecureSkipVerify bool
+	Endpoint  string
+	Timeout   time.Duration
+	UseTLS    bool
+	Headers   map[string]string
+	TLSConfig tlscfg.TLSConfig
 }
 
 const (
@@ -67,14 +62,27 @@ func NewOTLPEmitter(cfg OTLPEmitterConfig, log *logger.Logger) (ResultEmitter, e
 	}
 
 	dialOpts := []grpc.DialOption{grpc.WithBlock()}
-	if cfg.Insecure || endpoint == DefaultOTLPEndpoint {
-		dialOpts = append(dialOpts, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	} else {
-		creds, err := buildTLSCredentials(cfg, endpoint)
+	if cfg.UseTLS {
+		tlsConf, err := tlscfg.NewTLSConfig(cfg.TLSConfig)
 		if err != nil {
 			return nil, err
 		}
-		dialOpts = append(dialOpts, grpc.WithTransportCredentials(creds))
+		if tlsConf == nil {
+			tlsConf = &tls.Config{}
+		}
+		if tlsConf.MinVersion == 0 {
+			tlsConf.MinVersion = tls.VersionTLS12
+		}
+		if tlsConf.ServerName == "" {
+			if host, _, err := net.SplitHostPort(endpoint); err == nil {
+				tlsConf.ServerName = host
+			} else {
+				tlsConf.ServerName = endpoint
+			}
+		}
+		dialOpts = append(dialOpts, grpc.WithTransportCredentials(credentials.NewTLS(tlsConf)))
+	} else {
+		dialOpts = append(dialOpts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
@@ -107,44 +115,6 @@ func NewOTLPEmitter(cfg OTLPEmitterConfig, log *logger.Logger) (ResultEmitter, e
 		resource: resource,
 		scope:    scope,
 	}, nil
-}
-
-func buildTLSCredentials(cfg OTLPEmitterConfig, endpoint string) (credentials.TransportCredentials, error) {
-	tlsConf := &tls.Config{MinVersion: tls.VersionTLS12}
-	if cfg.CAFile != "" {
-		caPEM, err := os.ReadFile(cfg.CAFile)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read otlp ca_file: %w", err)
-		}
-		pool := x509.NewCertPool()
-		if !pool.AppendCertsFromPEM(caPEM) {
-			return nil, fmt.Errorf("failed to parse otlp ca_file")
-		}
-		tlsConf.RootCAs = pool
-	}
-	if cfg.CertFile != "" || cfg.KeyFile != "" {
-		if cfg.CertFile == "" || cfg.KeyFile == "" {
-			return nil, fmt.Errorf("both cert_file and key_file must be provided for OTLP TLS client auth")
-		}
-		cert, err := tls.LoadX509KeyPair(cfg.CertFile, cfg.KeyFile)
-		if err != nil {
-			return nil, fmt.Errorf("failed to load OTLP client certificate: %w", err)
-		}
-		tlsConf.Certificates = []tls.Certificate{cert}
-	}
-	if cfg.ServerName != "" {
-		tlsConf.ServerName = cfg.ServerName
-	} else {
-		if host, _, err := net.SplitHostPort(endpoint); err == nil {
-			tlsConf.ServerName = host
-		} else {
-			tlsConf.ServerName = endpoint
-		}
-	}
-	if cfg.InsecureSkipVerify {
-		tlsConf.InsecureSkipVerify = true
-	}
-	return credentials.NewTLS(tlsConf), nil
 }
 
 func (e *otlpEmitter) Emit(job JobRuntime, res ExecutionResult, snap JobSnapshot) {

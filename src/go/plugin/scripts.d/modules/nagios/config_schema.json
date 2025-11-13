@@ -27,6 +27,16 @@
       "minimum": 1,
       "description": "Maximum concurrent Nagios plugin executions for this shard (default 50)."
     },
+    "watcher_debounce": {
+      "type": "string",
+      "pattern": "^([0-9]+(\\.[0-9]+)?(ns|us|ms|s|m|h|d))+$",
+      "description": "Filesystem watcher debounce interval (default 250ms)."
+    },
+    "directory_rescan_interval": {
+      "type": "string",
+      "pattern": "^([0-9]+(\\.[0-9]+)?(ns|us|ms|s|m|h|d))+$",
+      "description": "Fallback rescan interval when watchers fail (default 1m)."
+    },
     "defaults": {
       "type": "object",
       "description": "Global defaults applied to every job (explicit or directory-generated)",
@@ -146,13 +156,13 @@
           "properties": {
             "endpoint": {"type": "string"},
             "timeout": {"type": "string", "pattern": "^([0-9]+(\.[0-9]+)?(ns|us|ms|s|m|h|d))+$"},
-            "insecure": {"type": "boolean"},
+            "tls": {"type": "boolean", "description": "Enable TLS (default true)."},
             "headers": {"type": "object", "additionalProperties": {"type": "string"}},
-            "ca_file": {"type": "string"},
-            "cert_file": {"type": "string"},
-            "key_file": {"type": "string"},
-            "server_name": {"type": "string"},
-            "insecure_skip_verify": {"type": "boolean"}
+            "tls_ca": {"type": "string"},
+            "tls_cert": {"type": "string"},
+            "tls_key": {"type": "string"},
+            "tls_server_name": {"type": "string"},
+            "tls_skip_verify": {"type": "boolean"}
           }
         }
       }

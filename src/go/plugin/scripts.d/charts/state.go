@@ -52,6 +52,7 @@ func RuntimeChart(meta JobIdentity, priority int) *module.Chart {
 		{ID: "running", Name: "running", Algo: module.Absolute},
 		{ID: "retrying", Name: "retrying", Algo: module.Absolute},
 		{ID: "skipped", Name: "skipped", Algo: module.Absolute},
+		{ID: "cpu_missing", Name: "cpu_missing", Algo: module.Absolute, DimOpts: module.DimOpts{Hidden: true}},
 	}
 	chart.Opts.Detail = true
 	return &chart

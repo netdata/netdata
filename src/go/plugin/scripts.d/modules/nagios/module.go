@@ -14,6 +14,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/multipath"
 	"github.com/netdata/netdata/go/plugins/pkg/pluginconfig"
+	"github.com/netdata/netdata/go/plugins/pkg/tlscfg"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/vnodes"
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/charts"
@@ -43,17 +44,19 @@ func init() {
 // Config represents a configuration shard loaded by go.d's file discovery.
 // A single Config can define explicit jobs as well as directory provisioning rules.
 type Config struct {
-	Name               string                   `yaml:"name" json:"name"`
-	Vnode              string                   `yaml:"vnode,omitempty" json:"vnode"`
-	UpdateEvery        int                      `yaml:"update_every,omitempty" json:"update_every"`
-	AutoDetectionRetry int                      `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
-	ExecutorWorkers    int                      `yaml:"executor_workers,omitempty" json:"executor_workers"`
-	Defaults           config.Defaults          `yaml:"defaults,omitempty" json:"defaults"`
-	UserMacros         map[string]string        `yaml:"user_macros,omitempty" json:"user_macros"`
-	Jobs               []spec.JobConfig         `yaml:"jobs,omitempty" json:"jobs"`
-	Directories        []config.DirectoryConfig `yaml:"directories,omitempty" json:"directories"`
-	TimePeriods        []timeperiod.Config      `yaml:"time_periods,omitempty" json:"time_periods"`
-	Logging            LoggingConfig            `yaml:"logging,omitempty" json:"logging"`
+	Name                    string                   `yaml:"name" json:"name"`
+	Vnode                   string                   `yaml:"vnode,omitempty" json:"vnode"`
+	UpdateEvery             int                      `yaml:"update_every,omitempty" json:"update_every"`
+	AutoDetectionRetry      int                      `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
+	ExecutorWorkers         int                      `yaml:"executor_workers,omitempty" json:"executor_workers"`
+	WatcherDebounce         confopt.Duration         `yaml:"watcher_debounce,omitempty" json:"watcher_debounce"`
+	DirectoryRescanInterval confopt.Duration         `yaml:"directory_rescan_interval,omitempty" json:"directory_rescan_interval"`
+	Defaults                config.Defaults          `yaml:"defaults,omitempty" json:"defaults"`
+	UserMacros              map[string]string        `yaml:"user_macros,omitempty" json:"user_macros"`
+	Jobs                    []spec.JobConfig         `yaml:"jobs,omitempty" json:"jobs"`
+	Directories             []config.DirectoryConfig `yaml:"directories,omitempty" json:"directories"`
+	TimePeriods             []timeperiod.Config      `yaml:"time_periods,omitempty" json:"time_periods"`
+	Logging                 LoggingConfig            `yaml:"logging,omitempty" json:"logging"`
 }
 
 type LoggingConfig struct {
@@ -62,15 +65,11 @@ type LoggingConfig struct {
 }
 
 type OTLPLoggingConfig struct {
-	Endpoint           string            `yaml:"endpoint,omitempty" json:"endpoint"`
-	Timeout            confopt.Duration  `yaml:"timeout,omitempty" json:"timeout"`
-	Insecure           bool              `yaml:"insecure,omitempty" json:"insecure"`
-	Headers            map[string]string `yaml:"headers,omitempty" json:"headers"`
-	CAFile             string            `yaml:"ca_file,omitempty" json:"ca_file"`
-	CertFile           string            `yaml:"cert_file,omitempty" json:"cert_file"`
-	KeyFile            string            `yaml:"key_file,omitempty" json:"key_file"`
-	ServerName         string            `yaml:"server_name,omitempty" json:"server_name"`
-	InsecureSkipVerify bool              `yaml:"insecure_skip_verify,omitempty" json:"insecure_skip_verify"`
+	Endpoint         string            `yaml:"endpoint,omitempty" json:"endpoint"`
+	Timeout          confopt.Duration  `yaml:"timeout,omitempty" json:"timeout"`
+	TLS              *bool             `yaml:"tls,omitempty" json:"tls"`
+	Headers          map[string]string `yaml:"headers,omitempty" json:"headers"`
+	tlscfg.TLSConfig `yaml:",inline" json:",inline"`
 }
 
 func (l *LoggingConfig) setDefaults() {
@@ -86,6 +85,10 @@ func (l *LoggingConfig) setDefaults() {
 	if l.OTLP.Headers == nil {
 		l.OTLP.Headers = make(map[string]string)
 	}
+	if l.OTLP.TLS == nil {
+		v := true
+		l.OTLP.TLS = &v
+	}
 	if !l.Enabled {
 		l.Enabled = true
 	}
@@ -93,16 +96,24 @@ func (l *LoggingConfig) setDefaults() {
 
 func (l LoggingConfig) emitterConfig() runtime.OTLPEmitterConfig {
 	return runtime.OTLPEmitterConfig{
-		Endpoint:           l.OTLP.Endpoint,
-		Timeout:            time.Duration(l.OTLP.Timeout),
-		Insecure:           l.OTLP.Insecure,
-		Headers:            l.OTLP.Headers,
-		CAFile:             l.OTLP.CAFile,
-		CertFile:           l.OTLP.CertFile,
-		KeyFile:            l.OTLP.KeyFile,
-		ServerName:         l.OTLP.ServerName,
-		InsecureSkipVerify: l.OTLP.InsecureSkipVerify,
+		Endpoint:  l.OTLP.Endpoint,
+		Timeout:   time.Duration(l.OTLP.Timeout),
+		UseTLS:    l.OTLP.tlsEnabled(),
+		Headers:   l.OTLP.Headers,
+		TLSConfig: l.OTLP.TLSConfig,
 	}
+}
+
+func (c OTLPLoggingConfig) tlsEnabled() bool {
+	if c.TLS == nil {
+		return true
+	}
+	return *c.TLS
+}
+
+func boolPtr(v bool) *bool {
+	b := v
+	return &b
 }
 
 // Collector is a placeholder module that keeps the plugin wiring compiling while the real
@@ -136,17 +147,19 @@ type perfChartMeta struct {
 func New() *Collector {
 	return &Collector{
 		Config: Config{
-			UpdateEvery:     module.UpdateEvery,
-			ExecutorWorkers: 50,
-			UserMacros:      make(map[string]string),
-			Defaults:        config.Defaults{CheckPeriod: timeperiod.DefaultPeriodName},
-			TimePeriods:     []timeperiod.Config{timeperiod.DefaultPeriodConfig()},
+			UpdateEvery:             module.UpdateEvery,
+			ExecutorWorkers:         50,
+			UserMacros:              make(map[string]string),
+			WatcherDebounce:         confopt.Duration(250 * time.Millisecond),
+			DirectoryRescanInterval: confopt.Duration(time.Minute),
+			Defaults:                config.Defaults{CheckPeriod: timeperiod.DefaultPeriodName},
+			TimePeriods:             []timeperiod.Config{timeperiod.DefaultPeriodConfig()},
 			Logging: LoggingConfig{
 				Enabled: true,
 				OTLP: OTLPLoggingConfig{
 					Endpoint: runtime.DefaultOTLPEndpoint,
 					Timeout:  confopt.Duration(runtime.DefaultOTLPTimeout),
-					Insecure: true,
+					TLS:      boolPtr(false),
 					Headers:  make(map[string]string),
 				},
 			},
@@ -174,6 +187,12 @@ func (c *Collector) Init(ctx context.Context) error {
 		c.UserMacros = make(map[string]string)
 	}
 	c.Logging.setDefaults()
+	if c.WatcherDebounce <= 0 {
+		c.WatcherDebounce = confopt.Duration(250 * time.Millisecond)
+	}
+	if c.DirectoryRescanInterval <= 0 {
+		c.DirectoryRescanInterval = confopt.Duration(time.Minute)
+	}
 	jobs, err := c.expandJobSpecs()
 	if err != nil {
 		return err
@@ -387,6 +406,8 @@ func (c *Collector) startReloadInfrastructure(ctx context.Context) error {
 	c.reloadCancel = cancel
 	c.reloadCh = make(chan struct{}, 1)
 	c.dirWatchers = nil
+	debounce := time.Duration(c.WatcherDebounce)
+	rescan := time.Duration(c.DirectoryRescanInterval)
 
 	c.reloadWG.Add(1)
 	go c.reloadLoop(reloadCtx)
@@ -396,10 +417,10 @@ func (c *Collector) startReloadInfrastructure(ctx context.Context) error {
 	}
 	for _, dirCfg := range c.Directories {
 		dc := dirCfg
-		watcher, err := newDirectoryWatcher(reloadCtx, c.Logger, dc, c.requestReload)
+		watcher, err := newDirectoryWatcher(reloadCtx, c.Logger, dc, debounce, c.requestReload)
 		if err != nil {
 			c.Warningf("nagios directory watch failed for %s: %v (falling back to periodic rescan)", dc.Path, err)
-			c.spawnPeriodicRescan(reloadCtx, dc)
+			c.spawnPeriodicRescan(reloadCtx, dc, rescan)
 			continue
 		}
 		c.dirWatchers = append(c.dirWatchers, watcher)
@@ -446,11 +467,14 @@ func (c *Collector) requestReload() {
 	}
 }
 
-func (c *Collector) spawnPeriodicRescan(ctx context.Context, dirCfg config.DirectoryConfig) {
+func (c *Collector) spawnPeriodicRescan(ctx context.Context, dirCfg config.DirectoryConfig, interval time.Duration) {
 	c.reloadWG.Add(1)
 	go func() {
 		defer c.reloadWG.Done()
-		ticker := time.NewTicker(1 * time.Minute)
+		if interval <= 0 {
+			interval = time.Minute
+		}
+		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
 		for {
 			select {

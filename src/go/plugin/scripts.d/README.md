@@ -89,14 +89,16 @@ logging:
   enabled: true
   otlp:
     endpoint: 127.0.0.1:4317
-    insecure: true
+    tls: false
     timeout: 5s
 ```
 
 The `logging` block enables OTLP log forwarding to Netdata's `otel.plugin`
-instance. By default the plugin emits to `127.0.0.1:4317` over insecure gRPC;
-adjust the endpoint, TLS mode, timeout, or headers if your OTLP pipeline lives
-elsewhere or requires authentication.
+instance. The sample config keeps `tls: false` so local collectors can start
+without certificates; set `tls: true` (and optionally `tls_ca` / `tls_cert` /
+`tls_key`) to enforce encryption, even when emitting to `127.0.0.1:4317`.
+Adjust the endpoint, timeout, or headers if your OTLP
+pipeline lives elsewhere or requires authentication.
 
 ### Scheduling semantics & skip behavior
 
@@ -154,18 +156,34 @@ track the configured intervals; spikes indicate the executor is falling behind
 ### Logging over OTLP (TLS support)
 
 Structured logs are forwarded to OTEL via `logging.otlp`. Besides `endpoint`,
-`timeout`, `insecure`, and `headers`, you can now set:
+`timeout`, `tls`, and `headers`, you can now set:
 
-- `ca_file`: custom CA bundle for the collector
-- `cert_file` / `key_file`: client certificate pair for mutual TLS
-- `server_name`: override the TLS SNI when the collector name differs from the
+- `tls_ca`: custom CA bundle for the collector
+- `tls_cert` / `tls_key`: client certificate pair for mutual TLS
+- `tls_server_name`: override the TLS SNI when the collector name differs from the
   endpoint host
-- `insecure_skip_verify`: disable server certificate verification (not
+- `tls_skip_verify`: disable server certificate verification (not
   recommended outside of lab environments)
 
-When `insecure` is `false`, the plugin automatically establishes a TLS 1.2
-connection using these settings; otherwise it falls back to insecure gRPC (the
-default for `127.0.0.1:4317`).
+When `tls` is `true`, the plugin always establishes a TLS 1.2 connection using
+these settings. Set `tls: false` only for loopback collectors or other trusted
+plaintext networks.
+
+### Directory watcher tuning
+
+Two shard-level knobs control how aggressively scripts.d.plugin reloads
+configuration when files change:
+
+- `watcher_debounce` (default `250ms`): how long inotify/fsnotify events are
+  batched before a reload is triggered. Increase this value if large config
+  syncs generate a flood of events; decrease it if you need near-real-time
+  reloads.
+- `directory_rescan_interval` (default `1m`): how often the collector polls the
+  directories when fsnotify cannot be established (e.g., missing permissions or
+  `ENOSPC`). Shortening this interval speeds up discovery at the cost of extra
+  IO.
+
+Both settings accept the usual Go duration syntax (`500ms`, `2s`, `1m30s`).
 
 ### Mock integration tests
 

@@ -17,24 +17,29 @@ import (
 )
 
 type directoryWatcher struct {
-	cfg     config.DirectoryConfig
-	log     *logger.Logger
-	watcher *fsnotify.Watcher
-	cancel  context.CancelFunc
-	wg      sync.WaitGroup
+	cfg      config.DirectoryConfig
+	log      *logger.Logger
+	watcher  *fsnotify.Watcher
+	cancel   context.CancelFunc
+	debounce time.Duration
+	wg       sync.WaitGroup
 }
 
-func newDirectoryWatcher(ctx context.Context, log *logger.Logger, cfg config.DirectoryConfig, onChange func()) (*directoryWatcher, error) {
+func newDirectoryWatcher(ctx context.Context, log *logger.Logger, cfg config.DirectoryConfig, debounce time.Duration, onChange func()) (*directoryWatcher, error) {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		return nil, err
 	}
 	watchCtx, cancel := context.WithCancel(ctx)
+	if debounce <= 0 {
+		debounce = 250 * time.Millisecond
+	}
 	dw := &directoryWatcher{
-		cfg:     cfg,
-		log:     log,
-		watcher: watcher,
-		cancel:  cancel,
+		cfg:      cfg,
+		log:      log,
+		watcher:  watcher,
+		cancel:   cancel,
+		debounce: debounce,
 	}
 	if err := dw.addInitialPaths(); err != nil {
 		watcher.Close()
@@ -74,6 +79,10 @@ func (dw *directoryWatcher) addInitialPaths() error {
 
 func (dw *directoryWatcher) run(ctx context.Context, onChange func()) {
 	defer dw.wg.Done()
+	interval := dw.debounce
+	if interval <= 0 {
+		interval = 250 * time.Millisecond
+	}
 	debounce := time.NewTimer(time.Hour)
 	debounce.Stop()
 	debouncing := false
@@ -96,9 +105,9 @@ func (dw *directoryWatcher) run(ctx context.Context, onChange func()) {
 				}
 				if !debouncing {
 					debouncing = true
-					debounce.Reset(250 * time.Millisecond)
+					debounce.Reset(interval)
 				} else {
-					debounce.Reset(250 * time.Millisecond)
+					debounce.Reset(interval)
 				}
 			}
 		case err := <-dw.watcher.Errors:
