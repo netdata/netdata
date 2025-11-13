@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"os/user"
+	"path/filepath"
 	"strings"
 
 	"go.uber.org/automaxprocs/maxprocs"
@@ -22,6 +23,7 @@ import (
 )
 
 func init() {
+	executable.Name = "scripts.d"
 	if v := os.Getenv("TZ"); strings.HasPrefix(v, ":") {
 		_ = os.Unsetenv("TZ")
 	}
@@ -39,6 +41,13 @@ func main() {
 
 	pluginconfig.MustInit(opts)
 
+	watchPaths := pluginconfig.CollectorsConfigWatchPaths()
+	if len(watchPaths) == 0 {
+		for _, dir := range pluginconfig.CollectorsDir() {
+			watchPaths = append(watchPaths, filepath.Join(dir, "*.conf"))
+		}
+	}
+
 	if lvl := pluginconfig.EnvLogLevel(); lvl != "" {
 		logger.Level.SetByName(lvl)
 	}
@@ -51,7 +60,7 @@ func main() {
 		PluginConfigDir:           pluginconfig.ConfigDir(),
 		CollectorsConfigDir:       pluginconfig.CollectorsDir(),
 		ServiceDiscoveryConfigDir: nil,
-		CollectorsConfigWatchPath: pluginconfig.CollectorsConfigWatchPaths(),
+		CollectorsConfigWatchPath: watchPaths,
 		VarLibDir:                 pluginconfig.VarLibDir(),
 		RunModule:                 opts.Module,
 		RunJob:                    opts.Job,
