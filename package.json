@@ -55,6 +55,7 @@
     "commander": "^14.0.2",
     "express": "^5.1.0",
     "js-yaml": "^4.1.0",
+    "json-schema-library": "^10.4.2",
     "ollama-ai-provider-v2": "1.5.3",
     "undici": "^7.16.0",
     "ws": "8.18.3",

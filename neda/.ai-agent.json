@@ -300,24 +300,6 @@
       "toolsAllowed": ["*"],
       "toolsDenied": []
     },
-    "slack": {
-      "type": "stdio",
-      "command": "npx",
-      "args": [
-        "-y",
-        "slack-mcp-server@latest",
-        "--transport",
-        "stdio"
-      ],
-      "env": {
-        "SLACK_MCP_XOXC_TOKEN": "${SLACK_MCP_XOXC_TOKEN}",
-        "SLACK_MCP_XOXD_TOKEN": "${SLACK_MCP_XOXD_TOKEN}",
-        "SLACK_MCP_ADD_MESSAGE_TOOL": "${SLACK_MCP_ADD_MESSAGE_TOOL}"
-      },
-      "enabled": true,
-      "toolsAllowed": ["*"],
-      "toolsDenied": []
-    },
     "reddit": {
       "type": "stdio",
       "command": "npx",

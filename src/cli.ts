@@ -32,6 +32,8 @@ import { mergeCallbacksWithPersistence } from './persistence.js';
 import { initTelemetry, shutdownTelemetry } from './telemetry/index.js';
 import { buildTelemetryRuntimeConfig, type TelemetryOverrides } from './telemetry/runtime-config.js';
 import { MCPProvider } from './tools/mcp-provider.js';
+import { normalizeSchemaDraftTarget, schemaDraftDisplayName, validateSchemaAgainstDraft, type SchemaDraftTarget } from './utils/schema-validation.js';
+// eslint-disable-next-line perfectionist/sort-imports
 import { formatAgentResultHumanReadable, setWarningSink, warn } from './utils.js';
 import { VERSION } from './version.generated.js';
 import './setup-undici.js';
@@ -465,6 +467,11 @@ async function listMcpTools(targets: string[], promptPath: string | undefined, o
 
   const traceMcpFlag = options.traceMcp === true;
   const verboseFlag = options.verbose === true;
+  const schemaDraft = typeof options.schemaValidate === 'string' && options.schemaValidate.length > 0
+    ? options.schemaValidate as SchemaDraftTarget
+    : undefined;
+  const schemaTotals = { total: 0, failed: 0 };
+  const schemaLabel = schemaDraft !== undefined ? schemaDraftDisplayName(schemaDraft) : undefined;
 
   // eslint-disable-next-line functional/no-loop-statements
   for (const name of unique) {
@@ -506,12 +513,41 @@ async function listMcpTools(targets: string[], promptPath: string | undefined, o
       } catch {
         console.log('    inputSchema: [unserializable]');
       }
+      if (schemaDraft !== undefined) {
+        schemaTotals.total += 1;
+        const report = validateSchemaAgainstDraft(inputSchema, schemaDraft);
+        if (report.ok) {
+          console.log(`    schema validation (${schemaLabel ?? schemaDraft}): OK`);
+        } else {
+          schemaTotals.failed += 1;
+          console.log(`    schema validation (${schemaLabel ?? schemaDraft}): FAIL`);
+          const maxIssuesToShow = 5;
+          report.errors.slice(0, maxIssuesToShow).forEach((issue) => {
+            const location = issue.instancePath.length > 0 ? issue.instancePath : '(root)';
+            const keyword = issue.keyword ?? 'unknown';
+            const msg = issue.message ?? 'schema violation';
+            const schemaPath = issue.schemaPath.length > 0 ? ` (${issue.schemaPath})` : '';
+            console.log(`      - [${keyword}] ${msg} at ${location}${schemaPath}`);
+          });
+          if (report.errors.length > maxIssuesToShow) {
+            const omittedCount = report.errors.length - maxIssuesToShow;
+            console.log(`      ... ${String(omittedCount)} more issue(s) omitted ...`);
+          }
+        }
+      }
       if (typeof tool.instructions === 'string' && tool.instructions.trim().length > 0) {
         console.log('    instructions:');
         console.log(indentMultiline(tool.instructions.trim(), 6));
       }
     });
     console.log('');
+  }
+  if (schemaDraft !== undefined && schemaTotals.total > 0) {
+    const passed = schemaTotals.total - schemaTotals.failed;
+    console.log(`Schema validation summary (${schemaLabel ?? schemaDraft}): ${String(passed)}/${String(schemaTotals.total)} passed, ${String(schemaTotals.failed)} failed.`);
+    if (schemaTotals.failed > 0) {
+      exitWith(5, `schema validation failed for ${String(schemaTotals.failed)} tool(s)`, 'EXIT-LIST-TOOLS-SCHEMA');
+    }
   }
   exitWith(0, 'listed MCP tools', 'EXIT-LIST-TOOLS');
 }
@@ -842,6 +878,8 @@ const slackHeadendOption = new Option('--slack', 'Start Slack Socket Mode headen
 const listToolsOption = new Option('--list-tools <server>', 'List tools for the specified MCP server (use "all" to list every server)')
   .argParser((value: string, previous: string[]) => appendValue(value, previous))
   .default([], undefined);
+const schemaValidateOption = new Option('--schema-validate <draft>', 'Validate MCP tool schemas against the specified JSON Schema draft (e.g. draft-04, draft-07, draft-2019-09)')
+  .argParser((value: string) => normalizeSchemaDraftTarget(value));
 
 program.addOption(agentOption);
 program.addOption(apiHeadendOption);
@@ -853,6 +891,7 @@ program.addOption(openaiCompletionsConcurrencyOption);
 program.addOption(anthropicCompletionsConcurrencyOption);
 program.addOption(slackHeadendOption);
 program.addOption(listToolsOption);
+program.addOption(schemaValidateOption);
 
 interface HeadendModeConfig {
   agentPaths: string[];

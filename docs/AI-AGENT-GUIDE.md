@@ -469,6 +469,11 @@ Values can be strings (Anthropic effort labels) or integers (token budgets). Use
 - **Debug tip**: Always smoke-test sub-agents with `--verbose` before invoking higher-level orchestrators. The verbose stream shows per-turn indices and tool names so you can confirm the planner is calling the expected tools (e.g., look for `agent:web.sweeps` before `agent:analysis` proceeds).
 - **Overrides**: Any CLI option seen in `OPTIONS_REGISTRY` (temperature, timeouts, tool limits, reasoning tokens, caching, etc.) takes top priority (Section 8). Use `--override key=value` for batch overrides across every agent in the run.
 
+**Tool inspection**
+- `--list-tools <server>` prints the registered MCP tools for that server (or `all`). The dump includes descriptions, input schemas, and tool-specific instructions so you can diff what the LLM receives versus what the MCP actually supports.
+- Append `--schema-validate <draft>` (accepts `draft-04`, `draft-06`, `draft-07`, `draft-2019-09`, `draft-2020-12`) to run a compatibility check against legacy JSON Schema targets. The CLI compiles each schema, walks every nested subschema, and flags keywords that require a newer draft (e.g., `propertyNames`, `const`, `if/then/else`, `unevaluatedProperties`). A failing server prints the offending locations and exits with code `5` so automation can gate deployments.
+- Servers that rely on secrets (Slack, BigQuery, etc.) still need their `${VAR}` placeholders resolved before `--list-tools` or validation can execute.
+
 **Checklist**
 - [ ] Supply prompts inline, via files, or stdin (`-`) while respecting the “only one stdin source” rule.
 - [ ] Use `--load/--save/--save-all` to persist or restore conversations when chaining sessions.

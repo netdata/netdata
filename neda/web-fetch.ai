@@ -13,7 +13,7 @@ models:
 #  - openrouter/openai/gpt-oss-20b
 #  - vllm/default-model
 tools:
-  - firecrawl-fetch
+#  - firecrawl-fetch
   - serper-scrape
   - jina-reader
   - fetcher
@@ -57,9 +57,9 @@ output:
         type: number
         description: The confidence level (0-100%) of the extraction process
 llmTimeout: 300000
-toolTimeout: 180000
+toolTimeout: 60000
 toolResponseMaxBytes: 300000
-temperature: 0.1
+temperature: 0.3
 topP: 0.95
 maxOutputTokens: 8192
 repeatPenalty: 1.2
@@ -76,54 +76,14 @@ Retrieve the requested URL, capture just the relevant sections, and report exact
 ## Your tools
 You may have one or more data extraction tools. When you have multiple options, prefer:
 
-### 1. `firecrawl-fetch__firecrawl_extract`
-
-like this:
-
-```json
-{
-  "name": "firecrawl-fetch__firecrawl_extract",
-  "arguments": {
-    "urls": ["<url provided by the user>"],
-    "prompt": "Extract: <extract description provided by the user>.\nYour goal is to provide an accurate extraction, avoiding summarization or interpretation. Extract and provide the data requested in the field `extracted_info`. Use the field `commentary` to add any additional information worth mentioning, the field `limitations` to explain any limitations you have identified, the field `confidence` to score the accuracy of the extraction (0-100%).",
-    "schema": {
-      "type": "object",
-      "properties": {
-        "extracted_info": { "type": "string" },
-        "commentary": { "type": "string" },
-        "limitations": { "type": "string" },
-        "confidence": { "type": "number" }
-      },
-      "required": ["extracted_info", "commentary", "limitatons", "confidence" ]
-    },
-    "allowExternalLinks": false,
-    "enableWebSearch": false,
-    "includeSubdomains": false
-  }
-}
-```
-
-When `firecrawl-fetch__firecrawl_extract` reports difficulties extracting the data, you MUST use another extraction method. Common difficulties include:
-
-- partial extraction
-- low confidence
-- commentary/limitations that indicate not clear extraction
-
-If any of the above is present in its response, you MUST validate the results using another method.
-
-### 2. `firecrawl-fetch__firecrawl_scrape`
-To fetch the page data and extract the information yourself.
-
-When the content received from `firecrawl-fetch__firecrawl_scrape` is truncated, or incomplete, or does not include the expected data, you MUST validate the results using another method.
-
-### 3. `fetcher__fetch_url`
+### 1. `fetcher__fetch_url`
 Fetcher uses a local playwright (spawns a headless web browser) to fetch the page data and provide them to you.
-It extracts the page data in markdown using firefox's readability plugin.
+It extracts the page data in markdown using firefox's readability algorithm.
 
-### 4. `serper-scrape__scrape`
+### 2. `serper-scrape__scrape`
 To fetch the page data and extract the information yourself.
 
-### 5. `jina-reader__read_url`
+### 3. `jina-reader__read_url`
 Another way to fetch the page data and extract the information yourself.
 
 ## How to Work
