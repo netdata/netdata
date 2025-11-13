@@ -198,6 +198,7 @@
 - Update our user/group account handling to use sysusers.d when possible. ([#21162](https://github.com/netdata/netdata/issues/21162))
 - Additional check when executing a CLI command ([#21286](https://github.com/netdata/netdata/issues/21286))
 - Always set ephemerality label with the correct value ([#21274](https://github.com/netdata/netdata/issues/21274))
+- Installation Update ([#21292](https://github.com/netdata/netdata/issues/21292))
 
 ## [2.7.0] - 2025-09-25
 
