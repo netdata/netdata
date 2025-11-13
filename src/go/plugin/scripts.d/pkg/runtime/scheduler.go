@@ -487,6 +487,8 @@ func (s *Scheduler) nextRunDelay() time.Duration {
 	if len(s.jobs) == 0 {
 		return 0
 	}
+	s.jobMu.RLock()
+	defer s.jobMu.RUnlock()
 	for _, js := range s.jobs {
 		delta := time.Until(js.nextRun)
 		if delta < 0 {
