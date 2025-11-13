@@ -12,19 +12,30 @@ const (
 	ctxPrefix = "nagios"
 )
 
-func ChartIDFromParts(shard, chartKey, suffix string) string {
-	return fmt.Sprintf("nagios.%s.%s.%s", shard, chartKey, suffix)
+func SchedulerChartID(shard, suffix string) string {
+	return fmt.Sprintf("%s.scheduler.%s", shard, suffix)
 }
 
-func MetricKeyFromParts(shard, chartKey, suffix, dim string) string {
-	return fmt.Sprintf("%s.%s", ChartIDFromParts(shard, chartKey, suffix), dim)
+func SchedulerMetricKey(shard, suffix, dim string) string {
+	return fmt.Sprintf("%s.%s", SchedulerChartID(shard, suffix), dim)
 }
 
-func jobChartBase(meta JobIdentity) module.Chart {
+func telemetryChartBase(meta JobIdentity, metric string) module.Chart {
 	return module.Chart{
-		Fam:    meta.ScriptKey,
-		Ctx:    fmt.Sprintf("%s.%s", ctxPrefix, meta.ScriptKey),
-		Type:   module.Line,
-		Labels: meta.Labels(),
+		Fam:          "jobs",
+		Ctx:          fmt.Sprintf("%s.jobs.%s", ctxPrefix, metric),
+		Type:         module.Line,
+		TypeOverride: ctxPrefix,
+		Labels:       meta.Labels(),
+	}
+}
+
+func perfdataChartBase(meta JobIdentity) module.Chart {
+	return module.Chart{
+		Fam:          meta.ScriptKey,
+		Ctx:          fmt.Sprintf("%s.%s", ctxPrefix, meta.ScriptKey),
+		Type:         module.Line,
+		TypeOverride: ctxPrefix,
+		Labels:       meta.Labels(),
 	}
 }

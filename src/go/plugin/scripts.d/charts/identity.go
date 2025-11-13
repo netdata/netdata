@@ -5,6 +5,7 @@ package charts
 import (
 	"crypto/sha1"
 	"encoding/hex"
+	"fmt"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -19,6 +20,8 @@ import (
 type JobIdentity struct {
 	Shard       string
 	JobName     string
+	JobKey      string
+	PluginBase  string
 	ChartKey    string
 	ScriptKey   string
 	ScriptTitle string
@@ -30,12 +33,16 @@ type JobIdentity struct {
 // a specific script + parameter combination (vnode is intentionally excluded).
 func NewJobIdentity(shard string, job spec.JobSpec) JobIdentity {
 	cmdline := buildCmdline(job)
-	scriptKey, scriptTitle := scriptKeyForJob(job)
+	pluginBase := pluginBasename(job)
+	scriptKey, scriptTitle := scriptKeyForJob(job, pluginBase)
 	chartKey := chartKeyForJob(job, cmdline, scriptKey)
+	jobKey := jobKeyForJob(job)
 
 	return JobIdentity{
 		Shard:       shard,
 		JobName:     job.Name,
+		JobKey:      jobKey,
+		PluginBase:  pluginBase,
 		ChartKey:    chartKey,
 		ScriptKey:   scriptKey,
 		ScriptTitle: scriptTitle,
@@ -48,18 +55,9 @@ func (id JobIdentity) Labels() []module.Label {
 	return []module.Label{
 		{Key: "nagios_job", Value: id.JobName, Source: module.LabelSourceConf},
 		{Key: "nagios_shard", Value: id.Shard, Source: module.LabelSourceConf},
+		{Key: "nagios_plugin", Value: id.PluginBase, Source: module.LabelSourceConf},
 		{Key: "nagios_cmdline", Value: id.Cmdline, Source: module.LabelSourceConf},
 	}
-}
-
-// ChartID formats the canonical chart ID for a measurement suffix.
-func (id JobIdentity) ChartID(suffix string) string {
-	return ChartIDFromParts(id.Shard, id.ChartKey, suffix)
-}
-
-// MetricID builds the name used in the metrics map for a dimension.
-func (id JobIdentity) MetricID(suffix, dim string) string {
-	return MetricKeyFromParts(id.Shard, id.ChartKey, suffix, dim)
 }
 
 func buildCmdline(job spec.JobSpec) string {
@@ -74,8 +72,8 @@ func buildCmdline(job spec.JobSpec) string {
 	return strings.Join(filtered, " ")
 }
 
-func scriptKeyForJob(job spec.JobSpec) (string, string) {
-	base := filepath.Base(strings.TrimSpace(job.Plugin))
+func scriptKeyForJob(job spec.JobSpec, pluginBase string) (string, string) {
+	base := pluginBase
 	if base == "" {
 		base = job.Name
 	}
@@ -88,6 +86,14 @@ func scriptKeyForJob(job spec.JobSpec) (string, string) {
 	return sanitized, scriptTitle
 }
 
+func pluginBasename(job spec.JobSpec) string {
+	base := filepath.Base(strings.TrimSpace(job.Plugin))
+	if base == "" {
+		return job.Name
+	}
+	return base
+}
+
 func chartKeyForJob(job spec.JobSpec, cmdline, scriptKey string) string {
 	snippet := sanitizeArgs(scriptKey, job.Args)
 	signature := buildJobSignature(job, cmdline)
@@ -97,6 +103,14 @@ func chartKeyForJob(job spec.JobSpec, cmdline, scriptKey string) string {
 		key = hash
 	}
 	return ids.Sanitize(key)
+}
+
+func jobKeyForJob(job spec.JobSpec) string {
+	key := ids.Sanitize(job.Name)
+	if key == "" {
+		key = "job"
+	}
+	return key
 }
 
 func sanitizeArgs(scriptKey string, args []string) string {
@@ -154,4 +168,20 @@ func appendSlice(b *strings.Builder, values []string) {
 func shortHash(data string) string {
 	sum := sha1.Sum([]byte(data))
 	return hex.EncodeToString(sum[:4])
+}
+
+func (id JobIdentity) TelemetryChartID(metric string) string {
+	return fmt.Sprintf("%s.%s.%s.%s", ctxPrefix, id.Shard, id.JobKey, metric)
+}
+
+func (id JobIdentity) TelemetryMetricID(metric, dim string) string {
+	return fmt.Sprintf("%s.%s", id.TelemetryChartID(metric), dim)
+}
+
+func (id JobIdentity) PerfdataChartID(labelID string) string {
+	return fmt.Sprintf("%s.%s.%s.perf_%s", ctxPrefix, id.Shard, id.JobKey, labelID)
+}
+
+func (id JobIdentity) PerfdataMetricID(labelID, dim string) string {
+	return fmt.Sprintf("%s.%s", id.PerfdataChartID(labelID), dim)
 }

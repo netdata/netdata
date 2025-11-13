@@ -68,8 +68,8 @@ type Executor struct {
 	results     chan ExecutionResult
 	resetNeeded bool
 
-	waitingMu sync.Mutex
-	waiting   map[string]struct{}
+	mu        sync.Mutex
+	inflight  map[string]struct{}
 	executing map[string]struct{}
 
 	wg sync.WaitGroup
@@ -81,7 +81,6 @@ type Executor struct {
 type ExecutorStats struct {
 	QueueDepth     int
 	Executing      int
-	Waiting        int
 	SkippedEnqueue uint64
 }
 
@@ -99,7 +98,7 @@ func NewExecutor(cfg ExecutorConfig) (*Executor, error) {
 
 	exec := &Executor{
 		cfg:       cfg,
-		waiting:   make(map[string]struct{}),
+		inflight:  make(map[string]struct{}),
 		executing: make(map[string]struct{}),
 	}
 	exec.resetChannels()
@@ -142,33 +141,27 @@ func (e *Executor) Stop() {
 }
 
 // Enqueue schedules a job for execution respecting single-flight semantics.
-// Returns true when the job was queued, false if it was already queued or executing.
+// Returns true when the job was queued, false if it was already running.
 func (e *Executor) Enqueue(job JobRuntime) (bool, error) {
 	if e.ctx == nil {
 		return false, ErrExecutorStopped
 	}
-
-	e.waitingMu.Lock()
-	if _, running := e.executing[job.ID]; running {
-		e.waitingMu.Unlock()
+	e.mu.Lock()
+	if _, exists := e.inflight[job.ID]; exists {
+		e.mu.Unlock()
 		e.skipped.Add(1)
 		return false, nil
 	}
-	if _, queued := e.waiting[job.ID]; queued {
-		e.waitingMu.Unlock()
-		e.skipped.Add(1)
-		return false, nil
-	}
-	e.waiting[job.ID] = struct{}{}
-	e.waitingMu.Unlock()
+	e.inflight[job.ID] = struct{}{}
+	e.mu.Unlock()
 
 	select {
 	case e.queue <- job:
 		return true, nil
 	case <-e.ctx.Done():
-		e.waitingMu.Lock()
-		delete(e.waiting, job.ID)
-		e.waitingMu.Unlock()
+		e.mu.Lock()
+		delete(e.inflight, job.ID)
+		e.mu.Unlock()
 		return false, ErrExecutorStopped
 	}
 }
@@ -180,14 +173,12 @@ func (e *Executor) Results() <-chan ExecutionResult {
 
 // Stats returns a snapshot of executor internals for telemetry.
 func (e *Executor) Stats() ExecutorStats {
-	e.waitingMu.Lock()
-	waiting := len(e.waiting)
+	e.mu.Lock()
 	executing := len(e.executing)
-	e.waitingMu.Unlock()
+	e.mu.Unlock()
 
 	return ExecutorStats{
 		QueueDepth:     len(e.queue),
-		Waiting:        waiting,
 		Executing:      executing,
 		SkippedEnqueue: e.skipped.Load(),
 	}
@@ -201,18 +192,18 @@ func (e *Executor) workerLoop(idx int) {
 		case <-e.ctx.Done():
 			return
 		case job := <-e.queue:
-			// Mark the job as executing and remove from waiting map.
-			e.waitingMu.Lock()
-			delete(e.waiting, job.ID)
+			// Mark the job as executing.
+			e.mu.Lock()
 			e.executing[job.ID] = struct{}{}
-			e.waitingMu.Unlock()
+			e.mu.Unlock()
 
 			res := e.cfg.Work(e.ctx, job)
 			res.WorkerIdx = idx
 
-			e.waitingMu.Lock()
+			e.mu.Lock()
 			delete(e.executing, job.ID)
-			e.waitingMu.Unlock()
+			delete(e.inflight, job.ID)
+			e.mu.Unlock()
 
 			select {
 			case e.results <- res:

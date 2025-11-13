@@ -4,7 +4,6 @@ package tests
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
@@ -42,8 +41,8 @@ func TestMockPluginsProduceExpectedStatesAndPerfdata(t *testing.T) {
 	assertMetricEquals(t, metrics, metas["mock_crit"], "state", "critical", 1)
 
 	// perfdata hidden dims exist
-	perfSuffix := fmt.Sprintf("perf.%s", ids.Sanitize("value"))
-	ck := metas["mock_ok"].MetricID(perfSuffix, "warn_defined")
+	labelID := ids.Sanitize("value")
+	ck := metas["mock_ok"].PerfdataMetricID(labelID, "warn_defined")
 	require.Equal(t, int64(1), metrics[ck], "warn metadata missing")
 }
 
@@ -87,7 +86,7 @@ func TestMockSlowPluginRaisesSkipMetric(t *testing.T) {
 	sched, _, _ := startTestScheduler(t, []specpkg.JobSpec{spec})
 	time.Sleep(2500 * time.Millisecond)
 	metrics := sched.CollectMetrics()
-	key := charts.MetricKeyFromParts(testShard, "scheduler", "scheduler_skipped", "skipped")
+	key := charts.SchedulerMetricKey(testShard, charts.ChartSchedulerRate, "skipped")
 	if metrics[key] == 0 {
 		t.Fatalf("scheduler skip counter not incremented: %d", metrics[key])
 	}
@@ -282,7 +281,7 @@ func ensureNdRun(t *testing.T) {
 }
 
 func assertMetricEquals(t *testing.T, metrics map[string]int64, meta charts.JobIdentity, chart, dim string, want int64) {
-	key := meta.MetricID(chart, dim)
+	key := meta.TelemetryMetricID(chart, dim)
 	got := metrics[key]
 	if got != want {
 		t.Fatalf("metric %s = %d, want %d (metrics=%v)", key, got, want, metrics)

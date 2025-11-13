@@ -17,8 +17,8 @@ func BuildJobCharts(meta JobIdentity, basePriority int) []*module.Chart {
 
 func BuildSchedulerCharts(shard string, basePriority int) []*module.Chart {
 	return []*module.Chart{
-		SchedulerQueueChart(shard, basePriority),
-		SchedulerSkippedChart(shard, basePriority+1),
+		SchedulerJobsChart(shard, basePriority),
+		SchedulerRateChart(shard, basePriority+1),
 		SchedulerNextRunChart(shard, basePriority+2),
 	}
 }

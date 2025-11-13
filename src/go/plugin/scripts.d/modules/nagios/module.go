@@ -322,7 +322,9 @@ func (c *Collector) initCharts() error {
 	var defs []*module.Chart
 	for idx, job := range c.jobSpecs {
 		meta := charts.NewJobIdentity(c.Name, job)
-		defs = append(defs, charts.BuildJobCharts(meta, 100+idx*10)...)
+		jobCharts := charts.BuildJobCharts(meta, 100+idx*10)
+		setChartsUpdateEvery(jobCharts, jobUpdateEvery(job))
+		defs = append(defs, jobCharts...)
 	}
 	defs = append(defs, charts.BuildSchedulerCharts(c.Name, 10)...)
 	newCharts := module.Charts{}
@@ -343,19 +345,20 @@ func (c *Collector) registerPerfdataChart(job spec.JobSpec, datum output.PerfDat
 	meta := charts.NewJobIdentity(c.Name, job)
 	labelID := ids.Sanitize(label)
 	scale := units.NewScale(datum.Unit)
-	key := fmt.Sprintf("%s|%s", meta.ChartKey, labelID)
+	key := fmt.Sprintf("%s|%s|%s", meta.Shard, meta.JobKey, labelID)
 	c.chartMu.Lock()
 	defer c.chartMu.Unlock()
 	if existing, ok := c.perfCharts[key]; ok {
 		if sameScale(existing.Scale, scale) {
 			return
 		}
-		chartID := meta.ChartID(fmt.Sprintf("perf.%s", labelID))
+		chartID := meta.PerfdataChartID(labelID)
 		if chart := c.charts.Get(chartID); chart != nil {
 			chart.MarkRemove()
 		}
 	}
 	chart := charts.PerfdataChart(meta, label, scale, 200)
+	chart.UpdateEvery = jobUpdateEvery(job)
 	if err := c.charts.Add(chart); err != nil {
 		c.Errorf("failed to add perfdata chart for job %s label %s: %v", job.Name, label, err)
 		return
@@ -401,6 +404,28 @@ func (c *Collector) rebuildRuntime(ctx context.Context, jobs []spec.JobSpec) err
 	c.scheduler = scheduler
 	c.schedulerMu.Unlock()
 	return nil
+}
+
+func setChartsUpdateEvery(chs []*module.Chart, updateEvery int) {
+	if updateEvery <= 0 {
+		return
+	}
+	for _, chart := range chs {
+		if chart != nil {
+			chart.UpdateEvery = updateEvery
+		}
+	}
+}
+
+func jobUpdateEvery(job spec.JobSpec) int {
+	if job.CheckInterval <= 0 {
+		return module.UpdateEvery
+	}
+	secs := int((job.CheckInterval + time.Second/2) / time.Second)
+	if secs < 1 {
+		return 1
+	}
+	return secs
 }
 
 func (c *Collector) startReloadInfrastructure(ctx context.Context) error {

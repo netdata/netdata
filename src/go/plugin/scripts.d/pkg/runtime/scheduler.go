@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
@@ -61,6 +62,12 @@ type Scheduler struct {
 	periods          *timeperiod.Set
 	rand             *rand.Rand
 	randMu           sync.Mutex
+
+	counters struct {
+		started  atomic.Uint64
+		finished atomic.Uint64
+		skipped  atomic.Uint64
+	}
 }
 
 type jobState struct {
@@ -279,10 +286,13 @@ func (s *Scheduler) handleTimer(jobID string) {
 		if s.log != nil {
 			s.log.Errorf("nagios executor enqueue failed: %v", err)
 		}
-	} else if !queued {
+	} else if queued {
+		s.counters.started.Add(1)
+	} else {
 		s.jobMu.Lock()
 		js.skipped++
 		s.jobMu.Unlock()
+		s.counters.skipped.Add(1)
 	}
 }
 
@@ -331,6 +341,7 @@ func (s *Scheduler) handleResult(res ExecutionResult) {
 	s.jobMu.Unlock()
 
 	if ok {
+		s.counters.finished.Add(1)
 		if scheduleRetry {
 			s.armTimer(js)
 		}
@@ -434,47 +445,48 @@ func buildJobID(sp spec.JobSpec, idx int) string {
 func (s *Scheduler) CollectMetrics() map[string]int64 {
 	metrics := make(map[string]int64)
 	stats := s.executor.Stats()
-	metrics[charts.MetricKeyFromParts(s.shard, "scheduler", "scheduler_queue", "queue_depth")] = int64(stats.QueueDepth)
-	metrics[charts.MetricKeyFromParts(s.shard, "scheduler", "scheduler_queue", "waiting")] = int64(stats.Waiting)
-	metrics[charts.MetricKeyFromParts(s.shard, "scheduler", "scheduler_queue", "executing")] = int64(stats.Executing)
-	metrics[charts.MetricKeyFromParts(s.shard, "scheduler", "scheduler_skipped", "skipped")] = int64(stats.SkippedEnqueue)
-	metrics[charts.MetricKeyFromParts(s.shard, "scheduler", "scheduler_next", "next")] = s.nextRunDelay().Nanoseconds()
+	metrics[charts.SchedulerMetricKey(s.shard, charts.ChartSchedulerJobs, "running")] = int64(stats.Executing)
+	metrics[charts.SchedulerMetricKey(s.shard, charts.ChartSchedulerJobs, "queued")] = int64(stats.QueueDepth)
+	metrics[charts.SchedulerMetricKey(s.shard, charts.ChartSchedulerJobs, "scheduled")] = int64(s.scheduledCount())
+	metrics[charts.SchedulerMetricKey(s.shard, charts.ChartSchedulerRate, "started")] = int64(s.counters.started.Load())
+	metrics[charts.SchedulerMetricKey(s.shard, charts.ChartSchedulerRate, "finished")] = int64(s.counters.finished.Load())
+	metrics[charts.SchedulerMetricKey(s.shard, charts.ChartSchedulerRate, "skipped")] = int64(s.counters.skipped.Load())
+	metrics[charts.SchedulerMetricKey(s.shard, charts.ChartSchedulerNext, "next")] = s.nextRunDelay().Nanoseconds()
 
 	s.jobMu.RLock()
 	defer s.jobMu.RUnlock()
 	for _, js := range s.jobs {
 		id := js.identity
-		metrics[id.MetricID("state", "ok")] = boolToInt(strings.EqualFold(js.state, "OK"))
-		metrics[id.MetricID("state", "warning")] = boolToInt(strings.EqualFold(js.state, "WARNING"))
-		metrics[id.MetricID("state", "critical")] = boolToInt(strings.EqualFold(js.state, "CRITICAL"))
-		metrics[id.MetricID("state", "unknown")] = boolToInt(strings.EqualFold(js.state, "UNKNOWN"))
-		metrics[id.MetricID("state", "attempt")] = int64(js.currentAttempt())
-		metrics[id.MetricID("state", "max_attempts")] = int64(js.maxAttempts)
-		metrics[id.MetricID("runtime", "running")] = boolToInt(js.running)
-		metrics[id.MetricID("runtime", "retrying")] = boolToInt(js.retrying)
+		metrics[id.TelemetryMetricID(charts.TelemetryStateMetric, "ok")] = boolToInt(strings.EqualFold(js.state, "OK"))
+		metrics[id.TelemetryMetricID(charts.TelemetryStateMetric, "warning")] = boolToInt(strings.EqualFold(js.state, "WARNING"))
+		metrics[id.TelemetryMetricID(charts.TelemetryStateMetric, "critical")] = boolToInt(strings.EqualFold(js.state, "CRITICAL"))
+		metrics[id.TelemetryMetricID(charts.TelemetryStateMetric, "unknown")] = boolToInt(strings.EqualFold(js.state, "UNKNOWN"))
+		metrics[id.TelemetryMetricID(charts.TelemetryStateMetric, "attempt")] = int64(js.currentAttempt())
+		metrics[id.TelemetryMetricID(charts.TelemetryStateMetric, "max_attempts")] = int64(js.maxAttempts)
+		metrics[id.TelemetryMetricID(charts.TelemetryRuntimeMetric, "running")] = boolToInt(js.running)
+		metrics[id.TelemetryMetricID(charts.TelemetryRuntimeMetric, "retrying")] = boolToInt(js.retrying)
 		missingCPU := !js.cpuMeasured && js.lastDuration > 0
-		metrics[id.MetricID("runtime", "skipped")] = boolToInt(js.periodSkipped)
-		metrics[id.MetricID("runtime", "cpu_missing")] = boolToInt(missingCPU)
-		metrics[id.MetricID("latency", "duration")] = js.lastDuration.Nanoseconds()
+		metrics[id.TelemetryMetricID(charts.TelemetryRuntimeMetric, "skipped")] = boolToInt(js.periodSkipped)
+		metrics[id.TelemetryMetricID(charts.TelemetryRuntimeMetric, "cpu_missing")] = boolToInt(missingCPU)
+		metrics[id.TelemetryMetricID(charts.TelemetryLatencyMetric, "duration")] = js.lastDuration.Nanoseconds()
 		cpuNs := js.lastCPU.Nanoseconds()
-		metrics[id.MetricID("cpu", "cpu_time")] = cpuNs
-		metrics[id.MetricID("mem", "rss")] = js.lastRSS
-		metrics[id.MetricID("disk", "read")] = js.lastDiskRead
-		metrics[id.MetricID("disk", "write")] = js.lastDiskWrite
+		metrics[id.TelemetryMetricID(charts.TelemetryCPUMetric, "cpu_time")] = cpuNs
+		metrics[id.TelemetryMetricID(charts.TelemetryMemoryMetric, "rss")] = js.lastRSS
+		metrics[id.TelemetryMetricID(charts.TelemetryDiskMetric, "read")] = js.lastDiskRead
+		metrics[id.TelemetryMetricID(charts.TelemetryDiskMetric, "write")] = js.lastDiskWrite
 
 		if len(js.perfdata) > 0 {
 			for labelID, datum := range js.perfdata {
-				suffix := fmt.Sprintf("perf.%s", labelID)
 				scale := units.NewScale(datum.Unit)
-				metrics[id.MetricID(suffix, "value")] = scale.Apply(datum.Value)
+				metrics[id.PerfdataMetricID(labelID, "value")] = scale.Apply(datum.Value)
 				if datum.Min != nil {
-					metrics[id.MetricID(suffix, "min")] = scale.Apply(*datum.Min)
+					metrics[id.PerfdataMetricID(labelID, "min")] = scale.Apply(*datum.Min)
 				}
 				if datum.Max != nil {
-					metrics[id.MetricID(suffix, "max")] = scale.Apply(*datum.Max)
+					metrics[id.PerfdataMetricID(labelID, "max")] = scale.Apply(*datum.Max)
 				}
-				s.setRangeMetrics(metrics, id, suffix, "warn", datum.Warn, scale)
-				s.setRangeMetrics(metrics, id, suffix, "crit", datum.Crit, scale)
+				s.setRangeMetrics(metrics, id, labelID, "warn", datum.Warn, scale)
+				s.setRangeMetrics(metrics, id, labelID, "crit", datum.Crit, scale)
 			}
 		}
 	}
@@ -508,6 +520,12 @@ func boolToInt(v bool) int64 {
 	return 0
 }
 
+func (s *Scheduler) scheduledCount() int {
+	s.jobMu.RLock()
+	defer s.jobMu.RUnlock()
+	return len(s.jobs)
+}
+
 func (s *Scheduler) advanceAnniversary(current time.Time, interval time.Duration, now time.Time) time.Time {
 	interval = intervalOrDefault(interval)
 	if current.IsZero() {
@@ -538,13 +556,13 @@ func (s *Scheduler) applyJitter(base time.Time, jitter time.Duration) time.Time 
 	return base.Add(time.Duration(val * float64(jitter)))
 }
 
-func (s *Scheduler) setRangeMetrics(metrics map[string]int64, id charts.JobIdentity, suffix, kind string, rng *output.ThresholdRange, scale units.Scale) {
-	definedKey := id.MetricID(suffix, kind+"_defined")
-	inclusiveKey := id.MetricID(suffix, kind+"_inclusive")
-	lowKey := id.MetricID(suffix, kind+"_low")
-	highKey := id.MetricID(suffix, kind+"_high")
-	lowDefinedKey := id.MetricID(suffix, kind+"_low_defined")
-	highDefinedKey := id.MetricID(suffix, kind+"_high_defined")
+func (s *Scheduler) setRangeMetrics(metrics map[string]int64, id charts.JobIdentity, labelID, kind string, rng *output.ThresholdRange, scale units.Scale) {
+	definedKey := id.PerfdataMetricID(labelID, kind+"_defined")
+	inclusiveKey := id.PerfdataMetricID(labelID, kind+"_inclusive")
+	lowKey := id.PerfdataMetricID(labelID, kind+"_low")
+	highKey := id.PerfdataMetricID(labelID, kind+"_high")
+	lowDefinedKey := id.PerfdataMetricID(labelID, kind+"_low_defined")
+	highDefinedKey := id.PerfdataMetricID(labelID, kind+"_high_defined")
 	if rng == nil {
 		metrics[definedKey] = 0
 		metrics[inclusiveKey] = 0
