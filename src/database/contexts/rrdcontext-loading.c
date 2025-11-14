@@ -34,7 +34,7 @@ static void rrdinstance_load_dimension_callback(SQL_DIMENSION_DATA *sd, void *da
     RRDCONTEXT *rc = rrdcontext_acquired_value(rca);
     if(!rc) {
         th_ignored_metrics++;
-        rrdcontext_release(rca);
+        dictionary_acquired_item_release(host->rrdctx.contexts, (DICTIONARY_ITEM *)rca);
         uuidmap_free(id);
         return;
     }
