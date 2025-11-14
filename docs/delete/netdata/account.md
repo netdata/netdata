@@ -26,7 +26,7 @@ Once in the Settings page, your profile information will appear in a pop-up wind
 
 Click on **"Delete account"**. A confirmation dialog will appear asking you to verify the account you're about to delete.
 
-![delete dialog](https://raw.githubusercontent.com/kanelatechnical/docs-images/c3aa0d7a4ef13ced5e11baf4a50d0b28e8d1004f/Confirmation%20Dialogue.png)
+![delete dialog](https://raw.githubusercontent.com/netdata/docs-images/master/Confirmation%20Dialogue.png)
 
 :::note
 
