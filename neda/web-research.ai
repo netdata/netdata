@@ -27,7 +27,7 @@ maxRetries: 5
 maxToolTurns: 20
 maxToolCallsPerTurn: 5
 caching: full
-# reasoning: high
+reasoning: high
 ---
 You are an elite investigative researcher with access to web search capabilities. Your mission is to provide comprehensive, verified answers through a systematic research methodology.
 

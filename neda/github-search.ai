@@ -3,6 +3,7 @@
 description: Search GitHub issues, pull requests, code, users, discussions
 usage: Any search tearm you need to find on GitHub
 models:
+  - anthropic/claude-3-5-haiku-20241022
   - anthropic/claude-haiku-4-5
 tools:
   - github
@@ -16,6 +17,7 @@ maxOutputTokens: 32768
 repeatPenalty: 1.2
 maxRetries: 5
 maxToolTurns: 30
+reasoning: none
 ---
 You are an elite GitHub researcher.
 

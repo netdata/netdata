@@ -22,7 +22,7 @@ export interface FrontmatterOptions {
   maxOutputTokens?: number;
   repeatPenalty?: number;
   toolResponseMaxBytes?: number;
-  reasoning?: ReasoningLevel;
+  reasoning?: ReasoningLevel | 'none';
   reasoningTokens?: number | string;
   caching?: CachingMode;
 }
@@ -126,11 +126,15 @@ export function parseFrontmatter(
     if (typeof raw.temperature === 'number') options.temperature = raw.temperature;
     if (typeof raw.topP === 'number') options.topP = raw.topP;
     if (typeof raw.reasoning === 'string') {
-      const normalized = raw.reasoning.toLowerCase();
-      if (normalized === 'minimal' || normalized === 'low' || normalized === 'medium' || normalized === 'high') {
+      const normalized = raw.reasoning.trim().toLowerCase();
+      if (normalized === 'none') {
+        options.reasoning = 'none';
+      } else if (normalized === 'default' || normalized === 'unset' || normalized.length === 0) {
+        // Explicit inherit: treat as if the key was omitted entirely.
+      } else if (normalized === 'minimal' || normalized === 'low' || normalized === 'medium' || normalized === 'high') {
         options.reasoning = normalized as ReasoningLevel;
       } else {
-        throw new Error(`Invalid reasoning level '${raw.reasoning}' in frontmatter. Expected minimal, low, medium, or high.`);
+        throw new Error(`Invalid reasoning level '${raw.reasoning}' in frontmatter. Expected none, default, unset, minimal, low, medium, or high.`);
       }
     }
     if (typeof raw.reasoningTokens === 'number') {

@@ -22,8 +22,8 @@ maxOutputTokens: 32000
 repeatPenalty: 1
 temperature: 0.3
 topP: 1
-caching: 'none'
-# reasoning: 'high'
+caching: none
+reasoning: high
 ---
 You are Netdata's elite Product Marketing expert, positioning Netdata on any industry, segment, customer or even against competitors and other monitoring tools.
 

@@ -12,13 +12,13 @@ import type { StructuredLogEvent } from '../logging/structured-log-event.js';
 import type { PreloadedSubAgent } from '../subagent-registry.js';
 import type { MCPRestartFailedError, LogFn, SharedAcquireOptions, SharedRegistry, SharedRegistryHandle } from '../tools/mcp-provider.js';
 import type { ToolExecuteResult } from '../tools/types.js';
-import type { AIAgentCallbacks, AIAgentResult, AIAgentSessionConfig, AccountingEntry, AgentFinishedEvent, Configuration, ConversationMessage, LogDetailValue, LogEntry, LogPayload, MCPServer, MCPServerConfig, MCPTool, ProviderConfig, TokenUsage, TurnRequest, TurnResult, TurnStatus, ToolChoiceMode } from '../types.js';
+import type { AIAgentCallbacks, AIAgentResult, AIAgentSessionConfig, AccountingEntry, AgentFinishedEvent, Configuration, ConversationMessage, LogDetailValue, LogEntry, LogPayload, MCPServer, MCPServerConfig, MCPTool, ProviderConfig, ProviderReasoningValue, ReasoningLevel, TokenUsage, TurnRequest, TurnResult, TurnStatus, ToolChoiceMode } from '../types.js';
 import type { JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js';
 import type { ModelMessage, LanguageModel, ToolSet } from 'ai';
 import type { ChildProcess } from 'node:child_process';
 import type { AddressInfo } from 'node:net';
 
-import { loadAgent } from '../agent-loader.js';
+import { loadAgent, loadAgentFromContent } from '../agent-loader.js';
 import { AgentRegistry } from '../agent-registry.js';
 import { AIAgentSession } from '../ai-agent.js';
 import { loadConfiguration } from '../config.js';
@@ -239,10 +239,18 @@ const defaultPersistenceCallbacks = (configuration: Configuration, existing?: AI
 };
 
 const baseCreate = AIAgentSession.create.bind(AIAgentSession);
+const sessionConfigObservers: ((config: AIAgentSessionConfig) => void)[] = [];
 (AIAgentSession as unknown as { create: (sessionConfig: AIAgentSessionConfig) => AIAgentSession }).create = (sessionConfig: AIAgentSessionConfig) => {
   const originalCallbacks = sessionConfig.callbacks;
   const callbacks = defaultPersistenceCallbacks(sessionConfig.config, originalCallbacks);
   const patchedConfig = callbacks === originalCallbacks ? sessionConfig : { ...sessionConfig, callbacks };
+  sessionConfigObservers.forEach((observer) => {
+    try {
+      observer(patchedConfig);
+    } catch (error: unknown) {
+      warn(`session config observer failure: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  });
   return baseCreate(patchedConfig);
 };
 
@@ -646,6 +654,30 @@ function makeSuccessResult(content: string): AIAgentResult {
   };
 }
 
+function registerSessionConfigObserver(observer: (config: AIAgentSessionConfig) => void): () => void {
+  sessionConfigObservers.push(observer);
+  return () => {
+    const index = sessionConfigObservers.indexOf(observer);
+    if (index >= 0) {
+      sessionConfigObservers.splice(index, 1);
+    }
+  };
+}
+
+async function captureSessionConfig(runFactory: () => Promise<unknown>): Promise<AIAgentSessionConfig> {
+  let captured: AIAgentSessionConfig | undefined;
+  const unregister = registerSessionConfigObserver((config) => {
+    captured = { ...config };
+  });
+  try {
+    await runFactory();
+  } finally {
+    unregister();
+  }
+  invariant(captured !== undefined, 'Session configuration capture failed.');
+  return captured;
+}
+
 function logHasDetail(entry: LogEntry, key: string): boolean {
   const details = entry.details;
   return details !== undefined && Object.prototype.hasOwnProperty.call(details, key);
@@ -767,6 +799,7 @@ let frontmatterErrorSummary: { strictError?: string; relaxedParsed?: boolean } |
 let frontmatterSummary: { toolName?: string; outputFormat?: string; inputFormat?: string; description?: string; models?: string[] } | undefined;
 let humanReadableSummaries: { json: string; text: string; successNoOutput: string; failure: string; truncatedZero: string } | undefined;
 let overrideTargetsRef: { provider: string; model: string }[] | undefined;
+const reasoningMatrixSummaries = new Map<string, { reasoning?: ReasoningLevel; reasoningValue?: ProviderReasoningValue | null }>();
 const overrideLLMExpected = {
   temperature: 0.27,
   topP: 0.52,
@@ -780,6 +813,141 @@ const overrideLLMExpected = {
   toolResponseMaxBytes: 777,
   mcpInitConcurrency: 6,
   stream: true,
+};
+
+type ReasoningSelector = ReasoningLevel | 'none' | 'inherit';
+type OverrideReasoningSelector = ReasoningSelector | 'absent';
+
+const buildReasoningMatrixPrompt = (selector: ReasoningSelector): string => {
+  const lines = [
+    '---',
+    'description: Reasoning matrix agent',
+    `models:`,
+    `  - ${PRIMARY_PROVIDER}/${MODEL_NAME}`,
+  ];
+  if (selector === 'none') {
+    lines.push('reasoning: none');
+  } else if (selector === 'inherit') {
+    lines.push('reasoning: default');
+  } else {
+    lines.push(`reasoning: ${selector}`);
+  }
+  lines.push('---');
+  lines.push(MINIMAL_SYSTEM_PROMPT);
+  return lines.join('\n');
+};
+
+interface ReasoningDimension<T> {
+  label: string;
+  description: string;
+  selector: T;
+}
+
+const FRONTMATTER_REASONING_CASES: ReasoningDimension<ReasoningSelector>[] = [
+  { label: 'fm-default', description: 'frontmatter=default', selector: 'inherit' },
+  { label: 'fm-none', description: 'frontmatter=none', selector: 'none' },
+  { label: 'fm-high', description: 'frontmatter=high', selector: 'high' },
+];
+
+const CONFIG_DEFAULT_REASONING_CASES: ReasoningDimension<ReasoningSelector>[] = [
+  { label: 'cfg-default', description: 'default=unset', selector: 'inherit' },
+  { label: 'cfg-low', description: 'default=low', selector: 'low' },
+];
+
+const OVERRIDE_REASONING_CASES: ReasoningDimension<OverrideReasoningSelector>[] = [
+  { label: 'ovr-absent', description: 'override=absent', selector: 'absent' },
+  { label: 'ovr-unset', description: 'override=unset', selector: 'inherit' },
+  { label: 'ovr-none', description: 'override=none', selector: 'none' },
+  { label: 'ovr-high', description: 'override=high', selector: 'high' },
+];
+
+type ReasoningExpectation =
+  | { type: 'level'; level: ReasoningLevel }
+  | { type: 'none'; mode: 'explicit' | 'implicit' };
+
+const convertOverrideSelector = (selector: OverrideReasoningSelector): ReasoningSelector => {
+  return selector === 'absent' ? 'inherit' : selector;
+};
+
+const computeExpectedReasoning = (
+  frontmatter: ReasoningSelector,
+  configurationDefault: ReasoningSelector,
+  override: OverrideReasoningSelector,
+): ReasoningExpectation => {
+  const selectionOrder: ReasoningSelector[] = [convertOverrideSelector(override), frontmatter, configurationDefault];
+  // eslint-disable-next-line functional/no-loop-statements
+  for (const value of selectionOrder) {
+    if (value === 'inherit') continue;
+    if (value === 'none') {
+      return { type: 'none', mode: 'explicit' };
+    }
+    return { type: 'level', level: value };
+  }
+  return { type: 'none', mode: 'implicit' };
+};
+
+const buildReasoningMatrixScenarios = (): HarnessTest[] => {
+  const scenarios: HarnessTest[] = [];
+  FRONTMATTER_REASONING_CASES.forEach((frontCase) => {
+    CONFIG_DEFAULT_REASONING_CASES.forEach((defaultCase) => {
+      OVERRIDE_REASONING_CASES.forEach((overrideCase) => {
+        const scenarioId = `reasoning-matrix-${frontCase.label}-${defaultCase.label}-${overrideCase.label}`;
+        scenarios.push({
+          id: scenarioId,
+          description: `${frontCase.description}; ${defaultCase.description}; ${overrideCase.description}`,
+          execute: async () => {
+            const configuration = makeBasicConfiguration();
+            const defaults: NonNullable<Configuration['defaults']> = {
+              ...BASE_DEFAULTS,
+              ...(configuration.defaults ?? {}),
+            };
+            configuration.defaults = defaults;
+            if (defaultCase.selector !== 'inherit') {
+              configuration.defaults.reasoning = defaultCase.selector;
+            } else if (configuration.defaults.reasoning !== undefined) {
+              delete configuration.defaults.reasoning;
+            }
+            const layers = buildInMemoryConfigLayers(configuration);
+            const promptContent = buildReasoningMatrixPrompt(frontCase.selector);
+            let globalOverrides: LoadAgentOptions['globalOverrides'] | undefined;
+            if (overrideCase.selector !== 'absent') {
+              globalOverrides = { reasoning: overrideCase.selector };
+            }
+            const loaded = loadAgentFromContent(scenarioId, promptContent, {
+              configLayers: layers,
+              globalOverrides,
+            });
+            const capturedConfig = await captureSessionConfig(async () => {
+              const session = await loaded.createSession(MINIMAL_SYSTEM_PROMPT, DEFAULT_PROMPT_SCENARIO, { outputFormat: 'markdown' });
+              void session;
+            });
+            reasoningMatrixSummaries.set(scenarioId, {
+              reasoning: capturedConfig.reasoning,
+              reasoningValue: capturedConfig.reasoningValue,
+            });
+            return makeSuccessResult('reasoning-matrix');
+          },
+          expect: (result) => {
+            invariant(result.success, `Scenario ${scenarioId} expected success.`);
+            const summary = reasoningMatrixSummaries.get(scenarioId);
+            invariant(summary !== undefined, `Reasoning summary missing for ${scenarioId}.`);
+            const expected = computeExpectedReasoning(frontCase.selector, defaultCase.selector, overrideCase.selector);
+            if (expected.type === 'level') {
+              invariant(summary.reasoning === expected.level, `Reasoning level mismatch for ${scenarioId}. Expected ${expected.level}, got ${summary.reasoning ?? 'none'}.`);
+              invariant(summary.reasoningValue === undefined, `Reasoning value should be undefined when level '${expected.level}' is selected for ${scenarioId}.`);
+            } else if (expected.mode === 'explicit') {
+              invariant(summary.reasoning === undefined, `Reasoning level should be cleared when disabled explicitly for ${scenarioId}.`);
+              invariant(summary.reasoningValue === null, `Reasoning value should be null when disabled explicitly for ${scenarioId}.`);
+            } else {
+              invariant(summary.reasoning === undefined, `Reasoning level should remain unset when falling back to implicit none for ${scenarioId}.`);
+              invariant(summary.reasoningValue === undefined, `Reasoning value should remain undefined when falling back to implicit none for ${scenarioId}.`);
+            }
+          },
+        });
+      });
+    });
+  });
+  return scenarios;
 };
 
 const BASE_TEST_SCENARIOS: HarnessTest[] = [
@@ -8536,6 +8704,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       invariant(result.success, 'Reasoning replay test expected success.');
     },
   },
+  ...buildReasoningMatrixScenarios(),
 ];
 
 async function runScenario(test: HarnessTest): Promise<AIAgentResult> {

@@ -19,6 +19,7 @@ maxOutputTokens: 16384
 repeatPenalty: 1.1
 maxRetries: 5
 maxToolTurns: 30
+reasoning: high
 ---
 Provide read-only visibility into tickets opened by paying customers and summarize current status and risks.
 

@@ -10,7 +10,7 @@ models:
 #  - openrouter/deepseek/deepseek-chat-v3.1
 #  - openrouter/openai/gpt-oss-120b
 #  - openrouter/openai/gpt-oss-20b
-#  - openai/gpt-5
+#  - openai/gpt-5.1
 tools:
   - bigquery
   - batch
@@ -23,6 +23,7 @@ maxOutputTokens: 16384
 repeatPenalty: 1.1
 maxRetries: 5
 maxToolTurns: 50
+reasoning: high
 ---
 Your Mission: provide business intelligence.
 

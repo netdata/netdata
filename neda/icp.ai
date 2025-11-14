@@ -6,10 +6,10 @@ description: |
 usage: |
   company name or contact email to reseach information for
 models:
+  - anthropic/claude-haiku-4-5
   - anthropic/claude-sonnet-4-5
-  - openai/gpt-5
+  - openai/gpt-5.1
 #  - openrouter/openai/gpt-oss-120b
-#  - openai/gpt-5
 #  - ollama/hf.co/unsloth/gpt-oss-20b-GGUF:F16
 tools:
   - jina

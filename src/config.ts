@@ -32,6 +32,7 @@ const ProviderModelOverridesSchema = z.object({
 });
 
 const ReasoningLevelSchema = z.enum(['minimal','low','medium','high']);
+const ReasoningDefaultSchema = z.enum(['none','minimal','low','medium','high']);
 
 const ProviderReasoningEntrySchema = z.union([z.string(), z.number()]);
 
@@ -231,6 +232,7 @@ const ConfigurationSchema = z.object({
       toolTimeout: z.number().positive().optional(),
       temperature: z.number().min(0).max(2).optional(),
       topP: z.number().min(0).max(1).optional(),
+      reasoning: ReasoningDefaultSchema.optional(),
       stream: z.boolean().optional(),
       maxToolTurns: z.number().int().positive().optional(),
       maxToolCallsPerTurn: z.number().int().positive().optional(),

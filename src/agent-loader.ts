@@ -5,7 +5,7 @@ import type { AIAgentSession } from './ai-agent.js';
 // keep type imports grouped at top
 import type { OutputFormatId } from './formats.js';
 import type { PreloadedSubAgent } from './subagent-registry.js';
-import type { AIAgentCallbacks, AIAgentResult, AIAgentSessionConfig, Configuration, ConversationMessage, ProviderConfig, ProviderReasoningValue, RestToolConfig } from './types.js';
+import type { AIAgentCallbacks, AIAgentResult, AIAgentSessionConfig, Configuration, ConversationMessage, ProviderConfig, ProviderReasoningValue, ReasoningLevel, RestToolConfig } from './types.js';
 // no runtime format validation here; caller must pass a valid OutputFormatId
 
 import { AIAgent as Agent } from './ai-agent.js';
@@ -146,7 +146,7 @@ export interface GlobalOverrides {
   toolResponseMaxBytes?: number;
   stream?: boolean;
   mcpInitConcurrency?: number;
-  reasoning?: 'minimal' | 'low' | 'medium' | 'high';
+  reasoning?: ReasoningLevel | 'none' | 'inherit';
   reasoningValue?: ProviderReasoningValue | null;
   caching?: 'none' | 'full';
 }
@@ -190,15 +190,15 @@ export interface LoadAgentOptions {
     toolTimeout?: number;
     maxRetries?: number;
     maxToolTurns?: number;
-    toolResponseMaxBytes?: number;
-    maxToolCallsPerTurn?: number;
-    reasoning?: 'minimal' | 'low' | 'medium' | 'high';
+  toolResponseMaxBytes?: number;
+  maxToolCallsPerTurn?: number;
+    reasoning?: ReasoningLevel | 'none';
     reasoningValue?: ProviderReasoningValue | null;
     caching?: 'none' | 'full';
   };
   providerOverrides?: Record<string, Partial<ProviderConfig>>;
   ancestors?: string[];
-  reasoning?: 'minimal' | 'low' | 'medium' | 'high';
+  reasoning?: ReasoningLevel | 'none';
   caching?: 'none' | 'full';
 }
 

@@ -4,7 +4,7 @@ description: Perform a quick company check to find basic information about a com
 usage: The company to check for (name, domain, email)
 models:
   - anthropic/claude-haiku-4-5
-  - anthropic/claude-haiku-4-5
+  - anthropic/claude-sonnet-4-5
 tools:
   - jina-search
   - brave
@@ -21,8 +21,8 @@ repeatPenalty: 1.2
 maxRetries: 3
 maxToolTurns: 3
 maxToolCallsPerTurn: 10
-caching: 'none'
-# reasoning: 'low'
+caching: none
+reasoning: none
 ---
 Your goal is to find information about the company the user provided:
 

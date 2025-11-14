@@ -5,31 +5,45 @@
       "apiKey": "sk-litellm-master-key",
       "baseUrl": "http://nova:8090/v1",
       "openaiMode": "chat",
-      "stringSchemaFormatsAllowed": ["*"],
-      "stringSchemaFormatsDenied": [ "uri" ]
+      "stringSchemaFormatsAllowed": [
+        "*"
+      ],
+      "stringSchemaFormatsDenied": [
+        "uri"
+      ]
     },
     "vllm1": {
       "type": "openai",
       "apiKey": "vllm",
       "baseUrl": "http://nova:8345/v1",
       "openaiMode": "chat",
-      "stringSchemaFormatsAllowed": ["*"],
-      "stringSchemaFormatsDenied": [ "uri" ]
+      "stringSchemaFormatsAllowed": [
+        "*"
+      ],
+      "stringSchemaFormatsDenied": [
+        "uri"
+      ]
     },
     "vllm2": {
       "type": "openai",
       "apiKey": "vllm",
       "baseUrl": "http://nova:8346/v1",
       "openaiMode": "chat",
-      "stringSchemaFormatsAllowed": ["*"],
-      "stringSchemaFormatsDenied": [ "uri" ]
+      "stringSchemaFormatsAllowed": [
+        "*"
+      ],
+      "stringSchemaFormatsDenied": [
+        "uri"
+      ]
     },
     "llama.cpp": {
       "type": "openai",
       "apiKey": "localkey",
       "baseUrl": "http://nova:8234/v1",
       "openaiMode": "chat",
-      "stringSchemaFormatsAllowed": ["*"],
+      "stringSchemaFormatsAllowed": [
+        "*"
+      ],
       "stringSchemaFormatsDenied": []
     },
     "openai": {
@@ -40,7 +54,9 @@
       "custom": {},
       "mergeStrategy": "overlay",
       "contextWindow": 400000,
-      "stringSchemaFormatsAllowed": ["*"],
+      "stringSchemaFormatsAllowed": [
+        "*"
+      ],
       "stringSchemaFormatsDenied": []
     },
     "anthropic": {
@@ -51,7 +67,9 @@
       "custom": {},
       "mergeStrategy": "overlay",
       "contextWindow": 200000,
-      "stringSchemaFormatsAllowed": ["*"],
+      "stringSchemaFormatsAllowed": [
+        "*"
+      ],
       "stringSchemaFormatsDenied": [],
       "models": {
         "claude-opus-4-1-20250805": {
@@ -92,7 +110,9 @@
       "headers": {},
       "custom": {},
       "mergeStrategy": "overlay",
-      "stringSchemaFormatsAllowed": ["*"],
+      "stringSchemaFormatsAllowed": [
+        "*"
+      ],
       "stringSchemaFormatsDenied": []
     },
     "openrouter": {
@@ -112,7 +132,9 @@
       },
       "headers": {},
       "mergeStrategy": "overlay",
-      "stringSchemaFormatsAllowed": ["*"],
+      "stringSchemaFormatsAllowed": [
+        "*"
+      ],
       "stringSchemaFormatsDenied": []
     },
     "ollama": {
@@ -136,13 +158,19 @@
         }
       },
       "headers": {},
-      "stringSchemaFormatsAllowed": ["*"],
+      "stringSchemaFormatsAllowed": [
+        "*"
+      ],
       "stringSchemaFormatsDenied": []
     }
   },
   "queues": {
-    "default": { "concurrent": 64 },
-    "fetcher": { "concurrent": 4 }
+    "default": {
+      "concurrent": 64
+    },
+    "fetcher": {
+      "concurrent": 4
+    }
   },
   "restTools": {
     "posthog-query": {
@@ -156,13 +184,21 @@
       "parametersSchema": {
         "type": "object",
         "properties": {
-          "hogql": { "type": "string", "minLength": 1 }
+          "hogql": {
+            "type": "string",
+            "minLength": 1
+          }
         },
-        "required": ["hogql"],
+        "required": [
+          "hogql"
+        ],
         "additionalProperties": false
       },
       "bodyTemplate": {
-        "query": { "kind": "HogQLQuery", "query": "${parameters.hogql}" }
+        "query": {
+          "kind": "HogQLQuery",
+          "query": "${parameters.hogql}"
+        }
       }
     },
     "ask-netdata": {
@@ -177,14 +213,22 @@
       "parametersSchema": {
         "type": "object",
         "properties": {
-          "question": { "type": "string", "minLength": 1 }
+          "question": {
+            "type": "string",
+            "minLength": 1
+          }
         },
-        "required": ["question"],
+        "required": [
+          "question"
+        ],
         "additionalProperties": false
       },
       "bodyTemplate": {
         "messages": [
-          { "role": "user", "content": "${parameters.question}" }
+          {
+            "role": "user",
+            "content": "${parameters.question}"
+          }
         ]
       },
       "streaming": {
@@ -230,7 +274,9 @@
       "type": "stdio",
       "command": "/usr/local/bin/file-mcp-server",
       "enabled": true,
-      "toolsAllowed": ["*"],
+      "toolsAllowed": [
+        "*"
+      ],
       "toolsDenied": []
     },
     "brave": {
@@ -246,7 +292,9 @@
         "BRAVE_API_KEY": "${BRAVE_API_KEY}"
       },
       "enabled": true,
-      "toolsAllowed": ["*"],
+      "toolsAllowed": [
+        "*"
+      ],
       "toolsDenied": []
     },
     "jina-reader": {
@@ -256,7 +304,9 @@
         "Authorization": "Bearer ${JINA_API_KEY}"
       },
       "enabled": true,
-      "toolsAllowed": [ "read_url" ],
+      "toolsAllowed": [
+        "read_url"
+      ],
       "toolsDenied": []
     },
     "jina-search": {
@@ -266,7 +316,10 @@
         "Authorization": "Bearer ${JINA_API_KEY}"
       },
       "enabled": true,
-      "toolsAllowed": [ "search_web", "search_arxiv" ],
+      "toolsAllowed": [
+        "search_web",
+        "search_arxiv"
+      ],
       "toolsDenied": []
     },
     "jina": {
@@ -276,28 +329,45 @@
         "Authorization": "Bearer ${JINA_API_KEY}"
       },
       "enabled": true,
-      "toolsAllowed": [ "*" ],
-      "toolsDenied": [ "show_api_key", "primer", "capture_screenshot_url", "search_images", "parallel_read_url", "sort_by_relevance", "deduplicate_strings", "deduplicate_images" ]
+      "toolsAllowed": [
+        "*"
+      ],
+      "toolsDenied": [
+        "show_api_key",
+        "primer",
+        "capture_screenshot_url",
+        "search_images",
+        "parallel_read_url",
+        "sort_by_relevance",
+        "deduplicate_strings",
+        "deduplicate_images"
+      ]
     },
     "netdata_costa": {
       "type": "websocket",
       "url": "ws://localhost:19999/mcp?api_key=b1eb964a-ff57-48f1-b87a-15b01702cdc7",
       "enabled": true,
-      "toolsAllowed": ["*"],
+      "toolsAllowed": [
+        "*"
+      ],
       "toolsDenied": []
     },
     "netdata_production": {
       "type": "websocket",
       "url": "ws://10.20.1.126:19999/mcp?api_key=1ddcfc20-0f08-4562-a5e5-f016786f1641",
       "enabled": true,
-      "toolsAllowed": ["*"],
+      "toolsAllowed": [
+        "*"
+      ],
       "toolsDenied": []
     },
     "netdata_demos": {
       "type": "websocket",
       "url": "ws://10.20.1.96:19999/mcp?api_key=edfa4484-c721-4973-8ff4-58adc360031d",
       "enabled": true,
-      "toolsAllowed": ["*"],
+      "toolsAllowed": [
+        "*"
+      ],
       "toolsDenied": []
     },
     "reddit": {
@@ -312,7 +382,9 @@
         "REDDIT_USER_AGENT": "${REDDIT_USER_AGENT}"
       },
       "enabled": true,
-      "toolsAllowed": ["*"],
+      "toolsAllowed": [
+        "*"
+      ],
       "toolsDenied": []
     },
     "freshdesk": {
@@ -326,7 +398,9 @@
         "FRESHDESK_DOMAIN": "${FRESHDESK_DOMAIN}"
       },
       "enabled": true,
-      "toolsAllowed": ["*"],
+      "toolsAllowed": [
+        "*"
+      ],
       "toolsDenied": []
     },
     "github": {
@@ -340,7 +414,9 @@
         "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_PERSONAL_ACCESS_TOKEN}"
       },
       "enabled": true,
-      "toolsAllowed": ["*"],
+      "toolsAllowed": [
+        "*"
+      ],
       "toolsDenied": [
         "create_or_update_file",
         "create_repository",
@@ -363,7 +439,9 @@
         "CONTEXT7_API_KEY": "${CONTEXT7_API_KEY}"
       },
       "enabled": true,
-      "toolsAllowed": ["*"],
+      "toolsAllowed": [
+        "*"
+      ],
       "toolsDenied": []
     },
     "playwright": {
@@ -375,7 +453,9 @@
       ],
       "env": {},
       "enabled": true,
-      "toolsAllowed": ["*"],
+      "toolsAllowed": [
+        "*"
+      ],
       "toolsDenied": []
     },
     "hubspot": {
@@ -389,7 +469,9 @@
         "PRIVATE_APP_ACCESS_TOKEN": "${PRIVATE_APP_ACCESS_TOKEN}"
       },
       "enabled": true,
-      "toolsAllowed": ["*"],
+      "toolsAllowed": [
+        "*"
+      ],
       "toolsDenied": []
     },
     "fireflies": {
@@ -399,7 +481,9 @@
         "Authorization": "Bearer ${FIREFLIES_API_KEY}"
       },
       "enabled": true,
-      "toolsAllowed": ["*"],
+      "toolsAllowed": [
+        "*"
+      ],
       "toolsDenied": []
     },
     "bigquery": {
@@ -415,7 +499,9 @@
         "BIGQUERY_PROJECT": "${BIGQUERY_PROJECT}"
       },
       "enabled": true,
-      "toolsAllowed": ["*"],
+      "toolsAllowed": [
+        "*"
+      ],
       "toolsDenied": []
     },
     "posthog": {
@@ -425,7 +511,9 @@
         "Authorization": "Bearer ${POSTHOG_API_KEY}"
       },
       "enabled": true,
-      "toolsAllowed": ["*"],
+      "toolsAllowed": [
+        "*"
+      ],
       "toolsDenied": []
     },
     "stripe": {
@@ -435,7 +523,9 @@
         "Authorization": "Bearer ${STRIPE_SECRET_KEY}"
       },
       "enabled": true,
-      "toolsAllowed": ["*"],
+      "toolsAllowed": [
+        "*"
+      ],
       "toolsDenied": []
     },
     "sequential-thinking": {
@@ -446,7 +536,9 @@
         "@modelcontextprotocol/server-sequential-thinking"
       ],
       "enabled": true,
-      "toolsAllowed": ["*"],
+      "toolsAllowed": [
+        "*"
+      ],
       "toolsDenied": []
     },
     "clear-thought": {
@@ -463,7 +555,9 @@
         "cool-locust-uy2Zhe"
       ],
       "enabled": true,
-      "toolsAllowed": ["*"],
+      "toolsAllowed": [
+        "*"
+      ],
       "toolsDenied": []
     },
     "fetcher": {
@@ -475,7 +569,9 @@
       ],
       "enabled": true,
       "queue": "fetcher",
-      "toolsAllowed": ["*"],
+      "toolsAllowed": [
+        "*"
+      ],
       "toolsDenied": []
     },
     "filesystem_repos": {
@@ -486,7 +582,9 @@
         "${NETDATA_REPOS_DIR}"
       ],
       "enabled": true,
-      "toolsAllowed": ["*"],
+      "toolsAllowed": [
+        "*"
+      ],
       "toolsDenied": []
     },
     "filesystem_cwd": {
@@ -497,7 +595,9 @@
         "${MCP_ROOT}"
       ],
       "enabled": true,
-      "toolsAllowed": ["*"],
+      "toolsAllowed": [
+        "*"
+      ],
       "toolsDenied": []
     },
     "gsc1": {
@@ -511,18 +611,25 @@
         "GSC_SKIP_OAUTH": "true"
       },
       "enabled": true,
-      "toolsAllowed": ["*"],
+      "toolsAllowed": [
+        "*"
+      ],
       "toolsDenied": []
     },
     "gsc2": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "mcp-server-gsc"],
+      "args": [
+        "-y",
+        "mcp-server-gsc"
+      ],
       "env": {
         "GOOGLE_APPLICATION_CREDENTIALS": "${GSC_CREDENTIALS}"
       },
       "enabled": true,
-      "toolsAllowed": ["*"],
+      "toolsAllowed": [
+        "*"
+      ],
       "toolsDenied": []
     },
     "analytics-mcp": {
@@ -537,7 +644,9 @@
         "GOOGLE_PROJECT_ID": "${GA_PROJECT_ID}"
       },
       "enabled": true,
-      "toolsAllowed": ["*"],
+      "toolsAllowed": [
+        "*"
+      ],
       "toolsDenied": []
     },
     "cloudflare-browser": {
@@ -547,8 +656,14 @@
         "Authorization": "Bearer ${CLOUDFLARE_API_KEY}"
       },
       "enabled": true,
-      "toolsAllowed": ["*"],
-      "toolsDenied": [ "accounts_list", "get_url_html_content", "get_url_screenshot" ]
+      "toolsAllowed": [
+        "*"
+      ],
+      "toolsDenied": [
+        "accounts_list",
+        "get_url_html_content",
+        "get_url_screenshot"
+      ]
     },
     "cloudflare-radar": {
       "type": "sse",
@@ -557,7 +672,9 @@
         "Authorization": "Bearer ${CLOUDFLARE_API_KEY}"
       },
       "enabled": true,
-      "toolsAllowed": ["*"],
+      "toolsAllowed": [
+        "*"
+      ],
       "toolsDenied": []
     },
     "cloudflare-graphql": {
@@ -567,7 +684,9 @@
         "Authorization": "Bearer ${CLOUDFLARE_API_KEY}"
       },
       "enabled": true,
-      "toolsAllowed": ["*"],
+      "toolsAllowed": [
+        "*"
+      ],
       "toolsDenied": []
     },
     "intercom": {
@@ -577,43 +696,63 @@
         "Authorization": "Bearer ${INTERCOM_API_KEY}"
       },
       "enabled": true,
-      "toolsAllowed": ["*"],
+      "toolsAllowed": [
+        "*"
+      ],
       "toolsDenied": []
     },
     "duckduckgo": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "duckduckgo-mcp-server"],
+      "args": [
+        "-y",
+        "duckduckgo-mcp-server"
+      ],
       "enabled": true,
-      "toolsAllowed": ["*"],
+      "toolsAllowed": [
+        "*"
+      ],
       "toolsDenied": []
     },
     "serper-search": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "serper-search-scrape-mcp-server"],
+      "args": [
+        "-y",
+        "serper-search-scrape-mcp-server"
+      ],
       "env": {
         "SERPER_API_KEY": "${SERPER_API_KEY}"
       },
       "enabled": true,
-      "toolsAllowed": ["google_search"],
+      "toolsAllowed": [
+        "google_search"
+      ],
       "toolsDenied": []
     },
     "serper-scrape": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "serper-search-scrape-mcp-server"],
+      "args": [
+        "-y",
+        "serper-search-scrape-mcp-server"
+      ],
       "env": {
         "SERPER_API_KEY": "${SERPER_API_KEY}"
       },
       "enabled": true,
-      "toolsAllowed": ["scrape"],
+      "toolsAllowed": [
+        "scrape"
+      ],
       "toolsDenied": []
     },
     "firecrawl-fetch": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "firecrawl-mcp"],
+      "args": [
+        "-y",
+        "firecrawl-mcp"
+      ],
       "env": {
         "FIRECRAWL_API_URL": "http://10.20.1.106:9910"
       },
@@ -637,42 +776,64 @@
     "routing": {
       "default": {
         "agent": "neda.ai",
-        "engage": ["mentions", "dms"],
-        "contextPolicy": { "channelPost": "selfOnly" }
+        "engage": [
+          "mentions",
+          "dms"
+        ],
+        "contextPolicy": {
+          "channelPost": "selfOnly"
+        }
       },
       "rules": [
         {
           "enabled": false,
-          "channels": ["#support"],
+          "channels": [
+            "#support"
+          ],
           "agent": "neda.ai",
-          "engage": ["channel-posts"],
+          "engage": [
+            "channel-posts"
+          ],
           "promptTemplates": {
             "channelPost": "Neda, analyze this support ticket:\n\nChannel: {channel.name} ({channel.id})\nUser: {user.label} ({user.id})\nTime: {ts}\nMessage: {text}\nURL: {message.url}\n\nFollow this process: 1) understand what the customer is saying, 2) consult ask-netdata and source-code to understand how Netdata works, 3) prepare a response for the customer, 4) if we have bug in our code, provide workarounds, 5) provide instructions for our engineers to solve the bug/issue, 6) mention the relevant code owners (find them from github once you know which source code files are affected) so that they will be notified."
           }
         },
         {
           "enabled": true,
-          "channels": ["#contact-us"],
+          "channels": [
+            "#contact-us"
+          ],
           "agent": "neda.ai",
-          "engage": ["channel-posts"],
+          "engage": [
+            "channel-posts"
+          ],
           "promptTemplates": {
             "channelPost": "Neda, they have just posted this contact form:\n\nChannel: {channel.name} ({channel.id})\nUser: {user.label} ({user.id})\nTime: {ts}\nMessage: {text}\nURL: {message.url}\n\nUse the company-quick-check agent to determine if this propect potentially fits our ICP. If they don't just mention your findings - do not do anything else. Sometimes we get spam on these public froms. If this looks like a spam, mention it and stop - do not do anything else.\n\nIf however they look legit and they fit our ICP:\n\n- Research the company profile, their technology stack, and calculate IPC and estimate ARR.\n- Check also our contact (research its profile).\n- Give us a hint on how they found us (focus on pre and post form submission events on posthog).\n- Check hubspot and fireflies for past engagements and encharge to find if they were in our mailing lists before this form submission (they may have been added now).\n\nCRITICAL: Do **NOT** run the product-messaging agent for this session - we just need to know who the customer is and how they found us - we will ask for more information when we need it."
           }
         },
         {
           "enabled": false,
-          "channels": ["#engineering"],
+          "channels": [
+            "#engineering"
+          ],
           "agent": "neda.ai",
-          "engage": ["mentions"],
+          "engage": [
+            "mentions"
+          ],
           "promptTemplates": {
             "mention": "Neda, technical question from engineering:\n\nChannel: {channel.name} ({channel.id})\nUser: {user.label} ({user.id})\nTime: {ts}\nMessage: {text}\nURL: {message.url}\n\nProvide technical assistance. Focus on code analysis, debugging, and architectural guidance."
           }
         },
         {
           "enabled": false,
-          "channels": ["#sales"],
+          "channels": [
+            "#sales"
+          ],
           "agent": "neda.ai",
-          "engage": ["mentions", "channel-posts"],
+          "engage": [
+            "mentions",
+            "channel-posts"
+          ],
           "promptTemplates": {
             "channelPost": "Neda, sales team update:\n\nChannel: {channel.name} ({channel.id})\nUser: {user.label} ({user.id})\nTime: {ts}\nMessage: {text}\nURL: {message.url}\n\nAnalyze this sales opportunity. Research the company, calculate ICP fit, check HubSpot for engagement history, and provide strategic recommendations.",
             "mention": "Neda, sales question:\n\nChannel: {channel.name} ({channel.id})\nUser: {user.label} ({user.id})\nTime: {ts}\nMessage: {text}\nURL: {message.url}\n\nAssist with this sales query."
@@ -680,36 +841,52 @@
         },
         {
           "enabled": false,
-          "channels": ["#general"],
+          "channels": [
+            "#general"
+          ],
           "agent": "neda.ai",
-          "engage": ["mentions"],
+          "engage": [
+            "mentions"
+          ],
           "promptTemplates": {
             "mention": "Neda, request from general channel:\n\nChannel: {channel.name} ({channel.id})\nUser: {user.label} ({user.id})\nTime: {ts}\nMessage: {text}\nURL: {message.url}\n\nRespond helpfully to this request."
           }
         },
         {
           "enabled": false,
-          "channels": ["#product"],
+          "channels": [
+            "#product"
+          ],
           "agent": "neda.ai",
-          "engage": ["mentions"],
+          "engage": [
+            "mentions"
+          ],
           "promptTemplates": {
             "mention": "Neda, product team query:\n\nChannel: {channel.name} ({channel.id})\nUser: {user.label} ({user.id})\nTime: {ts}\nMessage: {text}\nURL: {message.url}\n\nProvide product insights, user feedback analysis, or feature recommendations as requested."
           }
         },
         {
           "enabled": false,
-          "channels": ["#marketing"],
+          "channels": [
+            "#marketing"
+          ],
           "agent": "neda.ai",
-          "engage": ["mentions"],
+          "engage": [
+            "mentions"
+          ],
           "promptTemplates": {
             "mention": "Neda, marketing team request:\n\nChannel: {channel.name} ({channel.id})\nUser: {user.label} ({user.id})\nTime: {ts}\nMessage: {text}\nURL: {message.url}\n\nAssist with marketing analysis, content suggestions, or campaign insights."
           }
         },
         {
           "enabled": false,
-          "channels": ["#customer-success"],
+          "channels": [
+            "#customer-success"
+          ],
           "agent": "neda.ai",
-          "engage": ["channel-posts"],
+          "engage": [
+            "channel-posts"
+          ],
           "promptTemplates": {
             "channelPost": "Neda, customer success update:\n\nChannel: {channel.name} ({channel.id})\nUser: {user.label} ({user.id})\nTime: {ts}\nMessage: {text}\nURL: {message.url}\n\nAnalyze this customer situation. Check their usage in PostHog, infrastructure in BigQuery, and provide recommendations for retention and expansion."
           }
@@ -779,7 +956,7 @@
         "currency": "USD",
         "prompt": 1,
         "completion": 5,
-        "cacheRead": 0.10,
+        "cacheRead": 0.1,
         "cacheWrite": 1.25
       },
       "claude-3-5-sonnet-20241022": {
@@ -828,21 +1005,21 @@
         "unit": "per_1m",
         "currency": "USD",
         "prompt": 1.25,
-        "completion": 10,
+        "completion": 10.0,
         "cacheRead": 0.125
       },
       "gpt-5-codex": {
         "unit": "per_1m",
         "currency": "USD",
         "prompt": 1.25,
-        "completion": 10,
+        "completion": 10.0,
         "cacheRead": 0.125
       },
       "gpt-5-mini": {
         "unit": "per_1m",
         "currency": "USD",
         "prompt": 0.25,
-        "completion": 2,
+        "completion": 2.0,
         "cacheRead": 0.025
       },
       "gpt-5-nano": {
@@ -856,14 +1033,14 @@
         "unit": "per_1m",
         "currency": "USD",
         "prompt": 1.25,
-        "completion": 10,
+        "completion": 10.0,
         "cacheRead": 0.125
       },
       "gpt-4o": {
         "unit": "per_1m",
         "currency": "USD",
         "prompt": 2.5,
-        "completion": 10,
+        "completion": 10.0,
         "cacheRead": 1.25
       },
       "gpt-4o-mini": {
@@ -876,9 +1053,9 @@
       "gpt-4o-2024-05-13": {
         "unit": "per_1m",
         "currency": "USD",
-        "prompt": 5,
-        "completion": 15,
-        "cacheRead": 0
+        "prompt": 5.0,
+        "completion": 15.0,
+        "cacheRead": 0.0
       },
       "gpt-4o-mini-2024-07-18": {
         "unit": "per_1m",
@@ -967,8 +1144,8 @@
       "gpt-4.1": {
         "unit": "per_1m",
         "currency": "USD",
-        "prompt": 2,
-        "completion": 8,
+        "prompt": 2.0,
+        "completion": 8.0,
         "cacheRead": 0.5
       },
       "gpt-4.1-2025-04-14": {
@@ -1073,8 +1250,8 @@
         "unit": "per_1m",
         "currency": "USD",
         "prompt": 2.5,
-        "completion": 10,
-        "cacheRead": 0
+        "completion": 10.0,
+        "cacheRead": 0.0
       },
       "gpt-4o-search-preview-2025-03-11": {
         "unit": "per_1m",
@@ -1088,7 +1265,7 @@
         "currency": "USD",
         "prompt": 0.15,
         "completion": 0.6,
-        "cacheRead": 0
+        "cacheRead": 0.0
       },
       "gpt-4o-mini-search-preview-2025-03-11": {
         "unit": "per_1m",
@@ -1107,8 +1284,8 @@
       "o1": {
         "unit": "per_1m",
         "currency": "USD",
-        "prompt": 15,
-        "completion": 60,
+        "prompt": 15.0,
+        "completion": 60.0,
         "cacheRead": 7.5
       },
       "o1-2024-12-17": {
@@ -1149,9 +1326,9 @@
       "o1-pro": {
         "unit": "per_1m",
         "currency": "USD",
-        "prompt": 150,
-        "completion": 600,
-        "cacheRead": 0
+        "prompt": 150.0,
+        "completion": 600.0,
+        "cacheRead": 0.0
       },
       "o1-pro-2025-03-19": {
         "unit": "per_1m",
@@ -1163,8 +1340,8 @@
       "o3": {
         "unit": "per_1m",
         "currency": "USD",
-        "prompt": 2,
-        "completion": 8,
+        "prompt": 2.0,
+        "completion": 8.0,
         "cacheRead": 0.5
       },
       "o3-2025-04-16": {
@@ -1177,8 +1354,8 @@
       "o3-deep-research": {
         "unit": "per_1m",
         "currency": "USD",
-        "prompt": 10,
-        "completion": 40,
+        "prompt": 10.0,
+        "completion": 40.0,
         "cacheRead": 2.5
       },
       "o3-mini": {
@@ -1198,9 +1375,9 @@
       "o3-pro": {
         "unit": "per_1m",
         "currency": "USD",
-        "prompt": 20,
-        "completion": 80,
-        "cacheRead": 0
+        "prompt": 20.0,
+        "completion": 80.0,
+        "cacheRead": 0.0
       },
       "o3-pro-2025-06-10": {
         "unit": "per_1m",
@@ -1226,23 +1403,23 @@
       "o4-mini-deep-research": {
         "unit": "per_1m",
         "currency": "USD",
-        "prompt": 2,
-        "completion": 8,
+        "prompt": 2.0,
+        "completion": 8.0,
         "cacheRead": 0.5
       },
       "codex-mini-latest": {
         "unit": "per_1m",
         "currency": "USD",
         "prompt": 1.5,
-        "completion": 6,
+        "completion": 6.0,
         "cacheRead": 0.375
       },
       "computer-use-preview": {
         "unit": "per_1m",
         "currency": "USD",
-        "prompt": 3,
-        "completion": 12,
-        "cacheRead": 0
+        "prompt": 3.0,
+        "completion": 12.0,
+        "cacheRead": 0.0
       },
       "computer-use-preview-2025-03-11": {
         "unit": "per_1m",
@@ -1255,14 +1432,14 @@
         "unit": "per_1m",
         "currency": "USD",
         "prompt": 2.5,
-        "completion": 10,
-        "cacheRead": 0
+        "completion": 10.0,
+        "cacheRead": 0.0
       },
       "gpt-4o-realtime-preview": {
         "unit": "per_1m",
         "currency": "USD",
-        "prompt": 5,
-        "completion": 20,
+        "prompt": 5.0,
+        "completion": 20.0,
         "cacheRead": 2.5
       },
       "gpt-4o-mini-audio-preview": {
@@ -1270,7 +1447,7 @@
         "currency": "USD",
         "prompt": 0.15,
         "completion": 0.6,
-        "cacheRead": 0
+        "cacheRead": 0.0
       },
       "gpt-4o-mini-realtime-preview": {
         "unit": "per_1m",
@@ -1282,9 +1459,114 @@
       "gpt-image-1": {
         "unit": "per_1m",
         "currency": "USD",
-        "prompt": 5,
-        "completion": 0,
+        "prompt": 5.0,
+        "completion": 0.0,
         "cacheRead": 1.25
+      },
+      "gpt-5.1": {
+        "unit": "per_1m",
+        "currency": "USD",
+        "prompt": 1.25,
+        "completion": 10.0,
+        "cacheRead": 0.125
+      },
+      "gpt-5.1-chat-latest": {
+        "unit": "per_1m",
+        "currency": "USD",
+        "prompt": 1.25,
+        "completion": 10.0,
+        "cacheRead": 0.125
+      },
+      "gpt-5.1-codex": {
+        "unit": "per_1m",
+        "currency": "USD",
+        "prompt": 1.25,
+        "completion": 10.0,
+        "cacheRead": 0.125
+      },
+      "gpt-5.1-codex-mini": {
+        "unit": "per_1m",
+        "currency": "USD",
+        "prompt": 0.25,
+        "completion": 2.0,
+        "cacheRead": 0.025
+      },
+      "gpt-5-pro": {
+        "unit": "per_1m",
+        "currency": "USD",
+        "prompt": 15.0,
+        "completion": 120.0,
+        "cacheRead": 0.0
+      },
+      "gpt-realtime": {
+        "unit": "per_1m",
+        "currency": "USD",
+        "prompt": 4.0,
+        "completion": 16.0,
+        "cacheRead": 0.4
+      },
+      "gpt-realtime-mini": {
+        "unit": "per_1m",
+        "currency": "USD",
+        "prompt": 0.6,
+        "completion": 2.4,
+        "cacheRead": 0.06
+      },
+      "gpt-audio": {
+        "unit": "per_1m",
+        "currency": "USD",
+        "prompt": 2.5,
+        "completion": 10.0,
+        "cacheRead": 0.0
+      },
+      "gpt-audio-mini": {
+        "unit": "per_1m",
+        "currency": "USD",
+        "prompt": 0.6,
+        "completion": 2.4,
+        "cacheRead": 0.0
+      },
+      "gpt-5-search-api": {
+        "unit": "per_1m",
+        "currency": "USD",
+        "prompt": 1.25,
+        "completion": 10.0,
+        "cacheRead": 0.125
+      },
+      "gpt-4o-mini-tts": {
+        "unit": "per_1m",
+        "currency": "USD",
+        "prompt": 0.6,
+        "completion": 0.0,
+        "cacheRead": 0.0
+      },
+      "gpt-4o-transcribe": {
+        "unit": "per_1m",
+        "currency": "USD",
+        "prompt": 2.5,
+        "completion": 10.0,
+        "cacheRead": 0.0
+      },
+      "gpt-4o-transcribe-diarize": {
+        "unit": "per_1m",
+        "currency": "USD",
+        "prompt": 2.5,
+        "completion": 10.0,
+        "cacheRead": 0.0
+      },
+      "gpt-4o-mini-transcribe": {
+        "unit": "per_1m",
+        "currency": "USD",
+        "prompt": 1.25,
+        "completion": 5.0,
+        "cacheRead": 0.0
+      },
+      "gpt-image-1-mini": {
+        "unit": "per_1m",
+        "currency": "USD",
+        "prompt": 2.0,
+        "cacheRead": 0.2,
+        "completion": 0.0
       }
     },
     "google": {

@@ -31,7 +31,7 @@ export const phase2ModelConfigs: readonly Phase2ModelConfig[] = [
     tier: 2,
   },
   {
-    label: 'openai/gpt-5-mini',
+    label: 'openai/gpt-5.1-mini',
     provider: 'openai',
     modelId: 'gpt-5-mini',
     tier: 2,
@@ -49,7 +49,7 @@ export const phase2ModelConfigs: readonly Phase2ModelConfig[] = [
     tier: 3,
   },
   {
-    label: 'openai/gpt-5',
+    label: 'openai/gpt-5.1',
     provider: 'openai',
     modelId: 'gpt-5',
     tier: 3,

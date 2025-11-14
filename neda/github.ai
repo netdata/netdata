@@ -6,6 +6,7 @@ description: |
 usage: |
   repo/name or code search term or PR/issue URL
 models:
+  - anthropic/claude-haiku-4-5
   - anthropic/claude-sonnet-4-5
 tools:
   - github
@@ -19,6 +20,7 @@ maxOutputTokens: 16384
 repeatPenalty: 1.1
 maxRetries: 5
 maxToolTurns: 30
+reasoning: none
 ---
 
 Mission

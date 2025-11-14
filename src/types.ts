@@ -390,6 +390,7 @@ export interface Configuration {
     toolTimeout?: number;
     temperature?: number;
     topP?: number;
+    reasoning?: ReasoningLevel | 'none';
     maxToolTurns?: number;
     maxToolCallsPerTurn?: number;
     stream?: boolean;

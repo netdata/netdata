@@ -276,6 +276,7 @@ export function resolveDefaults(layers: ResolvedConfigLayer[]): NonNullable<Conf
     'toolTimeout',
     'temperature',
     'topP',
+    'reasoning',
     'maxOutputTokens',
     'repeatPenalty',
     'stream',

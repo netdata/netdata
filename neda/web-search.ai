@@ -3,12 +3,12 @@
 description: Answers any question using publicly available sources (web pages, PDF files, github repos, reddit posts, etc)
 usage: Search term or question to investigate
 models:
+  - anthropic/claude-3-5-haiku-20241022
   - anthropic/claude-haiku-4-5
-  - openai/gpt-5-mini
+  - openai/gpt-5.1-mini
   - google/gemini-2.5-flash
 #  - anthropic/claude-3-5-haiku-20241022
 #  - anthropic/claude-sonnet-4-5
-#  - openai/gpt-5-mini
 #  - google/gemini-2.5-pro
 #  - openrouter/openai/gpt-oss-20b
 tools:
@@ -31,6 +31,7 @@ repeatPenalty: 1.2
 maxRetries: 5
 maxToolTurns: 30
 maxToolCallsPerTurn: 10
+reasoning: none
 ---
 You are an elite search AI agent specializing in online investigations.
 

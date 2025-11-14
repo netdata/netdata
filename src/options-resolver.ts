@@ -19,7 +19,7 @@ interface CLIOverrides {
   traceSlack?: boolean;
   traceSdk?: boolean;
   verbose?: boolean;
-  reasoning?: ReasoningLevel;
+  reasoning?: ReasoningLevel | 'none';
   reasoningValue?: ProviderReasoningValue | null;
   caching?: CachingMode;
 }
@@ -37,7 +37,7 @@ interface GlobalLLMOverrides {
   repeatPenalty?: number;
   toolResponseMaxBytes?: number;
   mcpInitConcurrency?: number;
-  reasoning?: ReasoningLevel;
+  reasoning?: ReasoningLevel | 'none' | 'inherit';
   reasoningValue?: ProviderReasoningValue | null;
   caching?: CachingMode;
 }
@@ -53,7 +53,7 @@ interface DefaultsForUndefined {
   maxToolTurns?: number;
   maxToolCallsPerTurn?: number;
   toolResponseMaxBytes?: number;
-  reasoning?: ReasoningLevel;
+  reasoning?: ReasoningLevel | 'none';
   reasoningValue?: ProviderReasoningValue | null;
   caching?: CachingMode;
 }
@@ -95,14 +95,18 @@ export function resolveEffectiveOptions(args: {
   const getDefUndef = (name: string): unknown => (defaultsForUndefined !== undefined ? (defaultsForUndefined as Record<string, unknown>)[name] : undefined);
   const getCfgDefault = (name: string): unknown => (configDefaults as Record<string, unknown>)[name];
 
-  const normalizeReasoning = (value: unknown): ReasoningLevel | undefined => {
-    if (typeof value !== 'string') return undefined;
-    const normalized = value.toLowerCase();
+  const normalizeReasoningDirective = (value: unknown): ReasoningLevel | 'none' | 'inherit' | undefined => {
+    if (value === undefined || value === null || typeof value !== 'string') return undefined;
+    const normalized = value.trim().toLowerCase();
+    if (normalized.length === 0) return undefined;
+    if (normalized === 'none') return 'none';
+    if (normalized === 'default' || normalized === 'unset' || normalized === 'inherit') return 'inherit';
     if (normalized === 'minimal' || normalized === 'low' || normalized === 'medium' || normalized === 'high') {
       return normalized as ReasoningLevel;
     }
     return undefined;
   };
+  let reasoningDisabled = false;
 
   const normalizeCaching = (value: unknown): CachingMode | undefined => {
     if (typeof value !== 'string') return undefined;
@@ -133,16 +137,23 @@ export function resolveEffectiveOptions(args: {
   };
 
   const readReasoning = (): ReasoningLevel | undefined => {
-    const fromGlobal = normalizeReasoning(getGlobalVal('reasoning'));
-    if (fromGlobal !== undefined) return fromGlobal;
-    const fromCli = normalizeReasoning(getCliVal('reasoning'));
-    if (fromCli !== undefined) return fromCli;
-    const fmVal = normalizeReasoning(fm?.reasoning);
-    if (fmVal !== undefined) return fmVal;
-    const def = normalizeReasoning(getDefUndef('reasoning'));
-    if (def !== undefined) return def;
-    const cfg = normalizeReasoning(getCfgDefault('reasoning'));
-    if (cfg !== undefined) return cfg;
+    const sources: unknown[] = [
+      getGlobalVal('reasoning'),
+      getCliVal('reasoning'),
+      fm?.reasoning,
+      getDefUndef('reasoning'),
+      getCfgDefault('reasoning'),
+    ];
+    // eslint-disable-next-line functional/no-loop-statements
+    for (const value of sources) {
+      const directive = normalizeReasoningDirective(value);
+      if (directive === undefined || directive === 'inherit') continue;
+      if (directive === 'none') {
+        reasoningDisabled = true;
+        return undefined;
+      }
+      return directive;
+    }
     return undefined;
   };
 
@@ -192,6 +203,16 @@ export function resolveEffectiveOptions(args: {
     return fallback;
   };
 
+  const reasoning = readReasoning();
+  let reasoningValueResult: ProviderReasoningValue | null | undefined;
+  // Reasoning may be disabled by normalizeReasoningDirective; the analyzer cannot track this across helper calls.
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+  if (reasoningDisabled) {
+    reasoningValueResult = null;
+  } else {
+    reasoningValueResult = readReasoningValue();
+  }
+
   const out: ResolvedEffectiveOptions = {
     temperature: readNum('temperature', fm?.temperature, 0.7),
     topP: readNum('topP', fm?.topP, 1.0),
@@ -230,8 +251,8 @@ export function resolveEffectiveOptions(args: {
       if (typeof dv === 'number' && Number.isFinite(dv)) return Math.trunc(dv);
       return undefined;
     })(),
-    reasoning: readReasoning(),
-    reasoningValue: readReasoningValue(),
+    reasoning,
+    reasoningValue: reasoningValueResult,
     caching: readCaching(),
   };
   return out;

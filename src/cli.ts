@@ -11,7 +11,7 @@ import type { LoadAgentOptions } from './agent-loader.js';
 import type { FrontmatterOptions } from './frontmatter.js';
 import type { McpTransportSpec } from './headends/mcp-headend.js';
 import type { Headend, HeadendLogSink } from './headends/types.js';
-import type { LogEntry, AccountingEntry, AIAgentCallbacks, ConversationMessage, Configuration, MCPTool, ProviderReasoningValue, TelemetryLogExtra, TelemetryLogFormat, TelemetryTraceSampler } from './types.js';
+import type { LogEntry, AccountingEntry, AIAgentCallbacks, ConversationMessage, Configuration, MCPTool, ProviderReasoningValue, ReasoningLevel, TelemetryLogExtra, TelemetryLogFormat, TelemetryTraceSampler } from './types.js';
 import type { CommanderError } from 'commander';
 
 import { AgentRegistry } from './agent-registry.js';
@@ -920,16 +920,35 @@ const readOverrideValues = (opts: Record<string, unknown>): string[] => {
   return [];
 };
 
-const isReasoningLevel = (value: string): value is 'minimal' | 'low' | 'medium' | 'high' => {
+const isReasoningLevel = (value: string): value is ReasoningLevel => {
   const normalized = value.toLowerCase();
   return normalized === 'minimal' || normalized === 'low' || normalized === 'medium' || normalized === 'high';
 };
 
-const parseReasoningLevelStrict = (value: string): 'minimal' | 'low' | 'medium' | 'high' => {
-  if (!isReasoningLevel(value)) {
-    throw new Error("reasoning override requires one of: minimal, low, medium, high");
+const normalizeReasoningKeyword = (value: unknown): ReasoningLevel | 'none' | 'default' | 'unset' | 'inherit' | undefined => {
+  if (typeof value !== 'string') return undefined;
+  const normalized = value.trim().toLowerCase();
+  if (normalized.length === 0) return undefined;
+  if (normalized === 'none' || normalized === 'default' || normalized === 'unset' || normalized === 'inherit') return normalized;
+  if (isReasoningLevel(normalized)) return normalized;
+  return undefined;
+};
+
+const parseReasoningOverrideStrict = (value: string): ReasoningLevel | 'none' => {
+  const normalized = normalizeReasoningKeyword(value);
+  if (normalized === undefined || normalized === 'default' || normalized === 'unset' || normalized === 'inherit') {
+    throw new Error("reasoning override requires one of: none, minimal, low, medium, high");
   }
-  return value.toLowerCase() as 'minimal' | 'low' | 'medium' | 'high';
+  return normalized;
+};
+
+const parseDefaultReasoningValue = (value: string): ReasoningLevel | 'none' | undefined => {
+  const normalized = normalizeReasoningKeyword(value);
+  if (normalized === undefined) {
+    throw new Error("default reasoning requires one of: none, minimal, low, medium, high, default, unset, inherit");
+  }
+  if (normalized === 'default' || normalized === 'unset' || normalized === 'inherit') return undefined;
+  return normalized;
 };
 
 const isCachingMode = (value: string): value is 'none' | 'full' => {
@@ -1066,7 +1085,12 @@ const buildGlobalOverrides = (entries: readonly string[]): LoadAgentOptions['glo
         overrides.stream = parseBoolean('stream', value);
         break;
       case 'reasoning': {
-        overrides.reasoning = parseReasoningLevelStrict(value);
+        const normalizedReasoning = value.trim().toLowerCase();
+        if (normalizedReasoning === 'default' || normalizedReasoning === 'unset' || normalizedReasoning === 'inherit') {
+          overrides.reasoning = 'inherit';
+        } else {
+          overrides.reasoning = parseReasoningOverrideStrict(value);
+        }
         break;
       }
       case 'reasoningTokens': {
@@ -1161,10 +1185,24 @@ async function runHeadendMode(config: HeadendModeConfig): Promise<void> {
   };
   if (typeof config.options.reasoning === 'string' && config.options.reasoning.length > 0) {
     try {
-      loadOptions.reasoning = parseReasoningLevelStrict(config.options.reasoning);
+      loadOptions.reasoning = parseReasoningOverrideStrict(config.options.reasoning);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       exitWith(4, message, 'EXIT-HEADEND-REASONING');
+    }
+  }
+  if (typeof config.options.defaultReasoning === 'string' && config.options.defaultReasoning.length > 0) {
+    try {
+      const parsedDefaultReasoning = parseDefaultReasoningValue(config.options.defaultReasoning);
+      if (parsedDefaultReasoning !== undefined) {
+        loadOptions.defaultsForUndefined = {
+          ...(loadOptions.defaultsForUndefined ?? {}),
+          reasoning: parsedDefaultReasoning,
+        };
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      exitWith(4, message, 'EXIT-HEADEND-DEFAULT-REASONING');
     }
   }
   const configOptionsRecord: Record<string, unknown> = config.options;
@@ -1510,12 +1548,17 @@ program
       // Only override numeric options if explicitly provided via CLI (avoid overriding frontmatter with Commander defaults)
       const optSrc = (name: string): 'cli' | 'default' | 'env' | 'implied' | undefined => getOptionSource(name);
 
-      let cliReasoning: ('minimal' | 'low' | 'medium' | 'high') | undefined;
+      let cliReasoning: (ReasoningLevel | 'none') | undefined;
       if (optSrc('reasoning') === 'cli') {
-        if (typeof options.reasoning === 'string' && isReasoningLevel(options.reasoning)) {
-          cliReasoning = options.reasoning.toLowerCase() as 'minimal' | 'low' | 'medium' | 'high';
+        if (typeof options.reasoning === 'string' && options.reasoning.length > 0) {
+          try {
+            cliReasoning = parseReasoningOverrideStrict(options.reasoning);
+          } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            exitWith(4, message, 'EXIT-CLI-REASONING');
+          }
         } else {
-          exitWith(4, `invalid --reasoning value '${typeof options.reasoning === 'string' ? options.reasoning : ''}'`, 'EXIT-CLI-REASONING');
+          exitWith(4, 'invalid --reasoning value', 'EXIT-CLI-REASONING');
         }
       }
 
@@ -1541,6 +1584,20 @@ program
         }
       }
 
+      let cliDefaultReasoning: (ReasoningLevel | 'none') | undefined;
+      if (optSrc('defaultReasoning') === 'cli') {
+        if (typeof options.defaultReasoning === 'string' && options.defaultReasoning.length > 0) {
+          try {
+            cliDefaultReasoning = parseDefaultReasoningValue(options.defaultReasoning);
+          } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            exitWith(4, message, 'EXIT-CLI-DEFAULT-REASONING');
+          }
+        } else {
+          exitWith(4, 'invalid --default-reasoning value', 'EXIT-CLI-DEFAULT-REASONING');
+        }
+      }
+
       let cliCaching: ('none' | 'full') | undefined;
       if (optSrc('caching') === 'cli') {
         if (typeof options.caching === 'string' && isCachingMode(options.caching)) {
@@ -1549,6 +1606,8 @@ program
           exitWith(4, `invalid --caching value '${typeof options.caching === 'string' ? options.caching : ''}'`, 'EXIT-CLI-CACHING');
         }
       }
+
+      const cliDefaultsForUndefined = cliDefaultReasoning !== undefined ? { reasoning: cliDefaultReasoning } : undefined;
 
       // Derive agent id: from prompt filename when available, else 'cli-main'
       const fileAgentId = ((): string => {
@@ -1563,6 +1622,7 @@ program
         verbose: options.verbose === true,
         // Pass through the same overrides reference for registry + nested loads.
         globalOverrides,
+        defaultsForUndefined: cliDefaultsForUndefined,
       });
       const loaded = registry.loadFromContent(fileAgentId, fmSource, {
         configPath: cfgPath,
@@ -1573,6 +1633,7 @@ program
         baseDir: fmBaseDir,
         // Keep overrides pointer intact for downstream recursion checks.
         globalOverrides,
+        defaultsForUndefined: cliDefaultsForUndefined,
         // CLI overrides take precedence
         temperature: optSrc('temperature') === 'cli' ? Number(options.temperature) : undefined,
         topP: (optSrc('topP') === 'cli' || optSrc('top-p') === 'cli') ? Number(options.topP ?? options['top-p']) : undefined,

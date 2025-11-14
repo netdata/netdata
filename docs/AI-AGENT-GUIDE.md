@@ -7,7 +7,7 @@
 - **Tool failures**: `ToolsOrchestrator.executeWithManagement` never retries a tool. Failures are logged (`severity='ERR'`, `type='tool'`) and inserted into conversation as tool-result messages so the LLM can course-correct. Output > `toolResponseMaxBytes` (default 12 288 bytes) is truncated with `[TRUNCATED]` prefix before being returned and emits a warning that includes both the actual byte size and the limit (for example, `Tool response exceeded max size (actual 16384 B > limit 12288 B)`).
 - **LLM failures & retry logic**: Per turn, the session cycles through configured provider/model pairs (`targets`) and retries up to `maxRetries` (default 3). `LLMClient` normalizes provider errors into statuses (`rate_limit`, `network_error`, `auth_error`, etc.). Retryable errors advance to the next provider; fatal ones log `EXIT-*` and end the loop.
 - **Stop/cancel handling**: A `stopRef` (`{ stopping: boolean }`) can be threaded into `AIAgentSessionConfig`. The runner now polls this flag before every retry attempt, during rate-limit backoff sleeps, and once more before emitting a failure. When every provider in a cycle reports `rate_limit`, the session still enters the recommended backoff window even if no retries remain whenever a `stopRef` is present, ensuring late stop requests can resolve gracefully instead of bubbling a `rate_limit` error.
-- **Reasoning management**: Frontmatter/CLI `reasoning` (`minimal|low|medium|high`) and `reasoningTokens` overrides feed `ProviderReasoningMapping` before each turn. Anthropic-style thinking streams arrive via `onThinking` and surface as `THK` log entries plus grey stderr text. Every LLM turn also triggers `onTurnStarted(turnIndex)` so headends can render numbered turn headers even when no reasoning/progress chunks arrive.
+- **Reasoning management**: Frontmatter/CLI `reasoning` now accepts `none|minimal|low|medium|high|default|unset`. `none` disables reasoning (sets `reasoningValue = null`), `default`/`unset` behave as “not specified” so the global fallback (`defaults.reasoning` or `--default-reasoning`) can run. These settings plus `reasoningTokens` feed `ProviderReasoningMapping` before each turn. Anthropic-style thinking streams arrive via `onThinking` and surface as `THK` log entries plus grey stderr text. Every LLM turn also triggers `onTurnStarted(turnIndex)` so headends can render numbered turn headers even when no reasoning/progress chunks arrive.
 - **Context-window guard**: `AIAgentSession` tracks `currentCtxTokens`, `pendingCtxTokens`, `newCtxTokens`, and `schemaCtxTokens`. If projected totals exceed provider limits it enters “forced final turn” mode: tool calls disabled, final user nudge injected, and `logExit('EXIT-TOKEN-LIMIT', ...)` recorded.
 - **System prompt composition**: `agent-loader` flattens `.ai` content (resolves `include:`), strips frontmatter, then `applyFormat` injects `${FORMAT}` description. During runtime, `AIAgentSession` appends tool instruction blocks exactly once (see docs/SPECS.md §System Prompt Integration). No schemas are pasted into the prompt; they are passed as JSON tool defs.
 - **Injected user messages**:
@@ -59,7 +59,7 @@
 | `repeatPenalty` | number | `1.1` | >=0. |
 | `toolResponseMaxBytes` | bytes | `12288` | Over-limit responses are truncated. |
 | `stream` | boolean | `false` | CLI default is streaming off; headends opt-in. |
-| `reasoning` | enum | provider default | `minimal/low/medium/high`. |
+| `reasoning` | enum | provider default | `none/minimal/low/medium/high/default/unset`. |
 | `reasoningTokens` | number or string | undefined | `0`/`disabled` disables provider reasoning cache. |
 | `caching` | `full|none` | `full` | Anthropic cache control. |
 
@@ -468,6 +468,7 @@ Values can be strings (Anthropic effort labels) or integers (token budgets). Use
 - **Persistence & tracing**: `--dry-run` validates config + MCP servers without contacting LLMs. `--trace-llm`, `--trace-mcp`, `--trace-sdk`, `--verbose`, `--show-tree` mirror the logging descriptions in Section 1.
 - **Debug tip**: Always smoke-test sub-agents with `--verbose` before invoking higher-level orchestrators. The verbose stream shows per-turn indices and tool names so you can confirm the planner is calling the expected tools (e.g., look for `agent:web.sweeps` before `agent:analysis` proceeds).
 - **Overrides**: Any CLI option seen in `OPTIONS_REGISTRY` (temperature, timeouts, tool limits, reasoning tokens, caching, etc.) takes top priority (Section 8). Use `--override key=value` for batch overrides across every agent in the run.
+- **Default reasoning fallback**: Use `--default-reasoning <none|minimal|low|medium|high>` (or `defaults.reasoning` in `.ai-agent.json`) to change the level applied only when prompts say `default`/`unset` or omit `reasoning`. Explicit `reasoning: none|minimal|...` always wins over the fallback.
 
 **Tool inspection**
 - `--list-tools <server>` prints the registered MCP tools for that server (or `all`). The dump includes descriptions, input schemas, and tool-specific instructions so you can diff what the LLM receives versus what the MCP actually supports.

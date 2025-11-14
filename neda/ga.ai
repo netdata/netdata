@@ -6,12 +6,12 @@ description: |
 usage: |
   property or domain (optional) and time window
 models:
+  - anthropic/claude-haiku-4-5
   - anthropic/claude-sonnet-4-5
-#  - anthropic/claude-haiku-4-5
 #  - openrouter/deepseek/deepseek-chat-v3.1
 #  - openrouter/openai/gpt-oss-120b
 #  - openrouter/openai/gpt-oss-20b
-#  - openai/gpt-5
+#  - openai/gpt-5.1
 tools:
   - analytics-mcp
   - batch
@@ -24,6 +24,7 @@ maxOutputTokens: 16384
 repeatPenalty: 1.1
 maxRetries: 5
 maxToolTurns: 100
+reasoning: none
 ---
 You are an AI assistant that answers questions based on Google Analytics (GA4) data.
 

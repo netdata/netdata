@@ -3,10 +3,10 @@
 description: "Company Researcher: runs web research to produce rigorous, evidence‑backed prospect intelligence."
 usage: Company name, domain or a contact email to reseach information for
 models:
+  - anthropic/claude-haiku-4-5
   - anthropic/claude-sonnet-4-5
-#  - anthropic/claude-haiku-4-5
 #  - google/gemini-1.5-flash
-  - openai/gpt-5
+  - openai/gpt-5.1
 tools:
   - batch
 agents:
@@ -22,6 +22,7 @@ maxOutputTokens: 16384
 repeatPenalty: 1
 maxRetries: 5
 maxToolTurns: 20
+reasoning: none
 ---
 You are an elite AI company researcher.
 

@@ -8,6 +8,7 @@ usage: |
 models:
 #  - anthropic/claude-haiku-4-5
   - anthropic/claude-sonnet-4-5
+  - openai/gpt-5.1
 tools:
   - filesystem_repos
   - batch
@@ -20,6 +21,7 @@ maxOutputTokens: 32768
 repeatPenalty: 1.1
 maxRetries: 5
 maxToolTurns: 50
+reasoning: high
 ---
 
 Mission

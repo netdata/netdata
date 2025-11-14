@@ -134,12 +134,21 @@ export const OPTIONS_REGISTRY: OptionDef[] = [
   }),
   strDef({
     key: 'reasoning',
-    description: 'Reasoning effort level: minimal, low, medium, or high; leave unset to use provider defaults',
+    description: 'Reasoning effort level: none, minimal, low, medium, or high; leave unset to use provider defaults',
     cli: { names: ['--reasoning'], showInHelp: true },
     fm: { allowed: true, key: 'reasoning' },
     scope: 'masterDefault',
     groups: [G_MASTER_DEFAULTS],
     render: { showInFrontmatterTemplate: true },
+    default: undefined,
+  }),
+  strDef({
+    key: 'defaultReasoning',
+    description: 'Default reasoning for agents that omit it (use none|minimal|low|medium|high; default/unset clears).',
+    cli: { names: ['--default-reasoning'], showInHelp: true },
+    config: { path: 'defaults.reasoning' },
+    scope: 'masterDefault',
+    groups: [G_MASTER_DEFAULTS],
     default: undefined,
   }),
   strDef({

@@ -5,10 +5,10 @@ description: |-
   verifiable information about individuals for sales engagement.
 usage: name and company (or other info) of the person to research
 models:
+  - anthropic/claude-haiku-4-5
   - anthropic/claude-sonnet-4-5
-#  - anthropic/claude-haiku-4-5
 #  - google/gemini-2.5-pro
-#  - openai/gpt-5
+#  - openai/gpt-5.1
 #  - openrouter/openai/gpt-oss-120b
 #  - openrouter/openai/gpt-oss-20b
 tools:
@@ -26,6 +26,7 @@ maxOutputTokens: 16384
 repeatPenalty: 1
 maxRetries: 5
 maxToolTurns: 20
+reasoning: none
 ---
 You are an elite AI researcher tasked with preparing **professional background reports** on a specific individual who has contacted us for sales discussions for observability solutions, infrastructure management, and related services.
 

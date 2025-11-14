@@ -75,7 +75,7 @@ This is **emergent complexity from simple composition** - sophisticated multi-ag
 description: Company Researcher - rigorous, evidence‑backed prospect intelligence
 models:
   - anthropic/claude-sonnet-4-5
-  - openai/gpt-5
+  - openai/gpt-5.1
 agents:
   - web-fetch.ai    # ← These agents are also full planners!
   - web-search.ai   # ← They reason and adapt independently

@@ -3,8 +3,9 @@
 description: Search user comments on reddit
 usage: anything that can be found on reddit
 models:
+  - anthropic/claude-3-5-haiku-20241022
   - anthropic/claude-haiku-4-5
-  - anthropic/claude-haiku-4-5
+#  - anthropic/claude-haiku-4-5
 #  - anthropic/claude-sonnet-4-5
 #  - openrouter/openai/gpt-oss-120b
 #  - openrouter/openai/gpt-oss-20b
@@ -21,6 +22,7 @@ repeatPenalty: 1.2
 maxRetries: 3
 maxToolTurns: 10
 maxToolCallsPerTurn: 10
+reasoning: none
 ---
 
 You goal is to search reddit for what the user asks.

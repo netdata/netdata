@@ -3991,11 +3991,13 @@ export class AIAgentSession {
     const fallbackReasoningLevel = this.sessionConfig.reasoning;
     let effectiveReasoningLevel = reasoningLevel ?? fallbackReasoningLevel;
     const targetMaxOutputTokens = this.sessionConfig.maxOutputTokens;
-    let effectiveReasoningValue = reasoningValue ?? (
-      effectiveReasoningLevel !== undefined
-        ? this.resolveReasoningValue(provider, model, effectiveReasoningLevel, targetMaxOutputTokens)
-        : undefined
-    );
+    let effectiveReasoningValue = reasoningValue !== undefined
+      ? reasoningValue
+      : (
+        effectiveReasoningLevel !== undefined
+          ? this.resolveReasoningValue(provider, model, effectiveReasoningLevel, targetMaxOutputTokens)
+          : undefined
+      );
     const reasoningActive = effectiveReasoningLevel !== undefined || (effectiveReasoningValue !== undefined && effectiveReasoningValue !== null);
     if (disableReasoningForTurn) {
       if (reasoningActive) {

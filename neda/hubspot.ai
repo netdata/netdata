@@ -13,6 +13,7 @@ toolResponseMaxBytes: 100000
 temperature: 0.3
 maxOutputTokens: 16384
 maxToolTurns: 30
+reasoning: high
 ---
 You are a helpful AI CRM assistant.
 
