@@ -24,9 +24,15 @@ Once in the Settings page, your profile information will appear in a pop-up wind
 
 ### Step 4: Confirm Account Deletion
 
-Click on **"Delete account"**. A confirmation dialog will appear with the following warning:
+Click on **"Delete account"**. A confirmation dialog will appear asking you to verify the account you're about to delete.
 
-![delete dialog](https://raw.githubusercontent.com/netdata/docs-images/refs/heads/master/netdata-cloud/account-management/delete-account/delete-confirmation-dialog.png)
+![delete dialog](https://raw.githubusercontent.com/netdata/docs-images/master/Confirmation%20Dialogue.png)
+
+:::note
+
+To prevent accidental deletion of the wrong account, you'll need to type your account email address in the confirmation field. This ensures you're aware of exactly which account will be permanently deleted.
+
+:::
 
 ### Step 5: Final Confirmation
 
