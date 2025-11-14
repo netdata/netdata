@@ -199,6 +199,9 @@
 - Additional check when executing a CLI command ([#21286](https://github.com/netdata/netdata/issues/21286))
 - Always set ephemerality label with the correct value ([#21274](https://github.com/netdata/netdata/issues/21274))
 - Installation Update ([#21292](https://github.com/netdata/netdata/issues/21292))
+- Reorganize MSSQL collection. ([#21290](https://github.com/netdata/netdata/issues/21290))
+- Fix repository URLs for openSUSE Tumbleweed. ([#21296](https://github.com/netdata/netdata/issues/21296))
+- Sensors (windows.plugin) ([#21266](https://github.com/netdata/netdata/issues/21266))
 
 ## [2.7.0] - 2025-09-25
 
