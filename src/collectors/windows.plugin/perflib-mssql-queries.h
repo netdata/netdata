@@ -672,6 +672,14 @@ struct netdata_mssql_conn {
     SQLHSTMT dbSQLJobs;
     SQLHSTMT dbReplicationPublisher;
 
+    BOOL collect_transactions;
+    BOOL collect_waits;
+    BOOL collect_locks;
+    BOOL collect_replication;
+    BOOL collect_jobs;
+    BOOL collect_buffer;
+    BOOL collect_data_size;
+
     BOOL is_connected;
 };
 

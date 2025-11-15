@@ -1264,6 +1264,20 @@ static void netdata_read_config_options()
         dbconn->instances = additional_instances;
         dbconn->windows_auth = inicfg_get_boolean(&netdata_config, section_name, "windows authentication", false);
         dbconn->is_sqlexpress = inicfg_get_boolean(&netdata_config, section_name, "express", false);
+        dbconn->collect_transactions = inicfg_get_boolean(
+                &netdata_config, section_name, "collect transactions", true);
+        dbconn->collect_waits = inicfg_get_boolean(
+                &netdata_config, section_name, "collect waits", true);
+        dbconn->collect_locks = inicfg_get_boolean(
+                &netdata_config, section_name, "collect lock metrics", true);
+        dbconn->collect_replication = inicfg_get_boolean(
+                &netdata_config, section_name, "collect replication", true);
+        dbconn->collect_jobs = inicfg_get_boolean(
+                &netdata_config, section_name, "collect jobs", true);
+        dbconn->collect_buffer = inicfg_get_boolean(
+                &netdata_config, section_name, "collect buffer stats", true);
+        dbconn->collect_data_size = inicfg_get_boolean(
+                &netdata_config, section_name, "collect data size", true);
         dbconn->is_connected = FALSE;
 
         netdata_mount_mssql_connection_string(dbconn);
