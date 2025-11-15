@@ -1,0 +1,113 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "scripts.d Nagios job configuration",
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "name": {
+        "title": "Job name",
+        "description": "Unique identifier for this Nagios job.",
+        "type": "string"
+      },
+      "plugin": {
+        "title": "Plugin path",
+        "description": "Absolute path to the Nagios plugin executable.",
+        "type": "string"
+      },
+      "vnode": {
+        "title": "Virtual node",
+        "description": "Virtual node GUID/name to associate with this job.",
+        "type": "string"
+      },
+      "args": {
+        "title": "Arguments",
+        "description": "Command line arguments passed to the plugin (macros allowed).",
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "arg_values": {
+        "title": "ARGn values",
+        "description": "Values bound to $ARGn$ macros (max 32).",
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "maxItems": 32
+      },
+      "environment": {
+        "title": "Environment variables",
+        "description": "Additional environment variables for the plugin.",
+        "type": "object",
+        "additionalProperties": {
+          "type": "string"
+        }
+      },
+      "custom_vars": {
+        "title": "Custom service vars",
+        "description": "Values exported as $_SERVICE* macros.",
+        "type": "object",
+        "additionalProperties": {
+          "type": "string"
+        }
+      },
+      "timeout": {
+        "title": "Timeout",
+        "description": "Execution timeout (duration, e.g. 60s).",
+        "type": "string",
+        "pattern": "^([0-9]+(\\\\.[0-9]+)?(ns|us|ms|s|m|h|d))+$"
+      },
+      "timeout_state": {
+        "title": "Timeout state",
+        "description": "State reported when a timeout occurs.",
+        "type": "string",
+        "enum": ["critical", "warning", "unknown"]
+      },
+      "check_interval": {
+        "title": "Check interval",
+        "description": "Base scheduling interval (duration).",
+        "type": "string",
+        "pattern": "^([0-9]+(\\\\.[0-9]+)?(ns|us|ms|s|m|h|d))+$"
+      },
+      "retry_interval": {
+        "title": "Retry interval",
+        "description": "Interval between soft retries (duration).",
+        "type": "string",
+        "pattern": "^([0-9]+(\\\\.[0-9]+)?(ns|us|ms|s|m|h|d))+$"
+      },
+      "max_check_attempts": {
+        "title": "Max check attempts",
+        "description": "Number of soft attempts before a hard state is emitted.",
+        "type": "integer",
+        "minimum": 1
+      },
+      "inter_check_jitter": {
+        "title": "Inter-check jitter",
+        "description": "Random jitter applied to the interval (duration).",
+        "type": "string",
+        "pattern": "^([0-9]+(\\\\.[0-9]+)?(ns|us|ms|s|m|h|d))+$"
+      },
+      "working_directory": {
+        "title": "Working directory",
+        "description": "Directory from which the plugin will be executed.",
+        "type": "string"
+      },
+      "check_period": {
+        "title": "Check period",
+        "description": "Name of a time_period defined in the shard (defaults to 24x7).",
+        "type": "string"
+      },
+      "notes": {
+        "title": "Notes",
+        "description": "Free-form notes attached to this job.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "name",
+      "plugin"
+    ]
+  }
+}
