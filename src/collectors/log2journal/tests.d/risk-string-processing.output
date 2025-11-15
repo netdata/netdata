@@ -1,0 +1,23 @@
+BASE64_LIKE=VGhpcyBpcyBhIHRlc3Qgc3RyaW5nIGZvciBiYXNlNjQgbGlrZSBkYXRh
+CONTROL_CHARS=Tab	Newline
+CarriageReturnFormBackspace
+HTML_ENTITIES=&lt;script&gt;alert(&#39;test&#39;);&lt;/script&gt;
+LONG_REPLACEMENT= - This replacement text is intentionally very long to test how the parser handles large string operations and memory allocation during variable substitution processing.
+LONG_STRING=This is a very long string that repeats many times to test buffer handling. This is a very long string that repeats many times to test buffer handling. This is a very long string that repeats many times to test buffer handling. This is a very long string that repeats many times to test buffer handling. This is a very long string that repeats many times to test buffer handling.
+MAC_NEWLINES=Line1Line2Line3
+MESSAGE=Test message
+MIXED_QUOTES=Double "quoted" with 'single' and `backtick` quotes
+NULL_BYTE_STRING=Before null
+REGEX_CHARS=.*?+[]{}()^$|\special
+UNICODE_TEST=Unicode: αβγ 中文 🚀 العربية
+UNIX_NEWLINES=Line1
+Line2
+Line3
+URL_ENCODED=Hello%20World%21%40%23%24%25%5E%26%2A%28%29
+WHITESPACE_ONLY=   	
+   
+WINDOWS_NEWLINES=Line1
+Line2
+Line3
+ZERO_WIDTH=Zero​width‌joiner‍test
+

@@ -1,148 +1,253 @@
 #!/usr/bin/env bash
 
-if [ -f "${PWD}/log2journal" ]; then
-  log2journal_bin="${PWD}/log2journal"
+# Improved log2journal test framework with .cmd and .fail support
+
+set -e
+
+# Parse command line arguments
+VERBOSE=false
+SPECIFIC_TEST=""
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --verbose)
+            VERBOSE=true
+            shift
+            ;;
+        --test)
+            SPECIFIC_TEST="$2"
+            shift 2
+            ;;
+        -h|--help)
+            echo "Usage: $0 [OPTIONS]"
+            echo "Options:"
+            echo "  --verbose     Show exact commands and full diff output"
+            echo "  --test NAME   Run only the specified test"
+            echo "  --help        Show this help message"
+            echo ""
+            echo "Environment variables:"
+            echo "  TESTED_LOG2JOURNAL_BIN   Path to log2journal binary (default: log2journal)"
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $1"
+            echo "Use --help for usage information"
+            exit 1
+            ;;
+    esac
+done
+
+TEST_DIR="tests.d"
+RESULTS_DIR="/tmp/log2journal_test_results"
+
+# Use installed log2journal by default, allow override via environment variable
+if [ -z "${TESTED_LOG2JOURNAL_BIN}"  -a ! -z "${LOG2JOURNAL}" ]; then
+    export TESTED_LOG2JOURNAL_BIN="${LOG2JOURNAL}"
+fi
+if [ -z "$TESTED_LOG2JOURNAL_BIN" ]; then
+    export TESTED_LOG2JOURNAL_BIN="log2journal"
+fi
+
+echo "log2journal cmd: ${TESTED_LOG2JOURNAL_BIN}"
+
+# Colors for output
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+YELLOW='\033[0;33m'
+NC='\033[0m' # No Color
+
+# Counters
+TESTS_RUN=0
+TESTS_PASSED=0
+TESTS_FAILED=0
+TESTS_IGNORED=0
+
+# Create results directory
+mkdir -p "$RESULTS_DIR"
+
+# Function to run a single test
+run_test() {
+    local test_name="$1"
+    local yaml_file="$2"
+    local input_file="$3"
+    local expected_output="$4"
+    local expected_config="$5"
+    local cmd_file="$6"
+    local fail_file="$7"
+    
+    TESTS_RUN=$((TESTS_RUN + 1))
+    local test_passed=true
+    local error_msg=""
+    
+    # Determine command to run
+    local cmd=""
+    if [ -f "$cmd_file" ]; then
+        # Use custom command from .cmd file
+        cmd=$(envsubst < "$cmd_file")
+    elif [ -f "$yaml_file" ]; then
+        # Standard YAML file test
+        cmd="$TESTED_LOG2JOURNAL_BIN -f $yaml_file"
+    else
+        # Internal config test (extract config name from test_name)
+        if [[ "$test_name" =~ ^(default|nginx-combined|nginx-json|logfmt)$ ]]; then
+            cmd="$TESTED_LOG2JOURNAL_BIN -c $test_name"
+        else
+            echo -e "${YELLOW}IGNORED${NC} (no config or cmd file)"
+            TESTS_IGNORED=$((TESTS_IGNORED + 1))
+            return
+        fi
+    fi
+    
+    # Determine input source
+    local input_args=""
+    if [ -f "$input_file" ]; then
+        input_args="< $input_file"
+    else
+        input_args="< /dev/null"
+    fi
+    
+    if [ "$VERBOSE" = true ]; then
+        echo "Running test: $test_name"
+        echo "  Command: $cmd $input_args"
+    else
+        echo -n "Running test: $test_name ... "
+    fi
+    
+    # Check if this is a failure test
+    if [ -f "$fail_file" ]; then
+        # Test should fail
+        local actual_error="$RESULTS_DIR/${test_name}.err"
+        if eval "$cmd $input_args" > /dev/null 2> "$actual_error"; then
+            test_passed=false
+            error_msg="Test was expected to fail but succeeded"
+        else
+            # Command failed as expected, check error message if fail file has content
+            if [ -s "$fail_file" ]; then
+                if ! grep -qF "$(cat "$fail_file")" "$actual_error"; then
+                    test_passed=false
+                    error_msg="Error message mismatch - see $actual_error vs $fail_file"
+                fi
+            fi
+        fi
+    else
+        # Normal test - check output
+        if [ -f "$expected_output" ]; then
+            local actual_output="$RESULTS_DIR/${test_name}.out"
+            
+            if ! eval "$cmd $input_args" > "$actual_output" 2> "$RESULTS_DIR/${test_name}.err"; then
+                test_passed=false
+                error_msg="Command failed with non-zero exit code - see $RESULTS_DIR/${test_name}.err"
+            else
+                # Only check output if command succeeded
+                # For help/error output tests, ignore version lines to avoid build-dependent failures
+            if [[ "$test_name" =~ ^error- ]] && grep -q "^Netdata log2journal v" "$expected_output"; then
+                # Version-agnostic comparison for error tests
+                grep -v "^Netdata log2journal v" "$expected_output" > "$RESULTS_DIR/${test_name}.expected_no_version"
+                grep -v "^Netdata log2journal v" "$actual_output" > "$RESULTS_DIR/${test_name}.actual_no_version"
+                if ! diff -u "$RESULTS_DIR/${test_name}.expected_no_version" "$RESULTS_DIR/${test_name}.actual_no_version" > "$RESULTS_DIR/${test_name}.diff" 2>&1; then
+                    test_passed=false
+                    if [ "$VERBOSE" = true ]; then
+                        error_msg="Output mismatch (version-agnostic):\n$(cat "$RESULTS_DIR/${test_name}.diff")"
+                    else
+                        error_msg="Output mismatch (version-agnostic) - see $RESULTS_DIR/${test_name}.diff"
+                    fi
+                fi
+                
+                # Also verify version format is correct
+                if ! grep -q "^Netdata log2journal v[0-9]\+\.[0-9]\+\.[0-9]\+-[0-9]\+-g[a-f0-9]\+$" "$actual_output"; then
+                    test_passed=false
+                    error_msg="$error_msg\nVersion format is incorrect"
+                fi
+            else
+                # Normal comparison for non-version-dependent tests
+                if ! diff -u "$expected_output" "$actual_output" > "$RESULTS_DIR/${test_name}.diff" 2>&1; then
+                    test_passed=false
+                    if [ "$VERBOSE" = true ]; then
+                        error_msg="Output mismatch:\n$(cat "$RESULTS_DIR/${test_name}.diff")"
+                    else
+                        error_msg="Output mismatch - see $RESULTS_DIR/${test_name}.diff"
+                    fi
+                fi
+            fi
+            fi
+        fi
+        
+        # Check config output if expected
+        if [ -f "$expected_config" ]; then
+            local actual_config="$RESULTS_DIR/${test_name}-config.yaml"
+            
+            eval "$cmd --show-config $input_args" 2>/dev/null | sed '1,/^$/d' > "$actual_config" || true
+            
+            if ! diff -u "$expected_config" "$actual_config" > "$RESULTS_DIR/${test_name}-config.diff" 2>&1; then
+                test_passed=false
+                if [ "$VERBOSE" = true ]; then
+                    error_msg="$error_msg\nConfig mismatch:\n$(cat "$RESULTS_DIR/${test_name}-config.diff")"
+                else
+                    error_msg="$error_msg\nConfig mismatch - see $RESULTS_DIR/${test_name}-config.diff"
+                fi
+            fi
+        fi
+    fi
+    
+    # Report result
+    if [ "$test_passed" = true ]; then
+        echo -e "${GREEN}PASSED${NC}"
+        TESTS_PASSED=$((TESTS_PASSED + 1))
+    else
+        echo -e "${RED}FAILED${NC}"
+        echo -e "$error_msg"
+        TESTS_FAILED=$((TESTS_FAILED + 1))
+    fi
+}
+
+# Main test loop
+echo "Starting log2journal unit tests (v2 framework)..."
+echo "================================"
+
+# Find all unique test names by looking for any test files
+if [ -n "$SPECIFIC_TEST" ]; then
+    test_names="$SPECIFIC_TEST"
+    echo "Running specific test: $SPECIFIC_TEST"
 else
-  log2journal_bin="$(which log2journal)"
+    test_names=$(find "$TEST_DIR" -name "*.yaml" -o -name "*.input" -o -name "*.output" -o -name "*.cmd" -o -name "*.fail" -o -name "*-final-config.yaml" | \
+        sed -E 's/.*\/([^\/]+)\.(yaml|input|output|cmd|fail|-final-config\.yaml)$/\1/' | \
+        sed 's/-final-config$//' | \
+        sort -u)
 fi
 
-[ -z "${log2journal_bin}" ] && echo >&2 "Cannot find log2journal binary" && exit 1
-echo >&2 "Using: ${log2journal_bin}"
+for test_name in $test_names; do
+    # Check what files exist for this test
+    yaml_file="$TEST_DIR/${test_name}.yaml"
+    input_file="$TEST_DIR/${test_name}.input"
+    output_file="$TEST_DIR/${test_name}.output"
+    config_file="$TEST_DIR/${test_name}-final-config.yaml"
+    cmd_file="$TEST_DIR/${test_name}.cmd"
+    fail_file="$TEST_DIR/${test_name}.fail"
+    
+    # Check if test has any actual test files
+    if [ ! -f "$output_file" ] && [ ! -f "$config_file" ] && [ ! -f "$fail_file" ]; then
+        echo "Warning: Test $test_name has no expected output, config, or fail files, skipping"
+        TESTS_IGNORED=$((TESTS_IGNORED + 1))
+        continue
+    fi
+    
+    run_test "$test_name" "$yaml_file" "$input_file" "$output_file" "$config_file" "$cmd_file" "$fail_file"
+done
 
-script_dir=$(dirname "$(readlink -f "$0")")
-tests="${script_dir}/tests.d"
-
-if [ ! -d "${tests}" ]; then
-  echo >&2 "tests directory '${tests}' is not found."
-  exit 1
+# Summary
+echo "================================"
+echo "Test Summary:"
+echo "  Total tests run: $TESTS_RUN"
+echo -e "  Passed: ${GREEN}$TESTS_PASSED${NC}"
+echo -e "  Failed: ${RED}$TESTS_FAILED${NC}"
+if [ $TESTS_IGNORED -gt 0 ]; then
+    echo -e "  Ignored: ${YELLOW}$TESTS_IGNORED${NC}"
 fi
 
-# Create a random directory name in /tmp
-tmp=$(mktemp -d /tmp/script_temp.XXXXXXXXXX)
-
-# Function to clean up the temporary directory on exit
-cleanup() {
-  echo "Cleaning up..."
-  rm -rf "$tmp"
-}
-
-# Register the cleanup function to run on script exit
-trap cleanup EXIT
-
-# Change to the temporary directory
-cd "$tmp" || exit 1
-
-# -----------------------------------------------------------------------------
-
-test_log2journal_config() {
-  local in="${1}"
-  local out="${2}"
-  shift 2
-
-  [ -f output ] && rm output
-
-  printf >&2 "running: "
-  printf >&2 "%q " "${log2journal_bin}" "${@}"
-  printf >&2 "\n"
-
-  "${log2journal_bin}" <"${in}" "${@}" >output 2>&1
-  ret=$?
-
-  [ $ret -ne 0 ] && echo >&2 "${log2journal_bin} exited with code: $ret" && cat output && exit 1
-
-  diff --ignore-all-space "${out}" output
-  [ $? -ne -0 ] && echo >&2 "${log2journal_bin} output does not match!" && exit 1
-
-  echo >&2 "OK"
-  echo >&2
-
-  return 0
-}
-
-# test yaml parsing
-echo >&2
-echo >&2 "Testing full yaml config parsing..."
-test_log2journal_config /dev/null "${tests}/full.output" -f "${tests}/full.yaml" --show-config || exit 1
-
-echo >&2 "Testing command line parsing..."
-test_log2journal_config /dev/null "${tests}/full.output" --show-config      \
-  --prefix=NGINX_                                                           \
-  --filename-key NGINX_LOG_FILENAME                                         \
-  --inject SYSLOG_IDENTIFIER=nginx-log                                      \
-  --inject=SYSLOG_IDENTIFIER2=nginx-log2                                    \
-  --inject 'PRIORITY=${NGINX_STATUS}'                                       \
-  --inject='NGINX_STATUS_FAMILY=${NGINX_STATUS}${NGINX_METHOD}'             \
-  --rewrite 'PRIORITY=//${NGINX_STATUS}/inject,dont-stop'                   \
-  --rewrite "PRIORITY=/^[123]/6"                                            \
-  --rewrite='PRIORITY=|^4|5'                                                \
-  '--rewrite=PRIORITY=-^5-3'                                                \
-  --rewrite "PRIORITY=;.*;4"                                                \
-  --rewrite 'NGINX_STATUS_FAMILY=|^(?<first_digit>[1-5])|${first_digit}xx'  \
-  --rewrite 'NGINX_STATUS_FAMILY=|.*|UNKNOWN'                               \
-  --rename TEST1=TEST2                                                      \
-  --rename=TEST3=TEST4                                                      \
-  --unmatched-key MESSAGE                                                   \
-  --inject-unmatched PRIORITY=1                                             \
-  --inject-unmatched=PRIORITY2=2                                            \
-  --include=".*"                                                            \
-  --exclude ".*HELLO.*WORLD.*"                                              \
-  '(?x)                                   # Enable PCRE2 extended mode
-   ^
-   (?<NGINX_REMOTE_ADDR>[^ ]+) \s - \s    # NGINX_REMOTE_ADDR
-   (?<NGINX_REMOTE_USER>[^ ]+) \s         # NGINX_REMOTE_USER
-   \[
-     (?<NGINX_TIME_LOCAL>[^\]]+)          # NGINX_TIME_LOCAL
-   \]
-   \s+ "
-   (?<MESSAGE>
-     (?<NGINX_METHOD>[A-Z]+) \s+          # NGINX_METHOD
-     (?<NGINX_URL>[^ ]+) \s+
-     HTTP/(?<NGINX_HTTP_VERSION>[^"]+)
-   )
-   " \s+
-   (?<NGINX_STATUS>\d+) \s+               # NGINX_STATUS
-   (?<NGINX_BODY_BYTES_SENT>\d+) \s+      # NGINX_BODY_BYTES_SENT
-   "(?<NGINX_HTTP_REFERER>[^"]*)" \s+     # NGINX_HTTP_REFERER
-   "(?<NGINX_HTTP_USER_AGENT>[^"]*)"      # NGINX_HTTP_USER_AGENT' \
-    || exit 1
-
-# -----------------------------------------------------------------------------
-
-test_log2journal() {
-  local n="${1}"
-  local in="${2}"
-  local out="${3}"
-  shift 3
-
-  printf >&2 "running test No ${n}: "
-  printf >&2 "%q " "${log2journal_bin}" "${@}"
-  printf >&2 "\n"
-  echo >&2 "using as input  : ${in}"
-  echo >&2 "expecting output: ${out}"
-
-  [ -f output ] && rm output
-
-  "${log2journal_bin}" <"${in}" "${@}" >output 2>&1
-  ret=$?
-
-  [ $ret -ne 0 ] && echo >&2 "${log2journal_bin} exited with code: $ret" && cat output && exit 1
-
-  diff "${out}" output
-  [ $? -ne -0 ] && echo >&2 "${log2journal_bin} output does not match! - here is what we got:" && cat output && exit 1
-
-  echo >&2 "OK"
-  echo >&2
-
-  return 0
-}
-
-echo >&2
-echo >&2 "Testing parsing and output..."
-
-test_log2journal 1 "${tests}/json.log" "${tests}/json.output" json
-test_log2journal 2 "${tests}/json.log" "${tests}/json-include.output" json --include "OBJECT"
-test_log2journal 3 "${tests}/json.log" "${tests}/json-exclude.output" json --exclude "ARRAY[^2]"
-test_log2journal 4 "${tests}/nginx-json.log" "${tests}/nginx-json.output" -f "${script_dir}/log2journal.d/nginx-json.yaml"
-test_log2journal 5 "${tests}/nginx-combined.log" "${tests}/nginx-combined.output" -f "${script_dir}/log2journal.d/nginx-combined.yaml"
-test_log2journal 6 "${tests}/logfmt.log" "${tests}/logfmt.output" -f "${tests}/logfmt.yaml"
-test_log2journal 7 "${tests}/logfmt.log" "${tests}/default.output" -f "${script_dir}/log2journal.d/default.yaml"
+if [ $TESTS_FAILED -gt 0 ]; then
+    echo -e "\n${RED}TESTS FAILED${NC}"
+    exit 1
+else
+    echo -e "\n${GREEN}ALL TESTS PASSED${NC}"
+    exit 0
+fi
