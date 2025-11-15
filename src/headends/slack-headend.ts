@@ -100,6 +100,9 @@ export class SlackHeadend implements Headend {
   private fallbackPort?: number;
   private fallbackServer?: http.Server;
   private stopping = false;
+  private shutdownSignal?: AbortSignal;
+  private globalStopRef?: { stopping: boolean };
+  private shutdownListener?: () => void;
 
   public constructor(options: SlackHeadendOptions) {
     this.agentPaths = options.agentPaths;
@@ -129,6 +132,13 @@ export class SlackHeadend implements Headend {
   public async start(context: HeadendContext): Promise<void> {
     if (this.slackApp !== undefined) return;
     this.context = context;
+    this.shutdownSignal = context.shutdownSignal;
+    this.globalStopRef = context.stopRef;
+    if (this.shutdownSignal !== undefined) {
+      const handler = () => { this.handleShutdownSignal(); };
+      this.shutdownSignal.addEventListener('abort', handler);
+      this.shutdownListener = handler;
+    }
 
     this.log('starting');
 
@@ -200,6 +210,11 @@ export class SlackHeadend implements Headend {
   public async stop(): Promise<void> {
     if (this.stopping) return;
     this.stopping = true;
+    this.handleShutdownSignal();
+    if (this.shutdownListener !== undefined && this.shutdownSignal !== undefined) {
+      this.shutdownSignal.removeEventListener('abort', this.shutdownListener);
+      this.shutdownListener = undefined;
+    }
     const slackApp = this.slackApp;
     if (slackApp !== undefined) {
       try {
@@ -690,6 +705,28 @@ export class SlackHeadend implements Headend {
       this.registeredSessions.add(session);
     }
     this.runReleases.set(runId, release);
+  }
+
+  private handleShutdownSignal(): void {
+    if (this.globalStopRef !== undefined) {
+      this.globalStopRef.stopping = true;
+    }
+    this.stopAllSessions('shutdown');
+  }
+
+  private stopAllSessions(reason: string): void {
+    const seen = new Set<SessionManager>();
+    const stopSessions = (sessions: SessionManager | undefined) => {
+      if (sessions === undefined || seen.has(sessions)) return;
+      seen.add(sessions);
+      sessions.listActiveRuns().forEach((run) => {
+        sessions.stopRun(run.runId, reason);
+      });
+    };
+    stopSessions(this.defaultSession);
+    this.agentCache.forEach(({ sessions }) => {
+      stopSessions(sessions);
+    });
   }
 
   private createDeferred<T>(): { promise: Promise<T>; resolve: (value: T) => void; reject: (reason?: unknown) => void } {

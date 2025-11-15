@@ -91,7 +91,20 @@ function getKindCode(event: StructuredLogEvent): string {
 
 function buildContext(event: StructuredLogEvent): { text?: string; highlight: 'llm' | 'tool' | undefined } {
   if (event.type === 'llm') {
+    const buildProviderModelLabel = (): string | undefined => {
+      const provider = event.provider ?? '';
+      const model = event.model ?? '';
+      if (provider.length > 0 && model.length > 0) {
+        return `${provider}/${model}`;
+      }
+      return undefined;
+    };
     if (event.direction === 'response') {
+      const message = typeof event.message === 'string' ? event.message : '';
+      const isResponseMetricLog = message === 'LLM response received';
+      const isFailureMetricLog = message.startsWith('LLM response failed');
+      if (isResponseMetricLog || isFailureMetricLog) {
+        const labelPrefix = isFailureMetricLog ? 'LLM response failed' : 'LLM response received';
       const getNumber = (key: string): number | undefined => {
         if (!Object.prototype.hasOwnProperty.call(event.labels, key)) return undefined;
         const raw = event.labels[key];
@@ -134,19 +147,21 @@ function buildContext(event: StructuredLogEvent): { text?: string; highlight: 'l
       if (typeof stopReason === 'string') parts.push(`stop=${stopReason}`);
       if (typeof reasoning === 'string') parts.push(`reasoning=${reasoning}`);
 
-      const reconstructed = parts.length > 0
-        ? `LLM response received [${parts.join(', ')}]`
-        : 'LLM response received';
-      return { text: reconstructed, highlight: 'llm' };
+        const reconstructed = parts.length > 0
+          ? `${labelPrefix} [${parts.join(', ')}]`
+          : labelPrefix;
+        return { text: reconstructed, highlight: 'llm' };
+      }
+      const providerLabel = buildProviderModelLabel();
+      if (providerLabel !== undefined) {
+        return { text: providerLabel, highlight: 'llm' };
+      }
+      return { highlight: 'llm' };
     }
 
-    const provider = event.provider ?? '';
-    const model = event.model ?? '';
-    const modelStr = provider.length > 0 && model.length > 0
-      ? `${provider}/${model}`
-      : '';
-    if (modelStr.length > 0) {
-      return { text: modelStr, highlight: 'llm' };
+    const providerLabel = buildProviderModelLabel();
+    if (providerLabel !== undefined) {
+      return { text: providerLabel, highlight: 'llm' };
     }
     return { highlight: 'llm' };
   }

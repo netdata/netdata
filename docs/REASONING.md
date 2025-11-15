@@ -67,8 +67,8 @@ We must update this document again after applying the fixes and validating real 
 1. The agent should set a reasoning effort on the requests if unset
 2. Configuration option `reasoning = none` should unset reasoning (even if set in front matter)
 3. Valid reasoning options are:
-   - `none`: disable reasoning entirely (maps to `reasoningValue = null`)
-   - `default` / `unset`: behave as if the key was omitted so global defaults (including `--default-reasoning`/`defaults.reasoning`) can apply
+   - `none` / `unset`: disable reasoning entirely (maps to `reasoningValue = null`)
+   - `default`: behave as if the key was omitted so global defaults (including `--default-reasoning`/`defaults.reasoning`) can apply
    - `minimal`: set minimal effort (or ~1024 tokens)
    - `low`: low or 30% of max output tokens
    - `medium`: medium or 60% of max output tokens
@@ -76,7 +76,7 @@ We must update this document again after applying the fixes and validating real 
    - (Key absent): same as `default`
    - `--default-reasoning <value>` CLI flag and `defaults.reasoning` in `.ai-agent.json` populate missing values only; they never override explicit `none/minimal/...` frontmatter entries.
 
-Use `--override reasoning=<value>` when you really want to stomp every agent/sub-agent (frontmatter is ignored). Use `--default-reasoning <value>` or `defaults.reasoning` when you only want to change the fallback for prompts that say `default`/`unset` or omit the key entirely.
+Use `--override reasoning=<value>` when you really want to stomp every agent/sub-agent (frontmatter is ignored). Use `--default-reasoning <value>` or `defaults.reasoning` when you only want to change the fallback for prompts that say `default` or omit the key entirely.
 4. Specific to `anthropic` provider:
    - Anthropic ALWAYS sends reasoning with signatures on the first LLM turn, so: reasoning MUST be turned off if the first request does not return signatures
    - Anthropic demands `stream` to be `true` when max output tokens is >= 21333 tokens, so: `stream` must be switched automatically to `true` when sending requests with max output tokens >= 21333 tokens to anthropic

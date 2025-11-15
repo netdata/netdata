@@ -31,6 +31,7 @@ import { BaseLLMProvider, type ResponseMessage } from '../llm-providers/base.js'
 import { OpenRouterProvider } from '../llm-providers/openrouter.js';
 import { TestLLMProvider } from '../llm-providers/test-llm.js';
 import { formatRichLogLine } from '../logging/rich-format.js';
+import { ShutdownController } from '../shutdown-controller.js';
 import { SubAgentRegistry } from '../subagent-registry.js';
 import { estimateMessagesTokens, resolveTokenizer } from '../tokenizer-registry.js';
 import { MCPProvider, forceRemoveSharedRegistryEntry } from '../tools/mcp-provider.js';
@@ -415,7 +416,26 @@ const CONCURRENCY_TIMEOUT_ARGUMENT = 'trigger-timeout';
 const CONCURRENCY_SECOND_ARGUMENT = 'concurrency-second';
 const THROW_FAILURE_MESSAGE = 'Simulated provider throw for coverage.';
 const BATCH_PROGRESS_RESPONSE = 'batch-progress-follow-up';
+const BATCH_STRING_PROGRESS = 'Batch progress conveyed via string payload.';
 const BATCH_STRING_RESULT = 'batch-string-mode';
+const BATCH_HEX_ARGUMENT_STRING = '{ "text": "hex-\\x41" }';
+const BATCH_HEX_EXPECTED_OUTPUT = 'hex-A';
+const BATCH_TRUNCATED_ARGUMENT_STRING = `{
+  "calls": [
+    {
+      "id": "repair-1",
+      "tool": "test__test",
+      "parameters": { "text": "alpha" }
+    },
+    {
+      "id": "repair-2",
+      "tool": "test__test"
+    }
+  ],
+  "meta": {
+    "note": "incomplete batch payload"
+  }
+}, ... (truncated for brevity)`;
 const FINAL_ANSWER_DELIVERED = 'Final answer delivered.';
 const TRACEABLE_PROVIDER_URL = 'https://openrouter.ai/api/v1';
 const RATE_LIMIT_WARNING_TOKEN = 'rate limit';
@@ -531,6 +551,7 @@ function validateRichFormatterParity(): void {
       ...rest,
     };
   };
+  const RESPONSE_RECEIVED_LABEL = 'LLM response received';
 
   const events: StructuredLogEvent[] = [
     createEvent({
@@ -600,6 +621,47 @@ function validateRichFormatterParity(): void {
       invariant(hasHighlight, `TTY formatter missing severity highlight for sample event ${String(index)}`);
     }
   });
+
+  const llmResponseEvent = createEvent({
+    message: RESPONSE_RECEIVED_LABEL,
+    type: 'llm',
+    direction: 'response',
+    provider: 'openai',
+    model: 'gpt-4o',
+    remoteIdentifier: 'openai:gpt-4o',
+    labels: {
+      latency_ms: '120',
+      response_bytes: '512',
+      input_tokens: '256',
+      output_tokens: '128',
+    },
+  });
+  const llmResponseLine = formatRichLogLine(llmResponseEvent, { tty: false });
+  invariant(llmResponseLine.includes(RESPONSE_RECEIVED_LABEL), 'LLM response logs should render the response metrics context.');
+
+  const agentLifecycleEvent = createEvent({
+    message: 'session finalization (error)',
+    type: 'llm',
+    direction: 'response',
+    remoteIdentifier: 'agent:fin',
+    labels: {},
+  });
+  const lifecycleLine = formatRichLogLine(agentLifecycleEvent, { tty: false });
+  invariant(!lifecycleLine.includes('LLM response received'), 'Non-response agent logs must not reuse the LLM response context.');
+
+  const llmFailureEvent = createEvent({
+    message: 'LLM response failed [RATE_LIMIT]: upstream rate limit',
+    type: 'llm',
+    direction: 'response',
+    provider: 'anthropic',
+    model: 'claude-3-sonnet',
+    remoteIdentifier: 'anthropic:claude-3-sonnet',
+    labels: {
+      latency_ms: '80',
+    },
+  });
+  const llmFailureLine = formatRichLogLine(llmFailureEvent, { tty: false });
+  invariant(llmFailureLine.includes('LLM response failed'), 'LLM failure response logs should render the failure metrics context.');
 }
 
 function expectLlmLogContext(
@@ -815,8 +877,9 @@ const overrideLLMExpected = {
   stream: true,
 };
 
-type ReasoningSelector = ReasoningLevel | 'none' | 'inherit';
+type ReasoningSelector = ReasoningLevel | 'none' | 'inherit' | 'unset' | 'absent';
 type OverrideReasoningSelector = ReasoningSelector | 'absent';
+type NormalizedReasoningSelector = ReasoningLevel | 'none' | 'inherit';
 
 const buildReasoningMatrixPrompt = (selector: ReasoningSelector): string => {
   const lines = [
@@ -825,7 +888,11 @@ const buildReasoningMatrixPrompt = (selector: ReasoningSelector): string => {
     `models:`,
     `  - ${PRIMARY_PROVIDER}/${MODEL_NAME}`,
   ];
-  if (selector === 'none') {
+  if (selector === 'absent') {
+    // omit reasoning key entirely
+  } else if (selector === 'unset') {
+    lines.push('reasoning: unset');
+  } else if (selector === 'none') {
     lines.push('reasoning: none');
   } else if (selector === 'inherit') {
     lines.push('reasoning: default');
@@ -844,8 +911,8 @@ interface ReasoningDimension<T> {
 }
 
 const FRONTMATTER_REASONING_CASES: ReasoningDimension<ReasoningSelector>[] = [
-  { label: 'fm-default', description: 'frontmatter=default', selector: 'inherit' },
-  { label: 'fm-none', description: 'frontmatter=none', selector: 'none' },
+  { label: 'fm-absent', description: 'frontmatter missing reasoning', selector: 'absent' },
+  { label: 'fm-unset', description: 'frontmatter=unset (disable)', selector: 'unset' },
   { label: 'fm-high', description: 'frontmatter=high', selector: 'high' },
 ];
 
@@ -869,12 +936,22 @@ const convertOverrideSelector = (selector: OverrideReasoningSelector): Reasoning
   return selector === 'absent' ? 'inherit' : selector;
 };
 
+const normalizeSelector = (value: ReasoningSelector): NormalizedReasoningSelector => {
+  if (value === 'absent') return 'inherit';
+  if (value === 'unset') return 'none';
+  return value;
+};
+
 const computeExpectedReasoning = (
   frontmatter: ReasoningSelector,
   configurationDefault: ReasoningSelector,
   override: OverrideReasoningSelector,
 ): ReasoningExpectation => {
-  const selectionOrder: ReasoningSelector[] = [convertOverrideSelector(override), frontmatter, configurationDefault];
+  const selectionOrder: NormalizedReasoningSelector[] = [
+    normalizeSelector(convertOverrideSelector(override)),
+    normalizeSelector(frontmatter),
+    normalizeSelector(configurationDefault),
+  ];
   // eslint-disable-next-line functional/no-loop-statements
   for (const value of selectionOrder) {
     if (value === 'inherit') continue;
@@ -902,8 +979,9 @@ const buildReasoningMatrixScenarios = (): HarnessTest[] => {
               ...(configuration.defaults ?? {}),
             };
             configuration.defaults = defaults;
-            if (defaultCase.selector !== 'inherit') {
-              configuration.defaults.reasoning = defaultCase.selector;
+            const normalizedDefault = normalizeSelector(defaultCase.selector);
+            if (normalizedDefault !== 'inherit') {
+              configuration.defaults.reasoning = normalizedDefault;
             } else if (configuration.defaults.reasoning !== undefined) {
               delete configuration.defaults.reasoning;
             }
@@ -911,7 +989,10 @@ const buildReasoningMatrixScenarios = (): HarnessTest[] => {
             const promptContent = buildReasoningMatrixPrompt(frontCase.selector);
             let globalOverrides: LoadAgentOptions['globalOverrides'] | undefined;
             if (overrideCase.selector !== 'absent') {
-              globalOverrides = { reasoning: overrideCase.selector };
+              const normalizedOverride = normalizeSelector(convertOverrideSelector(overrideCase.selector));
+              if (normalizedOverride !== 'inherit') {
+                globalOverrides = { reasoning: normalizedOverride };
+              }
             }
             const loaded = loadAgentFromContent(scenarioId, promptContent, {
               configLayers: layers,
@@ -951,6 +1032,32 @@ const buildReasoningMatrixScenarios = (): HarnessTest[] => {
 };
 
 const BASE_TEST_SCENARIOS: HarnessTest[] = [
+  {
+    id: 'shutdown-controller',
+    execute: async () => {
+      const controller = new ShutdownController();
+      const order: string[] = [];
+      controller.register('first', () => { order.push('first'); });
+      controller.register('second', () => { order.push('second'); });
+      await controller.shutdown();
+      invariant(controller.stopRef.stopping, 'Global stopRef should be marked when shutdown begins.');
+      invariant(controller.signal.aborted, 'AbortSignal should be aborted after shutdown.');
+      invariant(order.length === 2, 'All registered shutdown tasks should run once.');
+      invariant(order[0] === 'second' && order[1] === 'first', 'Shutdown tasks should execute in LIFO order.');
+      const recordedLength: number = order.length;
+      await controller.shutdown();
+      invariant(order.length === recordedLength, 'Shutdown should be idempotent.');
+      return {
+        success: true,
+        conversation: [],
+        logs: [],
+        accounting: [],
+      } as AIAgentResult;
+    },
+    expect: (result) => {
+      invariant(result.success, 'Shutdown controller test should report success.');
+    },
+  },
   {
     id: DEFAULT_PROMPT_SCENARIO,
     expect: (result) => {
@@ -1010,6 +1117,9 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       const failureEntry = toolEntries.find((entry) => entry.command === 'test__test');
       invariant(failureEntry !== undefined, 'Expected MCP accounting entry for run-test-2.');
       invariant(failureEntry.status === 'failed', 'Accounting entry must reflect MCP failure for run-test-2.');
+      const failureLog = result.logs.find((entry) => entry.type === 'tool' && typeof entry.message === 'string' && entry.message.includes('error') && entry.message.includes('test__test'));
+      invariant(failureLog !== undefined, 'Tool failure log expected for run-test-2.');
+      invariant(failureLog.severity === 'WRN', 'Tool failure logs must emit WRN severity for run-test-2.');
     },
   },
   {
@@ -1067,6 +1177,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       const exitLog = result.logs.find((log) => log.remoteIdentifier === 'agent:EXIT-NO-LLM-RESPONSE');
       invariant(exitLog !== undefined, 'Expected EXIT-NO-LLM-RESPONSE log for run-test-6.');
       invariant(typeof exitLog.message === 'string' && exitLog.message.includes('No LLM response after'), 'Exit log should indicate retries exhausted for run-test-6.');
+      invariant(exitLog.severity === 'ERR', 'EXIT-NO-LLM-RESPONSE must log ERR severity for run-test-6.');
     },
   },
   {
@@ -6851,6 +6962,11 @@ if (process.env.CONTEXT_DEBUG === 'true') {
               },
             ],
           };
+          const toolCalls = assistantMessage.toolCalls ?? [];
+          // eslint-disable-next-line functional/no-loop-statements
+          for (const call of toolCalls) {
+            await request.toolExecutor(call.name, call.parameters, { toolCallId: call.id });
+          }
           return {
             status: { type: 'success', hasToolCalls: true, finalAnswer: false },
             latencyMs: 5,
@@ -6950,6 +7066,312 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     },
   },
   {
+    id: 'run-test-122',
+    execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+      sessionConfig.tools = ['test', 'batch'];
+      // eslint-disable-next-line @typescript-eslint/unbound-method -- capture original method for restoration after interception
+      const originalExecuteTurn = LLMClient.prototype.executeTurn;
+      let invocation = 0;
+      LLMClient.prototype.executeTurn = async function(this: LLMClient, request: TurnRequest): Promise<TurnResult> {
+        invocation += 1;
+        if (invocation === 1) {
+          const assistantMessage: ConversationMessage = {
+            role: 'assistant',
+            content: '',
+            toolCalls: [
+              {
+                name: 'agent__batch',
+                id: 'call-batch-hex-params',
+                parameters: {
+                  calls: [
+                    {
+                      id: 'hex-1',
+                      tool: 'test__test',
+                      parameters: BATCH_HEX_ARGUMENT_STRING as unknown as Record<string, unknown>,
+                    },
+                  ],
+                },
+              },
+            ],
+          };
+          const toolCalls = assistantMessage.toolCalls ?? [];
+          const toolMessages: ConversationMessage[] = [];
+          // eslint-disable-next-line functional/no-loop-statements
+          for (const call of toolCalls) {
+            const output = await request.toolExecutor(call.name, call.parameters, { toolCallId: call.id });
+            if (typeof output === 'string') {
+              toolMessages.push({ role: 'tool', toolCallId: call.id, content: output });
+            }
+          }
+          return {
+            status: { type: 'success', hasToolCalls: true, finalAnswer: false },
+            latencyMs: 5,
+            messages: [assistantMessage, ...toolMessages],
+            tokens: { inputTokens: 16, outputTokens: 6, totalTokens: 22 },
+          };
+        }
+        if (invocation === 2) {
+          const finalContent = 'Hex batch scenario final report.';
+          const assistantMessage: ConversationMessage = {
+            role: 'assistant',
+            content: '',
+            toolCalls: [
+              {
+                name: 'agent__final_report',
+                id: FINAL_REPORT_CALL_ID,
+                parameters: {
+                  status: 'success',
+                  report_format: 'markdown',
+                  report_content: finalContent,
+                },
+              },
+            ],
+          };
+          const toolMessage: ConversationMessage = {
+            role: 'tool',
+            toolCallId: FINAL_REPORT_CALL_ID,
+            content: finalContent,
+          };
+          return {
+            status: { type: 'success', hasToolCalls: true, finalAnswer: true },
+            latencyMs: 5,
+            messages: [assistantMessage, toolMessage],
+            tokens: { inputTokens: 12, outputTokens: 4, totalTokens: 16 },
+          };
+        }
+        return await originalExecuteTurn.call(this, request);
+      };
+      try {
+        const session = AIAgentSession.create(sessionConfig);
+        return await session.run();
+      } finally {
+        LLMClient.prototype.executeTurn = originalExecuteTurn;
+      }
+    },
+    expect: (result: AIAgentResult) => {
+      invariant(result.success, 'Scenario run-test-122 expected success.');
+      const toolMessage = result.conversation.find((message) => message.role === 'tool' && typeof message.content === 'string' && message.content.includes(BATCH_HEX_EXPECTED_OUTPUT));
+      invariant(toolMessage !== undefined, 'Batch string parameters should survive parsing for run-test-122.');
+      const finalReport = result.finalReport;
+      invariant(finalReport?.status === 'success', 'Final report should indicate success for run-test-122.');
+    },
+  },
+  {
+    id: 'run-test-123',
+    execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+      sessionConfig.tools = ['test', 'batch'];
+      // eslint-disable-next-line @typescript-eslint/unbound-method -- capture original method for restoration after interception
+      const originalExecuteTurn = LLMClient.prototype.executeTurn;
+      let invocation = 0;
+      LLMClient.prototype.executeTurn = async function(this: LLMClient, request: TurnRequest): Promise<TurnResult> {
+        invocation += 1;
+        if (invocation === 1) {
+          const nestedCallsPayload = JSON.stringify([
+            { id: 'nested-progress', tool: 'agent__progress_report', parameters: { progress: BATCH_STRING_PROGRESS } },
+            { id: 'nested-hex', tool: 'test__test', parameters: BATCH_HEX_ARGUMENT_STRING },
+          ]);
+          const assistantMessage: ConversationMessage = {
+            role: 'assistant',
+            content: '',
+            toolCalls: [
+              {
+                name: 'agent__batch',
+                id: 'call-batch-hex-nested',
+                parameters: {
+                  calls: nestedCallsPayload,
+                },
+              },
+            ],
+          };
+          const toolCalls = assistantMessage.toolCalls ?? [];
+          const toolMessages: ConversationMessage[] = [];
+          // eslint-disable-next-line functional/no-loop-statements
+          for (const call of toolCalls) {
+            const output = await request.toolExecutor(call.name, call.parameters, { toolCallId: call.id });
+            if (typeof output === 'string') {
+              toolMessages.push({ role: 'tool', toolCallId: call.id, content: output });
+            }
+          }
+          return {
+            status: { type: 'success', hasToolCalls: true, finalAnswer: false },
+            latencyMs: 5,
+            messages: [assistantMessage, ...toolMessages],
+            tokens: { inputTokens: 18, outputTokens: 7, totalTokens: 25 },
+          };
+        }
+        if (invocation === 2) {
+          const finalContent = 'Hex batch scenario final report (nested).';
+          const assistantMessage: ConversationMessage = {
+            role: 'assistant',
+            content: '',
+            toolCalls: [
+              {
+                name: 'agent__final_report',
+                id: FINAL_REPORT_CALL_ID,
+                parameters: {
+                  status: 'success',
+                  report_format: 'markdown',
+                  report_content: finalContent,
+                },
+              },
+            ],
+          };
+          const toolMessage: ConversationMessage = {
+            role: 'tool',
+            toolCallId: FINAL_REPORT_CALL_ID,
+            content: finalContent,
+          };
+          return {
+            status: { type: 'success', hasToolCalls: true, finalAnswer: true },
+            latencyMs: 5,
+            messages: [assistantMessage, toolMessage],
+            tokens: { inputTokens: 12, outputTokens: 4, totalTokens: 16 },
+          };
+        }
+        return await originalExecuteTurn.call(this, request);
+      };
+      try {
+        const session = AIAgentSession.create(sessionConfig);
+        return await session.run();
+      } finally {
+        LLMClient.prototype.executeTurn = originalExecuteTurn;
+      }
+    },
+    expect: (result: AIAgentResult) => {
+      invariant(result.success, 'Scenario run-test-123 expected success.');
+      const batchToolMessage = result.conversation.find((message) => message.role === 'tool' && message.toolCallId === 'call-batch-hex-nested' && typeof message.content === 'string');
+      invariant(batchToolMessage !== undefined, 'Batch tool output missing for run-test-123.');
+      const batchContent = batchToolMessage.content;
+      let parsedUnknown: unknown;
+      try {
+        parsedUnknown = JSON.parse(batchContent) as unknown;
+      } catch (error) {
+        invariant(false, `Unable to parse batch output for run-test-123: ${error instanceof Error ? error.message : String(error)}`);
+        return;
+      }
+      const isRecord = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value);
+      invariant(isRecord(parsedUnknown), 'Batch output is not an object for run-test-123.');
+      const rawResults = parsedUnknown.results;
+      const results = Array.isArray(rawResults) ? rawResults : [];
+      const progressResult = results.find((entry): entry is Record<string, unknown> => {
+        if (!isRecord(entry)) return false;
+        const id = entry.id;
+        return typeof id === 'string' && id === 'nested-progress';
+      });
+      invariant(progressResult !== undefined, 'Progress result missing within batch output for run-test-123.');
+      const progressOk = typeof progressResult.ok === 'boolean' ? progressResult.ok : false;
+      invariant(progressOk, 'Progress entry should report ok=true for run-test-123.');
+      const hexResult = results.find((entry): entry is Record<string, unknown> => {
+        if (!isRecord(entry)) return false;
+        const id = entry.id;
+        return typeof id === 'string' && id === 'nested-hex';
+      });
+      invariant(hexResult !== undefined, 'Nested hex result missing for run-test-123.');
+      const hexOutput = typeof hexResult.output === 'string' ? hexResult.output : undefined;
+      invariant(typeof hexOutput === 'string' && hexOutput.includes(BATCH_HEX_EXPECTED_OUTPUT), 'Nested hex output not parsed for run-test-123.');
+      const finalReport = result.finalReport;
+      invariant(finalReport?.status === 'success', 'Final report should indicate success for run-test-123.');
+    },
+  },
+  {
+    id: 'run-test-124',
+    execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+      sessionConfig.tools = ['test', 'batch'];
+      // eslint-disable-next-line @typescript-eslint/unbound-method -- capture original method for restoration after interception
+      const originalExecuteTurn = LLMClient.prototype.executeTurn;
+      let invocation = 0;
+      LLMClient.prototype.executeTurn = async function(this: LLMClient, request: TurnRequest): Promise<TurnResult> {
+        invocation += 1;
+        if (invocation === 1) {
+          const assistantMessage: ConversationMessage = {
+            role: 'assistant',
+            content: '',
+            toolCalls: [
+              {
+                name: 'agent__batch',
+                id: 'call-batch-truncated',
+                parameters: BATCH_TRUNCATED_ARGUMENT_STRING as unknown as Record<string, unknown>,
+              },
+            ],
+          };
+          const toolCalls = assistantMessage.toolCalls ?? [];
+          const toolMessages: ConversationMessage[] = [];
+          // eslint-disable-next-line functional/no-loop-statements
+          for (const call of toolCalls) {
+            const output = await request.toolExecutor(call.name, call.parameters, { toolCallId: call.id });
+            if (typeof output === 'string') {
+              toolMessages.push({ role: 'tool', toolCallId: call.id, content: output });
+            }
+          }
+          return {
+            status: { type: 'success', hasToolCalls: true, finalAnswer: false },
+            latencyMs: 5,
+            messages: [assistantMessage, ...toolMessages],
+            tokens: { inputTokens: 18, outputTokens: 7, totalTokens: 25 },
+          };
+        }
+        if (invocation === 2) {
+          const finalContent = 'Truncated batch scenario final report.';
+          const assistantMessage: ConversationMessage = {
+            role: 'assistant',
+            content: '',
+            toolCalls: [
+              {
+                name: 'agent__final_report',
+                id: FINAL_REPORT_CALL_ID,
+                parameters: {
+                  status: 'success',
+                  report_format: 'markdown',
+                  report_content: finalContent,
+                },
+              },
+            ],
+          };
+          const toolMessage: ConversationMessage = {
+            role: 'tool',
+            toolCallId: FINAL_REPORT_CALL_ID,
+            content: finalContent,
+          };
+          return {
+            status: { type: 'success', hasToolCalls: true, finalAnswer: true },
+            latencyMs: 5,
+            messages: [assistantMessage, toolMessage],
+            tokens: { inputTokens: 12, outputTokens: 4, totalTokens: 16 },
+          };
+        }
+        return await originalExecuteTurn.call(this, request);
+      };
+      try {
+        const session = AIAgentSession.create(sessionConfig);
+        return await session.run();
+      } finally {
+        LLMClient.prototype.executeTurn = originalExecuteTurn;
+      }
+    },
+    expect: (result: AIAgentResult) => {
+      invariant(result.success, 'Scenario run-test-124 expected success.');
+      const batchToolMessage = result.conversation.find((message) => message.role === 'tool' && message.toolCallId === 'call-batch-truncated');
+      invariant(batchToolMessage !== undefined, 'Batch tool output missing for run-test-124.');
+      const finalReport = result.finalReport;
+      invariant(finalReport?.status === 'success', 'Final report should indicate success for run-test-124.');
+    },
+  },
+  {
+    id: 'run-test-131',
+    expect: (result: AIAgentResult) => {
+      invariant(result.success, 'Scenario run-test-131 expected success.');
+      const warningLog = result.logs.find(
+        (entry) =>
+          entry.severity === 'ERR'
+          && entry.remoteIdentifier === `${PRIMARY_PROVIDER}:${MODEL_NAME}`
+          && entry.message.includes('invalid tool parameters')
+      );
+      invariant(warningLog !== undefined, 'Parameter warning log missing for run-test-131.');
+      const previewDetail = warningLog.details?.raw_preview;
+      invariant(typeof previewDetail === 'string' && previewDetail.length > 0, 'Parameter warning log should include raw preview for run-test-131.');
+    },
+  },
+  {
     id: 'run-test-90-string',
     execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
       // eslint-disable-next-line @typescript-eslint/unbound-method -- capture original method for restoration after interception
@@ -6994,6 +7416,11 @@ if (process.env.CONTEXT_DEBUG === 'true') {
               },
             ],
           };
+          const toolCalls = assistantMessage.toolCalls ?? [];
+          // eslint-disable-next-line functional/no-loop-statements
+          for (const call of toolCalls) {
+            await request.toolExecutor(call.name, call.parameters, { toolCallId: call.id });
+          }
           const toolMessage: ConversationMessage = {
             role: 'tool',
             toolCallId: FINAL_REPORT_CALL_ID,
@@ -7871,6 +8298,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       invariant(typeof finalReport.content === 'string' && finalReport.content.includes('did not produce a final report'), 'Failure summary should mention the missing final report for run-test-101.');
       const exitLog = result.logs.find((entry) => entry.remoteIdentifier === EXIT_FINAL_REPORT_IDENTIFIER);
       invariant(exitLog !== undefined && typeof exitLog.message === 'string' && exitLog.message.includes('Synthesized failure final_report'), 'Synthesized final report exit log missing for run-test-101.');
+      invariant(exitLog.severity === 'ERR', 'Synthesized failure final_report logs must emit ERR severity for run-test-101.');
     },
   },
   {

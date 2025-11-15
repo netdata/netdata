@@ -108,8 +108,13 @@ Messages should focus on incremental information; implied fields live in the str
   - `schema_tokens` estimates the cost of the active tool definitions that accompany the request; it guarantees the guard accounts for tool schema overhead.
   - `expected_tokens` equals `ctx_tokens + new_tokens + schema_tokens`, the projected prompt length for the upcoming request.
   - `context_pct` measures `(expected_tokens + buffer + reserved_output) / context_window`, providing the guard headroom after subtracting both the configured buffer and the reserved completion tokens.
-- **Response metrics** – The matching `LLM response received` log includes `ctx` in the human-readable metrics list and the `ctx_tokens` detail field, mirroring the provider-reported `input + output + cache_read` total so operators can correlate request forecasts with actual usage.
+- **Response metrics** – Only the canonical `LLM response received`/`LLM response failed` logs (emitted directly by `LLMClient`) prepend the `LLM response …` context string. These entries include `ctx` in the human-readable metrics list and the `ctx_tokens` detail field, mirroring the provider-reported `input + output + cache_read` total so operators can correlate request forecasts with actual usage. Agent lifecycle logs (for example, `agent:init`, `agent:fin`, or `agent:EXIT-*`) now render provider/model context instead of spoofing LLM response text.
 - **Tool execution tokens** – Each successful tool invocation emits a `VRB` log with `details.tokens` capturing the estimated tokenizer cost of the tool output. When the context guard replaces a tool response with the fallback `(tool failed: context window budget exceeded)`, the corresponding accounting entry records `original_tokens`, `replacement_tokens`, and the context guard warning references the offending provider/model pair.
+- **Tool failure severity** – JSON-RPC/tool execution failures now emit `WRN` severity with `details.error_message` populated; downstream systems should continue to rely on `status`/`error_message` (not severity) to distinguish failure from success. Success paths remain `VRB` (or `TRC` when tracing is enabled).
+
+### Session Exit Logs
+
+- `agent:EXIT-*` entries inherit their severity from the `fatal` flag. Synthetic or hard failures keep `fatal=true` and therefore emit `ERR` severity, ensuring monitoring pipelines can alarm on failed sessions (including sub-agents). Successful exits (actual final reports) set `fatal=false`, log `VRB`/`FIN`, and keep the existing FIN summary lines that follow immediately after.
 
 ## Sink Behaviour and Field Sets
 

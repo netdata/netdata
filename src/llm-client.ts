@@ -10,6 +10,7 @@ import type {
   ProviderReasoningValue,
   ProviderTurnMetadata,
   ConversationMessage,
+  ProviderParameterWarning,
   LogPayload,
 } from './types.js';
 
@@ -656,6 +657,8 @@ export class LLMClient {
         details,
         payload: payload !== undefined ? { type: 'llmResponse', value: payload } : undefined,
       });
+      const warningSource = result.providerMetadata.parameterWarnings ?? metadata?.parameterWarnings;
+      this.logParameterWarnings(remoteId, warningSource);
       return;
     }
 
@@ -704,6 +707,8 @@ export class LLMClient {
       details,
       payload: payload !== undefined ? { type: 'llmResponse', value: payload } : undefined,
     });
+    const warningSource = result.providerMetadata.parameterWarnings ?? metadata?.parameterWarnings;
+    this.logParameterWarnings(remoteId, warningSource);
   }
 
   private flushPendingLlmRequestLog(): void {
@@ -796,6 +801,30 @@ export class LLMClient {
     }
 
     this.onLog(entry);
+  }
+
+  private logParameterWarnings(remoteId: string, warnings?: ProviderParameterWarning[]): void {
+    if (!Array.isArray(warnings) || warnings.length === 0) {
+      return;
+    }
+    warnings.forEach((warning) => {
+      const details: Record<string, LogDetailValue> = {
+        reason: warning.reason,
+      };
+      if (typeof warning.toolCallId === 'string' && warning.toolCallId.length > 0) {
+        details.tool_call_id = warning.toolCallId;
+      }
+      if (typeof warning.toolName === 'string' && warning.toolName.length > 0) {
+        details.tool_name = warning.toolName;
+      }
+      if (typeof warning.source === 'string' && warning.source.length > 0) {
+        details.source = warning.source;
+      }
+      if (typeof warning.rawPreview === 'string' && warning.rawPreview.length > 0) {
+        details.raw_preview = warning.rawPreview;
+      }
+      this.log('ERR', 'response', 'llm', remoteId, 'LLM emitted invalid tool parameters', { details });
+    });
   }
 
   private describeReasoningState(request: TurnRequest): 'unset' | 'disabled' | ReasoningLevel {

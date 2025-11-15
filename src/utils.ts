@@ -41,6 +41,188 @@ export function clampToolName(name: string, maxLength = TOOL_NAME_MAX_LENGTH): {
   return { name: name.slice(0, maxLength), truncated: true };
 }
 
+export const isPlainObject = (value: unknown): value is Record<string, unknown> => (
+  value !== null && typeof value === 'object' && !Array.isArray(value)
+);
+
+const tryParseJsonRecord = (value: string): Record<string, unknown> | undefined => {
+  try {
+    const parsed: unknown = JSON.parse(value);
+    return isPlainObject(parsed) ? parsed : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
+const stripSurroundingCodeFence = (value: string): string | undefined => {
+  const match = /^```(?:json)?\s*([\s\S]*?)\s*```$/iu.exec(value);
+  return match !== null ? match[1] : undefined;
+};
+
+const stripTrailingEllipsis = (value: string): string | undefined => {
+  const trimmed = value.replace(/(?:,\s*)?(?:\.{3}|…)(?:\s*\([^)]*\))?\s*$/u, '');
+  return trimmed.length !== value.length ? trimmed : undefined;
+};
+
+const extractFirstJsonObject = (value: string): string | undefined => {
+  let start = -1;
+  let depth = 0;
+  let inString = false;
+  let escapeNext = false;
+  // eslint-disable-next-line functional/no-loop-statements
+  for (let i = 0; i < value.length; i += 1) {
+    const ch = value[i] ?? '';
+    if (inString) {
+      if (escapeNext) {
+        escapeNext = false;
+        continue;
+      }
+      if (ch === '\\') {
+        escapeNext = true;
+        continue;
+      }
+      if (ch === '"') {
+        inString = false;
+      }
+      continue;
+    }
+    if (ch === '"') {
+      inString = true;
+      continue;
+    }
+    if (ch === '{') {
+      if (depth === 0) {
+        start = i;
+      }
+      depth += 1;
+      continue;
+    }
+    if (ch === '}') {
+      if (depth === 0) {
+        return undefined;
+      }
+      depth -= 1;
+      if (depth === 0 && start !== -1) {
+        return value.slice(start, i + 1);
+      }
+    }
+  }
+  return undefined;
+};
+
+const closeDanglingJson = (value: string): string | undefined => {
+  let inString = false;
+  let escapeNext = false;
+  const stack: string[] = [];
+  // eslint-disable-next-line functional/no-loop-statements, @typescript-eslint/prefer-for-of
+  for (let i = 0; i < value.length; i += 1) {
+    const ch = value[i] ?? '';
+    if (inString) {
+      if (escapeNext) {
+        escapeNext = false;
+        continue;
+      }
+      if (ch === '\\') {
+        escapeNext = true;
+        continue;
+      }
+      if (ch === '"') {
+        inString = false;
+      }
+      continue;
+    }
+    if (ch === '"') {
+      inString = true;
+      continue;
+    }
+    if (ch === '{' || ch === '[') {
+      stack.push(ch);
+      continue;
+    }
+    if (ch === '}' || ch === ']') {
+      if (stack.length === 0) {
+        return undefined;
+      }
+      const expected = stack.pop();
+      if ((ch === '}' && expected !== '{') || (ch === ']' && expected !== '[')) {
+        return undefined;
+      }
+    }
+  }
+  if (inString || stack.length === 0) {
+    return undefined;
+  }
+  const trimmed = value.replace(/[\s,]*$/u, '');
+  const closers = stack.reverse().map((token) => (token === '{' ? '}' : ']')).join('');
+  return `${trimmed}${closers}`;
+};
+
+export const parseJsonRecord = (raw: unknown): Record<string, unknown> | undefined => {
+  if (isPlainObject(raw)) {
+    return raw;
+  }
+  if (typeof raw !== 'string') {
+    return undefined;
+  }
+  const trimmed = raw.trim();
+  if (trimmed.length === 0) {
+    return undefined;
+  }
+
+  const candidates = new Set<string>();
+  const enqueue = (value: string | undefined): void => {
+    if (value === undefined) {
+      return;
+    }
+    const normalized = value.trim();
+    if (normalized.length === 0) {
+      return;
+    }
+    candidates.add(normalized);
+  };
+
+  enqueue(trimmed);
+  enqueue(stripSurroundingCodeFence(trimmed));
+  enqueue(stripTrailingEllipsis(trimmed));
+  const repaired = trimmed.replace(/\\x([0-9a-fA-F]{2})/g, (_match, hex) => `\\u00${String(hex).toUpperCase()}`);
+  if (repaired !== trimmed) {
+    enqueue(repaired);
+    enqueue(stripTrailingEllipsis(repaired));
+  }
+
+  // eslint-disable-next-line functional/no-loop-statements
+  for (const candidate of candidates) {
+    const direct = tryParseJsonRecord(candidate);
+    if (direct !== undefined) {
+      return direct;
+    }
+
+    const embedded = extractFirstJsonObject(candidate);
+    if (embedded !== undefined) {
+      const parsedEmbedded = tryParseJsonRecord(embedded);
+      if (parsedEmbedded !== undefined) {
+        return parsedEmbedded;
+      }
+      const closedEmbedded = closeDanglingJson(embedded);
+      if (closedEmbedded !== undefined) {
+        const repairedEmbedded = tryParseJsonRecord(closedEmbedded);
+        if (repairedEmbedded !== undefined) {
+          return repairedEmbedded;
+        }
+      }
+    }
+
+    const closed = closeDanglingJson(candidate);
+    if (closed !== undefined) {
+      const parsedClosed = tryParseJsonRecord(closed);
+      if (parsedClosed !== undefined) {
+        return parsedClosed;
+      }
+    }
+  }
+  return undefined;
+};
+
 
 
 interface ToolCallSummary {

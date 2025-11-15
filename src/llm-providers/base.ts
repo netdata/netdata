@@ -7,6 +7,7 @@ import type {
   ProviderReasoningMapping,
   ProviderReasoningValue,
   ProviderTurnMetadata,
+  ProviderParameterWarning,
   ReasoningLevel,
   TokenUsage,
   TurnRequest,
@@ -17,7 +18,7 @@ import type {
 import type { ProviderOptions } from '@ai-sdk/provider-utils';
 import type { LanguageModel, ModelMessage, ProviderMetadata, ReasoningOutput, StreamTextResult, ToolSet } from 'ai';
 
-import { clampToolName, sanitizeToolName, TOOL_NAME_MAX_LENGTH, warn } from '../utils.js';
+import { clampToolName, parseJsonRecord, sanitizeToolName, TOOL_NAME_MAX_LENGTH, truncateUtf8WithNotice, warn } from '../utils.js';
 
 const GUIDANCE_STRING_FORMATS = ['date-time', 'time', 'date', 'duration', 'email', 'hostname', 'ipv4', 'ipv6', 'uuid'] as const;
 const TOOL_FAILED_PREFIX = '(tool failed: ' as const;
@@ -52,6 +53,7 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
   private static readonly REASONING_LEVELS: ReasoningLevel[] = ['minimal', 'low', 'medium', 'high'];
   private readonly reasoningDefaults?: Partial<Record<ReasoningLevel, ProviderReasoningValue>>;
   private readonly reasoningLimits?: { min: number; max: number };
+  private static readonly RAW_PREVIEW_LIMIT_BYTES = 512;
 
   protected constructor(options?: {
     formatPolicy?: FormatPolicyInput;
@@ -183,20 +185,12 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
                 const { name } = clampToolName(sanitized);
                 const id = typeof recordEntry.id === 'string' ? recordEntry.id : `tool-call-${String(index + 1)}`;
                 const rawArgs = recordEntry.arguments ?? recordEntry.function?.arguments;
-                let parsedArgs: Record<string, unknown> = {};
-                if (typeof rawArgs === 'string') {
-                  try {
-                    parsedArgs = JSON.parse(rawArgs) as Record<string, unknown>;
-                  } catch {
-                    parsedArgs = {};
-                  }
-                } else if (rawArgs !== null && typeof rawArgs === 'object') {
-                  parsedArgs = rawArgs as Record<string, unknown>;
-                }
+                const parsedArgs = parseJsonRecord(rawArgs);
+                const parameters = parsedArgs ?? ((rawArgs !== undefined ? rawArgs : {}) as Record<string, unknown>);
                 return {
                   id,
                   name,
-                  parameters: parsedArgs,
+                  parameters,
                 };
               })
               .filter((entry): entry is { id: string; name: string; parameters: Record<string, unknown> } => Boolean(entry))
@@ -368,13 +362,53 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
     if (source === undefined) {
       return target !== undefined ? { ...target } : undefined;
     }
-    const base: Record<string, unknown> = target !== undefined ? { ...target } : {};
+    const merged = (target !== undefined ? { ...target } : {}) as ProviderTurnMetadata;
+    const recordView = merged as Record<string, unknown>;
     Object.entries(source).forEach(([key, value]) => {
-      if (value !== undefined) {
-        base[key] = value;
+      if (value === undefined) {
+        return;
       }
+      if (key === 'parameterWarnings') {
+        const existing = Array.isArray(merged.parameterWarnings)
+          ? merged.parameterWarnings
+          : [];
+        const incoming = Array.isArray(value) ? value as ProviderParameterWarning[] : [];
+        if (incoming.length === 0) {
+          return;
+        }
+        merged.parameterWarnings = [...existing, ...incoming];
+        return;
+      }
+      recordView[key] = value;
     });
-    return base as ProviderTurnMetadata;
+    return merged;
+  }
+
+  protected recordParameterWarning(warning: Omit<ProviderParameterWarning, 'rawPreview'> & { rawInput?: unknown }): void {
+    const entry: ProviderParameterWarning = {
+      toolCallId: warning.toolCallId,
+      toolName: warning.toolName,
+      reason: warning.reason,
+      source: warning.source,
+      rawPreview: this.previewRawValue(warning.rawInput),
+    };
+    this.enqueueProviderMetadata({ parameterWarnings: [entry] });
+  }
+
+  private previewRawValue(raw: unknown): string {
+    if (raw === undefined) {
+      return 'undefined';
+    }
+    if (typeof raw === 'string') {
+      return truncateUtf8WithNotice(raw, BaseLLMProvider.RAW_PREVIEW_LIMIT_BYTES);
+    }
+    try {
+      const serialized = JSON.stringify(raw);
+      return truncateUtf8WithNotice(serialized, BaseLLMProvider.RAW_PREVIEW_LIMIT_BYTES);
+    } catch {
+      const fallback = Object.prototype.toString.call(raw);
+      return truncateUtf8WithNotice(fallback, BaseLLMProvider.RAW_PREVIEW_LIMIT_BYTES);
+    }
   }
 
   private extractSignatureFromMetadata(metadata: ProviderMetadata): string | undefined {
@@ -2073,6 +2107,32 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
       }
       return name;
     };
+    const toParameters = (
+      candidate: unknown,
+      context: { toolName: string; toolCallId?: string; source: 'content' | 'legacy' }
+    ): Record<string, unknown> => {
+      const parsed = parseJsonRecord(candidate);
+      if (parsed !== undefined) {
+        return parsed;
+      }
+      if (candidate !== undefined) {
+        this.recordParameterWarning({
+          toolCallId: context.toolCallId,
+          toolName: context.toolName,
+          source: context.source,
+          reason: 'invalid_json_parameters',
+          rawInput: candidate,
+        });
+        return candidate as Record<string, unknown>;
+      }
+      this.recordParameterWarning({
+        toolCallId: context.toolCallId,
+        toolName: context.toolName,
+        source: context.source,
+        reason: 'missing_parameters',
+      });
+      return {};
+    };
     const reasoningSegments: ReasoningOutput[] = [...this.collectReasoningSegmentsFromMessage(m)];
 
     if (Array.isArray(m.content)) {
@@ -2093,10 +2153,11 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
         }
         if (part.type === 'tool-call' && part.toolCallId !== undefined && part.toolName !== undefined) {
           // AI SDK embeds tool calls in content
+          const safeName = toSafeToolName(part.toolName);
           toolCalls.push({
             id: part.toolCallId,
-            name: toSafeToolName(part.toolName),
-            parameters: (part.input ?? {}) as Record<string, unknown>
+            name: safeName,
+            parameters: toParameters(part.input, { toolName: safeName, toolCallId: part.toolCallId, source: 'content' }),
           });
           continue;
         }
@@ -2121,10 +2182,15 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
     // Prefer tool calls from content array (AI SDK format) over legacy toolCalls field
     const finalToolCalls = toolCallsFromContent ?? (Array.isArray(m.toolCalls) ? m.toolCalls.map(tc => {
       const rawName = tc.name ?? tc.function?.name ?? '';
+      const safeName = toSafeToolName(rawName);
       return {
         id: tc.id ?? tc.toolCallId ?? '',
-        name: toSafeToolName(rawName),
-        parameters: (tc.arguments ?? tc.function?.arguments ?? {}) as Record<string, unknown>
+        name: safeName,
+        parameters: toParameters(tc.arguments ?? tc.function?.arguments, {
+          toolName: safeName,
+          toolCallId: tc.id ?? tc.toolCallId,
+          source: 'legacy',
+        })
       };
     }) : undefined);
     

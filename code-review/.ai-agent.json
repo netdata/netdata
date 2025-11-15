@@ -1,0 +1,76 @@
+{
+  "providers": {
+    "anthropic": {
+      "type": "anthropic",
+      "apiKey": "${ANTHROPIC_API_KEY}",
+      "baseUrl": "https://api.anthropic.com/v1",
+      "contextWindow": 200000,
+      "stringSchemaFormatsAllowed": ["*"],
+      "stringSchemaFormatsDenied": [],
+      "models": {
+        "claude-sonnet-4-5": {
+          "overrides": {
+            "top_p": null
+          }
+        }
+      }
+    }
+  },
+  "mcpServers": {
+    "filesystem-cwd": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "/opt/ai-agent/mcp/fs/fs-mcp-server.js",
+        "${MCP_ROOT}"
+      ],
+      "enabled": true,
+      "toolsAllowed": ["*"],
+      "toolsDenied": []
+    },
+    "github": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-github"
+      ],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_PERSONAL_ACCESS_TOKEN}"
+      },
+      "enabled": true,
+      "toolsAllowed": ["*"],
+      "toolsDenied": [
+        "create_or_update_file",
+        "create_repository",
+        "push_files",
+        "create_issue",
+        "create_pull_request",
+        "fork_repository",
+        "create_branch",
+        "update_issue",
+        "add_issue_comment",
+        "create_pull_request_review",
+        "merge_pull_request",
+        "update_pull_request_branch"
+      ]
+    }
+  },
+  "queues": {
+    "default": {
+      "concurrent": 32
+    }
+  },
+  "defaults": {
+    "llmTimeout": 600000,
+    "toolTimeout": 300000,
+    "temperature": 0.7,
+    "topP": 1,
+    "maxOutputTokens": 8192,
+    "repeatPenalty": 1.1,
+    "stream": false,
+    "maxToolTurns": 10,
+    "maxRetries": 3,
+    "toolResponseMaxBytes": 32768
+  }
+}

@@ -3291,6 +3291,54 @@ const SCENARIOS: ScenarioDefinition[] = [
     ],
   },
   {
+    id: 'run-test-131',
+    description: 'LLM parameter warning logging coverage.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        expectedTools: [TOOL_NAME],
+        response: {
+          kind: 'tool-call',
+          assistantText: TOOL_REQUEST_TEXT,
+          toolCalls: [
+            {
+              toolName: TOOL_NAME,
+              callId: 'call-param-warning',
+              arguments: {
+                text: TOOL_ARGUMENT_SUCCESS,
+              },
+            },
+          ],
+          providerMetadata: {
+            parameterWarnings: [
+              {
+                toolCallId: 'call-param-warning',
+                toolName: TOOL_NAME,
+                reason: 'invalid_json_parameters',
+                rawPreview: '{"text":"broken',
+                source: 'content',
+              },
+            ],
+          },
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+          finishReason: TOOL_FINISH_REASON,
+        },
+      },
+      {
+        turn: 2,
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Parameter warnings logged.',
+          reportContent: `${RESULT_HEADING}Parameter warning coverage.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_SUCCESS,
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+        },
+      },
+    ],
+  },
+  {
     id: 'run-test-context-limit',
     description: 'Context guard forces final turn when tool output would overflow.',
     systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],

@@ -12,6 +12,7 @@ type AjvConstructor = new (options?: AjvOptions) => AjvInstance;
 const AjvCtor: AjvConstructor = Ajv as unknown as AjvConstructor;
 
 import { describeFormatParameter, formatPromptValue } from '../formats.js';
+import { parseJsonRecord, truncateUtf8WithNotice } from '../utils.js';
 
 import { ToolProvider } from './types.js';
 
@@ -36,6 +37,22 @@ const BATCH_TOOL = 'agent__batch';
 const SLACK_BLOCK_KIT_FORMAT: OutputFormatId = 'slack-block-kit';
 const REPORT_FORMAT_LABEL = '`report_format`';
 const DEFAULT_PARAMETERS_DESCRIPTION = 'Parameters for selected tool';
+
+const RAW_PREVIEW_LIMIT_BYTES = 512;
+const previewRawValue = (value: unknown): string => {
+  if (value === undefined) {
+    return 'undefined';
+  }
+  if (typeof value === 'string') {
+    return truncateUtf8WithNotice(value, RAW_PREVIEW_LIMIT_BYTES);
+  }
+  try {
+    return truncateUtf8WithNotice(JSON.stringify(value), RAW_PREVIEW_LIMIT_BYTES);
+  } catch {
+    const fallback = Object.prototype.toString.call(value);
+    return truncateUtf8WithNotice(fallback, RAW_PREVIEW_LIMIT_BYTES);
+  }
+};
 
 export class InternalToolProvider extends ToolProvider {
   readonly kind = 'agent' as const;
@@ -439,7 +456,10 @@ export class InternalToolProvider extends ToolProvider {
           }
           return [];
         })();
-        if (normalizedMessages.length === 0) throw new Error('final_report(slack-block-kit) requires `messages` or non-empty `content`.');
+        if (normalizedMessages.length === 0) {
+          this.opts.logError('final_report(slack-block-kit) requires `messages` or non-empty `content`.');
+          throw new Error('final_report(slack-block-kit) requires `messages` or non-empty `content`.');
+        }
         const repairedMessages: Record<string, unknown>[] = (() => {
           const normalizeMrkdwn = (input: string): string => {
             if (input.includes('**')) {
@@ -594,6 +614,7 @@ export class InternalToolProvider extends ToolProvider {
           normalizedMessages.splice(0, normalizedMessages.length, ...finalMsgs);
         } catch (error) {
           const msg = error instanceof Error ? error.message : String(error);
+          this.opts.logError(msg);
           throw new Error(msg);
         }
         const metaBase: Record<string, unknown> = (metadata ?? {});
@@ -606,7 +627,10 @@ export class InternalToolProvider extends ToolProvider {
       }
 
       if (this.formatId === 'json') {
-        if (contentJson === undefined) throw new Error('final_report(json) requires `content_json` (object).');
+        if (contentJson === undefined) {
+          this.opts.logError('final_report(json) requires `content_json` (object).');
+          throw new Error('final_report(json) requires `content_json` (object).');
+        }
         if (this.opts.expectedJsonSchema !== undefined) {
           const validate = this.ajv.compile(this.opts.expectedJsonSchema);
           const ok = validate(contentJson);
@@ -618,14 +642,19 @@ export class InternalToolProvider extends ToolProvider {
                   return `${inst} ${msg}`.trim();
                 }).join('; ')
               : '';
-            throw new Error(`final_report(json) schema validation failed: ${errs}`);
+            const errMsg = `final_report(json) schema validation failed: ${errs}`;
+            this.opts.logError(errMsg);
+            throw new Error(errMsg);
           }
         }
         this.opts.setFinalReport({ status, format: this.formatId, content, content_json: contentJson, metadata });
         return { ok: true, result: JSON.stringify({ ok: true }), latencyMs: Date.now() - start, kind: this.kind, namespace: this.namespace };
       }
 
-      if (typeof content !== 'string' || content.trim().length === 0) throw new Error('agent__final_report requires non-empty report_content field.');
+      if (typeof content !== 'string' || content.trim().length === 0) {
+        this.opts.logError('agent__final_report requires non-empty report_content field.');
+        throw new Error('agent__final_report requires non-empty report_content field.');
+      }
       this.opts.setFinalReport({ status, format: this.formatId, content, content_json: contentJson, metadata });
       return { ok: true, result: JSON.stringify({ ok: true }), latencyMs: Date.now() - start, kind: this.kind, namespace: this.namespace };
     }
@@ -686,10 +715,14 @@ export class InternalToolProvider extends ToolProvider {
             const parsed = JSON.parse(jsonStr) as unknown;
             if (Array.isArray(parsed)) {
               calls = parsed;
+            } else {
+              this.opts.logError(`agent__batch received non-array calls payload (raw preview: ${previewRawValue(parsed)})`);
             }
-          } catch {
-            // Silently ignore parse errors
+          } catch (error) {
+            this.opts.logError(`agent__batch failed to parse calls payload (raw preview: ${previewRawValue(rawCalls)}; error: ${error instanceof Error ? error.message : String(error)})`);
           }
+        } else {
+          this.opts.logError(`agent__batch received truncated calls payload (raw preview: ${previewRawValue(rawCalls)})`);
         }
       }
 
@@ -710,7 +743,15 @@ export class InternalToolProvider extends ToolProvider {
         const c = (cUnknown !== null && typeof cUnknown === 'object') ? (cUnknown as Record<string, unknown>) : {};
         const id = typeof c.id === 'string' ? c.id : (typeof c.id === 'number' ? String(c.id) : '');
         const tool = typeof c.tool === 'string' ? c.tool : '';
-        const provided = (c.parameters !== null && typeof c.parameters === 'object') ? (c.parameters as Record<string, unknown>) : {};
+        const parsedParameters = parseJsonRecord(c.parameters);
+        if (parsedParameters === undefined) {
+          if (c.parameters !== undefined) {
+            this.opts.logError(`agent__batch call '${id || '[missing id]'}' parameters invalid (raw preview: ${previewRawValue(c.parameters)})`);
+          } else {
+            this.opts.logError(`agent__batch call '${id || '[missing id]'}' missing parameters; defaulting to empty object.`);
+          }
+        }
+        const provided = parsedParameters ?? {};
         return { id, tool, parameters: provided };
       });
 

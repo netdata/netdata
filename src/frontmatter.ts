@@ -125,16 +125,18 @@ export function parseFrontmatter(
     if (typeof raw.repeatPenalty === 'number') options.repeatPenalty = raw.repeatPenalty;
     if (typeof raw.temperature === 'number') options.temperature = raw.temperature;
     if (typeof raw.topP === 'number') options.topP = raw.topP;
-    if (typeof raw.reasoning === 'string') {
+    if (raw.reasoning === null) {
+      options.reasoning = 'none';
+    } else if (typeof raw.reasoning === 'string') {
       const normalized = raw.reasoning.trim().toLowerCase();
-      if (normalized === 'none') {
+      if (normalized === 'none' || normalized === 'unset') {
         options.reasoning = 'none';
-      } else if (normalized === 'default' || normalized === 'unset' || normalized.length === 0) {
+      } else if (normalized === 'default' || normalized === 'inherit' || normalized.length === 0) {
         // Explicit inherit: treat as if the key was omitted entirely.
       } else if (normalized === 'minimal' || normalized === 'low' || normalized === 'medium' || normalized === 'high') {
         options.reasoning = normalized as ReasoningLevel;
       } else {
-        throw new Error(`Invalid reasoning level '${raw.reasoning}' in frontmatter. Expected none, default, unset, minimal, low, medium, or high.`);
+        throw new Error(`Invalid reasoning level '${raw.reasoning}' in frontmatter. Expected none, unset, default, minimal, low, medium, or high.`);
       }
     }
     if (typeof raw.reasoningTokens === 'number') {

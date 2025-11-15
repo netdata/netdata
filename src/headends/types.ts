@@ -23,6 +23,8 @@ export type HeadendLogSink = (entry: LogEntry) => void;
 
 export interface HeadendContext {
   log: HeadendLogSink;
+  shutdownSignal: AbortSignal;
+  stopRef: { stopping: boolean };
 }
 
 export interface Headend {

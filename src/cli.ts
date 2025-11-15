@@ -5,8 +5,6 @@ import path from 'node:path';
 import { Command, Option } from 'commander';
 import * as yaml from 'js-yaml';
 
-// Keep import order: builtins, external, type, internal
-// (moved below to maintain import order)
 import type { LoadAgentOptions } from './agent-loader.js';
 import type { FrontmatterOptions } from './frontmatter.js';
 import type { McpTransportSpec } from './headends/mcp-headend.js';
@@ -29,9 +27,10 @@ import { formatLog } from './log-formatter.js';
 import { makeTTYLogCallbacks } from './log-sink-tty.js';
 import { getOptionsByGroup, formatCliNames, OPTIONS_REGISTRY } from './options-registry.js';
 import { mergeCallbacksWithPersistence } from './persistence.js';
+import { ShutdownController } from './shutdown-controller.js';
 import { initTelemetry, shutdownTelemetry } from './telemetry/index.js';
 import { buildTelemetryRuntimeConfig, type TelemetryOverrides } from './telemetry/runtime-config.js';
-import { MCPProvider } from './tools/mcp-provider.js';
+import { MCPProvider, shutdownSharedRegistry } from './tools/mcp-provider.js';
 import { normalizeSchemaDraftTarget, schemaDraftDisplayName, validateSchemaAgainstDraft, type SchemaDraftTarget } from './utils/schema-validation.js';
 // eslint-disable-next-line perfectionist/sort-imports
 import { formatAgentResultHumanReadable, setWarningSink, warn } from './utils.js';
@@ -73,6 +72,12 @@ const ensureTelemetryShutdown = async (): Promise<void> => {
 };
 
 const exitAndShutdown = async (code: number, reason: string, tag: string): Promise<never> => {
+  try {
+    await shutdownController.shutdown();
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    try { process.stderr.write(`[warn] shutdown controller failed: ${message}\n`); } catch { /* ignore */ }
+  }
   await ensureTelemetryShutdown();
   exitWith(code, reason, tag);
   throw new Error('unreachable');
@@ -829,6 +834,11 @@ program.helpInformation = function() {
   return before + after;
 };
 
+const shutdownController = new ShutdownController();
+shutdownController.register('mcp-shared-registry', async () => {
+  await shutdownSharedRegistry();
+});
+
 program
   .name('ai-agent')
   .description('Universal LLM Tool Calling Interface with MCP support')
@@ -1369,23 +1379,53 @@ async function runHeadendMode(config: HeadendModeConfig): Promise<void> {
       const desc = event.headend.describe();
       emit(`headend ${desc.label} fatal error: ${event.error.message}`, 'ERR');
     },
+    shutdownSignal: shutdownController.signal,
+    stopRef: shutdownController.stopRef,
   });
+
+  const unregisterHeadendTask = shutdownController.register('headends', async () => {
+    await manager.stopAll();
+  });
+  let shutdownWatchdog: NodeJS.Timeout | undefined;
+  const clearShutdownWatchdog = (): void => {
+    if (shutdownWatchdog !== undefined) {
+      clearTimeout(shutdownWatchdog);
+      shutdownWatchdog = undefined;
+    }
+  };
 
   __RUNNING_SERVER = true;
 
-  const stopManager = async () => {
-    await manager.stopAll();
-  };
+  try {
 
-  const handleSignal = (signal: NodeJS.Signals) => {
-    emit(`received ${signal}, shutting down headends`, 'WRN');
-    void stopManager();
-  };
+    const stopManager = async () => {
+      await manager.stopAll();
+    };
+
+    const handleSignal = async (signal: NodeJS.Signals): Promise<void> => {
+      if (shutdownController.isStopping()) {
+        emit(`received ${signal} during shutdown; forcing exit`, 'ERR');
+        exitWith(1, `forced exit after ${signal}`, 'EXIT-HEADEND-FORCE');
+      }
+      emit(`received ${signal}, shutting down headends`, 'WRN');
+      shutdownWatchdog = setTimeout(() => {
+        emit('shutdown watchdog expired; forcing exit', 'ERR');
+        exitWith(1, 'shutdown watchdog expired', 'EXIT-HEADEND-WATCHDOG');
+      }, 30_000).unref();
+      try {
+        await shutdownController.shutdown({ logger: logSink });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        emit(`shutdown controller failed: ${message}`, 'ERR');
+      } finally {
+        clearShutdownWatchdog();
+      }
+    };
 
   const registeredSignals: NodeJS.Signals[] = ['SIGINT', 'SIGTERM'];
   const signalHandlers = new Map<NodeJS.Signals, () => void>();
   registeredSignals.forEach((sig) => {
-    const handler = () => { handleSignal(sig); };
+    const handler = () => { void handleSignal(sig); };
     signalHandlers.set(sig, handler);
     process.once(sig, handler);
   });
@@ -1423,6 +1463,10 @@ async function runHeadendMode(config: HeadendModeConfig): Promise<void> {
   }
   await ensureTelemetryShutdown();
   __RUNNING_SERVER = false;
+  } finally {
+    clearShutdownWatchdog();
+    unregisterHeadendTask();
+  }
 }
 
 // Global flag: suppress fatal exits when running long-lived headends

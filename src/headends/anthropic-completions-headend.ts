@@ -6,6 +6,7 @@ import { URL } from 'node:url';
 import type { AgentMetadata, AgentRegistry } from '../agent-registry.js';
 import type { AccountingEntry, AIAgentCallbacks, LLMAccountingEntry, LogDetailValue, LogEntry, ProgressEvent, ProgressMetrics } from '../types.js';
 import type { Headend, HeadendClosedEvent, HeadendContext, HeadendDescription } from './types.js';
+import type { Socket } from 'node:net';
 
 import { getTelemetryLabels } from '../telemetry/index.js';
 import { normalizeCallPath } from '../utils.js';
@@ -115,6 +116,10 @@ export class AnthropicCompletionsHeadend implements Headend {
   private server?: http.Server;
   private stopping = false;
   private closedSignaled = false;
+  private shutdownSignal?: AbortSignal;
+  private globalStopRef?: { stopping: boolean };
+  private shutdownListener?: () => void;
+  private readonly sockets = new Set<Socket>();
 
   public constructor(registry: AgentRegistry, options: { port: number; concurrency?: number }) {
     this.registry = registry;
@@ -136,9 +141,19 @@ export class AnthropicCompletionsHeadend implements Headend {
   public async start(context: HeadendContext): Promise<void> {
     if (this.server !== undefined) return;
     this.context = context;
+    const shutdownSignal = context.shutdownSignal;
+    this.shutdownSignal = shutdownSignal;
+    this.globalStopRef = context.stopRef;
     this.log('starting');
     const server = http.createServer((req, res) => { void this.handleRequest(req, res); });
     this.server = server;
+    server.on('connection', (socket: Socket) => {
+      this.sockets.add(socket);
+      socket.on('close', () => { this.sockets.delete(socket); });
+    });
+    const handler = () => { this.handleShutdownSignal(); };
+    shutdownSignal.addEventListener('abort', handler);
+    this.shutdownListener = handler;
     server.on('error', (err) => {
       const message = err instanceof Error ? err.message : String(err);
       this.log('server error', 'ERR', true, { error: message });
@@ -179,8 +194,13 @@ export class AnthropicCompletionsHeadend implements Headend {
       return;
     }
     this.stopping = true;
+    this.closeActiveSockets(true);
     await new Promise<void>((resolve) => { this.server?.close(() => { resolve(); }); });
     this.server = undefined;
+    if (this.shutdownListener !== undefined && this.shutdownSignal !== undefined) {
+      this.shutdownSignal.removeEventListener('abort', this.shutdownListener);
+      this.shutdownListener = undefined;
+    }
     this.signalClosed({ reason: 'stopped', graceful: true });
   }
 
@@ -850,6 +870,20 @@ export class AnthropicCompletionsHeadend implements Headend {
   private log(message: string, severity: LogEntry['severity'] = 'VRB', fatal = false, details?: Record<string, LogDetailValue>): void {
     if (this.context === undefined) return;
     this.context.log(buildLog(this.id, this.label, message, severity, fatal, details));
+  }
+
+  private handleShutdownSignal(): void {
+    if (this.globalStopRef !== undefined) {
+      this.globalStopRef.stopping = true;
+    }
+    this.closeActiveSockets();
+  }
+
+  private closeActiveSockets(force = false): void {
+    this.sockets.forEach((socket) => {
+      try { socket.end(); } catch { /* ignore */ }
+      setTimeout(() => { try { socket.destroy(); } catch { /* ignore */ } }, force ? 0 : 1000).unref();
+    });
   }
 
   private logEntry(entry: LogEntry): void {

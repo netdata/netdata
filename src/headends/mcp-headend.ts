@@ -12,6 +12,7 @@ import type { AgentMetadata, AgentRegistry } from '../agent-registry.js';
 import type { AIAgentCallbacks, LogDetailValue, LogEntry } from '../types.js';
 import type { Headend, HeadendClosedEvent, HeadendContext, HeadendDescription } from './types.js';
 import type { AuthInfo } from '@modelcontextprotocol/sdk/server/auth/types.js';
+import type { Socket } from 'node:net';
 
 import { describeFormat } from '../formats.js';
 import { resolveToolName, type AgentSchemaSummary } from '../schema-adapters.js';
@@ -102,6 +103,11 @@ export class McpHeadend implements Headend {
   private closedSignaled = false;
   private readonly limiter?: ConcurrencyLimiter;
   private readonly verboseLogging: boolean;
+  private shutdownSignal?: AbortSignal;
+  private globalStopRef?: { stopping: boolean };
+  private shutdownListener?: () => void;
+  private readonly httpSockets = new Set<Socket>();
+  private readonly sseSockets = new Set<Socket>();
 
   public constructor(options: McpHeadendOptions) {
     this.registry = options.registry;
@@ -126,7 +132,13 @@ export class McpHeadend implements Headend {
   public async start(context: HeadendContext): Promise<void> {
     if (this.context !== undefined) return;
     this.context = context;
+    const shutdownSignal = context.shutdownSignal;
+    this.shutdownSignal = shutdownSignal;
+    this.globalStopRef = context.stopRef;
     this.log('starting');
+    const handler = () => { this.handleShutdownSignal(); };
+    shutdownSignal.addEventListener('abort', handler);
+    this.shutdownListener = handler;
 
     switch (this.transportSpec.type) {
       case 'stdio': {
@@ -186,6 +198,10 @@ export class McpHeadend implements Headend {
         return;
       default:
         this.signalClosed({ reason: 'stopped', graceful: true });
+    }
+    if (this.shutdownListener !== undefined && this.shutdownSignal !== undefined) {
+      this.shutdownSignal.removeEventListener('abort', this.shutdownListener);
+      this.shutdownListener = undefined;
     }
   }
 
@@ -484,6 +500,21 @@ export class McpHeadend implements Headend {
     });
   }
 
+  private handleShutdownSignal(): void {
+    if (this.globalStopRef !== undefined) {
+      this.globalStopRef.stopping = true;
+    }
+    void this.stop();
+  }
+
+  private closeSockets(set: Set<Socket>, force = false): void {
+    set.forEach((socket) => {
+      try { socket.end(); } catch { /* ignore */ }
+      setTimeout(() => { try { socket.destroy(); } catch { /* ignore */ } }, force ? 0 : 1000).unref();
+    });
+    set.clear();
+  }
+
   private logEntry(entry: LogEntry): void {
     if (this.context === undefined) return;
     this.context.log(entry);
@@ -578,6 +609,10 @@ export class McpHeadend implements Headend {
     });
 
     this.httpServer = server;
+    server.on('connection', (socket) => {
+      this.httpSockets.add(socket);
+      socket.on('close', () => { this.httpSockets.delete(socket); });
+    });
 
     server.on('error', (err) => {
       const message = err instanceof Error ? err.message : String(err);
@@ -601,6 +636,7 @@ export class McpHeadend implements Headend {
       try { await ctx.transport.close(); } catch (err) { this.logCloseFailure('transport', err); }
     }
     if (this.httpServer !== undefined) {
+      this.closeSockets(this.httpSockets, true);
       await new Promise<void>((resolve) => {
         this.httpServer?.close(() => { resolve(); });
       });
@@ -614,6 +650,10 @@ export class McpHeadend implements Headend {
       void this.handleSseRequest(req, res);
     });
     this.sseServer = server;
+    server.on('connection', (socket) => {
+      this.sseSockets.add(socket);
+      socket.on('close', () => { this.sseSockets.delete(socket); });
+    });
     server.on('error', (err) => {
       const message = err instanceof Error ? err.message : String(err);
       this.log(`sse server error: ${message}`, 'ERR', true);
@@ -635,6 +675,7 @@ export class McpHeadend implements Headend {
       await this.closeServer(ctx.server);
     }
     if (this.sseServer !== undefined) {
+      this.closeSockets(this.sseSockets, true);
       await new Promise<void>((resolve) => { this.sseServer?.close(() => { resolve(); }); });
       this.sseServer = undefined;
     }

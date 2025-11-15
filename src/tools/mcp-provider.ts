@@ -90,6 +90,7 @@ export interface SharedRegistryHandle {
 export interface SharedRegistry {
   acquire: (serverName: string, config: MCPServerConfig, opts: SharedAcquireOptions) => Promise<SharedRegistryHandle>;
   getRestartError?: (serverName: string) => MCPRestartFailedError | undefined;
+  shutdown?: () => Promise<void> | void;
 }
 
 const DEFAULT_HEALTH_PROBE = 'ping' as const;
@@ -135,8 +136,12 @@ class SharedServerHandle implements SharedRegistryHandle {
 class MCPSharedRegistry {
   private entries = new Map<string, SharedServerEntry>();
   private initializing = new Map<string, Promise<SharedServerEntry>>();
+  private stopping = false;
 
   async acquire(serverName: string, config: MCPServerConfig, opts: SharedAcquireOptions): Promise<SharedServerHandle> {
+    if (this.stopping) {
+      throw new Error(`shared MCP registry is shutting down; cannot acquire '${serverName}'`);
+    }
     let entry = this.entries.get(serverName);
     if (entry === undefined) {
       let pending = this.initializing.get(serverName);
@@ -172,7 +177,44 @@ class MCPSharedRegistry {
     return this.entries.get(serverName)?.restartError;
   }
 
+  async shutdown(): Promise<void> {
+    if (this.stopping) return;
+    this.stopping = true;
+    this.initializing.clear();
+    const entries = Array.from(this.entries.values());
+    const closers = entries.map(async (entry) => {
+      const latch = entry.restartAttempt;
+      if (latch !== undefined) {
+        try { latch.resolve(false); } catch { /* ignore */ }
+        entry.restartAttempt = undefined;
+      }
+      entry.restartPromise = undefined;
+      entry.transportClosing = true;
+      try { entry.client.onclose = undefined; } catch { /* ignore */ }
+      try { await entry.client.close(); } catch { /* ignore */ }
+      try {
+        if (typeof entry.transport.close === 'function') {
+          await entry.transport.close();
+        }
+      } catch { /* ignore */ }
+      if (entry.pid !== null) {
+        try {
+          await killProcessTree(entry.pid, {
+            gracefulMs: 500,
+            logger: (message) => { entry.log('WRN', message, `mcp:${entry.serverName}`); },
+          });
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          entry.log('WRN', `failed to terminate pid for '${entry.serverName}': ${msg}`, `mcp:${entry.serverName}`);
+        }
+      }
+    });
+    await Promise.allSettled(closers);
+    this.entries.clear();
+  }
+
   async handleTimeout(serverName: string, logger: LogFn): Promise<void> {
+    if (this.stopping) return;
     const entry = this.entries.get(serverName);
     if (entry === undefined) return;
     const healthy = await this.runProbe(entry, logger).catch(() => false);
@@ -195,6 +237,7 @@ class MCPSharedRegistry {
   }
 
   private async handleTransportExit(entry: SharedServerEntry): Promise<void> {
+    if (this.stopping) return;
     if (this.entries.get(entry.serverName) !== entry) {
       return;
     }
@@ -220,6 +263,15 @@ class MCPSharedRegistry {
   }
 
   private async startRestartLoop(entry: SharedServerEntry, logger: LogFn, reason: string): Promise<boolean> {
+    if (this.stopping) {
+      const latch = entry.restartAttempt;
+      if (latch !== undefined) {
+        latch.resolve(false);
+        entry.restartAttempt = undefined;
+      }
+      entry.restartPromise = undefined;
+      return entry.restartError === undefined;
+    }
     if (entry.restartPromise === undefined) {
       entry.restartAttempt = this.createAttemptLatch();
       entry.restartPromise = (async () => {
@@ -242,6 +294,15 @@ class MCPSharedRegistry {
       let attempt = 0;
       // eslint-disable-next-line functional/no-loop-statements -- shared restart policy requires iterative retries.
       for (;;) {
+        if (this.stopping) {
+          const latch = entry.restartAttempt;
+          if (latch !== undefined) {
+            latch.resolve(false);
+            entry.restartAttempt = undefined;
+          }
+          entry.restartPromise = undefined;
+          return;
+        }
         const backoffMs = SHARED_RESTART_BACKOFF_MS[Math.min(attempt, SHARED_RESTART_BACKOFF_MS.length - 1)];
         if (attempt > 0 && backoffMs > 0) {
           await delay(backoffMs);
@@ -301,6 +362,9 @@ class MCPSharedRegistry {
   }
 
   private async initializeEntry(serverName: string, config: MCPServerConfig, opts: SharedAcquireOptions): Promise<SharedServerEntry> {
+    if (this.stopping) {
+      throw new Error(`shared MCP registry is shutting down; cannot initialize '${serverName}'`);
+    }
     let attempt = 0;
     // eslint-disable-next-line functional/no-loop-statements -- shared initialization retries until success per spec.
     for (;;) {
@@ -619,6 +683,12 @@ async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T
 }
 
 const defaultSharedRegistry: SharedRegistry = new MCPSharedRegistry();
+
+export const shutdownSharedRegistry = async (): Promise<void> => {
+  if (typeof (defaultSharedRegistry as MCPSharedRegistry).shutdown === 'function') {
+    await (defaultSharedRegistry as MCPSharedRegistry).shutdown();
+  }
+};
 
 export const forceRemoveSharedRegistryEntry = (serverName: string): void => {
   (defaultSharedRegistry as MCPSharedRegistry).forceRemove(serverName);

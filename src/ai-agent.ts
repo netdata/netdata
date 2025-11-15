@@ -61,7 +61,7 @@ import { InternalToolProvider } from './tools/internal-provider.js';
 import { MCPProvider } from './tools/mcp-provider.js';
 import { RestProvider } from './tools/rest-provider.js';
 import { ToolsOrchestrator, type ManagedToolResult, type ToolBudgetCallbacks } from './tools/tools.js';
-import { appendCallPathSegment, clampToolName, formatToolRequestCompact, normalizeCallPath, sanitizeToolName, truncateUtf8WithNotice, warn } from './utils.js';
+import { appendCallPathSegment, clampToolName, formatToolRequestCompact, normalizeCallPath, parseJsonRecord, sanitizeToolName, truncateUtf8WithNotice, warn } from './utils.js';
 
 // Immutable session class according to DESIGN.md
 type AjvInstance = AjvClass;
@@ -840,18 +840,21 @@ export class AIAgentSession {
   private logExit(
     exitCode: ExitCode,
     reason: string,
-    turn: number
+    turn: number,
+    options?: { fatal?: boolean; severity?: LogEntry['severity'] }
   ): void {
+    const fatal = options?.fatal ?? true;
+    const severity: LogEntry['severity'] = options?.severity ?? (fatal ? 'ERR' : 'VRB');
     const logEntry: LogEntry = {
       timestamp: Date.now(),
-      severity: 'VRB',
+      severity,
       turn,
       subturn: 0,
       direction: 'response',
       type: 'llm',
       remoteIdentifier: `agent:${exitCode}`,
-      fatal: true,
-      message: `${exitCode}: ${reason} (fatal=true)`,
+      fatal,
+      message: `${exitCode}: ${reason} (fatal=${fatal ? 'true' : 'false'})`,
       agentId: this.sessionConfig.agentId,
       callPath: this.callPath,
       txnId: this.txnId,
@@ -2094,7 +2097,7 @@ export class AIAgentSession {
           const exitMessage = this.forcedFinalTurnReason === 'context'
             ? `Final report received after context guard triggered (${AIAgentSession.FINAL_REPORT_TOOL}), session complete`
             : `Final report received (${AIAgentSession.FINAL_REPORT_TOOL}), session complete`;
-          this.logExit(exitCode, exitMessage, currentTurn);
+          this.logExit(exitCode, exitMessage, currentTurn, { fatal: false });
 
           // Emit FIN summary log entry
           this.emitFinalSummary(logs, accounting);
@@ -2901,27 +2904,6 @@ export class AIAgentSession {
       this.log(finMcp);
     } catch { /* swallow summary errors */ }
   }
-  
-  private parseJsonRecord(raw: string): Record<string, unknown> | undefined {
-    const trimmed = raw.trim();
-    if (trimmed.length === 0) return undefined;
-    const tryParse = (value: string): Record<string, unknown> | undefined => {
-      try {
-        const parsed: unknown = JSON.parse(value);
-        return (parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed))
-          ? (parsed as Record<string, unknown>)
-          : undefined;
-      } catch {
-        return undefined;
-      }
-    };
-    const direct = tryParse(trimmed);
-    if (direct !== undefined) return direct;
-    const repaired = trimmed.replace(/\\x([0-9a-fA-F]{2})/g, (_match, hex) => '\\u00' + String(hex).toUpperCase());
-    if (repaired === trimmed) return undefined;
-    return tryParse(repaired);
-  }
-
   private extractJsonRecordFromText(text: string): Record<string, unknown> | undefined {
     const length = text.length;
     let index = 0;
@@ -2957,7 +2939,7 @@ export class AIAgentSession {
           depth -= 1;
           if (depth === 0) {
             const candidate = text.slice(startIdx, cursor + 1);
-            const parsed = this.parseJsonRecord(candidate);
+            const parsed = parseJsonRecord(candidate);
             if (parsed !== undefined) {
               return parsed;
             }
@@ -3458,15 +3440,11 @@ export class AIAgentSession {
           droppedReasons.push(`call ${callIndexStr}: missing name`);
           return;
         }
-        let paramsCandidate: unknown = tcRaw.parameters;
-        if (!isRecord(paramsCandidate) && typeof paramsCandidate === 'string') {
-          const parsed = this.parseJsonRecord(paramsCandidate);
-          if (parsed !== undefined) {
-            paramsCandidate = parsed;
-          }
-        }
-        if (!isRecord(paramsCandidate)) {
-          droppedReasons.push(`call ${callIndexStr}: parameters not object`);
+        const rawParameters = tcRaw.parameters;
+        const paramsCandidate = parseJsonRecord(rawParameters);
+        if (paramsCandidate === undefined) {
+          const preview = this.previewRawParameter(rawParameters);
+          droppedReasons.push(`call ${callIndexStr}: parameters not object (raw preview: ${preview})`);
           return;
         }
         validCalls.push({
@@ -3482,7 +3460,7 @@ export class AIAgentSession {
         const msgIndexStr = msgIndex.toString();
         const warnEntry: LogEntry = {
           timestamp: Date.now(),
-          severity: 'WRN',
+          severity: 'ERR',
           turn: context.turn,
           subturn: 0,
           direction: 'response',
@@ -4378,7 +4356,6 @@ export class AIAgentSession {
       return undefined;
     }
     const parsed: ToolCall[] = [];
-    const isRecord = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value);
     // eslint-disable-next-line functional/no-loop-statements
     for (const entryUnknown of rawCalls) {
       if (entryUnknown === null || typeof entryUnknown !== 'object' || Array.isArray(entryUnknown)) {
@@ -4403,10 +4380,42 @@ export class AIAgentSession {
         return 'call-' + (parsed.length + 1).toString();
       })();
       const parametersCandidate = entry.parameters;
-      const toolParameters: Record<string, unknown> = isRecord(parametersCandidate) ? parametersCandidate : {};
+      const parsedParameters = parseJsonRecord(parametersCandidate);
+      if (parsedParameters === undefined) {
+        const preview = this.previewRawParameter(parametersCandidate);
+        const logEntry: LogEntry = {
+          timestamp: Date.now(),
+          severity: 'ERR',
+          turn: this.currentTurn,
+          subturn: 0,
+          direction: 'response',
+          type: 'tool',
+          remoteIdentifier: 'agent:final_report',
+          fatal: false,
+          message: `agent__final_report nested call '${toolCallId}' parameters invalid (raw preview: ${preview})`,
+        };
+        this.log(logEntry);
+      }
+      const toolParameters = parsedParameters ?? {};
       parsed.push({ id: toolCallId, name: clampedToolName, parameters: toolParameters });
     }
     return parsed.length > 0 ? parsed : undefined;
+  }
+
+  private previewRawParameter(raw: unknown): string {
+    if (raw === undefined) {
+      return 'undefined';
+    }
+    if (typeof raw === 'string') {
+      return truncateUtf8WithNotice(raw, 512);
+    }
+    try {
+      const serialized = JSON.stringify(raw);
+      return truncateUtf8WithNotice(serialized, 512);
+    } catch {
+      const fallback = Object.prototype.toString.call(raw);
+      return truncateUtf8WithNotice(fallback, 512);
+    }
   }
 
   // Immutable retry method - returns new session

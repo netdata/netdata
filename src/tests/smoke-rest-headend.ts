@@ -38,7 +38,13 @@ async function run(): Promise<void> {
   const port = await allocatePort();
   const registry = new AgentRegistry([]);
   const headend = new RestHeadend(registry, { port });
-  const context: HeadendContext = { log: () => { /* no-op for smoke test */ } };
+  const shutdownController = new AbortController();
+  const stopRef = { stopping: false };
+  const context: HeadendContext = {
+    log: () => { /* no-op for smoke test */ },
+    shutdownSignal: shutdownController.signal,
+    stopRef,
+  };
   await headend.start(context);
 
   const status = await new Promise<number>((resolve, reject) => {
@@ -52,6 +58,8 @@ async function run(): Promise<void> {
     throw new Error(`expected 200 from /health, received ${String(status)}`);
   }
 
+  stopRef.stopping = true;
+  shutdownController.abort();
   await headend.stop();
   const closed = await headend.closed;
   if (closed.reason !== 'stopped' || !closed.graceful) {

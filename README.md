@@ -389,6 +389,7 @@ The framework uses a **multi-level configuration system** with clear precedence 
 1. **Command-line parameters**: Direct CLI options like `--temperature 0.5`, `--top-p 0.8`, `--max-output-tokens 8192`, `--repeat-penalty 1.2`, `--max-tool-turns 20`, `--max-tool-calls-per-turn 8`, `--llm-timeout 300000`
    - These always override all other settings
    - Perfect for testing and debugging
+   - Use `--reasoning <none|minimal|low|medium|high>` when you need to stomp every agent/sub-agent, or `--default-reasoning <value>` when you only want to fill in prompts that omit a reasoning level. `--default-reasoning none` is especially useful when moving from Anthropic-style “high reasoning” defaults to smaller models—you can disable reasoning for prompts that never asked for it without rewriting their frontmatter.
 
 2. **Frontmatter in `.ai` files**: YAML configuration at the top of agent files
    ```yaml
@@ -398,6 +399,7 @@ The framework uses a **multi-level configuration system** with clear precedence 
    ---
    ```
    - Agent-specific settings that override config files
+   - `reasoning: none` (or `reasoning: unset`) now explicitly disables reasoning for that agent, while omitting the key (or writing `default`) lets the global fallback (`defaults.reasoning`/`--default-reasoning`) decide.
 
 3. **Configuration files** (searched in order):
    
@@ -537,6 +539,8 @@ Each flag is repeatable—every port or transport spins up an independent headen
 - `--slack` – Slack Socket Mode headend with @mentions, DMs, channel posts, shortcuts, and slash commands. Real-time progress updates with Block Kit UI, per-channel routing, and interactive controls. See [docs/SLACK.md](docs/SLACK.md) for setup and configuration.
 
 Per-headend concurrency guards are available (e.g., `--api-concurrency 8`). Each incoming request acquires a slot before the agent session is spawned, keeping the system responsive under load.
+
+Graceful shutdown is built in: the supervisor listens for `SIGINT`/`SIGTERM`, flips a shared `stopRef` so active sessions finish their current turns, closes REST/MCP/Slack sockets, and finally tears down shared MCP transports. A single signal triggers the graceful path (with a watchdog to avoid hanging forever); sending a second signal forces an immediate exit. This keeps systemd/PM2 happy and prevents MCP restart loops after you've asked the process to stop.
 
 ### Your First Agent
 Create `assistant.ai`:

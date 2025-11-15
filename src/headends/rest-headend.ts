@@ -5,6 +5,7 @@ import { URL } from 'node:url';
 import type { AgentRegistry } from '../agent-registry.js';
 import type { AIAgentCallbacks, LogEntry } from '../types.js';
 import type { Headend, HeadendClosedEvent, HeadendContext, HeadendDescription } from './types.js';
+import type { Socket } from 'node:net';
 
 import { getTelemetryLabels } from '../telemetry/index.js';
 
@@ -91,6 +92,10 @@ export class RestHeadend implements Headend {
   private readonly limiter: ConcurrencyLimiter;
   private readonly extraRoutes: { method: RestExtraRoute['method']; path: string; handler: RestExtraRoute['handler']; originalPath: string }[] = [];
   private readonly telemetryLabels: Record<string, string>;
+  private shutdownSignal?: AbortSignal;
+  private globalStopRef?: { stopping: boolean };
+  private shutdownListener?: () => void;
+  private readonly sockets = new Set<Socket>();
 
   public constructor(registry: AgentRegistry, opts: RestHeadendOptions) {
     this.registry = registry;
@@ -121,12 +126,24 @@ export class RestHeadend implements Headend {
   public async start(context: HeadendContext): Promise<void> {
     if (this.server !== undefined) return;
     this.context = context;
+    const shutdownSignal = context.shutdownSignal;
+    this.shutdownSignal = shutdownSignal;
+    this.globalStopRef = context.stopRef;
     this.log('starting');
 
     const server = http.createServer((req, res) => {
       void this.handleRequest(req, res);
     });
     this.server = server;
+    server.on('connection', (socket) => {
+      this.sockets.add(socket);
+      socket.on('close', () => {
+        this.sockets.delete(socket);
+      });
+    });
+    const handler = () => { this.handleShutdownSignal(); };
+    shutdownSignal.addEventListener('abort', handler);
+    this.shutdownListener = handler;
 
     server.on('error', (err: unknown) => {
       const message = err instanceof Error ? err.message : String(err);
@@ -166,12 +183,17 @@ export class RestHeadend implements Headend {
       return;
     }
     this.stopping = true;
+    this.closeActiveSockets(true);
     await new Promise<void>((resolve) => {
       this.server?.close(() => {
         resolve();
       });
     });
     this.server = undefined;
+    if (this.shutdownListener !== undefined && this.shutdownSignal !== undefined) {
+      this.shutdownSignal.removeEventListener('abort', this.shutdownListener);
+      this.shutdownListener = undefined;
+    }
     this.signalClosed({ reason: 'stopped', graceful: true });
   }
 
@@ -232,7 +254,7 @@ export class RestHeadend implements Headend {
     }
 
     const abortController = new AbortController();
-    const stopRef = { stopping: false };
+    const stopRef = { stopping: this.globalStopRef?.stopping === true };
     const onAbort = () => {
       if (abortController.signal.aborted) return;
       stopRef.stopping = true;
@@ -241,10 +263,18 @@ export class RestHeadend implements Headend {
     };
     req.on('aborted', onAbort);
     res.on('close', onAbort);
+    const onShutdown = () => {
+      stopRef.stopping = true;
+      if (!abortController.signal.aborted) {
+        abortController.abort();
+      }
+    };
+    this.shutdownSignal?.addEventListener('abort', onShutdown);
 
     const cleanup = () => {
       req.removeListener('aborted', onAbort);
       res.removeListener('close', onAbort);
+      this.shutdownSignal?.removeEventListener('abort', onShutdown);
     };
 
     let release: (() => void) | undefined;
@@ -335,7 +365,7 @@ export class RestHeadend implements Headend {
     requestId: string
   ): Promise<void> {
     const abortController = new AbortController();
-    const stopRef = { stopping: false };
+    const stopRef = { stopping: this.globalStopRef?.stopping === true };
     const onAbort = () => {
       if (abortController.signal.aborted) return;
       stopRef.stopping = true;
@@ -344,9 +374,15 @@ export class RestHeadend implements Headend {
     };
     req.on('aborted', onAbort);
     res.on('close', onAbort);
+    const onShutdown = () => {
+      stopRef.stopping = true;
+      if (!abortController.signal.aborted) abortController.abort();
+    };
+    this.shutdownSignal?.addEventListener('abort', onShutdown);
     const cleanup = () => {
       req.removeListener('aborted', onAbort);
       res.removeListener('close', onAbort);
+      this.shutdownSignal?.removeEventListener('abort', onShutdown);
     };
 
     let release: (() => void) | undefined;
@@ -373,6 +409,24 @@ export class RestHeadend implements Headend {
       release();
       cleanup();
     }
+  }
+
+  private handleShutdownSignal(): void {
+    if (this.globalStopRef !== undefined) {
+      this.globalStopRef.stopping = true;
+    }
+    this.closeActiveSockets();
+  }
+
+  private closeActiveSockets(force = false): void {
+    this.sockets.forEach((socket) => {
+      try {
+        socket.end();
+      } catch { /* ignore */ }
+      setTimeout(() => {
+        try { socket.destroy(); } catch { /* ignore */ }
+      }, force ? 0 : 1000).unref();
+    });
   }
 
   private matchExtraRoute(method: string | undefined, path: string): { method: RestExtraRoute['method']; path: string; handler: RestExtraRoute['handler']; originalPath: string } | undefined {

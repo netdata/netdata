@@ -380,20 +380,20 @@ The agent MUST properly display both content output and thinking/reasoning strea
 #### Exit Logging Format
 ```typescript
 // Verbose mode MUST log exit with:
-[VRB] ← [X.X] agent {EXIT-CODE}: {detailed_reason} (fatal=true)
+[LEVEL] ← [X.X] agent {EXIT-CODE}: {detailed_reason} (fatal={true|false})
 
 // Example outputs:
-[VRB] ← [5.0] agent EXIT-FINAL-ANSWER: Final answer received, session complete (fatal=true)
-[VRB] ← [3.0] agent EXIT-NO-LLM-RESPONSE: No LLM response after 3 retries across 2 providers (fatal=true)
-[VRB] ← [10.0] agent EXIT-MAX-TURNS-NO-RESPONSE: Max turns (10) reached without final response (fatal=true)
-[VRB] ← [2.0] agent EXIT-INACTIVITY-TIMEOUT: Inactivity timeout after 300000ms waiting for LLM (fatal=true)
+[VRB] ← [5.0] agent EXIT-FINAL-ANSWER: Final answer received, session complete (fatal=false)
+[ERR] ← [3.0] agent EXIT-NO-LLM-RESPONSE: No LLM response after 3 retries across 2 providers (fatal=true)
+[ERR] ← [10.0] agent EXIT-MAX-TURNS-NO-RESPONSE: Max turns (10) reached without final response (fatal=true)
+[ERR] ← [2.0] agent EXIT-INACTIVITY-TIMEOUT: Inactivity timeout after 300000ms waiting for LLM (fatal=true)
 ```
 
 #### Implementation Requirements
 1. **Every exit path** in the code MUST have a unique exit code
 2. **Verbose logging** MUST include the exit code and detailed reason
 3. **Exit location** should be traceable from the code (file:line)
-4. **Fatal flag** MUST be set to true for all exit logs
+4. **Fatal flag** MUST reflect whether the session actually failed (`true` for failures, `false` for clean exits)
 5. **Session state** should be preserved up to the exit point
 
 ## Implementation Notes

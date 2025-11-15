@@ -34,6 +34,14 @@ export interface TokenUsage {
   totalTokens: number;
 }
 
+export interface ProviderParameterWarning {
+  toolCallId?: string;
+  toolName?: string;
+  reason: string;
+  rawPreview?: string;
+  source?: string;
+}
+
 export interface ProviderTurnMetadata {
   actualProvider?: string;
   actualModel?: string;
@@ -43,6 +51,7 @@ export interface ProviderTurnMetadata {
   cacheReadInputTokens?: number;
   effectiveCostUsd?: number;
   reasoningState?: string;
+  parameterWarnings?: ProviderParameterWarning[];
 }
 
 export interface TurnRetryDirective {

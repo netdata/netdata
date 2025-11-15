@@ -676,7 +676,7 @@ export class ToolsOrchestrator {
         : `error ${composedToolName}: ${msg}`;
       const errLog: LogEntry = {
         timestamp: Date.now(),
-        severity: 'ERR',
+        severity: 'WRN',
         turn: ctx.turn,
         subturn: ctx.subturn,
         direction: 'response',

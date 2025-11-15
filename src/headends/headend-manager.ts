@@ -27,6 +27,8 @@ export interface HeadendFatalEvent {
 export interface HeadendManagerOptions {
   log?: HeadendLogSink;
   onFatal?: (event: HeadendFatalEvent) => void;
+  shutdownSignal: AbortSignal;
+  stopRef: { stopping: boolean };
 }
 
 const noopLog: HeadendLogSink = () => { /* noop */ };
@@ -35,16 +37,20 @@ export class HeadendManager {
   private readonly headends: Headend[];
   private readonly log: HeadendLogSink;
   private readonly onFatal?: (event: HeadendFatalEvent) => void;
+  private readonly shutdownSignal: AbortSignal;
+  private readonly stopRef: { stopping: boolean };
   private readonly active = new Set<Headend>();
   private readonly watchers: Promise<void>[] = [];
   private fatalResolved = false;
   private readonly fatalDeferred = createDeferred<HeadendFatalEvent | undefined>();
   private stopping = false;
 
-  public constructor(headends: Headend[], opts: HeadendManagerOptions = {}) {
+  public constructor(headends: Headend[], opts: HeadendManagerOptions) {
     this.headends = headends;
     this.log = opts.log ?? noopLog;
     this.onFatal = opts.onFatal;
+    this.shutdownSignal = opts.shutdownSignal;
+    this.stopRef = opts.stopRef;
   }
 
   public describe(): HeadendDescription[] {
@@ -93,6 +99,8 @@ export class HeadendManager {
         };
         this.log(merged);
       },
+      shutdownSignal: this.shutdownSignal,
+      stopRef: this.stopRef,
     };
     await headend.start(ctx);
     this.active.add(headend);
