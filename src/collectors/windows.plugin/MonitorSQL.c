@@ -235,6 +235,9 @@ void dict_mssql_fill_transactions(struct mssql_db_instance *mdi, const char *dbn
     long value = 0;
     SQLLEN col_object_len = 0, col_value_len = 0;
 
+    if (unlikely(!mdi->parent->conn->collect_transactions))
+        goto endtransactions;
+
     if (mdi->collect_instance)
         dict_mssql_fill_instance_transactions(mdi);
 
@@ -2910,28 +2913,24 @@ int dict_mssql_databases_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, v
     }
 
     int *update_every = data;
+    struct mssql_instance *mi = mdi->parent;
+    if (!mi) {
+        goto endchartcb;
+    }
 
-    void (*transaction_chart[])(struct mssql_db_instance *, const char *, int) = {
-        mssql_data_file_size_chart,
-        mssql_transactions_chart,
-        mssql_database_backup_restore_chart,
-        mssql_database_log_flushed_chart,
-        mssql_database_log_flushes_chart,
-        mssql_active_transactions_chart,
-        mssql_write_transactions_chart,
-        mssql_lockwait_chart,
-        mssql_deadlock_chart,
-        mssql_is_readonly_chart,
-        mssql_db_state_chart_loop,
-        mssql_lock_timeout_chart,
-        mssql_lock_request_chart,
+    struct netdata_mssql_conn *conn = mi->conn;
 
-        // Last function pointer must be NULL
-        NULL};
-
-    int i;
-    for (i = 0; transaction_chart[i]; i++) {
-        transaction_chart[i](mdi, db, *update_every);
+    if (likely(conn && conn->collect_transactions)) {
+        mssql_transactions_chart(mdi, db, *update_every);
+        mssql_database_backup_restore_chart(mdi, db, *update_every);
+        mssql_database_log_flushed_chart(mdi, db, *update_every);
+        mssql_database_log_flushes_chart(mdi, db, *update_every);
+        mssql_active_transactions_chart(mdi, db, *update_every);
+        mssql_write_transactions_chart(mdi, db, *update_every);
+        mssql_lockwait_chart(mdi, db, *update_every);
+        mssql_deadlock_chart(mdi, db, *update_every);
+        mssql_lock_timeout_chart(mdi, db, *update_every);
+        mssql_lock_request_chart(mdi, db, *update_every);
     }
 
 endchartcb:
