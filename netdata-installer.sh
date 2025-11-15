@@ -754,8 +754,8 @@ fi
 [ -L "${NETDATA_USER_CONFIG_DIR}/orig" ] && run rm -f "${NETDATA_USER_CONFIG_DIR}/orig"
 run ln -s "${NETDATA_STOCK_CONFIG_DIR}" "${NETDATA_USER_CONFIG_DIR}/orig"
 
-# --- web dir ----
 
+# --- web dir ---
 if [ ! -d "${NETDATA_WEB_DIR}" ]; then
   echo >&2 "Creating directory '${NETDATA_WEB_DIR}'"
   run mkdir -p "${NETDATA_WEB_DIR}" || exit 1
@@ -763,33 +763,9 @@ fi
 run find "${NETDATA_WEB_DIR}" -type f -exec chmod 0664 {} \;
 run find "${NETDATA_WEB_DIR}" -type d -exec chmod 0775 {} \;
 
-# --- data dirs ----
+# --- other dirs ----
 
-for x in "${NETDATA_LIB_DIR}" "${NETDATA_CACHE_DIR}" "${NETDATA_LOG_DIR}"; do
-  if [ ! -d "${x}" ]; then
-    echo >&2 "Creating directory '${x}'"
-    if ! run mkdir -p "${x}"; then
-      warning "Failed to create ${x}, it must be created by hand or the Netdata Agent will not be able to be started."
-    fi
-  fi
-
-  run chown -R "${NETDATA_USER}:${NETDATA_GROUP}" "${x}"
-  #run find "${x}" -type f -exec chmod 0660 {} \;
-  #run find "${x}" -type d -exec chmod 0770 {} \;
-done
-
-run chmod 755 "${NETDATA_LOG_DIR}"
-
-# --- claiming dir ----
-
-if [ ! -d "${NETDATA_CLAIMING_DIR}" ]; then
-  echo >&2 "Creating directory '${NETDATA_CLAIMING_DIR}'"
-  if ! run mkdir -p "${NETDATA_CLAIMING_DIR}"; then
-    warning "failed to create ${NETDATA_CLAIMING_DIR}, it will need to be created manually."
-  fi
-fi
-run chown -R "${NETDATA_USER}:${NETDATA_GROUP}" "${NETDATA_CLAIMING_DIR}"
-run chmod 770 "${NETDATA_CLAIMING_DIR}"
+install_netdata_dirs
 
 # --- plugins ----
 

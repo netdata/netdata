@@ -16,8 +16,13 @@ command_args="-P ${NETDATA_PIDFILE} ${NETDATA_EXTRA_ARGS}"
 command_args_foreground="-D"
 
 depend() {
+    # Gentoo and its derivatives still use systemd-tmpfiles even with OpenRC, Alpine does not.
+    if rc-service --exists systemd-tmpfiles-setup; then
+        need net systemd-tmpfiles-setup
+    else
+        need net
+    fi
     use logger
-    need net
     after apache2 squid nginx mysql named opensips upsd hostapd postfix lm_sensors
 }
 

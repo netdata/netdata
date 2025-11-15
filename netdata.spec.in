@@ -522,8 +522,27 @@ install -m 755 -d "${RPM_BUILD_ROOT}%{_presetdir}"
 install -m 644 -p "system/systemd/50-%{name}.preset" "${RPM_BUILD_ROOT}%{_presetdir}/50-%{name}.preset"
 install -m 755 -d "${RPM_BUILD_ROOT}%{_systemd_util_dir}/journald@%{name}.conf.d"
 install -m 644 -p "system/systemd/journald@%{name}.conf" "${RPM_BUILD_ROOT}%{_systemd_util_dir}/journald@%{name}.conf.d/%{name}.conf"
+install -m 755 -d "${RPM_BUILD_ROOT}%{_tmpfilesdir}"
+install -m 644 -p "%{__cmake_builddir}/system/systemd/tmpfiles/%{name}.conf" "${RPM_BUILD_ROOT}%{_tmpfilesdir}/%{name}.conf"
 install -m 755 -d "${RPM_BUILD_ROOT}%{_sysusersdir}"
 install -m 644 -p "%{__cmake_builddir}/system/systemd/sysusers/%{name}.conf" "${RPM_BUILD_ROOT}%{_sysusersdir}/%{name}.conf"
+
+%pre
+
+if ! getent group %{name} > /dev/null; then
+  groupadd --system %{name}
+fi
+
+if ! getent passwd %{name} > /dev/null; then
+  useradd --system -g %{name} --home %{contentdir} --no-create-home -s /sbin/nologin -c "Netdata pseudo user" %{name}
+fi
+
+# I am not sure that the corresponding group names are exactly the same as in Debian, but we should start somewhere, shouldn't we?
+for item in docker nginx varnish haproxy adm nsd proxy squid ceph nobody I2C; do
+  if getent group $item > /dev/null 2>&1; then
+    usermod -a -G ${item} %{name}
+  fi
+done
 
 %post
 %if 0%{?suse_version}
@@ -584,6 +603,7 @@ rm -rf "${RPM_BUILD_ROOT}"
 %{_unitdir}/%{name}-updater.service
 %{_presetdir}/50-%{name}.preset
 %{_systemd_util_dir}/journald@%{name}.conf.d/%{name}.conf
+%{_tmpfilesdir}/%{name}.conf
 
 %{_datarootdir}/%{name}/build-info-cmake-cache.gz
 

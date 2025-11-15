@@ -811,6 +811,7 @@ fi
 
 rm_file /etc/logrotate.d/netdata
 rm_file /etc/init.d/netdata
+rm_file /usr/lib/tmpfiles.d/netdata.conf
 rm_file /Library/LaunchDaemons/com.github.netdata.plist
 
 if [ -n "${NETDATA_PREFIX}" ] && [ -d "${NETDATA_PREFIX}" ] && [ "netdata" = "$(basename "$NETDATA_PREFIX")" ] ; then
