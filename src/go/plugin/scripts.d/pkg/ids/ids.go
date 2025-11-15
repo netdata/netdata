@@ -14,10 +14,12 @@ func Sanitize(name string) string {
 	var b strings.Builder
 	b.Grow(len(lower))
 	lastUnderscore := false
+	hasAlnum := false
 	for _, r := range lower {
 		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
 			b.WriteRune(r)
 			lastUnderscore = false
+			hasAlnum = true
 			continue
 		}
 		if r == '_' || r == '-' || isWhitespace(r) {
@@ -32,8 +34,8 @@ func Sanitize(name string) string {
 			lastUnderscore = true
 		}
 	}
-	result := strings.Trim(b.String(), "_")
-	if result != "" {
+	result := b.String()
+	if hasAlnum && result != "" {
 		return result
 	}
 	sum := sha1.Sum([]byte(name))

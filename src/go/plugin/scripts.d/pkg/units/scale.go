@@ -30,7 +30,7 @@ func NewScale(unit string) Scale {
 	if scale, ok := timeScale(lower); ok {
 		return scale
 	}
-	if scale, ok := byteScale(lower); ok {
+	if scale, ok := byteScale(trimmed); ok {
 		return scale
 	}
 	if lower == "%" {
@@ -64,35 +64,85 @@ func timeScale(unit string) (Scale, bool) {
 }
 
 func byteScale(unit string) (Scale, bool) {
-	if strings.HasSuffix(unit, "/s") {
-		base := strings.TrimSuffix(unit, "/s")
-		if mult, ok := byteMultiplier(base); ok {
-			return Scale{CanonicalUnit: "bytes/s", Divisor: 1, multiplier: mult}, true
-		}
+	base, perSecond := splitPerSecond(unit)
+	if base == "" {
+		return Scale{}, false
 	}
-	if strings.HasSuffix(unit, "ps") {
-		base := strings.TrimSuffix(unit, "ps")
-		if mult, ok := byteMultiplier(base); ok {
-			return Scale{CanonicalUnit: "bytes/s", Divisor: 1, multiplier: mult}, true
-		}
+	mult, kind, ok := byteMultiplier(base)
+	if !ok {
+		return Scale{}, false
 	}
-	if mult, ok := byteMultiplier(unit); ok {
-		return Scale{CanonicalUnit: "bytes", Divisor: 1, multiplier: mult}, true
+	canonical := kind
+	if perSecond {
+		canonical += "/s"
 	}
-	return Scale{}, false
+	return Scale{CanonicalUnit: canonical, Divisor: 1, multiplier: mult}, true
 }
 
-func byteMultiplier(unit string) (float64, bool) {
-	switch unit {
-	case "b", "byte", "bytes":
+func splitPerSecond(unit string) (string, bool) {
+	lower := strings.ToLower(unit)
+	switch {
+	case strings.HasSuffix(lower, "/s"):
+		return strings.TrimSpace(unit[:len(unit)-2]), true
+	case strings.HasSuffix(lower, "ps"):
+		return strings.TrimSpace(unit[:len(unit)-2]), true
+	default:
+		return strings.TrimSpace(unit), false
+	}
+}
+
+func byteMultiplier(unit string) (float64, string, bool) {
+	unit = strings.TrimSpace(unit)
+	if unit == "" {
+		return 0, "", false
+	}
+	kind, prefix, ok := splitByteUnit(unit)
+	if !ok {
+		return 0, "", false
+	}
+	mult, ok := byteMagnitude(prefix)
+	if !ok {
+		return 0, "", false
+	}
+	return mult, kind, true
+}
+
+func splitByteUnit(unit string) (string, string, bool) {
+	lower := strings.ToLower(unit)
+	switch {
+	case strings.HasSuffix(lower, "bytes"):
+		return "bytes", unit[:len(unit)-5], true
+	case strings.HasSuffix(lower, "byte"):
+		return "bytes", unit[:len(unit)-4], true
+	case strings.HasSuffix(lower, "bits"):
+		return "bits", unit[:len(unit)-4], true
+	case strings.HasSuffix(lower, "bit"):
+		return "bits", unit[:len(unit)-3], true
+	}
+	if len(unit) == 0 {
+		return "", "", false
+	}
+	last := unit[len(unit)-1]
+	switch last {
+	case 'B':
+		return "bytes", unit[:len(unit)-1], true
+	case 'b':
+		return "bits", unit[:len(unit)-1], true
+	}
+	return "", "", false
+}
+
+func byteMagnitude(prefix string) (float64, bool) {
+	switch strings.ToLower(strings.TrimSpace(prefix)) {
+	case "":
 		return 1, true
-	case "kb":
+	case "k":
 		return 1_000, true
-	case "mb":
+	case "m":
 		return 1_000_000, true
-	case "gb":
+	case "g":
 		return 1_000_000_000, true
-	case "tb":
+	case "t":
 		return 1_000_000_000_000, true
 	default:
 		return 0, false

@@ -42,12 +42,12 @@ func extractUsage(ps *os.ProcessState) ResourceUsage {
 	return usage
 }
 
-// convertMaxRSS normalizes platform-specific MaxRSS units: Linux reports KiB
-// while BSD/Darwin already use bytes.
+// convertMaxRSS normalizes platform-specific MaxRSS units: Linux and BSD
+// derivatives report KiB while Darwin already uses bytes.
 func convertMaxRSS(raw int64) int64 {
 	bytes := raw
 	switch runtime.GOOS {
-	case "linux", "android":
+	case "linux", "android", "freebsd", "openbsd", "netbsd", "dragonfly":
 		bytes *= 1024
 	}
 	return bytes

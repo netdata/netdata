@@ -734,7 +734,7 @@ func (js *jobState) recordResult(state string) {
 			js.retrying = true
 		}
 	}
-	js.state = js.hardState
+	js.state = state
 }
 
 func (js *jobState) updatePerfdata(perf []output.PerfDatum) {

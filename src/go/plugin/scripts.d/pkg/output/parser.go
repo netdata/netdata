@@ -80,9 +80,12 @@ func Parse(raw []byte) ParsedOutput {
 		}
 	}
 
+	longOutput := strings.Join(longLines, "\n")
+	longOutput = strings.TrimRightFunc(longOutput, unicode.IsSpace)
+
 	return ParsedOutput{
 		StatusLine: status,
-		LongOutput: strings.TrimSpace(strings.Join(longLines, "\n")),
+		LongOutput: longOutput,
 		Perfdata:   perfdata,
 	}
 }

@@ -81,3 +81,12 @@ func TestParseRangeVariants(t *testing.T) {
 func floatPtr(v float64) *float64 {
 	return &v
 }
+
+func TestParseLongOutputPreservesLeadingWhitespace(t *testing.T) {
+	raw := []byte("WARNING something broke\n  first line\n\tsecond line  \n")
+	parsed := Parse(raw)
+	expected := "  first line\n\tsecond line"
+	if parsed.LongOutput != expected {
+		t.Fatalf("expected long output %q, got %q", expected, parsed.LongOutput)
+	}
+}

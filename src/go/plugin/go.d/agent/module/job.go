@@ -486,7 +486,7 @@ func (j *Job) processMetrics(metrics map[string]int64, startTime time.Time, sinc
 	var i, updated, created int
 	for _, chart := range *j.charts {
 		if !chart.created || createChart {
-			typeID := fmt.Sprintf("%s.%s", j.FullName(), chart.ID)
+			typeID := fmt.Sprintf("%s.%s", getChartType(chart, j), getChartID(chart))
 			if len(typeID) >= NetdataChartIDMaxLength {
 				j.Warningf("chart 'type.id' length (%d) >= max allowed (%d), the chart is ignored (%s)",
 					len(typeID), NetdataChartIDMaxLength, typeID)

@@ -49,9 +49,12 @@ func (v *VirtualNode) Copy() *VirtualNode {
 	}
 
 	var labels map[string]string
-	if len(v.Labels) > 0 {
+	switch {
+	case len(v.Labels) > 0:
 		labels = make(map[string]string, len(v.Labels))
 		maps.Copy(labels, v.Labels)
+	default:
+		labels = make(map[string]string)
 	}
 	var custom map[string]string
 	if len(v.Custom) > 0 {
