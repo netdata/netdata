@@ -393,6 +393,9 @@ endlocks:
 
 int dict_mssql_fill_waits(struct mssql_instance *mi)
 {
+    if (unlikely(!mi->conn || !mi->conn->collect_waits))
+        return 0;
+
     char wait_type[NETDATA_MAX_INSTANCE_OBJECT + 1] = {};
     char wait_category[NETDATA_MAX_INSTANCE_OBJECT + 1] = {};
     SQLBIGINT total_wait = 0;
@@ -1789,6 +1792,9 @@ int dict_mssql_waits_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void 
 
 static void do_mssql_waits(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *mi, int update_every)
 {
+    if (unlikely(!mi->conn->collect_waits))
+        return;
+
     dictionary_sorted_walkthrough_read(mi->waits, dict_mssql_waits_charts_cb, mi);
 }
 
