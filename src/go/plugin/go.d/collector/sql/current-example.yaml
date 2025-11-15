@@ -1,0 +1,136 @@
+# =========================
+# SQL Collector v2.8.1 Spec
+# =========================
+# Core principles:
+# - Exactly ONE query source per metric block: either `query_ref` or inline `query`.
+# - `mode` decides how `dims[*].source` is interpreted:
+#     * columns: source = a numeric COLUMN name from the result set
+#     * kv:      source = a KEY name (never a column) looked up via kv_mode.name_col
+# - Chart splitting:
+#     * If `labels_from_row` is present -> one chart per unique label tuple.
+#     * If absent -> single chart (chart_id = <metric.id>).
+# - Chart IDs are auto (do not provide):
+#     * without labels_from_row: <metric.id>
+#     * with labels_from_row:    <metric.id>.<k1>=<v1>.<k2>=<v2> (values slugified; keys sorted)
+# - `context` is REQUIRED on each chart and fully user-defined (no auto prefixes).
+# - All dims in a chart share the SAME `units` and `algorithm` (no per-dim overrides).
+# - Global `static_labels` apply to everything collected by this config instance.
+# - Validation (must fail fast):
+#     * one of query_ref/query must be set (not both)
+#     * mode ∈ {columns, kv}
+#     * in kv: kv_mode.name_col ≠ kv_mode.value_col; each dim.source must match an existing KEY
+#     * in columns: label columns cannot be reused as dim.source columns
+#     * each chart must have unique dim names (case-insensitive)
+#     * each chart must set a `context`
+
+# ---------- CONNECTION ----------
+driver: <postgres|mysql|mariadb|mssql|oracle|...>            # REQUIRED. Which DB driver to use.
+dsn: "<connection string>"                                   # REQUIRED. Driver-specific DSN/URL.
+
+# Optional connection-level settings (non-functional to config schema; implement as you need)
+timeout: 5s                                                  # OPTIONAL. Per-query execution timeout.
+max_open_conns: 10                                           # OPTIONAL. DB pool max open conns.
+max_idle_conns: 10                                           # OPTIONAL. DB pool max idle conns.
+conn_max_lifetime: 10m                                       # OPTIONAL. DB conn lifetime cap.
+
+# Static labels applied to ALL emitted metrics/charts from this collector instance.
+# Good for env, instance, region, etc.
+static_labels: # OPTIONAL. Key/value map.
+  instance: main
+  env: prod
+
+# ---------- REUSABLE QUERIES ----------
+# Define reusable SQL by id. Pure text; no interpretation details here.
+queries: # OPTIONAL list. Can be empty if using inline queries in metrics.
+  - id: <query_id>                                           # REQUIRED unique id within this file.
+    query: |                                                 # REQUIRED SQL text.
+      SELECT ...
+
+# ---------- METRICS ----------
+# Each metric block executes a query and turns its result into one or more charts/dims.
+metrics:
+  - id: <metric_block_id>                                    # REQUIRED. Unique within this file.
+
+    # ----- QUERY SOURCE (choose EXACTLY one) -----
+    query_ref: <query_id>                                    # OPTIONAL. Use a query declared above via `queries`.
+    # OR:
+    # query: |                                               # OPTIONAL. Inline SQL (mutually exclusive with query_ref).
+    #   SELECT ...
+
+    # ----- RESPONSE MODE -----
+    mode: columns | kv                                       # REQUIRED.
+    # columns: parse numeric columns directly as dims
+    # kv:      parse rows as key/value pairs (dictionary)
+
+    # ----- KV MODE SETTINGS (only when mode: kv) -----
+    kv_mode: # OPTIONAL. If omitted, driver-hardcoded defaults are used.
+      # REQUIRED if driver defaults don't suffice:
+      name_col: <col_name>                                   # Name-column in the result set (e.g., Variable_name).
+      value_col: <col_name>                                  # Value-column in the result set (e.g., Value or Variable_value).
+      # RULE (KV semantics): in `kv` mode, each dim.source MUST be a KEY name,
+      # not a column name. The collector finds row where name_col == dim.source,
+      # then reads value_col.
+
+    # ----- LABELS FROM ROWS -----
+    # Presence => SPLIT into one chart per unique label tuple (k1=v1, k2=v2, ...).
+    # Absence  => SINGLE chart for the whole metric block.
+    labels_from_row: # OPTIONAL. Strict array of objects (no shorthands).
+      - source: <column_name>                                # REQUIRED. Column name from the result set to read as label value.
+        name: <label_key>                                    # REQUIRED. Label key to expose to Netdata.
+        # value_map: { raw: mapped, ... }                    # OPTIONAL. Remap raw db values to friendlier ones (string→string).
+
+    # ----- CHARTS -----
+    charts:
+      - title: "Human Title"                                 # OPTIONAL but recommended. Shown in dashboards.
+        context: "<netdata_context>"                         # REQUIRED. Netdata metric context. Must be unique across charts logically.
+        family: <grouping>                                   # OPTIONAL. Netdata chart family.
+        type: line                                           # OPTIONAL. Netdata chart type. Default: line (if omitted).
+        units: "<units>"                                     # OPTIONAL. Unit string for the entire chart. Default: "".
+        algorithm: absolute | incremental                    # OPTIONAL. Default: absolute.
+        # NOTE: incremental = rate calculation for counters.
+
+        # DIMS: list of metric dimensions for THIS chart.
+        # - Objects only (no string shortcuts).
+        # - All dims share the chart's `units` and `algorithm` (no per-dim overrides).
+        dims:
+          # ---- COLUMNS MODE DIM ----
+          # In mode: columns, `source` MUST be a numeric COLUMN name from the result set.
+          - name: <dim_id>                                   # REQUIRED. Netdata dimension id (unique within this chart).
+            source: <column_name>                            # REQUIRED. Numeric column to chart.
+
+          # ---- KV MODE DIM ----
+          # In mode: kv, `source` MUST be a KEY name (NOT a column).
+          # The collector finds the row where (row[kv_mode.name_col] == `source`) and uses row[kv_mode.value_col].
+          - name: <dim_id>
+            source: <key_name>                               # REQUIRED. Key name to resolve via kv_mode.name_col.
+
+          # ---- STATUS DIM (one-hot 1/0) ----
+          # Works in BOTH modes. Evaluate `status_when` against the resolved value:
+          #   * columns mode: the value in the specified column for the row
+          #   * kv mode:      the value for the resolved key (row[kv_mode.value_col])
+          - name: <dim_id>
+            source: <column_name_or_key_name>                # REQUIRED. Same interpretation as above, per mode.
+            status_when: # REQUIRED (exactly ONE of the below).
+              equals: <string|number|bool>                   # Active (1) if value == this literal.
+              # in: [ <v1>, <v2>, ... ]                     # Active if value ∈ set.
+              # match: '^regex$'                             # Active if value matches regex.
+
+# =========================
+# Implementation Notes / Defaults (for docs; not part of schema)
+# =========================
+# - Driver defaults for KV mode (example suggestion; implement in code):
+#     * mysql/mariadb: name_col=Variable_name, value_col=Value (or Variable_value; auto-detect)
+#     * postgres:      name_col=name, value_col=setting (when querying pg_settings)
+# - Numeric parsing:
+#     * columns-mode dims must resolve to numeric types (int/float/sci). NULL/empty => drop sample.
+#     * kv-mode dims must resolve to numeric value_col; non-numeric => drop sample (unless status_when).
+# - Validation must error if:
+#     * both query_ref and query are set, or neither is set
+#     * mode is not one of {columns, kv}
+#     * kv_mode present but name_col == value_col
+#     * kv-mode dim.source equals value_col (forbidden; must be a KEY)
+#     * labels_from_row.source reused in a columns-mode dim.source
+#     * chart missing context
+#     * duplicate dim names within the same chart (case-insensitive)
+# - Chart cardinality guardrail (implementation): refuse or warn if a metric block would create too many charts via labels_from_row.
+# - Chart/context uniqueness: contexts should remain unique at the semantic level; validator should detect accidental duplicates after expansion.
