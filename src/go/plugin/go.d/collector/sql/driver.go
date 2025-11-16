@@ -9,7 +9,7 @@ import (
 )
 
 var supportedDrivers = map[string]bool{
-	"mysql":    true,
-	"oracle":   true,
-	"postgres": true,
+	"mysql":  true,
+	"oracle": true,
+	"pgx":    true,
 }

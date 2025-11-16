@@ -12,11 +12,7 @@ modules:
         icon_filename: sql.svg
       related_resources:
         integrations:
-          list:
-            - plugin_name: apps.plugin
-              module_name: apps
-            - plugin_name: cgroups.plugin
-              module_name: cgroups
+          list: []
       alternative_monitored_instances: []
       info_provided_to_referring_integrations:
         description: ""
@@ -34,34 +30,44 @@ modules:
       multi_instance: true
       data_collection:
         metrics_description: |
-          This collector is a generic SQL integration that lets you define custom queries
-          and map their results to Netdata charts and dimensions.
-
-          It supports multiple SQL drivers (MySQL, PostgreSQL, Oracle) and can collect
-          any numeric or status-like values you can expose via SQL.
-        method_description: |
-          The collector establishes a connection to the target database using Go's
-          database/sql package and the configured driver (mysql, postgres, oracle).
-          For each configured metric block it executes a query (or reuses the results
-          of a reusable query), then:
+          This collector provides a **generic and fully customizable SQL monitoring
+          framework**. Instead of predefined charts, it allows you to define **any SQL
+          queries** and convert their results into Netdata metrics.
           
-          - In columns mode, it treats selected columns as metric values.
-          - In kv mode, it treats one column as a "name" (key) and another as the
-            associated numeric or status value.
-          
-          The results are then grouped into charts and dimensions according to the
+          You can collect **any numeric or status-like data** exposed by your database
+          through SQL. All charts and dimensions are created dynamically based on your
           configuration.
+          
+          :::tip
+
+          Everything shown on the dashboard comes directly from **your SQL queries**
+          and how you configure their results to be interpreted.
+
+          :::
+          
+          Supported SQL drivers:
+          - **MySQL / MariaDB**
+          - **PostgreSQL**
+          - **Oracle**
+        method_description: |
+          The collector connects to your database using Go’s **database/sql** package
+          and the selected driver (`mysql`, `postgres`, or `oracle`). For each metric
+          block you configure, it executes the corresponding SQL query (inline or via
+          `query_ref`) and processes the result set.
+          
+          ### Result Processing Modes
+          
+          | Mode       | How it works | Best used when |
+          |------------|--------------|----------------|
+          | **columns** | Treats specific columns from each row as metric dimensions. | The query output has known, stable column names. |
+          | **kv**      | Treats one column as a *name* (dimension key) and another as its numeric value. | Results represent dynamic key–value pairs. |
       default_behavior:
         auto_detection:
           description: |
-            This is a generic collector and does not perform automatic detection.
+            This is a **generic collector** and does **not** perform automatic detection.
             
-            By default, no jobs are created. You must add at least one job to go.d/sql.conf
-            and specify:
-            
-            - driver
-            - dsn
-            - metrics (and optionally reusable queries)
+            It does not create any jobs on its own — you need to [configure at least one
+            job](#setup) before it can collect data.
         limits:
           description: |
             There are no built-in limits on the number of queries or rows processed.
@@ -78,14 +84,7 @@ modules:
             Prefer indexed reads, avoid full table scans or heavy aggregations, and
             consider using database views tailored for monitoring.
       additional_permissions:
-        description: |
-          Create a read-only user for Netdata with permission to execute the queries
-          you configure. Typically, this means granting SELECT on:
-          
-          - the system views/tables that expose performance metrics, or
-          - custom views you create specifically for monitoring.
-          
-          The collector does not require write access.
+        description: ""
       supported_platforms:
         include: []
         exclude: []
@@ -120,9 +119,89 @@ modules:
           name: go.d/sql.conf
         options:
           description: |
-            The following options can be defined globally or per job. Most configuration
-            is done inside jobs, using the `queries` and `metrics` sections to define
-            how SQL results are converted into Netdata charts and dimensions.
+            **Full Configuration Structure**
+            
+            ```yaml
+            # ---------- CONNECTION ----------
+            driver: <postgres|mysql|mariadb|oracle>      # REQUIRED. SQL driver.
+            dsn: "<connection string>"                   # REQUIRED. Driver-specific DSN/URL.
+            
+            # Optional connection settings
+            timeout: <seconds>                           # OPTIONAL. Query timeout.
+            max_open_conns: <number>                     # OPTIONAL.
+            max_idle_conns: <number>                     # OPTIONAL.
+            conn_max_lifetime: <seconds>                 # OPTIONAL.
+            
+            # Optional static labels applied to all charts
+            static_labels:
+              <label_key1>: <label_value>
+              <label_key2>: <label_value>
+            
+            # ---------- REUSABLE QUERIES ----------
+            # Optional. Define reusable SQL queries referenced later via query_ref.
+            queries:
+              - id: <query_id>
+                query: |
+                  SELECT ...
+            
+            # ---------- METRICS ----------
+            # Each metric block runs one query and generates one or more charts.
+            metrics:
+              - id: <metric_block_id>                    # REQUIRED. Unique within this job.
+            
+                # Choose ONE of these:
+                query_ref: <query_id>                    # Use a reusable query
+                # OR
+                # query: |                               # Inline SQL
+                #   SELECT ...
+            
+                mode: <columns|kv>                       # REQUIRED. How to interpret result rows.
+            
+                # KV mode settings (only when mode: kv)
+                kv_mode:
+                  name_col: <column_name>                # Column containing keys
+                  value_col: <column_name>               # Column containing numeric values
+            
+                # Optional: derive labels from row columns (creates per-label charts)
+                labels_from_row:
+                  - source: <column_name>                # Column name from result set
+                    name: <label_key>                    # Label key exposed to Netdata
+                  - source: <column_name>
+                    name: <label_key>
+            
+                # Charts produced by this metric block
+                charts:
+                  - title: "<Chart Title>"               # REQUIRED. Shown in dashboards.
+                    context: "<context.name>"            # REQUIRED. Netdata context.
+                    family: "<family>"                   # REQUIRED. Netdata chart family.
+                    units: "<units>"                     # REQUIRED. Unit string for the chart.
+                    type: <line|stacked|area>            # OPTIONAL. Default: line.
+                    algorithm: <absolute|incremental>    # OPTIONAL. Default: absolute.
+            
+                    dims:
+                      # ---- COLUMNS MODE DIM ----
+                      # In mode: columns, `source` MUST be a numeric COLUMN name from the result set.
+                      - name: <dim_id>                   # REQUIRED. Dimension id (unique within this chart).
+                        source: <column_name>            # REQUIRED. Numeric column to chart.
+            
+                      # ---- KV MODE DIM ----
+                      # In mode: kv, `source` MUST be a KEY name (NOT a column).
+                      # The collector finds the row where (row[kv_mode.name_col] == `source`)
+                      # and uses row[kv_mode.value_col].
+                      - name: <dim_id>
+                        source: <key_name>               # REQUIRED. Key name resolved via kv_mode.name_col.
+            
+                      # ---- STATUS DIM (one-hot 1/0) ----
+                      # Works in BOTH modes. Evaluates `status_when` against the resolved value:
+                      #   * columns mode: the value in the specified column for the row
+                      #   * kv mode:      the value for the resolved key (row[kv_mode.value_col])
+                      - name: <dim_id>
+                        source: <column_name_or_key_name>  # Same interpretation as above, per mode.
+                        status_when: # Exactly ONE of the following:
+                          equals: <string|number|bool>    # Active (1) if value == this literal.
+                          # in: [ <v1>, <v2>, ... ]       # Active if value is in the list.
+                          # match: '^regex$'              # Active if value matches this regex.
+            ```
           folding:
             title: Config options
             enabled: true
@@ -140,17 +219,17 @@ modules:
 
             - name: driver
               description: >
-                SQL driver to use. Supported values: mysql, postgres, oracle.
+                SQL driver to use. Supported values: `mysql`, `pgx`, `oracle`.
               default_value: mysql
               required: true
-              group: Connection
+              group: Target
             - name: dsn
               description: >
-                Database connection string (DSN). The format depends on the selected driver
-                (for example: Go MySQL DSN, PostgreSQL URL/keywords, Oracle DSN).
-              default_value: root:my-secret-pw@tcp(10.10.10.20:3306)/
+                Database connection string (DSN). The format depends on the selected driver.
+              default_value: ""
               required: true
-              group: Connection
+              group: Target
+
             - name: timeout
               description: Query and connection check timeout (seconds).
               default_value: 5
@@ -182,22 +261,13 @@ modules:
 
             - name: queries
               description: >
-                A list of reusable queries. Each entry has:
-                  - id: unique identifier
-                  - query: SQL string to execute
-                Metric blocks can reference these via `query_ref` to avoid repeating SQL.
+                A list of reusable queries. Metric blocks can reference these via `query_ref` to avoid repeating SQL. See [Configuration Structure](#configuration) for details.
               default_value: "[]"
               required: false
               group: Queries & Metrics
             - name: metrics
               description: >
-                A list of metric blocks. Each block defines:
-                  - id: metric block id
-                  - query_ref or query: source of data
-                  - mode: columns | kv
-                  - kv_mode: optional KV mode config (name_col, value_col)
-                  - labels_from_row: how to turn columns into chart labels
-                  - charts: one or more Netdata charts (title, context, units, type, dims...)
+                A list of metric blocks. Each block defines how a query is executed and how its result is transformed into one or more charts. See [Configuration Structure](#configuration) for details.
               default_value: "[]"
               required: true
               group: Queries & Metrics
@@ -212,123 +282,43 @@ modules:
             title: Config
             enabled: true
           list:
-            - name: Minimal MySQL example (single chart)
+            - name: Columns mode – per-database conflicts (with labels)
               description: |
-                Collect the number of connected MySQL threads using a simple inline query
-                in columns mode. The DSN format follows the Go MySQL driver.
-              folding:
-                enabled: false
-              config: |
-                jobs:
-                  - name: mysql_threads
-                    driver: mysql
-                    dsn: 'netdata:strong-password@tcp(127.0.0.1:3306)/information_schema'
-                    timeout: 5
-
-                    metrics:
-                      - id: threads_connected
-                        mode: columns
-                        query: |
-                          SELECT
-                            VARIABLE_VALUE AS threads_connected
-                          FROM information_schema.GLOBAL_STATUS
-                          WHERE VARIABLE_NAME = 'Threads_connected'
-                        charts:
-                          - title: MySQL threads connected
-                            context: sql.mysql_threads_connected
-                            family: connections
-                            type: line
-                            units: connections
-                            algorithm: absolute
-                            dims:
-                              - name: threads_connected
-                                source: threads_connected
-            - name: PostgreSQL example with reusable query (kv mode)
-              description: |
-                Collect PostgreSQL connection states using a reusable query and kv mode.
-                The DSN format follows the pgx stdlib (PostgreSQL URL).
-              config: |
-                jobs:
-                  - name: postgres_activity
-                    driver: postgres
-                    dsn: 'postgresql://netdata:strong-password@127.0.0.1:5432/postgres'
-                    timeout: 5
-
-                    # Reusable queries
-                    queries:
-                      - id: activity_states
-                        query: |
-                          SELECT
-                            state,
-                            count(*) AS cnt
-                          FROM pg_stat_activity
-                          GROUP BY state
-
-                    # Metric blocks
-                    metrics:
-                      - id: activity_states
-                        mode: kv
-                        query_ref: activity_states
-                        kv_mode:
-                          name_col: state
-                          value_col: cnt
-                        charts:
-                          - title: PostgreSQL connection states
-                            context: sql.pg_activity_states
-                            family: connections
-                            type: stacked
-                            units: connections
-                            algorithm: absolute
-                            dims:
-                              - name: active
-                                source: active
-                              - name: idle
-                                source: idle
-                              - name: idle_in_transaction
-                                source: 'idle in transaction'
-                              - name: idle_in_transaction_aborted
-                                source: 'idle in transaction (aborted)'
-                              - name: disabled
-                                source: disabled
-            - name: Oracle example (basic columns mode)
-              description: |
-                Collect Oracle session count using a simple columns-mode query.
-                The DSN format follows the go-ora driver.
-              config: |
-                jobs:
-                  - name: oracle_sessions
-                    driver: oracle
-                    dsn: 'oracle://netdata:strong-password@db-host:1521/ORCLPDB1'
-                    timeout: 5
-
-                    metrics:
-                      - id: sessions
-                        mode: columns
-                        query: |
-                          SELECT COUNT(*) AS active_sessions
-                          FROM v$session
-                          WHERE status = 'ACTIVE'
-                        charts:
-                          - title: Oracle active sessions
-                            context: sql.oracle_active_sessions
-                            family: sessions
-                            type: line
-                            units: sessions
-                            algorithm: absolute
-                            dims:
-                              - name: active_sessions
-                                source: active_sessions
-            - name: Columns mode with labels from row
-              description: |
-                Example where a label is taken from a column and used to create
-                chart instances per database/schema.
+                PostgreSQL example that collects database-level conflict counters from
+                `pg_stat_database_conflicts` and creates a separate chart instance per
+                database using `labels_from_row`.
+                
+                The query:
+                
+                ```sql
+                SELECT
+                  datname,
+                  confl_tablespace,
+                  confl_lock,
+                  confl_snapshot,
+                  confl_bufferpin,
+                  confl_deadlock
+                FROM pg_stat_database_conflicts;
+                ```
+                
+                Example output:
+                
+                | datname    | confl_tablespace | confl_lock | confl_snapshot | confl_bufferpin | confl_deadlock |
+                |------------|------------------|------------|----------------|-----------------|----------------|
+                | postgres   | 0                | 0          | 0              | 0               | 0              |
+                | production | 0                | 0          | 0              | 0               | 0              |
+                
+                This configuration turns each row into a **chart instance** (one for
+                `db=postgres`, one for `db=production`) with five dimensions
+                (`confl_tablespace`, `confl_lock`, `confl_snapshot`, `confl_bufferpin`,
+                `confl_deadlock`).
               config: |
                 jobs:
                   - name: pg_conflicts_per_db
                     driver: postgres
-                    dsn: 'postgresql://netdata:strong-password@127.0.0.1:5432/postgres'
+                    dsn: 'postgresql://netdata:password@127.0.0.1:5432/postgres'
                     timeout: 5
-
+                
                     metrics:
                       - id: conflicts
                         mode: columns
@@ -340,85 +330,193 @@ modules:
                             confl_snapshot,
                             confl_bufferpin,
                             confl_deadlock
-                          FROM pg_stat_database_conflicts
+                          FROM pg_stat_database_conflicts;
                         labels_from_row:
                           - source: datname
-                            name: database
+                            name: db
                         charts:
-                          - title: PostgreSQL conflicts
-                            context: sql.pg_db_conflicts
+                          - title: "PostgreSQL conflicts"
+                            context: sql.pg_conflicts
                             family: conflicts
-                            type: line
                             units: conflicts
+                            type: line
                             algorithm: absolute
                             dims:
-                              - name: tablespace
+                              - name: confl_tablespace
                                 source: confl_tablespace
-                              - name: lock
+                              - name: confl_lock
                                 source: confl_lock
-                              - name: snapshot
+                              - name: confl_snapshot
                                 source: confl_snapshot
-                              - name: bufferpin
+                              - name: confl_bufferpin
                                 source: confl_bufferpin
-                              - name: deadlock
+                              - name: confl_deadlock
                                 source: confl_deadlock
-            - name: Multi-instance (MySQL and PostgreSQL)
+
+            - name: Columns mode – single numeric value (uptime)
               description: |
-                Monitor multiple databases (different drivers) from the same agent.
-                Job names must be unique.
+                PostgreSQL example that exposes a single numeric metric (server uptime in
+                seconds) as a one-dimension chart using columns mode.
+                
+                The query:
+                
+                ```sql
+                SELECT
+                  EXTRACT(
+                    EPOCH FROM (now() - pg_postmaster_start_time())
+                  ) AS uptime_seconds;
+                ```
+                
+                Example output:
+                
+                | uptime_seconds |
+                |----------------|
+                | 50.867359      |
+                
+                This configuration maps the `uptime_seconds` column to a single
+                `uptime` dimension on the `sql.pg_uptime` chart.
               config: |
                 jobs:
-                  - name: mysql_local
-                    driver: mysql
-                    dsn: 'netdata:strong-password@tcp(127.0.0.1:3306)/information_schema'
-                    timeout: 5
-                    static_labels:
-                      env: production
-                      role: primary
-
-                    metrics:
-                      - id: mysql_threads
-                        mode: columns
-                        query: |
-                          SELECT
-                            VARIABLE_VALUE AS threads_connected
-                          FROM information_schema.GLOBAL_STATUS
-                          WHERE VARIABLE_NAME = 'Threads_connected'
-                        charts:
-                          - title: MySQL threads connected
-                            context: sql.mysql_threads_connected
-                            family: connections
-                            type: line
-                            units: connections
-                            algorithm: absolute
-                            dims:
-                              - name: threads_connected
-                                source: threads_connected
-
-                  - name: postgres_local
+                  - name: pg_uptime
                     driver: postgres
-                    dsn: 'postgresql://netdata:strong-password@127.0.0.1:5432/postgres'
+                    dsn: 'postgresql://netdata:password@127.0.0.1:5432/postgres'
                     timeout: 5
-                    static_labels:
-                      env: production
-                      role: reporting
-
+                
                     metrics:
-                      - id: pg_uptime
+                      - id: uptime
                         mode: columns
                         query: |
                           SELECT
-                            EXTRACT(EPOCH FROM (now() - pg_postmaster_start_time())) AS uptime_seconds
+                            EXTRACT(
+                              EPOCH FROM (now() - pg_postmaster_start_time())
+                            ) AS uptime_seconds;
                         charts:
-                          - title: PostgreSQL uptime
+                          - title: "PostgreSQL uptime"
                             context: sql.pg_uptime
                             family: uptime
-                            type: line
                             units: seconds
+                            type: line
                             algorithm: absolute
                             dims:
                               - name: uptime
                                 source: uptime_seconds
+
+            - name: KV mode – connection states as key/value pairs
+              description: |
+                PostgreSQL example that aggregates connection states from
+                `pg_stat_activity` and uses kv mode to map each state to a dimension.
+                
+                The query:
+                
+                ```sql
+                SELECT
+                  state,
+                  count(*) AS cnt
+                FROM pg_stat_activity
+                GROUP BY state;
+                ```
+                
+                Example output:
+                
+                | state                        | cnt |
+                |------------------------------|-----|
+                | active                       |   1 |
+                | idle                         |  14 |
+                | idle in transaction          |   7 |
+                | idle in transaction (aborted)|   1 |
+                | fastpath function call       |   1 |
+                | disabled                     |   1 |
+                
+                With `mode: kv`, `state` becomes the **key** and `cnt` the **value**.
+                Each distinct `state` value is mapped to a chart dimension via `dims[*].source`.
+              config: |
+                jobs:
+                  - name: pg_activity_states
+                    driver: postgres
+                    dsn: 'postgresql://netdata:password@127.0.0.1:5432/postgres'
+                    timeout: 5
+                
+                    metrics:
+                      - id: activity_states
+                        mode: kv
+                        query: |
+                          SELECT
+                            state,
+                            count(*) AS cnt
+                          FROM pg_stat_activity
+                          GROUP BY state;
+                        kv_mode:
+                          name_col: state
+                          value_col: cnt
+                        charts:
+                          - title: "PostgreSQL connection states"
+                            context: sql.pg_activity_states
+                            family: connections
+                            units: connections
+                            type: stacked
+                            algorithm: absolute
+                            dims:
+                              - name: active
+                                source: active
+                              - name: idle
+                                source: idle
+                              - name: idle_in_transaction
+                                source: "idle in transaction"
+                              - name: idle_in_transaction_aborted
+                                source: "idle in transaction (aborted)"
+                              - name: fastpath_function_call
+                                source: "fastpath function call"
+                              - name: disabled
+                                source: disabled
+
+            - name: Columns mode – map state values to a status metric
+              description: |
+                Simple PostgreSQL example that turns a boolean-like state into a 0/1
+                status metric using `status_when`.
+                
+                The query:
+                
+                ```sql
+                SELECT pg_is_in_recovery();
+                ```
+                
+                Example output:
+                
+                | pg_is_in_recovery |
+                |-------------------|
+                | f                 |
+
+                This configuration creates a single chart with two status dimensions:
+                  - `in_recovery` becomes **1 when the value is `"t"`** and **0 otherwise**.
+                  - `not_in_recovery` becomes **1 when the value is `"f"`** and **0 otherwise**.
+              config: |
+                jobs:
+                  - name: pg_recovery_status
+                    driver: postgres
+                    dsn: 'postgresql://netdata:password@127.0.0.1:5432/postgres'
+                    timeout: 5
+                
+                    metrics:
+                      - id: recovery_status
+                        mode: columns
+                        query: |
+                          SELECT pg_is_in_recovery();
+                        charts:
+                          - title: "PostgreSQL recovery status"
+                            context: sql.pg_recovery_status
+                            family: state
+                            units: status
+                            type: line
+                            algorithm: absolute
+                            dims:
+                              - name: in_recovery
+                                source: pg_is_in_recovery
+                                status_when:
+                                  equals: "t"
+                              - name: not_in_recovery
+                                source: pg_is_in_recovery
+                                status_when:
+                                  equals: "f"
     troubleshooting:
       problems:
         list: []

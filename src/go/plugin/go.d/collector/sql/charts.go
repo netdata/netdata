@@ -3,6 +3,8 @@
 package sql
 
 import (
+	"fmt"
+
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 )
 
@@ -21,7 +23,7 @@ func (c *Collector) createChart(chartID string, m ConfigMetricBlock, ch ConfigCh
 		Title:    ch.Title,
 		Units:    ch.Units,
 		Type:     module.ChartType(ch.Type),
-		Ctx:      ch.Context,
+		Ctx:      fmt.Sprintf("sql.%s_%s", c.Driver, ch.Context),
 		Fam:      ch.Family,
 		Priority: prioChart,
 	}

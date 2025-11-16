@@ -1,4 +1,6 @@
 {
+  "update_every": 123,
+  "autodetection_retry": 123,
   "driver": "postgres",
   "dsn": "host=localhost port=5432 user=netdata dbname=metrics sslmode=disable",
   "timeout": 5,

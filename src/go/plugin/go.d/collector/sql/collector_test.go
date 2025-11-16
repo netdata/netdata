@@ -86,7 +86,7 @@ func TestCollector_Check(t *testing.T) {
 
 			collr := New()
 			collr.db = db
-			collr.Driver = "postgres"
+			collr.Driver = "pgx"
 			collr.DSN = "postgres://user:pass@localhost/db"
 			collr.Metrics = []ConfigMetricBlock{
 				{
@@ -170,7 +170,7 @@ SELECT
 
 				mock.ExpectQuery(query).WillReturnRows(rows).RowsWillBeClosed()
 
-				coll.Driver = "postgres"
+				coll.Driver = "pgx"
 				coll.DSN = "postgres://user:pass@localhost/db"
 				coll.Metrics = []ConfigMetricBlock{
 					{
@@ -247,7 +247,7 @@ SELECT
 
 				mock.ExpectQuery(query).WillReturnRows(rows).RowsWillBeClosed()
 
-				coll.Driver = "postgres"
+				coll.Driver = "pgx"
 				coll.DSN = "postgres://user:pass@localhost/db"
 				coll.Metrics = []ConfigMetricBlock{
 					{
@@ -310,7 +310,7 @@ SELECT
 
 				mock.ExpectQuery(query).WillReturnRows(rows).RowsWillBeClosed()
 
-				coll.Driver = "postgres"
+				coll.Driver = "pgx"
 				coll.DSN = "postgres://user:pass@localhost/db"
 				coll.Metrics = []ConfigMetricBlock{
 					{
@@ -358,7 +358,7 @@ SELECT
 
 				mock.ExpectQuery(query).WillReturnRows(rows).RowsWillBeClosed()
 
-				coll.Driver = "postgres"
+				coll.Driver = "pgx"
 				coll.DSN = "postgres://user:pass@localhost/db"
 				coll.Metrics = []ConfigMetricBlock{
 					{
@@ -433,7 +433,7 @@ SELECT
 
 				mock.ExpectQuery(query).WillReturnRows(rows).RowsWillBeClosed()
 
-				coll.Driver = "postgres"
+				coll.Driver = "pgx"
 				coll.DSN = "postgres://user:pass@localhost/db"
 				coll.Metrics = []ConfigMetricBlock{
 					{
@@ -513,7 +513,7 @@ SELECT
 
 				mock.ExpectQuery(query).WillReturnRows(rows).RowsWillBeClosed()
 
-				coll.Driver = "postgres"
+				coll.Driver = "pgx"
 				coll.DSN = "postgres://user:pass@localhost/db"
 				coll.Metrics = []ConfigMetricBlock{
 					{

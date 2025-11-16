@@ -1,3 +1,6 @@
+update_every: 123
+autodetection_retry: 123
+
 driver: "postgres"
 dsn: "host=localhost port=5432 user=netdata dbname=metrics sslmode=disable"
 timeout: 5
@@ -16,7 +19,7 @@ queries:
 metrics:
   - id: "users_metrics"
     query_ref: "get_users"
-    query: ""   # optional when using query_ref
+    query: ""
     mode: "columns"
     kv_mode:
       name_col: "metric_name"

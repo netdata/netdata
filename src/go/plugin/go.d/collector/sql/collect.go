@@ -46,7 +46,7 @@ func (c *Collector) collectMetrics(mx map[string]int64, mcache QueryRowsCache) e
 		}
 
 		switch strings.ToLower(m.Mode) {
-		case "columns":
+		case "columns", "":
 			if err := c.collectMetricsModeColumns(mx, m, rows); err != nil {
 				return fmt.Errorf("metric %q (index %d) columns: %w", m.ID, i, err)
 			}

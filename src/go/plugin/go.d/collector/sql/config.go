@@ -12,73 +12,70 @@ import (
 )
 
 type Config struct {
-	// Connection
+	UpdateEvery        int `yaml:"update_every,omitempty" json:"update_every"`
+	AutoDetectionRetry int `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
+
 	Driver          string           `yaml:"driver" json:"driver"`
 	DSN             string           `yaml:"dsn" json:"dsn"`
 	Timeout         confopt.Duration `yaml:"timeout" json:"timeout"`
-	MaxOpenConns    int              `yaml:"max_open_conns" json:"max_open_conns"`
-	MaxIdleConns    int              `yaml:"max_idle_conns" json:"max_idle_conns"`
+	MaxOpenConns    int              `yaml:"max_open_conns,omitempty" json:"max_open_conns"`
+	MaxIdleConns    int              `yaml:"max_idle_conns,omitempty" json:"max_idle_conns"`
 	ConnMaxLifetime confopt.Duration `yaml:"conn_max_lifetime" json:"conn_max_lifetime"`
 
-	// Global static labels
-	StaticLabels map[string]string `yaml:"static_labels" json:"static_labels"`
-
-	// Reusable queries
-	Queries []ConfigQueryDef `yaml:"queries" json:"queries"`
-
-	// Metric blocks
-	Metrics []ConfigMetricBlock `yaml:"metrics" json:"metrics"`
+	StaticLabels map[string]string   `yaml:"static_labels,omitempty" json:"static_labels"`
+	Queries      []ConfigQueryDef    `yaml:"queries,omitempty" json:"queries"`
+	Metrics      []ConfigMetricBlock `yaml:"metrics,omitempty" json:"metrics"`
 }
 
-type ConfigQueryDef struct {
-	ID    string `yaml:"id" json:"id"`
-	Query string `yaml:"query" json:"query"`
-}
+type (
+	ConfigQueryDef struct {
+		ID    string `yaml:"id" json:"id"`
+		Query string `yaml:"query" json:"query"`
+	}
 
-type ConfigMetricBlock struct {
-	ID            string               `yaml:"id" json:"id"`
-	QueryRef      string               `yaml:"query_ref" json:"query_ref"`
-	Query         string               `yaml:"query" json:"query"`
-	Mode          string               `yaml:"mode" json:"mode"` // "columns" | "kv"
-	KVMode        *ConfigKVMode        `yaml:"kv_mode" json:"kv_mode"`
-	LabelsFromRow []ConfigLabelFromRow `yaml:"labels_from_row" json:"labels_from_row"`
-	Charts        []ConfigChartConfig  `yaml:"charts" json:"charts"`
-}
+	ConfigMetricBlock struct {
+		ID            string               `yaml:"id" json:"id"`
+		QueryRef      string               `yaml:"query_ref,omitempty" json:"query_ref"`
+		Query         string               `yaml:"query,omitempty" json:"query"`
+		Mode          string               `yaml:"mode" json:"mode"` // "columns" | "kv"
+		KVMode        *ConfigKVMode        `yaml:"kv_mode,omitempty" json:"kv_mode"`
+		LabelsFromRow []ConfigLabelFromRow `yaml:"labels_from_row,omitempty" json:"labels_from_row"`
+		Charts        []ConfigChartConfig  `yaml:"charts,omitempty" json:"charts"`
+	}
+	ConfigKVMode struct {
+		NameCol  string `yaml:"name_col,omitempty" json:"name_col"`
+		ValueCol string `yaml:"value_col,omitempty" json:"value_col"`
+	}
+	ConfigLabelFromRow struct {
+		Source string `yaml:"source" json:"source"`
+		Name   string `yaml:"name" json:"name"`
+		//ValueMap map[string]string `yaml:"value_map" json:"value_map"`
+	}
+)
 
-type ConfigKVMode struct {
-	NameCol  string `yaml:"name_col" json:"name_col"`
-	ValueCol string `yaml:"value_col" json:"value_col"`
-}
+type (
+	ConfigChartConfig struct {
+		Title     string            `yaml:"title" json:"title"`
+		Context   string            `yaml:"context" json:"context"`
+		Family    string            `yaml:"family" json:"family"`
+		Type      string            `yaml:"type" json:"type"`
+		Units     string            `yaml:"units" json:"units"`
+		Algorithm string            `yaml:"algorithm" json:"algorithm"`
+		Dims      []ConfigDimConfig `yaml:"dims" json:"dims"`
+	}
+	ConfigDimConfig struct {
+		Name       string            `yaml:"name" json:"name"`
+		Source     string            `yaml:"source" json:"source"`
+		StatusWhen *ConfigStatusWhen `yaml:"status_when" json:"status_when,omitempty"`
+	}
+	ConfigStatusWhen struct {
+		Equals string   `yaml:"equals,omitempty" json:"equals,omitempty"`
+		In     []string `yaml:"in,omitempty" json:"in,omitempty"`
+		Match  string   `yaml:"match,omitempty" json:"match,omitempty"`
 
-type ConfigLabelFromRow struct {
-	Source   string            `yaml:"source" json:"source"`
-	Name     string            `yaml:"name" json:"name"`
-	ValueMap map[string]string `yaml:"value_map" json:"value_map"`
-}
-
-type ConfigChartConfig struct {
-	Title     string            `yaml:"title" json:"title"`
-	Context   string            `yaml:"context" json:"context"` // REQUIRED
-	Family    string            `yaml:"family" json:"family"`
-	Type      string            `yaml:"type" json:"type"`
-	Units     string            `yaml:"units" json:"units"`
-	Algorithm string            `yaml:"algorithm" json:"algorithm"` // "absolute" | "incremental"
-	Dims      []ConfigDimConfig `yaml:"dims" json:"dims"`
-}
-
-type ConfigDimConfig struct {
-	Name       string            `yaml:"name" json:"name"`
-	Source     string            `yaml:"source" json:"source"`
-	StatusWhen *ConfigStatusWhen `yaml:"status_when" json:"status_when,omitempty"`
-}
-
-type ConfigStatusWhen struct {
-	Equals string   `yaml:"equals,omitempty" json:"equals,omitempty"`
-	In     []string `yaml:"in,omitempty" json:"in,omitempty"`
-	Match  string   `yaml:"match,omitempty" json:"match,omitempty"`
-
-	re *regexp.Regexp
-}
+		re *regexp.Regexp
+	}
+)
 
 func (c *Collector) validateConfig() error {
 	var errs []error
@@ -156,7 +153,7 @@ func (c *Collector) validateConfig() error {
 		}
 
 		if len(m.Charts) == 0 {
-			errs = append(errs, fmt.Errorf("metrics[%d] missing charts", idx))
+			errs = append(errs, fmt.Errorf("metrics[%d].%s missing charts", idx, m.ID))
 		}
 
 		for k, ch := range m.Charts {
