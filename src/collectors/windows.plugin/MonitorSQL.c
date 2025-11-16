@@ -732,7 +732,10 @@ int dict_mssql_databases_run_queries(const DICTIONARY_ITEM *item __maybe_unused,
 
     // We failed to collect this for the database, so we are not going to try again
     if (unlikely(mdi->MSSQLDatabaseDataFileSize.current.Data != ULONG_LONG_MAX))
-        mdi->MSSQLDatabaseDataFileSize.current.Data = netdata_MSSQL_fill_long_value(
+        if (unlikely(!mdi->parent->conn->collect_data_size))
+            goto skip_data_size;
+
+    mdi->MSSQLDatabaseDataFileSize.current.Data = netdata_MSSQL_fill_long_value(
             mdi->parent->conn->dataFileSizeSTMT, NETDATA_QUERY_DATA_FILE_SIZE_MASK, dbname, mdi->parent->instanceID);
     else {
         mdi->collecting_data = false;
@@ -2940,6 +2943,9 @@ int dict_mssql_databases_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, v
     }
 
     struct netdata_mssql_conn *conn = mi->conn;
+
+    if (likely(conn && conn->collect_data_size))
+        mssql_data_file_size_chart(mdi, db, *update_every);
 
     if (likely(conn && conn->collect_transactions)) {
         mssql_transactions_chart(mdi, db, *update_every);
