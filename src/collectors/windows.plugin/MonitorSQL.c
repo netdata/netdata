@@ -721,23 +721,20 @@ endreplication:
     (void)netdata_select_db(mdi->parent->conn->netdataSQLHDBc, "master");
     netdata_MSSQL_release_results(mdi->parent->conn->dbReplicationPublisher);
 }
-int dict_mssql_databases_run_queries(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
-{
+int dict_mssql_databases_run_queries(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
     struct mssql_db_instance *mdi = value;
-    const char *dbname = dictionary_acquired_item_name((DICTIONARY_ITEM *)item);
+    const char *dbname = dictionary_acquired_item_name((DICTIONARY_ITEM *) item);
 
     if (unlikely(!mdi->collecting_data || !mdi->parent || !mdi->parent->conn)) {
         goto enddrunquery;
     }
 
     // We failed to collect this for the database, so we are not going to try again
-    if (unlikely(mdi->MSSQLDatabaseDataFileSize.current.Data != ULONG_LONG_MAX))
-        if (unlikely(!mdi->parent->conn->collect_data_size))
-            goto skip_data_size;
-
-    mdi->MSSQLDatabaseDataFileSize.current.Data = netdata_MSSQL_fill_long_value(
+    if (unlikely(mdi->MSSQLDatabaseDataFileSize.current.Data != ULONG_LONG_MAX)) {
+        if (likely(!mdi->parent->conn->collect_data_size))
+            mdi->MSSQLDatabaseDataFileSize.current.Data = netdata_MSSQL_fill_long_value(
             mdi->parent->conn->dataFileSizeSTMT, NETDATA_QUERY_DATA_FILE_SIZE_MASK, dbname, mdi->parent->instanceID);
-    else {
+    } else {
         mdi->collecting_data = false;
         goto enddrunquery;
     }
