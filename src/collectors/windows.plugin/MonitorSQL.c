@@ -2960,6 +2960,9 @@ int dict_mssql_databases_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, v
         mssql_lock_request_chart(mdi, db, *update_every);
     }
 
+    mssql_is_readonly_chart(mdi, db, *update_every);
+    mssql_db_state_chart_loop(mdi, db, *update_every);
+
 endchartcb:
     return 1;
 }
