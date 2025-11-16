@@ -113,6 +113,9 @@ static ULONGLONG netdata_MSSQL_fill_long_value(SQLHSTMT *stmt, const char *mask,
 
 void dict_mssql_fill_instance_transactions(struct mssql_db_instance *mdi)
 {
+    if (unlikely(!mdi || !mdi->parent || !mdi->parent->conn || !mdi->parent->conn->collect_buffer))
+        return;
+
     char object_name[NETDATA_MAX_INSTANCE_OBJECT + 1] = {};
     long value = 0;
     SQLLEN col_object_len = 0, col_value_len = 0;
@@ -2084,6 +2087,9 @@ int dict_mssql_buffman_stats_charts_cb(
 
 static void do_mssql_bufferman_stats_sql(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *mi, int update_every)
 {
+    if (unlikely(!mi->conn->collect_buffer))
+        return;
+
     dictionary_sorted_walkthrough_read(mi->databases, dict_mssql_buffman_stats_charts_cb, mi);
 }
 
