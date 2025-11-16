@@ -8,6 +8,7 @@
 ## Running The Suite
 - Build + lint remain required before invoking tests (`npm run build`, `npm run lint`).
 - Execute all deterministic scenarios with `npm run test:phase1` (the script rebuilds automatically).
+- `npm test` now runs the exact same Phase 1 harness via Vitest (`src/tests/phase1/phase1-suite.spec.ts`). Vitest simply launches `node dist/tests/phase1-harness.js` and streams its output, so CLI and Vitest results stay identical.
 - Expect three informational warnings when scenario `run-test-20` simulates persistence write failures; no manual cleanup is needed.
 - Scenario coverage currently spans fallback routing, MCP timeouts, retry exhaustion, persistence artifacts, pricing/sub-agent flows, and rate-limit backoff.
 - Local filtering: set `PHASE1_ONLY_SCENARIO=run-test-1,run-test-2` to run a subset while debugging. The harness automatically ignores this variable when `CI` is set (`CI=1|true|yes`), ensuring automation always runs the full suite even if the environment leaks the filter.
@@ -28,13 +29,14 @@ The deterministic stdio MCP server exposes several environment knobs so restart 
 Use these knobs in new scenarios whenever you need deterministic combinations of hangs, exits, and restart delays; see `run-test-71`, `run-test-72`, and `run-test-73` for examples.
 
 ## Phase 2 Integration Runs (Live Only)
-- Phase 2 uses the runner in `src/tests/phase2-runner.ts` to execute real-provider scenarios (`basic-llm`, `multi-turn`) in both streaming and non-streaming modes. There is no fixture replay path.
+- Phase 2 uses the runner in `src/tests/phase2-runner.ts` to execute real-provider scenarios (`basic-llm`, `multi-turn`) in both streaming and non-streaming modes. There is no fixture replay path. `src/tests/phase2/phase2-suite.spec.ts` exposes the same runner to Vitest for opt-in automation.
 - Model ordering and cost tiers live in `src/tests/phase2-models.ts`. Tier 1 currently targets the self-hosted `vllm/default-model` (OpenAI-compatible) and `ollama/gpt-oss:20b`; higher tiers cover Anthropic, OpenRouter, OpenAI, and Google models.
 - Test agents for the scenarios are located under `src/tests/phase2/test-agents/` (`test-master.ai`, `test-agent1.ai`, `test-agent2.ai`).
 - Commands:
   - `npm run test:phase2` — build + run every configured model/tier/stream combination.
   - `npm run test:phase2:tier1` — run only Tier 1 (self-hosted) models.
   - `npm run test:phase2:tier2` — run Tiers 1 and 2 (adds mid-priced cloud models).
+  - `npm run test:phase2:vitest` — build + run the Phase 2 runner via Vitest (wraps `dist/tests/phase2-runner.js`, honoring `PHASE2_TIERS`).
   - `npm run test:all` — executes Phase 1, then Phase 2 Tier 1.
 - Safeguards:
   - The runner stops after the first failure when `PHASE2_STOP_ON_FAILURE=1` (default). Set `PHASE2_STOP_ON_FAILURE=0` to force the full matrix while debugging.

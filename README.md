@@ -411,7 +411,7 @@ The framework uses a **multi-level configuration system** with clear precedence 
       - Ideal for project-specific settings
 
 ### Deterministic Testing
-- Run `npm run test:phase1` to execute the deterministic harness across scripted provider + MCP scenarios.
+- Run `npm run test:phase1` (or `npm test` if you prefer Vitest) to execute the deterministic harness across scripted provider + MCP scenarios.
 - Detailed steps, coverage guidance, and debugging tips live in [`docs/TESTING.md`](docs/TESTING.md).
 
    c. **Prompt file directory**: `.ai-agent.json` and `.ai-agent.env`

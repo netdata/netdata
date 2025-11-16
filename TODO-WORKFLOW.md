@@ -333,6 +333,32 @@ interface TeamOrchestrator {
 
 Open work here: define the concrete queue implementation + exact markdown injected each turn, but the broadcast + supervisor-cancellation semantics are locked.
 
+## Team Communication Implementation Options (analysis Nov 16 2025)
+
+### Option A – Dedicated `TeamOrchestrator` + Broadcast Tool Provider (recommended)
+- Introduce `src/orchestration/team-orchestrator.ts` that owns the team lifecycle and an in-memory `TeamConversationBroker`. The broker stores an append-only transcript plus per-member cursors so messages are only injected once per turn. The orchestrator spins up each member via the existing `AIAgentSession` API, passing a session-scoped `ToolProvider` that exposes a single internal tool `team__broadcast(message: string)`.
+- Implementation hooks: register the provider in `ToolsOrchestrator` before `AIAgentSession.run()` (see `src/tools/tools.ts:65-210`). When the member LLM calls the tool, the provider writes to the broker and returns a short acknowledgement. Before each member turn, the orchestrator injects any unread broadcasts by prepending a markdown block to the user prompt (similar to how context guard messages are injected in `src/ai-agent.ts:118-380`).
+- Benefits: keeps `AIAgentSession` untouched (it only sees another internal tool); isolation is preserved because every member still builds its own session state. Extensible: new communication primitives become more tool endpoints managed by the broker (brainstorm: `team__dm`, `team__request_help`). Maintainability: orchestration code lives in one module with a strict interface (constructor inputs = member agent IDs + config, outputs = supervisor result plus transcript snapshot).
+- Considerations: orchestrator must multiplex multiple active sessions, so we need a lightweight scheduler (round-robin, fairness hooks) plus cancellation wiring (use `AbortController`s propagated to each session). Accounting/opTree rollup should treat broadcasts as zero-cost internal tools but still log events for traceability.
+
+### Option B – Supervisor-Mediated Relay
+- The supervisor remains the only agent with the broadcast tool. Other members surface updates by sending `team_update` payloads through a new orchestration callback rather than calling tools. The orchestrator materializes each update inside the supervisor’s conversation (`## Update from member`) and, when the supervisor issues `team_broadcast`, the orchestrator pushes that note into other members’ prompts.
+- Benefits: simpler concurrency story (only supervisor drives prompts). Works well if Costa later requests hierarchical chains (supervisor delegating sequential turns). Also minimizes new tool plumbing.
+- Drawbacks: members cannot react to each other asynchronously; every exchange funnels through the supervisor, which contradicts the “broadcast-first” requirement and increases latency/cost. Harder to extend to future strategies like “swarm” or ad-hoc committees because there is no reusable broker.
+
+### Option C – Shared Transcript Snapshot Injection
+- Maintain a shared markdown transcript under `TeamState`. After each member turn we serialize the entire transcript and inject it wholesale into every member’s next user message (similar to the advisors enrichment format defined earlier).No new tool is required; each agent simply reads/writes from the orchestrator via direct API calls.
+- Benefits: implementation speed (just maintain a string buffer and splice it in). Testing is easier because the orchestrator reduces to “gather outputs, rebuild markdown, rerun sessions.”
+- Drawbacks: violates session isolation ideals once transcripts grow large (every member prompt balloons each turn, increasing context churn). Hard to add selective delivery or sub-channels later. Merging in/out logic would leak orchestration concerns into `AIAgentSession`, hurting maintainability.
+
+### Recommended Path
+- Adopt Option A as the baseline, because it isolates concerns (orchestrator handles communication, sessions handle reasoning) and naturally extends to future patterns (e.g., replace the broker with a priority queue, or add new `team__` tools). It also maps directly onto the already-decided broadcast semantics and keeps the rest of the system in “sessions are pure” compliance.
+- When implementing, codify a narrow interface:
+  - `TeamOrchestrator.start(): Promise<TeamResult>` – spins members + supervisor.
+  - `TeamConversationBroker.publish(memberId, payload)` / `consume(memberId)`.
+  - Tool provider factory `createTeamToolProvider(memberId, broker)` returning a `ToolProvider` registered via `ToolsOrchestrator.register()` for that session only.
+- Provide clear extension seams: e.g., broker can expose middleware hooks so other strategies (swarm/voting) can subscribe without modifying the orchestrator core.
+
 ## Plan
 
 ### Phase 1: Foundation
