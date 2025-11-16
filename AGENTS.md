@@ -7,7 +7,12 @@
 - docs/TESTING.md for deterministic harness usage and coverage guidance.
 - docs/docs/AI-AGENT-INTERNAL-API.md current status of the ai-agent internal agent API.
 - README.md for end-user documentation of the application.
-- docs/AI-AGENT-GUIDE.md for the AI-facing source of truth covering prompts, configs, headends, snapshots, and operational defaults. **Every code change that affects runtime behavior, defaults, schemas, or tooling MUST update this guide in the same change.**
+- docs/AI-AGENT-GUIDE.md for the AI-facing source of truth covering prompts, configs, headends, snapshots, and operational defaults.
+
+The code has extensive tests and its business logic is described in detail in the documents under `docs/specs/*.md`. These documents have been SYNCHORIZED with the codebase and they act as a reference during code refactorings, new features and improvements (they are organized by feature, module and business logic).
+
+CRITICAL: **Every code change that affects runtime behavior, defaults, schemas, or tooling MUST update DOCUMENTATION at the same commit.**
+CRITICAL: **Always keep documentation synchronized.**
 
 The application source code is in the root directory (src/, package.json, etc).
 
@@ -154,3 +159,6 @@ Per agent tools are subject to its configuration (frontmatter, command-line).
 
 PR-003:
 All conversation structures, reasoning payloads, and tool schemas MUST stay aligned with the latest Vercel AI SDK contract. Track SDK releases and update the agent promptly whenever the upstream schema changes.
+
+PR-004:
+"Silent failures" and "tolerance to errors" is not justified. We want a "fail fast and make boom" approach. Of course, the application should gracefully handle many error conditions and continue. "Make boom" = ALL ERROR CONDITIONS MUST BE LOGGED. The application should stop and exit ONLY DUE TO USER CONFIGURATION ERRORS. All other errors must be logged and the application should insist in reaching a healthy state (reconnect, retry, etc).

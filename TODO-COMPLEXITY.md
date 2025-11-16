@@ -1,74 +1,99 @@
-# TL;DR
-- Target: eliminate 401 complexity violations so `eslint.complexity.config.mjs` returns zero errors.
-- Hotspots span the agent core (`src/ai-agent.ts`), tool orchestration (`src/tools/**`), loaders, telemetry, CLI, and utilities; each requires structural refactors, not cosmetic tweaks.
-- Awaiting design decisions on how to decompose `executeAgentLoop`, tool management, and loader/config flows before coding can begin.
+# Unified Engineering Backlog (Complexity, Quality, and Operations)
 
-# Analysis
-## Lint baseline
-- `./lint.sh` invokes `eslint.complexity.config.mjs` and currently reports 401 blocking errors (mix of cyclomatic complexity, max-depth, max-statements, max-lines-per-function).
-- Parser complaints surface for `.d.ts` shims and certain `src/tests/**` files because the complexity config does not load the TS project; these must be addressed via ignores or by relocating non-source artifacts.
+## TL;DR
+- Collapse every outstanding TODO/review into a single backlog so architectural refactors, security/remediation work, and productization tasks share one prioritized queue.
+- Core blockers remain the `AIAgentSession`/tool orchestration monoliths, lack of transport-level safety nets (timeouts/retries/queues), missing auth & file-include guardrails, and noisy deterministic harness runs that mask regressions.
+- Secondary tracks cover deterministic sub-agent chaining, reasoning/context guard polish, structured telemetry/log schemas, shared MCP lifecycle + tool queues, OpenAI pricing schema updates, dependency sweeps, prompt/docs alignment (code-review agents), session-visualization UI, and external benchmarking (ai-agent vs swarms).
+- Completed items (provider hook rewrite, streaming fix, silent-core cleanup) stay documented here for traceability; all future updates to architecture, docs, or pricing must edit this single backlog.
 
-## Hotspot deep dives
-- **`src/ai-agent.ts:1155 executeAgentLoop` (914 lines, complexity 249)**
-  - Responsibilities: retry loop over provider/model pairs, telemetry/opTree wiring, accounting, tool planning, progress reporting, final report management, persistence, and error synthesis.
-  - State coupling: touches ~40 private fields (telemetry labels, progress reporter, concurrency planning, txn metadata, child conversations, planned subturns, tool orchestrator). Multiple inline helper closures mutate shared arrays.
-  - Nested control flow: triple-nested loops (turns → providers/models → tool batches) with numerous early `continue`/`break` branches, making straightforward extraction risky without a dedicated context object.
-- **`src/tools/tools.ts:140 executeWithManagementInternal` (458 lines, complexity 69)**
-  - Mixes concurrency slots, span attributes, session tree ops, telemetry metrics, accounting, provider dispatch, error shaping, retries, and result formatting.
-  - Inline branches handle MCP vs. internal tools vs. sub-agents, leading to repeated condition checks and duplicated logging blocks.
-- **`src/tools/internal-provider.ts:52 execute` (355 lines, complexity 59)**
-  - Handles final-report tool invocation, report validation, formatting for multiple output targets (markdown, json, slack, tty, pipe, sub-agent), persistence hooks, and failure fallbacks.
-  - Shares state with `AIAgentSession` via callbacks (accounting, opTree) without a clear intermediate abstraction.
-- **`src/agent-loader.ts:128 constructLoadedAgent` (370 lines, complexity 78)**
-  - Performs file IO, prompt parsing, frontmatter validation, defaults merging, env overlay injection, tool discovery, and registry registration in a linear, monolithic block.
-- **Telemetry + CLI**
-  - `src/telemetry/runtime-config.ts`, `src/telemetry/index.ts`, `src/cli.ts`, and headend runners each have 150–250 line functions combining option parsing, validation, and side-effect orchestration.
+## Analysis
 
-## Structural observations
-- Core agent loop, tooling orchestrator, and loader each violate the single responsibility principle, blending orchestration, bookkeeping, and formatting.
-- Shared mutable state (e.g., `this.opTree`, `this.plannedSubturns`, `toolSlotsInUse`) hampers naive extraction; helpers must receive explicit context objects to avoid hidden mutations.
-- Telemetry and logging requirements mean any refactor must keep exact sequencing of `this.log`, `opTree` calls, and callback invocations.
-- Existing helper methods (`logExit`, `pushSystemRetryMessage`, `sanitizeTurnMessages`) already hint at natural boundaries; we can extend this pattern rather than inventing entirely new paradigms.
+### Architecture & Complexity
+- `src/ai-agent.ts` still houses >4 k LOC with 249 complexity in `executeAgentLoop` (per `reviews/architecture.md` & `reviews/complexity.md`); responsibilities span retry orchestration, telemetry, tool management, persistence, and final-report synthesis. Extract `TurnLoopRunner`, `ToolExecutionManager`, `SessionStateManager`, and `FinalReportManager` so `AIAgentSession` becomes a coordinator.
+- `src/tools/tools.ts` (`executeWithManagementInternal`, complexity 69) mixes queueing, telemetry, and provider dispatch; needs a dedicated tool-execution facade plus shared queue manager (see “Shared Tool Queue Manager” section below).
+- `src/agent-loader.ts`, `src/cli.ts`, `src/headends/rest-headend.ts`, and `BaseLLMProvider` remain monolithic; align with the decomposition roadmap: prompt repository + config service + session factory, application host abstraction, provider strategy split.
+- CLI/bootstrap should become a thin shell that instantiates a reusable service container so other headends/API surfaces stop depending on CLI internals (per `reviews/architecture.md`).
 
-## Constraints & risks
-- Behavioural parity is mandatory; even minor changes to logging or accounting order could break tests or downstream consumers.
-- Refactors must also satisfy `functional/no-loop-statements` where applicable; introducing loops may require justified rule disables.
-- Tool concurrency and progress reporting rely on shared counters; moving logic into helpers without careful locking could introduce race conditions.
-- Lint config treats some generated/test artifacts as first-class; need a strategy (ignore list vs. relocations) that keeps repo policy intact.
-- Telemetry spans depend on execution order; reordering operations could degrade tracing fidelity unless spans are preserved.
+### Execution Flow & Agent Features
+- **Deterministic sub-agent chaining** (`TODO-CHAINS*`): `src/subagent-registry.ts` lacks `next` metadata, cycle detection, and chain-runner logic; frontmatter parser disallows a `next` key. Need a design decision on single-step vs array semantics, injected `reason` strings, downstream schema enforcement, and failure surfacing.
+- **Code-review agent prompts** (`TODO-code-review-agents.md`): ensure every prompt honors `${FORMAT}`/`${MAX_TURNS}` as mandated in `docs/AI-AGENT-GUIDE.md`; reconcile README claims (“specialists reuse discovery output only”) with actual tool access. Deliver an audit + remediation plan.
+- **Reasoning defaults/overrides** (`TODO-reasoning-defaults.md`): clarify semantics for `unset` vs missing keys, wire `--default-reasoning` to only fill absent prompts, and expand deterministic coverage across frontmatter/default/override combinations.
+- **Context guard counters** (`TODO-context-guard.md`): replace snapshot math with live counters (`currentCtxTokens`, `pendingCtxTokens`, `newCtxTokens`), trim tool outputs iteratively before forcing final turns, align warnings/accounting/logs, and update Phase 1 coverage for warning logs and `[tokens: ctx …]` metrics.
+- **Tool parameter parsing** (`TODO-llm-tool-parameters.md`): unify JSON-string parsing via shared helper, preserve lossy repair heuristics, and emit `ERR` logs whenever malformed payloads are tolerated (providers, sanitizer, nested final reports, `agent__batch`). Phase 1 scenarios (`run-test-122/124/131`) cover regressions.
 
-# Decisions
-1. Remediation will proceed sequentially: agent core → tool orchestration → loaders/config → telemetry/CLI.
-2. Update `eslint.complexity.config.mjs` to ignore `.d.ts` and `src/tests/**`, documenting the rationale.
-3. Introduce dedicated helper classes (`TurnLoopRunner`, `ToolExecutionManager`) with typed context structs; additional helpers may remain as pure functions where appropriate.
-4. Encapsulate telemetry/logging via thin utilities that guarantee identical emission order.
-5. Per-stage verification runs `npm run lint`, `npm run build`, and `npm run test:phase1`; Phase 2 suite defers until final integration pass.
-6. Loader/config cleanup starts with incremental private helpers inside existing modules, promoting to separate files only after behaviour is stable.
-7. Add lightweight unit tests for the new helper classes while continuing to rely on Phase 1/Phase 2 for end-to-end assurance.
+### Reliability, Security & Production Readiness
+- **HTTP/auth hardening** (from `reviews/security.md` & `reviews/production.md`): REST headend currently unauthenticated; prompt include resolver allows arbitrary file disclosure; TRACE logging leaks non-Authorization secrets. Need API key/mTLS enforcement, include sandboxing (block `..`, absolute paths), and broader header redaction.
+- **Transport safety nets**: enforce bounded timeouts in `src/setup-undici.ts`, add provider/tool-level retries & circuit breakers (`src/llm-client.ts`, `src/tools/rest-provider.ts`, `src/tools/mcp-provider.ts`), and avoid synchronous REST blocking by introducing async run IDs or streaming.
+- **Shared tool queues** (`TODO-queue-concurrency.md`): replace per-session `maxConcurrentTools` with process-wide queues configured in `.ai-agent.json` (`queues.{name}.concurrent` + mandatory `default`). Only MCP/REST tools join queues; emit telemetry for depth/wait time and log when calls actually waited.
+- **Shared MCP lifecycle** (`TODO-shared-mcp.md`): generalize pooling across transports, keep relentless restart loop with exponential backoff, probe health before restarting, detect idle exits via transport `onclose`, and ensure restart severity/log policy matches Costa’s directives.
+- **Graceful shutdown** (`TODO-graceful-shutdown.md`): wire `ShutdownController` → headend manager → MCP registry; propagate `stopRef` to sessions; add watchdog + double-signal behavior.
+- **Harness stability** (`TODO-harness-stability.md`): deterministic suite currently emits lingering-handle/persistence warnings post-shutdown refactor. Need cleanup of temp dirs, env layers, MCP fixtures, plus harness assertions that fail on regressions.
 
-# Plan
-1. Draft detailed design for `TurnLoopRunner` (context shape, public API, interaction points with `AIAgentSession`, telemetry/log guarantees) and review with Costa.
-2. Implement `TurnLoopRunner`, migrate `executeAgentLoop` to delegate, and add targeted unit tests + Phase 1 verification.
-3. Extract `ToolExecutionManager` from `ToolsOrchestrator`, covering concurrency, telemetry, and accounting; add unit coverage and Phase 1 validation.
-4. Refine `internal-provider` final-report handling to utilise the new tooling abstractions while preserving output semantics.
-5. Refactor `agent-loader.ts` incrementally using private helpers for IO, frontmatter parsing, and env/default merging; revisit module splits after stabilisation.
-6. Tackle telemetry/runtime and CLI functions, applying agreed helper utilities for logging/validation without reordering observable outputs.
-7. Sweep remaining utilities for residual complexity breaches, adding helpers or module splits as needed.
-8. After each stage, run `npm run lint`, `npm run build`, and `npm run test:phase1`; schedule a full `npm run test:phase2 -- --tier=1` once all refactors land.
+### Observability, Instrumentation, and UX
+- **Structured logs inventory** (`TODO-structured-logs.md`): document every structured field, register missing journald `MESSAGE_ID`s, ensure severity policy (LLM/tool/session failures) matches Costa’s November directives, and confine “LLM response received” context to actual LLM events.
+- **Instrumentation roadmap** (`TODO-INSTRUMENTATION.md`): converge logs/metrics/traces on shared resource attributes with opt-in OTLP export, journald detection heuristics, and consistent `log_uid`/label behavior across sinks. Ensure sinks degrade gracefully (systemd-cat helper, logfmt fallback) and telemetry stays opt-in.
+- **Session visualization UI** (`TODO-UI.md`): design backend snapshot indexer + REST API + frontend (summary, cost, graph/timeline tabs) to explore `sessions/<txn>.json.gz`. Requires stack decision (reuse Express vs standalone), auth plan, and perf considerations (large trees, truncated payloads).
 
-# Implied decisions
-- New helper modules/files likely required; naming/location conventions should align with existing folder structure (e.g., `core/`, `tools/`, `loaders/`).
-- Additional tests may be necessary to cover extracted logic even if high-level behaviour is unchanged.
-- Relocating inline lambdas to named helpers will adjust import structure; ensure tree-shaking/build impact is acceptable.
-- Temporary feature flags/logging may be required to validate parity; must be removed once refactor stabilises.
+### Pricing, Dependencies, and External Research
+- **OpenAI pricing table** (`TODO-openai-pricing.md`): confirm schema changes needed to encode multiple tiers (Batch/Flex/Standard/Priority) and non-token services in `neda/.ai-agent.json`; adjust runtime cost lookup accordingly.
+- **Dependency refresh** (`TODO-update-dependencies.md`): upgrade AI SDK, MCP SDK, OTEL, ESLint, knip, ollama provider, etc., capturing release-note-driven code/doc updates and re-running lint/build/Phase 1.
+- **Swarms comparison** (`TODO-swarms-comparison.md`): compile fact-based comparison (architecture, workflows, tooling, ops) between ai-agent and `kyegomez/swarms`; clarify deliverable format and evaluation weighting with Costa before drafting.
 
-# Testing requirements
-- `npm run lint` and `npx eslint --config eslint.complexity.config.mjs` (or equivalent filtered command) must pass with zero errors.
-- `npm run build` after each major refactor stage.
-- `npm run test:phase1` after each stage; defer `npm run test:phase2 -- --tier=1` until the final integration pass.
-- Targeted unit/integration tests where functions gain new helper boundaries (e.g., `TurnLoopRunner`, `ToolExecutionManager`).
+### Testing Strategy & Coverage
+- **Phase 1 harness strategy** (`TODO-TEST-STRATEGY.md`): map each scenario to the eleven user-facing guarantees (LLM retries, tool usage, limits, context guard, accounting, etc.), identify redundant cases, and propose a behavior-driven suite while retaining determinism codes.
+- **Phase 1 warnings cleanup** ties back to harness stability; once clean, consider gating CI on warning-free runs.
 
-# Documentation updates required
-- Update relevant TODO/technical debt docs (e.g., `TODO-DEBT.md`, `docs/IMPLEMENTATION.md` or new log/event docs) with refactoring strategy and outcomes.
-- Document new helper modules/context structs, especially around agent execution flow and telemetry hooks.
-- Note complexity lint expectations and how to run the dedicated check in developer docs (`LINTING.md`).
+### Completed Items (for traceability)
+- Provider architecture debt closed (Oct 2025): all provider-specific logic moved into hooks; no stringly `providerType` branches remain (see `TODO-DEBT.md`).
+- Streaming regression fixed: SSE metadata capture no longer drains bodies prematurely (`coverage-openrouter-sse-nonblocking`).
+- Silent-core compliance enforced: persistence/logging now flow through injected callbacks; core avoids direct stdio/fs writes.
+- Final-report fallback scenario (`run-test-102`) validated; pending decision on richer diagnostics remains listed below.
+
+## Decisions Needed (Awaiting Costa)
+1. Deterministic chaining semantics: single `next` vs arrays, injected `reason` wording, downstream schema enforcement, and failure propagation strategy.
+2. Code-review agents: should specialists lose filesystem/GitHub tools entirely or retain them with stricter guidance? Confirm required prompt placeholders (`${FORMAT}`, `${MAX_TURNS}`) scope.
+3. Context guard messaging + estimator: keep current failure copy or adopt richer logs; confirm per-tool estimator behavior and removal of snapshot APIs.
+4. Reasoning keyword semantics: does `unset` mean “disable” everywhere or only in frontmatter/config? Confirm override/default precedence matrix.
+5. REST auth + include sandbox approach: API key vs mTLS vs proxying? Acceptable include root(s) and blocklist behavior.
+6. Shared queue schema: confirm `.ai-agent.json` structure, default capacity formula, and migration messaging for removed `maxConcurrentTools`/`parallelToolCalls` knobs.
+7. OpenAI pricing schema: multi-tier encoding + runtime selection + handling of non-token services.
+8. Session UI scope: stack decision (reuse Express vs new service), auth expectations, initial feature set.
+9. Swarms comparison deliverable format and evaluation weighting (architecture vs DX vs ops).
+10. CI gating on warning-free Phase 1 harness: should harness noise become a failure once cleanup lands?
+
+## Plan (Single Backlog)
+1. **Architectural Core (Incremental Refactor Plan)**
+   - **Seams First (Weeks 1–2)**
+     - Introduce `TurnContext` struct to bundle turn parameters while still delegating to current logic.
+     - Extract log-merging helper (`agent-log-utils.ts`) and tool-budget callback interface with no behavioral changes.
+     - Add unit coverage for helpers and keep Phase 1 harness as guardrail.
+   - **Split `executeAgentLoop` (Weeks 3–4)**
+     - Move pre-turn setup into `prepareTurn`, provider/model retries into `runProviderCycle`, and final-report handling into `completeSession` (all private helpers inside `src/ai-agent.ts`).
+     - Ensure instrumentation order stays identical; extend harness assertions if log ordering is touched.
+   - **Tool Execution Manager (Weeks 5–6)**
+     - Create shim class that wraps `ToolsOrchestrator.executeWithManagementInternal`, then migrate logging/telemetry scaffolding and per-session slot tracking into it.
+     - Keep existing callbacks wired; add tests mocking the orchestrator.
+   - **Loader/CLI Adapters (Weeks 7–8)**
+     - Add `PromptRepository`, `ConfigService`, and `ApplicationHost` adapters that currently just forward to existing helpers, giving us seams for future splits.
+     - Update DESIGN/IMPLEMENTATION docs to reflect the new adapters; run Phase 1 harness after each move.
+2. **Reliability & Security** – Implement REST auth + include sandbox + timeout/retry/circuit breaker policies; wire graceful shutdown + shared queue manager + MCP lifecycle watchers; document new configs and add regression coverage (Phase 1 + targeted smoke tests).
+3. **Execution Enhancements** – Deliver deterministic chaining MVP, context guard counter rewrite, reasoning semantics, and tool parameter normalization; expand harness scenarios for each.
+4. **Observability & Instrumentation** – Finalize structured log schema inventory, register `MESSAGE_ID`s, extend telemetry (OTLP opt-in, queue metrics), and scope the session visualization UI (backend indexer + frontend prototype).
+5. **Product & Docs Alignment** – Audit code-review prompts, update OpenAI pricing schema + config, execute dependency sweep, and produce the ai-agent vs swarms comparison once format is approved.
+6. **Testing Infrastructure** – Clean harness shutdown warnings, publish the behavior-to-scenario matrix, and decide on CI gating for warning-free deterministic runs.
+
+## Implied Decisions / Guardrails
+- Provider hooks, streaming fix, and silent-core compliance are now immutable constraints; future refactors must preserve their interfaces and coverage.
+- Shared queue manager + MCP registry become the authoritative concurrency controls; no reintroduction of per-session knobs.
+- Structured logging severity policy (LLM/tool/session failures) is binding; deviations require explicit sign-off and harness updates.
+- Deterministic harness remains the safety net; any feature touching orchestration/tooling/logging must add or update Phase 1 coverage.
+
+## Testing Requirements
+- Every architectural or tooling change: `npm run lint`, `npm run build`, `npm run test:phase1`; defer `npm run test:phase2 -- --tier=1` until post-refactor integration, but schedule before merging multi-stage work.
+- Feature-specific additions (chaining, context guard, reasoning, queues, MCP lifecycle, pricing) need new deterministic scenarios and, when applicable, unit tests for extracted helpers.
+- Harness stability work must assert zero lingering handles/temp-dir warnings; treat regressions as failures once cleanup lands.
+
+## Documentation Updates Required
+- `docs/AI-AGENT-GUIDE.md`, `docs/DESIGN.md`, `docs/IMPLEMENTATION.md`, `docs/TESTING.md`, and `README.md` must be edited whenever runtime behavior, defaults, schemas, or tooling change (per existing policy).
+- Document new queue schema + reasoning semantics + context guard counters + structured log fields + REST auth requirements + pricing tiers + dependency versions.
+- Session UI + swarms comparison deliverables should capture findings in repo docs if Costa wants them persisted (otherwise keep external but note in this backlog when delivered).

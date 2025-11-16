@@ -17,11 +17,14 @@
     "prelint": "npm run update-version --silent",
     "start": "node dist/cli.js",
     "lint": "eslint . --max-warnings 0",
+    "test": "npm run build --silent && vitest run",
+    "test:watch": "npm run build --silent && vitest watch",
     "test:phase1": "npm run build --silent && node dist/tests/phase1-harness.js",
     "test:phase2": "npm run build --silent && node dist/tests/phase2-runner.js",
     "test:phase2:tier1": "npm run build --silent && node dist/tests/phase2-runner.js --tier=1",
     "test:phase2:tier2": "npm run build --silent && node dist/tests/phase2-runner.js --tier=1,2",
     "test:all": "npm run test:phase1 && node dist/tests/phase2-runner.js --tier=1",
+    "test:phase2:vitest": "npm run build --silent && vitest run --config vitest.phase2.config.ts",
     "update-version": "node scripts/update-version.mjs"
   },
   "engines": {
@@ -67,6 +70,7 @@
     "@types/ws": "^8.18.1",
     "@typescript-eslint/eslint-plugin": "^8.46.3",
     "@typescript-eslint/parser": "^8.46.3",
+    "@vitest/coverage-v8": "^4.0.9",
     "eslint": "^9.39.1",
     "eslint-plugin-eslint-comments": "^3.2.0",
     "eslint-plugin-functional": "^9.0.2",
@@ -82,6 +86,7 @@
     "eslint-plugin-unicorn": "^62.0.0",
     "knip": "^5.68.0",
     "prettier": "^3.6.2",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.9"
   }
 }
