@@ -30,11 +30,7 @@
       "labels_from_row": [
         {
           "source": "status",
-          "name": "state",
-          "value_map": {
-            "0": "inactive",
-            "1": "active"
-          }
+          "name": "state"
         }
       ],
       "charts": [
