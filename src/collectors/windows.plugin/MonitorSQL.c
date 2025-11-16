@@ -396,7 +396,7 @@ endlocks:
 
 int dict_mssql_fill_waits(struct mssql_instance *mi)
 {
-    if (unlikely(!mi->conn || !mi->conn->collect_waits))
+    if (unlikely(!mi->conn->collect_waits))
         return 0;
 
     char wait_type[NETDATA_MAX_INSTANCE_OBJECT + 1] = {};
@@ -519,9 +519,6 @@ int netdata_select_db(SQLHDBC hdbc, const char *database)
 
 void dict_mssql_fill_replication(struct mssql_db_instance *mdi)
 {
-    if (unlikely(!mdi->parent->conn->collect_replication))
-        return;
-
     char publisher[NETDATA_MAX_INSTANCE_OBJECT + 1] = {};
     char publisher_db[NETDATA_MAX_INSTANCE_OBJECT + 1] = {};
     char publication[NETDATA_MAX_INSTANCE_OBJECT + 1] = {};
@@ -742,7 +739,7 @@ int dict_mssql_databases_run_queries(const DICTIONARY_ITEM *item __maybe_unused,
     dict_mssql_fill_transactions(mdi, dbname);
     dict_mssql_fill_locks(mdi, dbname);
 
-    if (likely(mdi->running_replication))
+    if (likely(mdi->running_replication && mdi->parent->conn->collect_replication))
         dict_mssql_fill_replication(mdi);
 
 enddrunquery:
@@ -2935,23 +2932,30 @@ int dict_mssql_databases_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, v
 
     int *update_every = data;
     struct mssql_instance *mi = mdi->parent;
-    if (!mi) {
+    if (unlikely(!mi))
         goto endchartcb;
-    }
 
     struct netdata_mssql_conn *conn = mi->conn;
+    if (unlikely(!conn))
+        goto endchartcb;
 
-    if (likely(conn && conn->collect_data_size))
+    if (likely(conn->collect_data_size))
         mssql_data_file_size_chart(mdi, db, *update_every);
 
-    if (likely(conn && conn->collect_transactions)) {
+    if (likely(conn->collect_transactions)) {
         mssql_transactions_chart(mdi, db, *update_every);
         mssql_database_backup_restore_chart(mdi, db, *update_every);
         mssql_database_log_flushed_chart(mdi, db, *update_every);
         mssql_database_log_flushes_chart(mdi, db, *update_every);
         mssql_active_transactions_chart(mdi, db, *update_every);
         mssql_write_transactions_chart(mdi, db, *update_every);
+    }
+
+    if (likely(conn->collect_waits)) {
         mssql_lockwait_chart(mdi, db, *update_every);
+    }
+
+    if (likely(conn->collect_locks)) {
         mssql_deadlock_chart(mdi, db, *update_every);
         mssql_lock_timeout_chart(mdi, db, *update_every);
         mssql_lock_request_chart(mdi, db, *update_every);
