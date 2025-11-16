@@ -10,7 +10,7 @@ tools:
   - filesystem-cwd
   - github
 
-maxToolTurns: 20
+maxToolTurns: 40
 temperature: 0.3
 topP: 0.95
 maxOutputTokens: 8192
