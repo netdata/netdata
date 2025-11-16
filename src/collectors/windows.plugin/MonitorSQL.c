@@ -516,6 +516,9 @@ int netdata_select_db(SQLHDBC hdbc, const char *database)
 
 void dict_mssql_fill_replication(struct mssql_db_instance *mdi)
 {
+    if (unlikely(!mdi->parent->conn->collect_replication))
+        return;
+
     char publisher[NETDATA_MAX_INSTANCE_OBJECT + 1] = {};
     char publisher_db[NETDATA_MAX_INSTANCE_OBJECT + 1] = {};
     char publication[NETDATA_MAX_INSTANCE_OBJECT + 1] = {};
@@ -2443,6 +2446,9 @@ int dict_mssql_replication_chart_cb(const DICTIONARY_ITEM *item __maybe_unused, 
 
 static void do_mssql_replication(struct mssql_instance *mi, int update_every)
 {
+    if (unlikely(!mi->conn->collect_replication))
+        return;
+
     dictionary_sorted_walkthrough_read(mi->publisher_publication, dict_mssql_replication_chart_cb, &update_every);
 }
 
