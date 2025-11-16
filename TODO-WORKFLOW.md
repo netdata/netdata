@@ -6,7 +6,7 @@
 - Orchestration layer wraps existing session layer (sessions stay pure)
 - `AIAgentSession.run()` becomes recursive: checks frontmatter, applies patterns, calls child sessions
 - Terminal vs. non-terminal agents: only terminal agents own their final answer
-- Team pattern still needs detailed design (most complex, requires coordination hooks)
+- Team pattern baseline decided (broadcast-first, supervisor-controlled); remaining work is implementation detail for queues/hooks
 
 ## Analysis
 
@@ -35,6 +35,12 @@ AIAgentSession.run(input)
 
 **Key principle**: Sessions remain pure single-agent loops. Orchestration is external coordination using recursive `AIAgentSession.run()` calls.
 
+### Current Implementation Status (Nov 16 2025 review)
+- `src/frontmatter.ts:14-120` only accepts the classic options registry keys, so prompts currently have no way to declare `handoff`, `router`, `advisors`, or `team` metadata. The new YAML fields will simply be rejected until we extend the parser and allowed-key registry.
+- `src/agent-loader.ts:24-210` builds `LoadedAgent` objects without any orchestration fields. Even if frontmatter parsing were extended, the loader would drop those values before sessions are created, so we need explicit storage plus validation hooks.
+- `src/ai-agent.ts:1037-1400` runs sessions directly via `executeSession()` with no pre- or post-processing stages; the recursion helper described earlier (`spawnChildSession`) does not exist yet. All child invocations still go through `SubAgentRegistry`, meaning orchestration has zero entry-points today.
+- `src/subagent-registry.ts` remains the sole recursion surface (tool-driven). There is no accounting pipeline today for “out-of-band” session launches, so once orchestration calls are added we must plumb opTree + accounting aggregation manually instead of relying on existing tool metadata.
+
 ### Pattern Definitions
 
 #### 1. Handoff (`handoff: agent_name`)
@@ -57,38 +63,48 @@ agent.run(input)
   → return handoff_agent's result
 ```
 
-#### 2. Router (`router: true` or `route_to` tool)
-**What**: Single-turn agent that selects which agent handles the request. No tools/subagents except `route_to`.
-**Real-world**: Receptionist, triage, dispatcher.
-**Why**: Cost savings, intelligent routing without full orchestration overhead.
+#### 2. Router (`router` block + `handoff-to` tool)
+**What**: Normal multi-turn agent (full tools, sub-agents, reasoning) whose only exit path is a `handoff-to` tool instead of `final_report`. When invoked, the tool selects one destination from a fixed enum and can attach an optional message that becomes part of the downstream prompt.
+**Real-world**: Receptionist, triage, dispatcher that can gather context before delegating.
+**Why**: Gives routers the full power of the platform while still forcing deterministic delegation.
 **Terminal**: Non-terminal (delegates entire request).
 
 ```yaml
 # frontmatter
-router: true
-agents:
-  - legal-department
-  - technical-support
-  - billing
+router:
+  destinations:
+    - legal-department
+    - technical-support
+    - billing
 ```
 
 **Execution flow**:
 ```
 agent.run(input)
-  → session.start(input)  // single turn, calls route_to tool
-  → selected_agent = from tool call
-  → selected_agent.run(input)  // recursive!
-  → return selected_agent's result
+  → session.start(input)  // normal conversation with tools/sub-agents
+  → router eventually calls handoff-to(destination, message?)
+  → downstreamInput =
+      ## ORIGINAL USER REQUEST
+
+      [original input]
+
+      ## MESSAGE FROM AGENT `router-agent-name` WHO ROUTED THIS REQUEST TO YOU
+
+      [optional message]
+  → selectedAgent.run(downstreamInput)
+  → return selectedAgent's result
 ```
+
+If the router omits `message`, only the original user section is forwarded.
 
 **Tool schema**:
 ```typescript
 {
-  name: "route_to",
-  description: "Select the agent to handle this request",
+  name: "handoff-to",
+  description: "Send the user and an optional note to the selected agent",
   parameters: {
-    agent: { type: "string", enum: [...available_agents] },
-    reason: { type: "string" }
+    agent: { type: "string", enum: [...destinations] },
+    message: { type: "string", description: "Optional context for the next agent" }
   }
 }
 ```
@@ -116,6 +132,10 @@ agent.run(input)
   → return result
 ```
 
+**Failure handling**:
+- Each advisor that fails produces a synthetic `final_report` describing the failure.
+- The primary agent receives that failure text in place of the advisor's normal output and proceeds with whatever information is available.
+
 **Enriched message format**:
 ```markdown
 ## ORIGINAL USER REQUEST
@@ -138,10 +158,10 @@ agent.run(input)
 ```
 
 #### 4. Team (`team: { members: [...], ... }`)
-**What**: Multiple agents collaborate with shared message history. Each maintains independent session but broadcasts to common channel.
+**What**: Multiple agents collaborate asynchronously via a broadcast channel. Each maintains an independent session, can share updates through a special team broadcast tool, and exits by issuing its own `final_report` (which gets broadcast with an "I'm leaving" annotation).
 **Real-world**: Code review panel, planning committee, stakeholder alignment.
 **Why**: Extreme cost savings (impractical to transfer full discussions via tool calls), parallel deliberation.
-**Terminal**: Coordinator is terminal (makes final decision).
+**Terminal**: Supervisor/boss is terminal (makes final decision). Other members are non-terminal contributors.
 
 ```yaml
 # frontmatter
@@ -150,11 +170,12 @@ team:
     - analyst
     - developer
     - security-reviewer
-  terminationMode: consensus | maxRounds | coordinatorDecides
-  maxRounds: 10
+  supervisor: planning-lead
+  memberMaxTurns: 6
+  supervisorMaxTurns: 12
 ```
 
-**Execution model**: See "Team Pattern - Detailed Design Needed" section below.
+**Execution model**: See "Team Pattern - Broadcast Baseline" section below.
 
 ### Terminal vs. Non-Terminal Agents
 
@@ -166,8 +187,8 @@ team:
 | Has `handoff` | No | Delegates final answer to next agent |
 | Router | No | Delegates entire request to selected agent |
 | Has `advisors` | Yes | Makes final decision (advisors only advise) |
-| Team coordinator | Yes | Synthesizes team discussion into final answer |
-| Team member (non-coordinator) | No | Contributes to discussion, doesn't own final answer |
+| Team supervisor | Yes | Synthesizes team discussion into final answer |
+| Team member (non-supervisor) | No | Contributes to discussion, doesn't own final answer |
 
 **Composition rule**: When referencing an agent (for team membership, tool call, etc.), the **terminal agent** is the one whose output is returned.
 
@@ -202,8 +223,8 @@ class AIAgentSession {
     }
 
     // Post-session orchestration: Router pattern
-    if (this.config.router && result.routedTo) {
-      return this.runRouter(result.routedTo);
+    if (this.config.router && result.routerSelection) {
+      return this.runRouter(result.routerSelection);
     }
 
     return result;
@@ -233,23 +254,27 @@ interface AgentFrontmatter {
 
   // NEW: Orchestration patterns
   handoff?: string;                    // Agent to hand off to after completion
-  router?: boolean;                    // Is this a routing agent?
+  router?: {                           // Router metadata when agent finishes via handoff-to
+    destinations: string[];            // Whitelist of agent ids exposed in handoff-to
+  };
   advisors?: string[];                 // Agents to consult before execution
   team?: {
-    members: string[];                 // Team member agents
-    terminationMode: 'consensus' | 'maxRounds' | 'coordinatorDecides';
-    maxRounds?: number;
+    members: string[];                 // Team member agents (non-terminal)
+    supervisor: string;                // Terminal "boss" agent controlling lifecycle
+    memberMaxTurns?: number;           // Optional per-member cap
+    supervisorMaxTurns?: number;       // Optional global cap mirrored from boss settings
   };
 }
 ```
 
 **Validation rules**:
-- `router: true` incompatible with `subagents` (router only routes, no tools)
-- `team` coordinator cannot have `handoff` (team owns final answer)
-- Cycle detection: handoff chains, team membership (no agent can be ancestor of itself)
-- Advisors cannot be terminal (they don't have `final_report`)
+- Router frontmatter must list at least one destination and routers must not expose `final_report` (only `handoff-to`). Otherwise routers behave like normal agents and may still declare tools/sub-agents.
+- Team supervisor (the boss) owns the terminal `final_report`; team members must not declare their own `handoff` targets.
+- Cycle detection: handoff chains, router destinations, team membership (no agent can be ancestor of itself).
+- Advisors cannot be terminal (they don't produce user-facing answers).
+- All validations continue to run during agent loading, so misconfigurations are caught before runtime.
 
-## Decisions Needed
+## Decisions
 
 ### 1. Naming Confirmation
 - ~~`handoff` vs `next` vs `delegate`~~ **DECIDED: `handoff`**
@@ -257,71 +282,56 @@ interface AgentFrontmatter {
 - ~~`consult` vs `advisors` vs `gather`~~ **DECIDED: `advisors`**
 - ~~`team` vs `panel` vs `council`~~ **DECIDED: `team`**
 
-### 2. Router Tool Semantics
-- Single `route_to` tool, or multiple options?
-- Can router have other tools (analysis), or pure routing only?
-- How to handle routing failures (no suitable agent)?
+### 2. Router Semantics
+- Routers are full-fledged agents (all normal tools, sub-agents, multi-turn reasoning) but never call `final_report`.
+- They must end by invoking `handoff-to(destination, message?)`, where `destination` is one of the configured enum entries and `message` becomes an optional markdown section for the downstream agent.
+- Downstream prompt format is fixed: include original user request plus the optional router message. If the router omits `message`, the supplementary section is excluded.
 
 ### 3. Advisor Failure Handling
-- All advisors must succeed, or partial results acceptable?
-- Timeout per advisor?
-- Error propagation vs. graceful degradation?
+- When an advisor fails or times out, the orchestrator emits a synthetic `final_report` describing the failure.
+- The primary agent receives this synthetic report in place of the advisor's analysis and may decide how to proceed; advisors never retry automatically.
 
-### 4. Team Pattern (Major Design Work)
-See section below.
+### 4. Team Pattern Direction
+- Team orchestration adopts the broadcast-first model: members run asynchronously, use a dedicated broadcast tool, and their final reports both exit the member and broadcast an "unreachable" notice.
+- The supervising agent owns the terminal `final_report`. When it finishes (or exhausts turns), all remaining members are cancelled.
+- Remaining work is implementation detail (queue fairness, injection formatting), not a design decision.
 
 ### 5. Accounting Aggregation
-- How do parallel advisor costs aggregate?
-- How does handoff chain appear in opTree?
-- Team coordination overhead tracking?
+- All orchestration participants—handoff partners, routers, advisors, team members—roll up costs to the terminal agent. They are treated as sub-agents even when not spawned via explicit tool calls.
 
 ### 6. Frontmatter Validation
-- Load-time vs. runtime validation of orchestration patterns?
-- Cycle detection algorithm (DFS for handoff chains)?
-- Schema validation for pattern compatibility?
+- Validation remains a load-time concern. The loader checks router destination lists, cycle detection, advisor/team compatibility, etc., before any session starts.
 
-## Team Pattern - Detailed Design Needed
+## Team Pattern - Broadcast Baseline
 
-This is the most complex pattern. Key open questions:
+Team orchestration adopts the broadcast-first model Costa specified. Members operate independently, exchange findings via a dedicated broadcast tool, and the supervising "boss" agent owns the final answer and global lifecycle.
 
 ### 1. Message Broadcasting
-- **What gets broadcast?**: Only `final_report` calls? All assistant messages? Only marked messages?
-- **Broadcast tool**: New `broadcast(message)` tool, or reuse `progress_report`?
-- **Injection mechanism**: How to inject broadcast messages into member sessions?
-
-**Current thinking**: Use `progress_report` for broadcasts. Add message queue that agent loop checks before each turn.
+- Each member gets a `team_broadcast(message)` (name TBD) tool. Calls append to a shared transcript visible to every other member before their next turn.
+- When a member issues its `final_report`, the report is automatically broadcast with an annotation like "[member] has left the meeting and is no longer reachable" so peers know that participant exited.
+- Broadcasts always include sender identity and timestamp/order. We still need to design the injection format (probably a prefixed markdown section per member) but the presence of the special tool is decided.
 
 ### 2. Session Coordination
-- **Parallel async**: All members run simultaneously, blocked waiting for broadcasts
-- **Turn-based**: Members take turns speaking (simpler, but loses parallelism)
-- **Hybrid**: Parallel execution with synchronization points
+- Members run asynchronously with their own turn limits. Each has its own session loop and only pauses to ingest new broadcasts injected between turns.
+- The team orchestrator must maintain per-member queues and a global log, feeding new broadcasts into waiting members before they continue.
+- Remaining design work: define fairness (e.g., round-robin vs. opportunistic) and ensure starvation does not occur, but parallel async execution is now fixed.
 
-### 3. Termination Condition
-- **Consensus voting**: All members call `vote_conclude()` tool
-- **Coordinator decides**: One member is coordinator, calls `conclude_team()`
-- **Max rounds**: Forced termination after N rounds
+### 3. Termination + Bounds
+- Every member enforces its own `maxTurns`, but the entire team is also bounded by the supervising agent's `maxTurns`. If the supervisor (`team boss`) delivers its `final_report`, the orchestrator cancels/aborts all remaining members immediately.
+- Members that exhaust their turns or voluntarily issue `final_report` are marked exited and removed from scheduling.
+- Supervisor remains the sole terminal agent; all costs from members roll into the supervisor's accounting lineage.
 
-### 4. Who Is Coordinator?
-- **External orchestrator**: Code, not LLM agent (simplest)
-- **Designated member**: One team member marked as coordinator
-- **Emergent**: Last agent to vote becomes coordinator
-
-**Current thinking**: Designated coordinator member. Coordinator has `final_report`, other members only have `broadcast` and `vote_conclude`.
-
-### 5. Hook Points Needed
+### 4. Hook Points Needed
 ```typescript
 interface TeamOrchestrator {
-  onMemberBroadcast(memberId: string, message: string): void;
-  onMemberVote(memberId: string, ready: boolean): void;
-  injectMessage(memberId: string, message: string): void;
-  shouldContinue(): boolean;
+  onMemberBroadcast(memberId: string, message: string): void; // update global log + fan-out
+  onMemberExit(memberId: string): void;                       // mark as unreachable
+  injectMessages(memberId: string, messages: string[]): void; // feed queued broadcasts before next turn
+  cancelRemaining(reason: string): void;                      // invoked when boss finalizes
 }
 ```
 
-### 6. Blocking Model
-- Members wait for new broadcasts before continuing?
-- Or run continuously, checking for new messages each turn?
-- Or event-driven (wake on broadcast)?
+Open work here: define the concrete queue implementation + exact markdown injected each turn, but the broadcast + supervisor-cancellation semantics are locked.
 
 ## Plan
 
@@ -340,21 +350,21 @@ interface TeamOrchestrator {
 ### Phase 3: Advisors Pattern
 1. Implement `runAdvisors()` with parallel execution
 2. Message enrichment formatting
-3. Advisor failure handling
+3. Emit synthetic `final_report` payloads when advisors fail/time out
 4. Accounting aggregation for parallel advisors
 
 ### Phase 4: Router Pattern
-1. Implement router agent type (single-turn, `route_to` tool only)
-2. Router execution flow in `AIAgentSession.run()`
-3. Routing failure handling
-4. Validation: router cannot have subagents
+1. Implement router agent type (normal loop but finalizes via `handoff-to` tool)
+2. Build downstream prompt compositor (original request + optional router message)
+3. Routing failure handling (e.g., no destinations, tool misuse)
+4. Validation: routers require destinations and must not expose `final_report`
 
 ### Phase 5: Team Pattern (Requires Separate Design Document)
-1. Design message broadcasting infrastructure
-2. Implement coordination hooks
-3. Add termination logic
-4. Test with simple 2-agent team
-5. Scale to N-agent teams
+1. Implement broadcast tool + shared log injection between member sessions
+2. Build async scheduler that enforces per-member and supervisor turn limits
+3. Add supervisor-driven cancellation + auto-broadcast on member exit
+4. Test with simple 2-agent team plus supervisor to validate broadcast + cancellation
+5. Scale to N-agent teams and ensure starvation/fairness policies hold
 
 ### Phase 6: Integration Testing
 1. Test composition: handoff + advisors, router + handoff, team with handoff members
@@ -370,6 +380,7 @@ interface TeamOrchestrator {
 - Terminal resolution happens at runtime as execution unfolds
 - Each agent knows only its immediate orchestration needs (decentralized)
 - Full workflow emerges at runtime, not predetermined
+- Accounting for every orchestration hop rolls up to the terminal agent (treat all upstream participants as sub-agents regardless of invocation path)
 
 ## Pros and Cons
 
@@ -431,10 +442,15 @@ The handoff pattern replaces the previous "next" chaining design. Key elements p
 
 ---
 
+## Decisions from Nov 16 2025 Sync with Costa
+1. **Handoff payload shape** – Downstream agents receive only the upstream agent’s `final_report` body (markdown/JSON). No headers, metadata, or serialized `AIAgentResult` objects are forwarded.
+2. **Router guard-rails** – Routers retain `agent__final_report`. If the LLM calls it, the router is effectively terminal and no handoff occurs. Otherwise routers are expected to finish via `handoff-to`.
+3. **Advisor transcript formatting** – The enriched prompt includes a markdown header per advisor (e.g., `### From risk-assessor`) followed by the advisor output raw, without transformation or summarization. Failures still get a header but the body is the synthetic failure report as-is.
+
 ## Next Steps
 
 1. ~~**Costa to decide**: Confirm naming choices~~ **DONE: team, handoff, router, advisors**
-2. **Costa to decide**: Router semantics (pure routing vs. with analysis tools)
-3. **Costa to decide**: Advisor failure handling strategy
-4. **Detailed team design**: Requires separate focused discussion on hooks, broadcasting, coordination
+2. ~~**Costa to decide**: Router semantics (pure routing vs. with analysis tools)~~ **DONE: routers are full agents that finalize via `handoff-to` with optional message**
+3. ~~**Costa to decide**: Advisor failure handling strategy~~ **DONE: emit synthetic `final_report` on failure/timeouts**
+4. **Detailed team design**: Remaining work is implementation detail (queue format, fairness), but broadcast + supervisor control are locked per decision above
 5. **Implementation order**: Recommend Handoff → Advisors → Router → Team (increasing complexity)
