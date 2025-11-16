@@ -2133,6 +2133,9 @@ int dict_mssql_sysjobs_chart_cb(const DICTIONARY_ITEM *item __maybe_unused, void
 
 static void do_mssql_job_status_sql(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *mi, int update_every)
 {
+    if (unlikely(!mi->conn->collect_jobs))
+        return;
+
     dictionary_sorted_walkthrough_read(mi->sysjobs, dict_mssql_sysjobs_chart_cb, mi);
 }
 
