@@ -185,9 +185,10 @@ func buildDimID(chartID, dimName string) string {
 	return normalizeID(chartID + "." + dimName)
 }
 
+var idReplacer = strings.NewReplacer(" ", "_", ".", "_")
+
 func normalizeID(id string) string {
-	r := strings.NewReplacer(" ", "_", ".", "_")
-	return strings.ToLower(r.Replace(id))
+	return strings.ToLower(idReplacer.Replace(id))
 }
 
 func redactDSN(dsn string) string {
