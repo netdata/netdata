@@ -2944,9 +2944,6 @@ int dict_mssql_databases_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, v
 
     if (likely(conn->collect_transactions)) {
         mssql_transactions_chart(mdi, db, *update_every);
-        mssql_database_backup_restore_chart(mdi, db, *update_every);
-        mssql_database_log_flushed_chart(mdi, db, *update_every);
-        mssql_database_log_flushes_chart(mdi, db, *update_every);
         mssql_active_transactions_chart(mdi, db, *update_every);
         mssql_write_transactions_chart(mdi, db, *update_every);
     }
@@ -2963,6 +2960,9 @@ int dict_mssql_databases_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, v
 
     mssql_is_readonly_chart(mdi, db, *update_every);
     mssql_db_state_chart_loop(mdi, db, *update_every);
+    mssql_database_log_flushed_chart(mdi, db, *update_every);
+    mssql_database_log_flushes_chart(mdi, db, *update_every);
+    mssql_database_backup_restore_chart(mdi, db, *update_every);
 
 endchartcb:
     return 1;
