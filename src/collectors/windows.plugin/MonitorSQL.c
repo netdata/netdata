@@ -241,7 +241,7 @@ void dict_mssql_fill_transactions(struct mssql_db_instance *mdi, const char *dbn
     if (unlikely(!mdi->parent->conn->collect_transactions))
         goto endtransactions;
 
-    if (mdi->collect_instance)
+    if (likely(mdi->collect_instance))
         dict_mssql_fill_instance_transactions(mdi);
 
     SQLCHAR query[sizeof(NETDATA_QUERY_TRANSACTIONS_MASK) + 2 * NETDATA_MAX_INSTANCE_OBJECT + 1];
@@ -728,7 +728,7 @@ int dict_mssql_databases_run_queries(const DICTIONARY_ITEM *item __maybe_unused,
 
     // We failed to collect this for the database, so we are not going to try again
     if (unlikely(mdi->MSSQLDatabaseDataFileSize.current.Data != ULONG_LONG_MAX)) {
-        if (likely(!mdi->parent->conn->collect_data_size))
+        if (likely(mdi->parent->conn->collect_data_size))
             mdi->MSSQLDatabaseDataFileSize.current.Data = netdata_MSSQL_fill_long_value(
             mdi->parent->conn->dataFileSizeSTMT, NETDATA_QUERY_DATA_FILE_SIZE_MASK, dbname, mdi->parent->instanceID);
     } else {
@@ -1164,7 +1164,6 @@ void dict_mssql_insert_databases_cb(const DICTIONARY_ITEM *item __maybe_unused, 
 {
     struct mssql_db_instance *mdi = value;
 
-    mdi->MSSQLDatabaseDataFileSize.current.Data = ULONG_LONG_MAX;
     mdi->collecting_data = true;
 }
 
