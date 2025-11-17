@@ -97,6 +97,7 @@ func TestCollector_Check(t *testing.T) {
 						{
 							Title:   "test",
 							Context: "pg.test",
+							Family:  "test",
 							Units:   "events",
 							Dims: []ConfigDimConfig{
 								{Name: "value", Source: "value"},
@@ -180,6 +181,7 @@ SELECT
 							{
 								Title:   "bgwriter",
 								Context: "pg.bgwriter",
+								Family:  "bgwriter",
 								Units:   "bytes",
 								Dims: []ConfigDimConfig{
 									{Name: "checkpoints_timed", Source: "checkpoints_timed"},
@@ -260,6 +262,7 @@ SELECT
 							{
 								Title:   "conflicts",
 								Context: "pg.conflicts",
+								Family:  "conflicts",
 								Units:   "conflicts",
 								Dims: []ConfigDimConfig{
 									{Name: "confl_tablespace", Source: "confl_tablespace"},
@@ -320,6 +323,7 @@ SELECT
 							{
 								Title:   "uptime",
 								Context: "pg.uptime",
+								Family:  "uptime",
 								Units:   "seconds",
 								Dims: []ConfigDimConfig{
 									{Name: "extract", Source: "extract"},
@@ -372,6 +376,7 @@ SELECT
 							{
 								Title:   "activity states",
 								Context: "pg.activity_states",
+								Family:  "activity states",
 								Units:   "events",
 								Dims: []ConfigDimConfig{
 									{Name: "active", Source: "active"},
@@ -446,6 +451,7 @@ SELECT
 							{
 								Title:   "activity",
 								Context: "pg.activity",
+								Family:  "activity",
 								Units:   "seconds",
 								Dims: []ConfigDimConfig{
 									{Name: "xact_running_time", Source: "xact_running_time"},
@@ -523,6 +529,7 @@ SELECT
 							{
 								Title:   "activity",
 								Context: "pg.activity",
+								Family:  "activity",
 								Units:   "status",
 								Dims: []ConfigDimConfig{
 									{
