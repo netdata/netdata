@@ -57,7 +57,7 @@ modules:
               default_value: 10
               required: false
             - name: autodetection_retry
-              description: Recheck interval in seconds. Zero means no recheck will be scheduled.
+              description: Autodetection retry interval (seconds). Set 0 to disable.
               default_value: 0
               required: false
             - name: binary_path
