@@ -1,3 +1,4 @@
+import type { AgentMetadata } from '../agent-registry.js';
 import type { ProgressMetrics } from '../types.js';
 
 export const escapeMarkdown = (value: string): string => value
@@ -86,4 +87,22 @@ export const formatSummaryLine = ({ agentLabel, metrics, statusNote, usageSnapsh
     summary += ', completed';
   }
   return summary;
+};
+
+const sanitizeAgentLabelSegment = (raw: string): string => {
+  if (raw.length === 0) return raw;
+  const normalized = raw.replace(/\\/gu, '/');
+  const segments = normalized.split('/').filter((segment) => segment.length > 0);
+  const candidate = segments.length > 0 ? segments[segments.length - 1] : normalized;
+  const trimmed = candidate.endsWith('.ai') ? candidate.slice(0, -3) : candidate;
+  return trimmed.trim();
+};
+
+export const resolveAgentHeadingLabel = (agent: AgentMetadata): string => {
+  if (typeof agent.toolName === 'string' && agent.toolName.trim().length > 0) {
+    const preferred = sanitizeAgentLabelSegment(agent.toolName.trim());
+    if (preferred.length > 0) return preferred;
+  }
+  const fallback = sanitizeAgentLabelSegment(agent.id);
+  return fallback.length > 0 ? fallback : agent.id;
 };

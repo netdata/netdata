@@ -14,7 +14,7 @@ import { normalizeCallPath } from '../utils.js';
 
 import { ConcurrencyLimiter } from './concurrency.js';
 import { HttpError, readJson, writeJson, writeSseChunk, writeSseDone } from './http-utils.js';
-import { escapeMarkdown, formatMetricsLine, formatSummaryLine, italicize } from './summary-utils.js';
+import { escapeMarkdown, formatMetricsLine, formatSummaryLine, italicize, resolveAgentHeadingLabel } from './summary-utils.js';
 
 interface Deferred<T> {
   promise: Promise<T>;
@@ -312,7 +312,7 @@ export class OpenAICompletionsHeadend implements Headend {
     let rootTxnId: string | undefined;
     let summaryEmitted = false;
     const accounting: AccountingEntry[] = [];
-    const agentHeadingLabel = escapeMarkdown(agent.toolName ?? agent.id);
+    const agentHeadingLabel = escapeMarkdown(resolveAgentHeadingLabel(agent));
     interface TurnRenderState { index: number; summary?: string; thinking?: string; updates: string[] }
     let rootCallPath: string | undefined;
     let transactionHeader: string | undefined;
