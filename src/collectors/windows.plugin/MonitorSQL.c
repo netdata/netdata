@@ -397,7 +397,7 @@ endlocks:
 int dict_mssql_fill_waits(struct mssql_instance *mi)
 {
     if (unlikely(!mi->conn->collect_waits))
-        return 0;
+        return 1;
 
     char wait_type[NETDATA_MAX_INSTANCE_OBJECT + 1] = {};
     char wait_category[NETDATA_MAX_INSTANCE_OBJECT + 1] = {};
