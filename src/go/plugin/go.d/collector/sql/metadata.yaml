@@ -35,31 +35,31 @@ modules:
           Metrics and charts for this collector are **entirely defined by your SQL
           configuration**. There is no fixed metric reference: each job can expose
           different metrics depending on its `metrics` and `queries` blocks.
-  
+
           To see what a specific job collects, open that job’s dashboard in Netdata
           and inspect the charts and dimensions it created.
-  
+
           :::tip
-  
+
           To change what is collected, edit the `metrics` (and optional `queries`)
           in the job configuration. After you save the changes, the updated set of
           charts and metrics is reflected in Netdata after the next data collection.
-  
+
           :::
         method_description: |
           The collector connects to your database using Go’s **database/sql** package
           and the selected driver:
-    
+
             - `mysql` — MySQL / MariaDB
             - `pgx`   — PostgreSQL
             - `oracle` — Oracle Database
-    
+
           For each metric block you define, it executes the SQL query (inline or via
           `query_ref`), reads the result set, and maps it to Netdata charts and
           dimensions.
-          
+
           ### Result Processing Modes
-          
+
           | Mode       | How it works                                                                 | Best used when                                      |
           |------------|------------------------------------------------------------------------------|-----------------------------------------------------|
           | **columns**| Specific numeric columns from each row become dimensions on your charts.     | The result set has stable, known column names.      |
@@ -76,14 +76,14 @@ modules:
             There are no built-in limits on the number of queries or rows processed.
             However, each metric block must define at least one chart, and each chart
             must define at least one dimension.
-            
+
             Keep your queries lightweight and scoped to the data you actually need
             to avoid adding load on the database server.
         performance_impact:
           description: |
             Performance impact depends entirely on the queries you configure and the
             collection frequency (update_every).
-            
+
             Prefer indexed reads, avoid full table scans or heavy aggregations, and
             consider using database views tailored for monitoring.
       additional_permissions:
@@ -98,12 +98,12 @@ modules:
             description: |
               Create a dedicated user for Netdata with read-only privileges on the
               views/tables used in your monitoring queries.
-              
+
               For example, on a typical RDBMS you would:
-              
+
               - Create a user.
               - Grant SELECT on system metrics views or monitoring views.
-              
+
               After creating the user and updating the configuration, restart the
               Netdata Agent with `sudo systemctl restart netdata`, or the appropriate
               method for your system.
@@ -111,10 +111,10 @@ modules:
             description: |
               Ensure the Netdata host can reach the database via the configured DSN,
               either using:
-              
+
               - a local UNIX/TCP socket, or
               - a network connection (hostname/IP and port).
-              
+
               If the database is remote, make sure any firewalls or security groups
               allow connections from the Netdata node.
       configuration:
@@ -123,52 +123,52 @@ modules:
         options:
           description: |
             **Full Configuration Structure**
-            
+
             ```yaml
             # ---------- CONNECTION ----------
             driver: <mysql|pgx|oracle>      # REQUIRED. SQL driver.
             dsn: "<connection string>"                   # REQUIRED. Driver-specific DSN/URL.
-            
+
             # Optional connection settings
             timeout: <seconds>                           # OPTIONAL. Query timeout.
-            
+
             # Optional static labels applied to all charts
             static_labels:
               <label_key1>: <label_value>
               <label_key2>: <label_value>
-            
+
             # ---------- REUSABLE QUERIES ----------
             # Optional. Define reusable SQL queries referenced later via query_ref.
             queries:
               - id: <query_id>
                 query: |
                   SELECT ...
-            
+
             # ---------- METRICS ----------
             # Each metric block runs one query and generates one or more charts.
             metrics:
               - id: <metric_block_id>                    # REQUIRED. Unique within this job.
-            
+
                 # Choose ONE of these:
                 query_ref: <query_id>                    # Use a reusable query
                 # OR
                 # query: |                               # Inline SQL
                 #   SELECT ...
-            
+
                 mode: <columns|kv>                       # REQUIRED. How to interpret result rows.
-            
+
                 # KV mode settings (only when mode: kv)
                 kv_mode:
                   name_col: <column_name>                # Column containing keys
                   value_col: <column_name>               # Column containing numeric values
-            
+
                 # Optional: derive labels from row columns (creates per-label charts)
                 labels_from_row:
                   - source: <column_name>                # Column name from result set
                     name: <label_key>                    # Label key exposed to Netdata
                   - source: <column_name>
                     name: <label_key>
-            
+
                 # Charts produced by this metric block
                 charts:
                   - title: "<Chart Title>"               # REQUIRED. Shown in dashboards.
@@ -177,20 +177,20 @@ modules:
                     units: "<units>"                     # REQUIRED. Unit string for the chart.
                     type: <line|stacked|area>            # OPTIONAL. Default: line.
                     algorithm: <absolute|incremental>    # OPTIONAL. Default: absolute.
-            
+
                     dims:
                       # ---- COLUMNS MODE DIM ----
                       # In mode: columns, `source` MUST be a numeric COLUMN name from the result set.
                       - name: <dim_id>                   # REQUIRED. Dimension id (unique within this chart).
                         source: <column_name>            # REQUIRED. Numeric column to chart.
-            
+
                       # ---- KV MODE DIM ----
                       # In mode: kv, `source` MUST be a KEY name (NOT a column).
                       # The collector finds the row where (row[kv_mode.name_col] == `source`)
                       # and uses row[kv_mode.value_col].
                       - name: <dim_id>
                         source: <key_name>               # REQUIRED. Key name resolved via kv_mode.name_col.
-            
+
                       # ---- STATUS DIM (one-hot 1/0) ----
                       # Works in BOTH modes. Evaluates `status_when` against the resolved value:
                       #   * columns mode: the value in the specified column for the row
@@ -272,9 +272,9 @@ modules:
                 PostgreSQL example that collects database-level conflict counters from
                 `pg_stat_database_conflicts` and creates a separate chart instance per
                 database using `labels_from_row`.
-                
+
                 The query:
-                
+
                 ```sql
                 SELECT
                   datname,
@@ -285,14 +285,14 @@ modules:
                   confl_deadlock
                 FROM pg_stat_database_conflicts;
                 ```
-                
+
                 Example output:
-                
+
                 | datname    | confl_tablespace | confl_lock | confl_snapshot | confl_bufferpin | confl_deadlock |
                 |------------|------------------|------------|----------------|-----------------|----------------|
                 | postgres   | 0                | 0          | 0              | 0               | 0              |
                 | production | 0                | 0          | 0              | 0               | 0              |
-                
+
                 This configuration turns each row into a **chart instance** (one for
                 `db=postgres`, one for `db=production`) with five dimensions
                 (`confl_tablespace`, `confl_lock`, `confl_snapshot`, `confl_bufferpin`,
@@ -303,7 +303,7 @@ modules:
                     driver: pgx
                     dsn: 'postgresql://netdata:password@127.0.0.1:5432/postgres'
                     timeout: 5
-                
+
                     metrics:
                       - id: conflicts
                         mode: columns
@@ -342,22 +342,22 @@ modules:
               description: |
                 PostgreSQL example that exposes a single numeric metric (server uptime in
                 seconds) as a one-dimension chart using columns mode.
-                
+
                 The query:
-                
+
                 ```sql
                 SELECT
                   EXTRACT(
                     EPOCH FROM (now() - pg_postmaster_start_time())
                   ) AS uptime_seconds;
                 ```
-                
+
                 Example output:
-                
+
                 | uptime_seconds |
                 |----------------|
                 | 50.867359      |
-                
+
                 This configuration maps the `uptime_seconds` column to a single
                 `uptime` dimension on the `sql.pg_uptime` chart.
               config: |
@@ -366,7 +366,7 @@ modules:
                     driver: pgx
                     dsn: 'postgresql://netdata:password@127.0.0.1:5432/postgres'
                     timeout: 5
-                
+
                     metrics:
                       - id: uptime
                         mode: columns
@@ -390,9 +390,9 @@ modules:
               description: |
                 PostgreSQL example that aggregates connection states from
                 `pg_stat_activity` and uses kv mode to map each state to a dimension.
-                
+
                 The query:
-                
+
                 ```sql
                 SELECT
                   state,
@@ -400,9 +400,9 @@ modules:
                 FROM pg_stat_activity
                 GROUP BY state;
                 ```
-                
+
                 Example output:
-                
+
                 | state                        | cnt |
                 |------------------------------|-----|
                 | active                       |   1 |
@@ -411,7 +411,7 @@ modules:
                 | idle in transaction (aborted)|   1 |
                 | fastpath function call       |   1 |
                 | disabled                     |   1 |
-                
+
                 With `mode: kv`, `state` becomes the **key** and `cnt` the **value**.
                 Each distinct `state` value is mapped to a chart dimension via `dims[*].source`.
               config: |
@@ -420,7 +420,7 @@ modules:
                     driver: pgx
                     dsn: 'postgresql://netdata:password@127.0.0.1:5432/postgres'
                     timeout: 5
-                
+
                     metrics:
                       - id: activity_states
                         mode: kv
@@ -458,15 +458,15 @@ modules:
               description: |
                 Simple PostgreSQL example that turns a boolean-like state into a 0/1
                 status metric using `status_when`.
-                
+
                 The query:
-                
+
                 ```sql
                 SELECT pg_is_in_recovery();
                 ```
-                
+
                 Example output:
-                
+
                 | pg_is_in_recovery |
                 |-------------------|
                 | f                 |
@@ -480,7 +480,7 @@ modules:
                     driver: pgx
                     dsn: 'postgresql://netdata:password@127.0.0.1:5432/postgres'
                     timeout: 5
-                
+
                     metrics:
                       - id: recovery_status
                         mode: columns
