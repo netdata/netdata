@@ -25,6 +25,12 @@ void rrdr2csv(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS options, const 
         if(options & RRDR_OPTION_LABEL_QUOTES) buffer_strcat(wb, "\"");
         i++;
     }
+
+    if(!i) {
+        // no dimensions present
+        return;
+    }
+
     buffer_strcat(wb, endline);
 
     if(format == DATASOURCE_CSV_MARKDOWN) {
@@ -46,11 +52,6 @@ void rrdr2csv(RRDR *r, BUFFER *wb, uint32_t format, RRDR_OPTIONS options, const 
             i++;
         }
         buffer_strcat(wb, endline);
-    }
-
-    if(!i) {
-        // no dimensions present
-        return;
     }
 
     long start = 0, end = rrdr_rows(r), step = 1;
