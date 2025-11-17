@@ -2189,6 +2189,9 @@ add_library(libnetdata STATIC ${LIBNETDATA_FILES})
 
 target_include_directories(libnetdata BEFORE PUBLIC ${CONFIG_H_DIR} ${CMAKE_SOURCE_DIR}/src)
 
+# Enable UTF-8 escaping in JSON output to ensure compatibility with btoa() in browsers
+target_compile_definitions(libnetdata PRIVATE BUFFER_JSON_ESCAPE_UTF)
+
 # pthread (FIXME: use find_package for this)
 
 # set(CMAKE_THREAD_PREFER_PTHREAD TRUE)

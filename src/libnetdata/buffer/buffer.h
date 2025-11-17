@@ -310,26 +310,78 @@ static void buffer_json_strcat(BUFFER *wb, const char *txt)
             if(unlikely(IS_UTF8_STARTBYTE(*t) && IS_UTF8_BYTE(t[1]))) {
                 // UTF-8 multi-byte encoded character
 
-                // find how big this character is (2-4 bytes)
-                size_t utf_character_size = 2;
-                while(utf_character_size < 4 && t[utf_character_size] && IS_UTF8_BYTE(t[utf_character_size]) && !IS_UTF8_STARTBYTE(t[utf_character_size]))
-                    utf_character_size++;
-
+                // Decode UTF-8 sequence to Unicode code point
                 uint32_t code_point = 0;
-                for (size_t i = 0; i < utf_character_size; i++) {
-                    code_point <<= 6;
-                    code_point |= (t[i] & 0x3F);
+                size_t utf_character_size = 0;
+
+                if((*t & 0xE0) == 0xC0) {
+                    // 2-byte sequence: 110xxxxx 10xxxxxx
+                    if(IS_UTF8_BYTE(t[1]) && !IS_UTF8_STARTBYTE(t[1])) {
+                        code_point = ((t[0] & 0x1F) << 6) | (t[1] & 0x3F);
+                        utf_character_size = 2;
+                    }
+                }
+                else if((*t & 0xF0) == 0xE0) {
+                    // 3-byte sequence: 1110xxxx 10xxxxxx 10xxxxxx
+                    if(t[1] && IS_UTF8_BYTE(t[1]) && !IS_UTF8_STARTBYTE(t[1]) &&
+                       t[2] && IS_UTF8_BYTE(t[2]) && !IS_UTF8_STARTBYTE(t[2])) {
+                        code_point = ((t[0] & 0x0F) << 12) | ((t[1] & 0x3F) << 6) | (t[2] & 0x3F);
+                        utf_character_size = 3;
+                    }
+                }
+                else if((*t & 0xF8) == 0xF0) {
+                    // 4-byte sequence: 11110xxx 10xxxxxx 10xxxxxx 10xxxxxx
+                    if(t[1] && IS_UTF8_BYTE(t[1]) && !IS_UTF8_STARTBYTE(t[1]) &&
+                       t[2] && IS_UTF8_BYTE(t[2]) && !IS_UTF8_STARTBYTE(t[2]) &&
+                       t[3] && IS_UTF8_BYTE(t[3]) && !IS_UTF8_STARTBYTE(t[3])) {
+                        code_point = ((t[0] & 0x07) << 18) | ((t[1] & 0x3F) << 12) | ((t[2] & 0x3F) << 6) | (t[3] & 0x3F);
+                        utf_character_size = 4;
+                    }
                 }
 
-                t += utf_character_size;
+                if(utf_character_size > 0) {
+                    t += utf_character_size;
 
-                // encode as \u escape sequence
-                *d++ = '\\';
-                *d++ = 'u';
-                *d++ = hex_digits[(code_point >> 12) & 0xf];
-                *d++ = hex_digits[(code_point >> 8) & 0xf];
-                *d++ = hex_digits[(code_point >> 4) & 0xf];
-                *d++ = hex_digits[code_point & 0xf];
+                    // Encode as \uXXXX escape sequence (or \uXXXX\uXXXX for surrogate pairs)
+                    if(code_point <= 0xFFFF) {
+                        // Basic Multilingual Plane - single \uXXXX
+                        *d++ = '\\';
+                        *d++ = 'u';
+                        *d++ = hex_digits[(code_point >> 12) & 0xf];
+                        *d++ = hex_digits[(code_point >> 8) & 0xf];
+                        *d++ = hex_digits[(code_point >> 4) & 0xf];
+                        *d++ = hex_digits[code_point & 0xf];
+                    }
+                    else if(code_point <= 0x10FFFF) {
+                        // Supplementary planes - use UTF-16 surrogate pair
+                        code_point -= 0x10000;
+                        uint16_t high = 0xD800 + ((code_point >> 10) & 0x3FF);
+                        uint16_t low = 0xDC00 + (code_point & 0x3FF);
+
+                        // High surrogate
+                        *d++ = '\\';
+                        *d++ = 'u';
+                        *d++ = hex_digits[(high >> 12) & 0xf];
+                        *d++ = hex_digits[(high >> 8) & 0xf];
+                        *d++ = hex_digits[(high >> 4) & 0xf];
+                        *d++ = hex_digits[high & 0xf];
+
+                        // Low surrogate
+                        *d++ = '\\';
+                        *d++ = 'u';
+                        *d++ = hex_digits[(low >> 12) & 0xf];
+                        *d++ = hex_digits[(low >> 8) & 0xf];
+                        *d++ = hex_digits[(low >> 4) & 0xf];
+                        *d++ = hex_digits[low & 0xf];
+                    }
+                    else {
+                        // Invalid code point, skip it
+                    }
+                }
+                else {
+                    // Invalid UTF-8 sequence, skip the start byte
+                    t++;
+                }
             }
             else
 #endif
