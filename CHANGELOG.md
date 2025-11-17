@@ -202,6 +202,7 @@
 - Reorganize MSSQL collection. ([#21290](https://github.com/netdata/netdata/issues/21290))
 - Fix repository URLs for openSUSE Tumbleweed. ([#21296](https://github.com/netdata/netdata/issues/21296))
 - Sensors (windows.plugin) ([#21266](https://github.com/netdata/netdata/issues/21266))
+- Account deletion update ([#21293](https://github.com/netdata/netdata/issues/21293))
 
 ## [2.7.0] - 2025-09-25
 
