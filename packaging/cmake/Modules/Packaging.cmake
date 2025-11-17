@@ -17,6 +17,44 @@ set(CPACK_DEBIAN_DEBUGINFO_PACKAGE NO)
 set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS YES)
 set(CPACK_DEBIAN_COMPRESSION_TYPE "xz")
 
+if(OS_LINUX)
+  set(OS_DISTRO_ID "unknown")
+  set(OS_VERSION_ID "unknown")
+
+  find_file(OS_RELEASE_PATH os-release PATHS /etc /usr/lib
+            NO_DEFAULT_PATH
+            NO_PACKAGE_ROOT_PATH
+            NO_CMAKE_PATH
+            NO_CMAKE_ENVIRONMENT_PATH
+            NO_SYSTEM_ENVIRONMENT_PATH
+            NO_CMAKE_SYSTEM_PATH
+            NO_CMAKE_INSTALL_PREFIX)
+
+  if(NOT OS_RELEASE_PATH STREQUAL OS_RELEASE_PATH-NOTFOUND)
+    file(STRINGS "${OS_RELEASE_PATH}" OS_RELEASE_LINES)
+
+    foreach(_line IN LISTS OS_RELEASE_LINES)
+      if(_line MATCHES "^ID=.*$")
+        string(SUBSTRING "${_line}" 3 -1 OS_DISTRO_ID)
+        string(REPLACE "\"" "" OS_DISTRO_ID "${OS_DISTRO_ID}")
+      elseif(_line MATCHES "^VERSION_ID=.*$")
+        string(SUBSTRING "${_line}" 11 -1 OS_VERSION_ID)
+        string(REPLACE "\"" "" OS_VERSION_ID "${OS_VERSION_ID}")
+      endif()
+    endforeach()
+  endif()
+
+  if(OS_DISTRO_ID STREQUAL "debian")
+    if(OS_VERSION_ID VERSION_GREATER_EQUAL 12)
+      set(CPACK_DEBIAN_COMPRESSION_TYPE "zstd")
+    endif()
+  elseif(OS_DISTRO_ID STREQUAL "ubuntu")
+    if(OS_VERSION_ID VERSION_GREATER_EQUAL 21.10)
+      set(CPACK_DEBIAN_COMPRESSION_TYPE "zstd")
+    endif()
+  endif()
+endif()
+
 set(CPACK_PACKAGING_INSTALL_PREFIX "/")
 
 set(CPACK_PACKAGE_VENDOR "Netdata Inc.")
