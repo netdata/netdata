@@ -1286,7 +1286,7 @@ static void netdata_read_config_options()
         dbconn->collect_buffer = inicfg_get_boolean(
                 &netdata_config, section_name, "collect buffer stats", true);
         dbconn->collect_data_size = inicfg_get_boolean(
-                &netdata_config, section_name, "collect data size", true);
+                &netdata_config, section_name, "collect database size", true);
         dbconn->is_connected = FALSE;
 
         netdata_mount_mssql_connection_string(dbconn);

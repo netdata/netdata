@@ -2229,6 +2229,34 @@ modules:
               description: Set to yes when running SQL Express version.
               default_value: no
               required: false
+            - name: collect transactions
+              description: Run queries to collect information from the server's transactions.
+              default_value: yes
+              required: false
+            - name: collect waits
+              description: Run queries to collect information from the server's lock waits.
+              default_value: yes
+              required: false
+            - name: collect lock metrics
+              description: Run queries to collect information from the server's overall locks.
+              default_value: yes
+              required: false
+            - name: collect replication
+              description: Run queries to collect information from the server's replication.
+              default_value: yes
+              required: false
+            - name: collect jobs
+              description: Run queries to collect information from the server's jobs.
+              default_value: yes
+              required: false
+            - name: collect buffer stats
+              description: Run queries to collect information from the server's buffer statistics.
+              default_value: yes
+              required: false
+            - name: collect database size
+              description: Run queries to collect information from the server's database size.
+              default_value: yes
+              required: false
         examples:
           folding:
             enabled: true
