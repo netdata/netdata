@@ -20,7 +20,7 @@
       },
       "driver": {
         "title": "Driver",
-        "description": "SQL driver / database engine to use. Supported values: `mysql` (MySQL/MariaDB), `pgx` (PostgreSQL), `oracle`, `sqlserver` (Microsoft SQL Server).",
+        "description": "SQL driver / database engine to use. Supported values: `mysql` (MySQL/MariaDB), `pgx` (PostgreSQL), `oracle` (OracleDB), `sqlserver` (Microsoft SQL Server).",
         "type": "string",
         "enum": [
           "mysql",

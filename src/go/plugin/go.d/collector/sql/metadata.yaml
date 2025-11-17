@@ -228,7 +228,10 @@ modules:
               group: Target
             - name: dsn
               description: >
-                Database connection string (DSN). The format depends on the selected driver.
+                Database connection string (DSN). The format depends on the selected driver (
+                ([MySQL](https://github.com/go-sql-driver/mysql#dsn-data-source-name),
+                [PostgreSQL](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING-URIS),
+                [MS SQL Server](https://github.com/denisenkom/go-mssqldb#connection-parameters-and-dsn)).
               default_value: ""
               required: true
               group: Target
