@@ -15,12 +15,9 @@ type Config struct {
 	UpdateEvery        int `yaml:"update_every,omitempty" json:"update_every"`
 	AutoDetectionRetry int `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
 
-	Driver          string           `yaml:"driver" json:"driver"`
-	DSN             string           `yaml:"dsn" json:"dsn"`
-	Timeout         confopt.Duration `yaml:"timeout" json:"timeout"`
-	MaxOpenConns    int              `yaml:"max_open_conns,omitempty" json:"max_open_conns"`
-	MaxIdleConns    int              `yaml:"max_idle_conns,omitempty" json:"max_idle_conns"`
-	ConnMaxLifetime confopt.Duration `yaml:"conn_max_lifetime" json:"conn_max_lifetime"`
+	Driver  string           `yaml:"driver" json:"driver"`
+	DSN     string           `yaml:"dsn" json:"dsn"`
+	Timeout confopt.Duration `yaml:"timeout" json:"timeout"`
 
 	StaticLabels map[string]string   `yaml:"static_labels,omitempty" json:"static_labels"`
 	Queries      []ConfigQueryDef    `yaml:"queries,omitempty" json:"queries"`
@@ -66,7 +63,7 @@ type (
 	ConfigDimConfig struct {
 		Name       string            `yaml:"name" json:"name"`
 		Source     string            `yaml:"source" json:"source"`
-		StatusWhen *ConfigStatusWhen `yaml:"status_when" json:"status_when,omitempty"`
+		StatusWhen *ConfigStatusWhen `yaml:"status_when,omitempty" json:"status_when,omitempty"`
 	}
 	ConfigStatusWhen struct {
 		Equals string   `yaml:"equals,omitempty" json:"equals,omitempty"`
@@ -195,7 +192,7 @@ func (c *Collector) validateConfig() error {
 						if err != nil {
 							errs = append(errs, fmt.Errorf("invalid regex in status_when.match for metric %q: %w", m.ID, err))
 						} else {
-							ch.Dims[i].StatusWhen.re = re
+							ch.Dims[d].StatusWhen.re = re
 						}
 						count++
 					}

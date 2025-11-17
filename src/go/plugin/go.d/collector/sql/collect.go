@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/metrix"
 )
@@ -64,7 +65,7 @@ func (c *Collector) collectMetrics(mx map[string]int64, mcache QueryRowsCache) e
 func (c *Collector) collectMetricsModeColumns(mx map[string]int64, m ConfigMetricBlock, rows []map[string]string) error {
 	for _, ch := range m.Charts {
 		for _, row := range rows {
-			chartID := buildChartID(m, ch, row)
+			chartID := c.buildChartID(m, ch, row)
 			if chartID == "" {
 				continue
 			}
@@ -99,7 +100,7 @@ func (c *Collector) collectMetricsModeKV(mx map[string]int64, m ConfigMetricBloc
 
 	for _, ch := range m.Charts {
 		for _, row := range rows {
-			chartID := buildChartID(m, ch, row)
+			chartID := c.buildChartID(m, ch, row)
 			if chartID == "" {
 				continue
 			}
@@ -148,15 +149,7 @@ func (c *Collector) openConnection() error {
 		return fmt.Errorf("open %s: %w (dsn=%s)", c.Driver, err, redactDSN(c.DSN))
 	}
 
-	if c.ConnMaxLifetime.Duration() > 0 {
-		db.SetConnMaxLifetime(c.ConnMaxLifetime.Duration())
-	}
-	if c.MaxOpenConns > 0 {
-		db.SetMaxOpenConns(c.MaxOpenConns)
-	}
-	if c.MaxIdleConns > 0 {
-		db.SetMaxIdleConns(c.MaxIdleConns)
-	}
+	db.SetConnMaxLifetime(time.Minute * 10)
 
 	ctx, cancel := context.WithTimeout(context.Background(), c.Timeout.Duration())
 	defer cancel()
@@ -171,13 +164,11 @@ func (c *Collector) openConnection() error {
 	return nil
 }
 
-func buildChartID(m ConfigMetricBlock, ch ConfigChartConfig, row map[string]string) string {
+func (c *Collector) buildChartID(m ConfigMetricBlock, ch ConfigChartConfig, row map[string]string) string {
 	var b strings.Builder
 	b.Grow(128)
 
-	b.WriteString(m.ID)
-	b.WriteString("_")
-	b.WriteString(ch.Context)
+	b.WriteString(c.Driver + "_" + m.ID + "_" + ch.Context)
 
 	for _, lf := range m.LabelsFromRow {
 		v, ok := row[lf.Source]

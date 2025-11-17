@@ -27,10 +27,8 @@ func init() {
 func New() *Collector {
 	return &Collector{
 		Config: Config{
-			Driver:          "mysql",
-			DSN:             "root:my-secret-pw@tcp(10.10.10.20:3306)/",
-			Timeout:         confopt.Duration(time.Second * 5),
-			ConnMaxLifetime: confopt.Duration(time.Minute * 10),
+			Driver:  "mysql",
+			Timeout: confopt.Duration(time.Second * 5),
 		},
 		charts:     &module.Charts{},
 		seenCharts: make(map[string]bool),

@@ -21,6 +21,8 @@ modules:
         - database
         - sql
         - mysql
+        - maria
+        - pgx
         - postgres
         - postgresql
         - oracle
@@ -30,44 +32,45 @@ modules:
       multi_instance: true
       data_collection:
         metrics_description: |
-          This collector provides a **generic and fully customizable SQL monitoring
-          framework**. Instead of predefined charts, it allows you to define **any SQL
-          queries** and convert their results into Netdata metrics.
-          
-          You can collect **any numeric or status-like data** exposed by your database
-          through SQL. All charts and dimensions are created dynamically based on your
-          configuration.
-          
+          Metrics and charts for this collector are **entirely defined by your SQL
+          configuration**. There is no fixed metric reference: each job can expose
+          different metrics depending on its `metrics` and `queries` blocks.
+  
+          To see what a specific job collects, open that job’s dashboard in Netdata
+          and inspect the charts and dimensions it created.
+  
           :::tip
-
-          Everything shown on the dashboard comes directly from **your SQL queries**
-          and how you configure their results to be interpreted.
-
+  
+          To change what is collected, edit the `metrics` (and optional `queries`)
+          in the job configuration. After you save the changes, the updated set of
+          charts and metrics is reflected in Netdata after the next data collection.
+  
           :::
-          
-          Supported SQL drivers:
-          - **MySQL / MariaDB**
-          - **PostgreSQL**
-          - **Oracle**
         method_description: |
           The collector connects to your database using Go’s **database/sql** package
-          and the selected driver (`mysql`, `postgres`, or `oracle`). For each metric
-          block you configure, it executes the corresponding SQL query (inline or via
-          `query_ref`) and processes the result set.
+          and the selected driver:
+    
+            - `mysql` — MySQL / MariaDB
+            - `pgx`   — PostgreSQL
+            - `oracle` — Oracle Database
+    
+          For each metric block you define, it executes the SQL query (inline or via
+          `query_ref`), reads the result set, and maps it to Netdata charts and
+          dimensions.
           
           ### Result Processing Modes
           
-          | Mode       | How it works | Best used when |
-          |------------|--------------|----------------|
-          | **columns** | Treats specific columns from each row as metric dimensions. | The query output has known, stable column names. |
-          | **kv**      | Treats one column as a *name* (dimension key) and another as its numeric value. | Results represent dynamic key–value pairs. |
+          | Mode       | How it works                                                                 | Best used when                                      |
+          |------------|------------------------------------------------------------------------------|-----------------------------------------------------|
+          | **columns**| Specific numeric columns from each row become dimensions on your charts.     | The result set has stable, known column names.      |
+          | **kv**     | One column provides metric names (keys) and another provides their values.   | The set of metrics is dynamic or key–value shaped.  |
       default_behavior:
         auto_detection:
           description: |
             This is a **generic collector** and does **not** perform automatic detection.
-            
-            It does not create any jobs on its own — you need to [configure at least one
-            job](#setup) before it can collect data.
+
+            It does not create any jobs on its own — you must configure at least one
+            job before it can collect data.
         limits:
           description: |
             There are no built-in limits on the number of queries or rows processed.
@@ -123,14 +126,11 @@ modules:
             
             ```yaml
             # ---------- CONNECTION ----------
-            driver: <postgres|mysql|mariadb|oracle>      # REQUIRED. SQL driver.
+            driver: <mysql|pgx|oracle>      # REQUIRED. SQL driver.
             dsn: "<connection string>"                   # REQUIRED. Driver-specific DSN/URL.
             
             # Optional connection settings
             timeout: <seconds>                           # OPTIONAL. Query timeout.
-            max_open_conns: <number>                     # OPTIONAL.
-            max_idle_conns: <number>                     # OPTIONAL.
-            conn_max_lifetime: <seconds>                 # OPTIONAL.
             
             # Optional static labels applied to all charts
             static_labels:
@@ -235,21 +235,6 @@ modules:
               default_value: 5
               required: false
               group: Connection
-            - name: max_open_conns
-              description: Maximum number of open connections. 0 means use the driver default.
-              default_value: 0
-              required: false
-              group: Connection
-            - name: max_idle_conns
-              description: Maximum number of idle connections in the pool. 0 means use the driver default.
-              default_value: 0
-              required: false
-              group: Connection
-            - name: conn_max_lifetime
-              description: Maximum lifetime of a connection (seconds). 0 means no limit.
-              default_value: 600
-              required: false
-              group: Connection
 
             - name: static_labels
               description: >
@@ -315,7 +300,7 @@ modules:
               config: |
                 jobs:
                   - name: pg_conflicts_per_db
-                    driver: postgres
+                    driver: pgx
                     dsn: 'postgresql://netdata:password@127.0.0.1:5432/postgres'
                     timeout: 5
                 
@@ -378,7 +363,7 @@ modules:
               config: |
                 jobs:
                   - name: pg_uptime
-                    driver: postgres
+                    driver: pgx
                     dsn: 'postgresql://netdata:password@127.0.0.1:5432/postgres'
                     timeout: 5
                 
@@ -432,7 +417,7 @@ modules:
               config: |
                 jobs:
                   - name: pg_activity_states
-                    driver: postgres
+                    driver: pgx
                     dsn: 'postgresql://netdata:password@127.0.0.1:5432/postgres'
                     timeout: 5
                 
@@ -492,7 +477,7 @@ modules:
               config: |
                 jobs:
                   - name: pg_recovery_status
-                    driver: postgres
+                    driver: pgx
                     dsn: 'postgresql://netdata:password@127.0.0.1:5432/postgres'
                     timeout: 5
                 

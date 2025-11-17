@@ -121,7 +121,6 @@ func TestCollector_Check(t *testing.T) {
 }
 
 func TestCollector_Collect(t *testing.T) {
-	t.Helper()
 
 	type testCase struct {
 		prepare func(t *testing.T, mock sqlmock.Sqlmock, coll *Collector)
@@ -200,7 +199,7 @@ SELECT
 				}
 			},
 			check: func(t *testing.T, mx map[string]int64) {
-				chartID := "bgwriter_pg.bgwriter"
+				chartID := "pgx_bgwriter_pg.bgwriter"
 
 				expected := map[string]int64{
 					buildDimID(chartID, "checkpoints_timed"):        1814,
@@ -275,8 +274,8 @@ SELECT
 				}
 			},
 			check: func(t *testing.T, mx map[string]int64) {
-				chartPostgres := "conflicts_pg.conflicts_postgres"
-				chartProduction := "conflicts_pg.conflicts_production"
+				chartPostgres := "pgx_conflicts_pg.conflicts_postgres"
+				chartProduction := "pgx_conflicts_pg.conflicts_production"
 
 				keys := []string{
 					"confl_tablespace",
@@ -331,7 +330,7 @@ SELECT
 				}
 			},
 			check: func(t *testing.T, mx map[string]int64) {
-				chartID := "uptime_pg.uptime"
+				chartID := "pgx_uptime_pg.uptime"
 				key := buildDimID(chartID, "extract")
 
 				got, ok := mx[key]
@@ -388,7 +387,7 @@ SELECT
 				}
 			},
 			check: func(t *testing.T, mx map[string]int64) {
-				chartID := "activity_states_pg.activity_states"
+				chartID := "pgx_activity_states_pg.activity_states"
 
 				expected := map[string]int64{
 					buildDimID(chartID, "active"):                      1,
@@ -459,8 +458,8 @@ SELECT
 			},
 			check: func(t *testing.T, mx map[string]int64) {
 				// Chart instances are split by state label.
-				idleChartID := "xact_state_pg.activity_idle in transaction"
-				activeChartID := "xact_state_pg.activity_active"
+				idleChartID := "pgx_xact_state_pg.activity_idle in transaction"
+				activeChartID := "pgx_xact_state_pg.activity_active"
 
 				xactIdleKey := buildDimID(idleChartID, "xact_running_time")
 				queryIdleKey := buildDimID(idleChartID, "query_running_time")
@@ -547,7 +546,7 @@ SELECT
 				}
 			},
 			check: func(t *testing.T, mx map[string]int64) {
-				chartID := "xact_state_map_pg.activity"
+				chartID := "pgx_xact_state_map_pg.activity"
 
 				activeKey := buildDimID(chartID, "state_active")
 				idleKey := buildDimID(chartID, "state_idle_in_transaction")

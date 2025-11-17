@@ -6,21 +6,21 @@
     "properties": {
       "update_every": {
         "title": "Update every",
-        "description": "Data collection interval, measured in seconds.",
+        "description": "How often to collect metrics from the database, in seconds.",
         "type": "integer",
         "minimum": 1,
         "default": 1
       },
       "autodetection_retry": {
         "title": "Detection retry",
-        "description": "Recheck interval in seconds. Zero disables retry.",
+        "description": "How often Netdata retries failed automatic detection jobs, in seconds. Set to 0 to disable retries.",
         "type": "integer",
         "minimum": 0,
         "default": 0
       },
       "driver": {
         "title": "Driver",
-        "description": "SQL driver to use for the connection.",
+        "description": "SQL driver / database engine to use. Supported values: `mysql` (MySQL/MariaDB), `pgx` (PostgreSQL), `oracle`.",
         "type": "string",
         "enum": [
           "mysql",
@@ -31,41 +31,19 @@
       },
       "dsn": {
         "title": "DSN",
-        "description": "Database connection string (DSN). The format depends on the selected driver (for example: Go MySQL DSN, PostgreSQL URL/keywords, Oracle DSN).",
-        "type": "string",
-        "default": "root:my-secret-pw@tcp(10.10.10.20:3306)/"
+        "description": "Database connection string (DSN). The format depends on the selected driver.",
+        "type": "string"
       },
       "timeout": {
         "title": "Timeout",
-        "description": "Timeout for queries, in seconds.",
+        "description": "Maximum time allowed for a single query and connection check, in seconds.",
         "type": "number",
         "minimum": 0,
         "default": 5
       },
-      "max_open_conns": {
-        "title": "Max open connections",
-        "description": "Maximum number of open connections to the database. Set to 0 to use the driver default.",
-        "type": "integer",
-        "minimum": 0,
-        "default": 0
-      },
-      "max_idle_conns": {
-        "title": "Max idle connections",
-        "description": "Maximum number of idle connections in the pool. Set to 0 to use the driver default.",
-        "type": "integer",
-        "minimum": 0,
-        "default": 0
-      },
-      "conn_max_lifetime": {
-        "title": "Connection max lifetime",
-        "description": "Maximum lifetime of a connection, in seconds. Set to 0 for no limit.",
-        "type": "number",
-        "minimum": 0,
-        "default": 600
-      },
       "static_labels": {
         "title": "Static labels",
-        "description": "Static labels applied to all charts emitted by this job (for example env, role, region).",
+        "description": "Key/value labels automatically added to every chart created by this job (for example `env=prod`, `region=eu-west`).",
         "type": "object",
         "additionalProperties": {
           "type": "string"
@@ -73,7 +51,7 @@
       },
       "queries": {
         "title": "Reusable queries",
-        "description": "Optional reusable SQL queries, referenced in metric blocks via query_ref.",
+        "description": "Optional list of reusable SQL queries that metric blocks can reference via `query_ref` to avoid repeating SQL text.",
         "type": "array",
         "items": {
           "title": "Query",
@@ -81,12 +59,12 @@
           "properties": {
             "id": {
               "title": "ID",
-              "description": "Unique query identifier used by metric blocks (query_ref).",
+              "description": "Unique query identifier referenced from metric blocks using `query_ref` within this job.",
               "type": "string"
             },
             "query": {
               "title": "Query",
-              "description": "SQL text to execute.",
+              "description": "SQL statement text executed when this query is referenced.",
               "type": "string"
             }
           },
@@ -98,7 +76,7 @@
       },
       "metrics": {
         "title": "Metric blocks",
-        "description": "A list of metric blocks. Each block defines how a query is executed and how its result is transformed into one or more chart.",
+        "description": "List of metric blocks. Each block runs one query and maps its result set into one or more Netdata charts.",
         "type": "array",
         "items": {
           "title": "Metric block",
@@ -111,17 +89,17 @@
             },
             "query_ref": {
               "title": "Query ref",
-              "description": "Reference to a reusable query defined in queries[]. Exactly one of query_ref or query should be set.",
+              "description": "Reference to a reusable query defined in `queries`. Exactly one of `query_ref` or `query` must be set.",
               "type": "string"
             },
             "query": {
               "title": "Inline query",
-              "description": "Inline SQL text for this metric block. Exactly one of query_ref or query should be set.",
+              "description": "Inline SQL statement for this metric block. Exactly one of `query_ref` or `query` must be set.",
               "type": "string"
             },
             "mode": {
               "title": "Mode",
-              "description": "How to interpret the result rows: columns or kv.",
+              "description": "How to interpret the result rows. `columns` treats selected columns as metrics. `kv` treats one column as metric name (key) and another as its value.",
               "type": "string",
               "enum": [
                 "columns",
@@ -131,7 +109,7 @@
             },
             "labels_from_row": {
               "title": "Labels from row",
-              "description": "Optional list of labels derived from result columns. When set, a separate chart instance is created per unique label combination.",
+              "description": "Optional labels derived from result columns. Each unique combination of label values produces a separate chart instance.",
               "type": "array",
               "items": {
                 "title": "Label from row",
@@ -139,12 +117,12 @@
                 "properties": {
                   "source": {
                     "title": "Source column",
-                    "description": "Column name from the result set to use as label value.",
+                    "description": "Name of the result column whose value will be used as the label value.",
                     "type": "string"
                   },
                   "name": {
                     "title": "Label key",
-                    "description": "Label key to expose to Netdata.",
+                    "description": "Label key/name added to the chart (for example `db`, `schema`, `table`).",
                     "type": "string"
                   }
                 },
@@ -154,26 +132,9 @@
                 ]
               }
             },
-            "kv_mode": {
-              "title": "KV mode",
-              "description": "Configuration for kv mode, mapping rows to key/value pairs.",
-              "type": "object",
-              "properties": {
-                "name_col": {
-                  "title": "Name column",
-                  "description": "Column from the result set that contains keys.",
-                  "type": "string"
-                },
-                "value_col": {
-                  "title": "Value column",
-                  "description": "Column from the result set that contains numeric values.",
-                  "type": "string"
-                }
-              }
-            },
             "charts": {
               "title": "Charts",
-              "description": "One or more Netdata charts derived from this metric block.",
+              "description": "One or more Netdata charts generated from this metric block.",
               "type": "array",
               "items": {
                 "title": "Chart",
@@ -181,33 +142,38 @@
                 "properties": {
                   "title": {
                     "title": "Title",
-                    "description": "Human-readable chart title shown in dashboards.",
+                    "description": "Human-friendly chart title shown in Netdata dashboards.",
                     "type": "string"
                   },
                   "context": {
                     "title": "Context",
-                    "description": "Netdata context name for this chart.",
+                    "description": "Base metric context name for the chart. The collector will prefix it as `sql.<driver>_<context>` to form the full Netdata context. Contexts define the metric namespace, control alert templates, and group charts across jobs and nodes.",
                     "type": "string"
                   },
                   "family": {
                     "title": "Family",
-                    "description": "Netdata chart family (grouping).",
+                    "description": "Chart family used to organize charts in the Netdata UI. You can use '/' to create hierarchical grouping levels (e.g. `Database/Connections/Active`). Each level becomes a nested section in the dashboard.",
                     "type": "string"
                   },
                   "type": {
                     "title": "Type",
-                    "description": "Netdata chart type.",
+                    "description": "Visual type of the chart.",
                     "type": "string",
+                    "enum": [
+                      "line",
+                      "stacked",
+                      "area"
+                    ],
                     "default": "line"
                   },
                   "units": {
                     "title": "Units",
-                    "description": "Unit string for all dimensions in this chart.",
+                    "description": "Unit label for all dimensions in this chart (for example `queries/s`, `bytes`, `connections`).",
                     "type": "string"
                   },
                   "algorithm": {
                     "title": "Algorithm",
-                    "description": "Netdata calculation algorithm.",
+                    "description": "How Netdata interprets values: `absolute` for values that are already final, `incremental` for monotonically increasing counters.",
                     "type": "string",
                     "enum": [
                       "absolute",
@@ -217,7 +183,7 @@
                   },
                   "dims": {
                     "title": "Dimensions",
-                    "description": "Dimensions (metrics) in this chart.",
+                    "description": "Definitions of the metrics (dimensions) that belong to this chart.",
                     "type": "array",
                     "items": {
                       "title": "Dimension",
@@ -225,27 +191,27 @@
                       "properties": {
                         "name": {
                           "title": "Name",
-                          "description": "Netdata dimension id (unique within this chart).",
+                          "description": "Dimension identifier, unique within this chart. Also used as the legend name.",
                           "type": "string"
                         },
                         "source": {
                           "title": "Source",
-                          "description": "In columns mode: numeric column name. In kv mode: key name.",
+                          "description": "In `columns` mode: the numeric result column to read. In `kv` mode: the key name that must match a value in `kv_mode.name_col`.",
                           "type": "string"
                         },
                         "status_when": {
                           "title": "Status when",
-                          "description": "Optional condition that turns this dimension into a 0/1 status metric.",
+                          "description": "Optional condition that turns this dimension into a boolean 0/1 status metric. The dimension is 1 if any row matches the condition, otherwise 0.",
                           "type": "object",
                           "properties": {
                             "equals": {
                               "title": "Equals",
-                              "description": "Set to 1 when the value equals this literal, otherwise 0.",
+                              "description": "Use 1 when the value is exactly equal to this literal, otherwise 0. Only one of `equals`, `in`, or `match` may be set.",
                               "type": "string"
                             },
                             "in": {
                               "title": "In",
-                              "description": "Set to 1 when the value is in this list, otherwise 0.",
+                              "description": "Use 1 when the value is equal to any element in this list, otherwise 0. Only one of `equals`, `in`, or `match` may be set.",
                               "type": "array",
                               "items": {
                                 "type": "string"
@@ -253,7 +219,7 @@
                             },
                             "match": {
                               "title": "Match (regex)",
-                              "description": "Set to 1 when the value matches this regular expression, otherwise 0.",
+                              "description": "Use 1 when the value matches this regular expression, otherwise 0. Only one of `equals`, `in`, or `match` may be set.",
                               "type": "string"
                             }
                           }
@@ -298,22 +264,25 @@
                     },
                     "kv_mode": {
                       "title": "KV mode",
-                      "description": "Configuration for kv mode, mapping rows to key/value pairs.",
+                      "description": "Configuration for `kv` mode that tells the collector which columns hold the key and value.",
                       "type": "object",
                       "properties": {
                         "name_col": {
                           "title": "Name column",
-                          "description": "Column from the result set that contains keys.",
+                          "description": "Name of the result column that contains metric keys (for example `state`).",
                           "type": "string"
                         },
                         "value_col": {
                           "title": "Value column",
-                          "description": "Column from the result set that contains numeric values.",
+                          "description": "Name of the result column that contains numeric metric values for each key.",
                           "type": "string"
                         }
                       }
                     }
-                  }
+                  },
+                  "required": [
+                    "kv_mode"
+                  ]
                 }
               ]
             }
@@ -322,7 +291,7 @@
       },
       "vnode": {
         "title": "Vnode",
-        "description": "Associates this data collection job with a Virtual Node.",
+        "description": "Name of the Virtual Node this job should send its metrics to. Leave empty to use the local node.",
         "type": "string"
       }
     },
@@ -346,18 +315,25 @@
             "driver",
             "dsn",
             "timeout",
-            "max_open_conns",
-            "max_idle_conns",
-            "conn_max_lifetime",
             "vnode"
           ]
         },
         {
-          "title": "Queries & Metrics",
+          "title": "Metrics",
           "fields": [
-            "static_labels",
-            "queries",
             "metrics"
+          ]
+        },
+        {
+          "title": "Reusable Queries",
+          "fields": [
+            "queries"
+          ]
+        },
+        {
+          "title": "Static Labels",
+          "fields": [
+            "static_labels"
           ]
         }
       ]
@@ -375,7 +351,8 @@
       }
     },
     "dsn": {
-      "ui:placeholder": "For example: root:password@tcp(127.0.0.1:3306)/ or postgresql://user:pass@host:5432/dbname"
+      "ui:placeholder": "Enter the database connection string",
+      "ui:help": "**DSN format depends on the selected driver.**\n\n### MySQL / MariaDB\nFormat: `user:password@tcp(host:port)/dbname?param1=value1&paramN=valueN`\nExample:\n```\nroot:pass@tcp(127.0.0.1:3306)/\n```\n[MySQL DSN documentation](https://github.com/go-sql-driver/mysql#dsn-data-source-name)\n\n### PostgreSQL\nFormats: `postgresql://user:password@host:5432/dbname?param1=value1&paramN=valueN`\nExample:\n```\npostgresql://user:pass@localhost:5432/mydb\n```\n[PostgreSQL DSN documentation](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING-URIS)\n\n### Oracle\nFormat: `oracle://username:password@host:port/service?param1=value1&paramN=valueN`\nExample:\n```\noracle://scott:tiger@db.example.com:1521/ORCLPDB1?ssl=off\n```"
     },
     "static_labels": {
       "ui:help": "Optional key/value labels added to every chart created by this job (for example env=prod, role=primary)."
@@ -389,6 +366,15 @@
     },
     "metrics": {
       "items": {
+        "ui:order": [
+          "id",
+          "query_ref",
+          "query",
+          "mode",
+          "kv_mode",
+          "labels_from_row",
+          "charts"
+        ],
         "mode": {
           "ui:widget": "radio",
           "ui:options": {
@@ -397,6 +383,16 @@
         },
         "query": {
           "ui:widget": "textarea"
+        },
+        "charts": {
+          "items": {
+            "type": {
+              "ui:widget": "radio",
+              "ui:options": {
+                "inline": true
+              }
+            }
+          }
         }
       }
     }
