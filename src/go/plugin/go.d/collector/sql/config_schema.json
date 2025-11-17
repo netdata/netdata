@@ -1,0 +1,401 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "SQL collector configuration.",
+    "type": "object",
+    "properties": {
+      "update_every": {
+        "title": "Update every",
+        "description": "How often to collect metrics from the database, in seconds.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 1
+      },
+      "autodetection_retry": {
+        "title": "Detection retry",
+        "description": "How often Netdata retries failed automatic detection jobs, in seconds. Set to 0 to disable retries.",
+        "type": "integer",
+        "minimum": 0,
+        "default": 0
+      },
+      "driver": {
+        "title": "Driver",
+        "description": "SQL driver / database engine to use. Supported values: `mysql` (MySQL/MariaDB), `pgx` (PostgreSQL), `oracle` (OracleDB), `sqlserver` (Microsoft SQL Server).",
+        "type": "string",
+        "enum": [
+          "mysql",
+          "pgx",
+          "oracle",
+          "sqlserver"
+        ],
+        "default": "mysql"
+      },
+      "dsn": {
+        "title": "DSN",
+        "description": "Database connection string (DSN). The format depends on the selected driver.",
+        "type": "string"
+      },
+      "timeout": {
+        "title": "Timeout",
+        "description": "Maximum time allowed for a single query and connection check, in seconds.",
+        "type": "number",
+        "minimum": 0,
+        "default": 5
+      },
+      "static_labels": {
+        "title": "Static labels",
+        "description": "Key/value labels automatically added to every chart created by this job (for example `env=prod`, `region=eu-west`).",
+        "type": "object",
+        "additionalProperties": {
+          "type": "string"
+        }
+      },
+      "queries": {
+        "title": "Reusable queries",
+        "description": "Optional list of reusable SQL queries that metric blocks can reference via `query_ref` to avoid repeating SQL text.",
+        "type": "array",
+        "items": {
+          "title": "Query",
+          "type": "object",
+          "properties": {
+            "id": {
+              "title": "ID",
+              "description": "Unique query identifier referenced from metric blocks using `query_ref` within this job.",
+              "type": "string"
+            },
+            "query": {
+              "title": "Query",
+              "description": "SQL statement text executed when this query is referenced.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "query"
+          ]
+        }
+      },
+      "metrics": {
+        "title": "Metric blocks",
+        "description": "List of metric blocks. Each block runs one query and maps its result set into one or more Netdata charts.",
+        "type": "array",
+        "items": {
+          "title": "Metric block",
+          "type": "object",
+          "properties": {
+            "id": {
+              "title": "ID",
+              "description": "Metric block identifier. Must be unique within this job.",
+              "type": "string"
+            },
+            "query_ref": {
+              "title": "Query ref",
+              "description": "Reference to a reusable query defined in `queries`. Exactly one of `query_ref` or `query` must be set.",
+              "type": "string"
+            },
+            "query": {
+              "title": "Inline query",
+              "description": "Inline SQL statement for this metric block. Exactly one of `query_ref` or `query` must be set.",
+              "type": "string"
+            },
+            "mode": {
+              "title": "Mode",
+              "description": "How to interpret the result rows. `columns` treats selected columns as metrics. `kv` treats one column as metric name (key) and another as its value.",
+              "type": "string",
+              "enum": [
+                "columns",
+                "kv"
+              ],
+              "default": "columns"
+            },
+            "labels_from_row": {
+              "title": "Labels from row",
+              "description": "Optional labels derived from result columns. Each unique combination of label values produces a separate chart instance.",
+              "type": "array",
+              "items": {
+                "title": "Label from row",
+                "type": "object",
+                "properties": {
+                  "source": {
+                    "title": "Source column",
+                    "description": "Name of the result column whose value will be used as the label value.",
+                    "type": "string"
+                  },
+                  "name": {
+                    "title": "Label key",
+                    "description": "Label key/name added to the chart (for example `db`, `schema`, `table`).",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "source",
+                  "name"
+                ]
+              }
+            },
+            "charts": {
+              "title": "Charts",
+              "description": "One or more Netdata charts generated from this metric block.",
+              "type": "array",
+              "items": {
+                "title": "Chart",
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "title": "Title",
+                    "description": "Human-friendly chart title shown in Netdata dashboards.",
+                    "type": "string"
+                  },
+                  "context": {
+                    "title": "Context",
+                    "description": "Base metric context name for the chart. The collector will prefix it as `sql.<driver>_<context>` to form the full Netdata context. Contexts define the metric namespace, control alert templates, and group charts across jobs and nodes.",
+                    "type": "string"
+                  },
+                  "family": {
+                    "title": "Family",
+                    "description": "Chart family used to organize charts in the Netdata UI. You can use '/' to create hierarchical grouping levels (e.g. `Database/Connections/Active`). Each level becomes a nested section in the dashboard.",
+                    "type": "string"
+                  },
+                  "type": {
+                    "title": "Type",
+                    "description": "Visual type of the chart.",
+                    "type": "string",
+                    "enum": [
+                      "line",
+                      "stacked",
+                      "area"
+                    ],
+                    "default": "line"
+                  },
+                  "units": {
+                    "title": "Units",
+                    "description": "Unit label for all dimensions in this chart (for example `queries/s`, `bytes`, `connections`).",
+                    "type": "string"
+                  },
+                  "algorithm": {
+                    "title": "Algorithm",
+                    "description": "How Netdata interprets values: `absolute` for values that are already final, `incremental` for monotonically increasing counters.",
+                    "type": "string",
+                    "enum": [
+                      "absolute",
+                      "incremental"
+                    ],
+                    "default": "absolute"
+                  },
+                  "dims": {
+                    "title": "Dimensions",
+                    "description": "Definitions of the metrics (dimensions) that belong to this chart.",
+                    "type": "array",
+                    "items": {
+                      "title": "Dimension",
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "title": "Name",
+                          "description": "Dimension identifier, unique within this chart. Also used as the legend name.",
+                          "type": "string"
+                        },
+                        "source": {
+                          "title": "Source",
+                          "description": "In `columns` mode: the numeric result column to read. In `kv` mode: the key name that must match a value in `kv_mode.name_col`.",
+                          "type": "string"
+                        },
+                        "status_when": {
+                          "title": "Status when",
+                          "description": "Optional condition that turns this dimension into a boolean 0/1 status metric. The dimension is 1 if any row matches the condition, otherwise 0.",
+                          "type": "object",
+                          "properties": {
+                            "equals": {
+                              "title": "Equals",
+                              "description": "Use 1 when the value is exactly equal to this literal, otherwise 0. Only one of `equals`, `in`, or `match` may be set.",
+                              "type": "string"
+                            },
+                            "in": {
+                              "title": "In",
+                              "description": "Use 1 when the value is equal to any element in this list, otherwise 0. Only one of `equals`, `in`, or `match` may be set.",
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "match": {
+                              "title": "Match (regex)",
+                              "description": "Use 1 when the value matches this regular expression, otherwise 0. Only one of `equals`, `in`, or `match` may be set.",
+                              "type": "string"
+                            }
+                          }
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "source"
+                      ]
+                    }
+                  }
+                },
+                "required": [
+                  "title",
+                  "context",
+                  "family",
+                  "units",
+                  "dims"
+                ]
+              }
+            }
+          },
+          "required": [
+            "id",
+            "mode",
+            "charts"
+          ],
+          "dependencies": {
+            "mode": {
+              "oneOf": [
+                {
+                  "properties": {
+                    "mode": {
+                      "const": "columns"
+                    }
+                  }
+                },
+                {
+                  "properties": {
+                    "mode": {
+                      "const": "kv"
+                    },
+                    "kv_mode": {
+                      "title": "KV mode",
+                      "description": "Configuration for `kv` mode that tells the collector which columns hold the key and value.",
+                      "type": "object",
+                      "properties": {
+                        "name_col": {
+                          "title": "Name column",
+                          "description": "Name of the result column that contains metric keys (for example `state`).",
+                          "type": "string"
+                        },
+                        "value_col": {
+                          "title": "Value column",
+                          "description": "Name of the result column that contains numeric metric values for each key.",
+                          "type": "string"
+                        }
+                      }
+                    }
+                  },
+                  "required": [
+                    "kv_mode"
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      },
+      "vnode": {
+        "title": "Vnode",
+        "description": "Name of the Virtual Node this job should send its metrics to. Leave empty to use the local node.",
+        "type": "string"
+      }
+    },
+    "required": [
+      "driver",
+      "dsn"
+    ]
+  },
+  "uiSchema": {
+    "uiOptions": {
+      "fullPage": true
+    },
+    "ui:flavour": "tabs",
+    "ui:options": {
+      "tabs": [
+        {
+          "title": "Base",
+          "fields": [
+            "update_every",
+            "autodetection_retry",
+            "driver",
+            "dsn",
+            "timeout",
+            "vnode"
+          ]
+        },
+        {
+          "title": "Metrics",
+          "fields": [
+            "metrics"
+          ]
+        },
+        {
+          "title": "Reusable Queries",
+          "fields": [
+            "queries"
+          ]
+        },
+        {
+          "title": "Static Labels",
+          "fields": [
+            "static_labels"
+          ]
+        }
+      ]
+    },
+    "vnode": {
+      "ui:placeholder": "To use this option, first create a Virtual Node and then reference its name here."
+    },
+    "autodetection_retry": {
+      "ui:help": "This option determines how frequently (in seconds) Netdata will retry data collection jobs that failed initially; setting it to 0 disables this retry mechanism entirely."
+    },
+    "driver": {
+      "ui:widget": "radio",
+      "ui:options": {
+        "inline": true
+      }
+    },
+    "dsn": {
+      "ui:placeholder": "Enter the database connection string",
+      "ui:help": "**DSN format depends on the selected driver.**\n\n### MySQL / MariaDB\nFormat: `user:password@tcp(host:port)/dbname?param1=value1&paramN=valueN`\nExample:\n```\nroot:pass@tcp(127.0.0.1:3306)/\n```\n[MySQL DSN documentation](https://github.com/go-sql-driver/mysql#dsn-data-source-name)\n\n### PostgreSQL\nFormats: `postgresql://user:password@host:5432/dbname?param1=value1&paramN=valueN`\nExample:\n```\npostgresql://user:pass@localhost:5432/mydb\n```\n[PostgreSQL DSN documentation](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING-URIS)\n\n### Oracle\nFormat: `oracle://username:password@host:port/service?param1=value1&paramN=valueN`\nExample:\n```\noracle://scott:tiger@db.example.com:1521/ORCLPDB1?ssl=off\n```\n\n### SQL Server\nFormat: `sqlserver://username:password@host:port?database=dbname&param=value`\nExample:\n```\nsqlserver://sa:myStrong(!)Password@localhost:1433?database=master&connection+timeout=30\n```\n[SQL Server driver DSN documentation](https://github.com/denisenkom/go-mssqldb#connection-parameters-and-dsn)"
+    },
+    "static_labels": {
+      "ui:help": "Optional key/value labels added to every chart created by this job (for example env=prod, role=primary)."
+    },
+    "queries": {
+      "items": {
+        "query": {
+          "ui:widget": "textarea"
+        }
+      }
+    },
+    "metrics": {
+      "items": {
+        "ui:order": [
+          "id",
+          "query_ref",
+          "query",
+          "mode",
+          "kv_mode",
+          "labels_from_row",
+          "charts"
+        ],
+        "mode": {
+          "ui:widget": "radio",
+          "ui:options": {
+            "inline": true
+          }
+        },
+        "query": {
+          "ui:widget": "textarea"
+        },
+        "charts": {
+          "items": {
+            "type": {
+              "ui:widget": "radio",
+              "ui:options": {
+                "inline": true
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
