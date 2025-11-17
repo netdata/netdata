@@ -8,7 +8,7 @@ import (
 )
 
 // Defaults describe reusable Nagios job attributes that can be applied to
-// multiple JobConfig entries (explicit jobs or directory-generated ones).
+// multiple JobConfig entries.
 type Defaults struct {
 	Timeout          confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
 	TimeoutState     string           `yaml:"timeout_state,omitempty" json:"timeout_state"`

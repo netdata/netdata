@@ -99,45 +99,45 @@ func DiskChart(meta JobIdentity, priority int) *module.Chart {
 	return &chart
 }
 
-func SchedulerJobsChart(shard string, priority int) *module.Chart {
-	chart := schedulerChartBase(shard)
-	chart.ID = SchedulerChartID(shard, ChartSchedulerJobs)
+func SchedulerJobsChart(scheduler string, priority int) *module.Chart {
+	chart := schedulerChartBase(scheduler)
+	chart.ID = SchedulerChartID(scheduler, ChartSchedulerJobs)
 	chart.Title = "Nagios Scheduler Jobs Status"
 	chart.Units = "jobs"
 	chart.Priority = priority
 	chart.Ctx = ctxPrefix + ".scheduler.jobs"
 	chart.Dims = module.Dims{
-		{ID: SchedulerMetricKey(shard, ChartSchedulerJobs, "running"), Name: "running", Algo: module.Absolute},
-		{ID: SchedulerMetricKey(shard, ChartSchedulerJobs, "queued"), Name: "queued", Algo: module.Absolute},
-		{ID: SchedulerMetricKey(shard, ChartSchedulerJobs, "scheduled"), Name: "scheduled", Algo: module.Absolute},
+		{ID: SchedulerMetricKey(scheduler, ChartSchedulerJobs, "running"), Name: "running", Algo: module.Absolute},
+		{ID: SchedulerMetricKey(scheduler, ChartSchedulerJobs, "queued"), Name: "queued", Algo: module.Absolute},
+		{ID: SchedulerMetricKey(scheduler, ChartSchedulerJobs, "scheduled"), Name: "scheduled", Algo: module.Absolute},
 	}
 	return &chart
 }
 
-func SchedulerRateChart(shard string, priority int) *module.Chart {
-	chart := schedulerChartBase(shard)
-	chart.ID = SchedulerChartID(shard, ChartSchedulerRate)
+func SchedulerRateChart(scheduler string, priority int) *module.Chart {
+	chart := schedulerChartBase(scheduler)
+	chart.ID = SchedulerChartID(scheduler, ChartSchedulerRate)
 	chart.Title = "Nagios Scheduler Workload"
 	chart.Units = "jobs"
 	chart.Priority = priority
 	chart.Ctx = ctxPrefix + ".scheduler.rate"
 	chart.Dims = module.Dims{
-		{ID: SchedulerMetricKey(shard, ChartSchedulerRate, "started"), Name: "started", Algo: module.Incremental},
-		{ID: SchedulerMetricKey(shard, ChartSchedulerRate, "finished"), Name: "finished", Algo: module.Incremental},
-		{ID: SchedulerMetricKey(shard, ChartSchedulerRate, "skipped"), Name: "skipped", Algo: module.Incremental},
+		{ID: SchedulerMetricKey(scheduler, ChartSchedulerRate, "started"), Name: "started", Algo: module.Incremental},
+		{ID: SchedulerMetricKey(scheduler, ChartSchedulerRate, "finished"), Name: "finished", Algo: module.Incremental},
+		{ID: SchedulerMetricKey(scheduler, ChartSchedulerRate, "skipped"), Name: "skipped", Algo: module.Incremental},
 	}
 	chart.Opts.Detail = true
 	return &chart
 }
 
-func SchedulerNextRunChart(shard string, priority int) *module.Chart {
-	chart := schedulerChartBase(shard)
-	chart.ID = SchedulerChartID(shard, ChartSchedulerNext)
+func SchedulerNextRunChart(scheduler string, priority int) *module.Chart {
+	chart := schedulerChartBase(scheduler)
+	chart.ID = SchedulerChartID(scheduler, ChartSchedulerNext)
 	chart.Title = "Nagios Scheduler Next Run Time"
 	chart.Units = "seconds"
 	chart.Priority = priority
 	chart.Ctx = ctxPrefix + ".scheduler.next"
-	chart.Dims = module.Dims{{ID: SchedulerMetricKey(shard, ChartSchedulerNext, "next"), Name: "next", Algo: module.Absolute, Div: 1_000_000_000}}
+	chart.Dims = module.Dims{{ID: SchedulerMetricKey(scheduler, ChartSchedulerNext, "next"), Name: "next", Algo: module.Absolute, Div: 1_000_000_000}}
 	chart.Opts.Detail = true
 	return &chart
 }
@@ -188,14 +188,14 @@ func canonicalUnit(scale units.Scale, fallback string) string {
 	return fallback
 }
 
-func schedulerChartBase(shard string) module.Chart {
+func schedulerChartBase(scheduler string) module.Chart {
 	return module.Chart{
 		Fam:          "scheduler",
 		Ctx:          fmt.Sprintf("%s.scheduler", ctxPrefix),
 		Type:         module.Line,
 		TypeOverride: ctxPrefix,
 		Labels: []module.Label{
-			{Key: "nagios_shard", Value: shard, Source: module.LabelSourceConf},
+			{Key: "nagios_scheduler", Value: scheduler, Source: module.LabelSourceConf},
 		},
 	}
 }

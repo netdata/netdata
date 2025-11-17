@@ -15,10 +15,10 @@ func BuildJobCharts(meta JobIdentity, basePriority int) []*module.Chart {
 	}
 }
 
-func BuildSchedulerCharts(shard string, basePriority int) []*module.Chart {
+func BuildSchedulerCharts(scheduler string, basePriority int) []*module.Chart {
 	return []*module.Chart{
-		SchedulerJobsChart(shard, basePriority),
-		SchedulerRateChart(shard, basePriority+1),
-		SchedulerNextRunChart(shard, basePriority+2),
+		SchedulerJobsChart(scheduler, basePriority),
+		SchedulerRateChart(scheduler, basePriority+1),
+		SchedulerNextRunChart(scheduler, basePriority+2),
 	}
 }

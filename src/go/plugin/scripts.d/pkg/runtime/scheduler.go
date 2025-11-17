@@ -27,16 +27,29 @@ import (
 
 // SchedulerConfig drives the construction of the async scheduler/executor pair.
 type SchedulerConfig struct {
-	Logger           *logger.Logger
-	Jobs             []spec.JobSpec
-	Workers          int
-	Shard            string
-	Periods          *timeperiod.Set
-	UserMacros       map[string]string
-	VnodeLookup      func(spec.JobSpec) VnodeInfo
+	Logger        *logger.Logger
+	Workers       int
+	QueueCapacity int
+	SchedulerName string
+	UserMacros    map[string]string
+	VnodeLookup   func(spec.JobSpec) VnodeInfo
+}
+
+// JobRegistration describes a runnable job managed by the scheduler.
+type JobRegistration struct {
+	Spec             spec.JobSpec
+	Runner           JobRunner
 	Emitter          ResultEmitter
 	RegisterPerfdata func(spec.JobSpec, output.PerfDatum)
+	Periods          *timeperiod.Set
+	UserMacros       map[string]string
+	Vnode            VnodeInfo
+	ID               string
 }
+
+// JobRunner allows modules to override the command execution stage.
+// The function should honor the provided timeout when respecting ctx deadlines.
+type JobRunner func(ctx context.Context, job JobRuntime, timeout time.Duration) ([]byte, string, ndexec.ResourceUsage, error)
 
 // Scheduler wires the per-job timers, executor, and result collection loops.
 type Scheduler struct {
@@ -44,8 +57,9 @@ type Scheduler struct {
 
 	executor *Executor
 
-	jobs  map[string]*jobState
-	jobMu sync.RWMutex
+	jobs   map[string]*jobState
+	jobMu  sync.RWMutex
+	jobSeq atomic.Uint64
 
 	timerCh chan string
 
@@ -54,14 +68,11 @@ type Scheduler struct {
 
 	wg sync.WaitGroup
 
-	userMacros       map[string]string
-	vnodeLookup      func(spec.JobSpec) VnodeInfo
-	shard            string
-	emitter          ResultEmitter
-	registerPerfdata func(spec.JobSpec, output.PerfDatum)
-	periods          *timeperiod.Set
-	rand             *rand.Rand
-	randMu           sync.Mutex
+	userMacros    map[string]string
+	vnodeLookup   func(spec.JobSpec) VnodeInfo
+	schedulerName string
+	rand          *rand.Rand
+	randMu        sync.Mutex
 
 	counters struct {
 		started  atomic.Uint64
@@ -100,103 +111,145 @@ type jobState struct {
 	statusLine      string
 	longOutput      string
 	jitterRange     time.Duration
+	emitter         ResultEmitter
+	registerPerf    func(spec.JobSpec, output.PerfDatum)
+	runner          JobRunner
+	userMacros      map[string]string
 }
 
-// NewScheduler initialises the scheduler structures but does not start timers/workers.
+// NewScheduler initialises the scheduler structures but does not register jobs.
 func NewScheduler(cfg SchedulerConfig) (*Scheduler, error) {
-	if len(cfg.Jobs) == 0 {
-		return nil, fmt.Errorf("scheduler requires at least one job")
-	}
 	if cfg.Workers <= 0 {
 		return nil, fmt.Errorf("scheduler workers must be > 0")
 	}
-	if cfg.Shard == "" {
-		cfg.Shard = "default"
+	if cfg.SchedulerName == "" {
+		cfg.SchedulerName = "default"
 	}
-	if cfg.Emitter == nil {
-		cfg.Emitter = NewNoopEmitter()
-	}
-
 	userMacros := make(map[string]string, len(cfg.UserMacros))
 	for k, v := range cfg.UserMacros {
 		userMacros[strings.ToUpper(k)] = v
 	}
-
 	lookup := cfg.VnodeLookup
 	if lookup == nil {
 		lookup = func(sp spec.JobSpec) VnodeInfo {
 			return VnodeInfo{Hostname: sp.Vnode}
 		}
 	}
-
-	s := &Scheduler{
-		log:              cfg.Logger,
-		timerCh:          make(chan string, len(cfg.Jobs)),
-		jobs:             make(map[string]*jobState, len(cfg.Jobs)),
-		userMacros:       userMacros,
-		vnodeLookup:      lookup,
-		shard:            cfg.Shard,
-		emitter:          cfg.Emitter,
-		registerPerfdata: cfg.RegisterPerfdata,
-		periods:          cfg.Periods,
-		rand:             rand.New(rand.NewSource(time.Now().UnixNano())),
+	queueCap := cfg.QueueCapacity
+	if queueCap <= 0 {
+		queueCap = 32
 	}
-
+	s := &Scheduler{
+		log:           cfg.Logger,
+		timerCh:       make(chan string, queueCap),
+		jobs:          make(map[string]*jobState),
+		userMacros:    userMacros,
+		vnodeLookup:   lookup,
+		schedulerName: cfg.SchedulerName,
+		rand:          rand.New(rand.NewSource(time.Now().UnixNano())),
+	}
 	workFn := func(ctx context.Context, job JobRuntime) ExecutionResult {
 		return s.runJob(ctx, job)
 	}
-
 	exec, err := NewExecutor(ExecutorConfig{
 		Logger:        cfg.Logger,
 		Workers:       cfg.Workers,
-		QueueCapacity: len(cfg.Jobs),
+		QueueCapacity: queueCap,
 		Work:          workFn,
 	})
 	if err != nil {
 		return nil, err
 	}
 	s.executor = exec
-
-	now := time.Now()
-	for idx, sp := range cfg.Jobs {
-		jr := JobRuntime{
-			ID:    buildJobID(sp, idx),
-			Spec:  sp,
-			Vnode: lookup(sp),
-		}
-		var period *timeperiod.Period
-		if cfg.Periods != nil {
-			var err error
-			period, err = cfg.Periods.Resolve(sp.CheckPeriod)
-			if err != nil {
-				return nil, err
-			}
-		}
-		baseline := now.Add(time.Duration(idx%len(cfg.Jobs)) * time.Second)
-		identity := charts.NewJobIdentity(cfg.Shard, sp)
-		js := &jobState{
-			runtime:         jr,
-			period:          period,
-			nextAnniversary: baseline,
-			nextRun:         baseline,
-			state:           "UNKNOWN",
-			softState:       "UNKNOWN",
-			hardState:       "UNKNOWN",
-			identity:        identity,
-			checkInterval:   intervalOrDefault(sp.CheckInterval),
-			retryInterval:   intervalOrDefault(sp.RetryInterval),
-			maxAttempts:     maxInt(sp.MaxCheckAttempts, 1),
-			timeoutState:    normalizeState(sp.TimeoutState),
-			jitterRange:     sp.InterCheckJitter,
-		}
-		if js.retryInterval <= 0 {
-			js.retryInterval = js.checkInterval
-		}
-		js.nextRun = s.applyJitter(js.nextAnniversary, js.jitterRange)
-		s.jobs[jr.ID] = js
-	}
-
 	return s, nil
+}
+
+// RegisterJob adds a job to the scheduler and arms its timer.
+func (s *Scheduler) RegisterJob(reg JobRegistration) (string, error) {
+	if strings.TrimSpace(reg.Spec.Name) == "" {
+		return "", fmt.Errorf("job name is required")
+	}
+	if reg.Emitter == nil {
+		reg.Emitter = NewNoopEmitter()
+	}
+	jobID := strings.TrimSpace(reg.ID)
+	if jobID == "" {
+		jobIdx := int(s.jobSeq.Add(1))
+		jobID = buildJobID(reg.Spec, jobIdx)
+	}
+	if _, exists := s.jobs[jobID]; exists {
+		return "", fmt.Errorf("job id '%s' already registered", jobID)
+	}
+	vnode := reg.Vnode
+	if VnodeInfoIsEmpty(vnode) && s.vnodeLookup != nil {
+		vnode = s.vnodeLookup(reg.Spec)
+	}
+	jr := JobRuntime{
+		ID:    jobID,
+		Spec:  reg.Spec,
+		Vnode: CloneVnodeInfo(vnode),
+	}
+	var period *timeperiod.Period
+	if reg.Periods != nil {
+		var err error
+		period, err = reg.Periods.Resolve(reg.Spec.CheckPeriod)
+		if err != nil {
+			return "", err
+		}
+	}
+	now := time.Now()
+	identity := charts.NewJobIdentity(s.schedulerName, reg.Spec)
+	userMacros := make(map[string]string, len(reg.UserMacros))
+	for k, v := range reg.UserMacros {
+		userMacros[strings.ToUpper(k)] = v
+	}
+	js := &jobState{
+		runtime:         jr,
+		period:          period,
+		nextAnniversary: now,
+		nextRun:         now,
+		state:           "UNKNOWN",
+		softState:       "UNKNOWN",
+		hardState:       "UNKNOWN",
+		identity:        identity,
+		checkInterval:   intervalOrDefault(reg.Spec.CheckInterval),
+		retryInterval:   intervalOrDefault(reg.Spec.RetryInterval),
+		maxAttempts:     maxInt(reg.Spec.MaxCheckAttempts, 1),
+		timeoutState:    normalizeState(reg.Spec.TimeoutState),
+		jitterRange:     reg.Spec.InterCheckJitter,
+		emitter:         reg.Emitter,
+		registerPerf:    reg.RegisterPerfdata,
+		runner:          reg.Runner,
+		userMacros:      userMacros,
+	}
+	if js.retryInterval <= 0 {
+		js.retryInterval = js.checkInterval
+	}
+	js.nextRun = s.applyJitter(js.nextAnniversary, js.jitterRange)
+
+	s.jobMu.Lock()
+	s.jobs[jr.ID] = js
+	s.jobMu.Unlock()
+
+	s.armTimer(js)
+	return jr.ID, nil
+}
+
+// UnregisterJob removes a job from the scheduler and stops its timer.
+func (s *Scheduler) UnregisterJob(jobID string) {
+	s.jobMu.Lock()
+	defer s.jobMu.Unlock()
+	js, ok := s.jobs[jobID]
+	if !ok {
+		return
+	}
+	if js.timer != nil {
+		js.timer.Stop()
+	}
+	if js.emitter != nil {
+		_ = js.emitter.Close()
+	}
+	delete(s.jobs, jobID)
 }
 
 // Start launches timers, workers, and the scheduler loop.
@@ -232,9 +285,6 @@ func (s *Scheduler) Stop() {
 	s.wg.Wait()
 	s.ctx = nil
 	s.cancel = nil
-	if s.emitter != nil {
-		_ = s.emitter.Close()
-	}
 }
 
 func (s *Scheduler) run() {
@@ -351,8 +401,10 @@ func (s *Scheduler) handleResult(res ExecutionResult) {
 		if !measured && res.Duration > 0 && s.log != nil {
 			s.log.Debugf("nagios job %s completed without CPU usage data; emitting zero", res.Job.Spec.Name)
 		}
-		s.registerPerfdataCharts(jobSpec, parsed.Perfdata)
-		s.emitter.Emit(res.Job, res, snapshot)
+		s.registerPerfdataCharts(jobSpec, parsed.Perfdata, js.registerPerf)
+		if js.emitter != nil {
+			js.emitter.Emit(res.Job, res, snapshot)
+		}
 	}
 }
 
@@ -388,19 +440,35 @@ func (s *Scheduler) runJob(ctx context.Context, job JobRuntime) ExecutionResult 
 		timeout = time.Minute
 	}
 
-	macroCtx := s.buildMacroContext(job)
-	macroSet := BuildMacroSet(macroCtx)
-	args := macroSet.CommandArgs
-	if len(args) == 0 {
-		args = job.Spec.Args
+	var output []byte
+	var cmdStr string
+	var usage ndexec.ResourceUsage
+	var err error
+
+	js, _ := s.getJobState(job.ID)
+	runner := JobRunner(nil)
+	if js != nil {
+		runner = js.runner
 	}
-	env := s.buildEnv(job.Spec.Environment, macroSet.Env)
-	opts := ndexec.RunOptions{Env: env}
-	if dir := job.Spec.WorkingDirectory; dir != "" {
-		opts.Dir = dir
+	if runner != nil {
+		runCtx, cancel := context.WithTimeout(ctx, timeout)
+		output, cmdStr, usage, err = runner(runCtx, job, timeout)
+		cancel()
+	} else {
+		macroCtx := s.buildMacroContext(job, js)
+		macroSet := BuildMacroSet(macroCtx)
+		args := macroSet.CommandArgs
+		if len(args) == 0 {
+			args = job.Spec.Args
+		}
+		env := s.buildEnv(job.Spec.Environment, macroSet.Env)
+		opts := ndexec.RunOptions{Env: env}
+		if dir := job.Spec.WorkingDirectory; dir != "" {
+			opts.Dir = dir
+		}
+		output, cmdStr, usage, err = ndexec.RunUnprivilegedWithOptionsUsage(s.log, timeout, opts, job.Spec.Plugin, args...)
 	}
 
-	output, cmdStr, usage, err := ndexec.RunUnprivilegedWithOptionsUsage(s.log, timeout, opts, job.Spec.Plugin, args...)
 	if s.log != nil {
 		s.log.Debugf("nagios: raw plugin output job=%s output=%q", job.Spec.Name, string(output))
 	}
@@ -416,7 +484,7 @@ func (s *Scheduler) runJob(ctx context.Context, job JobRuntime) ExecutionResult 
 	return res
 }
 
-func (s *Scheduler) buildMacroContext(job JobRuntime) MacroContext {
+func (s *Scheduler) buildMacroContext(job JobRuntime, js *jobState) MacroContext {
 	state := StateInfo{
 		ServiceState:       s.currentState(job.ID),
 		ServiceAttempt:     s.currentAttempt(job.ID),
@@ -424,9 +492,18 @@ func (s *Scheduler) buildMacroContext(job JobRuntime) MacroContext {
 		HostState:          "UP",
 		HostStateID:        "0",
 	}
+	macros := make(map[string]string, len(s.userMacros))
+	for k, v := range s.userMacros {
+		macros[k] = v
+	}
+	if js != nil && len(js.userMacros) > 0 {
+		for k, v := range js.userMacros {
+			macros[k] = v
+		}
+	}
 	return MacroContext{
 		Job:        job.Spec,
-		UserMacros: s.userMacros,
+		UserMacros: macros,
 		Vnode:      job.Vnode,
 		State:      state,
 	}
@@ -440,6 +517,13 @@ func (s *Scheduler) markRunning(jobID string, running bool) {
 	s.jobMu.Unlock()
 }
 
+func (s *Scheduler) getJobState(jobID string) (*jobState, bool) {
+	s.jobMu.RLock()
+	defer s.jobMu.RUnlock()
+	js, ok := s.jobs[jobID]
+	return js, ok
+}
+
 func buildJobID(sp spec.JobSpec, idx int) string {
 	vnode := sp.Vnode
 	if vnode == "" {
@@ -451,13 +535,13 @@ func buildJobID(sp spec.JobSpec, idx int) string {
 func (s *Scheduler) CollectMetrics() map[string]int64 {
 	metrics := make(map[string]int64)
 	stats := s.executor.Stats()
-	metrics[charts.SchedulerMetricKey(s.shard, charts.ChartSchedulerJobs, "running")] = int64(stats.Executing)
-	metrics[charts.SchedulerMetricKey(s.shard, charts.ChartSchedulerJobs, "queued")] = int64(stats.QueueDepth)
-	metrics[charts.SchedulerMetricKey(s.shard, charts.ChartSchedulerJobs, "scheduled")] = int64(s.scheduledCount())
-	metrics[charts.SchedulerMetricKey(s.shard, charts.ChartSchedulerRate, "started")] = int64(s.counters.started.Load())
-	metrics[charts.SchedulerMetricKey(s.shard, charts.ChartSchedulerRate, "finished")] = int64(s.counters.finished.Load())
-	metrics[charts.SchedulerMetricKey(s.shard, charts.ChartSchedulerRate, "skipped")] = int64(s.counters.skipped.Load())
-	metrics[charts.SchedulerMetricKey(s.shard, charts.ChartSchedulerNext, "next")] = s.nextRunDelay().Nanoseconds()
+	metrics[charts.SchedulerMetricKey(s.schedulerName, charts.ChartSchedulerJobs, "running")] = int64(stats.Executing)
+	metrics[charts.SchedulerMetricKey(s.schedulerName, charts.ChartSchedulerJobs, "queued")] = int64(stats.QueueDepth)
+	metrics[charts.SchedulerMetricKey(s.schedulerName, charts.ChartSchedulerJobs, "scheduled")] = int64(s.scheduledCount())
+	metrics[charts.SchedulerMetricKey(s.schedulerName, charts.ChartSchedulerRate, "started")] = int64(s.counters.started.Load())
+	metrics[charts.SchedulerMetricKey(s.schedulerName, charts.ChartSchedulerRate, "finished")] = int64(s.counters.finished.Load())
+	metrics[charts.SchedulerMetricKey(s.schedulerName, charts.ChartSchedulerRate, "skipped")] = int64(s.counters.skipped.Load())
+	metrics[charts.SchedulerMetricKey(s.schedulerName, charts.ChartSchedulerNext, "next")] = s.nextRunDelay().Nanoseconds()
 
 	s.jobMu.RLock()
 	defer s.jobMu.RUnlock()
@@ -606,8 +690,8 @@ func rangeBoundMetric(scale units.Scale, val *float64) (int64, bool) {
 	return scale.Apply(*val), true
 }
 
-func (s *Scheduler) registerPerfdataCharts(job spec.JobSpec, perf []output.PerfDatum) {
-	if s.registerPerfdata == nil {
+func (s *Scheduler) registerPerfdataCharts(job spec.JobSpec, perf []output.PerfDatum, register func(spec.JobSpec, output.PerfDatum)) {
+	if register == nil {
 		return
 	}
 	for _, datum := range perf {
@@ -615,7 +699,7 @@ func (s *Scheduler) registerPerfdataCharts(job spec.JobSpec, perf []output.PerfD
 		if label == "" {
 			continue
 		}
-		s.registerPerfdata(job, datum)
+		register(job, datum)
 	}
 }
 

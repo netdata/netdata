@@ -12,12 +12,12 @@ const (
 	ctxPrefix = "nagios"
 )
 
-func SchedulerChartID(shard, suffix string) string {
-	return fmt.Sprintf("%s.scheduler.%s", shard, suffix)
+func SchedulerChartID(scheduler, suffix string) string {
+	return fmt.Sprintf("%s.scheduler.%s", scheduler, suffix)
 }
 
-func SchedulerMetricKey(shard, suffix, dim string) string {
-	return fmt.Sprintf("%s.%s", SchedulerChartID(shard, suffix), dim)
+func SchedulerMetricKey(scheduler, suffix, dim string) string {
+	return fmt.Sprintf("%s.%s", SchedulerChartID(scheduler, suffix), dim)
 }
 
 func telemetryChartBase(meta JobIdentity, metric string) module.Chart {

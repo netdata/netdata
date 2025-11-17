@@ -22,7 +22,7 @@ import (
 )
 
 const (
-	testShard      = "mock-shard"
+	testScheduler  = "mock-scheduler"
 	mockPluginDir  = "plugins"
 	schedulerStart = 100 * time.Millisecond
 )
@@ -86,7 +86,7 @@ func TestMockSlowPluginRaisesSkipMetric(t *testing.T) {
 	sched, _, _ := startTestScheduler(t, []specpkg.JobSpec{spec})
 	time.Sleep(2500 * time.Millisecond)
 	metrics := sched.CollectMetrics()
-	key := charts.SchedulerMetricKey(testShard, charts.ChartSchedulerRate, "skipped")
+	key := charts.SchedulerMetricKey(testScheduler, charts.ChartSchedulerRate, "skipped")
 	if metrics[key] == 0 {
 		t.Fatalf("scheduler skip counter not incremented: %d", metrics[key])
 	}
@@ -189,19 +189,24 @@ func startTestScheduler(t *testing.T, jobs []specpkg.JobSpec) (*runtimepkg.Sched
 	}
 	identities := make(map[string]charts.JobIdentity, len(jobs))
 	for _, job := range jobs {
-		identities[job.Name] = charts.NewJobIdentity(testShard, job)
+		identities[job.Name] = charts.NewJobIdentity(testScheduler, job)
 	}
 	sched, err := runtimepkg.NewScheduler(runtimepkg.SchedulerConfig{
-		Jobs:             jobs,
-		Workers:          workers,
-		Shard:            testShard,
-		Emitter:          emitter,
-		Periods:          periods,
-		UserMacros:       map[string]string{"USER1": "/usr/lib/nagios/plugins"},
-		VnodeLookup:      vnodeLookup,
-		RegisterPerfdata: func(specpkg.JobSpec, output.PerfDatum) {},
+		Workers:       workers,
+		SchedulerName: testScheduler,
+		UserMacros:    map[string]string{"USER1": "/usr/lib/nagios/plugins"},
+		VnodeLookup:   vnodeLookup,
 	})
 	require.NoError(t, err)
+	for _, job := range jobs {
+		_, err := sched.RegisterJob(runtimepkg.JobRegistration{
+			Spec:             job,
+			Emitter:          emitter,
+			RegisterPerfdata: func(specpkg.JobSpec, output.PerfDatum) {},
+			Periods:          periods,
+		})
+		require.NoError(t, err)
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 	require.NoError(t, sched.Start(ctx))
 	time.Sleep(schedulerStart)

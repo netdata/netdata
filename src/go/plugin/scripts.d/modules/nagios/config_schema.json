@@ -5,11 +5,6 @@
     "type": "object",
     "additionalProperties": false,
     "properties": {
-      "name": {
-        "title": "Job name",
-        "description": "Unique identifier for this Nagios job.",
-        "type": "string"
-      },
       "plugin": {
         "title": "Plugin path",
         "description": "Absolute path to the Nagios plugin executable.",
@@ -19,6 +14,23 @@
         "title": "Virtual node",
         "description": "Virtual node GUID/name to associate with this job.",
         "type": "string"
+      },
+      "scheduler": {
+        "title": "Scheduler name",
+        "description": "Name of the scheduler that should execute this job (defaults to \"default\").",
+        "type": "string"
+      },
+      "update_every": {
+        "title": "Update every",
+        "description": "Execution interval in seconds. Leave empty to use the module default.",
+        "type": "integer",
+        "minimum": 1
+      },
+      "autodetection_retry": {
+        "title": "Detection retry",
+        "description": "Retry interval in seconds when auto-detection fails (0 disables retries).",
+        "type": "integer",
+        "minimum": 0
       },
       "args": {
         "title": "Arguments",
@@ -45,6 +57,14 @@
           "type": "string"
         }
       },
+      "user_macros": {
+        "title": "User macros",
+        "description": "Key/value pairs exposed as $USERn$ macros (e.g. USER1 becomes $USER1$).",
+        "type": "object",
+        "additionalProperties": {
+          "type": "string"
+        }
+      },
       "custom_vars": {
         "title": "Custom service vars",
         "description": "Values exported as $_SERVICE* macros.",
@@ -63,7 +83,11 @@
         "title": "Timeout state",
         "description": "State reported when a timeout occurs.",
         "type": "string",
-        "enum": ["critical", "warning", "unknown"]
+        "enum": [
+          "critical",
+          "warning",
+          "unknown"
+        ]
       },
       "check_interval": {
         "title": "Check interval",
@@ -94,11 +118,6 @@
         "description": "Directory from which the plugin will be executed.",
         "type": "string"
       },
-      "check_period": {
-        "title": "Check period",
-        "description": "Name of a time_period defined in the shard (defaults to 24x7).",
-        "type": "string"
-      },
       "notes": {
         "title": "Notes",
         "description": "Free-form notes attached to this job.",
@@ -106,8 +125,100 @@
       }
     },
     "required": [
-      "name",
       "plugin"
     ]
+  },
+  "uiSchema": {
+    "uiOptions": {
+      "fullPage": true
+    },
+    "ui:flavour": "tabs",
+    "ui:options": {
+      "tabs": [
+        {
+          "title": "General",
+          "fields": [
+            "plugin",
+            "scheduler",
+            "vnode",
+            "working_directory",
+            "notes"
+          ]
+        },
+        {
+          "title": "Arguments",
+          "fields": [
+            "args",
+            "arg_values",
+            "custom_vars"
+          ]
+        },
+        {
+          "title": "Timing & Retries",
+          "fields": [
+            "update_every",
+            "autodetection_retry",
+            "timeout",
+            "timeout_state",
+            "check_interval",
+            "retry_interval",
+            "max_check_attempts",
+            "inter_check_jitter",
+            "check_period"
+          ]
+        },
+        {
+          "title": "Environment",
+          "fields": [
+            "environment"
+          ]
+        }
+      ]
+    },
+    "plugin": {
+      "ui:placeholder": "/usr/lib/nagios/plugins/check_ssh"
+    },
+    "scheduler": {
+      "ui:placeholder": "default"
+    },
+    "vnode": {
+      "ui:placeholder": "optional-vnode"
+    },
+    "args": {
+      "ui:listFlavour": "list",
+      "ui:help": "Command-line arguments passed to the plugin. Macros such as {HOST.NAME}, {IP}, or $ARGn are supported."
+    },
+    "arg_values": {
+      "ui:listFlavour": "list",
+      "ui:help": "Values injected into sequential $ARGn placeholders."
+    },
+    "environment": {
+      "ui:help": "Environment variables exported before executing the plugin (key \u2192 value)."
+    },
+    "custom_vars": {
+      "ui:help": "Defines $_SERVICE* macros exposed to legacy scripts."
+    },
+    "timeout_state": {
+      "ui:widget": "radio",
+      "ui:options": {
+        "inline": true
+      }
+    },
+    "timeout": {
+      "ui:placeholder": "30s",
+      "ui:help": "Duration string (e.g. 10s, 1m30s)."
+    },
+    "check_interval": {
+      "ui:placeholder": "1m"
+    },
+    "retry_interval": {
+      "ui:placeholder": "30s"
+    },
+    "inter_check_jitter": {
+      "ui:placeholder": "5s"
+    },
+    "check_period": {
+      "ui:help": "Matches a named time period defined in the module configuration (defaults to 24x7)."
+    }
   }
 }

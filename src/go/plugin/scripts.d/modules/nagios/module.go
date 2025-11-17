@@ -18,10 +18,10 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/vnodes"
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/charts"
-	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/config"
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/ids"
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/output"
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/runtime"
+	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/schedulers"
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/spec"
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/timeperiod"
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/units"
@@ -41,22 +41,12 @@ func init() {
 	})
 }
 
-// Config represents a configuration shard loaded by go.d's file discovery.
-// A single Config can define explicit jobs as well as directory provisioning rules.
+// Config represents a Nagios module configuration loaded by go.d's file discovery.
+// Each file may define multiple explicit jobs plus shared defaults/macros.
 type Config struct {
-	Name                    string                   `yaml:"name" json:"name"`
-	Vnode                   string                   `yaml:"vnode,omitempty" json:"vnode"`
-	UpdateEvery             int                      `yaml:"update_every,omitempty" json:"update_every"`
-	AutoDetectionRetry      int                      `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
-	ExecutorWorkers         int                      `yaml:"executor_workers,omitempty" json:"executor_workers"`
-	WatcherDebounce         confopt.Duration         `yaml:"watcher_debounce,omitempty" json:"watcher_debounce"`
-	DirectoryRescanInterval confopt.Duration         `yaml:"directory_rescan_interval,omitempty" json:"directory_rescan_interval"`
-	Defaults                config.Defaults          `yaml:"defaults,omitempty" json:"defaults"`
-	UserMacros              map[string]string        `yaml:"user_macros,omitempty" json:"user_macros"`
-	Jobs                    []spec.JobConfig         `yaml:"jobs,omitempty" json:"jobs"`
-	Directories             []config.DirectoryConfig `yaml:"directories,omitempty" json:"directories"`
-	TimePeriods             []timeperiod.Config      `yaml:"time_periods,omitempty" json:"time_periods"`
-	Logging                 LoggingConfig            `yaml:"logging,omitempty" json:"logging"`
+	spec.JobConfig `yaml:",inline" json:",inline"`
+	UserMacros     map[string]string `yaml:"user_macros,omitempty" json:"user_macros"`
+	Logging        LoggingConfig     `yaml:"logging,omitempty" json:"logging"`
 }
 
 type LoggingConfig struct {
@@ -125,20 +115,17 @@ type Collector struct {
 	Config `yaml:",inline" json:""`
 
 	charts       *module.Charts
-	jobSpecs     []spec.JobSpec
-	scheduler    *runtime.Scheduler
 	chartMu      sync.RWMutex
-	schedulerMu  sync.RWMutex
-	reloadMu     sync.Mutex
 	perfCharts   map[string]perfChartMeta
-	reloadCh     chan struct{}
-	reloadCancel context.CancelFunc
-	reloadWG     sync.WaitGroup
-	dirWatchers  []*directoryWatcher
-	runCtx       context.Context
 	periods      *timeperiod.Set
+	jobSpec      spec.JobSpec
+	identity     charts.JobIdentity
+	jobHandle    *schedulers.JobHandle
 	vnodeInfo    map[string]runtime.VnodeInfo
 	missingVnode map[string]struct{}
+
+	currentVnode *vnodes.VirtualNode
+	vnodeMu      sync.RWMutex
 }
 
 type perfChartMeta struct {
@@ -149,13 +136,7 @@ type perfChartMeta struct {
 func New() *Collector {
 	return &Collector{
 		Config: Config{
-			UpdateEvery:             module.UpdateEvery,
-			ExecutorWorkers:         50,
-			UserMacros:              make(map[string]string),
-			WatcherDebounce:         confopt.Duration(250 * time.Millisecond),
-			DirectoryRescanInterval: confopt.Duration(time.Minute),
-			Defaults:                config.Defaults{CheckPeriod: timeperiod.DefaultPeriodName},
-			TimePeriods:             []timeperiod.Config{timeperiod.DefaultPeriodConfig()},
+			UserMacros: make(map[string]string),
 			Logging: LoggingConfig{
 				Enabled: true,
 				OTLP: OTLPLoggingConfig{
@@ -176,46 +157,43 @@ func (c *Collector) Configuration() any {
 }
 
 func (c *Collector) Init(ctx context.Context) error {
-	if c.UpdateEvery <= 0 {
-		c.UpdateEvery = module.UpdateEvery
-	}
-	if c.ExecutorWorkers <= 0 {
-		c.ExecutorWorkers = 50
-	}
 	if c.charts == nil {
 		c.charts = &module.Charts{}
 	}
-	if c.UserMacros == nil {
-		c.UserMacros = make(map[string]string)
+	if c.perfCharts == nil {
+		c.perfCharts = make(map[string]perfChartMeta)
 	}
 	c.Logging.setDefaults()
-	if c.WatcherDebounce <= 0 {
-		c.WatcherDebounce = confopt.Duration(250 * time.Millisecond)
-	}
-	if c.DirectoryRescanInterval <= 0 {
-		c.DirectoryRescanInterval = confopt.Duration(time.Minute)
-	}
-	jobs, err := c.expandJobSpecs()
-	if err != nil {
-		return err
-	}
-	if len(jobs) == 0 {
-		return fmt.Errorf("no Nagios jobs defined in config '%s'", c.Name)
-	}
 	if err := c.compileTimePeriods(); err != nil {
 		return err
 	}
+	sp, err := c.buildJobSpec()
+	if err != nil {
+		return err
+	}
+	c.jobSpec = sp
+	c.identity = charts.NewJobIdentity(sp.Scheduler, sp)
 	c.refreshVnodeInfo()
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	c.runCtx = ctx
-	if err := c.rebuildRuntime(ctx, jobs); err != nil {
+	if err := c.validateVnode(sp.Vnode); err != nil {
 		return err
 	}
-	if err := c.startReloadInfrastructure(ctx); err != nil {
+	if err := c.initCharts(); err != nil {
 		return err
 	}
+	emitter := c.buildEmitter(c.Logging.Enabled, c.Logging.emitterConfig())
+	reg := runtime.JobRegistration{
+		Spec:             sp,
+		Emitter:          emitter,
+		RegisterPerfdata: c.registerPerfdataChart,
+		Periods:          c.periods,
+		UserMacros:       c.copyUserMacros(),
+		Vnode:            c.vnodeInfoFor(sp),
+	}
+	handle, err := schedulers.AttachJob(sp.Scheduler, reg, c.Logger)
+	if err != nil {
+		return err
+	}
+	c.jobHandle = handle
 	return nil
 }
 
@@ -231,75 +209,51 @@ func (c *Collector) Charts() *module.Charts {
 }
 
 func (c *Collector) Collect(context.Context) map[string]int64 {
-	c.schedulerMu.RLock()
-	sched := c.scheduler
-	c.schedulerMu.RUnlock()
-	if sched == nil {
+	all := schedulers.CollectMetrics(c.jobSpec.Scheduler)
+	if len(all) == 0 {
 		return nil
 	}
-	return sched.CollectMetrics()
+	prefix := c.identity.MetricPrefix()
+	metrics := make(map[string]int64)
+	for k, v := range all {
+		if strings.HasPrefix(k, prefix) {
+			metrics[k] = v
+		}
+	}
+	if len(metrics) == 0 {
+		return nil
+	}
+	return metrics
 }
 
 func (c *Collector) Cleanup(context.Context) {
-	if c.reloadCancel != nil {
-		c.reloadCancel()
+	if c.jobHandle != nil {
+		schedulers.DetachJob(c.jobHandle)
+		c.jobHandle = nil
 	}
-	for _, w := range c.dirWatchers {
-		w.Close()
-	}
-	c.reloadWG.Wait()
-	c.stopScheduler()
-}
-
-func (c *Collector) expandJobSpecs() ([]spec.JobSpec, error) {
-	defaults := c.Defaults
-	var specs []spec.JobSpec
-
-	for _, jobCfg := range c.Jobs {
-		cfg := jobCfg
-		defaults.Apply(&cfg)
-		cfg.SetDefaults()
-		if cfg.Vnode == "" {
-			cfg.Vnode = c.Vnode
-		}
-		sp, err := cfg.ToSpec()
-		if err != nil {
-			return nil, fmt.Errorf("job '%s': %w", cfg.Name, err)
-		}
-		specs = append(specs, sp)
-	}
-
-	for _, dirCfg := range c.Directories {
-		expanded, err := dirCfg.Expand(defaults)
-		if err != nil {
-			return nil, fmt.Errorf("directory '%s': %w", dirCfg.Path, err)
-		}
-		for _, cfg := range expanded {
-			cfg.SetDefaults()
-			if cfg.Vnode == "" {
-				cfg.Vnode = c.Vnode
-			}
-			sp, err := cfg.ToSpec()
-			if err != nil {
-				return nil, fmt.Errorf("job '%s': %w", cfg.Name, err)
-			}
-			specs = append(specs, sp)
-		}
-	}
-
-	return specs, nil
 }
 
 func (c *Collector) vnodeInfoFor(job spec.JobSpec) runtime.VnodeInfo {
-	key := strings.ToLower(strings.TrimSpace(job.Vnode))
-	if key == "" {
-		return runtime.VnodeInfo{}
-	}
-	if info, ok := c.vnodeInfo[key]; ok {
+	info, ok := c.lookupVnode(job.Vnode)
+	if ok {
 		return cloneVnodeInfo(info)
 	}
-	c.warnMissingVnode(job.Vnode)
+	if strings.TrimSpace(job.Vnode) != "" {
+		c.warnMissingVnode(job.Vnode)
+	}
 	return runtime.VnodeInfo{Hostname: job.Vnode}
+}
+
+func (c *Collector) lookupVnode(name string) (runtime.VnodeInfo, bool) {
+	if c.vnodeInfo == nil {
+		return runtime.VnodeInfo{}, false
+	}
+	key := strings.ToLower(strings.TrimSpace(name))
+	if key == "" {
+		return runtime.VnodeInfo{}, false
+	}
+	info, ok := c.vnodeInfo[key]
+	return cloneVnodeInfo(info), ok
 }
 
 func (c *Collector) warnMissingVnode(name string) {
@@ -319,16 +273,10 @@ func (c *Collector) warnMissingVnode(name string) {
 }
 
 func (c *Collector) initCharts() error {
-	var defs []*module.Chart
-	for idx, job := range c.jobSpecs {
-		meta := charts.NewJobIdentity(c.Name, job)
-		jobCharts := charts.BuildJobCharts(meta, 100+idx*10)
-		setChartsUpdateEvery(jobCharts, jobUpdateEvery(job))
-		defs = append(defs, jobCharts...)
-	}
-	defs = append(defs, charts.BuildSchedulerCharts(c.Name, 10)...)
+	meta := charts.NewJobIdentity(c.jobSpec.Scheduler, c.jobSpec)
+	jobCharts := charts.BuildJobCharts(meta, 100)
 	newCharts := module.Charts{}
-	if err := newCharts.Add(defs...); err != nil {
+	if err := newCharts.Add(jobCharts...); err != nil {
 		return err
 	}
 	c.chartMu.Lock()
@@ -342,11 +290,11 @@ func (c *Collector) registerPerfdataChart(job spec.JobSpec, datum output.PerfDat
 	if label == "" {
 		return
 	}
-	meta := charts.NewJobIdentity(c.Name, job)
+	meta := c.identity
 	labelID := ids.Sanitize(label)
 	scale := units.NewScale(datum.Unit)
-	key := fmt.Sprintf("%s|%s|%s", meta.Shard, meta.JobKey, labelID)
-	c.Infof("nagios: registering perfdata chart shard=%s job=%s label=%s unit=%s", meta.Shard, job.Name, label, datum.Unit)
+	key := fmt.Sprintf("%s|%s", meta.JobKey, labelID)
+	c.Infof("nagios: registering perfdata chart scheduler=%s job=%s label=%s unit=%s", meta.Scheduler, job.Name, label, datum.Unit)
 	c.chartMu.Lock()
 	defer c.chartMu.Unlock()
 	if existing, ok := c.perfCharts[key]; ok {
@@ -359,7 +307,6 @@ func (c *Collector) registerPerfdataChart(job spec.JobSpec, datum output.PerfDat
 		}
 	}
 	chart := charts.PerfdataChart(meta, label, scale, 200)
-	chart.UpdateEvery = jobUpdateEvery(job)
 	if err := c.charts.Add(chart); err != nil {
 		c.Errorf("failed to add perfdata chart for job %s label %s: %v", job.Name, label, err)
 		return
@@ -369,159 +316,6 @@ func (c *Collector) registerPerfdataChart(job spec.JobSpec, datum output.PerfDat
 
 func sameScale(a, b units.Scale) bool {
 	return a.Divisor == b.Divisor && a.CanonicalUnit == b.CanonicalUnit
-}
-
-func (c *Collector) rebuildRuntime(ctx context.Context, jobs []spec.JobSpec) error {
-	c.stopScheduler()
-	c.refreshVnodeInfo()
-	c.jobSpecs = jobs
-	if err := c.initCharts(); err != nil {
-		return err
-	}
-	c.perfCharts = make(map[string]perfChartMeta)
-	userMacros := c.copyUserMacros()
-	emitter := c.buildEmitter()
-	scheduler, err := runtime.NewScheduler(runtime.SchedulerConfig{
-		Logger:      c.Logger,
-		Jobs:        jobs,
-		Workers:     c.ExecutorWorkers,
-		Shard:       c.Name,
-		Emitter:     emitter,
-		UserMacros:  userMacros,
-		Periods:     c.periods,
-		VnodeLookup: c.vnodeInfoFor,
-		RegisterPerfdata: func(job spec.JobSpec, datum output.PerfDatum) {
-			c.registerPerfdataChart(job, datum)
-		},
-	})
-	if err != nil {
-		_ = emitter.Close()
-		return err
-	}
-	if err := scheduler.Start(ctx); err != nil {
-		return err
-	}
-	c.schedulerMu.Lock()
-	c.scheduler = scheduler
-	c.schedulerMu.Unlock()
-	return nil
-}
-
-func setChartsUpdateEvery(chs []*module.Chart, updateEvery int) {
-	if updateEvery <= 0 {
-		return
-	}
-	for _, chart := range chs {
-		if chart != nil {
-			chart.UpdateEvery = updateEvery
-		}
-	}
-}
-
-func jobUpdateEvery(job spec.JobSpec) int {
-	if job.CheckInterval <= 0 {
-		return module.UpdateEvery
-	}
-	secs := int((job.CheckInterval + time.Second/2) / time.Second)
-	if secs < 1 {
-		return 1
-	}
-	return secs
-}
-
-func (c *Collector) startReloadInfrastructure(ctx context.Context) error {
-	reloadCtx, cancel := context.WithCancel(ctx)
-	c.reloadCancel = cancel
-	c.reloadCh = make(chan struct{}, 1)
-	c.dirWatchers = nil
-	debounce := time.Duration(c.WatcherDebounce)
-	rescan := time.Duration(c.DirectoryRescanInterval)
-
-	c.reloadWG.Add(1)
-	go c.reloadLoop(reloadCtx)
-
-	if len(c.Directories) == 0 {
-		return nil
-	}
-	for _, dirCfg := range c.Directories {
-		dc := dirCfg
-		watcher, err := newDirectoryWatcher(reloadCtx, c.Logger, dc, debounce, c.requestReload)
-		if err != nil {
-			c.Warningf("nagios directory watch failed for %s: %v (falling back to periodic rescan)", dc.Path, err)
-			c.spawnPeriodicRescan(reloadCtx, dc, rescan)
-			continue
-		}
-		c.dirWatchers = append(c.dirWatchers, watcher)
-	}
-	return nil
-}
-
-func (c *Collector) reloadLoop(ctx context.Context) {
-	defer c.reloadWG.Done()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-c.reloadCh:
-			c.reloadMu.Lock()
-			jobs, err := c.expandJobSpecs()
-			if err != nil {
-				c.Errorf("nagios reload failed: %v", err)
-				c.reloadMu.Unlock()
-				continue
-			}
-			if len(jobs) == 0 {
-				c.Warningf("nagios reload skipped: no jobs after expansion")
-				c.reloadMu.Unlock()
-				continue
-			}
-			if err := c.compileTimePeriods(); err != nil {
-				c.Errorf("nagios reload failed to compile time periods: %v", err)
-				c.reloadMu.Unlock()
-				continue
-			}
-			if err := c.rebuildRuntime(ctx, jobs); err != nil {
-				c.Errorf("nagios rebuild failed: %v", err)
-			}
-			c.reloadMu.Unlock()
-		}
-	}
-}
-
-func (c *Collector) requestReload() {
-	select {
-	case c.reloadCh <- struct{}{}:
-	default:
-	}
-}
-
-func (c *Collector) spawnPeriodicRescan(ctx context.Context, dirCfg config.DirectoryConfig, interval time.Duration) {
-	c.reloadWG.Add(1)
-	go func() {
-		defer c.reloadWG.Done()
-		if interval <= 0 {
-			interval = time.Minute
-		}
-		ticker := time.NewTicker(interval)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-				c.requestReload()
-			}
-		}
-	}()
-}
-
-func (c *Collector) stopScheduler() {
-	c.schedulerMu.Lock()
-	defer c.schedulerMu.Unlock()
-	if c.scheduler != nil {
-		c.scheduler.Stop()
-		c.scheduler = nil
-	}
 }
 
 func (c *Collector) copyUserMacros() map[string]string {
@@ -577,6 +371,15 @@ func (c *Collector) refreshVnodeInfo() {
 	c.missingVnode = make(map[string]struct{})
 }
 
+func (c *Collector) VirtualNode() *vnodes.VirtualNode {
+	c.vnodeMu.RLock()
+	defer c.vnodeMu.RUnlock()
+	if c.currentVnode == nil {
+		return nil
+	}
+	return c.currentVnode.Copy()
+}
+
 func cloneVnodeInfo(src runtime.VnodeInfo) runtime.VnodeInfo {
 	clone := src
 	if len(src.Labels) > 0 {
@@ -602,20 +405,52 @@ func firstNonEmpty(values ...string) string {
 }
 
 func (c *Collector) compileTimePeriods() error {
-	configs := c.TimePeriods
-	configs = timeperiod.EnsureDefault(configs)
+	configs := []timeperiod.Config{timeperiod.DefaultPeriodConfig()}
 	set, err := timeperiod.Compile(configs)
 	if err != nil {
 		return err
 	}
 	c.periods = set
-	c.TimePeriods = configs
 	return nil
 }
 
-func (c *Collector) buildEmitter() runtime.ResultEmitter {
-	if c.Logging.Enabled {
-		cfg := c.Logging.emitterConfig()
+func (c *Collector) buildJobSpec() (spec.JobSpec, error) {
+	cfg := c.JobConfig
+	sp, err := cfg.ToSpec()
+	if err != nil {
+		return spec.JobSpec{}, err
+	}
+	return sp, nil
+}
+
+func (c *Collector) validateVnode(name string) error {
+	if strings.TrimSpace(name) == "" {
+		return nil
+	}
+	info, ok := c.lookupVnode(name)
+	if !ok {
+		return fmt.Errorf("job '%s': vnode '%s' not found", c.jobSpec.Name, name)
+	}
+	c.setCurrentVnode(info)
+	return nil
+}
+
+func (c *Collector) setCurrentVnode(info runtime.VnodeInfo) {
+	converted := &vnodes.VirtualNode{
+		Name:     info.Hostname,
+		Hostname: info.Hostname,
+		Alias:    info.Alias,
+		Address:  info.Address,
+		Labels:   maps.Clone(info.Labels),
+		Custom:   maps.Clone(info.Custom),
+	}
+	c.vnodeMu.Lock()
+	c.currentVnode = converted
+	c.vnodeMu.Unlock()
+}
+
+func (c *Collector) buildEmitter(enabled bool, cfg runtime.OTLPEmitterConfig) runtime.ResultEmitter {
+	if enabled {
 		emitter, err := runtime.NewOTLPEmitter(cfg, c.Logger)
 		if err == nil {
 			return emitter

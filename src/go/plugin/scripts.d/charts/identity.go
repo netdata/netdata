@@ -18,7 +18,7 @@ import (
 // JobIdentity encapsulates every bit of information needed to build stable chart IDs,
 // labels, and titles for a specific Nagios job execution.
 type JobIdentity struct {
-	Shard       string
+	Scheduler   string
 	JobName     string
 	JobKey      string
 	PluginBase  string
@@ -29,9 +29,9 @@ type JobIdentity struct {
 }
 
 // NewJobIdentity builds a deterministic identifier for the given job under the
-// provided shard. The resulting ChartKey is stable across restarts and unique for
+// provided scheduler. The resulting ChartKey is stable across restarts and unique for
 // a specific script + parameter combination (vnode is intentionally excluded).
-func NewJobIdentity(shard string, job spec.JobSpec) JobIdentity {
+func NewJobIdentity(scheduler string, job spec.JobSpec) JobIdentity {
 	cmdline := buildCmdline(job)
 	pluginBase := pluginBasename(job)
 	scriptKey, scriptTitle := scriptKeyForJob(job, pluginBase)
@@ -39,7 +39,7 @@ func NewJobIdentity(shard string, job spec.JobSpec) JobIdentity {
 	jobKey := jobKeyForJob(job)
 
 	return JobIdentity{
-		Shard:       shard,
+		Scheduler:   scheduler,
 		JobName:     job.Name,
 		JobKey:      jobKey,
 		PluginBase:  pluginBase,
@@ -54,7 +54,7 @@ func NewJobIdentity(shard string, job spec.JobSpec) JobIdentity {
 func (id JobIdentity) Labels() []module.Label {
 	return []module.Label{
 		{Key: "nagios_job", Value: id.JobName, Source: module.LabelSourceConf},
-		{Key: "nagios_shard", Value: id.Shard, Source: module.LabelSourceConf},
+		{Key: "nagios_scheduler", Value: id.Scheduler, Source: module.LabelSourceConf},
 		{Key: "nagios_plugin", Value: id.PluginBase, Source: module.LabelSourceConf},
 		{Key: "nagios_cmdline", Value: id.Cmdline, Source: module.LabelSourceConf},
 	}
@@ -171,7 +171,7 @@ func shortHash(data string) string {
 }
 
 func (id JobIdentity) TelemetryChartID(metric string) string {
-	return fmt.Sprintf("%s.%s.%s.%s", ctxPrefix, id.Shard, id.JobKey, metric)
+	return fmt.Sprintf("%s.%s.%s.%s", ctxPrefix, id.Scheduler, id.JobKey, metric)
 }
 
 func (id JobIdentity) TelemetryMetricID(metric, dim string) string {
@@ -179,9 +179,17 @@ func (id JobIdentity) TelemetryMetricID(metric, dim string) string {
 }
 
 func (id JobIdentity) PerfdataChartID(labelID string) string {
-	return fmt.Sprintf("%s.%s.%s.perf_%s", ctxPrefix, id.Shard, id.JobKey, labelID)
+	return fmt.Sprintf("%s.%s.%s.perf_%s", ctxPrefix, id.Scheduler, id.JobKey, labelID)
 }
 
 func (id JobIdentity) PerfdataMetricID(labelID, dim string) string {
 	return fmt.Sprintf("%s.%s", id.PerfdataChartID(labelID), dim)
+}
+
+func (id JobIdentity) MetricPrefix() string {
+	return fmt.Sprintf("%s.%s.%s.", ctxPrefix, id.Scheduler, id.JobKey)
+}
+
+func (id JobIdentity) OwnsMetric(key string) bool {
+	return strings.HasPrefix(key, id.MetricPrefix())
 }

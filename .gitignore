@@ -209,3 +209,5 @@ compile.sh
 run-ibm.sh
 
 tmp/
+
+build-and-install.sh

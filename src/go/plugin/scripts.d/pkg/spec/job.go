@@ -29,6 +29,7 @@ var allowedTimeoutStates = map[string]struct{}{
 // JobConfig matches the YAML schema exposed to users.
 type JobConfig struct {
 	Name             string            `yaml:"name" json:"name"`
+	Scheduler        string            `yaml:"scheduler,omitempty" json:"scheduler,omitempty"`
 	Vnode            string            `yaml:"vnode,omitempty" json:"vnode"`
 	Plugin           string            `yaml:"plugin" json:"plugin"`
 	Args             []string          `yaml:"args,omitempty" json:"args"`
@@ -52,6 +53,7 @@ type JobConfig struct {
 // JobSpec is the normalized, runtime-friendly representation of a job definition.
 type JobSpec struct {
 	Name             string
+	Scheduler        string
 	Vnode            string
 	Plugin           string
 	Args             []string
@@ -93,6 +95,9 @@ func (cfg *JobConfig) SetDefaults() {
 	}
 	if cfg.CheckPeriod == "" {
 		cfg.CheckPeriod = timeperiod.DefaultPeriodName
+	}
+	if strings.TrimSpace(cfg.Scheduler) == "" {
+		cfg.Scheduler = "default"
 	}
 }
 
@@ -136,6 +141,7 @@ func (cfg JobConfig) ToSpec() (JobSpec, error) {
 
 	sp := JobSpec{
 		Name:             cfg.Name,
+		Scheduler:        strings.TrimSpace(cfg.Scheduler),
 		Vnode:            cfg.Vnode,
 		Plugin:           cfg.Plugin,
 		Args:             append([]string{}, cfg.Args...),
