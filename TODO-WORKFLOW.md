@@ -361,13 +361,52 @@ Open work here: define the concrete queue implementation + exact markdown inject
 
 ## Plan
 
-### Phase 1: Foundation
-1. Extend frontmatter parsing to accept `handoff`, `router`, `consult`, `team` fields
+> Current priority: deliver **Phase 1 (Sub-Agent Clarifications)** so existing agents can chat with previously spawned children. Later phases will be revisited once Phase 1 is complete and the design has proven itself.
+
+### Phase 1: Sub-Agent Clarifications
+
+#### Step 1: Frontmatter & Loader
+**Files**: `src/frontmatter.ts`, `src/agent-loader.ts`, `src/options-registry.ts`
+- Add `chat: boolean` (default `false`) to `FrontmatterOptions`
+- Parse and store on `LoadedAgent` and `PreloadedSubAgent.chatEnabled`
+
+#### Step 2: AIAgentSession.clarify() Method
+**File**: `src/ai-agent.ts`
+- Add `public async clarify(question: string, parentCallPath: string): Promise<AIAgentResult>`
+- Format: `## CLARIFICATION REQUEST FROM {parentCallPath}\n\n{question}`
+- Append as user message, reset `this.finalReport`, call `executeAgentLoop()`
+- Add `getTurnsRemaining(): number` (returns `maxTurns - currentTurn`)
+
+#### Step 3: LiveSubAgentRegistry
+**File**: `src/subagent-registry.ts`
+- Add `liveChildren: Map<string, { session, chatEnabled }>`
+- Modify `execute()`: if `chatEnabled`, keep session, generate ID, append footer
+- Add `clarifyChild()`, `destroyChild()`, `destroyAllChildren()`, `listLiveChildren()`
+
+#### Step 4: agent__ask_clarification Tool
+**Files**: `src/tools/internal-provider.ts`, `src/internal-tools.ts`
+- Register tool with dynamic enum of live child IDs
+- Execute: call `registry.clarifyChild()`, return structured result
+- Handle errors: `chat_disabled`, `clarification_no_turns`
+
+#### Step 5: Cleanup
+**File**: `src/ai-agent.ts`
+- In `run()` finally block: call `this.subAgents?.destroyAllChildren()`
+- On abort: propagate to children, destroy all
+
+#### Step 6: Testing & Documentation
+- Test cases: success, chat disabled, no turns, nested, cleanup cascade, accounting
+- Update docs: `chat` frontmatter, tool usage, error conditions
+
+---
+
+### Phase 2: Orchestration Foundation
+1. Extend frontmatter parsing to accept `handoff`, `router`, `advisors`, `team` fields
 2. Add validation: cycle detection, pattern compatibility checks
 3. Implement `isTerminal` flag computation based on frontmatter
 4. Add orchestration layer wrapper in `AIAgentSession.run()`
 
-### Phase 2: Handoff Pattern
+### Phase 3: Handoff Pattern
 1. Implement `runHandoff()` in AIAgentSession
 2. Chain resolution at load time (validate references exist)
 3. Accounting aggregation for handoff chains
@@ -472,6 +511,24 @@ The handoff pattern replaces the previous "next" chaining design. Key elements p
 1. **Handoff payload shape** – Downstream agents receive only the upstream agent’s `final_report` body (markdown/JSON). No headers, metadata, or serialized `AIAgentResult` objects are forwarded.
 2. **Router guard-rails** – Routers retain `agent__final_report`. If the LLM calls it, the router is effectively terminal and no handoff occurs. Otherwise routers are expected to finish via `handoff-to`.
 3. **Advisor transcript formatting** – The enriched prompt includes a markdown header per advisor (e.g., `### From risk-assessor`) followed by the advisor output raw, without transformation or summarization. Failures still get a header but the body is the synthetic failure report as-is.
+
+## Clarification Decisions (Nov 17 2025)
+- **Phase 1 scope** – Deliver only “sub-agent chat”: every existing agent can continue talking to any sub-agent it already spawned. No new orchestration patterns ship in this phase.
+- **Implementation locus** – Reuse the current sub-agent plumbing (`SubAgentRegistry` + `AIAgentSession`). We freeze the live child session after its first `agent__final_report` and resume it in-place when the parent calls `agent__ask_clarification`.
+- **Resource policy** – No artificial caps or idle timeouts. The only limits are the declared `maxToolCallsPerTurn` and `maxTurns`; worst-case depth is bounded by those budgets. Frozen sessions live until the parent session ends, at which point we cascade `destroy()` down the tree.
+- **Economics** – Handoffs, routers, and advisors already work today; they're simply expensive because every follow-up respawns a fresh sub-agent. Clarifications reduce those costs by letting us reuse the existing child session instead of rerunning it.
+- **Frontmatter toggle** – Add `chat: true|false` (default **false**) so prompts must opt into clarification-friendly behavior. Advisors/teams (later phases) will require `chat: true`.
+- **Clarification recursion** – Unlimited. A child being clarified may spawn or clarify its own children; chains can be arbitrarily deep.
+- **Pattern composition** – Advisors fire before the main session (pre-spawned chat-enabled helpers). Handoffs/routers run after the main session completes (delegation of the answer). These shortcuts coexist without conflict.
+- **Turn accounting** – Clarifications consume turns for both parent and child. Invoking `agent__ask_clarification` uses up one of the parent’s tool turns, and the child’s response decrements its remaining `maxTurns`/`maxToolTurns`.
+- **Clarification UX** – Inject clarification prompts as user messages prefixed with:
+  ```markdown
+  ## CLARIFICATION REQUEST FROM {parentCallPath}
+
+  {question}
+  ```
+  Tool responses return structured payloads including `status`, `content`, `clarificationId`, and `turnsRemaining` (plus a markdown footer so the LLM can read it without JSON parsing).
+- **Cleanup semantics** – Child sessions persist only for the lifetime of the parent `AIAgentSession`. They are destroyed when explicitly requested, when the parent finishes its run, or when the parent aborts; the destroy operation cascades down to all descendants.
 
 ## Next Steps
 
