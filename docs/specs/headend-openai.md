@@ -238,25 +238,26 @@ Content includes rendered reasoning prefix + final output.
 
 ## Reasoning Rendering
 
-**Location**: `src/headends/openai-completions-headend.ts:400-421`
+**Location**: `src/headends/openai-completions-headend.ts:400-448`
 
 ```typescript
 renderReasoning(): string {
-  // Transaction header
-  // Turn-by-turn breakdown:
-  //   1. Turn N (summary)
-  //     - thinking: _text_
-  //     - progress updates
-  // Transaction summary: metrics (origin txnId)
+  // Heading: ## <agent>: <txnId>
+  // For each turn:
+  //   ### Turn N
+  //   (<formatTotals output>)
+  //   \n\n---\n<real thinking text>
+  //   \n\n---\n- <agent progress lines>
+  // Summary appended via formatSummaryLine → "SUMMARY: <agent>, ..."
 }
 ```
 
 Structure:
-- `Started **agent** transaction **txnId**:`
-- Numbered turns with summaries
-- Thinking blocks (italicized)
-- Progress updates (agent started/finished/failed)
-- Final transaction summary with origin
+- `## <agent>: <txnId>` plain-text header (Markdown H2, escaped; no bolding).
+- Turns render as `### Turn N` with the per-turn metrics summary on the next line enclosed in parentheses.
+- Real provider thinking is wrapped between blank-line hairlines (`\n\n---\n`) until an artificial message (progress line/summary) needs to print; additional thinking deltas keep appending inside the open block.
+- Progress updates continue to render as `- **callPath** ...` bullets after the thinking block closes.
+- Final line is `SUMMARY: <agent>, duration **…**, cost **$…**, agents N, tools M, tokens …` with no origin/txn id.
 
 ## Progress Event Handling
 

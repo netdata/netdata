@@ -14,7 +14,7 @@ import { normalizeCallPath } from '../utils.js';
 
 import { ConcurrencyLimiter } from './concurrency.js';
 import { HttpError, readJson, writeJson, writeSseChunk, writeSseDone } from './http-utils.js';
-import { escapeMarkdown, formatMetricsLine, italicize } from './summary-utils.js';
+import { escapeMarkdown, formatMetricsLine, formatSummaryLine, italicize } from './summary-utils.js';
 
 interface Deferred<T> {
   promise: Promise<T>;
@@ -310,10 +310,9 @@ export class OpenAICompletionsHeadend implements Headend {
     let assistantRoleSent = false;
     let transactionHeaderSent = false;
     let rootTxnId: string | undefined;
-    let rootOriginTxnId: string | undefined;
     let summaryEmitted = false;
     const accounting: AccountingEntry[] = [];
-    const agentHeadingLabel = `**${escapeMarkdown(agent.toolName ?? agent.id)}**`;
+    const agentHeadingLabel = escapeMarkdown(agent.toolName ?? agent.id);
     interface TurnRenderState { index: number; summary?: string; thinking?: string; updates: string[] }
     let rootCallPath: string | undefined;
     let transactionHeader: string | undefined;
@@ -321,7 +320,7 @@ export class OpenAICompletionsHeadend implements Headend {
     const turns: TurnRenderState[] = [];
     let turnCounter = 0;
     let expectingNewTurn = true;
-    let masterSummary: { text: string; origin?: string } | undefined;
+    let masterSummary: { text?: string; metrics?: ProgressMetrics; statusNote?: string } | undefined;
     const emitAssistantRole = (): void => {
       if (!streamed || assistantRoleSent) return;
       assistantRoleSent = true;
@@ -378,10 +377,6 @@ export class OpenAICompletionsHeadend implements Headend {
       });
       return { tokensIn, tokensOut, tokensCacheRead, tokensCacheWrite, tools, costUsd };
     };
-    const resolveOriginFromAccounting = (): string | undefined => {
-      const entry = accounting.find((item) => typeof item.originTxnId === 'string' && item.originTxnId.length > 0);
-      return entry?.originTxnId;
-    };
     const formatTotals = (): string | undefined => {
       const totals = computeTotals();
       const parts: string[] = [];
@@ -400,22 +395,46 @@ export class OpenAICompletionsHeadend implements Headend {
     const renderReasoning = (): string => {
       if (transactionHeader === undefined) return '';
       const lines: string[] = [transactionHeader];
+      let thinkingSectionOpen = false;
+      const ensureBlankLine = (): void => {
+        if (lines.length === 0) return;
+        if (lines[lines.length - 1] !== '') lines.push('');
+      };
+      const openThinkingSection = (): void => {
+        if (thinkingSectionOpen) return;
+        ensureBlankLine();
+        lines.push('---');
+        thinkingSectionOpen = true;
+      };
+      const closeThinkingSection = (): void => {
+        if (!thinkingSectionOpen) return;
+        ensureBlankLine();
+        lines.push('---');
+        thinkingSectionOpen = false;
+      };
       turns.forEach((turn) => {
-        const headingParts = [`${String(turn.index)}. Turn ${String(turn.index)}`];
-        if (turn.summary !== undefined && turn.summary.length > 0) headingParts.push(`(${turn.summary})`);
-        lines.push(headingParts.join(' '));
-        if (turn.thinking !== undefined && turn.thinking.trim().length > 0) {
-          lines.push(`  - thinking: _${escapeMarkdown(turn.thinking.trim())}_`);
+        closeThinkingSection();
+        ensureBlankLine();
+        lines.push(`### Turn ${String(turn.index)}`);
+        if (turn.summary !== undefined && turn.summary.length > 0) {
+          lines.push(`(${turn.summary})`);
         }
-        turn.updates.forEach((line) => {
-          lines.push(`  - ${line}`);
-        });
+        const thinkingText = turn.thinking !== undefined ? escapeMarkdown(turn.thinking.trim()) : '';
+        if (thinkingText.length > 0) {
+          openThinkingSection();
+          lines.push(thinkingText);
+        }
+        if (turn.updates.length > 0) {
+          closeThinkingSection();
+          turn.updates.forEach((line) => {
+            lines.push(`- ${line}`);
+          });
+        }
       });
-      if (summaryEmitted && masterSummary !== undefined) {
-        const originSuffix = masterSummary.origin !== undefined && masterSummary.origin.length > 0
-          ? ` (origin ${escapeMarkdown(masterSummary.origin)})`
-          : '';
-        lines.push(`Transaction summary: ${masterSummary.text}${originSuffix}`);
+      if (summaryEmitted && masterSummary?.text !== undefined) {
+        closeThinkingSection();
+        ensureBlankLine();
+        lines.push(masterSummary.text);
       }
       return `${lines.join('\n')}\n`;
     };
@@ -427,71 +446,61 @@ export class OpenAICompletionsHeadend implements Headend {
       emitReasoning(delta);
       renderedReasoning = next;
     };
-    const ensureSummary = (usageSnapshot: { prompt: number; completion: number; total: number }): { text: string; origin: string } => {
-      const fallbackMetrics = masterSummary === undefined
-        ? (() => {
-          const agentIds = new Set<string>();
-          let toolsRun = 0;
-          let tokensCacheRead = 0;
-          let tokensCacheWrite = 0;
-          let costUsd = 0;
-          let minTs: number | undefined;
-          let maxTs: number | undefined;
-          accounting.forEach((entry) => {
-            if (typeof entry.agentId === 'string' && entry.agentId.length > 0) agentIds.add(entry.agentId);
-            if (entry.type === 'tool') toolsRun += 1;
-            if (entry.type === 'llm') {
-              tokensCacheRead += entry.tokens.cacheReadInputTokens ?? entry.tokens.cachedTokens ?? 0;
-              tokensCacheWrite += entry.tokens.cacheWriteInputTokens ?? 0;
-              if (typeof entry.costUsd === 'number' && Number.isFinite(entry.costUsd)) {
-                costUsd += entry.costUsd;
-              }
+    const ensureSummary = (usageSnapshot: { prompt: number; completion: number; total: number }): void => {
+      const fallbackMetrics = masterSummary?.metrics ?? (() => {
+        const agentIds = new Set<string>();
+        let toolsRun = 0;
+        let tokensCacheRead = 0;
+        let tokensCacheWrite = 0;
+        let costUsd = 0;
+        let minTs: number | undefined;
+        let maxTs: number | undefined;
+        accounting.forEach((entry) => {
+          if (typeof entry.agentId === 'string' && entry.agentId.length > 0) agentIds.add(entry.agentId);
+          if (entry.type === 'tool') toolsRun += 1;
+          if (entry.type === 'llm') {
+            tokensCacheRead += entry.tokens.cacheReadInputTokens ?? entry.tokens.cachedTokens ?? 0;
+            tokensCacheWrite += entry.tokens.cacheWriteInputTokens ?? 0;
+            if (typeof entry.costUsd === 'number' && Number.isFinite(entry.costUsd)) {
+              costUsd += entry.costUsd;
             }
-            const ts = entry.timestamp;
-            if (typeof ts === 'number' && Number.isFinite(ts)) {
-              minTs = minTs === undefined ? ts : Math.min(minTs, ts);
-              maxTs = maxTs === undefined ? ts : Math.max(maxTs, ts);
-            }
-          });
-          const durationMs = (minTs !== undefined && maxTs !== undefined) ? Math.max(0, maxTs - minTs) : undefined;
-          const agentsRun = agentIds.size > 0 ? agentIds.size : 1;
-          const normalizedCost = Number(costUsd.toFixed(4));
-          const metrics: ProgressMetrics = {
-            durationMs,
-            tokensIn: usageSnapshot.prompt,
-            tokensOut: usageSnapshot.completion,
-            tokensCacheRead,
-            tokensCacheWrite,
-            toolsRun,
-            agentsRun,
-            costUsd: Number.isFinite(normalizedCost) ? normalizedCost : undefined,
-          };
-          return metrics;
-        })()
-        : undefined;
-      const summaryText = masterSummary?.text
-        ?? (() => {
-          const metricsLine = fallbackMetrics !== undefined ? formatMetricsLine(fallbackMetrics) : '';
-          if (metricsLine.length > 0) return metricsLine;
-          if (usageSnapshot.total > 0) {
-            const tokenSegments = [`→${String(usageSnapshot.prompt)}`, `←${String(usageSnapshot.completion)}`];
-            return `tokens ${tokenSegments.join(' ')}`;
           }
-          return 'completed';
-        })();
-      const summaryOrigin = masterSummary?.origin
-        ?? rootOriginTxnId
-        ?? resolveOriginFromAccounting()
-        ?? rootTxnId
-        ?? agent.id;
+          const ts = entry.timestamp;
+          if (typeof ts === 'number' && Number.isFinite(ts)) {
+            minTs = minTs === undefined ? ts : Math.min(minTs, ts);
+            maxTs = maxTs === undefined ? ts : Math.max(maxTs, ts);
+          }
+        });
+        const durationMs = (minTs !== undefined && maxTs !== undefined) ? Math.max(0, maxTs - minTs) : undefined;
+        const agentsRun = agentIds.size > 0 ? agentIds.size : 1;
+        const normalizedCost = Number(costUsd.toFixed(4));
+        const metrics: ProgressMetrics = {
+          durationMs,
+          tokensIn: usageSnapshot.prompt,
+          tokensOut: usageSnapshot.completion,
+          tokensCacheRead,
+          tokensCacheWrite,
+          toolsRun,
+          agentsRun,
+          costUsd: Number.isFinite(normalizedCost) ? normalizedCost : undefined,
+        };
+        return metrics;
+      })();
+      const statusNote = masterSummary?.statusNote;
+      const summaryText = formatSummaryLine({
+        agentLabel: agentHeadingLabel,
+        metrics: fallbackMetrics,
+        statusNote,
+        usageSnapshot: { prompt: usageSnapshot.prompt, completion: usageSnapshot.completion },
+      });
       if (masterSummary === undefined) {
-        masterSummary = { text: summaryText, origin: summaryOrigin };
-        if (typeof summaryOrigin === 'string' && summaryOrigin.length > 0) {
-          rootOriginTxnId = summaryOrigin;
-        }
-        summaryEmitted = true;
+        masterSummary = { text: summaryText, metrics: fallbackMetrics, statusNote };
+      } else {
+        masterSummary.text = summaryText;
+        masterSummary.metrics ??= fallbackMetrics;
       }
-      return { text: summaryText, origin: summaryOrigin };
+      summaryEmitted = true;
+      flushReasoning();
     };
     const ensureTurn = (): TurnRenderState => {
       if (expectingNewTurn || turns.length === 0) {
@@ -538,8 +547,8 @@ export class OpenAICompletionsHeadend implements Headend {
       }
       if (!transactionHeaderSent) {
         const headerId = rootTxnId ?? txnId ?? agentIdParam ?? callPath ?? 'transaction';
-        const headerLabel = `**${escapeMarkdown(headerId)}**`;
-        transactionHeader = `Started ${agentHeadingLabel} transaction ${headerLabel}:`;
+        const headerLabel = escapeMarkdown(headerId);
+        transactionHeader = `## ${agentHeadingLabel}: ${headerLabel}`;
         transactionHeaderSent = true;
         flushReasoning();
       }
@@ -576,10 +585,6 @@ export class OpenAICompletionsHeadend implements Headend {
       if (!agentMatches && !callPathMatches) return;
       const eventMetrics = 'metrics' in event ? (event as { metrics?: ProgressMetrics }).metrics : undefined;
       const metricsText = formatMetricsLine(eventMetrics);
-      const originCandidate = (event as { originTxnId?: string }).originTxnId;
-      if (typeof originCandidate === 'string' && originCandidate.length > 0) {
-        rootOriginTxnId = originCandidate;
-      }
       const displayCallPath = (() => {
         if (normalizedAgentPath.length > 0) return normalizedAgentPath;
         if (typeof agentPathRaw === 'string' && agentPathRaw.length > 0) return agentPathRaw;
@@ -617,10 +622,13 @@ export class OpenAICompletionsHeadend implements Headend {
           })();
           appendProgressLine(line);
           if (agentMatches && (callPath === undefined || callPath === rootCallPath)) {
-            const summary = metricsText.length > 0 ? metricsText : 'completed';
-            const origin = (event as { originTxnId?: string }).originTxnId ?? rootOriginTxnId;
-            if (origin !== undefined && origin.length > 0) rootOriginTxnId = origin;
-            masterSummary = { text: summary, origin };
+            const summaryStatus = eventMetrics === undefined ? 'completed' : undefined;
+            const summaryText = formatSummaryLine({
+              agentLabel: agentHeadingLabel,
+              metrics: eventMetrics,
+              statusNote: summaryStatus,
+            });
+            masterSummary = { text: summaryText, metrics: eventMetrics, statusNote: summaryStatus };
             summaryEmitted = true;
             flushReasoning();
           }
@@ -639,12 +647,15 @@ export class OpenAICompletionsHeadend implements Headend {
           }
           appendProgressLine(line);
           if (agentMatches && (callPath === undefined || callPath === rootCallPath)) {
-            const summary = metricsText.length > 0
-              ? metricsText
-              : (errorText !== undefined ? `failed: ${errorText}` : 'failed');
-            const origin = (event as { originTxnId?: string }).originTxnId ?? rootOriginTxnId;
-            if (origin !== undefined && origin.length > 0) rootOriginTxnId = origin;
-            masterSummary = { text: summary, origin };
+            const statusNote = typeof event.error === 'string' && event.error.length > 0
+              ? `failed: ${event.error}`
+              : 'failed';
+            const summaryText = formatSummaryLine({
+              agentLabel: agentHeadingLabel,
+              metrics: eventMetrics,
+              statusNote,
+            });
+            masterSummary = { text: summaryText, metrics: eventMetrics, statusNote };
             summaryEmitted = true;
             flushReasoning();
           }

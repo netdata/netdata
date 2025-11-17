@@ -13,7 +13,7 @@ import { normalizeCallPath } from '../utils.js';
 
 import { ConcurrencyLimiter } from './concurrency.js';
 import { HttpError, readJson, writeJson, writeSseChunk, writeSseDone } from './http-utils.js';
-import { escapeMarkdown, formatMetricsLine, italicize } from './summary-utils.js';
+import { escapeMarkdown, formatMetricsLine, formatSummaryLine, italicize } from './summary-utils.js';
 
 interface Deferred<T> {
   promise: Promise<T>;
@@ -308,11 +308,10 @@ export class AnthropicCompletionsHeadend implements Headend {
     let output = '';
     let reasoning = '';
     const accounting: AccountingEntry[] = [];
-    let masterSummary: { text: string; origin?: string } | undefined;
-    let rootOriginTxnId: string | undefined;
+    let masterSummary: { text?: string; metrics?: ProgressMetrics; statusNote?: string } | undefined;
     let textBlockOpen = false;
     let thinkingBlockOpen = false;
-    const agentHeadingLabel = `**${escapeMarkdown(agent.toolName ?? agent.id)}**`;
+    const agentHeadingLabel = escapeMarkdown(agent.toolName ?? agent.id);
     interface TurnRenderState { index: number; summary?: string; thinking?: string; updates: string[] }
     const turns: TurnRenderState[] = [];
     let renderedReasoning = '';
@@ -398,22 +397,46 @@ export class AnthropicCompletionsHeadend implements Headend {
     const renderReasoning = (): string => {
       if (transactionHeader === undefined) return '';
       const lines: string[] = [transactionHeader];
+      let thinkingSectionOpen = false;
+      const ensureBlankLine = (): void => {
+        if (lines.length === 0) return;
+        if (lines[lines.length - 1] !== '') lines.push('');
+      };
+      const openThinkingSection = (): void => {
+        if (thinkingSectionOpen) return;
+        ensureBlankLine();
+        lines.push('---');
+        thinkingSectionOpen = true;
+      };
+      const closeThinkingSection = (): void => {
+        if (!thinkingSectionOpen) return;
+        ensureBlankLine();
+        lines.push('---');
+        thinkingSectionOpen = false;
+      };
       turns.forEach((turn) => {
-        const headingParts = [`${String(turn.index)}. Turn ${String(turn.index)}`];
-        if (turn.summary !== undefined && turn.summary.length > 0) headingParts.push(`(${turn.summary})`);
-        lines.push(headingParts.join(' '));
-        if (turn.thinking !== undefined && turn.thinking.trim().length > 0) {
-          lines.push(`  - thinking: _${escapeMarkdown(turn.thinking.trim())}_`);
+        closeThinkingSection();
+        ensureBlankLine();
+        lines.push(`### Turn ${String(turn.index)}`);
+        if (turn.summary !== undefined && turn.summary.length > 0) {
+          lines.push(`(${turn.summary})`);
         }
-        turn.updates.forEach((line) => {
-          lines.push(`  - ${line}`);
-        });
+        const thinkingText = turn.thinking !== undefined ? escapeMarkdown(turn.thinking.trim()) : '';
+        if (thinkingText.length > 0) {
+          openThinkingSection();
+          lines.push(thinkingText);
+        }
+        if (turn.updates.length > 0) {
+          closeThinkingSection();
+          turn.updates.forEach((line) => {
+            lines.push(`- ${line}`);
+          });
+        }
       });
-      if (summaryEmitted && masterSummary !== undefined) {
-        const originSuffix = masterSummary.origin !== undefined && masterSummary.origin.length > 0
-          ? ` (origin ${escapeMarkdown(masterSummary.origin)})`
-          : '';
-        lines.push(`Transaction summary: ${masterSummary.text}${originSuffix}`);
+      if (summaryEmitted && masterSummary?.text !== undefined) {
+        closeThinkingSection();
+        ensureBlankLine();
+        lines.push(masterSummary.text);
       }
       return `${lines.join('\n')}\n`;
     };
@@ -424,6 +447,62 @@ export class AnthropicCompletionsHeadend implements Headend {
       const delta = next.slice(renderedReasoning.length);
       emitReasoningDelta(delta);
       renderedReasoning = next;
+    };
+    const ensureSummary = (usageSnapshot: { input: number; output: number; total: number }): void => {
+      const fallbackMetrics = masterSummary?.metrics ?? (() => {
+        const agentIds = new Set<string>();
+        let toolsRun = 0;
+        let tokensCacheRead = 0;
+        let tokensCacheWrite = 0;
+        let costUsd = 0;
+        let minTs: number | undefined;
+        let maxTs: number | undefined;
+        accounting.forEach((entry) => {
+          if (typeof entry.agentId === 'string' && entry.agentId.length > 0) agentIds.add(entry.agentId);
+          if (entry.type === 'tool') toolsRun += 1;
+          if (entry.type === 'llm') {
+            tokensCacheRead += entry.tokens.cacheReadInputTokens ?? entry.tokens.cachedTokens ?? 0;
+            tokensCacheWrite += entry.tokens.cacheWriteInputTokens ?? 0;
+            if (typeof entry.costUsd === 'number' && Number.isFinite(entry.costUsd)) {
+              costUsd += entry.costUsd;
+            }
+          }
+          const ts = entry.timestamp;
+          if (typeof ts === 'number' && Number.isFinite(ts)) {
+            minTs = minTs === undefined ? ts : Math.min(minTs, ts);
+            maxTs = maxTs === undefined ? ts : Math.max(maxTs, ts);
+          }
+        });
+        const durationMs = (minTs !== undefined && maxTs !== undefined) ? Math.max(0, maxTs - minTs) : undefined;
+        const agentsRun = agentIds.size > 0 ? agentIds.size : 1;
+        const normalizedCost = Number(costUsd.toFixed(4));
+        const metrics: ProgressMetrics = {
+          durationMs,
+          tokensIn: usageSnapshot.input,
+          tokensOut: usageSnapshot.output,
+          tokensCacheRead,
+          tokensCacheWrite,
+          toolsRun,
+          agentsRun,
+          costUsd: Number.isFinite(normalizedCost) ? normalizedCost : undefined,
+        };
+        return metrics;
+      })();
+      const statusNote = masterSummary?.statusNote;
+      const summaryText = formatSummaryLine({
+        agentLabel: agentHeadingLabel,
+        metrics: fallbackMetrics,
+        statusNote,
+        usageSnapshot: { prompt: usageSnapshot.input, completion: usageSnapshot.output },
+      });
+      if (masterSummary === undefined) {
+        masterSummary = { text: summaryText, metrics: fallbackMetrics, statusNote };
+      } else {
+        masterSummary.text = summaryText;
+        masterSummary.metrics ??= fallbackMetrics;
+      }
+      summaryEmitted = true;
+      flushReasoning();
     };
     const ensureTurn = (): TurnRenderState => {
       if (expectingNewTurn || turns.length === 0) {
@@ -470,17 +549,13 @@ export class AnthropicCompletionsHeadend implements Headend {
       }
       if (transactionHeader === undefined) {
         const headerId = rootTxnId ?? txnId ?? callPath ?? requestId;
-        const headerLabel = `**${escapeMarkdown(headerId)}**`;
-        transactionHeader = `Started ${agentHeadingLabel} transaction ${headerLabel}:`;
+        const headerLabel = escapeMarkdown(headerId);
+        transactionHeader = `## ${agentHeadingLabel}: ${headerLabel}`;
         flushReasoning();
       }
       if (rootCallPath === undefined && typeof callPath === 'string' && callPath.length > 0) {
         rootCallPath = callPath;
       }
-    };
-    const resolveOriginFromAccounting = (): string | undefined => {
-      const entry = accounting.find((item) => typeof item.originTxnId === 'string' && item.originTxnId.length > 0);
-      return entry?.originTxnId;
     };
     const handleProgressEvent = (event: ProgressEvent): void => {
       if (event.type === 'tool_started' || event.type === 'tool_finished') return;
@@ -522,14 +597,13 @@ export class AnthropicCompletionsHeadend implements Headend {
             return metricsText.length > 0 ? `${prefix}: finished ${metricsText}` : `${prefix}: finished`;
           })();
           appendProgressLine(finishedLine);
-          const originCandidate = (event as { originTxnId?: string }).originTxnId;
-          if (typeof originCandidate === 'string' && originCandidate.length > 0) {
-            rootOriginTxnId = originCandidate;
-          }
-          const summary = metricsText.length > 0 ? metricsText : 'completed';
-          const origin = originCandidate ?? rootOriginTxnId;
-          if (typeof origin === 'string' && origin.length > 0) rootOriginTxnId = origin;
-          masterSummary = { text: summary, origin };
+          const summaryStatus = metrics === undefined ? 'completed' : undefined;
+          const summaryText = formatSummaryLine({
+            agentLabel: agentHeadingLabel,
+            metrics,
+            statusNote: summaryStatus,
+          });
+          masterSummary = { text: summaryText, metrics, statusNote: summaryStatus };
           summaryEmitted = true;
           flushReasoning();
           return;
@@ -547,16 +621,15 @@ export class AnthropicCompletionsHeadend implements Headend {
             line += `: ${metricsText}`;
           }
           appendProgressLine(line);
-          const originCandidate = (event as { originTxnId?: string }).originTxnId;
-          if (typeof originCandidate === 'string' && originCandidate.length > 0) {
-            rootOriginTxnId = originCandidate;
-          }
-          const summary = metricsText.length > 0
-            ? metricsText
-            : (errorText !== undefined ? `failed: ${errorText}` : 'failed');
-          const origin = originCandidate ?? rootOriginTxnId;
-          if (typeof origin === 'string' && origin.length > 0) rootOriginTxnId = origin;
-          masterSummary = { text: summary, origin };
+          const statusNote = typeof event.error === 'string' && event.error.length > 0
+            ? `failed: ${event.error}`
+            : 'failed';
+          const summaryText = formatSummaryLine({
+            agentLabel: agentHeadingLabel,
+            metrics,
+            statusNote,
+          });
+          masterSummary = { text: summaryText, metrics, statusNote };
           summaryEmitted = true;
           flushReasoning();
           return;
@@ -665,76 +738,17 @@ export class AnthropicCompletionsHeadend implements Headend {
           };
           writeSseChunk(res, textEvent);
         }
-        const fallbackMetrics = masterSummary === undefined
-          ? (() => {
-            const agentIds = new Set<string>();
-            let toolsRun = 0;
-            let tokensCacheRead = 0;
-            let tokensCacheWrite = 0;
-            let costUsd = 0;
-            let minTs: number | undefined;
-            let maxTs: number | undefined;
-            accounting.forEach((entry) => {
-              if (typeof entry.agentId === 'string' && entry.agentId.length > 0) agentIds.add(entry.agentId);
-              if (entry.type === 'tool') toolsRun += 1;
-              if (entry.type === 'llm') {
-                tokensCacheRead += entry.tokens.cacheReadInputTokens ?? entry.tokens.cachedTokens ?? 0;
-                tokensCacheWrite += entry.tokens.cacheWriteInputTokens ?? 0;
-                if (typeof entry.costUsd === 'number' && Number.isFinite(entry.costUsd)) {
-                  costUsd += entry.costUsd;
-                }
-              }
-              const ts = entry.timestamp;
-              if (typeof ts === 'number' && Number.isFinite(ts)) {
-                minTs = minTs === undefined ? ts : Math.min(minTs, ts);
-                maxTs = maxTs === undefined ? ts : Math.max(maxTs, ts);
-              }
-            });
-            const durationMs = (minTs !== undefined && maxTs !== undefined) ? Math.max(0, maxTs - minTs) : undefined;
-            const agentsRun = agentIds.size > 0 ? agentIds.size : 1;
-            const normalizedCost = Number(costUsd.toFixed(4));
-            const metrics: ProgressMetrics = {
-              durationMs,
-              tokensIn: usage.input,
-              tokensOut: usage.output,
-              tokensCacheRead,
-              tokensCacheWrite,
-              toolsRun,
-              agentsRun,
-              costUsd: Number.isFinite(normalizedCost) ? normalizedCost : undefined,
-            };
-            return metrics;
-          })()
-          : undefined;
-        const summaryText = masterSummary?.text
-          ?? (() => {
-            const metricsLine = fallbackMetrics !== undefined ? formatMetricsLine(fallbackMetrics) : '';
-            if (metricsLine.length > 0) return metricsLine;
-            if (usage.total > 0) {
-              return `tokens →${String(usage.input)} ←${String(usage.output)}`;
-            }
-            return 'completed';
-          })();
-        const summaryOrigin = masterSummary?.origin
-          ?? rootOriginTxnId
-          ?? resolveOriginFromAccounting()
-          ?? requestId;
-        if (masterSummary === undefined) {
-          masterSummary = { text: summaryText, origin: summaryOrigin };
-          if (typeof summaryOrigin === 'string' && summaryOrigin.length > 0) rootOriginTxnId = summaryOrigin;
-          summaryEmitted = true;
-          flushReasoning();
+        ensureSummary(usage);
+        const summaryText = masterSummary?.text;
+        if (summaryText !== undefined && summaryText.length > 0) {
+          openTextBlock();
+          const summaryEvent = {
+            type: 'content_block_delta' as const,
+            content_block: { type: 'text' as const, text_delta: `\n${summaryText}\n` },
+          };
+          writeSseChunk(res, summaryEvent);
+          closeTextBlock();
         }
-        const originSuffix = typeof summaryOrigin === 'string' && summaryOrigin.length > 0
-          ? ` | origin ${escapeMarkdown(summaryOrigin)}`
-          : '';
-        openTextBlock();
-        const summaryEvent = {
-          type: 'content_block_delta' as const,
-          content_block: { type: 'text' as const, text_delta: `\nTransaction summary: ${summaryText}${originSuffix}\n` },
-        };
-        writeSseChunk(res, summaryEvent);
-        closeTextBlock();
         const stopEvent = { type: 'message_stop' as const };
         writeSseChunk(res, stopEvent);
         writeSseDone(res);
@@ -749,6 +763,7 @@ export class AnthropicCompletionsHeadend implements Headend {
           startNextTurn();
           expectingNewTurn = false;
         }
+        ensureSummary(usage);
         const rendered = renderReasoning().trim();
         const contentBlocks = (() => {
           const blocks: { type: 'text' | 'thinking'; text?: string; thinking?: string }[] = [];

@@ -54,6 +54,7 @@ We must update this document again after applying the fixes and validating real 
 - **OpenAI Chat Compatibility** – forwards thinking as SSE reasoning deltas; runs master-only.
 - **Anthropic Chat Compatibility** – streams `thinking_delta` blocks to Claude clients and appends aggregated reasoning to the final message payload.
 - **Slack** – Displays the master agent’s latest reasoning text in progress updates, but does not yet render the full reasoning stream as Block Kit.
+- **Markdown layout** – Every headend now renders `## <agent>: <txnId>` headers, `### Turn N` sections, thinking blocks wrapped between `\n\n---\n` separators, and a single `SUMMARY: <agent>, ...` line so streaming/non-streaming surfaces stay identical.
 
 ## Open TODOs
 - Audit every mutation path (`sanitizeTurnMessages`, persistence reload, retry) to ensure we never drop `providerMetadata` in reasoning segments.

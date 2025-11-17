@@ -245,12 +245,11 @@ Thinking block included if reasoning content exists.
 
 ## Reasoning Rendering
 
-Same structure as OpenAI headend:
-- Transaction header with agent and txnId
-- Numbered turns with summaries
-- Thinking content (italicized)
-- Progress updates
-- Transaction summary with origin
+- `## <agent>: <txnId>` header (plain text, escaped) aligns with the OpenAI-compatible headend.
+- Each turn logs as `### Turn N` with the full metrics snapshot shown on the next line inside parentheses.
+- Real Anthropic thinking deltas flow between blank-line hairlines (`\n\n---\n`). The block stays open while new thinking arrives and only closes when the renderer needs to output a synthetic line (progress entry, next heading, or the final summary).
+- Progress bullets remain `- **callPath**: ...` just like before.
+- The final line reads `SUMMARY: <agent>, duration **…**, cost **$…**, agents N, tools M, tokens …` without origin/txn metadata; both streaming and non-streaming consumers receive the same text.
 
 ## Progress Event Handling
 

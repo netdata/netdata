@@ -333,7 +333,7 @@ Headends emit events through the context:
 
 - **Concurrency limiter**: All network headends share `ConcurrencyLimiter` (`src/headends/concurrency.ts`) which supports abortable acquire/release; CLI `--api-concurrency`, `--openai-completions-concurrency`, etc., feed those limits.
 - **Shared telemetry labels**: `getTelemetryLabels()` tags each headend with `{ headend: id }` so OTLP metrics/traces can filter per surface (`src/headends/*-headend.ts:70-90`).
-- **Progress propagation**: REST/OpenAI/Anthropic headends forward `onProgress` events to clients (Slack posts to threads), ensuring consistent “Transaction summary” output regardless of surface (`src/headends/openai-completions-headend.ts:311-420`, `src/headends/anthropic-completions-headend.ts:300-360`, `src/headends/rest-headend.ts:242-358`).
+- **Progress propagation**: REST/OpenAI/Anthropic headends forward `onProgress` events to clients (Slack posts to threads), ensuring the `SUMMARY: <agent>, ...` line and the turn-by-turn Markdown transcript stay identical across surfaces (`src/headends/openai-completions-headend.ts:311-448`, `src/headends/anthropic-completions-headend.ts:300-360`, `src/headends/rest-headend.ts:242-358`).
 - **Slash route reuse**: Slack headend registers a REST extra route when available; otherwise it spawns a tiny fallback HTTP server, so slash commands work even without REST headend present (`src/headends/slack-headend.ts:98-305`, `src/headends/rest-headend.ts:176-208`).
 
 ## Test Coverage

@@ -46,3 +46,44 @@ export const formatMetricsLine = (metrics?: ProgressMetrics): string => {
   if (typeof metrics.costUsd === 'number' && Number.isFinite(metrics.costUsd)) parts.push(`cost $**${metrics.costUsd.toFixed(4)}**`);
   return parts.join(', ');
 };
+
+export interface SummaryLineOptions {
+  agentLabel: string;
+  metrics?: ProgressMetrics;
+  statusNote?: string;
+  usageSnapshot?: { prompt: number; completion: number };
+}
+
+export const formatSummaryLine = ({ agentLabel, metrics, statusNote, usageSnapshot }: SummaryLineOptions): string => {
+  const segments: string[] = [];
+  const duration = formatDuration(metrics?.durationMs);
+  if (typeof duration === 'string' && duration.length > 0) segments.push(`duration **${escapeMarkdown(duration)}**`);
+  const normalizedCost = typeof metrics?.costUsd === 'number' && Number.isFinite(metrics.costUsd)
+    ? `cost **$${metrics.costUsd.toFixed(4)}**`
+    : undefined;
+  if (normalizedCost !== undefined) segments.push(normalizedCost);
+  const agents = typeof metrics?.agentsRun === 'number' && Number.isFinite(metrics.agentsRun)
+    ? `agents ${String(metrics.agentsRun)}`
+    : undefined;
+  if (agents !== undefined) segments.push(agents);
+  const tools = typeof metrics?.toolsRun === 'number' && Number.isFinite(metrics.toolsRun)
+    ? `tools ${String(metrics.toolsRun)}`
+    : undefined;
+  if (tools !== undefined) segments.push(tools);
+  const tokenMetrics: ProgressMetrics | undefined = metrics ?? (usageSnapshot !== undefined
+    ? { tokensIn: usageSnapshot.prompt, tokensOut: usageSnapshot.completion }
+    : undefined);
+  const tokens = tokenMetrics !== undefined ? formatTokenSegments(tokenMetrics) : undefined;
+  if (tokens !== undefined) segments.push(tokens);
+  const safeStatus = typeof statusNote === 'string' && statusNote.trim().length > 0
+    ? escapeMarkdown(statusNote.trim())
+    : undefined;
+  let summary = `SUMMARY: ${agentLabel}`;
+  if (safeStatus !== undefined) summary += `, ${safeStatus}`;
+  if (segments.length > 0) {
+    summary += `, ${segments.join(', ')}`;
+  } else if (safeStatus === undefined) {
+    summary += ', completed';
+  }
+  return summary;
+};
