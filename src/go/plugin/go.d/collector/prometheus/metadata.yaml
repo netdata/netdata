@@ -7344,36 +7344,6 @@ modules:
   - <<: *module
     meta:
       <<: *meta
-      id: collector-go.d.plugin-prometheus-sql
-      most_popular: false
-      community: true
-      monitored_instance:
-        name: SQL Database agnostic
-        link: https://github.com/free/sql_exporter
-        icon_filename: sql.svg
-        categories:
-          - data-collection.database-servers
-      keywords:
-        - database
-        - relational db
-        - data querying
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Query SQL databases for efficient database performance monitoring.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [SQL Exporter](https://github.com/free/sql_exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [SQL Exporter](https://github.com/free/sql_exporter) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      <<: *meta
       id: collector-go.d.plugin-prometheus-starwind_vsan
       most_popular: false
       community: true
