@@ -32,7 +32,6 @@ func New() *Collector {
 		},
 		charts:     &module.Charts{},
 		seenCharts: make(map[string]bool),
-		skipValues: make(map[string]bool),
 	}
 }
 
@@ -45,7 +44,6 @@ type Collector struct {
 	db *sql.DB
 
 	seenCharts map[string]bool
-	skipValues map[string]bool
 }
 
 func (c *Collector) Configuration() any {

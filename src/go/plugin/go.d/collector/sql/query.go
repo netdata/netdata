@@ -9,13 +9,13 @@ import (
 	"time"
 )
 
-// QueryRowsCache maps query_id -> slice of row maps (col -> string value)
-type QueryRowsCache map[string][]map[string]string
+// queryRowsCache maps query_id -> slice of row maps (col -> string value)
+type queryRowsCache map[string][]map[string]string
 
 // execReusableQueries runs all queries declared in Config.Queries (new schema)
 // and returns their full rowsets in memory. It also returns per-query durations (ms).
-func (c *Collector) execReusableQueries(ctx context.Context) (QueryRowsCache, map[string]int64, error) {
-	cache := make(QueryRowsCache, len(c.Queries))
+func (c *Collector) execReusableQueries(ctx context.Context) (queryRowsCache, map[string]int64, error) {
+	cache := make(queryRowsCache, len(c.Queries))
 	durations := make(map[string]int64, len(c.Queries))
 
 	for i, q := range c.Queries {
@@ -40,8 +40,8 @@ func (c *Collector) execReusableQueries(ctx context.Context) (QueryRowsCache, ma
 // execMetricQueries resolves and executes the query for each metric block.
 // If a metric uses query_ref, it reuses rows from qcache (no re-query).
 // If a metric has inline query, it executes it and stores the rows.
-func (c *Collector) execMetricQueries(ctx context.Context, qcache QueryRowsCache) (QueryRowsCache, map[string]int64, error) {
-	cache := make(QueryRowsCache, len(c.Metrics))
+func (c *Collector) execMetricQueries(ctx context.Context, qcache queryRowsCache) (queryRowsCache, map[string]int64, error) {
+	cache := make(queryRowsCache, len(c.Metrics))
 	durations := make(map[string]int64, len(c.Metrics))
 
 	for i, m := range c.Metrics {
@@ -57,7 +57,6 @@ func (c *Collector) execMetricQueries(ctx context.Context, qcache QueryRowsCache
 				return nil, nil, fmt.Errorf("metrics[%d] query_ref %q not found in queries cache", i+1, m.QueryRef)
 			}
 			cache[m.ID] = rows
-			durations[m.ID] = 0
 		case m.Query != "":
 			rows, dur, err := c.runSQL(ctx, m.Query)
 			if err != nil {

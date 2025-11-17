@@ -9,10 +9,11 @@ import (
 )
 
 const (
-	prioChart = module.Priority + iota
+	prioMetricChart = module.Priority + iota
+	prioQueryTimingChart
 )
 
-func (c *Collector) createChart(chartID string, m ConfigMetricBlock, ch ConfigChartConfig, row map[string]string) {
+func (c *Collector) createMetricBlockChart(chartID string, m ConfigMetricBlock, ch ConfigChartConfig, row map[string]string) {
 	if c.seenCharts[chartID] {
 		return
 	}
@@ -25,13 +26,15 @@ func (c *Collector) createChart(chartID string, m ConfigMetricBlock, ch ConfigCh
 		Type:     module.ChartType(ch.Type),
 		Ctx:      fmt.Sprintf("sql.%s_%s", c.Driver, ch.Context),
 		Fam:      ch.Family,
-		Priority: prioChart,
+		Priority: prioMetricChart,
+		Labels: []module.Label{
+			{Key: "driver", Value: c.Driver},
+		},
 	}
 
 	for k, v := range c.StaticLabels {
 		chart.Labels = append(chart.Labels, module.Label{Key: k, Value: v})
 	}
-	chart.Labels = append(chart.Labels, module.Label{Key: "driver", Value: c.Driver})
 
 	for _, lf := range m.LabelsFromRow {
 		if v, ok := row[lf.Source]; ok {
@@ -49,5 +52,36 @@ func (c *Collector) createChart(chartID string, m ConfigMetricBlock, ch ConfigCh
 
 	if err := c.Charts().Add(chart); err != nil {
 		c.Warningf("failed to add chart %q: %v", chartID, err)
+	}
+}
+
+func (c *Collector) createQueryTimingChart(chartID, label string) {
+	if c.seenCharts[chartID] {
+		return
+	}
+	c.seenCharts[chartID] = true
+
+	chart := &module.Chart{
+		ID:       chartID,
+		Title:    "SQL query execution time",
+		Units:    "ms",
+		Ctx:      fmt.Sprintf("sql.%s_query_time", c.Driver),
+		Fam:      "Query/Timings",
+		Priority: prioQueryTimingChart,
+		Labels: []module.Label{
+			{Key: "driver", Value: c.Driver},
+			{Key: "query_id", Value: label},
+		},
+		Dims: []*module.Dim{
+			{
+				ID:   buildDimID(chartID, "duration"),
+				Name: "duration",
+			},
+		},
+	}
+
+	if err := c.Charts().Add(chart); err != nil {
+		c.Warningf("failed to add query timing chart %q: %v", chartID, err)
+		return
 	}
 }

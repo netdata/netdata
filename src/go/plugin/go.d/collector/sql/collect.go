@@ -16,30 +16,32 @@ import (
 
 func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
 	if c.db == nil {
-		if err := c.openConnection(); err != nil {
+		if err := c.openConnection(ctx); err != nil {
 			return nil, err
 		}
 	}
 
-	qcache, _, err := c.execReusableQueries(ctx)
+	qcache, qdur, err := c.execReusableQueries(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	mcache, _, err := c.execMetricQueries(ctx, qcache)
+	mcache, mdur, err := c.execMetricQueries(ctx, qcache)
 	if err != nil {
 		return nil, err
 	}
 
 	mx := make(map[string]int64)
+
 	if err := c.collectMetrics(mx, mcache); err != nil {
 		return nil, err
 	}
+	c.collectQueryTimingMetrics(mx, qdur, mdur)
 
 	return mx, nil
 }
 
-func (c *Collector) collectMetrics(mx map[string]int64, mcache QueryRowsCache) error {
+func (c *Collector) collectMetrics(mx map[string]int64, mcache queryRowsCache) error {
 	for i, m := range c.Metrics {
 		rows, ok := mcache[m.ID]
 		if !ok {
@@ -65,11 +67,11 @@ func (c *Collector) collectMetrics(mx map[string]int64, mcache QueryRowsCache) e
 func (c *Collector) collectMetricsModeColumns(mx map[string]int64, m ConfigMetricBlock, rows []map[string]string) error {
 	for _, ch := range m.Charts {
 		for _, row := range rows {
-			chartID := c.buildChartID(m, ch, row)
+			chartID := c.buildMetricChartID(m, ch, row)
 			if chartID == "" {
 				continue
 			}
-			c.createChart(chartID, m, ch, row)
+			c.createMetricBlockChart(chartID, m, ch, row)
 
 			for _, d := range ch.Dims {
 				raw, ok := row[d.Source]
@@ -100,11 +102,11 @@ func (c *Collector) collectMetricsModeKV(mx map[string]int64, m ConfigMetricBloc
 
 	for _, ch := range m.Charts {
 		for _, row := range rows {
-			chartID := c.buildChartID(m, ch, row)
+			chartID := c.buildMetricChartID(m, ch, row)
 			if chartID == "" {
 				continue
 			}
-			c.createChart(chartID, m, ch, row)
+			c.createMetricBlockChart(chartID, m, ch, row)
 
 			k, ok1 := row[nameCol]
 			vraw, ok2 := row[valCol]
@@ -130,6 +132,22 @@ func (c *Collector) collectMetricsModeKV(mx map[string]int64, m ConfigMetricBloc
 	return nil
 }
 
+func (c *Collector) collectQueryTimingMetrics(mx map[string]int64, qdur, mdur map[string]int64) {
+	collect := func(durations map[string]int64) {
+		// Reusable queries: label is <query_id>
+		// Metric-block inline queries: label is <metric_block_id>
+		for qid, dur := range durations {
+			chartID := c.buildTimingChartIDFromQueryID(qid)
+			c.createQueryTimingChart(chartID, qid)
+
+			dimID := buildDimID(chartID, "duration")
+			mx[dimID] = dur
+		}
+	}
+	collect(qdur)
+	collect(mdur)
+}
+
 func (c *Collector) evalStatusWhen(sw *ConfigStatusWhen, value string) bool {
 	switch {
 	case sw.Equals != "":
@@ -143,28 +161,31 @@ func (c *Collector) evalStatusWhen(sw *ConfigStatusWhen, value string) bool {
 	}
 }
 
-func (c *Collector) openConnection() error {
+func (c *Collector) openConnection(ctx context.Context) error {
 	db, err := sql.Open(c.Driver, c.DSN)
 	if err != nil {
 		return fmt.Errorf("open %s: %w (dsn=%s)", c.Driver, err, redactDSN(c.DSN))
 	}
 
-	db.SetConnMaxLifetime(time.Minute * 10)
+	db.SetConnMaxLifetime(10 * time.Minute)
 
-	ctx, cancel := context.WithTimeout(context.Background(), c.Timeout.Duration())
+	pingCtx := ctx
+	cancel := func() {}
+	if d := c.Timeout.Duration(); d > 0 {
+		pingCtx, cancel = context.WithTimeout(ctx, d)
+	}
 	defer cancel()
 
-	if err := db.PingContext(ctx); err != nil {
+	if err := db.PingContext(pingCtx); err != nil {
 		_ = db.Close()
 		return fmt.Errorf("ping %s: %w (dsn=%s)", c.Driver, err, redactDSN(c.DSN))
 	}
 
 	c.db = db
-
 	return nil
 }
 
-func (c *Collector) buildChartID(m ConfigMetricBlock, ch ConfigChartConfig, row map[string]string) string {
+func (c *Collector) buildMetricChartID(m ConfigMetricBlock, ch ConfigChartConfig, row map[string]string) string {
 	var b strings.Builder
 	b.Grow(128)
 
@@ -179,6 +200,12 @@ func (c *Collector) buildChartID(m ConfigMetricBlock, ch ConfigChartConfig, row 
 	}
 
 	return normalizeID(b.String())
+}
+
+func (c *Collector) buildTimingChartIDFromQueryID(queryID string) string {
+	// “reusable” query id or metric block id;
+	raw := fmt.Sprintf("%s_query_time_%s", c.Driver, queryID)
+	return normalizeID(raw)
 }
 
 func buildDimID(chartID, dimName string) string {
