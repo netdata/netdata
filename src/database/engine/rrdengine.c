@@ -1337,6 +1337,9 @@ static time_t find_uuid_first_time(
 static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile_to_delete, struct rrdengine_datafile *first_datafile_remaining, bool worker) {
     time_t global_first_time_s = LONG_MAX;
 
+    if (unlikely(!first_datafile_remaining))
+        return;
+
     if(worker)
         worker_is_busy(UV_EVENT_DBENGINE_FIND_ROTATED_METRICS);
 
@@ -1499,7 +1502,7 @@ void datafile_delete(
                      ctx->config.dbfiles_path, datafile->tier, datafile->fileno);
 
     if (update_retention)
-        update_metrics_first_time_s(ctx, datafile, get_next_datafile(datafile, NULL, true), worker);
+        update_metrics_first_time_s(ctx, datafile, get_next_datafile(datafile, NULL, false), worker);
 
 //    if (!ctx_is_available_for_queries(ctx)) {
 //        // agent is shutting down, we cannot continue
