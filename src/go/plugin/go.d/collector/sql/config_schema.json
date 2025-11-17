@@ -20,12 +20,13 @@
       },
       "driver": {
         "title": "Driver",
-        "description": "SQL driver / database engine to use. Supported values: `mysql` (MySQL/MariaDB), `pgx` (PostgreSQL), `oracle`.",
+        "description": "SQL driver / database engine to use. Supported values: `mysql` (MySQL/MariaDB), `pgx` (PostgreSQL), `oracle`, `sqlserver` (Microsoft SQL Server).",
         "type": "string",
         "enum": [
           "mysql",
           "pgx",
-          "oracle"
+          "oracle",
+          "sqlserver"
         ],
         "default": "mysql"
       },
@@ -352,7 +353,7 @@
     },
     "dsn": {
       "ui:placeholder": "Enter the database connection string",
-      "ui:help": "**DSN format depends on the selected driver.**\n\n### MySQL / MariaDB\nFormat: `user:password@tcp(host:port)/dbname?param1=value1&paramN=valueN`\nExample:\n```\nroot:pass@tcp(127.0.0.1:3306)/\n```\n[MySQL DSN documentation](https://github.com/go-sql-driver/mysql#dsn-data-source-name)\n\n### PostgreSQL\nFormats: `postgresql://user:password@host:5432/dbname?param1=value1&paramN=valueN`\nExample:\n```\npostgresql://user:pass@localhost:5432/mydb\n```\n[PostgreSQL DSN documentation](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING-URIS)\n\n### Oracle\nFormat: `oracle://username:password@host:port/service?param1=value1&paramN=valueN`\nExample:\n```\noracle://scott:tiger@db.example.com:1521/ORCLPDB1?ssl=off\n```"
+      "ui:help": "**DSN format depends on the selected driver.**\n\n### MySQL / MariaDB\nFormat: `user:password@tcp(host:port)/dbname?param1=value1&paramN=valueN`\nExample:\n```\nroot:pass@tcp(127.0.0.1:3306)/\n```\n[MySQL DSN documentation](https://github.com/go-sql-driver/mysql#dsn-data-source-name)\n\n### PostgreSQL\nFormats: `postgresql://user:password@host:5432/dbname?param1=value1&paramN=valueN`\nExample:\n```\npostgresql://user:pass@localhost:5432/mydb\n```\n[PostgreSQL DSN documentation](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING-URIS)\n\n### Oracle\nFormat: `oracle://username:password@host:port/service?param1=value1&paramN=valueN`\nExample:\n```\noracle://scott:tiger@db.example.com:1521/ORCLPDB1?ssl=off\n```\n\n### SQL Server\nFormat: `sqlserver://username:password@host:port?database=dbname&param=value`\nExample:\n```\nsqlserver://sa:myStrong(!)Password@localhost:1433?database=master&connection+timeout=30\n```\n[SQL Server driver DSN documentation](https://github.com/denisenkom/go-mssqldb#connection-parameters-and-dsn)"
     },
     "static_labels": {
       "ui:help": "Optional key/value labels added to every chart created by this job (for example env=prod, role=primary)."

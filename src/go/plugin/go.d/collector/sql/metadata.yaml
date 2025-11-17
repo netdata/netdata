@@ -22,10 +22,12 @@ modules:
         - sql
         - mysql
         - maria
-        - pgx
         - postgres
         - postgresql
+        - pgx
         - oracle
+        - sqlserver
+        - mssql
         - generic
       most_popular: false
     overview:
@@ -53,6 +55,7 @@ modules:
             - `mysql` — MySQL / MariaDB
             - `pgx`   — PostgreSQL
             - `oracle` — Oracle Database
+            - `sqlserver` — Microsoft SQL Server / Azure SQL
 
           For each metric block you define, it executes the SQL query (inline or via
           `query_ref`), reads the result set, and maps it to Netdata charts and
@@ -126,7 +129,7 @@ modules:
 
             ```yaml
             # ---------- CONNECTION ----------
-            driver: <mysql|pgx|oracle>      # REQUIRED. SQL driver.
+            driver: <mysql|pgx|oracle|sqlserver>      # REQUIRED. SQL driver.
             dsn: "<connection string>"                   # REQUIRED. Driver-specific DSN/URL.
 
             # Optional connection settings
@@ -219,7 +222,7 @@ modules:
 
             - name: driver
               description: >
-                SQL driver to use. Supported values: `mysql`, `pgx`, `oracle`.
+                SQL driver to use. Supported values: `mysql`, `pgx`, `oracle`, `sqlserver`.
               default_value: mysql
               required: true
               group: Target
