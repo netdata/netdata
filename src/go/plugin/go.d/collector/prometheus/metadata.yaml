@@ -1155,6 +1155,26 @@ modules:
   - <<: *module
     meta:
       <<: *meta
+      id: collector-go.d.plugin-prometheus-scylladb
+      most_popular: false
+      community: true
+      monitored_instance:
+        name: ScyllaDB
+        link: https://www.scylladb.com/
+        icon_filename: scylladb.png
+        categories:
+          - data-collection.database-servers
+      keywords: []
+    overview:
+      <<: *overview
+      data_collection:
+        metrics_description: |
+          Track ScyllaDB NoSQL database metrics for efficient database management and performance with Netdata's Prometheus integration.
+        method_description: |
+          Metrics are gathered by periodically sending HTTP requests to the ScyllaDB built-in Prometheus exporter.
+  - <<: *module
+    meta:
+      <<: *meta
       id: collector-go.d.plugin-prometheus-crowdsec
       most_popular: false
       community: true
