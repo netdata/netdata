@@ -250,7 +250,7 @@ metrics:
 | **Collection** | update_every | Data collection interval (seconds). | 1 | no |
 |  | autodetection_retry | Autodetection retry interval (seconds). Not used for this collector. Set 0 to disable. | 0 | no |
 | **Target** | driver | SQL driver to use. Supported values: `mysql`, `pgx`, `oracle`, `sqlserver`. | mysql | yes |
-|  | dsn | Database connection string (DSN). The format depends on the selected driver ( ([MySQL](https://github.com/go-sql-driver/mysql#dsn-data-source-name), [PostgreSQL](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING-URIS), [MS SQL Server](https://github.com/denisenkom/go-mssqldb#connection-parameters-and-dsn)). |  | yes |
+|  | dsn | Database connection string (DSN). The format depends on the selected driver ( [MySQL](https://github.com/go-sql-driver/mysql#dsn-data-source-name), [PostgreSQL](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING-URIS), [MS SQL Server](https://github.com/denisenkom/go-mssqldb#connection-parameters-and-dsn)). |  | yes |
 | **Connection** | timeout | Query and connection check timeout (seconds). | 5 | no |
 | **Labels** | static_labels | A map of static labels added to every chart created by this job. Useful for tagging charts with environment, region, or role. | {} | no |
 | **Queries & Metrics** | queries | A list of reusable queries. Metric blocks can reference these via `query_ref` to avoid repeating SQL. See [Configuration Structure](#configuration) for details. | [] | no |
