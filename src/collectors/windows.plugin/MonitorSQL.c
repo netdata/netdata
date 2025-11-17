@@ -1164,6 +1164,7 @@ void dict_mssql_insert_databases_cb(const DICTIONARY_ITEM *item __maybe_unused, 
 {
     struct mssql_db_instance *mdi = value;
 
+    mdi->MSSQLDatabaseDataFileSize.current.Data = ULONG_LONG_MAX;
     mdi->collecting_data = true;
 }
 
