@@ -585,7 +585,7 @@ ml_dimension_deserialize_kmeans(const char *json_str)
     return true;
 }
 
-static void ml_dimension_stream_kmeans(const ml_dimension_t *dim)
+static void ml_dimension_stream_kmeans(ml_worker_t *worker, const ml_dimension_t *dim)
 {
     struct sender_state *s = dim->rd->rrdset->rrdhost->sender;
     if (!s)
@@ -596,10 +596,13 @@ static void ml_dimension_stream_kmeans(const ml_dimension_t *dim)
         !rrddim_check_upstream_exposed(dim->rd))
         return;
 
-    CLEAN_BUFFER *payload = buffer_create(0, NULL);
+    // Reuse worker's buffers instead of allocating new ones
+    BUFFER *payload = worker->stream_payload_buffer;
+    buffer_flush(payload);
     ml_dimension_serialize_kmeans(dim, payload);
 
-    CLEAN_BUFFER *wb = buffer_create(0, NULL);
+    BUFFER *wb = worker->stream_wb_buffer;
+    buffer_flush(wb);
 
     buffer_sprintf(
         wb, PLUGINSD_KEYWORD_JSON " " PLUGINSD_KEYWORD_JSON_CMD_ML_MODEL "\n%s\n" PLUGINSD_KEYWORD_JSON_END "\n",
@@ -650,7 +653,7 @@ static void ml_dimension_update_models(ml_worker_t *worker, ml_dimension_t *dim)
     model_info.inlined_kmeans = dim->km_contexts.back();
     worker->pending_model_info.push_back(model_info);
 
-    ml_dimension_stream_kmeans(dim);
+    ml_dimension_stream_kmeans(worker, dim);
 
     // Clear the training in progress flag
     dim->training_in_progress = false;

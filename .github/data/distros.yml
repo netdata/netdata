@@ -249,17 +249,17 @@ include:
 
   - &opensuse
     distro: opensuse
-    version: "16.0"
+    version: "tumbleweed"
     support_type: Core
     notes: ''
-    eol_check: true
+    eol_check: false
     bundle_sentry: *default_sentry
-    base_image: opensuse/leap:16.0
+    base_image: opensuse/tumbleweed
     jsonc_removal: |
       zypper rm -y libjson-c-devel
     packages: &opensuse_packages
       type: rpm
-      repo_distro: opensuse/16.0
+      repo_distro: opensuse/tumbleweed
       builder_rev: *def_builder_rev
       arches:
         - x86_64
@@ -267,8 +267,16 @@ include:
     test:
       ebpf-core: true
   - <<: *opensuse
+    version: "16.0"
+    base_image: opensuse/leap:16.0
+    eol_check: true
+    packages:
+      <<: *opensuse_packages
+      repo_distro: opensuse/16.0
+  - <<: *opensuse
     version: "15.6"
     base_image: opensuse/leap:15.6
+    eol_check: true
     packages:
       <<: *opensuse_packages
       repo_distro: opensuse/15.6

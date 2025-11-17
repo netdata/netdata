@@ -655,6 +655,7 @@ static void journalfile_restore_extent_metadata(struct rrdengine_instance *ctx, 
 
     time_t now_s = max_acceptable_collected_time();
     time_t extent_first_time_s = journalfile->v2.first_time_s ? journalfile->v2.first_time_s : LONG_MAX;
+    time_t extent_last_time_s = journalfile->v2.last_time_s ? journalfile->v2.last_time_s : 0;
     for (i = 0; i < count ; ++i) {
         nd_uuid_t *temp_id;
         uint8_t page_type = jf_metric_data->descr[i].type;
@@ -719,11 +720,13 @@ static void journalfile_restore_extent_metadata(struct rrdengine_instance *ctx, 
             jf_metric_data->extent_size);
 
         extent_first_time_s = MIN(extent_first_time_s, vd.start_time_s);
+        extent_last_time_s = MAX(extent_last_time_s, vd.end_time_s);
 
         mrg_metric_release(main_mrg, metric);
     }
 
     journalfile->v2.first_time_s = extent_first_time_s;
+    journalfile->v2.last_time_s = extent_last_time_s;
 
     time_t old = __atomic_load_n(&ctx->atomic.first_time_s, __ATOMIC_RELAXED);;
     do {
@@ -828,7 +831,7 @@ static uint64_t journalfile_iterate_transactions(struct rrdengine_instance *ctx,
 
             max_size = pos + size_bytes - pos_i;
             ret = journalfile_replay_transaction(ctx, journalfile, buf + pos_i, &id, max_size);
-            if (!ret) /* TODO: support transactions bigger than 4K */
+            if (!ret)
                 /* unknown transaction size, move on to the next block */
                 pos_i = ALIGN_BYTES_FLOOR(pos_i + RRDENG_BLOCK_SIZE);
             else
@@ -1602,7 +1605,11 @@ int journalfile_load(struct rrdengine_instance *ctx, struct rrdengine_journalfil
     nd_log_daemon(NDLP_DEBUG, "DBENGINE: journal file \"%s\" loaded (size:%" PRIu64 ").", path, file_size);
 
     bool is_last_file = (ctx_last_fileno_get(ctx) == journalfile->datafile->fileno);
-    if (is_last_file && journalfile->datafile->pos <= rrdeng_target_data_file_size(ctx) / 3) {
+    bool has_old_data = false;
+    if (ctx->config.tier == 0 && journalfile->v2.last_time_s > 0)
+        has_old_data = (now_realtime_sec() - journalfile->v2.last_time_s) > 86400;
+
+    if (is_last_file && journalfile->datafile->pos <= rrdeng_target_data_file_size(ctx) / 3 && !has_old_data) {
         ctx->loading.create_new_datafile_pair = false;
         return 0;
     }

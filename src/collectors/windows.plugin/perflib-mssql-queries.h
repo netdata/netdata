@@ -3,9 +3,17 @@
 #ifndef NETDATA_PERFLIB_MSSQL_QUERIES_H
 #define NETDATA_PERFLIB_MSSQL_QUERIES_H
 
+#include <sqlext.h>
+#include <sqltypes.h>
+#include <sql.h>
+
 // https://learn.microsoft.com/en-us/sql/relational-databases/system-dynamic-management-views/sys-dm-tran-locks-transact-sql?view=sql-server-ver16
 #define NETDATA_QUERY_LOCKS_MASK                                                                                       \
     "SELECT resource_type, count(*) FROM %s.sys.dm_tran_locks WHERE DB_NAME(resource_database_id) = '%s' group by resource_type;"
+
+#define NETDATA_REPLICATION_DB "distribution"
+
+#define NETDATA_REPLICATION_MONITOR_QUERY "EXEC sp_replmonitorhelppublication;"
 
 #define NETDATA_QUERY_LIST_DB "SELECT name FROM sys.databases;"
 
@@ -627,4 +635,348 @@
                 N'SOS_WORK_DISPATCHER',                                                                               \
                 'RESERVED_MEMORY_ALLOCATION_EXT') AND ws.[waiting_tasks_count] > 0 AND ws.[wait_time_ms] > 100;"
 
+#ifndef MEGA_FACTOR
+#define MEGA_FACTOR (1048576) // 1024 * 1024
+#endif
+// https://learn.microsoft.com/en-us/sql/sql-server/install/instance-configuration?view=sql-server-ver16
+#define NETDATA_MAX_INSTANCE_NAME (32)
+#define NETDATA_MAX_INSTANCE_OBJECT (128)
+// https://learn.microsoft.com/en-us/previous-versions/sql/sql-server-2008-r2/ms191240(v=sql.105)#sysname
+#define SQLSERVER_MAX_NAME_LENGTH NETDATA_MAX_INSTANCE_OBJECT
+#define NETDATA_MSSQL_NEXT_TRY (60)
+
+struct netdata_mssql_conn {
+    const char *instance;
+    const char *driver;
+    const char *server;
+    const char *address;
+    const char *username;
+    const char *password;
+    int instances;
+    bool windows_auth;
+    bool is_sqlexpress;
+
+    SQLCHAR *connectionString;
+
+    SQLHENV netdataSQLEnv;
+    SQLHDBC netdataSQLHDBc;
+
+    SQLHSTMT checkPermSTMT;
+    SQLHSTMT databaseListSTMT;
+    SQLHSTMT dataFileSizeSTMT;
+    SQLHSTMT dbTransactionSTMT;
+    SQLHSTMT dbInstanceTransactionSTMT;
+    SQLHSTMT dbWaitsSTMT;
+    SQLHSTMT dbLocksSTMT;
+    SQLHSTMT dbSQLState;
+    SQLHSTMT dbSQLJobs;
+    SQLHSTMT dbReplicationPublisher;
+
+    BOOL is_connected;
+};
+
+enum netdata_mssql_metrics {
+    NETDATA_MSSQL_GENERAL_STATS,
+    NETDATA_MSSQL_SQL_ERRORS,
+    NETDATA_MSSQL_MEMORY,
+    NETDATA_MSSQL_SQL_STATS,
+    NETDATA_MSSQL_ACCESS_METHODS,
+
+    NETDATA_MSSQL_DATABASE,
+    NETDATA_MSSQL_LOCKS,
+    NETDATA_MSSQL_WAITS,
+    NETDATA_MSSQL_BUFFER_MANAGEMENT,
+    NETDATA_MSSQL_JOBS,
+
+    NETDATA_MSSQL_METRICS_END
+};
+
+struct mssql_db_waits {
+    const char *wait_type;
+    const char *wait_category;
+
+    RRDSET *st_total_wait;
+    RRDDIM *rd_total_wait;
+
+    RRDSET *st_resource_wait_msec;
+    RRDDIM *rd_resource_wait_msec;
+
+    RRDSET *st_signal_wait_msec;
+    RRDDIM *rd_signal_wait_msec;
+
+    RRDSET *st_max_wait_time_msec;
+    RRDDIM *rd_max_wait_time_msec;
+
+    RRDSET *st_waiting_tasks;
+    RRDDIM *rd_waiting_tasks;
+
+    COUNTER_DATA MSSQLDatabaseTotalWait;
+    COUNTER_DATA MSSQLDatabaseResourceWaitMSec;
+    COUNTER_DATA MSSQLDatabaseSignalWaitMSec;
+    COUNTER_DATA MSSQLDatabaseMaxWaitTimeMSec;
+    COUNTER_DATA MSSQLDatabaseWaitingTasks;
+};
+
+// https://learn.microsoft.com/en-us/sql/relational-databases/system-stored-procedures/sp-replmonitorhelppublication-transact-sql?view=sql-server-ver17
+struct mssql_publisher_publication {
+    struct mssql_instance *parent;
+
+    // Lables
+    char *publisher;
+    char *publication;
+    char *db;
+    int type;
+
+    // Charts
+    int status;
+    int warning;
+
+    int avg_latency;
+
+    int retention;
+
+    int subscriptioncount;
+    int runningdistagentcount;
+
+    int average_runspeedPerf;
+
+    RRDSET *st_publisher_status;
+    RRDDIM *rd_publisher_status_started;
+    RRDDIM *rd_publisher_status_successed;
+    RRDDIM *rd_publisher_status_in_progress;
+    RRDDIM *rd_publisher_status_idle;
+    RRDDIM *rd_publisher_status_retrying;
+    RRDDIM *rd_publisher_status_failed;
+
+    RRDSET *st_warning;
+    RRDDIM *rd_warning_expiration;
+    RRDDIM *rd_warning_latency;
+    RRDDIM *rd_warning_mergeeexpiration;
+    RRDDIM *rd_warning_mergefastduration;
+    RRDDIM *rd_warning_mergelowduration;
+    RRDDIM *rd_warning_mergefastrunspeed;
+    RRDDIM *rd_warning_mergelowrunspeed;
+
+    RRDSET *st_avg_latency;
+    RRDDIM *rd_avg_latency;
+
+    RRDSET *st_retention;
+    RRDDIM *rd_retention;
+
+    RRDSET *st_subscription_count;
+    RRDDIM *rd_subscription_count;
+
+    RRDSET *st_running_agent;
+    RRDDIM *rd_running_agent;
+
+    RRDSET *st_synchronization_time;
+    RRDDIM *rd_synchronization_time;
+};
+
+struct mssql_instance {
+    char *instanceID;
+    int update_every;
+
+    struct netdata_mssql_conn *conn;
+
+    char *objectName[NETDATA_MSSQL_METRICS_END];
+
+    RRDSET *st_user_connections;
+    RRDDIM *rd_user_connections;
+
+    RRDSET *st_process_blocked;
+    RRDDIM *rd_process_blocked;
+
+    RRDSET *st_stats_auto_param;
+    RRDDIM *rd_stats_auto_param;
+
+    RRDSET *st_stats_batch_request;
+    RRDDIM *rd_stats_batch_request;
+
+    RRDSET *st_stats_safe_auto;
+    RRDDIM *rd_stats_safe_auto;
+
+    RRDSET *st_access_method_page_splits;
+    RRDDIM *rd_access_method_page_splits;
+
+    RRDSET *st_sql_errors;
+    RRDDIM *rd_sql_errors;
+
+    DICTIONARY *locks_instances;
+
+    DICTIONARY *databases;
+    DICTIONARY *sysjobs;
+    DICTIONARY *publisher_publication;
+
+    RRDSET *st_conn_memory;
+    RRDDIM *rd_conn_memory;
+
+    RRDSET *st_ext_benefit_mem;
+    RRDDIM *rd_ext_benefit_mem;
+
+    RRDSET *st_pending_mem_grant;
+    RRDDIM *rd_pending_mem_grant;
+
+    RRDSET *st_mem_tot_server;
+    RRDDIM *rd_mem_tot_server;
+
+    DICTIONARY *waits;
+
+    COUNTER_DATA MSSQLAccessMethodPageSplits;
+    COUNTER_DATA MSSQLBlockedProcesses;
+    COUNTER_DATA MSSQLUserConnections;
+    COUNTER_DATA MSSQLConnectionMemoryBytes;
+    COUNTER_DATA MSSQLExternalBenefitOfMemory;
+    COUNTER_DATA MSSQLPendingMemoryGrants;
+    COUNTER_DATA MSSQLSQLErrorsTotal;
+    COUNTER_DATA MSSQLTotalServerMemory;
+    COUNTER_DATA MSSQLStatsAutoParameterization;
+    COUNTER_DATA MSSQLStatsBatchRequests;
+    COUNTER_DATA MSSQLStatSafeAutoParameterization;
+};
+
+struct mssql_lock_instance {
+    struct mssql_instance *parent;
+
+    char *resourceID;
+
+    COUNTER_DATA lockWait;
+    COUNTER_DATA deadLocks;
+
+    RRDSET *st_deadLocks;
+    RRDDIM *rd_lockWait;
+
+    RRDSET *st_lockWait;
+    RRDDIM *rd_deadLocks;
+};
+
+struct mssql_db_jobs {
+    bool enabled;
+
+    RRDSET *st_status;
+    RRDDIM *rd_status_enabled;
+    RRDDIM *rd_status_disabled;
+
+    COUNTER_DATA MSSQLJOBState;
+};
+
+struct mssql_db_instance {
+    struct mssql_instance *parent;
+
+    bool collecting_data;
+    bool collect_instance;
+    bool running_replication;
+
+    RRDSET *st_db_data_file_size;
+    RRDSET *st_db_active_transactions;
+    RRDSET *st_db_backup_restore_operations;
+    RRDSET *st_db_log_flushed;
+    RRDSET *st_db_log_flushes;
+    RRDSET *st_db_transactions;
+    RRDSET *st_db_write_transactions;
+    RRDSET *st_db_lockwait;
+    RRDSET *st_db_deadlock;
+    RRDSET *st_db_readonly;
+    RRDSET *st_db_state;
+    RRDSET *st_lock_timeouts;
+    RRDSET *st_lock_requests;
+    RRDSET *st_buff_page_iops;
+    RRDSET *st_buff_cache_hits;
+    RRDSET *st_buff_checkpoint_pages;
+    RRDSET *st_buff_cache_page_life_expectancy;
+    RRDSET *st_buff_lazy_write;
+    RRDSET *st_buff_page_lookups;
+
+    RRDSET *st_stats_compilation;
+    RRDSET *st_stats_recompiles;
+
+    RRDDIM *rd_db_data_file_size;
+    RRDDIM *rd_db_active_transactions;
+    RRDDIM *rd_db_backup_restore_operations;
+    RRDDIM *rd_db_log_flushed;
+    RRDDIM *rd_db_log_flushes;
+    RRDDIM *rd_db_transactions;
+    RRDDIM *rd_db_write_transactions;
+    RRDDIM *rd_db_lockwait;
+    RRDDIM *rd_db_deadlock;
+    RRDDIM *rd_db_readonly_yes;
+    RRDDIM *rd_db_readonly_no;
+    RRDDIM *rd_db_state[NETDATA_DB_STATES];
+    RRDDIM *rd_lock_timeouts;
+    RRDDIM *rd_lock_requests;
+    RRDDIM *rd_buff_page_reads;
+    RRDDIM *rd_buff_page_writes;
+    RRDDIM *rd_buff_cache_hits;
+    RRDDIM *rd_buff_checkpoint_pages;
+    RRDDIM *rd_buff_cache_page_life_expectancy;
+    RRDDIM *rd_buff_lazy_write;
+    RRDDIM *rd_buff_page_lookups;
+
+    RRDDIM *rd_stats_compilation;
+    RRDDIM *rd_stats_recompiles;
+
+    COUNTER_DATA MSSQLDatabaseDataFileSize;
+
+    COUNTER_DATA MSSQLDatabaseActiveTransactions;
+    COUNTER_DATA MSSQLDatabaseBackupRestoreOperations;
+    COUNTER_DATA MSSQLDatabaseLogFlushed;
+    COUNTER_DATA MSSQLDatabaseLogFlushes;
+    COUNTER_DATA MSSQLDatabaseTransactions;
+    COUNTER_DATA MSSQLDatabaseWriteTransactions;
+
+    COUNTER_DATA MSSQLDatabaseLockWaitSec;
+    COUNTER_DATA MSSQLDatabaseDeadLockSec;
+    COUNTER_DATA MSSQLDatabaseLockTimeoutsSec;
+    COUNTER_DATA MSSQLDatabaseLockRequestsSec;
+
+    // Buffer Management (https://learn.microsoft.com/en-us/sql/relational-databases/performance-monitor/sql-server-buffer-manager-object)
+    COUNTER_DATA MSSQLBufferPageReads;
+    COUNTER_DATA MSSQLBufferPageWrites;
+    COUNTER_DATA MSSQLBufferCacheHits;
+    COUNTER_DATA MSSQLBufferCheckpointPages;
+    COUNTER_DATA MSSQLBufferPageLifeExpectancy;
+    COUNTER_DATA MSSQLBufferLazyWrite;
+    COUNTER_DATA MSSQLBufferPageLookups;
+
+    COUNTER_DATA MSSQLCompilations;
+    COUNTER_DATA MSSQLRecompilations;
+
+    COUNTER_DATA MSSQLDBIsReadonly;
+    COUNTER_DATA MSSQLDBState;
+
+    uint32_t updated;
+};
+
+enum netdata_mssql_odbc_errors {
+    NETDATA_MSSQL_ODBC_NO_ERROR,
+    NETDATA_MSSQL_ODBC_CONNECT,
+    NETDATA_MSSQL_ODBC_BIND,
+    NETDATA_MSSQL_ODBC_PREPARE,
+    NETDATA_MSSQL_ODBC_QUERY,
+    NETDATA_MSSQL_ODBC_FETCH
+};
+
+static inline PERF_DATA_BLOCK *
+netdata_mssql_get_perf_data_block(bool *collect_perflib, struct mssql_instance *mi, DWORD idx)
+{
+    DWORD id = RegistryFindIDByName(mi->objectName[idx]);
+    if (id == PERFLIB_REGISTRY_NAME_NOT_FOUND) {
+        collect_perflib[idx] = false;
+        return NULL;
+    }
+
+    PERF_DATA_BLOCK *pDataBlock = perflibGetPerformanceData(id);
+    if (!pDataBlock) {
+        collect_perflib[idx] = true;
+        return NULL;
+    }
+
+    return pDataBlock;
+}
+
+void do_mssql_general_stats(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *mi, int update_every);
+void do_mssql_errors(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *mi, int update_every);
+void do_mssql_memory_mgr(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *mi, int update_every);
+void do_mssql_statistics_perflib(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *mi, int update_every);
+void do_mssql_access_methods(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *mi, int update_every);
 #endif

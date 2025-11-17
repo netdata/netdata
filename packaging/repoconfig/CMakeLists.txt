@@ -10,7 +10,7 @@ list(APPEND DEB_DISTROS debian ubuntu)
 set(DEB_GPG_KEY_SOURCE "https://repo.netdata.cloud/netdatabot.gpg.key")
 
 set(PACKAGE_VERSION 5)
-set(PACKAGE_RELEASE 1)
+set(PACKAGE_RELEASE 2)
 
 set(CPACK_THREADS 0)
 set(CPACK_STRIP_FILES NO)
@@ -213,6 +213,10 @@ elseif(${DISTRO} IN_LIST RPM_DISTROS)
     set(REPO_CFG_PATH "zypp/repos.d")
     set(REPO_ID "zypp")
     set(DIST_NAME "opensuse")
+
+    if(${DISTRO_VERSION} STREQUAL tumbleweed)
+        set(DIST_VERSION "tumbleweed")
+    endif()
   elseif(${DISTRO} STREQUAL "rhel")
     set(DIST_NAME "el")
 
