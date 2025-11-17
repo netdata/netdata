@@ -11,6 +11,13 @@
         "minimum": 1,
         "default": 10
       },
+      "autodetection_retry": {
+        "title": "Detection retry",
+        "description": "Recheck interval in seconds. Zero means no recheck will be scheduled.",
+        "type": "integer",
+        "minimum": 0,
+        "default": 60
+      },
       "binary_path": {
         "title": "Binary path",
         "description": "Path to the `nvidia-smi` binary.",

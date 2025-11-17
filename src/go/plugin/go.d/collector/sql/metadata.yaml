@@ -1,0 +1,529 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-sql
+      plugin_name: go.d.plugin
+      module_name: sql
+      monitored_instance:
+        name: SQL databases (generic)
+        link: https://en.wikipedia.org/wiki/SQL
+        categories:
+          - data-collection.database-servers
+        icon_filename: sql.svg
+      related_resources:
+        integrations:
+          list: []
+      alternative_monitored_instances: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - db
+        - database
+        - sql
+        - mysql
+        - maria
+        - postgres
+        - postgresql
+        - pgx
+        - oracle
+        - sqlserver
+        - mssql
+        - generic
+      most_popular: false
+    overview:
+      multi_instance: true
+      data_collection:
+        metrics_description: |
+          Metrics and charts for this collector are **entirely defined by your SQL
+          configuration**. There is no fixed metric reference: each job can expose
+          different metrics depending on its `metrics` and `queries` blocks.
+
+          To see what a specific job collects, open that job’s dashboard in Netdata
+          and inspect the charts and dimensions it created.
+
+          :::tip
+
+          To change what is collected, edit the `metrics` (and optional `queries`)
+          in the job configuration. After you save the changes, the updated set of
+          charts and metrics is reflected in Netdata after the next data collection.
+
+          :::
+        method_description: |
+          The collector connects to your database using Go’s **database/sql** package
+          and the selected driver:
+
+            - `mysql` — MySQL / MariaDB
+            - `pgx`   — PostgreSQL
+            - `oracle` — Oracle Database
+            - `sqlserver` — Microsoft SQL Server / Azure SQL
+
+          For each metric block you define, it executes the SQL query (inline or via
+          `query_ref`), reads the result set, and maps it to Netdata charts and
+          dimensions.
+
+          ### Result Processing Modes
+
+          | Mode       | How it works                                                                 | Best used when                                      |
+          |------------|------------------------------------------------------------------------------|-----------------------------------------------------|
+          | **columns**| Specific numeric columns from each row become dimensions on your charts.     | The result set has stable, known column names.      |
+          | **kv**     | One column provides metric names (keys) and another provides their values.   | The set of metrics is dynamic or key–value shaped.  |
+      default_behavior:
+        auto_detection:
+          description: |
+            This is a **generic collector** and does **not** perform automatic detection.
+
+            It does not create any jobs on its own — you must configure at least one
+            job before it can collect data.
+        limits:
+          description: |
+            There are no built-in limits on the number of queries or rows processed.
+            However, each metric block must define at least one chart, and each chart
+            must define at least one dimension.
+
+            Keep your queries lightweight and scoped to the data you actually need
+            to avoid adding load on the database server.
+        performance_impact:
+          description: |
+            Performance impact depends entirely on the queries you configure and the
+            collection frequency (update_every).
+
+            Prefer indexed reads, avoid full table scans or heavy aggregations, and
+            consider using database views tailored for monitoring.
+      additional_permissions:
+        description: ""
+      supported_platforms:
+        include: []
+        exclude: []
+    setup:
+      prerequisites:
+        list:
+          - title: Create a read-only database user
+            description: |
+              Create a dedicated user for Netdata with read-only privileges on the
+              views/tables used in your monitoring queries.
+
+              For example, on a typical RDBMS you would:
+
+              - Create a user.
+              - Grant SELECT on system metrics views or monitoring views.
+
+              After creating the user and updating the configuration, restart the
+              Netdata Agent with `sudo systemctl restart netdata`, or the appropriate
+              method for your system.
+          - title: Allow Netdata to connect to the database
+            description: |
+              Ensure the Netdata host can reach the database via the configured DSN,
+              either using:
+
+              - a local UNIX/TCP socket, or
+              - a network connection (hostname/IP and port).
+
+              If the database is remote, make sure any firewalls or security groups
+              allow connections from the Netdata node.
+      configuration:
+        file:
+          name: go.d/sql.conf
+        options:
+          description: |
+            **Full Configuration Structure**
+
+            ```yaml
+            # ---------- CONNECTION ----------
+            driver: <mysql|pgx|oracle|sqlserver>      # REQUIRED. SQL driver.
+            dsn: "<connection string>"                   # REQUIRED. Driver-specific DSN/URL.
+
+            # Optional connection settings
+            timeout: <seconds>                           # OPTIONAL. Query timeout.
+
+            # Optional static labels applied to all charts
+            static_labels:
+              <label_key1>: <label_value>
+              <label_key2>: <label_value>
+
+            # ---------- REUSABLE QUERIES ----------
+            # Optional. Define reusable SQL queries referenced later via query_ref.
+            queries:
+              - id: <query_id>
+                query: |
+                  SELECT ...
+
+            # ---------- METRICS ----------
+            # Each metric block runs one query and generates one or more charts.
+            metrics:
+              - id: <metric_block_id>                    # REQUIRED. Unique within this job.
+
+                # Choose ONE of these:
+                query_ref: <query_id>                    # Use a reusable query
+                # OR
+                # query: |                               # Inline SQL
+                #   SELECT ...
+
+                mode: <columns|kv>                       # REQUIRED. How to interpret result rows.
+
+                # KV mode settings (only when mode: kv)
+                kv_mode:
+                  name_col: <column_name>                # Column containing keys
+                  value_col: <column_name>               # Column containing numeric values
+
+                # Optional: derive labels from row columns (creates per-label charts)
+                labels_from_row:
+                  - source: <column_name>                # Column name from result set
+                    name: <label_key>                    # Label key exposed to Netdata
+                  - source: <column_name>
+                    name: <label_key>
+
+                # Charts produced by this metric block
+                charts:
+                  - title: "<Chart Title>"               # REQUIRED. Shown in dashboards.
+                    context: "<context.name>"            # REQUIRED. Netdata context.
+                    family: "<family>"                   # REQUIRED. Netdata chart family.
+                    units: "<units>"                     # REQUIRED. Unit string for the chart.
+                    type: <line|stacked|area>            # OPTIONAL. Default: line.
+                    algorithm: <absolute|incremental>    # OPTIONAL. Default: absolute.
+
+                    dims:
+                      # ---- COLUMNS MODE DIM ----
+                      # In mode: columns, `source` MUST be a numeric COLUMN name from the result set.
+                      - name: <dim_id>                   # REQUIRED. Dimension id (unique within this chart).
+                        source: <column_name>            # REQUIRED. Numeric column to chart.
+
+                      # ---- KV MODE DIM ----
+                      # In mode: kv, `source` MUST be a KEY name (NOT a column).
+                      # The collector finds the row where (row[kv_mode.name_col] == `source`)
+                      # and uses row[kv_mode.value_col].
+                      - name: <dim_id>
+                        source: <key_name>               # REQUIRED. Key name resolved via kv_mode.name_col.
+
+                      # ---- STATUS DIM (one-hot 1/0) ----
+                      # Works in BOTH modes. Evaluates `status_when` against the resolved value:
+                      #   * columns mode: the value in the specified column for the row
+                      #   * kv mode:      the value for the resolved key (row[kv_mode.value_col])
+                      - name: <dim_id>
+                        source: <column_name_or_key_name>  # Same interpretation as above, per mode.
+                        status_when: # Exactly ONE of the following:
+                          equals: <string|number|bool>    # Active (1) if value == this literal.
+                          # in: [ <v1>, <v2>, ... ]       # Active if value is in the list.
+                          # match: '^regex$'              # Active if value matches this regex.
+            ```
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: update_every
+              description: Data collection interval (seconds).
+              default_value: 1
+              required: false
+              group: Collection
+            - name: autodetection_retry
+              description: Autodetection retry interval (seconds). Not used for this collector. Set 0 to disable.
+              default_value: 0
+              required: false
+              group: Collection
+
+            - name: driver
+              description: >
+                SQL driver to use. Supported values: `mysql`, `pgx`, `oracle`, `sqlserver`.
+              default_value: mysql
+              required: true
+              group: Target
+            - name: dsn
+              description: >
+                Database connection string (DSN). The format depends on the selected driver (
+                ([MySQL](https://github.com/go-sql-driver/mysql#dsn-data-source-name),
+                [PostgreSQL](https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING-URIS),
+                [MS SQL Server](https://github.com/denisenkom/go-mssqldb#connection-parameters-and-dsn)).
+              default_value: ""
+              required: true
+              group: Target
+
+            - name: timeout
+              description: Query and connection check timeout (seconds).
+              default_value: 5
+              required: false
+              group: Connection
+
+            - name: static_labels
+              description: >
+                A map of static labels added to every chart created by this job.
+                Useful for tagging charts with environment, region, or role.
+              default_value: "{}"
+              required: false
+              group: Labels
+
+            - name: queries
+              description: >
+                A list of reusable queries. Metric blocks can reference these via `query_ref` to avoid repeating SQL. See [Configuration Structure](#configuration) for details.
+              default_value: "[]"
+              required: false
+              group: Queries & Metrics
+            - name: metrics
+              description: >
+                A list of metric blocks. Each block defines how a query is executed and how its result is transformed into one or more charts. See [Configuration Structure](#configuration) for details.
+              default_value: "[]"
+              required: true
+              group: Queries & Metrics
+
+            - name: vnode
+              description: Associates this data collection job with a Virtual Node.
+              default_value: ""
+              required: false
+              group: Virtual Node
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Columns mode – per-database conflicts (with labels)
+              description: |
+                PostgreSQL example that collects database-level conflict counters from
+                `pg_stat_database_conflicts` and creates a separate chart instance per
+                database using `labels_from_row`.
+
+                The query:
+
+                ```sql
+                SELECT
+                  datname,
+                  confl_tablespace,
+                  confl_lock,
+                  confl_snapshot,
+                  confl_bufferpin,
+                  confl_deadlock
+                FROM pg_stat_database_conflicts;
+                ```
+
+                Example output:
+
+                | datname    | confl_tablespace | confl_lock | confl_snapshot | confl_bufferpin | confl_deadlock |
+                |------------|------------------|------------|----------------|-----------------|----------------|
+                | postgres   | 0                | 0          | 0              | 0               | 0              |
+                | production | 0                | 0          | 0              | 0               | 0              |
+
+                This configuration turns each row into a **chart instance** (one for
+                `db=postgres`, one for `db=production`) with five dimensions
+                (`confl_tablespace`, `confl_lock`, `confl_snapshot`, `confl_bufferpin`,
+                `confl_deadlock`).
+              config: |
+                jobs:
+                  - name: pg_conflicts_per_db
+                    driver: pgx
+                    dsn: 'postgresql://netdata:password@127.0.0.1:5432/postgres'
+                    timeout: 5
+
+                    metrics:
+                      - id: conflicts
+                        mode: columns
+                        query: |
+                          SELECT
+                            datname,
+                            confl_tablespace,
+                            confl_lock,
+                            confl_snapshot,
+                            confl_bufferpin,
+                            confl_deadlock
+                          FROM pg_stat_database_conflicts;
+                        labels_from_row:
+                          - source: datname
+                            name: db
+                        charts:
+                          - title: "PostgreSQL conflicts"
+                            context: sql.pg_conflicts
+                            family: conflicts
+                            units: conflicts
+                            type: line
+                            algorithm: absolute
+                            dims:
+                              - name: confl_tablespace
+                                source: confl_tablespace
+                              - name: confl_lock
+                                source: confl_lock
+                              - name: confl_snapshot
+                                source: confl_snapshot
+                              - name: confl_bufferpin
+                                source: confl_bufferpin
+                              - name: confl_deadlock
+                                source: confl_deadlock
+
+            - name: Columns mode – single numeric value (uptime)
+              description: |
+                PostgreSQL example that exposes a single numeric metric (server uptime in
+                seconds) as a one-dimension chart using columns mode.
+
+                The query:
+
+                ```sql
+                SELECT
+                  EXTRACT(
+                    EPOCH FROM (now() - pg_postmaster_start_time())
+                  ) AS uptime_seconds;
+                ```
+
+                Example output:
+
+                | uptime_seconds |
+                |----------------|
+                | 50.867359      |
+
+                This configuration maps the `uptime_seconds` column to a single
+                `uptime` dimension on the `sql.pg_uptime` chart.
+              config: |
+                jobs:
+                  - name: pg_uptime
+                    driver: pgx
+                    dsn: 'postgresql://netdata:password@127.0.0.1:5432/postgres'
+                    timeout: 5
+
+                    metrics:
+                      - id: uptime
+                        mode: columns
+                        query: |
+                          SELECT
+                            EXTRACT(
+                              EPOCH FROM (now() - pg_postmaster_start_time())
+                            ) AS uptime_seconds;
+                        charts:
+                          - title: "PostgreSQL uptime"
+                            context: sql.pg_uptime
+                            family: uptime
+                            units: seconds
+                            type: line
+                            algorithm: absolute
+                            dims:
+                              - name: uptime
+                                source: uptime_seconds
+
+            - name: KV mode – connection states as key/value pairs
+              description: |
+                PostgreSQL example that aggregates connection states from
+                `pg_stat_activity` and uses kv mode to map each state to a dimension.
+
+                The query:
+
+                ```sql
+                SELECT
+                  state,
+                  count(*) AS cnt
+                FROM pg_stat_activity
+                GROUP BY state;
+                ```
+
+                Example output:
+
+                | state                        | cnt |
+                |------------------------------|-----|
+                | active                       |   1 |
+                | idle                         |  14 |
+                | idle in transaction          |   7 |
+                | idle in transaction (aborted)|   1 |
+                | fastpath function call       |   1 |
+                | disabled                     |   1 |
+
+                With `mode: kv`, `state` becomes the **key** and `cnt` the **value**.
+                Each distinct `state` value is mapped to a chart dimension via `dims[*].source`.
+              config: |
+                jobs:
+                  - name: pg_activity_states
+                    driver: pgx
+                    dsn: 'postgresql://netdata:password@127.0.0.1:5432/postgres'
+                    timeout: 5
+
+                    metrics:
+                      - id: activity_states
+                        mode: kv
+                        query: |
+                          SELECT
+                            state,
+                            count(*) AS cnt
+                          FROM pg_stat_activity
+                          GROUP BY state;
+                        kv_mode:
+                          name_col: state
+                          value_col: cnt
+                        charts:
+                          - title: "PostgreSQL connection states"
+                            context: sql.pg_activity_states
+                            family: connections
+                            units: connections
+                            type: stacked
+                            algorithm: absolute
+                            dims:
+                              - name: active
+                                source: active
+                              - name: idle
+                                source: idle
+                              - name: idle_in_transaction
+                                source: "idle in transaction"
+                              - name: idle_in_transaction_aborted
+                                source: "idle in transaction (aborted)"
+                              - name: fastpath_function_call
+                                source: "fastpath function call"
+                              - name: disabled
+                                source: disabled
+
+            - name: Columns mode – map state values to a status metric
+              description: |
+                Simple PostgreSQL example that turns a boolean-like state into a 0/1
+                status metric using `status_when`.
+
+                The query:
+
+                ```sql
+                SELECT pg_is_in_recovery();
+                ```
+
+                Example output:
+
+                | pg_is_in_recovery |
+                |-------------------|
+                | f                 |
+
+                This configuration creates a single chart with two status dimensions:
+                  - `in_recovery` becomes **1 when the value is `"t"`** and **0 otherwise**.
+                  - `not_in_recovery` becomes **1 when the value is `"f"`** and **0 otherwise**.
+              config: |
+                jobs:
+                  - name: pg_recovery_status
+                    driver: pgx
+                    dsn: 'postgresql://netdata:password@127.0.0.1:5432/postgres'
+                    timeout: 5
+
+                    metrics:
+                      - id: recovery_status
+                        mode: columns
+                        query: |
+                          SELECT pg_is_in_recovery();
+                        charts:
+                          - title: "PostgreSQL recovery status"
+                            context: sql.pg_recovery_status
+                            family: state
+                            units: status
+                            type: line
+                            algorithm: absolute
+                            dims:
+                              - name: in_recovery
+                                source: pg_is_in_recovery
+                                status_when:
+                                  equals: "t"
+                              - name: not_in_recovery
+                                source: pg_is_in_recovery
+                                status_when:
+                                  equals: "f"
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: |
+        Metrics and charts are **defined by your SQL queries and metric blocks** at runtime. They differ by database engine, schema, and configuration, and may include, for example, connection counts, cache hit ratios, row throughput, lock statistics, or custom business KPIs. Use the **Metrics** tab on the job’s dashboard to see exactly what is collected for that job.
+
+        :::tip
+
+         To change what is collected, edit the `metrics` (and optionally `queries`) sections in `go.d/sql.conf` for the corresponding job. Each change is reflected in Netdata charts after the next data collection.
+
+        :::
+
+      availability: []
+      scopes: []
