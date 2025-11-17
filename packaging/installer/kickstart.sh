@@ -2273,7 +2273,7 @@ install_on_linux() {
         case "${NETDATA_REQUESTED_INSTALL_TYPE}" in
           native|auto)
             case "${SELECTED_RELEASE_CHANNEL}" in
-              stable) fatal "A stable build with native packages has not yet been published for this system, but is expected to be published within hte next few weeks. If you need to install now, you should be able to do so either by using a nightly build (add --release-channel=nightly to the options passed to this script) or by using a static build (add --install-type=static to the options passed to this script). Note that if you use a static build, you may have to reinstall once a stable build is published with native packages for this system to get full support." F051D ;;
+              stable) fatal "A stable build with native packages has not yet been published for this system, but is expected to be published within the next few weeks. If you need to install now, you should be able to do so either by using a nightly build (add --release-channel=nightly to the options passed to this script) or by using a static build (add --install-type=static to the options passed to this script). Note that if you use a static build, you may have to reinstall once a stable build is published with native packages for this system to get full support." F051D ;;
               nightly) fatal "A nightly build with native packages has not yet been published for this system, but is expected to be published at 01:00 UTC tomorrow. Please try again tomorrow." F051E ;;
             esac
             ;;
@@ -2316,8 +2316,8 @@ install_on_linux() {
 
 install_on_macos() {
   case "${NETDATA_REQUESTED_INSTALL_TYPE}" in
-    native) fatal "User requested native package, but native packages are not available for macOS. Try installing without \`--only-native\` option." F0305 ;;
-    static) fatal "User requested static build, but static builds are not available for macOS. Try installing without \`--only-static\` option." F0306 ;;
+    native) fatal "User requested native package, but native packages are not available for macOS. Try installing without \`--native-only\` option." F0305 ;;
+    static) fatal "User requested static build, but static builds are not available for macOS. Try installing without \`--static-only\` option." F0306 ;;
     *)
       SELECTED_INSTALL_METHOD="build"
       INSTALL_TYPE="kickstart-build"
@@ -2333,8 +2333,8 @@ install_on_macos() {
 
 install_on_freebsd() {
   case "${NETDATA_REQUESTED_INSTALL_TYPE}" in
-    native) fatal "User requested native package, but native packages are not available for FreeBSD. Try installing without \`--only-native\` option." F0308 ;;
-    static) fatal "User requested static build, but static builds are not available for FreeBSD. Try installing without \`--only-static\` option." F0309 ;;
+    native) fatal "User requested native package, but native packages are not available for FreeBSD. Try installing without \`--native-only\` option." F0308 ;;
+    static) fatal "User requested static build, but static builds are not available for FreeBSD. Try installing without \`--static-only\` option." F0309 ;;
     *)
       SELECTED_INSTALL_METHOD="build"
       INSTALL_TYPE="kickstart-build"
