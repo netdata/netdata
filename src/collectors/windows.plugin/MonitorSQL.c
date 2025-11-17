@@ -120,12 +120,12 @@ void dict_mssql_fill_instance_transactions(struct mssql_db_instance *mdi)
     long value = 0;
     SQLLEN col_object_len = 0, col_value_len = 0;
 
-    SQLCHAR query[sizeof(NETDATA_QUERY_TRANSACTIONS_PER_INSTANCE_MASK) + NETDATA_MAX_INSTANCE_OBJECT + 1];
+    SQLCHAR query[sizeof(NETDATA_QUERY_BUFFER_STATS) + NETDATA_MAX_INSTANCE_OBJECT + 1];
     snprintfz(
-        (char *)query,
-        sizeof(NETDATA_QUERY_TRANSACTIONS_PER_INSTANCE_MASK) + NETDATA_MAX_INSTANCE_OBJECT,
-        NETDATA_QUERY_TRANSACTIONS_PER_INSTANCE_MASK,
-        mdi->parent->instanceID);
+            (char *)query,
+            sizeof(NETDATA_QUERY_BUFFER_STATS) + NETDATA_MAX_INSTANCE_OBJECT,
+            NETDATA_QUERY_BUFFER_STATS,
+            mdi->parent->instanceID);
 
     SQLRETURN ret = SQLExecDirect(mdi->parent->conn->dbInstanceTransactionSTMT, (SQLCHAR *)query, SQL_NTS);
     if (likely(netdata_mssql_check_result(ret))) {

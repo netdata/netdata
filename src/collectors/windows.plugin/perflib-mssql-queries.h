@@ -26,7 +26,7 @@
 #define NETDATA_QUERY_TRANSACTIONS_MASK                                                                                \
     "SELECT counter_name, cntr_value FROM %s.sys.dm_os_performance_counters WHERE instance_name = '%s' AND counter_name IN ('Active Transactions', 'Transactions/sec', 'Write Transactions/sec', 'Backup/Restore Throughput/sec', 'Log Bytes Flushed/sec', 'Log Flushes/sec', 'Number of Deadlocks/sec', 'Lock Waits/sec', 'Lock Timeouts/sec', 'Lock Requests/sec');"
 
-#define NETDATA_QUERY_TRANSACTIONS_PER_INSTANCE_MASK                                                                                \
+#define NETDATA_QUERY_BUFFER_STATS                                                                                \
     "SELECT counter_name, cntr_value FROM sys.dm_os_performance_counters WHERE (object_name like '%%Buffer Manager%%' or object_name like '%%SQL Statistics%%') AND counter_name IN ('Page reads/sec', 'Page writes/sec', 'Buffer cache hit ratio', 'Checkpoint pages/sec', 'Page life expectancy', 'Lazy writes/sec', 'Page Lookups/sec', 'SQL Compilations/sec', 'SQL Re-Compilations/sec');"
 
 #define NETDATA_QUERY_CHECK_PERM                                                                                       \
