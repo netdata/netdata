@@ -147,14 +147,24 @@ func (m *ConfigMetricBlock) validate(idx int, queryIdx map[string]bool) []error 
 	}
 
 	mode := strings.ToLower(strings.TrimSpace(m.Mode))
-	if mode != "columns" && mode != "kv" {
-		errs = append(errs, fmt.Errorf("metrics[%d] invalid mode %q (expected: columns|kv)", midx, m.Mode))
-	}
-
-	if mode == "kv" && m.KVMode != nil {
-		if m.KVMode.NameCol != "" && m.KVMode.NameCol == m.KVMode.ValueCol {
-			errs = append(errs, fmt.Errorf("metrics[%d] kv_mode.name_col must differ from kv_mode.value_col", midx))
+	switch mode {
+	case "kv":
+		if m.KVMode == nil {
+			errs = append(errs, fmt.Errorf("metrics[%d] kv mode requires kv_mode to be defined", midx))
+		} else {
+			if strings.TrimSpace(m.KVMode.NameCol) == "" {
+				errs = append(errs, fmt.Errorf("metrics[%d] kv_mode.name_col is required in kv mode", midx))
+			}
+			if strings.TrimSpace(m.KVMode.ValueCol) == "" {
+				errs = append(errs, fmt.Errorf("metrics[%d] kv_mode.value_col is required in kv mode", midx))
+			}
+			if strings.EqualFold(m.KVMode.NameCol, m.KVMode.ValueCol) {
+				errs = append(errs, fmt.Errorf("metrics[%d] kv_mode.name_col must differ from kv_mode.value_col", midx))
+			}
 		}
+	case "columns", "":
+	default:
+		errs = append(errs, fmt.Errorf("metrics[%d] invalid mode %q (expected: columns|kv)", midx, m.Mode))
 	}
 
 	labelCols := map[string]bool{}
