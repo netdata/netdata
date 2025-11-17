@@ -1337,9 +1337,6 @@ static time_t find_uuid_first_time(
 static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile_to_delete, struct rrdengine_datafile *first_datafile_remaining, bool worker) {
     time_t global_first_time_s = LONG_MAX;
 
-    if (unlikely(!first_datafile_remaining))
-        return;
-
     if(worker)
         worker_is_busy(UV_EVENT_DBENGINE_FIND_ROTATED_METRICS);
 
@@ -1374,8 +1371,11 @@ static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct r
         added++;
     }
 
-    netdata_log_info("DBENGINE: recalculating tier %d retention for %zu metrics starting with datafile %u",
-         ctx->config.tier, count, first_datafile_remaining->fileno);
+    netdata_log_info(
+        "DBENGINE: recalculating tier %d retention for %zu metrics starting with datafile %u",
+        ctx->config.tier,
+        count,
+        first_datafile_remaining ? first_datafile_remaining->fileno : 0);
 
     journalfile_v2_data_release(journalfile);
 
