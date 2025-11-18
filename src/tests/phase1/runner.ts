@@ -962,6 +962,7 @@ const computeExpectedReasoning = (
   return { type: 'none', mode: 'implicit' };
 };
 
+
 const buildReasoningMatrixScenarios = (): HarnessTest[] => {
   const scenarios: HarnessTest[] = [];
   FRONTMATTER_REASONING_CASES.forEach((frontCase) => {
@@ -9262,6 +9263,140 @@ const scenarioFilterIdsFromEnv = (() => {
   }
   return parsed;
 })();
+
+BASE_TEST_SCENARIOS.push({
+  id: 'run-test-final-report-retry-text',
+  execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+    // eslint-disable-next-line @typescript-eslint/unbound-method
+    const originalExecuteTurn = LLMClient.prototype.executeTurn;
+    let invocation = 0;
+    LLMClient.prototype.executeTurn = async function(this: LLMClient, request: TurnRequest): Promise<TurnResult> {
+      invocation += 1;
+      if (invocation === 1) {
+        const assistantMessage: ConversationMessage = {
+          role: 'assistant',
+          content: '{"status":"success","report_format":"text","report_content":"Fallback report."}',
+          toolCalls: [
+            {
+              id: FINAL_REPORT_CALL_ID,
+              name: 'agent__final_report',
+              parameters: 'invalid-final-report' as unknown as Record<string, unknown>,
+            },
+          ],
+        };
+        return {
+          status: { type: 'success', hasToolCalls: true, finalAnswer: true },
+          latencyMs: 5,
+          messages: [assistantMessage],
+          tokens: { inputTokens: 10, outputTokens: 5, totalTokens: 15 },
+        };
+      }
+      if (invocation === 2) {
+        const finalContent = 'Final report after retry.';
+        const assistantMessage: ConversationMessage = {
+          role: 'assistant',
+          content: '',
+          toolCalls: [
+            {
+              id: FINAL_REPORT_CALL_ID,
+              name: 'agent__final_report',
+              parameters: {
+                status: 'success',
+                report_format: 'markdown',
+                report_content: finalContent,
+              },
+            },
+          ],
+        };
+        const toolCalls = assistantMessage.toolCalls ?? [];
+        // eslint-disable-next-line functional/no-loop-statements
+        for (const call of toolCalls) {
+          await request.toolExecutor(call.name, call.parameters, { toolCallId: call.id });
+        }
+        const toolMessage: ConversationMessage = {
+          role: 'tool',
+          toolCallId: FINAL_REPORT_CALL_ID,
+          content: finalContent,
+        };
+        return {
+          status: { type: 'success', hasToolCalls: true, finalAnswer: true },
+          latencyMs: 5,
+          messages: [assistantMessage, toolMessage],
+          tokens: { inputTokens: 12, outputTokens: 6, totalTokens: 18 },
+        };
+      }
+      return await originalExecuteTurn.call(this, request);
+    };
+    try {
+      const session = AIAgentSession.create(sessionConfig);
+      return await session.run();
+    } finally {
+      LLMClient.prototype.executeTurn = originalExecuteTurn;
+    }
+  },
+  expect: (result: AIAgentResult) => {
+    invariant(result.success, 'Scenario run-test-final-report-retry-text expected success.');
+    const finalReport = result.finalReport;
+    invariant(finalReport?.content === 'Final report after retry.', 'Final report content mismatch for run-test-final-report-retry-text.');
+    const textExtractionLogs = result.logs.filter((entry) => entry.remoteIdentifier === 'agent:text-extraction');
+    invariant(textExtractionLogs.length === 1, 'Text extraction log missing for run-test-final-report-retry-text.');
+    const collapseLog = result.logs.find((entry) => entry.remoteIdentifier === 'agent:orchestrator' && typeof entry.message === 'string' && entry.message.includes('Collapsing remaining turns'));
+    invariant(collapseLog !== undefined, 'Turn collapse log expected for run-test-final-report-retry-text.');
+    const fallbackLog = result.logs.find((entry) => entry.remoteIdentifier === 'agent:fallback-report');
+    invariant(fallbackLog === undefined, 'Fallback acceptance should not occur before the final turn for run-test-final-report-retry-text.');
+    const acceptanceLog = result.logs.find((entry) => entry.remoteIdentifier === 'agent:final-report-accepted');
+    invariant(acceptanceLog !== undefined && acceptanceLog.details?.source === 'tool-call', 'Final report should be accepted from the tool call for run-test-final-report-retry-text.');
+  },
+} satisfies HarnessTest);
+
+BASE_TEST_SCENARIOS.push({
+  id: 'run-test-synthetic-failure-contract',
+  execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+    sessionConfig.maxTurns = 2;
+    // eslint-disable-next-line @typescript-eslint/unbound-method
+    const originalExecuteTurn = LLMClient.prototype.executeTurn;
+    let invocation = 0;
+    const maxSyntheticResponses = (sessionConfig.maxRetries ?? 3) * (sessionConfig.maxTurns ?? 2);
+    LLMClient.prototype.executeTurn = async function(this: LLMClient, request: TurnRequest): Promise<TurnResult> {
+      invocation += 1;
+      if (invocation <= maxSyntheticResponses) {
+        const assistantMessage: ConversationMessage = {
+          role: 'assistant',
+          content: `Status update turn ${String(invocation)}.`,
+          toolCalls: [],
+        };
+        return {
+          status: { type: 'success', hasToolCalls: false, finalAnswer: false },
+          latencyMs: 5,
+          messages: [assistantMessage],
+          tokens: { inputTokens: 5, outputTokens: 3, totalTokens: 8 },
+        };
+      }
+      return await originalExecuteTurn.call(this, request);
+    };
+    try {
+      const session = AIAgentSession.create(sessionConfig);
+      return await session.run();
+    } finally {
+      LLMClient.prototype.executeTurn = originalExecuteTurn;
+    }
+  },
+  expect: (result: AIAgentResult) => {
+    invariant(result.success, 'Scenario run-test-synthetic-failure-contract should synthesize a failure report.');
+    const finalReport = result.finalReport;
+    invariant(finalReport?.status === 'failure', 'Final report should indicate failure for run-test-synthetic-failure-contract.');
+    invariant(typeof finalReport.content === 'string' && finalReport.content.includes('after 2 turns'), 'Failure summary mismatch for run-test-synthetic-failure-contract.');
+    const metadata = finalReport.metadata;
+    assertRecord(metadata, 'Final report metadata expected for run-test-synthetic-failure-contract.');
+    invariant(metadata.reason === 'max_turns_exhausted', 'Metadata reason mismatch for run-test-synthetic-failure-contract.');
+    invariant(metadata.turns_completed === 2, 'turns_completed metadata mismatch for run-test-synthetic-failure-contract.');
+    invariant(metadata.final_report_attempts === 0, 'final_report_attempts should be 0 for run-test-synthetic-failure-contract.');
+    const failureLog = result.logs.find((entry) => entry.remoteIdentifier === 'agent:failure-report');
+    invariant(failureLog !== undefined, 'Failure report log missing for run-test-synthetic-failure-contract.');
+    const acceptanceLog = result.logs.find((entry) => entry.remoteIdentifier === 'agent:final-report-accepted');
+    invariant(acceptanceLog !== undefined && acceptanceLog.details?.source === 'synthetic', 'Synthetic final report acceptance log missing for run-test-synthetic-failure-contract.');
+  },
+} satisfies HarnessTest);
 
 const filterScenarios = (ids: string[], logWarnings: boolean): HarnessTest[] => {
   if (ids.length === 0) return BASE_TEST_SCENARIOS;

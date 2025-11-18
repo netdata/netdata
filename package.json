@@ -32,7 +32,7 @@
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^2.0.45",
-    "@ai-sdk/google": "^2.0.34",
+    "@ai-sdk/google": "^2.0.36",
     "@ai-sdk/openai": "^2.0.68",
     "@ai-sdk/provider-utils": "^3.0.17",
     "@anthropic-ai/tokenizer": "^0.0.4",
@@ -52,7 +52,7 @@
     "@opentelemetry/sdk-trace-node": "^2.2.0",
     "@opentelemetry/semantic-conventions": "^1.38.0",
     "@slack/bolt": "^4.6.0",
-    "ai": "^5.0.93",
+    "ai": "^5.0.94",
     "ajv": "^8.17.1",
     "async-mutex": "^0.5.0",
     "commander": "^14.0.2",

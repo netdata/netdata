@@ -45,6 +45,16 @@ type ExitCode =
 
 
 const FINAL_REPORT_FORMAT_VALUES = ['json', 'markdown', 'markdown+mermaid', 'slack-block-kit', 'tty', 'pipe', 'sub-agent', 'text'] as const satisfies readonly NonNullable<AIAgentResult['finalReport']>['format'][];
+type FinalReportPayload = NonNullable<AIAgentResult['finalReport']>;
+type PendingFinalReportPayload = Omit<FinalReportPayload, 'ts'>;
+const FINAL_REPORT_SOURCE_TEXT_FALLBACK = 'text-fallback' as const;
+const FINAL_REPORT_SOURCE_TOOL_MESSAGE = 'tool-message' as const;
+type PendingFinalReportSource = typeof FINAL_REPORT_SOURCE_TEXT_FALLBACK | typeof FINAL_REPORT_SOURCE_TOOL_MESSAGE;
+interface ToolSelection {
+  availableTools: MCPTool[];
+  allowedToolNames: Set<string>;
+  toolsForTurn: MCPTool[];
+}
 
 // empty line between import groups enforced by linter
 import { validateProviders, validateMCPServers, validatePrompts } from './config.js';
@@ -157,7 +167,7 @@ export class AIAgentSession {
   private readonly toolBudgetCallbacks: ToolBudgetCallbacks;
   private forcedFinalTurnReason?: 'context';
   private contextLimitWarningLogged = false;
-  private finalTurnLogIssued = false;
+  private finalTurnEntryLogged = false;
   // Internal housekeeping notes
   private childConversations: { agentId?: string; toolName: string; promptPath: string; conversation: ConversationMessage[]; trace?: { originId?: string; parentId?: string; selfId?: string; callPath?: string } }[] = [];
   private readonly subAgents?: SubAgentRegistry;
@@ -196,11 +206,17 @@ export class AIAgentSession {
     metadata?: Record<string, unknown>;
     ts: number;
   };
+  private finalReportSource?: 'tool-call' | PendingFinalReportSource | 'synthetic';
+  private pendingFinalReport?: { source: PendingFinalReportSource; payload: PendingFinalReportPayload };
+  private pendingToolSelection?: ToolSelection;
   private pendingRetryMessages: string[] = [];
+  private trimmedToolCallIds = new Set<string>();
+  private turnHasSuccessfulToolOutput = false;
 
   // Counters for summary
   private llmAttempts = 0;
   private llmSyntheticFailures = 0;
+  private finalReportAttempts = 0;
   private centralSizeCapHits = 0;
   private currentLlmOpId?: string;
   private systemTurnBegan = false;
@@ -678,14 +694,13 @@ export class AIAgentSession {
         },
         setFinalReport: (p) => {
           const normalizedStatus: 'success' | 'failure' | 'partial' = p.status;
-          this.finalReport = {
+          this.commitFinalReport({
             status: normalizedStatus,
             format: p.format as 'json'|'markdown'|'markdown+mermaid'|'slack-block-kit'|'tty'|'pipe'|'sub-agent'|'text',
             content: p.content,
             content_json: p.content_json,
             metadata: p.metadata,
-            ts: Date.now()
-          };
+          }, 'tool-call');
         },
         orchestrator: orch,
         getCurrentTurn: () => this.currentTurn,
@@ -1431,7 +1446,9 @@ export class AIAgentSession {
         // Graceful stop: do not start further turns
         return this.finalizeGracefulStopSession(conversation, logs, accounting);
       }
+      this.turnHasSuccessfulToolOutput = false;
       this._currentTurn = currentTurn;
+      this.logTurnStart(currentTurn);
       try { this.sessionConfig.callbacks?.onTurnStarted?.(currentTurn); } catch (e) { warn(`onTurnStarted callback failed: ${e instanceof Error ? e.message : String(e)}`); }
       try {
         // Capture effective prompts for this turn (post expansion/enhancement)
@@ -1449,6 +1466,7 @@ export class AIAgentSession {
       let lastError: string | undefined;
       let turnSuccessful = false;
       let finalTurnRetryWarnLogged = false;
+      let turnHadFinalReportAttempt = false;
 
       // Global attempts across all provider/model pairs for this turn
       let attempts = 0;
@@ -1486,6 +1504,12 @@ export class AIAgentSession {
         const { provider, model } = pair;
         let cycleIndex = 0;
         let cycleComplete = false;
+
+        const forcedFinalTurn = this.forcedFinalTurnReason !== undefined;
+        const isFinalTurn = forcedFinalTurn || currentTurn === maxTurns;
+        const toolSelection = this.selectToolsForTurn(provider, isFinalTurn);
+        this.pendingToolSelection = toolSelection;
+        this.schemaCtxTokens = this.estimateToolSchemaTokens(toolSelection.toolsForTurn);
 
         const providerContextStatus = this.evaluateContextForProvider(provider, model);
         if (providerContextStatus === 'final') {
@@ -1565,8 +1589,6 @@ export class AIAgentSession {
             }
             // Force the final-report instruction onto the conversation once we enter the last turn.
 
-            const forcedFinalTurn = this.forcedFinalTurnReason !== undefined;
-            const isFinalTurn = forcedFinalTurn || currentTurn === maxTurns;
             if (isFinalTurn) {
               const finalInstruction = this.forcedFinalTurnReason === 'context'
                 ? AIAgentSession.CONTEXT_FINAL_MESSAGE
@@ -1579,7 +1601,7 @@ export class AIAgentSession {
               });
             }
             if (isFinalTurn) {
-              this.logFinalTurnWarning(forcedFinalTurn ? 'context' : 'max_turns', currentTurn);
+              this.logEnteringFinalTurn(forcedFinalTurn ? 'context' : 'max_turns', currentTurn);
             }
 
             this.llmAttempts++;
@@ -1645,10 +1667,14 @@ export class AIAgentSession {
               sessionReasoningLevel,
               sessionReasoningValue ?? undefined
             );
-            const { messages: sanitizedMessages, dropped: droppedInvalidToolCalls } = this.sanitizeTurnMessages(
+            const { messages: sanitizedMessages, dropped: droppedInvalidToolCalls, finalReportAttempted } = this.sanitizeTurnMessages(
               turnResult.messages,
               { turn: currentTurn, provider, model }
             );
+            if (finalReportAttempted) {
+              (turnResult.status as { finalReportAttempted?: boolean }).finalReportAttempted = true;
+              turnHadFinalReportAttempt = true;
+            }
 
             sanitizedMessages.forEach((message) => {
               if (message.role !== 'tool') return;
@@ -1658,6 +1684,9 @@ export class AIAgentSession {
               if (override === undefined) return;
               message.content = override;
               this.toolFailureMessages.delete(callId);
+              if (this.trimmedToolCallIds.delete(callId)) {
+                message.content = AIAgentSession.TOOL_NO_OUTPUT;
+              }
             });
 
             if (this.toolFailureFallbacks.length > 0) {
@@ -1673,9 +1702,21 @@ export class AIAgentSession {
               this.toolFailureFallbacks.length = 0;
             }
 
+            sanitizedMessages.forEach((message) => {
+              if (message.role !== 'tool') return;
+              const callId = (message as { toolCallId?: string }).toolCallId;
+              if (callId === undefined) return;
+              if (!this.trimmedToolCallIds.has(callId)) return;
+              if (typeof message.content !== 'string') return;
+              const trimmed = message.content.trim().toLowerCase();
+              if (!trimmed.startsWith('(tool failed: context window budget exceeded')) return;
+              message.content = AIAgentSession.TOOL_NO_OUTPUT;
+              this.trimmedToolCallIds.delete(callId);
+            });
+
             let reasoningHeaderEmitted = false;
-            if (!turnResult.shownThinking) {
-              const reasoningChunks: string[] = [];
+          if (!turnResult.shownThinking) {
+            const reasoningChunks: string[] = [];
               sanitizedMessages.forEach((message) => {
                 if (message.role !== 'assistant') {
                   return;
@@ -1869,8 +1910,21 @@ export class AIAgentSession {
 
                
               if (this.finalReport === undefined && !sanitizedHasToolCalls && sanitizedHasText) {
-                if (this.tryAdoptFinalReportFromText(assistantForAdoption, textContent)) {
-                  sanitizedHasToolCalls = true;
+                const extracted = this.tryAdoptFinalReportFromText(assistantForAdoption, textContent);
+                if (extracted !== undefined) {
+                  this.pendingFinalReport = { source: FINAL_REPORT_SOURCE_TEXT_FALLBACK, payload: extracted };
+                  const warnEntry: LogEntry = {
+                    timestamp: Date.now(),
+                    severity: 'WRN',
+                    turn: currentTurn,
+                    subturn: 0,
+                    direction: 'response',
+                    type: 'llm',
+                    remoteIdentifier: 'agent:text-extraction',
+                    fatal: false,
+                    message: 'Final report extracted from text content after tool call rejection. Retrying for proper tool call.'
+                  };
+                  this.log(warnEntry);
                 }
               }
 
@@ -1899,36 +1953,47 @@ export class AIAgentSession {
           if (normalizedStatus === undefined) return false;
           const formatCandidate = formatParam ?? this.resolvedFormat ?? 'text';
           const finalFormat = FINAL_REPORT_FORMAT_VALUES.find((value) => value === formatCandidate) ?? 'text';
-          this.finalReport = {
+          this.commitFinalReport({
             status: normalizedStatus,
             format: finalFormat,
             content: contentParam,
             content_json: contentJson,
             metadata,
-            ts: Date.now(),
-          };
+          }, 'tool-call');
           sanitizedHasToolCalls = true;
           return true;
         };
-        const adoptFromToolMessage = () => {
-          if (toolFailureDetected) return false;
+        const adoptFromToolMessage = (): PendingFinalReportPayload | undefined => {
+          if (toolFailureDetected) return undefined;
           const toolMessage = sanitizedMessages.find((msg) => msg.role === 'tool' && typeof msg.content === 'string' && msg.content.trim().length > 0);
-          if (toolMessage === undefined || typeof toolMessage.content !== 'string') return false;
+          if (toolMessage === undefined || typeof toolMessage.content !== 'string') return undefined;
           const normalizedContent = toolMessage.content.trim();
-          if (normalizedContent.length === 0) return false;
+          if (normalizedContent.length === 0) return undefined;
           const finalFormat = this.resolvedFormat ?? 'text';
-          this.finalReport = {
+          return {
             status: 'success',
             format: (FINAL_REPORT_FORMAT_VALUES.find((value) => value === finalFormat) ?? 'text'),
             content: normalizedContent,
-            ts: Date.now(),
           };
-          sanitizedHasToolCalls = true;
-          return true;
         };
         if (!adoptFromToolCall()) {
           if (!toolFailureDetected) {
-            adoptFromToolMessage();
+            const pending = adoptFromToolMessage();
+            if (pending !== undefined) {
+            this.pendingFinalReport = { source: FINAL_REPORT_SOURCE_TOOL_MESSAGE, payload: pending };
+              const warnEntry: LogEntry = {
+                timestamp: Date.now(),
+                severity: 'WRN',
+                turn: currentTurn,
+                subturn: 0,
+                direction: 'response',
+                type: 'llm',
+                remoteIdentifier: 'agent:text-extraction',
+                fatal: false,
+                message: 'Final report extracted from tool output after tool call rejection. Retrying for proper tool call.'
+              };
+              this.log(warnEntry);
+            }
           }
         }
       }
@@ -2001,104 +2066,7 @@ export class AIAgentSession {
 
         // Add new messages to conversation
         conversation.push(...sanitizedMessages);
-        // Deterministic finalization: if final_report has been set, finish now
-        if (this.finalReport !== undefined) {
-          const fr = this.finalReport;
-          // Validate final JSON against schema if provided (no output to onOutput here)
-          if (fr.format === 'json') {
-            // Validate JSON against frontmatter schema if available
-            const schema = this.sessionConfig.expectedOutput?.schema;
-            if (schema !== undefined && fr.content_json !== undefined) {
-              try {
-                this.ajv = this.ajv ?? new AjvCtor({ allErrors: true, strict: false });
-                const validate = this.ajv.compile(schema);
-                const valid = validate(fr.content_json);
-                if (!valid) {
-                  const ajvErrors = Array.isArray(validate.errors) ? (validate.errors as AjvErrorObject[]) : [];
-                  const errs = ajvErrors.map((error) => {
-                    const path = typeof error.instancePath === 'string' && error.instancePath.length > 0
-                      ? error.instancePath
-                      : (typeof error.schemaPath === 'string' ? error.schemaPath : '');
-                    const msg = typeof error.message === 'string' ? error.message : '';
-                    return `${path} ${msg}`.trim();
-                  }).join('; ');
-                  const payloadPreview = (() => {
-                    try {
-                      const raw = JSON.stringify(fr.content_json);
-                      return typeof raw === 'string'
-                        ? (raw.length > 200 ? `${raw.slice(0, 200)}…` : raw)
-                        : undefined;
-                    } catch {
-                      return undefined;
-                    }
-                  })();
-                  const warn: LogEntry = {
-                    timestamp: Date.now(),
-                    severity: 'WRN',
-                    turn: currentTurn,
-                    subturn: 0,
-                    direction: 'response',
-                    type: 'llm',
-                    remoteIdentifier: 'agent:ajv',
-                    fatal: false,
-                    message: `final_report JSON does not match schema: ${errs}${payloadPreview !== undefined ? `; payload preview=${payloadPreview}` : ''}`
-                  };
-                  this.log(warn);
-                }
-              } catch (e) {
-                const warn: LogEntry = {
-                  timestamp: Date.now(),
-                  severity: 'WRN',
-                  turn: currentTurn,
-                  subturn: 0,
-                  direction: 'response',
-                  type: 'llm',
-                  remoteIdentifier: 'agent:ajv',
-                  fatal: false,
-                  message: `AJV validation failed: ${e instanceof Error ? e.message : String(e)}`
-                };
-                this.log(warn);
-              }
-            }
-          } else {
-            // For markdown/text, no onOutput; CLI will print via formatter
-          }
-
-          const finalOutput = (() => {
-            if (fr.format === 'json' && fr.content_json !== undefined) {
-              try { return JSON.stringify(fr.content_json); } catch { return undefined; }
-            }
-            if (typeof fr.content === 'string' && fr.content.length > 0) return fr.content;
-            return undefined;
-          })();
-          if (this.sessionConfig.renderTarget !== 'sub-agent' && finalOutput !== undefined && this.sessionConfig.callbacks?.onOutput !== undefined) {
-            this.sessionConfig.callbacks.onOutput(finalOutput);
-            if (!finalOutput.endsWith('\n')) {
-              this.sessionConfig.callbacks.onOutput('\n');
-            }
-          }
-
-          this.logFinalTurnWarning(this.forcedFinalTurnReason === 'context' ? 'context' : 'max_turns', currentTurn);
-
-          // Log successful exit
-          const exitCode = this.forcedFinalTurnReason === 'context' ? 'EXIT-TOKEN-LIMIT' : 'EXIT-FINAL-ANSWER';
-          const exitMessage = this.forcedFinalTurnReason === 'context'
-            ? `Final report received after context guard triggered (${AIAgentSession.FINAL_REPORT_TOOL}), session complete`
-            : `Final report received (${AIAgentSession.FINAL_REPORT_TOOL}), session complete`;
-          this.logExit(exitCode, exitMessage, currentTurn, { fatal: false });
-
-          // Emit FIN summary log entry
-          this.emitFinalSummary(logs, accounting);
-
-          return {
-            success: true,
-            conversation,
-            logs,
-            accounting,
-            finalReport: fr,
-            childConversations: this.childConversations
-          };
-        }
+        const finalReportReady = this.finalReport !== undefined;
               
               const hasToolResults = sanitizedMessages.some((m: ConversationMessage) => m.role === 'tool');
               const hasContent = turnResult.hasContent ?? (() => {
@@ -2137,7 +2105,9 @@ export class AIAgentSession {
                 `cached ${String(cachedTokens)}`,
                 `${String(latencyMs)}ms`,
               ];
-              const totalCtx = inputTokens + outputTokens + cacheRead;
+              const pendingTokens = this.pendingCtxTokens;
+              const responseCtxTokens = inputTokens + outputTokens;
+              const totalCtx = this.currentCtxTokens + responseCtxTokens + pendingTokens;
               this.currentCtxTokens = totalCtx;
               this.pendingCtxTokens = 0;
               this.schemaCtxTokens = 0;
@@ -2168,7 +2138,7 @@ export class AIAgentSession {
                 latency_ms: latencyMs,
                 response_bytes: responseBytes,
                 reasoning: reasoningStatus,
-                ctx_tokens: totalCtx,
+                ctx_tokens: responseCtxTokens,
                 has_tool_calls: sanitizedHasToolCalls,
                 has_tool_results: hasToolResults,
                 final_answer: turnResult.status.finalAnswer,
@@ -2238,7 +2208,8 @@ export class AIAgentSession {
               }
 
               const retryFlags = turnResult as { incompleteFinalReportDetected?: boolean; finalReportAttempted?: boolean };
-              if ((retryFlags.incompleteFinalReportDetected === true || retryFlags.finalReportAttempted === true) && currentTurn < maxTurns) {
+              const finalReportAttemptFlag = turnHadFinalReportAttempt || retryFlags.finalReportAttempted === true;
+              if ((retryFlags.incompleteFinalReportDetected === true || finalReportAttemptFlag) && currentTurn < maxTurns) {
                 const previousMaxTurns = maxTurns;
                 maxTurns = currentTurn + 1;
                 const adjustLog: LogEntry = {
@@ -2250,9 +2221,13 @@ export class AIAgentSession {
                   type: 'llm',
                   remoteIdentifier: 'agent:orchestrator',
                   fatal: false,
-                  message: `Final report retry detected at turn ${String(currentTurn)}, adjusting max_turns from ${String(previousMaxTurns)} to ${String(maxTurns)}`
+                  message: `Final report retry detected at turn ${String(currentTurn)}; Collapsing remaining turns from ${String(previousMaxTurns)} to ${String(maxTurns)}`
                 };
                 this.log(adjustLog);
+              }
+
+              if (finalReportReady) {
+                return this.finalizeWithCurrentFinalReport(conversation, logs, accounting, currentTurn);
               }
 
               // Check for reasoning-only responses (empty response but not final answer)
@@ -2323,6 +2298,7 @@ export class AIAgentSession {
                   maxRateLimitWaitMs = 0;
                 }
                 this.finalReport = undefined;
+                this.finalReportSource = undefined;
                 this.pushSystemRetryMessage(conversation, this.buildFinalReportReminder());
                 continue;
               } else {
@@ -2600,6 +2576,10 @@ export class AIAgentSession {
       }
 
       if (!turnSuccessful) {
+        if (currentTurn === maxTurns && this.finalReport === undefined && this.pendingFinalReport !== undefined) {
+          this.acceptPendingFinalReport(currentTurn);
+          return this.finalizeWithCurrentFinalReport(conversation, logs, accounting, currentTurn);
+        }
         if (Boolean(this.stopRef?.stopping)) {
           return this.finalizeGracefulStopSession(conversation, logs, accounting);
         }
@@ -2607,49 +2587,67 @@ export class AIAgentSession {
           const fallbackFormatCandidate = this.resolvedFormat ?? 'text';
           const fallbackFormat = FINAL_REPORT_FORMAT_VALUES.find((value) => value === fallbackFormatCandidate) ?? 'text';
           const detailMessage = 'Context window budget exhausted before another model call could be attempted. Providing a synthesized final report with known limitations.';
-          const fallbackReport: NonNullable<AIAgentResult['finalReport']> = {
+          const metadata: Record<string, unknown> = {
+            reason: 'context_limit',
+            turns_completed: currentTurn,
+            final_report_attempts: this.finalReportAttempts,
+            last_stop_reason: lastError ?? 'context_limit'
+          };
+          this.logFailureReport('Context limit reached; synthesized final report.', currentTurn, {
+            reason: 'context_limit',
+            turns_completed: currentTurn,
+            final_report_attempts: this.finalReportAttempts,
+          });
+          this.commitFinalReport({
             status: 'failure',
             format: fallbackFormat,
             content: detailMessage,
-            ts: Date.now(),
-          };
-          this.finalReport = fallbackReport;
-          this.logExit('EXIT-TOKEN-LIMIT', 'Context window reached; synthesized final report without additional model turn', currentTurn);
-          this.emitFinalSummary(logs, accounting);
-          return {
-            success: true,
-            conversation,
-            logs,
-            accounting,
-            finalReport: fallbackReport,
-            childConversations: this.childConversations,
-          };
+            metadata,
+          }, 'synthetic');
+          return this.finalizeWithCurrentFinalReport(conversation, logs, accounting, currentTurn);
         }
         if (currentTurn === maxTurns && this.finalReport === undefined && !finalReportToolFailed) {
-          const attemptLabel = `${String(maxRetries)} attempt${maxRetries === 1 ? '' : 's'}`;
-          const baseSummary = `The model did not produce a final report after ${attemptLabel} on the final turn.`;
-          const detailedSummary = lastError !== undefined ? `${baseSummary} Last error: ${lastError}.` : baseSummary;
+          const turnLabel = `${String(currentTurn)} turn${currentTurn === 1 ? '' : 's'}`;
+          const baseSummary = `Session completed without a final report after ${turnLabel}.`;
+          const detailedSummary = lastError !== undefined
+            ? `${baseSummary} Last error: ${lastError}.`
+            : `${baseSummary} Final report attempts: ${String(this.finalReportAttempts)}.`;
           const fallbackFormatCandidate = this.resolvedFormat ?? 'text';
           const fallbackFormat = FINAL_REPORT_FORMAT_VALUES.find((value) => value === fallbackFormatCandidate) ?? 'text';
-          const metadata = lastError !== undefined ? { lastError } : undefined;
-          const fallbackReport: NonNullable<AIAgentResult['finalReport']> = {
+          const metadata: Record<string, unknown> = {
+            reason: 'max_turns_exhausted',
+            turns_completed: currentTurn,
+            final_report_attempts: this.finalReportAttempts,
+            last_stop_reason: lastError ?? 'none',
+          };
+          this.logFailureReport('Max turns exhausted without final report.', currentTurn, {
+            reason: 'max_turns_exhausted',
+            turns_completed: currentTurn,
+            final_report_attempts: this.finalReportAttempts,
+          });
+          this.commitFinalReport({
             status: 'failure',
             format: fallbackFormat,
             content: detailedSummary,
-            ...(metadata !== undefined ? { metadata } : {}),
-            ts: Date.now(),
+            metadata,
+          }, 'synthetic');
+          return this.finalizeWithCurrentFinalReport(conversation, logs, accounting, currentTurn);
+        }
+
+        if (currentTurn < maxTurns && typeof lastError === 'string' && lastError.startsWith('invalid_response')) {
+          const warnEntry: LogEntry = {
+            timestamp: Date.now(),
+            severity: 'WRN',
+            turn: currentTurn,
+            subturn: 0,
+            direction: 'response',
+            type: 'llm',
+            remoteIdentifier: 'agent:orchestrator',
+            fatal: false,
+            message: `Turn ${String(currentTurn)} exhausted ${String(maxRetries)} attempt${maxRetries === 1 ? '' : 's'} with invalid responses; advancing to the next turn.`,
           };
-          this.finalReport = fallbackReport;
-          this.logExit('EXIT-FINAL-ANSWER', 'Synthesized failure final_report after retries', currentTurn);
-          this.emitFinalSummary(logs, accounting);
-          return {
-            success: true,
-            conversation,
-            logs,
-            accounting,
-            finalReport: fallbackReport,
-            childConversations: this.childConversations,
-          };
+          this.log(warnEntry);
+          continue;
         }
 
         // All attempts failed for this turn
@@ -3091,12 +3089,31 @@ export class AIAgentSession {
     const projectedTokens = this.currentCtxTokens + this.pendingCtxTokens + this.newCtxTokens + extraTokens;
     const blocked: ContextGuardBlockedEntry[] = [];
     const targets = this.getContextTargets();
+    if (process.env.CONTEXT_DEBUG === 'true') {
+      console.log('context-guard/evaluate', {
+        projectedTokens,
+        currentCtxTokens: this.currentCtxTokens,
+        pendingCtxTokens: this.pendingCtxTokens,
+        newCtxTokens: this.newCtxTokens,
+        extraTokens,
+      });
+    }
     // eslint-disable-next-line functional/no-loop-statements
     for (const target of targets) {
       const contextWindow = target.contextWindow;
       const bufferTokens = target.bufferTokens;
       const maxOutputTokens = this.computeMaxOutputTokens(contextWindow);
       const limit = Math.max(0, contextWindow - bufferTokens - maxOutputTokens);
+      if (process.env.CONTEXT_DEBUG === 'true') {
+        console.log('context-guard/evaluate-target', {
+          provider: target.provider,
+          model: target.model,
+          contextWindow,
+          bufferTokens,
+          maxOutputTokens,
+          limit,
+        });
+      }
       if (limit > 0 && projectedTokens > limit) {
         blocked.push({
           provider: target.provider,
@@ -3214,8 +3231,13 @@ export class AIAgentSession {
       this.forcedFinalTurnReason = 'context';
       this.contextLimitWarningLogged = false;
     }
-    this.logFinalTurnWarning('context');
+    this.logEnteringFinalTurn('context', this.currentTurn);
     this.pushSystemRetryMessage(this.conversation, AIAgentSession.CONTEXT_FINAL_MESSAGE);
+    if (this.pendingCtxTokens > 0) {
+      this.currentCtxTokens += this.pendingCtxTokens;
+      this.pendingCtxTokens = 0;
+    }
+    this.newCtxTokens = 0;
     if (this.contextLimitWarningLogged) {
       return;
     }
@@ -3255,15 +3277,30 @@ export class AIAgentSession {
     this.contextLimitWarningLogged = true;
   }
 
-  private logFinalTurnWarning(reason: 'context' | 'max_turns', turnOverride?: number): void {
-    if (this.finalTurnLogIssued) return;
+  private logTurnStart(turn: number): void {
+    const entry: LogEntry = {
+      timestamp: Date.now(),
+      severity: 'VRB',
+      turn,
+      subturn: 0,
+      direction: 'request',
+      type: 'llm',
+      remoteIdentifier: 'agent:turn-start',
+      fatal: false,
+      message: `Turn ${String(turn)} starting`,
+    };
+    this.log(entry);
+  }
+
+  private logEnteringFinalTurn(reason: 'context' | 'max_turns', turn: number): void {
+    if (this.finalTurnEntryLogged) return;
     const message = reason === 'context'
       ? `Context guard enforced: restricting tools to \`${AIAgentSession.FINAL_REPORT_TOOL}\` and injecting finalization instruction.`
-      : `Final turn detected: restricting tools to \`${AIAgentSession.FINAL_REPORT_TOOL}\` and injecting finalization instruction.`;
+      : `Final turn (${String(turn)}) detected: restricting tools to \`${AIAgentSession.FINAL_REPORT_TOOL}\`.`;
     const warnEntry: LogEntry = {
       timestamp: Date.now(),
-      severity: reason === 'context' ? 'WRN' : 'VRB',
-      turn: turnOverride ?? this.currentTurn,
+      severity: 'WRN',
+      turn,
       subturn: 0,
       direction: 'request',
       type: 'llm',
@@ -3272,7 +3309,200 @@ export class AIAgentSession {
       message,
     };
     this.log(warnEntry);
-    this.finalTurnLogIssued = true;
+    this.finalTurnEntryLogged = true;
+  }
+
+  private logFinalReportAccepted(source: 'tool-call' | PendingFinalReportSource | 'synthetic', turn: number): void {
+    const entry: LogEntry = {
+      timestamp: Date.now(),
+      severity: source === 'tool-call' ? 'VRB' : (source === 'synthetic' ? 'ERR' : 'WRN'),
+      turn,
+      subturn: 0,
+      direction: 'response',
+      type: 'llm',
+      remoteIdentifier: 'agent:final-report-accepted',
+      fatal: false,
+      message: source === 'tool-call'
+        ? 'Final report accepted from tool call.'
+        : source === FINAL_REPORT_SOURCE_TEXT_FALLBACK
+          ? 'Final report accepted from text extraction fallback.'
+          : source === FINAL_REPORT_SOURCE_TOOL_MESSAGE
+            ? 'Final report accepted from tool-message fallback.'
+            : 'Synthetic final report generated.',
+      details: { source }
+    };
+    this.log(entry);
+  }
+
+  private logFallbackAcceptance(source: PendingFinalReportSource, turn: number): void {
+    const entry: LogEntry = {
+      timestamp: Date.now(),
+      severity: 'WRN',
+      turn,
+      subturn: 0,
+      direction: 'response',
+      type: 'llm',
+      remoteIdentifier: 'agent:fallback-report',
+      fatal: false,
+      message: source === FINAL_REPORT_SOURCE_TEXT_FALLBACK
+        ? 'Accepting final report from text extraction as last resort (final turn, no valid tool call).'
+        : 'Accepting final report from tool-message fallback as last resort (final turn, no valid tool call).'
+    };
+    this.log(entry);
+  }
+
+  private logFailureReport(reason: string, turn: number, details?: Record<string, LogDetailValue>): void {
+    const entry: LogEntry = {
+      timestamp: Date.now(),
+      severity: 'ERR',
+      turn,
+      subturn: 0,
+      direction: 'response',
+      type: 'llm',
+      remoteIdentifier: 'agent:failure-report',
+      fatal: false,
+      message: reason,
+      ...(details !== undefined ? { details } : {}),
+    };
+    this.log(entry);
+  }
+
+  private selectToolsForTurn(provider: string, isFinalTurn: boolean): ToolSelection {
+    const allTools = [...(this.toolsOrchestrator?.listTools() ?? [])];
+    const filteredSelection = this.filterToolsForProvider(allTools, provider);
+    const availableTools = filteredSelection.tools;
+    const allowedToolNames = filteredSelection.allowedNames;
+    const toolsForTurn = isFinalTurn
+      ? (() => {
+          const filtered = availableTools.filter((tool) => sanitizeToolName(tool.name) === AIAgentSession.FINAL_REPORT_TOOL);
+          return filtered.length > 0 ? filtered : availableTools;
+        })()
+      : availableTools;
+    return { availableTools, allowedToolNames, toolsForTurn };
+  }
+
+  private consumePendingToolSelection(): ToolSelection | undefined {
+    const selection = this.pendingToolSelection;
+    this.pendingToolSelection = undefined;
+    return selection;
+  }
+
+  private commitFinalReport(payload: PendingFinalReportPayload, source: 'tool-call' | PendingFinalReportSource | 'synthetic'): void {
+    this.finalReport = {
+      status: payload.status,
+      format: payload.format,
+      content: payload.content,
+      content_json: payload.content_json,
+      metadata: payload.metadata,
+      ts: Date.now()
+    };
+    this.finalReportSource = source;
+    this.pendingFinalReport = undefined;
+  }
+
+  private acceptPendingFinalReport(turn: number): void {
+    if (this.pendingFinalReport === undefined) return;
+    const pending = this.pendingFinalReport;
+    this.commitFinalReport(pending.payload, pending.source);
+    this.logFallbackAcceptance(pending.source, turn);
+  }
+
+  private finalizeWithCurrentFinalReport(
+    conversation: ConversationMessage[],
+    logs: LogEntry[],
+    accounting: AccountingEntry[],
+    currentTurn: number
+  ): AIAgentResult {
+    const fr = this.finalReport;
+    if (fr === undefined) {
+      throw new Error('finalizeWithCurrentFinalReport called without final report');
+    }
+    if (fr.format === 'json') {
+      const schema = this.sessionConfig.expectedOutput?.schema;
+      if (schema !== undefined && fr.content_json !== undefined) {
+        try {
+          this.ajv = this.ajv ?? new AjvCtor({ allErrors: true, strict: false });
+          const validate = this.ajv.compile(schema);
+          const valid = validate(fr.content_json);
+          if (!valid) {
+            const ajvErrors = Array.isArray(validate.errors) ? (validate.errors as AjvErrorObject[]) : [];
+            const errs = ajvErrors.map((error) => {
+              const path = typeof error.instancePath === 'string' && error.instancePath.length > 0
+                ? error.instancePath
+                : (typeof error.schemaPath === 'string' ? error.schemaPath : '');
+              const msg = typeof error.message === 'string' ? error.message : '';
+              return `${path} ${msg}`.trim();
+            }).join('; ');
+            const payloadPreview = (() => {
+              try {
+                const raw = JSON.stringify(fr.content_json);
+                return typeof raw === 'string'
+                  ? (raw.length > 200 ? `${raw.slice(0, 200)}…` : raw)
+                  : undefined;
+              } catch {
+                return undefined;
+              }
+            })();
+            const warn: LogEntry = {
+              timestamp: Date.now(),
+              severity: 'WRN',
+              turn: currentTurn,
+              subturn: 0,
+              direction: 'response',
+              type: 'llm',
+              remoteIdentifier: 'agent:ajv',
+              fatal: false,
+              message: `final_report JSON does not match schema: ${errs}${payloadPreview !== undefined ? `; payload preview=${payloadPreview}` : ''}`
+            };
+            this.log(warn);
+          }
+        } catch (e) {
+          const warn: LogEntry = {
+            timestamp: Date.now(),
+            severity: 'WRN',
+            turn: currentTurn,
+            subturn: 0,
+            direction: 'response',
+            type: 'llm',
+            remoteIdentifier: 'agent:ajv',
+            fatal: false,
+            message: `AJV validation failed: ${e instanceof Error ? e.message : String(e)}`
+          };
+          this.log(warn);
+        }
+      }
+    }
+    if (this.sessionConfig.renderTarget !== 'sub-agent' && this.sessionConfig.callbacks?.onOutput !== undefined) {
+      const finalOutput = (() => {
+        if (fr.format === 'json' && fr.content_json !== undefined) {
+          try { return JSON.stringify(fr.content_json); } catch { return undefined; }
+        }
+        if (typeof fr.content === 'string' && fr.content.length > 0) return fr.content;
+        return undefined;
+      })();
+      if (finalOutput !== undefined) {
+        this.sessionConfig.callbacks.onOutput(finalOutput);
+        if (!finalOutput.endsWith('\n')) {
+          this.sessionConfig.callbacks.onOutput('\n');
+        }
+      }
+    }
+    const source = this.finalReportSource ?? 'tool-call';
+    this.logFinalReportAccepted(source, currentTurn);
+    const exitCode = this.forcedFinalTurnReason === 'context' ? 'EXIT-TOKEN-LIMIT' : 'EXIT-FINAL-ANSWER';
+    const exitMessage = this.forcedFinalTurnReason === 'context'
+      ? `Final report received after context guard triggered (${AIAgentSession.FINAL_REPORT_TOOL}), session complete`
+      : `Final report received (${AIAgentSession.FINAL_REPORT_TOOL}), session complete`;
+    this.logExit(exitCode, exitMessage, currentTurn, { fatal: false });
+    this.emitFinalSummary(logs, accounting);
+    return {
+      success: true,
+      conversation,
+      logs,
+      accounting,
+      finalReport: fr,
+      childConversations: this.childConversations
+    };
   }
 
 
@@ -3349,13 +3579,13 @@ export class AIAgentSession {
   private tryAdoptFinalReportFromText(
     assistantMessage: ConversationMessage | undefined,
     text: string
-  ): boolean {
-    if (typeof text !== 'string') return false;
+  ): PendingFinalReportPayload | undefined {
+    if (typeof text !== 'string') return undefined;
     const trimmedText = text.trim();
-    if (trimmedText.length === 0) return false;
+    if (trimmedText.length === 0) return undefined;
     const json = this.extractJsonRecordFromText(trimmedText);
-     
-    if (json === undefined) return false;
+    
+    if (json === undefined) return undefined;
     const isRecord = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value);
     const pickString = (value: unknown): string | undefined => (typeof value === 'string' ? value : undefined);
     const statusRaw = json.status;
@@ -3363,15 +3593,15 @@ export class AIAgentSession {
     const contentJsonRaw = json.content_json;
     const contentJson = isRecord(contentJsonRaw) ? contentJsonRaw : undefined;
     const contentCandidate = pickString(json.report_content) ?? pickString(json.content);
-    if (typeof statusRaw !== 'string') return false;
+    if (typeof statusRaw !== 'string') return undefined;
     const formatCandidate = (formatRaw ?? '').trim();
     const formatMatch = FINAL_REPORT_FORMAT_VALUES.find((value) => value === formatCandidate);
-    if (formatMatch === undefined) return false;
+    if (formatMatch === undefined) return undefined;
     const finalFormat = formatMatch;
     const normalizedStatus = statusRaw === 'success' || statusRaw === 'failure' || statusRaw === 'partial'
       ? statusRaw
       : undefined;
-    if (normalizedStatus === undefined) return false;
+    if (normalizedStatus === undefined) return undefined;
     const finalStatus: 'success' | 'failure' | 'partial' = normalizedStatus;
     let finalContent: string | undefined = contentCandidate;
     if ((finalContent === undefined || finalContent.trim().length === 0) && contentJson !== undefined) {
@@ -3381,8 +3611,8 @@ export class AIAgentSession {
         finalContent = undefined;
       }
     }
-    if (finalContent === undefined) return false;
-    if (finalContent.trim().length === 0) return false;
+    if (finalContent === undefined) return undefined;
+    if (finalContent.trim().length === 0) return undefined;
     const metadata = isRecord(json.metadata) ? json.metadata : undefined;
     const parameters: Record<string, unknown> = {
       status: finalStatus,
@@ -3391,35 +3621,26 @@ export class AIAgentSession {
     };
     if (contentJson !== undefined) parameters.content_json = contentJson;
     if (metadata !== undefined) parameters.metadata = metadata;
-    if (assistantMessage !== undefined) {
-      const syntheticCall: ToolCall = {
-        id: 'synthetic-final-report-' + Date.now().toString(),
-        name: AIAgentSession.FINAL_REPORT_TOOL,
-        parameters,
-      };
-      assistantMessage.toolCalls = [syntheticCall];
-    }
-    const finalReportPayload: NonNullable<AIAgentResult['finalReport']> = {
+    const finalReportPayload: PendingFinalReportPayload = {
       status: finalStatus,
       format: finalFormat,
-      ts: Date.now(),
+      content: finalContent,
     };
-    finalReportPayload.content = finalContent;
     if (contentJson !== undefined) {
       finalReportPayload.content_json = contentJson;
     }
     if (metadata !== undefined) {
       finalReportPayload.metadata = metadata;
     }
-    this.finalReport = finalReportPayload;
-    return true;
+    return finalReportPayload;
   }
 
   private sanitizeTurnMessages(
     messages: ConversationMessage[],
     context: { turn: number; provider: string; model: string }
-  ): { messages: ConversationMessage[]; dropped: number } {
+  ): { messages: ConversationMessage[]; dropped: number; finalReportAttempted: boolean } {
     let dropped = 0;
+    let finalReportAttempted = false;
     const isRecord = (value: unknown): value is Record<string, unknown> =>
       value !== null && typeof value === 'object' && !Array.isArray(value);
     const sanitized = messages.map((msg, msgIndex) => {
@@ -3454,6 +3675,10 @@ export class AIAgentSession {
         if (paramsCandidate === undefined) {
           const preview = this.previewRawParameter(rawParameters);
           droppedReasons.push(`call ${callIndexStr}: parameters not object (raw preview: ${preview})`);
+          if (rawName === AIAgentSession.FINAL_REPORT_TOOL) {
+            finalReportAttempted = true;
+            this.finalReportAttempts += 1;
+          }
           return;
         }
         validCalls.push({
@@ -3492,7 +3717,7 @@ export class AIAgentSession {
 
       return { ...msg, toolCalls: validCalls };
     });
-    return { messages: sanitized, dropped };
+    return { messages: sanitized, dropped, finalReportAttempted };
   }
 
   private emitReasoningChunks(chunks: string[]): void {
@@ -3586,19 +3811,10 @@ export class AIAgentSession {
   ) {
     // no spans; opTree is canonical
     // Expose provider tools (which includes internal tools from InternalToolProvider)
-    const allTools = [
-      ...(this.toolsOrchestrator?.listTools() ?? [])
-    ];
-
-    const filteredSelection = this.filterToolsForProvider(allTools, provider);
-    const availableTools = filteredSelection.tools;
-    const allowedToolNames = filteredSelection.allowedNames;
-    const toolsForTurn = isFinalTurn
-      ? (() => {
-          const filtered = availableTools.filter((tool) => sanitizeToolName(tool.name) === AIAgentSession.FINAL_REPORT_TOOL);
-          return filtered.length > 0 ? filtered : availableTools;
-        })()
-      : availableTools;
+    const pendingSelection = this.consumePendingToolSelection();
+    const selection = pendingSelection ?? this.selectToolsForTurn(provider, isFinalTurn);
+    const allowedToolNames = selection.allowedToolNames;
+    const toolsForTurn = selection.toolsForTurn;
     let disableReasoningForTurn = false;
 
     this.schemaCtxTokens = this.estimateToolSchemaTokens(toolsForTurn);
@@ -3606,7 +3822,7 @@ export class AIAgentSession {
       console.log('context-guard/schema-tokens', {
         turn: currentTurn,
         schemaCtxTokens: this.schemaCtxTokens,
-        toolsForTurn: toolsForTurn.map((tool) => sanitizeToolName(tool.name)),
+        toolsForTurn: toolsForTurn.map((tool: MCPTool) => sanitizeToolName(tool.name)),
       });
     }
 
@@ -3638,6 +3854,7 @@ export class AIAgentSession {
       const isFinalReportTool = normalizedToolName === AIAgentSession.FINAL_REPORT_TOOL
         || normalizedToolName === AIAgentSession.FINAL_REPORT_SHORT;
       if (isFinalReportTool) {
+        this.finalReportAttempts += 1;
         const nestedCalls = this.parseNestedCallsFromFinalReport(parameters);
         if (nestedCalls !== undefined) {
           let nestedResult = AIAgentSession.TOOL_NO_OUTPUT;
@@ -3714,6 +3931,9 @@ export class AIAgentSession {
             this.newCtxTokens += failureTokens;
             if (callId !== undefined) {
               this.toolFailureMessages.set(callId, toolOutput);
+              if (!this.turnHasSuccessfulToolOutput && (failureReason === 'context_budget_exceeded' || failureReason === 'token_budget_exceeded')) {
+                this.trimmedToolCallIds.add(callId);
+              }
             } else {
               this.toolFailureFallbacks.push(toolOutput);
             }
@@ -3810,11 +4030,14 @@ export class AIAgentSession {
                   },
                 };
                 this.log(warnEntry);
-                const renderedFailure = '(tool failed: context window budget exceeded)';
+                const renderedFailure = AIAgentSession.TOOL_NO_OUTPUT;
                 const failureTokens = this.estimateTokensForCounters([{ role: 'tool', content: renderedFailure }]);
                 this.newCtxTokens += failureTokens;
                 if (callId !== undefined) {
                   this.toolFailureMessages.set(callId, renderedFailure);
+                  if (!this.turnHasSuccessfulToolOutput) {
+                    this.trimmedToolCallIds.add(callId);
+                  }
                 } else {
                   this.toolFailureFallbacks.push(renderedFailure);
                 }
@@ -3889,6 +4112,7 @@ export class AIAgentSession {
           };
           accounting.push(successEntry);
           try { this.sessionConfig.callbacks?.onAccounting?.(successEntry); } catch (e) { warn(`tool accounting callback failed: ${e instanceof Error ? e.message : String(e)}`); }
+          this.turnHasSuccessfulToolOutput = true;
           if (managedTokens === undefined) {
             const toolLog: LogEntry = {
               timestamp: Date.now(),
@@ -3957,6 +4181,9 @@ export class AIAgentSession {
         const renderedFailure = `(tool failed: ${failureDetail})`;
         if (typeof options?.toolCallId === 'string' && options.toolCallId.length > 0) {
           this.toolFailureMessages.set(options.toolCallId, renderedFailure);
+          if (!this.turnHasSuccessfulToolOutput && failureDetail.toLowerCase().includes('context window budget exceeded')) {
+            this.trimmedToolCallIds.add(options.toolCallId);
+          }
         } else {
           this.toolFailureFallbacks.push(renderedFailure);
         }
