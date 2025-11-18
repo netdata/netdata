@@ -124,16 +124,16 @@ Expected Output: Reports if this used is a subscriber to our mailing lists and k
 
 ### fireflies
 Scope: analyzes Fireflies meeting transcripts to identify pain points, infrastructure scale, decision-makers, and map customer commitments to SEE sales stages (10-100%) for deal qualification and probability assessment.
-Input: A company name or domain name, or contact email, together with some time-period, or even a specific meeting id
+Input: A company name or contact email, optionally with a time-period, or even a specific meeting id - the agent can search for transcripts of specific emails or words in titles and transcripts - it cannot discover transcripts by company domain or name, so for best results provide to the request the list of email addresses of potential participants
 Output: Detailed analysis of the meetings matching the criteria
 
-**Example 1**
-Input: find the last meeting we had with Ellusium and analyze the pain points of the customer
-Expected Output: all the pain points of Ellisium, as derived from our last meeting with them
+**Good Example**
+Input: find the last meeting we had with peter@ellucium.com and analyze the pain points of the customer
+Expected Output: all the pain points of Ellusium as derived from our last meeting we had with Peter
 
-**Example 2**
+**Bad Example**
 Input: find the last meeting we had with Credit Acceptance and analyze how satisfied is the customer with Netdata
-Expected Output: analysis of the satisfaction with Netdata, as derived from our last meeting with them
+Problem: the agent cannot identify which transcripts belong to "Credit Acceptance". It may find a few by doing a full text search on the transcripts, but this is error prone, fuzzy and not guaranteed. For best results lookup the "Credit Acceptance" email address from hubspot or bigquery and rephrase the request to include the list of potential emails.
 
 ### posthog
 Scope: query user activities in-app and public

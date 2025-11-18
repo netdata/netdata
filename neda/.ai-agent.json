@@ -110,6 +110,7 @@
       "headers": {},
       "custom": {},
       "mergeStrategy": "overlay",
+      "contextWindow": 200000,
       "stringSchemaFormatsAllowed": [
         "*"
       ],
@@ -1587,6 +1588,12 @@
         "currency": "USD",
         "prompt": 0,
         "completion": 0
+      },
+      "gemini-3-pro-preview": {
+        "unit": "per_1m",
+        "currency": "USD",
+        "prompt": 2.0,
+        "completion": 12.0
       },
       "gemini-2.5-pro": {
         "unit": "per_1m",
