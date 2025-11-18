@@ -157,6 +157,7 @@ export class AIAgentSession {
   private readonly toolBudgetCallbacks: ToolBudgetCallbacks;
   private forcedFinalTurnReason?: 'context';
   private contextLimitWarningLogged = false;
+  private finalTurnLogIssued = false;
   // Internal housekeeping notes
   private childConversations: { agentId?: string; toolName: string; promptPath: string; conversation: ConversationMessage[]; trace?: { originId?: string; parentId?: string; selfId?: string; callPath?: string } }[] = [];
   private readonly subAgents?: SubAgentRegistry;
@@ -1447,7 +1448,6 @@ export class AIAgentSession {
       this.llmClient.setTurn(currentTurn, 0);
       let lastError: string | undefined;
       let turnSuccessful = false;
-      let finalTurnWarnLogged = false;
       let finalTurnRetryWarnLogged = false;
 
       // Global attempts across all provider/model pairs for this turn
@@ -1578,22 +1578,8 @@ export class AIAgentSession {
                 metadata: { retryMessage: 'final-turn-instruction' },
               });
             }
-            if (isFinalTurn && !finalTurnWarnLogged) {
-              const warn: LogEntry = {
-                timestamp: Date.now(),
-                severity: 'WRN',
-                turn: currentTurn,
-                subturn: 0,
-                direction: 'request',
-                type: 'llm',
-                remoteIdentifier: AIAgentSession.REMOTE_FINAL_TURN,
-                fatal: false,
-                message: forcedFinalTurn
-                  ? `Context guard enforced: restricting tools to \`${AIAgentSession.FINAL_REPORT_TOOL}\` and injecting finalization instruction.`
-                  : `Final turn detected: restricting tools to \`${AIAgentSession.FINAL_REPORT_TOOL}\` and injecting finalization instruction.`
-              };
-              this.log(warn);
-              finalTurnWarnLogged = true;
+            if (isFinalTurn) {
+              this.logFinalTurnWarning(forcedFinalTurn ? 'context' : 'max_turns', currentTurn);
             }
 
             this.llmAttempts++;
@@ -2091,6 +2077,8 @@ export class AIAgentSession {
               this.sessionConfig.callbacks.onOutput('\n');
             }
           }
+
+          this.logFinalTurnWarning(this.forcedFinalTurnReason === 'context' ? 'context' : 'max_turns', currentTurn);
 
           // Log successful exit
           const exitCode = this.forcedFinalTurnReason === 'context' ? 'EXIT-TOKEN-LIMIT' : 'EXIT-FINAL-ANSWER';
@@ -3226,6 +3214,7 @@ export class AIAgentSession {
       this.forcedFinalTurnReason = 'context';
       this.contextLimitWarningLogged = false;
     }
+    this.logFinalTurnWarning('context');
     this.pushSystemRetryMessage(this.conversation, AIAgentSession.CONTEXT_FINAL_MESSAGE);
     if (this.contextLimitWarningLogged) {
       return;
@@ -3264,6 +3253,26 @@ export class AIAgentSession {
     }
     this.log(warnEntry);
     this.contextLimitWarningLogged = true;
+  }
+
+  private logFinalTurnWarning(reason: 'context' | 'max_turns', turnOverride?: number): void {
+    if (this.finalTurnLogIssued) return;
+    const message = reason === 'context'
+      ? `Context guard enforced: restricting tools to \`${AIAgentSession.FINAL_REPORT_TOOL}\` and injecting finalization instruction.`
+      : `Final turn detected: restricting tools to \`${AIAgentSession.FINAL_REPORT_TOOL}\` and injecting finalization instruction.`;
+    const warnEntry: LogEntry = {
+      timestamp: Date.now(),
+      severity: reason === 'context' ? 'WRN' : 'VRB',
+      turn: turnOverride ?? this.currentTurn,
+      subturn: 0,
+      direction: 'request',
+      type: 'llm',
+      remoteIdentifier: AIAgentSession.REMOTE_FINAL_TURN,
+      fatal: false,
+      message,
+    };
+    this.log(warnEntry);
+    this.finalTurnLogIssued = true;
   }
 
 

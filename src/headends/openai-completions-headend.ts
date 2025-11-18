@@ -14,6 +14,7 @@ import { normalizeCallPath } from '../utils.js';
 
 import { ConcurrencyLimiter } from './concurrency.js';
 import { HttpError, readJson, writeJson, writeSseChunk, writeSseDone } from './http-utils.js';
+import { renderReasoningMarkdown, type ReasoningTurnState } from './reasoning-markdown.js';
 import { escapeMarkdown, formatMetricsLine, formatSummaryLine, italicize, resolveAgentHeadingLabel } from './summary-utils.js';
 
 interface Deferred<T> {
@@ -313,11 +314,10 @@ export class OpenAICompletionsHeadend implements Headend {
     let summaryEmitted = false;
     const accounting: AccountingEntry[] = [];
     const agentHeadingLabel = escapeMarkdown(resolveAgentHeadingLabel(agent));
-    interface TurnRenderState { index: number; summary?: string; thinking?: string; updates: string[] }
     let rootCallPath: string | undefined;
     let transactionHeader: string | undefined;
     let renderedReasoning = '';
-    const turns: TurnRenderState[] = [];
+    const turns: ReasoningTurnState[] = [];
     let turnCounter = 0;
     let expectingNewTurn = true;
     let masterSummary: { text?: string; metrics?: ProgressMetrics; statusNote?: string } | undefined;
@@ -392,52 +392,11 @@ export class OpenAICompletionsHeadend implements Headend {
       if (totals.costUsd > 0) parts.push(`cost $${totals.costUsd.toFixed(4)}`);
       return parts.length > 0 ? parts.join(', ') : undefined;
     };
-    const renderReasoning = (): string => {
-      if (transactionHeader === undefined) return '';
-      const lines: string[] = [transactionHeader];
-      let thinkingSectionOpen = false;
-      const ensureBlankLine = (): void => {
-        if (lines.length === 0) return;
-        if (lines[lines.length - 1] !== '') lines.push('');
-      };
-      const openThinkingSection = (): void => {
-        if (thinkingSectionOpen) return;
-        ensureBlankLine();
-        lines.push('---');
-        thinkingSectionOpen = true;
-      };
-      const closeThinkingSection = (): void => {
-        if (!thinkingSectionOpen) return;
-        ensureBlankLine();
-        lines.push('---');
-        thinkingSectionOpen = false;
-      };
-      turns.forEach((turn) => {
-        closeThinkingSection();
-        ensureBlankLine();
-        lines.push(`### Turn ${String(turn.index)}`);
-        if (turn.summary !== undefined && turn.summary.length > 0) {
-          lines.push(`(${turn.summary})`);
-        }
-        const thinkingText = turn.thinking !== undefined ? escapeMarkdown(turn.thinking.trim()) : '';
-        if (thinkingText.length > 0) {
-          openThinkingSection();
-          lines.push(thinkingText);
-        }
-        if (turn.updates.length > 0) {
-          closeThinkingSection();
-          turn.updates.forEach((line) => {
-            lines.push(`- ${line}`);
-          });
-        }
-      });
-      if (summaryEmitted && masterSummary?.text !== undefined) {
-        closeThinkingSection();
-        ensureBlankLine();
-        lines.push(masterSummary.text);
-      }
-      return `${lines.join('\n')}\n`;
-    };
+    const renderReasoning = (): string => renderReasoningMarkdown({
+      header: transactionHeader,
+      turns,
+      summaryText: summaryEmitted && masterSummary?.text !== undefined ? masterSummary.text : undefined,
+    });
     const flushReasoning = (): void => {
       if (!streamed || transactionHeader === undefined) return;
       const next = renderReasoning();
@@ -502,7 +461,7 @@ export class OpenAICompletionsHeadend implements Headend {
       summaryEmitted = true;
       flushReasoning();
     };
-    const ensureTurn = (): TurnRenderState => {
+    const ensureTurn = (): ReasoningTurnState => {
       if (expectingNewTurn || turns.length === 0) {
         startNextTurn();
         expectingNewTurn = false;
@@ -511,7 +470,7 @@ export class OpenAICompletionsHeadend implements Headend {
     };
     const startNextTurn = (): void => {
       turnCounter += 1;
-      const turn: TurnRenderState = { index: turnCounter, updates: [] };
+      const turn: ReasoningTurnState = { index: turnCounter, updates: [] };
       if (turnCounter > 1) {
         const summary = formatTotals();
         if (summary !== undefined) turn.summary = summary;
