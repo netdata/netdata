@@ -12,6 +12,8 @@ import type { AgentMetadata, AgentRegistry } from '../agent-registry.js';
 import type { AIAgentCallbacks, LogDetailValue, LogEntry } from '../types.js';
 import type { Headend, HeadendClosedEvent, HeadendContext, HeadendDescription } from './types.js';
 import type { AuthInfo } from '@modelcontextprotocol/sdk/server/auth/types.js';
+import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
+import type { ServerNotification, ServerRequest } from '@modelcontextprotocol/sdk/types.js';
 import type { Socket } from 'node:net';
 
 import { describeFormat } from '../formats.js';
@@ -355,7 +357,7 @@ export class McpHeadend implements Headend {
       server.registerTool(
         normalized,
         toolConfig,
-        async (rawArgs, extra) => {
+        async (rawArgs: unknown, extra: RequestHandlerExtra<ServerRequest, ServerNotification>) => {
           const requestId = randomUUID();
           const parsed = paramsSchema.safeParse(rawArgs);
           if (!parsed.success) {
