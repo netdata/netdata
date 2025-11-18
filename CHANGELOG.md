@@ -203,6 +203,17 @@
 - Fix repository URLs for openSUSE Tumbleweed. ([#21296](https://github.com/netdata/netdata/issues/21296))
 - Sensors (windows.plugin) ([#21266](https://github.com/netdata/netdata/issues/21266))
 - Account deletion update ([#21293](https://github.com/netdata/netdata/issues/21293))
+- Feat(go.d): add generic sql collector ([#21281](https://github.com/netdata/netdata/issues/21281))
+- Regenerate integrations docs ([#21297](https://github.com/netdata/netdata/issues/21297))
+- Docs: remove prometheus SQL Exporter ([#21306](https://github.com/netdata/netdata/issues/21306))
+- Regenerate integrations docs ([#21307](https://github.com/netdata/netdata/issues/21307))
+- Docs: add ScyllaDB prometheus ([#21308](https://github.com/netdata/netdata/issues/21308))
+- Regenerate integrations docs ([#21309](https://github.com/netdata/netdata/issues/21309))
+- Fix csvjsonarray format returning invalid JSON with extra closing bracket when no data present ([#21304](https://github.com/netdata/netdata/issues/21304))
+- Improve(go.d/nvidia_smi): add autodetection_retry option ([#21311](https://github.com/netdata/netdata/issues/21311))
+- Regenerate integrations docs ([#21312](https://github.com/netdata/netdata/issues/21312))
+- Improve(go.d/sql): add per-query execution time charts ([#21313](https://github.com/netdata/netdata/issues/21313))
+- Regenerate integrations docs ([#21314](https://github.com/netdata/netdata/issues/21314))
 
 ## [2.7.0] - 2025-09-25
 
