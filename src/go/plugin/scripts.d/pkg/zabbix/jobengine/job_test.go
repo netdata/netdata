@@ -601,7 +601,10 @@ func buildMultiScenario(idx int, used, free float64, v variant) scenario {
 	name := fmt.Sprintf("multi_%d_%s", idx, variantName(v))
 	cfg := multiPipelineJobConfig(fmt.Sprintf("multi_%d", idx))
 	input := Input{Payload: []byte(fmt.Sprintf(`{"used": %f, "free": %f}`, used, free)), Timestamp: time.Now()}
-	expect := expectation{metrics: 0, active: 1, job: FailureFlags{Dimension: true}, instances: map[string]FailureFlags{"default": {Dimension: true}}}
+	// Validation happens BEFORE multiplier, so all normal inputs pass validation
+	// Multiplier=2 is applied after validation
+	usedAfterMultiplier := used * 2
+	expect := expectation{metrics: 2, values: []float64{usedAfterMultiplier, free}, active: 1, job: FailureFlags{}, instances: map[string]FailureFlags{"default": {}}}
 	switch v {
 	case variantCollectErr:
 		input.CollectError = errors.New("collect")
@@ -618,6 +621,10 @@ func buildMultiScenario(idx int, used, free float64, v variant) scenario {
 		expect.instances = map[string]FailureFlags{"default": {Extraction: true}}
 	case variantDimensionErr:
 		input.Payload = []byte(`{"used": 200, "free": 300}`)
+		expect.metrics = 2
+		expect.values = nil
+		expect.job = FailureFlags{Dimension: true}
+		expect.instances = map[string]FailureFlags{"default": {Dimension: true}}
 	}
 	return scenario{name: name, cfg: cfg, input: input, expect: expect}
 }
@@ -786,7 +793,9 @@ func buildCSVMultiScenario(idx int, first float64, v variant) scenario {
 	cfg := csvMultiJobConfig(fmt.Sprintf("csv_multi_%d", idx))
 	payload := fmt.Sprintf("name,value\nrow1,%f\nrow2,20", first)
 	input := Input{Payload: []byte(payload), Timestamp: time.Now()}
-	expect := expectation{metrics: 2, values: []float64{first, 20}, active: 1, job: FailureFlags{}, instances: map[string]FailureFlags{"default": {}}}
+	// CSVToJSONMulti returns 2 metrics but pipeline expects 1
+	// Job engine drops output and returns 1 metric with value=0 and Dimension error
+	expect := expectation{metrics: 1, values: []float64{0}, active: 1, job: FailureFlags{Dimension: true}, instances: map[string]FailureFlags{"default": {Dimension: true}}}
 	switch v {
 	case variantCollectErr:
 		input.CollectError = errors.New("collect")
@@ -799,6 +808,7 @@ func buildCSVMultiScenario(idx int, first float64, v variant) scenario {
 		input.Payload = []byte("name,value\nrow1,oops\nrow2,20")
 		expect.metrics = 1
 		expect.values = nil
+		// Extraction error takes precedence; multi-metric warning doesn't add Dimension flag
 		expect.job = FailureFlags{Extraction: true}
 		expect.instances = map[string]FailureFlags{"default": {Extraction: true}}
 	case variantDimensionErr:
@@ -940,6 +950,7 @@ func csvLLDJobConfig(name string) pkgzabbix.JobConfig {
 				Name:      "path",
 				Context:   "zabbix.csv.path",
 				Dimension: "value",
+				Unit:      "characters",
 				Steps: []zpre.Step{
 					{Type: zpre.StepTypeCSVToJSON, Params: csvParams},
 					{Type: zpre.StepTypeJavaScript, Params: pathLengthScript},
@@ -979,6 +990,7 @@ return value;`
 				Name:      "path",
 				Context:   "zabbix.xml.path",
 				Dimension: "value",
+				Unit:      "characters",
 				Steps: []zpre.Step{
 					{Type: zpre.StepTypeXMLToJSON},
 					{Type: zpre.StepTypeJavaScript, Params: script},

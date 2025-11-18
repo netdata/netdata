@@ -224,7 +224,7 @@ func (j *Job) runDiscovery(val zpre.Value) ([]map[string]string, error) {
 	if len(res.Metrics) == 0 {
 		return nil, fmt.Errorf("lld returned no metrics")
 	}
-	var entries []map[string]string
+	entries := []map[string]string{}
 	for _, metric := range res.Metrics {
 		payload := strings.TrimSpace(metric.Value)
 		if payload == "" {
