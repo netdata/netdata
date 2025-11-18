@@ -113,18 +113,14 @@ static ULONGLONG netdata_MSSQL_fill_long_value(SQLHSTMT *stmt, const char *mask,
 
 void dict_mssql_fill_instance_transactions(struct mssql_db_instance *mdi)
 {
+    if (unlikely(!mdi || !mdi->parent || !mdi->parent->conn || !mdi->parent->conn->collect_buffer))
+        return;
+
     char object_name[NETDATA_MAX_INSTANCE_OBJECT + 1] = {};
     long value = 0;
     SQLLEN col_object_len = 0, col_value_len = 0;
 
-    SQLCHAR query[sizeof(NETDATA_QUERY_TRANSACTIONS_PER_INSTANCE_MASK) + NETDATA_MAX_INSTANCE_OBJECT + 1];
-    snprintfz(
-        (char *)query,
-        sizeof(NETDATA_QUERY_TRANSACTIONS_PER_INSTANCE_MASK) + NETDATA_MAX_INSTANCE_OBJECT,
-        NETDATA_QUERY_TRANSACTIONS_PER_INSTANCE_MASK,
-        mdi->parent->instanceID);
-
-    SQLRETURN ret = SQLExecDirect(mdi->parent->conn->dbInstanceTransactionSTMT, (SQLCHAR *)query, SQL_NTS);
+    SQLRETURN ret = SQLExecDirect(mdi->parent->conn->dbInstanceTransactionSTMT, (SQLCHAR *)NETDATA_QUERY_BUFFER_STATS, SQL_NTS);
     if (likely(netdata_mssql_check_result(ret))) {
         mdi->collecting_data = false;
         netdata_MSSQL_error(
@@ -235,7 +231,10 @@ void dict_mssql_fill_transactions(struct mssql_db_instance *mdi, const char *dbn
     long value = 0;
     SQLLEN col_object_len = 0, col_value_len = 0;
 
-    if (mdi->collect_instance)
+    if (unlikely(!mdi->parent->conn->collect_transactions))
+        goto endtransactions;
+
+    if (likely(mdi->collect_instance))
         dict_mssql_fill_instance_transactions(mdi);
 
     SQLCHAR query[sizeof(NETDATA_QUERY_TRANSACTIONS_MASK) + 2 * NETDATA_MAX_INSTANCE_OBJECT + 1];
@@ -390,6 +389,9 @@ endlocks:
 
 int dict_mssql_fill_waits(struct mssql_instance *mi)
 {
+    if (unlikely(!mi->conn->collect_waits))
+        return 1;
+
     char wait_type[NETDATA_MAX_INSTANCE_OBJECT + 1] = {};
     char wait_category[NETDATA_MAX_INSTANCE_OBJECT + 1] = {};
     SQLBIGINT total_wait = 0;
@@ -709,20 +711,20 @@ endreplication:
     (void)netdata_select_db(mdi->parent->conn->netdataSQLHDBc, "master");
     netdata_MSSQL_release_results(mdi->parent->conn->dbReplicationPublisher);
 }
-int dict_mssql_databases_run_queries(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
-{
+int dict_mssql_databases_run_queries(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
     struct mssql_db_instance *mdi = value;
-    const char *dbname = dictionary_acquired_item_name((DICTIONARY_ITEM *)item);
+    const char *dbname = dictionary_acquired_item_name((DICTIONARY_ITEM *) item);
 
     if (unlikely(!mdi->collecting_data || !mdi->parent || !mdi->parent->conn)) {
         goto enddrunquery;
     }
 
     // We failed to collect this for the database, so we are not going to try again
-    if (unlikely(mdi->MSSQLDatabaseDataFileSize.current.Data != ULONG_LONG_MAX))
-        mdi->MSSQLDatabaseDataFileSize.current.Data = netdata_MSSQL_fill_long_value(
+    if (unlikely(mdi->MSSQLDatabaseDataFileSize.current.Data != ULONG_LONG_MAX)) {
+        if (likely(mdi->parent->conn->collect_data_size))
+            mdi->MSSQLDatabaseDataFileSize.current.Data = netdata_MSSQL_fill_long_value(
             mdi->parent->conn->dataFileSizeSTMT, NETDATA_QUERY_DATA_FILE_SIZE_MASK, dbname, mdi->parent->instanceID);
-    else {
+    } else {
         mdi->collecting_data = false;
         goto enddrunquery;
     }
@@ -730,7 +732,7 @@ int dict_mssql_databases_run_queries(const DICTIONARY_ITEM *item __maybe_unused,
     dict_mssql_fill_transactions(mdi, dbname);
     dict_mssql_fill_locks(mdi, dbname);
 
-    if (likely(mdi->running_replication))
+    if (likely(mdi->running_replication && mdi->parent->conn->collect_replication))
         dict_mssql_fill_replication(mdi);
 
 enddrunquery:
@@ -1264,6 +1266,20 @@ static void netdata_read_config_options()
         dbconn->instances = additional_instances;
         dbconn->windows_auth = inicfg_get_boolean(&netdata_config, section_name, "windows authentication", false);
         dbconn->is_sqlexpress = inicfg_get_boolean(&netdata_config, section_name, "express", false);
+        dbconn->collect_transactions = inicfg_get_boolean(
+                &netdata_config, section_name, "collect transactions", true);
+        dbconn->collect_waits = inicfg_get_boolean(
+                &netdata_config, section_name, "collect waits", true);
+        dbconn->collect_locks = inicfg_get_boolean(
+                &netdata_config, section_name, "collect lock metrics", true);
+        dbconn->collect_replication = inicfg_get_boolean(
+                &netdata_config, section_name, "collect replication", true);
+        dbconn->collect_jobs = inicfg_get_boolean(
+                &netdata_config, section_name, "collect jobs", true);
+        dbconn->collect_buffer = inicfg_get_boolean(
+                &netdata_config, section_name, "collect buffer stats", true);
+        dbconn->collect_data_size = inicfg_get_boolean(
+                &netdata_config, section_name, "collect database size", true);
         dbconn->is_connected = FALSE;
 
         netdata_mount_mssql_connection_string(dbconn);
@@ -1772,6 +1788,9 @@ int dict_mssql_waits_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void 
 
 static void do_mssql_waits(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *mi, int update_every)
 {
+    if (unlikely(!mi->conn->collect_waits))
+        return;
+
     dictionary_sorted_walkthrough_read(mi->waits, dict_mssql_waits_charts_cb, mi);
 }
 
@@ -2058,6 +2077,9 @@ int dict_mssql_buffman_stats_charts_cb(
 
 static void do_mssql_bufferman_stats_sql(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *mi, int update_every)
 {
+    if (unlikely(!mi->conn->collect_buffer))
+        return;
+
     dictionary_sorted_walkthrough_read(mi->databases, dict_mssql_buffman_stats_charts_cb, mi);
 }
 
@@ -2107,6 +2129,9 @@ int dict_mssql_sysjobs_chart_cb(const DICTIONARY_ITEM *item __maybe_unused, void
 
 static void do_mssql_job_status_sql(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *mi, int update_every)
 {
+    if (unlikely(!mi->conn->collect_jobs))
+        return;
+
     dictionary_sorted_walkthrough_read(mi->sysjobs, dict_mssql_sysjobs_chart_cb, mi);
 }
 
@@ -2420,6 +2445,9 @@ int dict_mssql_replication_chart_cb(const DICTIONARY_ITEM *item __maybe_unused, 
 
 static void do_mssql_replication(struct mssql_instance *mi, int update_every)
 {
+    if (unlikely(!mi->conn->collect_replication))
+        return;
+
     dictionary_sorted_walkthrough_read(mi->publisher_publication, dict_mssql_replication_chart_cb, &update_every);
 }
 
@@ -2896,29 +2924,38 @@ int dict_mssql_databases_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, v
     }
 
     int *update_every = data;
+    struct mssql_instance *mi = mdi->parent;
+    if (unlikely(!mi))
+        goto endchartcb;
 
-    void (*transaction_chart[])(struct mssql_db_instance *, const char *, int) = {
-        mssql_data_file_size_chart,
-        mssql_transactions_chart,
-        mssql_database_backup_restore_chart,
-        mssql_database_log_flushed_chart,
-        mssql_database_log_flushes_chart,
-        mssql_active_transactions_chart,
-        mssql_write_transactions_chart,
-        mssql_lockwait_chart,
-        mssql_deadlock_chart,
-        mssql_is_readonly_chart,
-        mssql_db_state_chart_loop,
-        mssql_lock_timeout_chart,
-        mssql_lock_request_chart,
+    struct netdata_mssql_conn *conn = mi->conn;
+    if (unlikely(!conn))
+        goto endchartcb;
 
-        // Last function pointer must be NULL
-        NULL};
+    if (likely(conn->collect_data_size))
+        mssql_data_file_size_chart(mdi, db, *update_every);
 
-    int i;
-    for (i = 0; transaction_chart[i]; i++) {
-        transaction_chart[i](mdi, db, *update_every);
+    if (likely(conn->collect_transactions)) {
+        mssql_transactions_chart(mdi, db, *update_every);
+        mssql_active_transactions_chart(mdi, db, *update_every);
+        mssql_write_transactions_chart(mdi, db, *update_every);
     }
+
+    if (likely(conn->collect_waits)) {
+        mssql_lockwait_chart(mdi, db, *update_every);
+    }
+
+    if (likely(conn->collect_locks)) {
+        mssql_deadlock_chart(mdi, db, *update_every);
+        mssql_lock_timeout_chart(mdi, db, *update_every);
+        mssql_lock_request_chart(mdi, db, *update_every);
+    }
+
+    mssql_is_readonly_chart(mdi, db, *update_every);
+    mssql_db_state_chart_loop(mdi, db, *update_every);
+    mssql_database_log_flushed_chart(mdi, db, *update_every);
+    mssql_database_log_flushes_chart(mdi, db, *update_every);
+    mssql_database_backup_restore_chart(mdi, db, *update_every);
 
 endchartcb:
     return 1;
