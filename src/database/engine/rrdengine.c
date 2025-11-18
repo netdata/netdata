@@ -1371,8 +1371,11 @@ static void update_metrics_first_time_s(struct rrdengine_instance *ctx, struct r
         added++;
     }
 
-    netdata_log_info("DBENGINE: recalculating tier %d retention for %zu metrics starting with datafile %u",
-         ctx->config.tier, count, first_datafile_remaining->fileno);
+    netdata_log_info(
+        "DBENGINE: recalculating tier %d retention for %zu metrics starting with datafile %u",
+        ctx->config.tier,
+        count,
+        first_datafile_remaining ? first_datafile_remaining->fileno : 0);
 
     journalfile_v2_data_release(journalfile);
 
@@ -1499,7 +1502,7 @@ void datafile_delete(
                      ctx->config.dbfiles_path, datafile->tier, datafile->fileno);
 
     if (update_retention)
-        update_metrics_first_time_s(ctx, datafile, get_next_datafile(datafile, NULL, true), worker);
+        update_metrics_first_time_s(ctx, datafile, get_next_datafile(datafile, NULL, false), worker);
 
 //    if (!ctx_is_available_for_queries(ctx)) {
 //        // agent is shutting down, we cannot continue
