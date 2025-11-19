@@ -218,11 +218,17 @@ export class InternalToolProvider extends ToolProvider {
     lines.push('- **CRITICAL:** The content of your final report MUST be delivered using this tool ONLY, not as part of your regular output.');
 
     lines.push('');
-    lines.push('**MANDATORY TOOLS COMPLIANCE**');
-    lines.push('- You run in agentic mode, interfacing with software tools with specific output requirements.');
-    lines.push('- Always respond with valid tool calls, even for your final answer.');
-    lines.push(`- You must provide your final report to the user using the ${FINAL_REPORT_TOOL} tool, with the correct format.`);
+    lines.push('### MANDATORY RULE FOR TOOLS');
+    lines.push('- You run in agentic mode, interfacing with software tools with specific formatting requirements.');
+    lines.push('- Always respond with valid tool calls, even for your final report.');
+    lines.push(`- You must provide your final report to the user using the ${FINAL_REPORT_TOOL} tool, with the correct format (pay attention to formatting and newlines handling).`);
     lines.push(`- The CONTENT of your final report must be delivered using the ${FINAL_REPORT_TOOL} tool ONLY.`);
+
+    lines.push('');
+    lines.push('### MANDATORY RULE FOR NEWLINES IN JSON STRINGS');
+    lines.push('- To add newlines in JSON string fields, use the `\\n` escape sequence within the string value.');
+    lines.push('- When your final report includes newlines, you MUST use the `\\n` escape sequence within the string value for every newline you want to add, instead of raw newline characters.');
+    lines.push(`- Do not include raw newline characters in JSON string values (json becomes invalid); use '\\n' instead.`);
 
     return lines.join('\n');
   }

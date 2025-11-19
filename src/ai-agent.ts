@@ -134,7 +134,7 @@ export class AIAgentSession {
   private static readonly FINAL_REPORT_SHORT = 'final_report';
   private static readonly MAX_TURNS_FINAL_MESSAGE = 'Maximum number of turns/steps reached. You must provide your final report now, by calling the `agent__final_report` tool. Do not attempt to call any other tool. Read carefully the instructions on how to call the `agent__final_report` tool and call it now.';
   private static readonly CONTEXT_FINAL_MESSAGE = 'The conversation is at the context window limit. You must call `agent__final_report` immediately to deliver your final answer using the information already gathered. Do not call any other tools.';
-  private static readonly TOOL_NO_OUTPUT = '(no output)';
+  private static readonly TOOL_NO_OUTPUT = '(tool failed: context window budget exceeded)';
   private static readonly RETRY_ACTION_SKIP_PROVIDER = 'skip-provider';
   private static readonly DEFAULT_CONTEXT_WINDOW_TOKENS = 131072;
   private static readonly DEFAULT_CONTEXT_BUFFER_TOKENS = 256;
@@ -1692,9 +1692,7 @@ export class AIAgentSession {
               if (override === undefined) return;
               message.content = override;
               this.toolFailureMessages.delete(callId);
-              if (this.trimmedToolCallIds.delete(callId)) {
-                message.content = AIAgentSession.TOOL_NO_OUTPUT;
-              }
+              // trimmedToolCallIds no longer used - context failure messages preserved as-is
             });
 
             if (this.toolFailureFallbacks.length > 0) {
@@ -1710,17 +1708,8 @@ export class AIAgentSession {
               this.toolFailureFallbacks.length = 0;
             }
 
-            sanitizedMessages.forEach((message) => {
-              if (message.role !== 'tool') return;
-              const callId = (message as { toolCallId?: string }).toolCallId;
-              if (callId === undefined) return;
-              if (!this.trimmedToolCallIds.has(callId)) return;
-              if (typeof message.content !== 'string') return;
-              const trimmed = message.content.trim().toLowerCase();
-              if (!trimmed.startsWith('(tool failed: context window budget exceeded')) return;
-              message.content = AIAgentSession.TOOL_NO_OUTPUT;
-              this.trimmedToolCallIds.delete(callId);
-            });
+            // Note: trimmedToolCallIds tracking removed - context failure messages now preserved as-is
+            // to maintain CONTRACT compliance (LLM must see why tool output was dropped)
 
             let reasoningHeaderEmitted = false;
           if (!turnResult.shownThinking) {
@@ -2007,7 +1996,7 @@ export class AIAgentSession {
       }
 
 
-      if (droppedInvalidToolCalls > 0 && !sanitizedHasToolCalls) {
+      if (droppedInvalidToolCalls > 0) {
                 const warnEntry: LogEntry = {
                   timestamp: Date.now(),
                   severity: 'WRN',
@@ -2026,7 +2015,11 @@ export class AIAgentSession {
                   rateLimitedInCycle = 0;
                   maxRateLimitWaitMs = 0;
                 }
-                continue;
+                // Only continue (retry) if there are no valid tool calls
+                // If valid calls exist, proceed with them but still notify about invalid ones
+                if (!sanitizedHasToolCalls) {
+                  continue;
+                }
               }
               // Synthetic error: success with content but no tools and no final_report → retry this turn
               if (this.finalReport === undefined) {
