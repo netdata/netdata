@@ -31,6 +31,8 @@ enum netdata_win_sensor_monitored {
     NETDATA_WIN_SENSOR_LONGITUDE_DEGREES,
     NETDATA_WIN_SENSOR_FORCE_NEWTONS,
     NETDATA_WIN_SENSOR_GAUGE_PRESSURE,
+    NETDATA_WIN_SENSOR_HUMAN_PRESENCE,
+    NETDATA_WIN_SENSOR_HUMAN_PROXIMITY_METERS,
 
     // Add only one vector axis here
     NETDATA_WIN_SENSOR_TYPE_DISTANCE_X,
@@ -92,6 +94,8 @@ REFPROPERTYKEY sensor_keys[] = {
     &SENSOR_DATA_TYPE_LONGITUDE_DEGREES,
     &SENSOR_DATA_TYPE_FORCE_NEWTONS,
     &SENSOR_DATA_TYPE_GAUGE_PRESSURE_PASCAL,
+    &SENSOR_DATA_TYPE_HUMAN_PRESENCE,
+    &SENSOR_DATA_TYPE_HUMAN_PROXIMITY_METERS,
 
     // Add only one vector axis here
     &SENSOR_DATA_TYPE_DISTANCE_X_METERS,
@@ -237,6 +241,20 @@ static struct win_sensor_config {
         .context = "system.hw.sensor.gauge_pressure.input",
         .family = "Pressure",
         .priority = NETDATA_CHART_PRIO_SENSOR_GAUGE_PRESSURE,
+    },
+    {
+        .title = "Human presence",
+        .units = "state",
+        .context = "system.hw.sensor.human_presence.input",
+        .family = "Presence",
+        .priority = NETDATA_CHART_PRIO_SENSOR_HUMAN,
+    },
+    {
+        .title = "Human proximity",
+        .units = "m",
+        .context = "system.hw.sensor.human_proximity.input",
+        .family = "Proximity",
+        .priority = NETDATA_CHART_PRIO_SENSOR_PROXIMITY,
     },
     {
         .title = "Distance",
