@@ -218,6 +218,8 @@
 - MSSQL Options (windows.plugin) ([#21301](https://github.com/netdata/netdata/issues/21301))
 - Proper locking when searching for datafile ([#21302](https://github.com/netdata/netdata/issues/21302))
 - Reset backfill requests on child reconnect ([#21315](https://github.com/netdata/netdata/issues/21315))
+- Add helm repo when adding kuberentes to the nodes ([#21318](https://github.com/netdata/netdata/issues/21318))
+- Regenerate integrations docs ([#21316](https://github.com/netdata/netdata/issues/21316))
 
 ## [2.7.0] - 2025-09-25
 
