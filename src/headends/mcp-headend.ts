@@ -610,6 +610,10 @@ export class McpHeadend implements Headend {
       void this.handleHttpRequest(req, res);
     });
 
+    // Disable request timeout - let MCP client control timeouts
+    // Default is 300000ms (5 minutes) which breaks long-running agent sessions
+    server.requestTimeout = 0;
+
     this.httpServer = server;
     server.on('connection', (socket) => {
       this.httpSockets.add(socket);
@@ -651,6 +655,11 @@ export class McpHeadend implements Headend {
     const server = http.createServer((req, res) => {
       void this.handleSseRequest(req, res);
     });
+
+    // Disable request timeout - let MCP client control timeouts
+    // Default is 300000ms (5 minutes) which breaks long-running agent sessions
+    server.requestTimeout = 0;
+
     this.sseServer = server;
     server.on('connection', (socket) => {
       this.sseSockets.add(socket);
@@ -686,6 +695,14 @@ export class McpHeadend implements Headend {
   private startWsTransport(port: number): void {
     if (this.wsServer !== undefined) return;
     const server = new WebSocketServer({ port });
+
+    // Disable request timeout on internal HTTP server
+    // WebSocketServer creates an internal HTTP server that also has the 300s default
+    const internalServer = (server as unknown as { _server?: http.Server })._server;
+    if (internalServer !== undefined) {
+      internalServer.requestTimeout = 0;
+    }
+
     this.wsServer = server;
     server.on('error', (err) => {
       const message = err instanceof Error ? err.message : String(err);

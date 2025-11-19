@@ -2735,7 +2735,7 @@ export class AIAgentSession {
     try {
       if (!this.systemTurnBegan) { this.opTree.beginTurn(0, { system: true, label: 'init' }); this.systemTurnBegan = true; }
       const finOp = this.opTree.beginOp(0, 'system', { label: 'fin' });
-      this.log({ timestamp: Date.now(), severity: 'VRB', turn: 0, subturn: 0, direction: 'response', type: 'llm', remoteIdentifier: 'agent:fin', fatal: false, message: 'session finalized after uncaught error' }, { opId: finOp });
+      this.log({ timestamp: Date.now(), severity: 'ERR', turn: 0, subturn: 0, direction: 'response', type: 'llm', remoteIdentifier: 'agent:fin', fatal: false, message: 'session finalized after uncaught error' }, { opId: finOp });
       this.opTree.endOp(finOp, 'ok');
       this.opTree.endTurn(0);
       this.opTree.endSession(false, errMsg);

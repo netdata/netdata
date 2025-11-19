@@ -5,6 +5,25 @@
 - Scripted provider lives at `src/llm-providers/test-llm.ts`; deterministic MCP server lives at `src/tests/mcp/test-stdio-server.ts`.
 - Scenario definitions reside in `src/tests/fixtures/test-llm-scenarios.ts` and are executed via `src/tests/phase1-harness.ts`.
 
+### Harness Controls and Observable Contract
+Phase 1 tests only have five levers, and every scenario must be designed by manipulating these inputs and then asserting the resulting user-facing contract:
+
+1. **User prompt** – shape the task, history, and configuration overrides that the CLI would normally pass to the agent.
+2. **Test MCP tool** – return deterministic mocked tool payloads, failures, or timeouts to force tool-selection and tool-execution branches.
+3. **Test LLM provider** – emit scripted assistant/tool-call outputs (including malformed responses) to drive retries, context guards, and fallback logic.
+4. **Final response** – inspect the final report (status, content, format) and any tool outputs emitted back to the caller. This is the primary end-user surface.
+5. **Accounting** – observe the `accounting` array in the result, which records all LLM invocations (provider, model, tokens, status, latency) and tool executions (command, status, latency). This verifies retry counts, fallback behavior, and execution sequence without checking internal logs.
+
+Harness tests **must not** depend on internal log strings (`result.logs`), log identifiers (`remoteIdentifier`), log severities, or other implementation-specific data structures. Instead, craft scenarios that trigger the desired code paths through the five controls above and then assert the externally observable contract via final response and accounting.
+
+### Defining the Contract
+The contract is the union of user-configurable settings and global business rules. Every harness scenario should pose the question “Is the configuration respected under all conditions?” Examples include:
+
+- `maxToolTurns`, `maxToolCallsPerTurn`, `maxRetries`, `toolResponseMaxBytes`, `contextWindow` per model, fallback model lists, reasoning toggles, timeouts, temperature/`top_p`, `maxOutputTokens`, repeat-penalty overrides, etc. Tests should confirm these knobs behave exactly as configured even when tools or LLM responses fail.
+- Business rules such as “always return output (success report or synthetic failure)”, “CLI exits with code 0 on success, non-zero on failure”, “tool responses that overflow the context window are dropped and replaced with failure notices”, “dropped tool outputs always feed an explicit error message back to the LLM”, “if the LLM responds with empty content we inject an ephemeral corrective user turn”, and similar guardrails documented in specs.
+
+Harness scenarios MUST combine configuration + scripted LLM/MCP behavior to hit each branch, then verify—via the final response and accounting—that the contract stayed intact. When a potential violation cannot be proven via the final response alone, accounting should expose the relevant signal (e.g., retry counts, provider switches, tool execution status). Logs should only be inspected manually while debugging and must not be part of automated assertions.
+
 ## Running The Suite
 - Build + lint remain required before invoking tests (`npm run build`, `npm run lint`).
 - Execute all deterministic scenarios with `npm run test:phase1` (the script rebuilds automatically).
