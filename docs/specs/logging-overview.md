@@ -201,9 +201,14 @@ All logs enriched with:
 - `agent:error` - Uncaught exception
 
 ### Turn Events
-- `agent:final-turn` - Final turn detected
+- `agent:turn-start` - A new LLM turn begins (VRB)
+- `agent:final-turn` - Final turn detected (WRN)
 - `agent:context` - Context guard events
 - `{provider}:{model}` - LLM request/response
+- `agent:text-extraction` - Parsed a final report candidate from assistant text/tool output (still pending)
+- `agent:fallback-report` - Pending fallback accepted because retries exhausted on the final turn
+- `agent:final-report-accepted` - Final report committed; `details.source` ∈ {`tool-call`,`text-fallback`,`tool-message`,`synthetic`}
+- `agent:failure-report` - Synthetic failure report generated when no valid final report was produced
 
 ### Tool Events
 - `{namespace}:{tool}` - Tool execution

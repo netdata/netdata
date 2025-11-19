@@ -184,6 +184,33 @@ const fallbackWait = Math.min(Math.max(attempts * 1_000, RATE_LIMIT_MIN_WAIT_MS)
 3. Log warning about final turn
 4. Retry if model doesn't call final_report
 
+### Final Report Attempt Tracking & Turn Collapse
+**Location**: `src/ai-agent.ts:1671-1678` (flag setting), `src/ai-agent.ts:2213-2240` (collapse logic), `src/ai-agent.ts:3707` (sanitizer increment), `src/ai-agent.ts:3884` (executor increment)
+
+- `finalReportAttempts` increments twice: when the sanitizer drops malformed `agent__final_report` calls and when the tool executor receives a legitimate call. Either event sets `finalReportAttempted = true` for the turn.
+- If `incompleteFinalReportDetected === true` **or** the attempt flag is set, `maxTurns` collapses to `currentTurn + 1`. The orchestrator logs `agent:orchestrator` with the old/new limits so operators can trace why the session ended early.
+- Every collapse emits `recordRetryCollapseMetrics({ reason, turn, previousMaxTurns, newMaxTurns })`, which backs the `ai_agent_retry_collapse_total` metric.
+
+### Pending Final Report Cache
+**Location**: `src/ai-agent.ts:1862-1990` (extraction/storage), `src/ai-agent.ts:2592-2599` (acceptance check), `src/ai-agent.ts:3421-3439` (commit/accept methods), `src/ai-agent.ts:3355-3370` (fallback logging)
+
+- Text extraction and tool-message adoption no longer fabricate tool calls. Instead, valid payloads populate `pendingFinalReport = { source, payload }` and the retry loop proceeds as if no tool call existed.
+- Cached payloads are only accepted via `acceptPendingFinalReport()` after the session enters the forced final turn (context guard or `currentTurn === maxTurns`). This guarantees retries always happen before fallbacks.
+- Accepting a cache logs `agent:fallback-report` (including the source) and preserves `finalReportSource` so final telemetry/logs distinguish fallback exits from tool-call exits.
+
+### Synthetic Failure Contract
+**Location**: `src/ai-agent.ts:2593-2645`
+
+- When max turns or context guard exhausts the run without a pending cache, the session synthesizes a `status: 'failure'` final report, logs `agent:failure-report`, and commits it with metadata `{ reason, turns_completed, final_report_attempts, last_stop_reason }`.
+- FIN + `agent:final-report-accepted` (with `source='synthetic'`) ensure headends render an explicit explanation instead of `(no output)`.
+- `recordFinalReportMetrics` captures the synthetic reason so dashboards can alert whenever these spike.
+
+### Telemetry Signals (Retry/Finalization)
+- `ai_agent_final_report_total{source, status, forced_final_reason}` increments for every accepted final report. Alert when `source != 'tool-call'` or `status != 'success'` diverges from historical norms.
+- `ai_agent_final_report_attempts_total` accumulates the session’s attempt count, helping spot regressions where the LLM repeatedly emits malformed payloads.
+- `ai_agent_final_report_turns` histogram records the turn index that produced the final report, enabling SLA checks for prompt changes.
+- `ai_agent_retry_collapse_total{reason}` counts how often the orchestrator shortens `maxTurns` so we can correlate collapses with prompt/policy updates.
+
 ## Conversation Mutation During Retry
 
 ### System Messages Injection

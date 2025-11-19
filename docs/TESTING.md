@@ -9,9 +9,15 @@
 - Build + lint remain required before invoking tests (`npm run build`, `npm run lint`).
 - Execute all deterministic scenarios with `npm run test:phase1` (the script rebuilds automatically).
 - `npm test` now runs the exact same Phase 1 harness via Vitest (`src/tests/phase1/phase1-suite.spec.ts`). Vitest simply launches `node dist/tests/phase1-harness.js` and streams its output, so CLI and Vitest results stay identical.
+- **Always run the full suite**: Local filters (`PHASE1_ONLY_SCENARIO=...`) are for debugging only. Before merging any change that touches retry/final-report logic you must run `npm run test:phase1` without filters so the new `run-test-final-report-retry-text` / `run-test-synthetic-failure-contract` scenarios always execute alongside the legacy set.
 - Expect three informational warnings when scenario `run-test-20` simulates persistence write failures; no manual cleanup is needed.
 - Scenario coverage currently spans fallback routing, MCP timeouts, retry exhaustion, persistence artifacts, pricing/sub-agent flows, and rate-limit backoff.
 - Local filtering: set `PHASE1_ONLY_SCENARIO=run-test-1,run-test-2` to run a subset while debugging. The harness automatically ignores this variable when `CI` is set (`CI=1|true|yes`), ensuring automation always runs the full suite even if the environment leaks the filter.
+
+### Retry / Finalization Scenarios
+- `run-test-final-report-retry-text` validates that invalid final-report tool calls trigger retries, text extraction stays pending until the final turn, and the eventual acceptance log cites `source='tool-call'`. Assertions inspect both logs and `finalReport.content`.
+- `run-test-synthetic-failure-contract` forces max turns without any tool calls so we can assert the synthetic failure contract (`status: failure`, metadata reason `max_turns_exhausted`, `agent:failure-report`, telemetry source `synthetic`).
+- Future tests added under `TODO-retry-testing-plan.md` must assert `result.finalReport !== undefined`, the correct `finalReportSource`, and the telemetry/log identifiers introduced in Nov 2025. Use the same pattern as the scenarios above when building new fixtures.
 
 ### Restart Fixture Controls
 The deterministic stdio MCP server exposes several environment knobs so restart scenarios stay reproducible:

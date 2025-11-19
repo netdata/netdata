@@ -64,7 +64,7 @@ import { buildPromptVars, applyFormat, expandVars } from './prompt-builder.js';
 import { SessionProgressReporter } from './session-progress-reporter.js';
 import { SessionTreeBuilder } from './session-tree.js';
 import { SubAgentRegistry } from './subagent-registry.js';
-import { recordContextGuardMetrics, recordLlmMetrics, runWithSpan, addSpanAttributes, addSpanEvent } from './telemetry/index.js';
+import { recordContextGuardMetrics, recordFinalReportMetrics, recordLlmMetrics, recordRetryCollapseMetrics, runWithSpan, addSpanAttributes, addSpanEvent } from './telemetry/index.js';
 import { estimateMessagesTokens, resolveTokenizer } from './tokenizer-registry.js';
 import { AgentProvider } from './tools/agent-provider.js';
 import { InternalToolProvider } from './tools/internal-provider.js';
@@ -1505,8 +1505,14 @@ export class AIAgentSession {
         let cycleIndex = 0;
         let cycleComplete = false;
 
-        const forcedFinalTurn = this.forcedFinalTurnReason !== undefined;
-        const isFinalTurn = forcedFinalTurn || currentTurn === maxTurns;
+        let forcedFinalTurn = this.forcedFinalTurnReason !== undefined;
+        let isFinalTurn = forcedFinalTurn || currentTurn === maxTurns;
+        const syncFinalTurnFlags = (): void => {
+          if (!forcedFinalTurn && this.forcedFinalTurnReason !== undefined) {
+            forcedFinalTurn = true;
+            isFinalTurn = true;
+          }
+        };
         const toolSelection = this.selectToolsForTurn(provider, isFinalTurn);
         this.pendingToolSelection = toolSelection;
         this.schemaCtxTokens = this.estimateToolSchemaTokens(toolSelection.toolsForTurn);
@@ -1515,6 +1521,7 @@ export class AIAgentSession {
         if (providerContextStatus === 'final') {
           const evaluation = this.evaluateContextGuard(this.schemaCtxTokens);
           this.enforceContextFinalTurn(evaluation.blocked, 'turn_preflight');
+          syncFinalTurnFlags();
           this.schemaCtxTokens = this.computeForcedFinalSchemaTokens(provider);
           const postEnforce = this.evaluateContextGuard(this.schemaCtxTokens);
           if (postEnforce.blocked.length > 0) {
@@ -1628,6 +1635,7 @@ export class AIAgentSession {
             const guardEvaluation = this.evaluateContextGuard(this.schemaCtxTokens);
             if (guardEvaluation.blocked.length > 0) {
               this.enforceContextFinalTurn(guardEvaluation.blocked, 'turn_preflight');
+              syncFinalTurnFlags();
               this.schemaCtxTokens = this.computeForcedFinalSchemaTokens(provider);
               const postEnforceGuard = this.evaluateContextGuard(this.schemaCtxTokens);
               if (postEnforceGuard.blocked.length > 0) {
@@ -2212,6 +2220,8 @@ export class AIAgentSession {
               if ((retryFlags.incompleteFinalReportDetected === true || finalReportAttemptFlag) && currentTurn < maxTurns) {
                 const previousMaxTurns = maxTurns;
                 maxTurns = currentTurn + 1;
+                const collapseReason: 'final_report_attempt' | 'incomplete_final_report' =
+                  retryFlags.incompleteFinalReportDetected === true ? 'incomplete_final_report' : 'final_report_attempt';
                 const adjustLog: LogEntry = {
                   timestamp: Date.now(),
                   severity: 'WRN',
@@ -2224,6 +2234,16 @@ export class AIAgentSession {
                   message: `Final report retry detected at turn ${String(currentTurn)}; Collapsing remaining turns from ${String(previousMaxTurns)} to ${String(maxTurns)}`
                 };
                 this.log(adjustLog);
+                recordRetryCollapseMetrics({
+                  agentId: this.sessionConfig.agentId,
+                  callPath: this.callPath,
+                  headendId: this.headendId,
+                  reason: collapseReason,
+                  turn: currentTurn,
+                  previousMaxTurns,
+                  newMaxTurns: maxTurns,
+                  customLabels: this.telemetryLabels,
+                });
               }
 
               if (finalReportReady) {
@@ -2349,7 +2369,7 @@ export class AIAgentSession {
             }
           } else {
             // Handle various error types
-            lastError = 'message' in turnResult.status ? turnResult.status.message : turnResult.status.type;
+                  lastError = 'message' in turnResult.status ? turnResult.status.message : turnResult.status.type;
 
             const remoteId = this.composeRemoteIdentifier(provider, model, turnResult.providerMetadata);
             const retryDirective = turnResult.retry ?? this.buildFallbackRetryDirective({
@@ -3494,6 +3514,20 @@ export class AIAgentSession {
       ? `Final report received after context guard triggered (${AIAgentSession.FINAL_REPORT_TOOL}), session complete`
       : `Final report received (${AIAgentSession.FINAL_REPORT_TOOL}), session complete`;
     this.logExit(exitCode, exitMessage, currentTurn, { fatal: false });
+    const metadataRecord = fr.metadata;
+    const metadataReason = typeof metadataRecord?.reason === 'string' ? metadataRecord.reason : undefined;
+    recordFinalReportMetrics({
+      agentId: this.sessionConfig.agentId,
+      callPath: this.callPath,
+      headendId: this.headendId,
+      source,
+      status: fr.status,
+      turnsCompleted: currentTurn,
+      finalReportAttempts: this.finalReportAttempts,
+      forcedFinalReason: this.forcedFinalTurnReason,
+      syntheticReason: source === 'synthetic' ? metadataReason : undefined,
+      customLabels: this.telemetryLabels,
+    });
     this.emitFinalSummary(logs, accounting);
     return {
       success: true,

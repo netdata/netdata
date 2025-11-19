@@ -112,12 +112,38 @@ export interface ContextGuardMetricsRecord {
   customLabels?: Record<string, string>;
 }
 
+export interface FinalReportMetricsRecord {
+  agentId?: string;
+  callPath?: string;
+  headendId?: string;
+  source: 'tool-call' | 'text-fallback' | 'tool-message' | 'synthetic';
+  status: 'success' | 'failure' | 'partial';
+  turnsCompleted: number;
+  finalReportAttempts: number;
+  forcedFinalReason?: 'context' | 'max_turns';
+  syntheticReason?: string;
+  customLabels?: Record<string, string>;
+}
+
+export interface RetryCollapseMetricsRecord {
+  agentId?: string;
+  callPath?: string;
+  headendId?: string;
+  reason: 'final_report_attempt' | 'incomplete_final_report';
+  turn: number;
+  previousMaxTurns: number;
+  newMaxTurns: number;
+  customLabels?: Record<string, string>;
+}
+
 interface TelemetryRecorder {
   recordLlmMetrics: (record: LlmMetricsRecord) => void;
   recordToolMetrics: (record: ToolMetricsRecord) => void;
   recordContextGuardMetrics: (record: ContextGuardMetricsRecord) => void;
   recordQueueDepth: (record: QueueDepthRecord) => void;
   recordQueueWait: (record: QueueWaitRecord) => void;
+  recordFinalReportMetrics: (record: FinalReportMetricsRecord) => void;
+  recordRetryCollapseMetrics: (record: RetryCollapseMetricsRecord) => void;
   shutdown: () => Promise<void>;
 }
 
@@ -131,6 +157,10 @@ class NoopRecorder implements TelemetryRecorder {
   recordQueueDepth = (_record: QueueDepthRecord): void => { /* noop */ };
 
   recordQueueWait = (_record: QueueWaitRecord): void => { /* noop */ };
+
+  recordFinalReportMetrics = (_record: FinalReportMetricsRecord): void => { /* noop */ };
+
+  recordRetryCollapseMetrics = (_record: RetryCollapseMetricsRecord): void => { /* noop */ };
 
   shutdown = async (): Promise<void> => {
     // noop
@@ -282,6 +312,14 @@ export function recordQueueWaitMetrics(record: QueueWaitRecord): void {
 
 export function recordContextGuardMetrics(record: ContextGuardMetricsRecord): void {
   recorder.recordContextGuardMetrics(record);
+}
+
+export function recordFinalReportMetrics(record: FinalReportMetricsRecord): void {
+  recorder.recordFinalReportMetrics(record);
+}
+
+export function recordRetryCollapseMetrics(record: RetryCollapseMetricsRecord): void {
+  recorder.recordRetryCollapseMetrics(record);
 }
 
 export function emitTelemetryLog(event: StructuredLogEvent): void {
@@ -578,6 +616,14 @@ class OtelMetricsRecorder implements TelemetryRecorder {
     remainingGauge: ObservableGaugeInstrument;
   };
   private readonly contextGuardGaugeValues = new Map<string, { labels: Attributes; value: number }>();
+  private readonly finalReport: {
+    outcomes: CounterInstrument;
+    attempts: CounterInstrument;
+    turns: HistogramInstrument;
+  };
+  private readonly retry: {
+    collapse: CounterInstrument;
+  };
   private readonly queue: {
     depthGauge: ObservableGaugeInstrument;
     inUseGauge: ObservableGaugeInstrument;
@@ -637,6 +683,24 @@ class OtelMetricsRecorder implements TelemetryRecorder {
         observable.observe(entry.value, entry.labels);
       });
     });
+
+    this.finalReport = {
+      outcomes: this.meter.createCounter('ai_agent_final_report_total', {
+        description: 'Final reports emitted grouped by source/status',
+      }),
+      attempts: this.meter.createCounter('ai_agent_final_report_attempts_total', {
+        description: 'Final-report attempts observed before acceptance',
+      }),
+      turns: this.meter.createHistogram('ai_agent_final_report_turns', {
+        description: 'Turn index when the final report was accepted',
+      }),
+    };
+
+    this.retry = {
+      collapse: this.meter.createCounter('ai_agent_retry_collapse_total', {
+        description: 'Times remaining turns collapsed after a final-report attempt',
+      }),
+    };
 
     this.queue = {
       depthGauge: this.meter.createObservableGauge('ai_agent_queue_depth', {
@@ -765,6 +829,40 @@ class OtelMetricsRecorder implements TelemetryRecorder {
     this.queue.waitHistogram.record(latency, labels);
     const attrLabels: Attributes = labels;
     this.queueWaitGaugeValues.set(record.queue, { labels: attrLabels, value: latency });
+  }
+
+  recordFinalReportMetrics(record: FinalReportMetricsRecord): void {
+    const baseLabels: Record<string, string> = {
+      agent: record.agentId ?? 'unknown',
+      call_path: record.callPath ?? 'unknown',
+      headend: record.headendId ?? 'cli',
+      source: record.source,
+      status: record.status,
+      forced_final_reason: record.forcedFinalReason ?? 'none',
+    };
+    if (record.syntheticReason !== undefined && record.syntheticReason.length > 0) {
+      baseLabels.synthetic_reason = record.syntheticReason;
+    }
+    const labels = buildLabelSet(baseLabels, this.labels, record.customLabels);
+    this.finalReport.outcomes.add(1, labels);
+    const attempts = Number.isFinite(record.finalReportAttempts) ? Math.max(0, record.finalReportAttempts) : 0;
+    if (attempts > 0) {
+      this.finalReport.attempts.add(attempts, labels);
+    }
+    const turns = Number.isFinite(record.turnsCompleted) ? Math.max(0, record.turnsCompleted) : 0;
+    if (turns > 0) {
+      this.finalReport.turns.record(turns, labels);
+    }
+  }
+
+  recordRetryCollapseMetrics(record: RetryCollapseMetricsRecord): void {
+    const labels = buildLabelSet({
+      agent: record.agentId ?? 'unknown',
+      call_path: record.callPath ?? 'unknown',
+      headend: record.headendId ?? 'cli',
+      reason: record.reason,
+    }, this.labels, record.customLabels);
+    this.retry.collapse.add(1, labels);
   }
 
   async shutdown(): Promise<void> {

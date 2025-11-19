@@ -260,8 +260,13 @@ The flow is **procedural**, not state-machine driven. Error handling is inline v
 - `agent:tools` - Tool banner
 - `agent:pricing` - Missing pricing warning
 - `agent:start` - User prompt (verbose)
-- `agent:final-turn` - Final turn detected
+- `agent:turn-start` - Each LLM turn begins (VRB)
+- `agent:final-turn` - Final turn detected (WRN)
 - `agent:context` - Context guard events
+- `agent:text-extraction` - Final report payload parsed from assistant text/tool message (still pending)
+- `agent:fallback-report` - Cached pending payload accepted on the forced final turn
+- `agent:final-report-accepted` - Final report committed; `details.source` disambiguates tool-call vs fallback vs synthetic
+- `agent:failure-report` - Synthetic failure final report synthesized (ERR)
 - `agent:fin` - Session finalized
 - `agent:error` - Uncaught exception
 - Exit codes: `agent:EXIT-*`
@@ -275,8 +280,8 @@ The flow is **procedural**, not state-machine driven. Error handling is inline v
 
 ## Business Logic Coverage (Verified 2025-11-16)
 
-- **Synthetic final report adoption**: `tryAdoptFinalReportFromText` builds a fake `agent__final_report` call when the assistant returns valid JSON in plain text, keeping exit semantics identical to tool-driven flows (`src/ai-agent.ts:3340-3400`).
-- **Context-forced fallback report**: When the context guard blocks further turns, the session synthesizes a `failure` final report, logs `EXIT-TOKEN-LIMIT`, and surfaces the fallback reason in the FIN summary (`src/ai-agent.ts:2618-2638`).
+- **Pending final report cache & fallback acceptance**: `tryAdoptFinalReportFromText` now returns a payload that is stored in `pendingFinalReport` (instead of fabricating a tool call). The orchestrator keeps retrying until the forced final turn, then optionally accepts the cached payload (logging `agent:fallback-report` and preserving `finalReportSource`). (`src/ai-agent.ts:1862-1960`, `src/ai-agent.ts:3337-3410`).
+- **Context-forced fallback report**: When the context guard blocks further turns, the session synthesizes a `failure` final report, logs `agent:failure-report` + `EXIT-TOKEN-LIMIT`, and surfaces the reason in the FIN summary and telemetry (`src/ai-agent.ts:2593-2625`).
 - **Incomplete final report detection**: If the assistant calls the final-report tool without required fields, the session shortens `maxTurns`, injects instructions, and retries within the same provider cycle (`src/ai-agent.ts:2252-2275`).
 - **Tool failure overrides**: `toolFailureMessages` / `toolFailureFallbacks` let MCP/REST providers replace low-level errors with curated text so final answers consistently describe which tool failed (`src/ai-agent.ts:1671-1895`, `src/ai-agent.ts:3707-3952`).
 - **sleepWithAbort + retry directives**: Backoff waits respect aborts, and `buildFallbackRetryDirective` crafts deterministic retry metadata when providers omit guidance (covers rate_limit, auth, quota, timeout, and network errors) (`src/ai-agent.ts:2470-2545`, `src/ai-agent.ts:3298-3338`).

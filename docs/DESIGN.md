@@ -292,9 +292,13 @@ for turn in 0..maxTurns:
 ## Error Handling
 
 ### Final Turn Behavior
-- Tools disabled on final turn (turn >= maxTurns - 1)
-- Special "no more tools" message appended
-- If no assistant response: return error (not success)
+- Tools disabled on final turn (turn >= maxTurns - 1) and `logEnteringFinalTurn` emits `agent:final-turn` (WRN) so telemetry/alerts can key off the last-turn window.
+- Special "no more tools" message is appended and deduped through `pushSystemRetryMessage`.
+- `pendingFinalReport` caches any report parsed from assistant text or tool output but defers acceptance until retries are exhausted **and** we are inside the forced final turn. Earlier turns keep retrying instead of short‑circuiting.
+- `finalReportAttempts` increments in both the sanitizer (invalid payload dropped) and tool executor (valid call). When either `incompleteFinalReportDetected` or `finalReportAttempts > 0` fires, `maxTurns` collapses to `currentTurn + 1` and we log `agent:orchestrator` plus fire a telemetry counter (see below).
+- Fallback acceptance is logged explicitly via `agent:fallback-report` (WRN) indicating whether the cache originated from text extraction or tool-message adoption.
+- `logFinalReportAccepted` records the source (`tool-call`, `text-fallback`, `tool-message`, or `synthetic`) so downstream systems can alert on anything other than the happy path.
+- If no assistant response arrives even after enforcing the final turn, `logFailureReport` synthesizes a structured `status: failure` report, marks `finalReportSource = 'synthetic'`, and ensures `(no output)` never escapes to headends.
 
 ### Retry Exhaustion
 - After max retries: return session with error
@@ -395,6 +399,11 @@ The agent MUST properly display both content output and thinking/reasoning strea
 3. **Exit location** should be traceable from the code (file:line)
 4. **Fatal flag** MUST reflect whether the session actually failed (`true` for failures, `false` for clean exits)
 5. **Session state** should be preserved up to the exit point
+
+### Final Report Telemetry & Observability
+- `recordFinalReportMetrics` (src/telemetry/index.ts) emits `ai_agent_final_report_total`, `ai_agent_final_report_attempts_total`, and `ai_agent_final_report_turns` with labels `source`, `status`, `forced_final_reason`, `headend`, and `synthetic_reason`. Dashboards must alarm whenever `source != 'tool-call'` exceeds historical baselines.
+- `recordRetryCollapseMetrics` feeds `ai_agent_retry_collapse_total` (`reason = 'final_report_attempt' | 'incomplete_final_report'`) whenever `maxTurns` collapses early. This was added so we can observe LLM compliance regressions before they impact `(no output)` rates.
+- `agent:turn-start`, `agent:text-extraction`, `agent:fallback-report`, `agent:final-report-accepted`, and `agent:failure-report` logs are part of the lifecycle contract and must remain documented; follow-on tooling consumes them to annotate live headends and page SREs when synthetic failures spike.
 
 ## Implementation Notes
 
