@@ -324,6 +324,13 @@ These options allow the collector to connect to your MSSQL instance and collect 
 | additional instances | Number of additional SQL Server instances to monitor. | 0 | no |
 | windows authentication | Set to yes to use Windows credentials instead of SQL Server authentication. | no | no |
 | express | Set to yes when running SQL Express version. | no | no |
+| collect transactions | Run queries to collect information from the server's transactions. | yes | no |
+| collect waits | Run queries to collect information from the server's lock waits. | yes | no |
+| collect lock metrics | Run queries to collect information from the server's overall locks. | yes | no |
+| collect replication | Run queries to collect information from the server's replication. | yes | no |
+| collect jobs | Run queries to collect information from the server's jobs. | yes | no |
+| collect buffer stats | Run queries to collect information from the server's buffer statistics. | yes | no |
+| collect database size | Run queries to collect information from the server's database size. | yes | no |
 
 
 
