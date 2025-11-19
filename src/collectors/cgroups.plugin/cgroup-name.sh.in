@@ -683,7 +683,7 @@ if [ -z "${NAME}" ]; then
     docker_validate_id "${DOCKERID}"
   elif [[ ${CGROUP} =~ ^.*libpod-[a-fA-F0-9]+.*$ ]]; then
     # Podman
-    PODMANID="$(echo "${CGROUP}" | sed "s|^.*libpod-\([a-fA-F0-9]\+\).*$|\1|")"
+    PODMANID="$(echo "${CGROUP}" | sed "s|^.*libpod-\(conmon-\)\?\([a-fA-F0-9]\+\).*$|\2|")"
     podman_validate_id "${PODMANID}"
 
   elif [[ ${CGROUP} =~ machine.slice[_/].*\.service ]]; then
