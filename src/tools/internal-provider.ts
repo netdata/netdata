@@ -165,13 +165,25 @@ export class InternalToolProvider extends ToolProvider {
   private buildInstructions(): string {
     const lines: string[] = ['### Internal Tools', ''];
 
+    lines.push('You have access to the following internal tools to assist you in completing your task effectively.');
+    lines.push('These tools expect valid JSON input according to their defined schemas.');
+    lines.push('In many cases you may have to include multi-line strings in JSON fields; remember to use the `\\n` escape sequence for newlines within JSON string values.');
+
     if (!this.disableProgressTool) {
-      lines.push(`#### ${PROGRESS_TOOL} — Progress Updates for the user`);
+      lines.push(`#### ${PROGRESS_TOOL} — Progress Updates for the User`);
       lines.push('- Use this tool to update the user on your progress.');
-      lines.push('- Keep the `progress` message concise (≤20 words).');
-      lines.push('- Always pair this tool with other tools you are invoking (except `agent__final_report`).');
+      lines.push('- Keep the progress message concise (≤20 words).');
+      lines.push(`- Always pair this tool with other tools you are invoking (except ${FINAL_REPORT_TOOL}).`);
       lines.push('- Do not call this tool by itself.');
-      lines.push('- Do not pair this tool with `agent__final_report`');
+      lines.push(`- Do not pair this tool with ${FINAL_REPORT_TOOL}`);
+      lines.push('- Do not add any formatting or newlines to the progress message.');
+      lines.push('');
+      lines.push('Good examples:');
+      lines.push('- Found the data about X, now searching for Y.');
+      lines.push('- Discovered how X works, checking if it can also do Y.');
+      lines.push('- Looks like X is not available, trying Y instead.');
+      lines.push('');
+      lines.push('Good progress messages are short, clear, without formatting, and provide information about current status and next steps.');
     }
 
     if (this.opts.enableBatch) {
@@ -216,6 +228,11 @@ export class InternalToolProvider extends ToolProvider {
     }
     lines.push('- Include optional `metadata` only when explicitly relevant.');
     lines.push('- **CRITICAL:** The content of your final report MUST be delivered using this tool ONLY, not as part of your regular output.');
+
+    if (!this.disableProgressTool) {
+      lines.push(`### MANDATORY RULE FOR ${PROGRESS_TOOL}`);
+      lines.push(`- Always pair ${PROGRESS_TOOL} with other tools you are invoking (except ${FINAL_REPORT_TOOL}).`);
+    }
 
     lines.push('');
     lines.push('### MANDATORY RULE FOR TOOLS');
