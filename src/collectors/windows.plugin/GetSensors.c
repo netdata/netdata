@@ -401,7 +401,7 @@ static int netdata_collect_sensor_data(collected_number *value, ISensor *pSensor
     if (SUCCEEDED(hr) && pReport) {
         PropVariantInit(&pv);
         hr = pReport->lpVtbl->GetSensorValue(pReport, key, &pv);
-        if (SUCCEEDED(hr) && (pv.vt == VT_R4 || pv.vt == VT_R8 || pv.vt == VT_UI4)) {
+        if (SUCCEEDED(hr) && (pv.vt == VT_R4 || pv.vt == VT_R8 || pv.vt == VT_UI4 || pv.vt == VT_BOOL)) {
             switch (pv.vt) {
                 case VT_UI4:
                     *value = (collected_number)(pv.ulVal * 100);
@@ -411,6 +411,9 @@ static int netdata_collect_sensor_data(collected_number *value, ISensor *pSensor
                     break;
                 case VT_R8:
                     *value = (collected_number)(pv.dblVal * div_factor);
+                    break;
+                case VT_BOOL:
+                    *value = (pv.boolVal == VARIANT_TRUE) ? 100 : 0;
                     break;
             }
             defined = 1;
