@@ -79,6 +79,38 @@ void do_mssql_auto_parameterization_attempts(struct mssql_instance *mi, int upda
     rrdset_done(mi->st_stats_auto_param);
 }
 
+void do_mssql_batch_requests(struct mssql_instance *mi, int update_every)
+{
+    if (unlikely(!mi->st_stats_batch_request)) {
+        snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_sqlstats_batch_requests", mi->instanceID);
+        netdata_fix_chart_name(id);
+        mi->st_stats_batch_request = rrdset_create_localhost(
+                "mssql",
+                id,
+                NULL,
+                "sql activity",
+                "mssql.instance_sqlstats_batch_requests",
+                "Total of batches requests",
+                "requests/s",
+                PLUGIN_WINDOWS_NAME,
+                "PerflibMSSQL",
+                PRIO_MSSQL_STATS_BATCH_REQUEST,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+        mi->rd_stats_batch_request =
+                rrddim_add(mi->st_stats_batch_request, "batch", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+        rrdlabels_add(mi->st_stats_batch_request->rrdlabels, "mssql_instance", mi->instanceID, RRDLABEL_SRC_AUTO);
+    }
+
+    rrddim_set_by_pointer(
+            mi->st_stats_batch_request,
+            mi->rd_stats_batch_request,
+            (collected_number)mi->MSSQLStatsBatchRequests.current.Data);
+    rrdset_done(mi->st_stats_batch_request);
+}
+
 void do_mssql_statistics_perflib(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *mi, int update_every)
 {
     char id[RRD_ID_LENGTH_MAX + 1];
@@ -92,34 +124,7 @@ void do_mssql_statistics_perflib(PERF_DATA_BLOCK *pDataBlock, struct mssql_insta
     }
 
     if (likely(perflibGetObjectCounter(pDataBlock, pObjectType, &mi->MSSQLStatsBatchRequests))) {
-        if (unlikely(!mi->st_stats_batch_request)) {
-            snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_sqlstats_batch_requests", mi->instanceID);
-            netdata_fix_chart_name(id);
-            mi->st_stats_batch_request = rrdset_create_localhost(
-                    "mssql",
-                    id,
-                    NULL,
-                    "sql activity",
-                    "mssql.instance_sqlstats_batch_requests",
-                    "Total of batches requests",
-                    "requests/s",
-                    PLUGIN_WINDOWS_NAME,
-                    "PerflibMSSQL",
-                    PRIO_MSSQL_STATS_BATCH_REQUEST,
-                    update_every,
-                    RRDSET_TYPE_LINE);
-
-            mi->rd_stats_batch_request =
-                    rrddim_add(mi->st_stats_batch_request, "batch", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-
-            rrdlabels_add(mi->st_stats_batch_request->rrdlabels, "mssql_instance", mi->instanceID, RRDLABEL_SRC_AUTO);
-        }
-
-        rrddim_set_by_pointer(
-                mi->st_stats_batch_request,
-                mi->rd_stats_batch_request,
-                (collected_number)mi->MSSQLStatsBatchRequests.current.Data);
-        rrdset_done(mi->st_stats_batch_request);
+        do_mssql_batch_requests(mi, update_every);
     }
 
     if (likely(perflibGetObjectCounter(pDataBlock, pObjectType, &mi->MSSQLStatSafeAutoParameterization))) {
