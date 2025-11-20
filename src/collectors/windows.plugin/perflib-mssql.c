@@ -111,6 +111,38 @@ void do_mssql_batch_requests(struct mssql_instance *mi, int update_every)
     rrdset_done(mi->st_stats_batch_request);
 }
 
+void do_mssql_auto_parameterization_attempts(struct mssql_instance *mi, int update_every)
+{
+    if (unlikely(!mi->st_stats_safe_auto)) {
+        snprintfz(
+                id, RRD_ID_LENGTH_MAX, "instance_%s_sqlstats_safe_auto_parameterization_attempts", mi->instanceID);
+        netdata_fix_chart_name(id);
+        mi->st_stats_safe_auto = rrdset_create_localhost(
+                "mssql",
+                id,
+                NULL,
+                "sql activity",
+                "mssql.instance_sqlstats_safe_auto_parameterization_attempts",
+                "Safe auto-parameterization attempts",
+                "attempts/s",
+                PLUGIN_WINDOWS_NAME,
+                "PerflibMSSQL",
+                PRIO_MSSQL_STATS_SAFE_AUTO_PARAMETRIZATION,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+        mi->rd_stats_safe_auto = rrddim_add(mi->st_stats_safe_auto, "safe", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
+
+        rrdlabels_add(mi->st_stats_safe_auto->rrdlabels, "mssql_instance", mi->instanceID, RRDLABEL_SRC_AUTO);
+    }
+
+    rrddim_set_by_pointer(
+            mi->st_stats_safe_auto,
+            mi->rd_stats_safe_auto,
+            (collected_number)mi->MSSQLStatSafeAutoParameterization.current.Data);
+    rrdset_done(mi->st_stats_safe_auto);
+}
+
 void do_mssql_statistics_perflib(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *mi, int update_every)
 {
     char id[RRD_ID_LENGTH_MAX + 1];
@@ -119,44 +151,14 @@ void do_mssql_statistics_perflib(PERF_DATA_BLOCK *pDataBlock, struct mssql_insta
     if (unlikely(!pObjectType))
         return;
 
-    if (likely(perflibGetObjectCounter(pDataBlock, pObjectType, &mi->MSSQLStatsAutoParameterization))) {
+    if (likely(perflibGetObjectCounter(pDataBlock, pObjectType, &mi->MSSQLStatsAutoParameterization)))
         do_mssql_auto_parameterization_attempts(mi, update_every);
-    }
 
-    if (likely(perflibGetObjectCounter(pDataBlock, pObjectType, &mi->MSSQLStatsBatchRequests))) {
+    if (likely(perflibGetObjectCounter(pDataBlock, pObjectType, &mi->MSSQLStatsBatchRequests)))
         do_mssql_batch_requests(mi, update_every);
-    }
 
-    if (likely(perflibGetObjectCounter(pDataBlock, pObjectType, &mi->MSSQLStatSafeAutoParameterization))) {
-        if (unlikely(!mi->st_stats_safe_auto)) {
-            snprintfz(
-                    id, RRD_ID_LENGTH_MAX, "instance_%s_sqlstats_safe_auto_parameterization_attempts", mi->instanceID);
-            netdata_fix_chart_name(id);
-            mi->st_stats_safe_auto = rrdset_create_localhost(
-                    "mssql",
-                    id,
-                    NULL,
-                    "sql activity",
-                    "mssql.instance_sqlstats_safe_auto_parameterization_attempts",
-                    "Safe auto-parameterization attempts",
-                    "attempts/s",
-                    PLUGIN_WINDOWS_NAME,
-                    "PerflibMSSQL",
-                    PRIO_MSSQL_STATS_SAFE_AUTO_PARAMETRIZATION,
-                    update_every,
-                    RRDSET_TYPE_LINE);
-
-            mi->rd_stats_safe_auto = rrddim_add(mi->st_stats_safe_auto, "safe", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-
-            rrdlabels_add(mi->st_stats_safe_auto->rrdlabels, "mssql_instance", mi->instanceID, RRDLABEL_SRC_AUTO);
-        }
-
-        rrddim_set_by_pointer(
-                mi->st_stats_safe_auto,
-                mi->rd_stats_safe_auto,
-                (collected_number)mi->MSSQLStatSafeAutoParameterization.current.Data);
-        rrdset_done(mi->st_stats_safe_auto);
-    }
+    if (likely(perflibGetObjectCounter(pDataBlock, pObjectType, &mi->MSSQLStatSafeAutoParameterization)))
+        do_mssql_auto_parameterization_attempts(mi, update_every);
 }
 
 void do_mssql_memory_mgr(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *mi, int update_every)
