@@ -184,6 +184,8 @@ export class InternalToolProvider extends ToolProvider {
       lines.push('');
       lines.push('A good progress message is short, clear, without formatting, and provides information about the current status and the goal(s) of this turn.');
       lines.push('A good progress message appears at most once per turn/step, and never alone (bundle it with other tools, or omit it altogether).');
+      lines.push('');
+      lines.push(`IMPORTANT: The ${PROGRESS_TOOL} just let's the user know what you are doing; you have to call other tools to actually perform actions and get data.`);
     }
 
     if (this.opts.enableBatch) {
@@ -247,15 +249,16 @@ export class InternalToolProvider extends ToolProvider {
     lines.push('- When your final report includes newlines, you MUST use the `\\n` escape sequence within the string value for every newline you want to add, instead of raw newline characters.');
     lines.push(`- Do not include raw newline characters in JSON string values (json becomes invalid); use '\\n' instead.`);
 
-    // if (this.opts.enableBatch) {
-    //   lines.push('');
-    //   lines.push('### MANDATORY RULE FOR PARALLEL TOOL CALLS');
-    //   lines.push(`When gathering information from multiple independent sources, use the ${BATCH_TOOL} tool to execute tools in parallel.`);
-    //   if (!this.disableProgressTool) {
-    //     lines.push(`- Do not include more than one ${PROGRESS_TOOL} per batch.`);
-    //     lines.push(`- Add exactly one ${PROGRESS_TOOL} per batch, describing the current status and the aggregate goal(s) of all other tools in this batch.`);
-    //   }
-    // }
+    if (this.opts.enableBatch) {
+      lines.push('');
+      lines.push('### MANDATORY RULE FOR PARALLEL TOOL CALLS');
+      lines.push(`When gathering information from multiple independent sources, use the ${BATCH_TOOL} tool to execute tools in parallel.`);
+      if (!this.disableProgressTool) {
+        lines.push(`- Do not include more than one ${PROGRESS_TOOL} per batch.`);
+        lines.push(`- Add exactly one ${PROGRESS_TOOL} per batch, describing the current status and the aggregate goal(s) of all other tools in this batch.`);
+        lines.push(`- The ${PROGRESS_TOOL} is for you to update the user; to collect data or perform actions, use other tools in the same batch.`);
+      }
+    }
 
     return lines.join('\n');
   }
