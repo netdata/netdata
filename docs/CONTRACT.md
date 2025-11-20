@@ -32,19 +32,7 @@ Every user-configurable setting has a guarantee that MUST be respected under ALL
 
 ### Context Window Management
 
-**`contextWindow` (per provider/model)**
-- Conversation + tool schemas + pending outputs NEVER exceed this limit
-- Context guard evaluates: `currentTokens + pendingTokens + schemaTokens + maxOutputTokens + bufferTokens ≤ contextWindow`
-- When limit approached → forced final turn (tools restricted to `final_report` only)
-
-**`contextWindowBufferTokens` (per provider/model)**
-- Safety margin subtracted from context window
-- Prevents provider rejections due to estimation drift
-
-**`maxOutputTokens`**
-- Requested token budget for LLM responses
-- Passed to provider in every request
-- Included in context guard calculations
+See Section 2 “Context Management Contract” for the complete definition of counters, guard calculations, and enforcement rules. This configuration section only names the tunables (`contextWindow`, `contextWindowBufferTokens`, `maxOutputTokens`); their behaviour is governed entirely by that contract.
 
 ### Tool Response Handling
 
@@ -53,6 +41,7 @@ Every user-configurable setting has a guarantee that MUST be respected under ALL
 - Truncated responses include notice: `[TRUNCATED] Original size X bytes; truncated to Y bytes.` (prepended to content)
 - Warning logged with metadata: tool name, actual bytes, limit bytes
 - Original response only preserved in logs when `traceTools` mode enabled
+- **Exception:** `agent__batch` meta-tool output NOT truncated as a whole; individual tools within the batch ARE subject to truncation
 
 **`toolTimeout`**
 - Tool execution aborted after this duration (milliseconds)
@@ -104,17 +93,38 @@ These rules MUST hold in all cases, regardless of configuration.
 
 Note: Exit codes map to failure categories, not specific error types. Check `result.error` and `result.finalReport.status` for detailed failure reasons.
 
-### Context Guard Enforcement
+### Context Management Contract
 
-**When context budget exceeded:**
-1. **Tool responses** exceeding remaining budget are dropped
-2. Dropped responses replaced with failure message visible to LLM: `(tool failed: context window budget exceeded)`
-3. **Forced final turn** activated: only `final_report` tool available
-4. Session continues with restricted tools until final turn completes
+#### Counters and Inputs
+- `currentCtxTokens`: Tokens already committed to the conversation by the previous successful LLM response. By contract this equals `inputTokens + outputTokens + cacheReadTokens` reported by the provider. Turn 1 MUST log `ctx 0` because no request has been sent yet.
+- `pendingCtxTokens`: Estimated token cost of every message appended since the last LLM request (tool outputs, retry notices, new user input). These tokens will enter the next prompt and therefore appear as `new` in the request log.
+- `newCtxTokens`: Scratch bucket for tool outputs generated during the current turn before the guard flushes them into `pendingCtxTokens`. Every guard evaluation MUST move `newCtxTokens` into `pendingCtxTokens` before calculating projections, ensuring nothing is lost during retries.
+- `schemaCtxTokens`: Token estimate for the tool schema exposed on the upcoming request. When tools are restricted (e.g., forced final turn), this value MUST be recomputed for the reduced tool set.
+- `contextWindow`: Provider/model capacity. `contextWindowBufferTokens` subtracts a safety margin, and `maxOutputTokens` reserves space for the model’s reply. These three values define the hard ceiling for projections.
 
-**Context guard triggers:**
-- **Pre-turn preflight**: Before LLM request, if projected tokens exceed limit
-- **Post-tool evaluation**: After tool execution, if response would exceed budget
+#### LLM Request Metrics
+- Every `LLM request prepared` log MUST satisfy `expectedTokens = ctxTokens + pendingCtxTokens + schemaCtxTokens`.
+- `ctxTokens` MUST match the provider-reported `ctx` from the previous response (0 on the very first turn).
+- `new tokens` shown in the log equal `pendingCtxTokens` at the moment of logging and therefore represent the prompt delta the model is about to receive.
+- Any retry-only system/user nudges included via `pendingRetryMessages` count toward `pendingCtxTokens` before the log is emitted.
+
+#### Guard Projection
+- Projection formula: `projected = currentCtxTokens + pendingCtxTokens + newCtxTokens + schemaCtxTokens`.
+- Per target limit: `limit = contextWindow - contextWindowBufferTokens - maxOutputTokens`.
+- Guard triggers in two places:
+  - **`tool_preflight`**: before committing a tool response.
+  - **`turn_preflight`**: before issuing the next LLM request.
+- If `projected > limit`, the guard MUST record the blocked provider/model pair and move the session into forced-final handling.
+
+#### Tool Overflow Handling
+- Tool outputs whose estimated tokens would overflow the projection are dropped immediately. The LLM receives the deterministic stub `(tool failed: context window budget exceeded)` and the accounting entry captures both the original estimate and the replacement token count.
+- Once a drop occurs, the orchestrator sets its `toolBudgetExceeded` flag, which forbids scheduling any NEW user-facing tools. Parallel executions already in flight may finish, but no additional tools may start until the session concludes.
+- Overflow drops are logged with `projected_tokens`, `limit_tokens`, and `remaining_tokens` (if positive) so operators can audit exactly why the response was rejected.
+
+#### Forced Final Turn
+- When the guard fires (either from a tool overflow or a turn preflight), the session immediately injects the final-instruction system message, restricts the tool list to `agent__final_report`, and logs the `forcedFinalTurnReason = 'context'`.
+- Schema tokens are recomputed for the reduced toolset and the guard is re-evaluated. If projections still exceed the limit, the session proceeds best-effort but MUST log the post-shrink warning.
+- From this point forward no new tools (including progress_report) may be executed; only the final report tool is allowed, and the agent must use already gathered information to respond.
 
 ### Empty or Invalid LLM Responses
 

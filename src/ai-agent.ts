@@ -130,6 +130,7 @@ export class AIAgentSession {
   private static readonly REMOTE_AGENT_TOOLS = 'agent:tools';
   private static readonly REMOTE_FINAL_TURN = 'agent:final-turn';
   private static readonly REMOTE_CONTEXT = 'agent:context';
+  private static readonly REMOTE_ORCHESTRATOR = 'agent:orchestrator';
   private static readonly FINAL_REPORT_TOOL = 'agent__final_report';
   private static readonly FINAL_REPORT_SHORT = 'final_report';
   private static readonly MAX_TURNS_FINAL_MESSAGE = 'Maximum number of turns/steps reached. You must provide your final report now, by calling the `agent__final_report` tool. Do not attempt to call any other tool. Read carefully the instructions on how to call the `agent__final_report` tool and call it now.';
@@ -473,7 +474,9 @@ export class AIAgentSession {
         bufferTokens,
       } satisfies TargetContextConfig;
     });
-    this.currentCtxTokens = this.estimateTokensForCounters(this.conversation);
+    this.currentCtxTokens = 0;
+    this.pendingCtxTokens = 0;
+    this.newCtxTokens = 0;
     if (process.env.CONTEXT_DEBUG === 'true') {
       console.log('context-guard/init-counters', {
         currentCtxTokens: this.currentCtxTokens,
@@ -1415,8 +1418,9 @@ export class AIAgentSession {
     let currentTurn = startTurn;
     let finalReportToolFailed = false;
 
-    this.currentCtxTokens = this.estimateTokensForCounters(conversation);
-    this.pendingCtxTokens = 0;
+    const seedConversationTokens = this.estimateTokensForCounters(conversation);
+    this.currentCtxTokens = 0;
+    this.pendingCtxTokens = seedConversationTokens;
     this.newCtxTokens = 0;
     if (process.env.CONTEXT_DEBUG === 'true') {
       console.log('context-guard/loop-init', {
@@ -1424,6 +1428,7 @@ export class AIAgentSession {
         pendingCtxTokens: this.pendingCtxTokens,
         newCtxTokens: this.newCtxTokens,
         schemaCtxTokens: this.schemaCtxTokens,
+        seedConversationTokens,
         turn: currentTurn,
       });
     }
@@ -1467,6 +1472,38 @@ export class AIAgentSession {
       let turnSuccessful = false;
       let finalTurnRetryWarnLogged = false;
       let turnHadFinalReportAttempt = false;
+      let collapseLoggedThisTurn = false;
+      const collapseRemainingTurns = (reason: 'final_report_attempt' | 'incomplete_final_report'): void => {
+        if (collapseLoggedThisTurn) return;
+        if (currentTurn >= maxTurns) return;
+        const previousMaxTurns = maxTurns;
+        maxTurns = currentTurn + 1;
+        const adjustLog: LogEntry = {
+          timestamp: Date.now(),
+          severity: 'WRN',
+          turn: currentTurn,
+          subturn: 0,
+          direction: 'response',
+          type: 'llm',
+          remoteIdentifier: AIAgentSession.REMOTE_ORCHESTRATOR,
+          fatal: false,
+          message: reason === 'incomplete_final_report'
+            ? `Incomplete final report detected at turn ${String(currentTurn)}; Collapsing remaining turns from ${String(previousMaxTurns)} to ${String(maxTurns)}`
+            : `Final report retry detected at turn ${String(currentTurn)}; Collapsing remaining turns from ${String(previousMaxTurns)} to ${String(maxTurns)}`
+        };
+        this.log(adjustLog);
+        recordRetryCollapseMetrics({
+          agentId: this.sessionConfig.agentId,
+          callPath: this.callPath,
+          headendId: this.headendId,
+          reason,
+          turn: currentTurn,
+          previousMaxTurns,
+          newMaxTurns: maxTurns,
+          customLabels: this.telemetryLabels,
+        });
+        collapseLoggedThisTurn = true;
+      };
 
       // Global attempts across all provider/model pairs for this turn
       let attempts = 0;
@@ -1522,6 +1559,9 @@ export class AIAgentSession {
           const evaluation = this.evaluateContextGuard(this.schemaCtxTokens);
           this.enforceContextFinalTurn(evaluation.blocked, 'turn_preflight');
           syncFinalTurnFlags();
+          // Regenerate tool selection with isFinalTurn=true to restrict to final_report only
+          const finalToolSelection = this.selectToolsForTurn(provider, true);
+          this.pendingToolSelection = finalToolSelection;
           this.schemaCtxTokens = this.computeForcedFinalSchemaTokens(provider);
           const postEnforce = this.evaluateContextGuard(this.schemaCtxTokens);
           if (postEnforce.blocked.length > 0) {
@@ -1636,6 +1676,9 @@ export class AIAgentSession {
             if (guardEvaluation.blocked.length > 0) {
               this.enforceContextFinalTurn(guardEvaluation.blocked, 'turn_preflight');
               syncFinalTurnFlags();
+              // Regenerate tool selection with isFinalTurn=true to restrict to final_report only
+              const finalToolSelection = this.selectToolsForTurn(provider, true);
+              this.pendingToolSelection = finalToolSelection;
               this.schemaCtxTokens = this.computeForcedFinalSchemaTokens(provider);
               const postEnforceGuard = this.evaluateContextGuard(this.schemaCtxTokens);
               if (postEnforceGuard.blocked.length > 0) {
@@ -1682,6 +1725,7 @@ export class AIAgentSession {
             if (finalReportAttempted) {
               (turnResult.status as { finalReportAttempted?: boolean }).finalReportAttempted = true;
               turnHadFinalReportAttempt = true;
+              collapseRemainingTurns('final_report_attempt');
             }
 
             sanitizedMessages.forEach((message) => {
@@ -2106,14 +2150,12 @@ export class AIAgentSession {
                 `cached ${String(cachedTokens)}`,
                 `${String(latencyMs)}ms`,
               ];
-              const pendingTokens = this.pendingCtxTokens;
-              const responseCtxTokens = inputTokens + outputTokens;
-              const totalCtx = this.currentCtxTokens + responseCtxTokens + pendingTokens;
-              this.currentCtxTokens = totalCtx;
+              const responseCtxTokens = inputTokens + outputTokens + cacheRead;
+              this.currentCtxTokens = responseCtxTokens;
               this.pendingCtxTokens = 0;
               this.schemaCtxTokens = 0;
-              if (totalCtx > 0) {
-                metricsParts.push(`ctx ${String(totalCtx)}`);
+              if (responseCtxTokens > 0) {
+                metricsParts.push(`ctx ${String(responseCtxTokens)}`);
               }
               if (typeof turnResult.stopReason === 'string' && turnResult.stopReason.length > 0) {
                 metricsParts.push(`stop=${turnResult.stopReason}`);
@@ -2210,33 +2252,10 @@ export class AIAgentSession {
 
               const retryFlags = turnResult as { incompleteFinalReportDetected?: boolean; finalReportAttempted?: boolean };
               const finalReportAttemptFlag = turnHadFinalReportAttempt || retryFlags.finalReportAttempted === true;
-              if ((retryFlags.incompleteFinalReportDetected === true || finalReportAttemptFlag) && currentTurn < maxTurns) {
-                const previousMaxTurns = maxTurns;
-                maxTurns = currentTurn + 1;
-                const collapseReason: 'final_report_attempt' | 'incomplete_final_report' =
-                  retryFlags.incompleteFinalReportDetected === true ? 'incomplete_final_report' : 'final_report_attempt';
-                const adjustLog: LogEntry = {
-                  timestamp: Date.now(),
-                  severity: 'WRN',
-                  turn: currentTurn,
-                  subturn: 0,
-                  direction: 'response',
-                  type: 'llm',
-                  remoteIdentifier: 'agent:orchestrator',
-                  fatal: false,
-                  message: `Final report retry detected at turn ${String(currentTurn)}; Collapsing remaining turns from ${String(previousMaxTurns)} to ${String(maxTurns)}`
-                };
-                this.log(adjustLog);
-                recordRetryCollapseMetrics({
-                  agentId: this.sessionConfig.agentId,
-                  callPath: this.callPath,
-                  headendId: this.headendId,
-                  reason: collapseReason,
-                  turn: currentTurn,
-                  previousMaxTurns,
-                  newMaxTurns: maxTurns,
-                  customLabels: this.telemetryLabels,
-                });
+              if (retryFlags.incompleteFinalReportDetected === true && currentTurn < maxTurns) {
+                collapseRemainingTurns('incomplete_final_report');
+              } else if (finalReportAttemptFlag && currentTurn < maxTurns) {
+                collapseRemainingTurns('final_report_attempt');
               }
 
               if (finalReportReady) {
@@ -2620,6 +2639,18 @@ export class AIAgentSession {
           return this.finalizeWithCurrentFinalReport(conversation, logs, accounting, currentTurn);
         }
         if (currentTurn === maxTurns && this.finalReport === undefined && !finalReportToolFailed) {
+          const collapseEntry: LogEntry = {
+            timestamp: Date.now(),
+            severity: 'WRN',
+            turn: currentTurn,
+            subturn: 0,
+            direction: 'response',
+            type: 'llm',
+            remoteIdentifier: AIAgentSession.REMOTE_ORCHESTRATOR,
+            fatal: false,
+            message: `No final report after ${String(currentTurn)} turns; Collapsing remaining turns from ${String(maxTurns)} to ${String(currentTurn)}.`
+          };
+          this.log(collapseEntry);
           const turnLabel = `${String(currentTurn)} turn${currentTurn === 1 ? '' : 's'}`;
           const baseSummary = `Session completed without a final report after ${turnLabel}.`;
           const detailedSummary = lastError !== undefined
@@ -2627,14 +2658,17 @@ export class AIAgentSession {
             : `${baseSummary} Final report attempts: ${String(this.finalReportAttempts)}.`;
           const fallbackFormatCandidate = this.resolvedFormat ?? 'text';
           const fallbackFormat = FINAL_REPORT_FORMAT_VALUES.find((value) => value === fallbackFormatCandidate) ?? 'text';
+          const metadataReason = (this.finalReportAttempts > 0 && typeof lastError === 'string' && lastError.startsWith('invalid_response'))
+            ? 'max_retries_exhausted'
+            : 'max_turns_exhausted';
           const metadata: Record<string, unknown> = {
-            reason: 'max_turns_exhausted',
+            reason: metadataReason,
             turns_completed: currentTurn,
             final_report_attempts: this.finalReportAttempts,
             last_stop_reason: lastError ?? 'none',
           };
           this.logFailureReport('Max turns exhausted without final report.', currentTurn, {
-            reason: 'max_turns_exhausted',
+            reason: metadataReason,
             turns_completed: currentTurn,
             final_report_attempts: this.finalReportAttempts,
           });
@@ -2655,7 +2689,7 @@ export class AIAgentSession {
             subturn: 0,
             direction: 'response',
             type: 'llm',
-            remoteIdentifier: 'agent:orchestrator',
+            remoteIdentifier: AIAgentSession.REMOTE_ORCHESTRATOR,
             fatal: false,
             message: `Turn ${String(currentTurn)} exhausted ${String(maxRetries)} attempt${maxRetries === 1 ? '' : 's'} with invalid responses; advancing to the next turn.`,
           };
@@ -3997,115 +4031,18 @@ export class AIAgentSession {
 
           const managedTokens = typeof managed.tokens === 'number' ? managed.tokens : undefined;
           const isInternalProvider = providerLabel === 'agent';
-          let toolTokens: number;
-          if (managedTokens === undefined) {
-            toolTokens = this.estimateTokensForCounters([{ role: 'tool', content: toolOutput }]);
-            if (!isInternalProvider) {
-              const guardEvaluation = this.evaluateContextGuard(toolTokens);
-              if (process.env.CONTEXT_DEBUG === 'true') {
-                const approxTokens = Math.ceil(estimateMessagesBytes([{ role: 'tool', content: toolOutput }]) / 4);
-                let limitTokens: number | undefined;
-                let contextWindow: number | undefined;
-                if (guardEvaluation.blocked.length > 0) {
-                  const firstBlocked = guardEvaluation.blocked[0];
-                  limitTokens = firstBlocked.limit;
-                  contextWindow = firstBlocked.contextWindow;
-                }
-                console.log('context-guard/tool-eval', {
-                  toolTokens,
-                  approxTokens,
-                  contentLength: toolOutput.length,
-                  currentCtx: this.currentCtxTokens,
-                  pendingCtx: this.pendingCtxTokens,
-                  newCtx: this.newCtxTokens,
-                  projectedTokens: guardEvaluation.projectedTokens,
-                  limitTokens,
-                  contextWindow,
-                });
-              }
-              if (guardEvaluation.blocked.length > 0) {
-                const blockedEntries = guardEvaluation.blocked.length > 0
-                  ? guardEvaluation.blocked
-                  : [{
-                      provider: 'unknown',
-                      model: 'unknown',
-                      contextWindow: AIAgentSession.DEFAULT_CONTEXT_WINDOW_TOKENS,
-                      bufferTokens: AIAgentSession.DEFAULT_CONTEXT_BUFFER_TOKENS,
-                      maxOutputTokens: this.computeMaxOutputTokens(AIAgentSession.DEFAULT_CONTEXT_WINDOW_TOKENS),
-                      limit: 0,
-                      projected: guardEvaluation.projectedTokens,
-                    }];
-                const first = blockedEntries[0];
-                const remainingTokens = first.limit > first.projected ? first.limit - first.projected : 0;
-                const warnEntry: LogEntry = {
-                  timestamp: Date.now(),
-                  severity: 'WRN',
-                  turn: currentTurn,
-                  subturn: subturnCounter,
-                  direction: 'response',
-                  type: 'tool',
-                  remoteIdentifier: providerLabel,
-                  fatal: false,
-                  message: `Tool '${effectiveToolName}' output discarded: context window budget exceeded (${String(toolTokens)} tokens, limit ${String(first.limit)}).`,
-                  details: {
-                    tool: effectiveToolName,
-                    provider: providerLabel,
-                    tokens_estimated: toolTokens,
-                    projected_tokens: guardEvaluation.projectedTokens,
-                    limit_tokens: first.limit,
-                    remaining_tokens: remainingTokens,
-                  },
-                };
-                this.log(warnEntry);
-                const renderedFailure = AIAgentSession.TOOL_NO_OUTPUT;
-                const failureTokens = this.estimateTokensForCounters([{ role: 'tool', content: renderedFailure }]);
-                this.newCtxTokens += failureTokens;
-                if (callId !== undefined) {
-                  this.toolFailureMessages.set(callId, renderedFailure);
-                  if (!this.turnHasSuccessfulToolOutput) {
-                    this.trimmedToolCallIds.add(callId);
-                  }
-                } else {
-                  this.toolFailureFallbacks.push(renderedFailure);
-                }
-                const failureEntry: AccountingEntry = {
-                  type: 'tool',
-                  timestamp: startTime,
-                  status: 'failed',
-                  latency: managed.latency,
-                  mcpServer: providerLabel,
-                  command: effectiveToolName,
-                  charactersIn: managed.charactersIn,
-                  charactersOut: managed.charactersOut,
-                  error: 'context_budget_exceeded',
-                  agentId: this.sessionConfig.agentId,
-                  callPath: this.callPath,
-                  txnId: this.txnId,
-                  parentTxnId: this.parentTxnId,
-                  originTxnId: this.originTxnId,
-                  details: {
-                    projected_tokens: first.projected,
-                    limit_tokens: first.limit,
-                    remaining_tokens: remainingTokens,
-                    original_tokens: toolTokens,
-                    replacement_tokens: failureTokens,
-                  },
-                };
-                accounting.push(failureEntry);
-                try { this.sessionConfig.callbacks?.onAccounting?.(failureEntry); } catch (e) { warn(`tool accounting callback failed: ${e instanceof Error ? e.message : String(e)}`); }
-                addSpanEvent('tool.call.failure', {
-                  'ai.tool.name': effectiveToolName,
-                  'ai.tool.latency_ms': managed.latency,
-                  'ai.tool.failure.reason': 'context_budget_exceeded',
-                });
-                this.enforceContextFinalTurn(blockedEntries, 'tool_preflight');
-                return renderedFailure;
-              }
-            }
-          } else {
-            toolTokens = managedTokens;
+          const toolTokens = managedTokens ?? this.estimateTokensForCounters([{ role: 'tool', content: toolOutput }]);
+          if (!isInternalProvider) {
+            const guardEvaluation = this.evaluateContextGuard(toolTokens);
             if (process.env.CONTEXT_DEBUG === 'true') {
               const approxTokens = Math.ceil(estimateMessagesBytes([{ role: 'tool', content: toolOutput }]) / 4);
+              let limitTokens: number | undefined;
+              let contextWindow: number | undefined;
+              if (guardEvaluation.blocked.length > 0) {
+                const firstBlocked = guardEvaluation.blocked[0];
+                limitTokens = firstBlocked.limit;
+                contextWindow = firstBlocked.contextWindow;
+              }
               console.log('context-guard/tool-eval', {
                 toolTokens,
                 approxTokens,
@@ -4113,11 +4050,102 @@ export class AIAgentSession {
                 currentCtx: this.currentCtxTokens,
                 pendingCtx: this.pendingCtxTokens,
                 newCtx: this.newCtxTokens,
-                projectedTokens: this.currentCtxTokens + this.pendingCtxTokens + this.newCtxTokens,
-                limitTokens: undefined,
-                contextWindow: undefined,
+                projectedTokens: guardEvaluation.projectedTokens,
+                limitTokens,
+                contextWindow,
               });
             }
+            if (guardEvaluation.blocked.length > 0) {
+              const blockedEntries = guardEvaluation.blocked.length > 0
+                ? guardEvaluation.blocked
+                : [{
+                    provider: 'unknown',
+                    model: 'unknown',
+                    contextWindow: AIAgentSession.DEFAULT_CONTEXT_WINDOW_TOKENS,
+                    bufferTokens: AIAgentSession.DEFAULT_CONTEXT_BUFFER_TOKENS,
+                    maxOutputTokens: this.computeMaxOutputTokens(AIAgentSession.DEFAULT_CONTEXT_WINDOW_TOKENS),
+                    limit: 0,
+                    projected: guardEvaluation.projectedTokens,
+                  }];
+              const first = blockedEntries[0];
+              const remainingTokens = first.limit > first.projected ? first.limit - first.projected : 0;
+              const warnEntry: LogEntry = {
+                timestamp: Date.now(),
+                severity: 'WRN',
+                turn: currentTurn,
+                subturn: subturnCounter,
+                direction: 'response',
+                type: 'tool',
+                remoteIdentifier: providerLabel,
+                fatal: false,
+                message: `Tool '${effectiveToolName}' output discarded: context window budget exceeded (${String(toolTokens)} tokens, limit ${String(first.limit)}).`,
+                details: {
+                  tool: effectiveToolName,
+                  provider: providerLabel,
+                  tokens_estimated: toolTokens,
+                  projected_tokens: guardEvaluation.projectedTokens,
+                  limit_tokens: first.limit,
+                  remaining_tokens: remainingTokens,
+                },
+              };
+              this.log(warnEntry);
+              const renderedFailure = AIAgentSession.TOOL_NO_OUTPUT;
+              const failureTokens = this.estimateTokensForCounters([{ role: 'tool', content: renderedFailure }]);
+              this.newCtxTokens += failureTokens;
+              if (callId !== undefined) {
+                this.toolFailureMessages.set(callId, renderedFailure);
+                if (!this.turnHasSuccessfulToolOutput) {
+                  this.trimmedToolCallIds.add(callId);
+                }
+              } else {
+                this.toolFailureFallbacks.push(renderedFailure);
+              }
+              const failureEntry: AccountingEntry = {
+                type: 'tool',
+                timestamp: startTime,
+                status: 'failed',
+                latency: managed.latency,
+                mcpServer: providerLabel,
+                command: effectiveToolName,
+                charactersIn: managed.charactersIn,
+                charactersOut: managed.charactersOut,
+                error: 'context_budget_exceeded',
+                agentId: this.sessionConfig.agentId,
+                callPath: this.callPath,
+                txnId: this.txnId,
+                parentTxnId: this.parentTxnId,
+                originTxnId: this.originTxnId,
+                details: {
+                  projected_tokens: first.projected,
+                  limit_tokens: first.limit,
+                  remaining_tokens: remainingTokens,
+                  original_tokens: toolTokens,
+                  replacement_tokens: failureTokens,
+                },
+              };
+              accounting.push(failureEntry);
+              try { this.sessionConfig.callbacks?.onAccounting?.(failureEntry); } catch (e) { warn(`tool accounting callback failed: ${e instanceof Error ? e.message : String(e)}`); }
+              addSpanEvent('tool.call.failure', {
+                'ai.tool.name': effectiveToolName,
+                'ai.tool.latency_ms': managed.latency,
+                'ai.tool.failure.reason': 'context_budget_exceeded',
+              });
+              this.enforceContextFinalTurn(blockedEntries, 'tool_preflight');
+              return renderedFailure;
+            }
+          } else if (process.env.CONTEXT_DEBUG === 'true') {
+            const approxTokens = Math.ceil(estimateMessagesBytes([{ role: 'tool', content: toolOutput }]) / 4);
+            console.log('context-guard/tool-eval', {
+              toolTokens,
+              approxTokens,
+              contentLength: toolOutput.length,
+              currentCtx: this.currentCtxTokens,
+              pendingCtx: this.pendingCtxTokens,
+              newCtx: this.newCtxTokens,
+              projectedTokens: this.currentCtxTokens + this.pendingCtxTokens + this.newCtxTokens,
+              limitTokens: undefined,
+              contextWindow: undefined,
+            });
           }
 
           this.newCtxTokens += toolTokens;

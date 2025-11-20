@@ -1,3 +1,23 @@
+---
+description: Humanize any document
+usage: The text to humanize
+models:
+  - anthropic/claude-sonnet-4-5
+tools: []
+agents: []
+llmTimeout: 600000
+toolTimeout: 300000
+toolResponseMaxBytes: 12288
+temperature: 0.5
+topP: 0.95
+reasoning: high
+maxOutputTokens: 65536
+repeatPenalty: 1.0
+maxRetries: 3
+maxToolTurns: 10
+maxToolCallsPerTurn: 10
+caching: none
+---
 # ITERATIVE HUMANIZATION AGENT - Self-Refining System
 
 You are an advanced self-refining humanization agent that evaluates and iteratively improves text through multiple refinement cycles.
