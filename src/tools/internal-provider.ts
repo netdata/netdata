@@ -171,19 +171,19 @@ export class InternalToolProvider extends ToolProvider {
 
     if (!this.disableProgressTool) {
       lines.push(`#### ${PROGRESS_TOOL} — Progress Updates for the User`);
-      lines.push('- Use this tool to update the user on your progress.');
+      lines.push('Use this tool to update the user on your overall progress and next steps.');
+      lines.push('');
       lines.push('- Keep the progress message concise (≤20 words).');
-      lines.push(`- Always pair this tool with other tools you are invoking (except ${FINAL_REPORT_TOOL}).`);
-      lines.push('- Do not call this tool by itself.');
-      lines.push(`- Do not pair this tool with ${FINAL_REPORT_TOOL}`);
+      lines.push(`- Bundle this tool with other tools you are invoking (except ${FINAL_REPORT_TOOL}) - do not waste turns just to give progress updates.`);
       lines.push('- Do not add any formatting or newlines to the progress message.');
       lines.push('');
       lines.push('Good examples:');
-      lines.push('- Found the data about X, now searching for Y.');
-      lines.push('- Discovered how X works, checking if it can also do Y.');
-      lines.push('- Looks like X is not available, trying Y instead.');
+      lines.push('- Found the data about X, now searching for Y and Z.');
+      lines.push('- Discovered how X works, checking if it can also do Y or Z.');
+      lines.push('- Looks like X is not available, trying Y and Z instead.');
       lines.push('');
-      lines.push('Good progress messages are short, clear, without formatting, and provide information about current status and next steps.');
+      lines.push('A good progress message is short, clear, without formatting, and provides information about the current status and the goal(s) of this turn.');
+      lines.push('A good progress message appears at most once per turn/step, and never alone (bundle it with other tools, or omit it altogether).');
     }
 
     if (this.opts.enableBatch) {
@@ -202,7 +202,7 @@ export class InternalToolProvider extends ToolProvider {
         lines.push('      { "id": 1, "tool": "tool1", "parameters": { "param1": "value1", "param2": "value2" } },');
         lines.push('      { "id": 2, "tool": "tool2", "parameters": { "param1": "value1" } }');
       }
-      lines.push('      (Tool names must match exactly and every required parameter must be present.)');
+      lines.push('      (Tool names must match exactly, and every required parameter must be present.)');
       lines.push('    ]');
       lines.push('  }');
       if (!this.disableProgressTool) {
@@ -251,6 +251,10 @@ export class InternalToolProvider extends ToolProvider {
       lines.push('');
       lines.push('### MANDATORY RULE FOR PARALLEL TOOL CALLS');
       lines.push(`When gathering information from multiple independent sources, use the ${BATCH_TOOL} tool to execute tools in parallel.`);
+      if (!this.disableProgressTool) {
+        lines.push(`- Do not include more than one ${PROGRESS_TOOL} per batch.`);
+        lines.push(`- Add exactly one ${PROGRESS_TOOL} per batch, describing the current status and the aggregate goal(s) of all other tools in this batch.`);
+      }
     }
 
     return lines.join('\n');
