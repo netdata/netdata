@@ -322,13 +322,15 @@ set(CPACK_DEBIAN_PLUGIN-GO_DEBUGINFO_PACKAGE Off)
 
 set(CPACK_COMPONENT_PLUGIN-SCRIPTS_DEPENDS "netdata")
 set(CPACK_COMPONENT_PLUGIN-SCRIPTS_DESCRIPTION
-		"The experimental scripts plugin (Nagios compatibility module) for the Netdata Agent
- This plugin executes stock Nagios checks via go.d's runtime so users can
- migrate existing Nagios estates into Netdata with minimal changes.")
+		"The scripts metrics collection plugin for the Netdata Agent
+ This plugin allows the Netdata Agent to collect metrics using scripts
+that provide data in an extended version of the output format used by
+Nagios plugins. This provides compatibility with most Nagios plugins,
+as well as enabling simple active checks.")
 
 set(CPACK_DEBIAN_PLUGIN-SCRIPTS_PACKAGE_NAME "netdata-plugin-scripts")
 set(CPACK_DEBIAN_PLUGIN-SCRIPTS_PACKAGE_SECTION "net")
-set(CPACK_DEBIAN_PLUGIN-SCRIPTS_PACKAGE_CONFLICTS "netdata (<< 1.46)")
+set(CPACK_DEBIAN_PLUGIN-SCRIPTS_PACKAGE_CONFLICTS "netdata (<< 2.8)")
 set(CPACK_DEBIAN_PLUGIN-SCRIPTS_PACKAGE_PREDEPENDS "netdata-user")
 
 set(CPACK_DEBIAN_PLUGIN-SCRIPTS_PACKAGE_CONTROL_EXTRA
