@@ -262,7 +262,7 @@ static struct win_sensor_config {
     },
     {
         .title = "Human presence",
-        .units = "state",
+        .units = "presence",
         .context = "system.hw.sensor.human_presence.input",
         .family = "Presence",
         .priority = NETDATA_CHART_PRIO_SENSOR_HUMAN,
