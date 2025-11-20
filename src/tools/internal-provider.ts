@@ -247,15 +247,15 @@ export class InternalToolProvider extends ToolProvider {
     lines.push('- When your final report includes newlines, you MUST use the `\\n` escape sequence within the string value for every newline you want to add, instead of raw newline characters.');
     lines.push(`- Do not include raw newline characters in JSON string values (json becomes invalid); use '\\n' instead.`);
 
-    if (this.opts.enableBatch) {
-      lines.push('');
-      lines.push('### MANDATORY RULE FOR PARALLEL TOOL CALLS');
-      lines.push(`When gathering information from multiple independent sources, use the ${BATCH_TOOL} tool to execute tools in parallel.`);
-      if (!this.disableProgressTool) {
-        lines.push(`- Do not include more than one ${PROGRESS_TOOL} per batch.`);
-        lines.push(`- Add exactly one ${PROGRESS_TOOL} per batch, describing the current status and the aggregate goal(s) of all other tools in this batch.`);
-      }
-    }
+    // if (this.opts.enableBatch) {
+    //   lines.push('');
+    //   lines.push('### MANDATORY RULE FOR PARALLEL TOOL CALLS');
+    //   lines.push(`When gathering information from multiple independent sources, use the ${BATCH_TOOL} tool to execute tools in parallel.`);
+    //   if (!this.disableProgressTool) {
+    //     lines.push(`- Do not include more than one ${PROGRESS_TOOL} per batch.`);
+    //     lines.push(`- Add exactly one ${PROGRESS_TOOL} per batch, describing the current status and the aggregate goal(s) of all other tools in this batch.`);
+    //   }
+    // }
 
     return lines.join('\n');
   }
