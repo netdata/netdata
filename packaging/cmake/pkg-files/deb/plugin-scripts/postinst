@@ -6,9 +6,6 @@ case "$1" in
   configure|reconfigure)
     chown root:netdata /usr/libexec/netdata/plugins.d/scripts.d.plugin
     chmod 0750 /usr/libexec/netdata/plugins.d/scripts.d.plugin
-    if ! setcap "cap_dac_read_search+epi cap_net_admin=eip cap_net_raw=eip" /usr/libexec/netdata/plugins.d/scripts.d.plugin; then
-        chmod -f 4750 /usr/libexec/netdata/plugins.d/scripts.d.plugin
-    fi
     ;;
 esac
 
