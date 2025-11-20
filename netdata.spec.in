@@ -445,6 +445,7 @@ advanced correlations and fast root cause analysis, native horizontal scalabilit
 	-DENABLE_PLUGIN_CGROUP_NETWORK=On \
 	-DENABLE_PLUGIN_DEBUGFS=On \
 	-DENABLE_PLUGIN_GO=On \
+	-DENABLE_PLUGIN_SCRIPTS=On \
 	%if %{_have_ibm_plugin}
 	-DENABLE_PLUGIN_IBM=On \
 	%else
@@ -696,6 +697,11 @@ rm -rf "${RPM_BUILD_ROOT}"
 %exclude %{_libdir}/%{name}/ibm-mqclient
 %endif
 
+# Scripts plugin belongs to a different sub-package
+%exclude %{_libexecdir}/%{name}/plugins.d/scripts.d.plugin
+%exclude %{_libdir}/%{name}/conf.d/scripts.d.conf
+%exclude %{_libdir}/%{name}/conf.d/scripts.d
+
 # Network viewer belongs to a different sub-package
 %exclude %{_libexecdir}/%{name}/plugins.d/network-viewer.plugin
 
@@ -884,6 +890,28 @@ so most users will want it installed.
 %defattr(0644,root,netdata,0755)
 %{_libdir}/%{name}/conf.d/go.d.conf
 %{_libdir}/%{name}/conf.d/go.d
+
+%package plugin-scripts
+Summary: The scripts metrics collection plugin for the Netdata Agent
+Group: Applications/System
+Requires: %{name} = %{version}
+Conflicts: %{name} < %{version}
+%if ! %{_have_sysuser}
+Requires(pre): %{name}-user >= %{version}
+%endif
+
+%description plugin-scripts
+ This plugin allows the Netdata Agent to collect metrics using scripts
+that provide data in an extended version of the output format used by
+Nagios plugins. This provides compatibility with most Nagios plugins,
+as well as enabling simple active checks.
+
+%files plugin-scripts
+%defattr(0750,root,netdata,0750)
+%{_libexecdir}/%{name}/plugins.d/scripts.d.plugin
+%defattr(0644,root,netdata,0755)
+%{_libdir}/%{name}/conf.d/scripts.d.conf
+%{_libdir}/%{name}/conf.d/scripts.d
 
 %if %{_have_ibm_plugin}
 %package plugin-ibm
@@ -3260,6 +3288,8 @@ done
 %attr(0644,root,root) %{_sysusersdir}/%{name}.conf
 
 %changelog
+* Thu Nov 20 2025 Austin hemmelgarn <austin@netdata.cloud> 0.0.0-38
+- Add scripts plugin
 * Tue Nov 11 2025 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-37
 - Update to use sysusers infrastructure when available.
 * Fri Oct 24 2025 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-36
