@@ -285,7 +285,7 @@ const FINAL_REPORT_SANITIZED_CONTENT = 'Final report without sanitized tool call
 const FINAL_REPORT_AFTER_RETRY = 'Final report after retry.';
 const TEXT_FALLBACK_CONTENT = 'Text fallback content.';
 const TOOL_MESSAGE_FALLBACK_CONTENT = 'Tool message fallback content.';
-const SYNTHETIC_MAX_RETRY_REASON = 'max_turns_exhausted';
+const SYNTHETIC_MAX_RETRY_REASON = 'max_retries_exhausted';
 const FINAL_REPORT_MAX_RETRIES_TOTAL_ATTEMPTS = 4;
 const INVALID_FINAL_REPORT_PAYLOAD = 'invalid-final-report';
 const INVALID_FINAL_REPORT_PAYLOAD_WITH_NEWLINES = '{status:success\nreport_format:text}';
@@ -2239,9 +2239,12 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       invariant(metricsLog.remoteIdentifier === `${PRIMARY_PROVIDER}:${MODEL_NAME}`, 'Unexpected remoteIdentifier for context metrics request log.');
 
       const ctxTokens = expectLogDetailNumber(metricsLog, 'ctx_tokens', 'ctx_tokens detail missing for context_guard__llm_metrics_logging.');
-      invariant(ctxTokens > 0, 'ctx_tokens should be positive for context_guard__llm_metrics_logging.');
+      invariant(ctxTokens >= 0, 'ctx_tokens should never be negative for context_guard__llm_metrics_logging.');
       const newTokens = expectLogDetailNumber(metricsLog, 'new_tokens', 'new_tokens detail missing for context_guard__llm_metrics_logging.');
       invariant(newTokens >= 0, 'new_tokens should be non-negative for context_guard__llm_metrics_logging.');
+      if (ctxTokens === 0) {
+        invariant(newTokens > 0, 'First-turn metrics should report prompt tokens via new_tokens when ctx_tokens is zero.');
+      }
       const schemaTokens = expectLogDetailNumber(metricsLog, 'schema_tokens', 'schema_tokens detail missing for context_guard__llm_metrics_logging.');
       invariant(schemaTokens > 0, 'schema_tokens should be positive for context_guard__llm_metrics_logging.');
       const expectedTokens = expectLogDetailNumber(metricsLog, 'expected_tokens', 'expected_tokens detail missing for context_guard__llm_metrics_logging.');
@@ -2426,7 +2429,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       const expectedTokens = expectLogDetailNumber(firstRequestLog, 'expected_tokens', 'expected_tokens detail missing for context_guard__init_counters_from_history.');
 
       invariant(expectedTokens === ctxTokens + schemaTokens + newTokens, 'expected_tokens should equal ctx + schema + new for context_guard__init_counters_from_history.');
-      invariant(newTokens === 0, 'new_tokens should be zero before tool execution for context_guard__init_counters_from_history.');
+      invariant(ctxTokens === 0, 'ctx_tokens should be zero before the first LLM attempt for context_guard__init_counters_from_history.');
 
       const firstUserIndex = result.conversation.findIndex((message) => message.role === 'user');
       invariant(firstUserIndex >= 0, 'Initial user message not found for context_guard__init_counters_from_history.');
@@ -2443,7 +2446,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         console.log('context-history approx ctx:', approxTokens);
         console.log('context-history projected ctx:', projectedCtxTokens);
       }
-      invariant(ctxTokens === projectedCtxTokens, `ctx_tokens should match projected estimate (expected ${String(projectedCtxTokens)}, got ${String(ctxTokens)}).`);
+      invariant(newTokens === projectedCtxTokens, `new_tokens should match projected estimate (expected ${String(projectedCtxTokens)}, got ${String(newTokens)}).`);
 
       const historyAssistant = initialMessages.find((message) => message.role === 'assistant');
       invariant(
@@ -2535,8 +2538,16 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       const newTokens = expectLogDetailNumber(requestLogAfter, 'new_tokens', 'new_tokens detail missing (post-tool) for run-test-context-token-double-count.');
       const expectedAfter = expectLogDetailNumber(requestLogAfter, 'expected_tokens', 'expected_tokens detail missing (post-tool) for run-test-context-token-double-count.');
 
+      const baselineNewTokens = logHasDetail(baselineLog, 'new_tokens')
+        ? expectLogDetailNumber(baselineLog, 'new_tokens', 'new_tokens detail missing (baseline) for run-test-context-token-double-count.')
+        : 0;
       const newTokenTolerance = 16;
-      invariant(Math.abs(newTokens - toolTokens) <= newTokenTolerance, `Pending context tokens should equal tool token estimate (expected ~${String(toolTokens)}, got ${String(newTokens)}).`);
+      if (baselineNewTokens <= newTokens) {
+        const deltaNewTokens = newTokens - baselineNewTokens;
+        invariant(Math.abs(deltaNewTokens - toolTokens) <= newTokenTolerance, `Pending context tokens increase should match tool token estimate (expected delta ~${String(toolTokens)}, got ${String(deltaNewTokens)}).`);
+      } else {
+        invariant(Math.abs(newTokens - toolTokens) <= newTokenTolerance, `Pending context tokens should equal tool token estimate (expected ~${String(toolTokens)}, got ${String(newTokens)}).`);
+      }
       invariant(expectedAfter === ctxAfter + schemaAfter + newTokens, 'expected_tokens should equal ctx + schema + new for run-test-context-token-double-count.');
 
     },

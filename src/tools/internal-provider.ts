@@ -195,7 +195,7 @@ export class InternalToolProvider extends ToolProvider {
       lines.push('  {');
       lines.push('    "calls": [');
       if (!this.disableProgressTool) {
-        lines.push(`      { "id": 1, "tool": "${PROGRESS_TOOL}", "parameters": { "progress": "Researching Netdata and eBPF" } },`);
+        lines.push(`      { "id": 1, "tool": "${PROGRESS_TOOL}", "parameters": { "progress": "Collected data about X, now researching Y" } },`);
         lines.push('      { "id": 2, "tool": "tool1", "parameters": { "param1": "value1", "param2": "value2" } },');
         lines.push('      { "id": 3, "tool": "tool2", "parameters": { "param1": "value1" } }');
       } else {
@@ -246,6 +246,12 @@ export class InternalToolProvider extends ToolProvider {
     lines.push('- To add newlines in JSON string fields, use the `\\n` escape sequence within the string value.');
     lines.push('- When your final report includes newlines, you MUST use the `\\n` escape sequence within the string value for every newline you want to add, instead of raw newline characters.');
     lines.push(`- Do not include raw newline characters in JSON string values (json becomes invalid); use '\\n' instead.`);
+
+    if (this.opts.enableBatch) {
+      lines.push('');
+      lines.push('### MANDATORY RULE FOR PARALLEL TOOL CALLS');
+      lines.push(`When gathering information from multiple independent sources, use the ${BATCH_TOOL} tool to execute tools in parallel.`);
+    }
 
     return lines.join('\n');
   }

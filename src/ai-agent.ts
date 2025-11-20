@@ -132,6 +132,7 @@ export class AIAgentSession {
   private static readonly REMOTE_CONTEXT = 'agent:context';
   private static readonly REMOTE_ORCHESTRATOR = 'agent:orchestrator';
   private static readonly FINAL_REPORT_TOOL = 'agent__final_report';
+  private static readonly FINAL_REPORT_TOOL_ALIASES = new Set<string>(['agent__final_report', 'agent-final-report']);
   private static readonly FINAL_REPORT_SHORT = 'final_report';
   private static readonly MAX_TURNS_FINAL_MESSAGE = 'Maximum number of turns/steps reached. You must provide your final report now, by calling the `agent__final_report` tool. Do not attempt to call any other tool. Read carefully the instructions on how to call the `agent__final_report` tool and call it now.';
   private static readonly CONTEXT_FINAL_MESSAGE = 'The conversation is at the context window limit. You must call `agent__final_report` immediately to deliver your final answer using the information already gathered. Do not call any other tools.';
@@ -1469,6 +1470,7 @@ export class AIAgentSession {
       // Orchestrator receives ctx turn/subturn per call; no MCP client turn management
       this.llmClient.setTurn(currentTurn, 0);
       let lastError: string | undefined;
+      let lastErrorType: string | undefined;
       let turnSuccessful = false;
       let finalTurnRetryWarnLogged = false;
       let turnHadFinalReportAttempt = false;
@@ -1478,10 +1480,10 @@ export class AIAgentSession {
         if (currentTurn >= maxTurns) return;
         const previousMaxTurns = maxTurns;
         maxTurns = currentTurn + 1;
-        const adjustLog: LogEntry = {
-          timestamp: Date.now(),
-          severity: 'WRN',
-          turn: currentTurn,
+      const adjustLog: LogEntry = {
+        timestamp: Date.now(),
+        severity: 'WRN',
+        turn: currentTurn,
           subturn: 0,
           direction: 'response',
           type: 'llm',
@@ -1503,6 +1505,7 @@ export class AIAgentSession {
           customLabels: this.telemetryLabels,
         });
         collapseLoggedThisTurn = true;
+        this.logEnteringFinalTurn('max_turns', maxTurns);
       };
 
       // Global attempts across all provider/model pairs for this turn
@@ -1913,7 +1916,7 @@ export class AIAgentSession {
               }
               let sanitizedHasToolCalls = assistantForAdoption !== undefined && Array.isArray(assistantForAdoption.toolCalls) && assistantForAdoption.toolCalls.length > 0;
               const textContent = assistantForAdoption !== undefined && typeof assistantForAdoption.content === 'string' ? assistantForAdoption.content : undefined;
-              const sanitizedHasText = textContent !== undefined && textContent.trim().length > 0;
+              const sanitizedHasText = textContent !== undefined && textContent.length > 0;
 
               const toolFailureDetected = sanitizedMessages.some((msg) => msg.role === 'tool' && typeof msg.content === 'string' && msg.content.trim().toLowerCase().startsWith('(tool failed:'));
               let failureToolNameNormalized: string | undefined;
@@ -2055,6 +2058,10 @@ export class AIAgentSession {
                 this.log(warnEntry);
                 this.pushSystemRetryMessage(conversation, `System notice: the previous response had invalid tool-call arguments. Provide a JSON object when invoking tools and retry the required call.`);
                 lastError = 'invalid_response: malformed_tool_call';
+                lastErrorType = 'invalid_response';
+                if (finalReportAttempted) {
+                  collapseRemainingTurns('final_report_attempt');
+                }
                 if (cycleComplete) {
                   rateLimitedInCycle = 0;
                   maxRateLimitWaitMs = 0;
@@ -2068,7 +2075,8 @@ export class AIAgentSession {
               // Synthetic error: success with content but no tools and no final_report → retry this turn
               if (this.finalReport === undefined) {
                 if (!turnResult.status.finalAnswer && !sanitizedHasToolCalls && sanitizedHasText) {
-                const warnEntry: LogEntry = {
+                const syntheticMessage = 'Synthetic retry: assistant returned content without tool calls and without final_report.';
+                const providerWarnEntry: LogEntry = {
                   timestamp: Date.now(),
                   severity: 'WRN',
                   turn: currentTurn,
@@ -2077,9 +2085,14 @@ export class AIAgentSession {
                   type: 'llm',
                   remoteIdentifier: `${provider}:${model}`,
                   fatal: false,
-                  message: 'Synthetic retry: assistant returned content without tool calls and without final_report.'
+                  message: syntheticMessage,
                 };
-                this.log(warnEntry);
+                this.log(providerWarnEntry);
+                const orchestratorWarnEntry: LogEntry = {
+                  ...providerWarnEntry,
+                  remoteIdentifier: AIAgentSession.REMOTE_ORCHESTRATOR,
+                };
+                this.log(orchestratorWarnEntry);
                 if (isFinalTurn && !finalTurnRetryWarnLogged) {
                   const agentWarn: LogEntry = {
                     timestamp: Date.now(),
@@ -2096,6 +2109,7 @@ export class AIAgentSession {
                   finalTurnRetryWarnLogged = true;
                 }
                 lastError = 'invalid_response: content_without_tools_or_final';
+                lastErrorType = 'invalid_response';
                 if (cycleComplete) {
                   rateLimitedInCycle = 0;
                   maxRateLimitWaitMs = 0;
@@ -2287,6 +2301,7 @@ export class AIAgentSession {
                   this.log(warnEntry);
                   this.llmSyntheticFailures++;
                   lastError = 'invalid_response: empty_without_tools';
+                  lastErrorType = 'invalid_response';
                   if (cycleComplete) {
                     rateLimitedInCycle = 0;
                     maxRateLimitWaitMs = 0;
@@ -2325,6 +2340,7 @@ export class AIAgentSession {
                 this.log(warnEntry);
                 this.llmSyntheticFailures++;
                 lastError = `final_report_status_${finalReportStatus}`;
+                lastErrorType = 'invalid_response';
                 if (cycleComplete) {
                   rateLimitedInCycle = 0;
                   maxRateLimitWaitMs = 0;
@@ -2381,7 +2397,8 @@ export class AIAgentSession {
             }
           } else {
             // Handle various error types
-                  lastError = 'message' in turnResult.status ? turnResult.status.message : turnResult.status.type;
+                lastError = 'message' in turnResult.status ? turnResult.status.message : turnResult.status.type;
+                lastErrorType = turnResult.status.type;
 
             const remoteId = this.composeRemoteIdentifier(provider, model, turnResult.providerMetadata);
             const retryDirective = turnResult.retry ?? this.buildFallbackRetryDirective({
@@ -2583,6 +2600,7 @@ export class AIAgentSession {
         } catch (error: unknown) {
           const errorMessage: string = error instanceof Error ? error.message : String(error);
           lastError = errorMessage;
+          lastErrorType = 'internal_error';
           // Ensure accounting entry even if an unexpected error occurred before turnResult
             const accountingEntry: AccountingEntry = {
               type: 'llm',
@@ -2625,7 +2643,7 @@ export class AIAgentSession {
             final_report_attempts: this.finalReportAttempts,
             last_stop_reason: lastError ?? 'context_limit'
           };
-          this.logFailureReport('Context limit reached; synthesized final report.', currentTurn, {
+          this.logFailureReport(detailMessage, currentTurn, {
             reason: 'context_limit',
             turns_completed: currentTurn,
             final_report_attempts: this.finalReportAttempts,
@@ -2658,16 +2676,23 @@ export class AIAgentSession {
             : `${baseSummary} Final report attempts: ${String(this.finalReportAttempts)}.`;
           const fallbackFormatCandidate = this.resolvedFormat ?? 'text';
           const fallbackFormat = FINAL_REPORT_FORMAT_VALUES.find((value) => value === fallbackFormatCandidate) ?? 'text';
-          const metadataReason = (this.finalReportAttempts > 0 && typeof lastError === 'string' && lastError.startsWith('invalid_response'))
-            ? 'max_retries_exhausted'
-            : 'max_turns_exhausted';
+          const metadataReason = (() => {
+            const isInvalidResponseError = lastErrorType === 'invalid_response' || (typeof lastError === 'string' && lastError.startsWith('invalid_response'));
+            if (this.finalReportAttempts > 0 && isInvalidResponseError) {
+              return 'max_retries_exhausted';
+            }
+            if (typeof lastErrorType === 'string' && lastErrorType !== 'success') {
+              return lastErrorType === 'invalid_response' ? 'max_turns_exhausted' : 'llm_error';
+            }
+            return 'max_turns_exhausted';
+          })();
           const metadata: Record<string, unknown> = {
             reason: metadataReason,
             turns_completed: currentTurn,
             final_report_attempts: this.finalReportAttempts,
             last_stop_reason: lastError ?? 'none',
           };
-          this.logFailureReport('Max turns exhausted without final report.', currentTurn, {
+          this.logFailureReport(detailedSummary, currentTurn, {
             reason: metadataReason,
             turns_completed: currentTurn,
             final_report_attempts: this.finalReportAttempts,
@@ -2681,7 +2706,7 @@ export class AIAgentSession {
           return this.finalizeWithCurrentFinalReport(conversation, logs, accounting, currentTurn);
         }
 
-        if (currentTurn < maxTurns && typeof lastError === 'string' && lastError.startsWith('invalid_response')) {
+        if (currentTurn < maxTurns && (lastErrorType === 'invalid_response' || (typeof lastError === 'string' && lastError.startsWith('invalid_response')))) {
           const warnEntry: LogEntry = {
             timestamp: Date.now(),
             severity: 'WRN',
@@ -3736,7 +3761,7 @@ export class AIAgentSession {
         if (paramsCandidate === undefined) {
           const preview = this.previewRawParameter(rawParameters);
           droppedReasons.push(`call ${callIndexStr}: parameters not object (raw preview: ${preview})`);
-          if (rawName === AIAgentSession.FINAL_REPORT_TOOL) {
+          if (AIAgentSession.FINAL_REPORT_TOOL_ALIASES.has(rawName)) {
             finalReportAttempted = true;
             this.finalReportAttempts += 1;
           }
@@ -4078,7 +4103,7 @@ export class AIAgentSession {
                 type: 'tool',
                 remoteIdentifier: providerLabel,
                 fatal: false,
-                message: `Tool '${effectiveToolName}' output discarded: context window budget exceeded (${String(toolTokens)} tokens, limit ${String(first.limit)}).`,
+                message: `Tool '${effectiveToolName}' output dropped: context window budget exceeded (${String(toolTokens)} tokens, limit ${String(first.limit)}).`,
                 details: {
                   tool: effectiveToolName,
                   provider: providerLabel,
@@ -4086,6 +4111,7 @@ export class AIAgentSession {
                   projected_tokens: guardEvaluation.projectedTokens,
                   limit_tokens: first.limit,
                   remaining_tokens: remainingTokens,
+                  reason: 'token_budget_exceeded',
                 },
               };
               this.log(warnEntry);
@@ -4109,7 +4135,7 @@ export class AIAgentSession {
                 command: effectiveToolName,
                 charactersIn: managed.charactersIn,
                 charactersOut: managed.charactersOut,
-                error: 'context_budget_exceeded',
+                error: 'token_budget_exceeded',
                 agentId: this.sessionConfig.agentId,
                 callPath: this.callPath,
                 txnId: this.txnId,
