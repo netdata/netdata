@@ -748,7 +748,6 @@ static bool datafile_is_full(struct rrdengine_instance *ctx, struct rrdengine_da
 #ifdef OS_WINDOWS
     time_t now = now_realtime_sec();
     if (now - datafile->writers.last_sync_time > 60) {
-        nd_log_daemon(NDLP_INFO, "DBENGINE: datafile %d, last sync time: %ld, now: %ld", datafile->fileno, datafile->writers.last_sync_time, now);
         sync_uv_file_data(datafile->file);
         sync_uv_file_data(datafile->journalfile->file);
         datafile->writers.last_sync_time = now_realtime_sec();
