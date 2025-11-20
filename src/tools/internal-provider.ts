@@ -21,6 +21,7 @@ interface InternalToolProviderOptions {
   outputFormat: OutputFormatId;
   expectedOutputFormat?: OutputFormatId;
   expectedJsonSchema?: Record<string, unknown>;
+  maxToolCallsPerTurn: number;
   updateStatus: (text: string) => void;
   setTitle: (title: string, emoji?: string) => void;
   setFinalReport: (payload: { status: 'success'|'failure'|'partial'; format: string; content?: string; content_json?: Record<string, unknown>; metadata?: Record<string, unknown>; messages?: unknown[] }) => void;
@@ -59,6 +60,7 @@ export class InternalToolProvider extends ToolProvider {
   private readonly ajv: AjvInstance = new AjvCtor({ allErrors: true, strict: false });
   private readonly formatId: OutputFormatId;
   private readonly formatDescription: string;
+  private readonly maxToolCallsPerTurn: number;
   private instructions: string;
   private cachedBatchSchemas?: { schemas: Record<string, unknown>[]; summaries: { name: string; required: string[] }[] };
   private readonly disableProgressTool: boolean;
@@ -70,6 +72,7 @@ export class InternalToolProvider extends ToolProvider {
     super();
     this.formatId = opts.outputFormat;
     this.formatDescription = describeFormatParameter(this.formatId);
+    this.maxToolCallsPerTurn = opts.maxToolCallsPerTurn;
     const expected = opts.expectedOutputFormat;
     if (expected !== undefined && expected !== this.formatId) {
       throw new Error(`Output format mismatch: expectedOutput.format=${expected} but session outputFormat=${this.formatId}`);
@@ -242,6 +245,11 @@ export class InternalToolProvider extends ToolProvider {
     lines.push('- Always respond with valid tool calls, even for your final report.');
     lines.push(`- You must provide your final report to the user using the ${FINAL_REPORT_TOOL} tool, with the correct format (pay attention to formatting and newlines handling).`);
     lines.push(`- The CONTENT of your final report must be delivered using the ${FINAL_REPORT_TOOL} tool ONLY.`);
+    if (this.opts.enableBatch) {
+      lines.push(`- Per turn you can invoke at most ${String(this.maxToolCallsPerTurn)} tools in total (including those inside a batch request). Plan your tools accordingly.`);
+    } else {
+      lines.push(`- Per turn you can invoke at most ${String(this.maxToolCallsPerTurn)} tools in total.`);
+    }
 
     lines.push('');
     lines.push('### MANDATORY RULE FOR NEWLINES IN JSON STRINGS');

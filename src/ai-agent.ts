@@ -605,6 +605,7 @@ export class AIAgentSession {
     }
     // Internal tools provider
     {
+      const resolvedMaxToolCallsPerTurn = Math.max(1, this.sessionConfig.maxToolCallsPerTurn ?? 10);
       const declaredTools = Array.isArray(this.sessionConfig.tools) ? this.sessionConfig.tools : [];
       const hasNonInternalDeclaredTools = declaredTools.some((toolName) => {
         if (typeof toolName !== 'string') return false;
@@ -628,6 +629,7 @@ export class AIAgentSession {
         expectedOutputFormat: eo?.format === 'json' ? 'json' : undefined,
         expectedJsonSchema,
         disableProgressTool: !enableProgressTool,
+        maxToolCallsPerTurn: resolvedMaxToolCallsPerTurn,
         logError: (message: string) => {
           const entry: LogEntry = {
             timestamp: Date.now(),
