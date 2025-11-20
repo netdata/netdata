@@ -817,7 +817,7 @@
             },
             "update_every": {
               "ui:help": "The frequency this alarm is to be evaluated, in seconds.",
-              "ui:classNames": "dyncfg-grid-col-span-1-4"
+              "ui:classNames": "dyncfg-grid-col-span-1-2"
             },
             "units_placeholder": {
               "ui:widget": "unitsPlaceholder",
