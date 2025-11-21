@@ -161,7 +161,7 @@ func (m *Manager) run() {
 			case <-m.ctx.Done():
 				return
 			case fn := <-m.dyncfgCh:
-				m.dyncfgExec(fn)
+				m.dyncfgSeqExec(fn)
 			}
 		} else {
 			select {
@@ -172,7 +172,7 @@ func (m *Manager) run() {
 			case cfg := <-m.rmCh:
 				m.removeConfig(cfg)
 			case fn := <-m.dyncfgCh:
-				m.dyncfgExec(fn)
+				m.dyncfgSeqExec(fn)
 			}
 		}
 	}

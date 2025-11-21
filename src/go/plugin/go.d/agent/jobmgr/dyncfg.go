@@ -29,10 +29,10 @@ func (m *Manager) dyncfgConfig(fn functions.Function) {
 
 	//m.Infof("QQ FN: '%s'", fn)
 
-	m.dyncfgExec(fn)
+	m.dyncfgQueuedExec(fn)
 }
 
-func (m *Manager) dyncfgExec(fn functions.Function) {
+func (m *Manager) dyncfgQueuedExec(fn functions.Function) {
 	id := fn.Args[0]
 
 	switch {
@@ -40,6 +40,19 @@ func (m *Manager) dyncfgExec(fn functions.Function) {
 		m.dyncfgCollectorExec(fn)
 	case strings.HasPrefix(id, m.dyncfgVnodePrefixValue()):
 		m.dyncfgVnodeExec(fn)
+	default:
+		m.dyncfgApi.SendCodef(fn, 503, "unknown function '%s' (%s).", fn.Name, id)
+	}
+}
+
+func (m *Manager) dyncfgSeqExec(fn functions.Function) {
+	id := fn.Args[0]
+
+	switch {
+	case strings.HasPrefix(id, m.dyncfgCollectorPrefixValue()):
+		m.dyncfgCollectorSeqExec(fn)
+	case strings.HasPrefix(id, m.dyncfgVnodePrefixValue()):
+		m.dyncfgVnodeSeqExec(fn)
 	default:
 		m.dyncfgApi.SendCodef(fn, 503, "unknown function '%s' (%s).", fn.Name, id)
 	}
