@@ -2,6 +2,15 @@
 
 ### Merged Pull Requests:
 
+- Fix(cgroups): improve podman container name resolution ([#21317](https://github.com/netdata/netdata/issues/21317))
+- Build(deps): bump golang.org/x/crypto from 0.43.0 to 0.45.0 in /src/go ([#21322](https://github.com/netdata/netdata/issues/21322))
+- Remove log message ([#21325](https://github.com/netdata/netdata/issues/21325))
+- Improve(health/dyncfg): Add source unit field to alert value ([#21326](https://github.com/netdata/netdata/issues/21326))
+
+## [2.8.0] - 2025-11-19
+
+### Merged Pull Requests:
+
 - Improve(go.d/rabbitmq): add support for old RabbitMQ whoami tags format ([#21049](https://github.com/netdata/netdata/issues/21049))
 - Ai-docs ([#21043](https://github.com/netdata/netdata/issues/21043))
 - Feat(go.d/snmp): add optional ICMP ping metrics ([#21052](https://github.com/netdata/netdata/issues/21052))

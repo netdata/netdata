@@ -381,7 +381,7 @@ cleanup:
 static bool profile_speed = false;
 static bool print_tree_and_exit = false;
 #if (PROCESSES_HAVE_SMAPS_ROLLUP == 1)
-int pss_refresh_period = 300; // seconds
+int pss_refresh_period = 0; // disabled by default
 #endif
 
 static void parse_args(int argc, char **argv)
@@ -586,9 +586,9 @@ static void parse_args(int argc, char **argv)
                     "                        (default is %d seconds)\n"
                     "\n"
 #if (PROCESSES_HAVE_SMAPS_ROLLUP == 1)
-                    " --pss TIME            estimated memory interval (e.g. 5m, 300s)\n"
-                    "                        use 'off' to disable smaps sampling\n"
-                    "                        (default is 5 minutes)\n"
+                    " --pss TIME            enable estimated memory using PSS sampling at the given interval\n"
+                    "                        (e.g. 5m, 300s). Use 'off' or '0' to disable.\n"
+                    "                        (default is off)\n"
                     "\n"
 #endif
 #endif
