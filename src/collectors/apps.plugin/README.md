@@ -146,10 +146,10 @@ interpreters: process1 process2 process3
 
 #### Unix-like systems (Linux, FreeBSD, macOS)
 
-| Field    | Description                                                          | Example              |
-|----------|----------------------------------------------------------------------|----------------------|
-| comm     | Process name (command)                                               | `chrome`             |
-| cmdline  | Full command line with arguments                                     | `/usr/bin/chrome --enable-features=...` |
+| Field   | Description                      | Example                                 |
+|---------|----------------------------------|-----------------------------------------|
+| comm    | Process name (command)           | `chrome`                                |
+| cmdline | Full command line with arguments | `/usr/bin/chrome --enable-features=...` |
 
 > **Note:** On Linux specifically, the **comm** field is limited to 15 characters from `/proc/{PID}/comm`.
 > `apps.plugin` attempts to obtain the full process name by searching for it in the **cmdline**.
@@ -157,11 +157,11 @@ interpreters: process1 process2 process3
 
 #### Windows process fields
 
-| Field    | Description                                                          | Example              |
-|----------|----------------------------------------------------------------------|----------------------|
-| comm     | Performance Monitor instance name (may include instance numbers)      | `chrome#12`          |
-| cmdline  | Full path to the executable (without command line arguments)         | `C:\Program Files\Google\Chrome\Application\chrome.exe` |
-| name     | Friendly name from file description or service display name          | `Google Chrome`      |
+| Field   | Description                                                      | Example                                                 |
+|---------|------------------------------------------------------------------|---------------------------------------------------------|
+| comm    | Performance Monitor instance name (may include instance numbers) | `chrome#12`                                             |
+| cmdline | Full path to the executable (without command line arguments)     | `C:\Program Files\Google\Chrome\Application\chrome.exe` |
+| name    | Friendly name from file description or service display name      | `Google Chrome`                                         |
 
 > On Windows:
 > - All pattern types (exact, prefix, suffix, substring) also match against the **name** field
@@ -180,14 +180,15 @@ You can use asterisks (`*`) to create patterns:
 > - **Netdata v2.5.2 and earlier**: Windows patterns match against `comm` and `cmdline` fields
 > - **Netdata v2.5.3 and later**: Windows patterns match against `comm`, `cmdline`, and `name` (friendly name) fields
 
-| Mode      | Pattern     | Description                                 | Unix-like | Windows |
-|-----------|-------------|---------------------------------------------|-----------|---------|
-| exact     | `firefox`   | Matches **comm** exactly                    | ✓ Yes     | ✓ Yes   |
-| prefix    | `firefox*`  | Matches **comm** starting with firefox     | ✓ Yes     | ✓ Yes   |
-| suffix    | `*fox`      | Matches **comm** ending with fox           | ✓ Yes     | ✓ Yes   |
-| substring | `*firefox*` | Searches within **cmdline**                 | ✓ Yes (full command line) | ✓ Yes (full path) |
+| Mode      | Pattern     | Description                            | Unix-like                 | Windows           |
+|-----------|-------------|----------------------------------------|---------------------------|-------------------|
+| exact     | `firefox`   | Matches **comm** exactly               | ✓ Yes                     | ✓ Yes             |
+| prefix    | `firefox*`  | Matches **comm** starting with firefox | ✓ Yes                     | ✓ Yes             |
+| suffix    | `*fox`      | Matches **comm** ending with fox       | ✓ Yes                     | ✓ Yes             |
+| substring | `*firefox*` | Searches within **cmdline**            | ✓ Yes (full command line) | ✓ Yes (full path) |
 
 **Note on substring matching (`*pattern*`):**
+
 - On Unix-like systems: Searches within the full command line including arguments
 - On Windows: Searches within the full executable path (e.g., `C:\Program Files\Mozilla Firefox\firefox.exe`)
 
@@ -200,11 +201,13 @@ You can use asterisks (`*`) to create patterns:
 #### Windows default grouping behavior
 
 On Windows, when a process doesn't match any pattern in `apps_groups.conf`:
+
 - The **name** field (friendly name from file description or service display name) is used as the default group/category if available
 - If no **name** field exists, the **comm** field is used
 - This provides better default grouping for Windows services and applications with descriptive names
 
 For example, a process might have:
+
 - **comm**: `svchost`
 - **name**: `Windows Update`
 - **Default category**: `Windows Update` (uses the friendly name)
@@ -251,15 +254,15 @@ You can use the Netdata `processes` function to verify that your `apps_groups.co
 
 1. **Access the processes function** through Netdata Cloud (required for security reasons)
 2. **Review the output** to see:
-   - Current running processes with their `comm`, `cmdline`, and (on Windows) `name` fields
-   - The **Category** column shows which group from `apps_groups.conf` each process has been assigned to
-   - Resource utilization for each process
+    - Current running processes with their `comm`, `cmdline`, and (on Windows) `name` fields
+    - The **Category** column shows which group from `apps_groups.conf` each process has been assigned to
+    - Resource utilization for each process
 
 3. **Troubleshooting tips**:
-   - If a process shows the wrong Category, check the exact process name in the function output
-   - On Windows, remember that the `name` field is used for default categories but NOT for pattern matching
-   - Remember that the first matching pattern wins - check your pattern order
-   - For inherited groups, verify the parent process has the correct Category
+    - If a process shows the wrong Category, check the exact process name in the function output
+    - On Windows, remember that the `name` field is used for default categories but NOT for pattern matching
+    - Remember that the first matching pattern wins - check your pattern order
+    - For inherited groups, verify the parent process has the correct Category
 
 There are a few command line options you can pass to `apps.plugin`. The list of available options can be acquired with the `--help` flag.
 The options can be set in the `netdata.conf` using the [`edit-config` script](/docs/netdata-agent/configuration/README.md).
@@ -275,7 +278,7 @@ For example, to disable user and user group charts you would set:
 
 On Linux systems with kernel 4.14 or later, `apps.plugin` uses Proportional Set Size (PSS) data from `/proc/<pid>/smaps_rollup` to provide more accurate memory usage estimates for processes that heavily use shared memory (e.g., databases, shared memory applications).
 
-**By default, PSS sampling is enabled with a 5-minute refresh interval.** This provides better accuracy than raw RSS (Resident Set Size), which can overstate memory usage for processes sharing memory pages. The plugin periodically samples PSS values and uses them to scale the shared memory portion of RSS, providing a more accurate estimate without the overhead of reading smaps on every iteration.
+**By default, PSS sampling is disabled**. When disabled, memory charts show traditional RSS (Resident Set Size), which may overstate usage for processes sharing memory pages. Enabling PSS sampling allows the plugin to periodically sample PSS values and use them to scale the shared portion of RSS, providing a significantly more accurate estimate without the overhead of reading smaps on every iteration.
 
 #### Configuration
 
@@ -287,26 +290,30 @@ The `--pss` option controls PSS sampling behavior:
 ```
 
 **Valid values:**
+
 - Duration (e.g., `5m`, `300s`, `10m`): Sets the refresh interval for PSS sampling. Lower values provide more accurate estimates but increase CPU overhead.
 - `off` or `0`: Completely disables PSS sampling. Memory charts will show traditional RSS-based measurements.
 
-**Default:** `5m` (5 minutes)
+**Default:** `off`
 
 **How it works:**
+
 - `apps.plugin` uses adaptive sampling that alternates between two strategies each iteration:
-  - **Delta-based**: Prioritizes processes with largest shared memory changes (refreshes big memory consumers within seconds)
-  - **Age-based**: Prioritizes processes with oldest samples (ensures all processes refreshed within 2× the interval)
+    - **Delta-based**: Prioritizes processes with largest shared memory changes (refreshes big memory consumers within seconds)
+    - **Age-based**: Prioritizes processes with oldest samples (ensures all processes refreshed within 2× the interval)
 - The sampled PSS/RSS ratio is cached and applied to subsequent RSS readings to estimate current memory usage
 - This approach ensures rapid response to significant memory changes while guaranteeing bounded staleness for all processes
 - When disabled (`--pss 0` or `--pss off`), no PSS sampling occurs and estimated memory charts are not shown
 
 **Performance considerations:**
+
 - Reading `/proc/<pid>/smaps_rollup` is more expensive than reading `/proc/<pid>/status`
 - Shorter refresh periods provide more accurate estimates but increase CPU usage
 - On systems with thousands of processes, consider increasing the refresh period (e.g., `10m` or `15m`)
 - For systems without significant shared memory usage, disabling PSS sampling (`--pss off`) reduces overhead
 
 **Chart behavior:**
+
 - **Default (PSS enabled):** Shows both "Estimated memory usage (RSS with shared scaling)" and "Memory RSS usage" charts
 - **When disabled (`--pss 0`):** Shows only "Memory RSS usage" charts
 - The `processes` function API exposes additional columns (PSS, PssAge, SharedRatio) when PSS is enabled

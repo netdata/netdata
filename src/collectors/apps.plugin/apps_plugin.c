@@ -381,7 +381,7 @@ cleanup:
 static bool profile_speed = false;
 static bool print_tree_and_exit = false;
 #if (PROCESSES_HAVE_SMAPS_ROLLUP == 1)
-int pss_refresh_period = 300; // seconds
+int pss_refresh_period = 0; // disabled by default
 #endif
 
 static void parse_args(int argc, char **argv)
