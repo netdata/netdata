@@ -71,7 +71,7 @@ import { InternalToolProvider } from './tools/internal-provider.js';
 import { MCPProvider } from './tools/mcp-provider.js';
 import { RestProvider } from './tools/rest-provider.js';
 import { ToolsOrchestrator, type ManagedToolResult, type ToolBudgetCallbacks } from './tools/tools.js';
-import { appendCallPathSegment, clampToolName, formatToolRequestCompact, normalizeCallPath, parseJsonRecord, sanitizeToolName, truncateUtf8WithNotice, warn } from './utils.js';
+import { appendCallPathSegment, clampToolName, formatToolRequestCompact, normalizeCallPath, parseJsonRecord, parseJsonRecordDetailed, parseJsonValueDetailed, sanitizeToolName, truncateUtf8WithNotice, warn } from './utils.js';
 
 // Immutable session class according to DESIGN.md
 type AjvInstance = AjvClass;
@@ -131,6 +131,7 @@ export class AIAgentSession {
   private static readonly REMOTE_FINAL_TURN = 'agent:final-turn';
   private static readonly REMOTE_CONTEXT = 'agent:context';
   private static readonly REMOTE_ORCHESTRATOR = 'agent:orchestrator';
+  private static readonly REMOTE_SANITIZER = 'agent:sanitizer';
   private static readonly FINAL_REPORT_TOOL = 'agent__final_report';
   private static readonly FINAL_REPORT_TOOL_ALIASES = new Set<string>(['agent__final_report', 'agent-final-report']);
   private static readonly FINAL_REPORT_SHORT = 'final_report';
@@ -1989,12 +1990,70 @@ export class AIAgentSession {
           const formatParamRaw = (params as { report_format?: unknown }).report_format;
           const formatParam = typeof formatParamRaw === 'string' && formatParamRaw.trim().length > 0 ? formatParamRaw.trim() : undefined;
           const contentValue = (params as { report_content?: unknown }).report_content;
-          const contentParam = typeof contentValue === 'string' && contentValue.trim().length > 0 ? contentValue.trim() : undefined;
+          const contentParamRaw = typeof contentValue === 'string' && contentValue.trim().length > 0 ? contentValue.trim() : undefined;
+          const encodingValue = (params as { encoding?: unknown }).encoding;
+          const encoding = encodingValue === 'base64' ? 'base64' : 'raw';
+          const encodingLabel = typeof encodingValue === 'string' ? encodingValue : (encodingValue === undefined ? 'undefined' : 'non-string');
+          if (encodingValue !== undefined && encodingValue !== 'raw' && encodingValue !== 'base64') {
+            const warnEntry: LogEntry = {
+              timestamp: Date.now(),
+              severity: 'WRN',
+              turn: currentTurn,
+              subturn: 0,
+              direction: 'response',
+              type: 'llm',
+              remoteIdentifier: AIAgentSession.REMOTE_SANITIZER,
+              fatal: false,
+              message: `agent__final_report encoding '${encodingLabel}' is invalid; defaulting to 'raw'.`,
+            };
+            this.log(warnEntry);
+          }
+          let contentParam = contentParamRaw;
+          if (encoding === 'base64' && contentParamRaw !== undefined) {
+            try {
+              contentParam = Buffer.from(contentParamRaw, 'base64').toString('utf8');
+            } catch (error) {
+              const errMsg = error instanceof Error ? error.message : String(error);
+              const warnEntry: LogEntry = {
+                timestamp: Date.now(),
+                severity: 'ERR',
+                turn: currentTurn,
+                subturn: 0,
+                direction: 'response',
+                type: 'llm',
+                remoteIdentifier: AIAgentSession.REMOTE_SANITIZER,
+                fatal: false,
+                message: `agent__final_report base64 decode failed: ${errMsg}`,
+              };
+              this.log(warnEntry);
+              return false;
+            }
+          }
           if (status === undefined || contentParam === undefined) return false;
           const metadataCandidate = (params as { metadata?: unknown }).metadata;
           const metadata = (metadataCandidate !== null && typeof metadataCandidate === 'object' && !Array.isArray(metadataCandidate)) ? metadataCandidate as Record<string, unknown> : undefined;
           const contentJsonCandidate = (params as { content_json?: unknown }).content_json;
-          const contentJson = (contentJsonCandidate !== null && typeof contentJsonCandidate === 'object' && !Array.isArray(contentJsonCandidate)) ? contentJsonCandidate as Record<string, unknown> : undefined;
+          let contentJson = (contentJsonCandidate !== null && typeof contentJsonCandidate === 'object' && !Array.isArray(contentJsonCandidate)) ? contentJsonCandidate as Record<string, unknown> : undefined;
+          if (contentJson === undefined && typeof contentJsonCandidate === 'string') {
+            const parsedContentJson = parseJsonValueDetailed(contentJsonCandidate);
+            if (parsedContentJson.value !== undefined && typeof parsedContentJson.value === 'object' && !Array.isArray(parsedContentJson.value)) {
+              contentJson = parsedContentJson.value as Record<string, unknown>;
+              if (parsedContentJson.repairs.length > 0) {
+                const warnEntry: LogEntry = {
+                  timestamp: Date.now(),
+                  severity: 'WRN',
+                  turn: currentTurn,
+                  subturn: 0,
+                  direction: 'response',
+                  type: 'llm',
+                  remoteIdentifier: AIAgentSession.REMOTE_SANITIZER,
+                  fatal: false,
+                  message: `agent__final_report.content_json repaired via [${parsedContentJson.repairs.join('>')}]`,
+                };
+                this.log(warnEntry);
+              }
+            }
+          }
           const normalizedStatus = status === 'success' || status === 'failure' || status === 'partial' ? status : undefined;
           if (normalizedStatus === undefined) return false;
           const formatCandidate = formatParam ?? this.resolvedFormat ?? 'text';
@@ -2340,6 +2399,14 @@ export class AIAgentSession {
                   message: `Final report returned status='${finalReportStatus}', retrying.`,
                 };
                 this.log(warnEntry);
+                // Track that the model attempted a final_report even though it failed or was incomplete.
+                // This forces the session to collapse remaining turns and helps surface retries in logs.
+                turnHadFinalReportAttempt = true;
+                if (finalReportStatus === 'missing') {
+                  collapseRemainingTurns('incomplete_final_report');
+                } else {
+                  collapseRemainingTurns('final_report_attempt');
+                }
                 this.llmSyntheticFailures++;
                 lastError = `final_report_status_${finalReportStatus}`;
                 lastErrorType = 'invalid_response';
@@ -3759,15 +3826,38 @@ export class AIAgentSession {
           return;
         }
         const rawParameters = tcRaw.parameters;
-        const paramsCandidate = parseJsonRecord(rawParameters);
+        const paramsDetailed = parseJsonRecordDetailed(rawParameters);
+        const paramsCandidate = paramsDetailed.value;
         if (paramsCandidate === undefined) {
-          const preview = this.previewRawParameter(rawParameters);
-          droppedReasons.push(`call ${callIndexStr}: parameters not object (raw preview: ${preview})`);
+          const rawFull = typeof rawParameters === 'string' ? rawParameters : (() => {
+            try { return JSON.stringify(rawParameters); } catch { return '[unserializable]'; }
+          })();
+          droppedReasons.push(`call ${callIndexStr}: parameters not object (raw: ${rawFull})`);
           if (AIAgentSession.FINAL_REPORT_TOOL_ALIASES.has(rawName)) {
             finalReportAttempted = true;
             this.finalReportAttempts += 1;
           }
           return;
+        }
+        if (paramsDetailed.repairs.length > 0) {
+          const warnEntry: LogEntry = {
+            timestamp: Date.now(),
+            severity: 'WRN',
+            turn: context.turn,
+            subturn: 0,
+            direction: 'response',
+            type: 'llm',
+            remoteIdentifier: AIAgentSession.REMOTE_SANITIZER,
+            fatal: false,
+            message: `Tool call parameters repaired via [${paramsDetailed.repairs.join('>')}]`,
+            details: {
+              repairs: paramsDetailed.repairs.join('>'),
+              original: paramsDetailed.originalText ?? '',
+              repaired: paramsDetailed.repairedText ?? '',
+              tool: rawName,
+            },
+          };
+          this.log(warnEntry);
         }
         validCalls.push({
           id: rawId,
@@ -3787,7 +3877,7 @@ export class AIAgentSession {
           subturn: 0,
           direction: 'response',
           type: 'llm',
-          remoteIdentifier: 'agent:sanitizer',
+          remoteIdentifier: AIAgentSession.REMOTE_SANITIZER,
           fatal: false,
           message: `Dropped ${countStr} invalid tool call(s) from assistant message index ${msgIndexStr} (provider=${context.provider}:${context.model}): ${droppedReasons.join(', ')}`,
         };
@@ -4236,6 +4326,29 @@ export class AIAgentSession {
         const latency = Date.now() - startTime;
         const errorMsg = error instanceof Error ? error.message : String(error);
         addSpanEvent('tool.call.error', { 'ai.tool.name': effectiveToolName, 'ai.tool.error': errorMsg });
+
+        if (isFinalReportTool) {
+          const serialized = (() => {
+            try {
+              return JSON.stringify(parameters);
+            } catch {
+              return '[unserializable-final-report-payload]';
+            }
+          })();
+          const errLog: LogEntry = {
+            timestamp: Date.now(),
+            severity: 'ERR',
+            turn: currentTurn,
+            subturn: subturnCounter,
+            direction: 'response',
+            type: 'tool',
+            remoteIdentifier: AIAgentSession.REMOTE_ORCHESTRATOR,
+            fatal: false,
+            message: `agent__final_report failed: ${errorMsg}`,
+            details: { payload: serialized },
+          };
+          this.log(errLog);
+        }
 
         // Add failed tool accounting
         const accountingEntry: AccountingEntry = {

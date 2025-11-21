@@ -4119,7 +4119,7 @@ const SCENARIOS: ScenarioDefinition[] = [
               callId: 'call-guard-drop-first',
               assistantText: 'Issuing first heavy payload.',
               arguments: {
-                text: TOOL_ARGUMENT_CONTEXT_OVERFLOW,
+                text: TOOL_ARGUMENT_SUCCESS,
               },
             },
             {
@@ -4127,7 +4127,7 @@ const SCENARIOS: ScenarioDefinition[] = [
               callId: 'call-guard-drop-second',
               assistantText: 'Issuing second heavy payload.',
               arguments: {
-                text: TOOL_ARGUMENT_CONTEXT_OVERFLOW,
+                text: TOOL_ARGUMENT_LONG_OUTPUT,
               },
             },
           ],

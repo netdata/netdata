@@ -38,7 +38,7 @@
 - **Fallback cache ≠ success**: If you emit valid JSON in text (instead of calling the tool), the agent caches it but still retries. Only on the *forced final turn* (max turns or context guard) will that cached payload be accepted—logged as `agent:fallback-report` and attributed to you as a soft failure.
 - **Malformed calls shrink your budget**: Whenever you send `agent__final_report` with invalid parameters (missing status/format/content) the orchestrator logs `agent:orchestrator Collapsing remaining turns...` and reduces `maxTurns` to `currentTurn + 1`. Persistently malformed payloads therefore eliminate future tool turns.
 - **Synthetic failures trigger alerts**: If you refuse to send a valid tool call, the session emits `agent:failure-report` and surfaces a synthetic `status: failure` final report. Telemetry labels (`source='synthetic'`, `reason='max_turns_exhausted'|...)`) notify on-call teams. Do **not** rely on this path.
-- **What you should do**: Always call `agent__final_report` with `status`, `report_format`, `report_content`, and (when applicable) `content_json` that matches the schema. Treat text extraction as an emergency fallback only.
+- **What you should do**: Always call `agent__final_report` with `status`, `report_format`, `encoding` (`raw` or `base64`), `report_content`, and (when applicable) `content_json` that matches the schema. Treat text extraction as an emergency fallback only.
 - [ ] Decide whether to expose tool instructions (default: appended automatically once).
 - [ ] Enable tracing/verbose flags when debugging provider/tool failures.
 

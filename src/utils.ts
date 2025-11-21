@@ -1,3 +1,5 @@
+import { jsonrepair } from 'jsonrepair';
+
 import type { AIAgentResult, AccountingEntry, ConversationMessage } from './types.js';
 
 function bytesLen(s: string): number {
@@ -45,10 +47,9 @@ export const isPlainObject = (value: unknown): value is Record<string, unknown> 
   value !== null && typeof value === 'object' && !Array.isArray(value)
 );
 
-const tryParseJsonRecord = (value: string): Record<string, unknown> | undefined => {
+const tryParseJson = (value: string): unknown => {
   try {
-    const parsed: unknown = JSON.parse(value);
-    return isPlainObject(parsed) ? parsed : undefined;
+    return JSON.parse(value);
   } catch {
     return undefined;
   }
@@ -62,6 +63,25 @@ const stripSurroundingCodeFence = (value: string): string | undefined => {
 const stripTrailingEllipsis = (value: string): string | undefined => {
   const trimmed = value.replace(/(?:,\s*)?(?:\.{3}|…)(?:\s*\([^)]*\))?\s*$/u, '');
   return trimmed.length !== value.length ? trimmed : undefined;
+};
+
+const normalizeHexEscapes = (value: unknown): unknown => {
+  const replaceHex = (s: string): string => {
+    const toChar = (hex: unknown): string => {
+      const hexStr = typeof hex === 'string' ? hex : String(hex);
+      return String.fromCharCode(Number.parseInt(hexStr, 16));
+    };
+    return s
+      .replace(/\\x([0-9a-fA-F]{2})/g, (_m, hex) => toChar(hex))
+      .replace(/\bx([0-9a-fA-F]{2})\b/g, (_m, hex) => toChar(hex));
+  };
+  if (typeof value === 'string') return replaceHex(value);
+  if (Array.isArray(value)) return value.map((v) => normalizeHexEscapes(v));
+  if (isPlainObject(value)) {
+    const entries = Object.entries(value).map(([k, v]) => [k, normalizeHexEscapes(v)]);
+    return Object.fromEntries(entries);
+  }
+  return value;
 };
 
 const extractFirstJsonObject = (value: string): string | undefined => {
@@ -157,70 +177,110 @@ const closeDanglingJson = (value: string): string | undefined => {
   return `${trimmed}${closers}`;
 };
 
-export const parseJsonRecord = (raw: unknown): Record<string, unknown> | undefined => {
-  if (isPlainObject(raw)) {
-    return raw;
+export interface JsonParseDiagnostics {
+  value?: unknown;
+  repairs: string[];
+  error?: string;
+  originalText?: string;
+  repairedText?: string;
+}
+
+const attemptRepairs = (text: string): { value?: unknown; repairedText?: string; steps: string[] } => {
+  const steps: string[] = [];
+  const parsed = tryParseJson(text);
+  if (parsed !== undefined) {
+    return { value: parsed, repairedText: text, steps };
+  }
+  try {
+    const repaired = jsonrepair(text);
+    const reparsed = tryParseJson(repaired);
+    if (reparsed !== undefined) {
+      return { value: reparsed, repairedText: repaired, steps: ['jsonrepair'] };
+    }
+  } catch {
+    /* ignore jsonrepair failure; caller will handle */
+  }
+  return { steps: [] };
+};
+
+export const parseJsonValueDetailed = (raw: unknown): JsonParseDiagnostics => {
+  if (isPlainObject(raw) || Array.isArray(raw)) {
+    return { value: normalizeHexEscapes(raw), repairs: [] };
   }
   if (typeof raw !== 'string') {
-    return undefined;
+    return { repairs: [], error: 'non_string' };
   }
-  const trimmed = raw.trim();
-  if (trimmed.length === 0) {
-    return undefined;
+  const originalText = raw.trim();
+  if (originalText.length === 0) {
+    return { repairs: [], error: 'empty', originalText };
   }
 
-  const candidates = new Set<string>();
-  const enqueue = (value: string | undefined): void => {
-    if (value === undefined) {
-      return;
-    }
-    const normalized = value.trim();
-    if (normalized.length === 0) {
-      return;
-    }
-    candidates.add(normalized);
+  const enqueue = (target: string | undefined, steps: string[]): { text: string; steps: string[] } | undefined => {
+    if (target === undefined) return undefined;
+    const normalized = target.trim();
+    if (normalized.length === 0) return undefined;
+    return { text: normalized, steps };
   };
 
-  enqueue(trimmed);
-  enqueue(stripSurroundingCodeFence(trimmed));
-  enqueue(stripTrailingEllipsis(trimmed));
-  const repaired = trimmed.replace(/\\x([0-9a-fA-F]{2})/g, (_match, hex) => `\\u00${String(hex).toUpperCase()}`);
-  if (repaired !== trimmed) {
-    enqueue(repaired);
-    enqueue(stripTrailingEllipsis(repaired));
-  }
+  const queue: { text: string; steps: string[] }[] = [];
+  const seen = new Set<string>();
 
+  const hexFixed = originalText.replace(/\\x([0-9a-fA-F]{2})/g, (_match, hex) => `\\u00${String(hex).toUpperCase()}`);
+  const baseCandidates = [
+    enqueue(originalText, []),
+    enqueue(stripSurroundingCodeFence(originalText), ['stripCodeFence']),
+    enqueue(stripTrailingEllipsis(originalText), ['stripTrailingEllipsis']),
+    enqueue(hexFixed !== originalText ? hexFixed : undefined, ['hexEscapeFix']),
+  ].filter((v): v is { text: string; steps: string[] } => v !== undefined);
+  queue.push(...baseCandidates);
+
+  let lastError: string | undefined;
   // eslint-disable-next-line functional/no-loop-statements
-  for (const candidate of candidates) {
-    const direct = tryParseJsonRecord(candidate);
-    if (direct !== undefined) {
-      return direct;
+  while (queue.length > 0) {
+    const candidate = queue.shift();
+    if (candidate === undefined) break;
+    if (seen.has(candidate.text)) continue;
+    seen.add(candidate.text);
+
+    const attempt = attemptRepairs(candidate.text);
+    if (attempt.value !== undefined) {
+      return {
+        value: normalizeHexEscapes(attempt.value),
+        repairs: [...candidate.steps, ...attempt.steps],
+        originalText,
+        repairedText: attempt.repairedText,
+      };
     }
 
-    const embedded = extractFirstJsonObject(candidate);
-    if (embedded !== undefined) {
-      const parsedEmbedded = tryParseJsonRecord(embedded);
-      if (parsedEmbedded !== undefined) {
-        return parsedEmbedded;
-      }
-      const closedEmbedded = closeDanglingJson(embedded);
-      if (closedEmbedded !== undefined) {
-        const repairedEmbedded = tryParseJsonRecord(closedEmbedded);
-        if (repairedEmbedded !== undefined) {
-          return repairedEmbedded;
-        }
-      }
+    // Explore secondary transforms only if parse failed
+    const extracted = extractFirstJsonObject(candidate.text);
+    if (extracted !== undefined) {
+      const enriched = enqueue(extracted, [...candidate.steps, 'extractFirstObject']);
+      if (enriched !== undefined) queue.push(enriched);
     }
-
-    const closed = closeDanglingJson(candidate);
+    const closed = closeDanglingJson(candidate.text);
     if (closed !== undefined) {
-      const parsedClosed = tryParseJsonRecord(closed);
-      if (parsedClosed !== undefined) {
-        return parsedClosed;
-      }
+      const enriched = enqueue(closed, [...candidate.steps, 'closeDangling']);
+      if (enriched !== undefined) queue.push(enriched);
+    }
+    lastError = 'parse_failed';
+    if (queue.length > 40) {
+      break; // safety cap
     }
   }
-  return undefined;
+
+  return { repairs: [], error: lastError ?? 'parse_failed', originalText };
+};
+
+export const parseJsonRecordDetailed = (raw: unknown): JsonParseDiagnostics & { value?: Record<string, unknown> } => {
+  const detailed = parseJsonValueDetailed(raw);
+  const value = isPlainObject(detailed.value) ? detailed.value : undefined;
+  return { ...detailed, value };
+};
+
+export const parseJsonRecord = (raw: unknown): Record<string, unknown> | undefined => {
+  const { value } = parseJsonRecordDetailed(raw);
+  return value;
 };
 
 

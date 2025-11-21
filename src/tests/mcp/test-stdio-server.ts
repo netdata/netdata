@@ -37,8 +37,8 @@ server.registerTool(
   async () => noopResult,
 );
 
-const longPayload = '#'.repeat(1024);
-const guardOverflowPayload = '@'.repeat(2000);
+const longPayload = '#'.repeat(3200);
+const guardOverflowPayload = '@'.repeat(1200);
 
 const fixtureMode = process.env.MCP_FIXTURE_MODE ?? '';
 const fixtureStateFile = process.env.MCP_FIXTURE_STATE_FILE;

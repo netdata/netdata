@@ -12,7 +12,7 @@ type AjvConstructor = new (options?: AjvOptions) => AjvInstance;
 const AjvCtor: AjvConstructor = Ajv as unknown as AjvConstructor;
 
 import { describeFormatParameter, formatPromptValue } from '../formats.js';
-import { parseJsonRecord, truncateUtf8WithNotice } from '../utils.js';
+import { parseJsonRecord, parseJsonValueDetailed, truncateUtf8WithNotice } from '../utils.js';
 
 import { ToolProvider } from './types.js';
 
@@ -256,6 +256,7 @@ export class InternalToolProvider extends ToolProvider {
     lines.push('- To add newlines in JSON string fields, use the `\\n` escape sequence within the string value.');
     lines.push('- When your final report includes newlines, you MUST use the `\\n` escape sequence within the string value for every newline you want to add, instead of raw newline characters.');
     lines.push(`- Do not include raw newline characters in JSON string values (json becomes invalid); use '\\n' instead.`);
+    lines.push('- If escaping becomes hard (e.g., heavy markdown), set `encoding="base64"` on `agent__final_report` and base64-encode `report_content`; otherwise use `encoding="raw"`.');
 
     if (this.opts.enableBatch) {
       lines.push('');
@@ -416,11 +417,16 @@ export class InternalToolProvider extends ToolProvider {
       inputSchema: {
         type: 'object',
         additionalProperties: false,
-        required: ['status', 'report_format', 'report_content'],
+        required: ['status', 'report_format', 'report_content', 'encoding'],
         properties: {
           status: statusProp,
           report_format: { type: 'string', const: this.formatId, description: this.formatDescription },
-          report_content: { type: 'string', minLength: 1, description: 'MANDATORY: the content of your final report.' },
+          encoding: {
+            type: 'string',
+            enum: ['raw', 'base64'],
+            description: 'Encoding of report_content. Use base64 when content includes markdown/newlines; otherwise use raw.'
+          },
+          report_content: { type: 'string', minLength: 1, description: 'MANDATORY: the content of your final report. If encoding=base64, this must be base64-encoded UTF-8.' },
           metadata: metadataProp,
         },
       },
@@ -443,8 +449,22 @@ export class InternalToolProvider extends ToolProvider {
       if (requestedFormat !== undefined && requestedFormat !== this.formatId) {
         this.opts.logError(`agent__final_report: received report_format='${requestedFormat}', expected '${this.formatId}'. Proceeding with expected format.`);
       }
-      const content = typeof parameters.report_content === 'string' ? parameters.report_content : (typeof parameters.content === 'string' ? parameters.content : undefined);
-      const contentJson = (parameters.content_json !== null && typeof parameters.content_json === 'object' && !Array.isArray(parameters.content_json)) ? (parameters.content_json as Record<string, unknown>) : undefined;
+      const encodingRaw = typeof parameters.encoding === 'string' ? parameters.encoding : undefined;
+      const encoding = encodingRaw === 'base64' ? 'base64' : 'raw';
+      if (encodingRaw !== undefined && encodingRaw !== 'raw' && encodingRaw !== 'base64') {
+        this.opts.logError(`agent__final_report: invalid encoding '${encodingRaw}', defaulting to 'raw'.`);
+      }
+      let content = typeof parameters.report_content === 'string' ? parameters.report_content : (typeof parameters.content === 'string' ? parameters.content : undefined);
+      if (encoding === 'base64' && typeof content === 'string') {
+        try {
+          content = Buffer.from(content, 'base64').toString('utf8');
+        } catch (error) {
+          const errMsg = error instanceof Error ? error.message : String(error);
+          this.opts.logError(`agent__final_report: base64 decode failed: ${errMsg}`);
+          throw new Error(`agent__final_report: base64 decode failed: ${errMsg}`);
+        }
+      }
+      let contentJson = (parameters.content_json !== null && typeof parameters.content_json === 'object' && !Array.isArray(parameters.content_json)) ? (parameters.content_json as Record<string, unknown>) : undefined;
       const metadata = (parameters.metadata !== null && typeof parameters.metadata === 'object' && !Array.isArray(parameters.metadata)) ? (parameters.metadata as Record<string, unknown>) : undefined;
       const rawMessages = Object.prototype.hasOwnProperty.call(parameters, 'messages') ? parameters.messages : undefined;
 
@@ -665,7 +685,7 @@ export class InternalToolProvider extends ToolProvider {
         const slackVal = (metaBase as Record<string, unknown> & { slack?: unknown }).slack;
         const slackExisting: Record<string, unknown> = (slackVal !== undefined && slackVal !== null && typeof slackVal === 'object' && !Array.isArray(slackVal)) ? (slackVal as Record<string, unknown>) : {};
         const metaSlack: Record<string, unknown> = { ...slackExisting, messages: normalizedMessages };
-        const mergedMeta: Record<string, unknown> = { ...metaBase, slack: metaSlack };
+        const mergedMeta: Record<string, unknown> = { ...metaBase, encoding, slack: metaSlack };
         this.opts.setFinalReport({ status, format: this.formatId, content, content_json: contentJson, metadata: mergedMeta });
         return { ok: true, result: JSON.stringify({ ok: true }), latencyMs: Date.now() - start, kind: this.kind, namespace: this.namespace };
       }
@@ -677,10 +697,67 @@ export class InternalToolProvider extends ToolProvider {
         }
         if (this.opts.expectedJsonSchema !== undefined) {
           const validate = this.ajv.compile(this.opts.expectedJsonSchema);
-          const ok = validate(contentJson);
+          const cloneDeep = (obj: Record<string, unknown>): Record<string, unknown> => JSON.parse(JSON.stringify(obj)) as Record<string, unknown>;
+          const target = cloneDeep(contentJson);
+
+          const getPathSegments = (instancePath: string): (string | number)[] => (
+            instancePath.split('/').filter((s) => s.length > 0).map((seg) => {
+              const maybeInt = Number.parseInt(seg, 10);
+              return Number.isFinite(maybeInt) && seg.trim() === maybeInt.toString() ? maybeInt : seg;
+            })
+          );
+
+          const getAtPath = (obj: unknown, segments: (string | number)[]): { parent?: Record<string, unknown> | unknown[]; key?: string | number; value?: unknown } => {
+            let ref: unknown = obj;
+            let parent: Record<string, unknown> | unknown[] | undefined;
+            let key: string | number | undefined;
+            // eslint-disable-next-line functional/no-loop-statements
+            for (const seg of segments) {
+              if (ref === undefined || ref === null) return { parent: undefined, key: undefined, value: undefined };
+              if (typeof ref !== 'object') return { parent: undefined, key: undefined, value: undefined };
+              parent = ref as Record<string, unknown> | unknown[];
+              key = seg;
+              ref = (ref as Record<string, unknown> & unknown[])[seg as keyof typeof ref];
+            }
+            return { parent, key, value: ref };
+          };
+
+          const setAtPath = (obj: unknown, segments: (string | number)[], value: unknown): boolean => {
+            if (segments.length === 0) return false;
+            const { parent, key } = getAtPath(obj, segments);
+            if (parent === undefined || key === undefined) return false;
+            (parent as Record<string, unknown> & unknown[])[key as keyof typeof parent] = value as never;
+            return true;
+          };
+
+          let ok = validate(target);
+          let errors: AjvErrorObject[] = validate.errors ?? [];
+          let lastPath = '';
+          let attempts = 0;
+          const maxAttempts = 4;
+
+          // eslint-disable-next-line functional/no-loop-statements
+          while (!ok && errors.length > 0 && attempts < maxAttempts) {
+            attempts += 1;
+            const err = errors[0];
+            const path = typeof err.instancePath === 'string' ? err.instancePath : '';
+            if (path.length === 0 || path === lastPath) break;
+            lastPath = path;
+            const segments = getPathSegments(path);
+            const { value } = getAtPath(target, segments);
+            if (typeof value !== 'string') break;
+            const parsed = parseJsonValueDetailed(value);
+            if (parsed.value === undefined) break;
+            const updated = setAtPath(target, segments, parsed.value);
+            if (!updated) break;
+            this.opts.logError(`agent__final_report content_json repaired at path '${path}' via [${parsed.repairs.join('>')}]`);
+            ok = validate(target);
+            errors = (validate.errors as AjvErrorObject[] | null) ?? [];
+          }
+
           if (!ok) {
-            const errs = Array.isArray(validate.errors)
-              ? (validate.errors as AjvErrorObject[]).map((error) => {
+            const errs = Array.isArray(errors)
+              ? errors.map((error) => {
                   const inst = typeof error.instancePath === 'string' ? error.instancePath : '';
                   const msg = typeof error.message === 'string' ? error.message : '';
                   return `${inst} ${msg}`.trim();
@@ -690,8 +767,10 @@ export class InternalToolProvider extends ToolProvider {
             this.opts.logError(errMsg);
             throw new Error(errMsg);
           }
+          contentJson = target;
         }
-        this.opts.setFinalReport({ status, format: this.formatId, content, content_json: contentJson, metadata });
+        const mergedMeta = { ...metadata, encoding };
+        this.opts.setFinalReport({ status, format: this.formatId, content, content_json: contentJson, metadata: mergedMeta });
         return { ok: true, result: JSON.stringify({ ok: true }), latencyMs: Date.now() - start, kind: this.kind, namespace: this.namespace };
       }
 
@@ -699,7 +778,8 @@ export class InternalToolProvider extends ToolProvider {
         this.opts.logError('agent__final_report requires non-empty report_content field.');
         throw new Error('agent__final_report requires non-empty report_content field.');
       }
-      this.opts.setFinalReport({ status, format: this.formatId, content, content_json: contentJson, metadata });
+      const mergedMeta = { ...metadata, encoding };
+      this.opts.setFinalReport({ status, format: this.formatId, content, content_json: contentJson, metadata: mergedMeta });
       return { ok: true, result: JSON.stringify({ ok: true }), latencyMs: Date.now() - start, kind: this.kind, namespace: this.namespace };
     }
     if (this.opts.enableBatch && name === 'agent__batch') {
@@ -754,16 +834,15 @@ export class InternalToolProvider extends ToolProvider {
         }
 
         if (lastValidIndex > 0) {
-          try {
-            const jsonStr = trimmed.substring(0, lastValidIndex + 1);
-            const parsed = JSON.parse(jsonStr) as unknown;
-            if (Array.isArray(parsed)) {
-              calls = parsed;
-            } else {
-              this.opts.logError(`agent__batch received non-array calls payload (raw preview: ${previewRawValue(parsed)})`);
+          const jsonStr = trimmed.substring(0, lastValidIndex + 1);
+          const parsed = parseJsonValueDetailed(jsonStr);
+          if (Array.isArray(parsed.value)) {
+            calls = parsed.value;
+            if (parsed.repairs.length > 0) {
+              this.opts.logError(`agent__batch calls repaired via [${parsed.repairs.join('>')}]`);
             }
-          } catch (error) {
-            this.opts.logError(`agent__batch failed to parse calls payload (raw preview: ${previewRawValue(rawCalls)}; error: ${error instanceof Error ? error.message : String(error)})`);
+          } else {
+            this.opts.logError(`agent__batch received non-array calls payload (raw preview: ${previewRawValue(parsed.value ?? jsonStr)})`);
           }
         } else {
           this.opts.logError(`agent__batch received truncated calls payload (raw preview: ${previewRawValue(rawCalls)})`);

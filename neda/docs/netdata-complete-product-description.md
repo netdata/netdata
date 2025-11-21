@@ -106,8 +106,9 @@ Netdata ships purpose-built collector frameworks that share a unified lifecycle:
 | `apps.plugin` | C | Process, service, and application grouping | Uses cgroups, namespaces, container metadata |
 | `cgroups.plugin` | C | Container and VM resource accounting | Native cgroup v1/v2 support |
 | `go.d` | Go | Network/service-facing collectors (200+ integrations) | Auto-discovery, parallel polling |
+| `scripts.d` | Go | Nagios plugins scheduler and collector (4000+ integrations) | Vast ecosystem and simple protocol for scripts execution and synthetic tests |
 | `otelcol.plugin` | Go | OpenTelemetry collector distro (metrics/logs ingest/export) | Built from upstream OTel Collector with Netdata exporters |
-| `otel-plugin` | Rust | OTel intake that writes systemd-journal files | Rust journald writer preserving native format |
+| `otel-plugin` | Rust | OTel intake for metrics and logs (writes systemd-journal compatible files) | Rust journald writer preserving native format |
 | `python.d` | Python | Long-tail integrations & IoT sensors | Ideal for quick custom collectors |
 | `charts.d` | Bash | Lightweight shell-based collectors | Legacy but still maintained |
 | `ebpf.plugin` | C/eBPF | Kernel instrumentation (syscalls, I/O, networking - does not in containers or kubernetes) | Requires kernel ≥4.11 |
@@ -127,7 +128,7 @@ Netdata ships purpose-built collector frameworks that share a unified lifecycle:
 
 ### 2.3 Collector Catalog (As of October 2025)
 
-**go.d collectors:** `activemq`, `adaptecraid`, `ap`, `apache`, `apcupsd`, `beanstalk`, `bind`, `boinc`, `cassandra`, `ceph`, `chrony`, `clickhouse`, `cockroachdb`, `consul`, `coredns`, `couchbase`, `couchdb`, `dmcache`, `dnsdist`, `dnsmasq`, `dnsmasq_dhcp`, `dnsquery`, `docker`, `docker_engine`, `dockerhub`, `dovecot`, `elasticsearch`, `envoy`, `ethtool`, `exim`, `fail2ban`, `filecheck`, `fluentd`, `freeradius`, `gearman`, `geth`, `haproxy`, `hddtemp`, `hdfs`, `hpssa`, `httpcheck`, `icecast`, `intelgpu`, `ipfs`, `isc_dhcpd`, `k8s_kubelet`, `k8s_kubeproxy`, `k8s_state`, `lighttpd`, `litespeed`, `logind`, `logstash`, `lvm`, `maxscale`, `megacli`, `memcached`, `mongodb`, `monit`, `mysql`, `nats`, `nginx`, `nginxplus`, `nginxunit`, `nginxvts`, `nsd`, `ntpd`, `nvidia_smi`, `nvme`, `openldap`, `openvpn`, `openvpn_status_log`, `oracledb`, `pgbouncer`, `phpdaemon`, `phpfpm`, `pihole`, `pika`, `ping`, `portcheck`, `postfix`, `postgres`, `powerdns`, `powerdns_recursor`, `prometheus`, `proxysql`, `pulsar`, `puppet`, `rabbitmq`, `redis`, `rethinkdb`, `riakkv`, `rspamd`, `samba`, `scaleio`, `sensors`, `smartctl`, `snmp`, `spigotmc`, `squid`, `squidlog`, `storcli`, `supervisord`, `systemdunits`, `tengine`, `testrandom`, `tomcat`, `tor`, `traefik`, `typesense`, `unbound`, `upsd`, `uwsgi`, `varnish`, `vcsa`, `vernemq`, `vsphere`, `w1sensor`, `weblog`, `whoisquery`, `wireguard`, `x509check`, `yugabytedb`, `zfspool`, `zookeeper`.
+**go.d collectors:** `activemq`, `adaptecraid`, `ap`, `apache`, `apcupsd`, `beanstalk`, `bind`, `boinc`, `cassandra`, `ceph`, `chrony`, `clickhouse`, `cockroachdb`, `consul`, `coredns`, `couchbase`, `couchdb`, `dmcache`, `dnsdist`, `dnsmasq`, `dnsmasq_dhcp`, `dnsquery`, `docker`, `docker_engine`, `dockerhub`, `dovecot`, `elasticsearch`, `envoy`, `ethtool`, `exim`, `fail2ban`, `filecheck`, `fluentd`, `freeradius`, `gearman`, `geth`, `haproxy`, `hddtemp`, `hdfs`, `hpssa`, `httpcheck`, `icecast`, `intelgpu`, `ipfs`, `isc_dhcpd`, `k8s_kubelet`, `k8s_kubeproxy`, `k8s_state`, `lighttpd`, `litespeed`, `logind`, `logstash`, `lvm`, `maxscale`, `megacli`, `memcached`, `mongodb`, `monit`, `mysql`, `nats`, `nginx`, `nginxplus`, `nginxunit`, `nginxvts`, `nsd`, `ntpd`, `nvidia_smi`, `nvme`, `openldap`, `openvpn`, `openvpn_status_log`, `oracledb`, `pgbouncer`, `phpdaemon`, `phpfpm`, `pihole`, `pika`, `ping`, `portcheck`, `postfix`, `postgres`, `powerdns`, `powerdns_recursor`, `prometheus`, `proxysql`, `pulsar`, `puppet`, `rabbitmq`, `redis`, `rethinkdb`, `riakkv`, `rspamd`, `samba`, `scaleio`, `sensors`, `smartctl`, `snmp`, `spigotmc`, `squid`, `squidlog`, `storcli`, `supervisord`, `systemdunits`, `tengine`, `testrandom`, `tomcat`, `tor`, `traefik`, `typesense`, `unbound`, `upsd`, `uwsgi`, `varnish`, `vcsa`, `vernemq`, `vsphere`, `w1sensor`, `weblog`, `whoisquery`, `wireguard`, `x509check`, `yugabytedb`, `zfspool`, `zookeeper` and configurable SQL collector (collects metrics by running user-configurable SQL queries).
 
 **python.d collectors:** `am2320`, `go_expvar`, `haproxy`, `pandas`, `traefik` (legacy modules remain in community repos; new development favors go.d).
 
@@ -140,6 +141,10 @@ Netdata ships purpose-built collector frameworks that share a unified lifecycle:
 **Log ingestion:** `systemd-journal`, `windows-events`, `otelcol.plugin`, `otel-plugin`, Kubernetes events (go.d), `log2journal` transformer, and third-party shipping via journald uploaders.
 
 **Synthetic & custom inputs:** StatsD, Prometheus remote-write, OpenTelemetry metrics/logs via `otelcol.plugin`/`otel-plugin`, HTTP JSON, command execution (`exec` collectors), MCP-triggered functions, and external scripts via `collector.conf` stanzas.
+
+**otel-plugin:** OpenTelemetry collector for metrics and logs (traces is planned for the next quarter).
+
+**scripts.d.plugin:** Run unmodified Nagios plugins for collecting metrics, logs and triggering alerts based on Nagios plugins statuses.
 
 _Source of truth_: `netdata/src/collectors` (C plug-ins), `netdata/src/go/plugin/go.d/collector`, and `netdata/src/collectors/python.d.plugin` contain the authoritative inventories; regenerate this section when new collectors ship.
 
@@ -176,7 +181,7 @@ Netdata's auto-discovery eliminates manual configuration:
 - **Zero-code application insights**: `apps.plugin` (process/resource aggregation) and `ebpf.plugin` (kernel-level per-process telemetry - does not run in containers or kubernetes) deliver per-second CPU, memory, I/O, networking, OOM, and syscall visibility without touching application code.
 - **Logs as first-class signals**: systemd-journal, `log2journal`, `weblog`, `otelcol.plugin`, and `otel-plugin` provide raw log search and logs-to-metrics conversion for web services, applications, and cloud-native sources.
 - **Custom metrics ingestion**: Prometheus/OpenMetrics scraping, StatsD, and OTLP metrics via `otel-plugin` let instrumented code feed business or application KPIs into Netdata dashboards.
-- **Synthetic monitoring**: go.d collectors like `httpcheck`, `ping`, `portcheck`, `dnsquery`, and `testrandom` run uptime/performance probes against services, APIs, and endpoints, feeding directly into alerts and dashboards.
+- **Synthetic monitoring**: go.d collectors like `httpcheck`, `ping`, `portcheck`, `dnsquery`, and `testrandom` run uptime/performance probes against services, APIs, and endpoints, feeding directly into alerts and dashboards + `scripts.d` provides access to 4000+ Nagios plugins.
 - **APM gaps (explicit)**: No distributed tracing or span storage today (OTLP trace ingestion planned for end of 2025), no code-level profiling/flame graphs, no transactional/user-experience monitoring, and limited error tracking (logs/process crashes only).
 - **Positioning**: Netdata bridges infrastructure monitoring and APM—ideal for zero-instrumentation observability, but designed to complement trace-centric APM platforms for microservice call flows and deep code analysis.
 
@@ -768,7 +773,7 @@ helm install netdata netdata/netdata
 ### 9.7 Configuration, Lifecycle & Operations
 
 - **Configuration layers**: Stock defaults under `/usr/lib/netdata/conf.d`, site overrides in `/etc/netdata`, dynamic Cloud policies stored in `/var/lib/netdata/cloud.d`; precedence is dynamic → local → stock.
-- **File-based configs**: `netdata.conf`, `stream.conf`, `cloud.d/`, `health.d/`, `go.d/`, `python.d/`, `apps_groups.conf`, `alerts.d/`, and `statsd.d/`. All are INI/YAML and version-control friendly.
+- **File-based configs**: `netdata.conf`, `stream.conf`, `cloud.d/`, `health.d/`, `go.d/`, `scripts.d/`, `python.d/`, `apps_groups.conf`, `alerts.d/`, and `statsd.d/`. All are INI/YAML and version-control friendly.
 - **Dynamic configuration (DynCfg)**: Cloud UI edits stay synchronized via ACLK; agents persist snapshots locally and revert on disconnect if desired.
 - **Backups & restore**: Retention lives in `/var/lib/netdata/dbengine`; configs in `/etc/netdata`; Cloud metadata exported via API. Cold backups possible using `netdatacli shutdown-agent` followed by filesystem snapshot.
 - **Upgrade cadence**: Major releases monthly, nightly builds daily. Agents support zero-downtime restarts; Parents in HA clusters upgrade one at a time.
@@ -1182,7 +1187,7 @@ helm install netdata netdata/netdata
 
 **Step 4: Configure (Optional)**
 - Edit `/etc/netdata/netdata.conf` for main settings
-- Configure collectors in `/etc/netdata/go.d/` or `/etc/netdata/python.d/`
+- Configure collectors in `/etc/netdata/go.d/`, `/etc/netdata/python.d/`, `/etc/netdata/scripts.d/`
 - Set up streaming in `/etc/netdata/stream.conf`
 
 **Step 5: Explore**

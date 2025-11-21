@@ -48,6 +48,14 @@ See Section 2 “Context Management Contract” for the complete definition of c
 - Timed-out tools marked as `status: 'failed'` in accounting
 - LLM receives failure message: `(tool failed: timeout)`
 
+### Tool Request Parsing and Repair
+
+- Tool arguments are parsed with a deterministic two-step pipeline: native `JSON.parse`, then `jsonrepair` + re-parse when the first parse fails. Additional guarded fixes may close dangling braces or extract the first JSON object when needed.
+- When repair succeeds, a WARN log records the exact repair steps and includes both original and repaired payloads for visibility.
+- When parsing fails, the tool call is dropped, an ERR log records the full raw payload (not truncated), and the LLM is told to retry; valid calls in the same message still proceed.
+- `agent__final_report` adds an `encoding` field (`raw` | `base64`); when `base64` is provided, `report_content` is decoded before use. `content_json` undergoes schema validation with a small iterative repair loop that attempts to parse stringified nested JSON fields before final rejection.
+- If the `agent__final_report` tool fails for any reason (validation, decode, execution error), remaining turns are collapsed immediately and an ERR log is emitted containing the full JSON payload that was provided to the tool.
+
 ### Provider Configuration
 
 **`providers` (target list)**

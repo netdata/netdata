@@ -86,7 +86,6 @@ const dumpScenarioResultIfNeeded = (scenarioId: string, result: AIAgentResult): 
   if (!DUMP_SCENARIOS.has(scenarioId)) return;
   console.log(`[dump] scenario=${scenarioId}:`, JSON.stringify(result, null, 2));
 };
-const TOOL_OVERFLOW_PAYLOAD = '@'.repeat(2000);
 const TOOL_DROP_STUB = `(tool failed: ${CONTEXT_OVERFLOW_FRAGMENT})`;
 const SHARED_REGISTRY_RESULT = 'shared-response';
 const SECOND_TURN_FINAL_ANSWER = 'Second turn final answer.';
@@ -314,9 +313,9 @@ const SESSIONS_SUBDIR = 'sessions';
 const BILLING_FILENAME = 'billing.jsonl';
 const THRESHOLD_BUFFER_TOKENS = 8;
 const THRESHOLD_MAX_OUTPUT_TOKENS = 32;
-const THRESHOLD_CONTEXT_WINDOW_BELOW = 900;
-const THRESHOLD_CONTEXT_WINDOW_EQUAL = 855;
-const THRESHOLD_CONTEXT_WINDOW_ABOVE = 700;
+const THRESHOLD_CONTEXT_WINDOW_BELOW = 980;
+const THRESHOLD_CONTEXT_WINDOW_EQUAL = 975;
+const THRESHOLD_CONTEXT_WINDOW_ABOVE = 820;
 const PREFLIGHT_CONTEXT_WINDOW = 80;
 const PREFLIGHT_BUFFER_TOKENS = 8;
 const PREFLIGHT_MAX_OUTPUT_TOKENS = 16;
@@ -2022,7 +2021,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       const firstTool = result.conversation.find((message) => message.role === 'tool' && (message as { toolCallId?: string }).toolCallId === 'call-guard-drop-first');
       invariant(firstTool !== undefined, 'First tool result missing for context_guard__tool_drop_after_success.');
       invariant(typeof firstTool.content === 'string', 'First tool content should be a string.');
-      invariant(firstTool.content === TOOL_OVERFLOW_PAYLOAD, 'First tool output should remain intact for context_guard__tool_drop_after_success.');
+      invariant(firstTool.content === 'phase-1-tool-success', 'First tool output should remain intact for context_guard__tool_drop_after_success.');
 
       const secondTool = result.conversation.find((message) => message.role === 'tool' && (message as { toolCallId?: string }).toolCallId === 'call-guard-drop-second');
       invariant(secondTool !== undefined, 'Second tool result missing for context_guard__tool_drop_after_success.');
@@ -2071,7 +2070,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
           type: 'test-llm',
           models: {
             [MODEL_NAME]: {
-              contextWindow: 1250,
+              contextWindow: 1500,
               contextWindowBufferTokens: 0,
               tokenizer: TOKENIZER_GPT4O,
             },
@@ -2116,7 +2115,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
           type: 'test-llm',
           models: {
             [MODEL_NAME]: {
-              contextWindow: 1700,
+              contextWindow: 4000,
               contextWindowBufferTokens: 0,
               tokenizer: TOKENIZER_GPT4O,
             },
@@ -7235,6 +7234,10 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     },
     expect: (result: AIAgentResult) => {
       invariant(result.success, 'Scenario run-test-122 expected success.');
+      if (process.env.CONTEXT_DEBUG === 'true') {
+        console.log('run-test-122 conversation:', JSON.stringify(result.conversation, null, 2));
+        console.log('run-test-122 logs:', JSON.stringify(result.logs, null, 2));
+      }
       const toolMessage = result.conversation.find((message) => message.role === 'tool' && typeof message.content === 'string' && message.content.includes(BATCH_HEX_EXPECTED_OUTPUT));
       invariant(toolMessage !== undefined, 'Batch string parameters should survive parsing for run-test-122.');
       const finalReport = result.finalReport;

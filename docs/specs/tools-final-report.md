@@ -1,7 +1,7 @@
 # final_report Tool
 
 ## TL;DR
-Mandatory tool for agent to deliver final answer. Captures status, format, content, optional JSON payload, and metadata. Terminates session execution.
+Mandatory tool for agent to deliver final answer. Captures status, format, encoding, content, optional JSON payload, and metadata. Terminates session execution. `report_content` may be `raw` or `base64`; `content_json` is schema-validated with a light repair loop for stringified nested JSON.
 
 ## Source Files
 - `src/tools/internal-provider.ts` - Tool definition and handler
@@ -72,8 +72,13 @@ Mandatory tool for agent to deliver final answer. Captures status, format, conte
 #### Other Formats (markdown, tty, pipe, text, sub-agent)
 ```json
 {
-  "required": ["status", "report_format", "report_content"],
+  "required": ["status", "report_format", "report_content", "encoding"],
   "properties": {
+    "encoding": {
+      "type": "string",
+      "enum": ["raw", "base64"],
+      "description": "Use base64 when content has heavy markdown/newlines; otherwise raw"
+    },
     "report_content": {
       "type": "string",
       "description": "The final answer text"
