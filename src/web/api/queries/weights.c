@@ -2226,6 +2226,12 @@ static ssize_t weights_do_context_callback(void *data, RRDCONTEXT_ACQUIRED *rca,
 static ssize_t query_scope_foreach_host_parallel(SIMPLE_PATTERN *scope_hosts_sp, SIMPLE_PATTERN *hosts_sp,
                                                   struct query_weights_data *qwd)
 {
+#ifndef ENABLE_DBENGINE
+    return query_scope_foreach_host(scope_hosts_sp, hosts_sp,
+                                    weights_do_node_callback, qwd,
+                                    &qwd->versions, NULL);
+
+#else
     size_t host_count = dictionary_entries(rrdhost_root_index);
     qwd->hosts_array = mallocz(sizeof(RRDHOST *) * host_count);
     qwd->hosts_array_capacity = host_count;
@@ -2305,6 +2311,7 @@ static ssize_t query_scope_foreach_host_parallel(SIMPLE_PATTERN *scope_hosts_sp,
     freez(qwd->hosts_array);
 
     return total_added;
+#endif
 }
 
 static ssize_t weights_do_node_callback(void *data, RRDHOST *host, bool queryable) {
