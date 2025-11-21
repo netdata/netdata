@@ -1234,7 +1234,7 @@ update_binpkg() {
   current_version="$(get_current_version)"
   latest_version="$(get_latest_version)"
 
-  if [ "${current_version}" -ne 0 ] && [ "${latest_version}" -ne 0 ]; then
+  if [ "${RELEASE_CHANNEL}" != "none" ] && [ "${current_version}" -ne 0 ] && [ "${latest_version}" -ne 0 ]; then
     if [ "${current_version}" -lt "${latest_version}" ] && [ "${initial_version}" -eq "${current_version}" ]; then
       error ""
       error "NETDATA WAS NOT UPDATED!"
