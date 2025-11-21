@@ -56,7 +56,7 @@ function(bundle_dashboard)
   handle_braindead_versioning_insanity("${dashboard_src_prefix}")
 
   message(STATUS "  Generating CMakeLists.txt file for dashboard code")
-  set(rules "")
+  set(rules "install(FILES .MANIFEST COMPONENT dashboard DESTINATION ${WEB_DEST})\n")
 
   subdirlist(dash_dirs "${dashboard_src_prefix}")
 
@@ -79,5 +79,31 @@ function(bundle_dashboard)
   file(WRITE "${dashboard_src_dir}/CMakeLists.txt" "${rules}")
   message(STATUS "  Generating CMakeLists.txt file for dashboard code -- Done")
   add_subdirectory("${dashboard_src_dir}" "${dashboard_bin_dir}")
+
+  message(STATUS "  Generating manifest for dashboard code")
+  list(APPEND manifest
+    .MANIFEST
+    netdata-swagger.json
+    netdata-swagger.yaml
+  )
+
+  foreach(dir IN LISTS dash_dirs)
+    file(GLOB files
+         LIST_DIRECTORIES FALSE
+         RELATIVE "${dashboard_src_prefix}"
+         "${dashboard_src_prefix}/${dir}/*")
+
+    list(APPEND manifest "${files}")
+  endforeach()
+
+  file(GLOB files
+       LIST_DIRECTORIES FALSE
+       RELATIVE "${dashboard_src_prefix}"
+       "${dashboard_src_prefix}/*")
+
+  list(APPEND manifest "${files}")
+  list(JOIN manifest "\n" manifest_items)
+  file(WRITE "${dashboard_src_dir}/.MANIFEST" "${manifest_items}\n")
+  message(STATUS "  Generating manifest for dashboard code -- Done")
   message(STATUS "Preparing local agent dashboard code -- Done")
 endfunction()
