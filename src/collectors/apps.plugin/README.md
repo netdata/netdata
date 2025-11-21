@@ -314,8 +314,8 @@ The `--pss` option controls PSS sampling behavior:
 
 **Chart behavior:**
 
-- **Default (PSS enabled):** Shows both "Estimated memory usage (RSS with shared scaling)" and "Memory RSS usage" charts
-- **When disabled (`--pss 0`):** Shows only "Memory RSS usage" charts
+- **When PSS is enabled:** Shows both "Estimated memory usage (RSS with shared scaling)" and "Memory RSS usage" charts
+- **Default (PSS disabled):** Shows only "Memory RSS usage" charts
 - The `processes` function API exposes additional columns (PSS, PssAge, SharedRatio) when PSS is enabled
 
 ### Integration with eBPF
