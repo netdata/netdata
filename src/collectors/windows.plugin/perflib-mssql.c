@@ -161,6 +161,37 @@ void do_mssql_statistics_perflib(PERF_DATA_BLOCK *pDataBlock, struct mssql_insta
         do_mssql_auto_parameterization_attempts(mi, update_every);
 }
 
+void do_mssql_memmgr_connection_memory_bytes(struct mssql_instance *mi, int update_every)
+{
+    if (unlikely(!mi->st_conn_memory)) {
+        snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_memmgr_connection_memory_bytes", mi->instanceID);
+        netdata_fix_chart_name(id);
+        mi->st_conn_memory = rrdset_create_localhost(
+                "mssql",
+                id,
+                NULL,
+                "memory",
+                "mssql.instance_memmgr_connection_memory_bytes",
+                "Amount of dynamic memory to maintain connections",
+                "bytes",
+                PLUGIN_WINDOWS_NAME,
+                "PerflibMSSQL",
+                PRIO_MSSQL_MEMMGR_CONNECTION_MEMORY_BYTES,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+        mi->rd_conn_memory = rrddim_add(mi->st_conn_memory, "memory", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+        rrdlabels_add(mi->st_conn_memory->rrdlabels, "mssql_instance", mi->instanceID, RRDLABEL_SRC_AUTO);
+    }
+
+    rrddim_set_by_pointer(
+            mi->st_conn_memory,
+            mi->rd_conn_memory,
+            (collected_number)(mi->MSSQLConnectionMemoryBytes.current.Data * 1024));
+    rrdset_done(mi->st_conn_memory);
+}
+
 void do_mssql_memory_mgr(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *mi, int update_every)
 {
     char id[RRD_ID_LENGTH_MAX + 1];
@@ -169,35 +200,8 @@ void do_mssql_memory_mgr(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *mi,
     if (unlikely(!pObjectType))
         return;
 
-    if (likely(perflibGetObjectCounter(pDataBlock, pObjectType, &mi->MSSQLConnectionMemoryBytes))) {
-        if (unlikely(!mi->st_conn_memory)) {
-            snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_memmgr_connection_memory_bytes", mi->instanceID);
-            netdata_fix_chart_name(id);
-            mi->st_conn_memory = rrdset_create_localhost(
-                    "mssql",
-                    id,
-                    NULL,
-                    "memory",
-                    "mssql.instance_memmgr_connection_memory_bytes",
-                    "Amount of dynamic memory to maintain connections",
-                    "bytes",
-                    PLUGIN_WINDOWS_NAME,
-                    "PerflibMSSQL",
-                    PRIO_MSSQL_MEMMGR_CONNECTION_MEMORY_BYTES,
-                    update_every,
-                    RRDSET_TYPE_LINE);
-
-            mi->rd_conn_memory = rrddim_add(mi->st_conn_memory, "memory", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-
-            rrdlabels_add(mi->st_conn_memory->rrdlabels, "mssql_instance", mi->instanceID, RRDLABEL_SRC_AUTO);
-        }
-
-        rrddim_set_by_pointer(
-                mi->st_conn_memory,
-                mi->rd_conn_memory,
-                (collected_number)(mi->MSSQLConnectionMemoryBytes.current.Data * 1024));
-        rrdset_done(mi->st_conn_memory);
-    }
+    if (likely(perflibGetObjectCounter(pDataBlock, pObjectType, &mi->MSSQLConnectionMemoryBytes)))
+        do_mssql_memmgr_connection_memory_bytes(mi, update_every);
 
     if (likely(perflibGetObjectCounter(pDataBlock, pObjectType, &mi->MSSQLExternalBenefitOfMemory))) {
         if (unlikely(!mi->st_ext_benefit_mem)) {
