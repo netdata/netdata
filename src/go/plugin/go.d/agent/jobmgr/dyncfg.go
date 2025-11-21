@@ -29,7 +29,13 @@ func (m *Manager) dyncfgConfig(fn functions.Function) {
 
 	//m.Infof("QQ FN: '%s'", fn)
 
-	switch id := fn.Args[0]; true {
+	m.dyncfgExec(fn)
+}
+
+func (m *Manager) dyncfgExec(fn functions.Function) {
+	id := fn.Args[0]
+
+	switch {
 	case strings.HasPrefix(id, m.dyncfgCollectorPrefixValue()):
 		m.dyncfgCollectorExec(fn)
 	case strings.HasPrefix(id, m.dyncfgVnodePrefixValue()):

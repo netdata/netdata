@@ -161,7 +161,7 @@ func (m *Manager) run() {
 			case <-m.ctx.Done():
 				return
 			case fn := <-m.dyncfgCh:
-				m.dyncfgCollectorSeqExec(fn)
+				m.dyncfgExec(fn)
 			}
 		} else {
 			select {
@@ -172,14 +172,7 @@ func (m *Manager) run() {
 			case cfg := <-m.rmCh:
 				m.removeConfig(cfg)
 			case fn := <-m.dyncfgCh:
-				switch id := fn.Args[0]; true {
-				case strings.HasPrefix(id, m.dyncfgCollectorPrefixValue()):
-					m.dyncfgCollectorSeqExec(fn)
-				case strings.HasPrefix(id, m.dyncfgVnodePrefixValue()):
-					m.dyncfgVnodeSeqExec(fn)
-				default:
-					m.dyncfgApi.SendCodef(fn, 503, "unknown function '%s' (%s).", fn.Name, id)
-				}
+				m.dyncfgExec(fn)
 			}
 		}
 	}
