@@ -1098,6 +1098,12 @@ SETUID_WARNING
 fi
 
 # -----------------------------------------------------------------------------
+progress "Cleaning up old dashboard files"
+if [ -r "${NETDATA_WEB_DIR}/.MANIFEST" ]; then
+  find "${NETDATA_WEB_DIR}" -type f -print0 | grep -vzf "${NETDATA_WEB_DIR}/.MANIFEST" | xargs -0 rm
+fi
+
+# -----------------------------------------------------------------------------
 progress "Copy uninstaller"
 if [ -f "${NETDATA_PREFIX}"/usr/libexec/netdata-uninstaller.sh ]; then
   echo >&2 "Removing uninstaller from old location"
