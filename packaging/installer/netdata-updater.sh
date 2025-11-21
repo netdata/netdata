@@ -1142,22 +1142,22 @@ update_binpkg() {
   fi
 
   if ${pkg_installed_check} netdata-repo > /dev/null 2>&1; then
-    NETDATA_RELEASE_CHANNEL="stable"
+    RELEASE_CHANNEL="stable"
     repopkg="netdata-repo"
   elif ${pkg_installed_check} netdata-repo-edge > /dev/null 2>&1; then
-    NETDATA_RELEASE_CHANNEL="nightly"
+    RELEASE_CHANNEL="nightly"
     repopkg="netdata-repo-edge"
   elif echo "${nd_version}" | grep -Eq -- 'v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'; then
-    NETDATA_RELEASE_CHANNEL="stable"
+    RELEASE_CHANNEL="stable"
   elif echo "${nd_version}" | grep -Eq -- '-nightly$'; then
-    NETDATA_RELEASE_CHANNEL="nightly"
+    RELEASE_CHANNEL="nightly"
   else
-    NETDATA_RELEASE_CHANNEL="none"
+    RELEASE_CHANNEL="none"
     warning "Unable to determine which release channel is being used on this system, cannot check if packages are still being published."
   fi
 
   if [ -n "${repo_path}" ]; then
-    case "${NETDATA_RELEASE_CHANNEL}" in
+    case "${RELEASE_CHANNEL}" in
       stable) check_url="${NETDATA_STABLE_REPO_URL}/${repo_path}/.currently.published" ;;
       nightly) check_url="${NETDATA_NIGHTLY_REPO_URL}/${repo_path}/.currently.published" ;;
     esac
