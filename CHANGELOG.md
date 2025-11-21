@@ -2,6 +2,17 @@
 
 ### Merged Pull Requests:
 
+- Remove log message ([#21325](https://github.com/netdata/netdata/issues/21325))
+- Fix compilation when DBENGINE is disabled ([#21323](https://github.com/netdata/netdata/issues/21323))
+- Fix(cgroups): improve podman container name resolution ([#21317](https://github.com/netdata/netdata/issues/21317))
+- Improve(health/dyncfg): Add source unit field to alert value ([#21326](https://github.com/netdata/netdata/issues/21326))
+- Disable apps plugin pss mem by default ([#21330](https://github.com/netdata/netdata/issues/21330))
+- Fix(go.d): fix dyncfg vnodes configs ([#21332](https://github.com/netdata/netdata/issues/21332))
+
+## [2.8.0] - 2025-11-19
+
+### Merged Pull Requests:
+
 - Improve(go.d/rabbitmq): add support for old RabbitMQ whoami tags format ([#21049](https://github.com/netdata/netdata/issues/21049))
 - Ai-docs ([#21043](https://github.com/netdata/netdata/issues/21043))
 - Feat(go.d/snmp): add optional ICMP ping metrics ([#21052](https://github.com/netdata/netdata/issues/21052))
