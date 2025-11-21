@@ -188,7 +188,9 @@ export class InternalToolProvider extends ToolProvider {
       lines.push('A good progress message is short, clear, without formatting, and provides information about the current status and the goal(s) of this turn.');
       lines.push('A good progress message appears at most once per turn/step, and never alone (bundle it with other tools, or omit it altogether).');
       lines.push('');
-      lines.push(`IMPORTANT: The ${PROGRESS_TOOL} just let's the user know what you are doing; you have to call other tools to actually perform actions and get data.`);
+      lines.push(`**CRITICAL**:`);
+      lines.push(`- The ${PROGRESS_TOOL} is just informing the user; to perform actions you have to call other tools.`);
+      lines.push(`- When calling ${PROGRESS_TOOL} with a message like "Now doing X", does NOT mean action X is performed; you must call the appropriate tool(s) to actually do it.`);
     }
 
     if (this.opts.enableBatch) {
@@ -237,6 +239,7 @@ export class InternalToolProvider extends ToolProvider {
     if (!this.disableProgressTool) {
       lines.push(`### MANDATORY RULE FOR ${PROGRESS_TOOL}`);
       lines.push(`- Always pair ${PROGRESS_TOOL} with other tools you are invoking (except ${FINAL_REPORT_TOOL}).`);
+      lines.push(`- The ${PROGRESS_TOOL} updates the user but does not perform actions, use other tools to performs actions.`);
     }
 
     lines.push('');
@@ -265,7 +268,7 @@ export class InternalToolProvider extends ToolProvider {
       if (!this.disableProgressTool) {
         lines.push(`- Do not include more than one ${PROGRESS_TOOL} per batch.`);
         lines.push(`- Add exactly one ${PROGRESS_TOOL} per batch, describing the current status and the aggregate goal(s) of all other tools in this batch.`);
-        lines.push(`- The ${PROGRESS_TOOL} is for you to update the user; to collect data or perform actions, use other tools in the same batch.`);
+        lines.push(`- The ${PROGRESS_TOOL} updates the user; to collect data or perform actions, use other tools in the same batch.`);
       }
     }
 
