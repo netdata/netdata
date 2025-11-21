@@ -31,7 +31,7 @@
     "max_job_queues": 200,
     "max_message_queues": 200,
     "max_output_queues": 200,
-    "max_active_jobs": 200,
+    "active_jobs": [],
     "collect_disks_matching": "",
     "collect_subsystems_matching": "",
     "collect_job_queues_matching": ""

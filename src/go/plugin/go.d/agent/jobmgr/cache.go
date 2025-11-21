@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/confgroup"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/dyncfg"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 )
 
@@ -57,7 +58,7 @@ type (
 	}
 	seenConfig struct {
 		cfg    confgroup.Config
-		status dyncfgStatus
+		status dyncfg.Status
 	}
 
 	runningJobs struct {

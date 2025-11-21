@@ -485,6 +485,7 @@
       commands:
         - channel: nightly
           command: |
+            helm repo add netdata https://netdata.github.io/helmchart/ && helm repo update
             helm install netdata netdata/netdata \
             --set image.tag=edge{% if $showClaimingOptions %} \
             --set parent.claiming.enabled="true" \
@@ -495,6 +496,7 @@
             --set child.claiming.rooms={% $claim_rooms %}{% /if %}
         - channel: stable
           command: |
+            helm repo add netdata https://netdata.github.io/helmchart/ && helm repo update
             helm install netdata netdata/netdata \
             --set image.tag=stable{% if $showClaimingOptions %} \
             --set parent.claiming.enabled="true" \

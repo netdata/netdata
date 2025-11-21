@@ -1,3 +1,9 @@
+@PKG_NAME@ (5-2) unstable; urgency=medium
+
+  * Version bump to keep in sync with RPM repo packages
+
+ -- Austin Hemmelgarn <austin@netdata.cloud>  Thu, 13 Nov 2025 07:47:08 -0500
+
 @PKG_NAME@ (5-1) unstable; urgency=high
 
   * Deploy new package and metadata signing keys

@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/stm"
+	"github.com/netdata/netdata/go/plugins/pkg/stm"
 )
 
 const Precision = 1000 // Precision multiplier for floating-point values

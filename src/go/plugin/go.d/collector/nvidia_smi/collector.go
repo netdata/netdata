@@ -9,8 +9,8 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 )
 
 //go:embed "config_schema.json"
@@ -44,10 +44,11 @@ func New() *Collector {
 }
 
 type Config struct {
-	UpdateEvery int              `yaml:"update_every,omitempty" json:"update_every"`
-	Timeout     confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
-	BinaryPath  string           `yaml:"binary_path" json:"binary_path"`
-	LoopMode    bool             `yaml:"loop_mode,omitempty" json:"loop_mode"`
+	UpdateEvery        int              `yaml:"update_every,omitempty" json:"update_every"`
+	AutoDetectionRetry int              `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
+	Timeout            confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
+	BinaryPath         string           `yaml:"binary_path" json:"binary_path"`
+	LoopMode           bool             `yaml:"loop_mode,omitempty" json:"loop_mode"`
 }
 
 type Collector struct {

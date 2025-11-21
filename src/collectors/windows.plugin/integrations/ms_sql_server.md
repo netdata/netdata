@@ -97,6 +97,23 @@ Metrics:
 | mssql.instance_memmgr_external_benefit_of_memory | benefit | bytes |
 | mssql.instance_blocked_processes | blocked | processes |
 
+### Per MSSQL Jobs
+
+These metrics refer to the Microsoft SQL Servers jobs on host.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| mssql_instance | The instance name. |
+| job_name | The job name. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| mssql.instance_jobs_status | enabled, disabled | jobs |
+
 ### Per MSSQL Resource Locks
 
 Monitors SQL Server resource locks by type. SQL Server uses locks to manage concurrent access to database resources during transactions, preventing conflicts when multiple users access the same data simultaneously. This metric tracks locks on different [resource types](https://learn.microsoft.com/en-us/sql/relational-databases/performance-monitor/sql-server-locks-object?view=sql-server-ver17) like rows, pages, tables, and databases.
@@ -164,6 +181,30 @@ Metrics:
 | mssql.database_log_flushed | flushed | bytes/s |
 | mssql.database_data_files_size | size | bytes |
 
+### Per MSSQL Replication
+
+These metrics refer to the Microsoft SQL Servers replication on host.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| mssql_instance | The instance name. |
+| publisher | The SQL server publisher name. |
+| database | The database being replicated. |
+| publication | The publication name. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| mssql.replication_status | started, succeeded, in_progress, idle, retrying, failed | status |
+| mssql.replication_warning | expiration, latency, merge expiration, fast duration, low duration, fast run speed, low run speed | status |
+| mssql.replication_avg_latency | latency | seconds |
+| mssql.replication_subscription | subscription | subscription |
+| mssql.replication_agent_running | agents | agents |
+| mssql.replication_synchronization | seconds | seconds |
+
 
 
 ## Alerts
@@ -215,7 +256,29 @@ For **each SQL Server** instance you want to monitor, complete the following ste
    GO
    ```
 
-3. **Configure SQL Server Network Settings**
+3. **Enable Query Job status**
+
+   Connect to your database and grant `SELECT` permission to `netdata_user`:
+
+  ```tsql
+  USE msdb;
+  GO
+  GRANT SELECT ON SCHEMA::[dbo] TO netdata_user;
+  GO
+  ```
+
+4. **Enable Query replication stored procedure**
+
+   Connect to your database and add `netdata_user` to `replmonitor`:
+
+  ```tsql
+  USE distribution;
+  GO
+  EXEC sp_addrolemember 'replmonitor', 'netdata_user';
+  GO
+  ```
+
+5. **Configure SQL Server Network Settings**
 
    Enable SQL Server to accept TCP connections:
 
@@ -228,7 +291,7 @@ For **each SQL Server** instance you want to monitor, complete the following ste
     - Enter a port number in the `TCP Port` field (default is `1433`)
   - Select `SQL Server Services` and restart your SQL Server instance
 
-4. **Configure SQL Server Authentication (Optional)**
+6. **Configure SQL Server Authentication (Optional)**
 
    If you're using SQL Server authentication (rather than Windows authentication):
 
@@ -261,6 +324,13 @@ These options allow the collector to connect to your MSSQL instance and collect 
 | additional instances | Number of additional SQL Server instances to monitor. | 0 | no |
 | windows authentication | Set to yes to use Windows credentials instead of SQL Server authentication. | no | no |
 | express | Set to yes when running SQL Express version. | no | no |
+| collect transactions | Run queries to collect information from the server's transactions. | yes | no |
+| collect waits | Run queries to collect information from the server's lock waits. | yes | no |
+| collect lock metrics | Run queries to collect information from the server's overall locks. | yes | no |
+| collect replication | Run queries to collect information from the server's replication. | yes | no |
+| collect jobs | Run queries to collect information from the server's jobs. | yes | no |
+| collect buffer stats | Run queries to collect information from the server's buffer statistics. | yes | no |
+| collect database size | Run queries to collect information from the server's database size. | yes | no |
 
 
 

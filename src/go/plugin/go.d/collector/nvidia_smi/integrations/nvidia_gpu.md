@@ -148,7 +148,7 @@ The following options can be defined globally: update_every, autodetection_retry
 | Option | Description | Default | Required |
 |:-----|:------------|:--------|:---------:|
 | update_every | Data collection frequency. | 10 | no |
-| autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
+| autodetection_retry | Autodetection retry interval (seconds). Set 0 to disable. | 0 | no |
 | binary_path | Path to nvidia_smi binary. The default is "nvidia_smi" and the executable is looked for in the directories specified in the PATH environment variable. | nvidia_smi | no |
 | timeout | The maximum duration, in seconds, to wait for an `nvidia-smi` command to complete. This setting applies differently based on the collector's mode. **Loop Mode:** In loop mode, the timeout primarily determines how long to wait for the initial `nvidia-smi` execution. If the initial query takes longer than the timeout, the collector may report an error. For systems with multiple GPUs, the initial load time can sometimes be significant (e.g., 5-10 seconds). **Regular Mode:** If the collector is in regular mode, the timeout specifies how long to wait for each individual `nvidia-smi` execution. | 10 | no |
 | loop_mode | When enabled, `nvidia-smi` is executed continuously in a separate thread using the `-l` option. | yes | no |

@@ -715,6 +715,8 @@ static ALWAYS_INLINE void pgc_queue_del(PGC *cache __maybe_unused, struct pgc_qu
 
     page_flag_clear(page, q->flags);
 
+    struct section_pages *sp_to_free = NULL;
+
     if(q->linked_list_in_sections_judy) {
         Pvoid_t *section_pages_pptr = JudyLGet(q->sections_judy, page->section, PJE0);
         if(section_pages_pptr == NULL || section_pages_pptr == PJERR)
@@ -735,8 +737,7 @@ static ALWAYS_INLINE void pgc_queue_del(PGC *cache __maybe_unused, struct pgc_qu
             if(!rc)
                 fatal("DBENGINE CACHE: cannot delete section from Judy LL");
 
-            // freez(sp);
-            aral_freez(pgc_sections_aral, sp);
+            sp_to_free = sp;
 
             mem_delta -= sizeof(struct section_pages);
             mem_delta += JudyAllocThreadPulseGetAndReset();
@@ -751,6 +752,9 @@ static ALWAYS_INLINE void pgc_queue_del(PGC *cache __maybe_unused, struct pgc_qu
 
     if(!having_lock)
         pgc_queue_unlock(cache, q);
+
+    if (sp_to_free)
+        aral_freez(pgc_sections_aral, sp_to_free);
 }
 
 static ALWAYS_INLINE void page_has_been_accessed(PGC *cache, PGC_PAGE *page) {
@@ -2477,6 +2481,8 @@ void pgc_open_cache_to_journal_v2(
             continue;
         }
 
+        METRIC *metric = mrg_metric_dup(main_mrg, (METRIC *)page->metric_id);
+
         page_flag_set(page, PGC_PAGE_IS_BEING_MIGRATED_TO_V2);
 
         pgc_queue_unlock(cache, &cache->hot);
@@ -2516,8 +2522,9 @@ void pgc_open_cache_to_journal_v2(
 
         struct jv2_metrics_info *mi;
         if(!*PValue) {
-            mi = aral_mallocz(ar_mi); // callocz(1, sizeof(struct jv2_metrics_info));
-            mi->uuid = mrg_metric_uuid(main_mrg, (METRIC *)page->metric_id);
+            mi = aral_mallocz(ar_mi);
+            mi->metric = metric;
+            mi->uuid = mrg_metric_uuid(main_mrg, metric);
             mi->first_time_s = page->start_time_s;
             mi->last_time_s = page->end_time_s;
             mi->number_of_pages = 1;
@@ -2530,6 +2537,7 @@ void pgc_open_cache_to_journal_v2(
         else {
             mi = *PValue;
             mi->number_of_pages++;
+            mrg_metric_release(main_mrg, metric);
             if(page->start_time_s < mi->first_time_s)
                 mi->first_time_s = page->start_time_s;
             if(page->end_time_s > mi->last_time_s)
@@ -2542,7 +2550,7 @@ void pgc_open_cache_to_journal_v2(
                   (long)page->start_time_s, mi->JudyL_pages_by_start_time, PValue);
 
         if(!*PValue) {
-            struct jv2_page_info *pi = aral_mallocz(ar_pi); // callocz(1, (sizeof(struct jv2_page_info)));
+            struct jv2_page_info *pi = aral_mallocz(ar_pi);
             pi->start_time_s = page->start_time_s;
             pi->end_time_s = page->end_time_s;
             pi->update_every_s = page->update_every_s;
@@ -2605,6 +2613,7 @@ void pgc_open_cache_to_journal_v2(
             }
 
             JudyLFreeArray(&mi->JudyL_pages_by_start_time, PJE0);
+            mrg_metric_release(main_mrg, mi->metric);
             aral_freez(ar_mi, mi);
         }
         JudyLFreeArray(&JudyL_metrics, PJE0);

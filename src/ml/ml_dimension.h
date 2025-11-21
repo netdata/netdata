@@ -14,18 +14,16 @@ struct ml_dimension_t {
     enum ml_metric_type mt;
     enum ml_training_status ts;
     enum ml_machine_learning_status mls;
-
-    time_t last_training_time;
+    SPINLOCK slock;
+    uint32_t suppression_window_counter;
+    uint32_t suppression_anomaly_counter;
+    bool training_in_progress;
 
     std::vector<calculated_number_t> cns;
 
     std::vector<ml_kmeans_inlined_t> km_contexts;
-    SPINLOCK slock;
     ml_kmeans_t kmeans;
     std::vector<DSample> feature;
-
-    uint32_t suppression_window_counter;
-    uint32_t suppression_anomaly_counter;
 };
 
 bool
@@ -153,7 +151,7 @@ public:
         if (AcqRS)
             rrdset_acquired_release(AcqRS);
 
-        if (AcqRD)
+        if (AcqRH)
             rrdhost_acquired_release(AcqRH);
     }
 

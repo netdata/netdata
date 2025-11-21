@@ -10,8 +10,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/framework"
 	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/modules/db2/contexts"
 	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/pkg/dbdriver"
@@ -29,13 +29,13 @@ func defaultConfig() Config {
 		MaxDbConns:    1,
 		MaxDbLifeTime: confopt.Duration(10 * time.Minute),
 
-		CollectDatabaseMetrics:   framework.AutoBoolAuto,
-		CollectBufferpoolMetrics: framework.AutoBoolAuto,
-		CollectTablespaceMetrics: framework.AutoBoolAuto,
-		CollectConnectionMetrics: framework.AutoBoolAuto,
-		CollectLockMetrics:       framework.AutoBoolAuto,
-		CollectTableMetrics:      framework.AutoBoolAuto,
-		CollectIndexMetrics:      framework.AutoBoolAuto,
+		CollectDatabaseMetrics:   confopt.AutoBoolAuto,
+		CollectBufferpoolMetrics: confopt.AutoBoolAuto,
+		CollectTablespaceMetrics: confopt.AutoBoolAuto,
+		CollectConnectionMetrics: confopt.AutoBoolAuto,
+		CollectLockMetrics:       confopt.AutoBoolAuto,
+		CollectTableMetrics:      confopt.AutoBoolAuto,
+		CollectIndexMetrics:      confopt.AutoBoolAuto,
 
 		CollectMemoryMetrics:  true,
 		CollectWaitMetrics:    true,
@@ -43,19 +43,47 @@ func defaultConfig() Config {
 
 		MaxDatabases:   10,
 		MaxBufferpools: 20,
-		MaxTablespaces: 100,
-		MaxConnections: 200,
-		MaxTables:      50,
-		MaxIndexes:     100,
+		MaxTablespaces: 50,
+		MaxConnections: 50,
+		MaxTables:      25,
+		MaxIndexes:     50,
 
 		BackupHistoryDays: 30,
 
-		CollectDatabasesMatching:   "",
-		CollectBufferpoolsMatching: "",
-		CollectTablespacesMatching: "",
-		CollectConnectionsMatching: "",
-		CollectTablesMatching:      "",
-		CollectIndexesMatching:     "",
+		CollectDatabasesMatching: "",
+
+		IncludeConnections: []string{
+			"db2sysc*",
+			"db2agent*",
+			"db2hadr*",
+			"db2acd*",
+			"db2bmgr*",
+		},
+		ExcludeConnections: []string{
+			"*TEMP*",
+		},
+
+		IncludeBufferpools: []string{
+			"IBMDEFAULTBP",
+			"IBMSYSTEMBP*",
+			"IBMHADRBP*",
+		},
+		ExcludeBufferpools: nil,
+
+		IncludeTablespaces: []string{
+			"SYSCATSPACE",
+			"TEMPSPACE*",
+			"SYSTOOLSPACE",
+		},
+		ExcludeTablespaces: []string{
+			"TEMPSPACE2",
+		},
+
+		IncludeTables: nil,
+		ExcludeTables: nil,
+
+		IncludeIndexes: nil,
+		ExcludeIndexes: nil,
 	}
 }
 
@@ -105,41 +133,61 @@ func (c *Collector) Init(ctx context.Context) error {
 		}
 		c.databaseSelector = m
 	}
-	if c.CollectBufferpoolsMatching != "" {
-		m, err := matcher.NewSimplePatternsMatcher(c.CollectBufferpoolsMatching)
-		if err != nil {
-			return fmt.Errorf("invalid bufferpool selector pattern '%s': %v", c.CollectBufferpoolsMatching, err)
-		}
-		c.bufferpoolSelector = m
+
+	connInclude, err := compileMatcher(c.IncludeConnections)
+	if err != nil {
+		return fmt.Errorf("invalid include_connections patterns: %w", err)
 	}
-	if c.CollectTablespacesMatching != "" {
-		m, err := matcher.NewSimplePatternsMatcher(c.CollectTablespacesMatching)
-		if err != nil {
-			return fmt.Errorf("invalid tablespace selector pattern '%s': %v", c.CollectTablespacesMatching, err)
-		}
-		c.tablespaceSelector = m
+	connExclude, err := compileMatcher(c.ExcludeConnections)
+	if err != nil {
+		return fmt.Errorf("invalid exclude_connections patterns: %w", err)
 	}
-	if c.CollectConnectionsMatching != "" {
-		m, err := matcher.NewSimplePatternsMatcher(c.CollectConnectionsMatching)
-		if err != nil {
-			return fmt.Errorf("invalid connection selector pattern '%s': %v", c.CollectConnectionsMatching, err)
-		}
-		c.connectionSelector = m
+	c.connectionInclude = connInclude
+	c.connectionExclude = connExclude
+
+	bpInclude, err := compileMatcher(c.IncludeBufferpools)
+	if err != nil {
+		return fmt.Errorf("invalid include_bufferpools patterns: %w", err)
 	}
-	if c.CollectTablesMatching != "" {
-		m, err := matcher.NewSimplePatternsMatcher(c.CollectTablesMatching)
-		if err != nil {
-			return fmt.Errorf("invalid table selector pattern '%s': %v", c.CollectTablesMatching, err)
-		}
-		c.tableSelector = m
+	bpExclude, err := compileMatcher(c.ExcludeBufferpools)
+	if err != nil {
+		return fmt.Errorf("invalid exclude_bufferpools patterns: %w", err)
 	}
-	if c.CollectIndexesMatching != "" {
-		m, err := matcher.NewSimplePatternsMatcher(c.CollectIndexesMatching)
-		if err != nil {
-			return fmt.Errorf("invalid index selector pattern '%s': %v", c.CollectIndexesMatching, err)
-		}
-		c.indexSelector = m
+	c.bufferpoolInclude = bpInclude
+	c.bufferpoolExclude = bpExclude
+
+	tspInclude, err := compileMatcher(c.IncludeTablespaces)
+	if err != nil {
+		return fmt.Errorf("invalid include_tablespaces patterns: %w", err)
 	}
+	tspExclude, err := compileMatcher(c.ExcludeTablespaces)
+	if err != nil {
+		return fmt.Errorf("invalid exclude_tablespaces patterns: %w", err)
+	}
+	c.tablespaceInclude = tspInclude
+	c.tablespaceExclude = tspExclude
+
+	tblInclude, err := compileMatcher(c.IncludeTables)
+	if err != nil {
+		return fmt.Errorf("invalid include_tables patterns: %w", err)
+	}
+	tblExclude, err := compileMatcher(c.ExcludeTables)
+	if err != nil {
+		return fmt.Errorf("invalid exclude_tables patterns: %w", err)
+	}
+	c.tableInclude = tblInclude
+	c.tableExclude = tblExclude
+
+	idxInclude, err := compileMatcher(c.IncludeIndexes)
+	if err != nil {
+		return fmt.Errorf("invalid include_indexes patterns: %w", err)
+	}
+	idxExclude, err := compileMatcher(c.ExcludeIndexes)
+	if err != nil {
+		return fmt.Errorf("invalid exclude_indexes patterns: %w", err)
+	}
+	c.indexInclude = idxInclude
+	c.indexExclude = idxExclude
 
 	if err := c.ensureConnected(ctx); err != nil {
 		return err

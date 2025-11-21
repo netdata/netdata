@@ -1,0 +1,40 @@
+update_every: 123
+autodetection_retry: 123
+
+driver: "postgres"
+dsn: "host=localhost port=5432 user=netdata dbname=metrics sslmode=disable"
+timeout: 5
+
+static_labels:
+  env: "prod"
+  region: "eu-west"
+
+queries:
+  - id: "get_users"
+    query: "SELECT id, name FROM users"
+
+metrics:
+  - id: "users_metrics"
+    query_ref: "get_users"
+    query: "query"
+    mode: "columns"
+    kv_mode:
+      name_col: "metric_name"
+      value_col: "metric_value"
+    labels_from_row:
+      - source: "status"
+        name: "state"
+    charts:
+      - title: "User Count"
+        context: "app.users"
+        family: "users"
+        type: "line"
+        units: "count"
+        algorithm: "absolute"
+        dims:
+          - name: "users_total"
+            source: "id"
+            status_when:
+              equals: "equals"
+              in: ["in"]
+              match: "match"

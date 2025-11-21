@@ -40,6 +40,22 @@ AutoReqProv: yes
 %global __cmake_builddir %{__builddir}
 %endif
 
+# Determine requirements for account handling.
+# openSUSE and RHEL/OEL 8 need Provides for user/group accounts explicitly
+# spelled out, other platforms do not.
+%if 0%{?suse_version}
+%global _have_sysuser 1
+%global _need_explicit_user_provides 1
+%else
+%if 0%{?centos_ver} >= 10 || 0%{?oraclelinux} >= 10 || 0%{?fedora} >= 43
+%global _have_sysuser 1
+%global _need_explicit_user_provides 0
+%else
+%global _have_sysuser 0
+%global _need_explicit_user_provides 0
+%endif
+%endif
+
 # Disable eBPF for architectures other than x86
 %ifarch x86_64 i386
 %global _have_ebpf 1
@@ -56,9 +72,8 @@ AutoReqProv: yes
 %define _libexecdir /usr/libexec
 %define _libdir /usr/lib
 
-%{!?_systemd_util_dir:%global _systemd_util_dir /usr/lib/systemd}
-
-# Fedora doesn’t define this, but other distros do
+%{!?_sysusersdir:%global _sysusersdir %{_libdir}/sysusers.d}
+%{!?_systemd_util_dir:%global _systemd_util_dir %{_libdir}/systemd}
 %{!?_presetdir:%global _presetdir %{_libdir}/systemd/system-preset}
 
 # Redefine centos_ver to standardize on a single macro
@@ -87,19 +102,27 @@ AutoReqProv: yes
 %global _have_cups 0
 %endif
 
-# Disable NFACCT for RHEL equivalents and Amazon Linux
+# Disable NFACCT for RHEL equivalents, Amazon Linux, and openSUSE 16.0 and newer
 %if 0%{?centos_ver} || 0%{?amzn}
+%global _have_nfacct 0
+%else
+%if 0%{?suse_version} >= 1600
 %global _have_nfacct 0
 %else
 %global _have_nfacct 1
 %endif
+%endif
 
-# Disable xenstat if we’re not on Fedora or openSUSE
+# Disable xenstat if we’re not on Fedora or openSUSE 15.6 or earlier
 %if 0%{?suse_version} || 0%{?fedora}
 %if 0%{!?amzm:1}
 %global _have_xenstat 0
 %else
+%if 0%{?suse_version} >= 1600
+%global _have_xenstat 0
+%else
 %global _have_xenstat 1
+%endif
 %endif
 %else
 %global _have_xenstat 0
@@ -123,16 +146,8 @@ AutoReqProv: yes
 %global _have_mongo_exporter 1
 %endif
 
-# log2journal can’t build on some systems
-%if 0%{?sle_version}
-%if %{sle_version} < 150600
-%global _have_log2journal 0
-%else
+# log2journal can’t build on some systems, but we don’t support those systems anymore.
 %global _have_log2journal 1
-%endif
-%else
-%global _have_log2journal 1
-%endif
 
 # If ML hasn’t been explicitly disabled or enabled yet, enable it now.
 %if 0%{!?_have_ml:1}
@@ -215,10 +230,6 @@ BuildRequires: systemd-rpm-macros
 BuildRequires: systemd
 %endif
 
-# Core requirements for the install to succeed
-Requires(pre): /usr/sbin/groupadd
-Requires(pre): /usr/sbin/useradd
-
 # #####################################################################
 # External plugin package dependencies
 # #####################################################################
@@ -226,9 +237,15 @@ Requires(pre): /usr/sbin/useradd
 # to support weak dependencies. Explicitly requiring our default plugins
 # makes it impossible to properly test the packages prior to upload,
 # so we just skip depending on them on CentOS 7.
+%if ! %{_have_sysuser}
+Requires(pre): %{name}-user >= %{version}
+%endif
 Requires: %{name}-dashboard
 %if 0%{?_have_ebpf}
 Requires: %{name}-plugin-ebpf = %{version}
+%endif
+%if 0%{?_have_rust}
+Requires: %{name}-plugin-otel = %{version}
 %endif
 Requires: %{name}-plugin-apps = %{version}
 Requires: %{name}-plugin-pythond = %{version}
@@ -256,7 +273,6 @@ Suggests: %{name}-plugin-cups = %{version}
 Recommends: %{name}-plugin-systemd-journal = %{version}
 Recommends: %{name}-plugin-systmed-units = %{version}
 Recommends: %{name}-plugin-network-viewer = %{version}
-Recommends: %{name}-plugin-logs-management = %{version}
 %else
 Requires: %{name}-plugin-systemd-journal = %{version}
 Requires: %{name}-plugin-network-viewer = %{version}
@@ -506,23 +522,8 @@ install -m 755 -d "${RPM_BUILD_ROOT}%{_presetdir}"
 install -m 644 -p "system/systemd/50-%{name}.preset" "${RPM_BUILD_ROOT}%{_presetdir}/50-%{name}.preset"
 install -m 755 -d "${RPM_BUILD_ROOT}%{_systemd_util_dir}/journald@%{name}.conf.d"
 install -m 644 -p "system/systemd/journald@%{name}.conf" "${RPM_BUILD_ROOT}%{_systemd_util_dir}/journald@%{name}.conf.d/%{name}.conf"
-
-%pre
-
-if ! getent group %{name} > /dev/null; then
-  groupadd --system %{name}
-fi
-
-if ! getent passwd %{name} > /dev/null; then
-  useradd --system -g %{name} --home %{contentdir} --no-create-home -s /sbin/nologin -c "Netdata pseudo user" %{name}
-fi
-
-# I am not sure that the corresponding group names are exactly the same as in Debian, but we should start somewhere, shouldn't we?
-for item in docker nginx varnish haproxy adm nsd proxy squid ceph nobody I2C; do
-  if getent group $item > /dev/null 2>&1; then
-    usermod -a -G ${item} %{name}
-  fi
-done
+install -m 755 -d "${RPM_BUILD_ROOT}%{_sysusersdir}"
+install -m 644 -p "%{__cmake_builddir}/system/systemd/sysusers/%{name}.conf" "${RPM_BUILD_ROOT}%{_sysusersdir}/%{name}.conf"
 
 %post
 %if 0%{?suse_version}
@@ -534,15 +535,25 @@ done
 %preun
 %if 0%{?suse_version}
 %service_del_preun %{name}.service
+%service_del_preun %{name}-updater.timer
 %else
 %systemd_preun %{name}.service
+%systemd_preun %{name}-updater.timer
 %endif
+
+if [ "${1}" -eq 0 ]; then
+  if [ -x "%{_libexecdir}/%{name}/%{name}-updater.sh" ]; then
+    %{_libexecdir}/%{name}/%{name}-updater.sh --disable-auto-updates
+  fi
+fi
 
 %postun
 %if 0%{?suse_version}
 %service_del_postun %{name}.service
+%service_del_postun %{name}-updater.timer
 %else
 %systemd_postun_with_restart %{name}.service
+%systemd_postun_with_restart %{name}-updater.timer
 %endif
 
 %clean
@@ -688,6 +699,8 @@ rm -rf "${RPM_BUILD_ROOT}"
 # Network viewer belongs to a different sub-package
 %exclude %{_libexecdir}/%{name}/plugins.d/network-viewer.plugin
 
+%exclude %{_sysusersdir}/%{name}.conf
+
 # CUPS belongs to a different sub package
 %if %{_have_cups}
 %exclude %{_libexecdir}/%{name}/plugins.d/cups.plugin
@@ -696,15 +709,12 @@ rm -rf "${RPM_BUILD_ROOT}"
 Summary: The CUPS metrics collection plugin for the Netdata Agent
 Group: Applications/System
 Requires: %{name} = %{version}
+%if ! %{_have_sysuser}
+Requires(pre): %{name}-user >= %{version}
+%endif
 
 %description plugin-cups
  This plugin allows the Netdata Agent to collect metrics from the Common UNIX Printing System.
-
-%pre plugin-cups
-
-if ! getent group %{name} > /dev/null; then
-  groupadd --system %{name}
-fi
 
 %files plugin-cups
 %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/cups.plugin
@@ -716,15 +726,12 @@ Summary: The FreeIPMI metrics collection plugin for the Netdata Agent
 Group: Applications/System
 Requires: freeipmi
 Requires: %{name} = %{version}
+%if ! %{_have_sysuser}
+Requires(pre): %{name}-user >= %{version}
+%endif
 
 %description plugin-freeipmi
  This plugin allows the Netdata Agent to collect metrics from hardware using FreeIPMI.
-
-%pre plugin-freeipmi
-
-if ! getent group %{name} > /dev/null; then
-  groupadd --system %{name}
-fi
 
 %files plugin-freeipmi
 %attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/freeipmi.plugin
@@ -736,15 +743,12 @@ Summary: The NFACCT metrics collection plugin for the Netdata Agent
 Group: Applications/System
 Requires: %{name} = %{version}
 Conflicts: %{name} < %{version}
+%if ! %{_have_sysuser}
+Requires(pre): %{name}-user >= %{version}
+%endif
 
 %description plugin-nfacct
  This plugin allows the Netdata Agent to collect metrics from the firewall using NFACCT objects.
-
-%pre plugin-nfacct
-
-if ! getent group %{name} > /dev/null; then
-  groupadd --system %{name}
-fi
 
 %files plugin-nfacct
 %attr(4750,root,netdata) %{_libexecdir}/%{name}/plugins.d/nfacct.plugin
@@ -761,16 +765,13 @@ Suggests: apcupsd
 Suggests: iw
 Suggests: sudo
 %endif
+%if ! %{_have_sysuser}
+Requires(pre): %{name}-user >= %{version}
+%endif
 
 %description plugin-chartsd
  This plugin adds a selection of additional collectors written in shell script to the Netdata Agent.
 It includes collectors for APCUPSD, LibreSWAN, OpenSIPS, and Wireless access point statistics.
-
-%pre plugin-chartsd
-
-if ! getent group %{name} > /dev/null; then
-  groupadd --system %{name}
-fi
 
 %files plugin-chartsd
 %defattr(0750,root,netdata,0750)
@@ -794,15 +795,12 @@ Recommends: %{name}-ebpf-legacy-code >= %{version}
 Requires: %{name}-plugin-apps = %{version}
 Requires: %{name}-ebpf-legacy-code >= %{version}
 %endif
+%if ! %{_have_sysuser}
+Requires(pre): %{name}-user >= %{version}
+%endif
 
 %description plugin-ebpf
  This plugin allows the Netdata Agent to use eBPF code to collect more detailed kernel-level metrics for the system.
-
-%pre plugin-ebpf
-
-if ! getent group %{name} > /dev/null; then
-  groupadd --system %{name}
-fi
 
 %files plugin-ebpf
 %defattr(4750,root,netdata,4750)
@@ -816,16 +814,13 @@ Summary: Compiled eBPF legacy code for the Netdata eBPF plugin
 Group: Applications/System
 Requires: %{name}-plugin-ebpf = %{version}
 Conflicts: %{name} < %{version}
+%if ! %{_have_sysuser}
+Requires(pre): %{name}-user >= %{version}
+%endif
 
 %description ebpf-legacy-code
  This package provides the pre-compiled eBPF legacy code for use by the Netdata eBPF plugin.
  This code is only needed when using the eBPF plugin with kernel versions before 5.10.
-
-%pre ebpf-legacy-code
-
-if ! getent group %{name} > /dev/null; then
-  groupadd --system %{name}
-fi
 
 %files ebpf-legacy-code
 %defattr(0640,root,netdata,0640)
@@ -846,17 +841,14 @@ Requires: python3
 %if 0%{?centos_ver} != 7
 Suggests: sudo
 %endif
+%if ! %{_have_sysuser}
+Requires(pre): %{name}-user >= %{version}
+%endif
 
 %description plugin-pythond
  This plugin adds a selection of additional collectors written in Python to the Netdata Agent.
 Many of the collectors provided by this package are also available in netdata-plugin-go. In msot cases, you probably
 want to use those versions instead of the Python versions.
-
-%pre plugin-pythond
-
-if ! getent group %{name} > /dev/null; then
-  groupadd --system %{name}
-fi
 
 %files plugin-pythond
 %defattr(0750,root,netdata,0750)
@@ -875,17 +867,14 @@ Conflicts: %{name} < %{version}
 Suggests: nvme-cli
 Suggests: sudo
 %endif
+%if ! %{_have_sysuser}
+Requires(pre): %{name}-user >= %{version}
+%endif
 
 %description plugin-go
  This plugin adds a selection of additional collectors written in Go to the Netdata Agent
 A significant percentage of the application specific collectors provided by Netdata are part of this plugin,
 so most users will want it installed.
-
-%pre plugin-go
-
-if ! getent group %{name} > /dev/null; then
-  groupadd --system %{name}
-fi
 
 %files plugin-go
 %defattr(0750,root,netdata,0750)
@@ -904,17 +893,17 @@ Requires: %{name} = %{version}
 Requires: %{name}-plugin-ibm-libs = %{version}
 Requires: unixODBC
 Conflicts: %{name} < %{version}
+%if ! %{_have_sysuser}
+Requires(pre): %{name}-user >= %{version}
+%else
+Requires(pre): user(%{name})
+Requires(pre): group(%{name})
+%endif
 AutoReqProv: no
 
 %description plugin-ibm
 This plugin adds IBM ecosystem collectors (AS/400, DB2, MQ, WebSphere) to the Netdata Agent.
 Database collectors (AS/400, DB2) use unixODBC exclusively and require appropriate ODBC drivers.
-
-%pre plugin-ibm
-
-if ! getent group %{name} > /dev/null; then
-  groupadd --system %{name}
-fi
 
 %files plugin-ibm
 %defattr(0750,root,netdata,0750)
@@ -928,23 +917,27 @@ Summary: IBM MQ client libraries for the Netdata IBM ecosystem metrics collectio
 Group: Applications/System
 Requires: %{name} = %{version}
 Conflicts: %{name} < %{version}
+%if ! %{_have_sysuser}
+%if ! %{_have_sysuser}
+Requires(pre): %{name}-user >= %{version}
+%endif
+%else
+Requires(pre): user(%{name})
+Requires(pre): group(%{name})
+%endif
 AutoReqProv: no
 
 %description plugin-ibm-libs
 This package provides the IBM MQ client libraries needed by Netdata IBM
 ecosystem metrics collection plugin.
 
-%pre plugin-ibm-libs
-
-if ! getent group %{name} > /dev/null; then
-  groupadd --system %{name}
-fi
-
 %files plugin-ibm-libs
 %defattr(0750,root,netdata,0750)
 %{_libdir}/%{name}/ibm-mqclient/bin/amqcgskv32
 %{_libdir}/%{name}/ibm-mqclient/bin/amqcgskv64
 %{_libdir}/%{name}/ibm-mqclient/bin/amqjrever
+%{_libdir}/%{name}/ibm-mqclient/bin/amqltmcc
+%{_libdir}/%{name}/ibm-mqclient/bin/amqltmcc64
 %{_libdir}/%{name}/ibm-mqclient/bin/crtmqenv
 %{_libdir}/%{name}/ibm-mqclient/bin/dmpmqcfg
 %{_libdir}/%{name}/ibm-mqclient/bin/dmpmqmsg
@@ -966,6 +959,7 @@ fi
 %{_libdir}/%{name}/ibm-mqclient/bin/runmqicred
 %{_libdir}/%{name}/ibm-mqclient/bin/runmqras
 %{_libdir}/%{name}/ibm-mqclient/bin/runmqsc
+%{_libdir}/%{name}/ibm-mqclient/bin/runmqtmc
 %{_libdir}/%{name}/ibm-mqclient/bin/runp11cred
 %{_libdir}/%{name}/ibm-mqclient/bin/setmqenv
 %{_libdir}/%{name}/ibm-mqclient/bin/strmqtrc
@@ -976,7 +970,23 @@ fi
 %{_libdir}/%{name}/ibm-mqclient/gskit8/bin/gsk8ver_64
 %{_libdir}/%{name}/ibm-mqclient/gskit8/bin/private_verifyinstall
 %{_libdir}/%{name}/ibm-mqclient/gskit8/bin/private_verifyinstall_64
+%{_libdir}/%{name}/ibm-mqclient/gskit8/lib/C/icc/icclib/libicclib084.so
+%{_libdir}/%{name}/ibm-mqclient/gskit8/lib/N/icc/icclib/libicclib085.so
+%{_libdir}/%{name}/ibm-mqclient/gskit8/lib/libgsk8acmeidup.so
+%{_libdir}/%{name}/ibm-mqclient/gskit8/lib/libgsk8cms.so
+%{_libdir}/%{name}/ibm-mqclient/gskit8/lib/libgsk8dbfl.so
+%{_libdir}/%{name}/ibm-mqclient/gskit8/lib/libgsk8drld.so
+%{_libdir}/%{name}/ibm-mqclient/gskit8/lib/libgsk8iccs.so
+%{_libdir}/%{name}/ibm-mqclient/gskit8/lib/libgsk8kicc.so
+%{_libdir}/%{name}/ibm-mqclient/gskit8/lib/libgsk8km.so
+%{_libdir}/%{name}/ibm-mqclient/gskit8/lib/libgsk8km2.so
+%{_libdir}/%{name}/ibm-mqclient/gskit8/lib/libgsk8ldap.so
+%{_libdir}/%{name}/ibm-mqclient/gskit8/lib/libgsk8p11.so
+%{_libdir}/%{name}/ibm-mqclient/gskit8/lib/libgsk8ssl.so
+%{_libdir}/%{name}/ibm-mqclient/gskit8/lib/libgsk8sys.so
+%{_libdir}/%{name}/ibm-mqclient/gskit8/lib/libgsk8valn.so
 %{_libdir}/%{name}/ibm-mqclient/gskit8/lib64/C/icc/icclib/libicclib084.so
+%{_libdir}/%{name}/ibm-mqclient/gskit8/lib64/N/icc/icclib/libicclib085.so
 %{_libdir}/%{name}/ibm-mqclient/gskit8/lib64/libgsk8acmeidup_64.so
 %{_libdir}/%{name}/ibm-mqclient/gskit8/lib64/libgsk8cms_64.so
 %{_libdir}/%{name}/ibm-mqclient/gskit8/lib64/libgsk8dbfl_64.so
@@ -990,22 +1000,6 @@ fi
 %{_libdir}/%{name}/ibm-mqclient/gskit8/lib64/libgsk8ssl_64.so
 %{_libdir}/%{name}/ibm-mqclient/gskit8/lib64/libgsk8sys_64.so
 %{_libdir}/%{name}/ibm-mqclient/gskit8/lib64/libgsk8valn_64.so
-%{_libdir}/%{name}/ibm-mqclient/gskit8/lib64/N/icc/icclib/libicclib085.so
-%{_libdir}/%{name}/ibm-mqclient/gskit8/lib/C/icc/icclib/libicclib084.so
-%{_libdir}/%{name}/ibm-mqclient/gskit8/lib/libgsk8acmeidup.so
-%{_libdir}/%{name}/ibm-mqclient/gskit8/lib/libgsk8cms.so
-%{_libdir}/%{name}/ibm-mqclient/gskit8/lib/libgsk8dbfl.so
-%{_libdir}/%{name}/ibm-mqclient/gskit8/lib/libgsk8drld.so
-%{_libdir}/%{name}/ibm-mqclient/gskit8/lib/libgsk8iccs.so
-%{_libdir}/%{name}/ibm-mqclient/gskit8/lib/libgsk8kicc.so
-%{_libdir}/%{name}/ibm-mqclient/gskit8/lib/libgsk8km2.so
-%{_libdir}/%{name}/ibm-mqclient/gskit8/lib/libgsk8km.so
-%{_libdir}/%{name}/ibm-mqclient/gskit8/lib/libgsk8ldap.so
-%{_libdir}/%{name}/ibm-mqclient/gskit8/lib/libgsk8p11.so
-%{_libdir}/%{name}/ibm-mqclient/gskit8/lib/libgsk8ssl.so
-%{_libdir}/%{name}/ibm-mqclient/gskit8/lib/libgsk8sys.so
-%{_libdir}/%{name}/ibm-mqclient/gskit8/lib/libgsk8valn.so
-%{_libdir}/%{name}/ibm-mqclient/gskit8/lib/N/icc/icclib/libicclib085.so
 %{_libdir}/%{name}/ibm-mqclient/gskit8/private_checkinstall
 %{_libdir}/%{name}/ibm-mqclient/gskit8/private_postinstall
 %defattr(0640,root,netdata,0640)
@@ -1021,7 +1015,6 @@ fi
 %{_libdir}/%{name}/ibm-mqclient/gskit8/ReadMe.txt
 %{_libdir}/%{name}/ibm-mqclient/java/lib/com.ibm.mq.tools.ras.jar
 %{_libdir}/%{name}/ibm-mqclient/lap/LAPApp.jar
-%{_libdir}/%{name}/ibm-mqclient/lap/licenses/icon.gif
 %{_libdir}/%{name}/ibm-mqclient/lap/licenses/LA_cs
 %{_libdir}/%{name}/ibm-mqclient/lap/licenses/LA_de
 %{_libdir}/%{name}/ibm-mqclient/lap/licenses/LA_el
@@ -1060,38 +1053,16 @@ fi
 %{_libdir}/%{name}/ibm-mqclient/lap/licenses/LI_tr
 %{_libdir}/%{name}/ibm-mqclient/lap/licenses/LI_zh
 %{_libdir}/%{name}/ibm-mqclient/lap/licenses/LI_zh_TW
+%{_libdir}/%{name}/ibm-mqclient/lap/licenses/icon.gif
 %{_libdir}/%{name}/ibm-mqclient/lap/licenses/logo.gif
 %{_libdir}/%{name}/ibm-mqclient/lap/licenses/non_ibm_license
 %{_libdir}/%{name}/ibm-mqclient/lap/licenses/notices
-%defattr(0750,root,netdata,0750)
-%{_libdir}/%{name}/ibm-mqclient/lib64/libcurl.so
-%{_libdir}/%{name}/ibm-mqclient/lib64/libedit.so
-%{_libdir}/%{name}/ibm-mqclient/lib64/libimqb23gl_r.so
-%{_libdir}/%{name}/ibm-mqclient/lib64/libimqb23gl_r.so.4.1
-%{_libdir}/%{name}/ibm-mqclient/lib64/libimqb23gl.so
-%{_libdir}/%{name}/ibm-mqclient/lib64/libimqb23gl.so.4.1
-%{_libdir}/%{name}/ibm-mqclient/lib64/libmqecs_r.so
-%{_libdir}/%{name}/ibm-mqclient/lib64/libmqecs.so
-%{_libdir}/%{name}/ibm-mqclient/lib64/libmqe_r.so
-%{_libdir}/%{name}/ibm-mqclient/lib64/libmqe.so
-%{_libdir}/%{name}/ibm-mqclient/lib64/libmqjx_r.so
-%{_libdir}/%{name}/ibm-mqclient/lib64/libmqjxx_r.so
-%{_libdir}/%{name}/ibm-mqclient/lib64/libmqmcs_r.so
-%{_libdir}/%{name}/ibm-mqclient/lib64/libmqmcs.so
-%{_libdir}/%{name}/ibm-mqclient/lib64/libmqm_r.so
-%{_libdir}/%{name}/ibm-mqclient/lib64/libmqm.so
-%{_libdir}/%{name}/ibm-mqclient/lib64/libmqmzse.so
-%{_libdir}/%{name}/ibm-mqclient/lib64/libmqxzu_r.so
-%{_libdir}/%{name}/ibm-mqclient/lib64/libmqxzu.so
-%{_libdir}/%{name}/ibm-mqclient/lib64/libmqz_r.so
-%{_libdir}/%{name}/ibm-mqclient/lib64/libmqzsd_r.so
-%{_libdir}/%{name}/ibm-mqclient/lib64/libmqzsd.so
-%{_libdir}/%{name}/ibm-mqclient/lib64/libmqz.so
-%defattr(0640,root,netdata,0640)
+%{_libdir}/%{name}/ibm-mqclient/lib/amqczsc
+%{_libdir}/%{name}/ibm-mqclient/lib/amqczscg
 %{_libdir}/%{name}/ibm-mqclient/lib/amqtrc.fmt
 %{_libdir}/%{name}/ibm-mqclient/lib/ccdt_schema.json
-%{_libdir}/%{name}/ibm-mqclient/lib/ccsid_part2.tbl
 %{_libdir}/%{name}/ibm-mqclient/lib/ccsid.tbl
+%{_libdir}/%{name}/ibm-mqclient/lib/ccsid_part2.tbl
 %{_libdir}/%{name}/ibm-mqclient/lib/iconv/002501B5.tbl
 %{_libdir}/%{name}/ibm-mqclient/lib/iconv/002501F4.tbl
 %{_libdir}/%{name}/ibm-mqclient/lib/iconv/00250333.tbl
@@ -2950,30 +2921,81 @@ fi
 %{_libdir}/%{name}/ibm-mqclient/lib/iconv/F20424E4.tbl
 %defattr(0750,root,netdata,0750)
 %{_libdir}/%{name}/ibm-mqclient/lib/libcurl.so
-%{_libdir}/%{name}/ibm-mqclient/lib/libimqb23gl_r.so
-%{_libdir}/%{name}/ibm-mqclient/lib/libimqb23gl_r.so.4.1
-%{_libdir}/%{name}/ibm-mqclient/lib/libimqb23gl.so
 %{_libdir}/%{name}/ibm-mqclient/lib/libimqb23gl.so.4.1
-%{_libdir}/%{name}/ibm-mqclient/lib/libmqecs_r.so
-%{_libdir}/%{name}/ibm-mqclient/lib/libmqecs.so
-%{_libdir}/%{name}/ibm-mqclient/lib/libmqe_r.so
+%{_libdir}/%{name}/ibm-mqclient/lib/libimqb23gl_r.so.4.1
+%{_libdir}/%{name}/ibm-mqclient/lib/libimqc23gl.so.4.1
+%{_libdir}/%{name}/ibm-mqclient/lib/libimqc23gl_r.so.4.1
+%{_libdir}/%{name}/ibm-mqclient/lib/libmqccics_r.a
+%{_libdir}/%{name}/ibm-mqclient/lib/libmqcxa.so
+%{_libdir}/%{name}/ibm-mqclient/lib/libmqcxa_r.so
+%{_libdir}/%{name}/ibm-mqclient/lib/libmqdc.so
+%{_libdir}/%{name}/ibm-mqclient/lib/libmqdc_r.so
 %{_libdir}/%{name}/ibm-mqclient/lib/libmqe.so
+%{_libdir}/%{name}/ibm-mqclient/lib/libmqe_r.so
+%{_libdir}/%{name}/ibm-mqclient/lib/libmqecs.so
+%{_libdir}/%{name}/ibm-mqclient/lib/libmqecs_r.so
+%{_libdir}/%{name}/ibm-mqclient/lib/libmqic.so
+%{_libdir}/%{name}/ibm-mqclient/lib/libmqic_r.so
+%{_libdir}/%{name}/ibm-mqclient/lib/libmqicb.so
+%{_libdir}/%{name}/ibm-mqclient/lib/libmqicb_r.so
+%{_libdir}/%{name}/ibm-mqclient/lib/libmqiz.so
+%{_libdir}/%{name}/ibm-mqclient/lib/libmqiz_r.so
 %{_libdir}/%{name}/ibm-mqclient/lib/libmqjx_r.so
 %{_libdir}/%{name}/ibm-mqclient/lib/libmqjxx_r.so
-%{_libdir}/%{name}/ibm-mqclient/lib/libmqmcs_r.so
-%{_libdir}/%{name}/ibm-mqclient/lib/libmqmcs.so
-%{_libdir}/%{name}/ibm-mqclient/lib/libmqm_r.so
 %{_libdir}/%{name}/ibm-mqclient/lib/libmqm.so
+%{_libdir}/%{name}/ibm-mqclient/lib/libmqm_r.so
+%{_libdir}/%{name}/ibm-mqclient/lib/libmqmcs.so
+%{_libdir}/%{name}/ibm-mqclient/lib/libmqmcs_r.so
 %{_libdir}/%{name}/ibm-mqclient/lib/libmqmzse.so
-%{_libdir}/%{name}/ibm-mqclient/lib/libmqxzu_r.so
 %{_libdir}/%{name}/ibm-mqclient/lib/libmqxzu.so
-%{_libdir}/%{name}/ibm-mqclient/lib/libmqz_r.so
-%{_libdir}/%{name}/ibm-mqclient/lib/libmqzsd_r.so
-%{_libdir}/%{name}/ibm-mqclient/lib/libmqzsd.so
+%{_libdir}/%{name}/ibm-mqclient/lib/libmqxzu_r.so
 %{_libdir}/%{name}/ibm-mqclient/lib/libmqz.so
+%{_libdir}/%{name}/ibm-mqclient/lib/libmqz_r.so
+%{_libdir}/%{name}/ibm-mqclient/lib/libmqzsd.so
+%{_libdir}/%{name}/ibm-mqclient/lib/libmqzsd_r.so
+%{_libdir}/%{name}/ibm-mqclient/lib64/amqczsc
+%{_libdir}/%{name}/ibm-mqclient/lib64/amqczscg
+%{_libdir}/%{name}/ibm-mqclient/lib64/amqmdnetstd.dll
+%{_libdir}/%{name}/ibm-mqclient/lib64/amqmxmsstd.dll
+%{_libdir}/%{name}/ibm-mqclient/lib64/libcurl.so
+%{_libdir}/%{name}/ibm-mqclient/lib64/libedit.so
+%{_libdir}/%{name}/ibm-mqclient/lib64/libimqb23gl.so.4.1
+%{_libdir}/%{name}/ibm-mqclient/lib64/libimqb23gl_r.so.4.1
+%{_libdir}/%{name}/ibm-mqclient/lib64/libimqc23gl.so.4.1
+%{_libdir}/%{name}/ibm-mqclient/lib64/libimqc23gl_r.so.4.1
+%{_libdir}/%{name}/ibm-mqclient/lib64/libmqccics_r.a
+%{_libdir}/%{name}/ibm-mqclient/lib64/libmqcxa.so
+%{_libdir}/%{name}/ibm-mqclient/lib64/libmqcxa64.so
+%{_libdir}/%{name}/ibm-mqclient/lib64/libmqcxa64_r.so
+%{_libdir}/%{name}/ibm-mqclient/lib64/libmqcxa_r.so
+%{_libdir}/%{name}/ibm-mqclient/lib64/libmqdc.so
+%{_libdir}/%{name}/ibm-mqclient/lib64/libmqdc_r.so
+%{_libdir}/%{name}/ibm-mqclient/lib64/libmqe.so
+%{_libdir}/%{name}/ibm-mqclient/lib64/libmqe_r.so
+%{_libdir}/%{name}/ibm-mqclient/lib64/libmqecs.so
+%{_libdir}/%{name}/ibm-mqclient/lib64/libmqecs_r.so
+%{_libdir}/%{name}/ibm-mqclient/lib64/libmqic.so
+%{_libdir}/%{name}/ibm-mqclient/lib64/libmqic_r.so
+%{_libdir}/%{name}/ibm-mqclient/lib64/libmqicb.so
+%{_libdir}/%{name}/ibm-mqclient/lib64/libmqicb_r.so
+%{_libdir}/%{name}/ibm-mqclient/lib64/libmqiz.so
+%{_libdir}/%{name}/ibm-mqclient/lib64/libmqiz_r.so
+%{_libdir}/%{name}/ibm-mqclient/lib64/libmqjx_r.so
+%{_libdir}/%{name}/ibm-mqclient/lib64/libmqjxx_r.so
+%{_libdir}/%{name}/ibm-mqclient/lib64/libmqm.so
+%{_libdir}/%{name}/ibm-mqclient/lib64/libmqm_r.so
+%{_libdir}/%{name}/ibm-mqclient/lib64/libmqmcs.so
+%{_libdir}/%{name}/ibm-mqclient/lib64/libmqmcs_r.so
+%{_libdir}/%{name}/ibm-mqclient/lib64/libmqmzse.so
+%{_libdir}/%{name}/ibm-mqclient/lib64/libmqxzu.so
+%{_libdir}/%{name}/ibm-mqclient/lib64/libmqxzu_r.so
+%{_libdir}/%{name}/ibm-mqclient/lib64/libmqz.so
+%{_libdir}/%{name}/ibm-mqclient/lib64/libmqz_r.so
+%{_libdir}/%{name}/ibm-mqclient/lib64/libmqzsd.so
+%{_libdir}/%{name}/ibm-mqclient/lib64/libmqzsd_r.so
 %defattr(0640,root,netdata,0640)
-%{_libdir}/%{name}/ibm-mqclient/licenses/Chinese_TW.txt
 %{_libdir}/%{name}/ibm-mqclient/licenses/Chinese.txt
+%{_libdir}/%{name}/ibm-mqclient/licenses/Chinese_TW.txt
 %{_libdir}/%{name}/ibm-mqclient/licenses/Czech.txt
 %{_libdir}/%{name}/ibm-mqclient/licenses/English.txt
 %{_libdir}/%{name}/ibm-mqclient/licenses/French.txt
@@ -2984,22 +3006,24 @@ fi
 %{_libdir}/%{name}/ibm-mqclient/licenses/Japanese.txt
 %{_libdir}/%{name}/ibm-mqclient/licenses/Korean.txt
 %{_libdir}/%{name}/ibm-mqclient/licenses/Lithuanian.txt
-%{_libdir}/%{name}/ibm-mqclient/licenses/non_ibm_license.txt
-%{_libdir}/%{name}/ibm-mqclient/licenses/notices.txt
 %{_libdir}/%{name}/ibm-mqclient/licenses/Polish.txt
 %{_libdir}/%{name}/ibm-mqclient/licenses/Portuguese.txt
 %{_libdir}/%{name}/ibm-mqclient/licenses/Russian.txt
 %{_libdir}/%{name}/ibm-mqclient/licenses/Slovenian.txt
 %{_libdir}/%{name}/ibm-mqclient/licenses/Spanish.txt
 %{_libdir}/%{name}/ibm-mqclient/licenses/Turkish.txt
-%{_libdir}/%{name}/ibm-mqclient/MANIFEST
-%{_libdir}/%{name}/ibm-mqclient/MANIFEST.Redist
+%{_libdir}/%{name}/ibm-mqclient/licenses/non_ibm_license.txt
+%{_libdir}/%{name}/ibm-mqclient/licenses/notices.txt
 %{_libdir}/%{name}/ibm-mqclient/msg/en_US/amq.cat
-%{_libdir}/%{name}/ibm-mqclient/README.Redist
 %{_libdir}/%{name}/ibm-mqclient/swidtag/IBM_MQ-9.4.3.mqtag
 %{_libdir}/%{name}/ibm-mqclient/swidtag/IBM_MQ_GSKit-8.0.60.mqtag
 %{_libdir}/%{name}/ibm-mqclient/swidtag/IBM_MQ_Redistributable_Client-9.4.3.mqtag
 %{_libdir}/%{name}/ibm-mqclient/swidtag/IBM_MQ_Runtime-9.4.3.mqtag
+%{_libdir}/%{name}/ibm-mqclient/swidtag/ibm.com_IBM_MQ_Advanced_for_Developers_Non-Warranted-9.4.3.1.swidtag
+%{_libdir}/%{name}/ibm-mqclient/swidtag/ibm.com_IBM_MQ_Client-9.4.3.1.swidtag
+%{_libdir}/%{name}/ibm-mqclient/swidtag/ibm.com_IBM_MQ_Client-9.4.3.swidtag
+%{_libdir}/%{name}/ibm-mqclient/MANIFEST.Redist
+%{_libdir}/%{name}/ibm-mqclient/README.Redist
 %endif
 
 %package plugin-apps
@@ -3007,15 +3031,12 @@ Summary: The per-application metrics collection plugin for the Netdata Agent
 Group: Applications/System
 Requires: %{name} = %{version}
 Conflicts: %{name} < %{version}
+%if ! %{_have_sysuser}
+Requires(pre): %{name}-user >= %{version}
+%endif
 
 %description plugin-apps
  This plugin allows the Netdata Agent to collect per-application and per-user metrics without using cgroups.
-
-%pre plugin-apps
-
-if ! getent group %{name} > /dev/null; then
-  groupadd --system %{name}
-fi
 
 %files plugin-apps
 %defattr(0750,root,netdata,0750)
@@ -3029,15 +3050,12 @@ Summary: The slabinfo metrics collector for the Netdata Agent
 Group: Applications/System
 Requires: %{name} = %{version}
 Conflicts: %{name} < %{version}
+%if ! %{_have_sysuser}
+Requires(pre): %{name}-user >= %{version}
+%endif
 
 %description plugin-slabinfo
  This plugin allows the Netdata Agent to collect perfromance and utilization metrics for the Linux kernel’s SLAB allocator.
-
-%pre plugin-slabinfo
-
-if ! getent group %{name} > /dev/null; then
-  groupadd --system %{name}
-fi
 
 %files plugin-slabinfo
 %defattr(0750,root,netdata,0750)
@@ -3049,15 +3067,12 @@ Summary: The perf metrics collector for the Netdata Agent
 Group: Applications/System
 Requires: %{name} = %{version}
 Conflicts: %{name} < %{version}
+%if ! %{_have_sysuser}
+Requires(pre): %{name}-user >= %{version}
+%endif
 
 %description plugin-perf
  This plugin allows the Netdata to collect metrics from the Linux perf subsystem.
-
-%pre plugin-perf
-
-if ! getent group %{name} > /dev/null; then
-  groupadd --system %{name}
-fi
 
 %files plugin-perf
 %defattr(0750,root,netdata,0750)
@@ -3074,15 +3089,12 @@ Summary: The debugfs metrics collector for the Netdata Agent
 Group: Applications/System
 Requires: %{name} = %{version}
 Conflicts: %{name} < %{version}
+%if ! %{_have_sysuser}
+Requires(pre): %{name}-user >= %{version}
+%endif
 
 %description plugin-debugfs
  This plugin allows the Netdata Agent to collect Linux kernel metrics exposed through debugfs.
-
-%pre plugin-debugfs
-
-if ! getent group %{name} > /dev/null; then
-  groupadd --system %{name}
-fi
 
 %files plugin-debugfs
 %defattr(0750,root,netdata,0750)
@@ -3094,16 +3106,13 @@ Summary: The systemd-journal plugin for the Netdata Agent
 Group: Applications/System
 Requires: %{name} = %{version}
 Conflicts: %{name} < %{version}
+%if ! %{_have_sysuser}
+Requires(pre): %{name}-user >= %{version}
+%endif
 
 %description plugin-systemd-journal
  This plugin allows the Netdata Agent to present entries from the systemd
  journal on Netdata Cloud or the local Agent Dashboard.
-
-%pre plugin-systemd-journal
-
-if ! getent group %{name} > /dev/null; then
-  groupadd --system %{name}
-fi
 
 %files plugin-systemd-journal
 %defattr(0750,root,netdata,0750)
@@ -3116,14 +3125,12 @@ Summary: The systemd units plugin for the Netdata Agent
 Group: Applications/System
 Requires: %{name} = %{version}
 Conflicts: %{name} < %{version}
+%if ! %{_have_sysuser}
+Requires(pre): %{name}-user >= %{version}
+%endif
 
 %description plugin-systemd-units
  This plugin allows Netdata to collect metrics about systemd units.
-
-%pre plugin-systemd-units
-if ! getent group %{name} > /dev/null; then
-  groupadd --system %{name}
-fi
 
 %files plugin-systemd-units
 %defattr(0750,root,netdata,0750)
@@ -3136,14 +3143,12 @@ Summary: The xenstat plugin for the Netdata Agent
 Group: Applications/System
 Requires: %{name} = %{version}
 Conflicts: %{name} < %{version}
+%if ! %{_have_sysuser}
+Requires(pre): %{name}-user >= %{version}
+%endif
 
 %description plugin-xenstat
  This plugin allows Netdata to collect metrics from the Xen Hypervisor.
-
-%pre plugin-xenstat
-if ! getent group %{name} > /dev/null; then
-  groupadd --system %{name}
-fi
 
 %files plugin-xenstat
 %defattr(0750,root,netdata,0750)
@@ -3163,15 +3168,13 @@ Recommends: %{name}-plugin-ebpf = %{version}
 Requires: %{name}-plugin-ebpf = %{version}
 %endif
 %endif
+%if ! %{_have_sysuser}
+Requires(pre): %{name}-user >= %{version}
+%endif
 
 %description plugin-network-viewer
  This plugin allows the Netdata Agent to provide network connection
  mapping functionality for use in netdata Cloud.
-
-%pre plugin-network-viewer
-if ! getent group %{name} > /dev/null; then
-  groupadd --system %{name}
-fi
 
 %files plugin-network-viewer
 %defattr(0750,root,netdata,0750)
@@ -3183,14 +3186,12 @@ Summary: The local dashboard for the Netdata Agent
 Group: Applications/System
 Requires: %{name} >= %{version}
 Conflicts: %{name} < %{version}
+%if ! %{_have_sysuser}
+Requires(pre): %{name}-user >= %{version}
+%endif
 
 %description dashboard
  This allows access to the dashboard on the local node without internet access.
-
-%pre dashboard
-if ! getent group %{name} > /dev/null; then
-  groupadd --system %{name}
-fi
 
 %files dashboard
 %defattr(0644,root,root,0755)
@@ -3202,24 +3203,68 @@ Summary: The Open Telemetry plugin for the Netdata Agent
 Group: Applications/System
 Requires: %{name} >= %{version}
 Conflicts: %{name} < %{version}
+%if ! %{_have_sysuser}
+Requires(pre): %{name}-user >= %{version}
+%endif
 
 %description plugin-otel
  This plugin allows the Netdata Agent to collect metrics and logs via the
  OpenTelemetry gRPC protocol, providing integration with modern observability
  stacks.
 
-%pre plugin-otel
-if ! getent group %{name} > /dev/null; then
-  groupadd --system %{name}
-fi
-
 %files plugin-otel
 %defattr(0750,root,netdata,0750)
-%caps(cap_net_bind_service=eip) %attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/otel-plugin
+%attr(0750,root,netdata) %{_libexecdir}/%{name}/plugins.d/otel-plugin
 %endif
 
+%package user
+Summary: User and group accounts for the Netdata Agent
+Group: Applications/System
+%if ! %{_have_sysuser}
+Requires: /usr/sbin/useradd
+Requires: /usr/sbin/groupadd
+%else
+Requires: systemd
+%endif
+%if %{_need_explicit_user_provides}
+Provides: user(netdata)
+Provides: group(netdata)
+%endif
+
+%description user
+ This package provides the netdata user and group that are used by the Netdata Agent.
+
+%post user
+%if %{_need_explicit_user_provides} || ! %{_have_sysuser}
+if command -v systemd-sysusers >/dev/null 2>&1; then
+    systemd-sysusers %{_sysusersdir}/%{name}.conf
+else
+    if ! getent group %{name} > /dev/null; then
+        groupadd --system %{name}
+    fi
+
+    if ! getent passwd %{name} > /dev/null; then
+        useradd --system -g %{name} --home %{contentdir} --no-create-home -s /sbin/nologin -c "Netdata pseudo user" %{name}
+    fi
+fi
+%endif
+
+for item in docker ceph I2C; do
+  if getent group $item > /dev/null 2>&1; then
+    usermod -a -G ${item} %{name}
+  fi
+done
+
+%files user
+%defattr(0644,root,root,0755)
+%attr(0644,root,root) %{_sysusersdir}/%{name}.conf
+
 %changelog
-* Tue Sep 30 2025 Austin Hemmelgarn <austin@netdata.cloud>
+* Tue Nov 11 2025 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-37
+- Update to use sysusers infrastructure when available.
+* Fri Oct 24 2025 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-36
+- Add proper cleanup of auto-update configuration on uninstall
+* Tue Sep 30 2025 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-35
 - Add IBM plugin
 * Tue Jul 29 2025 Austin Hemmelgarn <austin@netdata.cloud> 0.0.0-34
 - Add OpenTelemetry plugin

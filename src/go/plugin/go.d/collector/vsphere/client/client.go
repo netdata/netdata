@@ -8,8 +8,6 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/tlscfg"
-
 	"github.com/vmware/govmomi"
 	"github.com/vmware/govmomi/performance"
 	"github.com/vmware/govmomi/session"
@@ -18,6 +16,8 @@ import (
 	"github.com/vmware/govmomi/vim25/mo"
 	"github.com/vmware/govmomi/vim25/soap"
 	"github.com/vmware/govmomi/vim25/types"
+
+	"github.com/netdata/netdata/go/plugins/pkg/tlscfg"
 )
 
 const (

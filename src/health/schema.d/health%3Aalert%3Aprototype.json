@@ -23,8 +23,12 @@
             "title": "The instance this rule should be applied to.",
             "description": "You can find the instance names on all charts at the instances drop down menu. Do not include the host name in this field."
           },
-          "host_labels": { "$ref": "#/definitions/matchHostLabels" },
-          "instance_labels": { "$ref": "#/definitions/matchInstanceLabels" }
+          "host_labels": {
+            "$ref": "#/definitions/matchHostLabels"
+          },
+          "instance_labels": {
+            "$ref": "#/definitions/matchInstanceLabels"
+          }
         },
         "required": [
           "on",
@@ -43,8 +47,12 @@
             "title": "The context of the instances this rule should be applied to.",
             "description": "The context is the code-name of each chart on the dashboard, that appears at the chart title bar, between the chart title and its unit of measurement, like: system.cpu, disk.io, etc."
           },
-          "host_labels": { "$ref": "#/definitions/matchHostLabels" },
-          "instance_labels": { "$ref": "#/definitions/matchInstanceLabels" }
+          "host_labels": {
+            "$ref": "#/definitions/matchHostLabels"
+          },
+          "instance_labels": {
+            "$ref": "#/definitions/matchInstanceLabels"
+          }
         },
         "required": [
           "on",
@@ -90,9 +98,21 @@
               "data_source": {
                 "type": "string",
                 "oneOf": [
-                  { "const": "samples", "title": "Samples", "description": "Use the time-series values for each dimension" },
-                  { "const": "percentages", "title": "Percentages", "description": "Use the percentage of each dimension vs the sum of all dimensions" },
-                  { "const": "anomalies", "title": "Anomalies", "description": "Use the anomaly rate of each dimension" }
+                  {
+                    "const": "samples",
+                    "title": "Samples",
+                    "description": "Use the time-series values for each dimension"
+                  },
+                  {
+                    "const": "percentages",
+                    "title": "Percentages",
+                    "description": "Use the percentage of each dimension vs the sum of all dimensions"
+                  },
+                  {
+                    "const": "anomalies",
+                    "title": "Anomalies",
+                    "description": "Use the anomaly rate of each dimension"
+                  }
                 ],
                 "default": "samples",
                 "title": " ",
@@ -101,20 +121,62 @@
               "time_group": {
                 "type": "string",
                 "oneOf": [
-                  { "const": "average", "title": "Average" },
-                  { "const": "median", "title": "Median" },
-                  { "const": "min", "title": "Minimum" },
-                  { "const": "max", "title": "Maximum" },
-                  { "const": "sum", "title": "Sum" },
-                  { "const": "incremental_sum", "title": "Incremental Sum" },
-                  { "const": "stddev", "title": "Standard Deviation" },
-                  { "const": "cv", "title": "Coefficient of Variation" },
-                  { "const": "trimmed-mean", "title": "Trimmed Mean" },
-                  { "const": "trimmed-median", "title": "Trimmed Median" },
-                  { "const": "percentile", "title": "Percentile" },
-                  { "const": "ses", "title": "Simple Exponential Smoothing" },
-                  { "const": "des", "title": "Double Exponential Smoothing" },
-                  { "const": "countif", "title": "Count If" }
+                  {
+                    "const": "average",
+                    "title": "Average"
+                  },
+                  {
+                    "const": "median",
+                    "title": "Median"
+                  },
+                  {
+                    "const": "min",
+                    "title": "Minimum"
+                  },
+                  {
+                    "const": "max",
+                    "title": "Maximum"
+                  },
+                  {
+                    "const": "sum",
+                    "title": "Sum"
+                  },
+                  {
+                    "const": "incremental_sum",
+                    "title": "Incremental Sum"
+                  },
+                  {
+                    "const": "stddev",
+                    "title": "Standard Deviation"
+                  },
+                  {
+                    "const": "cv",
+                    "title": "Coefficient of Variation"
+                  },
+                  {
+                    "const": "trimmed-mean",
+                    "title": "Trimmed Mean"
+                  },
+                  {
+                    "const": "trimmed-median",
+                    "title": "Trimmed Median"
+                  },
+                  {
+                    "const": "percentile",
+                    "title": "Percentile"
+                  },
+                  {
+                    "const": "ses",
+                    "title": "Simple Exponential Smoothing"
+                  },
+                  {
+                    "const": "des",
+                    "title": "Double Exponential Smoothing"
+                  },
+                  {
+                    "const": "countif",
+                    "title": "Count If"
+                  }
                 ],
                 "default": "average",
                 "title": "Time Aggregation",
@@ -135,11 +197,31 @@
               "dims_group": {
                 "type": "string",
                 "oneOf": [
-                  { "const": "average", "title": "Average", "description": "The average of all dimensions" },
-                  { "const": "min", "title": "Minimum", "description": "The minimum of all dimensions" },
-                  { "const": "max", "title": "Maximum", "description": "The maximum of all dimensions" },
-                  { "const": "sum", "title": "Sum", "description": "The sum of all dimensions" },
-                  { "const": "min2max", "title": "Min-to-Max", "description": "The delta between the minimum of the maximum of the dimensions" }
+                  {
+                    "const": "average",
+                    "title": "Average",
+                    "description": "The average of all dimensions"
+                  },
+                  {
+                    "const": "min",
+                    "title": "Minimum",
+                    "description": "The minimum of all dimensions"
+                  },
+                  {
+                    "const": "max",
+                    "title": "Maximum",
+                    "description": "The maximum of all dimensions"
+                  },
+                  {
+                    "const": "sum",
+                    "title": "Sum",
+                    "description": "The sum of all dimensions"
+                  },
+                  {
+                    "const": "min2max",
+                    "title": "Min-to-Max",
+                    "description": "The delta between the minimum of the maximum of the dimensions"
+                  }
                 ],
                 "default": "sum",
                 "title": "Dims Aggregation",
@@ -158,14 +240,31 @@
                 "uniqueItems": true,
                 "items": {
                   "oneOf": [
-                    { "const":  "unaligned", "title": "Do not shift the time-frame for visual presentation" },
-                    { "const":  "absolute", "title": "Make all values positive before using them" },
-                    { "const":  "null2zero", "title": "Treat gaps in the time-series as a zero value" },
-                    { "const":  "match_ids", "title": "Match only dimension IDs, not Names" },
-                    { "const":  "match_names", "title": "Match only dimension Names, not IDs" }
+                    {
+                      "const": "unaligned",
+                      "title": "Do not shift the time-frame for visual presentation"
+                    },
+                    {
+                      "const": "absolute",
+                      "title": "Make all values positive before using them"
+                    },
+                    {
+                      "const": "null2zero",
+                      "title": "Treat gaps in the time-series as a zero value"
+                    },
+                    {
+                      "const": "match_ids",
+                      "title": "Match only dimension IDs, not Names"
+                    },
+                    {
+                      "const": "match_names",
+                      "title": "Match only dimension Names, not IDs"
+                    }
                   ]
                 },
-                "default": [ "unaligned" ]
+                "default": [
+                  "unaligned"
+                ]
               }
             },
             "allOf": [
@@ -173,7 +272,9 @@
                 "if": {
                   "properties": {
                     "time_group": {
-                      "enum": ["trimmed-mean"]
+                      "enum": [
+                        "trimmed-mean"
+                      ]
                     }
                   }
                 },
@@ -186,14 +287,18 @@
                       "description": ""
                     }
                   },
-                  "required": ["time_group_value"]
+                  "required": [
+                    "time_group_value"
+                  ]
                 }
               },
               {
                 "if": {
                   "properties": {
                     "time_group": {
-                      "enum": ["trimmed-median"]
+                      "enum": [
+                        "trimmed-median"
+                      ]
                     }
                   }
                 },
@@ -206,14 +311,18 @@
                       "description": ""
                     }
                   },
-                  "required": ["time_group_value"]
+                  "required": [
+                    "time_group_value"
+                  ]
                 }
               },
               {
                 "if": {
                   "properties": {
                     "time_group": {
-                      "enum": ["percentile"]
+                      "enum": [
+                        "percentile"
+                      ]
                     }
                   }
                 },
@@ -226,7 +335,9 @@
                       "description": ""
                     }
                   },
-                  "required": ["time_group_value"]
+                  "required": [
+                    "time_group_value"
+                  ]
                 }
               },
               {
@@ -242,12 +353,30 @@
                     "time_group_condition": {
                       "type": "string",
                       "oneOf": [
-                        { "const": "!=", "title": "!=" },
-                        { "const": "=", "title": "==" },
-                        { "const": ">=", "title": ">=" },
-                        { "const": ">", "title": ">" },
-                        { "const": "<=", "title": "<=" },
-                        { "const": "<", "title": "<" }
+                        {
+                          "const": "!=",
+                          "title": "!="
+                        },
+                        {
+                          "const": "=",
+                          "title": "=="
+                        },
+                        {
+                          "const": ">=",
+                          "title": ">="
+                        },
+                        {
+                          "const": ">",
+                          "title": ">"
+                        },
+                        {
+                          "const": "<=",
+                          "title": "<="
+                        },
+                        {
+                          "const": "<",
+                          "title": "<"
+                        }
                       ],
                       "default": "equal",
                       "title": "Condition",
@@ -260,7 +389,10 @@
                       "description": ""
                     }
                   },
-                  "required": ["time_group_condition", "time_group_value"]
+                  "required": [
+                    "time_group_condition",
+                    "time_group_value"
+                  ]
                 }
               }
             ]
@@ -269,6 +401,12 @@
             "type": "string",
             "title": "Calculation",
             "description": "An expression to transform the value"
+          },
+          "units_placeholder": {
+            "type": "string",
+            "default": "-",
+            "title": "Source unit",
+            "description": "before scaling in UI"
           },
           "units": {
             "type": "string",
@@ -319,7 +457,10 @@
             "uniqueItems": true,
             "items": {
               "oneOf": [
-                { "const":  "no-clear-notification", "title": "Do not perform any action when the alert is cleared"}
+                {
+                  "const": "no-clear-notification",
+                  "title": "Do not perform any action when the alert is cleared"
+                }
               ]
             },
             "default": []
@@ -372,15 +513,33 @@
         "title": "Alert Configuration",
         "description": "The properties that control the value the alert will get, the conditions it will trigger, the back-off for notifications, the auto-repeating of notifications, etc.",
         "properties": {
-          "match": { "$ref": "#/definitions/matchInstance" },
-          "summary": { "$ref": "#/definitions/configSummary" },
-          "info": { "$ref": "#/definitions/configInfo" },
-          "type": { "$ref": "#/definitions/configType" },
-          "component": { "$ref": "#/definitions/configComponent" },
-          "classification": { "$ref": "#/definitions/configClassification" },
-          "value": { "$ref": "#/definitions/configValue" },
-          "conditions": { "$ref": "#/definitions/configConditions" },
-          "action": { "$ref": "#/definitions/configAction" }
+          "match": {
+            "$ref": "#/definitions/matchInstance"
+          },
+          "summary": {
+            "$ref": "#/definitions/configSummary"
+          },
+          "info": {
+            "$ref": "#/definitions/configInfo"
+          },
+          "type": {
+            "$ref": "#/definitions/configType"
+          },
+          "component": {
+            "$ref": "#/definitions/configComponent"
+          },
+          "classification": {
+            "$ref": "#/definitions/configClassification"
+          },
+          "value": {
+            "$ref": "#/definitions/configValue"
+          },
+          "conditions": {
+            "$ref": "#/definitions/configConditions"
+          },
+          "action": {
+            "$ref": "#/definitions/configAction"
+          }
         },
         "required": []
       },
@@ -389,15 +548,33 @@
         "title": "Alert Configuration",
         "description": "The properties that control the value the alert will get, the conditions it will trigger, the back-off for notifications, the auto-repeating of notifications, etc.",
         "properties": {
-          "match": { "$ref": "#/definitions/matchTemplate" },
-          "summary": { "$ref": "#/definitions/configSummary" },
-          "info": { "$ref": "#/definitions/configInfo" },
-          "type": { "$ref": "#/definitions/configType" },
-          "component": { "$ref": "#/definitions/configComponent" },
-          "classification": { "$ref": "#/definitions/configClassification" },
-          "value": { "$ref": "#/definitions/configValue" },
-          "conditions": { "$ref": "#/definitions/configConditions" },
-          "action": { "$ref": "#/definitions/configAction" }
+          "match": {
+            "$ref": "#/definitions/matchTemplate"
+          },
+          "summary": {
+            "$ref": "#/definitions/configSummary"
+          },
+          "info": {
+            "$ref": "#/definitions/configInfo"
+          },
+          "type": {
+            "$ref": "#/definitions/configType"
+          },
+          "component": {
+            "$ref": "#/definitions/configComponent"
+          },
+          "classification": {
+            "$ref": "#/definitions/configClassification"
+          },
+          "value": {
+            "$ref": "#/definitions/configValue"
+          },
+          "conditions": {
+            "$ref": "#/definitions/configConditions"
+          },
+          "action": {
+            "$ref": "#/definitions/configAction"
+          }
         },
         "required": []
       }
@@ -425,28 +602,43 @@
             "type": {
               "type": "string",
               "oneOf": [
-                { "const":  "instance" , "title": "A specific Instance" },
-                { "const":  "template" , "title": "Each of the Instances" }
+                {
+                  "const": "instance",
+                  "title": "A specific Instance"
+                },
+                {
+                  "const": "template",
+                  "title": "Each of the Instances"
+                }
               ],
               "default": "template",
               "title": "Apply this rule to:",
               "description": ""
             }
           },
-          "required": [ "type", "enabled" ],
+          "required": [
+            "type",
+            "enabled"
+          ],
           "if": {
             "properties": {
-              "type": { "const": "instance" }
+              "type": {
+                "const": "instance"
+              }
             }
           },
           "then": {
             "properties": {
-              "config": { "$ref": "#/definitions/configInstance" }
+              "config": {
+                "$ref": "#/definitions/configInstance"
+              }
             }
           },
           "else": {
             "properties": {
-              "config": { "$ref": "#/definitions/configTemplate" }
+              "config": {
+                "$ref": "#/definitions/configTemplate"
+              }
             }
           }
         }
@@ -467,7 +659,7 @@
       "ui:widget": "hidden"
     },
     "rules": {
-      "ui:openEmptyItem":  true,
+      "ui:openEmptyItem": true,
       "items": {
         "ui:classNames": "dyncfg-grid dyncfg-grid-col-6",
         "enabled": {
@@ -555,8 +747,25 @@
           },
           "value": {
             "ui:classNames": "dyncfg-grid dyncfg-grid-col-6 dyncfg-grid-col-span-1-6",
+            "ui:order": [
+              "database_lookup",
+              "calculation",
+              "units",
+              "update_every",
+              "units_placeholder"
+            ],
             "database_lookup": {
-              "ui:order": ["data_source", "time_group", "time_group_condition", "time_group_value", "after", "before", "dims_group", "dimensions", "options"],
+              "ui:order": [
+                "data_source",
+                "time_group",
+                "time_group_condition",
+                "time_group_value",
+                "after",
+                "before",
+                "dims_group",
+                "dimensions",
+                "options"
+              ],
               "ui:classNames": "dyncfg-grid dyncfg-grid-col-6 dyncfg-grid-col-span-1-6",
               "ui:collapsible": true,
               "ui:initiallyExpanded": true,
@@ -608,7 +817,12 @@
             },
             "update_every": {
               "ui:help": "The frequency this alarm is to be evaluated, in seconds.",
-              "ui:classNames": "dyncfg-grid-col-span-6-1"
+              "ui:classNames": "dyncfg-grid-col-span-1-2"
+            },
+            "units_placeholder": {
+              "ui:widget": "unitsPlaceholder",
+              "ui:classNames": "dyncfg-grid-col-span-5-1",
+              "ui:help": "Netdata may display scaled units (e.g. bytes → GiB). Use the metric’s original unit to avoid confusion when writing alert expressions."
             }
           },
           "conditions": {

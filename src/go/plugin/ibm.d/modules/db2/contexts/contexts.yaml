@@ -496,6 +496,81 @@ Bufferpool:
       dimensions:
         - {name: writes, algo: incremental}
 
+BufferpoolGroup:
+  labels:
+    - group
+  contexts:
+    - name: HitRatio
+      context: db2.bufferpool_group_hit_ratio
+      title: Buffer Pool Group Hit Ratio
+      family: bufferpools/groups
+      units: percentage
+      type: line
+      priority: 1117
+      dimensions:
+        - {name: overall, algo: absolute, precision: 1000, div: 1000}
+    - name: DetailedHitRatio
+      context: db2.bufferpool_group_detailed_hit_ratio
+      title: Buffer Pool Group Detailed Hit Ratios
+      family: bufferpools/groups
+      units: percentage
+      type: line
+      priority: 1118
+      dimensions:
+        - {name: data, algo: absolute, precision: 1000, div: 1000}
+        - {name: index, algo: absolute, precision: 1000, div: 1000}
+        - {name: xda, algo: absolute, precision: 1000, div: 1000}
+        - {name: column, algo: absolute, precision: 1000, div: 1000}
+    - name: Reads
+      context: db2.bufferpool_group_reads
+      title: Buffer Pool Group Reads
+      family: bufferpools/groups
+      units: reads/s
+      type: stacked
+      priority: 1119
+      dimensions:
+        - {name: logical, algo: incremental}
+        - {name: physical, algo: incremental}
+    - name: DataReads
+      context: db2.bufferpool_group_data_reads
+      title: Buffer Pool Group Data Reads
+      family: bufferpools/groups
+      units: reads/s
+      type: stacked
+      priority: 1120
+      dimensions:
+        - {name: logical, algo: incremental}
+        - {name: physical, algo: incremental}
+    - name: IndexReads
+      context: db2.bufferpool_group_index_reads
+      title: Buffer Pool Group Index Reads
+      family: bufferpools/groups
+      units: reads/s
+      type: stacked
+      priority: 1121
+      dimensions:
+        - {name: logical, algo: incremental}
+        - {name: physical, algo: incremental}
+    - name: Pages
+      context: db2.bufferpool_group_pages
+      title: Buffer Pool Group Pages
+      family: bufferpools/groups
+      units: pages
+      type: stacked
+      priority: 1122
+      dimensions:
+        - {name: used, algo: absolute}
+        - {name: total, algo: absolute}
+    - name: Writes
+      context: db2.bufferpool_group_writes
+      title: Buffer Pool Group Writes
+      family: bufferpools/groups
+      units: writes/s
+      type: line
+      priority: 1123
+      dimensions:
+        - {name: writes, algo: incremental}
+
 Tablespace:
   labels:
     - tablespace
@@ -539,6 +614,49 @@ Tablespace:
       units: state
       type: line
       priority: 1123
+      dimensions:
+        - {name: state, algo: absolute}
+
+TablespaceGroup:
+  labels:
+    - group
+  contexts:
+    - name: Usage
+      context: db2.tablespace_group_usage
+      title: Tablespace Group Usage
+      family: tablespaces/groups
+      units: percentage
+      type: line
+      priority: 1124
+      dimensions:
+        - {name: used, algo: absolute, precision: 1000, div: 1000}
+    - name: Size
+      context: db2.tablespace_group_size
+      title: Tablespace Group Size
+      family: tablespaces/groups
+      units: bytes
+      type: stacked
+      priority: 1125
+      dimensions:
+        - {name: used, algo: absolute}
+        - {name: free, algo: absolute}
+    - name: UsableSize
+      context: db2.tablespace_group_usable_size
+      title: Tablespace Group Usable Size
+      family: tablespaces/groups
+      units: bytes
+      type: line
+      priority: 1126
+      dimensions:
+        - {name: total, algo: absolute}
+        - {name: usable, algo: absolute}
+    - name: State
+      context: db2.tablespace_group_state
+      title: Tablespace Group State
+      family: tablespaces/groups
+      units: state
+      type: line
+      priority: 1127
       dimensions:
         - {name: state, algo: absolute}
 
@@ -601,6 +719,69 @@ Connection:
         - {name: commit, algo: incremental}
         - {name: rollback, algo: incremental}
 
+ConnectionGroup:
+  labels:
+    - group
+  contexts:
+    - name: Count
+      context: db2.connection_group.count
+      title: Connection Group Count
+      family: connections/groups
+      units: connections
+      type: line
+      priority: 1134
+      dimensions:
+        - {name: count, algo: absolute}
+    - name: State
+      context: db2.connection_group.state
+      title: Connection Group State Sum
+      family: connections/groups
+      units: state
+      type: line
+      priority: 1135
+      dimensions:
+        - {name: state, algo: absolute}
+    - name: Activity
+      context: db2.connection_group.activity
+      title: Connection Group Row Activity
+      family: connections/groups
+      units: rows/s
+      type: area
+      priority: 1136
+      dimensions:
+        - {name: read, algo: incremental}
+        - {name: written, algo: incremental}
+    - name: WaitTime
+      context: db2.connection_group.wait_time
+      title: Connection Group Wait Time
+      family: connections/groups
+      units: milliseconds
+      type: stacked
+      priority: 1137
+      dimensions:
+        - {name: lock, algo: incremental}
+        - {name: log_disk, algo: incremental}
+        - {name: log_buffer, algo: incremental}
+        - {name: pool_read, algo: incremental}
+        - {name: pool_write, algo: incremental}
+        - {name: direct_read, algo: incremental}
+        - {name: direct_write, algo: incremental}
+        - {name: fcm_recv, algo: incremental}
+        - {name: fcm_send, algo: incremental}
+    - name: ProcessingTime
+      context: db2.connection_group.processing_time
+      title: Connection Group Processing Time
+      family: connections/groups
+      units: milliseconds
+      type: stacked
+      priority: 1138
+      dimensions:
+        - {name: routine, algo: incremental}
+        - {name: compile, algo: incremental}
+        - {name: section, algo: incremental}
+        - {name: commit, algo: incremental}
+        - {name: rollback, algo: incremental}
+
 Table:
   labels:
     - table
@@ -627,6 +808,32 @@ Table:
         - {name: read, algo: incremental}
         - {name: written, algo: incremental}
 
+TableGroup:
+  labels:
+    - group
+  contexts:
+    - name: Size
+      context: db2.table_group_size
+      title: Table Group Size
+      family: tables/groups
+      units: bytes
+      type: stacked
+      priority: 1142
+      dimensions:
+        - {name: data, algo: absolute}
+        - {name: index, algo: absolute}
+        - {name: long_obj, algo: absolute}
+    - name: Activity
+      context: db2.table_group_activity
+      title: Table Group Activity
+      family: tables/groups
+      units: rows/s
+      type: area
+      priority: 1143
+      dimensions:
+        - {name: read, algo: incremental}
+        - {name: written, algo: incremental}
+
 Index:
   labels:
     - index
@@ -638,6 +845,21 @@ Index:
       units: scans/s
       type: area
       priority: 1150
+      dimensions:
+        - {name: index, algo: incremental}
+        - {name: full, algo: incremental}
+
+IndexGroup:
+  labels:
+    - group
+  contexts:
+    - name: Usage
+      context: db2.index_group_usage
+      title: Index Group Usage
+      family: indexes/groups
+      units: scans/s
+      type: area
+      priority: 1151
       dimensions:
         - {name: index, algo: incremental}
         - {name: full, algo: incremental}

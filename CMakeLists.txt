@@ -1931,12 +1931,13 @@ set(WINDOWS_PLUGIN_FILES
         src/collectors/windows.plugin/GetPowerSupply.c
         src/collectors/windows.plugin/GetServicesStatus.c
         src/collectors/windows.plugin/GetSensors.c
+        src/collectors/windows.plugin/GetHardwareInfo.c
+        src/collectors/windows.plugin/MonitorSQL.c
         src/collectors/windows.plugin/perflib-adcs.c
         src/collectors/windows.plugin/perflib-adfs.c
         src/collectors/windows.plugin/perflib-rrd.c
         src/collectors/windows.plugin/perflib-rrd.h
         src/collectors/windows.plugin/perflib-ad.c
-        src/collectors/windows.plugin/perflib-mssql.c
         src/collectors/windows.plugin/perflib-mssql-queries.h
         src/collectors/windows.plugin/perflib-storage.c
         src/collectors/windows.plugin/perflib-processor.c
@@ -1944,6 +1945,7 @@ set(WINDOWS_PLUGIN_FILES
         src/collectors/windows.plugin/perflib-objects.c
         src/collectors/windows.plugin/perflib-network.c
         src/collectors/windows.plugin/perflib-netframework.c
+        src/collectors/windows.plugin/perflib-mssql.c
         src/collectors/windows.plugin/perflib-memory.c
         src/collectors/windows.plugin/perflib-processes.c
         src/collectors/windows.plugin/perflib-web-service.c
@@ -1951,6 +1953,11 @@ set(WINDOWS_PLUGIN_FILES
         src/collectors/windows.plugin/perflib-exchange.c
         src/collectors/windows.plugin/perflib-numa.c
         src/collectors/windows.plugin/perflib-asp.c
+)
+
+set(WINDOWS_PLUGIN_DRIVER
+        src/collectors/windows.plugin/netdata_win_driver.c
+        src/collectors/windows.plugin/netdata_win_driver.h
 )
 
 set(PROC_PLUGIN_FILES
@@ -3017,6 +3024,35 @@ if(OS_WINDOWS)
         add_executable(NetdataClaim ${CLAIM_WINDOWS_FILES} ${NETDATA_CLAIM_RES_FILES})
         target_link_libraries(NetdataClaim shell32 gdi32 msftedit)
         target_compile_options(NetdataClaim PUBLIC -mwindows)
+
+        set(NETDATA_DRIVER_FILE "${CMAKE_BINARY_DIR}/netdata_driver.sys")
+
+        add_library(netdata_driver SHARED ${WINDOWS_PLUGIN_DRIVER})
+        set_target_properties(netdata_driver PROPERTIES LIBRARY_OUTPUT_NAME "netdata_driver")
+        set_target_properties(netdata_driver PROPERTIES PREFIX "")
+        set_target_properties(netdata_driver PROPERTIES SUFFIX ".sys")
+        target_include_directories(netdata_driver PRIVATE BEFORE "/mingw64/include/ddk" "${CMAKE_SOURCE_DIR}/src/collectors/windows.plugin")
+        target_compile_options(netdata_driver PRIVATE
+                -Wall
+                -Wextra
+                -Werror
+                -ffreestanding
+                -fno-exceptions
+                -fno-stack-protector
+                -fshort-wchar
+                -mno-red-zone
+        )
+        target_link_options(netdata_driver PRIVATE
+                -Wl,--entry,DriverEntry@8
+                -nostdlib
+                -Wl,--subsystem,native
+                -Wl,--image-base,0x10000
+        )
+        target_link_libraries(netdata_driver kernel32 ntoskrnl)
+
+        install(FILES "${NETDATA_DRIVER_FILE}"
+                COMPONENT netdata_win_driver
+                DESTINATION "${BINDIR}")
 endif()
 
 target_compile_options(netdata PRIVATE
@@ -3159,6 +3195,7 @@ endif()
 #
 
 if(ENABLE_PLUGIN_IBM)
+    pkg_check_modules(ODBC REQUIRED odbc)
     include(NetdataIBMPlugin)
     add_ibm_plugin_target()
 
@@ -3438,12 +3475,21 @@ install(FILES
         COMPONENT netdata
         DESTINATION usr/lib/netdata/system/systemd)
 
+configure_file(system/systemd/sysusers.conf.in system/systemd/sysusers/netdata.conf @ONLY)
+install(FILES
+        ${CMAKE_BINARY_DIR}/system/systemd/sysusers/netdata.conf
+        COMPONENT netdata
+        DESTINATION usr/lib/netdata/system/systemd/sysusers)
 
 if(BUILD_FOR_PACKAGING)
         install(FILES
                 ${CMAKE_BINARY_DIR}/system/systemd/netdata.service
                 COMPONENT netdata
                 DESTINATION lib/systemd/system)
+        install(FILES
+                ${CMAKE_BINARY_DIR}/system/systemd/sysusers/netdata.conf
+                COMPONENT user
+                DESTINATION usr/lib/sysusers.d)
         install(DIRECTORY
                 COMPONENT netdata
                 DESTINATION usr/lib/systemd/journald@netdata.conf.d)

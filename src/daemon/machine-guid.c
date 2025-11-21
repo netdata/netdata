@@ -99,6 +99,7 @@ static bool machine_guid_read_from_file(const char *filename, ND_MACHINE_GUID *h
 
     // Update last modified timestamp.
     h.last_modified_ut = STAT_GET_MTIME_SEC(st) * USEC_PER_SEC + STAT_GET_MTIME_NSEC(st) / 1000;
+    rfc3339_datetime_ut(h.last_modified_ut_rfc3339, sizeof(h.last_modified_ut_rfc3339), h.last_modified_ut, 2, true);
     *host_id = h;
 
     nd_log(NDLS_DAEMON, NDLP_INFO, "MACHINE_GUID: GUID read from file '%s'", filename);
@@ -125,6 +126,7 @@ static bool machine_guid_write_to_file(const char *filename, ND_MACHINE_GUID *ho
     if (host_id) {
         h.uuid = host_id->uuid;
         h.last_modified_ut = host_id->last_modified_ut;
+        safecpy(h.last_modified_ut_rfc3339, host_id->last_modified_ut_rfc3339);
     }
 
     // Create the text representation before writing.
@@ -204,6 +206,7 @@ static ND_MACHINE_GUID machine_guid_get_or_create(void) {
         nd_log(NDLS_DAEMON, NDLP_INFO, "MACHINE_GUID: got previous GUID from daemon status file");
 
     h.last_modified_ut = now_realtime_usec();
+    rfc3339_datetime_ut(h.last_modified_ut_rfc3339, sizeof(h.last_modified_ut_rfc3339), h.last_modified_ut, 2, true);
     nd_machine_guid = h;
 
     // Ensure the registry directory exists.

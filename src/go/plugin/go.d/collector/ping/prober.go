@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
+	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 
 	probing "github.com/prometheus-community/pro-bing"
 )
@@ -57,7 +57,7 @@ func (p *pingProber) Ping(host string) (*probing.Statistics, error) {
 	pr.SetLogger(nil)
 
 	if err := pr.Run(); err != nil {
-		return nil, fmt.Errorf("pinging host '%s' (ip '%s' iface '%s'): %v",
+		return nil, fmt.Errorf("pinging host '%s' (ip '%s' iface '%s'): %w",
 			pr.Addr(), pr.IPAddr(), pr.InterfaceName, err)
 	}
 

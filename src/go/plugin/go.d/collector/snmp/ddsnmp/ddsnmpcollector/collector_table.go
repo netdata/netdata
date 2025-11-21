@@ -17,23 +17,25 @@ import (
 
 // tableCollector handles collection of SNMP table metrics
 type tableCollector struct {
-	snmpClient   gosnmp.Handler
-	missingOIDs  map[string]bool
-	tableCache   *tableCache
-	log          *logger.Logger
-	valProc      *valueProcessor
-	rowProcessor *tableRowProcessor
+	snmpClient      gosnmp.Handler
+	disableBulkWalk bool
+	missingOIDs     map[string]bool
+	tableCache      *tableCache
+	log             *logger.Logger
+	valProc         *valueProcessor
+	rowProcessor    *tableRowProcessor
 }
 
 // newTableCollector creates a new table collector
-func newTableCollector(snmpClient gosnmp.Handler, missingOIDs map[string]bool, tableCache *tableCache, log *logger.Logger) *tableCollector {
+func newTableCollector(snmpClient gosnmp.Handler, missingOIDs map[string]bool, tableCache *tableCache, log *logger.Logger, disableBulkWalk bool) *tableCollector {
 	return &tableCollector{
-		snmpClient:   snmpClient,
-		missingOIDs:  missingOIDs,
-		tableCache:   tableCache,
-		log:          log,
-		valProc:      newValueProcessor(),
-		rowProcessor: newTableRowProcessor(log),
+		snmpClient:      snmpClient,
+		disableBulkWalk: disableBulkWalk,
+		missingOIDs:     missingOIDs,
+		tableCache:      tableCache,
+		log:             log,
+		valProc:         newValueProcessor(),
+		rowProcessor:    newTableRowProcessor(log),
 	}
 }
 
@@ -552,7 +554,7 @@ func (tc *tableCollector) snmpWalk(oid string) (map[string]gosnmp.SnmpPDU, error
 	var resp []gosnmp.SnmpPDU
 	var err error
 
-	if tc.snmpClient.Version() == gosnmp.Version1 {
+	if tc.snmpClient.Version() == gosnmp.Version1 || tc.disableBulkWalk {
 		resp, err = tc.snmpClient.WalkAll(oid)
 	} else {
 		resp, err = tc.snmpClient.BulkWalkAll(oid)
@@ -595,11 +597,11 @@ func (tc *tableCollector) snmpGet(oids []string) (map[string]gosnmp.SnmpPDU, err
 	return pdus, nil
 }
 
-func parseStaticTags(staticTags []string) map[string]string {
-	tags := make(map[string]string)
+func parseStaticTags(staticTags []ddprofiledefinition.StaticMetricTagConfig) map[string]string {
+	tags := make(map[string]string, len(staticTags))
 	for _, tag := range staticTags {
-		if n, v, _ := strings.Cut(tag, ":"); n != "" && v != "" {
-			tags[n] = v
+		if tag.Tag != "" && tag.Value != "" {
+			tags[tag.Tag] = tag.Value
 		}
 	}
 	return tags

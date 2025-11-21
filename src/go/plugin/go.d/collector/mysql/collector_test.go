@@ -32,17 +32,20 @@ var (
 	dataMySQLVer8030GlobalVariables, _          = os.ReadFile("testdata/mysql/v8.0.30/global_variables.txt")
 	dataMySQLVer8030ReplicaStatusMultiSource, _ = os.ReadFile("testdata/mysql/v8.0.30/replica_status_multi_source.txt")
 	dataMySQLVer8030ProcessList, _              = os.ReadFile("testdata/mysql/v8.0.30/process_list.txt")
+	dataMySQLVer8030EngineInnoDBStatus, _       = os.ReadFile("testdata/mysql/v8.0.30/engine_innodb_status.txt")
 
-	dataPerconaVer8029Version, _         = os.ReadFile("testdata/percona/v8.0.29/version.txt")
-	dataPerconaVer8029GlobalStatus, _    = os.ReadFile("testdata/percona/v8.0.29/global_status.txt")
-	dataPerconaVer8029GlobalVariables, _ = os.ReadFile("testdata/percona/v8.0.29/global_variables.txt")
-	dataPerconaVer8029UserStatistics, _  = os.ReadFile("testdata/percona/v8.0.29/user_statistics.txt")
-	dataPerconaV8029ProcessList, _       = os.ReadFile("testdata/percona/v8.0.29/process_list.txt")
+	dataPerconaVer8029Version, _            = os.ReadFile("testdata/percona/v8.0.29/version.txt")
+	dataPerconaVer8029GlobalStatus, _       = os.ReadFile("testdata/percona/v8.0.29/global_status.txt")
+	dataPerconaVer8029GlobalVariables, _    = os.ReadFile("testdata/percona/v8.0.29/global_variables.txt")
+	dataPerconaVer8029UserStatistics, _     = os.ReadFile("testdata/percona/v8.0.29/user_statistics.txt")
+	dataPerconaVer8029ProcessList, _        = os.ReadFile("testdata/percona/v8.0.29/process_list.txt")
+	dataPerconaVer8029EngineInnoDBStatus, _ = os.ReadFile("testdata/percona/v8.0.29/engine_innodb_status.txt")
 
-	dataMariaVer5564Version, _         = os.ReadFile("testdata/mariadb/v5.5.64/version.txt")
-	dataMariaVer5564GlobalStatus, _    = os.ReadFile("testdata/mariadb/v5.5.64/global_status.txt")
-	dataMariaVer5564GlobalVariables, _ = os.ReadFile("testdata/mariadb/v5.5.64/global_variables.txt")
-	dataMariaVer5564ProcessList, _     = os.ReadFile("testdata/mariadb/v5.5.64/process_list.txt")
+	dataMariaVer5564Version, _            = os.ReadFile("testdata/mariadb/v5.5.64/version.txt")
+	dataMariaVer5564GlobalStatus, _       = os.ReadFile("testdata/mariadb/v5.5.64/global_status.txt")
+	dataMariaVer5564GlobalVariables, _    = os.ReadFile("testdata/mariadb/v5.5.64/global_variables.txt")
+	dataMariaVer5564ProcessList, _        = os.ReadFile("testdata/mariadb/v5.5.64/process_list.txt")
+	dataMariaVer5564EngineInnoDBStatus, _ = os.ReadFile("testdata/mariadb/v5.5.64/engine_innodb_status.txt")
 
 	dataMariaVer1084Version, _                     = os.ReadFile("testdata/mariadb/v10.8.4/version.txt")
 	dataMariaVer1084GlobalStatus, _                = os.ReadFile("testdata/mariadb/v10.8.4/global_status.txt")
@@ -51,12 +54,14 @@ var (
 	dataMariaVer1084AllSlavesStatusMultiSource, _  = os.ReadFile("testdata/mariadb/v10.8.4/all_slaves_status_multi_source.txt")
 	dataMariaVer1084UserStatistics, _              = os.ReadFile("testdata/mariadb/v10.8.4/user_statistics.txt")
 	dataMariaVer1084ProcessList, _                 = os.ReadFile("testdata/mariadb/v10.8.4/process_list.txt")
+	dataMariaVer1084EngineInnoDBStatus, _          = os.ReadFile("testdata/mariadb/v10.8.4/engine_innodb_status.txt")
 
-	dataMariaGaleraClusterVer1084Version, _         = os.ReadFile("testdata/mariadb/v10.8.4-galera-cluster/version.txt")
-	dataMariaGaleraClusterVer1084GlobalStatus, _    = os.ReadFile("testdata/mariadb/v10.8.4-galera-cluster/global_status.txt")
-	dataMariaGaleraClusterVer1084GlobalVariables, _ = os.ReadFile("testdata/mariadb/v10.8.4-galera-cluster/global_variables.txt")
-	dataMariaGaleraClusterVer1084UserStatistics, _  = os.ReadFile("testdata/mariadb/v10.8.4-galera-cluster/user_statistics.txt")
-	dataMariaGaleraClusterVer1084ProcessList, _     = os.ReadFile("testdata/mariadb/v10.8.4-galera-cluster/process_list.txt")
+	dataMariaGaleraClusterVer1084Version, _            = os.ReadFile("testdata/mariadb/v10.8.4-galera-cluster/version.txt")
+	dataMariaGaleraClusterVer1084GlobalStatus, _       = os.ReadFile("testdata/mariadb/v10.8.4-galera-cluster/global_status.txt")
+	dataMariaGaleraClusterVer1084GlobalVariables, _    = os.ReadFile("testdata/mariadb/v10.8.4-galera-cluster/global_variables.txt")
+	dataMariaGaleraClusterVer1084UserStatistics, _     = os.ReadFile("testdata/mariadb/v10.8.4-galera-cluster/user_statistics.txt")
+	dataMariaGaleraClusterVer1084ProcessList, _        = os.ReadFile("testdata/mariadb/v10.8.4-galera-cluster/process_list.txt")
+	dataMariaGaleraClusterVer1084EngineInnoDBStatus, _ = os.ReadFile("testdata/mariadb/v10.8.4-galera-cluster/engine_innodb_status.txt")
 
 	dataMariaVer1145Version, _        = os.ReadFile("testdata/mariadb/v11.4.5/version.txt")
 	dataMariaVer1145UserStatistics, _ = os.ReadFile("testdata/mariadb/v11.4.5/user_statistics.txt")
@@ -64,37 +69,42 @@ var (
 
 func Test_testDataIsValid(t *testing.T) {
 	for name, data := range map[string][]byte{
-		"dataConfigJSON":                               dataConfigJSON,
-		"dataConfigYAML":                               dataConfigYAML,
-		"dataSessionVariables":                         dataSessionVariables,
-		"dataMySQLVer8030Version":                      dataMySQLVer8030Version,
-		"dataMySQLVer8030GlobalStatus":                 dataMySQLVer8030GlobalStatus,
-		"dataMySQLVer8030GlobalVariables":              dataMySQLVer8030GlobalVariables,
-		"dataMySQLVer8030ReplicaStatusMultiSource":     dataMySQLVer8030ReplicaStatusMultiSource,
-		"dataMySQLVer8030ProcessList":                  dataMySQLVer8030ProcessList,
-		"dataPerconaVer8029Version":                    dataPerconaVer8029Version,
-		"dataPerconaVer8029GlobalStatus":               dataPerconaVer8029GlobalStatus,
-		"dataPerconaVer8029GlobalVariables":            dataPerconaVer8029GlobalVariables,
-		"dataPerconaVer8029UserStatistics":             dataPerconaVer8029UserStatistics,
-		"dataPerconaV8029ProcessList":                  dataPerconaV8029ProcessList,
-		"dataMariaVer5564Version":                      dataMariaVer5564Version,
-		"dataMariaVer5564GlobalStatus":                 dataMariaVer5564GlobalStatus,
-		"dataMariaVer5564GlobalVariables":              dataMariaVer5564GlobalVariables,
-		"dataMariaVer5564ProcessList":                  dataMariaVer5564ProcessList,
-		"dataMariaVer1084Version":                      dataMariaVer1084Version,
-		"dataMariaVer1084GlobalStatus":                 dataMariaVer1084GlobalStatus,
-		"dataMariaVer1084GlobalVariables":              dataMariaVer1084GlobalVariables,
-		"dataMariaVer1084AllSlavesStatusSingleSource":  dataMariaVer1084AllSlavesStatusSingleSource,
-		"dataMariaVer1084AllSlavesStatusMultiSource":   dataMariaVer1084AllSlavesStatusMultiSource,
-		"dataMariaVer1084UserStatistics":               dataMariaVer1084UserStatistics,
-		"dataMariaVer1084ProcessList":                  dataMariaVer1084ProcessList,
-		"dataMariaGaleraClusterVer1084Version":         dataMariaGaleraClusterVer1084Version,
-		"dataMariaGaleraClusterVer1084GlobalStatus":    dataMariaGaleraClusterVer1084GlobalStatus,
-		"dataMariaGaleraClusterVer1084GlobalVariables": dataMariaGaleraClusterVer1084GlobalVariables,
-		"dataMariaGaleraClusterVer1084UserStatistics":  dataMariaGaleraClusterVer1084UserStatistics,
-		"dataMariaGaleraClusterVer1084ProcessList":     dataMariaGaleraClusterVer1084ProcessList,
-		"dataMariaVer1145Version":                      dataMariaVer1145Version,
-		"dataMariaVer1145UserStatistics":               dataMariaVer1145UserStatistics,
+		"dataConfigJSON":                                  dataConfigJSON,
+		"dataConfigYAML":                                  dataConfigYAML,
+		"dataSessionVariables":                            dataSessionVariables,
+		"dataMySQLVer8030Version":                         dataMySQLVer8030Version,
+		"dataMySQLVer8030GlobalStatus":                    dataMySQLVer8030GlobalStatus,
+		"dataMySQLVer8030GlobalVariables":                 dataMySQLVer8030GlobalVariables,
+		"dataMySQLVer8030ReplicaStatusMultiSource":        dataMySQLVer8030ReplicaStatusMultiSource,
+		"dataMySQLVer8030ProcessList":                     dataMySQLVer8030ProcessList,
+		"dataMySQLVer8030EngineInnoDBStatus":              dataMySQLVer8030EngineInnoDBStatus,
+		"dataPerconaVer8029Version":                       dataPerconaVer8029Version,
+		"dataPerconaVer8029GlobalStatus":                  dataPerconaVer8029GlobalStatus,
+		"dataPerconaVer8029GlobalVariables":               dataPerconaVer8029GlobalVariables,
+		"dataPerconaVer8029UserStatistics":                dataPerconaVer8029UserStatistics,
+		"dataPerconaVer8029ProcessList":                   dataPerconaVer8029ProcessList,
+		"dataPerconaVer8029EngineInnoDBStatus":            dataPerconaVer8029EngineInnoDBStatus,
+		"dataMariaVer5564Version":                         dataMariaVer5564Version,
+		"dataMariaVer5564GlobalStatus":                    dataMariaVer5564GlobalStatus,
+		"dataMariaVer5564GlobalVariables":                 dataMariaVer5564GlobalVariables,
+		"dataMariaVer5564ProcessList":                     dataMariaVer5564ProcessList,
+		"dataMariaVer5564EngineInnoDBStatus":              dataMariaVer5564EngineInnoDBStatus,
+		"dataMariaVer1084Version":                         dataMariaVer1084Version,
+		"dataMariaVer1084GlobalStatus":                    dataMariaVer1084GlobalStatus,
+		"dataMariaVer1084GlobalVariables":                 dataMariaVer1084GlobalVariables,
+		"dataMariaVer1084AllSlavesStatusSingleSource":     dataMariaVer1084AllSlavesStatusSingleSource,
+		"dataMariaVer1084AllSlavesStatusMultiSource":      dataMariaVer1084AllSlavesStatusMultiSource,
+		"dataMariaVer1084UserStatistics":                  dataMariaVer1084UserStatistics,
+		"dataMariaVer1084ProcessList":                     dataMariaVer1084ProcessList,
+		"dataMariaVer1084EngineInnoDBStatus":              dataMariaVer1084EngineInnoDBStatus,
+		"dataMariaGaleraClusterVer1084Version":            dataMariaGaleraClusterVer1084Version,
+		"dataMariaGaleraClusterVer1084GlobalStatus":       dataMariaGaleraClusterVer1084GlobalStatus,
+		"dataMariaGaleraClusterVer1084GlobalVariables":    dataMariaGaleraClusterVer1084GlobalVariables,
+		"dataMariaGaleraClusterVer1084UserStatistics":     dataMariaGaleraClusterVer1084UserStatistics,
+		"dataMariaGaleraClusterVer1084ProcessList":        dataMariaGaleraClusterVer1084ProcessList,
+		"dataMariaGaleraClusterVer1084EngineInnoDBStatus": dataMariaGaleraClusterVer1084EngineInnoDBStatus,
+		"dataMariaVer1145Version":                         dataMariaVer1145Version,
+		"dataMariaVer1145UserStatistics":                  dataMariaVer1145UserStatistics,
 	} {
 		require.NotNil(t, data, fmt.Sprintf("read data: %s", name))
 		_, err := prepareMockRows(data)
@@ -177,6 +187,7 @@ func TestCollector_Check(t *testing.T) {
 				mockExpect(t, m, queryDisableSessionQueryLog, nil)
 				mockExpect(t, m, queryDisableSessionSlowQueryLog, nil)
 				mockExpect(t, m, queryShowGlobalStatus, dataMariaVer1084GlobalStatus)
+				mockExpect(t, m, queryShowEngineInnoDBStatus, dataMariaVer1084EngineInnoDBStatus)
 				mockExpect(t, m, queryShowGlobalVariables, dataMariaVer1084GlobalVariables)
 				mockExpect(t, m, queryShowAllSlavesStatus, dataMariaVer1084AllSlavesStatusMultiSource)
 				mockExpect(t, m, queryShowUserStatistics, dataMariaVer1084UserStatistics)
@@ -217,6 +228,7 @@ func TestCollector_Check(t *testing.T) {
 				mockExpect(t, m, queryDisableSessionQueryLog, nil)
 				mockExpect(t, m, queryDisableSessionSlowQueryLog, nil)
 				mockExpect(t, m, queryShowGlobalStatus, dataMariaVer1084GlobalStatus)
+				mockExpect(t, m, queryShowEngineInnoDBStatus, dataMariaVer1084EngineInnoDBStatus)
 				mockExpect(t, m, queryShowGlobalVariables, dataMariaVer1084GlobalVariables)
 				mockExpectErr(m, queryShowAllSlavesStatus)
 				mockExpect(t, m, queryShowUserStatistics, dataMariaVer1084UserStatistics)
@@ -231,6 +243,7 @@ func TestCollector_Check(t *testing.T) {
 				mockExpect(t, m, queryDisableSessionQueryLog, nil)
 				mockExpect(t, m, queryDisableSessionSlowQueryLog, nil)
 				mockExpect(t, m, queryShowGlobalStatus, dataMariaVer1084GlobalStatus)
+				mockExpect(t, m, queryShowEngineInnoDBStatus, dataMariaVer1084EngineInnoDBStatus)
 				mockExpect(t, m, queryShowGlobalVariables, dataMariaVer1084GlobalVariables)
 				mockExpect(t, m, queryShowAllSlavesStatus, dataMariaVer1084AllSlavesStatusMultiSource)
 				mockExpectErr(m, queryShowUserStatistics)
@@ -245,6 +258,7 @@ func TestCollector_Check(t *testing.T) {
 				mockExpect(t, m, queryDisableSessionQueryLog, nil)
 				mockExpect(t, m, queryDisableSessionSlowQueryLog, nil)
 				mockExpect(t, m, queryShowGlobalStatus, dataMariaVer1084GlobalStatus)
+				mockExpect(t, m, queryShowEngineInnoDBStatus, dataMariaVer1084EngineInnoDBStatus)
 				mockExpect(t, m, queryShowGlobalVariables, dataMariaVer1084GlobalVariables)
 				mockExpect(t, m, queryShowAllSlavesStatus, dataMariaVer1084AllSlavesStatusMultiSource)
 				mockExpect(t, m, queryShowUserStatistics, dataMariaVer1084UserStatistics)
@@ -291,6 +305,7 @@ func TestCollector_Collect(t *testing.T) {
 					mockExpect(t, m, queryDisableSessionQueryLog, nil)
 					mockExpect(t, m, queryDisableSessionSlowQueryLog, nil)
 					mockExpect(t, m, queryShowGlobalStatus, dataMariaVer1084GlobalStatus)
+					mockExpect(t, m, queryShowEngineInnoDBStatus, dataMariaVer1084EngineInnoDBStatus)
 					mockExpect(t, m, queryShowGlobalVariables, dataMariaVer1084GlobalVariables)
 					mockExpect(t, m, queryShowAllSlavesStatus, nil)
 					mockExpect(t, m, queryShowUserStatistics, dataMariaVer1145UserStatistics)
@@ -351,6 +366,7 @@ func TestCollector_Collect(t *testing.T) {
 						"innodb_buffer_pool_reads":                171,
 						"innodb_buffer_pool_wait_free":            0,
 						"innodb_buffer_pool_write_requests":       148,
+						"innodb_checkpoint_age":                   184,
 						"innodb_data_fsyncs":                      17,
 						"innodb_data_pending_fsyncs":              0,
 						"innodb_data_pending_reads":               0,
@@ -360,6 +376,12 @@ func TestCollector_Collect(t *testing.T) {
 						"innodb_data_writes":                      16,
 						"innodb_data_written":                     0,
 						"innodb_deadlocks":                        0,
+						"innodb_last_checkpoint_at":               46601,
+						"innodb_log_file_size":                    100663296,
+						"innodb_log_files_in_group":               1,
+						"innodb_log_group_capacity":               100663296,
+						"innodb_log_occupancy":                    0,
+						"innodb_log_sequence_number":              46785,
 						"innodb_log_waits":                        0,
 						"innodb_log_write_requests":               109,
 						"innodb_log_writes":                       15,
@@ -472,6 +494,7 @@ func TestCollector_Collect(t *testing.T) {
 					mockExpect(t, m, queryDisableSessionQueryLog, nil)
 					mockExpect(t, m, queryDisableSessionSlowQueryLog, nil)
 					mockExpect(t, m, queryShowGlobalStatus, dataMariaVer5564GlobalStatus)
+					mockExpect(t, m, queryShowEngineInnoDBStatus, dataMariaVer5564EngineInnoDBStatus)
 					mockExpect(t, m, queryShowGlobalVariables, dataMariaVer5564GlobalVariables)
 					mockExpect(t, m, queryShowSlaveStatus, nil)
 					mockExpect(t, m, queryShowProcessList, dataMariaVer5564ProcessList)
@@ -525,6 +548,7 @@ func TestCollector_Collect(t *testing.T) {
 						"innodb_buffer_pool_reads":              144,
 						"innodb_buffer_pool_wait_free":          0,
 						"innodb_buffer_pool_write_requests":     0,
+						"innodb_checkpoint_age":                 0,
 						"innodb_data_fsyncs":                    3,
 						"innodb_data_pending_fsyncs":            0,
 						"innodb_data_pending_reads":             0,
@@ -534,6 +558,12 @@ func TestCollector_Collect(t *testing.T) {
 						"innodb_data_writes":                    3,
 						"innodb_data_written":                   1536,
 						"innodb_deadlocks":                      0,
+						"innodb_last_checkpoint_at":             1597945,
+						"innodb_log_file_size":                  5242880,
+						"innodb_log_files_in_group":             2,
+						"innodb_log_group_capacity":             10485760,
+						"innodb_log_occupancy":                  0,
+						"innodb_log_sequence_number":            1597945,
 						"innodb_log_waits":                      0,
 						"innodb_log_write_requests":             0,
 						"innodb_log_writes":                     1,
@@ -606,6 +636,7 @@ func TestCollector_Collect(t *testing.T) {
 					mockExpect(t, m, queryDisableSessionQueryLog, nil)
 					mockExpect(t, m, queryDisableSessionSlowQueryLog, nil)
 					mockExpect(t, m, queryShowGlobalStatus, dataMariaVer1084GlobalStatus)
+					mockExpect(t, m, queryShowEngineInnoDBStatus, dataMariaVer1084EngineInnoDBStatus)
 					mockExpect(t, m, queryShowGlobalVariables, dataMariaVer1084GlobalVariables)
 					mockExpect(t, m, queryShowAllSlavesStatus, nil)
 					mockExpect(t, m, queryShowUserStatistics, dataMariaVer1084UserStatistics)
@@ -667,6 +698,7 @@ func TestCollector_Collect(t *testing.T) {
 						"innodb_buffer_pool_reads":                171,
 						"innodb_buffer_pool_wait_free":            0,
 						"innodb_buffer_pool_write_requests":       148,
+						"innodb_checkpoint_age":                   184,
 						"innodb_data_fsyncs":                      17,
 						"innodb_data_pending_fsyncs":              0,
 						"innodb_data_pending_reads":               0,
@@ -676,6 +708,12 @@ func TestCollector_Collect(t *testing.T) {
 						"innodb_data_writes":                      16,
 						"innodb_data_written":                     0,
 						"innodb_deadlocks":                        0,
+						"innodb_last_checkpoint_at":               46601,
+						"innodb_log_file_size":                    100663296,
+						"innodb_log_files_in_group":               1,
+						"innodb_log_group_capacity":               100663296,
+						"innodb_log_occupancy":                    0,
+						"innodb_log_sequence_number":              46785,
 						"innodb_log_waits":                        0,
 						"innodb_log_write_requests":               109,
 						"innodb_log_writes":                       15,
@@ -788,6 +826,7 @@ func TestCollector_Collect(t *testing.T) {
 					mockExpect(t, m, queryDisableSessionQueryLog, nil)
 					mockExpect(t, m, queryDisableSessionSlowQueryLog, nil)
 					mockExpect(t, m, queryShowGlobalStatus, dataMariaVer1084GlobalStatus)
+					mockExpect(t, m, queryShowEngineInnoDBStatus, dataMariaVer1084EngineInnoDBStatus)
 					mockExpect(t, m, queryShowGlobalVariables, dataMariaVer1084GlobalVariables)
 					mockExpect(t, m, queryShowAllSlavesStatus, dataMariaVer1084AllSlavesStatusSingleSource)
 					mockExpect(t, m, queryShowUserStatistics, dataMariaVer1084UserStatistics)
@@ -848,6 +887,7 @@ func TestCollector_Collect(t *testing.T) {
 						"innodb_buffer_pool_reads":                171,
 						"innodb_buffer_pool_wait_free":            0,
 						"innodb_buffer_pool_write_requests":       148,
+						"innodb_checkpoint_age":                   184,
 						"innodb_data_fsyncs":                      17,
 						"innodb_data_pending_fsyncs":              0,
 						"innodb_data_pending_reads":               0,
@@ -857,6 +897,12 @@ func TestCollector_Collect(t *testing.T) {
 						"innodb_data_writes":                      16,
 						"innodb_data_written":                     0,
 						"innodb_deadlocks":                        0,
+						"innodb_last_checkpoint_at":               46601,
+						"innodb_log_file_size":                    100663296,
+						"innodb_log_files_in_group":               1,
+						"innodb_log_group_capacity":               100663296,
+						"innodb_log_occupancy":                    0,
+						"innodb_log_sequence_number":              46785,
 						"innodb_log_waits":                        0,
 						"innodb_log_write_requests":               109,
 						"innodb_log_writes":                       15,
@@ -972,6 +1018,7 @@ func TestCollector_Collect(t *testing.T) {
 					mockExpect(t, m, queryDisableSessionQueryLog, nil)
 					mockExpect(t, m, queryDisableSessionSlowQueryLog, nil)
 					mockExpect(t, m, queryShowGlobalStatus, dataMariaVer1084GlobalStatus)
+					mockExpect(t, m, queryShowEngineInnoDBStatus, dataMariaVer1084EngineInnoDBStatus)
 					mockExpect(t, m, queryShowGlobalVariables, dataMariaVer1084GlobalVariables)
 					mockExpect(t, m, queryShowAllSlavesStatus, dataMariaVer1084AllSlavesStatusMultiSource)
 					mockExpect(t, m, queryShowUserStatistics, dataMariaVer1084UserStatistics)
@@ -1032,6 +1079,7 @@ func TestCollector_Collect(t *testing.T) {
 						"innodb_buffer_pool_reads":                171,
 						"innodb_buffer_pool_wait_free":            0,
 						"innodb_buffer_pool_write_requests":       148,
+						"innodb_checkpoint_age":                   184,
 						"innodb_data_fsyncs":                      17,
 						"innodb_data_pending_fsyncs":              0,
 						"innodb_data_pending_reads":               0,
@@ -1041,6 +1089,12 @@ func TestCollector_Collect(t *testing.T) {
 						"innodb_data_writes":                      16,
 						"innodb_data_written":                     0,
 						"innodb_deadlocks":                        0,
+						"innodb_last_checkpoint_at":               46601,
+						"innodb_log_file_size":                    100663296,
+						"innodb_log_files_in_group":               1,
+						"innodb_log_group_capacity":               100663296,
+						"innodb_log_occupancy":                    0,
+						"innodb_log_sequence_number":              46785,
 						"innodb_log_waits":                        0,
 						"innodb_log_write_requests":               109,
 						"innodb_log_writes":                       15,
@@ -1159,6 +1213,7 @@ func TestCollector_Collect(t *testing.T) {
 					mockExpect(t, m, queryDisableSessionQueryLog, nil)
 					mockExpect(t, m, queryDisableSessionSlowQueryLog, nil)
 					mockExpect(t, m, queryShowGlobalStatus, dataMariaVer1084GlobalStatus)
+					mockExpect(t, m, queryShowEngineInnoDBStatus, dataMariaVer1084EngineInnoDBStatus)
 					mockExpect(t, m, queryShowGlobalVariables, dataMariaVer1084GlobalVariables)
 					mockExpectErr(m, queryShowAllSlavesStatus)
 					mockExpect(t, m, queryShowUserStatistics, dataMariaVer1084UserStatistics)
@@ -1219,6 +1274,7 @@ func TestCollector_Collect(t *testing.T) {
 						"innodb_buffer_pool_reads":                171,
 						"innodb_buffer_pool_wait_free":            0,
 						"innodb_buffer_pool_write_requests":       148,
+						"innodb_checkpoint_age":                   184,
 						"innodb_data_fsyncs":                      17,
 						"innodb_data_pending_fsyncs":              0,
 						"innodb_data_pending_reads":               0,
@@ -1228,6 +1284,12 @@ func TestCollector_Collect(t *testing.T) {
 						"innodb_data_writes":                      16,
 						"innodb_data_written":                     0,
 						"innodb_deadlocks":                        0,
+						"innodb_last_checkpoint_at":               46601,
+						"innodb_log_file_size":                    100663296,
+						"innodb_log_files_in_group":               1,
+						"innodb_log_group_capacity":               100663296,
+						"innodb_log_occupancy":                    0,
+						"innodb_log_sequence_number":              46785,
 						"innodb_log_waits":                        0,
 						"innodb_log_write_requests":               109,
 						"innodb_log_writes":                       15,
@@ -1340,6 +1402,7 @@ func TestCollector_Collect(t *testing.T) {
 					mockExpect(t, m, queryDisableSessionQueryLog, nil)
 					mockExpect(t, m, queryDisableSessionSlowQueryLog, nil)
 					mockExpect(t, m, queryShowGlobalStatus, dataMariaGaleraClusterVer1084GlobalStatus)
+					mockExpect(t, m, queryShowEngineInnoDBStatus, dataMariaGaleraClusterVer1084EngineInnoDBStatus)
 					mockExpect(t, m, queryShowGlobalVariables, dataMariaGaleraClusterVer1084GlobalVariables)
 					mockExpect(t, m, queryShowAllSlavesStatus, nil)
 					mockExpect(t, m, queryShowUserStatistics, dataMariaGaleraClusterVer1084UserStatistics)
@@ -1400,6 +1463,7 @@ func TestCollector_Collect(t *testing.T) {
 						"innodb_buffer_pool_reads":                184,
 						"innodb_buffer_pool_wait_free":            0,
 						"innodb_buffer_pool_write_requests":       203,
+						"innodb_checkpoint_age":                   6745,
 						"innodb_data_fsyncs":                      15,
 						"innodb_data_pending_fsyncs":              0,
 						"innodb_data_pending_reads":               0,
@@ -1409,6 +1473,12 @@ func TestCollector_Collect(t *testing.T) {
 						"innodb_data_writes":                      14,
 						"innodb_data_written":                     0,
 						"innodb_deadlocks":                        0,
+						"innodb_last_checkpoint_at":               46617,
+						"innodb_log_file_size":                    100663296,
+						"innodb_log_files_in_group":               1,
+						"innodb_log_group_capacity":               100663296,
+						"innodb_log_occupancy":                    6,
+						"innodb_log_sequence_number":              53362,
 						"innodb_log_waits":                        0,
 						"innodb_log_write_requests":               65,
 						"innodb_log_writes":                       13,
@@ -1537,6 +1607,7 @@ func TestCollector_Collect(t *testing.T) {
 					mockExpect(t, m, queryDisableSessionQueryLog, nil)
 					mockExpect(t, m, queryDisableSessionSlowQueryLog, nil)
 					mockExpect(t, m, queryShowGlobalStatus, dataMySQLVer8030GlobalStatus)
+					mockExpect(t, m, queryShowEngineInnoDBStatus, dataMySQLVer8030EngineInnoDBStatus)
 					mockExpect(t, m, queryShowGlobalVariables, dataMySQLVer8030GlobalVariables)
 					mockExpect(t, m, queryShowReplicaStatus, dataMySQLVer8030ReplicaStatusMultiSource)
 					mockExpect(t, m, queryShowProcessListPS, dataMySQLVer8030ProcessList)
@@ -1596,6 +1667,7 @@ func TestCollector_Collect(t *testing.T) {
 						"innodb_buffer_pool_reads":              878,
 						"innodb_buffer_pool_wait_free":          0,
 						"innodb_buffer_pool_write_requests":     2377,
+						"innodb_checkpoint_age":                 0,
 						"innodb_data_fsyncs":                    255,
 						"innodb_data_pending_fsyncs":            0,
 						"innodb_data_pending_reads":             0,
@@ -1604,6 +1676,12 @@ func TestCollector_Collect(t *testing.T) {
 						"innodb_data_reads":                     899,
 						"innodb_data_writes":                    561,
 						"innodb_data_written":                   6128128,
+						"innodb_last_checkpoint_at":             31603995,
+						"innodb_log_file_size":                  50331648,
+						"innodb_log_files_in_group":             2,
+						"innodb_log_group_capacity":             100663296,
+						"innodb_log_occupancy":                  0,
+						"innodb_log_sequence_number":            31603995,
 						"innodb_log_waits":                      0,
 						"innodb_log_write_requests":             1062,
 						"innodb_log_writes":                     116,
@@ -1675,10 +1753,11 @@ func TestCollector_Collect(t *testing.T) {
 					mockExpect(t, m, queryDisableSessionQueryLog, nil)
 					mockExpect(t, m, queryDisableSessionSlowQueryLog, nil)
 					mockExpect(t, m, queryShowGlobalStatus, dataPerconaVer8029GlobalStatus)
+					mockExpect(t, m, queryShowEngineInnoDBStatus, dataPerconaVer8029EngineInnoDBStatus)
 					mockExpect(t, m, queryShowGlobalVariables, dataPerconaVer8029GlobalVariables)
 					mockExpect(t, m, queryShowReplicaStatus, nil)
 					mockExpect(t, m, queryShowUserStatistics, dataPerconaVer8029UserStatistics)
-					mockExpect(t, m, queryShowProcessListPS, dataPerconaV8029ProcessList)
+					mockExpect(t, m, queryShowProcessListPS, dataPerconaVer8029ProcessList)
 				},
 				check: func(t *testing.T, collr *Collector) {
 					mx := collr.Collect(context.Background())
@@ -1735,6 +1814,7 @@ func TestCollector_Collect(t *testing.T) {
 						"innodb_buffer_pool_reads":                978,
 						"innodb_buffer_pool_wait_free":            0,
 						"innodb_buffer_pool_write_requests":       77412,
+						"innodb_checkpoint_age":                   0,
 						"innodb_data_fsyncs":                      50,
 						"innodb_data_pending_fsyncs":              0,
 						"innodb_data_pending_reads":               0,
@@ -1743,6 +1823,12 @@ func TestCollector_Collect(t *testing.T) {
 						"innodb_data_reads":                       1002,
 						"innodb_data_writes":                      288,
 						"innodb_data_written":                     3420160,
+						"innodb_last_checkpoint_at":               31825026,
+						"innodb_log_file_size":                    50331648,
+						"innodb_log_files_in_group":               2,
+						"innodb_log_group_capacity":               100663296,
+						"innodb_log_occupancy":                    0,
+						"innodb_log_sequence_number":              31825026,
 						"innodb_log_waits":                        0,
 						"innodb_log_write_requests":               651,
 						"innodb_log_writes":                       47,
@@ -1890,6 +1976,85 @@ func mockExpectErr(mock sqlmock.Sqlmock, query string) {
 	mock.ExpectQuery(query).WillReturnError(fmt.Errorf("mock error (%s)", query))
 }
 
+func TestPrepareMockRows(t *testing.T) {
+	tests := map[string]struct {
+		data string
+		rows *sqlmock.Rows
+	}{
+		"one row": {
+			data: `
++------+-------+
+| Name | Value |
++------+-------+
+| a    | 1     |
++------+-------+
+`,
+			rows: sqlmock.NewRows([]string{"Name", "Value"}).
+				AddRow("a", "1"),
+		},
+		"two rows": {
+			data: `
++------+-------+
+| Name | Value |
++------+-------+
+| a    | 1     |
+| b    | 2     |
++------+-------+
+`,
+			rows: sqlmock.NewRows([]string{"Name", "Value"}).
+				AddRow("a", "1").AddRow("b", "2"),
+		},
+		"multiline text": {
+			data: `
++------+-------+
+| Name | Value |
++------+-------+
+| a    | b
+c d
+e |
++------+-------+
+`,
+			rows: sqlmock.NewRows([]string{"Name", "Value"}).
+				AddRow("a", "b\nc d\ne"),
+		},
+		"multiline text prefixed and suffixed with \\n": {
+			data: `
++------+-------+
+| Name | Value |
++------+-------+
+| a    | 
+b c
+d
+ |
++------+-------+
+`,
+			rows: sqlmock.NewRows([]string{"Name", "Value"}).
+				AddRow("a", "\nb c\nd\n"),
+		},
+		"multiline text in the first column": {
+			data: `
++-------+------+
+| Value | Name |
++-------+------+
+| a
+b c
+d
+ | e    |
++-------+------+
+`,
+			rows: sqlmock.NewRows([]string{"Value", "Name"}).
+				AddRow("a\nb c\nd\n", "e"),
+		}}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			out, err := prepareMockRows([]byte(test.data))
+			assert.NoError(t, err)
+			assert.Equal(t, test.rows, out)
+		})
+	}
+}
+
 func prepareMockRows(data []byte) (*sqlmock.Rows, error) {
 	if len(data) == 0 {
 		return sqlmock.NewRows(nil), nil
@@ -1900,9 +2065,11 @@ func prepareMockRows(data []byte) (*sqlmock.Rows, error) {
 
 	var numColumns int
 	var rows *sqlmock.Rows
+	var rowLines []string
 
 	for sc.Scan() {
-		s := strings.TrimSpace(strings.Trim(sc.Text(), "|"))
+		line := sc.Text()
+		s := strings.TrimSpace(line)
 		switch {
 		case s == "",
 			strings.HasPrefix(s, "+"),
@@ -1910,26 +2077,24 @@ func prepareMockRows(data []byte) (*sqlmock.Rows, error) {
 			continue
 		}
 
-		parts := strings.Split(s, "|")
-		for i, v := range parts {
-			parts[i] = strings.TrimSpace(v)
-		}
-
 		if rows == nil {
+			parts := splitCells(line)
 			numColumns = len(parts)
 			rows = sqlmock.NewRows(parts)
 			continue
 		}
 
-		if len(parts) != numColumns {
-			return nil, fmt.Errorf("prepareMockRows(): columns != values (%d/%d)", numColumns, len(parts))
+		if strings.Count(s, "|")-1 == numColumns || (rowLines != nil && strings.HasSuffix(s, "|")) {
+			vals, err := buildRow(append(rowLines, line), numColumns)
+			if err != nil {
+				return nil, err
+			}
+			rows.AddRow(vals...)
+			rowLines = nil
+			continue
 		}
 
-		values := make([]driver.Value, len(parts))
-		for i, v := range parts {
-			values[i] = v
-		}
-		rows.AddRow(values...)
+		rowLines = append(rowLines, line)
 	}
 
 	if rows == nil {
@@ -1937,4 +2102,30 @@ func prepareMockRows(data []byte) (*sqlmock.Rows, error) {
 	}
 
 	return rows, sc.Err()
+}
+
+func splitCells(s string) []string {
+	parts := strings.Split(strings.Trim(s, "|"), "|")
+	for i := range parts {
+		parts[i] = strings.TrimSpace(parts[i])
+	}
+	return parts
+}
+
+func buildRow(lines []string, cols int) ([]driver.Value, error) {
+	row := strings.Join(lines, "\n")
+	if !strings.HasPrefix(row, "|") || !strings.HasSuffix(row, "|") {
+		return nil, errors.New("prepareMockRows(): malformed row")
+	}
+
+	parts := strings.Split(strings.Trim(row, "|"), "|")
+	if len(parts) != cols {
+		return nil, fmt.Errorf("prepareMockRows(): columns != values (%d/%d)", cols, len(parts))
+	}
+
+	vals := make([]driver.Value, cols)
+	for i, c := range parts {
+		vals[i] = strings.Trim(c, " ")
+	}
+	return vals, nil
 }

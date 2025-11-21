@@ -6,6 +6,18 @@ Monitors IBM DB2 databases using system catalog views and MON_GET_* table
 functions to expose connections, locking, buffer pool efficiency, tablespace
 capacity, and workload performance metrics.
 
+Detailed charts are opt-in per object family through include/exclude lists.
+Defaults focus on engine activity (system connections, core buffer pools,
+catalog tablespaces). Matching uses glob patterns that can target schema or
+application names, with include rules taking precedence over excludes.
+
+When the number of matching objects exceeds the configured `max_*` limits,
+the collector publishes deterministic top-N per-instance charts, aggregates
+the remainder under `group="__other__"`, and logs a throttled warning so you
+can refine selectors before cardinality runs away. Group charts (by schema,
+application prefix, or buffer pool family) are always emitted so high-level
+visibility is preserved even when individual instances are trimmed.
+
 
 This collector is part of the [Netdata](https://github.com/netdata/netdata) monitoring solution.
 
@@ -90,6 +102,28 @@ Metrics:
 | db2.bufferpool_instance_pages | used, total | pages |
 | db2.bufferpool_instance_writes | writes | writes/s |
 
+### Per bufferpoolgroup
+
+These metrics refer to individual bufferpoolgroup instances.
+
+Labels:
+
+| Label | Description |
+|:------|:------------|
+| group | Group identifier |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:-------|:-----------|:-----|
+| db2.bufferpool_group_hit_ratio | overall | percentage |
+| db2.bufferpool_group_detailed_hit_ratio | data, index, xda, column | percentage |
+| db2.bufferpool_group_reads | logical, physical | reads/s |
+| db2.bufferpool_group_data_reads | logical, physical | reads/s |
+| db2.bufferpool_group_index_reads | logical, physical | reads/s |
+| db2.bufferpool_group_pages | used, total | pages |
+| db2.bufferpool_group_writes | writes | writes/s |
+
 ### Per connection
 
 These metrics refer to individual connection instances.
@@ -113,6 +147,26 @@ Metrics:
 | db2.connection_activity | read, written | rows/s |
 | db2.connection_wait_time | lock, log_disk, log_buffer, pool_read, pool_write, direct_read, direct_write, fcm_recv, fcm_send | milliseconds |
 | db2.connection_processing_time | routine, compile, section, commit, rollback | milliseconds |
+
+### Per connectiongroup
+
+These metrics refer to individual connectiongroup instances.
+
+Labels:
+
+| Label | Description |
+|:------|:------------|
+| group | Group identifier |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:-------|:-----------|:-----|
+| db2.connection_group.count | count | connections |
+| db2.connection_group.state | state | state |
+| db2.connection_group.activity | read, written | rows/s |
+| db2.connection_group.wait_time | lock, log_disk, log_buffer, pool_read, pool_write, direct_read, direct_write, fcm_recv, fcm_send | milliseconds |
+| db2.connection_group.processing_time | routine, compile, section, commit, rollback | milliseconds |
 
 ### Per database
 
@@ -147,6 +201,22 @@ Metrics:
 | Metric | Dimensions | Unit |
 |:-------|:-----------|:-----|
 | db2.index_usage | index, full | scans/s |
+
+### Per indexgroup
+
+These metrics refer to individual indexgroup instances.
+
+Labels:
+
+| Label | Description |
+|:------|:------------|
+| group | Group identifier |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:-------|:-----------|:-----|
+| db2.index_group_usage | index, full | scans/s |
 
 ### Per memorypool
 
@@ -226,6 +296,23 @@ Metrics:
 | db2.table_size | data, index, long_obj | bytes |
 | db2.table_activity | read, written | rows/s |
 
+### Per tablegroup
+
+These metrics refer to individual tablegroup instances.
+
+Labels:
+
+| Label | Description |
+|:------|:------------|
+| group | Group identifier |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:-------|:-----------|:-----|
+| db2.table_group_size | data, index, long_obj | bytes |
+| db2.table_group_activity | read, written | rows/s |
+
 ### Per tableio
 
 These metrics refer to individual tableio instances.
@@ -267,6 +354,25 @@ Metrics:
 | db2.tablespace_usable_size | total, usable | bytes |
 | db2.tablespace_state | state | state |
 
+### Per tablespacegroup
+
+These metrics refer to individual tablespacegroup instances.
+
+Labels:
+
+| Label | Description |
+|:------|:------------|
+| group | Group identifier |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:-------|:-----------|:-----|
+| db2.tablespace_group_usage | used | percentage |
+| db2.tablespace_group_size | used, free | bytes |
+| db2.tablespace_group_usable_size | total, usable | bytes |
+| db2.tablespace_group_state | state | state |
+
 
 ## Configuration
 
@@ -303,20 +409,25 @@ The following options can be defined globally or per job.
 | CollectIndexMetrics | CollectIndexMetrics toggles index usage metrics. | `auto` | no | - | - |
 | MaxDatabases | MaxDatabases caps the number of databases charted. | `10` | no | - | - |
 | MaxBufferpools | MaxBufferpools caps the number of buffer pools charted. | `20` | no | - | - |
-| MaxTablespaces | MaxTablespaces caps the number of tablespaces charted. | `100` | no | - | - |
-| MaxConnections | MaxConnections caps the number of connection instances charted. | `200` | no | - | - |
-| MaxTables | MaxTables caps the number of tables charted. | `50` | no | - | - |
-| MaxIndexes | MaxIndexes caps the number of indexes charted. | `100` | no | - | - |
+| MaxTablespaces | MaxTablespaces caps the number of tablespaces charted. | `50` | no | - | - |
+| MaxConnections | MaxConnections caps the number of connection instances charted. | `50` | no | - | - |
+| MaxTables | MaxTables caps the number of tables charted. | `25` | no | - | - |
+| MaxIndexes | MaxIndexes caps the number of indexes charted. | `50` | no | - | - |
 | BackupHistoryDays | BackupHistoryDays controls how many days of backup history are retrieved. | `30` | no | - | - |
 | CollectMemoryMetrics | CollectMemoryMetrics enables memory pool statistics. | `true` | no | - | - |
 | CollectWaitMetrics | CollectWaitMetrics enables wait time statistics (locks, logs, I/O). | `true` | no | - | - |
 | CollectTableIOMetrics | CollectTableIOMetrics enables table I/O statistics when available. | `true` | no | - | - |
 | CollectDatabasesMatching | CollectDatabasesMatching filters databases by name using glob patterns. | `` | no | - | - |
-| CollectBufferpoolsMatching | CollectBufferpoolsMatching filters buffer pools by name using glob patterns. | `` | no | - | - |
-| CollectTablespacesMatching | CollectTablespacesMatching filters tablespaces by name using glob patterns. | `` | no | - | - |
-| CollectConnectionsMatching | CollectConnectionsMatching filters monitored connections by application ID. | `` | no | - | - |
-| CollectTablesMatching | CollectTablesMatching filters tables by schema/name. | `` | no | - | - |
-| CollectIndexesMatching | CollectIndexesMatching filters indexes by schema/name. | `` | no | - | - |
+| IncludeConnections | IncludeConnections filters monitored connections by application ID or application name (wildcards supported). | `[db2sysc* db2agent* db2hadr* db2acd* db2bmgr*]` | no | - | - |
+| ExcludeConnections | ExcludeConnections excludes connections after inclusion matching. | `[*TEMP*]` | no | - | - |
+| IncludeBufferpools | IncludeBufferpools filters buffer pools by name. | `[IBMDEFAULTBP IBMSYSTEMBP* IBMHADRBP*]` | no | - | - |
+| ExcludeBufferpools | ExcludeBufferpools excludes buffer pools after inclusion. | `nil` | no | - | - |
+| IncludeTablespaces | IncludeTablespaces filters tablespaces by name. | `[SYSCATSPACE TEMPSPACE* SYSTOOLSPACE]` | no | - | - |
+| ExcludeTablespaces | ExcludeTablespaces excludes tablespaces after inclusion. | `[TEMPSPACE2]` | no | - | - |
+| IncludeTables | IncludeTables filters tables by schema/name. | `nil` | no | - | - |
+| ExcludeTables | ExcludeTables excludes tables after inclusion. | `nil` | no | - | - |
+| IncludeIndexes | IncludeIndexes filters indexes by schema/name. | `nil` | no | - | - |
+| ExcludeIndexes | ExcludeIndexes excludes indexes after inclusion. | `nil` | no | - | - |
 
 ### Examples
 

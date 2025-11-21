@@ -1,7 +1,7 @@
 package db2
 
 import (
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/confopt"
+	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/framework"
 )
 
@@ -25,25 +25,25 @@ type Config struct {
 	MaxDbLifeTime confopt.Duration `yaml:"max_db_life_time,omitempty" json:"max_db_life_time" ui:"group:Advanced"`
 
 	// CollectDatabaseMetrics toggles high-level database status metrics.
-	CollectDatabaseMetrics framework.AutoBool `yaml:"collect_database_metrics,omitempty" json:"collect_database_metrics" ui:"group:Databases"`
+	CollectDatabaseMetrics confopt.AutoBool `yaml:"collect_database_metrics,omitempty" json:"collect_database_metrics" ui:"group:Databases"`
 
 	// CollectBufferpoolMetrics toggles buffer pool efficiency metrics.
-	CollectBufferpoolMetrics framework.AutoBool `yaml:"collect_bufferpool_metrics,omitempty" json:"collect_bufferpool_metrics" ui:"group:Buffer Pools"`
+	CollectBufferpoolMetrics confopt.AutoBool `yaml:"collect_bufferpool_metrics,omitempty" json:"collect_bufferpool_metrics" ui:"group:Buffer Pools"`
 
 	// CollectTablespaceMetrics toggles tablespace capacity metrics.
-	CollectTablespaceMetrics framework.AutoBool `yaml:"collect_tablespace_metrics,omitempty" json:"collect_tablespace_metrics" ui:"group:Tablespaces"`
+	CollectTablespaceMetrics confopt.AutoBool `yaml:"collect_tablespace_metrics,omitempty" json:"collect_tablespace_metrics" ui:"group:Tablespaces"`
 
 	// CollectConnectionMetrics toggles per-connection activity metrics.
-	CollectConnectionMetrics framework.AutoBool `yaml:"collect_connection_metrics,omitempty" json:"collect_connection_metrics" ui:"group:Connections Monitoring"`
+	CollectConnectionMetrics confopt.AutoBool `yaml:"collect_connection_metrics,omitempty" json:"collect_connection_metrics" ui:"group:Connections Monitoring"`
 
 	// CollectLockMetrics toggles lock contention metrics.
-	CollectLockMetrics framework.AutoBool `yaml:"collect_lock_metrics,omitempty" json:"collect_lock_metrics" ui:"group:Other Metrics"`
+	CollectLockMetrics confopt.AutoBool `yaml:"collect_lock_metrics,omitempty" json:"collect_lock_metrics" ui:"group:Other Metrics"`
 
 	// CollectTableMetrics toggles table-level size and row metrics.
-	CollectTableMetrics framework.AutoBool `yaml:"collect_table_metrics,omitempty" json:"collect_table_metrics" ui:"group:Tables"`
+	CollectTableMetrics confopt.AutoBool `yaml:"collect_table_metrics,omitempty" json:"collect_table_metrics" ui:"group:Tables"`
 
 	// CollectIndexMetrics toggles index usage metrics.
-	CollectIndexMetrics framework.AutoBool `yaml:"collect_index_metrics,omitempty" json:"collect_index_metrics" ui:"group:Indexes"`
+	CollectIndexMetrics confopt.AutoBool `yaml:"collect_index_metrics,omitempty" json:"collect_index_metrics" ui:"group:Indexes"`
 
 	// MaxDatabases caps the number of databases charted.
 	MaxDatabases int `yaml:"max_databases,omitempty" json:"max_databases" ui:"group:Databases"`
@@ -78,18 +78,28 @@ type Config struct {
 	// CollectDatabasesMatching filters databases by name using glob patterns.
 	CollectDatabasesMatching string `yaml:"collect_databases_matching,omitempty" json:"collect_databases_matching" ui:"group:Databases"`
 
-	// CollectBufferpoolsMatching filters buffer pools by name using glob patterns.
-	CollectBufferpoolsMatching string `yaml:"collect_bufferpools_matching,omitempty" json:"collect_bufferpools_matching" ui:"group:Buffer Pools"`
+	// IncludeConnections filters monitored connections by application ID or application name (wildcards supported).
+	IncludeConnections []string `yaml:"include_connections,omitempty" json:"include_connections" ui:"group:Connections Monitoring"`
+	// ExcludeConnections excludes connections after inclusion matching.
+	ExcludeConnections []string `yaml:"exclude_connections,omitempty" json:"exclude_connections" ui:"group:Connections Monitoring"`
 
-	// CollectTablespacesMatching filters tablespaces by name using glob patterns.
-	CollectTablespacesMatching string `yaml:"collect_tablespaces_matching,omitempty" json:"collect_tablespaces_matching" ui:"group:Tablespaces"`
+	// IncludeBufferpools filters buffer pools by name.
+	IncludeBufferpools []string `yaml:"include_bufferpools,omitempty" json:"include_bufferpools" ui:"group:Buffer Pools"`
+	// ExcludeBufferpools excludes buffer pools after inclusion.
+	ExcludeBufferpools []string `yaml:"exclude_bufferpools,omitempty" json:"exclude_bufferpools" ui:"group:Buffer Pools"`
 
-	// CollectConnectionsMatching filters monitored connections by application ID.
-	CollectConnectionsMatching string `yaml:"collect_connections_matching,omitempty" json:"collect_connections_matching" ui:"group:Connections Monitoring"`
+	// IncludeTablespaces filters tablespaces by name.
+	IncludeTablespaces []string `yaml:"include_tablespaces,omitempty" json:"include_tablespaces" ui:"group:Tablespaces"`
+	// ExcludeTablespaces excludes tablespaces after inclusion.
+	ExcludeTablespaces []string `yaml:"exclude_tablespaces,omitempty" json:"exclude_tablespaces" ui:"group:Tablespaces"`
 
-	// CollectTablesMatching filters tables by schema/name.
-	CollectTablesMatching string `yaml:"collect_tables_matching,omitempty" json:"collect_tables_matching" ui:"group:Tables"`
+	// IncludeTables filters tables by schema/name.
+	IncludeTables []string `yaml:"include_tables,omitempty" json:"include_tables" ui:"group:Tables"`
+	// ExcludeTables excludes tables after inclusion.
+	ExcludeTables []string `yaml:"exclude_tables,omitempty" json:"exclude_tables" ui:"group:Tables"`
 
-	// CollectIndexesMatching filters indexes by schema/name.
-	CollectIndexesMatching string `yaml:"collect_indexes_matching,omitempty" json:"collect_indexes_matching" ui:"group:Indexes"`
+	// IncludeIndexes filters indexes by schema/name.
+	IncludeIndexes []string `yaml:"include_indexes,omitempty" json:"include_indexes" ui:"group:Indexes"`
+	// ExcludeIndexes excludes indexes after inclusion.
+	ExcludeIndexes []string `yaml:"exclude_indexes,omitempty" json:"exclude_indexes" ui:"group:Indexes"`
 }

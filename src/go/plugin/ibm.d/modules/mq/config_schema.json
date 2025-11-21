@@ -4,170 +4,303 @@
     "properties": {
       "channel": {
         "default": "SYSTEM.DEF.SVRCONN",
-        "title": "IBM MQ channel name for connection",
+        "description": "IBM MQ channel name for connection",
+        "title": "Channel",
         "type": "string"
       },
       "channel_selector": {
         "default": "",
-        "title": "Pattern to filter channels (wildcards supported)",
+        "description": "Pattern to filter channels (wildcards supported)",
+        "title": "Channel Selector",
         "type": "string"
       },
       "collect_channel_config": {
         "default": true,
-        "title": "Enable collection of channel configuration metrics",
+        "description": "Enable collection of channel configuration metrics",
+        "title": "Collect Channel Config",
         "type": "boolean"
       },
       "collect_channels": {
         "default": true,
-        "title": "Enable collection of channel metrics",
+        "description": "Enable collection of channel metrics",
+        "title": "Collect Channels",
         "type": "boolean"
       },
       "collect_listeners": {
         "default": true,
-        "title": "Enable collection of listener metrics",
+        "description": "Enable collection of listener metrics",
+        "title": "Collect Listeners",
         "type": "boolean"
       },
       "collect_queue_config": {
         "default": true,
-        "title": "Enable collection of queue configuration metrics",
+        "description": "Enable collection of queue configuration metrics",
+        "title": "Collect Queue Config",
         "type": "boolean"
       },
       "collect_queues": {
         "default": true,
-        "title": "Enable collection of queue metrics",
+        "description": "Enable collection of queue metrics",
+        "title": "Collect Queues",
         "type": "boolean"
       },
       "collect_reset_queue_stats": {
         "default": false,
-        "title": "Enable collection of queue statistics (destructive operation)",
+        "description": "Enable collection of queue statistics (destructive operation)",
+        "title": "Collect Reset Queue Stats",
         "type": "boolean"
       },
       "collect_statistics_queue": {
         "default": false,
-        "title": "Enable collection of statistics queue metrics (SYSTEM.ADMIN.STATISTICS.QUEUE provides advanced metrics like min/max depth)",
+        "description": "Enable collection of statistics queue metrics (SYSTEM.ADMIN.STATISTICS.QUEUE provides advanced metrics like min/max depth)",
+        "title": "Collect Statistics Queue",
         "type": "boolean"
       },
       "collect_subscriptions": {
         "default": true,
-        "title": "Enable collection of subscription metrics",
+        "description": "Enable collection of subscription metrics",
+        "title": "Collect Subscriptions",
         "type": "boolean"
       },
       "collect_sys_topics": {
         "default": false,
-        "title": "Enable collection of $SYS topic metrics (provides Queue Manager CPU, memory, and log utilization)",
+        "description": "Enable collection of $SYS topic metrics (provides Queue Manager CPU, memory, and log utilization)",
+        "title": "Collect Sys Topics",
         "type": "boolean"
       },
       "collect_system_channels": {
         "default": true,
-        "title": "Enable collection of system channel metrics (SYSTEM.* channels show clustering and administrative health)",
+        "description": "Enable collection of system channel metrics (SYSTEM.* channels show clustering and administrative health)",
+        "title": "Collect System Channels",
         "type": "boolean"
       },
       "collect_system_listeners": {
         "default": true,
-        "title": "Enable collection of system listener metrics (SYSTEM.* listeners show internal connectivity)",
+        "description": "Enable collection of system listener metrics (SYSTEM.* listeners show internal connectivity)",
+        "title": "Collect System Listeners",
         "type": "boolean"
       },
       "collect_system_queues": {
         "default": true,
-        "title": "Enable collection of system queue metrics (SYSTEM.* queues provide critical infrastructure visibility)",
+        "description": "Enable collection of system queue metrics (SYSTEM.* queues provide critical infrastructure visibility)",
+        "title": "Collect System Queues",
         "type": "boolean"
       },
       "collect_system_topics": {
         "default": true,
-        "title": "Enable collection of system topic metrics (SYSTEM.* topics show internal messaging patterns)",
+        "description": "Enable collection of system topic metrics (SYSTEM.* topics show internal messaging patterns)",
+        "title": "Collect System Topics",
         "type": "boolean"
       },
       "collect_topics": {
         "default": true,
-        "title": "Enable collection of topic metrics",
+        "description": "Enable collection of topic metrics",
+        "title": "Collect Topics",
         "type": "boolean"
+      },
+      "exclude_queues": {
+        "default": [
+          "SYSTEM.*",
+          "AMQ.*"
+        ],
+        "description": "Patterns to exclude queues after inclusion (wildcards supported).",
+        "items": {
+          "type": "string"
+        },
+        "title": "Exclude Queues",
+        "type": "array"
       },
       "host": {
         "default": "localhost",
-        "title": "IBM MQ server hostname or IP address",
+        "description": "IBM MQ server hostname or IP address",
+        "title": "Host",
         "type": "string"
+      },
+      "include_queues": {
+        "default": [
+          "SYSTEM.DEAD.LETTER.QUEUE",
+          "SYSTEM.ADMIN.COMMAND.QUEUE",
+          "SYSTEM.ADMIN.STATISTICS.QUEUE"
+        ],
+        "description": "Patterns to include queues (wildcards supported). Empty means include everything.",
+        "items": {
+          "type": "string"
+        },
+        "title": "Include Queues",
+        "type": "array"
       },
       "listener_selector": {
         "default": "",
-        "title": "Pattern to filter listeners (wildcards supported)",
+        "description": "Pattern to filter listeners (wildcards supported)",
+        "title": "Listener Selector",
         "type": "string"
       },
       "max_channels": {
         "default": 100,
-        "title": "Maximum number of channels to collect (0 = no limit)",
+        "description": "Maximum number of channels to collect (0 = no limit)",
+        "title": "Max Channels",
         "type": "integer"
       },
       "max_listeners": {
         "default": 100,
-        "title": "Maximum number of listeners to collect (0 = no limit)",
+        "description": "Maximum number of listeners to collect (0 = no limit)",
+        "title": "Max Listeners",
         "type": "integer"
       },
       "max_queues": {
-        "default": 100,
-        "title": "Maximum number of queues to collect (0 = no limit)",
+        "default": 50,
+        "description": "Maximum number of queues to collect (0 = no limit)",
+        "title": "Max Queues",
         "type": "integer"
       },
       "max_topics": {
         "default": 100,
-        "title": "Maximum number of topics to collect (0 = no limit)",
+        "description": "Maximum number of topics to collect (0 = no limit)",
+        "title": "Max Topics",
         "type": "integer"
       },
       "password": {
         "default": "",
+        "description": "Password for IBM MQ authentication",
         "format": "password",
-        "title": "Password for IBM MQ authentication",
+        "title": "Password",
         "type": "string"
       },
       "port": {
         "default": 1414,
+        "description": "IBM MQ server port number",
         "maximum": 65535,
         "minimum": 1,
-        "title": "IBM MQ server port number",
+        "title": "Port",
         "type": "integer"
       },
       "queue_manager": {
         "default": "QM1",
-        "title": "IBM MQ Queue Manager name to connect to",
-        "type": "string"
-      },
-      "queue_selector": {
-        "default": "",
-        "title": "Pattern to filter queues (wildcards supported)",
+        "description": "IBM MQ Queue Manager name to connect to",
+        "title": "Queue Manager",
         "type": "string"
       },
       "statistics_interval,omitempty": {
         "default": 60,
-        "title": "Statistics collection interval in seconds (auto-detected STATINT overwrites this value)",
+        "description": "Statistics collection interval in seconds (auto-detected STATINT overwrites this value)",
+        "title": "Statistics Interval,omitempty",
         "type": "integer"
       },
       "subscription_selector": {
         "default": "",
-        "title": "Pattern to filter subscriptions (wildcards supported)",
+        "description": "Pattern to filter subscriptions (wildcards supported)",
+        "title": "Subscription Selector",
         "type": "string"
       },
       "sys_topic_interval,omitempty": {
         "default": 10,
-        "title": "$SYS topic collection interval in seconds (user override for customized MQ configurations)",
+        "description": "$SYS topic collection interval in seconds (user override for customized MQ configurations)",
+        "title": "Sys Topic Interval,omitempty",
         "type": "integer"
       },
       "topic_selector": {
         "default": "",
-        "title": "Pattern to filter topics (wildcards supported)",
+        "description": "Pattern to filter topics (wildcards supported)",
+        "title": "Topic Selector",
         "type": "string"
       },
       "update_every": {
         "default": 10,
+        "description": "Data collection frequency",
         "minimum": 1,
-        "title": "Data collection frequency",
+        "title": "Update Every",
         "type": "integer"
       },
       "user": {
         "default": "",
-        "title": "Username for IBM MQ authentication",
+        "description": "Username for IBM MQ authentication",
+        "title": "User",
         "type": "string"
       }
     },
     "title": "mq collector configuration",
     "type": "object"
+  },
+  "uiSchema": {
+    "exclude_queues": {
+      "ui:listFlavour": "list"
+    },
+    "include_queues": {
+      "ui:listFlavour": "list"
+    },
+    "password": {
+      "ui:widget": "password"
+    },
+    "ui:flavour": "tabs",
+    "ui:options": {
+      "tabs": [
+        {
+          "fields": [
+            "update_every"
+          ],
+          "title": "Connection"
+        },
+        {
+          "fields": [
+            "queue_manager",
+            "channel",
+            "host",
+            "port",
+            "user",
+            "include_queues",
+            "exclude_queues",
+            "statistics_interval,omitempty",
+            "sys_topic_interval,omitempty"
+          ],
+          "title": "Advanced"
+        },
+        {
+          "fields": [
+            "password"
+          ],
+          "title": "Auth"
+        },
+        {
+          "fields": [
+            "collect_queues",
+            "collect_channels",
+            "collect_topics",
+            "collect_listeners",
+            "collect_subscriptions",
+            "collect_system_queues",
+            "collect_system_channels",
+            "collect_system_topics",
+            "collect_system_listeners",
+            "collect_channel_config",
+            "collect_queue_config",
+            "collect_reset_queue_stats",
+            "collect_statistics_queue",
+            "collect_sys_topics"
+          ],
+          "title": "Collection"
+        },
+        {
+          "fields": [
+            "channel_selector",
+            "topic_selector",
+            "listener_selector",
+            "subscription_selector"
+          ],
+          "title": "Filters"
+        },
+        {
+          "fields": [
+            "max_queues",
+            "max_channels",
+            "max_topics",
+            "max_listeners"
+          ],
+          "title": "Limits"
+        }
+      ]
+    },
+    "uiOptions": {
+      "fullPage": true
+    }
   }
 }

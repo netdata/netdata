@@ -8,14 +8,17 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"sync"
 
+	"github.com/netdata/netdata/go/plugins/pkg/executable"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/filepersister"
 )
 
 func statusFileName(dir string) string {
-	return filepath.Join(dir, "god-jobs-statuses.json")
+	name := strings.ReplaceAll(executable.Name, ".", "")
+	return filepath.Join(dir, fmt.Sprintf("%s-jobs-statuses.json", name))
 }
 
 func (m *Manager) loadFileStatus() {

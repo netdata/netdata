@@ -94,6 +94,18 @@ compose:
         template: |
           name: {{ .Name }}-foobar2
 `
+
+	const servicesConfig = `
+services:
+  - id: "svc-foobar1"
+    match: '{{ glob .Name "mock*1*" }}'
+    config_template: |
+      name: {{ .Name }}-foobar1
+  - id: "svc-foobar2"
+    match: '{{ glob .Name "mock*2*" }}'
+    config_template: |
+      name: {{ .Name }}-foobar2
+`
 	tests := map[string]discoverySim{
 		"new group with no targets": {
 			config: config,
@@ -186,6 +198,21 @@ compose:
 				prepareDiscoveredGroup("mock11-foobar1", "mock22-foobar2"),
 			},
 		},
+		"services-only: new group with targets": {
+			config: servicesConfig,
+			discoverers: []model.Discoverer{
+				newMockDiscoverer("rule1",
+					newMockTargetGroup("test", "mock1", "mock2"),
+				),
+			},
+			useServices:       true, // tell the simulator to wire svr-only
+			wantClassifyCalls: 0,    // no classify in services mode
+			wantComposeCalls:  2,    // compose called per target (2 targets)
+			wantConfGroups: []*confgroup.Group{
+				// same expected configs as the legacy "new group with targets"
+				prepareDiscoveredGroupWithModule("mock1-foobar1", "svc-foobar1", "mock2-foobar2", "svc-foobar2"),
+			},
+		},
 	}
 
 	for name, sim := range tests {
@@ -204,6 +231,27 @@ func prepareDiscoveredGroup(configNames ...string) *confgroup.Group {
 			SetSourceType(confgroup.TypeDiscovered).
 			SetSource("test").
 			SetName(name))
+	}
+
+	return &confgroup.Group{
+		Source:  "test",
+		Configs: configs,
+	}
+}
+
+func prepareDiscoveredGroupWithModule(values ...string) *confgroup.Group {
+	var configs []confgroup.Config
+
+	for i := 0; i < len(values); i += 2 {
+		cfgName := values[i]
+		modName := values[i+1]
+		configs = append(configs, confgroup.Config{}.
+			SetProvider("mock").
+			SetSourceType(confgroup.TypeDiscovered).
+			SetSource("test").
+			SetName(cfgName).
+			SetModule(modName),
+		)
 	}
 
 	return &confgroup.Group{
@@ -300,4 +348,186 @@ func mustCalcHash(obj any) uint64 {
 		panic(fmt.Sprintf("hash calculation: %v", err))
 	}
 	return hash
+}
+
+func TestConvertOldToServices(t *testing.T) {
+	type inYAML struct {
+		Classify string
+		Compose  string
+	}
+
+	tests := map[string]struct {
+		in   inYAML
+		want []ServiceRuleConfig
+	}{
+		"basic 1:1 mapping": {
+			in: inYAML{
+				Classify: `
+- name: "Applications"
+  selector: "unknown"
+  tags: "-unknown app"
+  match:
+    - tags: "activemq"
+      expr: '{{ and (eq .Port "8161") (eq .Comm "activemq") }}'
+`,
+				Compose: `
+- name: "Applications"
+  selector: "app"
+  config:
+    - selector: "activemq"
+      template: |
+        module: activemq
+        name: local
+        url: http://{{.Address}}
+        webadmin: admin
+`,
+			},
+			want: []ServiceRuleConfig{
+				{
+					ID:             "activemq",
+					Match:          `{{ and (eq .Port "8161") (eq .Comm "activemq") }}`,
+					ConfigTemplate: "module: activemq\nname: local\nurl: http://{{.Address}}\nwebadmin: admin\n",
+				},
+			},
+		},
+
+		"multiple classify exprs for same tag -> multiple service rules": {
+			in: inYAML{
+				Classify: `
+- name: "Databases"
+  selector: "unknown"
+  match:
+    - tags: "redis"
+      expr: '{{ eq .Port "6379" }}'
+    - tags: "redis"
+      expr: '{{ and (eq .Comm "redis-server") (eq .Address "127.0.0.1") }}'
+`,
+				Compose: `
+- name: "Databases"
+  selector: "app"
+  config:
+    - selector: "redis"
+      template: |
+        module: redis
+        name: {{ .Name }}
+`,
+			},
+			// NOTE: Order should follow classify expr encounter order:
+			// 1) Port-based, 2) Comm+Address-based. IDs redis, redis_2 accordingly.
+			want: []ServiceRuleConfig{
+				{
+					ID:             "redis",
+					Match:          `{{ eq .Port "6379" }}`,
+					ConfigTemplate: "module: redis\nname: {{ .Name }}\n",
+				},
+				{
+					ID:             "redis_2",
+					Match:          `{{ and (eq .Comm "redis-server") (eq .Address "127.0.0.1") }}`,
+					ConfigTemplate: "module: redis\nname: {{ .Name }}\n",
+				},
+			},
+		},
+
+		"ignore deletions and rule-level tags without expr": {
+			in: inYAML{
+				Classify: `
+- name: "NoExpr"
+  selector: "unknown"
+  tags: "nginx"     # rule-level tag: no expr -> cannot produce a service rule
+  match: []
+- name: "Deletions"
+  selector: "unknown"
+  match:
+    - tags: "-nginx"               # deletion: ignore
+      expr: '{{ eq .Port "80" }}'  # has expr but tag is a deletion, ignore
+`,
+				Compose: `
+- name: "Web"
+  selector: "app"
+  config:
+    - selector: "nginx"
+      template: |
+        module: nginx
+        name: web
+`,
+			},
+			want: nil, // nothing to map
+		},
+
+		"compose selector without classify producer -> empty": {
+			in: inYAML{
+				Classify: `
+- name: "App"
+  selector: "unknown"
+  match:
+    - tags: "foo"
+      expr: '{{ eq .Port "1234" }}'
+`,
+				Compose: `
+- name: "App"
+  selector: "app"
+  config:
+    - selector: "bar"
+      template: |
+        module: bar
+`,
+			},
+			want: nil,
+		},
+
+		"multiple compose selectors map to different classify tags": {
+			in: inYAML{
+				Classify: `
+- name: "Mixed"
+  selector: "unknown"
+  match:
+    - tags: "kafka"
+      expr: '{{ eq .Port "9092" }}'
+    - tags: "zookeeper"
+      expr: '{{ eq .Port "2181" }}'
+`,
+				Compose: `
+- name: "Stream"
+  selector: "app"
+  config:
+    - selector: "zookeeper"
+      template: |
+        module: zookeeper
+        name: zk
+    - selector: "kafka"
+      template: |
+        module: kafka
+        name: broker
+`,
+			},
+			// Order follows compose config order; for each selector, classify exprs order is preserved.
+			want: []ServiceRuleConfig{
+				{
+					ID:             "zookeeper",
+					Match:          `{{ eq .Port "2181" }}`,
+					ConfigTemplate: "module: zookeeper\nname: zk\n",
+				},
+				{
+					ID:             "kafka",
+					Match:          `{{ eq .Port "9092" }}`,
+					ConfigTemplate: "module: kafka\nname: broker\n",
+				},
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			var cls []ClassifyRuleConfig
+			var cmp []ComposeRuleConfig
+
+			require.NoError(t, yaml.Unmarshal([]byte(tc.in.Classify), &cls), "classify YAML")
+			require.NoError(t, yaml.Unmarshal([]byte(tc.in.Compose), &cmp), "compose YAML")
+
+			got, err := ConvertOldToServices(cls, cmp)
+			require.NoError(t, err)
+
+			assert.Equal(t, tc.want, got)
+		})
+	}
 }

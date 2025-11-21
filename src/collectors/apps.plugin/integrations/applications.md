@@ -69,6 +69,7 @@ Metrics:
 | app.cpu_utilization | user, system | percentage |
 | app.cpu_guest_utilization | guest | percentage |
 | app.cpu_context_switches | voluntary, involuntary | switches/s |
+| app.estimated_mem_usage | mem | MiB |
 | app.mem_usage | rss | MiB |
 | app.mem_private_usage | mem | MiB |
 | app.vmem_usage | vmem | MiB |

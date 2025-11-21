@@ -29,6 +29,7 @@ int do_GetSystemRAM(int update_every, usec_t dt);
 int do_GetSystemCPU(int update_every, usec_t dt);
 int do_GetPowerSupply(int update_every, usec_t dt);
 int do_GetServicesStatus(int update_every, usec_t dt);
+int do_GetHardwareInfo(int update_every, usec_t dt);
 int do_GetSensors(int update_every, usec_t dt);
 
 // Perflib
@@ -52,7 +53,18 @@ int do_PerflibASP(int update_every, usec_t dt __maybe_unused);
 
 // Cleanup
 void do_PerflibMSSQL_cleanup();
+void do_GetHardwareInfo_cleanup();
 void do_Sensors_cleanup();
+
+enum MSSQL_REPLICATION_WARNINGS {
+    MSSQL_REPLICATON_EXPIRATION = 1<<0,
+    MSSQL_REPLICATON_LATENCY = 1<<1,
+    MSSQL_REPLICATON_MERGEEXPIRATION = 1<<2,
+    MSSQL_REPLICATON_MERGEFASTDURATION = 1<<3,
+    MSSQL_REPLICATON_MERGELOWDURATION = 1<<4,
+    MSSQL_REPLICATON_MERGEFASTRUNSPEED = 1<<5,
+    MSSQL_REPLICATON_MERGELOWRUNSPEED = 1<<6
+};
 
 enum PERFLIB_PRIO {
     PRIO_WEBSITE_IIS_REQUESTS_RATE = 21000, // PRIO selected, because APPS is using 20YYY
@@ -108,6 +120,10 @@ enum PERFLIB_PRIO {
     PRIO_MSSQL_DATABASE_LOCKS_TIMEOUT_PER_SECOND,
     PRIO_MSSQL_DATABASE_LOCK_REQUESTS_SEC,
 
+    PRIO_MSSQL_DATABASE_READONLY,
+    PRIO_MSSQL_DATABASE_STATE,
+    PRIO_MSSQL_DATABASE_JOBS_STATUS,
+
     PRIO_MSSQL_DATABASE_DATA_FILE_SIZE,
 
     PRIO_MSSQL_STATS_BATCH_REQUEST,
@@ -141,6 +157,13 @@ enum PERFLIB_PRIO {
     PRIO_MSSQL_WAITING_COUNT,
 
     PRIO_MSSQL_SQL_ERRORS,
+
+    PRIO_MSSQL_REPLICATION_STATUS,
+    PRIO_MSSQL_REPLICATION_WARNING,
+    PRIO_MSSQL_REPLICATION_AVG_LATENCY,
+    PRIO_MSSQL_REPLICATION_SUBSCRIPTION_COUNT,
+    PRIO_MSSQL_REPLICATION_AGENT_RUNNING,
+    PRIO_MSSQL_REPLICATION_SYNC_TIME,
 
     PRIO_NETFRAMEWORK_CLR_EXCEPTION_THROWN,
     PRIO_NETFRAMEWORK_CLR_EXCEPTION_FILTERS,

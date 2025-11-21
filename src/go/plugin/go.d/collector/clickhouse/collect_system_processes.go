@@ -5,7 +5,7 @@ package clickhouse
 import (
 	"strconv"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
+	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
 
 const queryLongestQueryTime = `

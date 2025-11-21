@@ -8,14 +8,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/vsphere/client"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/vsphere/discover"
-	rs "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/vsphere/resources"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/tlscfg"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/vmware/govmomi/simulator"
+
+	"github.com/netdata/netdata/go/plugins/pkg/tlscfg"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/vsphere/client"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/vsphere/discover"
+	rs "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/vsphere/resources"
 )
 
 func TestNew(t *testing.T) {

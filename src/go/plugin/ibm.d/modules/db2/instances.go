@@ -146,22 +146,11 @@ func (c *Collector) doCollectDatabaseInstances(ctx context.Context, applySelecto
 }
 
 func (c *Collector) collectBufferpoolInstances(ctx context.Context) error {
-	if c.MaxBufferpools <= 0 {
-		return nil
-	}
-
-	// Always use MON_GET_BUFFERPOOL for bufferpool instances
-	// Note: MON_GET_BUFFERPOOL doesn't support FETCH FIRST, so we'll handle limit in post-processing
 	query := queryMonGetBufferpool
 	c.Debugf("using MON_GET_BUFFERPOOL for bufferpool instances")
 
 	var currentBP string
-	count := 0
 	err := c.doQuery(ctx, query, func(column, value string, lineEnd bool) {
-		// Handle limit for MON_GET queries
-		if count >= c.MaxBufferpools {
-			return
-		}
 		switch column {
 		case "BP_NAME":
 			currentBP = strings.TrimSpace(value)
@@ -169,15 +158,13 @@ func (c *Collector) collectBufferpoolInstances(ctx context.Context) error {
 				return
 			}
 
-			// Apply selector if configured
-			if c.bufferpoolSelector != nil && !c.bufferpoolSelector.MatchString(currentBP) {
-				currentBP = "" // Skip this bufferpool
+			if !c.allowBufferpool(currentBP) {
+				currentBP = ""
 				return
 			}
 
 			if _, exists := c.bufferpools[currentBP]; !exists {
 				c.bufferpools[currentBP] = &bufferpoolMetrics{name: currentBP}
-				count++
 			}
 			if _, exists := c.mx.bufferpools[currentBP]; !exists {
 				c.mx.bufferpools[currentBP] = bufferpoolInstanceMetrics{}
@@ -457,6 +444,11 @@ func (c *Collector) collectTablespaceInstances(ctx context.Context) error {
 				return
 			}
 
+			if !c.allowTablespace(currentTbsp, "", "") {
+				currentTbsp = ""
+				return
+			}
+
 			if _, exists := c.tablespaces[currentTbsp]; !exists {
 				c.tablespaces[currentTbsp] = &tablespaceMetrics{name: currentTbsp}
 			}
@@ -544,17 +536,30 @@ func (c *Collector) collectTablespaceInstances(ctx context.Context) error {
 				}
 			}
 		}
+
+		if currentTbsp != "" {
+			meta := c.tablespaces[currentTbsp]
+			if !c.allowTablespace(currentTbsp, meta.contentType, meta.state) {
+				delete(c.tablespaces, currentTbsp)
+				delete(c.mx.tablespaces, currentTbsp)
+				currentTbsp = ""
+			}
+		}
+
+		if lineEnd {
+			currentTbsp = ""
+		}
 	})
 
 	return err
 }
 
 func (c *Collector) collectConnectionInstances(ctx context.Context) error {
+	// MaxConnections <=0 disables per-connection collection entirely.
 	if c.MaxConnections <= 0 {
 		return nil
 	}
 
-	// Always use MON_GET_CONNECTION for connection instances
 	query := queryMonGetConnectionDetails
 	c.Debugf("using MON_GET_CONNECTION for connection instances")
 
@@ -570,6 +575,7 @@ func (c *Collector) collectConnectionInstances(ctx context.Context) error {
 			if _, exists := c.connections[currentAppID]; !exists {
 				c.connections[currentAppID] = &connectionMetrics{applicationID: currentAppID}
 			}
+
 			c.mx.connections[currentAppID] = connectionInstanceMetrics{}
 
 		case "APPLICATION_NAME":
@@ -595,7 +601,6 @@ func (c *Collector) collectConnectionInstances(ctx context.Context) error {
 		case "APPL_STATUS":
 			if currentAppID != "" {
 				c.connections[currentAppID].connectionState = value
-				// Map state to numeric
 				stateValue := int64(0)
 				execQueries := int64(0)
 				switch strings.ToUpper(value) {
@@ -638,6 +643,16 @@ func (c *Collector) collectConnectionInstances(ctx context.Context) error {
 				}
 			}
 		}
+
+		if lineEnd && currentAppID != "" {
+			meta := c.connections[currentAppID]
+			if !c.allowConnection(currentAppID, meta) {
+				delete(c.connections, currentAppID)
+				delete(c.mx.connections, currentAppID)
+			}
+			currentAppID = ""
+		}
+
 	})
 
 	return err

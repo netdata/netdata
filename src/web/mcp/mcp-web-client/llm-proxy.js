@@ -63,15 +63,23 @@ const MODEL_DEFINITIONS = {
     contextWindow: 128000, 
     pricing: { input: 0.25, cacheRead: 0.025, output: 2.00 } 
   },
-  'gpt-5-nano': { 
-    contextWindow: 128000, 
-    pricing: { input: 0.05, cacheRead: 0.005, output: 0.40 } 
+  'gpt-5-nano': {
+    contextWindow: 128000,
+    pricing: { input: 0.05, cacheRead: 0.005, output: 0.40 }
   },
-  'gpt-5-chat-latest': { 
-    contextWindow: 128000, 
-    pricing: { input: 1.25, cacheRead: 0.125, output: 10.00 } 
+  'gpt-5-chat-latest': {
+    contextWindow: 128000,
+    pricing: { input: 1.25, cacheRead: 0.125, output: 10.00 }
   },
-  
+  'gpt-5-pro': {
+    contextWindow: 128000,
+    pricing: { input: 15.00, cacheRead: 0.00, output: 120.00 }
+  },
+  'gpt-5-codex': {
+    contextWindow: 128000,
+    pricing: { input: 1.25, cacheRead: 0.125, output: 10.00 }
+  },
+
   // GPT-4o Series
   'gpt-4o': { 
     contextWindow: 128000, 
@@ -407,11 +415,21 @@ const MODEL_DEFINITIONS = {
   },
   
   // Claude Sonnet 4
-  'claude-sonnet-4-20250514': { 
-    contextWindow: 200000, 
-    pricing: { input: 3.00, cacheWrite: 3.75, cacheRead: 0.30, output: 15.00 } 
+  'claude-sonnet-4-20250514': {
+    contextWindow: 200000,
+    pricing: { input: 3.00, cacheWrite: 3.75, cacheRead: 0.30, output: 15.00 }
   },
-  
+
+  // Claude 4.5 Series
+  'claude-sonnet-4-5': {
+    contextWindow: 200000,
+    pricing: { input: 3.00, cacheWrite: 3.75, cacheRead: 0.30, output: 15.00 }
+  },
+  'claude-haiku-4-5': {
+    contextWindow: 200000,
+    pricing: { input: 1.00, cacheWrite: 1.25, cacheRead: 0.10, output: 5.00 }
+  },
+
   // Claude Sonnet 3.7
   'claude-3-7-sonnet-20250219': { 
     contextWindow: 200000, 

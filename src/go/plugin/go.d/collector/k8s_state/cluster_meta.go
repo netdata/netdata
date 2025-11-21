@@ -9,9 +9,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/web"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"github.com/netdata/netdata/go/plugins/pkg/web"
 )
 
 func (c *Collector) getKubeClusterID() string {

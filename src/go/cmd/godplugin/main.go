@@ -8,18 +8,16 @@ import (
 	"os"
 	"os/user"
 	"strings"
-	"time"
-
-	"github.com/netdata/netdata/go/plugins/logger"
-	"github.com/netdata/netdata/go/plugins/pkg/buildinfo"
-	"github.com/netdata/netdata/go/plugins/pkg/executable"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/cli"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/pluginconfig"
 
 	"go.uber.org/automaxprocs/maxprocs"
 	"golang.org/x/net/http/httpproxy"
 
+	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/pkg/buildinfo"
+	"github.com/netdata/netdata/go/plugins/pkg/cli"
+	"github.com/netdata/netdata/go/plugins/pkg/executable"
+	"github.com/netdata/netdata/go/plugins/pkg/pluginconfig"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector"
 )
 
@@ -36,7 +34,7 @@ func main() {
 	opts := parseCLI()
 
 	if opts.Version {
-		fmt.Printf("go.d.plugin, version: %s\n", buildinfo.Version)
+		fmt.Printf("%s.plugin, version: %s\n", executable.Name, buildinfo.Version)
 		return
 	}
 
@@ -49,17 +47,6 @@ func main() {
 		logger.Level.Set(slog.LevelDebug)
 	}
 
-	// Parse dump duration if provided
-	var dumpMode time.Duration
-	if opts.DumpMode != "" {
-		var err error
-		dumpMode, err = time.ParseDuration(opts.DumpMode)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "error: invalid dump duration '%s': %v\n", opts.DumpMode, err)
-			os.Exit(1)
-		}
-	}
-
 	a := agent.New(agent.Config{
 		Name:                      executable.Name,
 		PluginConfigDir:           pluginconfig.ConfigDir(),
@@ -70,7 +57,6 @@ func main() {
 		RunModule:                 opts.Module,
 		RunJob:                    opts.Job,
 		MinUpdateEvery:            opts.UpdateEvery,
-		DumpMode:                  dumpMode,
 		DumpSummary:               opts.DumpSummary,
 	})
 
