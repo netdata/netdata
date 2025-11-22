@@ -70,6 +70,7 @@ jobs:
             Checkout: ${{ steps.checkout.outcome }}
             Update version: ${{ steps.update_version.outcome }}
             Install mcp-publisher: ${{ steps.install_publisher.outcome }}
+            MCP Auth: ${{ steps.mcp_auth.outcome }
             Validate: ${{ steps.validate.outcome }}
             Publish: ${{ steps.publish.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
