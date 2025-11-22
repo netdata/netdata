@@ -22,7 +22,7 @@ require (
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/go-ldap/ldap/v3 v3.4.12
 	github.com/go-sql-driver/mysql v1.9.3
-	github.com/godbus/dbus/v5 v5.1.0
+	github.com/godbus/dbus/v5 v5.2.0
 	github.com/gofrs/flock v0.13.0
 	github.com/gohugoio/hashstructure v0.6.0
 	github.com/golang/mock v1.6.0
