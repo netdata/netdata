@@ -223,6 +223,39 @@ void do_mssql_memmgr_external_benefit_of_memory(struct mssql_instance *mi, int u
     rrdset_done(mi->st_ext_benefit_mem);
 }
 
+void do_mssql_memmgr_pending_memory_grants(struct mssql_instance *mi, int update_every)
+{
+    if (unlikely(!mi->st_pending_mem_grant)) {
+        snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_memmgr_pending_memory_grants", mi->instanceID);
+        netdata_fix_chart_name(id);
+        mi->st_pending_mem_grant = rrdset_create_localhost(
+                "mssql",
+                id,
+                NULL,
+                "memory",
+                "mssql.instance_memmgr_pending_memory_grants",
+                "Process waiting for memory grant",
+                "processes",
+                PLUGIN_WINDOWS_NAME,
+                "PerflibMSSQL",
+                PRIO_MSSQL_MEMMGR_PENDING_MEMORY_GRANTS,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+        mi->rd_pending_mem_grant =
+                rrddim_add(mi->st_pending_mem_grant, "pending", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+        rrdlabels_add(mi->st_pending_mem_grant->rrdlabels, "mssql_instance", mi->instanceID, RRDLABEL_SRC_AUTO);
+    }
+
+    rrddim_set_by_pointer(
+            mi->st_pending_mem_grant,
+            mi->rd_pending_mem_grant,
+            (collected_number)mi->MSSQLPendingMemoryGrants.current.Data);
+
+    rrdset_done(mi->st_pending_mem_grant);
+}
+
 void do_mssql_memory_mgr(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *mi, int update_every)
 {
     char id[RRD_ID_LENGTH_MAX + 1];
@@ -239,35 +272,7 @@ void do_mssql_memory_mgr(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *mi,
     }
 
     if (likely(perflibGetObjectCounter(pDataBlock, pObjectType, &mi->MSSQLPendingMemoryGrants))) {
-        if (unlikely(!mi->st_pending_mem_grant)) {
-            snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_memmgr_pending_memory_grants", mi->instanceID);
-            netdata_fix_chart_name(id);
-            mi->st_pending_mem_grant = rrdset_create_localhost(
-                    "mssql",
-                    id,
-                    NULL,
-                    "memory",
-                    "mssql.instance_memmgr_pending_memory_grants",
-                    "Process waiting for memory grant",
-                    "processes",
-                    PLUGIN_WINDOWS_NAME,
-                    "PerflibMSSQL",
-                    PRIO_MSSQL_MEMMGR_PENDING_MEMORY_GRANTS,
-                    update_every,
-                    RRDSET_TYPE_LINE);
-
-            mi->rd_pending_mem_grant =
-                    rrddim_add(mi->st_pending_mem_grant, "pending", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-
-            rrdlabels_add(mi->st_pending_mem_grant->rrdlabels, "mssql_instance", mi->instanceID, RRDLABEL_SRC_AUTO);
-        }
-
-        rrddim_set_by_pointer(
-                mi->st_pending_mem_grant,
-                mi->rd_pending_mem_grant,
-                (collected_number)mi->MSSQLPendingMemoryGrants.current.Data);
-
-        rrdset_done(mi->st_pending_mem_grant);
+        do_mssql_memmgr_pending_memory_grants(mi, update_every);
     }
 
     if (likely(perflibGetObjectCounter(pDataBlock, pObjectType, &mi->MSSQLTotalServerMemory))) {
