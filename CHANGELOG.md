@@ -6,6 +6,9 @@
 - Build(deps): bump golang.org/x/crypto from 0.43.0 to 0.45.0 in /src/go ([#21322](https://github.com/netdata/netdata/issues/21322))
 - Remove log message ([#21325](https://github.com/netdata/netdata/issues/21325))
 - Improve(health/dyncfg): Add source unit field to alert value ([#21326](https://github.com/netdata/netdata/issues/21326))
+- Fix compilation when DBENGINE is disabled ([#21323](https://github.com/netdata/netdata/issues/21323))
+- Disable apps plugin pss mem by default ([#21330](https://github.com/netdata/netdata/issues/21330))
+- Fix(go.d): fix dyncfg vnodes configs ([#21332](https://github.com/netdata/netdata/issues/21332))
 
 ## [2.8.0] - 2025-11-19
 
