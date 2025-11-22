@@ -50,6 +50,7 @@ void do_mssql_access_methods(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance 
 void do_mssql_auto_parameterization_attempts(struct mssql_instance *mi, int update_every)
 {
     if (unlikely(!mi->st_stats_auto_param)) {
+        char id[RRD_ID_LENGTH_MAX + 1];
         snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_sqlstats_auto_parameterization_attempts", mi->instanceID);
         netdata_fix_chart_name(id);
         mi->st_stats_auto_param = rrdset_create_localhost(
@@ -82,6 +83,7 @@ void do_mssql_auto_parameterization_attempts(struct mssql_instance *mi, int upda
 void do_mssql_batch_requests(struct mssql_instance *mi, int update_every)
 {
     if (unlikely(!mi->st_stats_batch_request)) {
+        char id[RRD_ID_LENGTH_MAX + 1];
         snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_sqlstats_batch_requests", mi->instanceID);
         netdata_fix_chart_name(id);
         mi->st_stats_batch_request = rrdset_create_localhost(
@@ -111,9 +113,10 @@ void do_mssql_batch_requests(struct mssql_instance *mi, int update_every)
     rrdset_done(mi->st_stats_batch_request);
 }
 
-void do_mssql_auto_parameterization_attempts(struct mssql_instance *mi, int update_every)
+void do_mssql_safe_auto_parameterization_attempts(struct mssql_instance *mi, int update_every)
 {
     if (unlikely(!mi->st_stats_safe_auto)) {
+        char id[RRD_ID_LENGTH_MAX + 1];
         snprintfz(
                 id, RRD_ID_LENGTH_MAX, "instance_%s_sqlstats_safe_auto_parameterization_attempts", mi->instanceID);
         netdata_fix_chart_name(id);
@@ -145,8 +148,6 @@ void do_mssql_auto_parameterization_attempts(struct mssql_instance *mi, int upda
 
 void do_mssql_statistics_perflib(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *mi, int update_every)
 {
-    char id[RRD_ID_LENGTH_MAX + 1];
-
     PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, mi->objectName[NETDATA_MSSQL_SQL_STATS]);
     if (unlikely(!pObjectType))
         return;
@@ -158,12 +159,13 @@ void do_mssql_statistics_perflib(PERF_DATA_BLOCK *pDataBlock, struct mssql_insta
         do_mssql_batch_requests(mi, update_every);
 
     if (likely(perflibGetObjectCounter(pDataBlock, pObjectType, &mi->MSSQLStatSafeAutoParameterization)))
-        do_mssql_auto_parameterization_attempts(mi, update_every);
+        do_mssql_safe_auto_parameterization_attempts(mi, update_every);
 }
 
 void do_mssql_memmgr_connection_memory_bytes(struct mssql_instance *mi, int update_every)
 {
     if (unlikely(!mi->st_conn_memory)) {
+        char id[RRD_ID_LENGTH_MAX + 1];
         snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_memmgr_connection_memory_bytes", mi->instanceID);
         netdata_fix_chart_name(id);
         mi->st_conn_memory = rrdset_create_localhost(
@@ -195,6 +197,7 @@ void do_mssql_memmgr_connection_memory_bytes(struct mssql_instance *mi, int upda
 void do_mssql_memmgr_external_benefit_of_memory(struct mssql_instance *mi, int update_every)
 {
     if (unlikely(!mi->st_ext_benefit_mem)) {
+        char id[RRD_ID_LENGTH_MAX + 1];
         snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_memmgr_external_benefit_of_memory", mi->instanceID);
         netdata_fix_chart_name(id);
         mi->st_ext_benefit_mem = rrdset_create_localhost(
@@ -226,6 +229,7 @@ void do_mssql_memmgr_external_benefit_of_memory(struct mssql_instance *mi, int u
 void do_mssql_memmgr_pending_memory_grants(struct mssql_instance *mi, int update_every)
 {
     if (unlikely(!mi->st_pending_mem_grant)) {
+        char id[RRD_ID_LENGTH_MAX + 1];
         snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_memmgr_pending_memory_grants", mi->instanceID);
         netdata_fix_chart_name(id);
         mi->st_pending_mem_grant = rrdset_create_localhost(
@@ -259,6 +263,7 @@ void do_mssql_memmgr_pending_memory_grants(struct mssql_instance *mi, int update
 void do_mssql_memmgr_memmgr_server_memory(struct mssql_instance *mi, int update_every)
 {
     if (unlikely(!mi->st_mem_tot_server)) {
+        char id[RRD_ID_LENGTH_MAX + 1];
         snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_memmgr_server_memory", mi->instanceID);
         netdata_fix_chart_name(id);
         mi->st_mem_tot_server = rrdset_create_localhost(
@@ -314,14 +319,13 @@ void do_mssql_memory_mgr(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *mi,
 
 void do_mssql_errors(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *mi, int update_every)
 {
-    char id[RRD_ID_LENGTH_MAX + 1];
-
     PERF_OBJECT_TYPE *pObjectType = perflibFindObjectTypeByName(pDataBlock, mi->objectName[NETDATA_MSSQL_SQL_ERRORS]);
     if (unlikely(!pObjectType))
         return;
 
     if (likely(perflibGetObjectCounter(pDataBlock, pObjectType, &mi->MSSQLSQLErrorsTotal))) {
         if (unlikely(!mi->st_sql_errors)) {
+            char id[RRD_ID_LENGTH_MAX + 1];
             snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_sql_errors_total", mi->instanceID);
             netdata_fix_chart_name(id);
             mi->st_sql_errors = rrdset_create_localhost(
@@ -352,6 +356,7 @@ void do_mssql_errors(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *mi, int
 void do_mssql_user_connections(struct mssql_instance *mi, int update_every)
 {
     if (unlikely(!mi->st_user_connections)) {
+        char id[RRD_ID_LENGTH_MAX + 1];
         snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_user_connections", mi->instanceID);
         netdata_fix_chart_name(id);
         mi->st_user_connections = rrdset_create_localhost(
@@ -381,6 +386,7 @@ void do_mssql_user_connections(struct mssql_instance *mi, int update_every)
 void do_mssql_blocked_processes(struct mssql_instance *mi, int update_every)
 {
     if (unlikely(!mi->st_process_blocked)) {
+        char id[RRD_ID_LENGTH_MAX + 1];
         snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_blocked_process", mi->instanceID);
         netdata_fix_chart_name(id);
         mi->st_process_blocked = rrdset_create_localhost(
@@ -409,8 +415,6 @@ void do_mssql_blocked_processes(struct mssql_instance *mi, int update_every)
 
 void do_mssql_general_stats(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *mi, int update_every)
 {
-    char id[RRD_ID_LENGTH_MAX + 1];
-
     PERF_OBJECT_TYPE *pObjectType =
             perflibFindObjectTypeByName(pDataBlock, mi->objectName[NETDATA_MSSQL_GENERAL_STATS]);
     if (unlikely(!pObjectType))
