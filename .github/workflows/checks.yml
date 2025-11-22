@@ -19,7 +19,7 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
           submodules: recursive
@@ -88,7 +88,7 @@ jobs:
         run: echo "SKIPPED"
       - name: Checkout
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           submodules: recursive
       - name: Build
@@ -113,7 +113,7 @@ jobs:
         run: echo "SKIPPED"
       - name: Checkout
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           submodules: recursive
       - name: Build

@@ -32,7 +32,7 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
           submodules: recursive
@@ -154,7 +154,7 @@ jobs:
       - name: Checkout
         id: checkout
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
           submodules: recursive
@@ -222,7 +222,7 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
       - name: Prepare tools
         id: prepare
         run: |
@@ -273,7 +273,7 @@ jobs:
       - name: Checkout
         id: checkout
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
           submodules: recursive
@@ -355,7 +355,7 @@ jobs:
         if: needs.file-check.outputs.run != 'true'
         run: Write-Output "SKIPPED"
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         id: checkout
         if: needs.file-check.outputs.run == 'true'
         with:
@@ -466,7 +466,7 @@ jobs:
       - name: Checkout
         id: checkout
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
       - name: Prepare Environment
         id: prepare
         if: needs.file-check.outputs.run == 'true'
@@ -560,7 +560,7 @@ jobs:
       - name: Checkout
         id: checkout
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
       - name: Fetch artifacts
         id: fetch
         if: needs.file-check.outputs.run == 'true'
@@ -629,7 +629,7 @@ jobs:
       - name: Checkout
         id: checkout
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
       - name: Fetch artifacts
         id: fetch-artifacts
         if: needs.file-check.outputs.run == 'true'
@@ -698,7 +698,7 @@ jobs:
       - name: Checkout
         id: checkout
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
       - name: Fetch artifacts
         id: fetch-artifacts
         if: needs.file-check.outputs.run == 'true'
@@ -759,12 +759,12 @@ jobs:
     steps:
       - name: Checkout Main Repo
         id: checkout-main
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           path: main
       - name: Checkout Nightly Repo
         id: checkout-nightly
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           repository: netdata/netdata-nightlies
           path: nightlies
@@ -802,7 +802,7 @@ jobs:
           token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
       - name: Checkout netdata main Repo # Checkout back to netdata/netdata repo to the update latest packaged versions
         id: checkout-netdata
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
       - name: Init python environment for publish release metadata
@@ -893,7 +893,7 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
       - name: Retrieve Artifacts
         id: fetch
         uses: Wandalen/wretry.action@v3
@@ -960,7 +960,7 @@ jobs:
     steps:
       - name: Checkout
         id: checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
       - name: Prepare tools
         id: prepare
         run: |
@@ -1013,7 +1013,7 @@ jobs:
       - name: Checkout
         id: checkout
         if: needs.file-check.outputs.run == 'true'
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           submodules: recursive
       - name: Setup Buildx
@@ -1087,7 +1087,7 @@ jobs:
         id: skip
         if: needs.file-check.outputs.run != 'true'
         run: echo "SKIPPED"
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         id: checkout
         if: needs.file-check.outputs.run == 'true'
         with:
