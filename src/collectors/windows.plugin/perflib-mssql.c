@@ -349,6 +349,34 @@ void do_mssql_errors(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *mi, int
     }
 }
 
+void do_mssql_user_connections(struct mssql_instance *mi, int update_every)
+{
+    if (unlikely(!mi->st_user_connections)) {
+        snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_user_connections", mi->instanceID);
+        netdata_fix_chart_name(id);
+        mi->st_user_connections = rrdset_create_localhost(
+                "mssql",
+                id,
+                NULL,
+                "connections",
+                "mssql.instance_user_connections",
+                "User connections",
+                "connections",
+                PLUGIN_WINDOWS_NAME,
+                "PerflibMSSQL",
+                PRIO_MSSQL_USER_CONNECTIONS,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+        mi->rd_user_connections = rrddim_add(mi->st_user_connections, "user", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+        rrdlabels_add(mi->st_user_connections->rrdlabels, "mssql_instance", mi->instanceID, RRDLABEL_SRC_AUTO);
+    }
+
+    rrddim_set_by_pointer(
+            mi->st_user_connections, mi->rd_user_connections, (collected_number)mi->MSSQLUserConnections.current.Data);
+    rrdset_done(mi->st_user_connections);
+}
 
 void do_mssql_general_stats(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *mi, int update_every)
 {
@@ -360,31 +388,7 @@ void do_mssql_general_stats(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *
         return;
 
     if (likely(perflibGetObjectCounter(pDataBlock, pObjectType, &mi->MSSQLUserConnections))) {
-        if (unlikely(!mi->st_user_connections)) {
-            snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_user_connections", mi->instanceID);
-            netdata_fix_chart_name(id);
-            mi->st_user_connections = rrdset_create_localhost(
-                    "mssql",
-                    id,
-                    NULL,
-                    "connections",
-                    "mssql.instance_user_connections",
-                    "User connections",
-                    "connections",
-                    PLUGIN_WINDOWS_NAME,
-                    "PerflibMSSQL",
-                    PRIO_MSSQL_USER_CONNECTIONS,
-                    update_every,
-                    RRDSET_TYPE_LINE);
-
-            mi->rd_user_connections = rrddim_add(mi->st_user_connections, "user", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-
-            rrdlabels_add(mi->st_user_connections->rrdlabels, "mssql_instance", mi->instanceID, RRDLABEL_SRC_AUTO);
-        }
-
-        rrddim_set_by_pointer(
-                mi->st_user_connections, mi->rd_user_connections, (collected_number)mi->MSSQLUserConnections.current.Data);
-        rrdset_done(mi->st_user_connections);
+        do_mssql_user_connections(mi, update_every);
     }
 
     if (likely(perflibGetObjectCounter(pDataBlock, pObjectType, &mi->MSSQLBlockedProcesses))) {
