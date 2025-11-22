@@ -256,6 +256,38 @@ void do_mssql_memmgr_pending_memory_grants(struct mssql_instance *mi, int update
     rrdset_done(mi->st_pending_mem_grant);
 }
 
+void do_mssql_memmgr_memmgr_server_memory(struct mssql_instance *mi, int update_every)
+{
+    if (unlikely(!mi->st_mem_tot_server)) {
+        snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_memmgr_server_memory", mi->instanceID);
+        netdata_fix_chart_name(id);
+        mi->st_mem_tot_server = rrdset_create_localhost(
+                "mssql",
+                id,
+                NULL,
+                "memory",
+                "mssql.instance_memmgr_server_memory",
+                "Memory committed",
+                "bytes",
+                PLUGIN_WINDOWS_NAME,
+                "PerflibMSSQL",
+                PRIO_MSSQL_MEMMGR_TOTAL_SERVER,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+        mi->rd_mem_tot_server = rrddim_add(mi->st_mem_tot_server, "memory", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+        rrdlabels_add(mi->st_mem_tot_server->rrdlabels, "mssql_instance", mi->instanceID, RRDLABEL_SRC_AUTO);
+    }
+
+    rrddim_set_by_pointer(
+            mi->st_mem_tot_server,
+            mi->rd_mem_tot_server,
+            (collected_number)(mi->MSSQLTotalServerMemory.current.Data * 1024));
+
+    rrdset_done(mi->st_mem_tot_server);
+}
+
 void do_mssql_memory_mgr(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *mi, int update_every)
 {
     char id[RRD_ID_LENGTH_MAX + 1];
@@ -276,34 +308,7 @@ void do_mssql_memory_mgr(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *mi,
     }
 
     if (likely(perflibGetObjectCounter(pDataBlock, pObjectType, &mi->MSSQLTotalServerMemory))) {
-        if (unlikely(!mi->st_mem_tot_server)) {
-            snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_memmgr_server_memory", mi->instanceID);
-            netdata_fix_chart_name(id);
-            mi->st_mem_tot_server = rrdset_create_localhost(
-                    "mssql",
-                    id,
-                    NULL,
-                    "memory",
-                    "mssql.instance_memmgr_server_memory",
-                    "Memory committed",
-                    "bytes",
-                    PLUGIN_WINDOWS_NAME,
-                    "PerflibMSSQL",
-                    PRIO_MSSQL_MEMMGR_TOTAL_SERVER,
-                    update_every,
-                    RRDSET_TYPE_LINE);
-
-            mi->rd_mem_tot_server = rrddim_add(mi->st_mem_tot_server, "memory", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-
-            rrdlabels_add(mi->st_mem_tot_server->rrdlabels, "mssql_instance", mi->instanceID, RRDLABEL_SRC_AUTO);
-        }
-
-        rrddim_set_by_pointer(
-                mi->st_mem_tot_server,
-                mi->rd_mem_tot_server,
-                (collected_number)(mi->MSSQLTotalServerMemory.current.Data * 1024));
-
-        rrdset_done(mi->st_mem_tot_server);
+        do_mssql_memmgr_memmgr_server_memory(mi, update_every);
     }
 }
 
