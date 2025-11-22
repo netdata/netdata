@@ -2,6 +2,7 @@ name: Update MCP Registry
 on:
   release:
     types: [released]
+  workflow_dispatch:
 
 concurrency:
   group: update-mcp-registry-${{ github.ref }}-${{ github.event_name }}
@@ -16,6 +17,14 @@ jobs:
     name: Publish to MCP Registry
     runs-on: ubuntu-latest
     steps:
+      - name: Abort if manual run is not on a v* tag
+        if: >
+          github.event_name == 'workflow_dispatch' &&
+          !startsWith(github.ref, 'refs/tags/v')
+        run: |
+          echo "❌ This workflow can only be run manually on a tag starting with 'v'."
+          echo "Ref: ${{ github.ref }}"
+          exit 1
       - name: Checkout
         id: checkout
         uses: actions/checkout@v5
