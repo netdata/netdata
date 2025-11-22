@@ -2,6 +2,7 @@ name: Update MCP Registry
 on:
   release:
     types: [released]
+  workflow_dispatch:
 
 concurrency:
   group: update-mcp-registry-${{ github.ref }}-${{ github.event_name }}
@@ -16,6 +17,14 @@ jobs:
     name: Publish to MCP Registry
     runs-on: ubuntu-latest
     steps:
+      - name: Abort if manual run is not on a v* tag
+        if: >
+          github.event_name == 'workflow_dispatch' &&
+          !startsWith(github.ref, 'refs/tags/v')
+        run: |
+          echo "❌ This workflow can only be run manually on a tag starting with 'v'."
+          echo "Ref: ${{ github.ref }}"
+          exit 1
       - name: Checkout
         id: checkout
         uses: actions/checkout@v6
@@ -38,6 +47,11 @@ jobs:
           curl -fsSL "$URL" | tar xz
           sudo mv mcp-publisher /usr/local/bin/
           mcp-publisher --version
+
+      - name: Authenticate mcp-publisher
+        id: mcp_auth
+        run: |
+          mcp-publisher login github-oidc
 
       - name: Validate server.json (dry run)
         id: validate
@@ -65,6 +79,7 @@ jobs:
             Checkout: ${{ steps.checkout.outcome }}
             Update version: ${{ steps.update_version.outcome }}
             Install mcp-publisher: ${{ steps.install_publisher.outcome }}
+            MCP Auth: ${{ steps.mcp_auth.outcome }}
             Validate: ${{ steps.validate.outcome }}
             Publish: ${{ steps.publish.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
