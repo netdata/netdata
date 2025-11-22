@@ -192,6 +192,37 @@ void do_mssql_memmgr_connection_memory_bytes(struct mssql_instance *mi, int upda
     rrdset_done(mi->st_conn_memory);
 }
 
+void do_mssql_memmgr_external_benefit_of_memory(struct mssql_instance *mi, int update_every)
+{
+    if (unlikely(!mi->st_ext_benefit_mem)) {
+        snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_memmgr_external_benefit_of_memory", mi->instanceID);
+        netdata_fix_chart_name(id);
+        mi->st_ext_benefit_mem = rrdset_create_localhost(
+                "mssql",
+                id,
+                NULL,
+                "memory",
+                "mssql.instance_memmgr_external_benefit_of_memory",
+                "Performance benefit from adding memory to a specific cache",
+                "bytes",
+                PLUGIN_WINDOWS_NAME,
+                "PerflibMSSQL",
+                PRIO_MSSQL_MEMMGR_EXTERNAL_BENEFIT_OF_MEMORY,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+        mi->rd_ext_benefit_mem = rrddim_add(mi->st_ext_benefit_mem, "benefit", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+        rrdlabels_add(mi->st_ext_benefit_mem->rrdlabels, "mssql_instance", mi->instanceID, RRDLABEL_SRC_AUTO);
+    }
+
+    rrddim_set_by_pointer(
+            mi->st_ext_benefit_mem,
+            mi->rd_ext_benefit_mem,
+            (collected_number)mi->MSSQLExternalBenefitOfMemory.current.Data);
+    rrdset_done(mi->st_ext_benefit_mem);
+}
+
 void do_mssql_memory_mgr(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *mi, int update_every)
 {
     char id[RRD_ID_LENGTH_MAX + 1];
@@ -204,33 +235,7 @@ void do_mssql_memory_mgr(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *mi,
         do_mssql_memmgr_connection_memory_bytes(mi, update_every);
 
     if (likely(perflibGetObjectCounter(pDataBlock, pObjectType, &mi->MSSQLExternalBenefitOfMemory))) {
-        if (unlikely(!mi->st_ext_benefit_mem)) {
-            snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_memmgr_external_benefit_of_memory", mi->instanceID);
-            netdata_fix_chart_name(id);
-            mi->st_ext_benefit_mem = rrdset_create_localhost(
-                    "mssql",
-                    id,
-                    NULL,
-                    "memory",
-                    "mssql.instance_memmgr_external_benefit_of_memory",
-                    "Performance benefit from adding memory to a specific cache",
-                    "bytes",
-                    PLUGIN_WINDOWS_NAME,
-                    "PerflibMSSQL",
-                    PRIO_MSSQL_MEMMGR_EXTERNAL_BENEFIT_OF_MEMORY,
-                    update_every,
-                    RRDSET_TYPE_LINE);
-
-            mi->rd_ext_benefit_mem = rrddim_add(mi->st_ext_benefit_mem, "benefit", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
-
-            rrdlabels_add(mi->st_ext_benefit_mem->rrdlabels, "mssql_instance", mi->instanceID, RRDLABEL_SRC_AUTO);
-        }
-
-        rrddim_set_by_pointer(
-                mi->st_ext_benefit_mem,
-                mi->rd_ext_benefit_mem,
-                (collected_number)mi->MSSQLExternalBenefitOfMemory.current.Data);
-        rrdset_done(mi->st_ext_benefit_mem);
+        do_mssql_memmgr_external_benefit_of_memory(mi, update_every);
     }
 
     if (likely(perflibGetObjectCounter(pDataBlock, pObjectType, &mi->MSSQLPendingMemoryGrants))) {
