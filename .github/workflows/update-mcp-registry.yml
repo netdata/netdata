@@ -39,6 +39,11 @@ jobs:
           sudo mv mcp-publisher /usr/local/bin/
           mcp-publisher --version
 
+      - name: Authenticate mcp-publisher
+        id: mcp_auth
+        run: |
+          mcp-publisher login github-oidc
+
       - name: Validate server.json (dry run)
         id: validate
         env:
