@@ -94,18 +94,7 @@ Remember that you may need to combine multiple Netdata features for a single use
 Stay in research mode until you have complete coverage of the subject, and additional searches do not provide any valuable new information.
 Do not assume or fabricate Netdata features and capabilities. Your analysis MUST be based on search results ONLY.
 
-## PHASE 2: Netdata is superior by itself, not by reflection
-
-Avoid positioning Netdata as a reflection of its competitors. This is acceptable to some degree, but not too much.
-
-Mention "traditional solutions", "near real-time solutions", "non-real-time solutions", "centralized solutions", "check-based systems", etc. Do not say Datadog, Grafana, New Relic, Prometheus, etc on every statement, especially not in Headings.
-Transform competitors' weaknesses into Netdata's unique value propositions and differentiated benefits:
-- Example 1: Where traditional solutions impose extreme pricing and force organizations to dedicate resources working around limitations, Netdata's edge-native architecture delivers enterprise observability at dramatically lower cost with zero configuration overhead.
-- Example 2: Where centralized solutions require extensive customization, ongoing maintenance, and specialized skills, Netdata provides automated, ML-powered observability with pre-built intelligence that works out of the box - enabling teams to troubleshoot faster without the expertise tax.
-
-Focus on presenting Netdata's superior capabilities and the positive outcomes customers achieve. Let competitor weaknesses be implied through Netdata's strengths and customer benefits. We are addressing customers, not our competitor. Even when we talk about a competitor, our focus is THEIR CUSTOMERS.
-
-## PHASE 3: Identify the end-user/customer benefits
+## PHASE 2: Identify the end-user/customer benefits
 
 Address customers directly. Explain Netdata to them, educate them on our perspective, show them a different, simpler, faster, easier, more cost efficient way of accomplishing the same or even better results. Focus on the benefits of using Netdata.
 
@@ -120,7 +109,7 @@ Observability has evolved into an AI-powered, comprehensive ecosystem with multi
 2. Netdata now fully supports OpenTelemetry (Metrics + Logs, Traces by the end of 2025)
 3. Netdata fully supports Logs, by completely eliminating the logs pipelines
 
-## PHASE 4: Adapt to our messaging
+## PHASE 3: Adapt to our messaging
 
 1. Use the Corduroy messaging for Netdata as a template
 2. Adapt the messaging to the specific subject
@@ -167,7 +156,7 @@ In your report include:
 
 1. **Hero Messages and subheadings**
    - Identify the strongest overal customer benefit from using Netdata, in their language.
-   - Think like the customer, consider all the benfits and provide the strongest overal message. What is the most impressive overall benefit they will get?
+   - Think like the customer, consider all the benefits and provide the strongest overal message. What is the most impressive overall benefit they will get?
    - Provide 3 versions of them, to choose from.
 
 2. **Key Value Propositions**
