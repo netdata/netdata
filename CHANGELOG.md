@@ -9,6 +9,13 @@
 - Fix compilation when DBENGINE is disabled ([#21323](https://github.com/netdata/netdata/issues/21323))
 - Disable apps plugin pss mem by default ([#21330](https://github.com/netdata/netdata/issues/21330))
 - Fix(go.d): fix dyncfg vnodes configs ([#21332](https://github.com/netdata/netdata/issues/21332))
+- Build(deps): bump github.com/ibm-messaging/mq-golang/v5 from 5.6.6 to 5.6.7 in /src/go ([#21339](https://github.com/netdata/netdata/issues/21339))
+- Build(deps): bump github.com/godbus/dbus/v5 from 5.1.0 to 5.2.0 in /src/go ([#21337](https://github.com/netdata/netdata/issues/21337))
+- Build(deps): bump k8s.io/client-go from 0.34.1 to 0.34.2 in /src/go ([#21338](https://github.com/netdata/netdata/issues/21338))
+- Build(deps): bump github.com/prometheus/common from 0.67.2 to 0.67.4 in /src/go ([#21340](https://github.com/netdata/netdata/issues/21340))
+- Build(deps): bump actions/checkout from 5 to 6 ([#21335](https://github.com/netdata/netdata/issues/21335))
+- Build(deps): bump github.com/redis/go-redis/v9 from 9.16.0 to 9.17.0 in /src/go ([#21341](https://github.com/netdata/netdata/issues/21341))
+- Ci: fix MCP Registry publishing workflow ([#21342](https://github.com/netdata/netdata/issues/21342))
 
 ## [2.8.0] - 2025-11-19
 
