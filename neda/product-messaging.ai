@@ -191,6 +191,14 @@ In your report include:
 5. **FAQ**
    Provide 10-15 FAQ items
 
+6. **Objective Analysis** for internal use
+   An objective analysis about Netdata and the specific use case. This is to used internally.
+
+   - **Netdata's Strong Points**
+     Describe the strong points of Netdata for this use-case.
+   - **Netdata's Weak Points and Limitations**
+     Describe what Netdata misses for excelling in this use-case.
+
 ## Mandatory Rules
 
 **Brand Voice**: Netdata's voice is technical yet approachable, empowering, solution-oriented, and confident without being intimidating.
@@ -200,16 +208,16 @@ Find strong messaging that addresses the key pain-points of the industry/segment
 **You MUST:**
 1. Focus on end-users benefits, from using Netdata for monitoring their infrastructure. Support these benefits by mentioning their needs and pain points, when appropriate.
 2. Align with the messaging defined by Corduroy for Netdata, adapted to the specific use case / segment / industry / customer.
-3. Position Netdata as an innovative solution, unlike all others (edge based, distributed, automated, self-managed, easy, simple, holistic, high-fidelity, ML across the board, AI powered troubleshooting and reporting, true real-time, true watchdog, console replacement, operations-first, advanced analytics, extreme cost efficiency by design, extreme scalability, ideal for lean teams) - these must be derived. We don't speak about us, we speak for the customers.
+3. Position Netdata as an innovative solution, unlike all others (edge based, distributed, automated, self-managed, easy, simple, holistic, high-fidelity, ML across the board, AI powered troubleshooting and reporting, true real-time, true watchdog, console replacement, operations-first, advanced analytics, extreme cost efficiency by design, extreme scalability, ideal for lean teams) - these must be based on actual facts - do not fabricate features.
 4. Follow the 'Mandatory Netdata Facts and Conceptual Guidance'
 5. Include clear instructions on how to use the messaging.
 
 **You MUST NOT:**
-1. Do NOT position Netdata just as a cheaper alternative. Netdata is the best alternative and cost optimization is one of its core values.
-2. Do NOT produce a wall of text - this is not a blog.
+1. Do NOT position Netdata just as a cheaper alternative - cost optimization is one of its core values.
+2. Do NOT produce a wall of text - this is not a blog or documentation.
 3. Do NOT fabricate Netdata's features - if a crucial feature is missing, mention it.
 4. Do NOT give false promises:
-  - alert fatigue exists - it cannot be completely eliminated - our ML helps but does not entirely solve
+  - alert fatigue exists - it cannot be completely eliminated - our ML helps but does not entirely solve it
   - zero configuration = we have automated every configuration that can be automated, but there are still some configurations that require human action (e.g. password to access protected endpoints - db, message brokers, etc)
 5. NEVER lose focus on ICP: we target specific size of enterprises - do not give wrong examples.
 6. NEVER ignore 'Mandatory Netdata Facts and Conceptual Guidance'

@@ -1126,7 +1126,12 @@ export class AIAgentSession {
           return { providers: prov, mcpServers: srvs, billingFile: this.config.persistence?.billingFile ?? this.config.accounting?.file };
         };
         const summarizeSession = () => ({
-          targets: this.sessionConfig.targets,
+          targets: this.targetContextConfigs.map((t) => ({
+            provider: t.provider,
+            model: t.model,
+            contextWindow: t.contextWindow,
+            bufferTokens: t.bufferTokens,
+          })),
           tools: this.sessionConfig.tools,
           expectedOutput: this.sessionConfig.expectedOutput?.format,
           temperature: this.sessionConfig.temperature,
@@ -1990,45 +1995,7 @@ export class AIAgentSession {
           const formatParamRaw = (params as { report_format?: unknown }).report_format;
           const formatParam = typeof formatParamRaw === 'string' && formatParamRaw.trim().length > 0 ? formatParamRaw.trim() : undefined;
           const contentValue = (params as { report_content?: unknown }).report_content;
-          const contentParamRaw = typeof contentValue === 'string' && contentValue.trim().length > 0 ? contentValue.trim() : undefined;
-          const encodingValue = (params as { encoding?: unknown }).encoding;
-          const encoding = encodingValue === 'base64' ? 'base64' : 'raw';
-          const encodingLabel = typeof encodingValue === 'string' ? encodingValue : (encodingValue === undefined ? 'undefined' : 'non-string');
-          if (encodingValue !== undefined && encodingValue !== 'raw' && encodingValue !== 'base64') {
-            const warnEntry: LogEntry = {
-              timestamp: Date.now(),
-              severity: 'WRN',
-              turn: currentTurn,
-              subturn: 0,
-              direction: 'response',
-              type: 'llm',
-              remoteIdentifier: AIAgentSession.REMOTE_SANITIZER,
-              fatal: false,
-              message: `agent__final_report encoding '${encodingLabel}' is invalid; defaulting to 'raw'.`,
-            };
-            this.log(warnEntry);
-          }
-          let contentParam = contentParamRaw;
-          if (encoding === 'base64' && contentParamRaw !== undefined) {
-            try {
-              contentParam = Buffer.from(contentParamRaw, 'base64').toString('utf8');
-            } catch (error) {
-              const errMsg = error instanceof Error ? error.message : String(error);
-              const warnEntry: LogEntry = {
-                timestamp: Date.now(),
-                severity: 'ERR',
-                turn: currentTurn,
-                subturn: 0,
-                direction: 'response',
-                type: 'llm',
-                remoteIdentifier: AIAgentSession.REMOTE_SANITIZER,
-                fatal: false,
-                message: `agent__final_report base64 decode failed: ${errMsg}`,
-              };
-              this.log(warnEntry);
-              return false;
-            }
-          }
+          const contentParam = typeof contentValue === 'string' && contentValue.trim().length > 0 ? contentValue.trim() : undefined;
           if (status === undefined || contentParam === undefined) return false;
           const metadataCandidate = (params as { metadata?: unknown }).metadata;
           const metadata = (metadataCandidate !== null && typeof metadataCandidate === 'object' && !Array.isArray(metadataCandidate)) ? metadataCandidate as Record<string, unknown> : undefined;

@@ -35,7 +35,7 @@ export type ScenarioStepResponse =
   | {
       kind: 'text';
       assistantText: string;
-      finishReason?: 'stop' | 'other';
+      finishReason?: 'stop' | 'other' | 'content-filter' | 'refusal';
       tokenUsage?: TokenUsage;
       reasoning?: ReasoningOutput[];
       reasoningContent?: string | ReasoningOutput | ReasoningOutput[];
@@ -4349,6 +4349,25 @@ const SCENARIOS: ScenarioDefinition[] = [
             inputTokens: 88,
             outputTokens: 28,
             totalTokens: 116,
+          },
+        },
+      },
+    ],
+  },
+  {
+    id: 'run-test-refusal',
+    description: 'Provider refuses output with content-filter stop reason; should be treated as failure.',
+    turns: [
+      {
+        turn: 1,
+        response: {
+          kind: 'text',
+          assistantText: '',
+          finishReason: 'content-filter',
+          tokenUsage: {
+            inputTokens: 64,
+            outputTokens: 0,
+            totalTokens: 64,
           },
         },
       },

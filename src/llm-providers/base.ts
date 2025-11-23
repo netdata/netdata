@@ -50,6 +50,7 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
   private readonly stringFormatPolicy: FormatPolicyNormalized;
   private pendingMetadata?: ProviderTurnMetadata;
   private static readonly STOP_REASON_KEYS = ['stopReason', 'stop_reason', 'finishReason', 'finish_reason'] as const;
+  private static readonly REFUSAL_STOP_REASONS = new Set(['refusal', 'content-filter']);
   private static readonly REASONING_LEVELS: ReasoningLevel[] = ['minimal', 'low', 'medium', 'high'];
   private readonly reasoningDefaults?: Partial<Record<ReasoningLevel, ProviderReasoningValue>>;
   private readonly reasoningLimits?: { min: number; max: number };
@@ -1026,6 +1027,12 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
     return helper(value);
   }
 
+  protected isRefusalStopReason(stopReason: string | undefined): stopReason is string {
+    if (typeof stopReason !== 'string') return false;
+    const normalized = stopReason.trim().toLowerCase();
+    return BaseLLMProvider.REFUSAL_STOP_REASONS.has(normalized);
+  }
+
   protected extractToolCalls(messages: ConversationMessage[]) {
     return messages
       .filter(m => m.role === 'assistant' && m.toolCalls !== undefined)
@@ -1471,6 +1478,17 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
 
       const metadata = this.extractTurnMetadata(request, { usage, response: resp, latencyMs });
 
+      if (this.isRefusalStopReason(stopReason)) {
+        return {
+          status: { type: 'invalid_response', message: `refusal:${stopReason}` },
+          stopReason,
+          tokens,
+          latencyMs,
+          messages: [],
+          providerMetadata: metadata,
+        } satisfies TurnResult;
+      }
+
       return this.createSuccessResult(
         conversationMessages,
         tokens,
@@ -1764,6 +1782,17 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
       }
 
       const metadata = this.extractTurnMetadata(request, { usage: result.usage, response: respObj, latencyMs });
+
+      if (this.isRefusalStopReason(stopReason)) {
+        return {
+          status: { type: 'invalid_response', message: `refusal:${stopReason}` },
+          stopReason,
+          tokens,
+          latencyMs,
+          messages: [],
+          providerMetadata: metadata,
+        } satisfies TurnResult;
+      }
 
       return this.createSuccessResult(
         conversationMessages,

@@ -5,6 +5,7 @@
       "apiKey": "sk-litellm-master-key",
       "baseUrl": "http://nova:8090/v1",
       "openaiMode": "chat",
+      "contextWindow": 262144,
       "stringSchemaFormatsAllowed": [
         "*"
       ],

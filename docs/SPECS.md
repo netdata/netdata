@@ -24,6 +24,7 @@ Our conversation schemas, reasoning payloads, tool definitions, and streaming ex
 - Tool calls are preserved as assistant messages with `tool_calls` (id, name, arguments). Tool results are preserved as `tool` role messages with `tool_call_id`.
 - The next turn always includes all prior assistant/user/tool messages in order, giving the LLM full transparency into requests and responses.
 - A maximum tool-turns cap (`defaults.maxToolTurns`) is enforced. On the final allowed turn, tools are disabled and a single user message is appended instructing the LLM to conclude using existing tool results (see Hardcoded Strings). This guarantees a final answer without an error.
+- Stop-reason handling: if the upstream stop reason is exactly `refusal` or `content-filter`, the turn is treated as a hard failure (`invalid_response`); the truncated response is discarded, and the retry/fallback flow takes over.
 
 ## Hardcoded Strings (LLM-facing)
 

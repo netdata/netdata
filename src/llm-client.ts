@@ -578,7 +578,8 @@ export class LLMClient {
         details.context_pct = metrics.expectedPct;
       }
       const percentText = metrics.expectedPct !== undefined ? `${String(metrics.expectedPct)}%` : 'n/a';
-      message = `${baseMessage} [tokens: ctx ${String(metrics.ctxTokens)}, new ${String(metrics.newTokens)}, schema ${String(metrics.schemaTokens)}, expected ${String(metrics.expectedTokens)}, ${percentText}]`;
+      const windowText = metrics.contextWindow !== undefined ? ` of ${String(metrics.contextWindow)}` : '';
+      message = `${baseMessage} [tokens: ctx ${String(metrics.ctxTokens)}, new ${String(metrics.newTokens)}, schema ${String(metrics.schemaTokens)}, expected ${String(metrics.expectedTokens)}, ${percentText}${windowText}]`;
     }
     this.log('VRB', 'request', 'llm', `${request.provider}:${request.model}`, message, {
       details,

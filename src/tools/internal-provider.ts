@@ -259,7 +259,6 @@ export class InternalToolProvider extends ToolProvider {
     lines.push('- To add newlines in JSON string fields, use the `\\n` escape sequence within the string value.');
     lines.push('- When your final report includes newlines, you MUST use the `\\n` escape sequence within the string value for every newline you want to add, instead of raw newline characters.');
     lines.push(`- Do not include raw newline characters in JSON string values (json becomes invalid); use '\\n' instead.`);
-    lines.push('- If escaping becomes hard (e.g., heavy markdown), set `encoding="base64"` on `agent__final_report` and base64-encode `report_content`; otherwise use `encoding="raw"`.');
 
     if (this.opts.enableBatch) {
       lines.push('');
@@ -420,16 +419,11 @@ export class InternalToolProvider extends ToolProvider {
       inputSchema: {
         type: 'object',
         additionalProperties: false,
-        required: ['status', 'report_format', 'report_content', 'encoding'],
+        required: ['status', 'report_format', 'report_content'],
         properties: {
           status: statusProp,
           report_format: { type: 'string', const: this.formatId, description: this.formatDescription },
-          encoding: {
-            type: 'string',
-            enum: ['raw', 'base64'],
-            description: 'Encoding of report_content. Use base64 when content includes markdown/newlines; otherwise use raw.'
-          },
-          report_content: { type: 'string', minLength: 1, description: 'MANDATORY: the content of your final report. If encoding=base64, this must be base64-encoded UTF-8.' },
+          report_content: { type: 'string', minLength: 1, description: 'MANDATORY: the content of your final report.' },
           metadata: metadataProp,
         },
       },
@@ -452,24 +446,10 @@ export class InternalToolProvider extends ToolProvider {
       if (requestedFormat !== undefined && requestedFormat !== this.formatId) {
         this.opts.logError(`agent__final_report: received report_format='${requestedFormat}', expected '${this.formatId}'. Proceeding with expected format.`);
       }
-      const encodingRaw = typeof parameters.encoding === 'string' ? parameters.encoding : undefined;
-      const encoding = encodingRaw === 'base64' ? 'base64' : 'raw';
-      if (encodingRaw !== undefined && encodingRaw !== 'raw' && encodingRaw !== 'base64') {
-        this.opts.logError(`agent__final_report: invalid encoding '${encodingRaw}', defaulting to 'raw'.`);
-      }
       let content = typeof parameters.report_content === 'string' ? parameters.report_content : (typeof parameters.content === 'string' ? parameters.content : undefined);
-      if (encoding === 'base64' && typeof content === 'string') {
-        try {
-          content = Buffer.from(content, 'base64').toString('utf8');
-        } catch (error) {
-          const errMsg = error instanceof Error ? error.message : String(error);
-          this.opts.logError(`agent__final_report: base64 decode failed: ${errMsg}`);
-          throw new Error(`agent__final_report: base64 decode failed: ${errMsg}`);
-        }
-      }
       let contentJson = (parameters.content_json !== null && typeof parameters.content_json === 'object' && !Array.isArray(parameters.content_json)) ? (parameters.content_json as Record<string, unknown>) : undefined;
       const metadata = (parameters.metadata !== null && typeof parameters.metadata === 'object' && !Array.isArray(parameters.metadata)) ? (parameters.metadata as Record<string, unknown>) : undefined;
-      const rawMessages = Object.prototype.hasOwnProperty.call(parameters, 'messages') ? parameters.messages : undefined;
+      const rawMessages: unknown = Object.prototype.hasOwnProperty.call(parameters, 'messages') ? parameters.messages : undefined;
 
       if (this.formatId === SLACK_BLOCK_KIT_FORMAT) {
         const asString = (value: unknown): string | undefined => {
@@ -497,7 +477,7 @@ export class InternalToolProvider extends ToolProvider {
         const expandMessages = (candidate: unknown): Record<string, unknown>[] => {
           if (candidate === undefined || candidate === null) return [];
           const str = asString(candidate);
-          const parsed = str !== undefined ? safeParseJson(str) : candidate;
+      const parsed = str !== undefined ? safeParseJson(str) : candidate;
           if (typeof parsed === 'string') {
             const text = asString(parsed);
             return text !== undefined ? [ { blocks: [ { type: 'section', text: { type: 'mrkdwn', text } } ] } ] : [];
@@ -688,7 +668,7 @@ export class InternalToolProvider extends ToolProvider {
         const slackVal = (metaBase as Record<string, unknown> & { slack?: unknown }).slack;
         const slackExisting: Record<string, unknown> = (slackVal !== undefined && slackVal !== null && typeof slackVal === 'object' && !Array.isArray(slackVal)) ? (slackVal as Record<string, unknown>) : {};
         const metaSlack: Record<string, unknown> = { ...slackExisting, messages: normalizedMessages };
-        const mergedMeta: Record<string, unknown> = { ...metaBase, encoding, slack: metaSlack };
+        const mergedMeta: Record<string, unknown> = { ...metaBase, slack: metaSlack };
         this.opts.setFinalReport({ status, format: this.formatId, content, content_json: contentJson, metadata: mergedMeta });
         return { ok: true, result: JSON.stringify({ ok: true }), latencyMs: Date.now() - start, kind: this.kind, namespace: this.namespace };
       }
@@ -772,7 +752,7 @@ export class InternalToolProvider extends ToolProvider {
           }
           contentJson = target;
         }
-        const mergedMeta = { ...metadata, encoding };
+        const mergedMeta = { ...metadata };
         this.opts.setFinalReport({ status, format: this.formatId, content, content_json: contentJson, metadata: mergedMeta });
         return { ok: true, result: JSON.stringify({ ok: true }), latencyMs: Date.now() - start, kind: this.kind, namespace: this.namespace };
       }
@@ -781,7 +761,7 @@ export class InternalToolProvider extends ToolProvider {
         this.opts.logError('agent__final_report requires non-empty report_content field.');
         throw new Error('agent__final_report requires non-empty report_content field.');
       }
-      const mergedMeta = { ...metadata, encoding };
+      const mergedMeta = { ...metadata };
       this.opts.setFinalReport({ status, format: this.formatId, content, content_json: contentJson, metadata: mergedMeta });
       return { ok: true, result: JSON.stringify({ ok: true }), latencyMs: Date.now() - start, kind: this.kind, namespace: this.namespace };
     }

@@ -35,7 +35,7 @@ describe('json repair pipeline', () => {
     expect(result.repairs).toContain('jsonrepair');
   });
 
-  it('decodes base64 final_report content', async () => {
+  it('accepts raw final_report content', async () => {
     const captured: unknown[] = [];
     const provider = new InternalToolProvider('agent', {
       ...baseOpts,
@@ -46,13 +46,11 @@ describe('json repair pipeline', () => {
     });
 
     const content = 'hello\nworld';
-    const encoded = Buffer.from(content, 'utf8').toString('base64');
 
     const res = await provider.execute('agent__final_report', {
       status: 'success',
       report_format: 'text',
-      report_content: encoded,
-      encoding: 'base64',
+      report_content: content,
     });
 
     expect(res.ok).toBe(true);
