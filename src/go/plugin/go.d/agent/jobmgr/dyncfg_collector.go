@@ -214,19 +214,6 @@ func (m *Manager) dyncfgConfigTest(fn functions.Function) {
 		m.dyncfgApi.SendCodef(fn, 404, "The specified module '%s' is not registered.", mn)
 		return
 	}
-
-	if err := m.wrapJobPayloadIfNeeded(mn, jn, &fn); err != nil {
-		m.Warningf("dyncfg: %s: module %s job %s: failed to prepare payload: %v", cmd, mn, jn, err)
-		m.dyncfgApi.SendCodef(fn, 400, "Invalid configuration payload: %v.", err)
-		return
-	}
-
-	if err := m.wrapJobPayloadIfNeeded(mn, jn, &fn); err != nil {
-		m.Warningf("dyncfg: %s: module %s job %s: failed to prepare payload: %v", cmd, mn, jn, err)
-		m.dyncfgApi.SendCodef(fn, 400, "Invalid configuration payload: %v.", err)
-		return
-	}
-
 	cfg, err := configFromPayload(fn)
 	if err != nil {
 		m.Warningf("dyncfg: %s: module %s: failed to create config from payload: %v", cmd, mn, err)
@@ -568,12 +555,6 @@ func (m *Manager) dyncfgConfigAdd(fn functions.Function) {
 		return
 	}
 
-	if err := m.wrapJobPayloadIfNeeded(mn, jn, &fn); err != nil {
-		m.Warningf("dyncfg: %s: module %s job %s: failed to prepare payload: %v", cmd, mn, jn, err)
-		m.dyncfgApi.SendCodef(fn, 400, "Invalid configuration payload: %v.", err)
-		return
-	}
-
 	cfg, err := configFromPayload(fn)
 	if err != nil {
 		m.Warningf("dyncfg: %s: module %s job %s: failed to create config from payload: %v", cmd, mn, jn, err)
@@ -607,7 +588,6 @@ func (m *Manager) dyncfgConfigAdd(fn functions.Function) {
 
 	m.dyncfgApi.SendCodef(fn, 202, "")
 	m.dyncfgCollectorJobCreate(ecfg.cfg, ecfg.status)
-	m.requestCollectorReload(mn)
 }
 
 func (m *Manager) dyncfgConfigRemove(fn functions.Function) {
@@ -644,7 +624,6 @@ func (m *Manager) dyncfgConfigRemove(fn functions.Function) {
 
 	m.dyncfgApi.SendCodef(fn, 200, "")
 	m.dyncfgJobRemove(ecfg.cfg)
-	m.requestCollectorReload(mn)
 }
 
 func (m *Manager) dyncfgConfigUpdate(fn functions.Function) {
@@ -717,7 +696,6 @@ func (m *Manager) dyncfgConfigUpdate(fn functions.Function) {
 
 		m.dyncfgApi.SendCodef(fn, 200, "")
 		m.dyncfgJobStatus(cfg, scfg.status)
-		m.requestCollectorReload(mn)
 		return
 	}
 
@@ -738,7 +716,6 @@ func (m *Manager) dyncfgConfigUpdate(fn functions.Function) {
 
 	m.dyncfgApi.SendCodef(fn, 200, "")
 	m.dyncfgJobStatus(scfg.cfg, scfg.status)
-	m.requestCollectorReload(mn)
 }
 
 func (m *Manager) dyncfgSetConfigMeta(cfg confgroup.Config, module, name string, fn functions.Function) {
@@ -775,12 +752,6 @@ func userConfigFromPayload(cfg any, jobName string, fn functions.Function) ([]by
 		return nil, err
 	}
 
-	if jobBytes, ok, err := extractJobYAML(bs, jobName); err != nil {
-		return nil, err
-	} else if ok {
-		return jobBytes, nil
-	}
-
 	var yms yaml.MapSlice
 	if err := yaml.Unmarshal(bs, &yms); err != nil {
 		return nil, err
@@ -795,121 +766,6 @@ func userConfigFromPayload(cfg any, jobName string, fn functions.Function) ([]by
 	}
 
 	return yaml.Marshal(v)
-}
-
-func extractJobYAML(doc []byte, jobName string) ([]byte, bool, error) {
-	var wrapper struct {
-		Jobs []map[string]any `yaml:"jobs"`
-	}
-	if err := yaml.Unmarshal(doc, &wrapper); err != nil {
-		return nil, false, err
-	}
-	if len(wrapper.Jobs) == 0 {
-		return nil, false, nil
-	}
-	target := strings.TrimSpace(jobName)
-	for _, job := range wrapper.Jobs {
-		if _, legacy := job["jobs"]; legacy {
-			return nil, false, fmt.Errorf("legacy scripts.d shard-style job definitions are no longer supported; please flatten your config")
-		}
-		name := strings.TrimSpace(fmt.Sprint(job["name"]))
-		if name == "" {
-			continue
-		}
-		if target != "" && target != name {
-			continue
-		}
-		job["name"] = name
-		bs, err := yaml.Marshal(job)
-		return bs, true, err
-	}
-	return nil, false, nil
-}
-
-func normalizeMap(v any) (map[string]any, bool) {
-	switch typed := v.(type) {
-	case map[string]any:
-		return typed, true
-	case map[interface{}]interface{}:
-		res := make(map[string]any, len(typed))
-		for k, val := range typed {
-			key, ok := k.(string)
-			if !ok {
-				continue
-			}
-			res[key] = normalizeValue(val)
-		}
-		return res, true
-	default:
-		return nil, false
-	}
-}
-
-func normalizeValue(v any) any {
-	switch val := v.(type) {
-	case map[string]any:
-		clean := make(map[string]any, len(val))
-		for k, v := range val {
-			clean[k] = normalizeValue(v)
-		}
-		return clean
-	case map[interface{}]interface{}:
-		clean := make(map[string]any, len(val))
-		for k, v := range val {
-			key, ok := k.(string)
-			if !ok {
-				continue
-			}
-			clean[key] = normalizeValue(v)
-		}
-		return clean
-	case []interface{}:
-		for i := range val {
-			val[i] = normalizeValue(val[i])
-		}
-		return val
-	default:
-		return val
-	}
-}
-
-func (m *Manager) wrapJobPayloadIfNeeded(module, jobName string, fn *functions.Function) error {
-	if !needsJobWrapper(module) || len(fn.Payload) == 0 {
-		return nil
-	}
-	var probe map[string]any
-	if err := yaml.Unmarshal(fn.Payload, &probe); err != nil {
-		return err
-	}
-	if _, ok := probe["jobs"]; ok {
-		return nil
-	}
-	job, ok := normalizeMap(probe)
-	if !ok {
-		return fmt.Errorf("payload is not a valid job definition")
-	}
-	if jobName != "" {
-		job["name"] = jobName
-	}
-	wrapped := map[string]any{
-		"jobs": []any{job},
-	}
-	bs, err := yaml.Marshal(wrapped)
-	if err != nil {
-		return err
-	}
-	fn.Payload = bs
-	fn.ContentType = "application/x-yaml"
-	return nil
-}
-
-func needsJobWrapper(module string) bool {
-	switch strings.ToLower(module) {
-	case "nagios", "zabbix":
-		return true
-	default:
-		return false
-	}
 }
 
 func configFromPayload(fn functions.Function) (confgroup.Config, error) {

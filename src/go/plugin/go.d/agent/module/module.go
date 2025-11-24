@@ -41,11 +41,6 @@ type Module interface {
 	VirtualNode() *vnodes.VirtualNode
 }
 
-// Reloadable marks modules that can hot-reload their configuration.
-type Reloadable interface {
-	RequestReload()
-}
-
 // Base is a helper struct. All modules should embed this struct.
 type Base struct {
 	*logger.Logger
