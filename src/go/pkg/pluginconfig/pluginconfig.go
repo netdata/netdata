@@ -130,11 +130,11 @@ func (d *directories) initUserRoots(opts *cli.Option, env envData, execDir strin
 		roots = append(roots, p)
 	}
 
-	// 2) NETDATA_USER_CONFIG_DIR
-	if buildinfo.UserConfigDir != "" {
-		roots = append(roots, safePathClean(buildinfo.UserConfigDir))
-	} else if dir := safePathClean(env.userDir); dir != "" {
+	// 2) NETDATA_USER_CONFIG_DIR (env has priority over buildinfo)
+	if dir := safePathClean(env.userDir); dir != "" {
 		roots = append(roots, dir)
+	} else if buildinfo.UserConfigDir != "" {
+		roots = append(roots, safePathClean(buildinfo.UserConfigDir))
 	}
 
 	if len(roots) != 0 {
@@ -164,12 +164,13 @@ func (d *directories) initUserRoots(opts *cli.Option, env envData, execDir strin
 
 // Build step 2: initialize single "stock" root: env, common locations, build-relative fallback.
 func (d *directories) initStockRoot(env envData, execDir string) {
-	if buildinfo.StockConfigDir != "" {
-		d.stockConfigDir = safePathClean(buildinfo.StockConfigDir)
-		return
-	}
+	// env.stockDir has priority
 	if stock := safePathClean(env.stockDir); stock != "" {
 		d.stockConfigDir = stock
+		return
+	}
+	if buildinfo.StockConfigDir != "" {
+		d.stockConfigDir = safePathClean(buildinfo.StockConfigDir)
 		return
 	}
 
