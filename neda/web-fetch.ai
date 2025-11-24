@@ -4,7 +4,7 @@ description: Targeted web fetcher that returns only the requested snippets
 usage: JSON payload with the url and what to extract
 toolName: web-fetch
 models:
-  - anthropic/claude-3-5-haiku-20241022
+#  - anthropic/claude-3-5-haiku-20241022
   - anthropic/claude-haiku-4-5
   - openai/gpt-5-mini
   - google/gemini-2.5-flash

@@ -172,6 +172,9 @@
     },
     "fetcher": {
       "concurrent": 4
+    },
+    "github": {
+      "concurrent": 2
     }
   },
   "restTools": {
@@ -407,6 +410,7 @@
     },
     "github": {
       "type": "stdio",
+      "queue": "github",
       "command": "npx",
       "args": [
         "-y",
