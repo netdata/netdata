@@ -16,6 +16,7 @@
 - Build(deps): bump actions/checkout from 5 to 6 ([#21335](https://github.com/netdata/netdata/issues/21335))
 - Build(deps): bump github.com/redis/go-redis/v9 from 9.16.0 to 9.17.0 in /src/go ([#21341](https://github.com/netdata/netdata/issues/21341))
 - Ci: fix MCP Registry publishing workflow ([#21342](https://github.com/netdata/netdata/issues/21342))
+- Add check for service shutdown while initializing health for a host ([#21329](https://github.com/netdata/netdata/issues/21329))
 
 ## [2.8.0] - 2025-11-19
 
