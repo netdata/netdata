@@ -2453,9 +2453,8 @@ static void do_mssql_replication(struct mssql_instance *mi, int update_every)
 
 static void mssql_database_backup_restore_chart(struct mssql_db_instance *mdi, const char *db, int update_every)
 {
-    char id[RRD_ID_LENGTH_MAX + 1];
-
     if (unlikely(!mdi->st_db_backup_restore_operations)) {
+        char id[RRD_ID_LENGTH_MAX + 1];
         snprintfz(id, RRD_ID_LENGTH_MAX, "db_%s_instance_%s_backup_restore_operations", db, mdi->parent->instanceID);
         netdata_fix_chart_name(id);
         mdi->st_db_backup_restore_operations = rrdset_create_localhost(
@@ -2493,9 +2492,8 @@ static void mssql_database_backup_restore_chart(struct mssql_db_instance *mdi, c
 
 static void mssql_database_log_flushes_chart(struct mssql_db_instance *mdi, const char *db, int update_every)
 {
-    char id[RRD_ID_LENGTH_MAX + 1];
-
     if (unlikely(!mdi->st_db_log_flushes)) {
+        char id[RRD_ID_LENGTH_MAX + 1];
         snprintfz(id, RRD_ID_LENGTH_MAX, "db_%s_instance_%s_log_flushes", db, mdi->parent->instanceID);
         netdata_fix_chart_name(id);
         mdi->st_db_log_flushes = rrdset_create_localhost(
@@ -2528,9 +2526,8 @@ static void mssql_database_log_flushes_chart(struct mssql_db_instance *mdi, cons
 
 static void mssql_database_log_flushed_chart(struct mssql_db_instance *mdi, const char *db, int update_every)
 {
-    char id[RRD_ID_LENGTH_MAX + 1];
-
     if (unlikely(!mdi->st_db_log_flushed)) {
+        char id[RRD_ID_LENGTH_MAX + 1];
         snprintfz(id, RRD_ID_LENGTH_MAX, "db_%s_instance_%s_log_flushed", db, mdi->parent->instanceID);
         netdata_fix_chart_name(id);
         mdi->st_db_log_flushed = rrdset_create_localhost(
@@ -2561,9 +2558,8 @@ static void mssql_database_log_flushed_chart(struct mssql_db_instance *mdi, cons
 
 static void mssql_transactions_chart(struct mssql_db_instance *mdi, const char *db, int update_every)
 {
-    char id[RRD_ID_LENGTH_MAX + 1];
-
     if (unlikely(!mdi->st_db_transactions)) {
+        char id[RRD_ID_LENGTH_MAX + 1];
         snprintfz(id, RRD_ID_LENGTH_MAX, "db_%s_instance_%s_transactions", db, mdi->parent->instanceID);
         netdata_fix_chart_name(id);
         mdi->st_db_transactions = rrdset_create_localhost(
@@ -2597,9 +2593,8 @@ static void mssql_transactions_chart(struct mssql_db_instance *mdi, const char *
 
 static void mssql_write_transactions_chart(struct mssql_db_instance *mdi, const char *db, int update_every)
 {
-    char id[RRD_ID_LENGTH_MAX + 1];
-
     if (unlikely(!mdi->st_db_write_transactions)) {
+        char id[RRD_ID_LENGTH_MAX + 1];
         snprintfz(id, RRD_ID_LENGTH_MAX, "db_%s_instance_%s_write_transactions", db, mdi->parent->instanceID);
         netdata_fix_chart_name(id);
         mdi->st_db_write_transactions = rrdset_create_localhost(
@@ -2634,9 +2629,8 @@ static void mssql_write_transactions_chart(struct mssql_db_instance *mdi, const 
 
 static void mssql_lockwait_chart(struct mssql_db_instance *mdi, const char *db, int update_every)
 {
-    char id[RRD_ID_LENGTH_MAX + 1];
-
     if (unlikely(!mdi->st_db_lockwait)) {
+        char id[RRD_ID_LENGTH_MAX + 1];
         snprintfz(id, RRD_ID_LENGTH_MAX, "db_%s_instance_%s_lockwait", db, mdi->parent->instanceID);
         netdata_fix_chart_name(id);
         mdi->st_db_lockwait = rrdset_create_localhost(
@@ -2667,9 +2661,8 @@ static void mssql_lockwait_chart(struct mssql_db_instance *mdi, const char *db, 
 
 static void mssql_deadlock_chart(struct mssql_db_instance *mdi, const char *db, int update_every)
 {
-    char id[RRD_ID_LENGTH_MAX + 1];
-
     if (unlikely(!mdi->st_db_deadlock)) {
+        char id[RRD_ID_LENGTH_MAX + 1];
         snprintfz(id, RRD_ID_LENGTH_MAX, "db_%s_instance_%s_deadlocks", db, mdi->parent->instanceID);
         netdata_fix_chart_name(id);
         mdi->st_db_deadlock = rrdset_create_localhost(
@@ -2779,9 +2772,8 @@ static void mssql_db_state_chart_loop(struct mssql_db_instance *mdi, const char 
 
 static void mssql_lock_request_chart(struct mssql_db_instance *mdi, const char *db, int update_every)
 {
-    char id[RRD_ID_LENGTH_MAX + 1];
-
     if (unlikely(!mdi->st_lock_requests)) {
+        char id[RRD_ID_LENGTH_MAX + 1];
         snprintfz(id, RRD_ID_LENGTH_MAX, "db_%s_instance_%s_lock_requests", db, mdi->parent->instanceID);
         netdata_fix_chart_name(id);
         mdi->st_lock_requests = rrdset_create_localhost(
@@ -2812,9 +2804,8 @@ static void mssql_lock_request_chart(struct mssql_db_instance *mdi, const char *
 
 static void mssql_lock_timeout_chart(struct mssql_db_instance *mdi, const char *db, int update_every)
 {
-    char id[RRD_ID_LENGTH_MAX + 1];
-
     if (unlikely(!mdi->st_lock_timeouts)) {
+        char id[RRD_ID_LENGTH_MAX + 1];
         snprintfz(id, RRD_ID_LENGTH_MAX, "db_%s_instance_%s_lock_timeouts", db, mdi->parent->instanceID);
         netdata_fix_chart_name(id);
         mdi->st_lock_timeouts = rrdset_create_localhost(
@@ -2845,9 +2836,8 @@ static void mssql_lock_timeout_chart(struct mssql_db_instance *mdi, const char *
 
 static void mssql_active_transactions_chart(struct mssql_db_instance *mdi, const char *db, int update_every)
 {
-    char id[RRD_ID_LENGTH_MAX + 1];
-
     if (unlikely(!mdi->st_db_active_transactions)) {
+        char id[RRD_ID_LENGTH_MAX + 1];
         snprintfz(id, RRD_ID_LENGTH_MAX, "db_%s_instance_%s_active_transactions", db, mdi->parent->instanceID);
         netdata_fix_chart_name(id);
         mdi->st_db_active_transactions = rrdset_create_localhost(
@@ -2882,9 +2872,8 @@ static void mssql_active_transactions_chart(struct mssql_db_instance *mdi, const
 
 static inline void mssql_data_file_size_chart(struct mssql_db_instance *mdi, const char *db, int update_every)
 {
-    char id[RRD_ID_LENGTH_MAX + 1];
-
     if (unlikely(!mdi->st_db_data_file_size)) {
+        char id[RRD_ID_LENGTH_MAX + 1];
         snprintfz(id, RRD_ID_LENGTH_MAX, "db_%s_instance_%s_data_files_size", db, mdi->parent->instanceID);
         netdata_fix_chart_name(id);
         mdi->st_db_data_file_size = rrdset_create_localhost(
