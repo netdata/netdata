@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
-	zpre "github.com/netdata/netdata/go/plugins/pkg/zabbixpreproc"
+	zpre "github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/zabbixpreproc"
 )
 
 // CollectionType enumerates supported Zabbix collection methods.

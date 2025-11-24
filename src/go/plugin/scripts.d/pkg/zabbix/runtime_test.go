@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
-	zpre "github.com/netdata/netdata/go/plugins/pkg/zabbixpreproc"
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/runtime"
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/spec"
+	zpre "github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/zabbixpreproc"
 )
 
 func TestBuildJobSpecsCommandPlugin(t *testing.T) {

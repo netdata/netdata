@@ -12,12 +12,12 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/multipath"
 	"github.com/netdata/netdata/go/plugins/pkg/pluginconfig"
-	zpre "github.com/netdata/netdata/go/plugins/pkg/zabbixpreproc"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/vnodes"
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/runtime"
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/spec"
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/zabbix"
+	zpre "github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/zabbixpreproc"
 )
 
 //go:embed config_schema.json

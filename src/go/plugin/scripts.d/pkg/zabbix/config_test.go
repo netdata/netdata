@@ -4,8 +4,9 @@ import (
 	"encoding/json"
 	"testing"
 
-	zpre "github.com/netdata/netdata/go/plugins/pkg/zabbixpreproc"
 	"gopkg.in/yaml.v3"
+
+	zpre "github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/zabbixpreproc"
 )
 
 func TestJobConfigValidate(t *testing.T) {

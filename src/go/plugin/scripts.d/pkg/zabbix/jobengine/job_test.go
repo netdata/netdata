@@ -9,9 +9,9 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
-	zpre "github.com/netdata/netdata/go/plugins/pkg/zabbixpreproc"
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/ids"
 	pkgzabbix "github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/zabbix"
+	zpre "github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/zabbixpreproc"
 )
 
 const pathLengthScript = `

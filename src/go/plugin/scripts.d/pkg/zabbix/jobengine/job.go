@@ -12,9 +12,9 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
-	zpre "github.com/netdata/netdata/go/plugins/pkg/zabbixpreproc"
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/ids"
 	pkgzabbix "github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/zabbix"
+	zpre "github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/zabbixpreproc"
 )
 
 // Job orchestrates collection -> LLD -> dependent pipeline execution for a single

@@ -6,10 +6,10 @@ import (
 	"context"
 
 	"github.com/netdata/netdata/go/plugins/logger"
-	zpre "github.com/netdata/netdata/go/plugins/pkg/zabbixpreproc"
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/runtime"
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/spec"
 	pkgzabbix "github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/zabbix"
+	zpre "github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/zabbixpreproc"
 )
 
 // runner is a thin wrapper that allows the module to delegate lifecycle control

@@ -10,12 +10,12 @@ import (
 	"sync"
 
 	"github.com/netdata/netdata/go/plugins/logger"
-	zpre "github.com/netdata/netdata/go/plugins/pkg/zabbixpreproc"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/agent/module"
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/ids"
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/runtime"
 	pkgzabbix "github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/zabbix"
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/zabbix/jobengine"
+	zpre "github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/zabbixpreproc"
 )
 
 type pipelineEmitter struct {

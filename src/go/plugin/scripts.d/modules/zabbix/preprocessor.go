@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	zpre "github.com/netdata/netdata/go/plugins/pkg/zabbixpreproc"
+	zpre "github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/zabbixpreproc"
 )
 
 var (

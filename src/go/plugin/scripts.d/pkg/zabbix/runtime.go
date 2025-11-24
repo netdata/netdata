@@ -13,13 +13,14 @@ import (
 	"time"
 
 	"github.com/gosnmp/gosnmp"
+
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
-	zpre "github.com/netdata/netdata/go/plugins/pkg/zabbixpreproc"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/runtime"
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/schedulers"
 	"github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/spec"
+	zpre "github.com/netdata/netdata/go/plugins/plugin/scripts.d/pkg/zabbixpreproc"
 )
 
 // Runtime orchestrates Zabbix jobs using the shared scripts.d scheduler infrastructure.
