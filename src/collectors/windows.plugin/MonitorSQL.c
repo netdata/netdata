@@ -1280,6 +1280,8 @@ static void netdata_read_config_options()
                 &netdata_config, section_name, "collect buffer stats", true);
         dbconn->collect_data_size = inicfg_get_boolean(
                 &netdata_config, section_name, "collect database size", true);
+        dbconn->collect_user_connections = inicfg_get_boolean(
+                &netdata_config, section_name, "collect user connections", true);
         dbconn->is_connected = FALSE;
 
         netdata_mount_mssql_connection_string(dbconn);
