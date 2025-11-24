@@ -1294,8 +1294,20 @@ modules:
               dimensions:
                 - name: input
             - name: system.hw.sensor.resistence.input
-              description: Electrical resistence.
+              description: Electrical resistence
               unit: "Ohms"
+              chart_type: line
+              dimensions:
+                - name: input
+            - name: system.hw.sensor.capacitance.input
+              description: Electrical capacitance
+              unit: "F"
+              chart_type: line
+              dimensions:
+                - name: input
+            - name: system.hw.sensor.inductance.input
+              description: Electrical indutance
+              unit: "H"
               chart_type: line
               dimensions:
                 - name: input
@@ -1326,6 +1338,18 @@ modules:
             - name: system.hw.sensor.gauge_pressure.input
               description: Gauge Pressure
               unit: "Pa"
+              chart_type: line
+              dimensions:
+                - name: input
+            - name: system.hw.sensor.human_presence.input
+              description: Human presence
+              unit: "presence"
+              chart_type: line
+              dimensions:
+                - name: input
+            - name: system.hw.sensor.human_proximity.input
+              description: Human proximity
+              unit: "m"
               chart_type: line
               dimensions:
                 - name: input

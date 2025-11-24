@@ -26,11 +26,15 @@ enum netdata_win_sensor_monitored {
     NETDATA_WIN_SENSOR_DATA_TYPE_LIGHT_TEMPERATURE,
     NETDATA_WIN_SENSOR_VOLTAGE,
     NETDATA_WIN_SENSOR_RESISTENCE,
+    NETDATA_WIN_SENSOR_CAPACITANCE_FARAD,
+    NETDATA_WIN_SENSOR_INDUCTANCE_HENRY,
     NETDATA_WIN_SENSOR_ATMOSPHERE_PRESSURE,
     NETDATA_WIN_SENSOR_LATITUDE_DEGREES,
     NETDATA_WIN_SENSOR_LONGITUDE_DEGREES,
     NETDATA_WIN_SENSOR_FORCE_NEWTONS,
     NETDATA_WIN_SENSOR_GAUGE_PRESSURE,
+    NETDATA_WIN_SENSOR_HUMAN_PRESENCE,
+    NETDATA_WIN_SENSOR_HUMAN_PROXIMITY_METERS,
 
     // Add only one vector axis here
     NETDATA_WIN_SENSOR_TYPE_DISTANCE_X,
@@ -87,11 +91,15 @@ REFPROPERTYKEY sensor_keys[] = {
     &SENSOR_DATA_TYPE_LIGHT_TEMPERATURE_KELVIN,
     &SENSOR_DATA_TYPE_VOLTAGE_VOLTS,
     &SENSOR_DATA_TYPE_RESISTANCE_OHMS,
+    &SENSOR_DATA_TYPE_CAPACITANCE_FARAD,
+    &SENSOR_DATA_TYPE_INDUCTANCE_HENRY,
     &SENSOR_DATA_TYPE_ATMOSPHERIC_PRESSURE_BAR,
     &SENSOR_DATA_TYPE_LATITUDE_DEGREES,
     &SENSOR_DATA_TYPE_LONGITUDE_DEGREES,
     &SENSOR_DATA_TYPE_FORCE_NEWTONS,
     &SENSOR_DATA_TYPE_GAUGE_PRESSURE_PASCAL,
+    &SENSOR_DATA_TYPE_HUMAN_PRESENCE,
+    &SENSOR_DATA_TYPE_HUMAN_PROXIMITY_METERS,
 
     // Add only one vector axis here
     &SENSOR_DATA_TYPE_DISTANCE_X_METERS,
@@ -190,18 +198,32 @@ static struct win_sensor_config {
         .priority = NETDATA_CHART_PRIO_SENSOR_TEMPERATURE,
     },
     {
-        .title = "Electrical potential.",
+        .title = "Electrical potential",
         .units = "V",
         .context = "system.hw.sensor.voltage.input",
         .family = "Potential",
         .priority = NETDATA_CHART_PRIO_SENSOR_VOLTAGE,
     },
     {
-        .title = "Electrical resistence.",
+        .title = "Electrical resistence",
         .units = "Ohms",
         .context = "system.hw.sensor.resistence.input",
         .family = "Resistence",
         .priority = NETDATA_CHART_PRIO_SENSOR_RESISTENCE,
+    },
+    {
+        .title = "Electrical capacitance",
+        .units = "F",
+        .context = "system.hw.sensor.capacitance.input",
+        .family = "Capacitance",
+        .priority = NETDATA_CHART_PRIO_SENSOR_CAPACITANCE,
+    },
+    {
+        .title = "Electrical inductance",
+        .units = "H",
+        .context = "system.hw.sensor.inductance.input",
+        .family = "Inductance",
+        .priority = NETDATA_CHART_PRIO_SENSOR_INDUCTANCE,
     },
     {
         .title = "Ambient atmospheric pressure",
@@ -237,6 +259,20 @@ static struct win_sensor_config {
         .context = "system.hw.sensor.gauge_pressure.input",
         .family = "Pressure",
         .priority = NETDATA_CHART_PRIO_SENSOR_GAUGE_PRESSURE,
+    },
+    {
+        .title = "Human presence",
+        .units = "presence",
+        .context = "system.hw.sensor.human_presence.input",
+        .family = "Presence",
+        .priority = NETDATA_CHART_PRIO_SENSOR_HUMAN,
+    },
+    {
+        .title = "Human proximity",
+        .units = "m",
+        .context = "system.hw.sensor.human_proximity.input",
+        .family = "Proximity",
+        .priority = NETDATA_CHART_PRIO_SENSOR_PROXIMITY,
     },
     {
         .title = "Distance",
@@ -383,7 +419,7 @@ static int netdata_collect_sensor_data(collected_number *value, ISensor *pSensor
     if (SUCCEEDED(hr) && pReport) {
         PropVariantInit(&pv);
         hr = pReport->lpVtbl->GetSensorValue(pReport, key, &pv);
-        if (SUCCEEDED(hr) && (pv.vt == VT_R4 || pv.vt == VT_R8 || pv.vt == VT_UI4)) {
+        if (SUCCEEDED(hr) && (pv.vt == VT_R4 || pv.vt == VT_R8 || pv.vt == VT_UI4 || pv.vt == VT_BOOL)) {
             switch (pv.vt) {
                 case VT_UI4:
                     *value = (collected_number)(pv.ulVal * 100);
@@ -393,6 +429,9 @@ static int netdata_collect_sensor_data(collected_number *value, ISensor *pSensor
                     break;
                 case VT_R8:
                     *value = (collected_number)(pv.dblVal * div_factor);
+                    break;
+                case VT_BOOL:
+                    *value = (pv.boolVal == VARIANT_TRUE) ? 100 : 0;
                     break;
             }
             defined = 1;
