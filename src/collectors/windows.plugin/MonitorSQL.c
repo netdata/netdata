@@ -882,6 +882,41 @@ enddbjobs:
     netdata_MSSQL_release_results(mi->conn->dbSQLJobs);
 }
 
+void metdata_mssql_fill_user_connection(struct mssql_instance *mi)
+{
+    if (unlikely(!mi->conn->collect_user_connections))
+        return;
+
+    collected_number connections = 0;
+    SQLLEN col_user_connections_len = 0;
+
+    SQLRETURN ret;
+
+    ret = SQLExecDirect(mi->conn->dbSQLUserConnections, (SQLCHAR *)NETDATA_QUERY_USER_CONNECTIONS, SQL_NTS);
+    if (likely(netdata_mssql_check_result(ret))) {
+        netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn->dbSQLUserConnections, NETDATA_MSSQL_ODBC_QUERY, mi->instanceID);
+        goto enduserconn;
+    }
+
+    ret = SQLBindCol(mi->conn->dbSQLUserConnections, 1, SQL_C_LONG, &connections, sizeof(connections), &col_user_connections_len);
+    if (likely(netdata_mssql_check_result(ret))) {
+        netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn->dbSQLUserConnections, NETDATA_MSSQL_ODBC_PREPARE, mi->instanceID);
+        goto enduserconn;
+    }
+
+    do {
+        ret = SQLFetch(mi->conn->dbSQLUserConnections);
+        if (likely(netdata_mssql_check_result(ret))) {
+            goto enduserconn;
+        }
+
+        mi->MSSQLUserConnections.current.Data = (ULONGLONG)connections;
+    } while (true);
+
+enduserconn:
+    netdata_MSSQL_release_results(mi->conn->dbSQLUserConnections);
+}
+
 void metdata_mssql_fill_dictionary_from_db(struct mssql_instance *mi)
 {
     char dbname[SQLSERVER_MAX_NAME_LENGTH + 1];
@@ -1038,6 +1073,12 @@ static bool netdata_MSSQL_initialize_connection(struct netdata_mssql_conn *nmc)
         }
 
         ret = SQLAllocHandle(SQL_HANDLE_STMT, nmc->netdataSQLHDBc, &nmc->dbSQLJobs);
+        if (likely(netdata_mssql_check_result(ret))) {
+            retConn = FALSE;
+            goto endMSSQLInitializationConnection;
+        }
+
+        ret = SQLAllocHandle(SQL_HANDLE_STMT, nmc->netdataSQLHDBc, &nmc->dbSQLUserConnections);
         if (likely(netdata_mssql_check_result(ret))) {
             retConn = FALSE;
             goto endMSSQLInitializationConnection;
@@ -1440,6 +1481,7 @@ int dict_mssql_query_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value,
             metdata_mssql_fill_dictionary_from_db(mi);
             metdata_mssql_fill_mssql_status(mi);
             metdata_mssql_fill_job_status(mi);
+            metdata_mssql_fill_user_connection(mi);
             dictionary_sorted_walkthrough_read(mi->databases, dict_mssql_databases_run_queries, NULL);
         }
 
