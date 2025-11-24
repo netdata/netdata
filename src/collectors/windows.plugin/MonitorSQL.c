@@ -2179,6 +2179,14 @@ static void do_mssql_job_status_sql(PERF_DATA_BLOCK *pDataBlock, struct mssql_in
     dictionary_sorted_walkthrough_read(mi->sysjobs, dict_mssql_sysjobs_chart_cb, mi);
 }
 
+static void do_mssql_user_connection(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *mi, int update_every)
+{
+    if (unlikely(!mi->conn->collect_user_connections))
+        return;
+
+    do_mssql_user_connections(mi, update_every);
+}
+
 void dict_mssql_replication_status(struct mssql_publisher_publication *mpp, int update_every)
 {
     if (unlikely(!mpp->st_publisher_status)) {
@@ -3048,13 +3056,14 @@ int dict_mssql_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value
         do_mssql_waits,
         do_mssql_bufferman_stats_sql,
         do_mssql_job_status_sql,
+        do_mssql_user_connection,
 
         NULL};
 
     DWORD i;
     PERF_DATA_BLOCK *pDataBlock;
     static bool collect_perflib[NETDATA_MSSQL_METRICS_END] = {
-        true, true, true, true, true, true, true, true, true, true};
+        true, true, true, true, true, true, true, true, true, true, false};
     for (i = 0; i < NETDATA_MSSQL_ACCESS_METHODS; i++) {
         if (unlikely(!collect_perflib[i]))
             continue;
