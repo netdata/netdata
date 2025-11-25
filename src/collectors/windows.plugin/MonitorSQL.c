@@ -892,7 +892,7 @@ void netdata_mssql_fill_user_connection(struct mssql_instance *mi)
 
     SQLRETURN ret;
 
-    ret = SQLExecDirect(mi->conn->dbSQLUserConnections, (SQLCHAR *)NETDATA_QUERY_USER_CONNECTIONS, SQL_NTS);
+    ret = SQLExecDirect(mi->conn->dbSQLUserConnections, (SQLCHAR *)NETDATA_QUERY_CONNECTIONS, SQL_NTS);
     if (likely(netdata_mssql_check_result(ret))) {
         netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn->dbSQLUserConnections, NETDATA_MSSQL_ODBC_QUERY, mi->instanceID);
         goto enduserconn;
