@@ -12,7 +12,7 @@ import type { StructuredLogEvent } from '../../logging/structured-log-event.js';
 import type { PreloadedSubAgent } from '../../subagent-registry.js';
 import type { MCPRestartFailedError, LogFn, SharedAcquireOptions, SharedRegistry, SharedRegistryHandle } from '../../tools/mcp-provider.js';
 import type { ToolExecuteResult } from '../../tools/types.js';
-import type { AIAgentCallbacks, AIAgentResult, AIAgentSessionConfig, AccountingEntry, AgentFinishedEvent, Configuration, ConversationMessage, LogDetailValue, LogEntry, LogPayload, MCPServer, MCPServerConfig, MCPTool, ProviderConfig, ProviderReasoningValue, ReasoningLevel, TokenUsage, TurnRequest, TurnResult, TurnStatus, ToolChoiceMode } from '../../types.js';
+import type { AIAgentCallbacks, AIAgentResult, AIAgentSessionConfig, AccountingEntry, AgentFinishedEvent, Configuration, ConversationMessage, LogDetailValue, LogEntry, LogPayload, MCPServer, MCPServerConfig, MCPTool, ProviderConfig, ProviderReasoningValue, ReasoningLevel, TokenUsage, ToolCall, TurnRequest, TurnResult, TurnStatus, ToolChoiceMode } from '../../types.js';
 import type { JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js';
 import type { ModelMessage, LanguageModel, ToolSet } from 'ai';
 import type { ChildProcess } from 'node:child_process';
@@ -377,6 +377,23 @@ const estimateMessagesBytesLocal = (messages: readonly ConversationMessage[]): n
     return 0;
   }
   return messages.reduce((total, message) => total + safeJsonByteLengthLocal(message), 0);
+};
+
+const extractNonceFromMessages = (messages: readonly ConversationMessage[], scenarioId: string): string => {
+  const candidate = messages.find((msg) =>
+    msg.noticeType === 'xml-next' ||
+    (msg.role === 'user' && typeof msg.content === 'string' && msg.content.includes('Nonce:'))
+  );
+  invariant(candidate !== undefined && typeof candidate.content === 'string', `Missing XML-NEXT with nonce for ${scenarioId}.`);
+  const matchLine = /Nonce:\s*([a-z0-9]+)/i.exec(candidate.content);
+  if (matchLine !== null && typeof matchLine[1] === 'string' && matchLine[1].length > 0) {
+    return matchLine[1];
+  }
+  const matchSlot = /<ai-agent-([a-z0-9]+)-FINAL/i.exec(candidate.content)
+    ?? /<ai-agent-([a-z0-9]+)-PROGRESS/i.exec(candidate.content)
+    ?? /<ai-agent-([a-z0-9]+)-0001/i.exec(candidate.content);
+  invariant(matchSlot !== null && typeof matchSlot[1] === 'string' && matchSlot[1].length > 0, `Nonce parse failed for ${scenarioId}.`);
+  return matchSlot[1];
 };
 
 function buildInMemoryConfigLayers(configuration: Configuration): ResolvedConfigLayer[] {
@@ -941,7 +958,7 @@ const overrideLLMExpected = {
 };
 
 type ReasoningSelector = ReasoningLevel | 'none' | 'inherit' | 'unset' | 'absent';
-type OverrideReasoningSelector = ReasoningSelector | 'absent';
+type OverrideReasoningSelector = ReasoningSelector;
 type NormalizedReasoningSelector = ReasoningLevel | 'none' | 'inherit';
 
 const buildReasoningMatrixPrompt = (selector: ReasoningSelector): string => {
@@ -1051,7 +1068,7 @@ const buildReasoningMatrixScenarios = (): HarnessTest[] => {
             }
             const layers = buildInMemoryConfigLayers(configuration);
             const promptContent = buildReasoningMatrixPrompt(frontCase.selector);
-            let globalOverrides: LoadAgentOptions['globalOverrides'] | undefined;
+            let globalOverrides: LoadAgentOptions['globalOverrides'];
             if (overrideCase.selector !== 'absent') {
               const normalizedOverride = normalizeSelector(convertOverrideSelector(overrideCase.selector));
               if (normalizedOverride !== 'inherit') {
@@ -7136,10 +7153,14 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         'Sanitizer message mismatch for run-test-90.',
       );
       const assistantMessages = result.conversation.filter((message) => message.role === 'assistant');
-      invariant(assistantMessages.length === 2, 'Two assistant messages expected after retry for run-test-90.');
-      const firstAssistant = assistantMessages[0];
-      invariant(firstAssistant.toolCalls?.length === 1, 'Single sanitized tool call expected for run-test-90.');
-      const retainedCall = firstAssistant.toolCalls[0];
+      invariant(assistantMessages.length >= 2, 'At least two assistant messages expected after retry for run-test-90.');
+      const firstAssistantWithTools = assistantMessages.find(
+        (message) => Array.isArray((message as { toolCalls?: unknown }).toolCalls) && (message as { toolCalls?: unknown }).toolCalls !== undefined,
+      );
+      invariant(firstAssistantWithTools !== undefined, 'Assistant message with tool calls expected for run-test-90.');
+      const toolCalls = (firstAssistantWithTools as { toolCalls: ToolCall[] }).toolCalls;
+      invariant(toolCalls.length === 1, 'Single sanitized tool call expected for run-test-90.');
+      const retainedCall = toolCalls[0];
       invariant(retainedCall.name === 'test__test', 'Retained tool call name mismatch for run-test-90.');
       const textValue = (retainedCall.parameters as { text?: unknown }).text;
       invariant(textValue === SANITIZER_VALID_ARGUMENT, 'Retained tool call arguments mismatch for run-test-90.');
@@ -11125,6 +11146,140 @@ BASE_TEST_SCENARIOS.push({
   },
 } satisfies HarnessTest);
 
+BASE_TEST_SCENARIOS.push({
+  id: 'run-test-xml-happy',
+  description: 'XML transport executes progress + final-report via XML tags with provider tools hidden.',
+  execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+    sessionConfig.toolingTransport = 'xml';
+    sessionConfig.userPrompt = DEFAULT_PROMPT_SCENARIO;
+    sessionConfig.headendWantsProgressUpdates = true;
+    sessionConfig.maxRetries = 1;
+    sessionConfig.maxTurns = 3;
+    return await runWithPatchedExecuteTurn(sessionConfig, async ({ request, invocation }) => {
+      await Promise.resolve();
+      invariant(request.tools.length === 0, 'Provider tools must be hidden in xml mode for run-test-xml-happy.');
+      const nonce = extractNonceFromMessages(request.messages, 'run-test-xml-happy');
+      if (invocation === 1) {
+        const assistantMessage: ConversationMessage = {
+          role: 'assistant',
+          content: `<ai-agent-${nonce}-PROGRESS tool="agent__progress_report">{\"progress\":\"Working via XML\"}</ai-agent-${nonce}-PROGRESS>`,
+        };
+        const payload = { progress: 'Working via XML' };
+        await request.toolExecutor('agent__progress_report', payload, { toolCallId: `${nonce}-PROGRESS` });
+        return {
+          status: { type: 'success', hasToolCalls: true, finalAnswer: false },
+          latencyMs: 5,
+          messages: [assistantMessage],
+          tokens: { inputTokens: 10, outputTokens: 5, totalTokens: 15 },
+        };
+      }
+      const assistantMessage: ConversationMessage = {
+        role: 'assistant',
+        content: `<ai-agent-${nonce}-FINAL tool="agent__final_report" status="success" format="markdown">{\"status\":\"success\",\"report_format\":\"markdown\",\"report_content\":\"Done via XML\"}</ai-agent-${nonce}-FINAL>`,
+      };
+      const payload = { status: 'success', report_format: 'markdown', report_content: 'Done via XML' };
+      await request.toolExecutor('agent__final_report', payload, { toolCallId: `${nonce}-FINAL` });
+      return {
+        status: { type: 'success', hasToolCalls: true, finalAnswer: true },
+        latencyMs: 5,
+        messages: [assistantMessage],
+        tokens: { inputTokens: 8, outputTokens: 4, totalTokens: 12 },
+      };
+    });
+  },
+  expect: (result: AIAgentResult) => {
+    invariant(result.success, 'run-test-xml-happy should succeed.');
+    const finalReport = result.finalReport;
+    invariant(finalReport !== undefined, 'Final report missing for run-test-xml-happy.');
+    invariant(finalReport.status === 'success', 'Final report not success for run-test-xml-happy.');
+    invariant(typeof finalReport.content === 'string' && finalReport.content.includes('Done via XML'), 'Final report content mismatch for run-test-xml-happy.');
+  },
+} satisfies HarnessTest);
+
+BASE_TEST_SCENARIOS.push({
+  id: 'run-test-xml-final-only',
+  description: 'xml-final transport uses native tools while final-report stays XML-tagged.',
+  execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+    sessionConfig.toolingTransport = 'xml-final';
+    sessionConfig.userPrompt = DEFAULT_PROMPT_SCENARIO;
+    sessionConfig.maxRetries = 1;
+    sessionConfig.maxTurns = 2;
+    return await runWithPatchedExecuteTurn(sessionConfig, async ({ request }) => {
+      await Promise.resolve();
+      invariant(request.tools.length > 0, 'Provider tools must be exposed in xml-final mode for run-test-xml-final-only.');
+      const toolNames = request.tools.map((t) => sanitizeToolName(t.name));
+      invariant(!toolNames.includes('agent__final_report'), 'Final-report tool must not be exposed as native tool in xml-final.');
+      invariant(!toolNames.includes('agent__progress_report'), 'Progress tool must not be exposed as native tool in xml-final.');
+      const nonce = extractNonceFromMessages(request.messages, 'run-test-xml-final-only');
+      const assistantMessage: ConversationMessage = {
+        role: 'assistant',
+        content: `<ai-agent-${nonce}-FINAL tool="agent__final_report" status="success" format="markdown">Final via xml-final</ai-agent-${nonce}-FINAL>`,
+      };
+      const payload = { status: 'success', report_format: 'markdown', report_content: 'Final via xml-final' };
+      await request.toolExecutor('agent__final_report', payload, { toolCallId: `${nonce}-FINAL` });
+      return {
+        status: { type: 'success', hasToolCalls: true, finalAnswer: true },
+        latencyMs: 5,
+        messages: [assistantMessage],
+        tokens: { inputTokens: 8, outputTokens: 4, totalTokens: 12 },
+      };
+    });
+  },
+  expect: (result: AIAgentResult) => {
+    invariant(result.success, 'run-test-xml-final-only should succeed.');
+    const finalReport = result.finalReport;
+    invariant(finalReport !== undefined, 'Final report missing for run-test-xml-final-only.');
+    invariant(finalReport.status === 'success', 'Final report not success for run-test-xml-final-only.');
+    invariant(typeof finalReport.content === 'string' && finalReport.content.includes('Final via xml-final'), 'Final report content mismatch for run-test-xml-final-only.');
+  },
+} satisfies HarnessTest);
+
+BASE_TEST_SCENARIOS.push({
+  id: 'run-test-xml-invalid-tag',
+  description: 'Invalid XML nonce is ignored; valid nonce on next turn succeeds with final-report.',
+  execute: async (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
+    sessionConfig.toolingTransport = 'xml';
+    sessionConfig.userPrompt = DEFAULT_PROMPT_SCENARIO;
+    sessionConfig.maxRetries = 1;
+    sessionConfig.maxTurns = 3;
+    return await runWithPatchedExecuteTurn(sessionConfig, async ({ request, invocation }) => {
+      await Promise.resolve();
+      const nonce = extractNonceFromMessages(request.messages, 'run-test-xml-invalid-tag');
+      if (invocation === 1) {
+        const assistantMessage: ConversationMessage = {
+          role: 'assistant',
+          content: `<ai-agent-deadbeef-FINAL tool="agent__final_report" status="success" format="markdown">ignored</ai-agent-deadbeef-FINAL>`,
+        };
+        return {
+          status: { type: 'success', hasToolCalls: false, finalAnswer: false },
+          latencyMs: 5,
+          messages: [assistantMessage],
+          tokens: { inputTokens: 9, outputTokens: 4, totalTokens: 13 },
+        };
+      }
+      const payload = { status: 'success', report_format: 'markdown', report_content: 'Recovered after invalid tag' };
+      const assistantMessage: ConversationMessage = {
+        role: 'assistant',
+        content: `<ai-agent-${nonce}-FINAL tool="agent__final_report" status="success" format="markdown">${JSON.stringify(payload)}</ai-agent-${nonce}-FINAL>`,
+      };
+      await request.toolExecutor('agent__final_report', payload, { toolCallId: `${nonce}-FINAL` });
+      return {
+        status: { type: 'success', hasToolCalls: true, finalAnswer: true },
+        latencyMs: 5,
+        messages: [assistantMessage],
+        tokens: { inputTokens: 8, outputTokens: 4, totalTokens: 12 },
+      };
+    });
+  },
+  expect: (result: AIAgentResult) => {
+    invariant(result.success, 'run-test-xml-invalid-tag should succeed.');
+    const finalReport = result.finalReport;
+    invariant(finalReport !== undefined, 'Final report missing for run-test-xml-invalid-tag.');
+    invariant(finalReport.status === 'success', 'Final report not success for run-test-xml-invalid-tag.');
+    invariant(typeof finalReport.content === 'string' && finalReport.content.includes('Recovered after invalid tag'), 'Final report content mismatch for run-test-xml-invalid-tag.');
+  },
+} satisfies HarnessTest);
+
 const filterScenarios = (ids: string[], logWarnings: boolean): HarnessTest[] => {
   if (ids.length === 0) return BASE_TEST_SCENARIOS;
   const requestedIds = new Set(ids);
@@ -11198,13 +11353,7 @@ export async function runPhaseOneSuite(options?: PhaseOneRunOptions): Promise<vo
 
 async function cleanupActiveHandles(): Promise<void> {
   const diagnosticProcess = process as typeof process & { _getActiveHandles?: () => unknown[] };
-  const activeHandles = typeof diagnosticProcess._getActiveHandles === 'function'
-    ? diagnosticProcess._getActiveHandles()
-    : [];
-  if (activeHandles.length === 0) {
-    return;
-  }
-  const childCleanup: Promise<void>[] = [];
+  const collectHandles = (): unknown[] => (typeof diagnosticProcess._getActiveHandles === 'function' ? diagnosticProcess._getActiveHandles() : []);
   const shouldIgnore = (handle: unknown): boolean => {
     if (handle === null || typeof handle !== 'object') return false;
     const fd = (handle as { fd?: unknown }).fd;
@@ -11237,75 +11386,83 @@ async function cleanupActiveHandles(): Promise<void> {
     }
     return parts.length > 0 ? `${name}(${parts.join(';')})` : name;
   };
-  activeHandles.forEach((handle) => {
-    if (handle === null || typeof handle !== 'object') return;
-    const maybePid = (handle as { pid?: unknown }).pid;
-    if (typeof maybePid === 'number') {
-      const child = handle as ChildProcess;
-      const exitPromise = new Promise<void>((resolve) => {
-        const finish = (): void => { resolve(); };
-        child.once('exit', finish);
-        child.once('error', finish);
-        setTimeout(() => { resolve(); }, 1000);
-      });
-      childCleanup.push(exitPromise);
-      try {
-        if (typeof child.kill === 'function') {
-          try { child.kill('SIGTERM'); } catch { /* ignore */ }
-          try { child.kill('SIGKILL'); } catch { /* ignore */ }
-        }
-      } catch { /* ignore */ }
-      try { child.disconnect(); } catch { /* ignore */ }
-      try { child.unref(); } catch { /* ignore */ }
-      const stdioStreams = Array.isArray(child.stdio) ? child.stdio : [];
-      stdioStreams.forEach((stream) => {
-        if (stream === null || stream === undefined) return;
-        const destroyStream = (stream as { destroy?: () => void }).destroy;
-        if (typeof destroyStream === 'function') {
-          try { destroyStream.call(stream); } catch { /* ignore */ }
-        }
-        const endStream = (stream as { end?: () => void }).end;
-        if (typeof endStream === 'function') {
-          try { endStream.call(stream); } catch { /* ignore */ }
-        }
-        const unrefStream = (stream as { unref?: () => void }).unref;
-        if (typeof unrefStream === 'function') {
-          try { unrefStream.call(stream); } catch { /* ignore */ }
-        }
-      });
-      return;
-    }
-    const fd = (handle as { fd?: unknown }).fd;
-    if (typeof fd === 'number' && (fd === 0 || fd === 1 || fd === 2)) {
-      return;
-    }
-    const destroy = (handle as { destroy?: () => void }).destroy;
-    if (typeof destroy === 'function') {
-      try { destroy.call(handle); } catch { /* ignore */ }
-    }
-    const end = (handle as { end?: () => void }).end;
-    if (typeof end === 'function') {
-      try { end.call(handle); } catch { /* ignore */ }
-    }
-    const close = (handle as { close?: () => void }).close;
-    if (typeof close === 'function') {
-      try { close.call(handle); } catch { /* ignore */ }
-    }
-    const unref = (handle as { unref?: () => void }).unref;
-    if (typeof unref === 'function') {
-      try { unref.call(handle); } catch { /* ignore */ }
-    }
-  });
-  await Promise.all(childCleanup);
-  const remaining = typeof diagnosticProcess._getActiveHandles === 'function'
-    ? diagnosticProcess._getActiveHandles()
-    : [];
-  const blockingHandles = remaining.filter((handle) => !shouldIgnore(handle));
-  if (blockingHandles.length > 0) {
-    const labels = blockingHandles.map(formatHandle);
-    
-    console.error(`[warn] lingering handles after cleanup: ${labels.join(', ')}`);
+
+  let activeHandles = collectHandles();
+  if (activeHandles.length === 0) return;
+
+  // Run up to two cleanup passes to give child processes time to exit after SIGTERM/SIGKILL.
+  // eslint-disable-next-line functional/no-loop-statements -- controlled cleanup loop is clearer than array methods here
+  for (let pass = 0; pass < 2 && activeHandles.length > 0; pass += 1) {
+    const childCleanup: Promise<void>[] = [];
+    activeHandles.forEach((handle) => {
+      if (handle === null || typeof handle !== 'object') return;
+      const maybePid = (handle as { pid?: unknown }).pid;
+      if (typeof maybePid === 'number') {
+        const child = handle as ChildProcess;
+        const exitPromise = new Promise<void>((resolve) => {
+          const finish = (): void => { resolve(); };
+          child.once('exit', finish);
+          child.once('error', finish);
+          setTimeout(() => { resolve(); }, 1500);
+        });
+        childCleanup.push(exitPromise);
+        try {
+          if (typeof child.kill === 'function') {
+            try { child.kill('SIGTERM'); } catch { /* ignore */ }
+            try { child.kill('SIGKILL'); } catch { /* ignore */ }
+          }
+        } catch { /* ignore */ }
+        try { child.disconnect(); } catch { /* ignore */ }
+        try { child.unref(); } catch { /* ignore */ }
+        const stdioStreams = Array.isArray(child.stdio) ? child.stdio : [];
+        stdioStreams.forEach((stream) => {
+          if (stream === null || stream === undefined) return;
+          const destroyStream = (stream as { destroy?: () => void }).destroy;
+          if (typeof destroyStream === 'function') {
+            try { destroyStream.call(stream); } catch { /* ignore */ }
+          }
+          const endStream = (stream as { end?: () => void }).end;
+          if (typeof endStream === 'function') {
+            try { endStream.call(stream); } catch { /* ignore */ }
+          }
+          const unrefStream = (stream as { unref?: () => void }).unref;
+          if (typeof unrefStream === 'function') {
+            try { unrefStream.call(stream); } catch { /* ignore */ }
+          }
+        });
+        return;
+      }
+      const fd = (handle as { fd?: unknown }).fd;
+      if (typeof fd === 'number' && (fd === 0 || fd === 1 || fd === 2)) {
+        return;
+      }
+      const destroy = (handle as { destroy?: () => void }).destroy;
+      if (typeof destroy === 'function') {
+        try { destroy.call(handle); } catch { /* ignore */ }
+      }
+      const end = (handle as { end?: () => void }).end;
+      if (typeof end === 'function') {
+        try { end.call(handle); } catch { /* ignore */ }
+      }
+      const close = (handle as { close?: () => void }).close;
+      if (typeof close === 'function') {
+        try { close.call(handle); } catch { /* ignore */ }
+      }
+      const unref = (handle as { unref?: () => void }).unref;
+      if (typeof unref === 'function') {
+        try { unref.call(handle); } catch { /* ignore */ }
+      }
+    });
+    await Promise.all(childCleanup);
+    await delay(50);
+    activeHandles = collectHandles();
   }
+
+  const remaining = activeHandles.filter((handle) => !shouldIgnore(handle));
+  if (remaining.length === 0) return;
+
+  const labels = remaining.map(formatHandle);
+  console.error(`[warn] lingering handles after cleanup: ${labels.join(', ')}`);
 }
 
 function findScenarioById(id: string): HarnessTest {

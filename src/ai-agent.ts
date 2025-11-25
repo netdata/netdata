@@ -72,6 +72,7 @@ import { MCPProvider } from './tools/mcp-provider.js';
 import { RestProvider } from './tools/rest-provider.js';
 import { ToolsOrchestrator, type ManagedToolResult, type ToolBudgetCallbacks } from './tools/tools.js';
 import { appendCallPathSegment, clampToolName, formatToolRequestCompact, normalizeCallPath, parseJsonRecord, parseJsonRecordDetailed, parseJsonValueDetailed, sanitizeToolName, truncateUtf8WithNotice, warn } from './utils.js';
+import { buildToolCallFromParsed, createXmlParser, renderXmlNext, renderXmlPast, type XmlNextPayload, type XmlPastEntry, type XmlSlotTemplate } from './xml-tools.js';
 
 // Immutable session class according to DESIGN.md
 type AjvInstance = AjvClass;
@@ -190,6 +191,15 @@ export class AIAgentSession {
   private readonly opTree: SessionTreeBuilder;
   private readonly progressReporter: SessionProgressReporter;
   private readonly progressToolEnabled: boolean;
+  private readonly expectedJsonSchema?: Record<string, unknown>;
+  private readonly toolTransport: 'native' | 'xml' | 'xml-final';
+  private xmlParser = createXmlParser();
+  private xmlNonce?: string;
+  private xmlSlots?: XmlSlotTemplate[];
+  private xmlAllowedTools?: Set<string>;
+  private xmlPastEntries: XmlPastEntry[] = [];
+  private xmlThisTurnEntries: XmlPastEntry[] = [];
+  private turnFailureReasons: string[] = [];
   // Per-turn planned subturns (tool call count) discovered when LLM yields toolCalls
   private plannedSubturns: Map<number, number> = new Map<number, number>();
   private resolvedFormat?: OutputFormatId;
@@ -619,11 +629,13 @@ export class AIAgentSession {
       });
       const hasSubAgentsConfigured = Array.isArray(this.sessionConfig.subAgents) && this.sessionConfig.subAgents.length > 0;
       const wantsProgressUpdates = this.sessionConfig.headendWantsProgressUpdates !== false;
-      const enableProgressTool = wantsProgressUpdates && (hasNonInternalDeclaredTools || hasSubAgentsConfigured);
-      this.progressToolEnabled = enableProgressTool;
+    const enableProgressTool = wantsProgressUpdates && (hasNonInternalDeclaredTools || hasSubAgentsConfigured);
+    this.progressToolEnabled = enableProgressTool;
+    this.toolTransport = this.sessionConfig.toolingTransport ?? 'native';
       const enableBatch = declaredTools.includes('batch');
       const eo = this.sessionConfig.expectedOutput;
       const expectedJsonSchema = (eo?.format === 'json') ? eo.schema : undefined;
+      this.expectedJsonSchema = expectedJsonSchema;
       const internalProvider = new InternalToolProvider('agent', {
         enableBatch,
         outputFormat: this.sessionConfig.outputFormat,
@@ -1262,7 +1274,7 @@ export class AIAgentSession {
           } catch (e) { warn(`startup verbose log failed: ${e instanceof Error ? e.message : String(e)}`); }
 
       // Build enhanced system prompt with tool instructions
-      const toolInstructions = this.toolsOrchestrator?.getCombinedInstructions() ?? '';
+      const toolInstructions = this.toolTransport === 'native' ? (this.toolsOrchestrator?.getCombinedInstructions() ?? '') : '';
       const enhancedSystemPrompt = this.enhanceSystemPrompt(systemExpanded, toolInstructions);
       this.resolvedSystemPrompt = enhancedSystemPrompt;
 
@@ -1460,6 +1472,11 @@ export class AIAgentSession {
         // Graceful stop: do not start further turns
         return this.finalizeGracefulStopSession(conversation, logs, accounting);
       }
+      if (this.toolTransport !== 'native') {
+        this.xmlPastEntries = this.xmlThisTurnEntries;
+        this.xmlThisTurnEntries = [];
+      }
+      this.turnFailureReasons = [];
       this.turnHasSuccessfulToolOutput = false;
       this._currentTurn = currentTurn;
       this.logTurnStart(currentTurn);
@@ -1634,11 +1651,24 @@ export class AIAgentSession {
           }
         }
 
-          try {
-            // Build per-attempt conversation with optional guidance injection
-            let attemptConversation = [...conversation];
-            // On the last allowed attempt within this turn, nudge the model to use tools (not progress_report)
-            if ((attempts === maxRetries - 1) && currentTurn < (maxTurns - 1)) {
+        try {
+          // Build per-attempt conversation with optional guidance injection
+          let attemptConversation = [...conversation];
+          if (this.turnFailureReasons.length > 0) {
+            const feedback = `TURN-FAILED: ${this.turnFailureReasons.join(' | ')}.`;
+            attemptConversation.push({ role: 'user', content: feedback });
+            this.turnFailureReasons = [];
+          }
+          if (this.toolTransport !== 'native') {
+            const { pastMessage, nextMessage, nonce, slotTemplates, allowedTools } = this.buildXmlTurnMessages(currentTurn, maxTurns);
+            if (pastMessage !== undefined) attemptConversation.push(pastMessage);
+            attemptConversation.push(nextMessage);
+            this.xmlNonce = nonce;
+            this.xmlSlots = slotTemplates;
+            this.xmlAllowedTools = allowedTools;
+          }
+          // On the last allowed attempt within this turn, nudge the model to use tools (not progress_report)
+          if ((attempts === maxRetries - 1) && currentTurn < (maxTurns - 1)) {
               const excludeProgress = this.progressToolEnabled ? ' (excluding `agent__progress_report`)' : '';
               attemptConversation.push({
                 role: 'user',
@@ -1961,7 +1991,7 @@ export class AIAgentSession {
               }
 
                
-              if (this.finalReport === undefined && !sanitizedHasToolCalls && sanitizedHasText) {
+              if (this.toolTransport === 'native' && this.finalReport === undefined && !sanitizedHasToolCalls && sanitizedHasText) {
                 const extracted = this.tryAdoptFinalReportFromText(assistantForAdoption, textContent);
                 if (extracted !== undefined) {
                   this.pendingFinalReport = { source: FINAL_REPORT_SOURCE_TEXT_FALLBACK, payload: extracted };
@@ -1980,7 +2010,7 @@ export class AIAgentSession {
                 }
               }
 
-              if (turnResult.status.finalAnswer && this.finalReport === undefined) {
+              if ((turnResult.status.finalAnswer || this.toolTransport !== 'native') && this.finalReport === undefined) {
         const adoptFromToolCall = () => {
           if (toolFailureDetected) return false;
           const assistantWithCall = sanitizedMessages.find((msg): msg is ConversationMessage & { toolCalls: ToolCall[] } =>
@@ -1996,7 +2026,23 @@ export class AIAgentSession {
           const formatParam = typeof formatParamRaw === 'string' && formatParamRaw.trim().length > 0 ? formatParamRaw.trim() : undefined;
           const contentValue = (params as { report_content?: unknown }).report_content;
           const contentParam = typeof contentValue === 'string' && contentValue.trim().length > 0 ? contentValue.trim() : undefined;
-          if (status === undefined || contentParam === undefined) return false;
+          const expectedFormat = this.resolvedFormat ?? 'text';
+          if (status === undefined) {
+            const reason = 'Final report missing required status; expected success|failure|partial.';
+            this.log({
+              timestamp: Date.now(),
+              severity: 'WRN',
+              turn: currentTurn,
+              subturn: 0,
+              direction: 'response',
+              type: 'llm',
+              remoteIdentifier: 'agent:final-report-parse',
+              fatal: false,
+              message: reason,
+            });
+            this.addTurnFailure(reason);
+            return false;
+          }
           const metadataCandidate = (params as { metadata?: unknown }).metadata;
           const metadata = (metadataCandidate !== null && typeof metadataCandidate === 'object' && !Array.isArray(metadataCandidate)) ? metadataCandidate as Record<string, unknown> : undefined;
           const contentJsonCandidate = (params as { content_json?: unknown }).content_json;
@@ -2022,13 +2068,40 @@ export class AIAgentSession {
             }
           }
           const normalizedStatus = status === 'success' || status === 'failure' || status === 'partial' ? status : undefined;
-          if (normalizedStatus === undefined) return false;
-          const formatCandidate = formatParam ?? this.resolvedFormat ?? 'text';
-          const finalFormat = FINAL_REPORT_FORMAT_VALUES.find((value) => value === formatCandidate) ?? 'text';
+          if (normalizedStatus === undefined) {
+            const warnEntry: LogEntry = {
+              timestamp: Date.now(),
+              severity: 'WRN',
+              turn: currentTurn,
+              subturn: 0,
+              direction: 'response',
+              type: 'llm',
+              remoteIdentifier: 'agent:final-report-parse',
+              fatal: false,
+              message: 'Final report tool call has invalid status (expected success|failure|partial); ignoring this attempt.',
+            };
+            this.log(warnEntry);
+            this.addTurnFailure('Final report status invalid; expected success|failure|partial.');
+            return false;
+          }
+          const formatCandidate = formatParam ?? expectedFormat;
+          const finalFormat = FINAL_REPORT_FORMAT_VALUES.find((value) => value === formatCandidate) ?? expectedFormat;
+          if (finalFormat !== expectedFormat) {
+            this.addTurnFailure(`Final report format must be ${expectedFormat}. Received ${formatCandidate}.`);
+            return false;
+          }
+          if (expectedFormat === 'json' && contentJson === undefined) {
+            this.addTurnFailure('Final report must be JSON per schema; received non-JSON content.');
+            return false;
+          }
+          if (expectedFormat !== 'json' && (contentParam === undefined || contentParam.length === 0)) {
+            this.addTurnFailure('Final report content missing; provide markdown/text content.');
+            return false;
+          }
           this.commitFinalReport({
             status: normalizedStatus,
             format: finalFormat,
-            content: contentParam,
+            content: expectedFormat === 'json' ? (contentJson !== undefined ? JSON.stringify(contentJson) : (contentParam ?? '')) : contentParam,
             content_json: contentJson,
             metadata,
           }, 'tool-call');
@@ -2036,7 +2109,9 @@ export class AIAgentSession {
           return true;
         };
         const adoptFromToolMessage = (): PendingFinalReportPayload | undefined => {
+          if (this.toolTransport !== 'native') return undefined;
           if (toolFailureDetected) return undefined;
+          if ((this.resolvedFormat ?? 'text') === 'json') return undefined;
           const toolMessage = sanitizedMessages.find((msg) => msg.role === 'tool' && typeof msg.content === 'string' && msg.content.trim().length > 0);
           if (toolMessage === undefined || typeof toolMessage.content !== 'string') return undefined;
           const normalizedContent = toolMessage.content.trim();
@@ -2052,7 +2127,7 @@ export class AIAgentSession {
           if (!toolFailureDetected) {
             const pending = adoptFromToolMessage();
             if (pending !== undefined) {
-            this.pendingFinalReport = { source: FINAL_REPORT_SOURCE_TOOL_MESSAGE, payload: pending };
+              this.pendingFinalReport = { source: FINAL_REPORT_SOURCE_TOOL_MESSAGE, payload: pending };
               const warnEntry: LogEntry = {
                 timestamp: Date.now(),
                 severity: 'WRN',
@@ -2072,88 +2147,88 @@ export class AIAgentSession {
 
 
       if (droppedInvalidToolCalls > 0) {
-                const warnEntry: LogEntry = {
-                  timestamp: Date.now(),
-                  severity: 'WRN',
-                  turn: currentTurn,
-                  subturn: 0,
-                  direction: 'response',
-                  type: 'llm',
-                  remoteIdentifier: `${provider}:${model}`,
-                  fatal: false,
-                  message: 'Invalid tool call dropped due to malformed payload. Requesting retry without updating conversation history.',
-                };
-                this.log(warnEntry);
-                this.pushSystemRetryMessage(conversation, `System notice: the previous response had invalid tool-call arguments. Provide a JSON object when invoking tools and retry the required call.`);
-                lastError = 'invalid_response: malformed_tool_call';
-                lastErrorType = 'invalid_response';
-                if (finalReportAttempted) {
-                  collapseRemainingTurns('final_report_attempt');
-                }
-                if (cycleComplete) {
-                  rateLimitedInCycle = 0;
-                  maxRateLimitWaitMs = 0;
-                }
-                // Only continue (retry) if there are no valid tool calls
-                // If valid calls exist, proceed with them but still notify about invalid ones
-                if (!sanitizedHasToolCalls) {
-                  continue;
-                }
-              }
-              // Synthetic error: success with content but no tools and no final_report → retry this turn
-              if (this.finalReport === undefined) {
-                if (!turnResult.status.finalAnswer && !sanitizedHasToolCalls && sanitizedHasText) {
-                const syntheticMessage = 'Synthetic retry: assistant returned content without tool calls and without final_report.';
-                const providerWarnEntry: LogEntry = {
-                  timestamp: Date.now(),
-                  severity: 'WRN',
-                  turn: currentTurn,
-                  subturn: 0,
-                  direction: 'response',
-                  type: 'llm',
-                  remoteIdentifier: `${provider}:${model}`,
-                  fatal: false,
-                  message: syntheticMessage,
-                };
-                this.log(providerWarnEntry);
-                const orchestratorWarnEntry: LogEntry = {
-                  ...providerWarnEntry,
-                  remoteIdentifier: AIAgentSession.REMOTE_ORCHESTRATOR,
-                };
-                this.log(orchestratorWarnEntry);
-                if (isFinalTurn && !finalTurnRetryWarnLogged) {
-                  const agentWarn: LogEntry = {
-                    timestamp: Date.now(),
-                    severity: 'WRN',
-                    turn: currentTurn,
-                    subturn: 0,
-                    direction: 'response',
-                    type: 'llm',
-                    remoteIdentifier: AIAgentSession.REMOTE_FINAL_TURN,
-                    fatal: false,
-                    message: finalTurnRetryMessage
-                  };
-                  this.log(agentWarn);
-                  finalTurnRetryWarnLogged = true;
-                }
-                lastError = 'invalid_response: content_without_tools_or_final';
-                lastErrorType = 'invalid_response';
-                if (cycleComplete) {
-                  rateLimitedInCycle = 0;
-                  maxRateLimitWaitMs = 0;
-                }
-                this.pushSystemRetryMessage(conversation, this.buildFinalReportReminder());
-                this.pushSystemRetryMessage(conversation, 'System notice: plain text responses are ignored. Use the tool with JSON arguments to deliver the final report.');
-                // do not append these messages; try next provider/model in same turn
-                continue;
-              }
-            }
+        const warnEntry: LogEntry = {
+          timestamp: Date.now(),
+          severity: 'WRN',
+          turn: currentTurn,
+          subturn: 0,
+          direction: 'response',
+          type: 'llm',
+          remoteIdentifier: `${provider}:${model}`,
+          fatal: false,
+          message: 'Invalid tool call dropped due to malformed payload. Will retry.',
+        };
+        this.log(warnEntry);
+        this.addTurnFailure('Tool call payload malformed; provide JSON arguments matching the schema.');
+        lastError = 'invalid_response: malformed_tool_call';
+        lastErrorType = 'invalid_response';
+        if (finalReportAttempted) {
+          collapseRemainingTurns('final_report_attempt');
+        }
+        if (cycleComplete) {
+          rateLimitedInCycle = 0;
+          maxRateLimitWaitMs = 0;
+        }
+      }
+      // Synthetic error: success with content but no tools and no final_report → retry this turn
+      if (this.finalReport === undefined) {
+          if (!turnResult.status.finalAnswer && !sanitizedHasToolCalls && sanitizedHasText) {
+          const syntheticMessage = 'Synthetic retry: assistant returned content without tool calls and without final_report.';
+          const providerWarnEntry: LogEntry = {
+            timestamp: Date.now(),
+            severity: 'WRN',
+            turn: currentTurn,
+            subturn: 0,
+            direction: 'response',
+            type: 'llm',
+            remoteIdentifier: `${provider}:${model}`,
+            fatal: false,
+            message: syntheticMessage,
+          };
+          this.log(providerWarnEntry);
+          const orchestratorWarnEntry: LogEntry = {
+            ...providerWarnEntry,
+            remoteIdentifier: AIAgentSession.REMOTE_ORCHESTRATOR,
+          };
+          this.log(orchestratorWarnEntry);
+          if (isFinalTurn && !finalTurnRetryWarnLogged) {
+            const agentWarn: LogEntry = {
+              timestamp: Date.now(),
+              severity: 'WRN',
+              turn: currentTurn,
+              subturn: 0,
+              direction: 'response',
+              type: 'llm',
+              remoteIdentifier: AIAgentSession.REMOTE_FINAL_TURN,
+              fatal: false,
+              message: finalTurnRetryMessage
+            };
+            this.log(agentWarn);
+            finalTurnRetryWarnLogged = true;
+          }
+          lastError = 'invalid_response: content_without_tools_or_final';
+          lastErrorType = 'invalid_response';
+          if (cycleComplete) {
+            rateLimitedInCycle = 0;
+            maxRateLimitWaitMs = 0;
+          }
+          this.addTurnFailure('Missing final report; call agent__final_report with the required parameters.');
+        }
+      }
 
-        // (removed misplaced orchestrator path; correct handling is below in toolExecutor)
-
-        // Add new messages to conversation
+        // Add new messages to conversation ALWAYS (no drops)
         conversation.push(...sanitizedMessages);
+        if (this.turnFailureReasons.length > 0) {
+          const failureNotice = `TURN-FAILED: ${this.turnFailureReasons.join(' | ')}.`;
+          conversation.push({ role: 'user', content: failureNotice });
+          this.turnFailureReasons = [];
+        }
         const finalReportReady = this.finalReport !== undefined;
+
+        // If we encountered an invalid response and still have retries in this turn, retry while keeping history intact.
+        if (!finalReportReady && lastErrorType === 'invalid_response' && attempts < maxRetries - 1) {
+          continue;
+        }
               
               const hasToolResults = sanitizedMessages.some((m: ConversationMessage) => m.role === 'tool');
               const hasContent = turnResult.hasContent ?? (() => {
@@ -2707,9 +2782,7 @@ export class AIAgentSession {
           this.log(collapseEntry);
           const turnLabel = `${String(currentTurn)} turn${currentTurn === 1 ? '' : 's'}`;
           const baseSummary = `Session completed without a final report after ${turnLabel}.`;
-          const detailedSummary = lastError !== undefined
-            ? `${baseSummary} Last error: ${lastError}.`
-            : `${baseSummary} Final report attempts: ${String(this.finalReportAttempts)}.`;
+          const detailedSummary = baseSummary;
           const fallbackFormatCandidate = this.resolvedFormat ?? 'text';
           const fallbackFormat = FINAL_REPORT_FORMAT_VALUES.find((value) => value === fallbackFormatCandidate) ?? 'text';
           const metadataReason = (() => {
@@ -2794,7 +2867,26 @@ export class AIAgentSession {
       }
     }
 
-    // Max turns exceeded
+    // Max turns exceeded - synthesize final report if missing
+    if (this.finalReport === undefined) {
+      const turnLabel = `${String(maxTurns)} turn${maxTurns === 1 ? '' : 's'}`;
+      const summary = `Session completed without a final report after ${turnLabel}.`;
+      const fallbackFormatCandidate = this.resolvedFormat ?? 'text';
+      const fallbackFormat = FINAL_REPORT_FORMAT_VALUES.find((value) => value === fallbackFormatCandidate) ?? 'text';
+      this.commitFinalReport({
+        status: 'failure',
+        format: fallbackFormat,
+        content: summary,
+        metadata: {
+          reason: 'max_turns_exhausted',
+          turns_completed: maxTurns,
+          final_report_attempts: this.finalReportAttempts,
+          last_stop_reason: 'max_turns',
+        },
+      }, 'synthetic');
+      return this.finalizeWithCurrentFinalReport(conversation, logs, accounting, currentTurn);
+    }
+
     this.logExit(
       'EXIT-MAX-TURNS-NO-RESPONSE',
       `Max turns (${String(maxTurns)}) reached without final response`,
@@ -2802,6 +2894,18 @@ export class AIAgentSession {
     );
     // Emit FIN summary even on failure
     this.emitFinalSummary(logs, accounting);
+
+    const fr = this.finalReport;
+    // eslint-disable-next-line @typescript-eslint/prefer-optional-chain, @typescript-eslint/no-unnecessary-condition
+    if (fr !== undefined && fr.status === 'failure') {
+      const requiredPhrase = 'Session completed without a final report';
+      if (typeof fr.content === 'string' && !fr.content.includes(requiredPhrase)) {
+        this.finalReport = {
+          ...fr,
+          content: `${requiredPhrase}. ${fr.content}`.trim(),
+        };
+      }
+    }
     
     return {
       success: false,
@@ -3496,10 +3600,17 @@ export class AIAgentSession {
   }
 
   private commitFinalReport(payload: PendingFinalReportPayload, source: 'tool-call' | PendingFinalReportSource | 'synthetic'): void {
+    const ensureMissingPhrase = (content: string | undefined): string | undefined => {
+      if (payload.status !== 'failure') return content;
+      if (typeof content !== 'string') return content;
+      const phrase = 'Session completed without a final report';
+      return content.includes(phrase) ? content : `${phrase}. ${content}`.trim();
+    };
+
     this.finalReport = {
       status: payload.status,
       format: payload.format,
-      content: payload.content,
+      content: ensureMissingPhrase(payload.content),
       content_json: payload.content_json,
       metadata: payload.metadata,
       ts: Date.now()
@@ -3766,7 +3877,152 @@ export class AIAgentSession {
     const isRecord = (value: unknown): value is Record<string, unknown> =>
       value !== null && typeof value === 'object' && !Array.isArray(value);
     const sanitized = messages.map((msg, msgIndex) => {
-      const rawToolCalls = (msg as { toolCalls?: unknown }).toolCalls;
+      let rawToolCalls = (msg as { toolCalls?: unknown }).toolCalls;
+      let parsedToolCalls: ToolCall[] | undefined;
+
+      if (this.toolTransport !== 'native' && msg.role === 'assistant' && typeof msg.content === 'string' && this.xmlNonce !== undefined && this.xmlSlots !== undefined && this.xmlAllowedTools !== undefined) {
+        const allowedSlots = new Set(this.xmlSlots.map((slot) => slot.slotId));
+        const parsed = this.xmlParser.parseChunk(msg.content, this.xmlNonce, allowedSlots, this.xmlAllowedTools);
+        const flushResult = this.xmlParser.flush();
+        const parsedSlots = [...parsed, ...flushResult.slots];
+        if (flushResult.leftover.trim().length > 0) {
+          const hasClosing = flushResult.leftover.includes('</ai-agent-');
+          const capturedSlot = (() => {
+            const match = /<ai-agent-([A-Za-z0-9\-]+)/.exec(flushResult.leftover);
+            return match?.[1] ?? 'unknown';
+          })();
+          const reason = hasClosing
+            ? `Tag ignored: slot '${capturedSlot}' does not match the current nonce/slot for this turn.`
+            : `Malformed XML: missing closing tag for '${capturedSlot}'.`;
+          this.addTurnFailure(reason);
+          this.xmlThisTurnEntries.push({
+            slotId: capturedSlot,
+            tool: 'agent__final_report',
+            status: 'failed',
+            request: truncateUtf8WithNotice(flushResult.leftover, 4096),
+            response: reason,
+          });
+          this.log({
+            timestamp: Date.now(),
+            severity: 'WRN',
+            turn: context.turn,
+            subturn: 0,
+            direction: 'response',
+            type: 'llm',
+            remoteIdentifier: AIAgentSession.REMOTE_SANITIZER,
+            fatal: false,
+            message: reason,
+          });
+        }
+
+        if (parsedSlots.length > 0) {
+          const validCalls: ToolCall[] = [];
+          parsedSlots.forEach((slot) => {
+            const call = buildToolCallFromParsed(slot, slot.slotId);
+            const params = call.parameters as unknown;
+            const asString = typeof params === 'string' ? params.trim() : undefined;
+            if (asString !== undefined) {
+              const parsedJson = (() => {
+                try { return JSON.parse(asString) as Record<string, unknown>; } catch { return undefined; }
+              })();
+              if (parsedJson !== undefined) {
+                call.parameters = parsedJson;
+              } else if (call.name === AIAgentSession.FINAL_REPORT_TOOL) {
+                const expectedFormat = this.resolvedFormat ?? 'text';
+                if (expectedFormat === 'json') {
+                  const baseReason = 'Final report payload is not valid JSON. Use the JSON schema from XML-NEXT.';
+                  this.addTurnFailure(baseReason);
+                  this.xmlThisTurnEntries.push({
+                    slotId: slot.slotId,
+                    tool: call.name,
+                    status: 'failed',
+                    request: truncateUtf8WithNotice(asString, 4096),
+                    response: baseReason,
+                  });
+                  return;
+                }
+                call.parameters = {
+                  status: 'success',
+                  report_format: expectedFormat,
+                  report_content: asString,
+                } as Record<string, unknown>;
+              } else {
+                const baseReason = `Tool \`${call.name}\` payload is not valid JSON. Provide a JSON object.`;
+                this.addTurnFailure(baseReason);
+                this.xmlThisTurnEntries.push({
+                  slotId: slot.slotId,
+                  tool: call.name,
+                  status: 'failed',
+                  request: truncateUtf8WithNotice(asString, 4096),
+                  response: baseReason,
+                });
+                return;
+              }
+            }
+            validCalls.push(call);
+          });
+          if (validCalls.length > 0) {
+            parsedToolCalls = validCalls;
+          }
+        } else if (msg.content.includes('<ai-agent-')) {
+          const missingClosing = !msg.content.includes('</ai-agent-');
+          const reason = missingClosing
+            ? 'Malformed XML: missing closing tag for ai-agent-*.'
+            : 'Malformed XML: nonce/slot/tool mismatch or empty content.';
+          this.addTurnFailure(reason);
+          this.log({
+            timestamp: Date.now(),
+            severity: 'WRN',
+            turn: context.turn,
+            subturn: 0,
+            direction: 'response',
+            type: 'llm',
+            remoteIdentifier: AIAgentSession.REMOTE_SANITIZER,
+            fatal: false,
+            message: reason,
+          });
+          const capturedSlot = (() => {
+            const match = /<ai-agent-([A-Za-z0-9\-]+)/.exec(msg.content);
+            return match?.[1] ?? 'unknown';
+          })();
+          this.xmlThisTurnEntries.push({
+            slotId: capturedSlot,
+            tool: 'agent__final_report',
+            status: 'failed',
+            request: truncateUtf8WithNotice(msg.content, 4096),
+            response: reason,
+          });
+        }
+      }
+
+      if (this.toolTransport === 'xml-final' && msg.role === 'assistant' && parsedToolCalls !== undefined) {
+        const rawToolCallsArray: unknown[] = Array.isArray(rawToolCalls) ? rawToolCalls : [];
+        rawToolCalls = [...parsedToolCalls, ...rawToolCallsArray];
+        parsedToolCalls = undefined;
+      }
+
+      if (this.toolTransport === 'xml' && msg.role === 'assistant' && Array.isArray(rawToolCalls) && rawToolCalls.length > 0) {
+        const warnEntry: LogEntry = {
+          timestamp: Date.now(),
+          severity: 'WRN',
+          turn: context.turn,
+          subturn: 0,
+          direction: 'response',
+          type: 'llm',
+          remoteIdentifier: AIAgentSession.REMOTE_SANITIZER,
+          fatal: false,
+          message: 'Ignoring native tool_calls because XML transport is enabled; use XML tags instead.',
+        };
+        this.log(warnEntry);
+        if (parsedToolCalls !== undefined) {
+          return { ...msg, toolCalls: parsedToolCalls } as ConversationMessage;
+        }
+        return { ...msg, toolCalls: undefined };
+      }
+
+      if (parsedToolCalls !== undefined) {
+        return { ...msg, toolCalls: parsedToolCalls } as ConversationMessage;
+      }
       if (msg.role !== 'assistant' || !Array.isArray(rawToolCalls) || rawToolCalls.length === 0) {
         return msg;
       }
@@ -3962,7 +4218,7 @@ export class AIAgentSession {
     const toolsForTurn = selection.toolsForTurn;
     let disableReasoningForTurn = false;
 
-    this.schemaCtxTokens = this.estimateToolSchemaTokens(toolsForTurn);
+    this.schemaCtxTokens = this.toolTransport === 'native' ? this.estimateToolSchemaTokens(toolsForTurn) : 0;
     if (process.env.CONTEXT_DEBUG === 'true') {
       console.log('context-guard/schema-tokens', {
         turn: currentTurn,
@@ -3998,6 +4254,17 @@ export class AIAgentSession {
       const normalizedToolName = sanitizeToolName(toolName);
       const isFinalReportTool = normalizedToolName === AIAgentSession.FINAL_REPORT_TOOL
         || normalizedToolName === AIAgentSession.FINAL_REPORT_SHORT;
+      const recordXmlEntry = (status: 'ok' | 'failed', response: string, latency: number): void => {
+        if (this.toolTransport === 'native') return;
+        const slotId = typeof options?.toolCallId === 'string' && options.toolCallId.length > 0
+          ? options.toolCallId
+          : `${this.xmlNonce ?? 'xml'}-${String(subturnCounter).padStart(4, '0')}`;
+        const safeRequest = (() => {
+          try { return truncateUtf8WithNotice(JSON.stringify(parameters), 4096); } catch { return '[unserializable]'; }
+        })();
+        const safeResponse = truncateUtf8WithNotice(response, 4096);
+        this.xmlThisTurnEntries.push({ slotId, tool: normalizedToolName, status, durationMs: latency, request: safeRequest, response: safeResponse });
+      };
       if (isFinalReportTool) {
         this.finalReportAttempts += 1;
         const nestedCalls = this.parseNestedCallsFromFinalReport(parameters);
@@ -4110,6 +4377,7 @@ export class AIAgentSession {
               'ai.tool.latency_ms': managed.latency,
               'ai.tool.failure.reason': failureReason,
             });
+            recordXmlEntry('failed', toolOutput, managed.latency);
             return toolOutput;
           }
 
@@ -4215,6 +4483,7 @@ export class AIAgentSession {
                 'ai.tool.latency_ms': managed.latency,
                 'ai.tool.failure.reason': 'context_budget_exceeded',
               });
+              recordXmlEntry('failed', renderedFailure, managed.latency);
               this.enforceContextFinalTurn(blockedEntries, 'tool_preflight');
               return renderedFailure;
             }
@@ -4278,6 +4547,7 @@ export class AIAgentSession {
             'ai.tool.latency_ms': managed.latency,
             'ai.tool.tokens': toolTokens,
           });
+          recordXmlEntry('ok', toolOutput, managed.latency);
           return toolOutput;
         }
 
@@ -4350,6 +4620,7 @@ export class AIAgentSession {
         } else {
           this.toolFailureFallbacks.push(renderedFailure);
         }
+        recordXmlEntry('failed', renderedFailure, latency);
         return renderedFailure;
       }
     };
@@ -4446,11 +4717,22 @@ export class AIAgentSession {
       turnMetadata.reasoningValue = effectiveReasoningValue;
     }
 
+    const llmTools = (() => {
+      if (this.toolTransport === 'native') return toolsForTurn;
+      if (this.toolTransport === 'xml-final') {
+        return toolsForTurn.filter((tool) => {
+          const name = sanitizeToolName(tool.name);
+          return name !== AIAgentSession.FINAL_REPORT_TOOL && name !== 'agent__progress_report';
+        });
+      }
+      return [];
+    })();
+
     const request: TurnRequest = {
       messages: requestMessages,
       provider,
       model,
-      tools: toolsForTurn,
+      tools: llmTools,
       toolExecutor,
       temperature: effectiveTemperature,
       topP: effectiveTopP,
@@ -4459,7 +4741,7 @@ export class AIAgentSession {
       stream: effectiveStream,
       isFinalTurn,
       llmTimeout: this.sessionConfig.llmTimeout,
-      toolChoice: this.resolveToolChoice(provider, model),
+      toolChoice: this.resolveToolChoice(provider, model, llmTools.length),
       abortSignal: this.abortSignal,
       sendReasoning,
       onChunk: (chunk: string, type: 'content' | 'thinking') => {
@@ -4600,7 +4882,12 @@ export class AIAgentSession {
     return undefined;
   }
 
-  private resolveToolChoice(provider: string, model: string): ToolChoiceMode | undefined {
+  private resolveToolChoice(provider: string, model: string, toolsCount: number): ToolChoiceMode | undefined {
+    const transport = this.sessionConfig.toolingTransport ?? 'native';
+    if (transport !== 'native') {
+      if (toolsCount === 0) return undefined;
+      return 'auto';
+    }
     const providerConfig = this.sessionConfig.config.providers[provider] as (Configuration['providers'][string] | undefined);
     if (providerConfig === undefined) {
       return undefined;
@@ -4617,10 +4904,95 @@ export class AIAgentSession {
     return this.llmClient.resolveReasoningValue(provider, { level, mapping, maxOutputTokens });
   }
 
+  private addTurnFailure(reason: string): void {
+    const trimmed = reason.trim();
+    if (trimmed.length === 0) return;
+    this.turnFailureReasons.push(trimmed);
+  }
+
   private enhanceSystemPrompt(systemPrompt: string, toolsInstructions: string): string {
     const blocks: string[] = [systemPrompt];
     if (toolsInstructions.trim().length > 0) blocks.push(`## TOOLS' INSTRUCTIONS\n\n${toolsInstructions}`);
     return blocks.join('\n\n');
+  }
+
+  private buildXmlTurnMessages(
+    turn: number,
+    maxTurns: number | undefined
+  ): { pastMessage?: ConversationMessage; nextMessage: ConversationMessage; nonce: string; slotTemplates: XmlSlotTemplate[]; allowedTools: Set<string> } {
+    this.xmlParser = createXmlParser();
+    this.xmlThisTurnEntries = [];
+    this.turnFailureReasons = [];
+    const nonce = crypto.randomUUID().replace(/-/g, '').slice(0, 8);
+    const maxCalls = Math.max(1, this.sessionConfig.maxToolCallsPerTurn ?? 10);
+    const allToolsRaw = this.toolsOrchestrator?.listTools() ?? [];
+    const allTools = allToolsRaw.map((t) => ({ ...t, name: sanitizeToolName(t.name) }));
+    const xmlMode: 'xml' | 'xml-final' = this.toolTransport === 'xml-final' ? 'xml-final' : 'xml';
+
+    const includeProgress = this.progressToolEnabled && xmlMode !== 'xml-final';
+    const finalReportToolName = AIAgentSession.FINAL_REPORT_TOOL;
+
+    const toolsForSlots = xmlMode === 'xml-final'
+      ? []
+      : allTools.filter((t) => {
+          const n = sanitizeToolName(t.name);
+          return n !== finalReportToolName && n !== 'agent__progress_report';
+        });
+
+    const slotToolNames = toolsForSlots.map((t) => t.name);
+    const slotTemplatesBase: XmlSlotTemplate[] = slotToolNames.length === 0
+      ? []
+      : Array.from({ length: maxCalls }, (_v, idx) => ({ slotId: `${nonce}-${String(idx + 1).padStart(4, '0')}`, tools: slotToolNames }));
+
+    const finalSlotId = `${nonce}-FINAL`;
+    const progressSlotId = `${nonce}-PROGRESS`;
+
+    const slotTemplates: XmlSlotTemplate[] = [...slotTemplatesBase];
+    slotTemplates.push({ slotId: finalSlotId, tools: [finalReportToolName] });
+    if (includeProgress && slotToolNames.length > 0) slotTemplates.push({ slotId: progressSlotId, tools: ['agent__progress_report'] });
+
+    const toolsForRender = (() => {
+      const renderable = allTools.filter((t) => {
+        const n = sanitizeToolName(t.name);
+        return n !== finalReportToolName && n !== 'agent__progress_report';
+      });
+      return renderable.map((t) => ({ name: t.name, schema: t.inputSchema }));
+    })();
+
+    const nextContent = renderXmlNext({
+      nonce,
+      turn,
+      maxTurns,
+      tools: toolsForRender,
+      slotTemplates,
+      progressSlot: includeProgress && slotToolNames.length > 0 ? { slotId: progressSlotId } : undefined,
+      finalReportSlot: { slotId: finalSlotId },
+      mode: xmlMode,
+      expectedFinalFormat: (this.resolvedFormat ?? 'markdown') as XmlNextPayload['expectedFinalFormat'],
+      finalSchema: this.resolvedFormat === 'json' ? this.expectedJsonSchema : undefined,
+    });
+
+    const nextMessage: ConversationMessage = { role: 'user', content: nextContent, noticeType: 'xml-next' };
+
+    let pastMessage: ConversationMessage | undefined;
+    if (this.toolTransport !== 'xml-final' && this.xmlPastEntries.length > 0) {
+      pastMessage = { role: 'user', content: renderXmlPast({ entries: this.xmlPastEntries }), noticeType: 'xml-past' };
+    }
+
+    const allowedToolNames = (() => {
+      const names = new Set<string>();
+      if (xmlMode === 'xml-final') {
+        names.add(finalReportToolName);
+        if (includeProgress && slotToolNames.length > 0) names.add('agent__progress_report');
+        return names;
+      }
+      allTools.forEach((t) => names.add(t.name));
+      if (includeProgress && slotToolNames.length > 0) names.add('agent__progress_report');
+      names.add(finalReportToolName);
+      return names;
+    })();
+
+    return { pastMessage, nextMessage, nonce, slotTemplates, allowedTools: allowedToolNames };
   }
 
   // Extracted batch execution for readability

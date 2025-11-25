@@ -199,6 +199,10 @@ Alternative designs considered
   - MCP and REST providers expose `tool.queue` metadata so `ToolsOrchestrator` can acquire/releases slots per call. Internal helpers never acquire slots.
   - Waiting executions emit `queued` log entries (with wait duration/capacity) and queue listeners update telemetry (`ai_agent_queue_depth`, `ai_agent_queue_wait_duration_ms`).
   - Cancelation propagates via `AbortSignal`; when a session ends we abort any queued waiters so the slot counter never leaks.
+- XML transport (tooling.transport = xml | xml-final):
+  - `xml`: provider tool definitions are withheld; toolChoice forced to `auto`. Each turn injects XML-NEXT (nonce, slots, schemas, final-report slot, optional progress) and optional XML-PAST (previous turn tool results). Assistant XML tags are parsed into toolCalls; native tool_calls are ignored. Progress shares the same XML channel.
+  - `xml-final`: provider tool definitions stay native (tool_calls) but the final report must be provided via XML. XML-NEXT reminds the model to call tools natively; progress slot suppressed; XML-PAST omitted. Assistant XML tags are parsed only for final-report/progress.
+  - Accounting uses `source: xml`; final-report command recorded as `agent__final_report_xml`; context guard still applies based on XML message size and tool outputs.
 
 ## Headend Surfaces
 

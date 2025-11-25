@@ -149,6 +149,7 @@ export interface GlobalOverrides {
   reasoning?: ReasoningLevel | 'none' | 'inherit';
   reasoningValue?: ProviderReasoningValue | null;
   caching?: 'none' | 'full';
+  toolingTransport?: 'native' | 'xml' | 'xml-final';
 }
 
 export interface LoadAgentOptions {
@@ -200,6 +201,7 @@ export interface LoadAgentOptions {
   ancestors?: string[];
   reasoning?: ReasoningLevel | 'none';
   caching?: 'none' | 'full';
+  toolingTransport?: 'native' | 'xml' | 'xml-final';
 }
 
 const resolveInputContract = (
@@ -361,6 +363,11 @@ function constructLoadedAgent(args: ConstructAgentArgs): LoadedAgent {
   ));
 
   let config = buildUnifiedConfiguration({ providers: needProviders, mcpServers: externalToolNames, restTools: externalToolNames }, layers, { verbose: options?.verbose });
+  if (options?.toolingTransport !== undefined) {
+    const tooling = { ...(config.tooling ?? {}) } as { transport?: 'native' | 'xml' | 'xml-final' };
+    tooling.transport = options.toolingTransport;
+    config = { ...config, tooling };
+  }
   if (options?.providerOverrides !== undefined) {
     Object.entries(options.providerOverrides).forEach(([name, override]) => {
       const existing = config.providers[name];
@@ -626,6 +633,7 @@ function constructLoadedAgent(args: ConstructAgentArgs): LoadedAgent {
       reasoning: eff.reasoning,
       reasoningValue: eff.reasoningValue,
       caching: eff.caching,
+      toolingTransport: config.tooling?.transport ?? 'native',
       headendId: o.headendId ?? o.renderTarget ?? 'cli',
       headendWantsProgressUpdates: o.wantsProgressUpdates !== undefined ? o.wantsProgressUpdates : true,
       // Preserve the original reference (no clone) so recursion guards see identical identity.

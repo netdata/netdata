@@ -35,6 +35,7 @@
 
 ### Overview
 - [tools-overview.md](tools-overview.md) - Tool system architecture
+- [tools-xml-transport.md](tools-xml-transport.md) - XML tool transport, XML-NEXT/PAST, slot validation, provider tool hiding
 
 ### Internal Tools
 - [tools-final-report.md](tools-final-report.md) - Final report delivery

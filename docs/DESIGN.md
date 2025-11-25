@@ -16,6 +16,7 @@ Each AI agent session is a **completely independent universe** with ZERO shared 
 - Main agent loop orchestrating turns, retries, and provider switching
 - Session state management and immutable operations
 - **Does NOT care about LLM details or tool execution mechanics**
+- XML transport (opt-in) lives here: when `tooling.transport` is `xml|xml-final`, XML-NEXT/PAST notices carry nonce, slots, and schemas; the model must emit `<ai-agent-NONCE-XXXX tool=\"...\">` tags. In `xml`, provider tool lists are hidden and all tools use XML. In `xml-final`, provider tool lists remain native (tool_calls) while only the final report rides over XML; progress is suppressed in this mode.
 
 #### llm-client.ts (Single Turn Implementation)
 - Complete implementation of single LLM turn execution

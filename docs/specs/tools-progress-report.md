@@ -1,7 +1,7 @@
 # progress_report Tool
 
 ## TL;DR
-Optional tool for reporting intermediate status during execution. Updates session title and emits progress events. Enabled only when external tools or subagents present.
+Optional tool for reporting intermediate status during execution. Updates session title and emits progress events. Enabled only when external tools or subagents present. In XML transport, progress uses the XML slot alongside final-report; provider tool list is hidden so the model must emit the XML tag.
 
 ## Source Files
 - `src/tools/internal-provider.ts` - Tool definition and handler
@@ -55,6 +55,9 @@ const enableProgressTool = wantsProgressUpdates && (hasNonInternalDeclaredTools 
 2. AND (has external tools OR has subagents)
 
 ## Execution Flow
+
+### XML Transport
+- When `tooling.transport` is `xml`, progress updates are sent via `<ai-agent-NONCE-XXXX tool="agent__progress_report">text</ai-agent-NONCE-XXXX>` using the slots declared in XML-NEXT; native `tool_calls` are dropped in this mode. Progress is suppressed in `xml-final`.
 
 ### 1. Status Update
 **Location**: `src/ai-agent.ts:624-657`

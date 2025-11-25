@@ -82,6 +82,7 @@ const FINAL_RESPONSE_KIND = 'final-report' as const;
 const MARKDOWN_FORMAT = 'markdown' as const;
 const STATUS_SUCCESS = 'success' as const;
 const STATUS_FAILURE = 'failure' as const;
+// Reserved for future XML scenarios
 const TOOL_REQUEST_TEXT = 'Requesting test to gather information.';
 const TOOL_ARGUMENT_SUCCESS = 'phase-1-tool-success';
 const TOOL_ARGUMENT_LONG_OUTPUT = 'long-output';

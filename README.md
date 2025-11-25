@@ -8,6 +8,13 @@ AI Agent is a framework that transforms how you build and deploy AI agents. Inst
 
 One simple format (`.ai` files) works as standalone agents, sub-agents, master orchestrators, API services, Slack bots, or web apps. Write once, use everywhere.
 
+Key features at a glance:
+- Multi-provider support (OpenAI, Anthropic, Google, OpenRouter, Ollama, Test LLM)
+- MCP/REST/sub-agent/internal tools with concurrency queues and context guard
+- Deterministic Phase 1/2 harnesses for regression coverage
+- XML transport option (`tooling.transport=xml|xml-final`): `xml` hides tool defs and requires XML tags for tools; `xml-final` keeps provider tools native but requires the final report via XML (`<ai-agent-NONCE-XXXX tool="agent__final_report">…</ai-agent-NONCE-XXXX>`); progress shares the XML channel in `xml` and is suppressed in `xml-final`
+- CLI override `--tooling-transport native|xml|xml-final` to switch transports without editing config/frontmatter (CLI wins over file defaults)
+
 ## Architecture: Recursive Autonomous Agents
 
 AI Agent implements a **recursive planning agent architecture** where every agent continuously plans, executes, observes, and adapts. Unlike traditional frameworks that separate "orchestrators" from "workers," every agent in this system is both a planner and an executor.

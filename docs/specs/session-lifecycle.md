@@ -67,11 +67,11 @@ Session created via static factory, executes main loop with turn-level retries, 
 6. Check pricing coverage, warn on missing entries
 7. Expand system prompt (apply format placeholder, variable expansion)
 8. Expand user prompt
-9. Build enhanced system prompt with tool instructions
+9. Build enhanced system prompt with tool instructions (native only; XML transport omits tool instructions)
 10. Initialize conversation:
     - If conversationHistory: merge with enhanced system prompt
     - Else: create new with system + user messages
-11. Execute agent loop
+11. Execute agent loop (XML modes inject XML-PAST/XML-NEXT each turn and hide provider tool definitions)
 12. Flatten opTree for logs/accounting
 13. End system turn (turn 0)
 14. End session in opTree
@@ -92,6 +92,7 @@ Session created via static factory, executes main loop with turn-level retries, 
 for turn = 1 to maxTurns:
   check cancellation/stop
   begin turn in opTree
+  if transport=xml|xml-final: rebuild XML-NEXT (nonce, slots, schemas, final-report slot, optional progress) and XML-PAST (previous turn results); append to conversation. In `xml`, provider tools list is withheld; in `xml-final`, provider tools remain native.
 
   attempts = 0
   while attempts < maxRetries and not successful:

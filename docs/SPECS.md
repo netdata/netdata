@@ -16,7 +16,7 @@ Our conversation schemas, reasoning payloads, tool definitions, and streaming ex
 2. **Execution**: Command-line interface accepts providers, models, MCP tools, and prompts (positionals), plus optional flags
 3. **Bootstrap**: Validates config and initializes MCP servers. Initialization is non-fatal: failures are logged and the agent can still proceed to the LLM. Use `--trace-mcp` to inspect initialization details. In `--dry-run`, both MCP spawn and LLM calls are skipped. Shared MCP servers retry initialization indefinitely using an exponential backoff (0, 1, 2, 5, 10, 30, 60 seconds; 60 s repeats) and log every restart decision/failure with `ERR`. The only way to stop retries is to disable the server and restart the agent. Private (`shared: false`) servers retain the single-retry behavior. Shared transports now also monitor `onclose` signals (stdio child exit, websocket close, streamable HTTP disconnect) and immediately enqueue the same restart loop, so a dead MCP process is recovered before the next request times out.
 4. **Processing**: Sends requests to LLMs with available tools (schemas). The LLM orchestrates repeated tool calls. The agent preserves assistant tool_calls and tool results in history and loops until completion (see Agentic Behavior)
-5. **Output**: Streams LLM responses to stdout in real time, logs errors to stderr
+5. **Output**: Streams LLM responses to stdout in real time, logs errors to stderr. In `xml`, provider tool schemas are withheld and tools must be called via XML tags (progress shares the XML channel). In `xml-final`, provider tools stay native (tool_calls) but the final report must be returned via the XML tag (progress suppressed).
 
 ## Agentic Behavior
 
