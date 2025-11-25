@@ -420,8 +420,10 @@ void do_mssql_general_stats(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *
     if (unlikely(!pObjectType))
         return;
 
-    if (likely(perflibGetObjectCounter(pDataBlock, pObjectType, &mi->MSSQLUserConnections))) {
-        do_mssql_user_connections(mi, update_every);
+    if (unlikely(!mi->conn) || unlikely(!mi->conn->collect_user_connections)) {
+        if (likely(perflibGetObjectCounter(pDataBlock, pObjectType, &mi->MSSQLUserConnections))) {
+            do_mssql_user_connections(mi, update_every);
+        }
     }
 
     if (likely(perflibGetObjectCounter(pDataBlock, pObjectType, &mi->MSSQLBlockedProcesses))) {

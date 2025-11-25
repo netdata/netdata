@@ -37,6 +37,8 @@
 
 #define NETDATA_QUERY_JOBS_STATUS "SELECT name, enabled FROM msdb.dbo.sysjobs;"
 
+#define NETDATA_QUERY_USER_CONNECTIONS "SELECT COUNT(*) AS user_connections FROM sys.dm_exec_sessions WHERE is_user_process = 1;"
+
 // https://learn.microsoft.com/en-us/sql/relational-databases/system-dynamic-management-views/sys-dm-os-wait-stats-transact-sql?view=sql-server-ver16
 #define NETDATA_QUERY_CHECK_WAITS                                                                                      \
     "SELECT                                                                                                            \
@@ -670,6 +672,7 @@ struct netdata_mssql_conn {
     SQLHSTMT dbLocksSTMT;
     SQLHSTMT dbSQLState;
     SQLHSTMT dbSQLJobs;
+    SQLHSTMT dbSQLUserConnections;
     SQLHSTMT dbReplicationPublisher;
 
     BOOL collect_transactions;
@@ -679,6 +682,7 @@ struct netdata_mssql_conn {
     BOOL collect_jobs;
     BOOL collect_buffer;
     BOOL collect_data_size;
+    BOOL collect_user_connections;
 
     BOOL is_connected;
 };
@@ -695,6 +699,7 @@ enum netdata_mssql_metrics {
     NETDATA_MSSQL_WAITS,
     NETDATA_MSSQL_BUFFER_MANAGEMENT,
     NETDATA_MSSQL_JOBS,
+    NETDATA_USER_CONNECTIONS,
 
     NETDATA_MSSQL_METRICS_END
 };
@@ -982,9 +987,10 @@ netdata_mssql_get_perf_data_block(bool *collect_perflib, struct mssql_instance *
     return pDataBlock;
 }
 
-void do_mssql_general_stats(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *mi, int update_every);
-void do_mssql_errors(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *mi, int update_every);
-void do_mssql_memory_mgr(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *mi, int update_every);
-void do_mssql_statistics_perflib(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *mi, int update_every);
-void do_mssql_access_methods(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *mi, int update_every);
+extern void do_mssql_general_stats(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *mi, int update_every);
+extern void do_mssql_errors(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *mi, int update_every);
+extern void do_mssql_memory_mgr(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *mi, int update_every);
+extern void do_mssql_statistics_perflib(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *mi, int update_every);
+extern void do_mssql_access_methods(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *mi, int update_every);
+extern void do_mssql_user_connections(struct mssql_instance *mi, int update_every);
 #endif

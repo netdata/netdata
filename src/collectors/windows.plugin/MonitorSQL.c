@@ -739,7 +739,7 @@ enddrunquery:
     return 1;
 }
 
-long metdata_mssql_check_permission(struct mssql_instance *mi)
+long netdata_mssql_check_permission(struct mssql_instance *mi)
 {
     static int next_try = NETDATA_MSSQL_NEXT_TRY - 1;
     long perm = 0;
@@ -779,7 +779,7 @@ endperm:
     return perm;
 }
 
-void metdata_mssql_fill_mssql_status(struct mssql_instance *mi)
+void netdata_mssql_fill_mssql_status(struct mssql_instance *mi)
 {
     char dbname[SQLSERVER_MAX_NAME_LENGTH + 1];
     int readonly = 0;
@@ -831,7 +831,7 @@ enddbstate:
     netdata_MSSQL_release_results(mi->conn->dbSQLState);
 }
 
-void metdata_mssql_fill_job_status(struct mssql_instance *mi)
+void netdata_mssql_fill_job_status(struct mssql_instance *mi)
 {
     char job[SQLSERVER_MAX_NAME_LENGTH + 1];
     BYTE state = 0;
@@ -882,7 +882,42 @@ enddbjobs:
     netdata_MSSQL_release_results(mi->conn->dbSQLJobs);
 }
 
-void metdata_mssql_fill_dictionary_from_db(struct mssql_instance *mi)
+void netdata_mssql_fill_user_connection(struct mssql_instance *mi)
+{
+    if (unlikely(!mi->conn->collect_user_connections))
+        return;
+
+    collected_number connections = 0;
+    SQLLEN col_user_connections_len = 0;
+
+    SQLRETURN ret;
+
+    ret = SQLExecDirect(mi->conn->dbSQLUserConnections, (SQLCHAR *)NETDATA_QUERY_USER_CONNECTIONS, SQL_NTS);
+    if (likely(netdata_mssql_check_result(ret))) {
+        netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn->dbSQLUserConnections, NETDATA_MSSQL_ODBC_QUERY, mi->instanceID);
+        goto enduserconn;
+    }
+
+    ret = SQLBindCol(mi->conn->dbSQLUserConnections, 1, SQL_C_LONG, &connections, sizeof(connections), &col_user_connections_len);
+    if (likely(netdata_mssql_check_result(ret))) {
+        netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn->dbSQLUserConnections, NETDATA_MSSQL_ODBC_PREPARE, mi->instanceID);
+        goto enduserconn;
+    }
+
+    do {
+        ret = SQLFetch(mi->conn->dbSQLUserConnections);
+        if (likely(netdata_mssql_check_result(ret))) {
+            goto enduserconn;
+        }
+
+        mi->MSSQLUserConnections.current.Data = (ULONGLONG)connections;
+    } while (true);
+
+enduserconn:
+    netdata_MSSQL_release_results(mi->conn->dbSQLUserConnections);
+}
+
+void netdata_mssql_fill_dictionary_from_db(struct mssql_instance *mi)
 {
     char dbname[SQLSERVER_MAX_NAME_LENGTH + 1];
     SQLLEN col_data_len = 0;
@@ -1043,6 +1078,12 @@ static bool netdata_MSSQL_initialize_connection(struct netdata_mssql_conn *nmc)
             goto endMSSQLInitializationConnection;
         }
 
+        ret = SQLAllocHandle(SQL_HANDLE_STMT, nmc->netdataSQLHDBc, &nmc->dbSQLUserConnections);
+        if (likely(netdata_mssql_check_result(ret))) {
+            retConn = FALSE;
+            goto endMSSQLInitializationConnection;
+        }
+
         ret = SQLAllocHandle(SQL_HANDLE_STMT, nmc->netdataSQLHDBc, &nmc->dbReplicationPublisher);
         if (likely(netdata_mssql_check_result(ret))) {
             retConn = FALSE;
@@ -1090,6 +1131,8 @@ static void initialize_mssql_objects(struct mssql_instance *mi, const char *inst
 
     strncpyz(&name[length], "SystemJobs", sizeof(name) - length);
     mi->objectName[NETDATA_MSSQL_JOBS] = strdupz(name);
+
+    mi->objectName[NETDATA_USER_CONNECTIONS] = NULL;
 
     strncpyz(&name[length], "Memory Manager", sizeof(name) - length);
     mi->objectName[NETDATA_MSSQL_MEMORY] = strdupz(name);
@@ -1280,6 +1323,8 @@ static void netdata_read_config_options()
                 &netdata_config, section_name, "collect buffer stats", true);
         dbconn->collect_data_size = inicfg_get_boolean(
                 &netdata_config, section_name, "collect database size", true);
+        dbconn->collect_user_connections = inicfg_get_boolean(
+                &netdata_config, section_name, "collect user connections", true);
         dbconn->is_connected = FALSE;
 
         netdata_mount_mssql_connection_string(dbconn);
@@ -1426,7 +1471,7 @@ int dict_mssql_query_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value,
     static long collecting = 1;
 
     if (likely(mi->conn && mi->conn->is_connected && collecting)) {
-        collecting = metdata_mssql_check_permission(mi);
+        collecting = netdata_mssql_check_permission(mi);
         if (!collecting) {
             nd_log(
                 NDLS_COLLECTORS,
@@ -1435,9 +1480,10 @@ int dict_mssql_query_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value,
                 mi->conn->username,
                 mi->instanceID);
         } else {
-            metdata_mssql_fill_dictionary_from_db(mi);
-            metdata_mssql_fill_mssql_status(mi);
-            metdata_mssql_fill_job_status(mi);
+            netdata_mssql_fill_dictionary_from_db(mi);
+            netdata_mssql_fill_mssql_status(mi);
+            netdata_mssql_fill_job_status(mi);
+            netdata_mssql_fill_user_connection(mi);
             dictionary_sorted_walkthrough_read(mi->databases, dict_mssql_databases_run_queries, NULL);
         }
 
@@ -2133,6 +2179,14 @@ static void do_mssql_job_status_sql(PERF_DATA_BLOCK *pDataBlock, struct mssql_in
         return;
 
     dictionary_sorted_walkthrough_read(mi->sysjobs, dict_mssql_sysjobs_chart_cb, mi);
+}
+
+static void do_mssql_user_connection(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *mi, int update_every)
+{
+    if (unlikely(!mi->conn->collect_user_connections))
+        return;
+
+    do_mssql_user_connections(mi, update_every);
 }
 
 void dict_mssql_replication_status(struct mssql_publisher_publication *mpp, int update_every)
@@ -3004,13 +3058,14 @@ int dict_mssql_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value
         do_mssql_waits,
         do_mssql_bufferman_stats_sql,
         do_mssql_job_status_sql,
+        do_mssql_user_connection,
 
         NULL};
 
     DWORD i;
     PERF_DATA_BLOCK *pDataBlock;
     static bool collect_perflib[NETDATA_MSSQL_METRICS_END] = {
-        true, true, true, true, true, true, true, true, true, true};
+        true, true, true, true, true, true, true, true, true, true, false};
     for (i = 0; i < NETDATA_MSSQL_ACCESS_METHODS; i++) {
         if (unlikely(!collect_perflib[i]))
             continue;
