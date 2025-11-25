@@ -894,26 +894,26 @@ void netdata_mssql_fill_user_connection(struct mssql_instance *mi)
 
     SQLRETURN ret;
 
-    ret = SQLExecDirect(mi->conn->dbSQLUserConnections, (SQLCHAR *)NETDATA_QUERY_CONNECTIONS, SQL_NTS);
+    ret = SQLExecDirect(mi->conn->dbSQLConnections, (SQLCHAR *)NETDATA_QUERY_CONNECTIONS, SQL_NTS);
     if (likely(netdata_mssql_check_result(ret))) {
-        netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn->dbSQLUserConnections, NETDATA_MSSQL_ODBC_QUERY, mi->instanceID);
+        netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn->dbSQLConnections, NETDATA_MSSQL_ODBC_QUERY, mi->instanceID);
         goto enduserconn;
     }
 
-    ret = SQLBindCol(mi->conn->dbSQLUserConnections, 1, SQL_C_LONG, &connections, sizeof(connections), &col_user_connections_len);
+    ret = SQLBindCol(mi->conn->dbSQLConnections, 1, SQL_C_LONG, &connections, sizeof(connections), &col_user_connections_len);
     if (likely(netdata_mssql_check_result(ret))) {
-        netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn->dbSQLUserConnections, NETDATA_MSSQL_ODBC_PREPARE, mi->instanceID);
+        netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn->dbSQLConnections, NETDATA_MSSQL_ODBC_PREPARE, mi->instanceID);
         goto enduserconn;
     }
 
-    ret = SQLBindCol(mi->conn->dbSQLUserConnections, 2, SQL_C_BIT, &is_user, sizeof(is_user), &col_user_bit_len);
+    ret = SQLBindCol(mi->conn->dbSQLConnections, 2, SQL_C_BIT, &is_user, sizeof(is_user), &col_user_bit_len);
     if (likely(netdata_mssql_check_result(ret))) {
-        netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn->dbSQLUserConnections, NETDATA_MSSQL_ODBC_PREPARE, mi->instanceID);
+        netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn->dbSQLConnections, NETDATA_MSSQL_ODBC_PREPARE, mi->instanceID);
         goto enduserconn;
     }
 
     do {
-        ret = SQLFetch(mi->conn->dbSQLUserConnections);
+        ret = SQLFetch(mi->conn->dbSQLConnections);
         if (likely(netdata_mssql_check_result(ret))) {
             goto enduserconn;
         }
@@ -923,7 +923,7 @@ void netdata_mssql_fill_user_connection(struct mssql_instance *mi)
     } while (true);
 
 enduserconn:
-    netdata_MSSQL_release_results(mi->conn->dbSQLUserConnections);
+    netdata_MSSQL_release_results(mi->conn->dbSQLConnections);
 }
 
 void netdata_mssql_fill_dictionary_from_db(struct mssql_instance *mi)
@@ -1087,7 +1087,7 @@ static bool netdata_MSSQL_initialize_connection(struct netdata_mssql_conn *nmc)
             goto endMSSQLInitializationConnection;
         }
 
-        ret = SQLAllocHandle(SQL_HANDLE_STMT, nmc->netdataSQLHDBc, &nmc->dbSQLUserConnections);
+        ret = SQLAllocHandle(SQL_HANDLE_STMT, nmc->netdataSQLHDBc, &nmc->dbSQLConnections);
         if (likely(netdata_mssql_check_result(ret))) {
             retConn = FALSE;
             goto endMSSQLInitializationConnection;
