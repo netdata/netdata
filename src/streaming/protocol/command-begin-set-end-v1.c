@@ -29,7 +29,10 @@ void stream_send_rrdset_metrics_v1(RRDSET_STREAM_BUFFER *rsb, RRDSET *st) {
             buffer_fast_strcat(wb, PLUGINSD_KEYWORD_SET " \"", 5);
             buffer_fast_strcat(wb, rrddim_id(rd), string_strlen(rd->id));
             buffer_fast_strcat(wb, "\" = ", 4);
-            buffer_print_int64(wb, (int64_t)rrddim_collected_as_double(rd));
+            if(rrddim_is_float(rd))
+                buffer_print_netdata_double(wb, rrddim_collected_as_double(rd));
+            else
+                buffer_print_int64(wb, rrddim_last_collected_raw_int(rd));
             buffer_fast_strcat(wb, "\n", 1);
         }
         else {

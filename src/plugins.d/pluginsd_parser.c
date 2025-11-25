@@ -1112,7 +1112,11 @@ static ALWAYS_INLINE PARSER_RC pluginsd_end_v2(char **words __maybe_unused, size
                 continue;
 
             rd->collector.calculated_value = 0;
-            rrddim_set_collected_int(rd, 0);
+            if(rrddim_is_float(rd)) {
+                rrddim_set_collected_float(rd, 0.0);
+            }
+            else
+                rrddim_set_collected_int(rd, 0);
             rrddim_clear_updated(rd);
         }
     }
@@ -1120,7 +1124,11 @@ static ALWAYS_INLINE PARSER_RC pluginsd_end_v2(char **words __maybe_unused, size
         RRDDIM *rd;
         rrddim_foreach_read(rd, st){
             rd->collector.calculated_value = 0;
-            rrddim_set_collected_int(rd, 0);
+            if(rrddim_is_float(rd)) {
+                rrddim_set_collected_float(rd, 0.0);
+            }
+            else
+                rrddim_set_collected_int(rd, 0);
             rrddim_clear_updated(rd);
         }
         rrddim_foreach_done(rd);

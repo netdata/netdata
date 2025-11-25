@@ -647,8 +647,8 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
     size_t dim_id;
     size_t dimensions = 0;
     struct rda_item *rda = rda_base;
-    total_number collected_total = 0;
-    total_number last_collected_total = 0;
+    NETDATA_DOUBLE collected_total = 0.0;
+    NETDATA_DOUBLE last_collected_total = 0.0;
     rrddim_foreach_read(rd, st) {
         if(rd_dfe.counter >= rda_slots)
             break;
@@ -675,7 +675,10 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
                 if(!(rrddim_option_check(rd, RRDDIM_OPTION_DONT_DETECT_RESETS_OR_OVERFLOWS)))
                     rda->reset_or_overflow = true;
 
-                rrddim_set_last_collected_float(rd, rrddim_collected_as_double(rd));
+                if(rrddim_is_float(rd))
+                    rrddim_set_last_collected_float(rd, rrddim_collected_as_double(rd));
+                else
+                    rrddim_set_last_collected_int(rd, rd->collector.collected.i.collected_value);
             }
 
             last_collected_total += rrddim_last_collected_as_double(rd);

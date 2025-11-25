@@ -241,7 +241,7 @@ static void replication_send_chart_collection_state(BUFFER *wb, RRDSET *st, STRE
         if(send_double_baseline)
             buffer_print_netdata_double_encoded(wb, integer_encoding, rrddim_last_collected_as_double(rd));
         else
-            buffer_print_int64_encoded(wb, integer_encoding, (int64_t)rrddim_last_collected_as_double(rd));
+            buffer_print_int64_encoded(wb, integer_encoding, rrddim_last_collected_raw_int(rd));
 
         buffer_fast_strcat(wb, " ", 1);
         buffer_print_netdata_double_encoded(wb, integer_encoding, rd->collector.last_calculated_value);

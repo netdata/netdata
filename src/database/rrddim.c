@@ -615,6 +615,20 @@ NETDATA_DOUBLE rrddim_set_by_pointer_double(RRDSET *st, RRDDIM *rd, NETDATA_DOUB
     struct timeval now;
     now_realtime_timeval(&now);
 
+    // For float dims, store exact; for int dims, keep int semantics
+    if(rrddim_is_float(rd)) {
+        rd->collector.last_collected_time = now;
+        rrddim_set_collected_float(rd, value);
+        rrddim_set_updated(rd);
+        rd->collector.counter++;
+
+        NETDATA_DOUBLE v = value >= 0 ? value : -value;
+        if(unlikely(v > rrddim_collected_max_as_double(rd)))
+            rrddim_set_collected_max_float(rd, v);
+
+        return rrddim_last_collected_as_double(rd);
+    }
+
     return (NETDATA_DOUBLE)rrddim_timed_set_by_pointer(st, rd, now, (collected_number)value);
 }
 
