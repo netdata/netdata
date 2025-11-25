@@ -4,15 +4,31 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { SpanKind, SpanStatusCode, type Attributes } from '@opentelemetry/api';
-import Ajv from 'ajv';
 
 import type { OutputFormatId } from './formats.js';
 import type { SessionNode } from './session-tree.js';
 import type { AIAgentSessionConfig, AIAgentResult, ConversationMessage, LogEntry, AccountingEntry, Configuration, TurnRequest, LLMAccountingEntry, MCPTool, ToolAccountingEntry, RestToolConfig, ProgressMetrics, ToolCall, SessionSnapshotPayload, AccountingFlushPayload, ReasoningLevel, ProviderReasoningMapping, ProviderReasoningValue, TurnRetryDirective, TurnStatus, LogDetailValue, ToolChoiceMode, LogPayload, TurnRequestContextMetrics } from './types.js';
-import type { Ajv as AjvClass, ErrorObject, Options as AjvOptions } from 'ajv';
+
+import { validateProviders, validateMCPServers, validatePrompts } from './config.js';
+import { ContextGuard, type ContextGuardBlockedEntry, type ContextGuardEvaluation, type TargetContextConfig } from './context-guard.js';
+import { FinalReportManager, FINAL_REPORT_FORMAT_VALUES, FINAL_REPORT_SOURCE_TEXT_FALLBACK, FINAL_REPORT_SOURCE_TOOL_MESSAGE, type PendingFinalReportPayload } from './final-report-manager.js';
+import { parseFrontmatter, parsePairs, extractBodyWithoutFrontmatter } from './frontmatter.js';
+import { LLMClient } from './llm-client.js';
+import { buildPromptVars, applyFormat, expandVars } from './prompt-builder.js';
+import { SessionProgressReporter } from './session-progress-reporter.js';
+import { SessionTreeBuilder } from './session-tree.js';
+import { SubAgentRegistry } from './subagent-registry.js';
+import { recordContextGuardMetrics, recordFinalReportMetrics, recordLlmMetrics, recordRetryCollapseMetrics, runWithSpan, addSpanAttributes, addSpanEvent } from './telemetry/index.js';
+import { AgentProvider } from './tools/agent-provider.js';
+import { InternalToolProvider } from './tools/internal-provider.js';
+import { MCPProvider } from './tools/mcp-provider.js';
+import { RestProvider } from './tools/rest-provider.js';
+import { ToolsOrchestrator, type ManagedToolResult } from './tools/tools.js';
+import { appendCallPathSegment, clampToolName, formatToolRequestCompact, normalizeCallPath, parseJsonRecord, parseJsonRecordDetailed, parseJsonValueDetailed, sanitizeToolName, truncateUtf8WithNotice, warn } from './utils.js';
+import { buildToolCallFromParsed, createXmlParser, renderXmlNext, renderXmlPast, type XmlNextPayload, type XmlPastEntry, type XmlSlotTemplate } from './xml-tools.js';
 
 // Exit codes according to DESIGN.md
-type ExitCode = 
+type ExitCode =
   // SUCCESS
   | 'EXIT-FINAL-ANSWER'
   | 'EXIT-MAX-TURNS-WITH-RESPONSE'
@@ -42,42 +58,16 @@ type ExitCode =
   | 'EXIT-SIGNAL-RECEIVED'
   | 'EXIT-UNKNOWN';
 
-
-const FINAL_REPORT_FORMAT_VALUES = ['json', 'markdown', 'markdown+mermaid', 'slack-block-kit', 'tty', 'pipe', 'sub-agent', 'text'] as const satisfies readonly NonNullable<AIAgentResult['finalReport']>['format'][];
-type FinalReportPayload = NonNullable<AIAgentResult['finalReport']>;
-type PendingFinalReportPayload = Omit<FinalReportPayload, 'ts'>;
-const FINAL_REPORT_SOURCE_TEXT_FALLBACK = 'text-fallback' as const;
-const FINAL_REPORT_SOURCE_TOOL_MESSAGE = 'tool-message' as const;
+// PendingFinalReportSource type alias for internal use
 type PendingFinalReportSource = typeof FINAL_REPORT_SOURCE_TEXT_FALLBACK | typeof FINAL_REPORT_SOURCE_TOOL_MESSAGE;
+
 interface ToolSelection {
   availableTools: MCPTool[];
   allowedToolNames: Set<string>;
   toolsForTurn: MCPTool[];
 }
 
-import { validateProviders, validateMCPServers, validatePrompts } from './config.js';
-import { ContextGuard, type ContextGuardBlockedEntry, type ContextGuardEvaluation, type TargetContextConfig } from './context-guard.js';
-import { parseFrontmatter, parsePairs, extractBodyWithoutFrontmatter } from './frontmatter.js';
-import { LLMClient } from './llm-client.js';
-import { buildPromptVars, applyFormat, expandVars } from './prompt-builder.js';
-import { SessionProgressReporter } from './session-progress-reporter.js';
-import { SessionTreeBuilder } from './session-tree.js';
-import { SubAgentRegistry } from './subagent-registry.js';
-import { recordContextGuardMetrics, recordFinalReportMetrics, recordLlmMetrics, recordRetryCollapseMetrics, runWithSpan, addSpanAttributes, addSpanEvent } from './telemetry/index.js';
-import { AgentProvider } from './tools/agent-provider.js';
-import { InternalToolProvider } from './tools/internal-provider.js';
-import { MCPProvider } from './tools/mcp-provider.js';
-import { RestProvider } from './tools/rest-provider.js';
-import { ToolsOrchestrator, type ManagedToolResult } from './tools/tools.js';
-import { appendCallPathSegment, clampToolName, formatToolRequestCompact, normalizeCallPath, parseJsonRecord, parseJsonRecordDetailed, parseJsonValueDetailed, sanitizeToolName, truncateUtf8WithNotice, warn } from './utils.js';
-import { buildToolCallFromParsed, createXmlParser, renderXmlNext, renderXmlPast, type XmlNextPayload, type XmlPastEntry, type XmlSlotTemplate } from './xml-tools.js';
-
 // Immutable session class according to DESIGN.md
-type AjvInstance = AjvClass;
-type AjvErrorObject = ErrorObject<string, Record<string, unknown>>;
-type AjvConstructor = new (options?: AjvOptions) => AjvInstance;
-const AjvCtor: AjvConstructor = Ajv as unknown as AjvConstructor;
-
 const estimateMessagesBytes = (messages: readonly ConversationMessage[] | undefined): number => {
   if (messages === undefined || messages.length === 0) return 0;
   return messages.reduce((total, message) => total + safeJsonByteLength(message), 0);
@@ -133,7 +123,6 @@ export class AIAgentSession {
   private readonly abortSignal?: AbortSignal;
   private canceled = false;
   private readonly stopRef?: { stopping: boolean };
-  private ajv?: AjvInstance;
   private readonly toolFailureMessages = new Map<string, string>();
   private readonly toolFailureFallbacks: string[] = [];
   private readonly contextGuard: ContextGuard;
@@ -175,18 +164,8 @@ export class AIAgentSession {
   private resolvedSystemPrompt?: string;
   private masterLlmStartLogged = false;
   private sessionTitle?: { title: string; emoji?: string; ts: number };
-  // Finalization state captured via agent__final_report
-  private finalReport?: {
-    status: 'success' | 'failure' | 'partial';
-    // Allow all known output formats plus legacy 'text'
-    format: 'json' | 'markdown' | 'markdown+mermaid' | 'slack-block-kit' | 'tty' | 'pipe' | 'sub-agent' | 'text';
-    content?: string;
-    content_json?: Record<string, unknown>;
-    metadata?: Record<string, unknown>;
-    ts: number;
-  };
-  private finalReportSource?: 'tool-call' | PendingFinalReportSource | 'synthetic';
-  private pendingFinalReport?: { source: PendingFinalReportSource; payload: PendingFinalReportPayload };
+  // Finalization state managed by FinalReportManager
+  private readonly finalReportManager: FinalReportManager;
   private pendingToolSelection?: ToolSelection;
   private pendingRetryMessages: string[] = [];
   private trimmedToolCallIds = new Set<string>();
@@ -195,8 +174,27 @@ export class AIAgentSession {
   // Counters for summary
   private llmAttempts = 0;
   private llmSyntheticFailures = 0;
-  private finalReportAttempts = 0;
   private centralSizeCapHits = 0;
+
+  // Delegation accessors for FinalReportManager
+  private get finalReport(): NonNullable<AIAgentResult['finalReport']> | undefined { return this.finalReportManager.getReport(); }
+  private set finalReport(value: NonNullable<AIAgentResult['finalReport']> | undefined) {
+    if (value === undefined) {
+      this.finalReportManager.clear();
+      return;
+    }
+    const payload: PendingFinalReportPayload = {
+      status: value.status,
+      format: value.format,
+      content: value.content,
+      content_json: value.content_json,
+      metadata: value.metadata,
+    };
+    this.finalReportManager.commit(payload, 'synthetic');
+  }
+  private get finalReportSource() { return this.finalReportManager.getSource(); }
+  private get pendingFinalReport() { return this.finalReportManager.getPending(); }
+  private get finalReportAttempts() { return this.finalReportManager.finalReportAttempts; }
   private currentLlmOpId?: string;
   private systemTurnBegan = false;
 
@@ -423,6 +421,10 @@ export class AIAgentSession {
     this._currentTurn = currentTurn;
     this.llmClient = llmClient;
     this.sessionConfig = sessionConfig;
+    // Initialize FinalReportManager (format resolved later in run())
+    this.finalReportManager = new FinalReportManager({
+      finalReportToolName: AIAgentSession.FINAL_REPORT_TOOL,
+    });
     this.abortSignal = sessionConfig.abortSignal;
     this.stopRef = sessionConfig.stopRef;
     this.headendId = sessionConfig.headendId;
@@ -682,6 +684,11 @@ export class AIAgentSession {
       this.resolvedFormat = formatInfo.formatId;
       this.resolvedFormatPromptValue = formatInfo.promptValue;
       this.resolvedFormatParameterDescription = formatInfo.parameterDescription;
+      this.finalReportManager.setResolvedFormat(
+        formatInfo.formatId,
+        formatInfo.promptValue,
+        formatInfo.parameterDescription
+      );
       orch.register(internalProvider);
     }
     if (this.subAgents !== undefined) {
@@ -1947,7 +1954,7 @@ export class AIAgentSession {
               if (this.toolTransport === 'native' && this.finalReport === undefined && !sanitizedHasToolCalls && sanitizedHasText) {
                 const extracted = this.tryAdoptFinalReportFromText(assistantForAdoption, textContent);
                 if (extracted !== undefined) {
-                  this.pendingFinalReport = { source: FINAL_REPORT_SOURCE_TEXT_FALLBACK, payload: extracted };
+                  this.finalReportManager.setPending(extracted, FINAL_REPORT_SOURCE_TEXT_FALLBACK);
                   const warnEntry: LogEntry = {
                     timestamp: Date.now(),
                     severity: 'WRN',
@@ -2080,7 +2087,7 @@ export class AIAgentSession {
           if (!toolFailureDetected) {
             const pending = adoptFromToolMessage();
             if (pending !== undefined) {
-              this.pendingFinalReport = { source: FINAL_REPORT_SOURCE_TOOL_MESSAGE, payload: pending };
+              this.finalReportManager.setPending(pending, FINAL_REPORT_SOURCE_TOOL_MESSAGE);
               const warnEntry: LogEntry = {
                 timestamp: Date.now(),
                 severity: 'WRN',
@@ -2409,8 +2416,9 @@ export class AIAgentSession {
                   rateLimitedInCycle = 0;
                   maxRateLimitWaitMs = 0;
                 }
-                this.finalReport = undefined;
-                this.finalReportSource = undefined;
+                if (finalReportStatus !== 'missing') {
+                  this.finalReportManager.clear();
+                }
                 this.pushSystemRetryMessage(conversation, this.buildFinalReportReminder());
                 continue;
               } else {
@@ -2859,18 +2867,9 @@ export class AIAgentSession {
     // Emit FIN summary even on failure
     this.emitFinalSummary(logs, accounting);
 
-    const fr = this.finalReport;
-    // eslint-disable-next-line @typescript-eslint/prefer-optional-chain, @typescript-eslint/no-unnecessary-condition
-    if (fr !== undefined && fr.status === 'failure') {
-      const requiredPhrase = 'Session completed without a final report';
-      if (typeof fr.content === 'string' && !fr.content.includes(requiredPhrase)) {
-        this.finalReport = {
-          ...fr,
-          content: `${requiredPhrase}. ${fr.content}`.trim(),
-        };
-      }
-    }
-    
+    // Note: FinalReportManager.commit() already ensures failure reports have the
+    // "Session completed without a final report" phrase, so no post-processing needed here.
+
     return {
       success: false,
       error: 'Max tool turns exceeded',
@@ -3066,55 +3065,6 @@ export class AIAgentSession {
       this.log(finMcp);
     } catch { /* swallow summary errors */ }
   }
-  private extractJsonRecordFromText(text: string): Record<string, unknown> | undefined {
-    const length = text.length;
-    let index = 0;
-    // eslint-disable-next-line functional/no-loop-statements
-    while (index < length) {
-      const startIdx = text.indexOf('{', index);
-      if (startIdx === -1) break;
-      let depth = 0;
-      let inString = false;
-      let escape = false;
-      // eslint-disable-next-line functional/no-loop-statements
-      for (let cursor = startIdx; cursor < length; cursor += 1) {
-        const ch = text[cursor];
-        if (inString) {
-          if (escape) {
-            escape = false;
-          } else if (ch === '\\') {
-            escape = true;
-          } else if (ch === '"') {
-            inString = false;
-          }
-          continue;
-        }
-        if (ch === '"') {
-          inString = true;
-          continue;
-        }
-        if (ch === '{') {
-          depth += 1;
-          continue;
-        }
-        if (ch === '}') {
-          depth -= 1;
-          if (depth === 0) {
-            const candidate = text.slice(startIdx, cursor + 1);
-            const parsed = parseJsonRecord(candidate);
-            if (parsed !== undefined) {
-              return parsed;
-            }
-            break;
-          }
-          continue;
-        }
-      }
-      index = startIdx + 1;
-    }
-    return undefined;
-  }
-
   private pushSystemRetryMessage(conversation: ConversationMessage[], message: string): void {
     const trimmed = message.trim();
     if (trimmed.length === 0) return;
@@ -3423,30 +3373,14 @@ export class AIAgentSession {
   }
 
   private commitFinalReport(payload: PendingFinalReportPayload, source: 'tool-call' | PendingFinalReportSource | 'synthetic'): void {
-    const ensureMissingPhrase = (content: string | undefined): string | undefined => {
-      if (payload.status !== 'failure') return content;
-      if (typeof content !== 'string') return content;
-      const phrase = 'Session completed without a final report';
-      return content.includes(phrase) ? content : `${phrase}. ${content}`.trim();
-    };
-
-    this.finalReport = {
-      status: payload.status,
-      format: payload.format,
-      content: ensureMissingPhrase(payload.content),
-      content_json: payload.content_json,
-      metadata: payload.metadata,
-      ts: Date.now()
-    };
-    this.finalReportSource = source;
-    this.pendingFinalReport = undefined;
+    this.finalReportManager.commit(payload, source);
   }
 
   private acceptPendingFinalReport(turn: number): void {
-    if (this.pendingFinalReport === undefined) return;
-    const pending = this.pendingFinalReport;
-    this.commitFinalReport(pending.payload, pending.source);
-    this.logFallbackAcceptance(pending.source, turn);
+    const acceptedSource = this.finalReportManager.acceptPending();
+    if (acceptedSource !== undefined) {
+      this.logFallbackAcceptance(acceptedSource, turn);
+    }
   }
 
   private finalizeWithCurrentFinalReport(
@@ -3459,59 +3393,24 @@ export class AIAgentSession {
     if (fr === undefined) {
       throw new Error('finalizeWithCurrentFinalReport called without final report');
     }
-    if (fr.format === 'json') {
-      const schema = this.sessionConfig.expectedOutput?.schema;
-      if (schema !== undefined && fr.content_json !== undefined) {
-        try {
-          this.ajv = this.ajv ?? new AjvCtor({ allErrors: true, strict: false });
-          const validate = this.ajv.compile(schema);
-          const valid = validate(fr.content_json);
-          if (!valid) {
-            const ajvErrors = Array.isArray(validate.errors) ? (validate.errors as AjvErrorObject[]) : [];
-            const errs = ajvErrors.map((error) => {
-              const path = typeof error.instancePath === 'string' && error.instancePath.length > 0
-                ? error.instancePath
-                : (typeof error.schemaPath === 'string' ? error.schemaPath : '');
-              const msg = typeof error.message === 'string' ? error.message : '';
-              return `${path} ${msg}`.trim();
-            }).join('; ');
-            const payloadPreview = (() => {
-              try {
-                const raw = JSON.stringify(fr.content_json);
-                return typeof raw === 'string'
-                  ? (raw.length > 200 ? `${raw.slice(0, 200)}…` : raw)
-                  : undefined;
-              } catch {
-                return undefined;
-              }
-            })();
-            const warn: LogEntry = {
-              timestamp: Date.now(),
-              severity: 'WRN',
-              turn: currentTurn,
-              subturn: 0,
-              direction: 'response',
-              type: 'llm',
-              remoteIdentifier: 'agent:ajv',
-              fatal: false,
-              message: `final_report JSON does not match schema: ${errs}${payloadPreview !== undefined ? `; payload preview=${payloadPreview}` : ''}`
-            };
-            this.log(warn);
-          }
-        } catch (e) {
-          const warn: LogEntry = {
-            timestamp: Date.now(),
-            severity: 'WRN',
-            turn: currentTurn,
-            subturn: 0,
-            direction: 'response',
-            type: 'llm',
-            remoteIdentifier: 'agent:ajv',
-            fatal: false,
-            message: `AJV validation failed: ${e instanceof Error ? e.message : String(e)}`
-          };
-          this.log(warn);
-        }
+    const schema = this.sessionConfig.expectedOutput?.schema;
+    if (schema !== undefined) {
+      const validationResult = this.finalReportManager.validateSchema(schema);
+      if (!validationResult.valid) {
+        const errs = validationResult.errors ?? 'unknown validation error';
+        const payloadPreview = validationResult.payloadPreview;
+        const warn: LogEntry = {
+          timestamp: Date.now(),
+          severity: 'WRN',
+          turn: currentTurn,
+          subturn: 0,
+          direction: 'response',
+          type: 'llm',
+          remoteIdentifier: 'agent:ajv',
+          fatal: false,
+          message: `final_report JSON does not match schema: ${errs}${payloadPreview !== undefined ? `; payload preview=${payloadPreview}` : ''}`
+        };
+        this.log(warn);
       }
     }
     if (this.sessionConfig.renderTarget !== 'sub-agent' && this.sessionConfig.callbacks?.onOutput !== undefined) {
@@ -3639,56 +3538,7 @@ export class AIAgentSession {
     if (typeof text !== 'string') return undefined;
     const trimmedText = text.trim();
     if (trimmedText.length === 0) return undefined;
-    const json = this.extractJsonRecordFromText(trimmedText);
-    
-    if (json === undefined) return undefined;
-    const isRecord = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value);
-    const pickString = (value: unknown): string | undefined => (typeof value === 'string' ? value : undefined);
-    const statusRaw = json.status;
-    const formatRaw = pickString(json.report_format) ?? pickString(json.format);
-    const contentJsonRaw = json.content_json;
-    const contentJson = isRecord(contentJsonRaw) ? contentJsonRaw : undefined;
-    const contentCandidate = pickString(json.report_content) ?? pickString(json.content);
-    if (typeof statusRaw !== 'string') return undefined;
-    const formatCandidate = (formatRaw ?? '').trim();
-    const formatMatch = FINAL_REPORT_FORMAT_VALUES.find((value) => value === formatCandidate);
-    if (formatMatch === undefined) return undefined;
-    const finalFormat = formatMatch;
-    const normalizedStatus = statusRaw === 'success' || statusRaw === 'failure' || statusRaw === 'partial'
-      ? statusRaw
-      : undefined;
-    if (normalizedStatus === undefined) return undefined;
-    const finalStatus: 'success' | 'failure' | 'partial' = normalizedStatus;
-    let finalContent: string | undefined = contentCandidate;
-    if ((finalContent === undefined || finalContent.trim().length === 0) && contentJson !== undefined) {
-      try {
-        finalContent = JSON.stringify(contentJson);
-      } catch {
-        finalContent = undefined;
-      }
-    }
-    if (finalContent === undefined) return undefined;
-    if (finalContent.trim().length === 0) return undefined;
-    const metadata = isRecord(json.metadata) ? json.metadata : undefined;
-    const parameters: Record<string, unknown> = {
-      status: finalStatus,
-      report_format: finalFormat,
-      report_content: finalContent,
-    };
-    if (contentJson !== undefined) parameters.content_json = contentJson;
-    if (metadata !== undefined) parameters.metadata = metadata;
-    const finalReportPayload: PendingFinalReportPayload = {
-      status: finalStatus,
-      format: finalFormat,
-      content: finalContent,
-    };
-    if (contentJson !== undefined) {
-      finalReportPayload.content_json = contentJson;
-    }
-    if (metadata !== undefined) {
-      finalReportPayload.metadata = metadata;
-    }
-    return finalReportPayload;
+    return this.finalReportManager.tryExtractFromText(trimmedText);
   }
 
   private sanitizeTurnMessages(
@@ -3881,7 +3731,7 @@ export class AIAgentSession {
           droppedReasons.push(`call ${callIndexStr}: parameters not object (raw: ${rawFull})`);
           if (AIAgentSession.FINAL_REPORT_TOOL_ALIASES.has(rawName)) {
             finalReportAttempted = true;
-            this.finalReportAttempts += 1;
+            this.finalReportManager.incrementAttempts();
           }
           return;
         }
@@ -4089,7 +3939,7 @@ export class AIAgentSession {
         this.xmlThisTurnEntries.push({ slotId, tool: normalizedToolName, status, durationMs: latency, request: safeRequest, response: safeResponse });
       };
       if (isFinalReportTool) {
-        this.finalReportAttempts += 1;
+        this.finalReportManager.incrementAttempts();
         const nestedCalls = this.parseNestedCallsFromFinalReport(parameters);
         if (nestedCalls !== undefined) {
           let nestedResult = AIAgentSession.TOOL_NO_OUTPUT;
