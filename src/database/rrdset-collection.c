@@ -771,54 +771,54 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
                     continue;
                 }
 
-                // If the new is smaller than the old (an overflow, or reset), set the old equal to the new
-                // to reset the calculation (it will give zero as the calculation for this second).
-                // It is imperative to set the comparison to uint64_t since type collected_number is signed and
-                // produces wrong results as far as incremental counters are concerned.
-                if(unlikely(rrddim_is_int(rd) && (uint64_t)rd->collector.collected.i.last_collected_value > (uint64_t)rd->collector.collected.i.collected_value)) {
-                    netdata_log_debug(D_RRD_STATS, "'%s' / '%s': RESET or OVERFLOW. Last collected value = " NETDATA_DOUBLE_FORMAT ", current = " NETDATA_DOUBLE_FORMAT
-                                      , rrdset_id(st)
-                                          , rrddim_name(rd)
-                                      , rrddim_last_collected_as_double(rd)
-                                      , rrddim_collected_as_double(rd));
-
-                    if(!(rrddim_option_check(rd, RRDDIM_OPTION_DONT_DETECT_RESETS_OR_OVERFLOWS)))
-                        rda->reset_or_overflow = true;
-
+                if(rrddim_is_int(rd)) {
                     uint64_t last = (uint64_t)rd->collector.collected.i.last_collected_value;
                     uint64_t new = (uint64_t)rd->collector.collected.i.collected_value;
                     uint64_t max = (uint64_t)rd->collector.collected.i.collected_value_max;
-                    uint64_t cap = 0;
 
-                    // Signed values are handled by exploiting two's complement which will produce positive deltas
-                    if (max > 0x00000000FFFFFFFFULL)
-                        cap = 0xFFFFFFFFFFFFFFFFULL; // handles signed and unsigned 64-bit counters
-                    else
-                        cap = 0x00000000FFFFFFFFULL; // handles signed and unsigned 32-bit counters
+                    // If the new is smaller than the old (overflow/reset), handle wrap
+                    if(unlikely(last > new)) {
+                        netdata_log_debug(D_RRD_STATS, "'%s' / '%s': RESET or OVERFLOW. Last collected value = " NETDATA_DOUBLE_FORMAT ", current = " NETDATA_DOUBLE_FORMAT
+                                          , rrdset_id(st)
+                                              , rrddim_name(rd)
+                                          , rrddim_last_collected_as_double(rd)
+                                          , rrddim_collected_as_double(rd));
 
-                    uint64_t delta = cap - last + new;
-                    uint64_t max_acceptable_rate = (cap / 100) * MAX_INCREMENTAL_PERCENT_RATE;
+                        if(!(rrddim_option_check(rd, RRDDIM_OPTION_DONT_DETECT_RESETS_OR_OVERFLOWS)))
+                            rda->reset_or_overflow = true;
 
-                    // If the delta is less than the maximum acceptable rate and the previous value was near the cap
-                    // then this is an overflow. There can be false positives such that a reset is detected as an
-                    // overflow.
-                    // TODO: remember recent history of rates and compare with current rate to reduce this chance.
-                    if (delta < max_acceptable_rate) {
+                        uint64_t cap = (max > 0x00000000FFFFFFFFULL) ? 0xFFFFFFFFFFFFFFFFULL : 0x00000000FFFFFFFFULL;
+                        uint64_t delta = cap - last + new;
+                        uint64_t max_acceptable_rate = (cap / 100) * MAX_INCREMENTAL_PERCENT_RATE;
+
+                        if (delta < max_acceptable_rate) {
+                            rd->collector.calculated_value +=
+                                (NETDATA_DOUBLE) delta
+                                * (NETDATA_DOUBLE) rd->multiplier
+                                / (NETDATA_DOUBLE) rd->divisor;
+                        } else {
+                            rd->collector.calculated_value += 0;
+                        }
+                    }
+                    else {
                         rd->collector.calculated_value +=
-                            (NETDATA_DOUBLE) delta
+                            (NETDATA_DOUBLE)((int64_t)(rd->collector.collected.i.collected_value - rd->collector.collected.i.last_collected_value))
                             * (NETDATA_DOUBLE) rd->multiplier
                             / (NETDATA_DOUBLE) rd->divisor;
-                    } else {
-                        // This is a reset. Any overflow with a rate greater than MAX_INCREMENTAL_PERCENT_RATE will also
-                        // be detected as a reset instead.
-                        rd->collector.calculated_value += (NETDATA_DOUBLE)0;
                     }
                 }
                 else {
-                    rd->collector.calculated_value +=
-                        (NETDATA_DOUBLE) (rrddim_collected_as_double(rd) - rrddim_last_collected_as_double(rd))
-                        * (NETDATA_DOUBLE) rd->multiplier
-                        / (NETDATA_DOUBLE) rd->divisor;
+                    NETDATA_DOUBLE last = rrddim_last_collected_as_double(rd);
+                    NETDATA_DOUBLE cur  = rrddim_collected_as_double(rd);
+                    if(unlikely(cur < last)) {
+                        if(!(rrddim_option_check(rd, RRDDIM_OPTION_DONT_DETECT_RESETS_OR_OVERFLOWS)))
+                            rda->reset_or_overflow = true;
+                        rd->collector.calculated_value += 0;
+                    }
+                    else {
+                        rd->collector.calculated_value +=
+                            (cur - last) * (NETDATA_DOUBLE) rd->multiplier / (NETDATA_DOUBLE) rd->divisor;
+                    }
                 }
 
                 rrdset_debug(st, "%s: CALC INC PRE " NETDATA_DOUBLE_FORMAT " = ("
