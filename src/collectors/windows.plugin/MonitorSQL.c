@@ -888,7 +888,9 @@ void netdata_mssql_fill_user_connection(struct mssql_instance *mi)
         return;
 
     collected_number connections = 0;
+    SQL_C_BIT is_user;
     SQLLEN col_user_connections_len = 0;
+    SQLLEN col_user_bit_len = 0;
 
     SQLRETURN ret;
 
@@ -904,13 +906,20 @@ void netdata_mssql_fill_user_connection(struct mssql_instance *mi)
         goto enduserconn;
     }
 
+    ret = SQLBindCol(mi->conn->dbSQLUserConnections, 2, SQL_C_BIT, &is_user, sizeof(is_user), &col_user_bit_len);
+    if (likely(netdata_mssql_check_result(ret))) {
+        netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn->dbSQLUserConnections, NETDATA_MSSQL_ODBC_PREPARE, mi->instanceID);
+        goto enduserconn;
+    }
+
     do {
         ret = SQLFetch(mi->conn->dbSQLUserConnections);
         if (likely(netdata_mssql_check_result(ret))) {
             goto enduserconn;
         }
 
-        mi->MSSQLUserConnections.current.Data = (ULONGLONG)connections;
+        if (is_user)
+            mi->MSSQLUserConnections.current.Data = (ULONGLONG)connections;
     } while (true);
 
 enduserconn:
