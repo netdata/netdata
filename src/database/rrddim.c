@@ -611,11 +611,21 @@ inline collected_number rrddim_set_by_pointer(RRDSET *st, RRDDIM *rd, collected_
     return rrddim_timed_set_by_pointer(st, rd, now, value);
 }
 
+NETDATA_DOUBLE rrddim_set_by_pointer_double(RRDSET *st, RRDDIM *rd, NETDATA_DOUBLE value) {
+    struct timeval now;
+    now_realtime_timeval(&now);
+
+    return (NETDATA_DOUBLE)rrddim_timed_set_by_pointer(st, rd, now, (collected_number)value);
+}
+
 collected_number rrddim_timed_set_by_pointer(RRDSET *st __maybe_unused, RRDDIM *rd, struct timeval collected_time, collected_number value) {
     netdata_log_debug(D_RRD_CALLS, "rrddim_set_by_pointer() for chart %s, dimension %s, value " COLLECTED_NUMBER_FORMAT, rrdset_name(st), rrddim_name(rd), value);
 
     rd->collector.last_collected_time = collected_time;
-    rd->collector.collected_value = value;
+    if(rrddim_is_float(rd))
+        rrddim_set_collected_float(rd, (NETDATA_DOUBLE)value);
+    else
+        rrddim_set_collected_int(rd, value);
     rrddim_set_updated(rd);
     rd->collector.counter++;
 
@@ -625,11 +635,14 @@ collected_number rrddim_timed_set_by_pointer(RRDSET *st __maybe_unused, RRDDIM *
 //        *((int64_t *)Pvalue) = *((int64_t *)Pvalue) + 1;
 //    spinlock_unlock(&st->rrdhost->accounting.spinlock);
 
-    collected_number v = (value >= 0) ? value : -value;
-    if (unlikely(v > rd->collector.collected_value_max))
-        rd->collector.collected_value_max = v;
-
-    return rd->collector.last_collected_value;
+    NETDATA_DOUBLE v = value >= 0 ? (NETDATA_DOUBLE)value : (NETDATA_DOUBLE)(-value);
+    if (unlikely(v > rrddim_collected_max_as_double(rd))) {
+        if(rrddim_is_float(rd))
+            rrddim_set_collected_max_float(rd, v);
+        else
+            rrddim_set_collected_max_int(rd, (int64_t)v);
+    }
+    return rrddim_is_float(rd) ? (collected_number)rrddim_last_collected_as_double(rd) : rd->collector.collected.i.last_collected_value;
 }
 
 

@@ -52,10 +52,17 @@ void stream_send_rrddim_metrics_v2(RRDSET_STREAM_BUFFER *rsb, RRDDIM *rd, usec_t
     buffer_fast_strcat(wb, " '", 2);
     buffer_fast_strcat(wb, rrddim_id(rd), string_strlen(rd->id));
     buffer_fast_strcat(wb, "' ", 2);
-    buffer_print_int64_encoded(wb, integer_encoding, rd->collector.last_collected_value);
+    NETDATA_DOUBLE baseline = rrddim_last_collected_as_double(rd);
+    bool send_double_baseline = rrddim_is_float(rd) && stream_has_capability(rsb, STREAM_CAP_FLOAT_BASELINE);
+
+    if(send_double_baseline)
+        buffer_print_netdata_double_encoded(wb, doubles_encoding, baseline);
+    else
+        buffer_print_int64_encoded(wb, integer_encoding, (int64_t)baseline);
+
     buffer_fast_strcat(wb, " ", 1);
 
-    if((NETDATA_DOUBLE)rd->collector.last_collected_value == n)
+    if(baseline == n)
         buffer_fast_strcat(wb, "#", 1);
     else
         buffer_print_netdata_double_encoded(wb, doubles_encoding, n);
@@ -80,4 +87,3 @@ ALWAYS_INLINE void stream_send_rrdset_metrics_finished(RRDSET_STREAM_BUFFER *rsb
 
     *rsb = (RRDSET_STREAM_BUFFER){ .wb = NULL, };
 }
-

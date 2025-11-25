@@ -519,6 +519,11 @@ static inline PARSER_RC pluginsd_dimension(char **words, size_t num_words, PARSE
             rrddim_option_set(rd, RRDDIM_OPTION_DONT_DETECT_RESETS_OR_OVERFLOWS);
         if (strstr(options, "nooverflow") != NULL)
             rrddim_option_set(rd, RRDDIM_OPTION_DONT_DETECT_RESETS_OR_OVERFLOWS);
+
+        if (strstr(options, "type=float") != NULL)
+            rrddim_option_set(rd, RRDDIM_OPTION_VALUE_FLOAT);
+        else if (strstr(options, "type=int") != NULL)
+            rrddim_option_clear(rd, RRDDIM_OPTION_VALUE_FLOAT);
     }
     else
         rrddim_isnot_obsolete___safe_from_collector_thread(st, rd);
@@ -1041,7 +1046,10 @@ static ALWAYS_INLINE PARSER_RC pluginsd_set_v2(char **words, size_t num_words, P
     rrddim_store_metric(rd, parser->user.v2.end_time * USEC_PER_SEC, value, flags);
     rd->collector.last_collected_time.tv_sec = parser->user.v2.end_time;
     rd->collector.last_collected_time.tv_usec = 0;
-    rd->collector.last_collected_value = collected_value;
+    if(rrddim_is_float(rd))
+        rrddim_set_last_collected_float(rd, (NETDATA_DOUBLE)collected_value);
+    else
+        rrddim_set_last_collected_int(rd, collected_value);
     rd->collector.last_stored_value = value;
     rd->collector.last_calculated_value = value;
     rd->collector.counter++;
@@ -1100,7 +1108,7 @@ static ALWAYS_INLINE PARSER_RC pluginsd_end_v2(char **words __maybe_unused, size
                 continue;
 
             rd->collector.calculated_value = 0;
-            rd->collector.collected_value = 0;
+            rrddim_set_collected_int(rd, 0);
             rrddim_clear_updated(rd);
         }
     }
@@ -1108,7 +1116,7 @@ static ALWAYS_INLINE PARSER_RC pluginsd_end_v2(char **words __maybe_unused, size
         RRDDIM *rd;
         rrddim_foreach_read(rd, st){
             rd->collector.calculated_value = 0;
-            rd->collector.collected_value = 0;
+            rrddim_set_collected_int(rd, 0);
             rrddim_clear_updated(rd);
         }
         rrddim_foreach_done(rd);

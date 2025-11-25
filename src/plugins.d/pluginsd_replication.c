@@ -315,7 +315,10 @@ ALWAYS_INLINE PARSER_RC pluginsd_replay_rrddim_collection_state(char **words, si
         rd->collector.last_collected_time.tv_usec = (suseconds_t)(last_collected_ut % USEC_PER_SEC);
     }
 
-    rd->collector.last_collected_value = last_collected_value_str ? str2ll_encoded(last_collected_value_str) : 0;
+    if(rrddim_is_float(rd))
+        rrddim_set_last_collected_float(rd, last_collected_value_str ? str2ndd_encoded(last_collected_value_str, NULL) : 0.0);
+    else
+        rrddim_set_last_collected_int(rd, last_collected_value_str ? str2ll_encoded(last_collected_value_str) : 0);
     rd->collector.last_calculated_value = last_calculated_value_str ? str2ndd_encoded(last_calculated_value_str, NULL) : 0;
     rd->collector.last_stored_value = last_stored_value_str ? str2ndd_encoded(last_stored_value_str, NULL) : 0.0;
 
