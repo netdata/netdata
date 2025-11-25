@@ -27,8 +27,12 @@ static inline PARSER_RC pluginsd_set(char **words, size_t num_words, PARSER *par
         netdata_log_debug(D_PLUGINSD, "PLUGINSD: 'host:%s/chart:%s/dim:%s' SET is setting value to '%s'",
               rrdhost_hostname(host), rrdset_id(st), dimension, value && *value ? value : "UNSET");
 
-    if (value && *value)
-        rrddim_set_by_pointer(st, rd, str2ll_encoded(value));
+    if (value && *value) {
+        if(rrddim_is_float(rd))
+            rrddim_set_by_pointer_double(st, rd, str2ndd_encoded(value, NULL));
+        else
+            rrddim_set_by_pointer(st, rd, str2ll_encoded(value));
+    }
 
     return PARSER_RC_OK;
 }
