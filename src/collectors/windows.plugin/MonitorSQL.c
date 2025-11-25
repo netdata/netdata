@@ -739,7 +739,7 @@ enddrunquery:
     return 1;
 }
 
-long metdata_mssql_check_permission(struct mssql_instance *mi)
+long netdata_mssql_check_permission(struct mssql_instance *mi)
 {
     static int next_try = NETDATA_MSSQL_NEXT_TRY - 1;
     long perm = 0;
@@ -779,7 +779,7 @@ endperm:
     return perm;
 }
 
-void metdata_mssql_fill_mssql_status(struct mssql_instance *mi)
+void netdata_mssql_fill_mssql_status(struct mssql_instance *mi)
 {
     char dbname[SQLSERVER_MAX_NAME_LENGTH + 1];
     int readonly = 0;
@@ -831,7 +831,7 @@ enddbstate:
     netdata_MSSQL_release_results(mi->conn->dbSQLState);
 }
 
-void metdata_mssql_fill_job_status(struct mssql_instance *mi)
+void netdata_mssql_fill_job_status(struct mssql_instance *mi)
 {
     char job[SQLSERVER_MAX_NAME_LENGTH + 1];
     BYTE state = 0;
@@ -882,7 +882,7 @@ enddbjobs:
     netdata_MSSQL_release_results(mi->conn->dbSQLJobs);
 }
 
-void metdata_mssql_fill_user_connection(struct mssql_instance *mi)
+void netdata_mssql_fill_user_connection(struct mssql_instance *mi)
 {
     if (unlikely(!mi->conn->collect_user_connections))
         return;
@@ -917,7 +917,7 @@ enduserconn:
     netdata_MSSQL_release_results(mi->conn->dbSQLUserConnections);
 }
 
-void metdata_mssql_fill_dictionary_from_db(struct mssql_instance *mi)
+void netdata_mssql_fill_dictionary_from_db(struct mssql_instance *mi)
 {
     char dbname[SQLSERVER_MAX_NAME_LENGTH + 1];
     SQLLEN col_data_len = 0;
@@ -1471,7 +1471,7 @@ int dict_mssql_query_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value,
     static long collecting = 1;
 
     if (likely(mi->conn && mi->conn->is_connected && collecting)) {
-        collecting = metdata_mssql_check_permission(mi);
+        collecting = netdata_mssql_check_permission(mi);
         if (!collecting) {
             nd_log(
                 NDLS_COLLECTORS,
@@ -1480,10 +1480,10 @@ int dict_mssql_query_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value,
                 mi->conn->username,
                 mi->instanceID);
         } else {
-            metdata_mssql_fill_dictionary_from_db(mi);
-            metdata_mssql_fill_mssql_status(mi);
-            metdata_mssql_fill_job_status(mi);
-            metdata_mssql_fill_user_connection(mi);
+            netdata_mssql_fill_dictionary_from_db(mi);
+            netdata_mssql_fill_mssql_status(mi);
+            netdata_mssql_fill_job_status(mi);
+            netdata_mssql_fill_user_connection(mi);
             dictionary_sorted_walkthrough_read(mi->databases, dict_mssql_databases_run_queries, NULL);
         }
 
