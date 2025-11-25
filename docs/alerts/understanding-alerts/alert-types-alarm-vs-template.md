@@ -51,32 +51,27 @@ Both `alarm` and `template` use the same underlying mechanisms (metric lookups, 
 
 ```mermaid
 flowchart TD
-    Start{{"Do you need to monitor<br/>multiple similar components?"}}
-    
+    Start("Do you need to monitor<br/>multiple similar components?")
     Start -->|Yes| Multiple("**Use `template`**<br/>One rule applies to all<br/>matching charts automatically")
     Start -->|No| Single("**Use `alarm`**<br/>Target one specific<br/>chart instance")
-    
     Multiple --> Examples1("**Examples:**<br/>- All network interfaces<br/>- All filesystems<br/>- All containers<br/>- All disk devices")
-    
     Single --> Examples2("**Examples:**<br/>- Root filesystem only<br/>- eth0 interface only<br/>- Specific database volume<br/>- Critical service chart")
-    
     Multiple --> Benefits1("**Benefits:**<br/>✓ Auto-covers new instances<br/>✓ Consistent thresholds<br/>✓ Less configuration")
-    
     Single --> Benefits2("**Benefits:**<br/>✓ Instance-specific thresholds<br/>✓ Special cases<br/>✓ Fine-grained control")
-
-    %% Style definitions
-    classDef decision fill:#2196F3,stroke:#000000,stroke-width:3px,color:#ffffff,font-size:16px
-    classDef template fill:#4caf50,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
-    classDef alarm fill:#ffeb3b,stroke:#000000,stroke-width:3px,color:#000000,font-size:18px
-    classDef examples fill:#f9f9f9,stroke:#000000,stroke-width:2px,color:#000000,font-size:14px
-    classDef benefits fill:#f9f9f9,stroke:#000000,stroke-width:2px,color:#000000,font-size:14px
-
-    %% Apply styles
+%% Style definitions
+    classDef decision fill: #2196F3, stroke: #000000, stroke-width: 3px, color: #ffffff, font-size: 16px
+    classDef template fill: #4caf50, stroke: #000000, stroke-width: 3px, color: #000000, font-size: 18px
+    classDef alarm fill: #ffeb3b, stroke: #000000, stroke-width: 3px, color: #000000, font-size: 18px
+    classDef examples fill: #f9f9f9, stroke: #000000, stroke-width: 2px, color: #000000, font-size: 14px
+    classDef benefits fill: #f9f9f9, stroke: #000000, stroke-width: 2px, color: #000000, font-size: 14px
+%% Apply styles
     class Start decision
     class Multiple template
     class Single alarm
-    class Examples1,Examples2 examples
-    class Benefits1,Benefits2 benefits
+    class Examples1 examples
+    class Examples2 examples
+    class Benefits1 benefits
+    class Benefits2 benefits
 ```
 
 Use **`alarm`** when:
