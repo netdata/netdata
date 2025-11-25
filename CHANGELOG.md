@@ -17,6 +17,10 @@
 - Build(deps): bump github.com/redis/go-redis/v9 from 9.16.0 to 9.17.0 in /src/go ([#21341](https://github.com/netdata/netdata/issues/21341))
 - Ci: fix MCP Registry publishing workflow ([#21342](https://github.com/netdata/netdata/issues/21342))
 - Add check for service shutdown while initializing health for a host ([#21329](https://github.com/netdata/netdata/issues/21329))
+- Chore(go.d): disable redis lib logging ([#21344](https://github.com/netdata/netdata/issues/21344))
+- Fix(go.d): prefer env-provided dirs over build-time defaults ([#21345](https://github.com/netdata/netdata/issues/21345))
+- New Sensors (Windows.plugin) ([#21319](https://github.com/netdata/netdata/issues/21319))
+- Reorganize MSSQL (windows.plugin) ([#21334](https://github.com/netdata/netdata/issues/21334))
 
 ## [2.8.0] - 2025-11-19
 
