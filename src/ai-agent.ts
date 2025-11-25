@@ -2226,7 +2226,7 @@ export class AIAgentSession {
         const finalReportReady = this.finalReport !== undefined;
 
         // If we encountered an invalid response and still have retries in this turn, retry while keeping history intact.
-        if (!finalReportReady && lastErrorType === 'invalid_response' && attempts < maxRetries - 1) {
+        if (!finalReportReady && lastErrorType === 'invalid_response' && attempts < maxRetries) {
           continue;
         }
               
@@ -2503,6 +2503,9 @@ export class AIAgentSession {
                   continue;
               }
               // Non-final turns: proceed to next turn; tools already executed if present
+              if (lastErrorType === 'invalid_response') {
+                continue;
+              }
               turnSuccessful = true;
               break;
             }
@@ -2782,7 +2785,7 @@ export class AIAgentSession {
           this.log(collapseEntry);
           const turnLabel = `${String(currentTurn)} turn${currentTurn === 1 ? '' : 's'}`;
           const baseSummary = `Session completed without a final report after ${turnLabel}.`;
-          const detailedSummary = baseSummary;
+          let detailedSummary = baseSummary;
           const fallbackFormatCandidate = this.resolvedFormat ?? 'text';
           const fallbackFormat = FINAL_REPORT_FORMAT_VALUES.find((value) => value === fallbackFormatCandidate) ?? 'text';
           const metadataReason = (() => {
@@ -2791,7 +2794,9 @@ export class AIAgentSession {
               return 'max_retries_exhausted';
             }
             if (typeof lastErrorType === 'string' && lastErrorType !== 'success') {
-              return lastErrorType === 'invalid_response' ? 'max_turns_exhausted' : 'llm_error';
+              if (lastErrorType === 'invalid_response') return 'max_turns_exhausted';
+              if (lastErrorType === 'network_error' || lastErrorType === 'timeout') return 'llm_error';
+              return lastErrorType;
             }
             return 'max_turns_exhausted';
           })();
@@ -2801,11 +2806,17 @@ export class AIAgentSession {
             final_report_attempts: this.finalReportAttempts,
             last_stop_reason: lastError ?? 'none',
           };
-          this.logFailureReport(detailedSummary, currentTurn, {
+          const failureDetails: Record<string, LogDetailValue> = {
             reason: metadataReason,
             turns_completed: currentTurn,
             final_report_attempts: this.finalReportAttempts,
-          });
+          };
+          if (typeof lastError === 'string' && lastError.length > 0) {
+            failureDetails.last_error = lastError;
+            // Surface the raw error text in the log message to aid diagnostics and meet harness expectations.
+            detailedSummary = `${detailedSummary} Cause: ${lastError}`;
+          }
+          this.logFailureReport(detailedSummary, currentTurn, failureDetails);
           this.commitFinalReport({
             status: 'failure',
             format: fallbackFormat,
