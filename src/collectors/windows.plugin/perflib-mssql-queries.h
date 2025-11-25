@@ -37,7 +37,7 @@
 
 #define NETDATA_QUERY_JOBS_STATUS "SELECT name, enabled FROM msdb.dbo.sysjobs;"
 
-#define NETDATA_QUERY_CONNECTIONS "SELECT COUNT(*) AS user_connections FROM sys.dm_exec_sessions WHERE is_user_process = 1;"
+#define NETDATA_QUERY_CONNECTIONS "SELECT COUNT(*), is_user_process FROM sys.dm_exec_sessions GROUP BY is_user_process;"
 
 // https://learn.microsoft.com/en-us/sql/relational-databases/system-dynamic-management-views/sys-dm-os-wait-stats-transact-sql?view=sql-server-ver16
 #define NETDATA_QUERY_CHECK_WAITS                                                                                      \
