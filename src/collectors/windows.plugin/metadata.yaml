@@ -2281,6 +2281,10 @@ modules:
               description: Run queries to collect information from the server's database size.
               default_value: yes
               required: false
+            - name: collect user connections
+              description: Run queries to collect information from the server's connection.
+              default_value: yes
+              required: false
         examples:
           folding:
             enabled: true
