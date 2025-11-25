@@ -32,7 +32,7 @@ void stream_send_rrdset_metrics_v1(RRDSET_STREAM_BUFFER *rsb, RRDSET *st) {
             if(rrddim_is_float(rd))
                 buffer_print_netdata_double(wb, rrddim_collected_as_double(rd));
             else
-                buffer_print_int64(wb, rrddim_last_collected_raw_int(rd));
+                buffer_print_int64(wb, rd->collector.collected.i.collected_value);
             buffer_fast_strcat(wb, "\n", 1);
         }
         else {
