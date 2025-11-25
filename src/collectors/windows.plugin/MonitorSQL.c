@@ -1132,6 +1132,8 @@ static void initialize_mssql_objects(struct mssql_instance *mi, const char *inst
     strncpyz(&name[length], "SystemJobs", sizeof(name) - length);
     mi->objectName[NETDATA_MSSQL_JOBS] = strdupz(name);
 
+    mi->objectName[NETDATA_USER_CONNECTIONS] = NULL;
+
     strncpyz(&name[length], "Memory Manager", sizeof(name) - length);
     mi->objectName[NETDATA_MSSQL_MEMORY] = strdupz(name);
 
