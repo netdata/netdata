@@ -656,7 +656,10 @@ collected_number rrddim_timed_set_by_pointer(RRDSET *st __maybe_unused, RRDDIM *
         else
             rrddim_set_collected_max_int(rd, (int64_t)v);
     }
-    return rrddim_is_float(rd) ? (collected_number)rrddim_last_collected_as_double(rd) : rd->collector.collected.i.last_collected_value;
+    // For int dims return the last collected int; for float dims the integer return is meaningless, so return 0 to avoid truncation misuse.
+    if(rrddim_is_float(rd))
+        return 0;
+    return rd->collector.collected.i.last_collected_value;
 }
 
 
