@@ -2345,6 +2345,12 @@ modules:
               chart_type: line
               dimensions:
                 - name: user
+            - name: mssql.instance_sessions_connections
+              description: Session connections
+              unit: connections
+              chart_type: line
+              dimensions:
+                - name: session
             - name: mssql.instance_sqlstats_batch_requests
               description: Total of batches requests
               unit: requests/s
