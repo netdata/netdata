@@ -887,6 +887,9 @@ void netdata_mssql_fill_user_connection(struct mssql_instance *mi)
     if (unlikely(!mi->conn->collect_user_connections))
         return;
 
+    mi->MSSQLUserConnections.current.Data = 0;
+    mi->MSSQLSessionConnections.current.Data = 0;
+
     collected_number connections = 0;
     unsigned char is_user;
     SQLLEN col_user_connections_len = 0;
