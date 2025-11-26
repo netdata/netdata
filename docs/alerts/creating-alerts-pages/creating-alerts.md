@@ -38,19 +38,18 @@ You can start with one and switch to the other later, or use **both in parallel*
 
 ```mermaid
 flowchart TD
-    Start{{"How do you want to<br/>create alerts?"}}
-    
-    Start -->|"I prefer files<br/>and version control"| Files("**Configuration Files**<br/>→ Go to 2.2")
-    Start -->|"I prefer UI<br/>and centralized management"| Cloud("**Netdata Cloud UI**<br/>→ Go to 2.3")
-    Start -->|"Just show me<br/>the fastest path"| Quick("**Quick Start**<br/>→ Go to 2.1")
-    
-    %% Style definitions
-    classDef decision fill:#2196F3,stroke:#666666,stroke-width:3px,color:#ffffff,font-size:16px
-    classDef option fill:#4caf50,stroke:#666666,stroke-width:3px,color:#000000,font-size:16px
-    
-    %% Apply styles
+    Start("How do you want to<br/>create alerts?")
+    Start -->|" I prefer files<br/>and version control "| Files("**Configuration Files**<br/>→ Go to 2.2")
+    Start -->|" I prefer UI<br/>and centralized management "| Cloud("**Netdata Cloud UI**<br/>→ Go to 2.3")
+    Start -->|" Just show me<br/>the fastest path "| Quick("**Quick Start**<br/>→ Go to 2.1")
+%% Style definitions
+    classDef decision fill: #2196F3, stroke: #666666, stroke-width: 3px, color: #ffffff, font-size: 16px
+    classDef option fill: #4caf50, stroke: #666666, stroke-width: 3px, color: #000000, font-size: 16px
+%% Apply styles
     class Start decision
-    class Files,Cloud,Quick option
+    class Files option
+    class Cloud option
+    class Quick option
 ```
 
 ## What's Next
