@@ -2198,6 +2198,7 @@ static void do_mssql_user_connection(PERF_DATA_BLOCK *pDataBlock, struct mssql_i
         return;
 
     do_mssql_user_connections(mi, update_every);
+    do_mssql_sessions_connections(mi, update_every);
 }
 
 void dict_mssql_replication_status(struct mssql_publisher_publication *mpp, int update_every)

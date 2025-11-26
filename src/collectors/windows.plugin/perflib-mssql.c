@@ -383,6 +383,38 @@ void do_mssql_user_connections(struct mssql_instance *mi, int update_every)
     rrdset_done(mi->st_user_connections);
 }
 
+void do_mssql_sessions_connections(struct mssql_instance *mi, int update_every)
+{
+    if (unlikely(!mi->st_session_connections)) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(id, RRD_ID_LENGTH_MAX, "instance_%s_sessions_connections", mi->instanceID);
+        netdata_fix_chart_name(id);
+        mi->st_session_connections = rrdset_create_localhost(
+                "mssql",
+                id,
+                NULL,
+                "connections",
+                "mssql.instance_sessions_connections",
+                "Session connections",
+                "connections",
+                PLUGIN_WINDOWS_NAME,
+                "PerflibMSSQL",
+                PRIO_MSSQL_SESSIONS_CONNECTIONS,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+        mi->rd_session_connections = rrddim_add(mi->st_session_connections, "session", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+        rrdlabels_add(mi->st_session_connections->rrdlabels, "mssql_instance", mi->instanceID, RRDLABEL_SRC_AUTO);
+    }
+
+    rrddim_set_by_pointer(
+            mi->st_session_connections,
+            mi->rd_session_connections,
+            (collected_number)mi->MSSQLSessionConnections.current.Data);
+    rrdset_done(mi->st_session_connections);
+}
+
 void do_mssql_blocked_processes(struct mssql_instance *mi, int update_every)
 {
     if (unlikely(!mi->st_process_blocked)) {

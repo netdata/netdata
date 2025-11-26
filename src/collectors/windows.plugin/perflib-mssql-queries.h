@@ -797,6 +797,9 @@ struct mssql_instance {
     RRDSET *st_user_connections;
     RRDDIM *rd_user_connections;
 
+    RRDSET *st_session_connections;
+    RRDDIM *rd_session_connections;
+
     RRDSET *st_process_blocked;
     RRDDIM *rd_process_blocked;
 
@@ -994,4 +997,5 @@ extern void do_mssql_memory_mgr(PERF_DATA_BLOCK *pDataBlock, struct mssql_instan
 extern void do_mssql_statistics_perflib(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *mi, int update_every);
 extern void do_mssql_access_methods(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *mi, int update_every);
 extern void do_mssql_user_connections(struct mssql_instance *mi, int update_every);
+extern void do_mssql_sessions_connections(struct mssql_instance *mi, int update_every);
 #endif
