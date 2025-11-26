@@ -888,7 +888,7 @@ void netdata_mssql_fill_user_connection(struct mssql_instance *mi)
         return;
 
     collected_number connections = 0;
-    SQL_C_BIT is_user;
+    unsigned char is_user;
     SQLLEN col_user_connections_len = 0;
     SQLLEN col_user_bit_len = 0;
 
