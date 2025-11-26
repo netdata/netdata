@@ -21,6 +21,7 @@
 - Fix(go.d): prefer env-provided dirs over build-time defaults ([#21345](https://github.com/netdata/netdata/issues/21345))
 - New Sensors (Windows.plugin) ([#21319](https://github.com/netdata/netdata/issues/21319))
 - Reorganize MSSQL (windows.plugin) ([#21334](https://github.com/netdata/netdata/issues/21334))
+- User Connections (MSSQL) ([#21348](https://github.com/netdata/netdata/issues/21348))
 
 ## [2.8.0] - 2025-11-19
 
