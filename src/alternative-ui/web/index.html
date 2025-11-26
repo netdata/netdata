@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Netdata Alternative UI</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="app">
+        <header class="header">
+            <div class="header-left">
+                <h1>Netdata Alternative UI</h1>
+                <span class="connection-status" id="connectionStatus">Connecting...</span>
+            </div>
+            <div class="header-right">
+                <span class="node-count" id="nodeCount">0 nodes</span>
+                <button class="btn btn-secondary" onclick="app.toggleTheme()">Toggle Theme</button>
+            </div>
+        </header>
+
+        <div class="main-container">
+            <aside class="sidebar" id="sidebar">
+                <div class="sidebar-header">
+                    <h2>Nodes</h2>
+                    <input type="text" id="nodeSearch" placeholder="Search nodes..." class="search-input">
+                </div>
+                <div class="node-list" id="nodeList">
+                    <div class="empty-state">No nodes connected</div>
+                </div>
+            </aside>
+
+            <main class="content" id="content">
+                <div class="welcome-screen" id="welcomeScreen">
+                    <div class="welcome-content">
+                        <h2>Welcome to Netdata Alternative UI</h2>
+                        <p>Push metrics from your applications to start monitoring.</p>
+
+                        <div class="code-example">
+                            <h3>Quick Start - Push Metrics</h3>
+                            <pre><code>curl -X POST http://localhost:19998/api/v1/push \
+  -H "Content-Type: application/json" \
+  -d '{
+    "node_id": "my-app",
+    "node_name": "My Application",
+    "charts": [{
+      "id": "cpu_usage",
+      "title": "CPU Usage",
+      "units": "%",
+      "dimensions": [{
+        "id": "user",
+        "value": 45.2
+      }, {
+        "id": "system",
+        "value": 12.8
+      }]
+    }]
+  }'</code></pre>
+                        </div>
+
+                        <div class="code-example">
+                            <h3>Python Example</h3>
+                            <pre><code>import requests
+import time
+import psutil
+
+while True:
+    cpu = psutil.cpu_percent(percpu=True)
+    requests.post("http://localhost:19998/api/v1/push", json={
+        "node_id": "python-app",
+        "charts": [{
+            "id": "cpu",
+            "title": "CPU per Core",
+            "units": "%",
+            "dimensions": [
+                {"id": f"core{i}", "value": v}
+                for i, v in enumerate(cpu)
+            ]
+        }]
+    })
+    time.sleep(1)</code></pre>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="dashboard" id="dashboard" style="display: none;">
+                    <div class="dashboard-header">
+                        <h2 id="selectedNodeName">Select a node</h2>
+                        <div class="dashboard-controls">
+                            <select id="timeRange" onchange="app.changeTimeRange()">
+                                <option value="300000">Last 5 minutes</option>
+                                <option value="900000">Last 15 minutes</option>
+                                <option value="1800000" selected>Last 30 minutes</option>
+                                <option value="3600000">Last 1 hour</option>
+                            </select>
+                            <button class="btn btn-primary" onclick="app.refreshCharts()">Refresh</button>
+                        </div>
+                    </div>
+                    <div class="charts-grid" id="chartsGrid">
+                        <!-- Charts will be rendered here -->
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
