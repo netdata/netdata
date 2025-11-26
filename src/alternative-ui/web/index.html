@@ -25,8 +25,21 @@
                     <h2>Nodes</h2>
                     <input type="text" id="nodeSearch" placeholder="Search nodes..." class="search-input">
                 </div>
-                <div class="node-list" id="nodeList">
-                    <div class="empty-state">No nodes connected</div>
+
+                <!-- Kubernetes Clusters Section -->
+                <div class="sidebar-section" id="k8sSection" style="display: none;">
+                    <h3 class="section-title">
+                        <span class="k8s-icon">&#9096;</span> Kubernetes
+                    </h3>
+                    <div class="k8s-clusters" id="k8sClusters"></div>
+                </div>
+
+                <!-- Other Nodes Section -->
+                <div class="sidebar-section">
+                    <h3 class="section-title">Applications</h3>
+                    <div class="node-list" id="nodeList">
+                        <div class="empty-state">No nodes connected</div>
+                    </div>
                 </div>
             </aside>
 
@@ -34,55 +47,50 @@
                 <div class="welcome-screen" id="welcomeScreen">
                     <div class="welcome-content">
                         <h2>Welcome to Netdata Alternative UI</h2>
-                        <p>Push metrics from your applications to start monitoring.</p>
+                        <p>Push metrics from your applications or Kubernetes clusters to start monitoring.</p>
 
-                        <div class="code-example">
-                            <h3>Quick Start - Push Metrics</h3>
-                            <pre><code>curl -X POST http://localhost:19998/api/v1/push \
+                        <div class="feature-cards">
+                            <div class="feature-card">
+                                <h3>Kubernetes Monitoring</h3>
+                                <p>Monitor pods, nodes, deployments, and cluster resources.</p>
+                                <pre><code>./k8s-collector \
+  --url http://localhost:19998 \
+  --cluster-name my-cluster</code></pre>
+                            </div>
+
+                            <div class="feature-card">
+                                <h3>Application Metrics</h3>
+                                <p>Push custom metrics from any application.</p>
+                                <pre><code>curl -X POST http://localhost:19998/api/v1/push \
   -H "Content-Type: application/json" \
-  -d '{
-    "node_id": "my-app",
-    "node_name": "My Application",
-    "charts": [{
-      "id": "cpu_usage",
-      "title": "CPU Usage",
-      "units": "%",
-      "dimensions": [{
-        "id": "user",
-        "value": 45.2
-      }, {
-        "id": "system",
-        "value": 12.8
-      }]
-    }]
-  }'</code></pre>
+  -d '{"node_id":"my-app","charts":[...]}'</code></pre>
+                            </div>
                         </div>
 
                         <div class="code-example">
-                            <h3>Python Example</h3>
-                            <pre><code>import requests
-import time
-import psutil
+                            <h3>Kubernetes Collector</h3>
+                            <pre><code># Build the K8s collector
+cd k8s && go build -o k8s-collector .
 
-while True:
-    cpu = psutil.cpu_percent(percpu=True)
-    requests.post("http://localhost:19998/api/v1/push", json={
-        "node_id": "python-app",
-        "charts": [{
-            "id": "cpu",
-            "title": "CPU per Core",
-            "units": "%",
-            "dimensions": [
-                {"id": f"core{i}", "value": v}
-                for i, v in enumerate(cpu)
-            ]
-        }]
-    })
-    time.sleep(1)</code></pre>
+# Run with your cluster
+./k8s-collector \
+  --url http://localhost:19998 \
+  --cluster-name production \
+  --namespaces default,kube-system \
+  --interval 10s</code></pre>
+                        </div>
+
+                        <div class="code-example">
+                            <h3>Python System Metrics</h3>
+                            <pre><code>python examples/push_metrics.py \
+  --url http://localhost:19998 \
+  --node-id my-server \
+  --interval 1</code></pre>
                         </div>
                     </div>
                 </div>
 
+                <!-- Standard Dashboard -->
                 <div class="dashboard" id="dashboard" style="display: none;">
                     <div class="dashboard-header">
                         <h2 id="selectedNodeName">Select a node</h2>
@@ -98,6 +106,70 @@ while True:
                     </div>
                     <div class="charts-grid" id="chartsGrid">
                         <!-- Charts will be rendered here -->
+                    </div>
+                </div>
+
+                <!-- Kubernetes Dashboard -->
+                <div class="k8s-dashboard" id="k8sDashboard" style="display: none;">
+                    <div class="dashboard-header">
+                        <h2 id="k8sClusterName">Kubernetes Cluster</h2>
+                        <div class="dashboard-controls">
+                            <select id="k8sNamespace" onchange="app.filterK8sNamespace()">
+                                <option value="">All Namespaces</option>
+                            </select>
+                            <select id="k8sResourceType" onchange="app.filterK8sResource()">
+                                <option value="">All Resources</option>
+                                <option value="cluster">Cluster</option>
+                                <option value="nodes">Nodes</option>
+                                <option value="pods">Pods</option>
+                                <option value="deployments">Deployments</option>
+                                <option value="storage">Storage</option>
+                            </select>
+                            <select id="k8sTimeRange" onchange="app.changeK8sTimeRange()">
+                                <option value="300000">Last 5 minutes</option>
+                                <option value="900000">Last 15 minutes</option>
+                                <option value="1800000" selected>Last 30 minutes</option>
+                                <option value="3600000">Last 1 hour</option>
+                            </select>
+                            <button class="btn btn-primary" onclick="app.refreshK8sCharts()">Refresh</button>
+                        </div>
+                    </div>
+
+                    <!-- Kubernetes Overview Cards -->
+                    <div class="k8s-overview" id="k8sOverview">
+                        <div class="overview-card" id="k8sNodesCard">
+                            <div class="overview-icon">&#9679;</div>
+                            <div class="overview-content">
+                                <span class="overview-value" id="k8sNodesCount">-</span>
+                                <span class="overview-label">Nodes</span>
+                            </div>
+                        </div>
+                        <div class="overview-card" id="k8sPodsCard">
+                            <div class="overview-icon">&#9632;</div>
+                            <div class="overview-content">
+                                <span class="overview-value" id="k8sPodsCount">-</span>
+                                <span class="overview-label">Pods</span>
+                            </div>
+                        </div>
+                        <div class="overview-card" id="k8sDeploymentsCard">
+                            <div class="overview-icon">&#9650;</div>
+                            <div class="overview-content">
+                                <span class="overview-value" id="k8sDeploymentsCount">-</span>
+                                <span class="overview-label">Deployments</span>
+                            </div>
+                        </div>
+                        <div class="overview-card" id="k8sServicesCard">
+                            <div class="overview-icon">&#9670;</div>
+                            <div class="overview-content">
+                                <span class="overview-value" id="k8sServicesCount">-</span>
+                                <span class="overview-label">Services</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Kubernetes Charts Grid -->
+                    <div class="charts-grid" id="k8sChartsGrid">
+                        <!-- K8s charts will be rendered here -->
                     </div>
                 </div>
             </main>

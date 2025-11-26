@@ -5,8 +5,10 @@ A lightweight metrics aggregation server that can receive metrics from multiple 
 ## Features
 
 - **Push-based metrics collection**: Receive metrics via HTTP POST from any application or node
+- **Kubernetes observability**: Dedicated Kubernetes collector and dashboard views
 - **Real-time updates**: WebSocket-based live updates in the dashboard
 - **Multi-node visualization**: View metrics from multiple sources in one place
+- **Namespace filtering**: Filter Kubernetes metrics by namespace and resource type
 - **Configurable retention**: Set how long to keep historical data
 - **Simple REST API**: Easy integration with any language or framework
 - **Zero dependencies**: Single binary with embedded web UI
@@ -222,6 +224,134 @@ Connect to `/ws` for real-time updates.
 {"type": "subscribe", "node_ids": ["node1", "node2"]}
 {"type": "unsubscribe", "node_ids": ["node1"]}
 {"type": "ping"}
+```
+
+## Kubernetes Monitoring
+
+The Alternative UI includes a dedicated Kubernetes collector that gathers metrics from your clusters.
+
+### Features
+
+- **Node metrics**: Status, CPU usage, memory usage, capacity
+- **Pod metrics**: Status by phase, CPU/memory per pod, container restarts
+- **Deployment metrics**: Desired vs ready replicas
+- **Cluster overview**: Namespace count, service count, PVC status
+
+### Build the Kubernetes Collector
+
+```bash
+cd k8s
+go mod tidy
+go build -o k8s-collector .
+```
+
+### Run the Collector
+
+```bash
+# Using kubeconfig (for local development)
+./k8s-collector \
+  --url http://localhost:19998 \
+  --kubeconfig ~/.kube/config \
+  --cluster-name my-cluster \
+  --interval 10s
+
+# In-cluster (for running inside Kubernetes)
+./k8s-collector \
+  --url http://metrics-server:19998 \
+  --cluster-name production \
+  --namespaces default,kube-system,monitoring
+```
+
+### Collector Options
+
+```
+Options:
+  -url string
+        Alternative UI server URL (default "http://localhost:19998")
+  -kubeconfig string
+        Path to kubeconfig file (optional, uses in-cluster config if not set)
+  -api-key string
+        API key for authentication (optional)
+  -cluster-name string
+        Cluster name for identification (default "kubernetes")
+  -interval duration
+        Collection interval (default 10s)
+  -namespaces string
+        Comma-separated list of namespaces to monitor (empty = all)
+```
+
+### Kubernetes Dashboard Features
+
+The web UI automatically detects Kubernetes clusters (nodes with `os: kubernetes` label) and provides:
+
+- **Cluster sidebar section**: Separate listing for K8s clusters
+- **Overview cards**: Quick view of nodes, pods, deployments, services count
+- **Namespace filter**: Filter charts by namespace
+- **Resource type filter**: Filter by cluster/nodes/pods/deployments/storage
+- **Grouped charts**: Charts organized by resource family
+
+### Metrics Collected
+
+| Category | Chart | Description |
+|----------|-------|-------------|
+| Cluster | Namespaces | Total namespace count |
+| Cluster | Services | Total service count |
+| Cluster | ConfigMaps & Secrets | Config object counts |
+| Cluster | PVC Status | Bound/Pending/Lost PVCs |
+| Nodes | Status | Node ready status (1=ready, 0=not ready) |
+| Nodes | CPU Usage | CPU usage per node (millicores) |
+| Nodes | Memory Usage | Memory usage per node (MiB) |
+| Nodes | Capacity | CPU and memory capacity |
+| Pods | Status | Pod count by phase per namespace |
+| Pods | CPU Usage | Top 20 pods by CPU |
+| Pods | Memory Usage | Top 20 pods by memory |
+| Pods | Restarts | Container restart counts |
+| Deployments | Replicas | Desired replica count |
+| Deployments | Ready | Ready replica count |
+
+### Requirements
+
+The Kubernetes collector requires:
+- Access to Kubernetes API server
+- `metrics-server` for CPU/memory metrics (optional but recommended)
+- RBAC permissions to read pods, nodes, deployments, services, namespaces, configmaps, secrets, PVCs
+
+### Example RBAC Configuration
+
+```yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: k8s-collector
+  namespace: monitoring
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: k8s-collector
+rules:
+- apiGroups: [""]
+  resources: ["nodes", "pods", "services", "namespaces", "configmaps", "secrets", "persistentvolumeclaims"]
+  verbs: ["list", "get"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "replicasets"]
+  verbs: ["list", "get"]
+- apiGroups: ["metrics.k8s.io"]
+  resources: ["nodes", "pods"]
+  verbs: ["list", "get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: k8s-collector
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: k8s-collector
+subjects:
+- kind: ServiceAccount
+  name: k8s-collector
+  namespace: monitoring
 ```
 
 ## Examples

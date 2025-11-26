@@ -432,6 +432,254 @@ body {
     background: var(--text-secondary);
 }
 
+/* Sidebar Sections */
+.sidebar-section {
+    border-bottom: 1px solid var(--border-color);
+}
+
+.section-title {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-secondary);
+    padding: 0.75rem 1rem 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.k8s-icon {
+    color: var(--accent-primary);
+    font-size: 1rem;
+}
+
+.k8s-clusters {
+    padding: 0.5rem;
+}
+
+/* Feature Cards */
+.feature-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.feature-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1.5rem;
+}
+
+.feature-card h3 {
+    font-size: 1rem;
+    margin-bottom: 0.5rem;
+    color: var(--accent-primary);
+}
+
+.feature-card p {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    margin-bottom: 1rem;
+}
+
+.feature-card pre {
+    background: var(--chart-bg);
+    border-radius: 6px;
+    padding: 0.75rem;
+    overflow-x: auto;
+}
+
+.feature-card code {
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--accent-secondary);
+}
+
+/* Kubernetes Dashboard */
+.k8s-dashboard {
+    /* Same as .dashboard */
+}
+
+/* Kubernetes Overview Cards */
+.k8s-overview {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.overview-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    transition: all 0.2s ease;
+}
+
+.overview-card:hover {
+    border-color: var(--accent-primary);
+    transform: translateY(-2px);
+}
+
+.overview-icon {
+    font-size: 1.5rem;
+    color: var(--accent-primary);
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-tertiary);
+    border-radius: 8px;
+}
+
+.overview-content {
+    display: flex;
+    flex-direction: column;
+}
+
+.overview-value {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.overview-label {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Kubernetes Node Item (cluster in sidebar) */
+.k8s-cluster-item {
+    padding: 0.75rem;
+    border-radius: 8px;
+    cursor: pointer;
+    margin-bottom: 0.5rem;
+    transition: all 0.2s ease;
+    border: 1px solid transparent;
+    background: var(--bg-tertiary);
+}
+
+.k8s-cluster-item:hover {
+    border-color: var(--accent-primary);
+}
+
+.k8s-cluster-item.selected {
+    border-color: var(--accent-primary);
+    background: var(--bg-primary);
+}
+
+.k8s-cluster-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.25rem;
+}
+
+.k8s-cluster-name {
+    font-weight: 500;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.k8s-cluster-name::before {
+    content: "⎈";
+    color: var(--accent-primary);
+}
+
+.k8s-cluster-meta {
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    display: flex;
+    gap: 0.75rem;
+}
+
+.k8s-cluster-stat {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+/* Resource Type Tags */
+.resource-tag {
+    display: inline-block;
+    padding: 0.125rem 0.5rem;
+    background: var(--bg-tertiary);
+    border-radius: 4px;
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    margin-right: 0.25rem;
+}
+
+.resource-tag.nodes {
+    background: #2d5a3d;
+    color: #8fdf9f;
+}
+
+.resource-tag.pods {
+    background: #3d4a5a;
+    color: #9fc8df;
+}
+
+.resource-tag.deployments {
+    background: #5a4a3d;
+    color: #dfcf9f;
+}
+
+.resource-tag.services {
+    background: #4a3d5a;
+    color: #cf9fdf;
+}
+
+/* Chart Family Header */
+.chart-family-header {
+    grid-column: 1 / -1;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid var(--border-color);
+    margin-bottom: 0.5rem;
+}
+
+.chart-family-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.chart-family-title::before {
+    content: "";
+    display: inline-block;
+    width: 4px;
+    height: 1rem;
+    background: var(--accent-primary);
+    border-radius: 2px;
+}
+
+/* Status Indicators */
+.status-healthy {
+    color: var(--accent-secondary);
+}
+
+.status-warning {
+    color: var(--accent-warning);
+}
+
+.status-critical {
+    color: var(--accent-danger);
+}
+
 /* Responsive */
 @media (max-width: 768px) {
     .main-container {
@@ -453,5 +701,17 @@ body {
     .header {
         flex-direction: column;
         gap: 0.75rem;
+    }
+
+    .dashboard-controls {
+        flex-wrap: wrap;
+    }
+
+    .k8s-overview {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .feature-cards {
+        grid-template-columns: 1fr;
     }
 }
