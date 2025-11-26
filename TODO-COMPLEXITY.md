@@ -97,3 +97,38 @@
 - `docs/AI-AGENT-GUIDE.md`, `docs/DESIGN.md`, `docs/IMPLEMENTATION.md`, `docs/TESTING.md`, and `README.md` must be edited whenever runtime behavior, defaults, schemas, or tooling change (per existing policy).
 - Document new queue schema + reasoning semantics + context guard counters + structured log fields + REST auth requirements + pricing tiers + dependency versions.
 - Session UI + swarms comparison deliverables should capture findings in repo docs if Costa wants them persisted (otherwise keep external but note in this backlog when delivered).
+
+## Task 2025-11-26: ai-agent turn-loop simplification
+
+### TL;DR
+- With main loops staying in `ai-agent.ts`, extract the session bootstrap/wiring block (constructor + static `create`) into a dedicated builder to reduce size and isolate side effects.
+- This block wires context guard, sub-agent registry, tool orchestrator, internal/rest/mcp providers, progress reporter, XML transport, final report manager, and tracing.
+- No code changes made; awaiting Costa’s decision before proceeding.
+
+### Analysis
+- Constructor + `create` perform most cross-cutting wiring: validation, trace labels, opTree bootstrapping, context-guard target derivation, progress reporter, sub-agent registry, tool orchestrator instantiation/registration (MCP, REST, internal tools, sub-agents), XML transport setup, session executor creation, initial titles, and abort/stop hooks.
+- These steps are side-effectful but order-dependent; they don’t need to live beside the turn loops. A `SessionBootstrap` (name TBD) could take `AIAgentSessionConfig` and return a fully wired dependency bundle for the session, leaving `AIAgentSession` with loop logic plus small helpers.
+- Interfaces are already explicit (LLM client, orchestrator, context guard, progress reporter, final report manager, session executor). Moving wiring out reduces constructor length and makes dependencies testable in isolation without touching the loop logic Costa wants to keep.
+
+### Decisions
+- Pending: Should we introduce a `SessionBootstrap` (name TBD) that builds/wires all per-session services (LLM client, context guard, sub-agent registry, orchestrator/providers, progress reporter, xml transport, final report manager, session executor) and hands them to `AIAgentSession`?
+- Confirm ordering constraints for wiring (e.g., opTree init before logging, tool registration before warmup) to keep log/telemetry parity.
+- Decide whether XML transport creation and context-guard target derivation belong entirely in bootstrap or partly in `AIAgentSession`.
+
+### Plan
+1) Draft `SessionBootstrap` contract: input `AIAgentSessionConfig`; output bundle `{ llmClient, contextGuard, progressReporter, subAgents, toolsOrchestrator, xmlTransport, finalReportManager, sessionExecutor, opTree, telemetryLabels, sessionTitle? }` plus validated/normalized config.
+2) Map constructor/static-create steps into bootstrap phases (validation, trace enrichment, opTree init, guard targets, provider registration, sub-agent registry, internal tool config, xml transport, executor wiring, initial titles, abort hooks) with required ordering.
+3) Verify log/telemetry side effects remain identical (especially init logs, tool banner, pricing warnings) by documenting the current sequence to preserve in tests.
+4) After approval, move wiring into new module; keep `AIAgentSession` loops unchanged but consuming injected bundle.
+
+### Implied decisions
+- Telemetry/log payload shapes and ordering during bootstrap (init logs, tool banner, pricing warnings) become part of the bootstrap contract; must stay backward-compatible unless Costa approves changes.
+- Loop behavior (context guard enforcement, retries, final report collapse) stays untouched; only wiring moves.
+
+### Testing requirements
+- Rerun deterministic Phase 1 harness; add init-focused assertions (init logs, tool banner contents, pricing warning presence, xml transport selection, progress tool enablement) to guard bootstrap ordering.
+- Ensure `npm run lint` and `npm run build` stay clean post-extraction; add unit tests around bootstrap to verify dependency graph assembly without executing turns.
+
+### Documentation updates required
+- Update `docs/DESIGN.md` and `docs/IMPLEMENTATION.md` to describe the new coordinator boundary and data flow (turn inputs/outputs, injected services).
+- Adjust `docs/AI-AGENT-GUIDE.md` if user-facing behavior or log wording changes; otherwise note that behavior remains identical but code structure changed.

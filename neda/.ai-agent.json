@@ -73,6 +73,16 @@
       ],
       "stringSchemaFormatsDenied": [],
       "models": {
+        "claude-opus-4-5-20251101": {
+          "overrides": {
+            "top_p": null
+          }
+        },
+        "claude-opus-4-5": {
+          "overrides": {
+            "top_p": null
+          }
+        },
         "claude-opus-4-1-20250805": {
           "overrides": {
             "top_p": null
@@ -909,6 +919,22 @@
   },
   "pricing": {
     "anthropic": {
+      "claude-opus-4-5-20251101": {
+        "unit": "per_1m",
+        "currency": "USD",
+        "prompt": 5,
+        "completion": 25,
+        "cacheRead": 0.5,
+        "cacheWrite": 6.25
+      },
+      "claude-opus-4-5": {
+        "unit": "per_1m",
+        "currency": "USD",
+        "prompt": 5,
+        "completion": 25,
+        "cacheRead": 0.5,
+        "cacheWrite": 6.25
+      },
       "claude-opus-4-1-20250805": {
         "unit": "per_1m",
         "currency": "USD",
