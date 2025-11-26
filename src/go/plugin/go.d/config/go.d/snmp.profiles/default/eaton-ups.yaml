@@ -1,0 +1,839 @@
+extends:
+  - _system-base.yaml
+
+selector:
+  - sysobjectid:
+      include:
+        - 1.3.6.1.4.1.534.1.*
+
+metadata:
+  device:
+    fields:
+      vendor:
+        value: "Eaton"
+      type:
+        value: "UPS"
+      model:
+        symbol:
+          OID: 1.3.6.1.4.1.534.1.1.2.0
+          name: xupsIdentModel
+      serial_number:
+        symbol:
+          OID: 1.3.6.1.4.1.534.1.1.6.0
+          name: xupsIdentSerialNumber
+      part_number:
+        symbol:
+          OID: 1.3.6.1.4.1.534.1.1.5.0
+          name: xupsIdentPartNumber
+
+# https://mibbrowser.online/mibdb_search.php?mib=XUPS-MIB
+# https://github.com/librenms/librenms/blob/master/mibs/eaton/XUPS-MIB
+
+metrics:
+  # ==========================================================================
+  # Battery Metrics
+  # ==========================================================================
+  - MIB: XUPS-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.534.1.2.1.0
+      name: xupsBatTimeRemaining
+      chart_meta:
+        description: Battery runtime remaining before UPS shutdown
+        family: 'System/Battery/Runtime'
+        unit: "s"
+
+  - MIB: XUPS-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.534.1.2.2.0
+      name: xupsBatVoltage
+      chart_meta:
+        description: Battery voltage
+        family: 'Hardware/Battery/Voltage'
+        unit: "V"
+
+  - MIB: XUPS-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.534.1.2.3.0
+      name: xupsBatCurrent
+      chart_meta:
+        description: Battery current (positive=discharging, negative=charging)
+        family: 'Hardware/Battery/Current'
+        unit: "A"
+
+  - MIB: XUPS-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.534.1.2.4.0
+      name: xupsBatCapacity
+      chart_meta:
+        description: Battery charge level
+        family: 'System/Battery/Capacity'
+        unit: "%"
+
+  - MIB: XUPS-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.534.1.2.5.0
+      name: xupsBatteryAbmStatus
+      chart_meta:
+        description: Advanced Battery Management status
+        family: 'Hardware/Battery/Status/ABM'
+        unit: "{status}"
+      mapping:
+        1: charging
+        2: discharging
+        3: floating
+        4: resting
+        5: unknown
+        6: disconnected
+        7: under_test
+        8: check_battery
+
+  - MIB: XUPS-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.534.1.2.7.0
+      name: xupsBatteryFailure
+      chart_meta:
+        description: Battery fault or test failure indicator
+        family: 'Hardware/Battery/Status/Failure'
+        unit: "{status}"
+      mapping:
+        1: failed
+        2: ok
+
+  - MIB: XUPS-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.534.1.2.8.0
+      name: xupsBatteryNotPresent
+      chart_meta:
+        description: Battery presence indicator
+        family: 'Hardware/Battery/Status/Presence'
+        unit: "{status}"
+      mapping:
+        1: absent
+        2: present
+
+  - MIB: XUPS-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.534.1.2.9.0
+      name: xupsBatteryAged
+      chart_meta:
+        description: Battery age indicator
+        family: 'Hardware/Battery/Status/Age'
+        unit: "{status}"
+      mapping:
+        1: aged
+        2: ok
+
+  - MIB: XUPS-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.534.1.2.10.0
+      name: xupsBatteryLowCapacity
+      chart_meta:
+        description: Battery low capacity indicator
+        family: 'Hardware/Battery/Status/Capacity'
+        unit: "{status}"
+      mapping:
+        1: low
+        2: ok
+
+  # ==========================================================================
+  # Input Metrics (Scalars)
+  # ==========================================================================
+  - MIB: XUPS-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.534.1.3.1.0
+      name: xupsInputFrequency
+      scale_factor: 0.1
+      chart_meta:
+        description: Input line frequency
+        family: 'PowerFlow/Input/Frequency'
+        unit: "Hz"
+
+  - MIB: XUPS-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.534.1.3.2.0
+      name: xupsInputLineBads
+      chart_meta:
+        description: Count of input out-of-tolerance events
+        family: 'PowerFlow/Input/Event/OutOfTolerance'
+        unit: "{event}"
+
+  - MIB: XUPS-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.534.1.3.5.0
+      name: xupsInputSource
+      chart_meta:
+        description: Current input power source
+        family: 'PowerFlow/Input/Source'
+        unit: "{source}"
+      mapping:
+        1: other
+        2: none
+        3: primary_utility
+        4: bypass_feed
+        5: secondary_utility
+        6: generator
+        7: flywheel
+        8: fuelcell
+
+  - MIB: XUPS-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.534.1.3.6.0
+      name: xupsDualInputStatus
+      chart_meta:
+        description: Dual input source status
+        family: 'PowerFlow/Input/Status/Dual'
+        unit: "{status}"
+      mapping:
+        1: both_bad
+        2: primary_good
+        3: secondary_good
+        4: both_good
+
+  - MIB: XUPS-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.534.1.3.9.0
+      name: xupsInputStatus
+      chart_meta:
+        description: Primary AC input status
+        family: 'PowerFlow/Input/Status/Primary'
+        unit: "{status}"
+      mapping:
+        1: bad
+        2: good
+
+  # ==========================================================================
+  # Input Total Metrics
+  # ==========================================================================
+  - MIB: XUPS-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.534.1.3.8.1.0
+      name: xupsInputAverageVoltage
+      chart_meta:
+        description: Average input voltage (single phase) or average across phases
+        family: 'PowerFlow/Input/Total/Voltage'
+        unit: "V"
+
+  - MIB: XUPS-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.534.1.3.8.2.0
+      name: xupsInputTotalCurrent
+      scale_factor: 0.1
+      chart_meta:
+        description: Total input current
+        family: 'PowerFlow/Input/Total/Current'
+        unit: "A"
+
+  - MIB: XUPS-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.534.1.3.8.3.0
+      name: xupsInputTotalWatts
+      chart_meta:
+        description: Total input active power
+        family: 'PowerFlow/Input/Total/Power/Active'
+        unit: "W"
+
+  - MIB: XUPS-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.534.1.3.8.4.0
+      name: xupsInputTotalVA
+      chart_meta:
+        description: Total input apparent power
+        family: 'PowerFlow/Input/Total/Power/Apparent'
+        unit: "VA"
+
+  - MIB: XUPS-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.534.1.3.8.5.0
+      name: xupsInputAveragePowerFactor
+      scale_factor: 0.01
+      chart_meta:
+        description: Average input power factor
+        family: 'PowerFlow/Input/Total/PowerFactor'
+        unit: ""
+
+  # ==========================================================================
+  # Input Table (Per-Phase)
+  # ==========================================================================
+  - MIB: XUPS-MIB
+    table:
+      OID: 1.3.6.1.4.1.534.1.3.4
+      name: xupsInputTable
+    symbols:
+      - OID: 1.3.6.1.4.1.534.1.3.4.1.2
+        name: xupsInputVoltage
+        chart_meta:
+          description: Input voltage per phase
+          family: 'PowerFlow/Input/Phase/Voltage'
+          unit: "V"
+
+      - OID: 1.3.6.1.4.1.534.1.3.4.1.3
+        name: xupsInputCurrent
+        chart_meta:
+          description: Input current per phase
+          family: 'PowerFlow/Input/Phase/Current'
+          unit: "A"
+
+      - OID: 1.3.6.1.4.1.534.1.3.4.1.7
+        name: xupsInputCurrentHighPrecision
+        scale_factor: 0.1
+        chart_meta:
+          description: Input current per phase (high precision)
+          family: 'PowerFlow/Input/Phase/CurrentHP'
+          unit: "A"
+
+      - OID: 1.3.6.1.4.1.534.1.3.4.1.4
+        name: xupsInputWatts
+        chart_meta:
+          description: Input real power per phase
+          family: 'PowerFlow/Input/Phase/Power'
+          unit: "W"
+    metric_tags:
+      - tag: phase
+        symbol:
+          OID: 1.3.6.1.4.1.534.1.3.4.1.1
+          name: xupsInputPhase
+      - tag: phase_name
+        symbol:
+          OID: 1.3.6.1.4.1.534.1.3.4.1.6
+          name: xupsInputName
+      - tag: _phase_id
+        symbol:
+          OID: 1.3.6.1.4.1.534.1.3.4.1.5
+          name: xupsInputId
+        mapping:
+          1: "L1-N"
+          2: "L2-N"
+          3: "L3-N"
+          4: "L1-L2"
+          5: "L2-L3"
+          6: "L3-L1"
+
+  # ==========================================================================
+  # Output Metrics (Scalars)
+  # ==========================================================================
+  - MIB: XUPS-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.534.1.4.1.0
+      name: xupsOutputLoad
+      chart_meta:
+        description: UPS output load percentage
+        family: 'PowerFlow/Output/Load'
+        unit: "%"
+
+  - MIB: XUPS-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.534.1.4.2.0
+      name: xupsOutputFrequency
+      scale_factor: 0.1
+      chart_meta:
+        description: Output frequency
+        family: 'PowerFlow/Output/Frequency'
+        unit: "Hz"
+
+  - MIB: XUPS-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.534.1.4.5.0
+      name: xupsOutputSource
+      chart_meta:
+        description: Current output power source
+        family: 'PowerFlow/Output/Source'
+        unit: "{source}"
+      mapping:
+        1: other
+        2: none
+        3: normal
+        4: bypass
+        5: battery
+        6: booster
+        7: reducer
+        8: parallel_capacity
+        9: parallel_redundant
+        10: high_efficiency
+        11: maintenance_bypass
+        12: ess_mode
+
+  - MIB: XUPS-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.534.1.4.6.0
+      name: xupsOutputHourlyPowerUsage
+      chart_meta:
+        description: Energy consumed during the last hour
+        family: 'PowerFlow/Output/Energy/Hourly'
+        unit: "Wh"
+
+  - MIB: XUPS-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.534.1.4.7.0
+      name: xupsOutputCumulativePowerUsage
+      chart_meta:
+        description: Cumulative energy consumed since last reset
+        family: 'PowerFlow/Output/Energy/Cumulative'
+        unit: "Wh"
+
+  - MIB: XUPS-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.534.1.4.10.0
+      name: xupsOutputStatus
+      chart_meta:
+        description: AC output protection status
+        family: 'PowerFlow/Output/Status'
+        unit: "{status}"
+      mapping:
+        1: not_powered
+        2: not_protected
+        3: protected
+
+  # ==========================================================================
+  # Output Total Metrics
+  # ==========================================================================
+  - MIB: XUPS-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.534.1.4.9.1.0
+      name: xupsOutputAverageVoltage
+      chart_meta:
+        description: Average output voltage
+        family: 'PowerFlow/Output/Total/Voltage'
+        unit: "V"
+
+  - MIB: XUPS-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.534.1.4.9.2.0
+      name: xupsOutputTotalCurrent
+      scale_factor: 0.1
+      chart_meta:
+        description: Total output current
+        family: 'PowerFlow/Output/Total/Current'
+        unit: "A"
+
+  - MIB: XUPS-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.534.1.4.9.3.0
+      name: xupsOutputTotalWatts
+      chart_meta:
+        description: Total output active power
+        family: 'PowerFlow/Output/Total/Power/Active'
+        unit: "W"
+
+  - MIB: XUPS-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.534.1.4.9.4.0
+      name: xupsOutputTotalVA
+      chart_meta:
+        description: Total output apparent power
+        family: 'PowerFlow/Output/Total/Power/Apparent'
+        unit: "VA"
+
+  - MIB: XUPS-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.534.1.4.9.5.0
+      name: xupsOutputAveragePowerFactor
+      scale_factor: 0.01
+      chart_meta:
+        description: Average output power factor
+        family: 'PowerFlow/Output/Total/PowerFactor'
+        unit: ""
+
+  # ==========================================================================
+  # Output Table (Per-Phase)
+  # ==========================================================================
+  - MIB: XUPS-MIB
+    table:
+      OID: 1.3.6.1.4.1.534.1.4.4
+      name: xupsOutputTable
+    symbols:
+      - OID: 1.3.6.1.4.1.534.1.4.4.1.2
+        name: xupsOutputVoltage
+        chart_meta:
+          description: Output voltage per phase
+          family: 'PowerFlow/Output/Phase/Voltage'
+          unit: "V"
+
+      - OID: 1.3.6.1.4.1.534.1.4.4.1.3
+        name: xupsOutputCurrent
+        chart_meta:
+          description: Output current per phase
+          family: 'PowerFlow/Output/Phase/Current'
+          unit: "A"
+
+      - OID: 1.3.6.1.4.1.534.1.4.4.1.7
+        name: xupsOutputCurrentHighPrecision
+        scale_factor: 0.1
+        chart_meta:
+          description: Output current per phase (high precision)
+          family: 'PowerFlow/Output/Phase/CurrentHP'
+          unit: "A"
+
+      - OID: 1.3.6.1.4.1.534.1.4.4.1.4
+        name: xupsOutputWatts
+        chart_meta:
+          description: Output real power per phase
+          family: 'PowerFlow/Output/Phase/Power/Active'
+          unit: "W"
+
+      - OID: 1.3.6.1.4.1.534.1.4.4.1.9
+        name: xupsOutputVA
+        chart_meta:
+          description: Output apparent power per phase
+          family: 'PowerFlow/Output/Phase/Power/Apparent'
+          unit: "VA"
+
+      - OID: 1.3.6.1.4.1.534.1.4.4.1.8
+        name: xupsOutputPercentLoad
+        chart_meta:
+          description: Output load percentage per phase
+          family: 'PowerFlow/Output/Phase/Load'
+          unit: "%"
+    metric_tags:
+      - tag: phase
+        symbol:
+          OID: 1.3.6.1.4.1.534.1.4.4.1.1
+          name: xupsOutputPhase
+      - tag: phase_name
+        symbol:
+          OID: 1.3.6.1.4.1.534.1.4.4.1.6
+          name: xupsOutputName
+      - tag: _phase_id
+        symbol:
+          OID: 1.3.6.1.4.1.534.1.4.4.1.5
+          name: xupsOutputId
+        mapping:
+          1: "L1-N"
+          2: "L2-N"
+          3: "L3-N"
+          4: "L1-L2"
+          5: "L2-L3"
+          6: "L3-L1"
+
+  # ==========================================================================
+  # Bypass Metrics (Scalars)
+  # ==========================================================================
+  - MIB: XUPS-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.534.1.5.1.0
+      name: xupsBypassFrequency
+      scale_factor: 0.1
+      chart_meta:
+        description: Bypass frequency
+        family: 'PowerFlow/Bypass/Frequency'
+        unit: "Hz"
+
+  # ==========================================================================
+  # Bypass Total Metrics
+  # ==========================================================================
+  - MIB: XUPS-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.534.1.5.4.1.0
+      name: xupsBypassAverageVoltage
+      chart_meta:
+        description: Average bypass voltage
+        family: 'PowerFlow/Bypass/Total/Voltage'
+        unit: "V"
+
+  - MIB: XUPS-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.534.1.5.4.2.0
+      name: xupsBypassTotalCurrent
+      scale_factor: 0.1
+      chart_meta:
+        description: Total bypass current
+        family: 'PowerFlow/Bypass/Total/Current'
+        unit: "A"
+
+  - MIB: XUPS-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.534.1.5.4.3.0
+      name: xupsBypassTotalWatts
+      chart_meta:
+        description: Total bypass active power
+        family: 'PowerFlow/Bypass/Total/Power/Active'
+        unit: "W"
+
+  - MIB: XUPS-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.534.1.5.4.4.0
+      name: xupsBypassTotalVA
+      chart_meta:
+        description: Total bypass apparent power
+        family: 'PowerFlow/Bypass/Total/Power/Apparent'
+        unit: "VA"
+
+  - MIB: XUPS-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.534.1.5.4.5.0
+      name: xupsBypassAveragePowerFactor
+      scale_factor: 0.01
+      chart_meta:
+        description: Average bypass power factor
+        family: 'PowerFlow/Bypass/Total/PowerFactor'
+        unit: ""
+
+  # ==========================================================================
+  # Bypass Table (Per-Phase)
+  # ==========================================================================
+  - MIB: XUPS-MIB
+    table:
+      OID: 1.3.6.1.4.1.534.1.5.3
+      name: xupsBypassTable
+    symbols:
+      - OID: 1.3.6.1.4.1.534.1.5.3.1.2
+        name: xupsBypassVoltage
+        chart_meta:
+          description: Bypass voltage per phase
+          family: 'PowerFlow/Bypass/Phase/Voltage'
+          unit: "V"
+
+      - OID: 1.3.6.1.4.1.534.1.5.3.1.5
+        name: xupsBypassCurrentHighPrecision
+        scale_factor: 0.1
+        chart_meta:
+          description: Bypass current per phase (high precision)
+          family: 'PowerFlow/Bypass/Phase/Current'
+          unit: "A"
+
+      - OID: 1.3.6.1.4.1.534.1.5.3.1.6
+        name: xupsBypassWatts
+        chart_meta:
+          description: Bypass real power per phase
+          family: 'PowerFlow/Bypass/Phase/Power'
+          unit: "W"
+    metric_tags:
+      - tag: phase
+        symbol:
+          OID: 1.3.6.1.4.1.534.1.5.3.1.1
+          name: xupsBypassPhase
+      - tag: phase_name
+        symbol:
+          OID: 1.3.6.1.4.1.534.1.5.3.1.4
+          name: xupsBypassName
+      - tag: _phase_id
+        symbol:
+          OID: 1.3.6.1.4.1.534.1.5.3.1.3
+          name: xupsBypassId
+        mapping:
+          1: "L1-N"
+          2: "L2-N"
+          3: "L3-N"
+          4: "L1-L2"
+          5: "L2-L3"
+          6: "L3-L1"
+
+  # ==========================================================================
+  # Environment Metrics
+  # ==========================================================================
+  - MIB: XUPS-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.534.1.6.1.0
+      name: xupsEnvAmbientTemp
+      chart_meta:
+        description: Ambient temperature near UPS
+        family: 'Environment/Temperature'
+        unit: "Cel"
+
+  - MIB: XUPS-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.534.1.6.4.0
+      name: xupsEnvAmbientHumidity
+      chart_meta:
+        description: Ambient humidity near UPS
+        family: 'Environment/Humidity'
+        unit: "%"
+
+  # ==========================================================================
+  # Alarm Metrics
+  # ==========================================================================
+  - MIB: XUPS-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.534.1.7.1.0
+      name: xupsAlarms
+      chart_meta:
+        description: Current number of active alarm conditions
+        family: 'System/Alarm/Active'
+        unit: "{alarm}"
+
+  - MIB: XUPS-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.534.1.7.18.0
+      name: xupsAlarmNumEvents
+      chart_meta:
+        description: Number of entries in UPS event history
+        family: 'System/Alarm/Event/History'
+        unit: "{event}"
+
+  # ==========================================================================
+  # Test Status Metrics
+  # ==========================================================================
+  - MIB: XUPS-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.534.1.8.2.0
+      name: xupsTestBatteryStatus
+      chart_meta:
+        description: Last battery test status
+        family: 'System/Test/Status/Battery'
+        unit: "{status}"
+      mapping:
+        1: unknown
+        2: passed
+        3: failed
+        4: in_progress
+        5: not_supported
+        6: inhibited
+        7: scheduled
+
+  - MIB: XUPS-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.534.1.8.4.0
+      name: xupsLastGeneralTestResult
+      chart_meta:
+        description: Last general test result
+        family: 'System/Test/Status/General'
+        unit: "{status}"
+      mapping:
+        1: unknown
+        2: passed
+        3: failed
+        4: in_progress
+        5: not_supported
+        6: inhibited
+        7: scheduled
+
+  # ==========================================================================
+  # Configuration Metrics
+  # ==========================================================================
+  - MIB: XUPS-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.534.1.10.1.0
+      name: xupsConfigOutputVoltage
+      chart_meta:
+        description: Nominal output voltage
+        family: 'System/Config/Voltage/Output'
+        unit: "V"
+
+  - MIB: XUPS-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.534.1.10.2.0
+      name: xupsConfigInputVoltage
+      chart_meta:
+        description: Nominal input voltage
+        family: 'System/Config/Voltage/Input'
+        unit: "V"
+
+  - MIB: XUPS-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.534.1.10.3.0
+      name: xupsConfigOutputWatts
+      chart_meta:
+        description: Nominal output power capacity
+        family: 'System/Config/Power/Capacity'
+        unit: "W"
+
+  - MIB: XUPS-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.534.1.10.4.0
+      name: xupsConfigOutputFreq
+      scale_factor: 0.1
+      chart_meta:
+        description: Nominal output frequency
+        family: 'System/Config/Frequency'
+        unit: "Hz"
+
+  # ==========================================================================
+  # Receptacle Table (Controllable Outlets)
+  # ==========================================================================
+  - MIB: XUPS-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.534.1.12.1.0
+      name: xupsNumReceptacles
+      chart_meta:
+        description: Number of controllable receptacles
+        family: 'PowerFlow/Receptacle/Total'
+        unit: "{receptacle}"
+
+  - MIB: XUPS-MIB
+    table:
+      OID: 1.3.6.1.4.1.534.1.12.2
+      name: xupsRecepTable
+    symbols:
+      - OID: 1.3.6.1.4.1.534.1.12.2.1.2
+        name: xupsRecepStatus
+        chart_meta:
+          description: Receptacle power status
+          family: 'PowerFlow/Receptacle/Status'
+          unit: "{status}"
+        mapping:
+          1: on
+          2: off
+          3: pending_off
+          4: pending_on
+          5: unknown
+          6: reserved
+          7: failed_closed
+          8: failed_open
+
+      - OID: 1.3.6.1.4.1.534.1.12.2.1.8
+        name: xupsRecepHourlyPowerUsage
+        chart_meta:
+          description: Receptacle hourly energy consumption
+          family: 'PowerFlow/Receptacle/Energy/Hourly'
+          unit: "Wh"
+
+      - OID: 1.3.6.1.4.1.534.1.12.2.1.9
+        name: xupsRecepCumulativePowerUsage
+        chart_meta:
+          description: Receptacle cumulative energy consumption
+          family: 'PowerFlow/Receptacle/Energy/Cumulative'
+          unit: "Wh"
+    metric_tags:
+      - tag: receptacle
+        symbol:
+          OID: 1.3.6.1.4.1.534.1.12.2.1.1
+          name: xupsRecepIndex
+
+  # ==========================================================================
+  # Topology Metrics
+  # ==========================================================================
+  - MIB: XUPS-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.534.1.13.1.0
+      name: xupsTopologyType
+      chart_meta:
+        description: UPS power topology type
+        family: 'System/Topology/Type'
+        unit: "{type}"
+
+  - MIB: XUPS-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.534.1.13.3.0
+      name: xupsTopoUnitNumber
+      chart_meta:
+        description: Unit number in parallel system (0=standalone or system view)
+        family: 'System/Topology/Unit'
+        unit: "{unit}"
+
+  - MIB: XUPS-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.534.1.13.4.0
+      name: xupsTopoPowerStrategy
+      chart_meta:
+        description: Current power strategy setting
+        family: 'System/Topology/PowerStrategy'
+        unit: "{strategy}"
+      mapping:
+        1: high_alert
+        2: standard
+        3: enable_high_efficiency
+        4: immediate_high_efficiency
+
+  # ==========================================================================
+  # Control Status Metrics
+  # ==========================================================================
+  - MIB: XUPS-MIB
+    symbol:
+      OID: 1.3.6.1.4.1.534.1.9.7.0
+      name: xupsSwitchable
+      chart_meta:
+        description: Whether UPS accepts remote control commands
+        family: 'System/Control/Status'
+        unit: "{status}"
+      mapping:
+        1: switchable
+        2: not_switchable
