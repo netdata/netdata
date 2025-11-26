@@ -920,6 +920,8 @@ void netdata_mssql_fill_user_connection(struct mssql_instance *mi)
 
         if (is_user)
             mi->MSSQLUserConnections.current.Data = (ULONGLONG)connections;
+        else
+            mi->MSSQLSessionConnections.current.Data = (ULONGLONG)connections;
     } while (true);
 
 enduserconn:

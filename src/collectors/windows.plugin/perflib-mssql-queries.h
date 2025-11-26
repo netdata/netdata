@@ -838,6 +838,7 @@ struct mssql_instance {
     COUNTER_DATA MSSQLAccessMethodPageSplits;
     COUNTER_DATA MSSQLBlockedProcesses;
     COUNTER_DATA MSSQLUserConnections;
+    COUNTER_DATA MSSQLSessionConnections;
     COUNTER_DATA MSSQLConnectionMemoryBytes;
     COUNTER_DATA MSSQLExternalBenefitOfMemory;
     COUNTER_DATA MSSQLPendingMemoryGrants;
