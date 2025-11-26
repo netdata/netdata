@@ -31,15 +31,15 @@
     "node": ">=20"
   },
   "dependencies": {
-    "@ai-sdk/anthropic": "^2.0.47",
+    "@ai-sdk/anthropic": "^2.0.49",
     "@ai-sdk/google": "^2.0.43",
     "@ai-sdk/openai": "^2.0.72",
     "@ai-sdk/provider-utils": "^3.0.17",
     "@anthropic-ai/tokenizer": "^0.0.4",
     "@dqbd/tiktoken": "^1.0.22",
     "@lenml/tokenizer-gemini": "^3.7.2",
-    "@modelcontextprotocol/sdk": "^1.22.0",
-    "@openrouter/ai-sdk-provider": "^1.2.5",
+    "@modelcontextprotocol/sdk": "^1.23.0",
+    "@openrouter/ai-sdk-provider": "^1.2.6",
     "@opentelemetry/api": "^1.9.0",
     "@opentelemetry/api-logs": "^0.208.0",
     "@opentelemetry/exporter-logs-otlp-grpc": "^0.208.0",
@@ -52,13 +52,13 @@
     "@opentelemetry/sdk-trace-node": "^2.2.0",
     "@opentelemetry/semantic-conventions": "^1.38.0",
     "@slack/bolt": "^4.6.0",
-    "ai": "^5.0.101",
+    "ai": "^5.0.102",
     "ajv": "^8.17.1",
     "async-mutex": "^0.5.0",
     "commander": "^14.0.2",
     "express": "^5.1.0",
     "js-yaml": "^4.1.1",
-    "json-schema-library": "^10.5.0",
+    "json-schema-library": "^10.5.1",
     "jsonrepair": "^3.13.1",
     "ollama-ai-provider-v2": "^1.5.5",
     "undici": "^7.16.0",
@@ -71,7 +71,7 @@
     "@types/ws": "^8.18.1",
     "@typescript-eslint/eslint-plugin": "^8.48.0",
     "@typescript-eslint/parser": "^8.48.0",
-    "@vitest/coverage-v8": "^4.0.13",
+    "@vitest/coverage-v8": "^4.0.14",
     "eslint": "^9.39.1",
     "eslint-plugin-eslint-comments": "^3.2.0",
     "eslint-plugin-functional": "^9.0.2",
@@ -88,6 +88,6 @@
     "knip": "^5.70.2",
     "prettier": "^3.6.2",
     "typescript": "^5.9.3",
-    "vitest": "^4.0.13"
+    "vitest": "^4.0.14"
   }
 }
