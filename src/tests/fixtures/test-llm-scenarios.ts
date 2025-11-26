@@ -4396,6 +4396,75 @@ const SCENARIOS: ScenarioDefinition[] = [
       },
     ],
   },
+  {
+    id: 'context_guard__threshold_above_probe',
+    description: 'Final report with failure status for above-limit context threshold tests.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Context limit exceeded at start; reporting failure.',
+          reportContent: `${RESULT_HEADING}Context window exceeded before processing could begin.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_FAILURE,
+          tokenUsage: {
+            inputTokens: 48,
+            outputTokens: 20,
+            totalTokens: 68,
+          },
+        },
+      },
+    ],
+  },
+  {
+    id: 'run-test-context-guard-preflight',
+    description: 'Context guard fires at preflight due to history exceeding available budget; forced final turn produces failure report.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        // Turn 2 because conversationHistory includes an assistant message
+        turn: 2,
+        expectedTools: ['agent__final_report'],
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Context budget exceeded; unable to complete task.',
+          reportContent: `${RESULT_HEADING}Context budget exceeded before processing could begin.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_FAILURE,
+          tokenUsage: {
+            inputTokens: 24,
+            outputTokens: 12,
+            totalTokens: 36,
+          },
+        },
+      },
+    ],
+  },
+  {
+    id: 'run-test-69',
+    description: 'Model override snake-case top_p propagation (no temperature requirement).',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        expectedTopP: 0.66,
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Verifying top_p override propagation.',
+          reportContent: `${RESULT_HEADING}top_p override applied successfully.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_SUCCESS,
+          tokenUsage: {
+            inputTokens: 48,
+            outputTokens: 20,
+            totalTokens: 68,
+          },
+        },
+      },
+    ],
+  },
 ];
 
 const scenarios = new Map<string, ScenarioDefinition>(SCENARIOS.map((scenario) => [scenario.id, scenario] as const));

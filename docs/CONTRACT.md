@@ -137,8 +137,8 @@ Note: Exit codes map to failure categories, not specific error types. Check `res
 ### Empty or Invalid LLM Responses
 
 **Empty content without tool calls:**
-- Response NOT added to conversation
-- Synthetic retry triggered with injected ephemeral message: `"System notice: plain text responses without tool calls are ignored. Use final_report to provide your answer."`
+- If the assistant returns only reasoning (non-empty `reasoning` field) and no tool calls or text content, the turn is allowed to proceed; the reasoning is preserved in the conversation for the next turn.
+- Otherwise (no content, no tools, no reasoning), the response is NOT added to the conversation, and a synthetic retry is triggered with the ephemeral message: `"System notice: plain text responses without tool calls are ignored. Use final_report to provide your answer."`
 - Counts as one attempt toward `maxRetries` budget
 
 **Invalid tool call parameters:**
