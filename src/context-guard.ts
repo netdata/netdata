@@ -10,6 +10,7 @@ import type { ToolBudgetCallbacks, ToolBudgetReservation } from './tools/tools.j
 import type { ConversationMessage, TurnRequestContextMetrics } from './types.js';
 
 import { estimateMessagesTokens, resolveTokenizer } from './tokenizer-registry.js';
+import { estimateMessagesBytes } from './utils.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -52,24 +53,6 @@ export interface ContextGuardConfig {
   maxOutputTokens?: number;
   callbacks?: ContextGuardCallbacks;
 }
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-const safeJsonByteLength = (value: unknown): number => {
-  try {
-    const str = JSON.stringify(value);
-    return typeof str === 'string' ? Buffer.byteLength(str, 'utf8') : 0;
-  } catch {
-    return 0;
-  }
-};
-
-const estimateMessagesBytes = (messages: readonly ConversationMessage[] | undefined): number => {
-  if (messages === undefined || messages.length === 0) return 0;
-  return messages.reduce((total, message) => total + safeJsonByteLength(message), 0);
-};
 
 // ---------------------------------------------------------------------------
 // ContextGuard Class

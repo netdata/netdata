@@ -16,6 +16,7 @@ import { parseFrontmatter, parsePairs, extractBodyWithoutFrontmatter } from './f
 import { LLMClient } from './llm-client.js';
 import { buildPromptVars, applyFormat, expandVars } from './prompt-builder.js';
 import { SessionProgressReporter } from './session-progress-reporter.js';
+import { SessionToolExecutor, type SessionContext, type ToolExecutionState } from './session-tool-executor.js';
 import { SessionTreeBuilder } from './session-tree.js';
 import { SubAgentRegistry } from './subagent-registry.js';
 import { recordContextGuardMetrics, recordFinalReportMetrics, recordLlmMetrics, recordRetryCollapseMetrics, runWithSpan, addSpanAttributes, addSpanEvent } from './telemetry/index.js';
@@ -23,8 +24,8 @@ import { AgentProvider } from './tools/agent-provider.js';
 import { InternalToolProvider } from './tools/internal-provider.js';
 import { MCPProvider } from './tools/mcp-provider.js';
 import { RestProvider } from './tools/rest-provider.js';
-import { ToolsOrchestrator, type ManagedToolResult } from './tools/tools.js';
-import { appendCallPathSegment, clampToolName, formatToolRequestCompact, normalizeCallPath, parseJsonRecord, parseJsonRecordDetailed, parseJsonValueDetailed, sanitizeToolName, truncateUtf8WithNotice, warn } from './utils.js';
+import { ToolsOrchestrator } from './tools/tools.js';
+import { appendCallPathSegment, estimateMessagesBytes, formatToolRequestCompact, normalizeCallPath, parseJsonRecordDetailed, parseJsonValueDetailed, sanitizeToolName, truncateUtf8WithNotice, warn } from './utils.js';
 import { XmlToolTransport } from './xml-transport.js';
 
 // Exit codes according to DESIGN.md
@@ -68,27 +69,6 @@ interface ToolSelection {
 }
 
 // Immutable session class according to DESIGN.md
-const estimateMessagesBytes = (messages: readonly ConversationMessage[] | undefined): number => {
-  if (messages === undefined || messages.length === 0) return 0;
-  return messages.reduce((total, message) => total + safeJsonByteLength(message), 0);
-};
-
-const safeJsonByteLength = (value: unknown): number => {
-  try {
-    return Buffer.byteLength(JSON.stringify(value), 'utf8');
-  } catch {
-    if (typeof value === 'string') return Buffer.byteLength(value, 'utf8');
-    if (value === null || value === undefined) return 0;
-    if (typeof value === 'object') {
-      let total = 0;
-      Object.values(value as Record<string, unknown>).forEach((nested) => {
-        total += safeJsonByteLength(nested);
-      });
-      return total;
-    }
-    return 0;
-  }
-};
 
 // TargetContextConfig, ContextGuardBlockedEntry, ContextGuardEvaluation moved to context-guard.ts
 
@@ -165,12 +145,13 @@ export class AIAgentSession {
   private pendingToolSelection?: ToolSelection;
   private pendingRetryMessages: string[] = [];
   private trimmedToolCallIds = new Set<string>();
-  private turnHasSuccessfulToolOutput = false;
 
   // Counters for summary
   private llmAttempts = 0;
   private llmSyntheticFailures = 0;
   private centralSizeCapHits = 0;
+
+  private readonly sessionExecutor: SessionToolExecutor;
 
   // Delegation accessors for FinalReportManager
   private get finalReport(): NonNullable<AIAgentResult['finalReport']> | undefined { return this.finalReportManager.getReport(); }
@@ -738,6 +719,39 @@ export class AIAgentSession {
     // Populate mapping now (before warmup) so hasTool() sees all registered providers
     void orch.listTools();
     this.toolsOrchestrator = orch;
+
+    const sessionContext: SessionContext = {
+      agentId: sessionConfig.agentId,
+      callPath: this.callPath,
+      txnId: this.txnId,
+      parentTxnId: this.parentTxnId,
+      originTxnId: this.originTxnId,
+      toolTimeout: sessionConfig.toolTimeout,
+      maxToolCallsPerTurn: sessionConfig.maxToolCallsPerTurn,
+      toolResponseMaxBytes: sessionConfig.toolResponseMaxBytes,
+      stopRef: this.stopRef,
+      isCanceled: () => this.canceled,
+      progressToolEnabled: this.progressToolEnabled,
+      finalReportToolName: AIAgentSession.FINAL_REPORT_TOOL,
+    };
+
+    this.sessionExecutor = new SessionToolExecutor(
+      this.toolsOrchestrator,
+      this.contextGuard,
+      this.finalReportManager,
+      this.xmlTransport,
+      (entry) => { this.log(entry); },
+      (entry) => {
+        this.accounting.push(entry);
+        try { this.sessionConfig.callbacks?.onAccounting?.(entry); } catch (e) { warn(`onAccounting callback failed: ${e instanceof Error ? e.message : String(e)}`); }
+      },
+      (result, context) => this.applyToolResponseCap(result, this.sessionConfig.toolResponseMaxBytes, this.logs, context),
+      sessionContext,
+      this.subAgents !== undefined ? {
+        hasTool: (name) => this.subAgents?.hasTool(name) ?? false,
+        addInvoked: (name) => this.invokedSubAgents.add(name)
+      } : undefined
+    );
 
     // Apply an initial session title without consuming a tool turn (side-channel)
     try {
@@ -1436,7 +1450,6 @@ export class AIAgentSession {
         this.xmlTransport.beginTurn();
       }
       this.turnFailureReasons = [];
-      this.turnHasSuccessfulToolOutput = false;
       this._currentTurn = currentTurn;
       this.logTurnStart(currentTurn);
       try { this.sessionConfig.callbacks?.onTurnStarted?.(currentTurn); } catch (e) { warn(`onTurnStarted callback failed: ${e instanceof Error ? e.message : String(e)}`); }
@@ -3807,7 +3820,6 @@ export class AIAgentSession {
     // Expose provider tools (which includes internal tools from InternalToolProvider)
     const pendingSelection = this.consumePendingToolSelection();
     const selection = pendingSelection ?? this.selectToolsForTurn(provider, isFinalTurn);
-    const allowedToolNames = selection.allowedToolNames;
     const toolsForTurn = selection.toolsForTurn;
     let disableReasoningForTurn = false;
 
@@ -3838,377 +3850,25 @@ export class AIAgentSession {
     this.toolFailureFallbacks.length = 0;
     
     // Create tool executor function that delegates to MCP client with accounting
-    let subturnCounter = 0;
+    const executionState: ToolExecutionState = {
+      toolFailureMessages: this.toolFailureMessages,
+      toolFailureFallbacks: this.toolFailureFallbacks,
+      trimmedToolCallIds: this.trimmedToolCallIds,
+      turnHasSuccessfulToolOutput: false,
+      incompleteFinalReportDetected: false
+    };
+    const baseExecutor = this.sessionExecutor.createExecutor(currentTurn, provider, executionState, selection.allowedToolNames);
+    
+    // Wrap to sync local flag for return value compatibility
     let incompleteFinalReportDetected = false;
-    const maxToolCallsPerTurn = Math.max(1, this.sessionConfig.maxToolCallsPerTurn ?? 10);
     const toolExecutor = async (toolName: string, parameters: Record<string, unknown>, options?: { toolCallId?: string }): Promise<string> => {
-      if (this.stopRef?.stopping === true) throw new Error('stop_requested');
-      if (this.canceled) throw new Error('canceled');
-      const normalizedToolName = sanitizeToolName(toolName);
-      const isFinalReportTool = normalizedToolName === AIAgentSession.FINAL_REPORT_TOOL
-        || normalizedToolName === AIAgentSession.FINAL_REPORT_SHORT;
-      const recordXmlEntry = (status: 'ok' | 'failed', response: string, latency: number): void => {
-        if (this.xmlTransport !== undefined) {
-          this.xmlTransport.recordToolResult(normalizedToolName, parameters, status, response, latency, options?.toolCallId);
-        }
-      };
-      if (isFinalReportTool) {
-        this.finalReportManager.incrementAttempts();
-        const nestedCalls = this.parseNestedCallsFromFinalReport(parameters);
-        if (nestedCalls !== undefined) {
-          let nestedResult = AIAgentSession.TOOL_NO_OUTPUT;
-          // eslint-disable-next-line functional/no-loop-statements
-          for (const nestedCall of nestedCalls) {
-            nestedResult = await toolExecutor(nestedCall.name, nestedCall.parameters);
-          }
-          return nestedResult;
-        }
-      }
-      // Advance subturn for each tool call within this turn
-      subturnCounter += 1;
-      if (subturnCounter > maxToolCallsPerTurn) {
-        const msg = `Tool calls per turn exceeded: limit=${String(maxToolCallsPerTurn)}. Switch strategy: avoid further tool calls this turn; either summarize progress or call ${AIAgentSession.FINAL_REPORT_TOOL} to conclude.`;
-        const warn: LogEntry = { timestamp: Date.now(), severity: 'ERR', turn: currentTurn, subturn: subturnCounter, direction: 'response', type: 'tool', remoteIdentifier: 'agent:limits', fatal: false, message: msg };
-        this.log(warn);
-        throw new Error('tool_calls_per_turn_limit_exceeded');
-      }
-      // Orchestrator receives ctx turn/subturn per call
-
-      // (no local preview helpers needed)
-
-      // Normalize tool name to strip router/provider wrappers like <|constrain|>
-      const effectiveToolName = normalizedToolName;
-      addSpanEvent('tool.call.requested', { 'ai.tool.name': effectiveToolName });
-      const startTime = Date.now();
       try {
-        if (!allowedToolNames.has(effectiveToolName)) {
-      const blocked: LogEntry = {
-        timestamp: Date.now(),
-        severity: 'WRN',
-        turn: currentTurn,
-        subturn: subturnCounter,
-        direction: 'response',
-        type: 'tool',
-        remoteIdentifier: AIAgentSession.REMOTE_AGENT_TOOLS,
-        fatal: false,
-        message: `Tool '${effectiveToolName}' is not permitted for provider '${provider}'`
-      };
-          this.log(blocked);
-          throw new Error('tool_not_permitted');
-        }
-        // Internal tools are handled by InternalToolProvider via orchestrator
-
-        // Sub-agent execution is handled by the orchestrator (AgentProvider)
-
-        // Orchestrator-managed execution for MCP + REST
-        if (this.toolsOrchestrator?.hasTool(effectiveToolName) === true) {
-          const isBatchTool = effectiveToolName === 'agent__batch';
-          const isSubAgentTool = this.subAgents?.hasTool(effectiveToolName) === true;
-          const managed = await this.toolsOrchestrator.executeWithManagement(
-            effectiveToolName,
-            parameters,
-            { turn: currentTurn, subturn: subturnCounter },
-            {
-              timeoutMs: this.sessionConfig.toolTimeout,
-              bypassConcurrency: isBatchTool,
-              disableGlobalTimeout: isBatchTool
-            }
-          );
-          if (isSubAgentTool) {
-            this.invokedSubAgents.add(effectiveToolName);
-          }
-          const providerLabel = typeof managed.providerLabel === 'string' && managed.providerLabel.length > 0
-            ? managed.providerLabel
-            : AIAgentSession.REMOTE_AGENT_TOOLS;
-          const toolOutput = managed.result.length > 0 ? managed.result : AIAgentSession.TOOL_NO_OUTPUT;
-          const callId = typeof options?.toolCallId === 'string' && options.toolCallId.length > 0
-            ? options.toolCallId
-            : undefined;
-          if (managed.dropped === true) {
-            const failureReason = managed.reason ?? 'context_budget_exceeded';
-            const failureTokens = this.estimateTokensForCounters([{ role: 'tool', content: toolOutput }]);
-            this.newCtxTokens += failureTokens;
-            if (callId !== undefined) {
-              this.toolFailureMessages.set(callId, toolOutput);
-              if (!this.turnHasSuccessfulToolOutput && (failureReason === 'context_budget_exceeded' || failureReason === 'token_budget_exceeded')) {
-                this.trimmedToolCallIds.add(callId);
-              }
-            } else {
-              this.toolFailureFallbacks.push(toolOutput);
-            }
-            const failureEntry: AccountingEntry = {
-              type: 'tool',
-              timestamp: startTime,
-              status: 'failed',
-              latency: managed.latency,
-              mcpServer: providerLabel,
-              command: effectiveToolName,
-              charactersIn: managed.charactersIn,
-              charactersOut: managed.charactersOut,
-              error: failureReason,
-              agentId: this.sessionConfig.agentId,
-              callPath: this.callPath,
-              txnId: this.txnId,
-              parentTxnId: this.parentTxnId,
-              originTxnId: this.originTxnId,
-              details: {
-                reason: failureReason,
-                original_tokens: managed.tokens ?? 0,
-                replacement_tokens: failureTokens,
-              },
-            };
-            accounting.push(failureEntry);
-            try { this.sessionConfig.callbacks?.onAccounting?.(failureEntry); } catch (e) { warn(`tool accounting callback failed: ${e instanceof Error ? e.message : String(e)}`); }
-            addSpanEvent('tool.call.failure', {
-              'ai.tool.name': effectiveToolName,
-              'ai.tool.latency_ms': managed.latency,
-              'ai.tool.failure.reason': failureReason,
-            });
-            recordXmlEntry('failed', toolOutput, managed.latency);
-            return toolOutput;
-          }
-
-          const managedTokens = typeof managed.tokens === 'number' ? managed.tokens : undefined;
-          const isInternalProvider = providerLabel === 'agent';
-          const toolTokens = managedTokens ?? this.estimateTokensForCounters([{ role: 'tool', content: toolOutput }]);
-          if (!isInternalProvider) {
-            const guardEvaluation = this.evaluateContextGuard(toolTokens);
-            if (process.env.CONTEXT_DEBUG === 'true') {
-              const approxTokens = Math.ceil(estimateMessagesBytes([{ role: 'tool', content: toolOutput }]) / 4);
-              let limitTokens: number | undefined;
-              let contextWindow: number | undefined;
-              if (guardEvaluation.blocked.length > 0) {
-                const firstBlocked = guardEvaluation.blocked[0];
-                limitTokens = firstBlocked.limit;
-                contextWindow = firstBlocked.contextWindow;
-              }
-              console.log('context-guard/tool-eval', {
-                toolTokens,
-                approxTokens,
-                contentLength: toolOutput.length,
-                currentCtx: this.currentCtxTokens,
-                pendingCtx: this.pendingCtxTokens,
-                newCtx: this.newCtxTokens,
-                projectedTokens: guardEvaluation.projectedTokens,
-                limitTokens,
-                contextWindow,
-              });
-            }
-            if (guardEvaluation.blocked.length > 0) {
-              const blockedEntries = guardEvaluation.blocked.length > 0
-                ? guardEvaluation.blocked
-                : [{
-                    provider: 'unknown',
-                    model: 'unknown',
-                    contextWindow: ContextGuard.DEFAULT_CONTEXT_WINDOW_TOKENS,
-                    bufferTokens: ContextGuard.DEFAULT_CONTEXT_BUFFER_TOKENS,
-                    maxOutputTokens: this.computeMaxOutputTokens(ContextGuard.DEFAULT_CONTEXT_WINDOW_TOKENS),
-                    limit: 0,
-                    projected: guardEvaluation.projectedTokens,
-                  }];
-              const first = blockedEntries[0];
-              const remainingTokens = first.limit > first.projected ? first.limit - first.projected : 0;
-              const warnEntry: LogEntry = {
-                timestamp: Date.now(),
-                severity: 'WRN',
-                turn: currentTurn,
-                subturn: subturnCounter,
-                direction: 'response',
-                type: 'tool',
-                remoteIdentifier: providerLabel,
-                fatal: false,
-                message: `Tool '${effectiveToolName}' output dropped: context window budget exceeded (${String(toolTokens)} tokens, limit ${String(first.limit)}).`,
-                details: {
-                  tool: effectiveToolName,
-                  provider: providerLabel,
-                  tokens_estimated: toolTokens,
-                  projected_tokens: guardEvaluation.projectedTokens,
-                  limit_tokens: first.limit,
-                  remaining_tokens: remainingTokens,
-                  reason: 'token_budget_exceeded',
-                },
-              };
-              this.log(warnEntry);
-              const renderedFailure = AIAgentSession.TOOL_NO_OUTPUT;
-              const failureTokens = this.estimateTokensForCounters([{ role: 'tool', content: renderedFailure }]);
-              this.newCtxTokens += failureTokens;
-              if (callId !== undefined) {
-                this.toolFailureMessages.set(callId, renderedFailure);
-                if (!this.turnHasSuccessfulToolOutput) {
-                  this.trimmedToolCallIds.add(callId);
-                }
-              } else {
-                this.toolFailureFallbacks.push(renderedFailure);
-              }
-              const failureEntry: AccountingEntry = {
-                type: 'tool',
-                timestamp: startTime,
-                status: 'failed',
-                latency: managed.latency,
-                mcpServer: providerLabel,
-                command: effectiveToolName,
-                charactersIn: managed.charactersIn,
-                charactersOut: managed.charactersOut,
-                error: 'token_budget_exceeded',
-                agentId: this.sessionConfig.agentId,
-                callPath: this.callPath,
-                txnId: this.txnId,
-                parentTxnId: this.parentTxnId,
-                originTxnId: this.originTxnId,
-                details: {
-                  projected_tokens: first.projected,
-                  limit_tokens: first.limit,
-                  remaining_tokens: remainingTokens,
-                  original_tokens: toolTokens,
-                  replacement_tokens: failureTokens,
-                },
-              };
-              accounting.push(failureEntry);
-              try { this.sessionConfig.callbacks?.onAccounting?.(failureEntry); } catch (e) { warn(`tool accounting callback failed: ${e instanceof Error ? e.message : String(e)}`); }
-              addSpanEvent('tool.call.failure', {
-                'ai.tool.name': effectiveToolName,
-                'ai.tool.latency_ms': managed.latency,
-                'ai.tool.failure.reason': 'context_budget_exceeded',
-              });
-              recordXmlEntry('failed', renderedFailure, managed.latency);
-              this.enforceContextFinalTurn(blockedEntries, 'tool_preflight');
-              return renderedFailure;
-            }
-          } else if (process.env.CONTEXT_DEBUG === 'true') {
-            const approxTokens = Math.ceil(estimateMessagesBytes([{ role: 'tool', content: toolOutput }]) / 4);
-            console.log('context-guard/tool-eval', {
-              toolTokens,
-              approxTokens,
-              contentLength: toolOutput.length,
-              currentCtx: this.currentCtxTokens,
-              pendingCtx: this.pendingCtxTokens,
-              newCtx: this.newCtxTokens,
-              projectedTokens: this.currentCtxTokens + this.pendingCtxTokens + this.newCtxTokens,
-              limitTokens: undefined,
-              contextWindow: undefined,
-            });
-          }
-
-          this.newCtxTokens += toolTokens;
-          const successEntry: AccountingEntry = {
-            type: 'tool',
-            timestamp: startTime,
-            status: 'ok',
-            latency: managed.latency,
-            mcpServer: providerLabel,
-            command: effectiveToolName,
-            charactersIn: managed.charactersIn,
-            charactersOut: managed.charactersOut,
-            agentId: this.sessionConfig.agentId,
-            callPath: this.callPath,
-            txnId: this.txnId,
-            parentTxnId: this.parentTxnId,
-            originTxnId: this.originTxnId,
-            details: { tokens: toolTokens },
-          };
-          accounting.push(successEntry);
-          try { this.sessionConfig.callbacks?.onAccounting?.(successEntry); } catch (e) { warn(`tool accounting callback failed: ${e instanceof Error ? e.message : String(e)}`); }
-          this.turnHasSuccessfulToolOutput = true;
-          if (managedTokens === undefined) {
-            const toolLog: LogEntry = {
-              timestamp: Date.now(),
-              severity: 'VRB',
-              turn: currentTurn,
-              subturn: subturnCounter,
-              direction: 'response',
-              type: 'tool',
-              remoteIdentifier: providerLabel,
-              fatal: false,
-              message: `Tool '${effectiveToolName}' completed (${String(managed.charactersOut)} bytes, ${String(toolTokens)} tokens).`,
-              details: {
-                latency_ms: managed.latency,
-                characters_in: managed.charactersIn,
-                characters_out: managed.charactersOut,
-                tokens: toolTokens,
-              },
-            };
-            this.log(toolLog);
-          }
-          addSpanEvent('tool.call.success', {
-            'ai.tool.name': effectiveToolName,
-            'ai.tool.latency_ms': managed.latency,
-            'ai.tool.tokens': toolTokens,
-          });
-          recordXmlEntry('ok', toolOutput, managed.latency);
-          return toolOutput;
-        }
-
-        // Unknown tool after all paths
-        {
-          const req = formatToolRequestCompact(toolName, parameters);
-          const warn: LogEntry = { timestamp: Date.now(), severity: 'WRN', turn: currentTurn, subturn: 0, direction: 'response', type: 'llm', remoteIdentifier: 'assistant:tool', fatal: false, message: `Unknown tool requested: ${req}` };
-          this.log(warn);
-          addSpanEvent('tool.call.unknown', { 'ai.tool.name': effectiveToolName });
-          throw new Error(`No server found for tool: ${effectiveToolName}`);
-        }
-      } catch (error) {
-        const latency = Date.now() - startTime;
-        const errorMsg = error instanceof Error ? error.message : String(error);
-        addSpanEvent('tool.call.error', { 'ai.tool.name': effectiveToolName, 'ai.tool.error': errorMsg });
-
-        if (isFinalReportTool) {
-          const serialized = (() => {
-            try {
-              return JSON.stringify(parameters);
-            } catch {
-              return '[unserializable-final-report-payload]';
-            }
-          })();
-          const errLog: LogEntry = {
-            timestamp: Date.now(),
-            severity: 'ERR',
-            turn: currentTurn,
-            subturn: subturnCounter,
-            direction: 'response',
-            type: 'tool',
-            remoteIdentifier: AIAgentSession.REMOTE_ORCHESTRATOR,
-            fatal: false,
-            message: `agent__final_report failed: ${errorMsg}`,
-            details: { payload: serialized },
-          };
-          this.log(errLog);
-        }
-
-        // Add failed tool accounting
-        const accountingEntry: AccountingEntry = {
-          type: 'tool',
-          timestamp: startTime,
-          status: 'failed',
-          latency,
-          mcpServer: 'unknown', // Can't get server name if the call failed early
-          command: toolName,
-          charactersIn: JSON.stringify(parameters).length,
-          charactersOut: 0,
-          error: errorMsg,
-          agentId: this.sessionConfig.agentId, callPath: this.callPath, txnId: this.txnId, parentTxnId: this.parentTxnId, originTxnId: this.originTxnId
-        };
-        accounting.push(accountingEntry);
-        try { this.sessionConfig.callbacks?.onAccounting?.(accountingEntry); } catch (e) { warn(`tool accounting callback failed: ${e instanceof Error ? e.message : String(e)}`); }
-
-        // Check if this is an incomplete final_report error
-        if (toolName === AIAgentSession.FINAL_REPORT_TOOL) {
-          incompleteFinalReportDetected = true;
-        }
-
-        // Return error message instead of throwing - ensures LLM always gets valid tool output
-        const limitMessage = `execution not allowed because the per-turn tool limit (${String(maxToolCallsPerTurn)}) was reached; retry this tool on the next turn if available.`;
-        const failureDetail = errorMsg === 'tool_calls_per_turn_limit_exceeded' ? limitMessage : errorMsg;
-        const renderedFailure = `(tool failed: ${failureDetail})`;
-        if (typeof options?.toolCallId === 'string' && options.toolCallId.length > 0) {
-          this.toolFailureMessages.set(options.toolCallId, renderedFailure);
-          if (!this.turnHasSuccessfulToolOutput && failureDetail.toLowerCase().includes('context window budget exceeded')) {
-            this.trimmedToolCallIds.add(options.toolCallId);
-          }
-        } else {
-          this.toolFailureFallbacks.push(renderedFailure);
-        }
-        recordXmlEntry('failed', renderedFailure, latency);
-        return renderedFailure;
+        const result = await baseExecutor(toolName, parameters, options);
+        incompleteFinalReportDetected = executionState.incompleteFinalReportDetected;
+        return result;
+      } catch (e) {
+        incompleteFinalReportDetected = executionState.incompleteFinalReportDetected;
+        throw e;
       }
     };
     const modelOverrides = this.resolveModelOverrides(provider, model);
@@ -4503,113 +4163,6 @@ export class AIAgentSession {
     return blocks.join('\n\n');
   }
 
-  // Extracted batch execution for readability
-  private async executeBatchCalls(
-    parameters: Record<string, unknown>,
-    currentTurn: number,
-    startTime: number,
-    logs: LogEntry[],
-    accounting: AccountingEntry[],
-    toolName: string
-  ): Promise<string> {
-    interface BatchCall { id: string; tool: string; parameters: Record<string, unknown> }
-    interface BatchInput { calls: BatchCall[] }
-
-    const isPlainObject = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);
-    const asString = (v: unknown): string | undefined => typeof v === 'string' ? v : undefined;
-    const asId = (v: unknown): string | undefined => (typeof v === 'string') ? v : (typeof v === 'number' && Number.isFinite(v) ? String(v) : undefined);
-
-    // Shared constants for batch logging
-    const BATCH_REMOTE_ID = 'agent:batch' as const;
-    const RESP_DIR = 'response' as const;
-    const LLM_TYPE = 'llm' as const;
-
-    const bi: BatchInput | undefined = (() => {
-      if (!isPlainObject(parameters)) return undefined;
-      const p: Record<string, unknown> = parameters;
-      const callsRaw = p.calls;
-      if (!Array.isArray(callsRaw)) return undefined;
-      const calls: BatchCall[] = callsRaw.map((cUnknown) => {
-        const c = isPlainObject(cUnknown) ? cUnknown : {};
-        const id = asId(c.id) ?? '';
-        const tool = asString(c.tool) ?? '';
-        const parameters = (isPlainObject(c.parameters) ? c.parameters : {});
-        return { id, tool, parameters };
-      });
-      return { calls };
-    })();
-
-    if (bi === undefined || bi.calls.some((c) => c.id.length === 0 || c.tool.length === 0)) {
-      // Warn once for invalid batch input
-      try {
-        const warn: LogEntry = { timestamp: Date.now(), severity: 'WRN', turn: currentTurn, subturn: 0, direction: RESP_DIR, type: LLM_TYPE, remoteIdentifier: BATCH_REMOTE_ID, fatal: false, message: 'Invalid batch input: each call requires id, tool, parameters' };
-        this.log(warn);
-      } catch (e) { warn(`LLM error log failed: ${e instanceof Error ? e.message : String(e)}`); }
-      const latency = Date.now() - startTime;
-      const accountingEntry: AccountingEntry = {
-        type: 'tool', timestamp: startTime, status: 'failed', latency,
-        mcpServer: 'agent', command: toolName,
-        charactersIn: JSON.stringify(parameters).length, charactersOut: 0,
-        error: 'invalid_batch_input',
-        agentId: this.sessionConfig.agentId, callPath: this.callPath, txnId: this.txnId, parentTxnId: this.parentTxnId, originTxnId: this.originTxnId
-      };
-      accounting.push(accountingEntry);
-      this.sessionConfig.callbacks?.onAccounting?.(accountingEntry);
-      throw new Error('invalid_batch_input: calls[] requires id, tool, parameters');
-    }
-
-    // Batch execution: orchestrator-only inner calls; record a span for the batch
-    // no spans
-    const results = await Promise.all(bi.calls.map(async (c) => {
-      const t0 = Date.now();
-      // Allow progress_report in batch, but not final_report or nested batch
-      if (c.tool === AIAgentSession.FINAL_REPORT_TOOL || c.tool === 'agent__batch') {
-        return { id: c.id, tool: c.tool, ok: false, elapsedMs: 0, error: { code: 'INTERNAL_NOT_ALLOWED', message: 'Internal tools are not allowed in batch' } };
-      }
-      // Handle progress_report directly in batch
-      if (c.tool === 'agent__progress_report') {
-        if (!this.progressToolEnabled) {
-          return { id: c.id, tool: c.tool, ok: false, elapsedMs: 0, error: { code: 'PROGRESS_DISABLED', message: 'agent__progress_report is disabled for this session' } };
-        }
-        const progress = typeof (c.parameters.progress) === 'string' ? c.parameters.progress : '';
-        if (progress.trim().length > 0) {
-          this.opTree.setLatestStatus(progress);
-          // Trigger callback to notify listeners (like Slack progress updates)
-          try {
-            this.sessionConfig.callbacks?.onOpTree?.(this.opTree.getSession());
-          } catch (e) {
-            warn(`onOpTree callback failed: ${e instanceof Error ? e.message : String(e)}`);
-          }
-          this.progressReporter.agentUpdate({
-            callPath: this.getCallPathLabel(),
-            agentId: this.getAgentIdLabel(),
-            agentPath: this.getAgentPathLabel(),
-            agentName: this.getAgentDisplayName(),
-            txnId: this.txnId,
-            parentTxnId: this.parentTxnId,
-            originTxnId: this.originTxnId,
-            message: progress,
-          });
-        }
-        return { id: c.id, tool: c.tool, ok: true, elapsedMs: 0, output: JSON.stringify({ ok: true }) };
-      }
-      try {
-        if (!(this.toolsOrchestrator?.hasTool(c.tool) ?? false)) {
-          return { id: c.id, tool: c.tool, ok: false, elapsedMs: 0, error: { code: 'UNKNOWN_TOOL', message: `Unknown tool: ${c.tool}` } };
-        }
-        const orchestrator = (this.toolsOrchestrator as unknown) as { executeWithManagement: (t: string, a: Record<string, unknown>, ctx: { turn: number; subturn: number }, opts?: { timeoutMs?: number }) => Promise<ManagedToolResult> };
-        const managed = await orchestrator.executeWithManagement(c.tool, c.parameters, { turn: currentTurn, subturn: 0 }, { timeoutMs: this.sessionConfig.toolTimeout });
-        return { id: c.id, tool: c.tool, ok: true, elapsedMs: managed.latency, output: managed.result };
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        return { id: c.id, tool: c.tool, ok: false, elapsedMs: Date.now() - t0, error: { code: 'EXECUTION_ERROR', message: msg } };
-      }
-    }));
-    const payload = this.applyToolResponseCap(JSON.stringify({ results }), this.sessionConfig.toolResponseMaxBytes, logs, { server: 'agent', tool: toolName, turn: currentTurn, subturn: 0 });
-    // end via opTree only
-    return payload;
-  }
-
   private expandNestedLLMToolCalls(toolCalls: ToolCall[]): ToolCall[] | undefined {
     let mutated = false;
     const expanded: ToolCall[] = [];
@@ -4617,7 +4170,7 @@ export class AIAgentSession {
     for (const call of toolCalls) {
       const normalizedName = sanitizeToolName(call.name);
       if (normalizedName === AIAgentSession.FINAL_REPORT_TOOL) {
-        const nested = this.parseNestedCallsFromFinalReport(call.parameters);
+        const nested = this.sessionExecutor.parseNestedCallsFromFinalReport(call.parameters, this.currentTurn);
         if (nested !== undefined) {
           expanded.push(...nested);
           mutated = true;
@@ -4627,74 +4180,6 @@ export class AIAgentSession {
       expanded.push(call);
     }
     return mutated ? expanded : undefined;
-  }
-
-  private parseNestedCallsFromFinalReport(parameters: Record<string, unknown>): ToolCall[] | undefined {
-    const rawCalls = (parameters as { calls?: unknown }).calls;
-    if (!Array.isArray(rawCalls) || rawCalls.length === 0) {
-      return undefined;
-    }
-    const parsed: ToolCall[] = [];
-    // eslint-disable-next-line functional/no-loop-statements
-    for (const entryUnknown of rawCalls) {
-      if (entryUnknown === null || typeof entryUnknown !== 'object' || Array.isArray(entryUnknown)) {
-        return undefined;
-      }
-      const entry = entryUnknown as { id?: unknown; tool?: unknown; parameters?: unknown };
-      const toolRaw = entry.tool;
-      if (typeof toolRaw !== 'string' || toolRaw.trim().length === 0) {
-        return undefined;
-      }
-      const sanitizedTool = sanitizeToolName(toolRaw);
-      const clampResult = clampToolName(sanitizedTool) as { name: string; truncated: boolean };
-      const clampedToolName = clampResult.name;
-      const idRaw = entry.id;
-      const toolCallId = (() => {
-        if (typeof idRaw === 'string' && idRaw.length > 0) {
-          return idRaw;
-        }
-        if (typeof idRaw === 'number' && Number.isFinite(idRaw)) {
-          return Math.trunc(idRaw).toString();
-        }
-        return 'call-' + (parsed.length + 1).toString();
-      })();
-      const parametersCandidate = entry.parameters;
-      const parsedParameters = parseJsonRecord(parametersCandidate);
-      if (parsedParameters === undefined) {
-        const preview = this.previewRawParameter(parametersCandidate);
-        const logEntry: LogEntry = {
-          timestamp: Date.now(),
-          severity: 'ERR',
-          turn: this.currentTurn,
-          subturn: 0,
-          direction: 'response',
-          type: 'tool',
-          remoteIdentifier: 'agent:final_report',
-          fatal: false,
-          message: `agent__final_report nested call '${toolCallId}' parameters invalid (raw preview: ${preview})`,
-        };
-        this.log(logEntry);
-      }
-      const toolParameters = parsedParameters ?? {};
-      parsed.push({ id: toolCallId, name: clampedToolName, parameters: toolParameters });
-    }
-    return parsed.length > 0 ? parsed : undefined;
-  }
-
-  private previewRawParameter(raw: unknown): string {
-    if (raw === undefined) {
-      return 'undefined';
-    }
-    if (typeof raw === 'string') {
-      return truncateUtf8WithNotice(raw, 512);
-    }
-    try {
-      const serialized = JSON.stringify(raw);
-      return truncateUtf8WithNotice(serialized, 512);
-    } catch {
-      const fallback = Object.prototype.toString.call(raw);
-      return truncateUtf8WithNotice(fallback, 512);
-    }
   }
 
   // Immutable retry method - returns new session
