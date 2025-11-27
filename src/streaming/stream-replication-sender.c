@@ -1247,9 +1247,10 @@ static bool replication_execute_request(struct replication_request *rq, bool wor
             buffer_print_uint64_encoded(wb, integer_encoding, now_realtime_sec());  // wall_clock_time
             buffer_fast_strcat(wb, "\n", 1);
 
-            sender_thread_buffer_free();
+            sender_commit(rq->sender, wb, STREAM_TRAFFIC_TYPE_REPLICATION);
+            __atomic_add_fetch(&rq->sender->host->stream.snd.status.replication.counter_out, 1, __ATOMIC_RELAXED);
+            replication_replied_add();
 
-            __atomic_add_fetch(&replication_globals.atomic.replied, 1, __ATOMIC_RELAXED);
             ret = true;  // Consider this a successful response
             goto cleanup;
         }

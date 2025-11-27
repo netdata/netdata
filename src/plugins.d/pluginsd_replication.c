@@ -488,30 +488,39 @@ ALWAYS_INLINE PARSER_RC pluginsd_replay_end(char **words, size_t num_words, PARS
     // 2. Child keeps splitting responses due to buffer constraints
     // 3. Network issues causing repeated empty/failed responses
 
-    bool is_empty_response = (first_entry_requested == 0 && last_entry_requested == 0);
+    // Check parent's current retention to detect if we're already caught up
+    time_t local_first_entry = 0, local_last_entry = 0;
+    rrdset_get_retention_of_tier_for_collected_chart(
+        st, &local_first_entry, &local_last_entry, now_realtime_sec(), 0);
+
+    // Detect suspicious pattern: parent requested data but is already caught up
+    // This indicates we're in a loop where child keeps splitting responses
+    // even though parent doesn't need more data.
+    bool parent_already_caught_up = (local_last_entry >= last_entry_child);
+    bool requested_non_empty_range = (first_entry_requested != 0 || last_entry_requested != 0);
+    bool is_suspicious_response = (requested_non_empty_range && parent_already_caught_up);
+
     bool should_check_for_stuck_replication = false;
 
-    // Track consecutive empty responses - applies to all builds
-    if(is_empty_response) {
+    // Track consecutive suspicious responses - applies to all builds
+    if(is_suspicious_response) {
         st->replication_empty_response_count++;
-        // After 3 consecutive empty responses, we should investigate
+        // After 3 consecutive suspicious responses, we need to investigate
         if(st->replication_empty_response_count >= 3) {
             should_check_for_stuck_replication = true;
         }
     } else {
-        // Reset counter if we got non-empty response (legitimate progress)
+        // Reset counter if this was a legitimate response (parent still catching up)
         st->replication_empty_response_count = 0;
     }
 
     if (should_check_for_stuck_replication) {
-        // Get current retention information from parent's database
-        time_t local_first_entry = 0, local_last_entry = 0;
-        rrdset_get_retention_of_tier_for_collected_chart(
-            st, &local_first_entry, &local_last_entry, now_realtime_sec(), 0);
+        // We already have local_first_entry and local_last_entry from above
 
         // Check multiple conditions to ensure we're truly stuck:
         //
         // Condition 1: Parent has data that covers or exceeds child's retention
+        // (We already checked this in parent_already_caught_up, but verify again)
         bool parent_has_equal_or_newer_data = (local_last_entry >= last_entry_child);
 
         // Condition 2: The gap from parent's data to child's data is small
