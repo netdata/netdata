@@ -17,7 +17,7 @@ fi
 is_user_in_group() {
   local gid="$1"
   local user="$2"
-  getent group "${gid}" | awk -F: '{print $4}' | tr ',' '\n' | grep -qx "${user}"
+  getent group "${gid}" 2>/dev/null | awk -F: '{print $4}' | tr ',' '\n' | grep -qx "${user}"
 }
 
 # Add user to a group by GID, creating the group if necessary
