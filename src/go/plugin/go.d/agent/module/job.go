@@ -177,6 +177,28 @@ type Job struct {
 	dumpAnalyzer interface{} // Will be *agent.DumpAnalyzer but avoid circular dependency
 }
 
+type collectedMetrics struct {
+	intMetrics   map[string]int64
+	floatMetrics map[string]float64
+}
+
+func (cm *collectedMetrics) getDimValue(dim *Dim) (float64, bool) {
+	if dim.Float {
+		v, ok := cm.floatMetrics[dim.ID]
+		return v, ok
+	}
+	v, ok := cm.intMetrics[dim.ID]
+	return float64(v), ok
+}
+
+func (cm *collectedMetrics) getVarValue(vr *Var) (float64, bool) {
+	if v, ok := cm.floatMetrics[vr.ID]; ok {
+		return v, ok
+	}
+	v, ok := cm.intMetrics[vr.ID]
+	return float64(v), ok
+}
+
 // NetdataChartIDMaxLength is the chart ID max length. See RRD_ID_LENGTH_MAX in the netdata source code.
 const NetdataChartIDMaxLength = 1200
 
@@ -424,7 +446,7 @@ func (j *Job) runOnce() {
 	j.buf.Reset()
 }
 
-func (j *Job) collect() (result map[string]int64) {
+func (j *Job) collect() collectedMetrics {
 	j.panicked = false
 	defer func() {
 		if r := recover(); r != nil {
@@ -435,21 +457,28 @@ func (j *Job) collect() (result map[string]int64) {
 			}
 		}
 	}()
-	result = j.module.Collect(context.TODO())
+
+	var mx collectedMetrics
+
+	if v, ok := j.module.(MetricCollector); ok {
+		mx.floatMetrics = v.CollectMetrics(context.TODO())
+	} else {
+		mx.intMetrics = j.module.Collect(context.TODO())
+	}
 
 	// Record collected metrics for dump mode
-	if j.dumpMode && j.dumpAnalyzer != nil && result != nil {
+	if j.dumpMode && j.dumpAnalyzer != nil && mx.intMetrics != nil {
 		if analyzer, ok := j.dumpAnalyzer.(interface {
 			RecordCollection(string, map[string]int64)
 		}); ok {
-			analyzer.RecordCollection(j.name, result)
+			analyzer.RecordCollection(j.name, mx.intMetrics)
 		}
 	}
 
-	return result
+	return mx
 }
 
-func (j *Job) processMetrics(metrics map[string]int64, startTime time.Time, sinceLastRun int) bool {
+func (j *Job) processMetrics(mx collectedMetrics, startTime time.Time, sinceLastRun int) bool {
 	var createChart bool
 	if j.module.VirtualNode() == nil {
 		select {
@@ -495,10 +524,10 @@ func (j *Job) processMetrics(metrics map[string]int64, startTime time.Time, sinc
 		}
 		(*j.charts)[i] = chart
 		i++
-		if len(metrics) == 0 || chart.Obsolete {
+		if len(mx.intMetrics)+len(mx.floatMetrics) == 0 || chart.Obsolete {
 			continue
 		}
-		if j.updateChart(chart, metrics, sinceLastRun) {
+		if j.updateChart(chart, mx, sinceLastRun) {
 			updated++
 		}
 	}
@@ -529,17 +558,15 @@ func (j *Job) processMetrics(metrics map[string]int64, startTime time.Time, sinc
 		}
 	}
 
-	j.updateChart(
-		j.collectStatusChart,
-		map[string]int64{"success": metrix.Bool(updated > 0), "failed": metrix.Bool(updated == 0)},
-		sinceLastRun,
-	)
+	intMx := collectedMetrics{intMetrics: map[string]int64{"success": metrix.Bool(updated > 0), "failed": metrix.Bool(updated == 0)}}
+	j.updateChart(j.collectStatusChart, intMx, sinceLastRun)
 
 	if updated == 0 {
 		return false
 	}
 
-	j.updateChart(j.collectDurationChart, map[string]int64{"duration": elapsed}, sinceLastRun)
+	intMx = collectedMetrics{intMetrics: map[string]int64{"duration": elapsed}}
+	j.updateChart(j.collectDurationChart, intMx, sinceLastRun)
 
 	return true
 }
@@ -630,16 +657,13 @@ func (j *Job) createChart(chart *Chart) {
 		})
 	}
 	for _, v := range chart.Vars {
-		if v.Name != "" {
-			j.api.VARIABLE(v.Name, v.Value)
-		} else {
-			j.api.VARIABLE(v.ID, v.Value)
-		}
+		name := firstNotEmpty(v.Name, v.Name)
+		j.api.VARIABLE(name, v.Value)
 	}
 	_ = j.api.EMPTYLINE()
 }
 
-func (j *Job) updateChart(chart *Chart, collected map[string]int64, sinceLastRun int) bool {
+func (j *Job) updateChart(chart *Chart, mx collectedMetrics, sinceLastRun int) bool {
 	if chart.ignore {
 		dims := chart.Dims[:0]
 		for _, dim := range chart.Dims {
@@ -658,8 +682,7 @@ func (j *Job) updateChart(chart *Chart, collected map[string]int64, sinceLastRun
 			if dim.remove {
 				continue
 			}
-			if _, ok := collected[dim.ID]; ok {
-				hasData = true
+			if _, hasData = mx.getDimValue(dim); hasData {
 				break
 			}
 		}
@@ -682,25 +705,30 @@ func (j *Job) updateChart(chart *Chart, collected map[string]int64, sinceLastRun
 		}
 		chart.Dims[i] = dim
 		i++
-		if v, ok := collected[dim.ID]; !ok {
-			j.api.SETEMPTY(firstNotEmpty(dim.Name, dim.ID))
+
+		name := firstNotEmpty(dim.Name, dim.ID)
+		v, ok := mx.getDimValue(dim)
+		if !ok {
+			j.api.SETEMPTY(name)
+			continue
+		}
+		updated++
+		if dim.Float {
+			j.api.SETFLOAT(name, v)
 		} else {
-			j.api.SET(firstNotEmpty(dim.Name, dim.ID), v)
-			updated++
+			j.api.SET(name, int64(v))
 		}
 	}
+
 	chart.Dims = chart.Dims[:i]
 
 	for _, vr := range chart.Vars {
-		if v, ok := collected[vr.ID]; ok {
-			if vr.Name != "" {
-				j.api.VARIABLE(vr.Name, v)
-			} else {
-				j.api.VARIABLE(vr.ID, v)
-			}
+		if v, ok := mx.getVarValue(vr); ok {
+			name := firstNotEmpty(vr.Name, vr.ID)
+			j.api.VARIABLE(name, v)
 		}
-
 	}
+
 	j.api.END()
 
 	if chart.updated = updated > 0; chart.updated {
