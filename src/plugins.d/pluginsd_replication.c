@@ -359,6 +359,9 @@ ALWAYS_INLINE PARSER_RC pluginsd_replay_rrdset_collection_state(char **words, si
 ALWAYS_INLINE PARSER_RC pluginsd_replay_end(char **words, size_t num_words, PARSER *parser) {
     if (num_words < 7) { // accepts 7, but the 7th is optional
         nd_log(NDLS_DAEMON, NDLP_ERR, "REPLAY: malformed " PLUGINSD_KEYWORD_REPLAY_END " command");
+        RRDSET *st = pluginsd_get_scope_chart(parser);
+        if(st)
+            st->replication_empty_response_count = 0;
         return PARSER_RC_ERROR;
     }
 
@@ -402,6 +405,10 @@ ALWAYS_INLINE PARSER_RC pluginsd_replay_end(char **words, size_t num_words, PARS
 
     parser->user.data_collections_count++;
 
+    // Reset empty response counter when we receive actual data
+    if(parser->user.replay.rset_enabled && st)
+        st->replication_empty_response_count = 0;
+
     if(parser->user.replay.rset_enabled && st->rrdhost->receiver) {
         time_t now = now_realtime_sec();
         time_t started = st->rrdhost->receiver->replication.first_time_s;
@@ -433,6 +440,9 @@ ALWAYS_INLINE PARSER_RC pluginsd_replay_end(char **words, size_t num_words, PARS
         st->replay.log_next_data_collection = true;
 #endif
 
+    if(start_streaming)
+        st->replication_empty_response_count = 0;
+
     if (start_streaming) {
 #ifdef REPLICATION_TRACKING
         st->stream.rcv.who = REPLAY_WHO_FINISHED;
@@ -463,6 +473,103 @@ ALWAYS_INLINE PARSER_RC pluginsd_replay_end(char **words, size_t num_words, PARS
         stream_thread_received_replication();
 
         return PARSER_RC_OK;
+    }
+
+    // ========================================================================
+    // SAFETY NET: Detect stuck replication loops
+    // ========================================================================
+    //
+    // We received start_streaming=false, which means we need to send another
+    // replication request. However, we need to detect if we're stuck in an
+    // infinite retry loop where no progress is being made.
+    //
+    // This can happen when:
+    // 1. Parent already has newer data than child
+    // 2. Child keeps splitting responses due to buffer constraints
+    // 3. Network issues causing repeated empty/failed responses
+
+    bool is_empty_response = (first_entry_requested == 0 && last_entry_requested == 0);
+    bool should_check_for_stuck_replication = false;
+
+    // Track consecutive empty responses - applies to all builds
+    if(is_empty_response) {
+        st->replication_empty_response_count++;
+        // After 3 consecutive empty responses, we should investigate
+        if(st->replication_empty_response_count >= 3) {
+            should_check_for_stuck_replication = true;
+        }
+    } else {
+        // Reset counter if we got non-empty response (legitimate progress)
+        st->replication_empty_response_count = 0;
+    }
+
+    if (should_check_for_stuck_replication) {
+        // Get current retention information from parent's database
+        time_t local_first_entry = 0, local_last_entry = 0;
+        rrdset_get_retention_of_tier_for_collected_chart(
+            st, &local_first_entry, &local_last_entry, now_realtime_sec(), 0);
+
+        // Check multiple conditions to ensure we're truly stuck:
+        //
+        // Condition 1: Parent has data that covers or exceeds child's retention
+        bool parent_has_equal_or_newer_data = (local_last_entry >= last_entry_child);
+
+        // Condition 2: The gap from parent's data to child's data is small
+        // (within one update interval - might just be timing)
+        time_t gap_to_child = (last_entry_child > local_last_entry) ?
+                              (last_entry_child - local_last_entry) : 0;
+        bool gap_is_negligible = (gap_to_child <= st->update_every);
+
+        // Condition 3: Parent's data is reasonably recent
+        time_t wall_clock = now_realtime_sec();
+        bool parent_data_is_recent = (local_last_entry > 0 &&
+                                     (wall_clock - local_last_entry) < 300);
+
+        // Only finish replication if we have strong evidence we're stuck
+        if (parent_has_equal_or_newer_data || gap_is_negligible) {
+
+            // Log with appropriate level based on confidence
+            ND_LOG_FIELD_PRIORITY level = (parent_has_equal_or_newer_data && parent_data_is_recent) ?
+                                          NDLP_INFO : NDLP_WARNING;
+
+            nd_log(NDLS_DAEMON, level,
+                   "PLUGINSD REPLAY: 'host:%s/chart:%s' detected stuck replication loop. "
+                   "Parent last entry: %llu, Child last entry: %llu, Gap: %llu seconds, "
+                   "Empty responses: %u. Forcing replication to finish.",
+                   rrdhost_hostname(host), rrdset_id(st),
+                   (unsigned long long)local_last_entry,
+                   (unsigned long long)last_entry_child,
+                   (unsigned long long)gap_to_child,
+                   (unsigned int)st->replication_empty_response_count
+            );
+
+            st->replication_empty_response_count = 0;
+
+            // IMPORTANT: Mark as finished and decrement counter NOW, before sending final request.
+            // This prevents infinite loops even if child continues to respond with start_streaming=false.
+            // The next REPLAY_END will see FINISHED flag and handle accordingly.
+            RRDSET_FLAGS old = rrdset_flag_set_and_clear(
+                st, RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED,
+                RRDSET_FLAG_RECEIVER_REPLICATION_IN_PROGRESS | RRDSET_FLAG_SYNC_CLOCK);
+
+            if(!(old & RRDSET_FLAG_RECEIVER_REPLICATION_FINISHED)) {
+                if(rrdhost_receiver_replicating_charts_minus_one(st->rrdhost) == 0)
+                    pulse_host_status(host, PULSE_HOST_STATUS_RCV_RUNNING, 0);
+            }
+
+            pluginsd_clear_scope_chart(parser, PLUGINSD_KEYWORD_REPLAY_END);
+            host->stream.rcv.status.replication.percent = 100.0;
+            worker_set_metric(WORKER_RECEIVER_JOB_REPLICATION_COMPLETION, host->stream.rcv.status.replication.percent);
+
+            // Send one final request to notify child. If child responds with start_streaming=true,
+            // it will start streaming. If it responds with start_streaming=false, the next
+            // REPLAY_END will see the FINISHED flag and log a warning but not loop forever.
+            bool ok = replicate_chart_request(send_to_plugin, parser, host, st,
+                                             first_entry_child, last_entry_child, child_world_time,
+                                             0, 0);  // prev_wanted = 0,0 to trigger empty request path
+
+            return ok ? PARSER_RC_OK : PARSER_RC_ERROR;
+        }
     }
 
 #ifdef REPLICATION_TRACKING

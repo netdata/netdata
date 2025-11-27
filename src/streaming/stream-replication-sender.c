@@ -442,16 +442,29 @@ static bool replication_query_execute(BUFFER *wb, struct replication_query *q, s
 
             if(buffer_strlen(wb) > max_msg_size && last_end_time_in_buffer) {
                 q->query.before = last_end_time_in_buffer;
-                q->query.enable_streaming = false;
+
+                // CRITICAL: If parent explicitly requested start_streaming=true,
+                // we MUST honor it even if buffer is full. This prevents infinite
+                // replication loops where parent is stuck waiting for child to finish.
+                // The parent only sets start_streaming=true when it's confident it's
+                // caught up or detected a stuck state, so we should respect that decision.
+                if (!q->request.enable_streaming) {
+                    // Parent didn't explicitly request finish, so we can split the response
+                    q->query.enable_streaming = false;
+                }
+                // else: Parent requested start_streaming=true, honor it despite buffer overflow
 
                 internal_error(
                     true,
                     "STREAM SND REPLAY: current remaining sender buffer of %zu bytes cannot fit the "
                     "message size %zu bytes for chart '%s' of host '%s'. "
-                    "Sending partial replication response %ld to %ld, %s (original: %ld to %ld, %s).",
+                    "Sending partial replication response %ld to %ld, %s (original: %ld to %ld, %s). "
+                    "%s parent's start_streaming=%s request.",
                     buffer_strlen(wb), max_msg_size, rrdset_id(q->st), rrdhost_hostname(q->st->rrdhost),
                     q->query.after, q->query.before, q->query.enable_streaming?"true":"false",
-                    q->request.after, q->request.before, q->request.enable_streaming?"true":"false");
+                    q->request.after, q->request.before, q->request.enable_streaming?"true":"false",
+                    q->request.enable_streaming ? "Honoring" : "Can override",
+                    q->request.enable_streaming ? "true" : "false");
 
                 q->query.interrupted = true;
 
@@ -1198,8 +1211,46 @@ static bool replication_execute_request(struct replication_request *rq, bool wor
         if(!rq->st) {
             __atomic_add_fetch(&replication_globals.atomic.error_not_found, 1, __ATOMIC_RELAXED);
             nd_log(NDLS_DAEMON, NDLP_ERR,
-                   "STREAM SND REPLAY ERROR: 'host:%s/chart:%s' not found",
+                   "STREAM SND REPLAY ERROR: 'host:%s/chart:%s' not found, sending empty response to unblock parent",
                    rrdhost_hostname(rq->sender->host), string2str(rq->chart_id));
+
+            // CRITICAL: Parent is waiting for a response! We MUST send REPLAY_END even if chart not found
+            // Otherwise parent will wait forever with chart stuck in replicating state.
+            // Send empty response with start_streaming=true to finish replication for this non-existent chart.
+            BUFFER *wb = sender_thread_buffer(rq->sender, REPLICATION_THREAD_BUFFER_INITIAL_SIZE);
+
+            bool with_slots = (rq->sender->capabilities & STREAM_CAP_SLOTS) ? true : false;
+            NUMBER_ENCODING integer_encoding = (rq->sender->capabilities & STREAM_CAP_IEEE754) ?
+                                               NUMBER_ENCODING_BASE64 : NUMBER_ENCODING_DECIMAL;
+
+            buffer_fast_strcat(wb, PLUGINSD_KEYWORD_REPLAY_BEGIN, sizeof(PLUGINSD_KEYWORD_REPLAY_BEGIN) - 1);
+            if(with_slots) {
+                buffer_fast_strcat(wb, " "PLUGINSD_KEYWORD_SLOT":", sizeof(PLUGINSD_KEYWORD_SLOT) - 1 + 2);
+                buffer_print_uint64_encoded(wb, integer_encoding, 0);  // slot 0 for unknown chart
+            }
+            buffer_fast_strcat(wb, " '", 2);
+            buffer_fast_strcat(wb, string2str(rq->chart_id), string_strlen(rq->chart_id));
+            buffer_fast_strcat(wb, "'\n", 2);
+
+            // Send REPLAY_END with empty data and start_streaming=true to unblock parent
+            buffer_fast_strcat(wb, PLUGINSD_KEYWORD_REPLAY_END " ", sizeof(PLUGINSD_KEYWORD_REPLAY_END) - 1 + 1);
+            buffer_print_int64_encoded(wb, integer_encoding, 0);  // update_every
+            buffer_fast_strcat(wb, " ", 1);
+            buffer_print_uint64_encoded(wb, integer_encoding, 0);  // db_first_entry
+            buffer_fast_strcat(wb, " ", 1);
+            buffer_print_uint64_encoded(wb, integer_encoding, 0);  // db_last_entry
+            buffer_fast_strcat(wb, " true  ", 7);  // start_streaming=true (force finish)
+            buffer_print_uint64_encoded(wb, integer_encoding, 0);  // after
+            buffer_fast_strcat(wb, " ", 1);
+            buffer_print_uint64_encoded(wb, integer_encoding, 0);  // before
+            buffer_fast_strcat(wb, " ", 1);
+            buffer_print_uint64_encoded(wb, integer_encoding, now_realtime_sec());  // wall_clock_time
+            buffer_fast_strcat(wb, "\n", 1);
+
+            sender_thread_buffer_free();
+
+            __atomic_add_fetch(&replication_globals.atomic.replied, 1, __ATOMIC_RELAXED);
+            ret = true;  // Consider this a successful response
             goto cleanup;
         }
     }
