@@ -887,34 +887,48 @@ void netdata_mssql_fill_user_connection(struct mssql_instance *mi)
     if (unlikely(!mi->conn->collect_user_connections))
         return;
 
+    mi->MSSQLUserConnections.current.Data = 0;
+    mi->MSSQLSessionConnections.current.Data = 0;
+
     collected_number connections = 0;
+    unsigned char is_user;
     SQLLEN col_user_connections_len = 0;
+    SQLLEN col_user_bit_len = 0;
 
     SQLRETURN ret;
 
-    ret = SQLExecDirect(mi->conn->dbSQLUserConnections, (SQLCHAR *)NETDATA_QUERY_USER_CONNECTIONS, SQL_NTS);
+    ret = SQLExecDirect(mi->conn->dbSQLConnections, (SQLCHAR *)NETDATA_QUERY_CONNECTIONS, SQL_NTS);
     if (likely(netdata_mssql_check_result(ret))) {
-        netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn->dbSQLUserConnections, NETDATA_MSSQL_ODBC_QUERY, mi->instanceID);
+        netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn->dbSQLConnections, NETDATA_MSSQL_ODBC_QUERY, mi->instanceID);
         goto enduserconn;
     }
 
-    ret = SQLBindCol(mi->conn->dbSQLUserConnections, 1, SQL_C_LONG, &connections, sizeof(connections), &col_user_connections_len);
+    ret = SQLBindCol(mi->conn->dbSQLConnections, 1, SQL_C_LONG, &connections, sizeof(connections), &col_user_connections_len);
     if (likely(netdata_mssql_check_result(ret))) {
-        netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn->dbSQLUserConnections, NETDATA_MSSQL_ODBC_PREPARE, mi->instanceID);
+        netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn->dbSQLConnections, NETDATA_MSSQL_ODBC_PREPARE, mi->instanceID);
+        goto enduserconn;
+    }
+
+    ret = SQLBindCol(mi->conn->dbSQLConnections, 2, SQL_C_BIT, &is_user, sizeof(is_user), &col_user_bit_len);
+    if (likely(netdata_mssql_check_result(ret))) {
+        netdata_MSSQL_error(SQL_HANDLE_STMT, mi->conn->dbSQLConnections, NETDATA_MSSQL_ODBC_PREPARE, mi->instanceID);
         goto enduserconn;
     }
 
     do {
-        ret = SQLFetch(mi->conn->dbSQLUserConnections);
+        ret = SQLFetch(mi->conn->dbSQLConnections);
         if (likely(netdata_mssql_check_result(ret))) {
             goto enduserconn;
         }
 
-        mi->MSSQLUserConnections.current.Data = (ULONGLONG)connections;
+        if (is_user)
+            mi->MSSQLUserConnections.current.Data = (ULONGLONG)connections;
+        else
+            mi->MSSQLSessionConnections.current.Data = (ULONGLONG)connections;
     } while (true);
 
 enduserconn:
-    netdata_MSSQL_release_results(mi->conn->dbSQLUserConnections);
+    netdata_MSSQL_release_results(mi->conn->dbSQLConnections);
 }
 
 void netdata_mssql_fill_dictionary_from_db(struct mssql_instance *mi)
@@ -1078,7 +1092,7 @@ static bool netdata_MSSQL_initialize_connection(struct netdata_mssql_conn *nmc)
             goto endMSSQLInitializationConnection;
         }
 
-        ret = SQLAllocHandle(SQL_HANDLE_STMT, nmc->netdataSQLHDBc, &nmc->dbSQLUserConnections);
+        ret = SQLAllocHandle(SQL_HANDLE_STMT, nmc->netdataSQLHDBc, &nmc->dbSQLConnections);
         if (likely(netdata_mssql_check_result(ret))) {
             retConn = FALSE;
             goto endMSSQLInitializationConnection;
@@ -2187,6 +2201,7 @@ static void do_mssql_user_connection(PERF_DATA_BLOCK *pDataBlock, struct mssql_i
         return;
 
     do_mssql_user_connections(mi, update_every);
+    do_mssql_sessions_connections(mi, update_every);
 }
 
 void dict_mssql_replication_status(struct mssql_publisher_publication *mpp, int update_every)
