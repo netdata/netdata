@@ -5,72 +5,77 @@
 
 set -e
 
+DOCKER_USR="${DOCKER_USR:-netdata}"
+
 if [ ! -w / ] && [ "${EUID}" -eq 0 ]; then
   echo >&2 "WARNING: This Docker host appears to not properly support newer stat system calls. This is known to cause issues with Netdata (most notably, nodes running on such hosts **cannot be claimed**)."
   echo >&2 "WARNING: For more information, see https://learn.netdata.cloud/docs/agent/claim#known-issues-on-older-hosts-with-seccomp-enabled"
 fi
 
-# Needed to read Proxmox VMs and (LXC) containers configuration files (name resolution + CPU and memory limits)
-function add_netdata_to_proxmox_conf_files_group() {
-  [ "${DOCKER_USR}" = "root" ] && return
+# Check if user is a member of a group by GID
+# Arguments: $1 = GID, $2 = username
+is_user_in_group() {
+  local gid="$1"
+  local user="$2"
+  getent group "${gid}" | awk -F: '{print $4}' | tr ',' '\n' | grep -qx "${user}"
+}
 
-  local group_guid
-  group_guid="$(stat -c %g /host/etc/pve 2>/dev/null || true)"
-  [ -z "${group_guid}" ] && return
+# Add user to a group by GID, creating the group if necessary
+# Arguments: $1 = GID, $2 = group name (for creation)
+add_user_to_gid() {
+  local gid="$1"
+  local group_name="$2"
 
-  if ! getent group "${group_guid}" >/dev/null; then
-    echo "Creating proxmox-etc-pve group with GID ${group_guid}"
-    if ! addgroup --gid "${group_guid}" "proxmox-etc-pve"; then
-      echo >&2 "Failed to add group proxmox-etc-pve with GID ${group_guid}."
-      return
+  [ -z "${gid}" ] && return 1
+
+  if ! getent group "${gid}" > /dev/null; then
+    echo "Creating ${group_name} group with GID ${gid}"
+    if ! addgroup --gid "${gid}" "${group_name}"; then
+      echo >&2 "Failed to add group ${group_name} with GID ${gid}."
+      return 1
     fi
   fi
 
-  if ! getent group "${group_guid}" | grep -q "${DOCKER_USR}"; then
-    echo "Assigning ${DOCKER_USR} user to group ${group_guid}"
-    if ! usermod --apend --groups "${group_guid}" "${DOCKER_USR}"; then
-      echo >&2 "Failed to add ${DOCKER_USR} user to group with GID ${group_guid}."
-      return
+  if ! is_user_in_group "${gid}" "${DOCKER_USR}"; then
+    echo "Assigning ${DOCKER_USR} user to group ${gid}"
+    if ! usermod --append --groups "${gid}" "${DOCKER_USR}"; then
+      echo >&2 "Failed to add ${DOCKER_USR} user to group with GID ${gid}."
+      return 1
     fi
   fi
+}
+
+# Needed to read Proxmox VMs and (LXC) containers configuration files
+add_netdata_to_proxmox_conf_files_group() {
+  [ "${DOCKER_USR}" = "root" ] && return 0
+
+  local group_gid
+  group_gid="$(stat -c %g /host/etc/pve 2> /dev/null || true)"
+  [ -z "${group_gid}" ] && return 0
+
+  add_user_to_gid "${group_gid}" "proxmox-etc-pve"
 }
 
 # Needed to access NVIDIA GPU monitoring
-function add_netdata_to_nvidia_group() {
-  [ "${DOCKER_USR}" = "root" ] && return
+add_netdata_to_nvidia_group() {
+  [ "${DOCKER_USR}" = "root" ] && return 0
 
   local group_gid
-  group_gid="$(stat -c %g /dev/nvidiactl 2>/dev/null || true)"
-  [ -z "${group_gid}" ] && return
+  group_gid="$(stat -c %g /dev/nvidiactl 2> /dev/null || true)"
+  [ -z "${group_gid}" ] && return 0
 
   # Skip if the device is owned by root group
-  [ "${group_gid}" -eq 0 ] && return
+  [ "${group_gid}" -eq 0 ] && return 0
 
-  if ! getent group "${group_gid}" >/dev/null; then
-    echo "Creating nvidia-dev group with GID ${group_gid}"
-    if ! addgroup --gid "${group_gid}" "nvidia-dev"; then
-      echo >&2 "Failed to add group nvidia-dev with GID ${group_gid}."
-      return
-    fi
-  fi
-
-  if ! getent group "${group_gid}" | grep -q "${DOCKER_USR}"; then
-    echo "Assigning ${DOCKER_USR} user to group ${group_gid}"
-    if ! usermod --append --groups "${group_gid}" "${DOCKER_USR}"; then
-      echo >&2 "Failed to add ${DOCKER_USR} user to group with GID ${group_gid}."
-      return
-    fi
-  fi
+  add_user_to_gid "${group_gid}" "nvidia-dev"
 }
 
-if [ ! "${DISABLE_TELEMETRY:-0}" -eq 0 ] ||
-  [ -n "$DISABLE_TELEMETRY" ] ||
-  [ ! "${DO_NOT_TRACK:-0}" -eq 0 ] ||
-  [ -n "$DO_NOT_TRACK" ]; then
+if [ "${DISABLE_TELEMETRY:-0}" != "0" ] ||
+  [ "${DO_NOT_TRACK:-0}" != "0" ]; then
   touch /etc/netdata/.opt-out-from-anonymous-statistics
 fi
 
-chmod o+rX / 2>/dev/null || echo "Unable to change permissions without errors."
+chmod o+rX / 2> /dev/null || echo "Unable to change permissions without errors."
 
 if [ "${EUID}" -eq 0 ]; then
   if [ -n "${NETDATA_EXTRA_APK_PACKAGES}" ]; then
@@ -93,8 +98,8 @@ if [ "${EUID}" -eq 0 ]; then
     fi
   fi
 
-  BALENA_PGID=$(stat -c %g /var/run/balena.sock 2>/dev/null || true)
-  DOCKER_PGID=$(stat -c %g /var/run/docker.sock 2>/dev/null || true)
+  BALENA_PGID=$(stat -c %g /var/run/balena.sock 2> /dev/null || true)
+  DOCKER_PGID=$(stat -c %g /var/run/docker.sock 2> /dev/null || true)
 
   re='^[0-9]+$'
   if [[ $BALENA_PGID =~ $re ]]; then
@@ -106,19 +111,23 @@ if [ "${EUID}" -eq 0 ]; then
     DOCKER_HOST="unix:///var/run/docker.sock"
     PGID="$DOCKER_PGID"
   fi
-  export PGID
-  export DOCKER_HOST
 
   if [ -n "${PGID}" ]; then
-    echo "Creating docker group with GID ${PGID}"
-    addgroup --gid "${PGID}" "docker" || echo >&2 "Failed to add group docker with GID ${PGID}, probably one already exists."
-    echo "Assigning ${DOCKER_USR} user to group with GID ${PGID}"
-    usermod --append --groups "${PGID}" "${DOCKER_USR}" || echo >&2 "Failed to add ${DOCKER_USR} user to group with GID ${PGID}."
+    export PGID
+  fi
+  if [ -n "${DOCKER_HOST}" ]; then
+    export DOCKER_HOST
+  fi
+
+  if [ -n "${PGID}" ]; then
+    echo "Configuring docker group (GID ${PGID}) for ${DOCKER_USR}"
+    add_user_to_gid "${PGID}" "docker" || true
   fi
 
   if [ -d "/host/etc/pve" ]; then
     add_netdata_to_proxmox_conf_files_group || true
   fi
+
   if [ -e "/dev/nvidiactl" ]; then
     add_netdata_to_nvidia_group || true
   fi
@@ -134,10 +143,10 @@ fi
 
 if [ -w "/etc/netdata" ]; then
   if mountpoint -q /etc/netdata; then
-    hostname >/etc/netdata/.container-hostname
+    hostname > /etc/netdata/.container-hostname
   else
     rm -f /etc/netdata/.container-hostname
   fi
 fi
 
-exec /usr/sbin/netdata -u "${DOCKER_USR}" -D -s /host -p "${NETDATA_LISTENER_PORT}" "$@"
+exec /usr/sbin/netdata -u "${DOCKER_USR}" -D -s /host -p "${NETDATA_LISTENER_PORT:-19999}" "$@"
