@@ -467,6 +467,7 @@ func (j *Job) collect() collectedMetrics {
 	}
 
 	// Record collected metrics for dump mode
+	// TODO: The dump analyzer only records intMetrics but ignores floatMetrics
 	if j.dumpMode && j.dumpAnalyzer != nil && mx.intMetrics != nil {
 		if analyzer, ok := j.dumpAnalyzer.(interface {
 			RecordCollection(string, map[string]int64)
