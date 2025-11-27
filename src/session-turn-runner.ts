@@ -2044,7 +2044,13 @@ export class TurnRunner {
                     },
                 });
                 if (parseResult.toolCalls !== undefined && parseResult.toolCalls.length > 0) {
-                    rawToolCalls = parseResult.toolCalls;
+                    // Merge XML-parsed tool calls with native tool calls (xml-final mode)
+                    // Native tool calls execute first, then XML-parsed calls (final report)
+                    if (rawToolCalls !== undefined && rawToolCalls.length > 0) {
+                        rawToolCalls = [...rawToolCalls, ...parseResult.toolCalls];
+                    } else {
+                        rawToolCalls = parseResult.toolCalls;
+                    }
                 }
             }
             if (rawToolCalls !== undefined && Array.isArray(rawToolCalls)) {
