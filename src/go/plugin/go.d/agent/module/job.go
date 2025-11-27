@@ -657,7 +657,7 @@ func (j *Job) createChart(chart *Chart) {
 		})
 	}
 	for _, v := range chart.Vars {
-		name := firstNotEmpty(v.Name, v.Name)
+		name := firstNotEmpty(v.Name, v.ID)
 		j.api.VARIABLE(name, v.Value)
 	}
 	_ = j.api.EMPTYLINE()
