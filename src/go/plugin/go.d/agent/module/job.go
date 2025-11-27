@@ -182,20 +182,11 @@ type collectedMetrics struct {
 	floatMetrics map[string]float64
 }
 
-func (cm *collectedMetrics) getDimValue(dim *Dim) (float64, bool) {
-	if dim.Float {
-		v, ok := cm.floatMetrics[dim.ID]
-		return v, ok
+func (cm *collectedMetrics) getValue(id string) (float64, bool) {
+	if v, ok := cm.floatMetrics[id]; ok {
+		return v, true
 	}
-	v, ok := cm.intMetrics[dim.ID]
-	return float64(v), ok
-}
-
-func (cm *collectedMetrics) getVarValue(vr *Var) (float64, bool) {
-	if v, ok := cm.floatMetrics[vr.ID]; ok {
-		return v, ok
-	}
-	v, ok := cm.intMetrics[vr.ID]
+	v, ok := cm.intMetrics[id]
 	return float64(v), ok
 }
 
@@ -683,7 +674,7 @@ func (j *Job) updateChart(chart *Chart, mx collectedMetrics, sinceLastRun int) b
 			if dim.remove {
 				continue
 			}
-			if _, hasData = mx.getDimValue(dim); hasData {
+			if _, hasData = mx.getValue(dim.ID); hasData {
 				break
 			}
 		}
@@ -708,7 +699,7 @@ func (j *Job) updateChart(chart *Chart, mx collectedMetrics, sinceLastRun int) b
 		i++
 
 		name := firstNotEmpty(dim.Name, dim.ID)
-		v, ok := mx.getDimValue(dim)
+		v, ok := mx.getValue(dim.ID)
 		if !ok {
 			j.api.SETEMPTY(name)
 			continue
@@ -724,7 +715,7 @@ func (j *Job) updateChart(chart *Chart, mx collectedMetrics, sinceLastRun int) b
 	chart.Dims = chart.Dims[:i]
 
 	for _, vr := range chart.Vars {
-		if v, ok := mx.getVarValue(vr); ok {
+		if v, ok := mx.getValue(vr.ID); ok {
 			name := firstNotEmpty(vr.Name, vr.ID)
 			j.api.VARIABLE(name, v)
 		}
