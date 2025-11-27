@@ -152,7 +152,7 @@ export function renderXmlNext(payload: XmlNextPayload): string {
   }
 
   lines.push('## Final Report');
-  lines.push('Once your task is complete, provide your final report/answer like this:');
+  lines.push('Once your task is complete, provide your final report/answer using this output:');
   lines.push('');
   lines.push('```');
   lines.push(`<ai-agent-${finalReportSlot.slotId} tool="agent__final_report" status="success|failure|partial" format="${expectedFinalFormat}">`);
@@ -160,22 +160,24 @@ export function renderXmlNext(payload: XmlNextPayload): string {
     lines.push('Provide a JSON object matching this schema:');
     lines.push(JSON.stringify(finalSchema ?? {}, null, 2));
   } else {
-    lines.push(`Your final report/answer here, in ${expectedFinalFormat}.`);
+    lines.push(`[Your final report/answer here, format: ${expectedFinalFormat}]`);
   }
   lines.push(`</ai-agent-${finalReportSlot.slotId}>`);
   lines.push('```');
   lines.push('');
 
-  lines.push('### XML Tags How-To');
-  lines.push('1. Start with the onening tag `<ai-agent-*` with the correct slot ID and tool name');
-  lines.push('2. Provide the content/payload matching the expectations');
-  lines.push('3. Close with a matching `</ai-agent-*` tag, with the correct slot ID');
-  lines.push('4. Responses with no opening tags, no content/payload between the tags, or no closing tags are errors');
+  lines.push('**CRITICAL: Final Report Checklist**');
+  lines.push('When ready to provide your final report, iterate through the following checklist:');
+  lines.push('- [ ] The opening XML tag MUST be first in your response');
+  lines.push('- [ ] The status XML attribute must be one of: success, failure, partial');
+  lines.push('- [ ] Your report content/payload matches the expected format');
+  lines.push('- [ ] Your output MUST end with the closing XML tag');
+  lines.push('Failure to comply with the above will result in rejection of your final report.');
 
-  lines.push('## Mandatory Rules for your Response');
+  lines.push('## Mandatory Workflow');
   if (toolList.length > 0) {
     lines.push('You MUST now either:');
-    lines.push('- Call one or more of your tools');
+    lines.push('- Call one or more of your tools to collect data or perform actions');
     lines.push('- OR provide your final report');
   }
   else {

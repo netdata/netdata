@@ -31,15 +31,15 @@
     "node": ">=20"
   },
   "dependencies": {
-    "@ai-sdk/anthropic": "^2.0.49",
-    "@ai-sdk/google": "^2.0.43",
-    "@ai-sdk/openai": "^2.0.72",
-    "@ai-sdk/provider-utils": "^3.0.17",
+    "@ai-sdk/anthropic": "^2.0.50",
+    "@ai-sdk/google": "^2.0.44",
+    "@ai-sdk/openai": "^2.0.74",
+    "@ai-sdk/provider-utils": "^3.0.18",
     "@anthropic-ai/tokenizer": "^0.0.4",
     "@dqbd/tiktoken": "^1.0.22",
     "@lenml/tokenizer-gemini": "^3.7.2",
     "@modelcontextprotocol/sdk": "^1.23.0",
-    "@openrouter/ai-sdk-provider": "^1.2.6",
+    "@openrouter/ai-sdk-provider": "^1.2.7",
     "@opentelemetry/api": "^1.9.0",
     "@opentelemetry/api-logs": "^0.208.0",
     "@opentelemetry/exporter-logs-otlp-grpc": "^0.208.0",
@@ -52,7 +52,7 @@
     "@opentelemetry/sdk-trace-node": "^2.2.0",
     "@opentelemetry/semantic-conventions": "^1.38.0",
     "@slack/bolt": "^4.6.0",
-    "ai": "^5.0.102",
+    "ai": "^5.0.104",
     "ajv": "^8.17.1",
     "async-mutex": "^0.5.0",
     "commander": "^14.0.2",
@@ -86,7 +86,7 @@
     "eslint-plugin-sonarjs": "^3.0.5",
     "eslint-plugin-unicorn": "^62.0.0",
     "knip": "^5.70.2",
-    "prettier": "^3.6.2",
+    "prettier": "^3.7.1",
     "typescript": "^5.9.3",
     "vitest": "^4.0.14"
   }

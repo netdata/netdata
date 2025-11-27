@@ -527,7 +527,7 @@ export class TurnRunner {
                         }
                     }
                     const turnResult = await this.executeSingleTurn(attemptConversation, provider, model, isFinalTurn, currentTurn, logs, accounting, lastShownThinkingHeaderTurn, attempts, maxRetries, sessionReasoningLevel, sessionReasoningValue ?? undefined);
-                    const { messages: sanitizedMessages, dropped: droppedInvalidToolCalls, finalReportAttempted } = this.sanitizeTurnMessages(turnResult.messages, { turn: currentTurn, provider, model });
+                    const { messages: sanitizedMessages, dropped: droppedInvalidToolCalls, finalReportAttempted } = this.sanitizeTurnMessages(turnResult.messages, { turn: currentTurn, provider, model, stopReason: turnResult.stopReason });
                     // Mark turnResult with finalReportAttempted flag but defer collapseRemainingTurns
                     // until we know if the final report was actually accepted (done later in the flow)
                     if (finalReportAttempted) {
@@ -1015,7 +1015,7 @@ export class TurnRunner {
                                 }
                                 lastError = 'invalid_response: content_without_tools_or_final';
                                 lastErrorType = 'invalid_response';
-                                this.addTurnFailure('Missing final report; call agent__final_report with the required parameters.');
+                                this.addTurnFailure('Missing final report; provide your final report with the required parameters');
                             }
                         }
                         // CONTRACT: Empty response without tool calls must NOT be added to conversation
@@ -2018,7 +2018,7 @@ export class TurnRunner {
             return undefined;
         return this.ctx.finalReportManager.tryExtractFromText(trimmedText);
     }
-    private sanitizeTurnMessages(messages: ConversationMessage[], context: { turn: number; provider: string; model: string }): { messages: ConversationMessage[]; dropped: number; finalReportAttempted: boolean } {
+    private sanitizeTurnMessages(messages: ConversationMessage[], context: { turn: number; provider: string; model: string; stopReason?: string }): { messages: ConversationMessage[]; dropped: number; finalReportAttempted: boolean } {
         let dropped = 0;
         let finalReportAttempted = false;
         const isRecord = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -2027,7 +2027,7 @@ export class TurnRunner {
             let parsedToolCalls;
             // XML transport parsing
             if (this.ctx.xmlTransport !== undefined && msg.role === 'assistant' && typeof msg.content === 'string') {
-                const parseResult = this.ctx.xmlTransport.parseAssistantMessage(msg.content, { turn: context.turn, resolvedFormat: this.ctx.resolvedFormat }, {
+                const parseResult = this.ctx.xmlTransport.parseAssistantMessage(msg.content, { turn: context.turn, resolvedFormat: this.ctx.resolvedFormat, stopReason: context.stopReason }, {
                     onTurnFailure: (reason) => { this.addTurnFailure(reason); },
                     onLog: (entry) => {
                         this.callbacks.log({

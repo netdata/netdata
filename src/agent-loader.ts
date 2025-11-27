@@ -633,7 +633,7 @@ function constructLoadedAgent(args: ConstructAgentArgs): LoadedAgent {
       reasoning: eff.reasoning,
       reasoningValue: eff.reasoningValue,
       caching: eff.caching,
-      toolingTransport: config.tooling?.transport ?? 'native',
+      toolingTransport: config.tooling?.transport ?? 'xml-final',
       headendId: o.headendId ?? o.renderTarget ?? 'cli',
       headendWantsProgressUpdates: o.wantsProgressUpdates !== undefined ? o.wantsProgressUpdates : true,
       // Preserve the original reference (no clone) so recursion guards see identical identity.

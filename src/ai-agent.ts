@@ -564,7 +564,7 @@ export class AIAgentSession {
       const wantsProgressUpdates = this.sessionConfig.headendWantsProgressUpdates !== false;
     const enableProgressTool = wantsProgressUpdates && (hasNonInternalDeclaredTools || hasSubAgentsConfigured);
     this.progressToolEnabled = enableProgressTool;
-    this.toolTransport = this.sessionConfig.toolingTransport ?? 'native';
+    this.toolTransport = this.sessionConfig.toolingTransport ?? 'xml-final';
     // Initialize XML transport when not using native tool calling
     if (this.toolTransport !== 'native') {
       this.xmlTransport = new XmlToolTransport(this.toolTransport);
@@ -1925,7 +1925,7 @@ export class AIAgentSession {
   }
 
   private resolveToolChoice(provider: string, model: string, toolsCount: number): ToolChoiceMode | undefined {
-    const transport = this.sessionConfig.toolingTransport ?? 'native';
+    const transport = this.sessionConfig.toolingTransport ?? 'xml-final';
     if (transport !== 'native') {
       if (toolsCount === 0) return undefined;
       return 'auto';

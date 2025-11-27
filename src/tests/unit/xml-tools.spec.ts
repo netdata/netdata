@@ -77,8 +77,11 @@ describe('XML streaming parser', () => {
       expectedFinalFormat: 'markdown',
       finalSchema: undefined,
     });
-    expect(xml).toContain('Mode: final-report via XML; tools via native tool calls');
+    // xml-final mode: final report via XML, tools via native (no tool schemas in output)
     expect(xml).toContain(`<ai-agent-${NONCE}-FINAL tool="agent__final_report"`);
-    expect(xml).toContain('Tools are available via native tool calls');
+    expect(xml).toContain('## Final Report');
+    expect(xml).toContain('format="markdown"');
+    // Should NOT contain tool schemas for non-final tools in xml-final mode
+    expect(xml).not.toContain('mock_tool');
   });
 });

@@ -447,12 +447,14 @@ Any deviation from the guarantees above is a **contract violation** and must be 
 ## 11. XML Tool Transport Contract (XML-PAST / XML-NEXT)
 
 **Modes**
-- `native` (default): unchanged tool-call behavior, tool choice may be `required`.
-- `xml-final`: provider tools stay native (tool_calls), but the final report must be emitted via XML. Progress is suppressed. Tool choice set to `auto`; provider tool definitions remain visible to the LLM for native calls.
+- `xml-final` (default): provider tools stay native (tool_calls), but the final report must be emitted via XML. Progress is suppressed. Tool choice set to `auto`; provider tool definitions remain visible to the LLM for native calls.
+- `native`: unchanged tool-call behavior, tool choice may be `required`.
 - `xml`: all tools may be invoked via XML tags; tool choice set to `auto`, and provider tool definitions are withheld (XML is the only invocation path). Progress uses the XML channel when enabled.
 
-**Turn nonce and slots**
-- Each turn defines a fresh nonce (e.g., `ai-agent-<8hex>`). Invocation slots are `NONCE-0001`, `NONCE-0002`, ... and are single-use for that turn.
+**Session nonce and slots**
+- Each session defines a fixed nonce (e.g., `<8hex>`) that remains constant across all turns.
+- Numbered invocation slots increment across turns: turn 1 uses `NONCE-0001`, `NONCE-0002`, etc.; turn 2 continues from where turn 1 left off (e.g., `NONCE-0004`, `NONCE-0005`).
+- Special slots `NONCE-FINAL` and `NONCE-PROGRESS` remain constant (not numbered).
 - Tags are detected by substring only (no XML parser): `<ai-agent-NONCE-000X tool="...">payload</ai-agent-NONCE-000X>`.
 
 **Messages**
@@ -461,6 +463,14 @@ Any deviation from the guarantees above is a **contract violation** and must be 
 
 **Final-report via XML**
 - Final-report uses a reserved slot in XML-NEXT (`tool="final-report"`, status `success|failure|partial`, format matching session expectation, raw content). JSON formats still undergo fuzzy repair + schema validation after extraction. No escaping/base64 required.
+
+**Unclosed final-report tag handling**
+- When a valid final-report opening tag is detected (`<ai-agent-NONCE-FINAL tool="agent__final_report">`) with content following it, the closing tag requirement depends on the LLM's `stopReason`:
+  - `stop`, `end_turn`, `end`, `eos` (normal completion): Accept content even without closing tag.
+  - `length`, `max_tokens` (truncation): Treat as incomplete, trigger retry.
+  - Unknown/undefined: Log warning but accept content.
+- This applies ONLY to `agent__final_report`; other tools always require complete tags.
+- Rationale: Large models often stop generating after completing their final answer without emitting closing tags. The stop reason is the authoritative signal for completion.
 
 **Tool execution and responses**
 - Tags from the assistant are parsed by nonce and unused slot id; invalid/mismatched tags are ignored (do not count as attempts).

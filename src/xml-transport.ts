@@ -28,6 +28,23 @@ import {
 // Transport mode type
 export type XmlTransportMode = 'xml' | 'xml-final';
 
+// XML tag prefix for detection
+const XML_TAG_PREFIX = '<ai-agent-';
+
+// Stop reasons indicating normal completion (accept final report without closing tag)
+const NORMAL_COMPLETION_STOP_REASONS = new Set([
+  'stop',       // OpenAI
+  'end_turn',   // Anthropic
+  'end',        // Generic
+  'eos',        // End of sequence
+]);
+
+// Stop reasons indicating truncation (reject, should retry)
+const TRUNCATION_STOP_REASONS = new Set([
+  'length',     // OpenAI
+  'max_tokens', // Anthropic
+]);
+
 // Configuration for building messages
 export interface XmlBuildMessagesConfig {
   turn: number;
@@ -53,6 +70,7 @@ export interface XmlBuildMessagesResult {
 export interface XmlParseContext {
   turn: number;
   resolvedFormat: OutputFormatId | undefined;
+  stopReason?: string;  // LLM stop reason - used to accept unclosed final reports on normal completion
 }
 
 // Callback for logging/errors during parsing
@@ -84,6 +102,10 @@ export class XmlToolTransport {
   private readonly mode: XmlTransportMode;
   private parser: ReturnType<typeof createXmlParser>;
 
+  // Session-level state: fixed nonce and incrementing slot counter
+  private readonly sessionNonce: string;
+  private nextSlotNumber = 1;
+
   // Current turn state
   private nonce: string | undefined;
   private slots: XmlSlotTemplate[] | undefined;
@@ -96,6 +118,7 @@ export class XmlToolTransport {
   constructor(mode: XmlTransportMode) {
     this.mode = mode;
     this.parser = createXmlParser();
+    this.sessionNonce = crypto.randomUUID().replace(/-/g, '').slice(0, 8);
   }
 
   /**
@@ -128,7 +151,7 @@ export class XmlToolTransport {
     this.parser = createXmlParser();
     this.thisTurnEntries = [];
 
-    const nonce = crypto.randomUUID().replace(/-/g, '').slice(0, 8);
+    const nonce = this.sessionNonce;
     const maxCalls = Math.max(1, config.maxToolCallsPerTurn);
     const allTools = config.tools.map((t) => ({ ...t, name: sanitizeToolName(t.name) }));
     const xmlMode: 'xml' | 'xml-final' = this.mode;
@@ -144,12 +167,18 @@ export class XmlToolTransport {
         });
 
     const slotToolNames = toolsForSlots.map((t) => t.name);
+    // Use incrementing slot numbers across turns for consistency
+    const startSlot = this.nextSlotNumber;
     const slotTemplatesBase: XmlSlotTemplate[] = slotToolNames.length === 0
       ? []
       : Array.from({ length: maxCalls }, (_v, idx) => ({
-          slotId: `${nonce}-${String(idx + 1).padStart(4, '0')}`,
+          slotId: `${nonce}-${String(startSlot + idx).padStart(4, '0')}`,
           tools: slotToolNames
         }));
+    // Advance counter for next turn
+    if (slotToolNames.length > 0) {
+      this.nextSlotNumber = startSlot + maxCalls;
+    }
 
     const finalSlotId = `${nonce}-FINAL`;
     const progressSlotId = `${nonce}-PROGRESS`;
@@ -224,6 +253,59 @@ export class XmlToolTransport {
   }
 
   /**
+   * Try to extract an unclosed final report when stop reason indicates normal completion.
+   * Returns the extracted content if successful, undefined otherwise.
+   */
+  private tryExtractUnclosedFinalReport(
+    content: string,
+    stopReason: string | undefined,
+    callbacks: XmlParseCallbacks
+  ): { slotId: string; content: string } | undefined {
+    if (this.nonce === undefined) return undefined;
+
+    const finalSlotId = `${this.nonce}-FINAL`;
+    const finalReportOpenTag = `<ai-agent-${finalSlotId}`;
+
+    // Check if content has an unclosed final report opening tag
+    const openTagIdx = content.indexOf(finalReportOpenTag);
+    if (openTagIdx === -1) return undefined;
+
+    // Check if there's a closing tag
+    const closeTag = `</ai-agent-${finalSlotId}>`;
+    if (content.includes(closeTag)) return undefined; // Has closing tag, let normal parsing handle it
+
+    // Extract the opening tag to find where content starts
+    const afterOpenTag = content.slice(openTagIdx);
+    const openTagEndMatch = /^<ai-agent-[A-Za-z0-9\-]+[^>]*>/.exec(afterOpenTag);
+    if (openTagEndMatch === null) return undefined; // Incomplete opening tag
+
+    // Check if this is actually a final report tool
+    if (!afterOpenTag.includes('tool="agent__final_report"')) return undefined;
+
+    // Extract content after the opening tag
+    const contentStart = openTagIdx + openTagEndMatch[0].length;
+    const extractedContent = content.slice(contentStart).trim();
+
+    if (extractedContent.length === 0) return undefined; // No content to extract
+
+    // Check stop reason to decide whether to accept
+    if (TRUNCATION_STOP_REASONS.has(stopReason ?? '')) {
+      // Truncated - reject and retry
+      callbacks.onLog({ severity: 'WRN', message: `Final report truncated (stopReason=${stopReason ?? 'unknown'}), will retry.` });
+      return undefined;
+    }
+
+    if (NORMAL_COMPLETION_STOP_REASONS.has(stopReason ?? '')) {
+      // Normal completion - accept without closing tag
+      return { slotId: finalSlotId, content: extractedContent };
+    }
+
+    // Unknown/undefined stop reason - log warning but accept
+    callbacks.onLog({ severity: 'WRN', message: `Accepting unclosed final report with unknown stopReason='${stopReason ?? 'undefined'}'.` });
+    return { slotId: finalSlotId, content: extractedContent };
+  }
+
+  /**
    * Parse XML tool calls from an assistant message.
    * Returns parsed tool calls and any errors to record.
    */
@@ -236,6 +318,50 @@ export class XmlToolTransport {
       return { toolCalls: undefined, errors: [] };
     }
 
+    // First, try to extract unclosed final report if stop reason indicates normal completion
+    const unclosedFinal = this.tryExtractUnclosedFinalReport(content, context.stopReason, callbacks);
+    if (unclosedFinal !== undefined) {
+      const expectedFormat = context.resolvedFormat ?? 'text';
+      const finalReportToolName = 'agent__final_report';
+
+      // Try to parse as JSON first
+      let parameters: Record<string, unknown>;
+      try {
+        parameters = JSON.parse(unclosedFinal.content) as Record<string, unknown>;
+      } catch {
+        // Not JSON - wrap as text content
+        if (expectedFormat === 'json') {
+          // JSON expected but got text - this is an error even for unclosed tags
+          const reason = 'Final report payload is not valid JSON. Use the JSON schema from XML-NEXT.';
+          callbacks.onTurnFailure(reason);
+          callbacks.onLog({ severity: 'WRN', message: reason });
+          return {
+            toolCalls: undefined,
+            errors: [{
+              slotId: unclosedFinal.slotId,
+              tool: finalReportToolName,
+              status: 'failed',
+              request: truncateUtf8WithNotice(unclosedFinal.content, 4096),
+              response: reason,
+            }]
+          };
+        }
+        parameters = {
+          status: 'success',
+          report_format: expectedFormat,
+          report_content: unclosedFinal.content,
+        };
+      }
+
+      const toolCall: ToolCall = {
+        id: unclosedFinal.slotId,
+        name: finalReportToolName,
+        parameters,
+      };
+
+      return { toolCalls: [toolCall], errors: [] };
+    }
+
     const allowedSlots = new Set(this.slots.map((slot) => slot.slotId));
     const parsed = this.parser.parseChunk(content, this.nonce, allowedSlots, this.allowedTools);
     const flushResult = this.parser.flush();
@@ -243,12 +369,11 @@ export class XmlToolTransport {
     const errors: XmlPastEntry[] = [];
 
     // Handle leftover content (incomplete/malformed tags)
-    if (flushResult.leftover.trim().length > 0) {
+    // Only flag as error if leftover actually contains an XML tag attempt
+    if (flushResult.leftover.trim().length > 0 && flushResult.leftover.includes(XML_TAG_PREFIX)) {
       const hasClosing = flushResult.leftover.includes('</ai-agent-');
-      const capturedSlot = (() => {
-        const match = /<ai-agent-([A-Za-z0-9\-]+)/.exec(flushResult.leftover);
-        return match?.[1] ?? 'unknown';
-      })();
+      const slotMatch = /<ai-agent-([A-Za-z0-9\-]+)/.exec(flushResult.leftover);
+      const capturedSlot = slotMatch?.[1] ?? `(partial: ${flushResult.leftover.slice(0, 60).replace(/\n/g, ' ')})`;
       const reason = hasClosing
         ? `Tag ignored: slot '${capturedSlot}' does not match the current nonce/slot for this turn.`
         : `Malformed XML: missing closing tag for '${capturedSlot}'.`;
@@ -256,7 +381,7 @@ export class XmlToolTransport {
       callbacks.onTurnFailure(reason);
 
       const errorEntry: XmlPastEntry = {
-        slotId: capturedSlot,
+        slotId: slotMatch?.[1] ?? 'malformed',
         tool: 'agent__final_report',
         status: 'failed',
         request: truncateUtf8WithNotice(flushResult.leftover, 4096),
@@ -270,22 +395,22 @@ export class XmlToolTransport {
 
     if (parsedSlots.length === 0) {
       // Check if there was an attempt at XML that failed
-      if (content.includes('<ai-agent-')) {
+      if (content.includes(XML_TAG_PREFIX)) {
+        const slotMatch = /<ai-agent-([A-Za-z0-9\-]+)/.exec(content);
         const missingClosing = !content.includes('</ai-agent-');
+        // Extract snippet around the tag for debugging
+        const tagIdx = content.indexOf(XML_TAG_PREFIX);
+        const snippet = content.slice(tagIdx, tagIdx + 60).replace(/\n/g, ' ');
+        const slotInfo = slotMatch?.[1] ?? `(partial: ${snippet})`;
         const reason = missingClosing
-          ? 'Malformed XML: missing closing tag for ai-agent-*.'
-          : 'Malformed XML: nonce/slot/tool mismatch or empty content.';
+          ? `Malformed XML: missing closing tag for '${slotInfo}'.`
+          : `Malformed XML: nonce/slot/tool mismatch or empty content for '${slotInfo}'.`;
 
         callbacks.onTurnFailure(reason);
         callbacks.onLog({ severity: 'WRN', message: reason });
 
-        const capturedSlot = (() => {
-          const match = /<ai-agent-([A-Za-z0-9\-]+)/.exec(content);
-          return match?.[1] ?? 'unknown';
-        })();
-
         const errorEntry: XmlPastEntry = {
-          slotId: capturedSlot,
+          slotId: slotMatch?.[1] ?? 'malformed',
           tool: 'agent__final_report',
           status: 'failed',
           request: truncateUtf8WithNotice(content, 4096),
@@ -318,6 +443,7 @@ export class XmlToolTransport {
           if (expectedFormat === 'json') {
             const baseReason = 'Final report payload is not valid JSON. Use the JSON schema from XML-NEXT.';
             callbacks.onTurnFailure(baseReason);
+            callbacks.onLog({ severity: 'WRN', message: baseReason });
 
             const errorEntry: XmlPastEntry = {
               slotId: slot.slotId,

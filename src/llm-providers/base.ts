@@ -1052,17 +1052,17 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
       const content = [
         '**CRITICAL**: You cannot collect more data!\n',
         '\n',
-        'You must call the tool `agent__final_report` with your report.\n',
+        'You MUST NOW provide your report.\n',
         '\n',
-        'Review the collected data, check your instructions, and call the tool `agent__final_report` with your final report in the `report_content` field:\n',
+        'Review the collected data, check your instructions, and provide your final report as instructed:\n',
         '\n',
         '- If the data is completely irrelevant or missing, set `status` to `failure` and describe the situation.\n',
-        '- If the data is severealy incomplete, set `status` to `partial` and describe what you found.\n',
+        '- If the data is incomplete, set `status` to `partial` and describe what you found.\n',
         '- If the data is rich, set `status` to `success` and provide a detailed report.\n',
         '\n',
         'Follow your instructions carefully, think hard, ensure your final report is accurate.\n',
         '\n',
-        'Provide now your report by calling the tool `agent__final_report`.'
+        'Provide your final report NOW.'
       ].join(' ');
       return messages.concat({ role: 'user', content } as ModelMessage);
     }

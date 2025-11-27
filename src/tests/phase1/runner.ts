@@ -894,6 +894,8 @@ function makeBasicConfiguration(): Configuration {
     },
     mcpServers: {},
     queues: { default: { concurrent: 32 } },
+    // Tests use native transport by default; XML-specific tests override this
+    tooling: { transport: 'native' },
   };
 }
 
@@ -9258,6 +9260,8 @@ async function runScenario(test: HarnessTest): Promise<AIAgentResult> {
     },
     queues: { default: { concurrent: 32 } },
     defaults: { ...BASE_DEFAULTS },
+    // Tests use native transport by default; XML-specific tests override this
+    tooling: { transport: 'native' },
   };
 
   const configuration: Configuration = JSON.parse(JSON.stringify(baseConfiguration)) as Configuration;
