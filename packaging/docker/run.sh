@@ -12,6 +12,9 @@ fi
 
 # Needed to read Proxmox VMs and (LXC) containers configuration files (name resolution + CPU and memory limits)
 function add_netdata_to_proxmox_conf_files_group() {
+  [ "${DOCKER_USR}" = "root" ] && return
+
+  local group_guid
   group_guid="$(stat -c %g /host/etc/pve 2>/dev/null || true)"
   [ -z "${group_guid}" ] && return
 
@@ -27,6 +30,34 @@ function add_netdata_to_proxmox_conf_files_group() {
     echo "Assigning ${DOCKER_USR} user to group ${group_guid}"
     if ! usermod --apend --groups "${group_guid}" "${DOCKER_USR}"; then
       echo >&2 "Failed to add ${DOCKER_USR} user to group with GID ${group_guid}."
+      return
+    fi
+  fi
+}
+
+# Needed to access NVIDIA GPU monitoring
+function add_netdata_to_nvidia_group() {
+  [ "${DOCKER_USR}" = "root" ] && return
+
+  local group_gid
+  group_gid="$(stat -c %g /dev/nvidiactl 2>/dev/null || true)"
+  [ -z "${group_gid}" ] && return
+
+  # Skip if the device is owned by root group
+  [ "${group_gid}" -eq 0 ] && return
+
+  if ! getent group "${group_gid}" >/dev/null; then
+    echo "Creating nvidia-dev group with GID ${group_gid}"
+    if ! addgroup --gid "${group_gid}" "nvidia-dev"; then
+      echo >&2 "Failed to add group nvidia-dev with GID ${group_gid}."
+      return
+    fi
+  fi
+
+  if ! getent group "${group_gid}" | grep -q "${DOCKER_USR}"; then
+    echo "Assigning ${DOCKER_USR} user to group ${group_gid}"
+    if ! usermod --append --groups "${group_gid}" "${DOCKER_USR}"; then
+      echo >&2 "Failed to add ${DOCKER_USR} user to group with GID ${group_gid}."
       return
     fi
   fi
@@ -87,6 +118,9 @@ if [ "${EUID}" -eq 0 ]; then
 
   if [ -d "/host/etc/pve" ]; then
     add_netdata_to_proxmox_conf_files_group || true
+  fi
+  if [ -e "/dev/nvidiactl" ]; then
+    add_netdata_to_nvidia_group || true
   fi
 else
   echo >&2 "WARNING: Entrypoint started as non-root user. This is not officially supported and some features may not be available."
