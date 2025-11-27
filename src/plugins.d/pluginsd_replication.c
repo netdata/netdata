@@ -523,19 +523,18 @@ ALWAYS_INLINE PARSER_RC pluginsd_replay_end(char **words, size_t num_words, PARS
         // (We already checked this in parent_already_caught_up, but verify again)
         bool parent_has_equal_or_newer_data = (local_last_entry >= last_entry_child);
 
-        // Condition 2: The gap from parent's data to child's data is small
-        // (within one update interval - might just be timing)
+        // Calculate the gap for logging purposes
         time_t gap_to_child = (last_entry_child > local_last_entry) ?
                               (last_entry_child - local_last_entry) : 0;
-        bool gap_is_negligible = (gap_to_child <= st->update_every);
 
-        // Condition 3: Parent's data is reasonably recent
+        // Condition 2: Parent's data is reasonably recent
         time_t wall_clock = now_realtime_sec();
         bool parent_data_is_recent = (local_last_entry > 0 &&
                                      (wall_clock - local_last_entry) < 300);
 
-        // Only finish replication if we have strong evidence we're stuck
-        if (parent_has_equal_or_newer_data || gap_is_negligible) {
+        // Only finish replication if parent has equal or newer data than child
+        // Do NOT terminate if there's any gap, as that would cause data loss
+        if (parent_has_equal_or_newer_data) {
 
             // Log with appropriate level based on confidence
             ND_LOG_FIELD_PRIORITY level = (parent_has_equal_or_newer_data && parent_data_is_recent) ?
