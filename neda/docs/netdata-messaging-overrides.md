@@ -12,38 +12,6 @@ When generating content, ensure accuracy on these critical topics. Items marked 
 
 ---
 
-## [CONCEPT] AI Co-Engineer Capabilities
-
-**Core truth to preserve**:
-
-Netdata provides AI-powered troubleshooting through **two distinct integration paths**:
-
-1. **Netdata Cloud AI Features** (primary)
-   - AI Troubleshoot (interactive troubleshooting from anywhere)
-   - Ask AI (contextual alert explanations)
-   - AI Insights (automated reporting)
-   - Requires Netdata Cloud subscription + AI Credits
-   - Includes 10 free sessions per month
-   - Uses Netdata's optimized AI playbooks
-   - main use: troubleshooting and reporting, directly on Netdata dashboards
-
-2. **MCP (Model Context Protocol)** (secondary)
-   - Runs directly on agents and parents
-   - Available in free/open-source version
-   - Bring your own LLM (Claude, ChatGPT, Gemini, etc.)
-   - Access via command line or LLM interfaces
-   - main use: AI-automation + use with third party tools
-
-**Both paths enable**: Root cause analysis, live troubleshooting, capacity planning, and automated reporting.
-
-**What to avoid**:
-- Implying only one AI integration method exists
-- Not mentioning the free MCP option for bring-your-own-LLM
-- Confusing which features require Cloud subscription vs which are free
-- Suggesting MCP requires Netdata Cloud (it doesn't)
-
----
-
 ## [EXACT] Cost Savings
 
 **Exception**: When performing **specific analysis** for particular competitors or use cases (e.g., "vs Datadog", "vs Elastic", etc), you MUST provide **detailed calculations** with different percentages based on actual pricing and usage. Specific analysis overrides this generic rule.
@@ -80,11 +48,50 @@ When however we compare Netdata generally against the industry, we MUST state: "
 
 ---
 
+## [EXACT] Community and Homelab Plans are for Personal Use
+
+Freelancers, professionals and businesess can use either Open Source or Netdata CLoud **Business plan** (or Netdata Cloud On Premises).
+Community and Homelab Plans are for personal use only.
+
+---
+
+## [CONCEPT] AI Co-Engineer Capabilities
+
+**Core truth to preserve**:
+
+Netdata provides AI-powered troubleshooting through **two distinct integration paths**:
+
+1. **Netdata Cloud AI Features** (primary)
+   - AI Troubleshoot (interactive troubleshooting from anywhere)
+   - Ask AI (contextual alert explanations)
+   - AI Insights (automated reporting)
+   - Requires Netdata Cloud subscription + AI Credits
+   - Includes 10 free sessions per month
+   - Uses Netdata's optimized AI playbooks
+   - main use: troubleshooting and reporting, directly on Netdata dashboards
+
+2. **MCP (Model Context Protocol)** (secondary)
+   - Runs directly on agents and parents
+   - Available in free/open-source version
+   - Bring your own LLM (Claude, ChatGPT, Gemini, etc.)
+   - Access via command line or LLM interfaces
+   - main use: AI-automation + use with third party tools
+
+**Both paths enable**: Root cause analysis, live troubleshooting, capacity planning, and automated reporting.
+
+**What to avoid**:
+- Implying only one AI integration method exists
+- Not mentioning the free MCP option for bring-your-own-LLM
+- Confusing which features require Cloud subscription vs which are free
+- Suggesting MCP requires Netdata Cloud (it doesn't)
+
+---
+
 ## [CONCEPT] No False Promises - No Overpromises
 
-**Core truths to preserve**:
+NEVER SUGGEST OR IMPLY FEATURES OR CAPABILITIES NETDATA DOES NOT HAVE.
 
-- **alert fatigue exists** - it cannot be completely eliminated - our ML helps significantly but does not entirely solve alert fatigue
+- **alert fatigue exists** - it cannot be completely eliminated - Netdata's ML helps significantly but does not entirely solve alert fatigue
 - **zero configuration** = we have automated every configuration that can be automated, but there are still some configurations that require human action (e.g. passwords to access protected endpoints - dbs, message brokers, etc). The configuration Netdata requires is significantly less, to practically ignorable, mainly because of:
   - extensive autodiscovery without manual configuration
   - automated/algorithmic dashboards that adapt automatically to the collected data - true for all kinds of dashboards: single-node, multi-node, multi-component, infrastructure-level
@@ -92,18 +99,13 @@ When however we compare Netdata generally against the industry, we MUST state: "
   - unsupervised machine learning that does not require manual tuning
   - zero maintenance operations (WORM files, no compaction, no tuning needed, nothing to keep an eye on)
 
+  Especially regarding configuration and maintenance, users MUST:
+    - configure retention based on their preference
+    - configure collectors that need credentials, or discovery did not detect
+    - keep an eye on resources to scale up/out Netdata Parents as the infrastructure changes
+
+- Netdata does not run natively on ESXi, or IBM i. Netdata runs on Linux, Windows, FreeBSD and MacOs. It can monitor more operating systems remotely, via their APIs, SNMP, or any other means they provide. Usually Netdata can use Prometheus or OpenTelemetry exporter, even Nagios plugins, to collect data remotely, so if another operating system can be monitored somehow, Netdata can monitor it, but NOT BY INSTALLING NETDATA ON IT.
+
 We need the strongest possible messaging, without giving false promises.
-
-Especially regarding configuration and maintenance, users MUST:
-- configure retention based on their preference
-- configure collectors that need credentials, or discovery did not detect
-- keep an eye on resources to scale up/out Netdata Parents as the infrastructure changes
-
----
-
-## [EXACT] Community and Homelab Plans are for Personal Use
-
-Freelancers, professionals and businesess can use either Open Source or Netdata CLoud **Business plan** (or Netdata Cloud On Premises).
-Community and Homelab Plans are for personal use only.
 
 ---
