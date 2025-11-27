@@ -158,7 +158,7 @@ agent.run(input)
 ```
 
 #### 4. Team (`team: { members: [...], ... }`)
-**What**: Multiple agents collaborate asynchronously via a broadcast channel. Each maintains an independent session, can share updates through a special team broadcast tool, and exits by issuing its own `final_report` (which gets broadcast with an "I'm leaving" annotation).
+**What**: Multiple agents collaborate asynchronously via a broadcast channel. Each member keeps an independent session and can only emit `team_broadcast` messages (no `final_report` tool for members). Members exit the team via a final broadcast (success or failure). The supervisor is the sole terminal agent.
 **Real-world**: Code review panel, planning committee, stakeholder alignment.
 **Why**: Extreme cost savings (impractical to transfer full discussions via tool calls), parallel deliberation.
 **Terminal**: Supervisor/boss is terminal (makes final decision). Other members are non-terminal contributors.
@@ -308,7 +308,7 @@ Team orchestration adopts the broadcast-first model Costa specified. Members ope
 
 ### 1. Message Broadcasting
 - Each member gets a `team_broadcast(message)` (name TBD) tool. Calls append to a shared transcript visible to every other member before their next turn.
-- When a member issues its `final_report`, the report is automatically broadcast with an annotation like "[member] has left the meeting and is no longer reachable" so peers know that participant exited.
+- Members do **not** expose `final_report`; their only exit path is a terminal broadcast (success or failure) which marks them exited and tells peers they are no longer reachable.
 - Broadcasts always include sender identity and timestamp/order. We still need to design the injection format (probably a prefixed markdown section per member) but the presence of the special tool is decided.
 
 ### 2. Session Coordination
@@ -318,7 +318,7 @@ Team orchestration adopts the broadcast-first model Costa specified. Members ope
 
 ### 3. Termination + Bounds
 - Every member enforces its own `maxTurns`, but the entire team is also bounded by the supervising agent's `maxTurns`. If the supervisor (`team boss`) delivers its `final_report`, the orchestrator cancels/aborts all remaining members immediately.
-- Members that exhaust their turns or voluntarily issue `final_report` are marked exited and removed from scheduling.
+- Members that exhaust their turns or send a terminal broadcast are marked exited and removed from scheduling.
 - Supervisor remains the sole terminal agent; all costs from members roll into the supervisor's accounting lineage.
 
 ### 4. Hook Points Needed
@@ -358,6 +358,15 @@ Open work here: define the concrete queue implementation + exact markdown inject
   - `TeamConversationBroker.publish(memberId, payload)` / `consume(memberId)`.
   - Tool provider factory `createTeamToolProvider(memberId, broker)` returning a `ToolProvider` registered via `ToolsOrchestrator.register()` for that session only.
 - Provide clear extension seams: e.g., broker can expose middleware hooks so other strategies (swarm/voting) can subscribe without modifying the orchestrator core.
+
+## Team Synchronization & Failure Handling (Agreed Nov 27 2025)
+
+- **Cycle ordering (source of truth = master session)**: User prompt → all active members run in parallel (each may take multiple internal turns, broadcast-only) → master consumes all broadcasts in one turn. If the master broadcasts (not final), that broadcast triggers the next member cycle. If the master issues `final_report`, orchestrator cancels any remaining members and returns the master result.
+- **Member exits and failures**: Members have no `final_report`. Their only exit path is a terminal `team_broadcast` (success or failure). On model/tool failure or turn exhaustion, orchestrator emits a failure broadcast: `member X failed and is no longer in the team. Reason: ...`, marks the member exited, and fans this to master + remaining members.
+- **Busy member delaying master is acceptable**: There is no intra-cycle cap (`maxTurnToBroadcast` deferred). If a member hogs turns, fix its prompt/tools; the orchestrator does not time-slice further.
+- **Broadcast schema (required)**: Payload must carry `type` (update|failure), `memberId`, `message`, `turnCount`, `timestamp` to let the master distinguish failures from normal updates.
+- **Context/window guards**: Reuse existing tool-size acceptance logic. If injecting queued broadcasts would overflow the context, drop the offending payload, replace it with a diagnostic broadcast explaining the overflow, and force the master to take its final turn so the run terminates cleanly per CONTRACT.
+- **Injection fan-out**: Master broadcasts are fanned out to all non-exited members before the next cycle. Member broadcasts are buffered and injected into the next master turn; they are also fanned to peers before those peers resume.
 
 ## Plan
 
