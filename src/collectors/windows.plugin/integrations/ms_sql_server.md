@@ -76,6 +76,7 @@ Metrics:
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
 | mssql.instance_user_connections | user | connections |
+| mssql.instance_sessions_connections | session | connections |
 | mssql.instance_sqlstats_batch_requests | batch | requests/s |
 | mssql.instance_sql_errors | errors | errors/s |
 | mssql.instance_sqlstats_sql_compilations | compilations | compilations/s |
@@ -331,6 +332,7 @@ These options allow the collector to connect to your MSSQL instance and collect 
 | collect jobs | Run queries to collect information from the server's jobs. | yes | no |
 | collect buffer stats | Run queries to collect information from the server's buffer statistics. | yes | no |
 | collect database size | Run queries to collect information from the server's database size. | yes | no |
+| collect user connections | Run queries to collect information from the server's connection. | yes | no |
 
 
 
