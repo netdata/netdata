@@ -22,6 +22,8 @@
 - New Sensors (Windows.plugin) ([#21319](https://github.com/netdata/netdata/issues/21319))
 - Reorganize MSSQL (windows.plugin) ([#21334](https://github.com/netdata/netdata/issues/21334))
 - User Connections (MSSQL) ([#21348](https://github.com/netdata/netdata/issues/21348))
+- Improve replication logic by checking if parent is caught up with child ([#21352](https://github.com/netdata/netdata/issues/21352))
+- Improve(go.d/snmp): add EATON UPS profile ([#21355](https://github.com/netdata/netdata/issues/21355))
 
 ## [2.8.0] - 2025-11-19
 
