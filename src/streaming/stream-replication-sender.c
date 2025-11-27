@@ -443,28 +443,25 @@ static bool replication_query_execute(BUFFER *wb, struct replication_query *q, s
             if(buffer_strlen(wb) > max_msg_size && last_end_time_in_buffer) {
                 q->query.before = last_end_time_in_buffer;
 
-                // CRITICAL: If parent explicitly requested start_streaming=true,
-                // we MUST honor it even if buffer is full. This prevents infinite
-                // replication loops where parent is stuck waiting for child to finish.
-                // The parent only sets start_streaming=true when it's confident it's
-                // caught up or detected a stuck state, so we should respect that decision.
-                if (!q->request.enable_streaming) {
-                    // Parent didn't explicitly request finish, so we can split the response
-                    q->query.enable_streaming = false;
-                }
-                // else: Parent requested start_streaming=true, honor it despite buffer overflow
+                // CRITICAL: When splitting a response due to buffer overflow, we MUST set
+                // enable_streaming=false to prevent data loss. If we send start_streaming=true
+                // with partial data, the parent will think replication is complete when we've
+                // actually truncated the requested interval, causing permanent data loss.
+                //
+                // The parent-side stuck detection will handle infinite loops differently by:
+                // 1. Detecting when no progress is made after multiple rounds
+                // 2. Explicitly marking replication as FINISHED before sending final request
+                // 3. Handling the child's response appropriately whether it says true or false
+                q->query.enable_streaming = false;
 
                 internal_error(
                     true,
                     "STREAM SND REPLAY: current remaining sender buffer of %zu bytes cannot fit the "
                     "message size %zu bytes for chart '%s' of host '%s'. "
-                    "Sending partial replication response %ld to %ld, %s (original: %ld to %ld, %s). "
-                    "%s parent's start_streaming=%s request.",
+                    "Sending partial replication response %ld to %ld, %s (original: %ld to %ld, %s).",
                     buffer_strlen(wb), max_msg_size, rrdset_id(q->st), rrdhost_hostname(q->st->rrdhost),
                     q->query.after, q->query.before, q->query.enable_streaming?"true":"false",
-                    q->request.after, q->request.before, q->request.enable_streaming?"true":"false",
-                    q->request.enable_streaming ? "Honoring" : "Can override",
-                    q->request.enable_streaming ? "true" : "false");
+                    q->request.after, q->request.before, q->request.enable_streaming?"true":"false");
 
                 q->query.interrupted = true;
 
