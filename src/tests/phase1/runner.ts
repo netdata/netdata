@@ -8605,7 +8605,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         mcpServers: {},
         queues: { default: { concurrent: 32 } },
       };
-      Reflect.set(session as unknown as Record<string, unknown>, 'sessionConfig', { config: configuration });
+      Reflect.set(session as unknown as Record<string, unknown>, 'sessionConfig', { config: configuration, toolingTransport: 'native' });
       const resolver = getPrivateMethod(session, 'resolveToolChoice') as (provider: string, model: string) => ToolChoiceMode | undefined;
       const requiredChoice = resolver.call(session, 'openrouter', 'model-required');
       const inheritedChoice = resolver.call(session, 'openrouter', 'model-inherit');
@@ -9281,6 +9281,8 @@ async function runScenario(test: HarnessTest): Promise<AIAgentResult> {
     llmTimeout: defaults.llmTimeout,
     agentId: `phase1-${prompt}`,
     abortSignal: abortController.signal,
+    // Tests use native transport by default; XML-specific tests override this
+    toolingTransport: 'native',
   };
 
   configure?.(configuration, baseSession, defaults);
