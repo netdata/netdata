@@ -21,6 +21,9 @@ case "${1}" in
     if [ -d "/etc/pve" ]; then
       groups="${groups} www-data"
     fi
+    if [ -e "/dev/nvidiactl" ]; then
+      groups="${groups} video"
+    fi
 
     for item in ${groups}; do
       if getent group "${item}" > /dev/null 2>&1; then

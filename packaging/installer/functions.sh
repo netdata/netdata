@@ -1045,6 +1045,9 @@ create_netdata_accounts() {
   if [ -d "/etc/pve" ]; then
     NETDATA_WANTED_GROUPS="${NETDATA_WANTED_GROUPS} www-data"
   fi
+  if [ -e "/dev/nvidiactl" ]; then
+    NETDATA_WANTED_GROUPS="${NETDATA_WANTED_GROUPS} video"
+  fi
 
   if command -v systemd-sysusers >/dev/null 2>&1; then
     install -m 644 -o root -g root "${NETDATA_PREFIX}/usr/lib/netdata/system/systemd/sysusers/netdata.conf" /usr/lib/sysusers.d/netdata.conf
