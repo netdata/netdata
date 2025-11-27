@@ -12,6 +12,8 @@ fi
 
 # Needed to read Proxmox VMs and (LXC) containers configuration files (name resolution + CPU and memory limits)
 function add_netdata_to_proxmox_conf_files_group() {
+  [ "${DOCKER_USR}" = "root" ] && return
+
   local group_guid
   group_guid="$(stat -c %g /host/etc/pve 2>/dev/null || true)"
   [ -z "${group_guid}" ] && return
@@ -35,6 +37,8 @@ function add_netdata_to_proxmox_conf_files_group() {
 
 # Needed to access NVIDIA GPU monitoring
 function add_netdata_to_nvidia_group() {
+  [ "${DOCKER_USR}" = "root" ] && return
+
   local group_gid
   group_gid="$(stat -c %g /dev/nvidiactl 2>/dev/null || true)"
   [ -z "${group_gid}" ] && return
