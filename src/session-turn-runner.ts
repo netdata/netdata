@@ -305,8 +305,8 @@ export class TurnRunner {
             let pairCursor = 0;
             let rateLimitedInCycle = 0;
             let maxRateLimitWaitMs = 0;
-            // eslint-disable-next-line functional/no-loop-statements
             // turnSuccessful starts false; checked on subsequent iterations after potential success at line ~1184
+            // eslint-disable-next-line functional/no-loop-statements
             while (attempts < maxRetries && !turnSuccessful) {
                 if (Boolean(this.ctx.stopRef?.stopping)) {
                     return this.finalizeGracefulStopSession(conversation, logs, accounting);
@@ -1800,7 +1800,7 @@ export class TurnRunner {
             childConversations: this.state.childConversations
         };
     }
-    private emitFinalSummary(logs: LogEntry[], accounting: AccountingEntry[]): void {
+    private emitFinalSummary(_logs: LogEntry[], accounting: AccountingEntry[]): void {
         try {
             const llmEntries = accounting.filter((e): e is AccountingEntry & { type: 'llm' } => e.type === 'llm');
             const tokIn = llmEntries.reduce((s: number, e) => s + e.tokens.inputTokens, 0);
@@ -2247,8 +2247,8 @@ export class TurnRunner {
         model: string,
         isFinalTurn: boolean,
         currentTurn: number,
-        logs: LogEntry[],
-        accounting: AccountingEntry[],
+        _logs: LogEntry[],
+        _accounting: AccountingEntry[],
         lastShownThinkingHeaderTurn: number,
         attempt: number,
         maxAttempts: number,
