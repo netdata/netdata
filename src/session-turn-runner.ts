@@ -306,6 +306,7 @@ export class TurnRunner {
             let rateLimitedInCycle = 0;
             let maxRateLimitWaitMs = 0;
             // eslint-disable-next-line functional/no-loop-statements
+            // turnSuccessful starts false; checked on subsequent iterations after potential success at line ~1184
             while (attempts < maxRetries && !turnSuccessful) {
                 if (Boolean(this.ctx.stopRef?.stopping)) {
                     return this.finalizeGracefulStopSession(conversation, logs, accounting);
