@@ -512,3 +512,25 @@ export function warn(message: string): void {
 }
 
 export { appendCallPathSegment, normalizeCallPath } from './utils/call-path.js';
+
+export const safeJsonByteLength = (value: unknown): number => {
+  try {
+    return Buffer.byteLength(JSON.stringify(value), 'utf8');
+  } catch {
+    if (typeof value === 'string') return Buffer.byteLength(value, 'utf8');
+    if (value === null || value === undefined) return 0;
+    if (typeof value === 'object') {
+      let total = 0;
+      Object.values(value as Record<string, unknown>).forEach((nested) => {
+        total += safeJsonByteLength(nested);
+      });
+      return total;
+    }
+    return 0;
+  }
+};
+
+export const estimateMessagesBytes = (messages: readonly ConversationMessage[] | undefined): number => {
+  if (messages === undefined || messages.length === 0) return 0;
+  return messages.reduce((total, message) => total + safeJsonByteLength(message), 0);
+};

@@ -1,7 +1,7 @@
 # final_report Tool
 
 ## TL;DR
-Mandatory tool for agent to deliver final answer. Captures status, format, encoding, content, optional JSON payload, and metadata. Terminates session execution. `report_content` may be `raw` or `base64`; `content_json` is schema-validated with a light repair loop for stringified nested JSON.
+Mandatory tool for agent to deliver final answer. Captures status, format, encoding, content, optional JSON payload, and metadata. Terminates session execution. `report_content` may be `raw` or `base64`; `content_json` is schema-validated with a light repair loop for stringified nested JSON. In XML transport (`tooling.transport=xml|xml-final`) the model must call `agent__final_report` via the XML slot in XML-NEXT. In `xml`, provider tool definitions are hidden and native tool_calls are ignored; in `xml-final`, provider tools remain native but the final report still must be sent via the XML tag.
 
 ## Source Files
 - `src/tools/internal-provider.ts` - Tool definition and handler
@@ -201,6 +201,9 @@ interface AIAgentResult {
 ```
 
 ## Adoption Strategies
+
+### XML Transport
+- When `tooling.transport` is `xml` or `xml-final`, `agent__final_report` must be emitted inside `<ai-agent-NONCE-XXXX tool="agent__final_report" status="...">...</ai-agent-NONCE-XXXX>` matching the current nonce/slot. Slots are predeclared in XML-NEXT; mismatched nonce/slot/tool are ignored. Progress shares the XML channel only in `xml`; it is suppressed in `xml-final`.
 
 ### From Tool Call
 **Location**: `src/ai-agent.ts:1892-1926`

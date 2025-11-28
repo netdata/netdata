@@ -137,8 +137,8 @@ Note: Exit codes map to failure categories, not specific error types. Check `res
 ### Empty or Invalid LLM Responses
 
 **Empty content without tool calls:**
-- Response NOT added to conversation
-- Synthetic retry triggered with injected ephemeral message: `"System notice: plain text responses without tool calls are ignored. Use final_report to provide your answer."`
+- If the assistant returns only reasoning (non-empty `reasoning` field) and no tool calls or text content, the turn is allowed to proceed; the reasoning is preserved in the conversation for the next turn.
+- Otherwise (no content, no tools, no reasoning), the response is NOT added to the conversation, and a synthetic retry is triggered with the ephemeral message: `"System notice: plain text responses without tool calls are ignored. Use final_report to provide your answer."`
 - Counts as one attempt toward `maxRetries` budget
 
 **Invalid tool call parameters:**
@@ -444,7 +444,60 @@ Any deviation from the guarantees above is a **contract violation** and must be 
 
 ---
 
-## 10. Version History
+## 11. XML Tool Transport Contract (XML-PAST / XML-NEXT)
+
+**Modes**
+- `xml-final` (default): provider tools stay native (tool_calls), but the final report must be emitted via XML. Progress is suppressed. Tool choice set to `auto`; provider tool definitions remain visible to the LLM for native calls.
+- `native`: unchanged tool-call behavior, tool choice may be `required`.
+- `xml`: all tools may be invoked via XML tags; tool choice set to `auto`, and provider tool definitions are withheld (XML is the only invocation path). Progress uses the XML channel when enabled.
+
+**Session nonce and slots**
+- Each session defines a fixed nonce (e.g., `<8hex>`) that remains constant across all turns.
+- Numbered invocation slots increment across turns: turn 1 uses `NONCE-0001`, `NONCE-0002`, etc.; turn 2 continues from where turn 1 left off (e.g., `NONCE-0004`, `NONCE-0005`).
+- Special slots `NONCE-FINAL` and `NONCE-PROGRESS` remain constant (not numbered).
+- Tags are detected by substring only (no XML parser): `<ai-agent-NONCE-000X tool="...">payload</ai-agent-NONCE-000X>`.
+
+**Messages**
+- XML-PAST (permanent): a user message containing prior turn tool results (slot id, tool, status, duration, request, response). Suppressed in `xml-final` mode. Intended for the model’s context; may be capped to last turn.
+- XML-NEXT (ephemeral, not stored/cached): per-turn instructions with the current nonce, available tools and their JSON schemas, slot templates, progress slot (optional), and final-report slot. In forced-final turns it only advertises the final-report slot (and optional progress).
+
+**Final-report via XML**
+- Final-report uses a reserved slot in XML-NEXT (`tool="final-report"`, status `success|failure|partial`, format matching session expectation, raw content). JSON formats still undergo fuzzy repair + schema validation after extraction. No escaping/base64 required.
+
+**Unclosed final-report tag handling**
+- When a valid final-report opening tag is detected (`<ai-agent-NONCE-FINAL tool="agent__final_report">`) with content following it, the closing tag requirement depends on the LLM's `stopReason`:
+  - `stop`, `end_turn`, `end`, `eos` (normal completion): Accept content even without closing tag.
+  - `length`, `max_tokens` (truncation): Treat as incomplete, trigger retry.
+  - Unknown/undefined: Log warning but accept content.
+- This applies ONLY to `agent__final_report`; other tools always require complete tags.
+- Rationale: Large models often stop generating after completing their final answer without emitting closing tags. The stop reason is the authoritative signal for completion.
+
+**Tool execution and responses**
+- Tags from the assistant are parsed by nonce and unused slot id; invalid/mismatched tags are ignored (do not count as attempts).
+- Each valid tag is executed through the existing tool orchestrator (same budgets, maxToolCallsPerTurn, accounting, retries). Tools are “emulated” — transport differs, execution identical.
+- Tool responses are returned as user messages: `System Notice: tool response for NONCE-000X (toolName)` containing request/response blocks. This avoids provider role-validation issues. Final-report produces no response message; it finalizes the session.
+
+**Ordering and selection**
+- Structured outputs: last valid matching tag for a given tool is used when a single result is expected (e.g., final-report). Unstructured outputs may be combined per tool rules; if not specified, each slot maps to one tool execution.
+
+**Retries and missing outputs**
+- Missing or invalid tags follow the existing retry logic for missing final-report/tool calls; empty/reasoning-only outputs are treated as missing. Retry budgets and provider cycling are unchanged.
+
+**Prompting and schemas**
+- The system prompt contains no tool/final-report text in XML modes; all instructions/schemas live in XML-NEXT. This allows forced-final turns to hide non-final tools by omitting them from XML-NEXT.
+
+**Accounting/telemetry**
+- Accounting entries use the real tool name with `source: xml`. Final-report emits `command: agent__final_report_xml` with status from the tag. Metrics/histograms remain, now distinguishable by source.
+
+**Streaming**
+- Streaming output is buffered once an opening-tag fragment for the current nonce appears and stops at the matching closing tag. Content outside matched tags is ignored.
+
+**Unchanged**
+- Context guard logic and limits are unchanged. Tool truncation rules remain; no size guard is applied to final outputs.
+
+---
+
+## 12. Version History
 
 **1.0** (2025-11-19)
 - Initial contract definition

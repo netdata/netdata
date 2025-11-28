@@ -561,6 +561,78 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
     return Math.max(1, bounded);
   }
 
+  /**
+   * Log comprehensive debug info for MODEL_ERROR cases.
+   * This runs unconditionally (not just DEBUG=true) because MODEL_ERROR
+   * causes retries and we need full diagnostics to fix root causes.
+   */
+  private logModelErrorDiagnostics(
+    error: unknown,
+    context: {
+      composedMessage: string;
+      name: string;
+      status: number;
+      codeStr?: string;
+      providerMessage?: string;
+      source: 'explicit' | 'default';
+    }
+  ): void {
+    try {
+      const safeStringify = (obj: unknown, maxLen = 5000): string => {
+        try {
+          const seen = new WeakSet<object>();
+          const str = JSON.stringify(obj, (_key, value: unknown) => {
+            if (typeof value === 'object' && value !== null) {
+              if (seen.has(value)) return '[Circular]';
+              seen.add(value);
+            }
+            if (typeof value === 'function') return '[Function]';
+            if (value instanceof Error) {
+              return { name: value.name, message: value.message, stack: value.stack };
+            }
+            return value;
+          }, 2);
+          return str.length > maxLen ? `${str.slice(0, maxLen)}...[truncated]` : str;
+        } catch {
+          return '[unserializable]';
+        }
+      };
+
+      const errObj = error as Record<string, unknown> | null | undefined;
+      const ctorName = errObj?.constructor !== undefined ? (errObj.constructor as { name?: string }).name : undefined;
+      // Extract error name safely - ensure string type to avoid [object Object]
+      const rawName = errObj?.name;
+      const errorName = typeof rawName === 'string' ? rawName : (typeof ctorName === 'string' ? ctorName : typeof error);
+      const rawMessage = errObj?.message;
+      const errorMessage = typeof rawMessage === 'string' ? rawMessage : String(error);
+      const errorStack = errObj?.stack;
+      const errorCause = errObj?.cause;
+      const lastError = errObj?.lastError;
+
+      warn(`[MODEL_ERROR_DIAGNOSTIC] ========== MODEL_ERROR DETECTED ==========`);
+      warn(`[MODEL_ERROR_DIAGNOSTIC] Source: ${context.source}`);
+      warn(`[MODEL_ERROR_DIAGNOSTIC] Composed message: ${context.composedMessage}`);
+      warn(`[MODEL_ERROR_DIAGNOSTIC] Error name: ${errorName}`);
+      warn(`[MODEL_ERROR_DIAGNOSTIC] Error message: ${errorMessage}`);
+      warn(`[MODEL_ERROR_DIAGNOSTIC] HTTP status: ${String(context.status)}`);
+      warn(`[MODEL_ERROR_DIAGNOSTIC] Code: ${context.codeStr ?? 'none'}`);
+      warn(`[MODEL_ERROR_DIAGNOSTIC] Provider message: ${context.providerMessage ?? 'none'}`);
+      if (errorStack !== undefined) {
+        warn(`[MODEL_ERROR_DIAGNOSTIC] Stack trace:\n${typeof errorStack === 'string' ? errorStack : safeStringify(errorStack)}`);
+      }
+      if (errorCause !== undefined) {
+        warn(`[MODEL_ERROR_DIAGNOSTIC] Cause: ${safeStringify(errorCause)}`);
+      }
+      if (lastError !== undefined) {
+        warn(`[MODEL_ERROR_DIAGNOSTIC] LastError: ${safeStringify(lastError)}`);
+      }
+      warn(`[MODEL_ERROR_DIAGNOSTIC] Full error object: ${safeStringify(error)}`);
+      warn(`[MODEL_ERROR_DIAGNOSTIC] ==========================================`);
+    } catch (e) {
+      warn(`[MODEL_ERROR_DIAGNOSTIC] Failed to log diagnostics: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
   public mapError(error: unknown): TurnStatus {
     const UNKNOWN_ERROR_MESSAGE = 'Unknown error';
     if (error === null || error === undefined) return { type: 'invalid_response', message: UNKNOWN_ERROR_MESSAGE };
@@ -872,6 +944,7 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
     if (status === 400 || name.includes('BadRequest') || providerMessage.toLowerCase().includes('invalid') || providerMessage.toLowerCase().includes('model')) {
       const lower = providerMessage.toLowerCase();
       const retryable = !(lower.includes('permanently') || lower.includes('unsupported'));
+      this.logModelErrorDiagnostics(error, { composedMessage, name, status, codeStr, providerMessage, source: 'explicit' });
       return { type: 'model_error', message: composedMessage, retryable };
     }
 
@@ -886,6 +959,7 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
     }
 
     // Default to model error with retryable flag
+    this.logModelErrorDiagnostics(error, { composedMessage, name, status, codeStr, providerMessage, source: 'default' });
     return { type: 'model_error', message: composedMessage, retryable: true };
   }
 
@@ -1052,17 +1126,17 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
       const content = [
         '**CRITICAL**: You cannot collect more data!\n',
         '\n',
-        'You must call the tool `agent__final_report` with your report.\n',
+        'You MUST NOW provide your report.\n',
         '\n',
-        'Review the collected data, check your instructions, and call the tool `agent__final_report` with your final report in the `report_content` field:\n',
+        'Review the collected data, check your instructions, and provide your final report as instructed:\n',
         '\n',
         '- If the data is completely irrelevant or missing, set `status` to `failure` and describe the situation.\n',
-        '- If the data is severealy incomplete, set `status` to `partial` and describe what you found.\n',
+        '- If the data is incomplete, set `status` to `partial` and describe what you found.\n',
         '- If the data is rich, set `status` to `success` and provide a detailed report.\n',
         '\n',
         'Follow your instructions carefully, think hard, ensure your final report is accurate.\n',
         '\n',
-        'Provide now your report by calling the tool `agent__final_report`.'
+        'Provide your final report NOW.'
       ].join(' ');
       return messages.concat({ role: 'user', content } as ModelMessage);
     }
@@ -1278,6 +1352,11 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
       let response = '';
       let fullStep = await fullIterator.next();
 
+      // Track pending tool executions to avoid idle timeout during long-running tools.
+      // When AI SDK invokes our execute callback (e.g., subagent), no chunks are emitted
+      // until execution completes. Without this, the idle timer would abort the stream.
+      let pendingToolCalls = 0;
+
       // eslint-disable-next-line functional/no-loop-statements
       while (fullStep.done !== true) {
         const part = fullStep.value;
@@ -1294,14 +1373,24 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
           if (request.onChunk !== undefined) {
             request.onChunk(part.text, 'thinking');
           }
+        } else if (part.type === 'tool-call') {
+          // Tool execution starting - suspend idle timer until result arrives
+          pendingToolCalls++;
+          clearIdle();
+        } else if (part.type === 'tool-result') {
+          // Tool execution completed - resume idle timer if no more pending
+          pendingToolCalls = Math.max(0, pendingToolCalls - 1);
         } else if (part.type === 'finish') {
           const fin = part as { finishReason?: string };
           if (typeof fin.finishReason === 'string' && fin.finishReason.length > 0) {
             stopReason = stopReason ?? fin.finishReason;
           }
         }
-        
-        resetIdle();
+
+        // Only reset idle timer if no tool executions are pending
+        if (pendingToolCalls === 0) {
+          resetIdle();
+        }
         fullStep = await fullIterator.next();
       }
 

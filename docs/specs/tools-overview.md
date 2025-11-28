@@ -14,6 +14,7 @@ Abstract ToolProvider interface with four implementations: MCP, REST, Internal, 
 - `src/tools/queue-manager.ts` - Concurrency queue management
 
 ## Tool Provider Architecture
+**XML transport impact**: In `xml`, provider tool definitions are withheld and tools are invoked via XML-NEXT/PAST tags. In `xml-final`, provider tools remain native (tool_calls) but the final report travels via XML. Budgets/validation remain identical either way.
 
 ### ToolProvider (Abstract Base)
 **Location**: `src/tools/types.ts:37-56`

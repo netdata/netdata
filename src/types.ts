@@ -240,6 +240,7 @@ export interface ConversationMessage {
   toolCalls?: ToolCall[];
   toolCallId?: string;
   reasoning?: ReasoningOutput[];
+  noticeType?: 'xml-next' | 'xml-past' | 'xml-tool-response';
   metadata?: {
     provider?: string;
     model?: string;
@@ -418,6 +419,7 @@ export interface Configuration {
     reasoningValue?: ProviderReasoningValue | null;
     contextWindowBufferTokens?: number;
   };
+  tooling?: { transport?: 'native' | 'xml' | 'xml-final' };
   telemetry?: TelemetryConfig;
   // Server headend configuration (optional)
   slack?: {
@@ -594,6 +596,7 @@ export interface AIAgentSessionConfig {
   stopRef?: { stopping: boolean };
   // Ancestors chain of sub-agent prompt paths (for recursion prevention across nested sessions)
   ancestors?: string[];
+  toolingTransport?: 'native' | 'xml' | 'xml-final';
 }
 
 // Session result
