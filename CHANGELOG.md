@@ -24,6 +24,12 @@
 - User Connections (MSSQL) ([#21348](https://github.com/netdata/netdata/issues/21348))
 - Improve replication logic by checking if parent is caught up with child ([#21352](https://github.com/netdata/netdata/issues/21352))
 - Improve(go.d/snmp): add EATON UPS profile ([#21355](https://github.com/netdata/netdata/issues/21355))
+- Session connections (MSSQL Plugin) ([#21350](https://github.com/netdata/netdata/issues/21350))
+- Fix(docker): add netdata user to nvidia device group on non-Debian systems ([#21358](https://github.com/netdata/netdata/issues/21358))
+- Build(deps): bump github.com/redis/go-redis/v9 from 9.17.0 to 9.17.1 in /src/go ([#21360](https://github.com/netdata/netdata/issues/21360))
+- Chore(go.d): add type=float dimension support ([#21362](https://github.com/netdata/netdata/issues/21362))
+- Chore(go.d): fix get dim value ([#21363](https://github.com/netdata/netdata/issues/21363))
+- Add netdata user to video group ([#21359](https://github.com/netdata/netdata/issues/21359))
 
 ## [2.8.0] - 2025-11-19
 
