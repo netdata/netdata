@@ -78,10 +78,15 @@ export class AnthropicProvider extends BaseLLMProvider {
       };
 
       // Check if message is ephemeral (changes every turn, should not be cached)
+      // noticeType is lost during convertMessages, so check content patterns
       const isEphemeralMessage = (msg: ResponseMessage): boolean => {
-        const noticeType = (msg as { noticeType?: string }).noticeType;
-        // xml-next, xml-past, xml-tool-response change every turn
-        return noticeType === 'xml-next' || noticeType === 'xml-past' || noticeType === 'xml-tool-response';
+        const content = (msg as { content?: unknown }).content;
+        if (typeof content !== 'string') return false;
+        const trimmed = content.trim();
+        // XML-NEXT: "# System Notice\n\nThis is turn No X"
+        // XML-PAST: "# System Notice\n\n## Previous Turn Tool Responses"
+        if (trimmed.startsWith('# System Notice')) return true;
+        return false;
       };
 
       const findCacheTargetIndex = (): number => {
