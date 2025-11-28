@@ -853,6 +853,7 @@ export class TurnRunner {
                                         fatal: false,
                                         message: reason,
                                     });
+                                    this.logFinalReportDump(currentTurn, params, 'missing status');
                                     this.addTurnFailure(reason);
                                     return false;
                                 }
@@ -891,9 +892,10 @@ export class TurnRunner {
                                         type: 'llm' as const,
                                         remoteIdentifier: 'agent:final-report-parse',
                                         fatal: false,
-                                        message: 'Final report tool call has invalid status (expected success|failure|partial); ignoring this attempt.',
+                                        message: `Final report tool call has invalid status '${status}' (expected success|failure|partial); ignoring this attempt.`,
                                     };
                                     this.log(warnEntry);
+                                    this.logFinalReportDump(currentTurn, params, `invalid status '${status}'`);
                                     this.addTurnFailure('Final report status invalid; expected success|failure|partial.');
                                     return false;
                                 }
@@ -905,16 +907,19 @@ export class TurnRunner {
                                 }
                                 if (expectedFormat === 'json' && contentJson === undefined) {
                                     this.addTurnFailure('Final report must be JSON per schema; received non-JSON content.');
+                                    this.logFinalReportDump(currentTurn, params, 'expected JSON content_json');
                                     return false;
                                 }
                                 // slack-block-kit requires messages array; other non-json formats require report_content
                                 if (expectedFormat === SLACK_BLOCK_KIT_FORMAT) {
                                     if (messagesParam === undefined || messagesParam.length === 0) {
                                         this.addTurnFailure('Final report missing messages array; provide Slack Block Kit messages.');
+                                        this.logFinalReportDump(currentTurn, params, 'expected messages array');
                                         return false;
                                     }
                                 } else if (expectedFormat !== 'json' && (contentParam === undefined || contentParam.length === 0)) {
                                     this.addTurnFailure('Final report content missing; provide your final report in the requested format.');
+                                    this.logFinalReportDump(currentTurn, params, 'expected report_content');
                                     return false;
                                 }
                                 // Determine content based on format
@@ -1691,6 +1696,24 @@ export class TurnRunner {
         if (trimmed.length === 0)
             return;
         this.state.turnFailureReasons.push(trimmed);
+    }
+    private logFinalReportDump(turn: number, params: Record<string, unknown>, context: string): void {
+        try {
+            const paramsDump = JSON.stringify(params, null, 2);
+            this.log({
+                timestamp: Date.now(),
+                severity: 'WRN' as const,
+                turn,
+                subturn: 0,
+                direction: 'response' as const,
+                type: 'llm' as const,
+                remoteIdentifier: 'agent:final-report-dump',
+                fatal: false,
+                message: `Final report params (${context}): ${paramsDump}`,
+            });
+        } catch {
+            // ignore serialization errors
+        }
     }
     private commitFinalReport(payload: PendingFinalReportPayload, source: FinalReportSource): void {
         this.ctx.finalReportManager.commit(payload, source);
