@@ -823,6 +823,8 @@ export class TurnRunner {
                                 const assistantWithCall = sanitizedMessages.find((msg) => msg.role === 'assistant' && Array.isArray(msg.toolCalls));
                                 if (assistantWithCall === undefined)
                                     return false;
+                                // Capture raw content for debugging dumps
+                                const rawContent = typeof assistantWithCall.content === 'string' ? assistantWithCall.content : undefined;
                                 const toolCalls = assistantWithCall.toolCalls;
                                 if (toolCalls === undefined)
                                     return false;
@@ -853,7 +855,7 @@ export class TurnRunner {
                                         fatal: false,
                                         message: reason,
                                     });
-                                    this.logFinalReportDump(currentTurn, params, 'missing status');
+                                    this.logFinalReportDump(currentTurn, params, 'missing status', rawContent);
                                     this.addTurnFailure(reason);
                                     return false;
                                 }
@@ -895,7 +897,7 @@ export class TurnRunner {
                                         message: `Final report tool call has invalid status '${status}' (expected success|failure|partial); ignoring this attempt.`,
                                     };
                                     this.log(warnEntry);
-                                    this.logFinalReportDump(currentTurn, params, `invalid status '${status}'`);
+                                    this.logFinalReportDump(currentTurn, params, `invalid status '${status}'`, rawContent);
                                     this.addTurnFailure('Final report status invalid; expected success|failure|partial.');
                                     return false;
                                 }
@@ -907,19 +909,19 @@ export class TurnRunner {
                                 }
                                 if (expectedFormat === 'json' && contentJson === undefined) {
                                     this.addTurnFailure('Final report must be JSON per schema; received non-JSON content.');
-                                    this.logFinalReportDump(currentTurn, params, 'expected JSON content_json');
+                                    this.logFinalReportDump(currentTurn, params, 'expected JSON content_json', rawContent);
                                     return false;
                                 }
                                 // slack-block-kit requires messages array; other non-json formats require report_content
                                 if (expectedFormat === SLACK_BLOCK_KIT_FORMAT) {
                                     if (messagesParam === undefined || messagesParam.length === 0) {
                                         this.addTurnFailure('Final report missing messages array; provide Slack Block Kit messages.');
-                                        this.logFinalReportDump(currentTurn, params, 'expected messages array');
+                                        this.logFinalReportDump(currentTurn, params, 'expected messages array', rawContent);
                                         return false;
                                     }
                                 } else if (expectedFormat !== 'json' && (contentParam === undefined || contentParam.length === 0)) {
                                     this.addTurnFailure('Final report content missing; provide your final report in the requested format.');
-                                    this.logFinalReportDump(currentTurn, params, 'expected report_content');
+                                    this.logFinalReportDump(currentTurn, params, 'expected report_content', rawContent);
                                     return false;
                                 }
                                 // Determine content based on format
@@ -1697,7 +1699,7 @@ export class TurnRunner {
             return;
         this.state.turnFailureReasons.push(trimmed);
     }
-    private logFinalReportDump(turn: number, params: Record<string, unknown>, context: string): void {
+    private logFinalReportDump(turn: number, params: Record<string, unknown>, context: string, rawContent?: string): void {
         try {
             const paramsDump = JSON.stringify(params, null, 2);
             this.log({
@@ -1711,6 +1713,20 @@ export class TurnRunner {
                 fatal: false,
                 message: `Final report params (${context}): ${paramsDump}`,
             });
+            // Also log raw content if available (for debugging XML issues)
+            if (typeof rawContent === 'string' && rawContent.trim().length > 0) {
+                this.log({
+                    timestamp: Date.now(),
+                    severity: 'WRN' as const,
+                    turn,
+                    subturn: 0,
+                    direction: 'response' as const,
+                    type: 'llm' as const,
+                    remoteIdentifier: 'agent:final-report-raw',
+                    fatal: false,
+                    message: `Raw assistant content:\n${rawContent}`,
+                });
+            }
         } catch {
             // ignore serialization errors
         }
