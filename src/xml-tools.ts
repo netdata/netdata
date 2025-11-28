@@ -1,5 +1,6 @@
 import type { ToolCall } from './types.js';
 
+import { describeFormatParameter, getFormatSchema, type OutputFormatId } from './formats.js';
 import { truncateUtf8WithNotice } from './utils.js';
 
 export interface XmlSlotTemplate {
@@ -16,7 +17,7 @@ export interface XmlNextPayload {
   progressSlot?: { slotId: string };
   finalReportSlot: { slotId: string };
   mode: 'xml' | 'xml-final';
-  expectedFinalFormat: 'json' | 'markdown' | 'text' | 'markdown+mermaid' | 'slack-block-kit' | 'tty' | 'pipe' | 'sub-agent';
+  expectedFinalFormat: OutputFormatId | 'text';
   finalSchema?: Record<string, unknown>;
 }
 
@@ -151,16 +152,53 @@ export function renderXmlNext(payload: XmlNextPayload): string {
     lines.push('');
   }
 
+  // Add format-specific instructions before the XML example
+  const isTextFormat = expectedFinalFormat === 'text';
+  const formatDescription = isTextFormat ? 'Plain text output.' : describeFormatParameter(expectedFinalFormat);
+  // Get format schema: user-provided for json, built-in for other structured formats
+  const formatSchema: Record<string, unknown> | undefined = (() => {
+    if (expectedFinalFormat === 'json') return finalSchema;
+    if (isTextFormat) return undefined;
+    return getFormatSchema(expectedFinalFormat);
+  })();
+
   lines.push('## Final Report');
+  lines.push(`**Format: ${expectedFinalFormat}** — ${formatDescription}`);
+  lines.push('');
   lines.push('Once your task is complete, provide your final report/answer using this output:');
   lines.push('');
+  if (expectedFinalFormat === 'json' && finalSchema !== undefined) {
+    // For JSON format: show the tool wrapper with user's schema nested in content_json
+    const toolSchema = {
+      type: 'object',
+      required: ['status', 'report_format', 'content_json'],
+      properties: {
+        status: { type: 'string', enum: ['success', 'failure', 'partial'], description: 'Task completion status' },
+        report_format: { type: 'string', const: 'json' },
+        content_json: finalSchema,
+      }
+    };
+    lines.push('Your response must be a JSON object matching this schema:');
+    lines.push('```json');
+    lines.push(JSON.stringify(toolSchema, null, 2));
+    lines.push('```');
+    lines.push('');
+    lines.push('Wrap your JSON in these XML tags:');
+  } else if (formatSchema !== undefined) {
+    // For other structured formats (slack-block-kit): show the format schema
+    lines.push('Your response must be a JSON object matching this schema:');
+    lines.push('```json');
+    lines.push(JSON.stringify(formatSchema, null, 2));
+    lines.push('```');
+    lines.push('');
+    lines.push('Wrap your JSON in these XML tags:');
+  }
   lines.push('```');
   lines.push(`<ai-agent-${finalReportSlot.slotId} tool="agent__final_report" status="success|failure|partial" format="${expectedFinalFormat}">`);
-  if (expectedFinalFormat === 'json') {
-    lines.push('Provide a JSON object matching this schema:');
-    lines.push(JSON.stringify(finalSchema ?? {}, null, 2));
+  if (expectedFinalFormat === 'json' || formatSchema !== undefined) {
+    lines.push('{ ... your JSON here ... }');
   } else {
-    lines.push(`[Your final report/answer here, format: ${expectedFinalFormat}]`);
+    lines.push(`[Your final report/answer here]`);
   }
   lines.push(`</ai-agent-${finalReportSlot.slotId}>`);
   lines.push('```');

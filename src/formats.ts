@@ -5,7 +5,39 @@ interface OutputFormat {
   toolDescription: string;
   promptValue: string;
   parameterDescription: string;
+  // Schema for formats requiring structured JSON output (shown in xml-final mode)
+  inputSchema?: Record<string, unknown>;
 }
+
+// Slack Block Kit schema - shared between native tool and xml-final modes
+const SLACK_BLOCK_KIT_SCHEMA: Record<string, unknown> = {
+  type: 'object',
+  required: ['status', 'report_format', 'messages'],
+  properties: {
+    status: { type: 'string', enum: ['success', 'failure', 'partial'] },
+    report_format: { type: 'string', const: 'slack-block-kit' },
+    messages: {
+      type: 'array',
+      minItems: 1,
+      description: 'Array of Slack messages, each containing blocks',
+      items: {
+        type: 'object',
+        required: ['blocks'],
+        properties: {
+          blocks: {
+            type: 'array',
+            description: 'Slack Block Kit blocks: section, header, divider, context',
+            items: {
+              type: 'object',
+              description: 'Block types: section (mrkdwn text ≤2900 chars), header (plain_text ≤150), divider, context (mrkdwn ≤2000)'
+            }
+          }
+        }
+      }
+    },
+    metadata: { type: 'object' }
+  }
+};
 
 const OUTPUT_FORMATS: Record<OutputFormatId, OutputFormat> = {
   markdown: {
@@ -24,7 +56,8 @@ const OUTPUT_FORMATS: Record<OutputFormatId, OutputFormat> = {
     id: 'slack-block-kit',
     toolDescription: 'Slack Block Kit payload.',
     promptValue: 'Slack Block Kit JSON array of messages (not raw text or GitHub markdown).',
-    parameterDescription: 'Produce Slack Block Kit array of messages. Use multiple Block Kit messages and Slack-mrkdwn sections/context (≤2000 chars), headers (plain_text ≤150), dividers, and fields (≤10). Do not emit raw text or GitHub markdown.'
+    parameterDescription: 'Produce Slack Block Kit array of messages. Use multiple Block Kit messages and Slack-mrkdwn sections/context (≤2000 chars), headers (plain_text ≤150), dividers, and fields (≤10). Do not emit raw text or GitHub markdown.',
+    inputSchema: SLACK_BLOCK_KIT_SCHEMA
   },
   tty: {
     id: 'tty',
@@ -64,6 +97,10 @@ export function formatPromptValue(id: OutputFormatId): string {
 
 export function describeFormatParameter(id: OutputFormatId): string {
   return OUTPUT_FORMATS[id].parameterDescription;
+}
+
+export function getFormatSchema(id: OutputFormatId): Record<string, unknown> | undefined {
+  return OUTPUT_FORMATS[id].inputSchema;
 }
 
 export function resolveFormatIdForCli(override: string | undefined, expectedJson: boolean, isTTY: boolean): OutputFormatId {

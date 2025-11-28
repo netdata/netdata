@@ -126,6 +126,7 @@ const REMOTE_ORCHESTRATOR = 'agent:orchestrator';
 const REMOTE_SANITIZER = 'agent:sanitizer';
 const REMOTE_FAILURE_REPORT = 'agent:failure-report';
 const FINAL_REPORT_TOOL = 'agent__final_report';
+const SLACK_BLOCK_KIT_FORMAT = 'slack-block-kit';
 const FINAL_REPORT_TOOL_ALIASES = new Set(['agent__final_report', 'agent-final-report']);
 const MAX_TURNS_FINAL_MESSAGE = 'Maximum number of turns/steps reached. You must provide your final report now, by calling the `agent__final_report` tool. Do not attempt to call any other tool. Read carefully the instructions on how to call the `agent__final_report` tool and call it now.';
 const CONTEXT_FINAL_MESSAGE = 'The conversation is at the context window limit. You must call `agent__final_report` immediately to deliver your final answer using the information already gathered. Do not call any other tools.';
@@ -835,6 +836,9 @@ export class TurnRunner {
                                 const formatParam = typeof formatParamRaw === 'string' && formatParamRaw.trim().length > 0 ? formatParamRaw.trim() : undefined;
                                 const contentValue = params.report_content;
                                 const contentParam = typeof contentValue === 'string' && contentValue.trim().length > 0 ? contentValue.trim() : undefined;
+                                // slack-block-kit uses 'messages' array instead of report_content
+                                const messagesValue = params.messages;
+                                const messagesParam = Array.isArray(messagesValue) ? messagesValue : undefined;
                                 const expectedFormat = this.ctx.resolvedFormat ?? 'text';
                                 if (status === undefined) {
                                     const reason = 'Final report missing required status; expected success|failure|partial.';
@@ -903,14 +907,30 @@ export class TurnRunner {
                                     this.addTurnFailure('Final report must be JSON per schema; received non-JSON content.');
                                     return false;
                                 }
-                                if (expectedFormat !== 'json' && (contentParam === undefined || contentParam.length === 0)) {
-                                    this.addTurnFailure('Final report content missing; provide markdown/text content.');
+                                // slack-block-kit requires messages array; other non-json formats require report_content
+                                if (expectedFormat === SLACK_BLOCK_KIT_FORMAT) {
+                                    if (messagesParam === undefined || messagesParam.length === 0) {
+                                        this.addTurnFailure('Final report missing messages array; provide Slack Block Kit messages.');
+                                        return false;
+                                    }
+                                } else if (expectedFormat !== 'json' && (contentParam === undefined || contentParam.length === 0)) {
+                                    this.addTurnFailure('Final report content missing; provide your final report in the requested format.');
                                     return false;
                                 }
+                                // Determine content based on format
+                                const finalContent = (() => {
+                                    if (expectedFormat === 'json') {
+                                        return contentJson !== undefined ? JSON.stringify(contentJson) : (contentParam ?? '');
+                                    }
+                                    if (expectedFormat === SLACK_BLOCK_KIT_FORMAT && messagesParam !== undefined) {
+                                        return JSON.stringify(messagesParam);
+                                    }
+                                    return contentParam;
+                                })();
                                 this.commitFinalReport({
                                     status: normalizedStatus,
                                     format: finalFormat,
-                                    content: expectedFormat === 'json' ? (contentJson !== undefined ? JSON.stringify(contentJson) : (contentParam ?? '')) : contentParam,
+                                    content: finalContent,
                                     content_json: contentJson as Record<string, unknown> | undefined,
                                     metadata: reportMetadata as Record<string, unknown> | undefined,
                                 }, 'tool-call');
@@ -1016,7 +1036,7 @@ export class TurnRunner {
                                 }
                                 lastError = 'invalid_response: content_without_tools_or_final';
                                 lastErrorType = 'invalid_response';
-                                this.addTurnFailure('Missing final report; provide your final report with the required parameters');
+                                this.addTurnFailure('Missing final report; provide your final report in the requested format');
                             }
                         }
                         // CONTRACT: Empty response without tool calls must NOT be added to conversation
@@ -1913,7 +1933,7 @@ export class TurnRunner {
         const contentField = (() => {
             if (format === 'json')
                 return 'content_json';
-            if (format === 'slack-block-kit')
+            if (format === SLACK_BLOCK_KIT_FORMAT)
                 return 'messages';
             return 'report_content';
         })();
