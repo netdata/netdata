@@ -2410,9 +2410,10 @@ export class TurnRunner {
             if (this.ctx.toolTransport === 'native')
                 return toolsForTurn;
             if (this.ctx.toolTransport === 'xml-final') {
+                // In xml-final: final_report via XML, all other tools (including progress_report) stay native
                 return toolsForTurn.filter((tool) => {
                     const name = sanitizeToolName(tool.name);
-                    return name !== FINAL_REPORT_TOOL && name !== 'agent__progress_report';
+                    return name !== FINAL_REPORT_TOOL;
                 });
             }
             return [];

@@ -77,11 +77,19 @@ export class AnthropicProvider extends BaseLLMProvider {
         return typeof content === 'string' && content.trim().startsWith('System notice:');
       };
 
+      // Check if message is ephemeral (changes every turn, should not be cached)
+      const isEphemeralMessage = (msg: ResponseMessage): boolean => {
+        const noticeType = (msg as { noticeType?: string }).noticeType;
+        // xml-next, xml-past, xml-tool-response change every turn
+        return noticeType === 'xml-next' || noticeType === 'xml-past' || noticeType === 'xml-tool-response';
+      };
+
       const findCacheTargetIndex = (): number => {
         // eslint-disable-next-line functional/no-loop-statements
         for (let i = extendedMessages.length - 1; i >= 0; i -= 1) {
           const candidate = extendedMessages[i] as ResponseMessage;
-          if (!isSystemNotice(candidate)) {
+          // Skip ephemeral messages that change every turn (breaks cache reads)
+          if (!isSystemNotice(candidate) && !isEphemeralMessage(candidate)) {
             return i;
           }
         }

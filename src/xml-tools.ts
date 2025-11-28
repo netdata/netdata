@@ -138,18 +138,18 @@ export function renderXmlNext(payload: XmlNextPayload): string {
       lines.push('No tools are available for this turn. You MUST provide your final report now.');
       lines.push('');
     }
-  }
 
-  if (progressSlot !== undefined) {
-    lines.push('## Progress Updates');
-    lines.push('Update the user about your current status and plan:');
-    lines.push('');
-    lines.push('```');
-    lines.push(`<ai-agent-${progressSlot.slotId} tool="agent__progress_report">`);
-    lines.push(`Found X, now searching for Y`);
-    lines.push(`</ai-agent-${progressSlot.slotId}>`);
-    lines.push('```');
-    lines.push('');
+    if (progressSlot !== undefined) {
+      lines.push('## Progress Updates');
+      lines.push('Update the user about your current status and plan:');
+      lines.push('');
+      lines.push('```');
+      lines.push(`<ai-agent-${progressSlot.slotId} tool="agent__progress_report">`);
+      lines.push(`Found X, now searching for Y`);
+      lines.push(`</ai-agent-${progressSlot.slotId}>`);
+      lines.push('```');
+      lines.push('');
+    }
   }
 
   // Add format-specific instructions before the XML example
@@ -215,7 +215,7 @@ export function renderXmlNext(payload: XmlNextPayload): string {
   lines.push('## Mandatory Workflow');
   if (toolList.length > 0) {
     lines.push('You MUST now either:');
-    lines.push('- Call one or more of your tools to collect data or perform actions');
+    lines.push('- Call one or more of your tools to collect data or perform actions together with the progress-report tool to update the user on your status');
     lines.push('- OR provide your final report');
   }
   else {
