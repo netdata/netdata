@@ -100,13 +100,13 @@ Mandatory tool for agent to deliver final answer. Captures status, format, encod
 ## Format Values
 
 **Supported Formats** (`src/ai-agent.ts:47`):
-- `json` - Structured JSON output
+- `json` - Structured JSON output (validated against schema if provided)
 - `markdown` - Markdown formatted text
 - `markdown+mermaid` - Markdown with Mermaid diagrams
-- `slack-block-kit` - Slack Block Kit payload
-- `tty` - Terminal-optimized text
+- `slack-block-kit` - Slack Block Kit payload (messages array)
+- `tty` - Terminal-optimized text with ANSI color codes
 - `pipe` - Plain text for piping
-- `sub-agent` - Sub-agent exchange format
+- `sub-agent` - Internal agent-to-agent exchange format (opaque blob, no validation)
 - `text` - Legacy plain text
 
 **Default**: Session's `outputFormat` setting
@@ -203,7 +203,30 @@ interface AIAgentResult {
 ## Adoption Strategies
 
 ### XML Transport
-- When `tooling.transport` is `xml` or `xml-final`, `agent__final_report` must be emitted inside `<ai-agent-NONCE-XXXX tool="agent__final_report" status="...">...</ai-agent-NONCE-XXXX>` matching the current nonce/slot. Slots are predeclared in XML-NEXT; mismatched nonce/slot/tool are ignored. Progress shares the XML channel only in `xml`; it is suppressed in `xml-final`.
+- When `tooling.transport` is `xml` or `xml-final`, `agent__final_report` must be emitted inside `<ai-agent-NONCE-FINAL tool="agent__final_report" status="..." format="...">payload</ai-agent-NONCE-FINAL>` matching the session nonce.
+- The `status` and `format` attributes are extracted from the XML tag (wrapper layer), while the tag content becomes the raw payload.
+- Progress shares the XML channel only in `xml`; in `xml-final`, progress follows tools transport (native tool_calls).
+
+### 3-Layer Processing Architecture
+Final report processing uses a 3-layer architecture to cleanly separate transport concerns from payload content:
+
+1. **Layer 1 (Transport/Wrapper Extraction)**:
+   - Extract `status` from XML tag attribute or tool params
+   - Extract `report_format` from XML tag attribute or tool params
+   - Extract raw payload from `_rawPayload` (XML) or content fields (native)
+   - Extract optional `metadata` from params
+
+2. **Layer 2 (Format-Specific Processing)**:
+   - `sub-agent`: Opaque blob passthrough—no validation, no JSON parsing. Whatever the model returns is passed through unchanged.
+   - `json`: Parse JSON from raw payload, validate structure. If parsing fails, reject and retry.
+   - `slack-block-kit`: Parse JSON, expect messages array. Supports both `[...]` array and `{messages: [...]}` object formats.
+   - Text formats (`text`, `markdown`, `markdown+mermaid`, `tty`, `pipe`): Use raw payload directly as text content.
+
+3. **Layer 3 (Final Report Construction)**:
+   - Build clean final report object with: status, format, content, content_json (for json format), metadata
+   - Wrapper fields never pollute payload content
+
+This separation ensures user schema fields (e.g., a `status` field in their JSON schema) are never overwritten by transport-level metadata.
 
 ### From Tool Call
 **Location**: `src/ai-agent.ts:1892-1926`

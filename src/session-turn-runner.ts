@@ -832,16 +832,31 @@ export class TurnRunner {
                                 if (finalReportCall === undefined)
                                     return false;
                                 const params = finalReportCall.parameters;
+                                const expectedFormat = this.ctx.resolvedFormat ?? 'text';
+
+                                // =================================================================
+                                // LAYER 1: Transport/Wrapper extraction
+                                // Extract wrapper fields (status, format) separately from payload
+                                // =================================================================
                                 const statusValue = params.status;
                                 const status = typeof statusValue === 'string' && statusValue.trim().length > 0 ? statusValue.trim() : undefined;
                                 const formatParamRaw = params.report_format;
                                 const formatParam = typeof formatParamRaw === 'string' && formatParamRaw.trim().length > 0 ? formatParamRaw.trim() : undefined;
+                                const metadataCandidate = params.metadata;
+                                const reportMetadata = (metadataCandidate !== null && typeof metadataCandidate === 'object' && !Array.isArray(metadataCandidate)) ? metadataCandidate : undefined;
+
+                                // Get raw payload: from XML transport (_rawPayload) or native fields
+                                const rawPayloadValue = params._rawPayload;
+                                const rawPayload = typeof rawPayloadValue === 'string' ? rawPayloadValue.trim() : undefined;
+
+                                // Native transport fallbacks (when _rawPayload not present)
                                 const contentValue = params.report_content;
                                 const contentParam = typeof contentValue === 'string' && contentValue.trim().length > 0 ? contentValue.trim() : undefined;
-                                // slack-block-kit uses 'messages' array instead of report_content
                                 const messagesValue = params.messages;
                                 const messagesParam = Array.isArray(messagesValue) ? messagesValue : undefined;
-                                const expectedFormat = this.ctx.resolvedFormat ?? 'text';
+                                const contentJsonCandidate = params.content_json;
+
+                                // Validate wrapper: status is required
                                 if (status === undefined) {
                                     const reason = 'Final report missing required status; expected success|failure|partial.';
                                     this.log({
@@ -858,30 +873,6 @@ export class TurnRunner {
                                     this.logFinalReportDump(currentTurn, params, 'missing status', rawContent);
                                     this.addTurnFailure(reason);
                                     return false;
-                                }
-                                const metadataCandidate = params.metadata;
-                                const reportMetadata = (metadataCandidate !== null && typeof metadataCandidate === 'object' && !Array.isArray(metadataCandidate)) ? metadataCandidate : undefined;
-                                const contentJsonCandidate = params.content_json;
-                                let contentJson = (contentJsonCandidate !== null && typeof contentJsonCandidate === 'object' && !Array.isArray(contentJsonCandidate)) ? contentJsonCandidate : undefined;
-                                if (contentJson === undefined && typeof contentJsonCandidate === 'string') {
-                                    const parsedContentJson = parseJsonValueDetailed(contentJsonCandidate);
-                                    if (parsedContentJson.value !== undefined && parsedContentJson.value !== null && typeof parsedContentJson.value === 'object' && !Array.isArray(parsedContentJson.value)) {
-                                        contentJson = parsedContentJson.value;
-                                        if (parsedContentJson.repairs.length > 0) {
-                                            const warnEntry = {
-                                                timestamp: Date.now(),
-                                                severity: 'WRN' as const,
-                                                turn: currentTurn,
-                                                subturn: 0,
-                                                direction: 'response' as const,
-                                                type: 'llm' as const,
-                                                remoteIdentifier: REMOTE_SANITIZER,
-                                                fatal: false,
-                                                message: `agent__final_report.content_json repaired via [${parsedContentJson.repairs.join('>')}]`,
-                                            };
-                                            this.log(warnEntry);
-                                        }
-                                    }
                                 }
                                 const normalizedStatus = status === 'success' || status === 'failure' || status === 'partial' ? status : undefined;
                                 if (normalizedStatus === undefined) {
@@ -901,44 +892,122 @@ export class TurnRunner {
                                     this.addTurnFailure('Final report status invalid; expected success|failure|partial.');
                                     return false;
                                 }
+
+                                // Validate wrapper: format must match expected
                                 const formatCandidate = formatParam ?? expectedFormat;
                                 const finalFormat = FINAL_REPORT_FORMAT_VALUES.find((value) => value === formatCandidate) ?? expectedFormat;
                                 if (finalFormat !== expectedFormat) {
                                     this.addTurnFailure(`Final report format must be ${expectedFormat}. Received ${formatCandidate}.`);
                                     return false;
                                 }
-                                if (expectedFormat === 'json' && contentJson === undefined) {
-                                    this.addTurnFailure('Final report must be JSON per schema; received non-JSON content.');
-                                    this.logFinalReportDump(currentTurn, params, 'expected JSON content_json', rawContent);
-                                    return false;
-                                }
-                                // slack-block-kit requires messages array; other non-json formats require report_content
-                                if (expectedFormat === SLACK_BLOCK_KIT_FORMAT) {
-                                    if (messagesParam === undefined || messagesParam.length === 0) {
+
+                                // =================================================================
+                                // LAYER 2: Format-specific content processing
+                                // Process raw payload based on format requirements
+                                // =================================================================
+                                let finalContent: string | undefined;
+                                let contentJson: Record<string, unknown> | undefined;
+
+                                if (expectedFormat === 'sub-agent') {
+                                    // SUB-AGENT: Opaque blob - no validation, no parsing
+                                    // Whatever the model returns is passed through unchanged
+                                    finalContent = rawPayload ?? contentParam ?? '';
+                                    if (finalContent.length === 0) {
+                                        this.addTurnFailure('Final report content missing.');
+                                        this.logFinalReportDump(currentTurn, params, 'empty sub-agent payload', rawContent);
+                                        return false;
+                                    }
+                                } else if (expectedFormat === 'json') {
+                                    // JSON: Parse and validate against schema
+                                    // Source: rawPayload (XML) > content_json (native) > contentParam
+                                    const jsonSource = rawPayload ?? (typeof contentJsonCandidate === 'string' ? contentJsonCandidate : undefined);
+                                    if (jsonSource !== undefined) {
+                                        const parsedJson = parseJsonValueDetailed(jsonSource);
+                                        if (parsedJson.value !== undefined && parsedJson.value !== null && typeof parsedJson.value === 'object' && !Array.isArray(parsedJson.value)) {
+                                            contentJson = parsedJson.value as Record<string, unknown>;
+                                            if (parsedJson.repairs.length > 0) {
+                                                this.log({
+                                                    timestamp: Date.now(),
+                                                    severity: 'WRN' as const,
+                                                    turn: currentTurn,
+                                                    subturn: 0,
+                                                    direction: 'response' as const,
+                                                    type: 'llm' as const,
+                                                    remoteIdentifier: REMOTE_SANITIZER,
+                                                    fatal: false,
+                                                    message: `agent__final_report JSON payload repaired via [${parsedJson.repairs.join('>')}]`,
+                                                });
+                                            }
+                                        }
+                                    } else if (contentJsonCandidate !== null && typeof contentJsonCandidate === 'object' && !Array.isArray(contentJsonCandidate)) {
+                                        // Native: content_json already parsed as object
+                                        contentJson = contentJsonCandidate as Record<string, unknown>;
+                                    }
+                                    if (contentJson === undefined) {
+                                        this.addTurnFailure('Final report must be JSON per schema; received non-JSON content.');
+                                        this.logFinalReportDump(currentTurn, params, 'expected JSON content', rawContent);
+                                        return false;
+                                    }
+                                    finalContent = JSON.stringify(contentJson);
+                                } else if (expectedFormat === SLACK_BLOCK_KIT_FORMAT) {
+                                    // SLACK-BLOCK-KIT: Parse JSON, expect messages array
+                                    // Source: rawPayload (XML) > messages (native)
+                                    let messagesArray: unknown[] | undefined;
+                                    if (rawPayload !== undefined) {
+                                        // XML transport: parse JSON from raw payload
+                                        const parsedJson = parseJsonValueDetailed(rawPayload);
+                                        if (parsedJson.value !== undefined && parsedJson.value !== null && typeof parsedJson.value === 'object') {
+                                            const parsed = parsedJson.value as Record<string, unknown>;
+                                            // Could be {messages: [...]} or just [...]
+                                            if (Array.isArray(parsed)) {
+                                                messagesArray = parsed;
+                                            } else if (Array.isArray(parsed.messages)) {
+                                                messagesArray = parsed.messages;
+                                            }
+                                            if (parsedJson.repairs.length > 0) {
+                                                this.log({
+                                                    timestamp: Date.now(),
+                                                    severity: 'WRN' as const,
+                                                    turn: currentTurn,
+                                                    subturn: 0,
+                                                    direction: 'response' as const,
+                                                    type: 'llm' as const,
+                                                    remoteIdentifier: REMOTE_SANITIZER,
+                                                    fatal: false,
+                                                    message: `agent__final_report slack-block-kit repaired via [${parsedJson.repairs.join('>')}]`,
+                                                });
+                                            }
+                                        }
+                                    } else {
+                                        // Native transport: use messages param directly
+                                        messagesArray = messagesParam;
+                                    }
+                                    if (messagesArray === undefined || messagesArray.length === 0) {
                                         this.addTurnFailure('Final report missing messages array; provide Slack Block Kit messages.');
                                         this.logFinalReportDump(currentTurn, params, 'expected messages array', rawContent);
                                         return false;
                                     }
-                                } else if (expectedFormat !== 'json' && (contentParam === undefined || contentParam.length === 0)) {
-                                    this.addTurnFailure('Final report content missing; provide your final report in the requested format.');
-                                    this.logFinalReportDump(currentTurn, params, 'expected report_content', rawContent);
-                                    return false;
+                                    finalContent = JSON.stringify(messagesArray);
+                                } else {
+                                    // TEXT FORMATS (text, markdown, markdown+mermaid, tty, pipe)
+                                    // Use raw payload or report_content directly
+                                    finalContent = rawPayload ?? contentParam;
+                                    if (finalContent === undefined || finalContent.length === 0) {
+                                        this.addTurnFailure('Final report content missing; provide your final report in the requested format.');
+                                        this.logFinalReportDump(currentTurn, params, 'expected report_content', rawContent);
+                                        return false;
+                                    }
                                 }
-                                // Determine content based on format
-                                const finalContent = (() => {
-                                    if (expectedFormat === 'json') {
-                                        return contentJson !== undefined ? JSON.stringify(contentJson) : (contentParam ?? '');
-                                    }
-                                    if (expectedFormat === SLACK_BLOCK_KIT_FORMAT && messagesParam !== undefined) {
-                                        return JSON.stringify(messagesParam);
-                                    }
-                                    return contentParam;
-                                })();
+
+                                // =================================================================
+                                // LAYER 3: Final Report construction
+                                // Build clean final report object
+                                // =================================================================
                                 this.commitFinalReport({
                                     status: normalizedStatus,
                                     format: finalFormat,
                                     content: finalContent,
-                                    content_json: contentJson as Record<string, unknown> | undefined,
+                                    content_json: contentJson,
                                     metadata: reportMetadata as Record<string, unknown> | undefined,
                                 }, 'tool-call');
                                 sanitizedHasToolCalls = true;
@@ -2449,7 +2518,7 @@ export class TurnRunner {
             if (this.ctx.toolTransport === 'native')
                 return toolsForTurn;
             if (this.ctx.toolTransport === 'xml-final') {
-                // In xml-final: final_report via XML, all other tools (including progress_report) stay native
+                // In xml-final: final_report via XML, all other tools (including progress) stay native
                 return toolsForTurn.filter((tool) => {
                     const name = sanitizeToolName(tool.name);
                     return name !== FINAL_REPORT_TOOL;

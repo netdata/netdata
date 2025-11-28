@@ -447,14 +447,14 @@ Any deviation from the guarantees above is a **contract violation** and must be 
 ## 11. XML Tool Transport Contract (XML-PAST / XML-NEXT)
 
 **Modes**
-- `xml-final` (default): provider tools stay native (tool_calls), but the final report must be emitted via XML. Progress is suppressed. Tool choice set to `auto`; provider tool definitions remain visible to the LLM for native calls.
+- `xml-final` (default): provider tools stay native (tool_calls), but the final report must be emitted via XML. Progress follows tools transport (native). Tool choice set to `auto`; provider tool definitions remain visible to the LLM for native calls.
 - `native`: unchanged tool-call behavior, tool choice may be `required`.
 - `xml`: all tools may be invoked via XML tags; tool choice set to `auto`, and provider tool definitions are withheld (XML is the only invocation path). Progress uses the XML channel when enabled.
 
 **Session nonce and slots**
 - Each session defines a fixed nonce (e.g., `<8hex>`) that remains constant across all turns.
 - Numbered invocation slots increment across turns: turn 1 uses `NONCE-0001`, `NONCE-0002`, etc.; turn 2 continues from where turn 1 left off (e.g., `NONCE-0004`, `NONCE-0005`).
-- Special slots `NONCE-FINAL` and `NONCE-PROGRESS` remain constant (not numbered).
+- Special slots: `NONCE-FINAL` for final report; `NONCE-PROGRESS` for progress (xml mode only, not xml-final).
 - Tags are detected by substring only (no XML parser): `<ai-agent-NONCE-000X tool="...">payload</ai-agent-NONCE-000X>`.
 
 **Messages**
@@ -462,7 +462,13 @@ Any deviation from the guarantees above is a **contract violation** and must be 
 - XML-NEXT (ephemeral, not stored/cached): per-turn instructions with the current nonce, available tools and their JSON schemas, slot templates, progress slot (optional), and final-report slot. In forced-final turns it only advertises the final-report slot (and optional progress).
 
 **Final-report via XML**
-- Final-report uses a reserved slot in XML-NEXT (`tool="final-report"`, status `success|failure|partial`, format matching session expectation, raw content). JSON formats still undergo fuzzy repair + schema validation after extraction. No escaping/base64 required.
+- Final-report uses a reserved slot in XML-NEXT (`tool="agent__final_report"`, status attribute, format attribute, raw content).
+- Tag attributes: `status="success|failure|partial"`, `format="<expected-format>"`.
+- Processing uses 3-layer architecture:
+  1. **Layer 1 (Transport)**: Extract `status` and `format` from XML tag attributes; extract raw payload from tag content.
+  2. **Layer 2 (Format Processing)**: Process payload based on format—`sub-agent` is opaque passthrough (no validation), `json` parses and validates, `slack-block-kit` expects messages array, text formats use raw content.
+  3. **Layer 3 (Final Report)**: Construct clean final report object. Wrapper fields never pollute payload content.
+- This separation ensures user schema fields are never overwritten by transport metadata.
 
 **Unclosed final-report tag handling**
 - When a valid final-report opening tag is detected (`<ai-agent-NONCE-FINAL tool="agent__final_report">`) with content following it, the closing tag requirement depends on the LLM's `stopReason`:

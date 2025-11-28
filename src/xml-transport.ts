@@ -432,6 +432,24 @@ export class XmlToolTransport {
       const params = call.parameters as unknown;
       const asString = typeof params === 'string' ? params.trim() : undefined;
 
+      // For final_report: build parameters with clean separation of wrapper vs payload
+      // Wrapper fields (status, format) come from XML attributes
+      // Payload is the raw content, untouched
+      if (call.name === finalReportToolName && asString !== undefined) {
+        const wrapperStatus = slot.statusAttr ?? 'success';
+        const wrapperFormat = slot.formatAttr ?? expectedFormat;
+
+        // Build clean parameters: wrapper fields + raw payload
+        const finalParams: Record<string, unknown> = {
+          status: wrapperStatus,
+          report_format: wrapperFormat,
+          _rawPayload: asString,  // Raw payload for downstream processing
+        };
+        call.parameters = finalParams;
+        validCalls.push(call);
+        return;
+      }
+
       if (asString !== undefined) {
         const parsedJson = (() => {
           try { return JSON.parse(asString) as Record<string, unknown>; } catch { return undefined; }
@@ -439,29 +457,6 @@ export class XmlToolTransport {
 
         if (parsedJson !== undefined) {
           call.parameters = parsedJson;
-        } else if (call.name === finalReportToolName) {
-          if (expectedFormat === 'json') {
-            const baseReason = 'Final report payload is not valid JSON. Use the JSON schema from XML-NEXT.';
-            callbacks.onTurnFailure(baseReason);
-            callbacks.onLog({ severity: 'WRN', message: baseReason });
-
-            const errorEntry: XmlPastEntry = {
-              slotId: slot.slotId,
-              tool: call.name,
-              status: 'failed',
-              request: truncateUtf8WithNotice(asString, 4096),
-              response: baseReason,
-            };
-            errors.push(errorEntry);
-            this.thisTurnEntries.push(errorEntry);
-            return;
-          }
-          // Non-JSON format: wrap as text content
-          call.parameters = {
-            status: 'success',
-            report_format: expectedFormat,
-            report_content: asString,
-          } as Record<string, unknown>;
         } else {
           const baseReason = `Tool \`${call.name}\` payload is not valid JSON. Provide a JSON object.`;
           callbacks.onTurnFailure(baseReason);

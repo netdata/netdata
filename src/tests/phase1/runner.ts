@@ -11233,7 +11233,7 @@ BASE_TEST_SCENARIOS.push({
       invariant(request.tools.length > 0, 'Provider tools must be exposed in xml-final mode for run-test-xml-final-only.');
       const toolNames = request.tools.map((t) => sanitizeToolName(t.name));
       invariant(!toolNames.includes('agent__final_report'), 'Final-report tool must not be exposed as native tool in xml-final.');
-      invariant(!toolNames.includes('agent__progress_report'), 'Progress tool must not be exposed as native tool in xml-final.');
+      // Progress follows tools transport (native), not final_report transport (XML)
       const nonce = extractNonceFromMessages(request.messages, 'run-test-xml-final-only');
       const assistantMessage: ConversationMessage = {
         role: 'assistant',

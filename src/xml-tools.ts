@@ -38,6 +38,9 @@ export interface ParsedXmlSlot {
   slotId: string;
   tool: string;
   rawPayload: string;
+  // XML attributes extracted from opening tag (for final_report)
+  statusAttr?: string;
+  formatAttr?: string;
 }
 
 interface ParserState {
@@ -71,13 +74,18 @@ export function createXmlParser(): { parseChunk: (chunk: string, nonce: string, 
       const openTag = state.buffer.slice(idx, openTagEnd);
       const toolMatch = /tool="([^"]+)"/.exec(openTag);
       const tool = toolMatch?.[1] ?? '';
+      // Extract status and format attributes from opening tag
+      const statusMatch = /status="([^"]+)"/.exec(openTag);
+      const formatMatch = /format="([^"]+)"/.exec(openTag);
+      const statusAttr = statusMatch?.[1];
+      const formatAttr = formatMatch?.[1];
       const content = state.buffer.slice(openTagEnd, closeIdx);
       state.buffer = state.buffer.slice(closeIdx + closeTag.length);
       idx = state.buffer.indexOf(OPEN_PREFIX);
       if (!allowedSlots.has(slotId)) continue;
       if (!allowedTools.has(tool)) continue;
       if (content.trim().length === 0) continue;
-      results.push({ slotId, tool, rawPayload: content });
+      results.push({ slotId, tool, rawPayload: content, statusAttr, formatAttr });
     }
     return results;
   };
