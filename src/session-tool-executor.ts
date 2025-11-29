@@ -8,6 +8,7 @@ import type {
 import type { XmlToolTransport } from './xml-transport.js';
 
 import { ContextGuard } from './context-guard.js';
+import { TOOL_NO_OUTPUT } from './llm-messages.js';
 import { addSpanEvent } from './telemetry/index.js';
 import {
   clampToolName,
@@ -50,7 +51,6 @@ export type ToolExecutor = (
 ) => Promise<string>;
 
 export class SessionToolExecutor {
-  private static readonly TOOL_NO_OUTPUT = '(tool failed: context window budget exceeded)';
   private static readonly REMOTE_ORCHESTRATOR = 'agent:orchestrator';
   private static readonly REMOTE_AGENT_TOOLS = 'agent:tools';
 
@@ -114,7 +114,7 @@ export class SessionToolExecutor {
           turn
         );
         if (nestedCalls !== undefined) {
-          let nestedResult = SessionToolExecutor.TOOL_NO_OUTPUT;
+          let nestedResult = TOOL_NO_OUTPUT;
           // eslint-disable-next-line functional/no-loop-statements
           for (const nestedCall of nestedCalls) {
             nestedResult = await executor(
@@ -204,7 +204,7 @@ export class SessionToolExecutor {
           const uncappedToolOutput =
             managed.result.length > 0
               ? managed.result
-              : SessionToolExecutor.TOOL_NO_OUTPUT;
+              : TOOL_NO_OUTPUT;
           const toolOutput = this.applyToolResponseCap !== undefined
             ? this.applyToolResponseCap(uncappedToolOutput, { server: providerLabel, tool: effectiveToolName, turn, subturn: subturnCounter })
             : uncappedToolOutput;
@@ -347,7 +347,7 @@ export class SessionToolExecutor {
               };
               this.log(warnEntry);
 
-              const renderedFailure = SessionToolExecutor.TOOL_NO_OUTPUT;
+              const renderedFailure = TOOL_NO_OUTPUT;
               const failureTokens = this.estimateTokensForCounters([
                 { role: 'tool', content: renderedFailure },
               ]);

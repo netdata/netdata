@@ -67,7 +67,7 @@ export class OpenRouterProvider extends BaseLLMProvider {
         action: 'retry',
         backoffMs: wait,
         logMessage: `OpenRouter rate limit; backing off ${wait !== undefined ? `${String(wait)}ms` : 'briefly'} before retry.${(status.sources ?? []).length > 0 ? ` Sources: ${(status.sources ?? []).join(' | ')}` : ''}`.trim(),
-        systemMessage: `System notice: OpenRouter (${providerHint}) rate-limited the last attempt. Retrying shortly; if limits persist, consider routing to a different backend.`,
+        systemMessage: `OpenRouter rate limit for ${providerHint}; retrying.`,
         sources: status.sources,
       };
     }

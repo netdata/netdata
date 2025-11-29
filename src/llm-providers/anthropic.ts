@@ -222,7 +222,7 @@ export class AnthropicProvider extends BaseLLMProvider {
         action: 'retry',
         backoffMs: wait,
         logMessage: message,
-        systemMessage: `System notice: Anthropic (${remoteId}) rate-limited the prior request. Retrying shortly; no changes required unless limits persist.`,
+        systemMessage: `Anthropic rate limit for ${remoteId}; retrying.`,
         sources: status.sources,
       };
     }

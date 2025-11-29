@@ -24,6 +24,26 @@ import type { AIAgentResult, AIAgentSessionConfig, AccountingEntry, Configuratio
 import type { XmlToolTransport } from './xml-transport.js';
 
 import { FINAL_REPORT_FORMAT_VALUES, FINAL_REPORT_SOURCE_TEXT_FALLBACK, FINAL_REPORT_SOURCE_TOOL_MESSAGE } from './final-report-manager.js';
+import {
+  CONTENT_GUIDANCE_JSON,
+  CONTENT_GUIDANCE_SLACK,
+  CONTENT_GUIDANCE_TEXT,
+  CONTEXT_FINAL_MESSAGE,
+  FINAL_REPORT_CONTENT_MISSING,
+  FINAL_REPORT_INVALID_STATUS,
+  FINAL_REPORT_JSON_REQUIRED,
+  FINAL_REPORT_MISSING,
+  FINAL_REPORT_SLACK_MESSAGES_MISSING,
+  FINAL_TURN_NOTICE,
+  MAX_TURNS_FINAL_MESSAGE,
+  TOOL_CALL_MALFORMED,
+  TOOL_NO_OUTPUT,
+  emptyResponseRetryNotice,
+  finalReportFormatMismatch,
+  finalReportReminder,
+  toolReminderMessage,
+  turnFailedPrefix,
+} from './llm-messages.js';
 import { addSpanAttributes, addSpanEvent, recordContextGuardMetrics, recordFinalReportMetrics, recordLlmMetrics, recordRetryCollapseMetrics, runWithSpan } from './telemetry/index.js';
 import { estimateMessagesBytes, formatToolRequestCompact, parseJsonValueDetailed, sanitizeToolName, warn } from './utils.js';
 
@@ -119,7 +139,7 @@ interface TurnRunnerState {
   lastTurnErrorType?: string;
 }
 
-// Static constants
+// Static constants (non-LLM-facing)
 const REMOTE_FINAL_TURN = 'agent:final-turn';
 const REMOTE_CONTEXT = 'agent:context';
 const REMOTE_ORCHESTRATOR = 'agent:orchestrator';
@@ -128,12 +148,7 @@ const REMOTE_FAILURE_REPORT = 'agent:failure-report';
 const FINAL_REPORT_TOOL = 'agent__final_report';
 const SLACK_BLOCK_KIT_FORMAT = 'slack-block-kit';
 const FINAL_REPORT_TOOL_ALIASES = new Set(['agent__final_report', 'agent-final-report']);
-const MAX_TURNS_FINAL_MESSAGE = 'Maximum number of turns/steps reached. You must provide your final report now, by calling the `agent__final_report` tool. Do not attempt to call any other tool. Read carefully the instructions on how to call the `agent__final_report` tool and call it now.';
-const CONTEXT_FINAL_MESSAGE = 'The conversation is at the context window limit. You must call `agent__final_report` immediately to deliver your final answer using the information already gathered. Do not call any other tools.';
-const TOOL_NO_OUTPUT = '(tool failed: context window budget exceeded)';
 const RETRY_ACTION_SKIP_PROVIDER = 'skip-provider';
-const CONTEXT_POST_SHRINK_WARN = 'Context guard post-shrink still over projected limit; continuing with forced final turn.';
-const CONTEXT_POST_SHRINK_TURN_WARN = 'Context guard post-shrink still over projected limit during turn execution; proceeding anyway.';
 export { FINAL_REPORT_TOOL };
 /**
  * TurnRunner encapsulates all turn iteration logic
@@ -371,7 +386,7 @@ export class TurnRunner {
                             type: 'llm' as const,
                             remoteIdentifier: REMOTE_CONTEXT,
                             fatal: false,
-                            message: CONTEXT_POST_SHRINK_WARN,
+                            message: 'Context guard post-shrink still over projected limit; continuing with forced final turn.',
                             details: {
                                 projected_tokens: postEnforce.projectedTokens,
                                 limit_tokens: firstBlocked.limit,
@@ -422,7 +437,7 @@ export class TurnRunner {
                     // Build per-attempt conversation with optional guidance injection
                     let attemptConversation = [...conversation];
                     if (this.state.turnFailureReasons.length > 0) {
-                        const feedback = `TURN-FAILED: ${this.state.turnFailureReasons.join(' | ')}.`;
+                        const feedback = turnFailedPrefix(this.state.turnFailureReasons);
                         attemptConversation.push({ role: 'user', content: feedback });
                         this.state.turnFailureReasons = [];
                     }
@@ -447,7 +462,7 @@ export class TurnRunner {
                         const excludeProgress = this.ctx.progressToolEnabled ? ' (excluding `agent__progress_report`)' : '';
                         attemptConversation.push({
                             role: 'user',
-                            content: `Reminder: do not end with plain text. Use an available tool${excludeProgress} to make progress. When ready to conclude, call the tool \`${FINAL_REPORT_TOOL}\` to provide the final answer.`
+                            content: toolReminderMessage(excludeProgress, FINAL_REPORT_TOOL)
                         });
                     }
                     // Force the final-report instruction onto the conversation once we enter the last turn
@@ -517,7 +532,7 @@ export class TurnRunner {
                                 type: 'llm' as const,
                                 remoteIdentifier: REMOTE_CONTEXT,
                                 fatal: false,
-                                message: CONTEXT_POST_SHRINK_TURN_WARN,
+                                message: 'Context guard post-shrink still over projected limit during turn execution; proceeding anyway.',
                                 details: {
                                     projected_tokens: postEnforceGuard.projectedTokens,
                                     limit_tokens: firstBlocked.limit,
@@ -889,7 +904,7 @@ export class TurnRunner {
                                     };
                                     this.log(warnEntry);
                                     this.logFinalReportDump(currentTurn, params, `invalid status '${status}'`, rawContent);
-                                    this.addTurnFailure('Final report status invalid; expected success|failure|partial.');
+                                    this.addTurnFailure(FINAL_REPORT_INVALID_STATUS);
                                     return false;
                                 }
 
@@ -897,7 +912,7 @@ export class TurnRunner {
                                 const formatCandidate = formatParam ?? expectedFormat;
                                 const finalFormat = FINAL_REPORT_FORMAT_VALUES.find((value) => value === formatCandidate) ?? expectedFormat;
                                 if (finalFormat !== expectedFormat) {
-                                    this.addTurnFailure(`Final report format must be ${expectedFormat}. Received ${formatCandidate}.`);
+                                    this.addTurnFailure(finalReportFormatMismatch(expectedFormat, formatCandidate));
                                     return false;
                                 }
 
@@ -913,7 +928,7 @@ export class TurnRunner {
                                     // Whatever the model returns is passed through unchanged
                                     finalContent = rawPayload ?? contentParam ?? '';
                                     if (finalContent.length === 0) {
-                                        this.addTurnFailure('Final report content missing.');
+                                        this.addTurnFailure(FINAL_REPORT_CONTENT_MISSING);
                                         this.logFinalReportDump(currentTurn, params, 'empty sub-agent payload', rawContent);
                                         return false;
                                     }
@@ -944,7 +959,7 @@ export class TurnRunner {
                                         contentJson = contentJsonCandidate as Record<string, unknown>;
                                     }
                                     if (contentJson === undefined) {
-                                        this.addTurnFailure('Final report must be JSON per schema; received non-JSON content.');
+                                        this.addTurnFailure(FINAL_REPORT_JSON_REQUIRED);
                                         this.logFinalReportDump(currentTurn, params, 'expected JSON content', rawContent);
                                         return false;
                                     }
@@ -983,7 +998,7 @@ export class TurnRunner {
                                         messagesArray = messagesParam;
                                     }
                                     if (messagesArray === undefined || messagesArray.length === 0) {
-                                        this.addTurnFailure('Final report missing messages array; provide Slack Block Kit messages.');
+                                        this.addTurnFailure(FINAL_REPORT_SLACK_MESSAGES_MISSING);
                                         this.logFinalReportDump(currentTurn, params, 'expected messages array', rawContent);
                                         return false;
                                     }
@@ -993,7 +1008,7 @@ export class TurnRunner {
                                     // Use raw payload or report_content directly
                                     finalContent = rawPayload ?? contentParam;
                                     if (finalContent === undefined || finalContent.length === 0) {
-                                        this.addTurnFailure('Final report content missing; provide your final report in the requested format.');
+                                        this.addTurnFailure(FINAL_REPORT_CONTENT_MISSING);
                                         this.logFinalReportDump(currentTurn, params, 'expected report_content', rawContent);
                                         return false;
                                     }
@@ -1067,7 +1082,7 @@ export class TurnRunner {
                                 message: `Dropped ${String(droppedInvalidToolCalls)} invalid tool call(s) due to malformed payload. Will retry.`,
                             };
                             this.log(warnEntry);
-                            this.addTurnFailure('Tool call payload malformed; provide JSON arguments matching the schema.');
+                            this.addTurnFailure(TOOL_CALL_MALFORMED);
                             lastError = 'invalid_response: malformed_tool_call';
                             lastErrorType = 'invalid_response';
                             if (finalReportAttempted) {
@@ -1112,7 +1127,7 @@ export class TurnRunner {
                                 }
                                 lastError = 'invalid_response: content_without_tools_or_final';
                                 lastErrorType = 'invalid_response';
-                                this.addTurnFailure('Missing final report; provide your final report in the requested format');
+                                this.addTurnFailure(FINAL_REPORT_MISSING);
                             }
                         }
                         // CONTRACT: Empty response without tool calls must NOT be added to conversation
@@ -1143,14 +1158,14 @@ export class TurnRunner {
                                 maxRateLimitWaitMs = 0;
                             }
                             // CONTRACT: Only inject ephemeral retry message, do NOT add empty response
-                            this.pushSystemRetryMessage(conversation, `System notice: the previous response was empty and no tools were invoked. Provide a tool call such as ${FINAL_REPORT_TOOL} with valid arguments.`);
+                            this.pushSystemRetryMessage(conversation, emptyResponseRetryNotice(FINAL_REPORT_TOOL));
                             // do not mark turnSuccessful; continue retry loop
                             continue;
                         }
                         // Add new messages to conversation (skipped above for empty responses per CONTRACT)
                         conversation.push(...sanitizedMessages);
                         if (this.state.turnFailureReasons.length > 0) {
-                            const failureNotice = `TURN-FAILED: ${this.state.turnFailureReasons.join(' | ')}.`;
+                            const failureNotice = turnFailedPrefix(this.state.turnFailureReasons);
                             conversation.push({ role: 'user', content: failureNotice });
                             this.state.turnFailureReasons = [];
                         }
@@ -1270,7 +1285,7 @@ export class TurnRunner {
                                     rateLimitedInCycle = 0;
                                     maxRateLimitWaitMs = 0;
                                 }
-                                this.pushSystemRetryMessage(conversation, 'System notice: this is the final turn. Provide the final report now.');
+                                this.pushSystemRetryMessage(conversation, FINAL_TURN_NOTICE);
                                 this.pushSystemRetryMessage(conversation, this.buildFinalReportReminder());
                                 continue;
                             }
@@ -2038,23 +2053,14 @@ export class TurnRunner {
     private buildFinalReportReminder(): string {
         const format = this.ctx.resolvedFormat ?? 'text';
         const formatDescription = this.ctx.resolvedFormatParameterDescription ?? 'the required format';
-        const contentField = (() => {
-            if (format === 'json')
-                return 'content_json';
-            if (format === SLACK_BLOCK_KIT_FORMAT)
-                return 'messages';
-            return 'report_content';
-        })();
         const contentGuidance = (() => {
-            if (contentField === 'content_json') {
-                return 'include a `content_json` object that matches the expected schema';
-            }
-            if (contentField === 'messages') {
-                return 'include a `messages` array populated with the final Slack Block Kit blocks';
-            }
-            return 'include `report_content` containing the full final answer';
+            if (format === 'json')
+                return CONTENT_GUIDANCE_JSON;
+            if (format === SLACK_BLOCK_KIT_FORMAT)
+                return CONTENT_GUIDANCE_SLACK;
+            return CONTENT_GUIDANCE_TEXT;
         })();
-        return `System notice: call ${FINAL_REPORT_TOOL} with report_format="${format}" (${formatDescription}), set status to success, failure, or partial as appropriate, and ${contentGuidance}.`;
+        return finalReportReminder(FINAL_REPORT_TOOL, format, formatDescription, contentGuidance);
     }
     private buildFallbackRetryDirective(input: { status: TurnStatus; remoteId: string; attempt: number }): TurnRetryDirective | undefined {
         const { status, remoteId, attempt } = input;

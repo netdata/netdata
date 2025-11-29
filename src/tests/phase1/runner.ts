@@ -26,6 +26,7 @@ import { parseFrontmatter, parseList, parsePairs } from '../../frontmatter.js';
 import { resolveIncludes } from '../../include-resolver.js';
 import { DEFAULT_TOOL_INPUT_SCHEMA } from '../../input-contract.js';
 import { LLMClient } from '../../llm-client.js';
+import { MAX_TURNS_FINAL_MESSAGE } from '../../llm-messages.js';
 import { AnthropicProvider } from '../../llm-providers/anthropic.js';
 import { BaseLLMProvider, type ResponseMessage } from '../../llm-providers/base.js';
 import { OpenRouterProvider } from '../../llm-providers/openrouter.js';
@@ -4383,7 +4384,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     };
   })(),
   (() => {
-    const FINAL_TURN_INSTRUCTION = 'Maximum number of turns/steps reached. You must provide your final report now, by calling the `agent__final_report` tool. Do not attempt to call any other tool. Read carefully the instructions on how to call the `agent__final_report` tool and call it now.';
+    const FINAL_TURN_INSTRUCTION = MAX_TURNS_FINAL_MESSAGE;
     let capturedRequests: TurnRequest[] = [];
     let capturedLogs: LogEntry[] = [];
     return {

@@ -14,6 +14,7 @@ import { ContextGuard, type ContextGuardBlockedEntry, type ContextGuardEvaluatio
 import { FinalReportManager, FINAL_REPORT_SOURCE_TEXT_FALLBACK, FINAL_REPORT_SOURCE_TOOL_MESSAGE, type PendingFinalReportPayload } from './final-report-manager.js';
 import { parseFrontmatter, parsePairs, extractBodyWithoutFrontmatter } from './frontmatter.js';
 import { LLMClient } from './llm-client.js';
+import { CONTEXT_FINAL_MESSAGE } from './llm-messages.js';
 import { buildPromptVars, applyFormat, expandVars } from './prompt-builder.js';
 import { SessionProgressReporter } from './session-progress-reporter.js';
 import { SessionToolExecutor, type SessionContext } from './session-tool-executor.js';
@@ -84,8 +85,6 @@ export class AIAgentSession {
   private static readonly FINAL_REPORT_TOOL = 'agent__final_report';
   private static readonly FINAL_REPORT_TOOL_ALIASES = new Set<string>(['agent__final_report', 'agent-final-report']);
   private static readonly FINAL_REPORT_SHORT = 'final_report';
-  private static readonly MAX_TURNS_FINAL_MESSAGE = 'Maximum number of turns/steps reached. You must provide your final report now, by calling the `agent__final_report` tool. Do not attempt to call any other tool. Read carefully the instructions on how to call the `agent__final_report` tool and call it now.';
-  private static readonly CONTEXT_FINAL_MESSAGE = 'The conversation is at the context window limit. You must call `agent__final_report` immediately to deliver your final answer using the information already gathered. Do not call any other tools.';
   private static readonly TOOL_NO_OUTPUT = '(tool failed: context window budget exceeded)';
   private static readonly RETRY_ACTION_SKIP_PROVIDER = 'skip-provider';
   private static readonly CONTEXT_POST_SHRINK_WARN = 'Context guard post-shrink still over projected limit; continuing with forced final turn.';
@@ -1698,26 +1697,6 @@ export class AIAgentSession {
     addSpanEvent('context.guard', attributes);
   }
 
-  private buildFinalReportReminder(): string {
-    const format = this.resolvedFormat ?? 'text';
-    const formatDescription = this.resolvedFormatParameterDescription ?? 'the required format';
-    const contentField = (() => {
-      if (format === 'json') return 'content_json';
-      if (format === 'slack-block-kit') return 'messages';
-      return 'report_content';
-    })();
-    const contentGuidance = (() => {
-      if (contentField === 'content_json') {
-        return 'include a `content_json` object that matches the expected schema';
-      }
-      if (contentField === 'messages') {
-        return 'include a `messages` array populated with the final Slack Block Kit blocks';
-      }
-      return 'include `report_content` containing the full final answer';
-    })();
-    return `System notice: call ${AIAgentSession.FINAL_REPORT_TOOL} with report_format="${format}" (${formatDescription}), set status to success, failure, or partial as appropriate, and ${contentGuidance}.`;
-  }
-
   private mergePendingRetryMessages(conversation: ConversationMessage[]): ConversationMessage[] {
     const cleaned = conversation.filter((msg) => msg.metadata?.retryMessage === undefined);
     if (cleaned.length !== conversation.length) {
@@ -1790,7 +1769,7 @@ export class AIAgentSession {
 
     // AIAgentSession-specific side effects
     this.logEnteringFinalTurn('context', this.currentTurn);
-    this.pushSystemRetryMessage(this.conversation, AIAgentSession.CONTEXT_FINAL_MESSAGE);
+    this.pushSystemRetryMessage(this.conversation, CONTEXT_FINAL_MESSAGE);
 
     // Log warning if not already logged
     if (this.contextLimitWarningLogged) {

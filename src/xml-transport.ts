@@ -14,6 +14,13 @@ import crypto from 'node:crypto';
 import type { OutputFormatId } from './formats.js';
 import type { ConversationMessage, MCPTool, ToolCall } from './types.js';
 
+import {
+  XML_FINAL_REPORT_NOT_JSON,
+  xmlMalformedMismatch,
+  xmlMissingClosingTag,
+  xmlSlotMismatch,
+  xmlToolPayloadNotJson,
+} from './llm-messages.js';
 import { sanitizeToolName, truncateUtf8WithNotice } from './utils.js';
 import {
   buildToolCallFromParsed,
@@ -332,9 +339,8 @@ export class XmlToolTransport {
         // Not JSON - wrap as text content
         if (expectedFormat === 'json') {
           // JSON expected but got text - this is an error even for unclosed tags
-          const reason = 'Final report payload is not valid JSON. Use the JSON schema from XML-NEXT.';
-          callbacks.onTurnFailure(reason);
-          callbacks.onLog({ severity: 'WRN', message: reason });
+          callbacks.onTurnFailure(XML_FINAL_REPORT_NOT_JSON);
+          callbacks.onLog({ severity: 'WRN', message: XML_FINAL_REPORT_NOT_JSON });
           return {
             toolCalls: undefined,
             errors: [{
@@ -342,7 +348,7 @@ export class XmlToolTransport {
               tool: finalReportToolName,
               status: 'failed',
               request: truncateUtf8WithNotice(unclosedFinal.content, 4096),
-              response: reason,
+              response: XML_FINAL_REPORT_NOT_JSON,
             }]
           };
         }
@@ -375,8 +381,8 @@ export class XmlToolTransport {
       const slotMatch = /<ai-agent-([A-Za-z0-9\-]+)/.exec(flushResult.leftover);
       const capturedSlot = slotMatch?.[1] ?? `(partial: ${flushResult.leftover.slice(0, 60).replace(/\n/g, ' ')})`;
       const reason = hasClosing
-        ? `Tag ignored: slot '${capturedSlot}' does not match the current nonce/slot for this turn.`
-        : `Malformed XML: missing closing tag for '${capturedSlot}'.`;
+        ? xmlSlotMismatch(capturedSlot)
+        : xmlMissingClosingTag(capturedSlot);
 
       callbacks.onTurnFailure(reason);
 
@@ -403,8 +409,8 @@ export class XmlToolTransport {
         const snippet = content.slice(tagIdx, tagIdx + 60).replace(/\n/g, ' ');
         const slotInfo = slotMatch?.[1] ?? `(partial: ${snippet})`;
         const reason = missingClosing
-          ? `Malformed XML: missing closing tag for '${slotInfo}'.`
-          : `Malformed XML: nonce/slot/tool mismatch or empty content for '${slotInfo}'.`;
+          ? xmlMissingClosingTag(slotInfo)
+          : xmlMalformedMismatch(slotInfo);
 
         callbacks.onTurnFailure(reason);
         callbacks.onLog({ severity: 'WRN', message: reason });
@@ -458,7 +464,7 @@ export class XmlToolTransport {
         if (parsedJson !== undefined) {
           call.parameters = parsedJson;
         } else {
-          const baseReason = `Tool \`${call.name}\` payload is not valid JSON. Provide a JSON object.`;
+          const baseReason = xmlToolPayloadNotJson(call.name);
           callbacks.onTurnFailure(baseReason);
 
           const errorEntry: XmlPastEntry = {

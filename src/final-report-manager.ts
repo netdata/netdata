@@ -312,29 +312,6 @@ export class FinalReportManager {
   }
 
   /**
-   * Build a reminder message for the LLM about how to call final_report
-   */
-  buildReminder(): string {
-    const format = this.config.resolvedFormat ?? 'text';
-    const formatDescription = this.config.resolvedFormatParameterDescription ?? 'the required format';
-    const contentField = (() => {
-      if (format === 'json') return 'content_json';
-      if (format === 'slack-block-kit') return 'messages';
-      return 'report_content';
-    })();
-    const contentGuidance = (() => {
-      if (contentField === 'content_json') {
-        return 'include a `content_json` object that matches the expected schema';
-      }
-      if (contentField === 'messages') {
-        return 'include a `messages` array populated with the final Slack Block Kit blocks';
-      }
-      return 'include `report_content` containing the full final answer';
-    })();
-    return `System notice: call ${this.config.finalReportToolName} with report_format="${format}" (${formatDescription}), set status to success, failure, or partial as appropriate, and ${contentGuidance}.`;
-  }
-
-  /**
    * Get the final output string for rendering
    */
   getFinalOutput(): string | undefined {
