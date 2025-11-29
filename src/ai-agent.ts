@@ -193,7 +193,7 @@ export class AIAgentSession {
   private resolveModelOverrides(
     provider: string,
     model: string
-  ): { temperature?: number | null; topP?: number | null } {
+  ): { temperature?: number | null; topP?: number | null; topK?: number | null } {
     const providers = this.sessionConfig.config.providers;
     const providerConfig = Object.prototype.hasOwnProperty.call(providers, provider)
       ? providers[provider]
@@ -202,7 +202,7 @@ export class AIAgentSession {
     const modelConfig = providerConfig.models?.[model];
     const overrides = modelConfig?.overrides;
     if (overrides === undefined) return {};
-    const result: { temperature?: number | null; topP?: number | null } = {};
+    const result: { temperature?: number | null; topP?: number | null; topK?: number | null } = {};
 
     const overrideTemperature = overrides.temperature;
     if (overrideTemperature !== undefined) {
@@ -216,6 +216,16 @@ export class AIAgentSession {
       const overrideTopPSnake = overrides.top_p;
       if (overrideTopPSnake !== undefined) {
         result.topP = overrideTopPSnake ?? null;
+      }
+    }
+
+    const overrideTopKCamel = overrides.topK;
+    if (overrideTopKCamel !== undefined) {
+      result.topK = overrideTopKCamel ?? null;
+    } else {
+      const overrideTopKSnake = overrides.top_k;
+      if (overrideTopKSnake !== undefined) {
+        result.topK = overrideTopKSnake ?? null;
       }
     }
 

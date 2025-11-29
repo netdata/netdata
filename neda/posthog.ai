@@ -18,11 +18,7 @@ tools:
 llmTimeout: 180000
 toolTimeout: 60000
 toolResponseMaxBytes: 65536
-temperature: 0.7
-topP: 1
 maxOutputTokens: 16384
-repeatPenalty: 1.1
-maxRetries: 5
 maxToolTurns: 30
 reasoning: high
 ---

@@ -15,13 +15,9 @@ tools:
   - batch
 llmTimeout: 300000
 toolTimeout: 60000
-maxRetries: 5
 maxToolTurns: 10
 toolResponseMaxBytes: 80000
 maxOutputTokens: 32000
-repeatPenalty: 1
-temperature: 0.3
-topP: 1
 caching: none
 reasoning: high
 ---

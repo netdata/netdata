@@ -142,6 +142,7 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
       stream: request.stream === true,
       temperature: request.temperature ?? null,
       topP: request.topP ?? null,
+      topK: request.topK ?? null,
       maxOutputTokens: request.maxOutputTokens ?? null,
       reasoningLevel: request.reasoningLevel ?? null,
       reasoningValue: request.reasoningValue ?? null,
@@ -1340,9 +1341,11 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
         tools,
         ...(toolChoice !== undefined ? { toolChoice } : {}),
         maxOutputTokens: request.maxOutputTokens,
-        temperature: request.temperature,
-        topP: request.topP,
-        frequencyPenalty: request.repeatPenalty,
+        // Only include nullable params if they have a value (null = don't send)
+        ...(request.temperature !== null ? { temperature: request.temperature } : {}),
+        ...(request.topP !== null ? { topP: request.topP } : {}),
+        ...(request.topK !== null ? { topK: request.topK } : {}),
+        ...(request.repeatPenalty !== null ? { frequencyPenalty: request.repeatPenalty } : {}),
         providerOptions: providerOptions as never,
         abortSignal: controller.signal,
       });
@@ -1628,9 +1631,11 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
         tools,
         ...(toolChoice !== undefined ? { toolChoice } : {}),
         maxOutputTokens: request.maxOutputTokens,
-        temperature: request.temperature,
-        topP: request.topP,
-        frequencyPenalty: request.repeatPenalty,
+        // Only include nullable params if they have a value (null = don't send)
+        ...(request.temperature !== null ? { temperature: request.temperature } : {}),
+        ...(request.topP !== null ? { topP: request.topP } : {}),
+        ...(request.topK !== null ? { topK: request.topK } : {}),
+        ...(request.repeatPenalty !== null ? { frequencyPenalty: request.repeatPenalty } : {}),
         providerOptions: providerOptions as never,
         abortSignal: controller.signal,
       });

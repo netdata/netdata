@@ -18,11 +18,7 @@ tools:
 llmTimeout: 120000
 toolTimeout: 600000
 toolResponseMaxBytes: 32768
-temperature: 0.5
-topP: 1
 maxOutputTokens: 16384
-repeatPenalty: 1.1
-maxRetries: 5
 maxToolTurns: 40
 ---
 You are a helpful SRE/DevOps expert, and you are asked questions about Netdata's Production infrastructure, to which you have access via your tools.

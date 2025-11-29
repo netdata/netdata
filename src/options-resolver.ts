@@ -8,10 +8,11 @@ interface CLIOverrides {
   maxToolCallsPerTurn?: number;
   llmTimeout?: number;
   toolTimeout?: number;
-  temperature?: number;
-  topP?: number;
+  temperature?: number | null;
+  topP?: number | null;
+  topK?: number | null;
   maxOutputTokens?: number;
-  repeatPenalty?: number;
+  repeatPenalty?: number | null;
   toolResponseMaxBytes?: number;
   mcpInitConcurrency?: number;
   traceLLM?: boolean;
@@ -31,10 +32,11 @@ interface GlobalLLMOverrides {
   maxToolCallsPerTurn?: number;
   llmTimeout?: number;
   toolTimeout?: number;
-  temperature?: number;
-  topP?: number;
+  temperature?: number | null;
+  topP?: number | null;
+  topK?: number | null;
   maxOutputTokens?: number;
-  repeatPenalty?: number;
+  repeatPenalty?: number | null;
   toolResponseMaxBytes?: number;
   mcpInitConcurrency?: number;
   reasoning?: ReasoningLevel | 'none' | 'inherit';
@@ -43,10 +45,11 @@ interface GlobalLLMOverrides {
 }
 
 interface DefaultsForUndefined {
-  temperature?: number;
-  topP?: number;
+  temperature?: number | null;
+  topP?: number | null;
+  topK?: number | null;
   maxOutputTokens?: number;
-  repeatPenalty?: number;
+  repeatPenalty?: number | null;
   llmTimeout?: number;
   toolTimeout?: number;
   maxRetries?: number;
@@ -59,10 +62,11 @@ interface DefaultsForUndefined {
 }
 
 interface ResolvedEffectiveOptions {
-  temperature: number;
-  topP: number;
+  temperature: number | null;
+  topP: number | null;
+  topK: number | null;
   maxOutputTokens: number | undefined;
-  repeatPenalty: number | undefined;
+  repeatPenalty: number | null;
   llmTimeout: number;
   toolTimeout: number;
   maxRetries: number;
@@ -203,6 +207,30 @@ export function resolveEffectiveOptions(args: {
     return fallback;
   };
 
+  // Read a nullable numeric parameter (supports 'null' meaning "don't send to model")
+  // Priority: global > cli > fm > defaultsForUndefined > configDefaults > fallback
+  // Returns: number (use this value), null (don't send), or the fallback
+  const readNullableNum = (name: string, fmVal: unknown, fallback: number | null): number | null => {
+    // Check each source in priority order
+    const sources: unknown[] = [
+      getGlobalVal(name),
+      getCliVal(name),
+      fmVal,
+      getDefUndef(name),
+      getCfgDefault(name),
+    ];
+    // eslint-disable-next-line functional/no-loop-statements
+    for (const val of sources) {
+      // Explicit null means "don't send"
+      if (val === null) return null;
+      // Finite number means "use this value"
+      if (typeof val === 'number' && Number.isFinite(val)) return val;
+      // Skip undefined/NaN and continue to next source
+    }
+    // No source provided a value, use fallback
+    return fallback;
+  };
+
   const reasoning = readReasoning();
   let reasoningValueResult: ProviderReasoningValue | null | undefined;
   // Reasoning may be disabled by normalizeReasoningDirective; the analyzer cannot track this across helper calls.
@@ -214,16 +242,19 @@ export function resolveEffectiveOptions(args: {
   }
 
   const out: ResolvedEffectiveOptions = {
-    temperature: readNum('temperature', fm?.temperature, 0.7),
-    topP: readNum('topP', fm?.topP, 1.0),
+    // Use readNullableNum for parameters that support "null" = don't send
+    // New defaults: temperature=0.0, topP/topK/repeatPenalty=null (don't send)
+    temperature: readNullableNum('temperature', fm?.temperature, 0.0),
+    topP: readNullableNum('topP', fm?.topP, null),
+    topK: ((): number | null => {
+      const v = readNullableNum('topK', fm?.topK, null);
+      return v !== null ? Math.trunc(v) : null;
+    })(),
     maxOutputTokens: ((): number | undefined => {
       const v = readNum('maxOutputTokens', (fm as { maxOutputTokens?: number } | undefined)?.maxOutputTokens, 4096);
       return Number.isNaN(v) ? undefined : Math.trunc(v);
     })(),
-    repeatPenalty: ((): number | undefined => {
-      const v = readNum('repeatPenalty', (fm as { repeatPenalty?: number } | undefined)?.repeatPenalty, 1.1);
-      return Number.isNaN(v) ? undefined : v;
-    })(),
+    repeatPenalty: readNullableNum('repeatPenalty', (fm as { repeatPenalty?: number | null } | undefined)?.repeatPenalty, null),
     llmTimeout: readNum('llmTimeout', fm?.llmTimeout, 600000),
     toolTimeout: readNum('toolTimeout', fm?.toolTimeout, 300000),
     maxRetries: readNum('maxRetries', fm?.maxRetries, 3),

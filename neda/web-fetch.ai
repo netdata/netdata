@@ -59,11 +59,7 @@ output:
 llmTimeout: 300000
 toolTimeout: 60000
 toolResponseMaxBytes: 300000
-temperature: 0.3
-topP: 0.95
 maxOutputTokens: 8192
-repeatPenalty: 1.2
-maxRetries: 5
 maxToolTurns: 5
 maxToolCallsPerTurn: 2
 caching: none

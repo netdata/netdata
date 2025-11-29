@@ -2,6 +2,39 @@ import { jsonrepair } from 'jsonrepair';
 
 import type { AIAgentResult, AccountingEntry, ConversationMessage } from './types.js';
 
+/**
+ * Special string values that indicate "do not send this parameter to the model".
+ * When any of these strings are used, the parameter should resolve to `null`.
+ */
+const UNSET_PARAM_VALUES = new Set(['none', 'off', 'unset', 'default', 'null']);
+
+/**
+ * Check if a value is a special "unset" string that means "do not send to model".
+ * Case-insensitive comparison.
+ */
+export function isUnsetParamValue(value: unknown): boolean {
+  return typeof value === 'string' && UNSET_PARAM_VALUES.has(value.toLowerCase().trim());
+}
+
+/**
+ * Parse a numeric parameter that supports special "unset" strings.
+ * Returns:
+ * - `null` if value is a special unset string (meaning "do not send")
+ * - `undefined` if value is undefined/null (meaning "no override, use default")
+ * - the number if value is a valid number
+ * - `undefined` if value cannot be parsed as a number
+ */
+export function parseNumericParam(value: unknown): number | null | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (isUnsetParamValue(value)) return null;
+  if (typeof value === 'number') return Number.isNaN(value) ? undefined : value;
+  if (typeof value === 'string') {
+    const parsed = Number.parseFloat(value);
+    return Number.isNaN(parsed) ? undefined : parsed;
+  }
+  return undefined;
+}
+
 function bytesLen(s: string): number {
   return Buffer.byteLength(s, 'utf8');
 }

@@ -33,7 +33,7 @@ import { buildTelemetryRuntimeConfig, type TelemetryOverrides } from './telemetr
 import { MCPProvider, shutdownSharedRegistry } from './tools/mcp-provider.js';
 import { normalizeSchemaDraftTarget, schemaDraftDisplayName, validateSchemaAgainstDraft, type SchemaDraftTarget } from './utils/schema-validation.js';
 // eslint-disable-next-line perfectionist/sort-imports
-import { formatAgentResultHumanReadable, setWarningSink, warn } from './utils.js';
+import { formatAgentResultHumanReadable, parseNumericParam, setWarningSink, warn } from './utils.js';
 import { VERSION } from './version.generated.js';
 import './setup-undici.js';
 
@@ -109,7 +109,7 @@ function addOptionsFromRegistry(prog: Command): void {
     if (type === 'boolean') return '';
     if (key.endsWith('Timeout')) return ' <ms>';
     if (key.endsWith('Bytes')) return ' <n>';
-    if (key === 'maxRetries' || key === 'maxToolTurns' || key === 'topP' || key === 'temperature') return ' <n>';
+    if (key === 'maxRetries' || key === 'maxToolTurns' || key === 'topP' || key === 'topK' || key === 'temperature') return ' <n>';
     if (key === 'models' || key === 'tools' || key === 'agents') return ' <list>';
     if (key === 'config' || key === 'accounting' || key === 'save' || key === 'load') return ' <filename>';
     return ' <value>';
@@ -643,12 +643,21 @@ function buildResolvedDefaultsHelp(): string {
       if (typeof cv === 'number' && Number.isFinite(cv)) return cv;
       return fallback;
     };
-    const defaultOf = (key: string): number | boolean => {
+    const defaultOf = (key: string): number | boolean | null => {
       const def = OPTIONS_REGISTRY.find((o) => o.key === key)?.default;
+      if (def === null) return null;
       return (typeof def === 'number' || typeof def === 'boolean') ? def : 0;
     };
     const temperature = readNum('temperature', 'temperature', defaultOf('temperature') as number);
-    const topP = readNum('topP', 'topP', defaultOf('topP') as number);
+    // For topP/topK, default is null (not sent), show 'not set' in template
+    const topP = (() => {
+      const def = defaultOf('topP');
+      return def === null ? 'not set' : readNum('topP', 'topP', def as number);
+    })();
+    const topK = (() => {
+      const def = defaultOf('topK');
+      return def === null ? 'not set' : readNum('topK', 'topK', def as number);
+    })();
     const llmTimeout = readNum('llmTimeout', 'llmTimeout', defaultOf('llmTimeout') as number);
     const toolTimeout = readNum('toolTimeout', 'toolTimeout', defaultOf('toolTimeout') as number);
     const maxRetries = readNum('maxRetries', 'maxRetries', defaultOf('maxRetries') as number);
@@ -710,7 +719,9 @@ function buildResolvedDefaultsHelp(): string {
       usage: (fmUsage.length > 0 ? fmUsage : '<user prompt>'),
       numbers: {
         temperature,
-        topP,
+        // topP/topK may be 'not set' when default is null; only include if numeric
+        ...(typeof topP === 'number' ? { topP } : {}),
+        ...(typeof topK === 'number' ? { topK } : {}),
         llmTimeout,
         toolTimeout,
         toolResponseMaxBytes,
@@ -801,9 +812,12 @@ program.helpInformation = function() {
         const names = formatCliNames(opt);
         if (typeof names === 'string' && names.length > 0) {
           const def = opt.default;
-          const defStr = typeof def === 'number' || typeof def === 'boolean' || (typeof def === 'string' && def.length > 0)
-            ? ` ${gray}(default: ${String(def)})${reset}`
-            : '';
+          const defStr = (() => {
+            if (def === null) return ` ${gray}(default: not sent)${reset}`;
+            if (typeof def === 'number' || typeof def === 'boolean') return ` ${gray}(default: ${String(def)})${reset}`;
+            if (typeof def === 'string' && def.length > 0) return ` ${gray}(default: ${def})${reset}`;
+            return '';
+          })();
           lines.push(`    ${green}${names}${reset}${defStr}`);
           lines.push(`      ${gray}${opt.description}${reset}`);
         }
@@ -997,6 +1011,8 @@ const buildGlobalOverrides = (entries: readonly string[]): LoadAgentOptions['glo
       temperature: 'temperature',
       topP: 'topP',
       'top-p': 'topP',
+      topK: 'topK',
+      'top-k': 'topK',
       maxOutputTokens: 'maxOutputTokens',
       'max-output-tokens': 'maxOutputTokens',
       repeatPenalty: 'repeatPenalty',
@@ -1032,6 +1048,13 @@ const buildGlobalOverrides = (entries: readonly string[]): LoadAgentOptions['glo
     if (!Number.isFinite(num)) throw new Error(`${key} override requires a numeric value`);
     if (!allowZero && num === 0) throw new Error(`${key} override cannot be zero`);
     return num;
+  };
+  // Parse nullable numeric parameter (supports 'none'/'off'/'unset'/'default'/'null' -> null)
+  const parseNullableNumber = (key: string, raw: string): number | null => {
+    const result = parseNumericParam(raw);
+    if (result === null) return null;
+    if (result === undefined) throw new Error(`${key} override requires a numeric value or 'none'/'off'/'unset'/'default'/'null'`);
+    return result;
   };
   const parseInteger = (key: string, raw: string): number => Math.trunc(parseNumber(key, raw));
   const parseBoolean = (key: string, raw: string): boolean => {
@@ -1072,16 +1095,21 @@ const buildGlobalOverrides = (entries: readonly string[]): LoadAgentOptions['glo
         break;
       }
       case 'temperature':
-        overrides.temperature = parseNumber('temperature', value);
+        overrides.temperature = parseNullableNumber('temperature', value);
         break;
       case 'topP':
-        overrides.topP = parseNumber('topP', value);
+        overrides.topP = parseNullableNumber('topP', value);
         break;
+      case 'topK': {
+        const topKVal = parseNullableNumber('topK', value);
+        overrides.topK = topKVal !== null ? Math.trunc(topKVal) : null;
+        break;
+      }
       case 'maxOutputTokens':
         overrides.maxOutputTokens = parseInteger('maxOutputTokens', value);
         break;
       case 'repeatPenalty':
-        overrides.repeatPenalty = parseNumber('repeatPenalty', value);
+        overrides.repeatPenalty = parseNullableNumber('repeatPenalty', value);
         break;
       case 'llmTimeout':
         overrides.llmTimeout = parseInteger('llmTimeout', value);

@@ -2412,6 +2412,16 @@ export class TurnRunner {
                 result.topP = overrideTopPSnake ?? null;
             }
         }
+        const overrideTopKCamel = overrides.topK;
+        if (overrideTopKCamel !== undefined) {
+            result.topK = overrideTopKCamel ?? null;
+        }
+        else {
+            const overrideTopKSnake = overrides.top_k;
+            if (overrideTopKSnake !== undefined) {
+                result.topK = overrideTopKSnake ?? null;
+            }
+        }
         return result;
     }
     // executeSingleTurn delegates to internal implementation
@@ -2512,6 +2522,14 @@ export class TurnRunner {
             else
                 effectiveTopP = modelOverrides.topP;
         }
+        let effectiveTopK = this.ctx.sessionConfig.topK;
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety for dynamic key lookup
+        if (modelOverrides.topK !== undefined) {
+            if (modelOverrides.topK === null)
+                effectiveTopK = undefined;
+            else
+                effectiveTopK = modelOverrides.topK;
+        }
         const fallbackReasoningLevel = this.ctx.sessionConfig.reasoning;
         let effectiveReasoningLevel = reasoningLevel ?? fallbackReasoningLevel;
         const targetMaxOutputTokens = this.ctx.sessionConfig.maxOutputTokens;
@@ -2607,6 +2625,7 @@ export class TurnRunner {
             toolExecutor,
             temperature: effectiveTemperature,
             topP: effectiveTopP,
+            topK: effectiveTopK,
             maxOutputTokens: targetMaxOutputTokens,
             repeatPenalty: this.ctx.sessionConfig.repeatPenalty,
             stream: effectiveStream,

@@ -162,7 +162,7 @@ export class SubAgentRegistry {
   async execute(
     exposedToolName: string,
     parameters: Record<string, unknown>,
-    parentSession: Pick<AIAgentSessionConfig, 'config' | 'callbacks' | 'stream' | 'traceLLM' | 'traceMCP' | 'traceSdk' | 'verbose' | 'temperature' | 'topP' | 'llmTimeout' | 'toolTimeout' | 'maxRetries' | 'maxTurns' | 'toolResponseMaxBytes' | 'targets'> & {
+    parentSession: Pick<AIAgentSessionConfig, 'config' | 'callbacks' | 'stream' | 'traceLLM' | 'traceMCP' | 'traceSdk' | 'verbose' | 'temperature' | 'topP' | 'topK' | 'llmTimeout' | 'toolTimeout' | 'maxRetries' | 'maxTurns' | 'toolResponseMaxBytes' | 'targets'> & {
       // extra trace/metadata for child
       trace?: { originId?: string; parentId?: string; callPath?: string; agentPath?: string; turnPath?: string };
       // control signals to propagate

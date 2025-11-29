@@ -6,6 +6,7 @@ import * as yaml from 'js-yaml';
 import type { ReasoningLevel, CachingMode } from './types.js';
 
 import { getFrontmatterAllowedKeys, OPTIONS_REGISTRY } from './options-registry.js';
+import { parseNumericParam } from './utils.js';
 
 export interface FrontmatterOptions {
   models?: string | string[];
@@ -17,10 +18,11 @@ export interface FrontmatterOptions {
   maxRetries?: number;
   llmTimeout?: number;
   toolTimeout?: number;
-  temperature?: number;
-  topP?: number;
+  temperature?: number | null;
+  topP?: number | null;
+  topK?: number | null;
   maxOutputTokens?: number;
-  repeatPenalty?: number;
+  repeatPenalty?: number | null;
   toolResponseMaxBytes?: number;
   reasoning?: ReasoningLevel | 'none';
   reasoningTokens?: number | string;
@@ -122,9 +124,15 @@ export function parseFrontmatter(
     if (typeof raw.toolTimeout === 'number') options.toolTimeout = raw.toolTimeout;
     if (typeof raw.toolResponseMaxBytes === 'number') options.toolResponseMaxBytes = raw.toolResponseMaxBytes;
     if (typeof raw.maxOutputTokens === 'number') options.maxOutputTokens = raw.maxOutputTokens;
-    if (typeof raw.repeatPenalty === 'number') options.repeatPenalty = raw.repeatPenalty;
-    if (typeof raw.temperature === 'number') options.temperature = raw.temperature;
-    if (typeof raw.topP === 'number') options.topP = raw.topP;
+    // Parse nullable numeric params (accept special strings like 'none', 'off', 'unset', 'default', 'null')
+    const parsedRepeatPenalty = parseNumericParam(raw.repeatPenalty);
+    if (parsedRepeatPenalty !== undefined) options.repeatPenalty = parsedRepeatPenalty;
+    const parsedTemperature = parseNumericParam(raw.temperature);
+    if (parsedTemperature !== undefined) options.temperature = parsedTemperature;
+    const parsedTopP = parseNumericParam(raw.topP);
+    if (parsedTopP !== undefined) options.topP = parsedTopP;
+    const parsedTopK = parseNumericParam(raw.topK);
+    if (parsedTopK !== undefined) options.topK = parsedTopK !== null ? Math.trunc(parsedTopK) : null;
     if (raw.reasoning === null) {
       options.reasoning = 'none';
     } else if (typeof raw.reasoning === 'string') {
@@ -271,9 +279,16 @@ export function buildFrontmatterTemplate(args: {
     let val: unknown = undefined;
     switch (opt.type) {
       case 'number': {
-        if (typeof fmVal === 'number' && Number.isFinite(fmVal)) val = fmVal;
-        else if (typeof opt.default === 'number') val = opt.default;
-        else val = 0;
+        if (fmVal === null || opt.default === null) {
+          // null means "don't send to model" - show as comment in template
+          val = null;
+        } else if (typeof fmVal === 'number' && Number.isFinite(fmVal)) {
+          val = fmVal;
+        } else if (typeof opt.default === 'number') {
+          val = opt.default;
+        } else {
+          val = 0;
+        }
         break;
       }
       case 'boolean': {

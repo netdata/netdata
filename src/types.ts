@@ -288,6 +288,8 @@ export interface ProviderModelOverrides {
   temperature?: number | null;
   topP?: number | null;
   top_p?: number | null;
+  topK?: number | null;
+  top_k?: number | null;
 }
 
 export type ToolChoiceMode = 'auto' | 'required';
@@ -398,8 +400,10 @@ export interface Configuration {
   defaults?: {
     llmTimeout?: number;
     toolTimeout?: number;
-    temperature?: number;
-    topP?: number;
+    temperature?: number | null;
+    topP?: number | null;
+    topK?: number | null;
+    repeatPenalty?: number | null;
     reasoning?: ReasoningLevel | 'none';
     maxToolTurns?: number;
     maxToolCallsPerTurn?: number;
@@ -562,10 +566,11 @@ export interface AIAgentSessionConfig {
   conversationHistory?: ConversationMessage[];
   // Expected output contract parsed from prompt frontmatter
   expectedOutput?: { format: 'json' | 'markdown' | 'text'; schema?: Record<string, unknown> };
-  temperature?: number;
-  topP?: number;
+  temperature?: number | null;
+  topP?: number | null;
+  topK?: number | null;
   maxOutputTokens?: number;
-  repeatPenalty?: number;
+  repeatPenalty?: number | null;
   maxRetries?: number;
   maxTurns?: number;
   maxToolCallsPerTurn?: number;
@@ -689,10 +694,11 @@ export interface TurnRequest {
   model: string;
   tools: MCPTool[];
   toolExecutor: ToolExecutor;
-  temperature?: number;
-  topP?: number;
+  temperature?: number | null;
+  topP?: number | null;
+  topK?: number | null;
   maxOutputTokens?: number;
-  repeatPenalty?: number;
+  repeatPenalty?: number | null;
   stream?: boolean;
   toolChoiceRequired?: boolean;
   toolChoice?: ToolChoiceMode;
@@ -739,8 +745,10 @@ export interface AIAgentOptions {
   configPath?: string;
   llmTimeout?: number;
   toolTimeout?: number;
-  temperature?: number;
-  topP?: number;
+  temperature?: number | null;
+  topP?: number | null;
+  topK?: number | null;
+  repeatPenalty?: number | null;
   callbacks?: AIAgentCallbacks;
   traceLLM?: boolean;
   traceMCP?: boolean;

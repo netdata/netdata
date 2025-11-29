@@ -6,6 +6,8 @@ import { z } from 'zod';
 
 import type { Configuration } from './types.js';
 
+import { isUnsetParamValue } from './utils.js';
+
 const computeDefaultQueueConcurrency = (): number => {
   try {
     const available = typeof os.availableParallelism === 'function' ? os.availableParallelism() : undefined;
@@ -31,10 +33,45 @@ export const DEFAULT_QUEUE_CONCURRENCY = computeDefaultQueueConcurrency();
 // - xml-final: only final-report (plus optional progress) via XML tags
 const ToolTransportEnum = z.enum(['native', 'xml', 'xml-final']);
 
+/**
+ * Create a Zod schema for nullable numeric parameters that accept special "unset" strings.
+ * Accepts: number | 'none' | 'off' | 'unset' | 'default' | 'null' | null
+ * Transforms special strings to null (meaning "don't send to model")
+ */
+const nullableNumericParam = (constraints?: { min?: number; max?: number; int?: boolean }) =>
+  z.union([
+    z.number(),
+    z.string(),
+    z.null(),
+  ])
+    .optional()
+    .transform((val): number | null | undefined => {
+      if (val === undefined) return undefined;
+      if (val === null) return null;
+      if (typeof val === 'string') {
+        if (isUnsetParamValue(val)) return null;
+        const parsed = Number.parseFloat(val);
+        if (Number.isNaN(parsed)) return undefined;
+        return constraints?.int === true ? Math.trunc(parsed) : parsed;
+      }
+      return val;
+    })
+    .refine((val) => {
+      if (val === undefined || val === null) return true;
+      if (constraints?.min !== undefined && val < constraints.min) return false;
+      if (constraints?.max !== undefined && val > constraints.max) return false;
+      if (constraints?.int === true && !Number.isInteger(val)) return false;
+      return true;
+    });
+
 const ProviderModelOverridesSchema = z.object({
-  temperature: z.number().min(0).max(2).nullable().optional(),
-  topP: z.number().min(0).max(1).nullable().optional(),
-  top_p: z.number().min(0).max(1).nullable().optional(),
+  temperature: nullableNumericParam({ min: 0, max: 2 }),
+  topP: nullableNumericParam({ min: 0, max: 1 }),
+  top_p: nullableNumericParam({ min: 0, max: 1 }),
+  topK: nullableNumericParam({ min: 1, int: true }),
+  top_k: nullableNumericParam({ min: 1, int: true }),
+  repeatPenalty: nullableNumericParam({ min: 0 }),
+  repeat_penalty: nullableNumericParam({ min: 0 }),
 });
 
 const ReasoningLevelSchema = z.enum(['minimal','low','medium','high']);
@@ -241,8 +278,10 @@ const ConfigurationSchema = z.object({
     .object({
       llmTimeout: z.number().positive().optional(),
       toolTimeout: z.number().positive().optional(),
-      temperature: z.number().min(0).max(2).optional(),
-      topP: z.number().min(0).max(1).optional(),
+      temperature: nullableNumericParam({ min: 0, max: 2 }),
+      topP: nullableNumericParam({ min: 0, max: 1 }),
+      topK: nullableNumericParam({ min: 1, int: true }),
+      repeatPenalty: nullableNumericParam({ min: 0 }),
       reasoning: ReasoningDefaultSchema.optional(),
       stream: z.boolean().optional(),
       maxToolTurns: z.number().int().positive().optional(),

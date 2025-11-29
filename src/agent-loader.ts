@@ -59,10 +59,11 @@ export interface LoadedAgent {
   accountingFile?: string;
   subAgents: PreloadedSubAgent[];
   effective: {
-    temperature: number;
-    topP: number;
+    temperature: number | null;
+    topP: number | null;
+    topK: number | null;
     maxOutputTokens?: number;
-    repeatPenalty?: number;
+    repeatPenalty: number | null;
     llmTimeout: number;
     toolTimeout: number;
     maxRetries: number;
@@ -134,10 +135,11 @@ export interface GlobalOverrides {
   models?: { provider: string; model: string }[];
   tools?: string[];
   agents?: string[];
-  temperature?: number;
-  topP?: number;
+  temperature?: number | null;
+  topP?: number | null;
+  topK?: number | null;
   maxOutputTokens?: number;
-  repeatPenalty?: number;
+  repeatPenalty?: number | null;
   llmTimeout?: number;
   toolTimeout?: number;
   maxRetries?: number;
@@ -169,10 +171,11 @@ export interface LoadAgentOptions {
   maxToolCallsPerTurn?: number;
   llmTimeout?: number;
   toolTimeout?: number;
-  temperature?: number;
-  topP?: number;
+  temperature?: number | null;
+  topP?: number | null;
+  topK?: number | null;
   maxOutputTokens?: number;
-  repeatPenalty?: number;
+  repeatPenalty?: number | null;
   toolResponseMaxBytes?: number;
   mcpInitConcurrency?: number;
   traceLLM?: boolean;
@@ -184,10 +187,11 @@ export interface LoadAgentOptions {
   billingFile?: string;
   // Defaults applied only when frontmatter/config do not specify (for sub-agents)
   defaultsForUndefined?: {
-    temperature?: number;
-    topP?: number;
+    temperature?: number | null;
+    topP?: number | null;
+    topK?: number | null;
     maxOutputTokens?: number;
-    repeatPenalty?: number;
+    repeatPenalty?: number | null;
     llmTimeout?: number;
     toolTimeout?: number;
     maxRetries?: number;
@@ -439,6 +443,7 @@ function constructLoadedAgent(args: ConstructAgentArgs): LoadedAgent {
       toolTimeout: options?.toolTimeout,
       temperature: options?.temperature,
       topP: options?.topP,
+      topK: options?.topK,
       maxOutputTokens: options?.maxOutputTokens,
       repeatPenalty: options?.repeatPenalty,
       toolResponseMaxBytes: options?.toolResponseMaxBytes,
@@ -623,6 +628,7 @@ function constructLoadedAgent(args: ConstructAgentArgs): LoadedAgent {
       abortSignal: (opts as { abortSignal?: AbortSignal } | undefined)?.abortSignal,
       temperature: eff.temperature,
       topP: eff.topP,
+      topK: eff.topK,
       maxOutputTokens: eff.maxOutputTokens,
       repeatPenalty: eff.repeatPenalty,
       maxRetries: eff.maxRetries,
@@ -728,6 +734,7 @@ function constructLoadedAgent(args: ConstructAgentArgs): LoadedAgent {
     effective: {
       temperature: eff.temperature,
       topP: eff.topP,
+      topK: eff.topK,
       maxOutputTokens: eff.maxOutputTokens,
       repeatPenalty: eff.repeatPenalty,
       llmTimeout: eff.llmTimeout,

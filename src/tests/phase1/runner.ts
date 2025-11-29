@@ -4270,10 +4270,10 @@ if (process.env.CONTEXT_DEBUG === 'true') {
 
   (() => {
     interface CapturedRequestSnapshot {
-      temperature?: number;
-      topP?: number;
+      temperature?: number | null;
+      topP?: number | null;
       maxOutputTokens?: number;
-      repeatPenalty?: number;
+      repeatPenalty?: number | null;
       messages: { role: string; content: string }[];
     };
     const HISTORY_SYSTEM = 'Legacy advisory instructions.';
@@ -4332,10 +4332,10 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         const systemMessage = first.messages.find((message) => message.role === 'system');
         invariant(systemMessage?.content.includes('TOOLS') === true, 'System message should be enhanced with tool instructions in run-test-60.');
         invariant(first.messages.some((message) => message.role === 'assistant' && message.content.includes(HISTORY_ASSISTANT)), 'Conversation history assistant message missing in request for run-test-60.');
-        invariant(first.temperature !== undefined && Math.abs(first.temperature - 0.21) < 1e-6, 'Temperature propagation failed for run-test-60.');
-        invariant(first.topP !== undefined && Math.abs(first.topP - 0.77) < 1e-6, 'topP propagation failed for run-test-60.');
+        invariant(typeof first.temperature === 'number' && Math.abs(first.temperature - 0.21) < 1e-6, 'Temperature propagation failed for run-test-60.');
+        invariant(typeof first.topP === 'number' && Math.abs(first.topP - 0.77) < 1e-6, 'topP propagation failed for run-test-60.');
         invariant(first.maxOutputTokens === 123, 'maxOutputTokens propagation failed for run-test-60.');
-        invariant(first.repeatPenalty !== undefined && Math.abs(first.repeatPenalty - 1.1) < 1e-6, 'repeatPenalty propagation failed for run-test-60.');
+        invariant(typeof first.repeatPenalty === 'number' && Math.abs(first.repeatPenalty - 1.1) < 1e-6, 'repeatPenalty propagation failed for run-test-60.');
         const hasHistoryInResult = result.conversation.some((message) => message.role === 'assistant' && message.content.includes(HISTORY_ASSISTANT));
         invariant(hasHistoryInResult, 'Historical assistant message should be present in result conversation for run-test-60.');
         const llmEntry = result.accounting.find(isLlmAccounting);
@@ -5502,7 +5502,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
     };
   })(),
   (() => {
-    let capturedTopP: number | undefined;
+    let capturedTopP: number | null | undefined;
     return {
       id: 'run-test-69',
       description: 'Model override snake-case top_p propagation.',
@@ -5815,12 +5815,12 @@ if (process.env.CONTEXT_DEBUG === 'true') {
         invariant(cfg.initialTitle === 'Loader Session Title', 'Initial title mismatch for run-test-73.');
         invariant(loaderAbortSignal !== undefined && cfg.abortSignal === loaderAbortSignal && !cfg.abortSignal.aborted, 'Abort signal mismatch for run-test-73.');
         invariant(cfg.ancestors === ancestorsList, 'Ancestors propagation mismatch for run-test-73.');
-        invariant(cfg.temperature !== undefined, 'Temperature undefined for run-test-73.');
+        invariant(typeof cfg.temperature === 'number', 'Temperature not a number for run-test-73.');
         invariant(Math.abs(cfg.temperature - 0.51) < 1e-6, 'Temperature override mismatch for run-test-73.');
-        invariant(cfg.topP !== undefined, 'topP undefined for run-test-73.');
+        invariant(typeof cfg.topP === 'number', 'topP not a number for run-test-73.');
         invariant(Math.abs(cfg.topP - 0.61) < 1e-6, 'topP override mismatch for run-test-73.');
         invariant(cfg.maxOutputTokens === 7_777, `maxOutputTokens mismatch for run-test-73 (actual=${String(cfg.maxOutputTokens)})`);
-        invariant(cfg.repeatPenalty !== undefined && Math.abs(cfg.repeatPenalty - 1.2) < 1e-6, 'repeatPenalty mismatch for run-test-73.');
+        invariant(typeof cfg.repeatPenalty === 'number' && Math.abs(cfg.repeatPenalty - 1.2) < 1e-6, 'repeatPenalty mismatch for run-test-73.');
         invariant(cfg.maxRetries === 11, 'maxRetries override mismatch for run-test-73.');
         invariant(cfg.maxTurns === 12, 'maxTurns override mismatch for run-test-73.');
         invariant(cfg.maxToolCallsPerTurn === 16, 'maxToolCallsPerTurn mismatch for run-test-73.');
@@ -5932,10 +5932,10 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       invariant(overrideParentLoaded !== undefined, 'Parent loaded agent missing for global override test.');
       invariant(overrideParentLoaded.targets === overrideTargetsRef, 'Parent targets reference mismatch for global override test.');
       invariant(overrideParentLoaded.targets.every((entry) => entry.provider === PRIMARY_PROVIDER && entry.model === MODEL_NAME), 'Parent targets should align with override values.');
-      invariant(Math.abs(overrideParentLoaded.effective.temperature - overrideLLMExpected.temperature) < 1e-6, 'Parent temperature should follow overrides.');
-      invariant(Math.abs(overrideParentLoaded.effective.topP - overrideLLMExpected.topP) < 1e-6, 'Parent topP should follow overrides.');
+      invariant(typeof overrideParentLoaded.effective.temperature === 'number' && Math.abs(overrideParentLoaded.effective.temperature - overrideLLMExpected.temperature) < 1e-6, 'Parent temperature should follow overrides.');
+      invariant(typeof overrideParentLoaded.effective.topP === 'number' && Math.abs(overrideParentLoaded.effective.topP - overrideLLMExpected.topP) < 1e-6, 'Parent topP should follow overrides.');
       invariant(overrideParentLoaded.effective.maxOutputTokens === overrideLLMExpected.maxOutputTokens, 'Parent maxOutputTokens should follow overrides.');
-      invariant(overrideParentLoaded.effective.repeatPenalty !== undefined && Math.abs(overrideParentLoaded.effective.repeatPenalty - overrideLLMExpected.repeatPenalty) < 1e-6, 'Parent repeatPenalty should follow overrides.');
+      invariant(typeof overrideParentLoaded.effective.repeatPenalty === 'number' && Math.abs(overrideParentLoaded.effective.repeatPenalty - overrideLLMExpected.repeatPenalty) < 1e-6, 'Parent repeatPenalty should follow overrides.');
       invariant(overrideParentLoaded.effective.llmTimeout === overrideLLMExpected.llmTimeout, 'Parent llmTimeout should follow overrides.');
       invariant(overrideParentLoaded.effective.maxRetries === overrideLLMExpected.maxRetries, 'Parent maxRetries should follow overrides.');
       invariant(overrideParentLoaded.effective.toolTimeout === overrideLLMExpected.toolTimeout, 'Parent toolTimeout should follow overrides.');
@@ -5947,10 +5947,10 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       invariant(overrideChildLoaded !== undefined, 'Child loaded agent missing for global override test.');
       invariant(overrideChildLoaded.targets === overrideTargetsRef, 'Child targets reference mismatch for global override test.');
       invariant(overrideChildLoaded.targets.every((entry) => entry.provider === PRIMARY_PROVIDER && entry.model === MODEL_NAME), 'Child targets should be overridden to primary provider/model.');
-      invariant(Math.abs(overrideChildLoaded.effective.temperature - overrideLLMExpected.temperature) < 1e-6, 'Child temperature should follow overrides.');
-      invariant(Math.abs(overrideChildLoaded.effective.topP - overrideLLMExpected.topP) < 1e-6, 'Child topP should follow overrides.');
+      invariant(typeof overrideChildLoaded.effective.temperature === 'number' && Math.abs(overrideChildLoaded.effective.temperature - overrideLLMExpected.temperature) < 1e-6, 'Child temperature should follow overrides.');
+      invariant(typeof overrideChildLoaded.effective.topP === 'number' && Math.abs(overrideChildLoaded.effective.topP - overrideLLMExpected.topP) < 1e-6, 'Child topP should follow overrides.');
       invariant(overrideChildLoaded.effective.maxOutputTokens === overrideLLMExpected.maxOutputTokens, 'Child maxOutputTokens should follow overrides.');
-      invariant(overrideChildLoaded.effective.repeatPenalty !== undefined && Math.abs(overrideChildLoaded.effective.repeatPenalty - overrideLLMExpected.repeatPenalty) < 1e-6, 'Child repeatPenalty should follow overrides.');
+      invariant(typeof overrideChildLoaded.effective.repeatPenalty === 'number' && Math.abs(overrideChildLoaded.effective.repeatPenalty - overrideLLMExpected.repeatPenalty) < 1e-6, 'Child repeatPenalty should follow overrides.');
       invariant(overrideChildLoaded.effective.llmTimeout === overrideLLMExpected.llmTimeout, 'Child llmTimeout should follow overrides.');
       invariant(overrideChildLoaded.effective.maxRetries === overrideLLMExpected.maxRetries, 'Child maxRetries should follow overrides.');
       invariant(overrideChildLoaded.effective.toolTimeout === overrideLLMExpected.toolTimeout, 'Child toolTimeout should follow overrides.');

@@ -6,6 +6,7 @@ import { OPTIONS_REGISTRY } from './options-registry.js';
 const EFFECTIVE_KEYS = [
   'temperature',
   'topP',
+  'topK',
   'maxOutputTokens',
   'repeatPenalty',
   'llmTimeout',
@@ -38,6 +39,9 @@ export function buildEffectiveOptionsSchema(): z.ZodObject<Record<EffectiveKey, 
     return v;
   };
 
+  // Numeric fields that allow null (meaning "do not send to provider")
+  const nullableNumericKeys = new Set(['temperature', 'topP', 'topK', 'repeatPenalty']);
+
   const shapeEntries = EFFECTIVE_KEYS.map((key) => {
     const def = must(defByKey[key], `Option registry missing definition for key '${key}'`);
     if (def.type === 'boolean') {
@@ -51,6 +55,10 @@ export function buildEffectiveOptionsSchema(): z.ZodObject<Record<EffectiveKey, 
       // mcpInitConcurrency is optional in effective options
       if (key === 'mcpInitConcurrency') {
         return [key, s.optional()] as const;
+      }
+      // Allow null for nullable numeric params (temperature, topP, topK, repeatPenalty)
+      if (nullableNumericKeys.has(key)) {
+        return [key, z.union([s, z.null()])] as const;
       }
       return [key, s] as const;
     }

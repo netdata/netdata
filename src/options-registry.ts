@@ -7,7 +7,7 @@ type OptionScope = 'masterOnly' | 'masterDefault' | 'allAgents' | 'global';
 interface OptionDef {
   key: string; // internal camelCase key
   type: OptionType;
-  default: number | boolean | string | string[] | undefined;
+  default: number | boolean | string | string[] | null | undefined;
   description: string;
   cli?: { names: string[]; showInHelp?: boolean };
   fm?: { allowed: boolean; key?: string };
@@ -25,8 +25,8 @@ function boolDef(init: Omit<OptionDef, 'type' | 'default'> & { default?: boolean
   return { ...init, type: 'boolean', default: init.default ?? false };
 }
 
-// Helper to define number
-function numDef(init: Omit<OptionDef, 'type'> & { default: number }): OptionDef {
+// Helper to define number (default can be number or null for "don't send" semantics)
+function numDef(init: Omit<OptionDef, 'type'> & { default: number | null }): OptionDef {
   return { ...init, type: 'number' };
 }
 
@@ -112,8 +112,8 @@ export const OPTIONS_REGISTRY: OptionDef[] = [
   }),
   numDef({
     key: 'temperature',
-    default: 0.7,
-    description: 'Response creativity/variance (0=focused, 1=balanced, 2=wild); higher values produce more unexpected outputs',
+    default: 0.0,
+    description: 'Response creativity/variance (0=focused, 1=balanced, 2=wild); use none/off/unset/default/null to let provider decide',
     cli: { names: ['--temperature'], showInHelp: true },
     fm: { allowed: true, key: 'temperature' },
     config: { path: 'defaults.temperature' },
@@ -123,14 +123,25 @@ export const OPTIONS_REGISTRY: OptionDef[] = [
   }),
   numDef({
     key: 'topP',
-    default: 1.0,
-    description: 'Token selection diversity (0.0-1.0); lower values use only top choices, higher values consider more alternatives',
+    default: null,
+    description: 'Token selection diversity (0.0-1.0); use none/off/unset/default/null to let provider decide (default: not sent)',
     cli: { names: ['--top-p', '--topP'], showInHelp: true },
     fm: { allowed: true, key: 'topP' },
     config: { path: 'defaults.topP' },
     scope: 'masterDefault',
     groups: [G_MASTER_DEFAULTS],
     numeric: { min: 0, max: 1 },
+  }),
+  numDef({
+    key: 'topK',
+    default: null,
+    description: 'Limits token selection to the K most probable tokens; use none/off/unset/default/null to let provider decide (default: not sent)',
+    cli: { names: ['--top-k', '--topK'], showInHelp: true },
+    fm: { allowed: true, key: 'topK' },
+    config: { path: 'defaults.topK' },
+    scope: 'masterDefault',
+    groups: [G_MASTER_DEFAULTS],
+    numeric: { min: 1, integer: true },
   }),
   strDef({
     key: 'reasoning',
@@ -174,8 +185,8 @@ export const OPTIONS_REGISTRY: OptionDef[] = [
   }),
   numDef({
     key: 'repeatPenalty',
-    default: 1.1,
-    description: 'Reduces repetitive text (1.0=off, higher=stronger); helps agent avoid repeating the same phrases',
+    default: null,
+    description: 'Reduces repetitive text (1.0=off, higher=stronger); use none/off/unset/default/null to let provider decide (default: not sent)',
     cli: { names: ['--repeat-penalty'], showInHelp: true },
     fm: { allowed: true, key: 'repeatPenalty' },
     config: { path: 'defaults.repeatPenalty' },
@@ -185,7 +196,7 @@ export const OPTIONS_REGISTRY: OptionDef[] = [
   }),
   numDef({
     key: 'maxRetries',
-    default: 3,
+    default: 5,
     description: 'How many times to retry when LLM calls fail; goes through all fallback models before giving up',
     cli: { names: ['--max-retries'], showInHelp: true },
     fm: { allowed: true, key: 'maxRetries' },
@@ -240,7 +251,7 @@ export const OPTIONS_REGISTRY: OptionDef[] = [
   strArrDef({
     key: 'override',
     default: [],
-    description: 'Override settings for every agent/sub-agent (key=value). Supported keys: models, tools, agents, temperature, topP, maxOutputTokens, repeatPenalty, llmTimeout, toolTimeout, maxRetries, maxToolTurns, maxToolCallsPerTurn, toolResponseMaxBytes, mcpInitConcurrency, stream, reasoning, reasoningTokens, caching, contextWindow.',
+    description: 'Override settings for every agent/sub-agent (key=value). Supported keys: models, tools, agents, temperature, topP, topK, maxOutputTokens, repeatPenalty, llmTimeout, toolTimeout, maxRetries, maxToolTurns, maxToolCallsPerTurn, toolResponseMaxBytes, mcpInitConcurrency, stream, reasoning, reasoningTokens, caching, contextWindow.',
     cli: { names: ['--override'], showInHelp: true },
     fm: { allowed: false },
     scope: 'allAgents',

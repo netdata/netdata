@@ -14,11 +14,7 @@ agents:
 llmTimeout: 120000
 toolTimeout: 60000
 toolResponseMaxBytes: 65536
-temperature: 0.7
-topP: 1
 maxOutputTokens: 4096
-repeatPenalty: 1.2
-maxRetries: 3
 maxToolTurns: 3
 maxToolCallsPerTurn: 10
 caching: none
