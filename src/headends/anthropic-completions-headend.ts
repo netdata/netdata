@@ -488,6 +488,8 @@ export class AnthropicCompletionsHeadend implements Headend {
         bufferTimer = undefined;
       }
       if (thinkingBuffer.length === 0) return;
+      // Ensure header exists before flushing (uses rootTxnId if captured from progress events)
+      ensureHeader(rootTxnId, rootCallPath ?? agent.id);
       const bufferedContent = thinkingBuffer;
       thinkingBuffer = '';
       streamMode = 'model';
@@ -584,11 +586,30 @@ export class AnthropicCompletionsHeadend implements Headend {
     };
     const handleProgressEvent = (event: ProgressEvent): void => {
       if (event.type === 'tool_started' || event.type === 'tool_finished') return;
-      if (event.agentId !== agent.id) return;
+      // Note: Don't filter by agentId here - subagent progress is allowed via callPathMatches below
       const callPathRaw = typeof event.callPath === 'string' && event.callPath.length > 0 ? event.callPath : event.agentId;
       const normalizedCallPath = normalizeCallPath(callPathRaw);
       const callPathForHeader = normalizedCallPath.length > 0 ? normalizedCallPath : callPathRaw;
+      if (rootCallPath === undefined) {
+        if (event.agentId === agent.id && normalizedCallPath.length > 0) {
+          rootCallPath = normalizedCallPath;
+        } else if (event.agentId === agent.id) {
+          rootCallPath = agent.id;
+        } else if (normalizedCallPath.length > 0) {
+          const segments = normalizedCallPath.split(':');
+          rootCallPath = segments.length > 1 ? segments.slice(0, -1).join(':') : normalizedCallPath;
+        }
+      }
       ensureHeader(event.txnId, callPathForHeader);
+      const agentMatches = event.agentId === agent.id;
+      const callPathMatches = (() => {
+        if (rootCallPath === undefined) return agentMatches;
+        if (normalizedCallPath.length === 0) return agentMatches;
+        if (normalizedCallPath === rootCallPath) return true;
+        if (normalizedCallPath.startsWith(`${rootCallPath}:`)) return true;
+        return false;
+      })();
+      if (!agentMatches && !callPathMatches) return;
       const agentPathRaw = (event as { agentPath?: string }).agentPath;
       const normalizedAgentPath = normalizeCallPath(agentPathRaw);
       const displayCallPath = (() => {
@@ -692,7 +713,8 @@ export class AnthropicCompletionsHeadend implements Headend {
       onThinking: (chunk) => {
         if (chunk.length === 0) return;
         reasoning += chunk;
-        ensureHeader(undefined, rootCallPath ?? agent.id);
+        // Don't call ensureHeader here - wait for progress event with txnId
+        // Header will be created when thinking is flushed or progress event arrives
         if (expectingNewTurn) {
           startNextTurn();
           expectingNewTurn = false;
@@ -700,7 +722,7 @@ export class AnthropicCompletionsHeadend implements Headend {
         appendThinkingChunk(chunk);
       },
       onTurnStarted: (turnIndex) => {
-        ensureHeader(undefined, rootCallPath ?? agent.id);
+        // Don't call ensureHeader here - wait for progress event with txnId
         ensureTurnIndex(turnIndex);
       },
       onProgress: (event) => { handleProgressEvent(event); },

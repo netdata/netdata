@@ -487,6 +487,8 @@ export class OpenAICompletionsHeadend implements Headend {
         bufferTimer = undefined;
       }
       if (thinkingBuffer.length === 0) return;
+      // Ensure header exists before flushing (uses rootTxnId if captured from progress events)
+      ensureHeader(rootTxnId, rootCallPath, agent.id);
       const bufferedContent = thinkingBuffer;
       thinkingBuffer = '';
       streamMode = 'model';
@@ -584,7 +586,7 @@ export class OpenAICompletionsHeadend implements Headend {
     };
     const handleProgressEvent = (event: ProgressEvent): void => {
       if (event.type === 'tool_started' || event.type === 'tool_finished') return;
-      if (event.agentId !== agent.id) return;
+      // Note: Don't filter by agentId here - subagent progress is allowed via callPathMatches below
       const callPathRaw = typeof event.callPath === 'string' && event.callPath.length > 0 ? event.callPath : undefined;
       const callPath = callPathRaw !== undefined ? normalizeCallPath(callPathRaw) : undefined;
       const agentPathRaw = (event as { agentPath?: string }).agentPath;
@@ -731,7 +733,8 @@ export class OpenAICompletionsHeadend implements Headend {
       },
       onThinking: (chunk) => {
         if (chunk.length === 0) return;
-        ensureHeader(undefined, rootCallPath, agent.id);
+        // Don't call ensureHeader here - wait for progress event with txnId
+        // Header will be created when thinking is flushed or progress event arrives
         if (expectingNewTurn) {
           startNextTurn();
           expectingNewTurn = false;
@@ -739,7 +742,7 @@ export class OpenAICompletionsHeadend implements Headend {
         appendThinkingChunk(chunk);
       },
       onTurnStarted: (turnIndex) => {
-        ensureHeader(undefined, rootCallPath, agent.id);
+        // Don't call ensureHeader here - wait for progress event with txnId
         ensureTurnIndex(turnIndex);
       },
       onProgress: (event) => {
