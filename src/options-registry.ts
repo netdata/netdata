@@ -260,7 +260,7 @@ export const OPTIONS_REGISTRY: OptionDef[] = [
   boolDef({
     key: 'stream',
     description: 'Show response as it\'s generated (streaming) instead of waiting for complete answer',
-    default: false,
+    default: true,
     cli: { names: ['--stream', '--no-stream'], showInHelp: true },
     fm: { allowed: false },
     config: { path: 'defaults.stream' },

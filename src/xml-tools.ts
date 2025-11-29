@@ -218,7 +218,8 @@ export function renderXmlNext(payload: XmlNextPayload): string {
   lines.push('- [ ] The status XML attribute must be one of: success, failure, partial');
   lines.push('- [ ] Your report content/payload matches the expected format');
   lines.push('- [ ] Your output MUST end with the closing XML tag');
-  lines.push('Failure to comply with the above will result in rejection of your final report.');
+  lines.push('- [ ] Your entire report is between the opening and closing XML tags, not outside them');
+  lines.push('The above checklist is mandatory for all final reports. Failure to comply with this checklist will result in rejection of your final report.');
 
   lines.push('## Mandatory Workflow');
   if (toolList.length > 0) {
