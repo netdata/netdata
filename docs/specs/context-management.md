@@ -65,8 +65,13 @@ interface ContextGuardEvaluation {
 
 ```typescript
 this.targetContextConfigs = sessionTargets.map((target) => {
-  const contextWindow = modelConfig?.contextWindow ?? providerConfig.contextWindow ?? DEFAULT;
-  const bufferTokens = modelConfig?.contextWindowBufferTokens ?? providerConfig.contextWindowBufferTokens ?? defaultBuffer;
+  const contextWindow = sessionConfig.contextWindow
+    ?? modelConfig?.contextWindow
+    ?? providerConfig.contextWindow
+    ?? DEFAULT;
+  const bufferTokens = modelConfig?.contextWindowBufferTokens
+    ?? providerConfig.contextWindowBufferTokens
+    ?? defaultBuffer;
   return { provider, model, contextWindow, tokenizerId, bufferTokens };
 });
 this.currentCtxTokens = this.estimateTokensForCounters(this.conversation);

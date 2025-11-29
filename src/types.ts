@@ -597,6 +597,8 @@ export interface AIAgentSessionConfig {
   // Ancestors chain of sub-agent prompt paths (for recursion prevention across nested sessions)
   ancestors?: string[];
   toolingTransport?: 'native' | 'xml' | 'xml-final';
+  // Override context window for all targets (applies uniformly regardless of provider/model config)
+  contextWindow?: number;
 }
 
 // Session result

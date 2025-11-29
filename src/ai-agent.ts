@@ -418,7 +418,9 @@ export class AIAgentSession {
     const targetContextConfigs: TargetContextConfig[] = sessionTargets.map((target) => {
       const providerConfig = this.config.providers[target.provider];
       const modelConfig = providerConfig.models?.[target.model];
-      const contextWindow = modelConfig?.contextWindow
+      // Session override (from CLI --override contextWindow=X) takes highest priority
+      const contextWindow = this.sessionConfig.contextWindow
+        ?? modelConfig?.contextWindow
         ?? providerConfig.contextWindow
         ?? defaultContextWindow;
       const tokenizerId = modelConfig?.tokenizer ?? providerConfig.tokenizer;

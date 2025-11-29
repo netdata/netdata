@@ -240,7 +240,7 @@ export const OPTIONS_REGISTRY: OptionDef[] = [
   strArrDef({
     key: 'override',
     default: [],
-    description: 'Override settings for every agent/sub-agent (key=value). Supports models/tools/agents plus LLM knobs like temperature, topP, maxOutputTokens, llmTimeout, retries, stream, reasoning, caching.',
+    description: 'Override settings for every agent/sub-agent (key=value). Supported keys: models, tools, agents, temperature, topP, maxOutputTokens, repeatPenalty, llmTimeout, toolTimeout, maxRetries, maxToolTurns, maxToolCallsPerTurn, toolResponseMaxBytes, mcpInitConcurrency, stream, reasoning, reasoningTokens, caching, contextWindow.',
     cli: { names: ['--override'], showInHelp: true },
     fm: { allowed: false },
     scope: 'allAgents',

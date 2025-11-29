@@ -150,6 +150,7 @@ export interface GlobalOverrides {
   reasoningValue?: ProviderReasoningValue | null;
   caching?: 'none' | 'full';
   toolingTransport?: 'native' | 'xml' | 'xml-final';
+  contextWindow?: number;
 }
 
 export interface LoadAgentOptions {
@@ -344,6 +345,12 @@ function constructLoadedAgent(args: ConstructAgentArgs): LoadedAgent {
   const fmModels = parsePairs(fm?.options?.models);
   const fmTools = parseList(fm?.options?.tools);
   const fmAgents = parseList(fm?.options?.agents);
+  const globalContextWindow = options?.globalOverrides?.contextWindow;
+  if (globalContextWindow !== undefined) {
+    if (!Number.isInteger(globalContextWindow) || globalContextWindow <= 0) {
+      throw new Error('globalOverrides.contextWindow must be a positive integer');
+    }
+  }
   // Only models overrides are active today; this structure accommodates future keys.
   const overrideTargets = Array.isArray(options?.globalOverrides?.models) && options.globalOverrides.models.length > 0
     ? options.globalOverrides.models
@@ -639,6 +646,7 @@ function constructLoadedAgent(args: ConstructAgentArgs): LoadedAgent {
       // Preserve the original reference (no clone) so recursion guards see identical identity.
       // Harness expectations rely on the session receiving the exact array instance from callers.
       ancestors: Array.isArray(o.ancestors) ? o.ancestors : ancestorChain,
+      contextWindow: options?.globalOverrides?.contextWindow,
     };
     const resolvedAgentPath = (() => {
       if (typeof o.agentPath === 'string' && o.agentPath.length > 0) return o.agentPath;

@@ -371,6 +371,7 @@ Values can be strings (Anthropic effort labels) or integers (token budgets). Use
 
 ### Context windows & tokenizer overrides
 - `contextWindow`: explicit token limit for a provider/model; used for budgeting when vendors omit metadata.
+- **Session override precedence**: `--override contextWindow=<tokens>` (or `globalOverrides.contextWindow` in the library) applies to every target in the session and supersedes model/provider values; fallbacks are model → provider → default ceiling.
 - `tokenizer`: string identifier consumed by the tokenizer registry (e.g., `"gpt-4o"`) so context estimates use the right encoder.
 - `contextWindowBufferTokens`: extra headroom reserved per request (e.g., `1024`). The context guard subtracts this buffer to avoid hard-overflow.
 

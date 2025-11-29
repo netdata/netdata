@@ -1022,6 +1022,8 @@ const buildGlobalOverrides = (entries: readonly string[]): LoadAgentOptions['glo
       [REASONING_TOKENS_OPTION]: 'reasoningTokens',
       [REASONING_TOKENS_ALT_OPTION]: 'reasoningTokens',
       caching: 'caching',
+      contextWindow: 'contextWindow',
+      'context-window': 'contextWindow',
     };
     return canonicalMap[lower] ?? lower;
   };
@@ -1128,8 +1130,14 @@ const buildGlobalOverrides = (entries: readonly string[]): LoadAgentOptions['glo
         overrides.caching = parseCachingModeStrict(value);
         break;
       }
+      case 'contextWindow': {
+        const tokens = parseInteger('contextWindow', value);
+        if (tokens <= 0) throw new Error('contextWindow override must be a positive integer');
+        overrides.contextWindow = tokens;
+        break;
+      }
       default:
-        throw new Error(`unsupported override key '${rawKey}'; expected keys like models, maxOutputTokens, temperature`);
+        throw new Error(`unsupported override key '${rawKey}'; expected keys like models, maxOutputTokens, temperature, contextWindow`);
     }
   });
   return overrides;

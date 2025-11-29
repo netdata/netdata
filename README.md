@@ -273,6 +273,7 @@ This is why you can build production-ready multi-agent systems in the time it ta
 
 ### 📏 **Token Budget Guardrails**
 - [x] **Per-Model Context Windows**: Configure `contextWindow`, optional `tokenizer`, and `contextWindowBufferTokens` per provider/model in `.ai-agent.json`; when omitted, the agent falls back to a 131072-token window so the guard is always active
+- [x] **Session Override**: `--override contextWindow=<tokens>` (or `globalOverrides.contextWindow` in the library API) forces a single context window across all targets and takes precedence over model/provider settings.
 - [x] **Tool Output Guard**: Tool responses are preflight token-counted; overflows are rejected with `(tool failed: context window budget exceeded)` and a forced final turn
 - [x] **Context Exit Reporting**: Sessions terminated by the guard emit `EXIT-TOKEN-LIMIT`, annotate accounting entries with projected vs. allowed tokens, and export telemetry via `ai_agent_context_guard_events_total` and `ai_agent_context_guard_remaining_tokens`
 
