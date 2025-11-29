@@ -102,11 +102,11 @@ export const FINAL_REPORT_SLACK_MESSAGES_MISSING =
   'Final report missing messages array; provide Slack Block Kit messages.';
 
 /**
- * When no final report is detected in response.
+ * When response has content but no valid tool calls and no final report.
  * Used in: session-turn-runner.ts via addTurnFailure
  */
 export const FINAL_REPORT_MISSING =
-  'Missing final report; provide your final report in the requested format';
+  'No progress made in this turn: no tools called and no final report/answer provided. To progress you MUST call tools or provide a final report/answer. Review carefully the provided instructions and tools (if any), decide your next action(s), and follow the instructions precisely to progress.';
 
 /**
  * When tool call parameters are malformed.
