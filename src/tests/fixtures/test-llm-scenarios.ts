@@ -4465,6 +4465,97 @@ const SCENARIOS: ScenarioDefinition[] = [
       },
     ],
   },
+  // -------------------------------------------------------------------------
+  // Leaked tool extraction scenarios (fallback for <tools> / <tool_call> etc.)
+  // -------------------------------------------------------------------------
+  {
+    id: 'run-test-leaked-tools-success',
+    description: 'Leaked <tools> XML pattern is extracted and executed successfully without TURN_FAILED.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        // allowMissingTools: true because the response is 'text' kind with embedded <tools>
+        allowMissingTools: true,
+        response: {
+          kind: 'text',
+          assistantText: `I will call the test tool now.\n\n<tools>{"name": "${TOOL_NAME}", "arguments": {"text": "${TOOL_ARGUMENT_SUCCESS}"}}</tools>`,
+          finishReason: 'stop',
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+        },
+      },
+      {
+        turn: 2,
+        expectedTools: ['agent__final_report'],
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Tool executed via fallback extraction.',
+          reportContent: `${RESULT_HEADING}Leaked tool pattern was extracted and executed successfully.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_SUCCESS,
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+        },
+      },
+    ],
+  },
+  {
+    id: 'run-test-leaked-tool-call-success',
+    description: 'Leaked <tool_call> XML pattern is extracted and executed successfully.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        allowMissingTools: true,
+        response: {
+          kind: 'text',
+          assistantText: `Calling test tool via <tool_call> format.\n\n<tool_call>\n{"name": "${TOOL_NAME}", "arguments": {"text": "${TOOL_ARGUMENT_SUCCESS}"}}\n</tool_call>`,
+          finishReason: 'stop',
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+        },
+      },
+      {
+        turn: 2,
+        expectedTools: ['agent__final_report'],
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Completed after <tool_call> extraction.',
+          reportContent: `${RESULT_HEADING}Leaked <tool_call> pattern extracted and executed.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_SUCCESS,
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+        },
+      },
+    ],
+  },
+  {
+    id: 'run-test-leaked-tools-unknown-tool',
+    description: 'Leaked <tools> with unknown tool name surfaces error but no TURN_FAILED_NO_TOOLS message.',
+    systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
+    turns: [
+      {
+        turn: 1,
+        allowMissingTools: true,
+        response: {
+          kind: 'text',
+          assistantText: `<tools>{"name": "unknown__nonexistent_tool", "arguments": {}}</tools>`,
+          finishReason: 'stop',
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+        },
+      },
+      {
+        turn: 2,
+        expectedTools: ['agent__final_report'],
+        response: {
+          kind: FINAL_RESPONSE_KIND,
+          assistantText: 'Unknown tool error received; providing summary.',
+          reportContent: `${RESULT_HEADING}Unknown tool was reported; fallback extraction worked.`,
+          reportFormat: MARKDOWN_FORMAT,
+          status: STATUS_FAILURE,
+          tokenUsage: DEFAULT_TOKEN_USAGE,
+        },
+      },
+    ],
+  },
 ];
 
 const scenarios = new Map<string, ScenarioDefinition>(SCENARIOS.map((scenario) => [scenario.id, scenario] as const));

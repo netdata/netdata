@@ -19,6 +19,7 @@ import type { SessionProgressReporter } from './session-progress-reporter.js';
 import type { SessionToolExecutor, ToolExecutionState } from './session-tool-executor.js';
 import type { SessionNode, SessionTreeBuilder } from './session-tree.js';
 import type { SubAgentRegistry } from './subagent-registry.js';
+import type { LeakedToolFallbackResult } from './tool-call-fallback.js';
 import type { ToolsOrchestrator } from './tools/tools.js';
 import type { AIAgentResult, AIAgentSessionConfig, AccountingEntry, Configuration, ConversationMessage, LogDetailValue, LogEntry, MCPTool, ProviderReasoningMapping, ProviderReasoningValue, ReasoningLevel, ToolCall, TurnResult, TurnRetryDirective, TurnStatus } from './types.js';
 import type { XmlToolTransport } from './xml-transport.js';
@@ -45,6 +46,7 @@ import {
   turnFailedPrefix,
 } from './llm-messages.js';
 import { addSpanAttributes, addSpanEvent, recordContextGuardMetrics, recordFinalReportMetrics, recordLlmMetrics, recordRetryCollapseMetrics, runWithSpan } from './telemetry/index.js';
+import { processLeakedToolCalls } from './tool-call-fallback.js';
 import { estimateMessagesBytes, formatToolRequestCompact, parseJsonValueDetailed, sanitizeToolName, warn } from './utils.js';
 
 /**
@@ -781,7 +783,7 @@ export class TurnRunner {
                         }
                         let sanitizedHasToolCalls = assistantForAdoption !== undefined && Array.isArray(assistantForAdoption.toolCalls) && assistantForAdoption.toolCalls.length > 0;
                         const textContent = assistantForAdoption !== undefined && typeof assistantForAdoption.content === 'string' ? assistantForAdoption.content : undefined;
-                        const sanitizedHasText = textContent !== undefined && textContent.length > 0;
+                        let sanitizedHasText = textContent !== undefined && textContent.length > 0;
                         const toolFailureDetected = sanitizedMessages.some((msg) => msg.role === 'tool' && typeof msg.content === 'string' && msg.content.trim().toLowerCase().startsWith('(tool failed:'));
                         if (toolFailureDetected) {
                             const failureToolMessage = sanitizedMessages
@@ -829,6 +831,32 @@ export class TurnRunner {
                                     message: 'Final report extracted from text content after tool call rejection. Retrying for proper tool call.'
                                 };
                                 this.log(warnEntry);
+                            }
+                        }
+                        // FALLBACK: Extract and execute tool calls from leaked XML-like patterns
+                        // Handles models that emit <tools>, <tool_call>, etc. instead of native tool calls
+                        if (!sanitizedHasToolCalls && sanitizedHasText && assistantForAdoption !== undefined && textContent !== undefined) {
+                            const fallbackResult = await this.processLeakedToolCallsFallback(textContent, currentTurn, provider);
+                            if (fallbackResult !== undefined) {
+                                assistantForAdoption.toolCalls = fallbackResult.toolCalls;
+                                assistantForAdoption.content = fallbackResult.cleanedContent ?? '';
+                                sanitizedHasToolCalls = true;
+                                sanitizedHasText = fallbackResult.hasRemainingText;
+                                // Add tool results to messages
+                                sanitizedMessages.push(...fallbackResult.toolResults);
+                                // Log extraction
+                                const patterns = fallbackResult.patternsMatched.map((p) => `<${p}>`).join(', ');
+                                this.log({
+                                    timestamp: Date.now(),
+                                    severity: 'WRN' as const,
+                                    turn: currentTurn,
+                                    subturn: 0,
+                                    direction: 'response' as const,
+                                    type: 'llm' as const,
+                                    remoteIdentifier: REMOTE_SANITIZER,
+                                    fatal: false,
+                                    message: `Extracted and executed ${String(fallbackResult.toolCalls.length)} tool call(s) from leaked XML patterns (${patterns}).`,
+                                });
                             }
                         }
                         if ((turnResult.status.finalAnswer || this.ctx.toolTransport !== 'native') && this.finalReport === undefined) {
@@ -2163,6 +2191,35 @@ export class TurnRunner {
             return undefined;
         return this.ctx.finalReportManager.tryExtractFromText(trimmedText);
     }
+
+    /**
+     * Process leaked tool calls from assistant content.
+     * Creates a tool executor, extracts and executes tools, returns results.
+     */
+    private async processLeakedToolCallsFallback(
+        textContent: string,
+        turn: number,
+        provider: string
+    ): Promise<LeakedToolFallbackResult | undefined> {
+        // Create execution state for the fallback executor
+        const executionState: ToolExecutionState = {
+            toolFailureMessages: new Map(),
+            toolFailureFallbacks: [],
+            trimmedToolCallIds: new Set(),
+            turnHasSuccessfulToolOutput: false,
+            incompleteFinalReportDetected: false,
+        };
+
+        // Create tool executor for fallback execution
+        const executor = this.ctx.sessionExecutor.createExecutor(turn, provider, executionState);
+
+        // Delegate to the module
+        return processLeakedToolCalls({
+            textContent,
+            executor,
+        });
+    }
+
     private sanitizeTurnMessages(messages: ConversationMessage[], context: { turn: number; provider: string; model: string; stopReason?: string }): { messages: ConversationMessage[]; dropped: number; finalReportAttempted: boolean } {
         let dropped = 0;
         let finalReportAttempted = false;
