@@ -16,8 +16,6 @@ models:
 tools:
   - openapi:encharge
   - batch
-llmTimeout: 180000
-toolTimeout: 120000
 toolResponseMaxBytes: 20000
 maxOutputTokens: 16384
 maxToolTurns: 100

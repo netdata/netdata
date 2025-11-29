@@ -11,8 +11,6 @@ tools:
   - batch
 agents:
   - web-fetch.ai
-llmTimeout: 120000
-toolTimeout: 60000
 toolResponseMaxBytes: 65536
 maxOutputTokens: 4096
 maxToolTurns: 3

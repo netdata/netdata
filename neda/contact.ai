@@ -16,8 +16,6 @@ tools:
 agents:
   - web-fetch.ai
   - web-search.ai
-llmTimeout: 120000
-toolTimeout: 60000
 toolResponseMaxBytes: 100000
 maxToolCallsPerTurn: 20
 maxOutputTokens: 16384

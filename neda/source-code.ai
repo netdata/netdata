@@ -12,8 +12,6 @@ models:
 tools:
   - filesystem_repos
   - batch
-llmTimeout: 120000
-toolTimeout: 120000
 toolResponseMaxBytes: 8192
 maxOutputTokens: 32768
 maxToolTurns: 50

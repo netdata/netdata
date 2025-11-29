@@ -12,8 +12,6 @@ models:
 tools:
   - reddit
 agents: []
-llmTimeout: 120000
-toolTimeout: 60000
 toolResponseMaxBytes: 300000
 maxOutputTokens: 8192
 maxToolTurns: 10

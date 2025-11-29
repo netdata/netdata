@@ -8,8 +8,6 @@ models:
 tools:
   - intercom
   - batch
-llmTimeout: 180000
-toolTimeout: 60000
 toolResponseMaxBytes: 100000
 maxOutputTokens: 8192
 maxToolTurns: 30

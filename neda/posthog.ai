@@ -15,8 +15,6 @@ models:
 tools:
   - posthog-query
   - batch
-llmTimeout: 180000
-toolTimeout: 60000
 toolResponseMaxBytes: 65536
 maxOutputTokens: 16384
 maxToolTurns: 30

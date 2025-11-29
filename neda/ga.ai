@@ -15,8 +15,6 @@ models:
 tools:
   - analytics-mcp
   - batch
-llmTimeout: 180000
-toolTimeout: 120000
 toolResponseMaxBytes: 100000
 maxOutputTokens: 16384
 maxToolTurns: 100

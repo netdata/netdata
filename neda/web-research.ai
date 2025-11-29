@@ -16,8 +16,6 @@ agents:
   - web-fetch.ai
   - github-search.ai
   - reddit.ai
-llmTimeout: 300000
-toolTimeout: 60000
 toolResponseMaxBytes: 100000
 maxOutputTokens: 32000
 maxToolTurns: 20

@@ -56,8 +56,6 @@ output:
       confidence:
         type: number
         description: The confidence level (0-100%) of the extraction process
-llmTimeout: 300000
-toolTimeout: 60000
 toolResponseMaxBytes: 300000
 maxOutputTokens: 8192
 maxToolTurns: 5

@@ -16,8 +16,6 @@ models:
 tools:
   - bigquery
   - batch
-llmTimeout: 120000
-toolTimeout: 30000
 toolResponseMaxBytes: 16384
 maxOutputTokens: 16384
 maxToolTurns: 50

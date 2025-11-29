@@ -10,8 +10,6 @@ models:
 tools:
   - freshdesk
   - batch
-llmTimeout: 120000
-toolTimeout: 60000
 toolResponseMaxBytes: 20000
 maxOutputTokens: 16384
 maxToolTurns: 30

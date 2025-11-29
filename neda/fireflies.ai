@@ -15,8 +15,6 @@ models:
 tools:
   - fireflies
   - batch
-llmTimeout: 120000
-toolTimeout: 60000
 toolResponseMaxBytes: 200000
 maxOutputTokens: 16384
 maxToolTurns: 20

@@ -11,8 +11,6 @@ models:
 tools:
   - github
   - batch
-llmTimeout: 120000
-toolTimeout: 60000
 toolResponseMaxBytes: 20000
 maxOutputTokens: 16384
 maxToolTurns: 30

@@ -15,8 +15,6 @@ tools:
   - netdata_production
 #  - netdata_demos
   - batch
-llmTimeout: 120000
-toolTimeout: 600000
 toolResponseMaxBytes: 32768
 maxOutputTokens: 16384
 maxToolTurns: 40

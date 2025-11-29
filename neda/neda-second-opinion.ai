@@ -16,8 +16,6 @@ tools:
 #  - web-research
 #  - batch
 agents:
-llmTimeout: 180000
-toolTimeout: 600000
 toolResponseMaxBytes: 40000
 maxOutputTokens: 16384
 maxToolTurns: 20
