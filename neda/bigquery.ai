@@ -44,10 +44,10 @@ This is CRITICAL because:
 - Subscription information may be outdated if changed after the last sync
 - Other agents rely on knowing the data cutoff time to avoid confusion
 
-ALWAYS start your response by running this query FIRST:
+ALWAYS start your response by running this query FIRST:\
 ```sql
-SELECT MAX(bd_data_ingested_at) AS last_ingested_at,
-       TIMESTAMP_DIFF(CURRENT_TIMESTAMP(), MAX(bd_data_ingested_at), MINUTE) AS age_minutes,
+SELECT MAX(CAST(bd_data_ingested_at AS TIMESTAMP)) AS last_ingested_at,
+       TIMESTAMP_DIFF(CURRENT_TIMESTAMP(), MAX(CAST(bd_data_ingested_at AS TIMESTAMP)), MINUTE) AS age_minutes,
        'watch_towers.spaces_latest' AS source_table
 FROM `netdata-analytics-bi.watch_towers.spaces_latest`;
 ```

@@ -1342,6 +1342,7 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
         maxOutputTokens: request.maxOutputTokens,
         temperature: request.temperature,
         topP: request.topP,
+        frequencyPenalty: request.repeatPenalty,
         providerOptions: providerOptions as never,
         abortSignal: controller.signal,
       });
@@ -1629,6 +1630,7 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
         maxOutputTokens: request.maxOutputTokens,
         temperature: request.temperature,
         topP: request.topP,
+        frequencyPenalty: request.repeatPenalty,
         providerOptions: providerOptions as never,
         abortSignal: controller.signal,
       });
