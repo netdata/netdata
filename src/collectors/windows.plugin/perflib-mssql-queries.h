@@ -15,6 +15,8 @@
 
 #define NETDATA_REPLICATION_MONITOR_QUERY "EXEC sp_replmonitorhelppublication;"
 
+#define NETDATA_REPLICATION_MONITOR_SUBSCRIPTION_QUERY "EXEC sp_replmonitorhelpsubscription @publication_type = %d;"
+
 #define NETDATA_QUERY_LIST_DB "SELECT name FROM sys.databases;"
 
 // https://learn.microsoft.com/en-us/sql/relational-databases/system-catalog-views/sys-database-files-transact-sql?view=sql-server-ver16
