@@ -32,8 +32,8 @@ import {
   FINAL_REPORT_CONTENT_MISSING,
   FINAL_REPORT_INVALID_STATUS,
   FINAL_REPORT_JSON_REQUIRED,
-  FINAL_REPORT_MISSING,
   FINAL_REPORT_SLACK_MESSAGES_MISSING,
+  TURN_FAILED_NO_TOOLS_NO_REPORT_CONTENT_PRESENT,
   FINAL_TURN_NOTICE,
   MAX_TURNS_FINAL_MESSAGE,
   TOOL_CALL_MALFORMED,
@@ -1127,7 +1127,7 @@ export class TurnRunner {
                                 }
                                 lastError = 'invalid_response: content_without_tools_or_final';
                                 lastErrorType = 'invalid_response';
-                                this.addTurnFailure(FINAL_REPORT_MISSING);
+                                this.addTurnFailure(TURN_FAILED_NO_TOOLS_NO_REPORT_CONTENT_PRESENT);
                             }
                         }
                         // CONTRACT: Empty response without tool calls must NOT be added to conversation
@@ -1934,8 +1934,18 @@ export class TurnRunner {
         this.emitFinalSummary(logs, accounting);
         // CONTRACT §2: success: true only for status 'success', false for 'failure' or 'partial'
         const success = fr.status === 'success';
+        // When status is failure/partial, propagate content as error for display (string or JSON)
+        const error = (() => {
+            if (success) return undefined;
+            if (typeof fr.content === 'string' && fr.content.length > 0) return fr.content;
+            if (fr.content_json !== undefined) {
+                try { return JSON.stringify(fr.content_json); } catch { /* ignore */ }
+            }
+            return undefined;
+        })();
         return {
             success,
+            error,
             conversation,
             logs,
             accounting,
