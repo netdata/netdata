@@ -5,6 +5,8 @@ export interface ReasoningTurnState {
   summary?: string;
   thinking?: string;
   updates: string[];
+  thinkingAfterProgress?: string;
+  progressSeen?: boolean;
 }
 
 export interface RenderReasoningOptions {
@@ -57,6 +59,9 @@ export const renderReasoningMarkdown = ({ header, turns, summaryText }: RenderRe
       turn.updates.forEach((line) => {
         lines.push(`- ${line}`);
       });
+    }
+    if (typeof turn.thinkingAfterProgress === 'string' && turn.thinkingAfterProgress.trim().length > 0) {
+      appendThinkingBlock(lines, turn.thinkingAfterProgress);
     }
   });
   if (typeof summaryText === 'string' && summaryText.length > 0) {

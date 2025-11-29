@@ -322,6 +322,34 @@ export class AnthropicCompletionsHeadend implements Headend {
     let summaryEmitted = false;
     let rootTxnId: string | undefined;
 
+    // Mode machine for progress/model output separation (Solution 2)
+    // - Start in 'progress' mode
+    // - Thinking is buffered in progress mode, emitted immediately in model mode
+    // - Progress events are always emitted immediately
+    // - Switch to model mode after 10s timeout or newline in buffer
+    let streamMode: 'progress' | 'model' = 'progress';
+    let thinkingBuffer = '';
+    let bufferTimer: ReturnType<typeof setTimeout> | undefined;
+    const BUFFER_TIMEOUT_MS = 10000;
+
+    const flushThinkingBuffer = (): void => {
+      if (bufferTimer !== undefined) {
+        clearTimeout(bufferTimer);
+        bufferTimer = undefined;
+      }
+      if (thinkingBuffer.length === 0) return;
+      const bufferedContent = thinkingBuffer;
+      thinkingBuffer = '';
+      streamMode = 'model';
+      const turn = ensureTurn();
+      if (turn.progressSeen === true) {
+        turn.thinkingAfterProgress = (turn.thinkingAfterProgress ?? '') + bufferedContent;
+      } else {
+        turn.thinking = (turn.thinking ?? '') + bufferedContent;
+      }
+      flushReasoning();
+    };
+
     const openTextBlock = (): void => {
       if (!streamed || textBlockOpen) return;
       const start = { type: 'content_block_start', content_block: { type: 'text' as const } };
@@ -471,8 +499,12 @@ export class AnthropicCompletionsHeadend implements Headend {
       return turns[turns.length - 1];
     };
     const startNextTurn = (): void => {
+      // Flush any buffered thinking from previous turn before starting new one
+      flushThinkingBuffer();
+      streamMode = 'progress'; // Reset mode for new turn
+
       turnCounter += 1;
-      const turn: ReasoningTurnState = { index: turnCounter, updates: [] };
+      const turn: ReasoningTurnState = { index: turnCounter, updates: [], progressSeen: false };
       if (turnCounter > 1) {
         const summary = formatTotals();
         if (summary !== undefined) turn.summary = summary;
@@ -491,13 +523,44 @@ export class AnthropicCompletionsHeadend implements Headend {
     };
     const appendThinkingChunk = (chunk: string): void => {
       if (chunk.length === 0) return;
-      const turn = ensureTurn();
-      turn.thinking = (turn.thinking ?? '') + chunk;
-      flushReasoning();
+      ensureTurn(); // Ensure turn exists for header/structure
+
+      if (streamMode === 'model') {
+        // In model mode: emit thinking immediately
+        const turn = ensureTurn();
+        if (turn.progressSeen === true) {
+          turn.thinkingAfterProgress = (turn.thinkingAfterProgress ?? '') + chunk;
+        } else {
+          turn.thinking = (turn.thinking ?? '') + chunk;
+        }
+        flushReasoning();
+      } else {
+        // In progress mode: buffer thinking, check for flush conditions
+        thinkingBuffer += chunk;
+
+        // Check for newline - if found, flush immediately
+        if (thinkingBuffer.includes('\n')) {
+          flushThinkingBuffer();
+          return;
+        }
+
+        // Start timer on first buffered chunk
+        bufferTimer ??= setTimeout(() => {
+          bufferTimer = undefined;
+          flushThinkingBuffer();
+        }, BUFFER_TIMEOUT_MS);
+      }
     };
     const appendProgressLine = (line: string): void => {
       const trimmed = line.trim();
       if (trimmed.length === 0) return;
+
+      // Flush any buffered thinking before emitting progress (preserves order)
+      flushThinkingBuffer();
+
+      // Switch to progress mode
+      streamMode = 'progress';
+
       const turn = ensureTurn();
       turn.updates.push(trimmed);
       flushReasoning();
@@ -541,10 +604,14 @@ export class AnthropicCompletionsHeadend implements Headend {
         case 'agent_started': {
           const reason = typeof event.reason === 'string' && event.reason.length > 0 ? italicize(event.reason) : undefined;
           appendProgressLine(reason !== undefined ? `${prefix}: started ${reason}` : `${prefix}: started`);
+          const turn = ensureTurn();
+          turn.progressSeen = true;
           return;
         }
         case 'agent_update': {
           appendProgressLine(`${prefix}: update ${italicize(event.message)}`);
+          const turn = ensureTurn();
+          turn.progressSeen = true;
           return;
         }
         case 'agent_finished': {
@@ -556,6 +623,8 @@ export class AnthropicCompletionsHeadend implements Headend {
             return metricsText.length > 0 ? `${prefix}: finished ${metricsText}` : `${prefix}: finished`;
           })();
           appendProgressLine(finishedLine);
+          const turn = ensureTurn();
+          turn.progressSeen = true;
           const summaryStatus = metrics === undefined ? 'completed' : undefined;
           const summaryText = formatSummaryLine({
             agentLabel: agentHeadingLabel,
@@ -580,6 +649,8 @@ export class AnthropicCompletionsHeadend implements Headend {
             line += `: ${metricsText}`;
           }
           appendProgressLine(line);
+          const turn = ensureTurn();
+          turn.progressSeen = true;
           const statusNote = typeof event.error === 'string' && event.error.length > 0
             ? `failed: ${event.error}`
             : 'failed';
@@ -593,8 +664,11 @@ export class AnthropicCompletionsHeadend implements Headend {
           flushReasoning();
           return;
         }
-        default:
+        default: {
           appendProgressLine(`${prefix}: update ${italicize('progress event')}`);
+          const turn = ensureTurn();
+          turn.progressSeen = true;
+        }
       }
     };
     const telemetryLabels = { ...getTelemetryLabels(), headend: this.id };
@@ -678,6 +752,10 @@ export class AnthropicCompletionsHeadend implements Headend {
       }
       const finalText = this.resolveContent(output, result.finalReport);
       const usage = collectUsage(accounting);
+
+      // Flush any remaining buffered thinking before final response
+      flushThinkingBuffer();
+
       if (streamed) {
         if (turns.length === 0) {
           startNextTurn();
@@ -751,6 +829,11 @@ export class AnthropicCompletionsHeadend implements Headend {
       }
       this.log('anthropic completion finished', 'VRB', false, { model: agent.id, status: result.success ? 'ok' : 'error' });
     } catch (err) {
+      // Clear any pending buffer timer
+      if (bufferTimer !== undefined) {
+        clearTimeout(bufferTimer);
+        bufferTimer = undefined;
+      }
       const message = err instanceof Error ? err.message : String(err);
       this.log('anthropic completion failed', 'ERR', false, { model: agent.id, error: message });
       if (streamed) {
@@ -765,6 +848,11 @@ export class AnthropicCompletionsHeadend implements Headend {
         writeJson(res, status, { error: code, message });
       }
     } finally {
+      // Clear any pending buffer timer to prevent post-teardown emissions
+      if (bufferTimer !== undefined) {
+        clearTimeout(bufferTimer);
+        bufferTimer = undefined;
+      }
       cleanup();
       release();
     }

@@ -2061,7 +2061,8 @@ function createCallbacks(
         thinkingOpen = false;
       }
       ttyLog.onLog?.(entry);
-      if (entry.severity === 'THK') {
+      // Show THK header only in TTY mode (thinking is suppressed in non-TTY)
+      if (entry.severity === 'THK' && process.stderr.isTTY) {
         const header = formatLog(entry, {
           color: true,
         });
@@ -2076,6 +2077,8 @@ function createCallbacks(
       }
     },
     onThinking: (text: string) => {
+      // Suppress thinking output in non-TTY mode to prevent interleaving with logfmt/json logs
+      if (!process.stderr.isTTY) return;
       const colored = colorize(text, '\x1b[2;37m');
       process.stderr.write(colored);
       if (text.length > 0) {

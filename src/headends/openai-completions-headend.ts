@@ -321,6 +321,35 @@ export class OpenAICompletionsHeadend implements Headend {
     let turnCounter = 0;
     let expectingNewTurn = true;
     let masterSummary: { text?: string; metrics?: ProgressMetrics; statusNote?: string } | undefined;
+
+    // Mode machine for progress/model output separation (Solution 2)
+    // - Start in 'progress' mode
+    // - Thinking is buffered in progress mode, emitted immediately in model mode
+    // - Progress events are always emitted immediately
+    // - Switch to model mode after 10s timeout or newline in buffer
+    let streamMode: 'progress' | 'model' = 'progress';
+    let thinkingBuffer = '';
+    let bufferTimer: ReturnType<typeof setTimeout> | undefined;
+    const BUFFER_TIMEOUT_MS = 10000;
+
+    const flushThinkingBuffer = (): void => {
+      if (bufferTimer !== undefined) {
+        clearTimeout(bufferTimer);
+        bufferTimer = undefined;
+      }
+      if (thinkingBuffer.length === 0) return;
+      const bufferedContent = thinkingBuffer;
+      thinkingBuffer = '';
+      streamMode = 'model';
+      const turn = ensureTurn();
+      if (turn.progressSeen === true) {
+        turn.thinkingAfterProgress = (turn.thinkingAfterProgress ?? '') + bufferedContent;
+      } else {
+        turn.thinking = (turn.thinking ?? '') + bufferedContent;
+      }
+      flushReasoning();
+    };
+
     const emitAssistantRole = (): void => {
       if (!streamed || assistantRoleSent) return;
       assistantRoleSent = true;
@@ -469,8 +498,12 @@ export class OpenAICompletionsHeadend implements Headend {
       return turns[turns.length - 1];
     };
     const startNextTurn = (): void => {
+      // Flush any buffered thinking from previous turn before starting new one
+      flushThinkingBuffer();
+      streamMode = 'progress'; // Reset mode for new turn
+
       turnCounter += 1;
-      const turn: ReasoningTurnState = { index: turnCounter, updates: [] };
+      const turn: ReasoningTurnState = { index: turnCounter, updates: [], progressSeen: false };
       if (turnCounter > 1) {
         const summary = formatTotals();
         if (summary !== undefined) turn.summary = summary;
@@ -489,13 +522,44 @@ export class OpenAICompletionsHeadend implements Headend {
     };
     const appendThinkingChunk = (chunk: string): void => {
       if (chunk.length === 0) return;
-      const turn = ensureTurn();
-      turn.thinking = (turn.thinking ?? '') + chunk;
-      flushReasoning();
+      ensureTurn(); // Ensure turn exists for header/structure
+
+      if (streamMode === 'model') {
+        // In model mode: emit thinking immediately
+        const turn = ensureTurn();
+        if (turn.progressSeen === true) {
+          turn.thinkingAfterProgress = (turn.thinkingAfterProgress ?? '') + chunk;
+        } else {
+          turn.thinking = (turn.thinking ?? '') + chunk;
+        }
+        flushReasoning();
+      } else {
+        // In progress mode: buffer thinking, check for flush conditions
+        thinkingBuffer += chunk;
+
+        // Check for newline - if found, flush immediately
+        if (thinkingBuffer.includes('\n')) {
+          flushThinkingBuffer();
+          return;
+        }
+
+        // Start timer on first buffered chunk
+        bufferTimer ??= setTimeout(() => {
+          bufferTimer = undefined;
+          flushThinkingBuffer();
+        }, BUFFER_TIMEOUT_MS);
+      }
     };
     const appendProgressLine = (line: string): void => {
       const trimmed = line.trim();
       if (trimmed.length === 0) return;
+
+      // Flush any buffered thinking before emitting progress (preserves order)
+      flushThinkingBuffer();
+
+      // Switch to progress mode
+      streamMode = 'progress';
+
       const turn = ensureTurn();
       turn.updates.push(trimmed);
       flushReasoning();
@@ -517,6 +581,7 @@ export class OpenAICompletionsHeadend implements Headend {
     };
     const handleProgressEvent = (event: ProgressEvent): void => {
       if (event.type === 'tool_started' || event.type === 'tool_finished') return;
+      if (event.agentId !== agent.id) return;
       const callPathRaw = typeof event.callPath === 'string' && event.callPath.length > 0 ? event.callPath : undefined;
       const callPath = callPathRaw !== undefined ? normalizeCallPath(callPathRaw) : undefined;
       const agentPathRaw = (event as { agentPath?: string }).agentPath;
@@ -564,12 +629,16 @@ export class OpenAICompletionsHeadend implements Headend {
           const prefix = `**${escapeMarkdown(displayCallPath)}**`;
           const line = reason !== undefined ? `${prefix} started ${reason}` : `${prefix} started`;
           appendProgressLine(line);
+          const turn = ensureTurn();
+          turn.progressSeen = true;
           return;
         }
         case 'agent_update': {
           const prefix = `**${escapeMarkdown(displayCallPath)}**`;
           const updateLine = `${prefix} update ${italicize(event.message)}`;
           appendProgressLine(updateLine);
+          const turn = ensureTurn();
+          turn.progressSeen = true;
           return;
         }
         case 'agent_finished': {
@@ -580,6 +649,8 @@ export class OpenAICompletionsHeadend implements Headend {
             return metricsText.length > 0 ? `${prefix} finished ${metricsText}` : `${prefix} finished`;
           })();
           appendProgressLine(line);
+          const turn = ensureTurn();
+          turn.progressSeen = true;
           if (agentMatches && (callPath === undefined || callPath === rootCallPath)) {
             const summaryStatus = eventMetrics === undefined ? 'completed' : undefined;
             const summaryText = formatSummaryLine({
@@ -605,6 +676,8 @@ export class OpenAICompletionsHeadend implements Headend {
             line += `: ${metricsText}`;
           }
           appendProgressLine(line);
+          const turn = ensureTurn();
+          turn.progressSeen = true;
           if (agentMatches && (callPath === undefined || callPath === rootCallPath)) {
             const statusNote = typeof event.error === 'string' && event.error.length > 0
               ? `failed: ${event.error}`
@@ -620,8 +693,11 @@ export class OpenAICompletionsHeadend implements Headend {
           }
           return;
         }
-        default:
+        default: {
           appendProgressLine(`**${escapeMarkdown(displayCallPath)}** update ${italicize('progress event')}`);
+          const turn = ensureTurn();
+          turn.progressSeen = true;
+        }
       }
     };
     const telemetryLabels = { ...getTelemetryLabels(), headend: this.id };
@@ -717,6 +793,10 @@ export class OpenAICompletionsHeadend implements Headend {
           ? finalText
           : (fallbackError ?? 'Agent session failed without details.'));
       const usageSnapshot = collectUsage(accounting);
+
+      // Flush any remaining buffered thinking before final response
+      flushThinkingBuffer();
+
       if (streamed) {
         // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- guard avoids duplicating turn entries when a new LLM turn begins
         if (expectingNewTurn || turns.length === 0) {
@@ -793,6 +873,11 @@ export class OpenAICompletionsHeadend implements Headend {
       }
       this.log('chat completion finished', 'VRB', false, { model: agent.id, status: result.success ? 'ok' : 'error' });
     } catch (err) {
+      // Clear any pending buffer timer
+      if (bufferTimer !== undefined) {
+        clearTimeout(bufferTimer);
+        bufferTimer = undefined;
+      }
       const message = err instanceof Error ? err.message : String(err);
       this.log('chat completion failed', 'ERR', false, { model: agent.id, error: message });
       if (streamed) {
@@ -818,6 +903,11 @@ export class OpenAICompletionsHeadend implements Headend {
         writeJson(res, status, { error: code, message });
       }
     } finally {
+      // Clear any pending buffer timer to prevent post-teardown emissions
+      if (bufferTimer !== undefined) {
+        clearTimeout(bufferTimer);
+        bufferTimer = undefined;
+      }
       cleanup();
       release();
     }
