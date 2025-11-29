@@ -274,14 +274,14 @@
   "defaults": {
     "llmTimeout": 600000,
     "toolTimeout": 300000,
-    "temperature": 0.7,
-    "topP": 1,
+    "temperature": 0,
+    "topP": null,
     "maxOutputTokens": 8192,
-    "repeatPenalty": 1.1,
+    "repeatPenalty": null,
     "stream": false,
     "maxTurns": 10,
     "mcpInitConcurrency": 10,
-    "maxRetries": 3,
+    "maxRetries": 5,
     "toolResponseMaxBytes": 32768
   },
   "mcpServers": {
