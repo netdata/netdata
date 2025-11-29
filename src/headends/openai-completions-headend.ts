@@ -332,23 +332,7 @@ export class OpenAICompletionsHeadend implements Headend {
     let bufferTimer: ReturnType<typeof setTimeout> | undefined;
     const BUFFER_TIMEOUT_MS = 10000;
 
-    const flushThinkingBuffer = (): void => {
-      if (bufferTimer !== undefined) {
-        clearTimeout(bufferTimer);
-        bufferTimer = undefined;
-      }
-      if (thinkingBuffer.length === 0) return;
-      const bufferedContent = thinkingBuffer;
-      thinkingBuffer = '';
-      streamMode = 'model';
-      const turn = ensureTurn();
-      if (turn.progressSeen === true) {
-        turn.thinkingAfterProgress = (turn.thinkingAfterProgress ?? '') + bufferedContent;
-      } else {
-        turn.thinking = (turn.thinking ?? '') + bufferedContent;
-      }
-      flushReasoning();
-    };
+    // flushThinkingBuffer is defined after ensureTurn (see below) due to hoisting constraints
 
     const emitAssistantRole = (): void => {
       if (!streamed || assistantRoleSent) return;
@@ -497,6 +481,23 @@ export class OpenAICompletionsHeadend implements Headend {
       }
       return turns[turns.length - 1];
     };
+    const flushThinkingBuffer = (): void => {
+      if (bufferTimer !== undefined) {
+        clearTimeout(bufferTimer);
+        bufferTimer = undefined;
+      }
+      if (thinkingBuffer.length === 0) return;
+      const bufferedContent = thinkingBuffer;
+      thinkingBuffer = '';
+      streamMode = 'model';
+      const turn = ensureTurn();
+      if (turn.progressSeen === true) {
+        turn.thinkingAfterProgress = (turn.thinkingAfterProgress ?? '') + bufferedContent;
+      } else {
+        turn.thinking = (turn.thinking ?? '') + bufferedContent;
+      }
+      flushReasoning();
+    };
     const startNextTurn = (): void => {
       // Flush any buffered thinking from previous turn before starting new one
       flushThinkingBuffer();
@@ -564,14 +565,16 @@ export class OpenAICompletionsHeadend implements Headend {
       turn.updates.push(trimmed);
       flushReasoning();
     };
-    const ensureHeader = (txnId?: string, callPath?: string, agentIdParam?: string): void => {
+    const ensureHeader = (txnId?: string, callPath?: string, _agentIdParam?: string): void => {
       if (rootTxnId === undefined && typeof txnId === 'string' && txnId.length > 0) {
         rootTxnId = txnId;
       }
       if (!transactionHeaderSent) {
-        const headerId = rootTxnId ?? txnId ?? agentIdParam ?? callPath ?? 'transaction';
-        const headerLabel = escapeMarkdown(headerId);
-        transactionHeader = `## ${agentHeadingLabel}: ${headerLabel}`;
+        // Use txnId if available; otherwise just show agent label without raw file paths
+        const headerId = rootTxnId ?? txnId;
+        transactionHeader = headerId !== undefined
+          ? `## ${agentHeadingLabel}: ${escapeMarkdown(headerId)}`
+          : `## ${agentHeadingLabel}`;
         transactionHeaderSent = true;
         flushReasoning();
       }
