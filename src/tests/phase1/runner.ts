@@ -306,7 +306,7 @@ const JSON_ONLY_URL = 'https://example.com/resource';
 const DEFAULT_PROMPT_SCENARIO = 'run-test-1' as const;
 const BASE_DEFAULTS = {
   stream: false,
-  maxToolTurns: 3,
+  maxTurns: 3,
   maxRetries: 2,
   llmTimeout: 10_000,
   toolTimeout: 10_000,
@@ -957,7 +957,7 @@ const overrideLLMExpected = {
   llmTimeout: 7_654,
   toolTimeout: 4_321,
   maxRetries: 5,
-  maxToolTurns: 11,
+  maxTurns: 11,
   maxToolCallsPerTurn: 4,
   toolResponseMaxBytes: 777,
   mcpInitConcurrency: 6,
@@ -1343,7 +1343,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
   {
     id: 'run-test-12',
     configure: (configuration, sessionConfig, defaults) => {
-      defaults.maxToolTurns = 1;
+      defaults.maxTurns = 1;
       configuration.defaults = defaults;
       sessionConfig.maxTurns = 1;
       sessionConfig.maxRetries = 1;
@@ -5686,7 +5686,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
             maxOutputTokens: 999,
           repeatPenalty: 1.01,
           maxRetries: 2,
-          maxToolTurns: 3,
+          maxTurns: 3,
           maxToolCallsPerTurn: 4,
           toolResponseMaxBytes: 5_555,
           stream: false,
@@ -5705,7 +5705,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
           'llmTimeout: 3333',
           'toolTimeout: 4444',
           'maxRetries: 7',
-          'maxToolTurns: 8',
+          'maxTurns: 8',
           'maxToolCallsPerTurn: 9',
           'temperature: 0.31',
           'topP: 0.41',
@@ -5729,7 +5729,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
           configPath,
           stream: true,
           maxRetries: 11,
-          maxToolTurns: 12,
+          maxTurns: 12,
           maxToolCallsPerTurn: 16,
           llmTimeout: 5_555,
           toolTimeout: 6_666,
@@ -5895,7 +5895,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
           llmTimeout: overrideLLMExpected.llmTimeout,
           toolTimeout: overrideLLMExpected.toolTimeout,
           maxRetries: overrideLLMExpected.maxRetries,
-          maxToolTurns: overrideLLMExpected.maxToolTurns,
+          maxTurns: overrideLLMExpected.maxTurns,
           maxToolCallsPerTurn: overrideLLMExpected.maxToolCallsPerTurn,
           toolResponseMaxBytes: overrideLLMExpected.toolResponseMaxBytes,
           mcpInitConcurrency: overrideLLMExpected.mcpInitConcurrency,
@@ -5939,7 +5939,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       invariant(overrideParentLoaded.effective.llmTimeout === overrideLLMExpected.llmTimeout, 'Parent llmTimeout should follow overrides.');
       invariant(overrideParentLoaded.effective.maxRetries === overrideLLMExpected.maxRetries, 'Parent maxRetries should follow overrides.');
       invariant(overrideParentLoaded.effective.toolTimeout === overrideLLMExpected.toolTimeout, 'Parent toolTimeout should follow overrides.');
-      invariant(overrideParentLoaded.effective.maxToolTurns === overrideLLMExpected.maxToolTurns, 'Parent maxToolTurns should follow overrides.');
+      invariant(overrideParentLoaded.effective.maxTurns === overrideLLMExpected.maxTurns, 'Parent maxTurns should follow overrides.');
       invariant(overrideParentLoaded.effective.maxToolCallsPerTurn === overrideLLMExpected.maxToolCallsPerTurn, 'Parent maxToolCallsPerTurn should follow overrides.');
       invariant(overrideParentLoaded.effective.toolResponseMaxBytes === overrideLLMExpected.toolResponseMaxBytes, 'Parent toolResponseMaxBytes should follow overrides.');
       invariant(overrideParentLoaded.effective.mcpInitConcurrency === overrideLLMExpected.mcpInitConcurrency, 'Parent mcpInitConcurrency should follow overrides.');
@@ -5954,7 +5954,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       invariant(overrideChildLoaded.effective.llmTimeout === overrideLLMExpected.llmTimeout, 'Child llmTimeout should follow overrides.');
       invariant(overrideChildLoaded.effective.maxRetries === overrideLLMExpected.maxRetries, 'Child maxRetries should follow overrides.');
       invariant(overrideChildLoaded.effective.toolTimeout === overrideLLMExpected.toolTimeout, 'Child toolTimeout should follow overrides.');
-      invariant(overrideChildLoaded.effective.maxToolTurns === overrideLLMExpected.maxToolTurns, 'Child maxToolTurns should follow overrides.');
+      invariant(overrideChildLoaded.effective.maxTurns === overrideLLMExpected.maxTurns, 'Child maxTurns should follow overrides.');
       invariant(overrideChildLoaded.effective.maxToolCallsPerTurn === overrideLLMExpected.maxToolCallsPerTurn, 'Child maxToolCallsPerTurn should follow overrides.');
       invariant(overrideChildLoaded.effective.toolResponseMaxBytes === overrideLLMExpected.toolResponseMaxBytes, 'Child toolResponseMaxBytes should follow overrides.');
       invariant(overrideChildLoaded.effective.mcpInitConcurrency === overrideLLMExpected.mcpInitConcurrency, 'Child mcpInitConcurrency should follow overrides.');

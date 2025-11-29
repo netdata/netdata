@@ -109,7 +109,7 @@ function addOptionsFromRegistry(prog: Command): void {
     if (type === 'boolean') return '';
     if (key.endsWith('Timeout')) return ' <ms>';
     if (key.endsWith('Bytes')) return ' <n>';
-    if (key === 'maxRetries' || key === 'maxToolTurns' || key === 'topP' || key === 'topK' || key === 'temperature') return ' <n>';
+    if (key === 'maxRetries' || key === 'maxTurns' || key === 'topP' || key === 'topK' || key === 'temperature') return ' <n>';
     if (key === 'models' || key === 'tools' || key === 'agents') return ' <list>';
     if (key === 'config' || key === 'accounting' || key === 'save' || key === 'load') return ' <filename>';
     return ' <value>';
@@ -661,7 +661,7 @@ function buildResolvedDefaultsHelp(): string {
     const llmTimeout = readNum('llmTimeout', 'llmTimeout', defaultOf('llmTimeout') as number);
     const toolTimeout = readNum('toolTimeout', 'toolTimeout', defaultOf('toolTimeout') as number);
     const maxRetries = readNum('maxRetries', 'maxRetries', defaultOf('maxRetries') as number);
-    const maxToolTurns = readNum('maxToolTurns', 'maxToolTurns', defaultOf('maxToolTurns') as number);
+    const maxTurns = readNum('maxTurns', 'maxTurns', defaultOf('maxTurns') as number);
     const toolResponseMaxBytes = readNum('toolResponseMaxBytes', 'toolResponseMaxBytes', defaultOf('toolResponseMaxBytes') as number);
 
     const inv = (typeof candidate === 'string' && candidate.length > 0) ? candidate : 'ai-agent';
@@ -726,7 +726,7 @@ function buildResolvedDefaultsHelp(): string {
         toolTimeout,
         toolResponseMaxBytes,
         maxRetries,
-        maxToolTurns,
+        maxTurns,
       },
       booleans: {
         stream: false,
@@ -1025,8 +1025,8 @@ const buildGlobalOverrides = (entries: readonly string[]): LoadAgentOptions['glo
       'tool-timeout-ms': 'toolTimeout',
       maxRetries: 'maxRetries',
       'max-retries': 'maxRetries',
-      maxToolTurns: 'maxToolTurns',
-      'max-tool-turns': 'maxToolTurns',
+      maxTurns: 'maxTurns',
+      'max-turns': 'maxTurns',
       maxToolCallsPerTurn: 'maxToolCallsPerTurn',
       'max-tool-calls-per-turn': 'maxToolCallsPerTurn',
       toolResponseMaxBytes: 'toolResponseMaxBytes',
@@ -1120,8 +1120,8 @@ const buildGlobalOverrides = (entries: readonly string[]): LoadAgentOptions['glo
       case 'maxRetries':
         overrides.maxRetries = parseInteger('maxRetries', value);
         break;
-      case 'maxToolTurns':
-        overrides.maxToolTurns = parseInteger('maxToolTurns', value);
+      case 'maxTurns':
+        overrides.maxTurns = parseInteger('maxTurns', value);
         break;
       case 'maxToolCallsPerTurn':
         overrides.maxToolCallsPerTurn = parseInteger('maxToolCallsPerTurn', value);
@@ -1740,7 +1740,7 @@ program
         llmTimeout: (optSrc('llmTimeoutMs') === 'cli' || optSrc('llm-timeout-ms') === 'cli') ? Number(options.llmTimeoutMs ?? options['llm-timeout-ms']) : undefined,
         toolTimeout: (optSrc('toolTimeoutMs') === 'cli' || optSrc('tool-timeout-ms') === 'cli') ? Number(options.toolTimeoutMs ?? options['tool-timeout-ms']) : undefined,
         maxRetries: optSrc('maxRetries') === 'cli' ? Number(options.maxRetries) : undefined,
-        maxToolTurns: optSrc('maxToolTurns') === 'cli' ? Number(options.maxToolTurns) : undefined,
+        maxTurns: optSrc('maxTurns') === 'cli' ? Number(options.maxTurns) : undefined,
         toolResponseMaxBytes: (optSrc('toolResponseMaxBytes') === 'cli' || optSrc('tool-response-max-bytes') === 'cli') ? Number(options.toolResponseMaxBytes ?? options['tool-response-max-bytes']) : undefined,
         stream: typeof options.stream === 'boolean' ? options.stream : undefined,
         traceLLM: options.traceLlm === true ? true : undefined,
@@ -1768,7 +1768,7 @@ program
       const fmtRaw: unknown = (() => { const rec: Record<string, unknown> = options; return Object.prototype.hasOwnProperty.call(rec, 'format') ? (rec as { format?: unknown }).format : undefined; })();
       const fmtOpt = typeof fmtRaw === 'string' && fmtRaw.length > 0 ? fmtRaw : undefined;
       const chosenFormatId = resolveFormatIdForCli(fmtOpt, expectedJson, process.stdout.isTTY ? true : false);
-      const vars = buildPromptVariables(loaded.effective.maxToolTurns);
+      const vars = buildPromptVariables(loaded.effective.maxTurns);
       vars.FORMAT = formatPromptValue(chosenFormatId);
       const resolvedSystem = expandPrompt(stripFrontmatter(resolvedSystemRaw), vars);
       const resolvedUser = expandPrompt(stripFrontmatter(resolvedUserRaw), vars);
@@ -1968,7 +1968,7 @@ async function readPrompt(value: string): Promise<string> {
   return value;
 }
 
-function buildPromptVariables(maxToolTurns: number): Record<string, string> {
+function buildPromptVariables(maxTurns: number): Record<string, string> {
   function pad2(n: number): string { return n < 10 ? `0${String(n)}` : String(n); }
   function formatRFC3339Local(d: Date): string {
     const y = d.getFullYear();
@@ -2001,7 +2001,7 @@ function buildPromptVariables(maxToolTurns: number): Record<string, string> {
     DATETIME: formatRFC3339Local(now),
     DAY: now.toLocaleDateString(undefined, { weekday: 'long' }),
     TIMEZONE: detectTimezone(),
-    MAX_TURNS: String(maxToolTurns),
+    MAX_TURNS: String(maxTurns),
     OS: detectOS(),
     ARCH: process.arch,
     KERNEL: `${os.type()} ${os.release()}`,

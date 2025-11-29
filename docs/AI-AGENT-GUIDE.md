@@ -3,7 +3,7 @@
 > **Audience & Use**: This document is written exclusively for AI assistants and automation scripts. No human review is assumed. Consume it programmatically to generate, compose, and operate ai-agents. Every fact is validated against the current TypeScript implementation (commit-time truth source).
 
 ## 1. Operating Model
-- **Control loop**: `AIAgentSession.executeAgentLoop` (src/ai-agent.ts) runs turns `1..maxToolTurns` (default 10). Each turn: (a) open opTree turn node, (b) run provider/model pairs via `LLMClient.executeTurn`, (c) stream assistant output, (d) execute tool calls through `ToolsOrchestrator`, (e) append tool results to conversation, (f) repeat until assistant emits final answer or `agent__final_report` call.
+- **Control loop**: `AIAgentSession.executeAgentLoop` (src/ai-agent.ts) runs turns `1..maxTurns` (default 10). Each turn: (a) open opTree turn node, (b) run provider/model pairs via `LLMClient.executeTurn`, (c) stream assistant output, (d) execute tool calls through `ToolsOrchestrator`, (e) append tool results to conversation, (f) repeat until assistant emits final answer or `agent__final_report` call.
 - **Tool failures**: `ToolsOrchestrator.executeWithManagement` never retries a tool. Failures are logged (`severity='WRN'`, `type='tool'`) and inserted into the conversation as tool-result messages so the LLM can course-correct. Output > `toolResponseMaxBytes` (default 12 288 bytes) is truncated with `[TRUNCATED]` prefix before being returned and emits a warning that includes both the actual byte size and the limit (for example, `Tool response exceeded max size (actual 16384 B > limit 12288 B)`).
 - **LLM failures & retry logic**: Per turn, the session cycles through configured provider/model pairs (`targets`) and retries up to `maxRetries` (default 3). `LLMClient` normalizes provider errors into statuses (`rate_limit`, `network_error`, `auth_error`, etc.). Retryable errors advance to the next provider; fatal ones log `EXIT-*` and end the loop.
 - **Stop/cancel handling**: A `stopRef` (`{ stopping: boolean }`) can be threaded into `AIAgentSessionConfig`. The runner now polls this flag before every retry attempt, during rate-limit backoff sleeps, and once more before emitting a failure. When every provider in a cycle reports `rate_limit`, the session still enters the recommended backoff window even if no retries remain whenever a `stopRef` is present, ensuring late stop requests can resolve gracefully instead of bubbling a `rate_limit` error.
@@ -12,7 +12,7 @@
 - **Context-window guard**: `AIAgentSession` tracks `currentCtxTokens`, `pendingCtxTokens`, `newCtxTokens`, and `schemaCtxTokens`. If projected totals exceed provider limits it enters “forced final turn” mode: tool calls disabled, final user nudge injected, and `logExit('EXIT-TOKEN-LIMIT', ...)` recorded.
 - **System prompt composition**: `agent-loader` flattens `.ai` content (resolves `include:`), strips frontmatter, then `applyFormat` injects `${FORMAT}` description. During runtime, `AIAgentSession` appends tool instruction blocks exactly once **only in native transport**; when `tooling.transport` is `xml|xml-final`, tool instructions are omitted and tools are advertised via XML-NEXT (xml) or via native tool-call reminder (xml-final). No schemas are pasted into the prompt; native mode passes schemas as JSON tool defs, XML modes carry schemas in XML-NEXT.
 - **Injected user messages**:
-  - If `maxToolTurns` is reached, the session appends the hardcoded “You are not allowed to run any more tools…” user message and disables tools for the concluding turn.
+  - If `maxTurns` is reached, the session appends the hardcoded "You are not allowed to run any more tools…" user message and disables tools for the concluding turn.
   - For forced-final context situations, a user message states “Maximum number of turns/steps reached…” before invoking `agent__final_report`.
 - **Internal tools**: `agent__final_report` is always available; the LLM must call it exactly once to conclude. `agent__batch` enables parallel tool execution for models without native parallel support (see below). Sub-agents register as `agent__<toolName>`. REST imports register as `rest__<toolName>`.
 - **XML transport (tooling.transport = xml | xml-final)**:
@@ -36,7 +36,7 @@
 
 **Checklist**
 - [ ] Declare at least one provider/model pair (`targets`).
-- [ ] Confirm `maxToolTurns`/`maxRetries` satisfy task budget.
+- [ ] Confirm `maxTurns`/`maxRetries` satisfy task budget.
 - [ ] Provide final-report instructions so the LLM knows when to call `agent__final_report`.
 
 ### Final Report Expectations (Read Carefully)
@@ -63,7 +63,7 @@
 
 | Key | Type | Default | Notes |
 | --- | --- | --- | --- |
-| `maxToolTurns` | int | `10` | Total LLM turns with tool access. |
+| `maxTurns` | int | `10` | Total LLM turns with tool access. |
 | `maxToolCallsPerTurn` | int | `10` | Caps tool invocations per turn. |
 | `maxRetries` | int | `3` | Provider/model attempts per turn. |
 | `llmTimeout` | ms | `600000` | Reset per streamed chunk. |
@@ -97,7 +97,7 @@ input:
       topic: { type: string }
 output:
   format: markdown
-maxToolTurns: 8
+maxTurns: 8
 ---
 You synthesize research data into concise briefs. Answer in ${FORMAT}.
 ```
@@ -133,7 +133,7 @@ You synthesize research data into concise briefs. Answer in ${FORMAT}.
 | `${DATETIME}` | Current local timestamp in RFC 3339 format. | `buildPromptVars()`
 | `${DAY}` | Local weekday name (e.g., “Friday”). | `buildPromptVars()`
 | `${TIMEZONE}` | Olson timezone ID (`America/Los_Angeles` fallback `TZ`/`UTC`). | `buildPromptVars()`
-| `${MAX_TURNS}` | Effective `maxToolTurns` after overrides. | Injected in `AIAgentSession`
+| `${MAX_TURNS}` | Effective `maxTurns` after overrides. | Injected in `AIAgentSession`
 | `${FORMAT}` / `{{FORMAT}}` | Target output instructions (“Markdown with tables”, “JSON matching schema X”). | `applyFormat()`
 
 - **CLI inline prompt placeholders** (`ai-agent "sys" "user"` mode only): same as above **plus** the host metadata shown below (see `buildPromptVariables` in `src/cli.ts`). These extras are *not* injected when running `.ai` files via headends.
@@ -185,7 +185,7 @@ You synthesize research data into concise briefs. Answer in ${FORMAT}.
 - **toolName discipline**: Every sub-agent must set `toolName`; it becomes the callable identifier exposed to parent LLMs. Missing `toolName` defaults to sanitized filename but explicit names are safer.
 - **Input validation**: Parents pass arguments that must satisfy the child’s `input` schema. Invalid payloads bubble up as `tool` errors.
 - **Isolation guarantees**: Each sub-agent run gets a new `AIAgentSession` with its own MCP clients, accounting, and context counters. Environment overlays come from the same merged config but no mutable state is shared.
-- **Recursion controls**: Parents inherit `maxToolTurns`, `maxRetries`, etc., to children unless the child frontmatter overrides them. The queue manager enforces process-wide limits across both MCP tools and sub-agents based on the queue each tool binds to.
+- **Recursion controls**: Parents inherit `maxTurns`, `maxRetries`, etc., to children unless the child frontmatter overrides them. The queue manager enforces process-wide limits across both MCP tools and sub-agents based on the queue each tool binds to.
 - **Workflow**:
   1. Parent .ai file lists `agents` (paths) and adds child `toolName` instructions in the prompt.
   2. Run headend/CLI with `--agent parent.ai` so the registry knows about the tree.
@@ -425,11 +425,11 @@ Values can be strings (Anthropic effort labels) or integers (token budgets). Use
 ## 8. Parameter Inheritance & Override Matrix
 | Priority (high→low) | Source | Notes |
 | --- | --- | --- |
-| 1 | CLI flags / Commander options | Includes `--temperature`, `--max-tool-turns`, `--parallel-tool-calls`, `--trace-*`, `--agent`, headend flags. | 
+| 1 | CLI flags / Commander options | Includes `--temperature`, `--max-turns`, `--parallel-tool-calls`, `--trace-*`, `--agent`, headend flags. | 
 | 2 | `globalOverrides` passed to registry/headends | Applies to every agent/sub-agent (headend manager uses same object). |
 | 3 | Agent frontmatter | Agent-specific; overrides config defaults for that file + sub-agents loaded beneath it (unless child overrides). |
 | 4 | `.ai-agent.json` defaults | Resolved per config layer (Section 4). |
-| 5 | Internal hardcoded defaults | Temperature 0.7, topP 1.0, llmTimeout 600 000 ms, toolTimeout 300 000 ms, maxRetries 3, maxToolTurns 10, maxToolCallsPerTurn 10, toolResponseMaxBytes 12 288 bytes, stream false.
+| 5 | Internal hardcoded defaults | Temperature 0.7, topP 1.0, llmTimeout 600 000 ms, toolTimeout 300 000 ms, maxRetries 3, maxTurns 10, maxToolCallsPerTurn 10, toolResponseMaxBytes 12 288 bytes, stream false.
 
 - **Sub-agent propagation**: Parent sessions pass effective options (post-override) when launching child sessions unless the child frontmatter/CLI overrides them. `defaultsForUndefined` ensures missing knobs inherit the parent’s resolved values.
 - **Runtime overrides**: `--override key=value` (applies to all agents) and `--models`/`--tools` CLI args feed `globalOverrides`. Use sparingly.
@@ -530,7 +530,7 @@ Values can be strings (Anthropic effort labels) or integers (token budgets). Use
 | `llmTimeout` | `600000` ms |
 | `toolTimeout` | `300000` ms |
 | `maxRetries` | `3` |
-| `maxToolTurns` | `10` |
+| `maxTurns` | `10` |
 | `maxToolCallsPerTurn` | `10` |
 | `toolResponseMaxBytes` | `12288` bytes |
 | `stream` | `false` |

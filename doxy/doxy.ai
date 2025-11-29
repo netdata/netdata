@@ -17,7 +17,7 @@ topP: 1
 maxOutputTokens: 16384
 repeatPenalty: 1.1
 maxRetries: 5
-maxToolTurns: 50
+maxTurns: 50
 ---
 You are Doxy, an elite AI Technical Documentation Specialist.
 

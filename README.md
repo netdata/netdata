@@ -86,7 +86,7 @@ models:
 agents:
   - web-fetch.ai    # ← These agents are also full planners!
   - web-search.ai   # ← They reason and adapt independently
-maxToolTurns: 20
+maxTurns: 20
 ---
 You are an elite AI company researcher.
 
@@ -248,7 +248,7 @@ This is why you can build production-ready multi-agent systems in the time it ta
   llms: openai/gpt-4o,anthropic/claude-3.5-sonnet,google/gemini-pro  # Fallback chain
   tools: web-search,calculator,file-system   # MCP tools
   limits:
-    maxToolTurns: 10
+    maxTurns: 10
     maxTokens: 50000
     timeout: 300000  # 5 minutes
   ---
@@ -403,7 +403,7 @@ The framework uses a **multi-level configuration system** with clear precedence 
    ```yaml
    ---
    temperature: 0.8
-   maxToolTurns: 15
+   maxTurns: 15
    ---
    ```
    - Agent-specific settings that override config files

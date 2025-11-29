@@ -8,7 +8,7 @@ agents: []
 toolResponseMaxBytes: 12288
 reasoning: high
 maxOutputTokens: 65536
-maxToolTurns: 10
+maxTurns: 10
 maxToolCallsPerTurn: 10
 caching: none
 ---

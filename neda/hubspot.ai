@@ -9,7 +9,7 @@ tools:
   - batch
 toolResponseMaxBytes: 100000
 maxOutputTokens: 16384
-maxToolTurns: 30
+maxTurns: 30
 reasoning: high
 ---
 You are a helpful AI CRM assistant.

@@ -17,7 +17,7 @@ tools:
   - batch
 toolResponseMaxBytes: 65536
 maxOutputTokens: 16384
-maxToolTurns: 30
+maxTurns: 30
 reasoning: high
 ---
 Your Mission: Track in-app engagement to distinguish active users from tire-kickers and identify expansion signals.

@@ -15,7 +15,7 @@ agents:
 toolResponseMaxBytes: 100000
 maxToolCallsPerTurn: 20
 maxOutputTokens: 16384
-maxToolTurns: 20
+maxTurns: 20
 reasoning: none
 ---
 You are an elite AI company researcher.

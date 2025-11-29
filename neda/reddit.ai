@@ -14,7 +14,7 @@ tools:
 agents: []
 toolResponseMaxBytes: 300000
 maxOutputTokens: 8192
-maxToolTurns: 10
+maxTurns: 10
 maxToolCallsPerTurn: 10
 reasoning: none
 ---

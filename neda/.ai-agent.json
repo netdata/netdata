@@ -279,7 +279,7 @@
     "maxOutputTokens": 8192,
     "repeatPenalty": 1.1,
     "stream": false,
-    "maxToolTurns": 10,
+    "maxTurns": 10,
     "mcpInitConcurrency": 10,
     "maxRetries": 3,
     "toolResponseMaxBytes": 32768

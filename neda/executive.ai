@@ -16,7 +16,7 @@ tools:
   - batch
 toolResponseMaxBytes: 15000
 maxOutputTokens: 16384
-maxToolTurns: 50
+maxTurns: 50
 reasoning: high
 ---
 Your Mission: provide business intelligence.

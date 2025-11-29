@@ -13,7 +13,7 @@ agents:
   - source-code.ai
 tools:
   - batch
-maxToolTurns: 10
+maxTurns: 10
 toolResponseMaxBytes: 80000
 maxOutputTokens: 32000
 caching: none

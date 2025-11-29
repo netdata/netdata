@@ -17,7 +17,7 @@ tools:
   - batch
 toolResponseMaxBytes: 32768
 maxOutputTokens: 16384
-maxToolTurns: 40
+maxTurns: 40
 ---
 You are a helpful SRE/DevOps expert, and you are asked questions about Netdata's Production infrastructure, to which you have access via your tools.
 

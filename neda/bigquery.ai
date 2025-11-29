@@ -18,7 +18,7 @@ tools:
   - batch
 toolResponseMaxBytes: 16384
 maxOutputTokens: 16384
-maxToolTurns: 50
+maxTurns: 50
 reasoning: high
 ---
 Your Mission: Query production data to validate infrastructure claims, analyze space activity, and identify ARR/MRR and expansion signals.

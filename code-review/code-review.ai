@@ -18,7 +18,7 @@ agents:
 tools:
   - batch
 
-maxToolTurns: 10
+maxTurns: 10
 temperature: 0.3
 topP: 0.95
 maxOutputTokens: 32768

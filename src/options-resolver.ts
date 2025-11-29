@@ -4,7 +4,7 @@ import type { Configuration, ReasoningLevel, ProviderReasoningValue, CachingMode
 interface CLIOverrides {
   stream?: boolean;
   maxRetries?: number;
-  maxToolTurns?: number;
+  maxTurns?: number;
   maxToolCallsPerTurn?: number;
   llmTimeout?: number;
   toolTimeout?: number;
@@ -28,7 +28,7 @@ interface CLIOverrides {
 interface GlobalLLMOverrides {
   stream?: boolean;
   maxRetries?: number;
-  maxToolTurns?: number;
+  maxTurns?: number;
   maxToolCallsPerTurn?: number;
   llmTimeout?: number;
   toolTimeout?: number;
@@ -53,7 +53,7 @@ interface DefaultsForUndefined {
   llmTimeout?: number;
   toolTimeout?: number;
   maxRetries?: number;
-  maxToolTurns?: number;
+  maxTurns?: number;
   maxToolCallsPerTurn?: number;
   toolResponseMaxBytes?: number;
   reasoning?: ReasoningLevel | 'none';
@@ -70,7 +70,7 @@ interface ResolvedEffectiveOptions {
   llmTimeout: number;
   toolTimeout: number;
   maxRetries: number;
-  maxToolTurns: number;
+  maxTurns: number;
   maxToolCallsPerTurn: number;
   toolResponseMaxBytes: number;
   stream: boolean;
@@ -258,7 +258,7 @@ export function resolveEffectiveOptions(args: {
     llmTimeout: readNum('llmTimeout', fm?.llmTimeout, 600000),
     toolTimeout: readNum('toolTimeout', fm?.toolTimeout, 300000),
     maxRetries: readNum('maxRetries', fm?.maxRetries, 3),
-    maxToolTurns: readNum('maxToolTurns', fm?.maxToolTurns, 10),
+    maxTurns: readNum('maxTurns', fm?.maxTurns, 10),
     maxToolCallsPerTurn: readNum('maxToolCallsPerTurn', (fm as { maxToolCallsPerTurn?: number } | undefined)?.maxToolCallsPerTurn, 10),
     toolResponseMaxBytes: readNum('toolResponseMaxBytes', fm?.toolResponseMaxBytes, 12288),
     stream: ((): boolean => {

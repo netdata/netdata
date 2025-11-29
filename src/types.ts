@@ -405,7 +405,7 @@ export interface Configuration {
     topK?: number | null;
     repeatPenalty?: number | null;
     reasoning?: ReasoningLevel | 'none';
-    maxToolTurns?: number;
+    maxTurns?: number;
     maxToolCallsPerTurn?: number;
     stream?: boolean;
     maxRetries?: number;
@@ -753,7 +753,7 @@ export interface AIAgentOptions {
   traceLLM?: boolean;
   traceMCP?: boolean;
   traceSdk?: boolean;
-  maxToolTurns?: number;
+  maxTurns?: number;
   verbose?: boolean;
   // Optional pre-set session title (does not consume a tool turn)
   initialTitle?: string;

@@ -279,8 +279,8 @@ Add new specialist by:
 
 **"Discovery failed"** - Check target path/URL is valid, GitHub token configured
 
-**"Specialist X failed"** - Check `maxToolTurns` sufficient, review specialist output for errors
+**"Specialist X failed"** - Check `maxTurns` sufficient, review specialist output for errors
 
 **"No issues found"** - Verify specialists received discovery output, check severity threshold
 
-**"Timeout"** - Reduce scope (review fewer files) or increase `maxToolTurns`
+**"Timeout"** - Reduce scope (review fewer files) or increase `maxTurns`

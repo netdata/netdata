@@ -67,7 +67,7 @@ export interface LoadedAgent {
     llmTimeout: number;
     toolTimeout: number;
     maxRetries: number;
-    maxToolTurns: number;
+    maxTurns: number;
     maxToolCallsPerTurn: number;
     toolResponseMaxBytes: number;
     stream: boolean;
@@ -143,7 +143,7 @@ export interface GlobalOverrides {
   llmTimeout?: number;
   toolTimeout?: number;
   maxRetries?: number;
-  maxToolTurns?: number;
+  maxTurns?: number;
   maxToolCallsPerTurn?: number;
   toolResponseMaxBytes?: number;
   stream?: boolean;
@@ -167,7 +167,7 @@ export interface LoadAgentOptions {
   // Optional overrides (CLI precedence) for runtime knobs
   stream?: boolean;
   maxRetries?: number;
-  maxToolTurns?: number;
+  maxTurns?: number;
   maxToolCallsPerTurn?: number;
   llmTimeout?: number;
   toolTimeout?: number;
@@ -195,7 +195,7 @@ export interface LoadAgentOptions {
     llmTimeout?: number;
     toolTimeout?: number;
     maxRetries?: number;
-    maxToolTurns?: number;
+    maxTurns?: number;
   toolResponseMaxBytes?: number;
   maxToolCallsPerTurn?: number;
     reasoning?: ReasoningLevel | 'none';
@@ -437,7 +437,7 @@ function constructLoadedAgent(args: ConstructAgentArgs): LoadedAgent {
     cli: {
       stream: options?.stream,
       maxRetries: options?.maxRetries,
-      maxToolTurns: options?.maxToolTurns,
+      maxTurns: options?.maxTurns,
       maxToolCallsPerTurn: options?.maxToolCallsPerTurn,
       llmTimeout: options?.llmTimeout,
       toolTimeout: options?.toolTimeout,
@@ -632,7 +632,7 @@ function constructLoadedAgent(args: ConstructAgentArgs): LoadedAgent {
       maxOutputTokens: eff.maxOutputTokens,
       repeatPenalty: eff.repeatPenalty,
       maxRetries: eff.maxRetries,
-      maxTurns: eff.maxToolTurns,
+      maxTurns: eff.maxTurns,
       maxToolCallsPerTurn: eff.maxToolCallsPerTurn,
       llmTimeout: eff.llmTimeout,
       toolTimeout: eff.toolTimeout,
@@ -740,7 +740,7 @@ function constructLoadedAgent(args: ConstructAgentArgs): LoadedAgent {
       llmTimeout: eff.llmTimeout,
       toolTimeout: eff.toolTimeout,
       maxRetries: eff.maxRetries,
-      maxToolTurns: eff.maxToolTurns,
+      maxTurns: eff.maxTurns,
       maxToolCallsPerTurn: eff.maxToolCallsPerTurn,
       toolResponseMaxBytes: eff.toolResponseMaxBytes,
       stream: eff.stream,

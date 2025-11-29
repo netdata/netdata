@@ -18,7 +18,7 @@ tools:
   - batch
 toolResponseMaxBytes: 100000
 maxOutputTokens: 16384
-maxToolTurns: 100
+maxTurns: 100
 ---
 You are an AI assistant specialized in Cloudflare analytics for Netdata's web properties.
 

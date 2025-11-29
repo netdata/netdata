@@ -281,7 +281,7 @@ export function resolveDefaults(layers: ResolvedConfigLayer[]): NonNullable<Conf
     'maxOutputTokens',
     'repeatPenalty',
     'stream',
-    'maxToolTurns',
+    'maxTurns',
     'maxRetries',
     'toolResponseMaxBytes',
     'mcpInitConcurrency'

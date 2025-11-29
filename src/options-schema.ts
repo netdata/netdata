@@ -12,7 +12,7 @@ const EFFECTIVE_KEYS = [
   'llmTimeout',
   'toolTimeout',
   'maxRetries',
-  'maxToolTurns',
+  'maxTurns',
   'maxToolCallsPerTurn',
   'toolResponseMaxBytes',
   'stream',

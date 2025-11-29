@@ -31,7 +31,7 @@ output:
 models: anthropic/claude-3-5-sonnet
 tools: mcp-server-1,mcp-server-2
 agents: sub-agent-1,sub-agent-2
-maxToolTurns: 10
+maxTurns: 10
 maxToolCallsPerTurn: 20
 maxRetries: 3
 llmTimeout: 60000
@@ -118,7 +118,7 @@ interface FrontmatterOptions {
   tools?: string | string[];
   agents?: string | string[];
   usage?: string;
-  maxToolTurns?: number;
+  maxTurns?: number;
   maxToolCallsPerTurn?: number;
   maxRetries?: number;
   llmTimeout?: number;
@@ -296,7 +296,7 @@ function buildFrontmatterTemplate(args): Record<string, unknown> {
 - `models`: LLM providers and models
 - `tools`: Tool providers (MCP servers, REST tools)
 - `agents`: Sub-agent definitions
-- `maxToolTurns`: Max LLM turns
+- `maxTurns`: Max LLM turns
 - `maxToolCallsPerTurn`: Max tool calls per turn
 - `maxRetries`: Retry limit
 - `llmTimeout`: LLM timeout in ms

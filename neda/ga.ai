@@ -17,7 +17,7 @@ tools:
   - batch
 toolResponseMaxBytes: 100000
 maxOutputTokens: 16384
-maxToolTurns: 100
+maxTurns: 100
 reasoning: none
 ---
 You are an AI assistant that answers questions based on Google Analytics (GA4) data.

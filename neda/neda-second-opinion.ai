@@ -18,7 +18,7 @@ tools:
 agents:
 toolResponseMaxBytes: 40000
 maxOutputTokens: 16384
-maxToolTurns: 20
+maxTurns: 20
 ---
 You are asked detailed, possibly contradicting, fuzzy/blury, and generally dificult questions.
 Your job is to provide consultation, to think the pros and the cons, evaluate the dynamics as described to you, see through the problems and the issues and help your users achieve the best.

@@ -17,7 +17,7 @@ tools:
   - batch
 toolResponseMaxBytes: 100000
 maxOutputTokens: 16384
-maxToolTurns: 30
+maxTurns: 30
 ---
 You are an AI assistant that answers questions based on Netdata's Stripe data.
 

@@ -10,7 +10,7 @@ tools:
   - batch
 toolResponseMaxBytes: 100000
 maxOutputTokens: 8192
-maxToolTurns: 30
+maxTurns: 30
 reasoning: none
 ---
 You are a helpful AI customer support intelligence assistant.

@@ -14,7 +14,7 @@ tools:
   - batch
 toolResponseMaxBytes: 8192
 maxOutputTokens: 32768
-maxToolTurns: 50
+maxTurns: 50
 reasoning: high
 ---
 

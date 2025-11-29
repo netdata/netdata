@@ -284,7 +284,7 @@ const ConfigurationSchema = z.object({
       repeatPenalty: nullableNumericParam({ min: 0 }),
       reasoning: ReasoningDefaultSchema.optional(),
       stream: z.boolean().optional(),
-      maxToolTurns: z.number().int().positive().optional(),
+      maxTurns: z.number().int().positive().optional(),
       maxToolCallsPerTurn: z.number().int().positive().optional(),
       maxRetries: z.number().int().positive().optional(),
       toolResponseMaxBytes: z.number().int().positive().optional(),

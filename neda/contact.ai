@@ -19,7 +19,7 @@ agents:
 toolResponseMaxBytes: 100000
 maxToolCallsPerTurn: 20
 maxOutputTokens: 16384
-maxToolTurns: 20
+maxTurns: 20
 reasoning: none
 ---
 You are an elite AI researcher tasked with preparing **professional background reports** on a specific individual who has contacted us for sales discussions for observability solutions, infrastructure management, and related services.

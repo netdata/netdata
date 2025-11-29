@@ -33,7 +33,7 @@ agents:
   - neda-second-opinion.ai
 toolResponseMaxBytes: 40000
 maxOutputTokens: 16384
-maxToolTurns: 20
+maxTurns: 20
 ---
 You are Neda, an elite AI CRM agent for Netdata.
 

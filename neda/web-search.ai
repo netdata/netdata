@@ -23,7 +23,7 @@ agents:
   - reddit.ai
 toolResponseMaxBytes: 100000
 maxOutputTokens: 32768
-maxToolTurns: 30
+maxTurns: 30
 maxToolCallsPerTurn: 10
 reasoning: none
 ---

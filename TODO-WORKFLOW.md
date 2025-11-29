@@ -529,7 +529,7 @@ The handoff pattern replaces the previous "next" chaining design. Key elements p
 - **Frontmatter toggle** – Add `chat: true|false` (default **false**) so prompts must opt into clarification-friendly behavior. Advisors/teams (later phases) will require `chat: true`.
 - **Clarification recursion** – Unlimited. A child being clarified may spawn or clarify its own children; chains can be arbitrarily deep.
 - **Pattern composition** – Advisors fire before the main session (pre-spawned chat-enabled helpers). Handoffs/routers run after the main session completes (delegation of the answer). These shortcuts coexist without conflict.
-- **Turn accounting** – Clarifications consume turns for both parent and child. Invoking `agent__ask_clarification` uses up one of the parent’s tool turns, and the child’s response decrements its remaining `maxTurns`/`maxToolTurns`.
+- **Turn accounting** – Clarifications consume turns for both parent and child. Invoking `agent__ask_clarification` uses up one of the parent's tool turns, and the child's response decrements its remaining `maxTurns`.
 - **Clarification UX** – Inject clarification prompts as user messages prefixed with:
   ```markdown
   ## CLARIFICATION REQUEST FROM {parentCallPath}

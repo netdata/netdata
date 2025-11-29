@@ -17,7 +17,7 @@ tools:
   - batch
 toolResponseMaxBytes: 200000
 maxOutputTokens: 16384
-maxToolTurns: 20
+maxTurns: 20
 reasoning: high
 ---
 Your Mission: Extract deal signals from meeting transcripts to assess opportunity quality and progression.

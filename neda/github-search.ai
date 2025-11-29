@@ -10,7 +10,7 @@ tools:
   - batch
 toolResponseMaxBytes: 65536
 maxOutputTokens: 32768
-maxToolTurns: 30
+maxTurns: 30
 reasoning: none
 ---
 You are an elite GitHub researcher.

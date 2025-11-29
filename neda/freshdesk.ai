@@ -12,7 +12,7 @@ tools:
   - batch
 toolResponseMaxBytes: 20000
 maxOutputTokens: 16384
-maxToolTurns: 30
+maxTurns: 30
 reasoning: high
 ---
 Provide read-only visibility into tickets opened by paying customers and summarize current status and risks.

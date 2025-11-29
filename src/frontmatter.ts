@@ -13,7 +13,7 @@ export interface FrontmatterOptions {
   tools?: string | string[];
   agents?: string | string[];
   usage?: string;
-  maxToolTurns?: number;
+  maxTurns?: number;
   maxToolCallsPerTurn?: number;
   maxRetries?: number;
   llmTimeout?: number;
@@ -117,7 +117,7 @@ export function parseFrontmatter(
     if (typeof raw.models === 'string' || Array.isArray(raw.models)) options.models = raw.models as (string | string[]);
     if (typeof raw.tools === 'string' || Array.isArray(raw.tools)) options.tools = raw.tools as (string | string[]);
     if (typeof raw.agents === 'string' || Array.isArray(raw.agents)) options.agents = raw.agents as (string | string[]);
-    if (typeof raw.maxToolTurns === 'number') options.maxToolTurns = raw.maxToolTurns;
+    if (typeof raw.maxTurns === 'number') options.maxTurns = raw.maxTurns;
     if (typeof raw.maxToolCallsPerTurn === 'number') options.maxToolCallsPerTurn = raw.maxToolCallsPerTurn;
     if (typeof raw.maxRetries === 'number') options.maxRetries = raw.maxRetries;
     if (typeof raw.llmTimeout === 'number') options.llmTimeout = raw.llmTimeout;

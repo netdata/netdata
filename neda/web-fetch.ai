@@ -58,7 +58,7 @@ output:
         description: The confidence level (0-100%) of the extraction process
 toolResponseMaxBytes: 300000
 maxOutputTokens: 8192
-maxToolTurns: 5
+maxTurns: 5
 maxToolCallsPerTurn: 2
 caching: none
 reasoning: none

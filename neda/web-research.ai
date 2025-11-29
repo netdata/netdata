@@ -18,7 +18,7 @@ agents:
   - reddit.ai
 toolResponseMaxBytes: 100000
 maxOutputTokens: 32000
-maxToolTurns: 20
+maxTurns: 20
 maxToolCallsPerTurn: 5
 caching: full
 reasoning: high
