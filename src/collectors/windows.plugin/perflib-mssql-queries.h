@@ -788,6 +788,31 @@ struct mssql_publisher_publication {
     RRDDIM *rd_synchronization_time;
 };
 
+// https://learn.microsoft.com/en-us/sql/relational-databases/system-stored-procedures/sp-replmonitorhelpsubscription-transact-sql?view=sql-server-ver17
+struct mssql_subscription_publication {
+    struct mssql_publisher_publication *parent;
+
+    // Additional lables
+    int publication_type;
+    int subtype;
+    char *subscriber_db;
+    char *subscriber;
+
+    // Charts
+    int agent_running;
+    int time_to_expiration;
+    int latency;
+
+    RRDSET *st_agent_running;
+    RRDDIM *rd_agent_running;
+
+    RRDSET *st_time2expiration;
+    RRDDIM *rd_time2expiration;
+
+    RRDSET *st_latency;
+    RRDDIM *rd_latency;
+};
+
 struct mssql_instance {
     char *instanceID;
     int update_every;
