@@ -847,6 +847,7 @@ struct mssql_instance {
     DICTIONARY *databases;
     DICTIONARY *sysjobs;
     DICTIONARY *publisher_publication;
+    DICTIONARY *publication_subscription;
 
     RRDSET *st_conn_memory;
     RRDDIM *rd_conn_memory;

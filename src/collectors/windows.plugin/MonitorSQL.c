@@ -1208,6 +1208,11 @@ void dict_mssql_insert_replication_cb(const DICTIONARY_ITEM *item __maybe_unused
     UNUSED(value);
 }
 
+void dict_mssql_insert_subscription_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
+{
+    UNUSED(value);
+}
+
 void dict_mssql_insert_jobs_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
 {
     UNUSED(value);
@@ -1385,6 +1390,14 @@ void dict_mssql_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, void *valu
             NULL,
             sizeof(struct mssql_publisher_publication));
         dictionary_register_insert_callback(mi->publisher_publication, dict_mssql_insert_replication_cb, NULL);
+    }
+
+    if (unlikely(!mi->publication_subscription)) {
+        mi->publication_subscription = dictionary_create_advanced(
+                DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
+                NULL,
+                sizeof(struct mssql_subscription_publication));
+        dictionary_register_insert_callback(mi->publication_subscription, dict_mssql_insert_subscription_cb, NULL);
     }
 
     if (unlikely(!mi->sysjobs)) {
