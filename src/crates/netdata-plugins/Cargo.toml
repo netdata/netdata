@@ -1,0 +1,20 @@
+[package]
+name = "netdata-plugins"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "netdata-plugins"
+path = "src/main.rs"
+
+[dependencies]
+# Multi-call support
+multicall = { workspace = true }
+
+# Plugin libraries
+log-viewer-plugin = { workspace = true }
+otel-plugin = { workspace = true }
+
+[lints]
+workspace = true
