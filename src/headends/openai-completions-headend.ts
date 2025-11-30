@@ -331,8 +331,8 @@ export class OpenAICompletionsHeadend implements Headend {
     let thinkingBuffer = '';
     let bufferTimer: ReturnType<typeof setTimeout> | undefined;
     const BUFFER_TIMEOUT_MS = 10000;
-
-    // flushThinkingBuffer is defined after ensureTurn (see below) due to hoisting constraints
+    const PROGRESS_TO_MODEL_SEP = '\n---\n\n';
+    const MODEL_TO_PROGRESS_SEP = '\n\n---\n';
 
     const emitAssistantRole = (): void => {
       if (!streamed || assistantRoleSent) return;
@@ -487,23 +487,17 @@ export class OpenAICompletionsHeadend implements Headend {
         bufferTimer = undefined;
       }
       if (thinkingBuffer.length === 0) return;
-      // Ensure header exists before flushing (uses rootTxnId if captured from progress events)
-      ensureHeader(rootTxnId, rootCallPath, agent.id);
       const bufferedContent = thinkingBuffer;
       thinkingBuffer = '';
+      // Switch mode BEFORE emitting
       streamMode = 'model';
-      const turn = ensureTurn();
-      if (turn.progressSeen === true) {
-        turn.thinkingAfterProgress = (turn.thinkingAfterProgress ?? '') + bufferedContent;
-      } else {
-        turn.thinking = (turn.thinking ?? '') + bufferedContent;
-      }
-      flushReasoning();
+      // Emit separator then buffer directly (no escaping, no modification)
+      emitReasoning(PROGRESS_TO_MODEL_SEP);
+      emitReasoning(bufferedContent);
     };
     const startNextTurn = (): void => {
-      // Flush any buffered thinking from previous turn before starting new one
-      flushThinkingBuffer();
-      streamMode = 'progress'; // Reset mode for new turn
+      // DO NOT flush thinking buffer here - it's independent of turns
+      // DO NOT reset streamMode here - mode is controlled by thinking/progress flow
 
       turnCounter += 1;
       const turn: ReasoningTurnState = { index: turnCounter, updates: [], progressSeen: false };
@@ -525,19 +519,12 @@ export class OpenAICompletionsHeadend implements Headend {
     };
     const appendThinkingChunk = (chunk: string): void => {
       if (chunk.length === 0) return;
-      ensureTurn(); // Ensure turn exists for header/structure
 
       if (streamMode === 'model') {
-        // In model mode: emit thinking immediately
-        const turn = ensureTurn();
-        if (turn.progressSeen === true) {
-          turn.thinkingAfterProgress = (turn.thinkingAfterProgress ?? '') + chunk;
-        } else {
-          turn.thinking = (turn.thinking ?? '') + chunk;
-        }
-        flushReasoning();
+        // In model mode: emit directly AS-IS (no escaping, no modification)
+        emitReasoning(chunk);
       } else {
-        // In progress mode: buffer thinking, check for flush conditions
+        // In progress mode: buffer thinking
         thinkingBuffer += chunk;
 
         // Check for newline - if found, flush immediately
@@ -557,11 +544,12 @@ export class OpenAICompletionsHeadend implements Headend {
       const trimmed = line.trim();
       if (trimmed.length === 0) return;
 
-      // Flush any buffered thinking before emitting progress (preserves order)
-      flushThinkingBuffer();
-
-      // Switch to progress mode
-      streamMode = 'progress';
+      // DO NOT flush thinking buffer - it's independent
+      // If in model mode, emit separator and switch to progress
+      if (streamMode === 'model') {
+        emitReasoning(MODEL_TO_PROGRESS_SEP);
+        streamMode = 'progress';
+      }
 
       const turn = ensureTurn();
       turn.updates.push(trimmed);
