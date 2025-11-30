@@ -103,6 +103,9 @@ static void rrdset_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
     rw_spinlock_init(&st->alerts.spinlock);
 
+    // Initialize replication stuck detection counter
+    st->replication_empty_response_count = 0;
+
     // initialize the db tiers
     {
         for(size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
