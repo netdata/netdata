@@ -182,7 +182,7 @@ Netdata's auto-discovery eliminates manual configuration:
 - **Logs as first-class signals**: systemd-journal, `log2journal`, `weblog`, `otelcol.plugin`, and `otel-plugin` provide raw log search and logs-to-metrics conversion for web services, applications, and cloud-native sources.
 - **Custom metrics ingestion**: Prometheus/OpenMetrics scraping, StatsD, and OTLP metrics via `otel-plugin` let instrumented code feed business or application KPIs into Netdata dashboards.
 - **Synthetic monitoring**: go.d collectors like `httpcheck`, `ping`, `portcheck`, `dnsquery`, and `testrandom` run uptime/performance probes against services, APIs, and endpoints, feeding directly into alerts and dashboards + `scripts.d` provides access to 4000+ Nagios plugins.
-- **APM gaps (explicit)**: No distributed tracing or span storage today (OTLP trace ingestion planned for end of 2025), no code-level profiling/flame graphs, no transactional/user-experience monitoring, and limited error tracking (logs/process crashes only).
+- **APM gaps (explicit)**: No distributed tracing or span storage today (OTLP trace ingestion planned for Q2 2026), no code-level profiling/flame graphs, no transactional/user-experience monitoring, and limited error tracking (logs/process crashes only).
 - **Positioning**: Netdata bridges infrastructure monitoring and APM—ideal for zero-instrumentation observability, but designed to complement trace-centric APM platforms for microservice call flows and deep code analysis.
 
 ## 3. Storage & Data Management

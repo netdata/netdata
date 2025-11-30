@@ -79,6 +79,11 @@ Secondary (maintained; use alongside Watch Towers when appropriate)
 - netdata-analytics-bi.data360.space360_latest
 - netdata-analytics-bi.data360.user360_latest
 
+## Boolean Datatypes stored as INT
+
+- Boolean-like flags in the `app_db_replication` tables (e.g., `is_staff`, `is_test_user`) are encoded as integers (0 = false, 1 = true), not as SQL BOOLEAN types.
+- Queries must use integer comparisons (e.g., `= 0` or `= 1`) instead of boolean literals (`= FALSE` or `= TRUE`).
+
 ## DATA FLOW OVERVIEW (grasp this first)
 - PostgreSQL → BigQuery replication (every ~4 hours) into `app_db_replication.<db>_<table>_{_asat_YYYYMMDD|_latest}`
 - Watch Towers jobs compute `watch_towers.spaces_asat_YYYYMMDD` (historical) and `watch_towers.spaces_latest` (current)

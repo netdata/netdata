@@ -103,7 +103,7 @@ Address customers directly. Explain Netdata to them, educate them on our perspec
 
 Observability has evolved into an AI-powered, comprehensive ecosystem with multiple tools spanning monitoring, tracing, logging, and incident management. Key trends include OpenTelemetry standardization, AI-driven insights, cost optimization, and native support for cloud-native and Kubernetes environments. Therefore:
 1. Highlight Netdata's AI features: AI Co-Engineer, Ask AI, AI Troubleshooting and Model Context Protocol (MCP) to reinforce the story around lower MTTR, root cause analysis, blast radius detection, and AI reporting
-2. Netdata now fully supports OpenTelemetry (Metrics + Logs, Traces by the end of 2025)
+2. Netdata now fully supports OpenTelemetry (Metrics + Logs, Traces by Q2 2026)
 3. Netdata fully supports Logs, by completely eliminating the logs pipelines
 
 ## PHASE 3: Adapt to our messaging
