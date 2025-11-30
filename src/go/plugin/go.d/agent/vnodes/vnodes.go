@@ -34,7 +34,10 @@ type VirtualNode struct {
 	Name     string            `yaml:"name" json:"name"`
 	Hostname string            `yaml:"hostname" json:"hostname"`
 	GUID     string            `yaml:"guid" json:"guid"`
+	Address  string            `yaml:"address,omitempty" json:"address,omitempty"`
+	Alias    string            `yaml:"alias,omitempty" json:"alias,omitempty"`
 	Labels   map[string]string `yaml:"labels,omitempty" json:"labels"`
+	Custom   map[string]string `yaml:"custom_vars,omitempty" json:"custom_vars,omitempty"`
 
 	Source     string `yaml:"-" json:"-"`
 	SourceType string `yaml:"-" json:"-"`
@@ -45,16 +48,30 @@ func (v *VirtualNode) Copy() *VirtualNode {
 		return nil
 	}
 
-	labels := make(map[string]string, len(v.Labels))
-	maps.Copy(labels, v.Labels)
+	var labels map[string]string
+	switch {
+	case len(v.Labels) > 0:
+		labels = make(map[string]string, len(v.Labels))
+		maps.Copy(labels, v.Labels)
+	default:
+		labels = make(map[string]string)
+	}
+	var custom map[string]string
+	if len(v.Custom) > 0 {
+		custom = make(map[string]string, len(v.Custom))
+		maps.Copy(custom, v.Custom)
+	}
 
 	return &VirtualNode{
 		Name:       v.Name,
 		Hostname:   v.Hostname,
 		GUID:       v.GUID,
+		Address:    v.Address,
+		Alias:      v.Alias,
 		Source:     v.Source,
 		SourceType: v.SourceType,
 		Labels:     labels,
+		Custom:     custom,
 	}
 }
 
@@ -62,7 +79,10 @@ func (v *VirtualNode) Equal(vn *VirtualNode) bool {
 	return v.Name == vn.Name &&
 		v.Hostname == vn.Hostname &&
 		v.GUID == vn.GUID &&
-		maps.Equal(v.Labels, vn.Labels)
+		v.Address == vn.Address &&
+		v.Alias == vn.Alias &&
+		maps.Equal(v.Labels, vn.Labels) &&
+		maps.Equal(v.Custom, vn.Custom)
 }
 
 func readConfDir(dir string) map[string]*VirtualNode {

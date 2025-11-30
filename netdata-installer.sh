@@ -263,6 +263,7 @@ ENABLE_PYTHON=1
 ENABLE_CHARTS=1
 ENABLE_OTEL=0
 ENABLE_IBM=0
+ENABLE_SCRIPTS=0
 FORCE_LEGACY_CXX=0
 NETDATA_CMAKE_OPTIONS="${NETDATA_CMAKE_OPTIONS-}"
 REMOVE_BUILD=1
@@ -306,6 +307,8 @@ while [ -n "${1}" ]; do
     "--disable-plugin-otel") ENABLE_OTEL=0 ;;
     "--enable-plugin-ibm") ENABLE_IBM=1 ;;
     "--disable-plugin-ibm") ENABLE_IBM=0 ;;
+    "--enable-plugin-scripts") ENABLE_SCRIPTS=1 ;;
+    "--disable-plugin-scripts") ENABLE_SCRIPTS=0 ;;
     "--enable-exporting-kinesis" | "--enable-backend-kinesis")
       # TODO: Needs CMake Support
       ;;
@@ -549,14 +552,21 @@ fi
 trap build_error EXIT
 
 # -----------------------------------------------------------------------------
-# If we’re installing the Go plugin, ensure a working Go toolchain is installed.
-if [ "${ENABLE_GO}" -eq 1 ]; then
+# If we’re building any Go-based component, ensure a working Go toolchain exists.
+NEED_GO_TOOLCHAIN=0
+if [ "${ENABLE_GO}" -eq 1 ] || [ "${ENABLE_IBM}" -eq 1 ] || [ "${ENABLE_SCRIPTS}" -eq 1 ]; then
+  NEED_GO_TOOLCHAIN=1
+fi
+
+if [ "${NEED_GO_TOOLCHAIN}" -eq 1 ]; then
   progress "Checking for a usable Go toolchain and attempting to install one to /usr/local/go if needed."
   . "${NETDATA_SOURCE_DIR}/packaging/check-for-go-toolchain.sh"
 
   if ! ensure_go_toolchain; then
-    warning "Go ${GOLANG_MIN_VERSION} needed to build Go plugin, but could not find or install a usable toolchain: ${GOLANG_FAILURE_REASON}"
+    warning "Go ${GOLANG_MIN_VERSION} needed to build Go-based plugins (go.d, scripts.d, IBM), but could not find or install a usable toolchain: ${GOLANG_FAILURE_REASON}. Disabling those components."
     ENABLE_GO=0
+    ENABLE_IBM=0
+    ENABLE_SCRIPTS=0
   fi
 fi
 

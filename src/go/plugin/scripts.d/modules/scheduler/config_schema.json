@@ -1,0 +1,132 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "scripts.d Scheduler configuration",
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "workers": {
+        "title": "Worker count",
+        "description": "Number of concurrent workers executing jobs (defaults to 50).",
+        "type": "integer",
+        "minimum": 1
+      },
+      "queue_size": {
+        "title": "Queue size",
+        "description": "Capacity of the internal work queue (defaults to 128).",
+        "type": "integer",
+        "minimum": 1
+      },
+      "labels": {
+        "title": "Labels",
+        "description": "Additional labels propagated to scheduler metrics.",
+        "type": "object",
+        "additionalProperties": {
+          "type": "string"
+        }
+      },
+      "logging": {
+        "title": "Logging configuration",
+        "description": "OTLP logging settings for jobs executed by this scheduler.",
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "title": "Enable logging",
+            "type": "boolean",
+            "default": true
+          },
+          "otlp": {
+            "title": "OTLP endpoint",
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "endpoint": {
+                "title": "Endpoint",
+                "type": "string",
+                "default": "127.0.0.1:4317"
+              },
+              "timeout": {
+                "title": "Timeout",
+                "type": "string",
+                "pattern": "^([0-9]+(\\.[0-9]+)?(ns|us|ms|s|m|h|d))+$",
+                "default": "5s"
+              },
+              "tls": {
+                "title": "Use TLS",
+                "type": "boolean",
+                "default": true
+              },
+              "headers": {
+                "title": "Headers",
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                }
+              },
+              "tls_server_name": {
+                "title": "TLS server name",
+                "type": "string"
+              },
+              "tls_ca": {
+                "title": "TLS CA",
+                "type": "string"
+              },
+              "tls_cert": {
+                "title": "TLS certificate",
+                "type": "string"
+              },
+              "tls_key": {
+                "title": "TLS key",
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "required": [],
+    "definitions": {},
+    "additionalProperties": false
+  },
+  "uiSchema": {
+    "uiOptions": {
+      "fullPage": true
+    },
+    "workers": {
+      "ui:placeholder": "50"
+    },
+    "queue_size": {
+      "ui:placeholder": "128"
+    },
+    "labels": {
+      "ui:help": "Key/value pairs attached to scheduler metrics (e.g. region:us-east)",
+      "ui:options": {
+        "addable": true,
+        "removable": true
+      }
+    },
+    "logging": {
+      "enabled": {
+        "ui:widget": "radio",
+        "ui:options": {
+          "inline": true
+        }
+      },
+      "otlp": {
+        "endpoint": {
+          "ui:placeholder": "127.0.0.1:4317"
+        },
+        "timeout": {
+          "ui:placeholder": "5s"
+        },
+        "tls": {
+          "ui:widget": "radio",
+          "ui:options": {
+            "inline": true
+          }
+        }
+      }
+    }
+  }
+}
