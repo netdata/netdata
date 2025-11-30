@@ -554,3 +554,90 @@ export class XmlToolTransport {
     return this.mode === 'xml-final';
   }
 }
+
+/**
+ * Filter for streaming XML final reports.
+ * Strips <ai-agent-{nonce}-FINAL ...> tags and passes through content.
+ */
+export class XmlFinalReportFilter {
+  private readonly openTagPrefix: string;
+  private readonly closeTag: string;
+  private buffer = '';
+  private state: 'search_open' | 'buffering_open' | 'inside' | 'buffering_close' | 'done' = 'search_open';
+  private _hasStreamedContent = false;
+
+  constructor(nonce: string) {
+    this.openTagPrefix = `<ai-agent-${nonce}-FINAL`;
+    this.closeTag = `</ai-agent-${nonce}-FINAL>`;
+  }
+
+  get hasStreamedContent(): boolean {
+    return this._hasStreamedContent;
+  }
+
+  process(chunk: string): string {
+    let output = '';
+    // eslint-disable-next-line functional/no-loop-statements
+    for (const char of chunk) {
+      if (this.state === 'search_open') {
+        if (char === '<') {
+          this.state = 'buffering_open';
+          this.buffer = char;
+        } else {
+          output += char;
+        }
+      } else if (this.state === 'buffering_open') {
+        this.buffer += char;
+        // Check prefix match
+        if (this.buffer.length <= this.openTagPrefix.length) {
+          if (!this.openTagPrefix.startsWith(this.buffer)) {
+            output += this.buffer;
+            this.buffer = '';
+            this.state = 'search_open';
+          }
+        } else {
+          // Buffer longer than prefix
+          if (this.buffer.startsWith(this.openTagPrefix)) {
+            if (char === '>') {
+              // Tag close
+              this.buffer = '';
+              this.state = 'inside';
+              this._hasStreamedContent = true;
+            }
+          } else {
+            // Should not happen if prefix matched before, but safety
+            output += this.buffer;
+            this.buffer = '';
+            this.state = 'search_open';
+          }
+        }
+      } else if (this.state === 'inside') {
+        if (char === '<') {
+          this.state = 'buffering_close';
+          this.buffer = char;
+        } else {
+          output += char;
+        }
+      } else if (this.state === 'buffering_close') {
+        this.buffer += char;
+        if (!this.closeTag.startsWith(this.buffer)) {
+          output += this.buffer;
+          this.buffer = '';
+          this.state = 'inside';
+        } else if (this.buffer === this.closeTag) {
+          this.buffer = '';
+          this.state = 'done';
+        }
+      } else {
+        output += char;
+      }
+    }
+    return output;
+  }
+
+  flush(): string {
+    const ret = this.buffer;
+    this.buffer = '';
+    return ret;
+  }
+}

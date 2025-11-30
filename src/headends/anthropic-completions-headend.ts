@@ -307,6 +307,7 @@ export class AnthropicCompletionsHeadend implements Headend {
     const requestId = randomUUID();
     const streamed = body.stream === true;
     let output = '';
+    let streamedChunks = 0;
     let reasoning = '';
     const accounting: AccountingEntry[] = [];
     let masterSummary: { text?: string; metrics?: ProgressMetrics; statusNote?: string } | undefined;
@@ -696,6 +697,9 @@ export class AnthropicCompletionsHeadend implements Headend {
             content_block: { type: 'text', text_delta: chunk },
           };
           writeSseChunk(res, event);
+          if (chunk.length > 0) {
+            streamedChunks += 1;
+          }
         }
       },
       onThinking: (chunk) => {
@@ -780,7 +784,7 @@ export class AnthropicCompletionsHeadend implements Headend {
         }
         flushReasoning();
         closeThinkingBlock();
-        if (finalText.length > 0) {
+        if (streamedChunks === 0 && finalText.length > 0) {
           openTextBlock();
           const textEvent = {
             type: 'content_block_delta' as const,

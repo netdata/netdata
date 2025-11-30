@@ -47,6 +47,7 @@ import {
 import { addSpanAttributes, addSpanEvent, recordContextGuardMetrics, recordFinalReportMetrics, recordLlmMetrics, recordRetryCollapseMetrics, runWithSpan } from './telemetry/index.js';
 import { processLeakedToolCalls } from './tool-call-fallback.js';
 import { estimateMessagesBytes, formatToolRequestCompact, parseJsonValueDetailed, sanitizeToolName, warn } from './utils.js';
+import { XmlFinalReportFilter } from './xml-transport.js';
 
 /**
  * Immutable configuration and collaborators passed to TurnRunner
@@ -158,6 +159,7 @@ export class TurnRunner {
     private readonly ctx: TurnRunnerContext;
     private readonly callbacks: TurnRunnerCallbacks;
     private state: TurnRunnerState;
+    private finalReportStreamed = false;
 
     constructor(ctx: TurnRunnerContext, callbacks: TurnRunnerCallbacks) {
         this.ctx = ctx;
@@ -1880,23 +1882,25 @@ export class TurnRunner {
             }
         }
         if (this.ctx.sessionConfig.renderTarget !== 'sub-agent' && this.callbacks.onOutput !== undefined) {
-            const finalOutput = (() => {
-                if (fr.format === 'json' && fr.content_json !== undefined) {
-                    try {
-                        return JSON.stringify(fr.content_json);
+            if (!this.finalReportStreamed) {
+                const finalOutput = (() => {
+                    if (fr.format === 'json' && fr.content_json !== undefined) {
+                        try {
+                            return JSON.stringify(fr.content_json);
+                        }
+                        catch {
+                            return undefined;
+                        }
                     }
-                    catch {
-                        return undefined;
+                    if (typeof fr.content === 'string' && fr.content.length > 0)
+                        return fr.content;
+                    return undefined;
+                })();
+                if (finalOutput !== undefined) {
+                    this.callbacks.onOutput(finalOutput);
+                    if (!finalOutput.endsWith('\n')) {
+                        this.callbacks.onOutput('\n');
                     }
-                }
-                if (typeof fr.content === 'string' && fr.content.length > 0)
-                    return fr.content;
-                return undefined;
-            })();
-            if (finalOutput !== undefined) {
-                this.callbacks.onOutput(finalOutput);
-                if (!finalOutput.endsWith('\n')) {
-                    this.callbacks.onOutput('\n');
                 }
             }
         }
@@ -2579,6 +2583,16 @@ export class TurnRunner {
             }
             return [];
         })();
+        let xmlFilter: XmlFinalReportFilter | undefined;
+        if (this.ctx.xmlTransport !== undefined && (this.ctx.toolTransport === 'xml-final' || this.ctx.toolTransport === 'xml')) {
+            const nonce = this.ctx.xmlTransport.getNonce();
+            if (nonce !== undefined) {
+                xmlFilter = new XmlFinalReportFilter(nonce);
+            }
+        }
+        // Reset streaming flag for this attempt
+        this.finalReportStreamed = false;
+
         const request = {
             messages: requestMessages,
             provider,
@@ -2599,7 +2613,18 @@ export class TurnRunner {
             onChunk: (chunk: string, type: 'content' | 'thinking') => {
                 const isRootSession = this.ctx.parentTxnId === undefined;
                 if (type === 'content' && this.callbacks.onOutput !== undefined) {
-                    this.callbacks.onOutput(chunk);
+                    if (xmlFilter !== undefined) {
+                        const filtered = xmlFilter.process(chunk);
+                        if (filtered.length > 0) {
+                            this.callbacks.onOutput(filtered);
+                            // Only mark as streamed if we actually emitted content (and are inside the tag)
+                            if (xmlFilter.hasStreamedContent) {
+                                this.finalReportStreamed = true;
+                            }
+                        }
+                    } else {
+                        this.callbacks.onOutput(chunk);
+                    }
                 }
                 else if (type === 'thinking') {
                     const trimmedThinking = chunk.trim();
@@ -2694,6 +2719,17 @@ export class TurnRunner {
         }
         catch (e) {
             throw e;
+        }
+        finally {
+            if (xmlFilter !== undefined && this.callbacks.onOutput !== undefined) {
+                const left = xmlFilter.flush();
+                if (left.length > 0) {
+                    this.callbacks.onOutput(left);
+                    if (xmlFilter.hasStreamedContent) {
+                        this.finalReportStreamed = true;
+                    }
+                }
+            }
         }
     }
     mergePendingRetryMessages(conversation: ConversationMessage[]): ConversationMessage[] {
