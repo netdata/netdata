@@ -660,7 +660,7 @@ export class AIAgentSession {
           this.log(entry);
         },
         setFinalReport: (p) => {
-          const normalizedStatus: 'success' | 'failure' | 'partial' = p.status;
+          const normalizedStatus: 'success' | 'failure' = p.status;
           this.commitFinalReport({
             status: normalizedStatus,
             format: p.format as 'json'|'markdown'|'markdown+mermaid'|'slack-block-kit'|'tty'|'pipe'|'sub-agent'|'text',

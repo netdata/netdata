@@ -138,9 +138,9 @@ export class FinalReportManager {
   /**
    * Get the status of the committed final report
    */
-  getStatus(): 'success' | 'failure' | 'partial' | undefined {
+  getStatus(): 'success' | 'failure' | undefined {
     const status = this.finalReport?.status;
-    if (status === 'success' || status === 'failure' || status === 'partial') {
+    if (status === 'success' || status === 'failure') {
       return status;
     }
     return undefined;
@@ -268,22 +268,17 @@ export class FinalReportManager {
     const pickString = (value: unknown): string | undefined =>
       (typeof value === 'string' ? value : undefined);
 
-    const statusRaw = json.status;
     const formatRaw = pickString(json.report_format) ?? pickString(json.format);
     const contentJsonRaw = json.content_json;
     const contentJson = isRecord(contentJsonRaw) ? contentJsonRaw : undefined;
     const contentCandidate = pickString(json.report_content) ?? pickString(json.content);
 
-    if (typeof statusRaw !== 'string') return undefined;
-
     const formatCandidate = (formatRaw ?? '').trim();
     const formatMatch = FINAL_REPORT_FORMAT_VALUES.find((value) => value === formatCandidate);
     if (formatMatch === undefined) return undefined;
 
-    const normalizedStatus = statusRaw === 'success' || statusRaw === 'failure' || statusRaw === 'partial'
-      ? statusRaw
-      : undefined;
-    if (normalizedStatus === undefined) return undefined;
+    // Model-provided final reports always have status 'success'
+    const normalizedStatus: 'success' | 'failure' = 'success';
 
     let finalContent: string | undefined = contentCandidate;
     if ((finalContent === undefined || finalContent.trim().length === 0) && contentJson !== undefined) {

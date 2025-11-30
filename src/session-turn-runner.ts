@@ -31,7 +31,6 @@ import {
   CONTENT_GUIDANCE_TEXT,
   CONTEXT_FINAL_MESSAGE,
   FINAL_REPORT_CONTENT_MISSING,
-  FINAL_REPORT_INVALID_STATUS,
   FINAL_REPORT_JSON_REQUIRED,
   FINAL_REPORT_SLACK_MESSAGES_MISSING,
   TURN_FAILED_NO_TOOLS_NO_REPORT_CONTENT_PRESENT,
@@ -879,10 +878,10 @@ export class TurnRunner {
 
                                 // =================================================================
                                 // LAYER 1: Transport/Wrapper extraction
-                                // Extract wrapper fields (status, format) separately from payload
+                                // Extract wrapper fields (format) separately from payload
+                                // Status is always 'success' for model-provided final reports
                                 // =================================================================
-                                const statusValue = params.status;
-                                const status = typeof statusValue === 'string' && statusValue.trim().length > 0 ? statusValue.trim() : undefined;
+                                const normalizedStatus: 'success' | 'failure' = 'success';
                                 const formatParamRaw = params.report_format;
                                 const formatParam = typeof formatParamRaw === 'string' && formatParamRaw.trim().length > 0 ? formatParamRaw.trim() : undefined;
                                 const metadataCandidate = params.metadata;
@@ -898,43 +897,6 @@ export class TurnRunner {
                                 const messagesValue = params.messages;
                                 const messagesParam = Array.isArray(messagesValue) ? messagesValue : undefined;
                                 const contentJsonCandidate = params.content_json;
-
-                                // Validate wrapper: status is required
-                                if (status === undefined) {
-                                    const reason = 'Final report missing required status; expected success|failure|partial.';
-                                    this.log({
-                                        timestamp: Date.now(),
-                                        severity: 'WRN' as const,
-                                        turn: currentTurn,
-                                        subturn: 0,
-                                        direction: 'response' as const,
-                                        type: 'llm' as const,
-                                        remoteIdentifier: 'agent:final-report-parse',
-                                        fatal: false,
-                                        message: reason,
-                                    });
-                                    this.logFinalReportDump(currentTurn, params, 'missing status', rawContent);
-                                    this.addTurnFailure(reason);
-                                    return false;
-                                }
-                                const normalizedStatus = status === 'success' || status === 'failure' || status === 'partial' ? status : undefined;
-                                if (normalizedStatus === undefined) {
-                                    const warnEntry = {
-                                        timestamp: Date.now(),
-                                        severity: 'WRN' as const,
-                                        turn: currentTurn,
-                                        subturn: 0,
-                                        direction: 'response' as const,
-                                        type: 'llm' as const,
-                                        remoteIdentifier: 'agent:final-report-parse',
-                                        fatal: false,
-                                        message: `Final report tool call has invalid status '${status}' (expected success|failure|partial); ignoring this attempt.`,
-                                    };
-                                    this.log(warnEntry);
-                                    this.logFinalReportDump(currentTurn, params, `invalid status '${status}'`, rawContent);
-                                    this.addTurnFailure(FINAL_REPORT_INVALID_STATUS);
-                                    return false;
-                                }
 
                                 // Validate wrapper: format must match expected
                                 const formatCandidate = formatParam ?? expectedFormat;
@@ -1232,7 +1194,7 @@ export class TurnRunner {
                                 }
                             }
                             const statusCandidate = this.getFinalReportStatus();
-                            const finalReportStatus = statusCandidate === 'success' || statusCandidate === 'failure' || statusCandidate === 'partial'
+                            const finalReportStatus = statusCandidate === 'success' || statusCandidate === 'failure'
                                 ? statusCandidate
                                 : 'missing';
                             const finalReportSucceeded = finalReportStatus === 'success';
@@ -1960,7 +1922,7 @@ export class TurnRunner {
             customLabels: this.ctx.telemetryLabels,
         });
         this.emitFinalSummary(logs, accounting);
-        // CONTRACT §2: success: true only for status 'success', false for 'failure' or 'partial'
+        // success: true for model-provided reports (status='success'), false for synthetic failures (status='failure')
         const success = fr.status === 'success';
         // When status is failure/partial, propagate content as error for display (string or JSON)
         const error = (() => {
@@ -2081,9 +2043,9 @@ export class TurnRunner {
         const modelSegment = metadata?.actualModel ?? model;
         return `${providerSegment}:${modelSegment}`;
     }
-    private getFinalReportStatus(): 'success' | 'failure' | 'partial' | undefined {
+    private getFinalReportStatus(): 'success' | 'failure' | undefined {
         const status = this.finalReport?.status;
-        if (status === 'success' || status === 'failure' || status === 'partial') {
+        if (status === 'success' || status === 'failure') {
             return status;
         }
         return undefined;

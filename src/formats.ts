@@ -12,9 +12,8 @@ interface OutputFormat {
 // Slack Block Kit schema - shared between native tool and xml-final modes
 const SLACK_BLOCK_KIT_SCHEMA: Record<string, unknown> = {
   type: 'object',
-  required: ['status', 'report_format', 'messages'],
+  required: ['report_format', 'messages'],
   properties: {
-    status: { type: 'string', enum: ['success', 'failure', 'partial'] },
     report_format: { type: 'string', const: 'slack-block-kit' },
     messages: {
       type: 'array',

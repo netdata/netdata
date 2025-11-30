@@ -24,7 +24,7 @@ export type ScenarioStepResponse =
       assistantText?: string;
       reportContent: string;
       reportFormat: string;
-      status?: 'success' | 'failure' | 'partial';
+      status?: 'success' | 'failure';
       reportContentJson?: Record<string, unknown>;
       tokenUsage?: TokenUsage;
       reasoning?: ReasoningOutput[];

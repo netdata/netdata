@@ -79,15 +79,6 @@ export const turnFailedPrefix = (reasons: string[]): string =>
   `TURN-FAILED: ${reasons.join(' | ')}.`;
 
 /**
- * When final report status is invalid.
- * Used in: session-turn-runner.ts via addTurnFailure
- *
- * CONDITION: final_report tool called && status !== 'success' && status !== 'failure' && status !== 'partial'
- */
-export const FINAL_REPORT_INVALID_STATUS =
-  'Final report status invalid; expected: success|failure|partial.';
-
-/**
  * When final report format doesn't match expected.
  * Used in: session-turn-runner.ts via addTurnFailure
  *
@@ -188,7 +179,7 @@ export const finalReportReminder = (
   formatDescription: string,
   contentGuidance: string
 ): string =>
-  `System notice: call ${finalReportTool} with report_format="${format}" (${formatDescription}), set status to success, failure, or partial as appropriate, and ${contentGuidance}.`;
+  `System notice: call ${finalReportTool} with report_format="${format}" (${formatDescription}), and ${contentGuidance}.`;
 
 /**
  * Content guidance for JSON format.

@@ -179,9 +179,8 @@ export function renderXmlNext(payload: XmlNextPayload): string {
     // For JSON format: show the tool wrapper with user's schema nested in content_json
     const toolSchema = {
       type: 'object',
-      required: ['status', 'report_format', 'content_json'],
+      required: ['report_format', 'content_json'],
       properties: {
-        status: { type: 'string', enum: ['success', 'failure', 'partial'], description: 'Task completion status' },
         report_format: { type: 'string', const: 'json' },
         content_json: finalSchema,
       }
@@ -202,7 +201,7 @@ export function renderXmlNext(payload: XmlNextPayload): string {
     lines.push('Wrap your JSON in these XML tags:');
   }
   lines.push('```');
-  lines.push(`<ai-agent-${finalReportSlot.slotId} tool="agent__final_report" status="success|failure|partial" format="${expectedFinalFormat}">`);
+  lines.push(`<ai-agent-${finalReportSlot.slotId} tool="agent__final_report" format="${expectedFinalFormat}">`);
   if (expectedFinalFormat === 'json' || formatSchema !== undefined) {
     lines.push('{ ... your JSON here ... }');
   } else {
@@ -215,7 +214,6 @@ export function renderXmlNext(payload: XmlNextPayload): string {
   lines.push('**CRITICAL: Final Report Checklist**');
   lines.push('When ready to provide your final report, iterate through the following checklist:');
   lines.push('- [ ] The opening XML tag MUST be first in your response');
-  lines.push('- [ ] The status XML attribute must be one of: success, failure, partial');
   lines.push('- [ ] Your report content/payload matches the expected format');
   lines.push('- [ ] Your output MUST end with the closing XML tag');
   lines.push('- [ ] Your entire report is between the opening and closing XML tags, not outside them');

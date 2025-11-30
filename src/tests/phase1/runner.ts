@@ -6963,7 +6963,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
   },
   {
     id: 'run-test-88',
-    description: 'Final report partial status is propagated.',
+    description: 'Model-provided final report results in success status.',
     configure: (_configuration: Configuration, sessionConfig: AIAgentSessionConfig) => {
       sessionConfig.maxTurns = 1;
     },
@@ -6985,12 +6985,13 @@ if (process.env.CONTEXT_DEBUG === 'true') {
           };
         }
         if (invocation === 2) {
-          const partialContent = 'Partial success: gathered overview, missing detailed metrics.';
+          // Model-provided final reports always result in status='success'
+          const reportContent = 'Report content: gathered overview with available metrics.';
           if (activeSession !== undefined) {
             (activeSession as unknown as { finalReport?: { status: string; format: 'markdown'; content: string } }).finalReport = {
-              status: 'partial',
+              status: 'success',
               format: 'markdown',
-              content: partialContent,
+              content: reportContent,
             };
           }
           const assistantMessage = {
@@ -7001,9 +7002,8 @@ if (process.env.CONTEXT_DEBUG === 'true') {
                 name: 'agent__final_report',
                 id: FINAL_REPORT_CALL_ID,
                 parameters: {
-                  status: 'partial',
                   report_format: 'markdown',
-                  report_content: partialContent,
+                  report_content: reportContent,
                 },
               },
             ],
@@ -7011,7 +7011,7 @@ if (process.env.CONTEXT_DEBUG === 'true') {
           const toolMessage = {
             role: 'tool',
             toolCallId: FINAL_REPORT_CALL_ID,
-            content: partialContent,
+            content: reportContent,
           };
           return {
             status: { type: 'success', hasToolCalls: true, finalAnswer: true },
@@ -7030,12 +7030,12 @@ if (process.env.CONTEXT_DEBUG === 'true') {
       }
     },
     expect: (result: AIAgentResult) => {
-      // CONTRACT §2: success: false when finalReport.status is 'partial'
-      invariant(!result.success, 'Scenario run-test-88 should have success=false when finalReport.status=partial per CONTRACT.');
+      // Model-provided final reports always result in success=true, status='success'
+      invariant(result.success, 'Scenario run-test-88 should have success=true for model-provided final report.');
       const finalReport = result.finalReport;
       invariant(finalReport !== undefined, 'Final report missing for run-test-88.');
-      invariant(finalReport.status === 'partial', 'Final report status should be partial for run-test-88.');
-      invariant(typeof finalReport.content === 'string' && finalReport.content.includes('Partial success'), 'Final report content mismatch for run-test-88.');
+      invariant(finalReport.status === 'success', 'Final report status should be success for run-test-88.');
+      invariant(typeof finalReport.content === 'string' && finalReport.content.includes('gathered overview'), 'Final report content mismatch for run-test-88.');
       const exitLog = result.logs.find((entry) => entry.remoteIdentifier === EXIT_FINAL_REPORT_IDENTIFIER);
       invariant(exitLog !== undefined, 'EXIT-FINAL-ANSWER log missing for run-test-88.');
     },

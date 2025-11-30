@@ -24,7 +24,7 @@ interface InternalToolProviderOptions {
   maxToolCallsPerTurn: number;
   updateStatus: (text: string) => void;
   setTitle: (title: string, emoji?: string) => void;
-  setFinalReport: (payload: { status: 'success'|'failure'|'partial'; format: string; content?: string; content_json?: Record<string, unknown>; metadata?: Record<string, unknown>; messages?: unknown[] }) => void;
+  setFinalReport: (payload: { status: 'success'|'failure'; format: string; content?: string; content_json?: Record<string, unknown>; metadata?: Record<string, unknown>; messages?: unknown[] }) => void;
   logError: (message: string) => void;
   orchestrator: ToolsOrchestrator;
   getCurrentTurn: () => number;
@@ -221,7 +221,6 @@ export class InternalToolProvider extends ToolProvider {
     lines.push(`#### ${FINAL_REPORT_TOOL} - How to Deliver Your Final Answer`);
     lines.push(`- You MUST call '${FINAL_REPORT_TOOL}' to provide your final answer to the user. All the content of your final report MUST be delivered using this tool.`);
     lines.push('- Required fields:');
-    lines.push('  - `status`: one of `success`, `failure`, `partial`.');
     if (this.formatId === 'json') {
       lines.push(`  - ${REPORT_FORMAT_LABEL}: "json".`);
       lines.push('  - `content_json`: MUST match the required JSON Schema exactly.');
@@ -275,7 +274,6 @@ export class InternalToolProvider extends ToolProvider {
   }
 
   private buildFinalReportTool(): MCPTool {
-    const statusProp = { type: 'string', enum: ['success', 'failure', 'partial'] } as const;
     const metadataProp = { type: 'object' };
     const baseDescription = 'You MUST use agent__final_report to provide your final response to the user request.';
 
@@ -287,9 +285,8 @@ export class InternalToolProvider extends ToolProvider {
         inputSchema: {
           type: 'object',
           additionalProperties: false,
-          required: ['status', 'report_format', 'content_json'],
+          required: ['report_format', 'content_json'],
           properties: {
-            status: statusProp,
             report_format: { type: 'string', const: 'json', description: this.formatDescription },
             content_json: schema,
             metadata: metadataProp,
@@ -306,9 +303,8 @@ export class InternalToolProvider extends ToolProvider {
         inputSchema: {
           type: 'object',
           additionalProperties: false,
-          required: ['status', 'report_format', 'messages'],
+          required: ['report_format', 'messages'],
           properties: {
-            status: statusProp,
             report_format: { type: 'string', const: SLACK_BLOCK_KIT_FORMAT, description: this.formatDescription },
             messages: {
               type: 'array',
@@ -419,9 +415,8 @@ export class InternalToolProvider extends ToolProvider {
       inputSchema: {
         type: 'object',
         additionalProperties: false,
-        required: ['status', 'report_format', 'report_content'],
+        required: ['report_format', 'report_content'],
         properties: {
-          status: statusProp,
           report_format: { type: 'string', const: this.formatId, description: this.formatDescription },
           report_content: { type: 'string', minLength: 1, description: 'MANDATORY: the content of your final report.' },
           metadata: metadataProp,
@@ -441,7 +436,8 @@ export class InternalToolProvider extends ToolProvider {
       return { ok: true, result: JSON.stringify({ ok: true }), latencyMs: Date.now() - start, kind: this.kind, namespace: this.namespace };
     }
     if (name === 'agent__final_report') {
-      const status = (typeof parameters.status === 'string' ? parameters.status : 'success') as 'success'|'failure'|'partial';
+      // Model-provided final report is always success; synthetic failures set status separately
+      const status: 'success' | 'failure' = 'success';
       const requestedFormat = typeof parameters.report_format === 'string' ? parameters.report_format : (typeof parameters.format === 'string' ? parameters.format : undefined);
       if (requestedFormat !== undefined && requestedFormat !== this.formatId) {
         this.opts.logError(`agent__final_report: received report_format='${requestedFormat}', expected '${this.formatId}'. Proceeding with expected format.`);
@@ -845,16 +841,25 @@ export class InternalToolProvider extends ToolProvider {
       }
 
       interface NormalizedCall { id: string; tool: string; parameters: Record<string, unknown> }
-      const normalizedCalls: NormalizedCall[] = calls.map((cUnknown) => {
+      const normalizedCalls: NormalizedCall[] = calls.map((cUnknown, idx) => {
         const c = (cUnknown !== null && typeof cUnknown === 'object') ? (cUnknown as Record<string, unknown>) : {};
-        const id = typeof c.id === 'string' ? c.id : (typeof c.id === 'number' ? String(c.id) : '');
-        const tool = typeof c.tool === 'string' ? c.tool : '';
-        const parsedParameters = parseJsonRecord(c.parameters);
+
+        // Normalize id: use id, or generate one if missing
+        const rawId = c.id;
+        const id = typeof rawId === 'string' ? rawId : (typeof rawId === 'number' ? String(rawId) : `call_${String(idx)}`);
+
+        // Normalize tool: prefer 'tool', fall back to 'name'
+        const rawTool = c.tool ?? c.name;
+        const tool = typeof rawTool === 'string' ? rawTool : '';
+
+        // Normalize parameters: prefer 'parameters', fall back to 'arguments'
+        const rawParams = c.parameters ?? c.arguments;
+        const parsedParameters = parseJsonRecord(rawParams);
         if (parsedParameters === undefined) {
-          if (c.parameters !== undefined) {
-            this.opts.logError(`agent__batch call '${id || '[missing id]'}' parameters invalid (raw preview: ${previewRawValue(c.parameters)})`);
+          if (rawParams !== undefined) {
+            this.opts.logError(`agent__batch call '${id}' parameters invalid (raw preview: ${previewRawValue(rawParams)})`);
           } else {
-            this.opts.logError(`agent__batch call '${id || '[missing id]'}' missing parameters; defaulting to empty object.`);
+            this.opts.logError(`agent__batch call '${id}' missing parameters; defaulting to empty object.`);
           }
         }
         const provided = parsedParameters ?? {};

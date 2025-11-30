@@ -86,10 +86,11 @@ These rules MUST hold in all cases, regardless of configuration.
 ### Always Return Output
 
 **The application NEVER crashes without returning `AIAgentResult`**
-- Success cases: `success: true`, `finalReport` with `status: 'success'`
-- Failure cases: `success: false`, `finalReport` with `status: 'failure'` or `'partial'`
-- Max turns exhausted: synthetic failure report with `metadata.reason: 'max_turns_exhausted'`
+- Model-provided final report: `success: true`, `finalReport` with `status: 'success'`
+- Synthetic failure (max turns, context overflow): `success: false`, `finalReport` with `status: 'failure'`
 - Fatal errors (auth, quota): `success: false`, `error` field populated
+
+**Note**: The `status` field is determined by the source of the final report, not by model input. Models do not provide a status field; the system sets it based on whether the report was model-provided (success) or synthetic (failure).
 
 ### CLI Exit Codes
 
@@ -269,17 +270,19 @@ The `accounting` array in `AIAgentResult` provides observable telemetry for veri
 
 ### Final Report Structure
 
-**Required fields:**
-- `status`: `'success'` | `'failure'` | `'partial'`
+**System-determined fields:**
+- `status`: `'success'` | `'failure'` — determined by source, not model input:
+  - `'success'`: Model provided a final report via tool call or text fallback
+  - `'failure'`: System generated a synthetic failure report (max turns, context overflow)
 - `format`: Output format (must match session `expectedOutputFormat`)
+- `ts`: Timestamp when report was captured
+
+**Model-provided fields:**
 - Content field (varies by format):
   - JSON format: `content_json` object
   - Slack format: `messages` array
   - Other formats: `content` string
-
-**Optional fields:**
-- `metadata`: Additional structured data
-- `ts`: Timestamp when report was captured
+- `metadata`: Additional structured data (optional)
 
 ### Format Enforcement
 
@@ -462,12 +465,13 @@ Any deviation from the guarantees above is a **contract violation** and must be 
 - XML-NEXT (ephemeral, not stored/cached): per-turn instructions with the current nonce, available tools and their JSON schemas, slot templates, progress slot (optional), and final-report slot. In forced-final turns it only advertises the final-report slot (and optional progress).
 
 **Final-report via XML**
-- Final-report uses a reserved slot in XML-NEXT (`tool="agent__final_report"`, status attribute, format attribute, raw content).
-- Tag attributes: `status="success|failure|partial"`, `format="<expected-format>"`.
+- Final-report uses a reserved slot in XML-NEXT (`tool="agent__final_report"`, format attribute, raw content).
+- Tag attributes: `format="<expected-format>"`.
+- Status is not provided by the model; system determines status based on source (model-provided = success, synthetic = failure).
 - Processing uses 3-layer architecture:
-  1. **Layer 1 (Transport)**: Extract `status` and `format` from XML tag attributes; extract raw payload from tag content.
+  1. **Layer 1 (Transport)**: Extract `format` from XML tag attributes; extract raw payload from tag content.
   2. **Layer 2 (Format Processing)**: Process payload based on format—`sub-agent` is opaque passthrough (no validation), `json` parses and validates, `slack-block-kit` expects messages array, text formats use raw content.
-  3. **Layer 3 (Final Report)**: Construct clean final report object. Wrapper fields never pollute payload content.
+  3. **Layer 3 (Final Report)**: Construct clean final report object with status='success'. Wrapper fields never pollute payload content.
 - This separation ensures user schema fields are never overwritten by transport metadata.
 
 **Unclosed final-report tag handling**
