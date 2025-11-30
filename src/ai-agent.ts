@@ -1381,7 +1381,10 @@ export class AIAgentSession {
         opTreeAscii: (() => { try { return this.opTree.renderAscii(); } catch { return undefined; } })(),
         opTree: (() => { try { return this.opTree.getSession(); } catch { return undefined; } })(),
       } as AIAgentResult;
-      this.emitAgentCompletion(result.success, result.error);
+      // Decouple progress events from model-given status: emit agent_finished if final report exists
+      // Model status (success/failure/partial) is semantic for parent agent, not a system failure indicator
+      const hasFinalReport = result.finalReport !== undefined;
+      this.emitAgentCompletion(hasFinalReport, hasFinalReport ? undefined : result.error);
       // Phase B/C: persist final session and accounting ledger
       try {
         await this.persistSessionSnapshot('final');
