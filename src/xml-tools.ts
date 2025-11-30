@@ -176,18 +176,10 @@ export function renderXmlNext(payload: XmlNextPayload): string {
   lines.push('Once your task is complete, provide your final report/answer using this output:');
   lines.push('');
   if (expectedFinalFormat === 'json' && finalSchema !== undefined) {
-    // For JSON format: show the tool wrapper with user's schema nested in content_json
-    const toolSchema = {
-      type: 'object',
-      required: ['report_format', 'content_json'],
-      properties: {
-        report_format: { type: 'string', const: 'json' },
-        content_json: finalSchema,
-      }
-    };
+    // For JSON format: show the user's schema directly (format is already in XML attribute)
     lines.push('Your response must be a JSON object matching this schema:');
     lines.push('```json');
-    lines.push(JSON.stringify(toolSchema, null, 2));
+    lines.push(JSON.stringify(finalSchema, null, 2));
     lines.push('```');
     lines.push('');
     lines.push('Wrap your JSON in these XML tags:');
