@@ -1,0 +1,20 @@
+pattern: "(?P<msg>.*)"
+
+# Test arrays with single items
+
+inject:
+  - key: SINGLE_INJECTION
+    value: "only one"
+  - key: INLINE_SINGLE
+    value: "inline"
+
+rewrite:
+  - key: SINGLE_REWRITE
+    value: "${msg}"
+    inject: yes
+
+rename:
+  - old_key: OLD_SINGLE
+    new_key: NEW_SINGLE
+
+# Test that order is preserved when there's only one item
