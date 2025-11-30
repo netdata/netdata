@@ -31,6 +31,7 @@
 - Chore(go.d): fix get dim value ([#21363](https://github.com/netdata/netdata/issues/21363))
 - Add netdata user to video group ([#21359](https://github.com/netdata/netdata/issues/21359))
 - Fix(docker): fix bugs and refactor Docker entrypoint script ([#21364](https://github.com/netdata/netdata/issues/21364))
+- Regenerate integrations docs ([#21346](https://github.com/netdata/netdata/issues/21346))
 
 ## [2.8.0] - 2025-11-19
 
