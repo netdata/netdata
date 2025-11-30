@@ -745,6 +745,47 @@ install_netdata_service() {
   return 1
 }
 
+install_netdata_tmpfiles() {
+  if [ "${UID}" -eq 0 ]; then
+    run mkdir -p /usr/lib/tmpfiles.d || return 1
+    run install -m 0644 -p "${NETDATA_PREFIX}/usr/lib/netdata/system/systemd/tmpfiles/netdata.conf" /usr/lib/tmpfiles.d/netdata.conf || return 1
+    return 0
+  else
+    return 1
+  fi
+}
+
+install_netdata_dirs() {
+  _DIRS_INSTALLED=0
+  if install_netdata_tmpfiles && command -v systemd-tmpfiles >/dev/null 2>&1 ; then
+    systemd-tmpfiles --create /usr/lib/tmpfiles.d/netdata.conf && _DIRS_INSTALLED=1
+  fi
+
+  if [ "${_DIRS_INSTALLED}" -eq 0 ]; then
+    for x in "${NETDATA_LIB_DIR}" "${NETDATA_CACHE_DIR}" "${NETDATA_LOG_DIR}"; do
+      if [ ! -d "${x}" ]; then
+        echo >&2 "Creating directory '${x}'"
+        if ! run mkdir -p "${x}"; then
+          warning "Failed to create ${x}, it must be created by hand or the Netdata Agent will not be able to be started."
+        fi
+      fi
+
+      run chown -R "${NETDATA_USER}:${NETDATA_GROUP}" "${x}"
+    done
+
+    run chmod 755 "${NETDATA_LOG_DIR}"
+
+    if [ ! -d "${NETDATA_CLAIMING_DIR}" ]; then
+      echo >&2 "Creating directory '${NETDATA_CLAIMING_DIR}'"
+      if ! run mkdir -p "${NETDATA_CLAIMING_DIR}"; then
+        warning "failed to create ${NETDATA_CLAIMING_DIR}, it will need to be created manually."
+      fi
+    fi
+    run chown -R "${NETDATA_USER}:${NETDATA_GROUP}" "${NETDATA_CLAIMING_DIR}"
+    run chmod 770 "${NETDATA_CLAIMING_DIR}"
+  fi
+}
+
 # -----------------------------------------------------------------------------
 # stop netdata
 

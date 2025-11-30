@@ -169,7 +169,8 @@ progress "fix permissions"
 
 run chmod g+rx,o+rx /opt
 run find /opt/netdata -type d -exec chmod go+rx '{}' \+
-run chown -R ${NETDATA_USER}:${NETDATA_GROUP} /opt/netdata/var
+
+install_netdata_dirs
 
 if [ -d /opt/netdata/usr/libexec/netdata/plugins.d/ebpf.d ]; then
   run chown -R root:${NETDATA_GROUP} /opt/netdata/usr/libexec/netdata/plugins.d/ebpf.d

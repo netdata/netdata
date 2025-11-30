@@ -3,8 +3,8 @@
 Description=Netdata, X-Ray Vision for your infrastructure!
 
 # append here other services you want netdata to wait for them to start
-After=network.target network-online.target nss-lookup.target
-Wants=network-online.target nss-lookup.target
+After=systemd-tmpfiles-setup.service network.target network-online.target nss-lookup.target
+Wants=systemd-tmpfiles-setup.service network-online.target nss-lookup.target
 
 [Service]
 LogNamespace=netdata
@@ -15,8 +15,6 @@ RuntimeDirectory=netdata
 RuntimeDirectoryMode=0775
 PIDFile=/run/netdata/netdata.pid
 ExecStart=@sbindir_POST@/netdata -P /run/netdata/netdata.pid -D
-ExecStartPre=/bin/mkdir -p @localstatedir_POST@/cache/netdata
-ExecStartPre=/bin/chown -R @netdata_user_POST@ @localstatedir_POST@/cache/netdata
 PermissionsStartOnly=true
 
 # saving a big db on slow disks may need some time
