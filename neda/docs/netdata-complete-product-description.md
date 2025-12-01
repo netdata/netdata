@@ -23,7 +23,7 @@ Netdata's architecture is built on a fundamental principle: **distribute the cod
    - Streams data to Parents for centralization (optional, 1 parent at a time, with multiple configured as fallback)
    - Exports data to multiple 3rd party TSDBs at once (optional)
    - Is a Model Context Protocol (MCP) server (single-node, streamable http, sse, websocket - stdio with a bridge)
-   - Resource usage: <5% CPU, ~150 MB RAM (including ML), can be tuned to <1% CPU, <100 MB RAM (offloading to parents and 32bit IoT)
+   - Resource usage: <5% CPU, 150-200 MB RAM (including ML). Memory is proportional to metrics discovered (~5000 metrics baseline) and affected by metric ephemerality. Can be tuned to <1% CPU, <100 MB RAM (offloading to parents and 32-bit IoT)
   
    Comparison with other monitoring agents at: https://www.netdata.cloud/blog/netdata-vs-datadog-dynatrace-instana-grafana/
 
@@ -787,9 +787,9 @@ helm install netdata netdata/netdata
 **Supported Range**: 1 to 100,000+ nodes
 
 **Per-Node Overhead:**
-- **Standalone**: ~5% CPU, ~200 MB RAM
-- **Child (offloaded)**: ~2% CPU, ~150 MB RAM, zero disk I/O
-- **Minimal mode**: <1% CPU, ~100 MB RAM
+- **Most deployments**: <5% CPU, 150-200 MB RAM (depends on metrics discovered, ~5000 metrics baseline)
+- **Child (offloaded)**: ~2% CPU, 100-150 MB RAM, zero disk I/O
+- **Minimal mode**: <1% CPU, <100 MB RAM
 
 **Parent Capacity:**
 - ~500 nodes per Parent cluster (recommended)

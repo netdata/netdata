@@ -1184,6 +1184,12 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
   private readonly REASONING_TYPE: string = BaseLLMProvider.PART_REASONING.replace('_','-');
   private readonly TOOL_RESULT_TYPE: string = BaseLLMProvider.PART_TOOL_RESULT.replace('_','-');
   private readonly TOOL_ERROR_TYPE: string = BaseLLMProvider.PART_TOOL_ERROR.replace('_','-');
+
+  private static isClosedStreamControllerError(error: unknown): boolean {
+    if (!(error instanceof Error)) return false;
+    const msg = error.message.toLowerCase();
+    return msg.includes('controller is already closed') || msg.includes('readablestream is already closed');
+  }
   
   // Shared streaming utilities
   protected createTimeoutController(timeoutMs: number): { controller: AbortController; resetIdle: () => void; clearIdle: () => void; didTimeout: () => boolean } {
@@ -1335,6 +1341,12 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
       
       const toolChoice = this.resolveToolChoice(request);
       this.traceSdkPayload(request, 'request', messages);
+      let suppressedClosedStreamError: Error | undefined;
+      const captureClosedStreamError = (error: unknown): void => {
+        if (BaseLLMProvider.isClosedStreamControllerError(error)) {
+          suppressedClosedStreamError = error instanceof Error ? error : new Error(String(error));
+        }
+      };
       const result = streamText({
         model,
         messages,
@@ -1348,6 +1360,8 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
         ...(request.repeatPenalty !== null ? { frequencyPenalty: request.repeatPenalty } : {}),
         providerOptions: providerOptions as never,
         abortSignal: controller.signal,
+        onError: (err) => { captureClosedStreamError(err); },
+        onAbort: (err) => { captureClosedStreamError(err); },
       });
 
       // Drain both text and reasoning streams with real-time callbacks
@@ -1400,8 +1414,18 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
 
       clearIdle();
 
-      const usage = await result.usage;
-      const resp = await result.response;
+      const awaitWithSuppression = async <T>(promise: Promise<T>): Promise<T | undefined> => {
+        try {
+          return await promise;
+        } catch (err) {
+          captureClosedStreamError(err);
+          if (BaseLLMProvider.isClosedStreamControllerError(err)) return undefined;
+          throw err;
+        }
+      };
+
+      const usage = await awaitWithSuppression(result.usage);
+      const resp = await awaitWithSuppression(result.response);
       this.traceSdkPayload(request, 'response', resp);
       stopReason = stopReason ?? this.extractStopReason(resp) ?? this.extractStopReason(result);
       if (process.env.DEBUG === 'true') {
@@ -1472,17 +1496,21 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
       } catch { /* ignore metadata errors */ }
       const latencyMs = Date.now() - startTime;
 
+      if (suppressedClosedStreamError !== undefined) {
+        warn(`streamText closed controller recovered: ${suppressedClosedStreamError.message}`);
+      }
+
       // Debug: log the raw response structure
       if (process.env.DEBUG === 'true') {
-        const snippet = JSON.stringify(resp.messages, null, 2).substring(0, 2000);
+        const snippet = JSON.stringify((resp as { messages?: unknown[] } | undefined)?.messages, null, 2).substring(0, 2000);
         warn(`[DEBUG] resp.messages structure: ${snippet}`);
       }
       
       // Backfill: Emit chunks for content that wasn't streamed (common with tool calls)
       // Many providers don't stream text-delta or reasoning-delta when producing tool calls
-      if (request.onChunk !== undefined && Array.isArray(resp.messages)) {
+      if (request.onChunk !== undefined && Array.isArray((resp as { messages?: unknown[] } | undefined)?.messages)) {
         // eslint-disable-next-line functional/no-loop-statements
-        for (const msg of resp.messages) {
+        for (const msg of (resp as { messages?: unknown[] } | undefined)?.messages ?? []) {
           const m = msg as { role?: string; content?: unknown };
           if (m.role === 'assistant' && Array.isArray(m.content)) {
             let hasEmittedReasoning = false;
