@@ -1042,6 +1042,7 @@ update_binpkg() {
   . "${os_release_file}"
 
   DISTRO="${ID}"
+  SYSVERSION="${VERSION_ID}"
 
   supported_compat_names="debian ubuntu centos fedora opensuse ol amzn"
 
