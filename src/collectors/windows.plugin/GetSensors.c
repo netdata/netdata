@@ -618,8 +618,11 @@ static void netdata_get_sensors()
 static void netdata_sensors_monitor(void *ptr __maybe_unused)
 {
     // Initialize COM for this thread - sensor thread only needs COM for Sensor API, not WMI
-    // RPC_E_CHANGED_MODE is acceptable if COM was already initialized in a different mode
     HRESULT hr = CoInitializeEx(NULL, COINIT_MULTITHREADED);
+    bool com_initialized = SUCCEEDED(hr);
+
+    // RPC_E_CHANGED_MODE means COM was already initialized in a different mode (e.g., COINIT_APARTMENTTHREADED)
+    // In this case, COM is available but we didn't increment the reference count
     if (FAILED(hr) && hr != RPC_E_CHANGED_MODE) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
                "Sensor thread: cannot initialize COM interface (error 0x%lX)", (unsigned long)hr);
@@ -632,7 +635,9 @@ static void netdata_sensors_monitor(void *ptr __maybe_unused)
     if (FAILED(hr)) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
                "Sensor thread: cannot create ISensorManager (error 0x%lX)", (unsigned long)hr);
-        CoUninitialize();
+        // Only uninitialize if we successfully initialized COM ourselves
+        if (com_initialized)
+            CoUninitialize();
         return;
     }
 
@@ -653,7 +658,10 @@ static void netdata_sensors_monitor(void *ptr __maybe_unused)
         pSensorManager->lpVtbl->Release(pSensorManager);
         pSensorManager = NULL;
     }
-    CoUninitialize();
+
+    // Only uninitialize if we successfully initialized COM ourselves
+    if (com_initialized)
+        CoUninitialize();
 }
 
 void dict_sensor_insert(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
