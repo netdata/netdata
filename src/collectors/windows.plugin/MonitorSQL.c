@@ -2638,12 +2638,63 @@ int dict_mssql_replication_chart_cb(const DICTIONARY_ITEM *item __maybe_unused, 
     dict_mssql_replication_sync_time(mpp, *update_every);
 }
 
+void dict_mssql_distributor_latency(struct mssql_subscription_publication *msp, int update_every)
+{
+    if (unlikely(!msp->st_latency)) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+
+        snprintfz(
+                id,
+                RRD_ID_LENGTH_MAX,
+                "instance_%s_replication_subscription_%s_%s_latency",
+                msp->parent->parent->instanceID,
+                msp->subscriber,
+                msp->subscriber_db);
+        netdata_fix_chart_name(id);
+        msp->st_latency = rrdset_create_localhost(
+                "mssql",
+                id,
+                NULL,
+                "replication",
+                "mssql.replication_subscriber_latency",
+                "The subscriber latency",
+                "seconds",
+                PLUGIN_WINDOWS_NAME,
+                "PerflibMSSQL",
+                PRIO_MSSQL_SUBSCRIBER_LATENCY,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+        rrdlabels_add(
+                msp->st_latency->rrdlabels, "mssql_instance", msp->parent->parent->instanceID, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(msp->st_latency->rrdlabels, "publisher", msp->parent->publisher, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(msp->st_latency->rrdlabels, "subscriber", msp->subscriber, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(msp->st_latency->rrdlabels, "subscriber_db", msp->subscriber_db, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(msp->st_latency->rrdlabels, "publication", msp->parent->parent->publication, RRDLABEL_SRC_AUTO);
+
+        msp->rd_latency =
+                rrddim_add(msp->st_latency, "seconds", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    }
+
+    rrddim_set_by_pointer(
+            msp->st_latency, msp->rd_latency, (collected_number)msp->latency);
+    rrdset_done(msp->st_latency);
+}
+
+int dict_mssql_distributor_chart_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
+    struct mssql_subscription_publication *msp = value;
+    int *update_every = data;
+
+    dict_mssql_distributor_latency(msp, *update_every);
+}
+
 static void do_mssql_replication(struct mssql_instance *mi, int update_every)
 {
     if (unlikely(!mi->conn->collect_replication))
         return;
 
     dictionary_sorted_walkthrough_read(mi->publisher_publication, dict_mssql_replication_chart_cb, &update_every);
+    dictionary_sorted_walkthrough_read(mi->publication_subscription, dict_mssql_distributor_chart_cb, &update_every);
 }
 
 static void mssql_database_backup_restore_chart(struct mssql_db_instance *mdi, const char *db, int update_every)
