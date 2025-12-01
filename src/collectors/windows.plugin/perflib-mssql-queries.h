@@ -804,8 +804,8 @@ struct mssql_subscription_publication {
     int time_to_expiration;
     int latency;
 
-    RRDSET *st_agent_running;
-    RRDDIM *rd_agent_running;
+    RRDSET *st_agent_not_running;
+    RRDDIM *rd_agent_not_running;
 
     RRDSET *st_time2expiration;
     RRDDIM *rd_time2expiration;
