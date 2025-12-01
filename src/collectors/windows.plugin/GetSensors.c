@@ -617,6 +617,30 @@ static void netdata_get_sensors()
 
 static void netdata_sensors_monitor(void *ptr __maybe_unused)
 {
+    // Initialize COM for this thread - sensor thread only needs COM for Sensor API, not WMI
+    HRESULT hr = CoInitializeEx(NULL, COINIT_MULTITHREADED);
+    bool com_initialized = SUCCEEDED(hr);
+
+    // RPC_E_CHANGED_MODE means COM was already initialized in a different mode (e.g., COINIT_APARTMENTTHREADED)
+    // In this case, COM is available but we didn't increment the reference count
+    if (FAILED(hr) && hr != RPC_E_CHANGED_MODE) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "Sensor thread: cannot initialize COM interface (error 0x%lX)", (unsigned long)hr);
+        return;
+    }
+
+    // Create sensor manager instance for this thread
+    hr = CoCreateInstance(
+        &CLSID_SensorManager, NULL, CLSCTX_INPROC_SERVER, &IID_ISensorManager, (void **)&pSensorManager);
+    if (FAILED(hr)) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "Sensor thread: cannot create ISensorManager (error 0x%lX)", (unsigned long)hr);
+        // Only uninitialize if we successfully initialized COM ourselves
+        if (com_initialized)
+            CoUninitialize();
+        return;
+    }
+
     heartbeat_t hb;
     heartbeat_init(&hb, USEC_PER_SEC);
 
@@ -628,6 +652,16 @@ static void netdata_sensors_monitor(void *ptr __maybe_unused)
 
         netdata_get_sensors();
     }
+
+    // Thread cleanup - release sensor manager and uninitialize COM
+    if (pSensorManager) {
+        pSensorManager->lpVtbl->Release(pSensorManager);
+        pSensorManager = NULL;
+    }
+
+    // Only uninitialize if we successfully initialized COM ourselves
+    if (com_initialized)
+        CoUninitialize();
 }
 
 void dict_sensor_insert(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
@@ -644,24 +678,9 @@ void dict_sensor_insert(const DICTIONARY_ITEM *item __maybe_unused, void *value,
 
 static int initialize(int update_every)
 {
-    // This is an internal plugin, if we initialize these two times, collector will fail. To avoid this
-    // we call InitializeWMI to verify COM interface was already initialized.
-    HRESULT hr = InitializeWMI();
-    if (hr != S_OK) {
-        hr = CoInitializeEx(NULL, COINIT_MULTITHREADED);
-        if (FAILED(hr)) {
-            nd_log(NDLS_COLLECTORS, NDLP_ERR, "Collector cannot initialize COM interface.");
-            return -1;
-        }
-    }
-
-    hr = CoCreateInstance(
-        &CLSID_SensorManager, NULL, CLSCTX_INPROC_SERVER, &IID_ISensorManager, (void **)&pSensorManager);
-    if (FAILED(hr)) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Collector cannot initialize sensor API.");
-        CoUninitialize();
-        return -1;
-    }
+    // Note: COM and Sensor API initialization is now done in the sensor thread
+    // (netdata_sensors_monitor) because COM must be initialized per-thread.
+    // The sensor thread owns the pSensorManager instance and handles its cleanup.
 
     sensors = dictionary_create_advanced(
         DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct sensor_data));
@@ -842,12 +861,11 @@ int do_GetSensors(int update_every, usec_t dt __maybe_unused)
 
 void do_Sensors_cleanup()
 {
+    // Wait for sensor thread to finish
+    // The thread handles its own COM cleanup (CoUninitialize) and pSensorManager release
     if (nd_thread_join(sensors_thread_update))
         nd_log_daemon(NDLP_ERR, "Failed to join sensors thread update");
 
-    if (pSensorManager) {
-        pSensorManager->lpVtbl->Release(pSensorManager);
-
-        CoUninitialize();
-    }
+    // Note: pSensorManager is owned and cleaned up by the sensor thread itself
+    // No additional cleanup needed here since the thread has already released resources
 }
