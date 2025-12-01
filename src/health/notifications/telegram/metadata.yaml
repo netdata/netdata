@@ -36,7 +36,7 @@
             required: true
           - name: 'TELEGRAM_API_URL'
             default_value: 'https://api.telegram.org'
-            description: "Set `TELEGRAM_API_URL` if you have your own server."
+            description: "Set `TELEGRAM_API_URL` to the corresponding URL if you have your own Telegram Bot API server (e.g., for privacy or local hosting). Defaults to the official Telegram API."
             required: false
           - name: 'TELEGRAM_BOT_TOKEN'
             default_value: ''
