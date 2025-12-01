@@ -2748,6 +2748,57 @@ void dict_mssql_distributor_agent_not_running(struct mssql_subscription_publicat
     rrdset_done(msp->st_agent_not_running);
 }
 
+void dict_mssql_distributor_time2expiration(struct mssql_subscription_publication *msp, int update_every)
+{
+    if (unlikely(!msp->st_time2expiration)) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+
+        snprintfz(
+                id,
+                RRD_ID_LENGTH_MAX,
+                "instance_%s_replication_subscription_%s_%s_time_to_expiration",
+                msp->parent->parent->instanceID,
+                msp->subscriber,
+                msp->subscriber_db);
+        netdata_fix_chart_name(id);
+        msp->st_time2expiration = rrdset_create_localhost(
+                "mssql",
+                id,
+                NULL,
+                "replication",
+                "mssql.replication_subscriber_time_to_expiration",
+                "Length of time before subscription expires.",
+                "seconds",
+                PLUGIN_WINDOWS_NAME,
+                "PerflibMSSQL",
+                PRIO_MSSQL_SUBSCRIBER_LATENCY,
+                update_every,
+                RRDSET_TYPE_LINE);
+
+        rrdlabels_add(
+                msp->st_time2expiration->rrdlabels, "mssql_instance", msp->parent->parent->instanceID, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(msp->st_time2expiration->rrdlabels, "publisher", msp->parent->publisher, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(msp->st_time2expiration->rrdlabels, "subscriber", msp->subscriber, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(msp->st_time2expiration->rrdlabels, "subscriber_db", msp->subscriber_db, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(msp->st_time2expiration->rrdlabels, "publication", msp->parent->publication, RRDLABEL_SRC_AUTO);
+
+        msp->rd_time2expiration =
+                rrddim_add(msp->st_time2expiration, "seconds", NULL, 1, 3600, RRD_ALGORITHM_ABSOLUTE);
+    }
+
+    rrddim_set_by_pointer(
+            msp->st_time2expiration, msp->rd_time2expiration, (collected_number)msp->time_to_expiration);
+    rrdset_done(msp->st_time2expiration);
+}
+
+int dict_mssql_distributor_chart_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
+    struct mssql_subscription_publication *msp = value;
+    int *update_every = data;
+
+    dict_mssql_distributor_latency(msp, *update_every);
+    dict_mssql_distributor_agent_not_running(msp, *update_every)
+    dict_mssql_distributor_time2expiration(msp, *update_every);
+}
 int dict_mssql_distributor_chart_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
     struct mssql_subscription_publication *msp = value;
     int *update_every = data;
