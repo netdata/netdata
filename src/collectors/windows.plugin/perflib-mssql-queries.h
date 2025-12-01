@@ -40,7 +40,7 @@
 
 #define NETDATA_QUERY_JOBS_STATUS "SELECT name, enabled FROM msdb.dbo.sysjobs;"
 
-#define NETDATA_QUERY_USER_CONNECTIONS "SELECT COUNT(*) AS user_connections FROM sys.dm_exec_sessions WHERE is_user_process = 1;"
+#define NETDATA_QUERY_CONNECTIONS "SELECT COUNT(*), is_user_process FROM sys.dm_exec_sessions GROUP BY is_user_process;"
 
 // https://learn.microsoft.com/en-us/sql/relational-databases/system-dynamic-management-views/sys-dm-os-wait-stats-transact-sql?view=sql-server-ver16
 #define NETDATA_QUERY_CHECK_WAITS                                                                                      \
@@ -675,7 +675,7 @@ struct netdata_mssql_conn {
     SQLHSTMT dbLocksSTMT;
     SQLHSTMT dbSQLState;
     SQLHSTMT dbSQLJobs;
-    SQLHSTMT dbSQLUserConnections;
+    SQLHSTMT dbSQLConnections;
     SQLHSTMT dbReplicationPublisher;
     SQLHSTMT dbReplicationDistributor;
 
@@ -825,6 +825,9 @@ struct mssql_instance {
     RRDSET *st_user_connections;
     RRDDIM *rd_user_connections;
 
+    RRDSET *st_session_connections;
+    RRDDIM *rd_session_connections;
+
     RRDSET *st_process_blocked;
     RRDDIM *rd_process_blocked;
 
@@ -867,6 +870,7 @@ struct mssql_instance {
     COUNTER_DATA MSSQLAccessMethodPageSplits;
     COUNTER_DATA MSSQLBlockedProcesses;
     COUNTER_DATA MSSQLUserConnections;
+    COUNTER_DATA MSSQLSessionConnections;
     COUNTER_DATA MSSQLConnectionMemoryBytes;
     COUNTER_DATA MSSQLExternalBenefitOfMemory;
     COUNTER_DATA MSSQLPendingMemoryGrants;
@@ -1022,4 +1026,5 @@ extern void do_mssql_memory_mgr(PERF_DATA_BLOCK *pDataBlock, struct mssql_instan
 extern void do_mssql_statistics_perflib(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *mi, int update_every);
 extern void do_mssql_access_methods(PERF_DATA_BLOCK *pDataBlock, struct mssql_instance *mi, int update_every);
 extern void do_mssql_user_connections(struct mssql_instance *mi, int update_every);
+extern void do_mssql_sessions_connections(struct mssql_instance *mi, int update_every);
 #endif

@@ -21,6 +21,18 @@
 - Fix(go.d): prefer env-provided dirs over build-time defaults ([#21345](https://github.com/netdata/netdata/issues/21345))
 - New Sensors (Windows.plugin) ([#21319](https://github.com/netdata/netdata/issues/21319))
 - Reorganize MSSQL (windows.plugin) ([#21334](https://github.com/netdata/netdata/issues/21334))
+- User Connections (MSSQL) ([#21348](https://github.com/netdata/netdata/issues/21348))
+- Improve replication logic by checking if parent is caught up with child ([#21352](https://github.com/netdata/netdata/issues/21352))
+- Improve(go.d/snmp): add EATON UPS profile ([#21355](https://github.com/netdata/netdata/issues/21355))
+- Session connections (MSSQL Plugin) ([#21350](https://github.com/netdata/netdata/issues/21350))
+- Fix(docker): add netdata user to nvidia device group on non-Debian systems ([#21358](https://github.com/netdata/netdata/issues/21358))
+- Build(deps): bump github.com/redis/go-redis/v9 from 9.17.0 to 9.17.1 in /src/go ([#21360](https://github.com/netdata/netdata/issues/21360))
+- Chore(go.d): add type=float dimension support ([#21362](https://github.com/netdata/netdata/issues/21362))
+- Chore(go.d): fix get dim value ([#21363](https://github.com/netdata/netdata/issues/21363))
+- Add netdata user to video group ([#21359](https://github.com/netdata/netdata/issues/21359))
+- Fix(docker): fix bugs and refactor Docker entrypoint script ([#21364](https://github.com/netdata/netdata/issues/21364))
+- Regenerate integrations docs ([#21346](https://github.com/netdata/netdata/issues/21346))
+- Improve stale replication ([#21357](https://github.com/netdata/netdata/issues/21357))
 
 ## [2.8.0] - 2025-11-19
 

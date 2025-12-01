@@ -531,6 +531,7 @@ if [[ ! $curl_options =~ .*\--connect-timeout ]]; then
 fi
 
 OPSGENIE_API_URL=${OPSGENIE_API_URL:-"https://api.opsgenie.com"}
+TELEGRAM_API_URL=${TELEGRAM_API_URL:-"https://api.telegram.org"}
 
 # If we didn't autodetect the character set for e-mail and it wasn't
 # set by the user, we need to set it to a reasonable default.  UTF-8
@@ -1610,7 +1611,7 @@ send_telegram() {
       IFS=":" read -r chatID threadID <<< "${chatid}"
 
       # https://core.telegram.org/bots/api#sendmessage
-      api_url="https://api.telegram.org/bot${bottoken}/sendMessage?chat_id=${chatID}"
+      api_url="${TELEGRAM_API_URL}/bot${bottoken}/sendMessage?chat_id=${chatID}"
       if [ -n "${threadID}" ]; then
         api_url+="&message_thread_id=${threadID}"
       fi

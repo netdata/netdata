@@ -87,14 +87,21 @@ func (a *API) SET(id string, value int64) {
 	_, _ = a.Write([]byte("SET '" + id + "' = " + strconv.FormatInt(value, 10) + "\n"))
 }
 
+// SETFLOAT sets the value of a dimension for the initialized chart.
+func (a *API) SETFLOAT(id string, value float64) {
+	v := strconv.FormatFloat(value, 'f', -1, 64)
+	_, _ = a.Write([]byte("SET '" + id + "' = " + v + "\n"))
+}
+
 // SETEMPTY sets an empty value for a dimension in the initialized chart.
 func (a *API) SETEMPTY(id string) {
 	_, _ = a.Write([]byte("SET '" + id + "' = \n"))
 }
 
 // VARIABLE sets the value of a CHART scope variable for the initialized chart.
-func (a *API) VARIABLE(ID string, value int64) {
-	_, _ = a.Write([]byte("VARIABLE CHART '" + ID + "' = " + strconv.FormatInt(value, 10) + "\n"))
+func (a *API) VARIABLE(ID string, value float64) {
+	v := strconv.FormatFloat(value, 'f', -1, 64)
+	_, _ = a.Write([]byte("VARIABLE CHART '" + ID + "' = " + v + "\n"))
 }
 
 // END completes data collection for the initialized chart.

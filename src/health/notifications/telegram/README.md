@@ -44,6 +44,7 @@ The following options can be defined for this notification
 | Option | Description | Default | Required |
 |:-----|:------------|:--------|:---------:|
 | SEND_TELEGRAM | Set `SEND_TELEGRAM` to YES | YES | yes |
+| TELEGRAM_API_URL | Set `TELEGRAM_API_URL` to the corresponding URL if you have your own Telegram Bot API server (e.g., for privacy or local hosting). Defaults to the official Telegram API. | https://api.telegram.org | no |
 | TELEGRAM_BOT_TOKEN | set `TELEGRAM_BOT_TOKEN` to your bot token. |  | yes |
 | DEFAULT_RECIPIENT_TELEGRAM | Set the `DEFAULT_RECIPIENT_TELEGRAM` variable in your config file to your Telegram chat ID (find it with @myidbot). Separate multiple chat IDs with spaces. To send alerts to a specific topic within a chat, use `chatID:topicID`. |  | yes |
 
