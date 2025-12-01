@@ -277,7 +277,7 @@ func TestNetdataExporter_Convert(t *testing.T) {
 
 			// Convert the metrics
 			inputMetrics := tt.inputMetrics()
-			charts := exporter.Convert(inputMetrics)
+			charts := exporter.convert(inputMetrics)
 
 			// Verify the chart count
 			assert.Equal(t, tt.expectedChartCount, len(charts), "Wrong number of charts created")
@@ -295,7 +295,7 @@ func TestNetdataExporter_Convert(t *testing.T) {
 				require.NotNil(t, gaugeChart, "Gauge chart should exist")
 				assert.Equal(t, "Test Gauge", gaugeChart.Title)
 				assert.Equal(t, "bytes", gaugeChart.Units)
-				assert.Equal(t, "test-service_test", gaugeChart.Family)
+				assert.Equal(t, "test-service/test/gauge", gaugeChart.Family)
 				assert.Equal(t, "line", gaugeChart.Type)
 				assert.Len(t, gaugeChart.Dimensions, 1)
 				assert.Equal(t, 42.0, gaugeChart.Dimensions[0].Value)
@@ -313,7 +313,7 @@ func TestNetdataExporter_Convert(t *testing.T) {
 				require.NotNil(t, sumChart, "Sum chart should exist")
 				assert.Equal(t, "Test Sum", sumChart.Title)
 				assert.Equal(t, "count", sumChart.Units)
-				assert.Equal(t, "test", sumChart.Family)
+				assert.Equal(t, "test/sum", sumChart.Family)
 				assert.Equal(t, "line", sumChart.Type)
 				assert.Len(t, sumChart.Dimensions, 1)
 				assert.Equal(t, 100.0, sumChart.Dimensions[0].Value)
@@ -331,7 +331,7 @@ func TestNetdataExporter_Convert(t *testing.T) {
 				require.NotNil(t, sumChart, "Sum chart should exist")
 				assert.Equal(t, "Test Sum", sumChart.Title)
 				assert.Equal(t, "count", sumChart.Units)
-				assert.Equal(t, "test", sumChart.Family)
+				assert.Equal(t, "test/sum", sumChart.Family)
 				assert.Equal(t, "line", sumChart.Type)
 				assert.Len(t, sumChart.Dimensions, 1)
 				assert.Equal(t, 100.0, sumChart.Dimensions[0].Value)
@@ -548,7 +548,7 @@ func TestNetdataExporter_Convert(t *testing.T) {
 
 				for _, chart := range charts {
 					assert.Equal(t, "test.labels", chart.Context)
-					assert.Equal(t, "test-service_test", chart.Family, "Family should include service name")
+					assert.Equal(t, "test-service/test/labels", chart.Family, "Family should include service name")
 
 					// Check for expected labels
 					labelMap := make(map[string]string)
@@ -639,19 +639,19 @@ func TestHelperFunctions(t *testing.T) {
 		resourceAttrs.PutStr("service.name", "test-service")
 
 		family := getFamily("test.metric", resourceAttrs)
-		assert.Equal(t, "test-service_test", family, "Family should include service name")
+		assert.Equal(t, "test-service/test/metric", family, "Family should include service name and use slashes")
 
 		// Test without service name but with service namespace
 		resourceAttrs = pcommon.NewMap()
 		resourceAttrs.PutStr("service.namespace", "test-namespace")
 
 		family = getFamily("test.metric", resourceAttrs)
-		assert.Equal(t, "test_namespace_test", family, "Family should include service namespace")
+		assert.Equal(t, "test-namespace/test/metric", family, "Family should include service namespace and use slashes")
 
 		// Test without service name or namespace
 		resourceAttrs = pcommon.NewMap()
 
 		family = getFamily("test.metric", resourceAttrs)
-		assert.Equal(t, "test", family, "Family should be based on metric name prefix")
+		assert.Equal(t, "test/metric", family, "Family should use metric name with slashes")
 	})
 }

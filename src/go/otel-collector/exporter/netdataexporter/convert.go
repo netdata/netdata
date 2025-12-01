@@ -679,17 +679,12 @@ func getFamily(metricName string, resourceAttrs pcommon.Map) string {
 		sb.WriteString(sanitizeID(val.AsString()))
 	}
 
-	// Split the metric name
-	parts := strings.Split(metricName, ".")
-	prefix := metricName
-	if len(parts) > 1 {
-		prefix = parts[0]
+	if sb.Len() > 0 {
+		sb.WriteString("/")
 	}
 
-	if sb.Len() > 0 {
-		sb.WriteString("_")
-	}
-	sb.WriteString(sanitizeID(prefix))
+	// Replace dots with slashes for hierarchical grouping
+	sb.WriteString(strings.ReplaceAll(metricName, ".", "/"))
 
 	return sb.String()
 }
