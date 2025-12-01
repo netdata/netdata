@@ -2739,7 +2739,7 @@ void dict_mssql_distributor_agent_not_running(struct mssql_subscription_publicat
                 NULL,
                 "replication",
                 "mssql.replication_subscriber_agent_not_running",
-                "Length of time agent has not running.",
+                "Length of time agent has not running",
                 "seconds",
                 PLUGIN_WINDOWS_NAME,
                 "PerflibMSSQL",
@@ -2782,7 +2782,7 @@ void dict_mssql_distributor_time2expiration(struct mssql_subscription_publicatio
                 NULL,
                 "replication",
                 "mssql.replication_subscriber_time_to_expiration",
-                "Length of time before subscription expires.",
+                "Length of time before subscription expires",
                 "seconds",
                 PLUGIN_WINDOWS_NAME,
                 "PerflibMSSQL",
@@ -2811,22 +2811,8 @@ int dict_mssql_distributor_chart_cb(const DICTIONARY_ITEM *item __maybe_unused, 
     int *update_every = data;
 
     dict_mssql_distributor_latency(msp, *update_every);
-    dict_mssql_distributor_agent_not_running(msp, *update_every)
+    dict_mssql_distributor_agent_not_running(msp, *update_every);
     dict_mssql_distributor_time2expiration(msp, *update_every);
-}
-int dict_mssql_distributor_chart_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
-    struct mssql_subscription_publication *msp = value;
-    int *update_every = data;
-
-    dict_mssql_distributor_latency(msp, *update_every);
-    dict_mssql_distributor_agent_not_running(msp, *update_every)
-}
-
-int dict_mssql_distributor_chart_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
-    struct mssql_subscription_publication *msp = value;
-    int *update_every = data;
-
-    dict_mssql_distributor_latency(msp, *update_every);
 }
 
 static void do_mssql_replication(struct mssql_instance *mi, int update_every)
