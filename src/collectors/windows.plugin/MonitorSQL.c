@@ -708,9 +708,127 @@ void dict_mssql_fill_replication(struct mssql_db_instance *mdi)
     } while (true);
 
 endreplication:
-    (void)netdata_select_db(mdi->parent->conn->netdataSQLHDBc, "master");
+    (void)netdata_select_db(mdi->parent->conn->netdataSQLHDBc, NETDATA_MSSQL_MASTER_DB);
     netdata_MSSQL_release_results(mdi->parent->conn->dbReplicationPublisher);
 }
+
+void dict_mssql_fill_subscription(struct mssql_db_instance *mdi, int type)
+{
+    char subscriber[NETDATA_MAX_INSTANCE_OBJECT + 1] = {};
+    char subscriber_db[NETDATA_MAX_INSTANCE_OBJECT + 1] = {};
+    int agent_not_running = 0, time_to_expiration = 0, latency = 0;
+    SQLLEN subscriber_len = 0, subscriberdb_len = 0, agent_not_running_len = 0, time_to_expiration_len = 0,
+           latency_len = 0;
+
+    if (likely(netdata_select_db(mdi->parent->conn->netdataSQLHDBc, NETDATA_REPLICATION_DB))) {
+        return;
+    }
+    char query[sizeof(NETDATA_REPLICATION_MONITOR_SUBSCRIPTION_QUERY) * 2];
+    snprintfz(query, sizeof(query) - 1, "%s%d;"NETDATA_REPLICATION_MONITOR_SUBSCRIPTION_QUERY, type)
+    SQLRETURN ret =
+            SQLExecDirect(mdi->parent->conn->dbReplicationDistributor, (SQLCHAR *)query, SQL_NTS);
+    if (likely(netdata_mssql_check_result(ret))) {
+        mdi->collecting_data = false;
+        netdata_MSSQL_error(
+                SQL_HANDLE_STMT,
+                mdi->parent->conn->dbReplicationDistributor,
+                NETDATA_MSSQL_ODBC_QUERY,
+                mdi->parent->instanceID);
+        goto enddistribution;
+    }
+
+    ret = SQLBindCol(
+            mdi->parent->conn->dbReplicationPublisher, 3, SQL_C_CHAR, subscriber, sizeof(subscriber), &subscriber_len);
+    if (likely(netdata_mssql_check_result(ret))) {
+        netdata_MSSQL_error(
+                SQL_HANDLE_STMT,
+                mdi->parent->conn->dbReplicationDistributor,
+                NETDATA_MSSQL_ODBC_PREPARE,
+                mdi->parent->instanceID);
+        goto enddistribution;
+    }
+
+    ret = SQLBindCol(
+            mdi->parent->conn->dbReplicationPublisher, 4, SQL_C_CHAR, subscriber_db, sizeof(subscriber_db), &subscriberdb_len);
+    if (likely(netdata_mssql_check_result(ret))) {
+        netdata_MSSQL_error(
+                SQL_HANDLE_STMT,
+                mdi->parent->conn->dbReplicationDistributor,
+                NETDATA_MSSQL_ODBC_PREPARE,
+                mdi->parent->instanceID);
+        goto enddistribution;
+    }
+
+    ret = SQLBindCol(
+            mdi->parent->conn->dbReplicationPublisher, 8, SQL_C_LONG, &latency, sizeof(latency), &latency_len);
+    if (likely(netdata_mssql_check_result(ret))) {
+        netdata_MSSQL_error(
+                SQL_HANDLE_STMT,
+                mdi->parent->conn->dbReplicationDistributor,
+                NETDATA_MSSQL_ODBC_PREPARE,
+                mdi->parent->instanceID);
+        goto enddistribution;
+    }
+
+    ret = SQLBindCol(
+            mdi->parent->conn->dbReplicationPublisher, 10, SQL_C_LONG, &agent_not_running,
+            sizeof(agent_not_running), &agent_not_running_len);
+    if (likely(netdata_mssql_check_result(ret))) {
+        // Null value
+        agent_not_running = 0;
+    }
+
+    ret = SQLBindCol(
+            mdi->parent->conn->dbReplicationPublisher, 12, SQL_C_LONG, &time_to_expiration,
+            sizeof(time_to_expiration), &time_to_expiration_len);
+    if (likely(netdata_mssql_check_result(ret))) {
+        // Null value
+        time_to_expiration = 0;
+    }
+
+    do {
+        ret = SQLFetch(mdi->parent->conn->dbReplicationPublisher);
+        switch (ret) {
+            case SQL_SUCCESS:
+            case SQL_SUCCESS_WITH_INFO:
+                break;
+            case SQL_NO_DATA:
+            default:
+                goto endreplication;
+        }
+
+        snprintfz(key, sizeof(key) - 1, "%s:%s", publisher_db, publication);
+        struct mssql_subscription_publication *msp =
+                dictionary_set(mdi->parent->publisher_publication, key, NULL, sizeof(*msp));
+
+        msp->publication_type = type;
+
+        if (unlikely(!msp->parent)) {
+            struct mssql_publisher_publication *mpp =
+                    dictionary_set(mdi->parent->publisher_publication, key, NULL, sizeof(*mpp));
+            msp->parent = mpp;
+        }
+
+        if (unlikely(!msp->subscriber)) {
+            msp->subscriber = strdupz(subscriber);
+        }
+
+        if (unlikely(!msp->subscriber_db))
+            msp->subscriber_db = strdupz(subscriber_db);
+
+        if (unlikely(!mpp->db))
+            mpp->db = strdupz(publisher_db);
+
+        msp->latency = latency;
+        msp->agent_not_running = agent_not_running;
+        msp->time_to_expiration = time_to_expiration;
+    } while (true);
+
+enddistribution:
+    (void)netdata_select_db(mdi->parent->conn->netdataSQLHDBc, NETDATA_MSSQL_MASTER_DB);
+    netdata_MSSQL_release_results(mdi->parent->conn->dbReplicationPublisher);
+}
+
 int dict_mssql_databases_run_queries(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
     struct mssql_db_instance *mdi = value;
     const char *dbname = dictionary_acquired_item_name((DICTIONARY_ITEM *) item);
@@ -732,8 +850,12 @@ int dict_mssql_databases_run_queries(const DICTIONARY_ITEM *item __maybe_unused,
     dict_mssql_fill_transactions(mdi, dbname);
     dict_mssql_fill_locks(mdi, dbname);
 
-    if (likely(mdi->running_replication && mdi->parent->conn->collect_replication))
+    if (likely(mdi->running_replication && mdi->parent->conn->collect_replication)) {
         dict_mssql_fill_replication(mdi);
+        dict_mssql_fill_subscription(mdi, 0);
+        dict_mssql_fill_subscription(mdi, 1);
+        dict_mssql_fill_subscription(mdi, 2);
+    }
 
 enddrunquery:
     return 1;
@@ -1085,6 +1207,12 @@ static bool netdata_MSSQL_initialize_connection(struct netdata_mssql_conn *nmc)
         }
 
         ret = SQLAllocHandle(SQL_HANDLE_STMT, nmc->netdataSQLHDBc, &nmc->dbReplicationPublisher);
+        if (likely(netdata_mssql_check_result(ret))) {
+            retConn = FALSE;
+            goto endMSSQLInitializationConnection;
+        }
+
+        ret = SQLAllocHandle(SQL_HANDLE_STMT, nmc->netdataSQLHDBc, &nmc->dbReplicationDistributor);
         if (likely(netdata_mssql_check_result(ret))) {
             retConn = FALSE;
             goto endMSSQLInitializationConnection;

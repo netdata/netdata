@@ -12,10 +12,11 @@
     "SELECT resource_type, count(*) FROM %s.sys.dm_tran_locks WHERE DB_NAME(resource_database_id) = '%s' group by resource_type;"
 
 #define NETDATA_REPLICATION_DB "distribution"
+#define NETDATA_MSSQL_MASTER_DB "master"
 
 #define NETDATA_REPLICATION_MONITOR_QUERY "EXEC sp_replmonitorhelppublication;"
 
-#define NETDATA_REPLICATION_MONITOR_SUBSCRIPTION_QUERY "EXEC sp_replmonitorhelpsubscription @publication_type = %d;"
+#define NETDATA_REPLICATION_MONITOR_SUBSCRIPTION_QUERY "EXEC sp_replmonitorhelpsubscription @publication_type = "
 
 #define NETDATA_QUERY_LIST_DB "SELECT name FROM sys.databases;"
 
@@ -676,6 +677,7 @@ struct netdata_mssql_conn {
     SQLHSTMT dbSQLJobs;
     SQLHSTMT dbSQLUserConnections;
     SQLHSTMT dbReplicationPublisher;
+    SQLHSTMT dbReplicationDistributor;
 
     BOOL collect_transactions;
     BOOL collect_waits;
@@ -794,12 +796,11 @@ struct mssql_subscription_publication {
 
     // Additional lables
     int publication_type;
-    int subtype;
     char *subscriber_db;
     char *subscriber;
 
     // Charts
-    int agent_running;
+    int agent_not_running;
     int time_to_expiration;
     int latency;
 
