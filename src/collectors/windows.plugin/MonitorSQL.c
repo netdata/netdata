@@ -716,15 +716,18 @@ void dict_mssql_fill_subscription(struct mssql_db_instance *mdi, int type)
 {
     char subscriber[NETDATA_MAX_INSTANCE_OBJECT + 1] = {};
     char subscriber_db[NETDATA_MAX_INSTANCE_OBJECT + 1] = {};
+    char publisher_db[NETDATA_MAX_INSTANCE_OBJECT + 1] = {};
+    char publication[NETDATA_MAX_INSTANCE_OBJECT + 1] = {};
+    char key[NETDATA_MAX_INSTANCE_OBJECT * 2 + 2];
     int agent_not_running = 0, time_to_expiration = 0, latency = 0;
     SQLLEN subscriber_len = 0, subscriberdb_len = 0, agent_not_running_len = 0, time_to_expiration_len = 0,
-           latency_len = 0;
+           latency_len = 0, publisherdb_len = 0, publication_len = 0;
 
     if (likely(netdata_select_db(mdi->parent->conn->netdataSQLHDBc, NETDATA_REPLICATION_DB))) {
         return;
     }
     char query[sizeof(NETDATA_REPLICATION_MONITOR_SUBSCRIPTION_QUERY) * 2];
-    snprintfz(query, sizeof(query) - 1, "%s%d;"NETDATA_REPLICATION_MONITOR_SUBSCRIPTION_QUERY, type)
+    snprintfz(query, sizeof(query) - 1, "%s%d;"NETDATA_REPLICATION_MONITOR_SUBSCRIPTION_QUERY, type);
     SQLRETURN ret =
             SQLExecDirect(mdi->parent->conn->dbReplicationDistributor, (SQLCHAR *)query, SQL_NTS);
     if (likely(netdata_mssql_check_result(ret))) {
@@ -750,6 +753,30 @@ void dict_mssql_fill_subscription(struct mssql_db_instance *mdi, int type)
 
     ret = SQLBindCol(
             mdi->parent->conn->dbReplicationPublisher, 4, SQL_C_CHAR, subscriber_db, sizeof(subscriber_db), &subscriberdb_len);
+    if (likely(netdata_mssql_check_result(ret))) {
+        netdata_MSSQL_error(
+                SQL_HANDLE_STMT,
+                mdi->parent->conn->dbReplicationDistributor,
+                NETDATA_MSSQL_ODBC_PREPARE,
+                mdi->parent->instanceID);
+        goto enddistribution;
+    }
+
+    ret = SQLBindCol(
+            mdi->parent->conn->dbReplicationPublisher, 5, SQL_C_CHAR, publisher_db,
+            sizeof(publisher_db), &publisherdb_len);
+    if (likely(netdata_mssql_check_result(ret))) {
+        netdata_MSSQL_error(
+                SQL_HANDLE_STMT,
+                mdi->parent->conn->dbReplicationDistributor,
+                NETDATA_MSSQL_ODBC_PREPARE,
+                mdi->parent->instanceID);
+        goto enddistribution;
+    }
+
+    ret = SQLBindCol(
+            mdi->parent->conn->dbReplicationPublisher, 6, SQL_C_CHAR, publication,
+            sizeof(publication), &publication_len);
     if (likely(netdata_mssql_check_result(ret))) {
         netdata_MSSQL_error(
                 SQL_HANDLE_STMT,
@@ -794,7 +821,7 @@ void dict_mssql_fill_subscription(struct mssql_db_instance *mdi, int type)
                 break;
             case SQL_NO_DATA:
             default:
-                goto endreplication;
+                goto enddistribution;
         }
 
         snprintfz(key, sizeof(key) - 1, "%s:%s", publisher_db, publication);
@@ -815,9 +842,6 @@ void dict_mssql_fill_subscription(struct mssql_db_instance *mdi, int type)
 
         if (unlikely(!msp->subscriber_db))
             msp->subscriber_db = strdupz(subscriber_db);
-
-        if (unlikely(!mpp->db))
-            mpp->db = strdupz(publisher_db);
 
         msp->latency = latency;
         msp->agent_not_running = agent_not_running;
@@ -2670,7 +2694,7 @@ void dict_mssql_distributor_latency(struct mssql_subscription_publication *msp, 
         rrdlabels_add(msp->st_latency->rrdlabels, "publisher", msp->parent->publisher, RRDLABEL_SRC_AUTO);
         rrdlabels_add(msp->st_latency->rrdlabels, "subscriber", msp->subscriber, RRDLABEL_SRC_AUTO);
         rrdlabels_add(msp->st_latency->rrdlabels, "subscriber_db", msp->subscriber_db, RRDLABEL_SRC_AUTO);
-        rrdlabels_add(msp->st_latency->rrdlabels, "publication", msp->parent->parent->publication, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(msp->st_latency->rrdlabels, "publication", msp->parent->publication, RRDLABEL_SRC_AUTO);
 
         msp->rd_latency =
                 rrddim_add(msp->st_latency, "seconds", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
