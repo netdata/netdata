@@ -787,7 +787,7 @@ void dict_mssql_fill_subscription(struct mssql_db_instance *mdi, int type)
     }
 
     ret = SQLBindCol(
-            mdi->parent->conn->dbReplicationPublisher, 8, SQL_C_LONG, &latency, sizeof(latency), &latency_len);
+            mdi->parent->conn->dbReplicationPublisher, 9, SQL_C_LONG, &latency, sizeof(latency), &latency_len);
     if (likely(netdata_mssql_check_result(ret))) {
         netdata_MSSQL_error(
                 SQL_HANDLE_STMT,
@@ -798,7 +798,7 @@ void dict_mssql_fill_subscription(struct mssql_db_instance *mdi, int type)
     }
 
     ret = SQLBindCol(
-            mdi->parent->conn->dbReplicationPublisher, 10, SQL_C_LONG, &agent_not_running,
+            mdi->parent->conn->dbReplicationPublisher, 11, SQL_C_LONG, &agent_not_running,
             sizeof(agent_not_running), &agent_not_running_len);
     if (likely(netdata_mssql_check_result(ret))) {
         // Null value
@@ -806,7 +806,7 @@ void dict_mssql_fill_subscription(struct mssql_db_instance *mdi, int type)
     }
 
     ret = SQLBindCol(
-            mdi->parent->conn->dbReplicationPublisher, 12, SQL_C_LONG, &time_to_expiration,
+            mdi->parent->conn->dbReplicationPublisher, 13, SQL_C_LONG, &time_to_expiration,
             sizeof(time_to_expiration), &time_to_expiration_len);
     if (likely(netdata_mssql_check_result(ret))) {
         // Null value
