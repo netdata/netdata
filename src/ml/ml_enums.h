@@ -3,7 +3,7 @@
 #ifndef NETDATA_ML_ENUMS_H
 #define NETDATA_ML_ENUMS_H
 
-enum ml_metric_type {
+enum ml_metric_type : unsigned char {
     // The dimension has constant values, no need to train
     METRIC_TYPE_CONSTANT,
 
@@ -13,7 +13,7 @@ enum ml_metric_type {
 
 const char *ml_metric_type_to_string(enum ml_metric_type mt);
 
-enum ml_machine_learning_status {
+enum ml_machine_learning_status : unsigned char {
     // Enable training/prediction
     MACHINE_LEARNING_STATUS_ENABLED,
 
@@ -23,7 +23,7 @@ enum ml_machine_learning_status {
 
 const char *ml_machine_learning_status_to_string(enum ml_machine_learning_status mls);
 
-enum ml_training_status {
+enum ml_training_status : unsigned char {
     // We don't have a model for this dimension
     TRAINING_STATUS_UNTRAINED,
 

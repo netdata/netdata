@@ -905,6 +905,88 @@ modules:
                 - name: semaphores
   - meta:
       plugin_name: windows.plugin
+      module_name: GetHardwareInfo
+      monitored_instance:
+        name: Hardware information collected from kernel ring.
+        link: "https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/"
+        categories:
+          - data-collection.windows-systems
+        icon_filename: "windows.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - cpu
+        - temperature
+      most_popular: false
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors cpu temperature on Windows systems.
+        method_description: |
+          It reads `msr` register using netdata_driver.sys driver.
+      supported_platforms:
+        include: ["windows"]
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+                This optional feature requires the Netdata Driver (netdata_driver.sys) to be installed on the host.
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:windows:GetHardwareInfo]"
+          description: "The Netdata main configuration file"
+        options:
+          description: ""
+          folding:
+            title: "Config option"
+            enabled: false
+          list:
+            - name: update every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: "This metric show latest CPU temperature."
+          labels: []
+          metrics:
+            - name: cpu.temperature
+              description: Core temperature
+              unit: "Celcius"
+              chart_type: line
+              dimensions:
+                - name: a dimension per core
+  - meta:
+      plugin_name: windows.plugin
       module_name: PerflibThermalZone
       monitored_instance:
         name: System thermal zone
@@ -1136,9 +1218,18 @@ modules:
               required: false
         examples:
           folding:
-            enabled: false
+            enabled: true
             title: ""
-          list: []
+          list:
+            - name: Specific Sensors
+              description: You can add custom sensor information by creating a dedicated sensor section.
+              folding:
+                enabled: false
+              config: |
+                [plugin:windows:GetSensors:Your Sensor Name]
+                  units = Speed
+                  multiplier = 100
+                  title = Current speed.
     troubleshooting:
       problems:
         list: []
@@ -1190,6 +1281,94 @@ modules:
               chart_type: line
               dimensions:
                 - name: input
+            - name: system.hw.sensor.color.input
+              description: Color temperature of light
+              unit: "Cel"
+              chart_type: line
+              dimensions:
+                - name: input
+            - name: system.hw.sensor.voltage.input
+              description: Electrical potential
+              unit: "V"
+              chart_type: line
+              dimensions:
+                - name: input
+            - name: system.hw.sensor.resistence.input
+              description: Electrical resistence
+              unit: "Ohms"
+              chart_type: line
+              dimensions:
+                - name: input
+            - name: system.hw.sensor.capacitance.input
+              description: Electrical capacitance
+              unit: "F"
+              chart_type: line
+              dimensions:
+                - name: input
+            - name: system.hw.sensor.inductance.input
+              description: Electrical indutance
+              unit: "H"
+              chart_type: line
+              dimensions:
+                - name: input
+            - name: system.hw.sensor.pressure.input
+              description: Ambient atmospheric pressure
+              unit: "Pa"
+              chart_type: line
+              dimensions:
+                - name: input
+            - name: system.hw.sensor.latitude.input
+              description: Geographic latitude
+              unit: "Degrees"
+              chart_type: line
+              dimensions:
+                - name: input
+            - name: system.hw.sensor.longitude.input
+              description: Geographic longitude
+              unit: "Degrees"
+              chart_type: line
+              dimensions:
+                - name: input
+            - name: system.hw.sensor.force.input
+              description: Force
+              unit: "N"
+              chart_type: line
+              dimensions:
+                - name: input
+            - name: system.hw.sensor.gauge_pressure.input
+              description: Gauge Pressure
+              unit: "Pa"
+              chart_type: line
+              dimensions:
+                - name: input
+            - name: system.hw.sensor.human_presence.input
+              description: Human presence
+              unit: "presence"
+              chart_type: line
+              dimensions:
+                - name: input
+            - name: system.hw.sensor.human_proximity.input
+              description: Human proximity
+              unit: "m"
+              chart_type: line
+              dimensions:
+                - name: input
+            - name: system.hw.sensor.distance.input
+              description: Distance
+              unit: "m"
+              chart_type: line
+              dimensions:
+                - name: inputX
+                - name: inputY
+                - name: inputZ
+            - name: system.hw.sensor.acceleration.input
+              description: Acceleration
+              unit: "g"
+              chart_type: line
+              dimensions:
+                - name: inputX
+                - name: inputY
+                - name: inputZ
             - name: system.hw.sensor.state.input
               description: Current sensor state.
               unit: "status"
@@ -1201,6 +1380,12 @@ modules:
                 - name: initializing
                 - name: access_denied
                 - name: error
+            - name: system.hw.sensor.custom
+              description: Custom Chart
+              unit: "nd"
+              chart_type: line
+              dimensions:
+                - name: inputN
   - meta:
       plugin_name: windows.plugin
       module_name: PerflibWebService
@@ -1972,7 +2157,29 @@ modules:
                  GO
                  ```
 
-              3. **Configure SQL Server Network Settings**
+              3. **Enable Query Job status**
+
+                 Connect to your database and grant `SELECT` permission to `netdata_user`:
+
+                ```tsql
+                USE msdb;
+                GO
+                GRANT SELECT ON SCHEMA::[dbo] TO netdata_user;
+                GO
+                ```
+
+              4. **Enable Query replication stored procedure**
+
+                 Connect to your database and add `netdata_user` to `replmonitor`:
+
+                ```tsql
+                USE distribution;
+                GO
+                EXEC sp_addrolemember 'replmonitor', 'netdata_user';
+                GO
+                ```
+
+              5. **Configure SQL Server Network Settings**
 
                  Enable SQL Server to accept TCP connections:
 
@@ -1985,7 +2192,7 @@ modules:
                   - Enter a port number in the `TCP Port` field (default is `1433`)
                 - Select `SQL Server Services` and restart your SQL Server instance
 
-              4. **Configure SQL Server Authentication (Optional)**
+              6. **Configure SQL Server Authentication (Optional)**
 
                  If you're using SQL Server authentication (rather than Windows authentication):
 
@@ -2045,6 +2252,38 @@ modules:
             - name: express
               description: Set to yes when running SQL Express version.
               default_value: no
+              required: false
+            - name: collect transactions
+              description: Run queries to collect information from the server's transactions.
+              default_value: yes
+              required: false
+            - name: collect waits
+              description: Run queries to collect information from the server's lock waits.
+              default_value: yes
+              required: false
+            - name: collect lock metrics
+              description: Run queries to collect information from the server's overall locks.
+              default_value: yes
+              required: false
+            - name: collect replication
+              description: Run queries to collect information from the server's replication.
+              default_value: yes
+              required: false
+            - name: collect jobs
+              description: Run queries to collect information from the server's jobs.
+              default_value: yes
+              required: false
+            - name: collect buffer stats
+              description: Run queries to collect information from the server's buffer statistics.
+              default_value: yes
+              required: false
+            - name: collect database size
+              description: Run queries to collect information from the server's database size.
+              default_value: yes
+              required: false
+            - name: collect user connections
+              description: Run queries to collect information from the server's connection.
+              default_value: yes
               required: false
         examples:
           folding:
@@ -2106,6 +2345,12 @@ modules:
               chart_type: line
               dimensions:
                 - name: user
+            - name: mssql.instance_sessions_connections
+              description: Session connections
+              unit: connections
+              chart_type: line
+              dimensions:
+                - name: session
             - name: mssql.instance_sqlstats_batch_requests
               description: Total of batches requests
               unit: requests/s
@@ -2233,6 +2478,21 @@ modules:
               chart_type: line
               dimensions:
                 - name: blocked
+        - name: MSSQL Jobs
+          description: "These metrics refer to the Microsoft SQL Servers jobs on host."
+          labels:
+            - name: mssql_instance
+              description: The instance name.
+            - name: job_name
+              description: The job name.
+          metrics:
+            - name: mssql.instance_jobs_status
+              description: Jobs running
+              unit: jobs
+              chart_type: line
+              dimensions:
+                - name: enabled
+                - name: disabled
         - name: MSSQL Resource Locks
           description: "Monitors SQL Server resource locks by type. SQL Server uses locks to manage concurrent access to database resources during transactions, preventing conflicts when multiple users access the same data simultaneously. This metric tracks locks on different [resource types](https://learn.microsoft.com/en-us/sql/relational-databases/performance-monitor/sql-server-locks-object?view=sql-server-ver17) like rows, pages, tables, and databases."
           labels:
@@ -2367,6 +2627,65 @@ modules:
               chart_type: line
               dimensions:
                 - name: size
+        - name: MSSQL Replication
+          description: "These metrics refer to the Microsoft SQL Servers replication on host."
+          labels:
+            - name: mssql_instance
+              description: The instance name.
+            - name: publisher
+              description: The SQL server publisher name.
+            - name: database
+              description: The database being replicated.
+            - name: publication
+              description: The publication name.
+          metrics:
+            - name: mssql.replication_status
+              description: Current replication status
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: started
+                - name: succeeded
+                - name: in_progress
+                - name: idle
+                - name: retrying
+                - name: failed
+            - name: mssql.replication_warning
+              description: Maximum threshold warning.
+              unit: status
+              chart_type: line
+              dimensions:
+                - name: expiration
+                - name: latency
+                - name: merge expiration
+                - name: fast duration
+                - name: low duration
+                - name: fast run speed
+                - name: low run speed
+            - name: mssql.replication_avg_latency
+              description: Average latency for a transactional publication.
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: latency
+            - name: mssql.replication_subscription
+              description: Number of subscriptions to a publication.
+              unit: subscription
+              chart_type: line
+              dimensions:
+                - name: subscription
+            - name: mssql.replication_agent_running
+              description: Distribution agents running.
+              unit: agents
+              chart_type: line
+              dimensions:
+                - name: agents
+            - name: mssql.replication_synchronization
+              description: The shortest synchronization.
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: seconds
   - meta:
       plugin_name: windows.plugin
       module_name: PerflibNetFramework

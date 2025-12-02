@@ -177,6 +177,32 @@ static NETDATA_DOUBLE eval_divide(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *erro
 }
 
 ALWAYS_INLINE
+static NETDATA_DOUBLE eval_modulo(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
+    NETDATA_DOUBLE n1 = eval_value(exp, &op->ops[0], error);
+    if(*error != EVAL_ERROR_OK) return NAN;
+
+    NETDATA_DOUBLE n2 = eval_value(exp, &op->ops[1], error);
+    if(*error != EVAL_ERROR_OK) return NAN;
+
+    if(isnan(n1) || isnan(n2)) {
+        *error = EVAL_ERROR_VALUE_IS_NAN;
+        return NAN;
+    }
+
+    if(isinf(n1) || isinf(n2)) {
+        *error = EVAL_ERROR_VALUE_IS_INFINITE;
+        return INFINITY;
+    }
+
+    if(n2 == 0) {
+        *error = EVAL_ERROR_VALUE_IS_INFINITE;
+        return NAN;  // Modulo by zero is undefined
+    }
+
+    return fmod(n1, n2);
+}
+
+ALWAYS_INLINE
 static NETDATA_DOUBLE eval_nop(EVAL_EXPRESSION *exp, EVAL_NODE *op, int *error) {
     return eval_value(exp, &op->ops[0], error);
 }
@@ -232,6 +258,7 @@ struct operator operators[256] = {
     [EVAL_OPERATOR_MINUS]                 = { "-",  4, 2, 0, eval_minus },
     [EVAL_OPERATOR_MULTIPLY]              = { "*",  5, 2, 0, eval_multiply },
     [EVAL_OPERATOR_DIVIDE]                = { "/",  5, 2, 0, eval_divide },
+    [EVAL_OPERATOR_MODULO]                = { "%",  5, 2, 0, eval_modulo },
     [EVAL_OPERATOR_NOT]                   = { "!",  6, 1, 0, eval_not },
     [EVAL_OPERATOR_SIGN_PLUS]             = { "+",  6, 1, 0, eval_sign_plus },
     [EVAL_OPERATOR_SIGN_MINUS]            = { "-",  6, 1, 0, eval_sign_minus },

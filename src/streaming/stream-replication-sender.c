@@ -442,6 +442,16 @@ static bool replication_query_execute(BUFFER *wb, struct replication_query *q, s
 
             if(buffer_strlen(wb) > max_msg_size && last_end_time_in_buffer) {
                 q->query.before = last_end_time_in_buffer;
+
+                // CRITICAL: When splitting a response due to buffer overflow, we MUST set
+                // enable_streaming=false to prevent data loss. If we send start_streaming=true
+                // with partial data, the parent will think replication is complete when we've
+                // actually truncated the requested interval, causing permanent data loss.
+                //
+                // The parent-side stuck detection will handle infinite loops differently by:
+                // 1. Detecting when no progress is made after multiple rounds
+                // 2. Explicitly marking replication as FINISHED before sending final request
+                // 3. Handling the child's response appropriately whether it says true or false
                 q->query.enable_streaming = false;
 
                 internal_error(
@@ -1198,8 +1208,47 @@ static bool replication_execute_request(struct replication_request *rq, bool wor
         if(!rq->st) {
             __atomic_add_fetch(&replication_globals.atomic.error_not_found, 1, __ATOMIC_RELAXED);
             nd_log(NDLS_DAEMON, NDLP_ERR,
-                   "STREAM SND REPLAY ERROR: 'host:%s/chart:%s' not found",
+                   "STREAM SND REPLAY ERROR: 'host:%s/chart:%s' not found, sending empty response to unblock parent",
                    rrdhost_hostname(rq->sender->host), string2str(rq->chart_id));
+
+            // CRITICAL: Parent is waiting for a response! We MUST send REPLAY_END even if chart not found
+            // Otherwise parent will wait forever with chart stuck in replicating state.
+            // Send empty response with start_streaming=true to finish replication for this non-existent chart.
+            BUFFER *wb = sender_thread_buffer(rq->sender, REPLICATION_THREAD_BUFFER_INITIAL_SIZE);
+
+            bool with_slots = (rq->sender->capabilities & STREAM_CAP_SLOTS) ? true : false;
+            NUMBER_ENCODING integer_encoding = (rq->sender->capabilities & STREAM_CAP_IEEE754) ?
+                                               NUMBER_ENCODING_BASE64 : NUMBER_ENCODING_DECIMAL;
+
+            buffer_fast_strcat(wb, PLUGINSD_KEYWORD_REPLAY_BEGIN, sizeof(PLUGINSD_KEYWORD_REPLAY_BEGIN) - 1);
+            if(with_slots) {
+                buffer_fast_strcat(wb, " "PLUGINSD_KEYWORD_SLOT":", sizeof(PLUGINSD_KEYWORD_SLOT) - 1 + 2);
+                buffer_print_uint64_encoded(wb, integer_encoding, 0);  // slot 0 for unknown chart
+            }
+            buffer_fast_strcat(wb, " '", 2);
+            buffer_fast_strcat(wb, string2str(rq->chart_id), string_strlen(rq->chart_id));
+            buffer_fast_strcat(wb, "'\n", 2);
+
+            // Send REPLAY_END with empty data and start_streaming=true to unblock parent
+            buffer_fast_strcat(wb, PLUGINSD_KEYWORD_REPLAY_END " ", sizeof(PLUGINSD_KEYWORD_REPLAY_END) - 1 + 1);
+            buffer_print_int64_encoded(wb, integer_encoding, 0);  // update_every
+            buffer_fast_strcat(wb, " ", 1);
+            buffer_print_uint64_encoded(wb, integer_encoding, 0);  // db_first_entry
+            buffer_fast_strcat(wb, " ", 1);
+            buffer_print_uint64_encoded(wb, integer_encoding, 0);  // db_last_entry
+            buffer_fast_strcat(wb, " true  ", 7);  // start_streaming=true (force finish)
+            buffer_print_uint64_encoded(wb, integer_encoding, 0);  // after
+            buffer_fast_strcat(wb, " ", 1);
+            buffer_print_uint64_encoded(wb, integer_encoding, 0);  // before
+            buffer_fast_strcat(wb, " ", 1);
+            buffer_print_uint64_encoded(wb, integer_encoding, now_realtime_sec());  // wall_clock_time
+            buffer_fast_strcat(wb, "\n", 1);
+
+            sender_commit(rq->sender, wb, STREAM_TRAFFIC_TYPE_REPLICATION);
+            __atomic_add_fetch(&rq->sender->host->stream.snd.status.replication.counter_out, 1, __ATOMIC_RELAXED);
+            replication_replied_add();
+
+            ret = true;  // Consider this a successful response
             goto cleanup;
         }
     }

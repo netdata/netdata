@@ -25,7 +25,7 @@ func (c *Collector) collectIndexInstances(ctx context.Context) error {
 			currentIndex = value
 			key = fmt.Sprintf("%s.%s", currentSchema, currentIndex)
 
-			if c.indexSelector != nil && !c.indexSelector.MatchString(key) {
+			if !c.allowIndex(key) {
 				key = ""
 				return
 			}
@@ -58,6 +58,12 @@ func (c *Collector) collectIndexInstances(ctx context.Context) error {
 					c.mx.indexes[key] = metrics
 				}
 			}
+		}
+
+		if lineEnd {
+			key = ""
+			currentIndex = ""
+			currentSchema = ""
 		}
 	})
 

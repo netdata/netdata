@@ -69,6 +69,7 @@ Metrics:
 | user.cpu_utilization | user, system | percentage |
 | user.cpu_guest_utilization | guest | percentage |
 | user.cpu_context_switches | voluntary, involuntary | switches/s |
+| user.estimated_mem_usage | mem | MiB |
 | user.mem_usage | rss | MiB |
 | user.mem_private_usage | mem | MiB |
 | user.vmem_usage | vmem | MiB |

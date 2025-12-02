@@ -44,8 +44,10 @@ type Config struct {
 	// Enable collection of queue configuration metrics
 	CollectQueueConfig bool `yaml:"collect_queue_config" json:"collect_queue_config"`
 
-	// Pattern to filter queues (wildcards supported)
-	QueueSelector string `yaml:"queue_selector" json:"queue_selector"`
+	// Patterns to include queues (wildcards supported). Empty means include everything.
+	IncludeQueues []string `yaml:"include_queues" json:"include_queues"`
+	// Patterns to exclude queues after inclusion (wildcards supported).
+	ExcludeQueues []string `yaml:"exclude_queues" json:"exclude_queues"`
 	// Pattern to filter channels (wildcards supported)
 	ChannelSelector string `yaml:"channel_selector" json:"channel_selector"`
 	// Pattern to filter topics (wildcards supported)

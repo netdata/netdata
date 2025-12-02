@@ -2,6 +2,7 @@ package mq
 
 import (
 	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/modules/mq/contexts"
+	"github.com/netdata/netdata/go/plugins/plugin/ibm.d/protocols/pcf"
 )
 
 // collectSysTopics collects resource metrics using IBM MQ's resource monitoring system
@@ -21,18 +22,29 @@ func (c *Collector) collectSysTopics() error {
 		return nil
 	}
 
+	if c.client.GetResourceStatus() == pcf.ResourceStatusFailed {
+		// Previous attempts already determined this isn't available; skip spamming logs
+		return nil
+	}
+
 	// Enable resource monitoring on first use
 	if err := c.client.EnableResourceMonitoring(); err != nil {
-		c.Warningf("Failed to enable resource monitoring: %v", err)
+		c.warnOnce("resource_monitoring_enable", "Failed to enable resource monitoring: %v", err)
+		if c.client.GetResourceStatus() == pcf.ResourceStatusFailed {
+			// Stop trying in future iterations
+			c.Config.CollectSysTopics = false
+		}
 		return nil // Don't fail the entire collection
 	}
+	c.clearWarnOnce("resource_monitoring_enable")
 
 	// Get resource publications
 	result, err := c.client.GetResourcePublications()
 	if err != nil {
-		c.Warningf("Failed to get resource publications: %v", err)
+		c.warnOnce("resource_monitoring_publications", "Failed to get resource publications: %v", err)
 		return nil // Don't fail the entire collection
 	}
+	c.clearWarnOnce("resource_monitoring_publications")
 
 	c.Debugf("Retrieved %d resource publications", result.Stats.Discovery.AvailableItems)
 

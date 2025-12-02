@@ -182,6 +182,12 @@ Need additional security configurations? Contact Netdata Support.
 
 ## Standards Alignment
 
+:::tip
+
+View Netdata's security certifications, compliance reports, and audit documentation at our [Trust Center](https://trust.netdata.cloud/).
+
+:::
+
 ### PCI DSS Alignment
 
 Netdata applies practices that align with PCI DSS security principles:
@@ -216,7 +222,7 @@ Request a BAA through Netdata Support if required.
 
 ### SOC 2 Compliance
 
-Netdata achieved SOC2 Type 1 compliance on May 14, 2025 for these Service Criteria:
+Netdata achieved SOC2 Type 2 compliance for these Service Criteria:
 
 | **Principle**        | **Practices**                            |
 |:---------------------|:-----------------------------------------|

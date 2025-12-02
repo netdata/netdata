@@ -38,7 +38,7 @@ endmeta-->
     - **Notification settings**
       - Configuration name (optional): A name for your configuration in order to easily refer to it
       - Rooms: A list of Rooms for which you want to be notified
-      - Notifications: The notifications which you want to be notified
+      - Notifications: The notification types you want to receive
     - **Integration configuration**
       - API Key: The key provided on Opsgenie for the channel you want to receive your notifications
 

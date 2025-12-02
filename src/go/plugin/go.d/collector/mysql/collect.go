@@ -36,6 +36,10 @@ func (c *Collector) collect() (map[string]int64, error) {
 		return nil, fmt.Errorf("error on collecting global status: %v", err)
 	}
 
+	if err := c.collectEngineInnoDBStatus(mx); err != nil {
+		return nil, fmt.Errorf("error on collecting engine innodb status: %v", err)
+	}
+
 	if hasInnodbOSLog(mx) {
 		c.addInnoDBOSLogOnce.Do(c.addInnoDBOSLogCharts)
 	} else if hasInnodbOSLogIO(mx) {
@@ -62,6 +66,15 @@ func (c *Collector) collect() (map[string]int64, error) {
 			return nil, fmt.Errorf("error on collecting global variables: %v", err)
 		}
 		c.recheckGlobalVarsTime = now
+	}
+	mx["innodb_log_file_size"] = c.varInnoDBLogFileSize
+	mx["innodb_log_files_in_group"] = c.varInnoDBLogFilesInGroup
+	mx["innodb_log_group_capacity"] = c.varInnoDBLogFileSize * c.varInnoDBLogFilesInGroup
+	// https://mariadb.com/docs/server/server-usage/storage-engines/innodb/innodb-redo-log#determining-the-redo-log-occupancy
+	if mx["innodb_log_group_capacity"] > 0 {
+		mx["innodb_log_occupancy"] = 100 * 1000 * mx["innodb_checkpoint_age"] / mx["innodb_log_group_capacity"]
+	} else {
+		mx["innodb_log_occupancy"] = 0
 	}
 	mx["max_connections"] = c.varMaxConns
 	mx["table_open_cache"] = c.varTableOpenCache

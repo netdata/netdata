@@ -88,8 +88,8 @@ func TestDimOpts_String(t *testing.T) {
 	}{
 		{"", DimOpts{}},
 		{
-			"hidden nooverflow noreset obsolete",
-			DimOpts{Hidden: true, NoOverflow: true, NoReset: true, Obsolete: true},
+			"hidden nooverflow noreset obsolete type=float",
+			DimOpts{Hidden: true, NoOverflow: true, NoReset: true, Obsolete: true, Float: true},
 		},
 		{
 			"hidden obsolete",

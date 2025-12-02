@@ -14,12 +14,14 @@ package odbcbridge
 */
 import "C"
 import (
+	"bytes"
 	"context"
 	"database/sql/driver"
 	"errors"
 	"fmt"
 	"io"
 	"strconv"
+	"strings"
 	"sync"
 	"unsafe"
 )
@@ -28,6 +30,16 @@ import (
 type OptimizedConnection struct {
 	handle C.odbc_conn_t
 	mu     sync.Mutex
+}
+
+func cleanErrorBuffer(buf []byte) string {
+	if len(buf) == 0 {
+		return ""
+	}
+	if idx := bytes.IndexByte(buf, 0); idx >= 0 {
+		buf = buf[:idx]
+	}
+	return strings.TrimSpace(string(buf))
 }
 
 // ConnectOptimized establishes a new optimized ODBC connection
@@ -39,7 +51,7 @@ func ConnectOptimized(dsn string) (*OptimizedConnection, error) {
 	handle := C.odbc_connect(cDSN, (*C.char)(unsafe.Pointer(&errorBuf[0])), C.int(len(errorBuf)))
 
 	if handle == nil {
-		return nil, fmt.Errorf("connection failed: %s", string(errorBuf))
+		return nil, fmt.Errorf("connection failed: %s", cleanErrorBuffer(errorBuf))
 	}
 
 	return &OptimizedConnection{handle: handle}, nil
@@ -93,7 +105,7 @@ func (c *OptimizedConnection) QueryContext(ctx context.Context, query string) (*
 	ret := C.odbc_execute_direct(c.handle, cQuery, (*C.char)(unsafe.Pointer(&errorBuf[0])), C.int(len(errorBuf)))
 
 	if ret != Success {
-		return nil, fmt.Errorf("%w: %s", ErrQueryFailed, string(errorBuf))
+		return nil, fmt.Errorf("%w: %s", ErrQueryFailed, cleanErrorBuffer(errorBuf))
 	}
 
 	// Get metadata
@@ -146,7 +158,7 @@ func (c *OptimizedConnection) PrepareContext(ctx context.Context, query string) 
 	ret := C.odbc_prepare(c.handle, cQuery, (*C.char)(unsafe.Pointer(&errorBuf[0])), C.int(len(errorBuf)))
 
 	if ret != Success {
-		return nil, fmt.Errorf("prepare failed: %s", string(errorBuf))
+		return nil, fmt.Errorf("prepare failed: %s", cleanErrorBuffer(errorBuf))
 	}
 
 	return &PreparedStatement{conn: c, ctx: ctx}, nil
@@ -299,7 +311,7 @@ func (s *PreparedStatement) Execute() (*OptimizedRows, error) {
 	ret := C.odbc_execute(s.conn.handle, (*C.char)(unsafe.Pointer(&errorBuf[0])), C.int(len(errorBuf)))
 
 	if ret != Success {
-		return nil, fmt.Errorf("execute failed: %s", string(errorBuf))
+		return nil, fmt.Errorf("execute failed: %s", cleanErrorBuffer(errorBuf))
 	}
 
 	// Get metadata (same as QueryContext)

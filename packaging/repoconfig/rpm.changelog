@@ -1,3 +1,5 @@
+* Thu Nov 13 2025 Austin Hemmelgarn <austin@netdata.cloud> 5-2
+- Fix repository URLs for openSUSE Tumbleweed.
 * Mon Mar 17 2025 Austin Hemmelgarn <austin@netdata.cloud> 5-1
 - Deploy new package and metadata signing keys
 * Wed Mar 3 2025 Austin Hemmelgarn <austin@netdata.cloud> 4-3

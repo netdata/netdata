@@ -14,7 +14,7 @@
 
 :::info
 
-Netdata achieves [SOC 2 Type 1 attestation](https://www.netdata.cloud/blog/soc2-type1/), reinforcing its dedication to robust security practices for user data.
+Netdata achieves SOC 2 [Type 1](https://www.netdata.cloud/blog/soc2-type1/) & [Type 2](https://www.netdata.cloud/blog/soc2-type-2-compliance/) attestations, reinforcing its dedication to robust security practices for user data.
 
 :::
 
@@ -57,17 +57,15 @@ Metric data travels via secure Agent-Cloud Link (ACLK):
 
 ```mermaid
 flowchart TD
-    A("Netdata Agent") -->|"Encrypts metrics<br/>and minimal metadata"| B("Agent-Cloud Link ACLK")
-    B -->|"TLS Encryption"| C("Netdata Cloud")
-    C -->|"Aggregates metadata<br/>for dashboards and alerts"| D("User Browser")
-
-    %% Style definitions
-    classDef alert fill:#ffeb3b,stroke:#000000,stroke-width:3px,color:#000000,font-size:14px
-    classDef neutral fill:#f9f9f9,stroke:#000000,stroke-width:3px,color:#000000,font-size:14px
-    classDef complete fill:#4caf50,stroke:#000000,stroke-width:3px,color:#000000,font-size:14px
-    classDef database fill:#2196F3,stroke:#000000,stroke-width:3px,color:#000000,font-size:14px
-
-    %% Apply styles
+    A("Netdata Agent") -->|" Encrypts metrics<br/>and minimal metadata "| B("Agent-Cloud Link ACLK")
+    B -->|" TLS Encryption "| C("Netdata Cloud")
+    C -->|" Aggregates metadata<br/>for dashboards and alerts "| D("User Browser")
+%% Style definitions
+    classDef alert fill: #ffeb3b, stroke: #000000, stroke-width: 3px, color: #000000, font-size: 14px
+    classDef neutral fill: #f9f9f9, stroke: #000000, stroke-width: 3px, color: #000000, font-size: 14px
+    classDef complete fill: #4caf50, stroke: #000000, stroke-width: 3px, color: #000000, font-size: 14px
+    classDef database fill: #2196F3, stroke: #000000, stroke-width: 3px, color: #000000, font-size: 14px
+%% Apply styles
     class A alert
     class B neutral
     class C database

@@ -48,6 +48,7 @@ typedef struct daemon_status_file {
     time_t boottime;            // system boottime
     time_t uptime;              // netdata uptime
     usec_t timestamp_ut;        // the timestamp of the status file
+    char timestamp_ut_rfc3339[RFC3339_MAX_LENGTH]; // pre-calculated RFC3339 for async-signal-safe use
     size_t restarts;            // the number of times this agent has restarted (ever)
     size_t crashes;             // the number of times this agent has crashed (ever)
     size_t posts;               // the number of posts to the backend
@@ -79,6 +80,7 @@ typedef struct daemon_status_file {
         uint64_t sqlite;       // Size of sqlite files
         uint64_t other;        // Size of other files (total - dbengine - sqlite)
         usec_t last_updated_ut; // Last time the footprint was updated (microseconds)
+        char last_updated_ut_rfc3339[RFC3339_MAX_LENGTH]; // pre-calculated RFC3339 for async-signal-safe use
     } disk_footprint;
     
     // Metrics statistics

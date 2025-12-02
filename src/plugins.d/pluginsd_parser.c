@@ -189,8 +189,8 @@ static inline void pluginsd_update_host_ephemerality(RRDHOST *host) {
         strncpyz(value, "false", sizeof(value) - 1);
     }
 
-    if(!rrdlabels_exist(host->rrdlabels, HOST_LABEL_IS_EPHEMERAL))
-        rrdlabels_add(host->rrdlabels, HOST_LABEL_IS_EPHEMERAL, value, RRDLABEL_SRC_CONFIG);
+    // Set or replace current label as needed
+    rrdlabels_add(host->rrdlabels, HOST_LABEL_IS_EPHEMERAL, value, RRDLABEL_SRC_CONFIG);
 }
 
 #define VNODE_BASE_EPOCH (1704067200L)  // Jan 1, 2024 00:00:00 UTC

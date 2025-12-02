@@ -19,8 +19,6 @@ Netdata excels at collecting, storing, and presenting metrics in ready-to-use da
 
 You can view these charts in Netdata Cloud’s **Metrics tab**, **individual node views**, and **Custom Dashboards**.
 
----
-
 ## Metric Correlations
 
 Netdata charts allow you to quickly identify related metrics using the Metric Correlations feature. When you highlight an area of interest on a chart (such as a spike or anomaly), Netdata suggests other metrics that display similar behavior during the same timeframe.
@@ -48,8 +46,6 @@ Each Netdata chart is designed to provide quick insights and interactive explora
 | Chart area             | Displays the metrics data                      |
 | Legend with dimensions | Lists all metric dimensions with color coding  |
 
----
-
 ## Core Concepts
 
 Understanding how Netdata organizes and presents metrics helps you make the most of its charts.
@@ -64,8 +60,6 @@ A **dimension** is a value shown on a chart. Dimensions can represent:
 
 Each chart’s legend lists its dimensions. You can hide or show specific dimensions to focus on what matters most.
 
----
-
 ### Contexts
 
 A **context** groups charts by metric type and displayed dimensions. Contexts define how charts are organized and where they appear in the Netdata menu.
@@ -78,8 +72,6 @@ A **context** groups charts by metric type and displayed dimensions. Contexts de
 The part before the dot (`.`) is the **type**, while the part after is defined by the chart’s developer or its family.
 
 Contexts are also used for alert configurations.
-
----
 
 ### Families
 
@@ -97,8 +89,6 @@ The combination of **context** and **family** forms the `[context].[family]` nam
 | `disk.ops`     | `disk_ops.sda`     | `disk_ops.sdb`     |
 | `disk.backlog` | `disk_backlog.sda` | `disk_backlog.sdb` |
 | `disk.util`    | `disk_util.sda`    | `disk_util.sdb`    |
-
----
 
 ## Title Bar
 
@@ -137,8 +127,6 @@ Space settings: Global defaults across the Space if no Room or personal settings
 
 This hierarchy ensures that your personal preferences always take precedence, while still allowing collaborative defaults at the Room or Space level.
 
----
-
 ## Definition Bar
 
 The Definition bar provides powerful filtering and grouping options, helping you explore your metrics more effectively:
@@ -155,8 +143,6 @@ The Definition bar provides powerful filtering and grouping options, helping you
 | Labels filter          | Filter by specific labels                          |
 | Time aggregation       | Control how data points are aggregated over time   |
 | Reset button           | Return to default filtering and grouping settings  |
-
----
 
 ## NIDL Framework
 
@@ -185,8 +171,6 @@ These dropdown menus serve two main functions:
 | Anomaly rate        | Displays anomaly rate for the selected timeframe    |
 | Value statistics    | Shows minimum, average, and maximum values          |
 
----
-
 ## Group By Dropdown
 
 The **Group by** dropdown allows you to apply different grouping strategies on the same dataset:
@@ -211,8 +195,6 @@ When working with cgroups (VMs and containers), using **Group by Instance** show
 Use **Group by Instance, Dimension** to visualize the time series for each individual collected metric in the chart.
 
 :::
-
----
 
 ## Aggregate Functions Dropdown
 
@@ -241,8 +223,6 @@ When selecting aggregation functions over time, charts may offer dropdown menus 
 
 These options let you control how outliers and edge cases are handled during time-based aggregation.
 
----
-
 ## Nodes Dropdown
 
 Filter and explore the contribution of each node to your chart:
@@ -255,8 +235,6 @@ Filter and explore the contribution of each node to your chart:
 | Anomaly rate            | Displays anomaly rate per node                           |
 | Error messages          | Lists any errors preventing nodes from contributing data |
 
----
-
 ## Instances Dropdown
 
 Use the **Instances** dropdown to filter or view the contribution of specific instances within your data:
@@ -267,8 +245,6 @@ Use the **Instances** dropdown to filter or view the contribution of specific in
 |-------------------------|--------------------------------------------------------------|
 | Contribution percentage | Shows how much each instance contributes to the chart volume |
 | Anomaly rate            | Displays the anomaly rate for each instance                  |
-
----
 
 ## Dimensions Dropdown
 
@@ -281,8 +257,6 @@ The **Dimensions** dropdown allows you to filter by or focus on particular dimen
 | Contribution percentage | Shows how much each dimension contributes to the chart volume |
 | Anomaly rate            | Displays the anomaly rate for each dimension                  |
 
----
-
 ## Labels Dropdown
 
 Filter or view your data by **labels**, giving you flexibility to isolate metrics by their tags:
@@ -293,8 +267,6 @@ Filter or view your data by **labels**, giving you flexibility to isolate metric
 |-------------------------|-------------------------------------------------|
 | Contribution percentage | Shows each label’s contribution to chart volume |
 | Anomaly rate            | Displays the anomaly rate breakdown by label    |
-
----
 
 ## Aggregate Functions Over Time
 
@@ -319,13 +291,9 @@ For more details, see [Data Queries - Data Grouping](/src/web/api/queries/README
 
 :::
 
----
-
 ## Reset to Defaults
 
 Click the green **Reset** button at the end of the Definition bar to restore the chart’s filtering and grouping options to their defaults.
-
----
 
 ## Anomaly Rate Ribbon
 
@@ -340,8 +308,6 @@ Netdata uses machine learning models trained on past data to predict expected me
 | Real-time detection    | Flags anomalies within seconds of occurrence        |
 
 This feature enables you to catch issues quickly across large volumes of metrics.
-
----
 
 ## Hover Over the Chart
 
@@ -358,8 +324,6 @@ Hovering over any point on a chart reveals a detailed information overlay, makin
 
 When you hover over the **Anomaly Rate ribbon**, the dimensions are sorted by anomaly rate, and a histogram displays these rates to help you quickly identify problematic metrics.
 
----
-
 ### Info Column
 
 The **Info Column** appears during hover and provides detailed data collection insights:
@@ -372,8 +336,6 @@ The **Info Column** appears during hover and provides detailed data collection i
 | Overflown    | At least one data source has a counter that overflowed                        |
 | Empty Data   | At least one dimension has no data for the selected points                    |
 
----
-
 ## Play, Pause, and Reset Controls
 
 Control chart playback and interact with time using the **Time Controls**. These controls help you pause or reset the charts while exploring metrics.
@@ -385,8 +347,6 @@ Control chart playback and interact with time using the **Time Controls**. These
 | Reset playback          | Double-click on the chart | n/a                    | Resumes playback (returns to Play mode) |
 
 These controls work when the **default “Pan” action** is selected in the toolbar.
-
----
 
 ## Toolbar
 
@@ -402,8 +362,6 @@ The chart **Toolbar** provides interactive tools for manipulating the chart view
 | Chart Zoom      | Zoom in or out on the chart             |
 | Reset Zoom      | Return to the original view             |
 
----
-
 ### Pan
 
 Use the **Pan Tool** to navigate through time on the chart:
@@ -413,8 +371,6 @@ Use the **Pan Tool** to navigate through time on the chart:
 | Pan through time | n/a      | Click and drag | Touch drag           |
 
 Drag right to move backward in time and left to move forward.
-
----
 
 ### Highlight
 
@@ -426,8 +382,6 @@ The **Highlight Tool** allows you to select timeframes for deeper analysis:
 
 Use highlighting to investigate spikes, anomalies, or unusual behavior. Click on the chart area to clear the highlight selection.
 
----
-
 ### Select and Zoom
 
 Zoom into specific timeframes for maximum data granularity:
@@ -436,8 +390,6 @@ Zoom into specific timeframes for maximum data granularity:
 |------------------------|------------------------------------|----------------------|
 | Zoom to timeframe      | Shift + mouse vertical selection   | n/a                  |
 | Horizontal Y-axis zoom | Shift + mouse horizontal selection | n/a                  |
-
----
 
 ### Zoom In and Out
 
@@ -448,8 +400,6 @@ The **Chart Zoom** tool allows you to zoom in and out to view different time ran
 | Zoom in/out      | Shift + mouse scrollwheel | Two-finger pinch or Shift + two-finger scroll |
 
 Zooming in helps you analyze recent events in detail, while zooming out provides an overview of longer-term trends.
-
----
 
 ## Dimensions Bar
 
@@ -467,8 +417,6 @@ You can sort the dimensions legend using various criteria:
 | Dimension value        | Sort by current metric values (ascending or descending) |
 | Dimension anomaly rate | Sort by anomaly rate (ascending or descending)          |
 
----
-
 ### Show and Hide Dimensions
 
 Simplify your charts by showing only the dimensions you want to focus on:
@@ -479,8 +427,6 @@ Simplify your charts by showing only the dimensions you want to focus on:
 | Toggle individual dimensions | Shift + click          | n/a                  |
 
 This feature is especially useful for identifying unusual behavior by isolating specific metrics.
-
----
 
 ## Resize a Chart
 

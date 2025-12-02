@@ -240,10 +240,13 @@ static int dyncfg_config_execute_cb(struct rrd_function_execute *rfe, void *data
                     goto cleanup;
                 }
             }
-            else if((cmd == DYNCFG_CMD_USERCONFIG || cmd == DYNCFG_CMD_TEST) && df->current.status != DYNCFG_STATUS_ORPHAN)  {
+            else if((cmd == DYNCFG_CMD_USERCONFIG || cmd == DYNCFG_CMD_TEST || cmd == DYNCFG_CMD_GET) && df->current.status != DYNCFG_STATUS_ORPHAN)  {
                 const char *old_rfe_function = rfe->function;
                 char buf2[2048];
-                snprintfz(buf2, sizeof(buf2), "config %s %s %s", dictionary_acquired_item_name(item), action, name?name:"");
+                if(cmd == DYNCFG_CMD_GET)
+                    snprintfz(buf2, sizeof(buf2), "config %s %s", dictionary_acquired_item_name(item), action);
+                else
+                    snprintfz(buf2, sizeof(buf2), "config %s %s %s", dictionary_acquired_item_name(item), action, name?name:"");
                 rfe->function = buf2;
                 dictionary_acquired_item_release(dyncfg_globals.nodes, item);
                 item = NULL;

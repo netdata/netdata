@@ -19,9 +19,12 @@ NEVER_INLINE
 static void shutdown_timed_out(void) {
     // keep this as a separate function, to have it logged like this in sentry
     daemon_status_file_shutdown_timeout(steps_timings);
-#ifdef ENABLE_SENTRY
-    nd_sentry_add_shutdown_timeout_as_breadcrumb();
-#endif
+
+    // NOTE: We intentionally skip adding a Sentry breadcrumb here because:
+    // 1. During shutdown timeout, the status file has already been saved with timeout info
+    // 2. Sentry may crash trying to access potentially freed/corrupted strings from session_status
+    // 3. The abort() below will trigger a signal that Sentry will catch anyway
+
     abort();
 }
 

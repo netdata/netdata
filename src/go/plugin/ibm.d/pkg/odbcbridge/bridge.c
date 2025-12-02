@@ -5,6 +5,9 @@
 #include <string.h>
 #include <stdio.h>
 
+#define ODBC_DEFAULT_BUFFER_SIZE 4096
+#define ODBC_MAX_BUFFER_SIZE (16 * 1024 * 1024)
+
 // Connection structure with optimizations
 typedef struct {
     SQLHENV env;
@@ -379,28 +382,113 @@ int odbc_get_value(odbc_conn_t conn_handle, int column_index, odbc_value_t* valu
             break;
         }
         
+        case ODBC_TYPE_BINARY: {
+            // Determine required buffer size
+            char dummy[1];
+            SQLLEN binary_len = 0;
+
+            ret = SQLGetData(conn->stmt, column_index + 1, SQL_C_BINARY,
+                             dummy, 0, &binary_len);
+
+            if (!SQL_SUCCEEDED(ret) && ret != SQL_SUCCESS_WITH_INFO) {
+                return ODBC_ERROR;
+            }
+
+            if (binary_len == SQL_NULL_DATA) {
+                value->is_null = true;
+                return ODBC_SUCCESS;
+            }
+
+            size_t buffer_size = ODBC_DEFAULT_BUFFER_SIZE;
+            if (binary_len > 0 && binary_len != SQL_NO_TOTAL) {
+                size_t required = (size_t)binary_len;
+                if (required > buffer_size) {
+                    buffer_size = required;
+                }
+            }
+
+            if (buffer_size > ODBC_MAX_BUFFER_SIZE) {
+                buffer_size = ODBC_MAX_BUFFER_SIZE;
+            }
+
+            if (buffer_size == 0) {
+                buffer_size = ODBC_DEFAULT_BUFFER_SIZE;
+            }
+
+            void* buffer = malloc(buffer_size);
+            if (!buffer) {
+                return ODBC_ERROR;
+            }
+
+            ret = SQLGetData(conn->stmt, column_index + 1, SQL_C_BINARY,
+                             buffer, buffer_size, &indicator);
+
+            if (SQL_SUCCEEDED(ret) || ret == SQL_SUCCESS_WITH_INFO) {
+                if (indicator == SQL_NULL_DATA) {
+                    value->is_null = true;
+                    free(buffer);
+                } else {
+                    value->type = ODBC_TYPE_BINARY;
+                    value->is_null = false;
+                    if (indicator >= 0 && indicator <= (SQLLEN)buffer_size) {
+                        value->data.binary_val.len = (size_t)indicator;
+                    } else if (indicator == SQL_NO_TOTAL || indicator > (SQLLEN)buffer_size) {
+                        value->data.binary_val.len = buffer_size;
+                    } else {
+                        value->data.binary_val.len = 0;
+                    }
+                    value->data.binary_val.data = buffer;
+                }
+                return ODBC_SUCCESS;
+            }
+
+            free(buffer);
+            break;
+        }
+
         case ODBC_TYPE_STRING:
         default: {
             // First call to get the required buffer size
             char dummy[1];
-            SQLLEN str_len_or_ind;
-            
+            SQLLEN str_len_or_ind = 0;
+
             ret = SQLGetData(conn->stmt, column_index + 1, SQL_C_CHAR,
                              dummy, 0, &str_len_or_ind);
-            
+
+            if (!SQL_SUCCEEDED(ret) && ret != SQL_SUCCESS_WITH_INFO) {
+                return ODBC_ERROR;
+            }
+
             if (str_len_or_ind == SQL_NULL_DATA) {
                 value->is_null = true;
                 return ODBC_SUCCESS;
             }
-            
-            // Allocate buffer and get the actual data
-            size_t buffer_size = (str_len_or_ind > 0) ? str_len_or_ind + 1 : 4096;
+
+            size_t buffer_size = ODBC_DEFAULT_BUFFER_SIZE;
+            if (str_len_or_ind > 0 && str_len_or_ind != SQL_NO_TOTAL) {
+                size_t required = (size_t)str_len_or_ind + 1;
+                if (required > buffer_size) {
+                    buffer_size = required;
+                }
+            }
+
+            if (buffer_size > ODBC_MAX_BUFFER_SIZE) {
+                buffer_size = ODBC_MAX_BUFFER_SIZE;
+            }
+
+            if (buffer_size == 0) {
+                buffer_size = ODBC_DEFAULT_BUFFER_SIZE;
+            }
+
             char* buffer = malloc(buffer_size);
-            
+            if (!buffer) {
+                return ODBC_ERROR;
+            }
+
             ret = SQLGetData(conn->stmt, column_index + 1, SQL_C_CHAR,
                              buffer, buffer_size, &indicator);
-            
-            if (SQL_SUCCEEDED(ret)) {
+
+            if (SQL_SUCCEEDED(ret) || ret == SQL_SUCCESS_WITH_INFO) {
                 if (indicator == SQL_NULL_DATA) {
                     value->is_null = true;
                     free(buffer);
@@ -410,13 +498,13 @@ int odbc_get_value(odbc_conn_t conn_handle, int column_index, odbc_value_t* valu
                     value->data.string_val = buffer;
                 }
                 return ODBC_SUCCESS;
-            } else {
-                free(buffer);
             }
+
+            free(buffer);
             break;
         }
     }
-    
+
     return ODBC_ERROR;
 }
 

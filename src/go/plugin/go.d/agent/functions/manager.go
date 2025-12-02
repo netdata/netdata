@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -15,6 +16,11 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/pkg/safewriter"
 )
+
+type functionSet struct {
+	direct   func(Function)            // for globally-unique names
+	prefixes map[string]func(Function) // for prefix-multiplexed names
+}
 
 func NewManager() *Manager {
 	return &Manager{
@@ -24,7 +30,7 @@ func NewManager() *Manager {
 		api:              netdataapi.New(safewriter.Stdout),
 		input:            stdinInput,
 		mux:              &sync.Mutex{},
-		FunctionRegistry: make(map[string]func(Function)),
+		FunctionRegistry: make(map[string]*functionSet),
 	}
 }
 
@@ -36,7 +42,7 @@ type Manager struct {
 	input input
 
 	mux              *sync.Mutex
-	FunctionRegistry map[string]func(Function)
+	FunctionRegistry map[string]*functionSet
 }
 
 func (m *Manager) Run(ctx context.Context, quitCh chan struct{}) {
@@ -81,29 +87,62 @@ func (m *Manager) run(ctx context.Context, quitCh chan struct{}) {
 				continue
 			}
 
-			function, ok := m.lookupFunction(fn.Name)
+			handler, ok := m.lookupFunction(fn.Name)
 			if !ok {
 				m.Infof("skipping execution of '%s': unregistered function", fn.Name)
 				m.respf(fn, 501, "unregistered function: %s", fn.Name)
 				continue
 			}
-			if function == nil {
+			if handler == nil {
 				m.Warningf("skipping execution of '%s': nil function registered", fn.Name)
 				m.respf(fn, 501, "nil function: %s", fn.Name)
 				continue
 			}
 
-			function(*fn)
+			handler(*fn)
 		}
 	}
 }
 
 func (m *Manager) lookupFunction(name string) (func(Function), bool) {
 	m.mux.Lock()
-	defer m.mux.Unlock()
+	fs, ok := m.FunctionRegistry[name]
+	m.mux.Unlock()
 
-	f, ok := m.FunctionRegistry[name]
-	return f, ok
+	if !ok || fs == nil {
+		return nil, false
+	}
+
+	return func(f Function) {
+		if len(fs.prefixes) > 0 {
+			m.handlePrefixRouting(f, fs)
+			return
+		}
+
+		if fs.direct != nil {
+			fs.direct(f)
+			return
+		}
+
+		m.respf(&f, 503, "unknown function '%s' (%v)", f.Name, f.Args)
+	}, true
+}
+
+func (m *Manager) handlePrefixRouting(f Function, fs *functionSet) {
+	if len(f.Args) == 0 {
+		m.respf(&f, 503, "unknown function '%s' (%v)", f.Name, f.Args)
+		return
+	}
+
+	id := f.Args[0]
+	for prefix, handler := range fs.prefixes {
+		if strings.HasPrefix(id, prefix) {
+			handler(f)
+			return
+		}
+	}
+
+	m.respf(&f, 503, "unknown function '%s' (%v)", f.Name, f.Args)
 }
 
 func (m *Manager) respf(fn *Function, code int, msgf string, a ...any) {
