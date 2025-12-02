@@ -46,4 +46,4 @@ jobs:
           REPO="${{ github.event.pull_request.head.repo.full_name }}"
           BRANCH="${{ github.event.pull_request.head.ref }}"
           echo "Running ingest for $REPO:$BRANCH"
-          python ingest/ingest.py --repos "$REPO:$BRANCH"
+          python ingest/ingest.py --repos "$REPO:$BRANCH" -f
