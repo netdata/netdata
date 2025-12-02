@@ -791,7 +791,7 @@ get_current_version() {
   if [ -z "${ndbinary}" ]; then
     _current_version=0
   else
-    _current_version="$(parse_version "$(${ndbinary} -v | cut -f 2 -d ' ')")"
+    _current_version="$(parse_version "$(${ndbinary} -V | cut -f 2 -d ' ')")"
   fi
 
   echo "${_current_version:-0}"
