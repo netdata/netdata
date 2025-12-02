@@ -1,6 +1,6 @@
 # Nodes tab
 
-The **Nodes tab** provides a live, centralized view of every node in your [Room](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#rooms), allowing you to filter, sort, and interact with key node information.
+The **Nodes tab** provides a live, centralized view of every node in your [Room](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#overview), allowing you to filter, sort, and interact with key node information.
 
 :::tip
 

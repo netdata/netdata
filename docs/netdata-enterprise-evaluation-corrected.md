@@ -44,7 +44,7 @@ Netdata has been architected to minimize resource consumption while maximizing o
 - **Storage Optimization**: Industry-leading compression achieving ~0.6 bytes per sample on disk for high-resolution data
 - **Edge Computing**: Distributed architecture keeps data processing close to its source, reducing bandwidth and central processing requirements - Netdata distributes the code instead of centralizing the data
 - **Intelligent ML**: Machine learning runs as low-priority background tasks, automatically yielding resources when needed for data collection. See [AI & ML Features](https://github.com/netdata/netdata/blob/master/docs/category-overview-pages/machine-learning-and-assisted-troubleshooting.md)
-- **Built-in Scalability**: Native clustering and high-availability features enable organizations to scale horizontally without architectural changes. See [Observability Centralization Points](https://github.com/netdata/netdata/blob/master/docs/observability-centralization-points/README.md).
+- **Built-in Scalability**: Native clustering and high-availability features enable organizations to scale horizontally without architectural changes. See [Observability Centralization Points](https://github.com/netdata/netdata/blob/master/docs/deployment-guides/deployment-with-centralization-points.md).
 - **Stable and Predictable Resource Usage**: Agents are optimized to spread work over time and avoid sudden changes in resource consumption
 
 This design philosophy enables Netdata to monitor infrastructure at unprecedented scale with minimal overhead, making it suitable for everything from IoT devices to high-performance computing clusters.

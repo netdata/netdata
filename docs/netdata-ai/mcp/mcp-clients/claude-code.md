@@ -19,8 +19,8 @@ Claude Code supports multiple MCP transport types, giving you flexibility in how
 2. **Netdata v2.6.0 or later** with MCP support - Prefer a Netdata Parent to get infrastructure level visibility. Your AI Client (running on your desktop or laptop) needs to have direct network access to the Netdata IP and port (usually 19999).
    - **v2.6.0 - v2.7.1**: Only WebSocket transport available, requires `nd-mcp` bridge
    - **v2.7.2+**: Direct HTTP/SSE support available (recommended)
-3. **For WebSocket or stdio connections: `nd-mcp` bridge** - The stdio-to-websocket bridge. [Find its absolute path](/docs/learn/mcp.md#finding-the-nd-mcp-bridge). Not needed for direct HTTP connections on v2.7.2+.
-4. **Optionally, the Netdata MCP API key** that unlocks full access to sensitive observability data (protected functions, full access to logs) on your Netdata. Each Netdata Agent or Parent has its own unique API key for MCP - [Find your Netdata MCP API key](/docs/learn/mcp.md#finding-your-api-key)
+3. **For WebSocket or stdio connections: `nd-mcp` bridge** - The stdio-to-websocket bridge. [Find its absolute path](/docs/netdata-ai/mcp/README.md#finding-the-nd-mcp-bridge). Not needed for direct HTTP connections on v2.7.2+.
+4. **Optionally, the Netdata MCP API key** that unlocks full access to sensitive observability data (protected functions, full access to logs) on your Netdata. Each Netdata Agent or Parent has its own unique API key for MCP - [Find your Netdata MCP API key](/docs/netdata-ai/mcp/README.md#finding-your-api-key)
 
 ## Configuration Methods
 
@@ -67,7 +67,7 @@ claude mcp add netdata /usr/sbin/nd-mcp \
 
 ### Method 3: Using npx mcp-remote (Alternative Bridge for v2.7.2+)
 
-If nd-mcp is not available, you can use the official MCP remote client (requires Netdata v2.7.2+). For detailed options and troubleshooting, see [Using MCP Remote Client](/docs/learn/mcp.md#using-mcp-remote-client).
+If nd-mcp is not available, you can use the official MCP remote client (requires Netdata v2.7.2+). For detailed options and troubleshooting, see [Using MCP Remote Client](/docs/netdata-ai/mcp/README.md#using-mcp-remote-client).
 
 ```bash
 # Using SSE transport
@@ -95,8 +95,8 @@ claude mcp get netdata
 
 Replace in all examples:
 - `YOUR_NETDATA_IP` - IP address or hostname of your Netdata Agent/Parent
-- `NETDATA_MCP_API_KEY` - Your [Netdata MCP API key](/docs/learn/mcp.md#finding-your-api-key)
-- `/usr/sbin/nd-mcp` - With your [actual nd-mcp path](/docs/learn/mcp.md#finding-the-nd-mcp-bridge) (stdio method only)
+- `NETDATA_MCP_API_KEY` - Your [Netdata MCP API key](/docs/netdata-ai/mcp/README.md#finding-your-api-key)
+- `/usr/sbin/nd-mcp` - With your [actual nd-mcp path](/docs/netdata-ai/mcp/README.md#finding-the-nd-mcp-bridge) (stdio method only)
 
 **Project-scoped configuration** creates a `.mcp.json` file that can be shared with your team via version control.
 
@@ -126,7 +126,7 @@ Claude Code also allows you to explicitly specify which MCP server to use with t
 
 This is particularly useful when you have multiple MCP servers configured and want to ensure Claude uses the correct one.
 
-> **💡 Advanced Usage:** Claude Code can combine observability data with system automation for powerful DevOps workflows. Learn about the opportunities and security considerations in [AI DevOps Copilot](/docs/ml-ai/ai-devops-copilot/ai-devops-copilot.md).
+> **💡 Advanced Usage:** Claude Code can combine observability data with system automation for powerful DevOps workflows. Learn about the opportunities and security considerations in [AI DevOps Copilot](/docs/netdata-ai/mcp/mcp-clients/ai-devops-copilot.md).
 
 ## Project-Based Configuration
 
@@ -247,5 +247,5 @@ Our key services to monitor:
 - [Claude Code MCP Configuration Guide](https://docs.claude.com/en/docs/claude-code/mcp)
 - [Claude Code Getting Started](https://docs.claude.com/en/docs/claude-code/getting-started)
 - [Claude Code Commands Reference](https://docs.claude.com/en/docs/claude-code/commands)
-- [Netdata MCP Setup](/docs/learn/mcp.md)
-- [AI DevOps Best Practices](/docs/ml-ai/ai-devops-copilot/ai-devops-copilot.md)
+- [Netdata MCP Setup](/docs/netdata-ai/mcp/README.md)
+- [AI DevOps Best Practices](/docs/netdata-ai/mcp/mcp-clients/ai-devops-copilot.md)

@@ -21,7 +21,7 @@ Codex CLI supports both stdio launchers and direct Streamable HTTP when the RMCP
    - **v2.6.0 - v2.7.1**: Only WebSocket transport available, requires `nd-mcp` bridge
    - **v2.7.2+**: Can use `npx mcp-remote` bridge for HTTP/SSE support
 3. **Launcher** – Run Netdata through `nd-mcp` (always) or `npx mcp-remote` (useful when you want a single stdio launcher for multiple MCP clients). Direct HTTP is also available for v2.7.2+ when you enable the RMCP client.
-4. **Optionally, the Netdata MCP API key** that unlocks full access to sensitive observability data (protected functions, full access to logs) on your Netdata. Each Netdata Agent or Parent has its own unique API key for MCP - [Find your Netdata MCP API key](/docs/learn/mcp.md#finding-your-api-key)
+4. **Optionally, the Netdata MCP API key** that unlocks full access to sensitive observability data (protected functions, full access to logs) on your Netdata. Each Netdata Agent or Parent has its own unique API key for MCP - [Find your Netdata MCP API key](/docs/netdata-ai/mcp/README.md#finding-your-api-key)
 
 ## Installation
 
@@ -62,7 +62,7 @@ tool_timeout_sec = 120
 
 ### Method 2: Using `npx mcp-remote` (Works for HTTP or SSE)
 
-This launcher wraps Netdata’s remote transports in stdio for clients that cannot speak HTTP directly or when you prefer a consistent launcher across tools. For detailed options, see [Using MCP Remote Client](/docs/learn/mcp.md#using-mcp-remote-client).
+This launcher wraps Netdata’s remote transports in stdio for clients that cannot speak HTTP directly or when you prefer a consistent launcher across tools. For detailed options, see [Using MCP Remote Client](/docs/netdata-ai/mcp/README.md#using-mcp-remote-client).
 
 ```toml
 # ~/.codex/config.toml
@@ -150,8 +150,8 @@ After configuring, verify that Netdata MCP is available:
 
 Replace in all examples:
 - `YOUR_NETDATA_IP` - IP address or hostname of your Netdata Agent/Parent
-- `NETDATA_MCP_API_KEY` - Your [Netdata MCP API key](/docs/learn/mcp.md#finding-your-api-key)
-- `/usr/sbin/nd-mcp` - With your [actual nd-mcp path](/docs/learn/mcp.md#finding-the-nd-mcp-bridge) (nd-mcp method only)
+- `NETDATA_MCP_API_KEY` - Your [Netdata MCP API key](/docs/netdata-ai/mcp/README.md#finding-your-api-key)
+- `/usr/sbin/nd-mcp` - With your [actual nd-mcp path](/docs/netdata-ai/mcp/README.md#finding-the-nd-mcp-bridge) (nd-mcp method only)
 
 ## How to Use
 
@@ -184,7 +184,7 @@ Analyze memory usage patterns and suggest optimization strategies
 Explain the current active alerts and their potential impact
 ```
 
-> **💡 Advanced Usage:** Codex CLI can combine observability data with code generation capabilities for powerful DevOps workflows. Learn about the opportunities and security considerations in [AI DevOps Copilot](/docs/ml-ai/ai-devops-copilot/ai-devops-copilot.md).
+> **💡 Advanced Usage:** Codex CLI can combine observability data with code generation capabilities for powerful DevOps workflows. Learn about the opportunities and security considerations in [AI DevOps Copilot](/docs/netdata-ai/mcp/mcp-clients/ai-devops-copilot.md).
 
 ## Troubleshooting
 
@@ -262,5 +262,5 @@ tool_timeout_sec = 180     # Time limit for individual tool calls
 - [OpenAI Codex CLI GitHub Repository](https://github.com/openai/codex)
 - [Codex CLI Configuration Documentation](https://github.com/openai/codex/blob/main/docs/config.md)
 - [Codex CLI Installation Guide](https://github.com/openai/codex#installation)
-- [Netdata MCP Setup](/docs/learn/mcp.md)
-- [AI DevOps Best Practices](/docs/ml-ai/ai-devops-copilot/ai-devops-copilot.md)
+- [Netdata MCP Setup](/docs/netdata-ai/mcp/README.md)
+- [AI DevOps Best Practices](/docs/netdata-ai/mcp/mcp-clients/ai-devops-copilot.md)

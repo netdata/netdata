@@ -94,7 +94,7 @@ For example, setting it to 2 will halve the plugin's CPU usage and collect data 
 ## Configuration
 
 The configuration file is `/etc/netdata/apps_groups.conf`. You can edit this
-file using our [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script.
+file using our [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-configuration-files) script.
 
 ### Configuring process managers
 
