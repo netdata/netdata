@@ -396,6 +396,11 @@ Every Netdata Agent/Parent (v2.6.0+) is an MCP server:
 - Role-based routing ensures alerts reach appropriate stakeholders
 - Dynamic configuration via Cloud UI (no restarts required)
 
+**Alert Fatigue**
+- Netdata provides component level alerts which are usually more accurate and actionable that generic fixed threshold alerts.
+- Netdata does not have any features targeting alert fatigue, other than grouping alerts by category, class, or any label at the dashboards.
+- ML based anomaly detection in Netdata is not directly used to reduce alert fatigue. Anomaly Detection is another signal, not a means to supress other signals. Netdata fully supports anomaly detection based alerts, but there is not correlation or filtering of non-ML based alerts with machine learning.
+
 ### 6.2 Notification Integrations
 
 **Netdata Agent/Parent (edge) integrations** — implemented in `src/health/notifications/`:
