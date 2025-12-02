@@ -173,7 +173,7 @@ Examples of Cloud workflows that rely on metadata:
 
 - "Mute all `class: capacity` alerts for `component: storage` in the `staging` room during this maintenance window."
 - "Send `class: availability` alerts for `component: payments-service` to the on-call team's PagerDuty integration."
-- "Show me only `type: latency` alerts from `component: api` over the last 24 hours in the events feed."
+- "Show me only `class: latency` alerts from `component: api` over the last 24 hours in the events feed."
 
 Having metadata consistently set across alerts is what makes these workflows reliable.
 
