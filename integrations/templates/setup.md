@@ -131,7 +131,7 @@ Configuration for this specific integration is located in the `[[ entry.setup.co
 [% include 'setup/sample-netdata-config.md' %]
 [% endif %]
 
-You can edit the configuration file using the [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config) script from the
+You can edit the configuration file using the [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-configuration-files) script from the
 Netdata [config directory](/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
 
 ```bash

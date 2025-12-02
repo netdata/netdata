@@ -14,7 +14,7 @@ Most collectors and plugins are enabled by default. You can selectively disable 
 
 **To disable plugins**:
 
-1. Open `netdata.conf` using [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config).
+1. Open `netdata.conf` using [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-configuration-files).
 2. Navigate to the `[plugins]` section
 3. Uncomment the relevant line and set it to `no`
 
@@ -43,7 +43,7 @@ You can modify how often collectors gather metrics to optimize CPU usage. This c
 
 ### Global
 
-1. Open `netdata.conf` using [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config).
+1. Open `netdata.conf` using [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-configuration-files).
 2. Set the `update every` value (default is `1`, meaning one-second intervals):
     ```text
     [global]
@@ -56,7 +56,7 @@ You can modify how often collectors gather metrics to optimize CPU usage. This c
 
 **For Plugins**:
 
-1. Open `netdata.conf` using [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config).
+1. Open `netdata.conf` using [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-configuration-files).
 2. Locate the plugin's section and set its frequency:
 
     ```text
