@@ -1135,7 +1135,6 @@ update_binpkg() {
   esac
 
   initial_version="$(get_current_version)"
-  nd_version="$(netdata -V | cut -f 2 -d ' ')"
 
   if [ -n "${repo_subcmd}" ]; then
     # shellcheck disable=SC2086
@@ -1148,9 +1147,9 @@ update_binpkg() {
   elif ${pkg_installed_check} netdata-repo-edge > /dev/null 2>&1; then
     RELEASE_CHANNEL="nightly"
     repopkg="netdata-repo-edge"
-  elif echo "${nd_version}" | grep -Eq -- 'v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'; then
+  elif echo "${initial_version}" | grep -Eq -- '^[0-9]*[1-9][0-9]*0{5}$'; then # All five final digits are zero and at least one preceeding digit is non-zero.
     RELEASE_CHANNEL="stable"
-  elif echo "${nd_version}" | grep -Eq -- '-nightly$'; then
+  elif echo "${initial_version}" | grep -Eq -- '^[0-9]*[1-9][0-9]{0,4}$'; then # At least one of the final five digits is non-zero.
     RELEASE_CHANNEL="nightly"
   else
     RELEASE_CHANNEL="none"
