@@ -32,4 +32,4 @@ For complete transparency:
 ## Enable and configure the ACLK
 
 The Agent-Cloud Link is enabled automatically—no configuration needed.
-If your Agent requires a proxy to access the internet, you'll need to [configure proxy settings](/src/claim/README.md#automatically-via-a-provisioning-system-or-the-command-line).
+If your Agent requires a proxy to access the internet, you'll need to [configure proxy settings](/src/claim/README.md#proxy-configuration).

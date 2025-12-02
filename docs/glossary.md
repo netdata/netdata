@@ -59,7 +59,7 @@ Missing a term? Let us know or submit a request to expand our glossary. Together
 
 - [**Group by**](/docs/dashboards-and-charts/netdata-charts.md#group-by-dropdown): The drop-down on the dimension bar of a composite chart that allows you to group metrics by dimension, node, or chart.
 
-- [**Health Configuration Files**](/src/health/REFERENCE.md#edit-health-configuration-files): Files that you can edit to configure your Agent's health watchdog service.
+- [**Health Configuration Files**](/src/health/REFERENCE.md#how-to-edit-health-configuration-files): Files that you can edit to configure your Agent's health watchdog service.
 
 - [**Home** tab](/docs/dashboards-and-charts/home-tab.md): Tab in Netdata Cloud that provides a predefined dashboard of relevant information about entities in the Room.
 
@@ -122,7 +122,7 @@ Missing a term? Let us know or submit a request to expand our glossary. Together
 
 ## T
 
-- [**Template Entity Type**](/src/health/REFERENCE.md#entity-types): Entity type that defines rules that apply to all charts of a specific context, and use the template label. Templates help you apply one entity to all disks, all network interfaces, all MySQL databases, and so on.
+- [**Template Entity Type**](/src/health/REFERENCE.md#entity-types-overview): Entity type that defines rules that apply to all charts of a specific context, and use the template label. Templates help you apply one entity to all disks, all network interfaces, all MySQL databases, and so on.
 
 - [**Tiers**](/src/database/engine/README.md#tiers): Tiering is a mechanism of providing multiple tiers of data with different granularity of metrics (the frequency they are collected and stored, i.e., their resolution).
 
