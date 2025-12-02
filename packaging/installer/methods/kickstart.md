@@ -58,8 +58,6 @@ To install and connect to Netdata Cloud in a single step from your terminal:
 3. Go to **Space Settings** → **Nodes**
 4. Click **Add Node** → Copy Claim Token
 
-<!-- Screenshot Placeholder -->
-<!-- ![Claim Token in Netdata Cloud UI](../img/kickstart/claim-token-ui.png) -->
 
 </details>
 
