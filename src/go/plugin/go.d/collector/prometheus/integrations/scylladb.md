@@ -141,7 +141,7 @@ The following options can be defined globally: update_every, autodetection_retry
 This option allows you to filter out unwanted time series. Only metrics matching the selector will be collected.
 
 - Logic: (pattern1 OR pattern2) AND !(pattern3 or pattern4)
-- Pattern syntax: [selector](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/pkg/prometheus/selector/README.md).
+- Pattern syntax: [selector](/src/go/pkg/prometheus/selector/README.md).
 - Option syntax:
 
 ```yaml
