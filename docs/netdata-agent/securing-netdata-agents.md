@@ -46,7 +46,7 @@ Parent nodes provide security by:
 
 This approach isolates production systems from direct internet exposure, even when using Netdata Cloud.
 
-For more information, see [Observability Centralization Points](/docs/observability-centralization-points/README.md).
+For more information, see [Observability Centralization Points](/docs/deployment-guides/deployment-with-centralization-points.md).
 
 :::
 

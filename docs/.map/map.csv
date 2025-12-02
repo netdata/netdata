@@ -137,7 +137,6 @@ https://github.com/netdata/netdata/edit/master/src/exporting/prometheus/README.m
 https://github.com/netdata/netdata/edit/master/src/web/api/exporters/shell/README.md,Shell Scripts,Published,Exporting Metrics,
 ,,,,
 ,,,,
-https://github.com/netdata/netdata/edit/master/docs/category-overview-pages/working-with-logs.md,Working with Logs,Unpublished,Working with Logs,
 logs_integrations,,,,
 https://github.com/netdata/netdata/edit/master/src/collectors/systemd-journal.plugin/README.md,Systemd Journal Plugin Reference,Published,Logs/Systemd Journal Logs,View and analyze logs available in systemd journal
 https://github.com/netdata/netdata/edit/master/src/collectors/systemd-journal.plugin/forward_secure_sealing.md,Forward Secure Sealing (FSS) in Systemd-Journal,Published,Logs/Systemd Journal Logs,

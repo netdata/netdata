@@ -21,8 +21,8 @@ OpenCode supports both local and remote MCP servers:
 2. **Netdata v2.6.0 or later** with MCP support - Prefer a Netdata Parent to get infrastructure level visibility. Your AI Client (running on your desktop or laptop) needs to have direct network access to the Netdata IP and port (usually 19999).
    - **v2.6.0 - v2.7.1**: Only WebSocket transport available, requires `nd-mcp` bridge
    - **v2.7.2+**: Direct HTTP/SSE support available (recommended)
-3. **For WebSocket or stdio connections: `nd-mcp` bridge** - The stdio-to-websocket bridge. [Find its absolute path](/docs/learn/mcp.md#finding-the-nd-mcp-bridge). Not needed for direct HTTP connections on v2.7.2+.
-4. **Optionally, the Netdata MCP API key** that unlocks full access to sensitive observability data (protected functions, full access to logs) on your Netdata. Each Netdata Agent or Parent has its own unique API key for MCP - [Find your Netdata MCP API key](/docs/learn/mcp.md#finding-your-api-key)
+3. **For WebSocket or stdio connections: `nd-mcp` bridge** - The stdio-to-websocket bridge. [Find its absolute path](/docs/netdata-ai/mcp/README.md#finding-the-nd-mcp-bridge). Not needed for direct HTTP connections on v2.7.2+.
+4. **Optionally, the Netdata MCP API key** that unlocks full access to sensitive observability data (protected functions, full access to logs) on your Netdata. Each Netdata Agent or Parent has its own unique API key for MCP - [Find your Netdata MCP API key](/docs/netdata-ai/mcp/README.md#finding-your-api-key)
 
 > Export `ND_MCP_BEARER_TOKEN` with your MCP key before launching OpenCode to keep secrets out of configuration files:
 > ```bash
@@ -102,7 +102,7 @@ For environments where you prefer or need to use the bridge:
 
 ### Method 3: Using npx mcp-remote (Alternative Bridge for v2.7.2+)
 
-If nd-mcp is not available, use the official MCP remote client (requires Netdata v2.7.2+). For detailed options and troubleshooting, see [Using MCP Remote Client](/docs/learn/mcp.md#using-mcp-remote-client).
+If nd-mcp is not available, use the official MCP remote client (requires Netdata v2.7.2+). For detailed options and troubleshooting, see [Using MCP Remote Client](/docs/netdata-ai/mcp/README.md#using-mcp-remote-client).
 
 ```json
 {
@@ -162,8 +162,8 @@ For remote servers with environment variables:
 
 Replace in all examples:
 - `YOUR_NETDATA_IP` - IP address or hostname of your Netdata Agent/Parent
-- `ND_MCP_BEARER_TOKEN` - Export with your [Netdata MCP API key](/docs/learn/mcp.md#finding-your-api-key) before launching OpenCode
-- `/usr/sbin/nd-mcp` - With your [actual nd-mcp path](/docs/learn/mcp.md#finding-the-nd-mcp-bridge) (local method only)
+- `ND_MCP_BEARER_TOKEN` - Export with your [Netdata MCP API key](/docs/netdata-ai/mcp/README.md#finding-your-api-key) before launching OpenCode
+- `/usr/sbin/nd-mcp` - With your [actual nd-mcp path](/docs/netdata-ai/mcp/README.md#finding-the-nd-mcp-bridge) (local method only)
 
 ## How to Use
 
@@ -235,7 +235,7 @@ Explain the current active alerts from Netdata and their potential impact
 Find any anomalous metrics in the last 2 hours and explain what might be causing them
 ```
 
-> **💡 Advanced Usage:** OpenCode's terminal-based interface combined with Netdata observability creates powerful DevOps workflows. Learn about the opportunities and security considerations in [AI DevOps Copilot](/docs/ml-ai/ai-devops-copilot/ai-devops-copilot.md).
+> **💡 Advanced Usage:** OpenCode's terminal-based interface combined with Netdata observability creates powerful DevOps workflows. Learn about the opportunities and security considerations in [AI DevOps Copilot](/docs/netdata-ai/mcp/mcp-clients/ai-devops-copilot.md).
 
 ## Troubleshooting
 
@@ -327,5 +327,5 @@ Enable verbose logging to troubleshoot MCP issues:
 - [OpenCode Documentation](https://opencode.ai/docs)
 - [OpenCode MCP Servers Guide](https://opencode.ai/docs/mcp-servers/)
 - [SST Discord Community](https://discord.gg/sst)
-- [Netdata MCP Setup](/docs/learn/mcp.md)
-- [AI DevOps Best Practices](/docs/ml-ai/ai-devops-copilot/ai-devops-copilot.md)
+- [Netdata MCP Setup](/docs/netdata-ai/mcp/README.md)
+- [AI DevOps Best Practices](/docs/netdata-ai/mcp/mcp-clients/ai-devops-copilot.md)

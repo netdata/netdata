@@ -83,7 +83,7 @@ Missing a term? Let us know or submit a request to expand our glossary. Together
 
 - [**Metrics Storage**](/src/database/README.md#modes): Upon collection the collected metrics need to be either forwarded, exported or just stored for further treatment. The Agent is capable to store metrics both short and long-term, with or without the usage of non-volatile storage.
 
-- [**Metrics Streaming Replication**](/docs/observability-centralization-points/README.md): Each node running Netdata can stream the metrics it collects, in real time, to another node. Metric streaming allows you to replicate metrics data across multiple nodes, or centralize all your metrics data into a single time-series database (TSDB).
+- [**Metrics Streaming Replication**](/docs/deployment-guides/deployment-with-centralization-points.md): Each node running Netdata can stream the metrics it collects, in real time, to another node. Metric streaming allows you to replicate metrics data across multiple nodes, or centralize all your metrics data into a single time-series database (TSDB).
 
 ## N
 
