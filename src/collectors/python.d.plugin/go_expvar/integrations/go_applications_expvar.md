@@ -244,11 +244,6 @@ lines:      a list of line definitions
 **Note: please do not use dots in the chart or line ID field.
 See [this issue](https://github.com/netdata/netdata/pull/1902#issuecomment-284494195) for explanation.**
 
-Please see these two links to the official Netdata documentation for more information about the values:
-
--   [External plugins - charts](https://github.com/netdata/netdata/blob/master/src/plugins.d/README.md#chart)
--   [Chart variables](https://github.com/netdata/netdata/blob/master/src/collectors/python.d.plugin/README.md#global-variables-order-and-chart)
-
 **Line definitions**
 
 Each chart can define multiple lines (dimensions).

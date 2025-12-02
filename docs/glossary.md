@@ -51,7 +51,7 @@ Missing a term? Let us know or submit a request to expand our glossary. Together
 
 - [**Family**](/docs/dashboards-and-charts/netdata-charts.md#families): 1. What we consider our Netdata community of users and engineers. 2. A single instance of a hardware or software resource that needs to be displayed separately from similar instances.
 
-- [**Flood Protection**](/docs/alerts-and-notifications/notifications/centralized-cloud-notifications/centralized-cloud-notifications-reference.md#flood-protection): If a node has too many state changes like firing too many alerts or going from reachable to unreachable, Netdata Cloud enables flood protection. As long as a node is in flood protection mode, Netdata Cloud doesn’t send notifications about this node
+- [**Flood Protection**](/docs/alerts-and-notifications/notifications/centralized-cloud-notifications/centralized-cloud-notifications-reference.md#benefits-of-centralized-notifications): If a node has too many state changes like firing too many alerts or going from reachable to unreachable, Netdata Cloud enables flood protection. As long as a node is in flood protection mode, Netdata Cloud doesn’t send notifications about this node
 
 - [**Functions** or **Netdata Functions**](/docs/top-monitoring-netdata-functions.md): Routines exposed by a collector on the Netdata Agent that can bring additional information to support troubleshooting or trigger some action to happen on the node itself.
 
@@ -112,13 +112,13 @@ Missing a term? Let us know or submit a request to expand our glossary. Together
 
 - [**Replication Streaming**](/src/streaming/README.md): Streaming configuration where child `A`, _with_ a database and web dashboard, streams metrics to parent `B`.
 
-- [**Room**](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#rooms): Rooms organize your connected nodes and provide infrastructure-wide dashboards using real-time metrics and visualizations.
+- [**Room**](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#overview): Rooms organize your connected nodes and provide infrastructure-wide dashboards using real-time metrics and visualizations.
 
 ## S
 
 - [**Single Node Dashboard**](/docs/dashboards-and-charts/metrics-tab-and-single-node-tabs.md): A dashboard pre-configured with every installation of the Netdata Agent, with thousands of metrics and hundreds of interactive charts that requires no setup.
 
-- [**Space**](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#spaces): A high-level container and virtual collaboration area where you can organize team members, access levels, and the nodes you want to monitor.
+- [**Space**](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#overview): A high-level container and virtual collaboration area where you can organize team members, access levels, and the nodes you want to monitor.
 
 ## T
 
