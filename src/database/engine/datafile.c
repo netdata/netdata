@@ -604,15 +604,6 @@ int init_data_files(struct rrdengine_instance *ctx)
     else {
         if (ctx->loading.create_new_datafile_pair)
             create_new_datafile_pair(ctx);
-
-        while(rrdeng_ctx_tier_cap_exceeded(ctx)) {
-            Word_t Index = 0;
-            Pvoid_t *PValue = JudyLFirst(ctx->datafiles.JudyL, &Index, PJE0);
-            if (PValue && *PValue) {
-                struct rrdengine_datafile *datafile = *PValue;
-                datafile_delete(ctx, datafile, false, true, false);
-            }
-        }
     }
 
     pgc_reset_hot_max(open_cache);
