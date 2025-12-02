@@ -102,7 +102,7 @@ function(bundle_dashboard)
        "${dashboard_src_prefix}/*")
 
   list(APPEND manifest "${files}")
-  list(FILTER manifest REGEX EXCLUDE "^[[:space:]]*$")
+  list(FILTER manifest EXCLUDE REGEX "^[[:space:]]*$")
   list(REMOVE_DUPLICATES manifest)
   list(SORT manifest)
   list(JOIN manifest "\n" manifest_items)
