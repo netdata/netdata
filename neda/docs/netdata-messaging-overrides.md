@@ -132,11 +132,11 @@ We need the strongest possible messaging, without giving false promises.
 
 ## [EXACT] Anomaly Advisor Root Cause Analysis Results
 
-**Must state**: "top 30-50 results" or "30-50 most relevant metrics"
+**Must state**: "root cause in top 30-50 results" or "root cause in the first 30-50 relevant metrics"
 
-**Full context**: When investigating anomalies, Netdata's Anomaly Advisor presents the top 30-50 metrics most correlated with the issue, ranked by relevance.
+**Full context**: When investigating anomalies, Netdata's Anomaly Advisor scores all the collected metrics. The root cause is usually in the top 30-50 metrics most correlated with the issue, ranked by relevance.
 
-**Do not say**: "top 10 results", "top 10 metrics" (understates capability)
+**Do not say**: "top 10 results", "top 10 metrics" (false expectation)
 
 ---
 
@@ -244,7 +244,7 @@ Memory is generally proportional to the number of metrics discovered.
 
 **Source**: https://www.netdata.cloud/blog/netdata-vs-prometheus-2025/
 
-**Do not say**: "independent benchmark", "independently validated", "third-party testing", "independent research" when referring to the 4.6M metrics/second Prometheus comparison
+**Do not say**: "independent test", "independent benchmark", "independently validated", "third-party testing", "independent research" when referring to the 4.6M metrics/second Prometheus comparison
 
 **Context**: The 36% less CPU, 88% less RAM, 97% less disk I/O figures at 4.6M metrics/second come from Netdata's own internal benchmark, not an independent study.
 
@@ -252,7 +252,13 @@ Memory is generally proportional to the number of metrics discovered.
 
 ## [EXACT] University of Amsterdam Study (ICSOC 2023)
 
-**What it validated**: Energy efficiency - Netdata has the lowest CPU and memory overhead among monitoring solutions, even while collecting per-second data.
+**What it validated**: Energy and performance overhead comparison of monitoring tools on Docker-based systems. The study compared Netdata, Prometheus, ELK stack, and Zipkin. Key findings:
+- Netdata has the **lowest CPU overhead**
+- Netdata has the **lowest RAM overhead**
+- Netdata is the **most energy-efficient**
+- Netdata has the **lowest impact on monitored applications** (least performance degradation to the workloads being monitored)
+
+All while collecting per-second data and running anomaly detection at the edge.
 
 **Must include URL**: https://research.vu.nl/en/publications/an-empirical-evaluation-oftheenergy-andperformance-overhead-ofmon/
 
@@ -260,6 +266,6 @@ Memory is generally proportional to the number of metrics discovered.
 
 **Do not conflate with**: The Prometheus benchmark figures (36% less CPU, 88% less RAM, 97% less disk I/O, 4.6M metrics/second). These are from Netdata's internal benchmark, NOT from the University of Amsterdam study.
 
-**Do not say**: "University of Amsterdam validated 36% less CPU" or "University of Amsterdam study shows 88% less RAM" - the UofA study measured energy efficiency and general overhead, not the specific Prometheus comparison percentages.
+**Do not say**: "University of Amsterdam validated 36% less CPU" or "University of Amsterdam study shows 88% less RAM" - the UofA study measured overhead against ELK, Prometheus, and Zipkin in Docker environments, not the specific 4.6M metrics/second Prometheus-only benchmark percentages.
 
 ---
