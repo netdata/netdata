@@ -839,13 +839,14 @@ void dict_mssql_fill_subscription(struct mssql_db_instance *mdi, int type)
                 goto enddistribution;
         }
 
-        snprintfz(key, sizeof(key) - 1, "%s:%s", publisher_db, publication);
+        snprintfz(key, sizeof(key) - 1, "%s:%s", subscriber_db, subscriber);
         struct mssql_subscription_publication *msp =
-            dictionary_set(mdi->parent->publisher_publication, key, NULL, sizeof(*msp));
+            dictionary_set(mdi->parent->publication_subscription, key, NULL, sizeof(*msp));
 
         msp->publication_type = type;
 
         if (unlikely(!msp->parent)) {
+            snprintfz(key, sizeof(key) - 1, "%s:%s", publisher_db, publication);
             struct mssql_publisher_publication *mpp =
                 dictionary_set(mdi->parent->publisher_publication, key, NULL, sizeof(*mpp));
             msp->parent = mpp;
