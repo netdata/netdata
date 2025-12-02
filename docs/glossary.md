@@ -19,7 +19,7 @@ Missing a term? Let us know or submit a request to expand our glossary. Together
 
 - [**Alerts** (formerly **Alarms**)](/docs/alerts-and-notifications/notifications/centralized-cloud-notifications/centralized-cloud-notifications-reference.md): With the information that appears on Netdata Cloud and the local dashboard about active alerts, you can configure alerts to match your infrastructure's needs or your team's goals.
 
-- [**Alarm Entity Type**](/src/health/REFERENCE.md#health-entity-reference): Entity types that are attached to specific charts and use the `alarm` label.
+- [**Alarm Entity Type**](/src/health/REFERENCE.md#entity-types-overview): Entity types that are attached to specific charts and use the `alarm` label.
 
 - [**Anomaly Advisor**](/docs/dashboards-and-charts/anomaly-advisor-tab.md): A Netdata feature that lets you focus on potentially anomalous metrics and charts related to a particular highlight window of interest.
 
@@ -51,7 +51,7 @@ Missing a term? Let us know or submit a request to expand our glossary. Together
 
 - [**Family**](/docs/dashboards-and-charts/netdata-charts.md#families): 1. What we consider our Netdata community of users and engineers. 2. A single instance of a hardware or software resource that needs to be displayed separately from similar instances.
 
-- [**Flood Protection**](/docs/alerts-and-notifications/notifications/centralized-cloud-notifications/centralized-cloud-notifications-reference.md#flood-protection): If a node has too many state changes like firing too many alerts or going from reachable to unreachable, Netdata Cloud enables flood protection. As long as a node is in flood protection mode, Netdata Cloud doesn’t send notifications about this node
+- [**Flood Protection**](/docs/alerts-and-notifications/notifications/centralized-cloud-notifications/centralized-cloud-notifications-reference.md#benefits-of-centralized-notifications): If a node has too many state changes like firing too many alerts or going from reachable to unreachable, Netdata Cloud enables flood protection. As long as a node is in flood protection mode, Netdata Cloud doesn’t send notifications about this node
 
 - [**Functions** or **Netdata Functions**](/docs/top-monitoring-netdata-functions.md): Routines exposed by a collector on the Netdata Agent that can bring additional information to support troubleshooting or trigger some action to happen on the node itself.
 
@@ -59,9 +59,7 @@ Missing a term? Let us know or submit a request to expand our glossary. Together
 
 - [**Group by**](/docs/dashboards-and-charts/netdata-charts.md#group-by-dropdown): The drop-down on the dimension bar of a composite chart that allows you to group metrics by dimension, node, or chart.
 
-- [**Health Configuration Files**](/src/health/REFERENCE.md#edit-health-configuration-files): Files that you can edit to configure your Agent's health watchdog service.
-
-- [**Health Entity Reference**](/src/health/REFERENCE.md#health-entity-reference):
+- [**Health Configuration Files**](/src/health/REFERENCE.md#how-to-edit-health-configuration-files): Files that you can edit to configure your Agent's health watchdog service.
 
 - [**Home** tab](/docs/dashboards-and-charts/home-tab.md): Tab in Netdata Cloud that provides a predefined dashboard of relevant information about entities in the Room.
 
@@ -85,7 +83,7 @@ Missing a term? Let us know or submit a request to expand our glossary. Together
 
 - [**Metrics Storage**](/src/database/README.md#modes): Upon collection the collected metrics need to be either forwarded, exported or just stored for further treatment. The Agent is capable to store metrics both short and long-term, with or without the usage of non-volatile storage.
 
-- [**Metrics Streaming Replication**](/docs/observability-centralization-points/README.md): Each node running Netdata can stream the metrics it collects, in real time, to another node. Metric streaming allows you to replicate metrics data across multiple nodes, or centralize all your metrics data into a single time-series database (TSDB).
+- [**Metrics Streaming Replication**](/docs/deployment-guides/deployment-with-centralization-points.md): Each node running Netdata can stream the metrics it collects, in real time, to another node. Metric streaming allows you to replicate metrics data across multiple nodes, or centralize all your metrics data into a single time-series database (TSDB).
 
 ## N
 
@@ -114,17 +112,17 @@ Missing a term? Let us know or submit a request to expand our glossary. Together
 
 - [**Replication Streaming**](/src/streaming/README.md): Streaming configuration where child `A`, _with_ a database and web dashboard, streams metrics to parent `B`.
 
-- [**Room**](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#rooms): Rooms organize your connected nodes and provide infrastructure-wide dashboards using real-time metrics and visualizations.
+- [**Room**](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#overview): Rooms organize your connected nodes and provide infrastructure-wide dashboards using real-time metrics and visualizations.
 
 ## S
 
 - [**Single Node Dashboard**](/docs/dashboards-and-charts/metrics-tab-and-single-node-tabs.md): A dashboard pre-configured with every installation of the Netdata Agent, with thousands of metrics and hundreds of interactive charts that requires no setup.
 
-- [**Space**](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#spaces): A high-level container and virtual collaboration area where you can organize team members, access levels, and the nodes you want to monitor.
+- [**Space**](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#overview): A high-level container and virtual collaboration area where you can organize team members, access levels, and the nodes you want to monitor.
 
 ## T
 
-- [**Template Entity Type**](/src/health/REFERENCE.md#entity-types): Entity type that defines rules that apply to all charts of a specific context, and use the template label. Templates help you apply one entity to all disks, all network interfaces, all MySQL databases, and so on.
+- [**Template Entity Type**](/src/health/REFERENCE.md#entity-types-overview): Entity type that defines rules that apply to all charts of a specific context, and use the template label. Templates help you apply one entity to all disks, all network interfaces, all MySQL databases, and so on.
 
 - [**Tiers**](/src/database/engine/README.md#tiers): Tiering is a mechanism of providing multiple tiers of data with different granularity of metrics (the frequency they are collected and stored, i.e., their resolution).
 

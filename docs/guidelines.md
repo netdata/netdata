@@ -63,7 +63,6 @@ If you just replace `edit` with `blob` in that URL, you have the permalink to th
 ### Making a pull request
 
 Pull requests (PRs) should be concise and informative.
-See our [PR guidelines](https://github.com/netdata/.github/blob/main/CONTRIBUTING.md#pr-guidelines) for specifics.
 
 The Netdata team will review your PR and assess it for correctness, conciseness, and overall quality.
 We may point to specific sections and ask for additional information or other fixes.

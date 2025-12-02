@@ -6,7 +6,7 @@ You can use Netdata's [Machine Learning](/src/ml/README.md) capabilities to dete
 
 To enable or disable Machine Learning capabilities on your node:
 
-1. [Edit `netdata.conf`](/docs/netdata-agent/configuration/README.md#edit-a-configuration-file-using-edit-config).
+1. [Edit `netdata.conf`](/docs/netdata-agent/configuration/README.md#edit-configuration-files).
 2. In the `[ml]` section:
     - Set `enabled` to `yes` to enable ML.
     - Set `enabled` to `no` to disable ML.
