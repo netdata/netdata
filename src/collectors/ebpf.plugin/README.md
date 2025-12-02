@@ -34,7 +34,7 @@ If your Agent is v1.22 or older, you may to enable the collector yourself.
 
 To enable or disable the entire eBPF collector:
 
-1. Navigate to the [Netdata config directory](/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
+1. Navigate to the [Netdata config directory](/docs/netdata-agent/configuration/README.md#locate-your-config-directory).
 
     ```bash
     cd /etc/netdata
@@ -60,7 +60,7 @@ You can configure the eBPF collector's behavior to fine-tune which metrics you r
 
 To edit the `ebpf.d.conf`:
 
-1. Navigate to the [Netdata config directory](/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
+1. Navigate to the [Netdata config directory](/docs/netdata-agent/configuration/README.md#locate-your-config-directory).
 
     ```bash
     cd /etc/netdata
@@ -262,7 +262,7 @@ You can configure each thread of the eBPF data collector. This allows you to ove
 
 To configure an eBPF thread:
 
-1. Navigate to the [Netdata config directory](/docs/netdata-agent/configuration/README.md#the-netdata-config-directory).
+1. Navigate to the [Netdata config directory](/docs/netdata-agent/configuration/README.md#locate-your-config-directory).
 
     ```bash
     cd /etc/netdata

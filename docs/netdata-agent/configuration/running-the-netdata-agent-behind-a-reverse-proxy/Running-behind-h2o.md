@@ -96,7 +96,7 @@ Using the above, you access Netdata on the backend servers like this:
 
 ### Encrypt the communication between H2O and Netdata
 
-In case Netdata's web server has been [configured to use TLS](/src/web/server/README.md#enable-httpstls-support), it is
+In case Netdata's web server has been [configured to use TLS](/src/web/server/README.md#examples), it is
 necessary to specify inside the H2O configuration that the final destination is using TLS. To do this, change the
 `http://` on the `proxy.reverse.url` line in your H2O configuration with `https://`
 

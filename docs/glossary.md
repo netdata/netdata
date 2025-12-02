@@ -19,7 +19,7 @@ Missing a term? Let us know or submit a request to expand our glossary. Together
 
 - [**Alerts** (formerly **Alarms**)](/docs/alerts-and-notifications/notifications/centralized-cloud-notifications/centralized-cloud-notifications-reference.md): With the information that appears on Netdata Cloud and the local dashboard about active alerts, you can configure alerts to match your infrastructure's needs or your team's goals.
 
-- [**Alarm Entity Type**](/src/health/REFERENCE.md#health-entity-reference): Entity types that are attached to specific charts and use the `alarm` label.
+- [**Alarm Entity Type**](/src/health/REFERENCE.md#entity-types-overview): Entity types that are attached to specific charts and use the `alarm` label.
 
 - [**Anomaly Advisor**](/docs/dashboards-and-charts/anomaly-advisor-tab.md): A Netdata feature that lets you focus on potentially anomalous metrics and charts related to a particular highlight window of interest.
 
@@ -60,8 +60,6 @@ Missing a term? Let us know or submit a request to expand our glossary. Together
 - [**Group by**](/docs/dashboards-and-charts/netdata-charts.md#group-by-dropdown): The drop-down on the dimension bar of a composite chart that allows you to group metrics by dimension, node, or chart.
 
 - [**Health Configuration Files**](/src/health/REFERENCE.md#edit-health-configuration-files): Files that you can edit to configure your Agent's health watchdog service.
-
-- [**Health Entity Reference**](/src/health/REFERENCE.md#health-entity-reference):
 
 - [**Home** tab](/docs/dashboards-and-charts/home-tab.md): Tab in Netdata Cloud that provides a predefined dashboard of relevant information about entities in the Room.
 
