@@ -244,6 +244,7 @@ lines:      a list of line definitions
 **Note: please do not use dots in the chart or line ID field.
 See [this issue](https://github.com/netdata/netdata/pull/1902#issuecomment-284494195) for explanation.**
 
+
 **Line definitions**
 
 Each chart can define multiple lines (dimensions).
