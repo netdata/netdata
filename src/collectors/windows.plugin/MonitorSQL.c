@@ -727,7 +727,7 @@ void dict_mssql_fill_subscription(struct mssql_db_instance *mdi, int type)
         return;
     }
     char query[sizeof(NETDATA_REPLICATION_MONITOR_SUBSCRIPTION_QUERY) * 2];
-    snprintfz(query, sizeof(query) - 1, "%s%d;"NETDATA_REPLICATION_MONITOR_SUBSCRIPTION_QUERY, type);
+    snprintfz(query, sizeof(query) - 1, "%s%d;", NETDATA_REPLICATION_MONITOR_SUBSCRIPTION_QUERY, type);
     SQLRETURN ret =
             SQLExecDirect(mdi->parent->conn->dbReplicationDistributor, (SQLCHAR *)query, SQL_NTS);
     if (likely(netdata_mssql_check_result(ret))) {
