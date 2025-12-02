@@ -33,6 +33,13 @@
 - Fix(docker): fix bugs and refactor Docker entrypoint script ([#21364](https://github.com/netdata/netdata/issues/21364))
 - Regenerate integrations docs ([#21346](https://github.com/netdata/netdata/issues/21346))
 - Improve stale replication ([#21357](https://github.com/netdata/netdata/issues/21357))
+- Update security and privacy design links in map.csv ([#21369](https://github.com/netdata/netdata/issues/21369))
+- Detect in kickstart script if we publish native packages for the platform ([#21262](https://github.com/netdata/netdata/issues/21262))
+- Fix dangling link to sizing documentation ([#21372](https://github.com/netdata/netdata/issues/21372))
+- Adjust windows sensors initialization ([#21374](https://github.com/netdata/netdata/issues/21374))
+- Improve(health/notifications/telegram): add option to set API url ([#21376](https://github.com/netdata/netdata/issues/21376))
+- Regenerate integrations docs ([#21377](https://github.com/netdata/netdata/issues/21377))
+- Build(deps): bump github.com/redis/go-redis/v9 from 9.17.1 to 9.17.2 in /src/go ([#21378](https://github.com/netdata/netdata/issues/21378))
 
 ## [2.8.0] - 2025-11-19
 
