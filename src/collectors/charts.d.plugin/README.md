@@ -20,7 +20,7 @@ By default, `charts.d.plugin` is not included as part of the install when using 
 
 ## Configuration
 
-`charts.d.plugin` itself can be [configured](/docs/netdata-agent/configuration/README.md#edit-configuration-files)using the configuration file `/etc/netdata/charts.d.conf`. This file is also a BASH script.
+`charts.d.plugin` itself can be [configured](/docs/netdata-agent/configuration/README.md#edit-configuration-files) using the configuration file `/etc/netdata/charts.d.conf`. This file is also a BASH script.
 
 In this file, you can place statements like this:
 
