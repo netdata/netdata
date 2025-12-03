@@ -354,6 +354,94 @@ subjects:
   namespace: monitoring
 ```
 
+## k0s Kubernetes Distribution Support
+
+The collector includes native support for [k0s](https://k0sproject.io/), a lightweight Kubernetes distribution. k0s clusters are automatically detected and additional metrics are collected.
+
+### Auto-Detection
+
+The collector automatically detects k0s clusters through:
+
+1. **Node labels**: `node.k0sproject.io/role` (controller/worker)
+2. **Node annotations**: `k0s.k0sproject.io/version`
+3. **System pods**: Presence of konnectivity-agent or k0s-* pods
+
+### k0s-Specific Kubeconfig
+
+When no kubeconfig is specified, the collector automatically checks for the k0s default location:
+
+```bash
+/var/lib/k0s/pki/admin.conf
+```
+
+### Running on k0s
+
+```bash
+# On a k0s controller node (uses default kubeconfig)
+./k8s-collector \
+  --url http://localhost:19998 \
+  --cluster-name my-k0s-cluster \
+  --interval 10s
+
+# With explicit k0s kubeconfig
+./k8s-collector \
+  --url http://localhost:19998 \
+  --kubeconfig /var/lib/k0s/pki/admin.conf \
+  --cluster-name production-k0s
+```
+
+### k0s Metrics Collected
+
+In addition to standard Kubernetes metrics, the following k0s-specific metrics are collected:
+
+| Category | Chart | Description |
+|----------|-------|-------------|
+| k0s | Cluster Topology | Controller and worker node counts |
+| k0s | System Components | Status of k0s system components (1=healthy, 0=unhealthy) |
+| k0s | System Replicas | Desired vs ready replicas for system components |
+| k0s | Control Plane CPU | CPU usage of control plane components (millicores) |
+| k0s | Control Plane Memory | Memory usage of control plane components (MiB) |
+| k0s | Konnectivity Status | Status of konnectivity agents per node |
+| k0s | Etcd Status | Embedded etcd pod status |
+| k0s | Etcd CPU | Etcd CPU usage (if metrics available) |
+| k0s | Etcd Memory | Etcd memory usage (if metrics available) |
+| k0s | Node Roles | Nodes organized by k0s role |
+
+### k0s System Components Monitored
+
+The collector monitors the following k0s system components in the kube-system namespace:
+
+- **coredns**: Cluster DNS
+- **konnectivity-agent**: Node-to-control-plane tunnel
+- **konnectivity-server**: Control plane tunnel server
+- **metrics-server**: Resource metrics API
+- **calico-node**: Calico CNI (if installed)
+- **kube-router**: Default k0s CNI
+
+### k0s Labels
+
+When a k0s cluster is detected, the pushed metrics include additional labels:
+
+```json
+{
+  "os": "k0s 1.28.2+k0s.0",
+  "labels": {
+    "type": "kubernetes",
+    "distribution": "k0s",
+    "k0s_version": "1.28.2+k0s.0",
+    "cluster": "my-cluster"
+  }
+}
+```
+
+### Dashboard Display
+
+The web UI shows k0s-specific information:
+
+- Cluster displays as "k0s" or "k0s <version>" in the sidebar
+- k0s metrics are grouped under the "k0s" family
+- System component health is visualized with status indicators
+
 ## Examples
 
 ### cURL
