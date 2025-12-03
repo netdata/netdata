@@ -6,6 +6,8 @@ on:
       - '**/*.md'
       - '**/*.mdx'
       - 'docs/**'
+      - '**/metadata.yaml'
+      - 'integrations/**'
 
 jobs:
   check-documentation:
