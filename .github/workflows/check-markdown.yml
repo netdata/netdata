@@ -52,11 +52,6 @@ jobs:
           source ./venv/bin/activate
           cd netdata && python3 integrations/gen_doc_collector_page.py
 
-      - name: Configure Git to use HTTPS instead of SSH
-        run: |
-          git config --global url."https://github.com/".insteadOf git@github.com:
-          git config --global url."https://".insteadOf git://
-
       - name: Run Ingest
         working-directory: learn
         run: |
