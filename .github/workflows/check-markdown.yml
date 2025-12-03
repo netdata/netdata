@@ -9,6 +9,10 @@ on:
       - '**/metadata.yaml'
       - 'integrations/**'
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   check-documentation:
     runs-on: ubuntu-latest
