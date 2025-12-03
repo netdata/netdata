@@ -57,4 +57,4 @@ jobs:
         run: |
           source ../venv/bin/activate
           echo "Running ingest with local netdata directory"
-          python ingest/ingest.py --local-repo "netdata:${{ github.workspace }}/netdata" --ignore-on-prem-repo --fail-links-netdata
+          python ingest/ingest.py --local-repo "netdata:${{ github.workspace }}/netdata" --ignore-on-prem-repo --fail-links-netdata --use_plain_https
