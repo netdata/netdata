@@ -26,13 +26,31 @@ jobs:
           path: learn
 
       - name: Init python env
-        uses: actions/setup-python@6
+        uses: actions/setup-python@v6
         with:
           python-version: "3.9"
 
-      - name: Setup python env
+      - name: Setup python dependencies
         run: |
+          python3 -m venv ./venv
+          source ./venv/bin/activate
           pip install -r learn/.learn_environment/ingest-requirements.txt
+          cd netdata && ./integrations/pip.sh
+
+      - name: Generate Integrations
+        run: |
+          source ./venv/bin/activate
+          cd netdata && python3 integrations/gen_integrations.py
+
+      - name: Generate Integrations Documentation
+        run: |
+          source ./venv/bin/activate
+          cd netdata && python3 integrations/gen_docs_integrations.py
+
+      - name: Generate src/collectors/COLLECTORS.md
+        run: |
+          source ./venv/bin/activate
+          cd netdata && python3 integrations/gen_doc_collector_page.py
 
       - name: Configure Git to use HTTPS instead of SSH
         run: |
@@ -40,10 +58,8 @@ jobs:
           git config --global url."https://".insteadOf git://
 
       - name: Run Ingest
-        env:
-          REPO: ${{ github.event.pull_request.head.repo.full_name }}
-          BRANCH: ${{ github.event.pull_request.head.ref }}
+        working-directory: learn
         run: |
-          cd learn
-          echo "Running ingest for $REPO:$BRANCH"
-          python ingest/ingest.py --repos "$REPO:$BRANCH" --fail-on-netdata
+          source ../venv/bin/activate
+          echo "Running ingest with local netdata directory"
+          python ingest/ingest.py --local-repo "netdata:${{ github.workspace }}/netdata" --ignore-on-prem-repo --fail-links-netdata
