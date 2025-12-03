@@ -149,7 +149,7 @@ impl NetdataChart {
         let title = &self.metric_description;
         let units = &self.metric_unit;
         let context = format!("otel.{}", &self.metric_name);
-        let family = context.clone();
+        let family = self.metric_name.replace('.', "/");
         let chart_type = if self.is_histogram() {
             "heatmap"
         } else {
