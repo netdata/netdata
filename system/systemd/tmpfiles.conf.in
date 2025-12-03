@@ -1,0 +1,15 @@
+d /run/netdata 0755 @netdata_user_POST@ @netdata_group_POST@ -
+
+d @cachedir_POST@ 0755 @netdata_user_POST@ @netdata_group_POST@ -
+z @cachedir_POST@/dbengine* 0750 @netdata_user_POST@ @netdata_group_POST@ -
+z @cachedir_POST@/dbengine*/* 0600 @netdata_user_POST@ @netdata_group_POST@ -
+z @cachedir_POST@/*-meta.db* 0660 @netdata_user_POST@ @netdata_group_POST@ -
+
+d @varlibdir_POST@ 0770 @netdata_user_POST@ @netdata_group_POST@ -
+d @varlibdir_POST@/cloud.d 0770 @netdata_user_POST@ @netdata_group_POST@ -
+z @varlibdir_POST@/cloud.d/* 0660 @netdata_user_POST@ @netdata_group_POST@ -
+d @varlibdir_POST@/registry 0770 @netdata_user_POST@ @netdata_group_POST@ -
+z @varlibdir_POST@/registry/netdata.public.unique.id 0660 @netdata_user_POST@ @netdata_group_POST@ -
+z @varlibdir_POST@/netdata.api.key 0660 @netdata_user_POST@ @netdata_group_POST@ -
+
+d @logdir_POST@ 0755 @netdata_user_POST@ @netdata_group_POST@ -
