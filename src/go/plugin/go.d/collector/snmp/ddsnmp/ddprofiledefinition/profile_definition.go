@@ -15,7 +15,7 @@ type ProfileDefinition struct {
 	SysobjectIDMetadata []SysobjectIDMetadataEntryConfig `yaml:"sysobjectid_metadata,omitempty"`
 	Metrics             []MetricsConfig                  `yaml:"metrics,omitempty" json:"metrics,omitempty"`
 	MetricTags          []MetricTagConfig                `yaml:"metric_tags,omitempty" json:"metric_tags,omitempty"`
-	StaticTags          []string                         `yaml:"static_tags,omitempty" json:"static_tags,omitempty"`
+	StaticTags          []StaticMetricTagConfig          `yaml:"static_tags,omitempty" json:"static_tags,omitempty"`
 
 	VirtualMetrics []VirtualMetricConfig `yaml:"virtual_metrics,omitempty" json:"virtual_metrics,omitempty"`
 

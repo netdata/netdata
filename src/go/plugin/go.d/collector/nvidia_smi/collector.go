@@ -44,10 +44,11 @@ func New() *Collector {
 }
 
 type Config struct {
-	UpdateEvery int              `yaml:"update_every,omitempty" json:"update_every"`
-	Timeout     confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
-	BinaryPath  string           `yaml:"binary_path" json:"binary_path"`
-	LoopMode    bool             `yaml:"loop_mode,omitempty" json:"loop_mode"`
+	UpdateEvery        int              `yaml:"update_every,omitempty" json:"update_every"`
+	AutoDetectionRetry int              `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
+	Timeout            confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
+	BinaryPath         string           `yaml:"binary_path" json:"binary_path"`
+	LoopMode           bool             `yaml:"loop_mode,omitempty" json:"loop_mode"`
 }
 
 type Collector struct {

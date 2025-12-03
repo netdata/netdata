@@ -11,8 +11,6 @@ By default, the **Agent dashboard** also shows the latest version (matching Netd
   `http://NODE:19999/v1`  
   Replace `NODE` with the IP address or hostname of your Agent.
 
----
-
 ## Main Sections
 
 The Netdata dashboard consists of the following main sections:
@@ -33,8 +31,6 @@ Some dashboard features require a Netdata Cloud login and a connected Agent — 
 
 :::
 
----
-
 ## How to Access the Dashboards
 
 ### Netdata Cloud
@@ -43,8 +39,6 @@ Access the Cloud dashboard at:
 **<https://app.netdata.cloud/>**
 
 [Sign in or sign up](https://app.netdata.cloud/sign-in) if you don’t have an account yet.
-
----
 
 ### Netdata Agent
 

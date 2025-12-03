@@ -142,4 +142,4 @@ Due to the visual complexity of individual charts, dashboards require a **minimu
 
 ## Next Steps
 
-After designing your dashboards, [invite your team](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#team-collaboration) to collaborate. Add new users to the same Room so they can view and interact with your dashboards effortlessly.
+After designing your dashboards, [invite your team](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#set-up-team-access) to collaborate. Add new users to the same Room so they can view and interact with your dashboards effortlessly.

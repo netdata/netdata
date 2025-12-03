@@ -98,15 +98,6 @@ const struct netdata_static_thread static_threads_common[] = {
         .start_routine = pluginsd_main
     },
     {
-        .name = "SERVICE",
-        .config_section = NULL,
-        .config_name = NULL,
-        .enabled = 1,
-        .thread = NULL,
-        .init_routine = NULL,
-        .start_routine = service_main
-    },
-    {
         .name = "STATSD_FLUSH",
         .config_section = NULL,
         .config_name = NULL,

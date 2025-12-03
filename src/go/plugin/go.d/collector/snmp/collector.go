@@ -59,6 +59,7 @@ func New() *Collector {
 					Privileged: true,
 					Packets:    3,
 					Interval:   confopt.Duration(time.Millisecond * 100),
+					Network:    "ip",
 				},
 			},
 		},

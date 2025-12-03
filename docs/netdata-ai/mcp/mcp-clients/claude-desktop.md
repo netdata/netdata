@@ -21,13 +21,13 @@ Claude Desktop launches MCP servers as child processes over `stdio` (the only tr
    - **v2.6.0 - v2.7.1**: Only WebSocket transport available, requires `nd-mcp` bridge
    - **v2.7.2+**: Can use `npx mcp-remote` bridge for HTTP/SSE support
 3. **Bridge required: Choose one:**
-   - `nd-mcp` bridge - The stdio-to-websocket bridge for all Netdata versions. [Find its absolute path](/docs/learn/mcp.md#finding-the-nd-mcp-bridge)
+   - `nd-mcp` bridge - The stdio-to-websocket bridge for all Netdata versions. [Find its absolute path](/docs/netdata-ai/mcp/README.md#finding-the-nd-mcp-bridge)
    - `npx mcp-remote@latest` - Official MCP remote client supporting HTTP/SSE (requires Netdata v2.7.2+)
 4. **Netdata MCP API key loaded into the environment** (recommended) - export it before launching Claude Desktop to avoid exposing it in config files:
    ```bash
    export ND_MCP_BEARER_TOKEN="$(cat /var/lib/netdata/mcp_dev_preview_api_key)"
    ```
-   Each Netdata Agent or Parent has its own unique API key for MCP - [Find your Netdata MCP API key](/docs/learn/mcp.md#finding-your-api-key)
+   Each Netdata Agent or Parent has its own unique API key for MCP - [Find your Netdata MCP API key](/docs/netdata-ai/mcp/README.md#finding-your-api-key)
 
 ## Platform-Specific Installation
 
@@ -128,9 +128,9 @@ For SSE transport instead of HTTP:
 
 Replace in all examples:
 
-- `/usr/sbin/nd-mcp` - With your [actual nd-mcp path](/docs/learn/mcp.md#finding-the-nd-mcp-bridge) (nd-mcp method only)
+- `/usr/sbin/nd-mcp` - With your [actual nd-mcp path](/docs/netdata-ai/mcp/README.md#finding-the-nd-mcp-bridge) (nd-mcp method only)
 - `YOUR_NETDATA_IP` - IP address or hostname of your Netdata Agent/Parent
-- `NETDATA_MCP_API_KEY` - Your [Netdata MCP API key](/docs/learn/mcp.md#finding-your-api-key)
+- `NETDATA_MCP_API_KEY` - Your [Netdata MCP API key](/docs/netdata-ai/mcp/README.md#finding-your-api-key)
 - `ND_MCP_BEARER_TOKEN` - Export this environment variable with your API key before launching Claude Desktop (nd-mcp method only)
 
 ## Verify Connection

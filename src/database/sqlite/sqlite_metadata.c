@@ -2429,10 +2429,20 @@ static void store_hosts_metadata(struct meta_config_s *config, BUFFER *work_buff
     }
 }
 
+#define SERVICE_HEARTBEAT 10
+void run_maintenace();
+
 // Worker thread to scan hosts for pending metadata to store
 static void start_metadata_hosts(uv_work_t *req)
 {
+    static time_t next_maintenance_check = 0;
     register_libuv_worker_jobs();
+
+    time_t now = now_realtime_sec();
+    if (now> next_maintenance_check) {
+        run_maintenace();
+        next_maintenance_check = now + SERVICE_HEARTBEAT;
+    }
 
     worker_data_t *worker = req->data;
     struct meta_config_s *config = worker->config;

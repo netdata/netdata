@@ -18,12 +18,6 @@ type Config struct {
 	// Timeout controls how long to wait for SQL statements and RPCs.
 	Timeout confopt.Duration `yaml:"timeout,omitempty" json:"timeout" ui:"group:Connection"`
 
-	// MaxDbConns restricts the maximum number of open ODBC connections.
-	MaxDbConns int `yaml:"max_db_conns,omitempty" json:"max_db_conns" ui:"group:Advanced"`
-
-	// MaxDbLifeTime limits how long a pooled connection may live before being recycled.
-	MaxDbLifeTime confopt.Duration `yaml:"max_db_life_time,omitempty" json:"max_db_life_time" ui:"group:Advanced"`
-
 	// Hostname is the remote IBM i host to monitor.
 	Hostname string `yaml:"hostname,omitempty" json:"hostname" ui:"group:Connection"`
 
@@ -57,23 +51,41 @@ type Config struct {
 	// CollectSubsystemMetrics toggles collection of subsystem activity metrics.
 	CollectSubsystemMetrics confopt.AutoBool `yaml:"collect_subsystem_metrics,omitempty" json:"collect_subsystem_metrics" ui:"group:Subsystems"`
 
-	// CollectJobQueueMetrics toggles collection of job queue backlog metrics.
-	CollectJobQueueMetrics confopt.AutoBool `yaml:"collect_job_queue_metrics,omitempty" json:"collect_job_queue_metrics" ui:"group:Job Queues"`
-
 	// CollectActiveJobs toggles collection of detailed per-job metrics.
 	CollectActiveJobs confopt.AutoBool `yaml:"collect_active_jobs,omitempty" json:"collect_active_jobs" ui:"group:Active Jobs"`
 
 	// CollectHTTPServerMetrics toggles collection of IBM HTTP Server statistics.
 	CollectHTTPServerMetrics confopt.AutoBool `yaml:"collect_http_server_metrics,omitempty" json:"collect_http_server_metrics" ui:"group:Other Metrics"`
 
-	// CollectMessageQueueMetrics toggles collection of IBM i message queue metrics.
-	CollectMessageQueueMetrics confopt.AutoBool `yaml:"collect_message_queue_metrics,omitempty" json:"collect_message_queue_metrics" ui:"group:Message Queues"`
-
-	// CollectOutputQueueMetrics toggles collection of IBM i output queue metrics.
-	CollectOutputQueueMetrics confopt.AutoBool `yaml:"collect_output_queue_metrics,omitempty" json:"collect_output_queue_metrics" ui:"group:Output Queues"`
-
 	// CollectPlanCacheMetrics toggles collection of plan cache analysis metrics.
 	CollectPlanCacheMetrics confopt.AutoBool `yaml:"collect_plan_cache_metrics,omitempty" json:"collect_plan_cache_metrics" ui:"group:Other Metrics"`
+
+	// CollectMessageQueueTotals enables expensive aggregate counting across all message queues.
+	CollectMessageQueueTotals confopt.AutoBool `yaml:"collect_message_queue_totals,omitempty" json:"collect_message_queue_totals" ui:"group:Queues"`
+
+	// CollectJobQueueTotals enables expensive aggregate counting across all job queues.
+	CollectJobQueueTotals confopt.AutoBool `yaml:"collect_job_queue_totals,omitempty" json:"collect_job_queue_totals" ui:"group:Queues"`
+
+	// CollectOutputQueueTotals enables expensive aggregate counting across all output queues.
+	CollectOutputQueueTotals confopt.AutoBool `yaml:"collect_output_queue_totals,omitempty" json:"collect_output_queue_totals" ui:"group:Queues"`
+
+	// SlowPath enables the asynchronous slow-path worker for heavy queries.
+	SlowPath bool `yaml:"slow_path,omitempty" json:"slow_path" ui:"group:Advanced"`
+
+	// SlowPathUpdateEvery controls the beat interval for the slow-path worker.
+	SlowPathUpdateEvery confopt.Duration `yaml:"slow_path_update_every,omitempty" json:"slow_path_update_every" ui:"group:Advanced"`
+
+	// SlowPathMaxConnections caps the number of concurrent queries the slow-path worker may run.
+	SlowPathMaxConnections int `yaml:"slow_path_max_connections,omitempty" json:"slow_path_max_connections" ui:"group:Advanced"`
+
+	// BatchPath enables the long-period batch worker for expensive queue aggregates.
+	BatchPath bool `yaml:"batch_path,omitempty" json:"batch_path" ui:"group:Advanced"`
+
+	// BatchPathUpdateEvery controls the beat interval for the batch worker.
+	BatchPathUpdateEvery confopt.Duration `yaml:"batch_path_update_every,omitempty" json:"batch_path_update_every" ui:"group:Advanced"`
+
+	// BatchPathMaxConnections caps concurrent queries for the batch worker.
+	BatchPathMaxConnections int `yaml:"batch_path_max_connections,omitempty" json:"batch_path_max_connections" ui:"group:Advanced"`
 
 	// MaxDisks caps how many disk units may be charted.
 	MaxDisks int `yaml:"max_disks,omitempty" json:"max_disks" ui:"group:Disks"`
@@ -81,24 +93,26 @@ type Config struct {
 	// MaxSubsystems caps how many subsystems may be charted.
 	MaxSubsystems int `yaml:"max_subsystems,omitempty" json:"max_subsystems" ui:"group:Subsystems"`
 
-	// MaxJobQueues caps how many job queues may be charted.
-	MaxJobQueues int `yaml:"max_job_queues,omitempty" json:"max_job_queues" ui:"group:Job Queues"`
-
-	// MaxMessageQueues caps how many message queues may be charted.
-	MaxMessageQueues int `yaml:"max_message_queues,omitempty" json:"max_message_queues" ui:"group:Message Queues"`
-
-	// MaxOutputQueues caps how many output queues may be charted.
-	MaxOutputQueues int `yaml:"max_output_queues,omitempty" json:"max_output_queues" ui:"group:Output Queues"`
-
-	// MaxActiveJobs caps how many active jobs may be charted.
-	MaxActiveJobs int `yaml:"max_active_jobs,omitempty" json:"max_active_jobs" ui:"group:Active Jobs"`
-
 	// DiskSelector filters disk units by name using glob-style patterns.
 	DiskSelector string `yaml:"collect_disks_matching,omitempty" json:"collect_disks_matching" ui:"group:Disks"`
 
 	// SubsystemSelector filters subsystems by name using glob-style patterns.
 	SubsystemSelector string `yaml:"collect_subsystems_matching,omitempty" json:"collect_subsystems_matching" ui:"group:Subsystems"`
 
-	// JobQueueSelector filters job queues by name using glob-style patterns.
-	JobQueueSelector string `yaml:"collect_job_queues_matching,omitempty" json:"collect_job_queues_matching" ui:"group:Job Queues"`
+	// ActiveJobs lists active jobs to monitor, using fully-qualified job identifiers (JOB_NUMBER/USER/JOB_NAME).
+	// When empty, active job collection is disabled.
+	ActiveJobs []string `yaml:"active_jobs,omitempty" json:"active_jobs" ui:"group:Active Jobs"`
+
+	// MessageQueues lists message queues to collect, formatted as LIBRARY/QUEUE strings.
+	// When empty, message queue collection is disabled. The default configuration monitors
+	// QSYS/QSYSOPR, QSYS/QSYSMSG, and QSYS/QHST.
+	MessageQueues []string `yaml:"message_queues,omitempty" json:"message_queues" ui:"group:Queues"`
+
+	// JobQueues lists job queues to collect, formatted as LIBRARY/QUEUE strings.
+	// When empty, job queue collection is disabled.
+	JobQueues []string `yaml:"job_queues,omitempty" json:"job_queues" ui:"group:Queues"`
+
+	// OutputQueues lists output queues to collect, formatted as LIBRARY/QUEUE strings.
+	// When empty, output queue collection is disabled.
+	OutputQueues []string `yaml:"output_queues,omitempty" json:"output_queues" ui:"group:Queues"`
 }

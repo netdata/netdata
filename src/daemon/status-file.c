@@ -100,7 +100,7 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
 
     dsf_acquire(*ds);
 
-    buffer_json_member_add_datetime_rfc3339(wb, "@timestamp", ds->timestamp_ut, true);
+    buffer_json_member_add_string(wb, "@timestamp", ds->timestamp_ut_rfc3339);
     buffer_json_member_add_uint64(wb, "version", STATUS_FILE_VERSION);
 
     buffer_json_member_add_object(wb, "agent");
@@ -108,7 +108,7 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
         buffer_json_member_add_uuid(wb, "id", ds->host_id.uuid.uuid);
 
         if(ds->v >= 24 && ds->host_id.last_modified_ut)
-            buffer_json_member_add_datetime_rfc3339(wb, "since", ds->host_id.last_modified_ut, true);
+            buffer_json_member_add_string(wb, "since", ds->host_id.last_modified_ut_rfc3339);
 
         buffer_json_member_add_uuid_compact(wb, "ephemeral_id", ds->invocation.uuid);
         buffer_json_member_add_string(wb, "version", ds->version);
@@ -246,7 +246,7 @@ static void daemon_status_file_to_json(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
             buffer_json_member_add_uint64(wb, "dbengine", ds->disk_footprint.dbengine);
             buffer_json_member_add_uint64(wb, "sqlite", ds->disk_footprint.sqlite);
             buffer_json_member_add_uint64(wb, "other", ds->disk_footprint.other);
-            buffer_json_member_add_datetime_rfc3339(wb, "last_updated", ds->disk_footprint.last_updated_ut, true);
+            buffer_json_member_add_string(wb, "last_updated", ds->disk_footprint.last_updated_ut_rfc3339);
             buffer_json_object_close(wb);
         }
         buffer_json_object_close(wb);
@@ -748,6 +748,8 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
     session_status.boottime = now_boottime_sec();
     session_status.uptime = now_realtime_sec() - netdata_start_time;
     session_status.timestamp_ut = now_ut;
+    rfc3339_datetime_ut(session_status.timestamp_ut_rfc3339, sizeof(session_status.timestamp_ut_rfc3339),
+                        session_status.timestamp_ut, 2, true);
     session_status.invocation = nd_log_get_invocation_id();
     session_status.db_mode = default_rrd_memory_mode;
     session_status.db_tiers = nd_profile.storage_tiers;
@@ -829,10 +831,13 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
         
         // Calculate other files (total - dbengine - sqlite)
         session_status.disk_footprint.other = total_size.bytes - dbengine_size.bytes - sqlite_size.bytes;
-        
+
         // Update last updated timestamp
         session_status.disk_footprint.last_updated_ut = now_ut;
-        
+        rfc3339_datetime_ut(session_status.disk_footprint.last_updated_ut_rfc3339,
+                            sizeof(session_status.disk_footprint.last_updated_ut_rfc3339),
+                            session_status.disk_footprint.last_updated_ut, 2, true);
+
         // Clean up patterns
         simple_pattern_free(dbengine_pattern);
         simple_pattern_free(sqlite_pattern);
@@ -1062,9 +1067,26 @@ void daemon_status_file_init(void) {
 
     if(last_session_status.v <= 26)
         fill_dmi_info(&last_session_status);
-    
+
     if(last_session_status.v <= 27)
         last_session_status.system_cpus = os_get_system_cpus();
+
+    // Regenerate RFC3339 strings from loaded timestamps for async-signal-safe compatibility
+    // (these fields don't exist in saved JSON, they're runtime-only for signal handlers)
+    if(last_session_status.timestamp_ut)
+        rfc3339_datetime_ut(last_session_status.timestamp_ut_rfc3339,
+                            sizeof(last_session_status.timestamp_ut_rfc3339),
+                            last_session_status.timestamp_ut, 2, true);
+
+    if(last_session_status.host_id.last_modified_ut)
+        rfc3339_datetime_ut(last_session_status.host_id.last_modified_ut_rfc3339,
+                            sizeof(last_session_status.host_id.last_modified_ut_rfc3339),
+                            last_session_status.host_id.last_modified_ut, 2, true);
+
+    if(last_session_status.disk_footprint.last_updated_ut)
+        rfc3339_datetime_ut(last_session_status.disk_footprint.last_updated_ut_rfc3339,
+                            sizeof(last_session_status.disk_footprint.last_updated_ut_rfc3339),
+                            last_session_status.disk_footprint.last_updated_ut, 2, true);
 
     daemon_status_file_migrate_once();
 }

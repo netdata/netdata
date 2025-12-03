@@ -22,7 +22,13 @@ import (
 //go:embed "config_schema.json"
 var configSchema string
 
+type noopLogger struct{}
+
+func (noopLogger) Printf(context.Context, string, ...any) {}
+
 func init() {
+	redis.SetLogger(noopLogger{})
+
 	module.Register("redis", module.Creator{
 		JobConfigSchema: configSchema,
 		Create:          func() module.Module { return New() },

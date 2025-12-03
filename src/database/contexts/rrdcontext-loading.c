@@ -32,6 +32,12 @@ static void rrdinstance_load_dimension_callback(SQL_DIMENSION_DATA *sd, void *da
         return;
     }
     RRDCONTEXT *rc = rrdcontext_acquired_value(rca);
+    if(!rc) {
+        th_ignored_metrics++;
+        dictionary_acquired_item_release(host->rrdctx.contexts, (DICTIONARY_ITEM *)rca);
+        uuidmap_free(id);
+        return;
+    }
 
     RRDINSTANCE_ACQUIRED *ria = (RRDINSTANCE_ACQUIRED *)dictionary_get_and_acquire_item(rc->rrdinstances, sd->chart_id);
     if(!ria) {
@@ -41,6 +47,13 @@ static void rrdinstance_load_dimension_callback(SQL_DIMENSION_DATA *sd, void *da
         return;
     }
     RRDINSTANCE *ri = rrdinstance_acquired_value(ria);
+    if(!ri) {
+        th_ignored_metrics++;
+        dictionary_acquired_item_release(rc->rrdinstances, (DICTIONARY_ITEM *)ria);
+        rrdcontext_release(rca);
+        uuidmap_free(id);
+        return;
+    }
 
     RRDMETRIC trm = {
         .uuid = id,
@@ -71,7 +84,21 @@ static void rrdinstance_load_instance_callback(SQL_CHART_DATA *sc, void *data) {
     };
 
     RRDCONTEXT_ACQUIRED *rca = (RRDCONTEXT_ACQUIRED *)dictionary_set_and_acquire_item(host->rrdctx.contexts, string2str(tc.id), &tc, sizeof(tc));
+    if(!rca) {
+        th_ignored_instances++;
+        string_freez(tc.id);
+        string_freez(tc.title);
+        string_freez(tc.units);
+        string_freez(tc.family);
+        return;
+    }
+
     RRDCONTEXT *rc = rrdcontext_acquired_value(rca);
+    if(!rc) {
+        th_ignored_instances++;
+        rrdcontext_release(rca);
+        return;
+    }
 
     RRDINSTANCE tri = {
         .uuid = uuidmap_create(sc->chart_id),
@@ -87,6 +114,17 @@ static void rrdinstance_load_instance_callback(SQL_CHART_DATA *sc, void *data) {
     };
 
     RRDINSTANCE_ACQUIRED *ria = (RRDINSTANCE_ACQUIRED *)dictionary_set_and_acquire_item(rc->rrdinstances, sc->id, &tri, sizeof(tri));
+    if(!ria) {
+        th_ignored_instances++;
+        uuidmap_free(tri.uuid);
+        string_freez(tri.id);
+        string_freez(tri.name);
+        string_freez(tri.title);
+        string_freez(tri.units);
+        string_freez(tri.family);
+        rrdcontext_release(rca);
+        return;
+    }
 
     rrdinstance_release(ria);
     rrdcontext_release(rca);

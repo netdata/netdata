@@ -597,11 +597,11 @@ func (tc *tableCollector) snmpGet(oids []string) (map[string]gosnmp.SnmpPDU, err
 	return pdus, nil
 }
 
-func parseStaticTags(staticTags []string) map[string]string {
-	tags := make(map[string]string)
+func parseStaticTags(staticTags []ddprofiledefinition.StaticMetricTagConfig) map[string]string {
+	tags := make(map[string]string, len(staticTags))
 	for _, tag := range staticTags {
-		if n, v, _ := strings.Cut(tag, ":"); n != "" && v != "" {
-			tags[n] = v
+		if tag.Tag != "" && tag.Value != "" {
+			tags[tag.Tag] = tag.Value
 		}
 	}
 	return tags

@@ -439,28 +439,28 @@ void websocket_thread(void *ptr) {
                 WS_CLIENT *next = wsc->next; // Save next in case we remove this client
 
                 if(wsc->state == WS_STATE_OPEN) {
-                    // Check if client is idle (no activity for over 120 seconds)
-                    if(now - wsc->last_activity_t > 120) {
+                    // Check if client is idle (no activity for over WS_IDLE_CHECK_INTERVAL seconds)
+                    if(now - wsc->last_activity_t > WS_IDLE_CHECK_INTERVAL) {
                         // Client is idle - send a ping to check if it's still alive
                         worker_is_busy(WORKERS_WEBSOCKET_SEND_PING);
                         websocket_protocol_send_ping(wsc, NULL, 0);
 
-                        // If no activity for over 300 seconds (5 minutes), consider it dead
-                        if(now - wsc->last_activity_t > 300) {
+                        // If no activity for over WS_INACTIVITY_TIMEOUT seconds, consider it dead
+                        if(now - wsc->last_activity_t > WS_INACTIVITY_TIMEOUT) {
                             worker_is_busy(WORKERS_WEBSOCKET_CLIENT_TIMEOUT);
-                            websocket_error(wsc, "Client timed out (no activity for over 5 minutes)");
+                            websocket_error(wsc, "Client timed out (no activity for over %d minutes)", WS_INACTIVITY_TIMEOUT / 60);
                             websocket_protocol_exception(wsc, WS_CLOSE_GOING_AWAY, "Timeout - no activity");
                         }
                     }
-                    // For normal clients, send periodic pings (every 60 seconds)
-                    else if(now - wsc->last_activity_t > 60) {
+                    // For normal clients, send periodic pings (every WS_PERIODIC_PING_INTERVAL seconds)
+                    else if(now - wsc->last_activity_t > WS_PERIODIC_PING_INTERVAL) {
                         worker_is_busy(WORKERS_WEBSOCKET_SEND_PING);
                         websocket_protocol_send_ping(wsc, NULL, 0);
                     }
                 }
                 else if(wsc->state == WS_STATE_CLOSING_SERVER || wsc->state == WS_STATE_CLOSING_CLIENT) {
-                    // If a client is in any CLOSING state for more than 5 seconds, force close it
-                    if(now - wsc->last_activity_t > 5) {
+                    // If a client is in any CLOSING state for more than WS_CLOSING_STATE_TIMEOUT seconds, force close it
+                    if(now - wsc->last_activity_t > WS_CLOSING_STATE_TIMEOUT) {
                         worker_is_busy(WORKERS_WEBSOCKET_CLIENT_STUCK);
                         websocket_error(wsc, "Forcing close (stuck in %s state)",
                                         wsc->state == WS_STATE_CLOSING_SERVER ? "CLOSING_SERVER" : "CLOSING_CLIENT");
@@ -484,14 +484,65 @@ void websocket_thread(void *ptr) {
 
     // Close all clients in this thread
     WS_CLIENT *wsc = wth->clients;
+
+    // SHUTDOWN MODE: Fast cleanup with timeouts to avoid blocking
+    usec_t cleanup_start = now_monotonic_usec();
+    usec_t max_cleanup_time = 5 * USEC_PER_SEC;
+    size_t clients_closed = 0, clients_skipped = 0;
+
     while(wsc) {
         WS_CLIENT *next = wsc->next;
 
-        websocket_protocol_send_close(wsc, WS_CLOSE_GOING_AWAY, "Server shutting down");
-        websocket_write_data(wsc);
-        websocket_thread_remove_client(wth, wsc, true);
+        // Cache elapsed time to avoid repeated syscalls
+        usec_t elapsed = now_monotonic_usec() - cleanup_start;
 
+        if(elapsed < max_cleanup_time && wsc->sock.fd >= 0) {
+            bool skip_client = false;
+
+            // Ensure socket is non-blocking
+            int flags = fcntl(wsc->sock.fd, F_GETFL, 0);
+            if(flags >= 0 && !(flags & O_NONBLOCK)) {
+                if(fcntl(wsc->sock.fd, F_SETFL, flags | O_NONBLOCK) < 0) {
+                    websocket_debug(wsc, "Failed to set O_NONBLOCK during shutdown: %s", strerror(errno));
+                    skip_client = true;
+                }
+            }
+
+            if(!skip_client) {
+                // Set send timeout: 100ms max per client
+                struct timeval timeout = { .tv_sec = 0, .tv_usec = 100000 };
+                if(setsockopt(wsc->sock.fd, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout)) < 0) {
+                    websocket_debug(wsc, "Failed to set SO_SNDTIMEO during shutdown: %s (continuing)", strerror(errno));
+                    // Non-critical, continue anyway
+                }
+
+                // Try to send close frame (won't block due to O_NONBLOCK + SO_SNDTIMEO)
+                websocket_protocol_send_close(wsc, WS_CLOSE_GOING_AWAY, "Server shutting down");
+                ssize_t written = websocket_write_data(wsc);
+                if(written < 0) {
+                    websocket_debug(wsc, "Failed to send close frame during shutdown");
+                }
+                clients_closed++;
+            }
+            else {
+                clients_skipped++;
+            }
+        }
+        else {
+            clients_skipped++;
+        }
+
+        websocket_thread_remove_client(wth, wsc, true);
         wsc = next;
+    }
+
+    netdata_log_info("WEBSOCKET[%zu] shutdown cleanup complete: %zu clients closed gracefully, %zu skipped",
+                     wth->id, clients_closed, clients_skipped);
+
+    if(clients_skipped > 0 && clients_skipped > clients_closed) {
+        nd_log_daemon(NDLP_WARNING, "WEBSOCKET[%zu] skipped more clients (%zu) than closed gracefully (%zu) - "
+                            "possible network issues or timeout reached",
+                            wth->id, clients_skipped, clients_closed);
     }
 
     // Reset thread's client list

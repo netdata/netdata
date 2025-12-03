@@ -1073,6 +1073,7 @@ static void stream_receiver_replication_reset(RRDHOST *host) {
 
     __atomic_store_n(&host->stream.rcv.status.replication.counter_in, 0, __ATOMIC_RELAXED);
     __atomic_store_n(&host->stream.rcv.status.replication.counter_out, 0, __ATOMIC_RELAXED);
+    __atomic_store_n(&host->stream.rcv.status.replication.backfill_pending, 0, __ATOMIC_RELAXED);
 }
 
 bool rrdhost_set_receiver(RRDHOST *host, struct receiver_state *rpt) {

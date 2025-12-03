@@ -39,7 +39,7 @@ JetBrains AI Assistant currently communicates with MCP servers over `stdio` only
    ```bash
    export ND_MCP_BEARER_TOKEN="$(cat /var/lib/netdata/mcp_dev_preview_api_key)"
    ```
-   Each Netdata Agent or Parent has its own unique API key for MCP - [Find your Netdata MCP API key](/docs/learn/mcp.md#finding-your-api-key)
+   Each Netdata Agent or Parent has its own unique API key for MCP - [Find your Netdata MCP API key](/docs/netdata-ai/mcp/README.md#finding-your-api-key)
 
 ## Installing AI Assistant
 
@@ -85,7 +85,7 @@ MCP support in JetBrains IDEs may require additional plugins or configuration. C
 
 ### Method 2: Using npx mcp-remote (Netdata v2.7.2+)
 
-For detailed options and troubleshooting, see [Using MCP Remote Client](/docs/learn/mcp.md#using-mcp-remote-client). JetBrains still launches this command over stdio; `mcp-remote` converts the remote HTTP/SSE session into the format AI Assistant understands.
+For detailed options and troubleshooting, see [Using MCP Remote Client](/docs/netdata-ai/mcp/README.md#using-mcp-remote-client). JetBrains still launches this command over stdio; `mcp-remote` converts the remote HTTP/SSE session into the format AI Assistant understands.
 
 **AI Assistant Settings:**
 
@@ -112,9 +112,9 @@ For detailed options and troubleshooting, see [Using MCP Remote Client](/docs/le
 
 Replace in all examples:
 
-- `/usr/sbin/nd-mcp` - With your [actual nd-mcp path](/docs/learn/mcp.md#finding-the-nd-mcp-bridge) (nd-mcp method only)
+- `/usr/sbin/nd-mcp` - With your [actual nd-mcp path](/docs/netdata-ai/mcp/README.md#finding-the-nd-mcp-bridge) (nd-mcp method only)
 - `YOUR_NETDATA_IP` - IP address or hostname of your Netdata Agent/Parent
-- `NETDATA_MCP_API_KEY` - Your [Netdata MCP API key](/docs/learn/mcp.md#finding-your-api-key)
+- `NETDATA_MCP_API_KEY` - Your [Netdata MCP API key](/docs/netdata-ai/mcp/README.md#finding-your-api-key)
 - `ND_MCP_BEARER_TOKEN` - Export with your API key before launching the IDE (nd-mcp method only)
 
 ## Usage in Different IDEs

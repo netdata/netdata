@@ -555,6 +555,8 @@ void sql_check_removed_alerts_state(RRDHOST *host)
 
            sql_inject_removed_status(host, alarm_id, alarm_event_id, unique_id, ++max_unique_id, &transition_id);
         }
+        if (!service_running(SERVICE_HEALTH))
+            break;
     }
 done:
     REPORT_BIND_FAIL(res, param);

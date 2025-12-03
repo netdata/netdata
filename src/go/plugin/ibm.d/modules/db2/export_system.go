@@ -7,6 +7,11 @@ import "github.com/netdata/netdata/go/plugins/plugin/ibm.d/modules/db2/contexts"
 func (c *Collector) exportSystemMetrics() {
 	labels := contexts.EmptyLabels{}
 
+	interval := int64(c.Config.UpdateEvery)
+	if interval <= 0 {
+		interval = 1
+	}
+
 	contexts.System.ServiceHealth.Set(c.State, labels, contexts.SystemServiceHealthValues{
 		Connection: c.mx.CanConnect,
 		Database:   c.mx.DatabaseStatus,
@@ -46,9 +51,9 @@ func (c *Collector) exportSystemMetrics() {
 	})
 
 	contexts.System.RowActivity.Set(c.State, labels, contexts.SystemRowActivityValues{
-		Read:     c.mx.RowsRead,
-		Returned: c.mx.RowsReturned,
-		Modified: c.mx.RowsModified,
+		Read:     c.mx.RowsRead / interval,
+		Returned: c.mx.RowsReturned / interval,
+		Modified: c.mx.RowsModified / interval,
 	})
 
 	contexts.System.BufferpoolHitRatio.Set(c.State, labels, contexts.SystemBufferpoolHitRatioValues{

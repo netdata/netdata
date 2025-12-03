@@ -40,6 +40,7 @@ modules:
           
           - `SELECT VERSION();`
           - `SHOW GLOBAL STATUS;`
+          - `SHOW ENGINE INNODB STATUS;`
           - `SHOW GLOBAL VARIABLES;`
           - `SHOW SLAVE STATUS;` or `SHOW ALL SLAVES STATUS;` (MariaDBv10.2+) or `SHOW REPLICA STATUS;` (MySQL 8.0.22+)
           - `SHOW USER_STATISTICS;` (MariaDBv10.1.1+)
@@ -391,6 +392,25 @@ modules:
                 - name: waits
                 - name: write_requests
                 - name: writes
+            - name: mysql.innodb_redo_log_activity
+              description: InnoDB Redo Log Activity
+              unit: B/s
+              chart_type: line
+              dimensions:
+                - name: redo_written
+                - name: checkpointed
+            - name: mysql.innodb_redo_log_occupancy
+              description: InnoDB Redo Log Occupancy
+              unit: percentage
+              chart_type: area
+              dimensions:
+                - name: occupancy
+            - name: mysql.innodb_redo_log_checkpoint_age
+              description: InnoDB Redo Log Checkpoint Age
+              unit: B
+              chart_type: line
+              dimensions:
+                - name: age
             - name: mysql.innodb_cur_row_lock
               description: InnoDB Current Row Locks
               unit: operations

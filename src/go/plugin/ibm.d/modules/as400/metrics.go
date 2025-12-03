@@ -7,9 +7,10 @@ package as400
 
 type metricsData struct {
 	// CPU metrics from SYSTEM_STATUS()
-	CPUPercentage      int64 `stm:"cpu_percentage"`       // AVERAGE_CPU_UTILIZATION
-	CurrentCPUCapacity int64 `stm:"current_cpu_capacity"` // CURRENT_CPU_CAPACITY
-	ConfiguredCPUs     int64 `stm:"configured_cpus"`      // CONFIGURED_CPUS
+	CPUPercentage         int64 `stm:"cpu_percentage"`       // AVERAGE_CPU_UTILIZATION
+	CurrentCPUCapacity    int64 `stm:"current_cpu_capacity"` // CURRENT_CPU_CAPACITY
+	ConfiguredCPUs        int64 `stm:"configured_cpus"`      // CONFIGURED_CPUS
+	EntitledCPUPercentage int64 `stm:"entitled_cpu_percentage"`
 
 	// Memory metrics from SYSTEM_STATUS()
 	MainStorageSize             int64 `stm:"main_storage_size"`              // MAIN_STORAGE_SIZE (KB)
@@ -76,6 +77,8 @@ type metricsData struct {
 	httpServers       map[string]httpServerInstanceMetrics
 	planCache         map[string]planCacheInstanceMetrics
 	systemActivity    systemActivityMetrics
+
+	queryLatencies map[string]int64 `stm:"-"`
 }
 
 // Per-instance metric structures for stm conversion

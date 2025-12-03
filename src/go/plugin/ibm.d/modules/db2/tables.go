@@ -25,7 +25,7 @@ func (c *Collector) collectTableInstances(ctx context.Context) error {
 			currentTable = value
 			key = fmt.Sprintf("%s.%s", currentSchema, currentTable)
 
-			if c.tableSelector != nil && !c.tableSelector.MatchString(key) {
+			if !c.allowTable(key) {
 				key = ""
 				return
 			}
@@ -74,6 +74,12 @@ func (c *Collector) collectTableInstances(ctx context.Context) error {
 					c.mx.tables[key] = metrics
 				}
 			}
+		}
+
+		if lineEnd {
+			key = ""
+			currentTable = ""
+			currentSchema = ""
 		}
 	})
 

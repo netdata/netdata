@@ -124,7 +124,13 @@ func (c *Client) getPCFReply(correlId []byte) ([]*ibmmq.PCFParameter, error) {
 		params, err := c.parsePCFResponseInternal(buffer[:datalen])
 		if err != nil {
 			// In multi-message responses, log the error but continue reading
-			c.protocol.Warningf("Error in multi-message response: %v", err)
+			if pcfErr, ok := err.(*PCFError); ok {
+				key := fmt.Sprintf("pcf_command_%d_reason_%d", cfh.Command, pcfErr.Code)
+				c.warnOnce(key, "PCF command %s(%d) failed: %s", mqcmdToString(cfh.Command), cfh.Command, pcfErr.Message)
+			} else {
+				key := fmt.Sprintf("pcf_command_%d_parse", cfh.Command)
+				c.warnOnce(key, "Error in multi-message response for %s(%d): %v", mqcmdToString(cfh.Command), cfh.Command, err)
+			}
 
 			// Check if this is the last message even with error
 			if cfh.Control == ibmmq.MQCFC_LAST {

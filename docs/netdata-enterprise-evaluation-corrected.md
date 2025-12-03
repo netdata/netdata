@@ -44,7 +44,7 @@ Netdata has been architected to minimize resource consumption while maximizing o
 - **Storage Optimization**: Industry-leading compression achieving ~0.6 bytes per sample on disk for high-resolution data
 - **Edge Computing**: Distributed architecture keeps data processing close to its source, reducing bandwidth and central processing requirements - Netdata distributes the code instead of centralizing the data
 - **Intelligent ML**: Machine learning runs as low-priority background tasks, automatically yielding resources when needed for data collection. See [AI & ML Features](https://github.com/netdata/netdata/blob/master/docs/category-overview-pages/machine-learning-and-assisted-troubleshooting.md)
-- **Built-in Scalability**: Native clustering and high-availability features enable organizations to scale horizontally without architectural changes. See [Observability Centralization Points](https://github.com/netdata/netdata/blob/master/docs/observability-centralization-points/README.md).
+- **Built-in Scalability**: Native clustering and high-availability features enable organizations to scale horizontally without architectural changes. See [Observability Centralization Points](https://github.com/netdata/netdata/blob/master/docs/deployment-guides/deployment-with-centralization-points.md).
 - **Stable and Predictable Resource Usage**: Agents are optimized to spread work over time and avoid sudden changes in resource consumption
 
 This design philosophy enables Netdata to monitor infrastructure at unprecedented scale with minimal overhead, making it suitable for everything from IoT devices to high-performance computing clusters.
@@ -186,7 +186,7 @@ For AI and Large Language Models, Netdata supports Model Context Protocol (MCP),
 Netdata provides enterprise-grade security and compliance capabilities designed to meet the requirements of regulated industries and security-conscious organizations.
 
 **Compliance Standards:**
-Netdata maintains SOC 2 Type 1 certification and is pursuing Type 2 certification, with ISO 27001 on the roadmap. The platform aligns with GDPR, CCPA, HIPAA (with BAA available), and PCI DSS requirements, making it suitable for financial services, healthcare, and government deployments.
+Netdata maintains SOC 2 Type 2 certification, with ISO 27001 on the roadmap. The platform aligns with GDPR, CCPA, HIPAA (with BAA available), and PCI DSS requirements, making it suitable for financial services, healthcare, and government deployments.
 
 **Data Sovereignty Architecture:**
 The platform's architecture ensures complete data sovereignty - all metrics and logs remain on customer infrastructure. Only metadata (node names, chart titles, alert configurations) is synchronized to Netdata Cloud, with all data transmission protected by TLS encryption. Air-gapped deployment options are available for maximum security isolation.

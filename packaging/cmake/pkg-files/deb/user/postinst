@@ -1,0 +1,34 @@
+#!/bin/sh
+
+set -e
+
+case "${1}" in
+  configure|reconfigure)
+    if command -v systemd-sysusers >/dev/null 2>&1; then
+      systemd-sysusers /usr/lib/sysusers.d/netdata.conf
+    else
+      if ! getent group netdata > /dev/null; then
+        addgroup --quiet --system netdata
+      fi
+
+      if ! getent passwd netdata > /dev/null; then
+        adduser --quiet --system --ingroup netdata --home /var/lib/netdata --no-create-home netdata
+      fi
+    fi
+
+    groups="docker ceph I2C"
+
+    if [ -d "/etc/pve" ]; then
+      groups="${groups} www-data"
+    fi
+    if [ -e "/dev/nvidiactl" ]; then
+      groups="${groups} video"
+    fi
+
+    for item in ${groups}; do
+      if getent group "${item}" > /dev/null 2>&1; then
+        usermod -a -G "${item}" netdata
+      fi
+    done
+    ;;
+esac

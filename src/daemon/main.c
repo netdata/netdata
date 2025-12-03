@@ -1055,6 +1055,10 @@ int netdata_main(int argc, char **argv) {
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("RRD structures");
 
+    delta_startup_time("commands liveness support");
+
+    commands_init();
+
     abort_on_fatal_disable();
     if (rrd_init(netdata_configured_hostname, system_info, false))
         fatal("Cannot initialize localhost instance with name '%s'.", netdata_configured_hostname);
@@ -1098,7 +1102,7 @@ int netdata_main(int argc, char **argv) {
     ml_start_threads();
 
     // ----------------------------------------------------------------------------------------------------------------
-    delta_startup_time("commands API");
+    delta_startup_time("commands full API");
 
     commands_init();
 

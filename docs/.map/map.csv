@@ -3,6 +3,7 @@ https://github.com/netdata/netdata/edit/master/docs/welcome-to-netdata.md,Welcom
 https://github.com/netdata/netdata/edit/master/docs/netdata-enterprise-evaluation-corrected.md,Enterprise Evaluation Guide,Published,Welcome to Netdata,
 https://github.com/netdata/netdata/edit/master/docs/realtime-monitoring.md,Real-time Monitoring,Published,Welcome to Netdata,
 https://github.com/netdata/netdata/edit/master/docs/scalability.md,Scalability,Published,Welcome to Netdata,
+https://github.com/netdata/netdata/edit/master/src/collectors/COLLECTORS.md,Monitor Anything,Published,Welcome to Netdata,Netdata gathers real-time metrics from hundreds of data sources using collectors. Most require zero configuration and are pre-configured out of the box.
 https://github.com/netdata/netdata/edit/master/docs/fleet-configuration-management.md,Fleet Deployment and Configuration Management,Published,Welcome to Netdata,
 https://github.com/netdata/netdata/edit/master/docs/getting-started-netdata/guide.md,Getting Started,Published,root,
 https://github.com/netdata/netdata/edit/master/docs/Demo-Sites.md,Live Demo,Published,root,
@@ -16,7 +17,8 @@ https://github.com/netdata/netdata/edit/master/packaging/installer/methods/packa
 https://github.com/netdata/netdata/edit/master/packaging/makeself/README.md,Static binary Linux Packages,Published,Netdata Agent/Installation/Linux,Users can build the static 64-bit binary package that we ship with every release of the open-source Netdata Agent for debugging or specialize purposes.
 https://github.com/netdata/netdata/edit/master/docs/learn/switching-install-types.md,Switch Install Types and Release Channels,Published,Netdata Agent/Installation/Linux,
 https://github.com/netdata/netdata/edit/master/packaging/installer/methods/offline.md,Offline systems,Published,Netdata Agent/Installation/Linux,"Install the Netdata Agent on offline/air gapped systems to benefit from real-time, per-second monitoring without connecting to the internet."
-https://github.com/netdata/netdata/edit/master/packaging/windows/WINDOWS_INSTALLER.md,Windows,Published,Netdata Agent/Installation,
+https://github.com/netdata/netdata/edit/master/packaging/windows/WINDOWS_INSTALLER.md,Windows,Published,Netdata Agent/Installation/Windows,
+https://github.com/netdata/netdata/edit/master/docs/install/windows-release-channels.md,Switching Install Types and Release Channels,Published,"Netdata Agent/Installation/Windows","Guide to choosing and switching between different Netdata Windows installation methods and release channels"
 https://github.com/netdata/netdata/edit/master/packaging/docker/README.md,Docker,Published,Netdata Agent/Installation,
 https://github.com/netdata/netdata/edit/master/packaging/installer/methods/kubernetes.md,Kubernetes,Published,Netdata Agent/Installation,"Deploy Netdata to monitor a Kubernetes cluster to monitor the health, performance, resource utilization, and application metrics of a Kubernetes cluster in real time."
 https://github.com/netdata/helmchart/edit/master/charts/netdata/README.md,Kubernetes Helm chart reference,Published,Netdata Agent/Installation,
@@ -121,7 +123,7 @@ https://github.com/netdata/netdata/edit/master/docs/observability-centralization
 https://github.com/netdata/netdata/edit/master/docs/collecting-metrics/system-metrics.md,System metrics,Unpublished,Collecting Metrics,"Netdata collects thousands of metrics from physical and virtual systems, IoT/edge devices, and containers with zero configuration."
 https://github.com/netdata/netdata/edit/master/docs/collecting-metrics/application-metrics.md,Application metrics,Unpublished,Collecting Metrics,"Monitor and troubleshoot every application on your infrastructure with per-second metrics, zero configuration, and meaningful charts."
 https://github.com/netdata/netdata/edit/master/docs/collecting-metrics/container-metrics.md,Container metrics,Unpublished,Collecting Metrics,Use Netdata to collect per-second utilization and application-level metrics from Linux/Docker containers and Kubernetes clusters.
-https://github.com/netdata/netdata/edit/master/src/collectors/COLLECTORS.md,Monitor Anything,Published,Collecting Metrics,Netdata gathers real-time metrics from hundreds of data sources using collectors. Most require zero configuration and are pre-configured out of the box.
+https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/collector/snmp/profile-format.md,SNMP Profile Format,Published,Collecting Metrics,Learn how Netdata’s SNMP collector uses profiles.
 collectors_integrations,,,,
 ,,,,
 ,,,,
@@ -135,7 +137,6 @@ https://github.com/netdata/netdata/edit/master/src/exporting/prometheus/README.m
 https://github.com/netdata/netdata/edit/master/src/web/api/exporters/shell/README.md,Shell Scripts,Published,Exporting Metrics,
 ,,,,
 ,,,,
-https://github.com/netdata/netdata/edit/master/docs/category-overview-pages/working-with-logs.md,Working with Logs,Unpublished,Working with Logs,
 logs_integrations,,,,
 https://github.com/netdata/netdata/edit/master/src/collectors/systemd-journal.plugin/README.md,Systemd Journal Plugin Reference,Published,Logs/Systemd Journal Logs,View and analyze logs available in systemd journal
 https://github.com/netdata/netdata/edit/master/src/collectors/systemd-journal.plugin/forward_secure_sealing.md,Forward Secure Sealing (FSS) in Systemd-Journal,Published,Logs/Systemd Journal Logs,
@@ -210,6 +211,7 @@ https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/top-ta
 https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/themes.md,Theme,Published,Dashboards and Charts,
 https://github.com/netdata/netdata-grafana-datasource-plugin/edit/master/README.md,Grafana Plugin,Published,Dashboards and Charts,
 https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/netdata-charts.md,Charts,Published,Dashboards and Charts,
+https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/expanded-chart-analysis.md,Expanded Chart Analysis,Published,Dashboards and Charts,
 https://github.com/netdata/netdata/edit/master/docs/NIDL-Framework.md,NIDL Framework,Published,Dashboards and Charts,
 https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/node-filter.md,Node Filter,Published,Dashboards and Charts,
 https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/visualization-date-and-time-controls.md,Time Controls,Published,Dashboards and Charts,
@@ -219,8 +221,8 @@ https://github.com/netdata/netdata/edit/master/docs/category-overview-pages/moni
 ,,,,
 ,,,,
 https://github.com/netdata/netdata/edit/master/docs/security-and-privacy-design/README.md,Security and Privacy Design,Published,Security and Privacy Design,
-https://github.com/netdata/netdata/edit/master/docs/security-and-privacy-design/netdata-agent-security.md,Netdata Agent Security and Privacy Design,Published,Security and Privacy Design,
-https://github.com/netdata/netdata/edit/master/docs/security-and-privacy-design/netdata-cloud-security.md,Netdata Cloud Security and Privacy Design,Published,Security and Privacy Design,
+https://github.com/netdata/netdata/edit/master/docs/security-and-privacy-design/netdata-agent-security.md,Netdata Agent,Published,Security and Privacy Design,
+https://github.com/netdata/netdata/edit/master/docs/security-and-privacy-design/netdata-cloud-security.md,Netdata Cloud,Published,Security and Privacy Design,
 ,,,,
 ,,,,
 ,,,,
@@ -300,7 +302,6 @@ https://github.com/netdata/netdata/edit/master/src/libnetdata/socket/README.md,S
 https://github.com/netdata/netdata/edit/master/docs/developer-and-contributor-corner/running-through-cf-tunnels.md,Running a Local Dashboard through Cloudflare Tunnels,Published,Developer and Contributor Corner,
 https://github.com/netdata/netdata/edit/master/REDISTRIBUTED.md,Redistributed Software,Published,Developer and Contributor Corner,
 https://github.com/netdata/netdata/edit/master/tests/health_mgmtapi/README.md,Health command API tester,Published,Developer and Contributor Corner,
-https://github.com/netdata/netdata/edit/master/docs/developer-and-contributor-corner/customize.md,Customize the standard dashboard,Unpublished,Developer and Contributor Corner,"Netdata's preconfigured dashboard offers many customization options, such as choosing when charts are updated, your preferred theme, and custom text to document processes, and more."
 https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/import-export-print-snapshot.md,"Import, export, and print a snapshot",Published,Developer and Contributor Corner,"Snapshots can be incredibly useful for diagnosing anomalies after they've already happened, and are interoperable with any other node running Netdata."
 https://github.com/netdata/netdata/edit/master/src/web/gui/custom/README.md,Build a custom Dashboard HTML page,Published,Developer and Contributor Corner,Build custom dashboards with key metrics from one or more nodes running the Netdata Agent and host them anywhere.
 https://github.com/netdata/netdata/edit/master/docs/netdata-for-IoT.md,Netdata for IoT,Unpublished,Developer and Contributor Corner,

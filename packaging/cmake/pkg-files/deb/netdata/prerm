@@ -1,0 +1,11 @@
+#!/bin/sh
+
+set -e
+
+case "$1" in
+  remove)
+    if [ -x "/usr/libexec/netdata/netdata-updater.sh" ] ; then
+      /usr/libexec/netdata/netdata-updater.sh --disable-auto-updates
+    fi
+    ;;
+esac

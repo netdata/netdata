@@ -65,12 +65,19 @@ typedef enum cmd_type {
  */
 typedef cmd_status_t (command_action_t) (char *args, char **message);
 
+typedef enum cmd_init_status {
+    CMD_INIT_STATUS_OFF,
+    CMD_INIT_STATUS_INIT,
+    CMD_INIT_STATUS_FULL,
+} cmd_init_status_t;
+
 typedef struct command_info {
     char *cmd_str;              // the command string
     char *params;
     char *help;
     command_action_t *func;     // the function that executes the command
     cmd_type_t type;            // Concurrency control information for the command
+    cmd_init_status_t init_status;     // command availability during start
 } command_info_t;
 
 typedef void (command_lock_t) (unsigned index);

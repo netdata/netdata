@@ -7,7 +7,7 @@ enabling users to ingest, store and visualize OpenTelemetry metrics in charts.
 
 Edit the [otel.yml](https://github.com/netdata/netdata/blob/master/src/crates/jf/otel-plugin/configs/otel.yml)
 configuration file using `edit-config` from the Netdata
-[config directory](/docs/netdata-agent/configuration/README.md#the-netdata-config-directory),
+[config directory](/docs/netdata-agent/configuration/README.md#locate-your-config-directory),
 which is typically located under `/etc/netdata`.
 
 ```bash

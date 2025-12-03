@@ -69,6 +69,9 @@ struct rrdengine_datafile {
         SPINLOCK spinlock;
         size_t running;
         size_t flushed_to_open_running;
+#ifdef OS_WINDOWS
+        time_t last_sync_time;
+#endif
     } writers;
 
     struct {
@@ -114,5 +117,9 @@ static struct rrdengine_instance *datafile_ctx(struct rrdengine_datafile *datafi
 
     return datafile->ctx;
 }
+
+#ifdef OS_WINDOWS
+void sync_uv_file_data(uv_file file);
+#endif
 
 #endif /* NETDATA_DATAFILE_H */

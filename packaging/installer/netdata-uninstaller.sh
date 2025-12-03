@@ -229,122 +229,28 @@ pkg_installed() {
   esac
 }
 
-detect_existing_install
+disable_updater() {
+  if [ -x "${NETDATA_PREFIX}/usr/libexec/netdata-updater.sh" ]; then
+    "${NETDATA_PREFIX}/usr/libexec/netdata-updater.sh" --disable-auto-updates
+  else
+    rm_file /etc/periodic/daily/netdata-updater
+    rm_file /etc/cron.daily/netdata-updater
+    rm_file /etc/cron.d/netdata-updater
+    rm_file /etc/cron.d/netdata-updater-daily
 
-if [ -x "$(command -v apt-get)" ] && [ "${INSTALL_TYPE}" = "binpkg-deb" ]; then
-  if dpkg -s netdata > /dev/null; then
-    echo "Found netdata native installation"
-    if user_input "Do you want to remove netdata? "; then
-      # shellcheck disable=SC2086
-      apt-get remove netdata ${FLAG}
+    if command -v systemctl >/dev/null 2>&1 ; then
+      systemctl stop netdata-updater.timer >/dev/null 2>&1 || true
+      systemctl disable netdata-updater.timer >/dev/null 2>&1 || true
     fi
-    if dpkg -s netdata-repo-edge > /dev/null; then
-      if user_input "Do you want to remove netdata-repo-edge? "; then
-        # shellcheck disable=SC2086
-        apt-get remove netdata-repo-edge ${FLAG}
-      fi
-    fi
-    if dpkg -s netdata-repo > /dev/null; then
-      if user_input "Do you want to remove netdata-repo? "; then
-        # shellcheck disable=SC2086
-        apt-get remove netdata-repo ${FLAG}
-      fi
-    fi
-    exit 0
   fi
-elif [ -x "$(command -v dnf)" ] && [ "${INSTALL_TYPE}" = "binpkg-rpm" ]; then
-  if rpm -q netdata > /dev/null; then
-    echo "Found netdata native installation."
-    if user_input "Do you want to remove netdata? "; then
-      # shellcheck disable=SC2086
-      dnf remove netdata ${FLAG}
-    fi
-    if rpm -q netdata-repo-edge > /dev/null; then
-      if user_input "Do you want to remove netdata-repo-edge? "; then
-        # shellcheck disable=SC2086
-        dnf remove netdata-repo-edge ${FLAG}
-      fi
-    fi
-    if rpm -q netdata-repo > /dev/null; then
-      if user_input "Do you want to remove netdata-repo? "; then
-        # shellcheck disable=SC2086
-        dnf remove netdata-repo ${FLAG}
-      fi
-    fi
-    exit 0
-  fi
-elif [ -x "$(command -v yum)" ] && [ "${INSTALL_TYPE}" = "binpkg-rpm" ]; then
-  if rpm -q netdata > /dev/null; then
-    echo "Found netdata native installation."
-    if user_input "Do you want to remove netdata? "; then
-      # shellcheck disable=SC2086
-      yum remove netdata ${FLAG}
-    fi
-    if rpm -q netdata-repo-edge > /dev/null; then
-      if user_input "Do you want to remove netdata-repo-edge? "; then
-        # shellcheck disable=SC2086
-        yum remove netdata-repo-edge ${FLAG}
-      fi
-    fi
-    if rpm -q netdata-repo > /dev/null; then
-      if user_input "Do you want to remove netdata-repo? "; then
-        # shellcheck disable=SC2086
-        yum remove netdata-repo ${FLAG}
-      fi
-    fi
-    exit 0
-  fi
-elif [ -x "$(command -v zypper)" ] && [ "${INSTALL_TYPE}" = "binpkg-rpm" ]; then
-  if [ "${FLAG}" = "-y" ]; then
-    FLAG=-n
-  fi
-  if zypper search -i netdata > /dev/null; then
-    echo "Found netdata native installation."
-    if user_input "Do you want to remove netdata? "; then
-      # shellcheck disable=SC2086
-      zypper ${FLAG} remove netdata
-    fi
-    if zypper search -i netdata-repo-edge > /dev/null; then
-      if user_input "Do you want to remove netdata-repo-edge? "; then
-        # shellcheck disable=SC2086
-        zypper ${FLAG} remove netdata-repo-edge
-      fi
-    fi
-    if zypper search -i netdata-repo > /dev/null; then
-      if user_input "Do you want to remove netdata-repo? "; then
-        # shellcheck disable=SC2086
-        zypper ${FLAG} remove netdata-repo
-      fi
-    fi
-    exit 0
-  fi
-fi
-
-# -----------------------------------------------------------------------------
-# portable service command
-
-service_cmd="$(command -v service 2> /dev/null)"
-rcservice_cmd="$(command -v rc-service 2> /dev/null)"
-systemctl_cmd="$(command -v systemctl 2> /dev/null)"
-service() {
-
-  cmd="${1}"
-  action="${2}"
-
-  if [ -n "${systemctl_cmd}" ]; then
-    run "${systemctl_cmd}" "${action}" "${cmd}"
-    return $?
-  elif [ -n "${service_cmd}" ]; then
-    run "${service_cmd}" "${cmd}" "${action}"
-    return $?
-  elif [ -n "${rcservice_cmd}" ]; then
-    run "${rcservice_cmd}" "${cmd}" "${action}"
-    return $?
-  fi
-  return 1
 }
 
-# -----------------------------------------------------------------------------
+cleanup_data_and_config() {
+  rm_dir "${NETDATA_PREFIX}/var/lib/netdata"
+  rm_dir "${NETDATA_PREFIX}/var/cache/netdata"
+  rm_dir "${NETDATA_PREFIX}/var/log/netdata"
+  rm_dir "${NETDATA_PREFIX}/etc/netdata"
+}
 
 setup_terminal() {
   TPUT_RESET=""
@@ -425,6 +331,146 @@ run() {
 
   return ${ret}
 }
+
+rm_file() {
+  FILE="$1"
+  if [ -f "${FILE}" ]; then
+    if user_input "Do you want to delete this file '$FILE' ? "; then
+      run rm -v "${FILE}"
+    fi
+  fi
+}
+
+rm_dir() {
+  DIR="$1"
+  if [ -n "$DIR" ] && [ -d "$DIR" ]; then
+    if user_input "Do you want to delete this directory '$DIR' ? "; then
+      run rm -v -f -R "${DIR}"
+    fi
+  fi
+}
+
+detect_existing_install
+disable_updater
+
+if [ -x "$(command -v apt-get)" ] && [ "${INSTALL_TYPE}" = "binpkg-deb" ]; then
+  if dpkg -s netdata > /dev/null; then
+    echo "Found netdata native installation"
+    if user_input "Do you want to remove netdata? "; then
+      # shellcheck disable=SC2086
+      apt-get remove netdata ${FLAG}
+    fi
+    if dpkg -s netdata-repo-edge > /dev/null; then
+      if user_input "Do you want to remove netdata-repo-edge? "; then
+        # shellcheck disable=SC2086
+        apt-get remove netdata-repo-edge ${FLAG}
+      fi
+    fi
+    if dpkg -s netdata-repo > /dev/null; then
+      if user_input "Do you want to remove netdata-repo? "; then
+        # shellcheck disable=SC2086
+        apt-get remove netdata-repo ${FLAG}
+      fi
+    fi
+    cleanup_data_and_config
+    exit 0
+  fi
+elif [ -x "$(command -v dnf)" ] && [ "${INSTALL_TYPE}" = "binpkg-rpm" ]; then
+  if rpm -q netdata > /dev/null; then
+    echo "Found netdata native installation."
+    if user_input "Do you want to remove netdata? "; then
+      # shellcheck disable=SC2086
+      dnf remove netdata ${FLAG}
+    fi
+    if rpm -q netdata-repo-edge > /dev/null; then
+      if user_input "Do you want to remove netdata-repo-edge? "; then
+        # shellcheck disable=SC2086
+        dnf remove netdata-repo-edge ${FLAG}
+      fi
+    fi
+    if rpm -q netdata-repo > /dev/null; then
+      if user_input "Do you want to remove netdata-repo? "; then
+        # shellcheck disable=SC2086
+        dnf remove netdata-repo ${FLAG}
+      fi
+    fi
+    cleanup_data_and_config
+    exit 0
+  fi
+elif [ -x "$(command -v yum)" ] && [ "${INSTALL_TYPE}" = "binpkg-rpm" ]; then
+  if rpm -q netdata > /dev/null; then
+    echo "Found netdata native installation."
+    if user_input "Do you want to remove netdata? "; then
+      # shellcheck disable=SC2086
+      yum remove netdata ${FLAG}
+    fi
+    if rpm -q netdata-repo-edge > /dev/null; then
+      if user_input "Do you want to remove netdata-repo-edge? "; then
+        # shellcheck disable=SC2086
+        yum remove netdata-repo-edge ${FLAG}
+      fi
+    fi
+    if rpm -q netdata-repo > /dev/null; then
+      if user_input "Do you want to remove netdata-repo? "; then
+        # shellcheck disable=SC2086
+        yum remove netdata-repo ${FLAG}
+      fi
+    fi
+    cleanup_data_and_config
+    exit 0
+  fi
+elif [ -x "$(command -v zypper)" ] && [ "${INSTALL_TYPE}" = "binpkg-rpm" ]; then
+  if [ "${FLAG}" = "-y" ]; then
+    FLAG=-n
+  fi
+  if zypper search -i netdata > /dev/null; then
+    echo "Found netdata native installation."
+    if user_input "Do you want to remove netdata? "; then
+      # shellcheck disable=SC2086
+      zypper ${FLAG} remove netdata
+    fi
+    if zypper search -i netdata-repo-edge > /dev/null; then
+      if user_input "Do you want to remove netdata-repo-edge? "; then
+        # shellcheck disable=SC2086
+        zypper ${FLAG} remove netdata-repo-edge
+      fi
+    fi
+    if zypper search -i netdata-repo > /dev/null; then
+      if user_input "Do you want to remove netdata-repo? "; then
+        # shellcheck disable=SC2086
+        zypper ${FLAG} remove netdata-repo
+      fi
+    fi
+    cleanup_data_and_config
+    exit 0
+  fi
+fi
+
+# -----------------------------------------------------------------------------
+# portable service command
+
+service_cmd="$(command -v service 2> /dev/null)"
+rcservice_cmd="$(command -v rc-service 2> /dev/null)"
+systemctl_cmd="$(command -v systemctl 2> /dev/null)"
+service() {
+
+  cmd="${1}"
+  action="${2}"
+
+  if [ -n "${systemctl_cmd}" ]; then
+    run "${systemctl_cmd}" "${action}" "${cmd}"
+    return $?
+  elif [ -n "${service_cmd}" ]; then
+    run "${service_cmd}" "${cmd}" "${action}"
+    return $?
+  elif [ -n "${rcservice_cmd}" ]; then
+    run "${rcservice_cmd}" "${cmd}" "${action}"
+    return $?
+  fi
+  return 1
+}
+
+# -----------------------------------------------------------------------------
 
 portable_del_group() {
   groupname="${1}"
@@ -594,24 +640,6 @@ quit_msg() {
   fi
 }
 
-rm_file() {
-  FILE="$1"
-  if [ -f "${FILE}" ]; then
-    if user_input "Do you want to delete this file '$FILE' ? "; then
-      run rm -v "${FILE}"
-    fi
-  fi
-}
-
-rm_dir() {
-  DIR="$1"
-  if [ -n "$DIR" ] && [ -d "$DIR" ]; then
-    if user_input "Do you want to delete this directory '$DIR' ? "; then
-      run rm -v -f -R "${DIR}"
-    fi
-  fi
-}
-
 safe_pidof() {
   pidof_cmd="$(command -v pidof 2> /dev/null)"
   if [ -n "${pidof_cmd}" ]; then
@@ -758,17 +786,6 @@ fi
 
 #### REMOVE NETDATA FILES
 
-# Handle updater files first so that it doesn’t try to run while we
-# are uninstalling things.
-if [ -x "${NETDATA_PREFIX}/usr/libexec/netdata-updater.sh" ]; then
-  "${NETDATA_PREFIX}/usr/libexec/netdata-updater.sh" --disable-auto-updates
-else
-  rm_file /etc/periodic/daily/netdata-updater
-  rm_file /etc/cron.daily/netdata-updater
-  rm_file /etc/cron.d/netdata-updater
-  rm_file /etc/cron.d/netdata-updater-daily
-fi
-
 if issystemd; then
   for unit in netdata.service netdata-updater.timer; do
     systemctl disable "${unit}"
@@ -808,10 +825,7 @@ else
   rm_file "/tmp/netdata-service-cmds"
   rm_dir "${NETDATA_PREFIX}/usr/share/netdata"
   rm_dir "${NETDATA_PREFIX}/usr/libexec/netdata"
-  rm_dir "${NETDATA_PREFIX}/var/lib/netdata"
-  rm_dir "${NETDATA_PREFIX}/var/cache/netdata"
-  rm_dir "${NETDATA_PREFIX}/var/log/netdata"
-  rm_dir "${NETDATA_PREFIX}/etc/netdata"
+  cleanup_data_and_config
 fi
 
 if [ -n "${tmpdir}" ]; then

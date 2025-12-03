@@ -9,6 +9,7 @@ typedef struct nd_machine_guid {
     char txt[UUID_STR_LEN];
     ND_UUID uuid;
     usec_t last_modified_ut;
+    char last_modified_ut_rfc3339[RFC3339_MAX_LENGTH]; // pre-calculated RFC3339 for async-signal-safe use
 } ND_MACHINE_GUID;
 
 ND_MACHINE_GUID *machine_guid_get(void);
