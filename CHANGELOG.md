@@ -40,6 +40,14 @@
 - Improve(health/notifications/telegram): add option to set API url ([#21376](https://github.com/netdata/netdata/issues/21376))
 - Regenerate integrations docs ([#21377](https://github.com/netdata/netdata/issues/21377))
 - Build(deps): bump github.com/redis/go-redis/v9 from 9.17.1 to 9.17.2 in /src/go ([#21378](https://github.com/netdata/netdata/issues/21378))
+- Fix Broken links before adding `-f` to ingest check ([#21379](https://github.com/netdata/netdata/issues/21379))
+- Remove info containing broken link ([#21382](https://github.com/netdata/netdata/issues/21382))
+- Use improved compression algorithms when building DEB packages. ([#21310](https://github.com/netdata/netdata/issues/21310))
+- Regenerate integrations docs ([#21381](https://github.com/netdata/netdata/issues/21381))
+- Format plugin (MSSQL) ([#21383](https://github.com/netdata/netdata/issues/21383))
+- Mark vkalintiris as CODEOWNER for Rust code. ([#21385](https://github.com/netdata/netdata/issues/21385))
+- Update home-tab.md ([#21386](https://github.com/netdata/netdata/issues/21386))
+- Remove retention check during datafile initialization ([#21387](https://github.com/netdata/netdata/issues/21387))
 
 ## [2.8.0] - 2025-11-19
 
