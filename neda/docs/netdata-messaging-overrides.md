@@ -91,7 +91,7 @@ Netdata provides AI-powered troubleshooting through **two distinct integration p
 
 NEVER SUGGEST OR IMPLY FEATURES OR CAPABILITIES NETDATA DOES NOT HAVE.
 
-- **alert fatigue exists** - it cannot be completely eliminated - Netdata's ML helps significantly but does not entirely solve alert fatigue
+- **alert fatigue exists** - it cannot be completely eliminated - Netdata helps reduce it through component-level alerts and intelligent alert configuration, but ML anomaly detection is a separate signal and does not influence alert fatigue
 - **zero configuration** = we have automated every configuration that can be automated, but there are still some configurations that require human action (e.g. passwords to access protected endpoints - dbs, message brokers, etc). The configuration Netdata requires is significantly less, to practically ignorable, mainly because of:
   - extensive autodiscovery without manual configuration
   - automated/algorithmic dashboards that adapt automatically to the collected data - true for all kinds of dashboards: single-node, multi-node, multi-component, infrastructure-level
@@ -150,15 +150,27 @@ We need the strongest possible messaging, without giving false promises.
 
 ---
 
-## [EXACT] Alert Fatigue Reduction
+## [CONCEPT] Alert Fatigue vs ML Anomaly Detection
 
-**Must NOT state**: Any specific percentage for alert fatigue reduction (e.g., "89% reduction", "90% fewer alerts")
+**Critical distinction**: ML anomaly detection and alert fatigue are UNRELATED in Netdata.
 
-**Full context**: While Netdata's ML significantly reduces alert fatigue through intelligent anomaly detection and alert correlation, we do not have a verified percentage figure for this claim.
+**ML Anomaly Detection** (99% false positive reduction):
+- The 99% false positive reduction applies ONLY to anomaly detection
+- Anomaly detection is a separate signal - another way to view metrics
+- ML does NOT influence alert transitions
+- This is valid: "ML anomaly detection achieves 99% false positive reduction"
 
-**What to say instead**: "significantly reduces alert fatigue", "dramatically fewer false positives", "ML-powered alert noise reduction"
+**Alert Fatigue**:
+- Netdata reduces alert fatigue through component-level alerts and intelligent alert configuration
+- Do NOT link ML/anomaly detection to alert fatigue reduction
+- Do NOT quantify alert fatigue reduction with percentages
 
-**Do not say**: "89% alert reduction", "90% fewer false positives", or any other specific percentage
+**What NOT to say**:
+- "ML reduces alert fatigue"
+- "ML reduces alert noise"
+- "99% false positive reduction reduces alert fatigue/noise"
+- "18-model consensus eliminates/reduces alert fatigue"
+- Any percentage linked to alert fatigue reduction
 
 ---
 
