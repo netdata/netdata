@@ -2,6 +2,22 @@
 
 ### Merged Pull Requests:
 
+- Improve replication logic by checking if parent is caught up with child ([#21352](https://github.com/netdata/netdata/issues/21352))
+- Improve stale replication ([#21357](https://github.com/netdata/netdata/issues/21357))
+- Fix(docker): add netdata user to nvidia device group on non-Debian systems ([#21358](https://github.com/netdata/netdata/issues/21358))
+- Add netdata user to video group ([#21359](https://github.com/netdata/netdata/issues/21359))
+- Fix(docker): fix bugs and refactor Docker entrypoint script ([#21364](https://github.com/netdata/netdata/issues/21364))
+- Adjust windows sensors initialization ([#21374](https://github.com/netdata/netdata/issues/21374))
+- Ci: fix MCP Registry publishing workflow ([#21342](https://github.com/netdata/netdata/issues/21342))
+- Chore(go.d): disable redis lib logging ([#21344](https://github.com/netdata/netdata/issues/21344))
+- Fix(go.d): prefer env-provided dirs over build-time defaults ([#21345](https://github.com/netdata/netdata/issues/21345))
+- Remove retention check during datafile initialization ([#21387](https://github.com/netdata/netdata/issues/21387))
+- Replace dots with slashes in OTEL metric families for hierarchical grouping ([#21371](https://github.com/netdata/netdata/issues/21371))
+
+## [2.8.1] - 2025-11-21
+
+### Merged Pull Requests:
+
 - Remove log message ([#21325](https://github.com/netdata/netdata/issues/21325))
 - Fix compilation when DBENGINE is disabled ([#21323](https://github.com/netdata/netdata/issues/21323))
 - Fix(cgroups): improve podman container name resolution ([#21317](https://github.com/netdata/netdata/issues/21317))
