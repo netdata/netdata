@@ -354,10 +354,12 @@ export class McpHeadend implements Headend {
         inputSchema: paramsShape,
       } as unknown as Parameters<typeof server.registerTool>[1];
 
+      // SDK v1.24+ types don't infer callback args when inputSchema is cast; runtime still passes (args, extra)
       server.registerTool(
         normalized,
         toolConfig,
-        async (rawArgs: unknown, extra: RequestHandlerExtra<ServerRequest, ServerNotification>) => {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+        (async (rawArgs: unknown, extra: RequestHandlerExtra<ServerRequest, ServerNotification>) => {
           const requestId = randomUUID();
           const parsed = paramsSchema.safeParse(rawArgs);
           if (!parsed.success) {
@@ -464,7 +466,8 @@ export class McpHeadend implements Headend {
             content: [{ type: 'text' as const, text: message }],
           };
         }
-        }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        }) as any,
       );
     });
   }
