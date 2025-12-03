@@ -1,4 +1,4 @@
-name: Dry-run Ingest Check
+name: Docs Broken Link Check
 
 on:
   pull_request:
