@@ -1,10 +1,10 @@
 name: Dry-run Ingest Check
 
-"on":
+on:
   pull_request:
     paths:
-      - '**.md'
-      - '**.mdx'
+      - '**/*.md'
+      - '**/*.mdx'
       - 'docs/**'
 
 jobs:
@@ -14,7 +14,6 @@ jobs:
       - name: Checkout PR branch
         uses: actions/checkout@v5
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
           path: netdata
 
@@ -22,7 +21,6 @@ jobs:
         uses: actions/checkout@v5
         with:
           repository: netdata/learn
-          token: ${{ secrets.GITHUB_TOKEN }}
           path: learn
 
       - name: Init python env
@@ -40,10 +38,10 @@ jobs:
           git config --global url."https://".insteadOf git://
 
       - name: Run Ingest
+        env:
+          REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          BRANCH: ${{ github.event.pull_request.head.ref }}
         run: |
           cd learn
-          # Pass the PR's repository and branch to ingest
-          REPO="${{ github.event.pull_request.head.repo.full_name }}"
-          BRANCH="${{ github.event.pull_request.head.ref }}"
           echo "Running ingest for $REPO:$BRANCH"
           python ingest/ingest.py --repos "$REPO:$BRANCH" --fail-on-netdata
