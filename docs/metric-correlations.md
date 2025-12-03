@@ -12,7 +12,7 @@ Since it leverages every available metric in your infrastructure with up to 1-se
 
 ## Using Metric Correlations
 
-When viewing the [Metrics tab or a single-node dashboard](/docs/dashboards-and-charts/metrics-tab-and-single-node-tabs.md), you'll find the **Metric Correlations** button in the top-right corner.
+When viewing the [Metrics tab or a single-node dashboard](/WRONGdocs/dashboards-and-charts/metrics-tab-and-single-node-tabs.md), you'll find the **Metric Correlations** button in the top-right corner.
 
 <details>
 <summary><strong>To start:</strong></summary><br/>
