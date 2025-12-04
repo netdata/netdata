@@ -136,6 +136,13 @@ export class XmlToolTransport {
   }
 
   /**
+   * Get the session nonce (fixed for entire session, used in system prompt).
+   */
+  getSessionNonce(): string {
+    return this.sessionNonce;
+  }
+
+  /**
    * Get the current nonce (for tool result recording).
    */
   getNonce(): string | undefined {

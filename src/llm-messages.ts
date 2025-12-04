@@ -226,7 +226,7 @@ export const TOOL_NO_OUTPUT = '(tool failed: context window budget exceeded)';
  * CONDITION: XML mode && final_report tag found && JSON.parse(payload) fails
  */
 export const XML_FINAL_REPORT_NOT_JSON =
-  'Final report payload is not valid JSON. Use the JSON schema from XML-NEXT.';
+  'final-report payload is not valid JSON. Provide the correct JSON object according to the final-report schema.';
 
 /**
  * Tool payload is not valid JSON (XML mode).
@@ -263,3 +263,155 @@ export const xmlMissingClosingTag = (capturedSlot: string): string =>
  */
 export const xmlMalformedMismatch = (slotInfo: string): string =>
   `Malformed XML: nonce/slot/tool mismatch or empty content for '${slotInfo}'.`;
+
+// =============================================================================
+// PROGRESS REPORT INSTRUCTIONS
+// Single source of truth for agent__progress_report tool guidance.
+// Used by: internal-provider.ts (system prompt, tool schema), xml-tools.ts (XML-NEXT)
+// =============================================================================
+
+/**
+ * Tool description for agent__progress_report schema.
+ * Used in: internal-provider.ts listTools()
+ */
+export const PROGRESS_TOOL_DESCRIPTION =
+  'Report current progress to user (max 15 words). Only call when also invoking other tools. Never call standalone.';
+
+/**
+ * Full instructions for agent__progress_report.
+ * Used in: internal-provider.ts buildInstructions()
+ */
+export const PROGRESS_TOOL_INSTRUCTIONS = `#### agent__progress_report — Progress Updates for the User
+
+Use this tool to update the user on your overall progress and next steps.
+
+**Rules:**
+- This tool is OPTIONAL — only call it when you have something meaningful to report
+- ONLY call progress_report when you are ALSO calling other tools in the same turn
+- NEVER call progress_report standalone (if you have no other tools to call, skip it entirely)
+- NEVER combine progress_report with agent__final_report
+- At most ONE progress_report per turn
+- Keep messages concise (max 15-20 words), no formatting or newlines
+
+**Good examples:**
+- Found the data about X, now searching for Y and Z.
+- Discovered how X works, checking if it can also do Y or Z.
+- Looks like X is not available, trying Y and Z instead.
+
+**CRITICAL:** progress_report only informs the user; it does NOT perform actions. You must call other tools to actually do work.`;
+
+/**
+ * Brief instructions for XML-NEXT progress slot.
+ * Used in: xml-tools.ts renderXmlNext()
+ */
+export const PROGRESS_TOOL_INSTRUCTIONS_BRIEF =
+  'Update the user about your current status (only when also calling other tools):';
+
+/**
+ * Batch-specific rules for progress_report.
+ * Used in: internal-provider.ts buildInstructions() batch section
+ */
+export const PROGRESS_TOOL_BATCH_RULES = `- Include at most one progress_report per batch
+- progress_report updates the user; to perform actions, use other tools in the same batch
+- If you have no other tools to call, do NOT include progress_report`;
+
+/**
+ * Mandatory workflow line mentioning progress_report for XML-NEXT.
+ * Used in: xml-tools.ts renderXmlNext()
+ */
+export const PROGRESS_TOOL_WORKFLOW_LINE =
+  'Call one or more tools to collect data or perform actions (optionally include progress_report to update the user)';
+
+// =============================================================================
+// FINAL REPORT INSTRUCTIONS
+// Single source of truth for agent__final_report guidance.
+// Used by: internal-provider.ts (system prompt)
+// =============================================================================
+
+/**
+ * Tool-based final_report instructions (for native mode).
+ * Used in: internal-provider.ts buildInstructions() when toolTransport === 'native'
+ */
+export const finalReportToolInstructions = (
+  _formatId: string,
+  formatFields: string
+): string => `#### agent__final_report - How to Deliver Your Final Answer
+- You MUST call 'agent__final_report' to provide your final answer to the user. All the content of your final report MUST be delivered using this tool.
+- Required fields:
+${formatFields}
+- Include optional \`metadata\` only when explicitly relevant.
+- **CRITICAL:** The content of your final report MUST be delivered using this tool ONLY, not as part of your regular output.`;
+
+/**
+ * XML-based final_report instructions (for xml-final mode).
+ * Used in: internal-provider.ts buildInstructions() when toolTransport === 'xml-final'
+ */
+export const finalReportXmlInstructions = (
+  formatId: string,
+  formatDescription: string,
+  schemaBlock: string,
+  sessionNonce?: string
+): string => {
+  const slotId = sessionNonce !== undefined ? `${sessionNonce}-FINAL` : 'NONCE-FINAL';
+  const exampleContent = formatId === 'json' || formatId === 'slack-block-kit' ? '{ ... your JSON here ... }' : '[Your final report/answer here]';
+  return `#### agent__final_report - How to Deliver Your Final Answer
+
+**Format: ${formatId}** — ${formatDescription}
+
+Once your task is complete, provide your final report/answer using XML tags.
+${schemaBlock}
+**Example:**
+\`\`\`
+<ai-agent-${slotId} tool="agent__final_report" format="${formatId}">
+${exampleContent}
+</ai-agent-${slotId}>
+\`\`\`
+
+**CRITICAL: Final Report Checklist**
+When ready to provide your final report, verify:
+- [ ] The opening XML tag \`<ai-agent-${slotId}\` MUST be first in your response
+- [ ] Your report content/payload matches the expected format (${formatId})
+- [ ] Your output MUST end with the closing XML tag \`</ai-agent-${slotId}>\`
+- [ ] Your entire report is between the opening and closing XML tags, not outside them`;
+};
+
+/**
+ * Format-specific required fields for tool-based instructions.
+ */
+export const FINAL_REPORT_FIELDS_JSON =
+  '  - `report_format`: "json".\n  - `content_json`: MUST match the required JSON Schema exactly.';
+
+export const FINAL_REPORT_FIELDS_SLACK =
+  '  - `report_format`: "slack-block-kit".\n  - `messages`: array of Slack Block Kit messages (no plain `report_content`).\n    • Up to 20 messages, each with ≤50 blocks. Sections/context mrkdwn ≤2000 chars; headers plain_text ≤150.';
+
+export const finalReportFieldsText = (formatId: string): string =>
+  `  - \`report_format\`: "${formatId}".\n  - \`report_content\`: the content of your final report, in the requested format.`;
+
+/**
+ * Mandatory rules for tools section.
+ * Used in: internal-provider.ts buildInstructions()
+ */
+export const MANDATORY_TOOLS_RULES = `### MANDATORY RULE FOR TOOLS
+- You run in agentic mode, interfacing with software tools with specific formatting requirements.
+- Always respond with valid tool calls, even for your final report.
+- You must provide your final report to the user using the agent__final_report tool, with the correct format (pay attention to formatting and newlines handling).
+- The CONTENT of your final report must be delivered using the agent__final_report tool ONLY.`;
+
+/**
+ * Mandatory rules for XML final report.
+ * Used in: internal-provider.ts buildInstructions() when toolTransport === 'xml-final'
+ */
+export const MANDATORY_XML_FINAL_RULES = `### MANDATORY RULE FOR FINAL REPORT
+- You run in agentic mode, interfacing with software tools with specific formatting requirements.
+- Always respond with valid tool calls for regular tools.
+- Your final report MUST be delivered using XML tags as described above, NOT as a tool call.
+- The CONTENT of your final report must be between the XML tags ONLY.`;
+
+/**
+ * Mandatory rules for JSON newlines.
+ * Used in: internal-provider.ts buildInstructions()
+ */
+export const MANDATORY_JSON_NEWLINES_RULES = `### MANDATORY RULE FOR NEWLINES IN JSON STRINGS
+- To add newlines in JSON string fields, use the \`\\n\` escape sequence within the string value.
+- When your final report includes newlines, you MUST use the \`\\n\` escape sequence within the string value for every newline you want to add, instead of raw newline characters.
+- Do not include raw newline characters in JSON string values (json becomes invalid); use '\\n' instead.`;

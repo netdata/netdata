@@ -11,10 +11,25 @@ type AjvErrorObject = ErrorObject<string, Record<string, unknown>>;
 type AjvConstructor = new (options?: AjvOptions) => AjvInstance;
 const AjvCtor: AjvConstructor = Ajv as unknown as AjvConstructor;
 
-import { describeFormatParameter, formatPromptValue } from '../formats.js';
+import { describeFormatParameter, formatPromptValue, getFormatSchema } from '../formats.js';
+import {
+  FINAL_REPORT_FIELDS_JSON,
+  FINAL_REPORT_FIELDS_SLACK,
+  finalReportFieldsText,
+  finalReportToolInstructions,
+  finalReportXmlInstructions,
+  MANDATORY_JSON_NEWLINES_RULES,
+  MANDATORY_TOOLS_RULES,
+  MANDATORY_XML_FINAL_RULES,
+  PROGRESS_TOOL_BATCH_RULES,
+  PROGRESS_TOOL_DESCRIPTION,
+  PROGRESS_TOOL_INSTRUCTIONS,
+} from '../llm-messages.js';
 import { parseJsonRecord, parseJsonValueDetailed, truncateUtf8WithNotice } from '../utils.js';
 
 import { ToolProvider } from './types.js';
+
+type ToolTransportMode = 'native' | 'xml' | 'xml-final';
 
 interface InternalToolProviderOptions {
   enableBatch: boolean;
@@ -30,13 +45,14 @@ interface InternalToolProviderOptions {
   getCurrentTurn: () => number;
   toolTimeoutMs?: number;
   disableProgressTool?: boolean;
+  toolTransport?: ToolTransportMode;
+  xmlSessionNonce?: string;  // For xml-final mode: the session-wide nonce for final report tag
 }
 
 const PROGRESS_TOOL = 'agent__progress_report';
 const FINAL_REPORT_TOOL = 'agent__final_report';
 const BATCH_TOOL = 'agent__batch';
 const SLACK_BLOCK_KIT_FORMAT: OutputFormatId = 'slack-block-kit';
-const REPORT_FORMAT_LABEL = '`report_format`';
 const DEFAULT_PARAMETERS_DESCRIPTION = 'Parameters for selected tool';
 
 const RAW_PREVIEW_LIMIT_BYTES = 512;
@@ -64,6 +80,8 @@ export class InternalToolProvider extends ToolProvider {
   private instructions: string;
   private cachedBatchSchemas?: { schemas: Record<string, unknown>[]; summaries: { name: string; required: string[] }[] };
   private readonly disableProgressTool: boolean;
+  private readonly toolTransport: ToolTransportMode;
+  private readonly xmlSessionNonce?: string;
 
   constructor(
     public readonly namespace: string,
@@ -73,6 +91,7 @@ export class InternalToolProvider extends ToolProvider {
     this.formatId = opts.outputFormat;
     this.formatDescription = describeFormatParameter(this.formatId);
     this.maxToolCallsPerTurn = opts.maxToolCallsPerTurn;
+    this.toolTransport = opts.toolTransport ?? 'native';
     const expected = opts.expectedOutputFormat;
     if (expected !== undefined && expected !== this.formatId) {
       throw new Error(`Output format mismatch: expectedOutput.format=${expected} but session outputFormat=${this.formatId}`);
@@ -84,6 +103,7 @@ export class InternalToolProvider extends ToolProvider {
       throw new Error(`JSON output required but expected format is ${expected}`);
     }
     this.disableProgressTool = opts.disableProgressTool === true;
+    this.xmlSessionNonce = opts.xmlSessionNonce;
     this.instructions = this.buildInstructions();
   }
 
@@ -92,7 +112,7 @@ export class InternalToolProvider extends ToolProvider {
     if (!this.disableProgressTool) {
       tools.push({
         name: PROGRESS_TOOL,
-        description: 'Report current progress to user (max 15 words). MUST call in parallel with primary actions for real-time visibility.',
+        description: PROGRESS_TOOL_DESCRIPTION,
         inputSchema: {
           type: 'object',
           additionalProperties: false,
@@ -166,6 +186,11 @@ export class InternalToolProvider extends ToolProvider {
   }
 
   private buildInstructions(): string {
+    // For xml mode, all instructions come from XML-NEXT (no system prompt instructions)
+    if (this.toolTransport === 'xml') {
+      return '';
+    }
+
     const lines: string[] = ['### Internal Tools', ''];
 
     lines.push('You have access to the following internal tools to assist you in completing your task effectively.');
@@ -173,24 +198,8 @@ export class InternalToolProvider extends ToolProvider {
     lines.push('In many cases you may have to include multi-line strings in JSON fields; remember to use the `\\n` escape sequence for newlines within JSON string values.');
 
     if (!this.disableProgressTool) {
-      lines.push(`#### ${PROGRESS_TOOL} — Progress Updates for the User`);
-      lines.push('Use this tool to update the user on your overall progress and next steps.');
+      lines.push(PROGRESS_TOOL_INSTRUCTIONS);
       lines.push('');
-      lines.push('- Keep the progress message concise (≤20 words).');
-      lines.push(`- Bundle this tool with other tools you are invoking (except ${FINAL_REPORT_TOOL}) - do not waste turns just to give progress updates.`);
-      lines.push('- Do not add any formatting or newlines to the progress message.');
-      lines.push('');
-      lines.push('Good examples:');
-      lines.push('- Found the data about X, now searching for Y and Z.');
-      lines.push('- Discovered how X works, checking if it can also do Y or Z.');
-      lines.push('- Looks like X is not available, trying Y and Z instead.');
-      lines.push('');
-      lines.push('A good progress message is short, clear, without formatting, and provides information about the current status and the goal(s) of this turn.');
-      lines.push('A good progress message appears at most once per turn/step, and never alone (bundle it with other tools, or omit it altogether).');
-      lines.push('');
-      lines.push(`**CRITICAL**:`);
-      lines.push(`- The ${PROGRESS_TOOL} is just informing the user; to perform actions you have to call other tools.`);
-      lines.push(`- When calling ${PROGRESS_TOOL} with a message like "Now doing X", does NOT mean action X is performed; you must call the appropriate tool(s) to actually do it.`);
     }
 
     if (this.opts.enableBatch) {
@@ -217,36 +226,29 @@ export class InternalToolProvider extends ToolProvider {
       }
     }
 
+    // Final report instructions: XML-based for xml-final, tool-based for native
     lines.push('');
-    lines.push(`#### ${FINAL_REPORT_TOOL} - How to Deliver Your Final Answer`);
-    lines.push(`- You MUST call '${FINAL_REPORT_TOOL}' to provide your final answer to the user. All the content of your final report MUST be delivered using this tool.`);
-    lines.push('- Required fields:');
-    if (this.formatId === 'json') {
-      lines.push(`  - ${REPORT_FORMAT_LABEL}: "json".`);
-      lines.push('  - `content_json`: MUST match the required JSON Schema exactly.');
-    } else if (this.formatId === SLACK_BLOCK_KIT_FORMAT) {
-      lines.push(`  - ${REPORT_FORMAT_LABEL}: "${SLACK_BLOCK_KIT_FORMAT}".`);
-      lines.push('  - `messages`: array of Slack Block Kit messages (no plain `report_content`).');
-      lines.push('    • Up to 20 messages, each with ≤50 blocks. Sections/context mrkdwn ≤2000 chars; headers plain_text ≤150.');
+    if (this.toolTransport === 'xml-final' && this.xmlSessionNonce !== undefined) {
+      // XML-based final report instructions with actual nonce
+      const schemaBlock = this.buildFinalReportSchemaBlock();
+      lines.push(finalReportXmlInstructions(this.formatId, this.formatDescription, schemaBlock, this.xmlSessionNonce));
+    } else if (this.toolTransport === 'xml-final') {
+      // XML-based but no nonce (shouldn't happen, but fallback)
+      const schemaBlock = this.buildFinalReportSchemaBlock();
+      lines.push(finalReportXmlInstructions(this.formatId, this.formatDescription, schemaBlock));
     } else {
-      lines.push(`  - ${REPORT_FORMAT_LABEL}: "${this.formatId}".`);
-      lines.push('  - `report_content`: the content of your final report, in the requested format.');
-    }
-    lines.push('- Include optional `metadata` only when explicitly relevant.');
-    lines.push('- **CRITICAL:** The content of your final report MUST be delivered using this tool ONLY, not as part of your regular output.');
-
-    if (!this.disableProgressTool) {
-      lines.push(`### MANDATORY RULE FOR ${PROGRESS_TOOL}`);
-      lines.push(`- Always pair ${PROGRESS_TOOL} with other tools you are invoking (except ${FINAL_REPORT_TOOL}).`);
-      lines.push(`- The ${PROGRESS_TOOL} updates the user but does not perform actions, use other tools to performs actions.`);
+      // Tool-based final report instructions (native mode)
+      const formatFields = this.buildFinalReportFormatFields();
+      lines.push(finalReportToolInstructions(this.formatId, formatFields));
     }
 
+    // Mandatory rules section
     lines.push('');
-    lines.push('### MANDATORY RULE FOR TOOLS');
-    lines.push('- You run in agentic mode, interfacing with software tools with specific formatting requirements.');
-    lines.push('- Always respond with valid tool calls, even for your final report.');
-    lines.push(`- You must provide your final report to the user using the ${FINAL_REPORT_TOOL} tool, with the correct format (pay attention to formatting and newlines handling).`);
-    lines.push(`- The CONTENT of your final report must be delivered using the ${FINAL_REPORT_TOOL} tool ONLY.`);
+    if (this.toolTransport === 'xml-final') {
+      lines.push(MANDATORY_XML_FINAL_RULES);
+    } else {
+      lines.push(MANDATORY_TOOLS_RULES);
+    }
     if (this.opts.enableBatch) {
       lines.push(`- Per turn you can invoke at most ${String(this.maxToolCallsPerTurn)} tools in total (including those inside a batch request). Plan your tools accordingly.`);
     } else {
@@ -254,23 +256,40 @@ export class InternalToolProvider extends ToolProvider {
     }
 
     lines.push('');
-    lines.push('### MANDATORY RULE FOR NEWLINES IN JSON STRINGS');
-    lines.push('- To add newlines in JSON string fields, use the `\\n` escape sequence within the string value.');
-    lines.push('- When your final report includes newlines, you MUST use the `\\n` escape sequence within the string value for every newline you want to add, instead of raw newline characters.');
-    lines.push(`- Do not include raw newline characters in JSON string values (json becomes invalid); use '\\n' instead.`);
+    lines.push(MANDATORY_JSON_NEWLINES_RULES);
 
     if (this.opts.enableBatch) {
       lines.push('');
       lines.push('### MANDATORY RULE FOR PARALLEL TOOL CALLS');
       lines.push(`When gathering information from multiple independent sources, use the ${BATCH_TOOL} tool to execute tools in parallel.`);
       if (!this.disableProgressTool) {
-        lines.push(`- Do not include more than one ${PROGRESS_TOOL} per batch.`);
-        lines.push(`- Add exactly one ${PROGRESS_TOOL} per batch, describing the current status and the aggregate goal(s) of all other tools in this batch.`);
-        lines.push(`- The ${PROGRESS_TOOL} updates the user; to collect data or perform actions, use other tools in the same batch.`);
+        lines.push(PROGRESS_TOOL_BATCH_RULES);
       }
     }
 
     return lines.join('\n');
+  }
+
+  private buildFinalReportFormatFields(): string {
+    if (this.formatId === 'json') {
+      return FINAL_REPORT_FIELDS_JSON;
+    } else if (this.formatId === SLACK_BLOCK_KIT_FORMAT) {
+      return FINAL_REPORT_FIELDS_SLACK;
+    }
+    return finalReportFieldsText(this.formatId);
+  }
+
+  private buildFinalReportSchemaBlock(): string {
+    if (this.formatId === 'json' && this.opts.expectedJsonSchema !== undefined) {
+      return `\n**Your response must be a JSON object matching this schema:**\n\`\`\`json\n${JSON.stringify(this.opts.expectedJsonSchema, null, 2)}\n\`\`\`\n`;
+    }
+    if (this.formatId === SLACK_BLOCK_KIT_FORMAT) {
+      const schema = getFormatSchema(SLACK_BLOCK_KIT_FORMAT);
+      if (schema !== undefined) {
+        return `\n**Your response must be a JSON object matching this schema:**\n\`\`\`json\n${JSON.stringify(schema, null, 2)}\n\`\`\`\n`;
+      }
+    }
+    return '';
   }
 
   private buildFinalReportTool(): MCPTool {
@@ -436,8 +455,9 @@ export class InternalToolProvider extends ToolProvider {
       return { ok: true, result: JSON.stringify({ ok: true }), latencyMs: Date.now() - start, kind: this.kind, namespace: this.namespace };
     }
     if (name === 'agent__final_report') {
-      // Model-provided final report is always success; synthetic failures set status separately
-      const status: 'success' | 'failure' = 'success';
+      // Read status from parameters if provided, defaulting to 'success' for normal agent completions
+      const rawStatus = typeof parameters.status === 'string' ? parameters.status : 'success';
+      const status: 'success' | 'failure' = rawStatus === 'failure' ? 'failure' : 'success';
       const requestedFormat = typeof parameters.report_format === 'string' ? parameters.report_format : (typeof parameters.format === 'string' ? parameters.format : undefined);
       if (requestedFormat !== undefined && requestedFormat !== this.formatId) {
         this.opts.logError(`agent__final_report: received report_format='${requestedFormat}', expected '${this.formatId}'. Proceeding with expected format.`);

@@ -278,7 +278,7 @@
     "topP": null,
     "maxOutputTokens": 8192,
     "repeatPenalty": null,
-    "stream": false,
+    "stream": true,
     "maxTurns": 10,
     "mcpInitConcurrency": 10,
     "maxRetries": 5,

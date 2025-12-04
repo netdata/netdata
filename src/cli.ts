@@ -1811,7 +1811,7 @@ program
         renderTarget: 'cli',
         outputFormat: chosenFormatId,
         telemetryLabels: sessionTelemetryLabels,
-        wantsProgressUpdates: false,
+        wantsProgressUpdates: true,
       });
 
       // Always print only the formatted human-readable output to stdout

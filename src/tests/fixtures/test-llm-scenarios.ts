@@ -1310,7 +1310,7 @@ const SCENARIOS: ScenarioDefinition[] = [
   },
   {
     id: 'run-test-26',
-    description: 'Batch invalid input detection (missing id).',
+    description: 'Batch invalid input detection (missing tool).',
     systemPromptMustInclude: [SYSTEM_PROMPT_MARKER],
     turns: [
       {
@@ -1323,11 +1323,11 @@ const SCENARIOS: ScenarioDefinition[] = [
             {
               toolName: 'agent__batch',
               callId: 'call-batch-invalid-id',
-              assistantText: 'Batch entry lacks the required id field.',
+              assistantText: 'Batch entry lacks the required tool field.',
               arguments: {
                 calls: [
                   {
-                    tool: TOOL_NAME,
+                    // Missing 'tool' field - should trigger invalid_batch_input validation
                     parameters: {
                       text: BATCH_INVALID_INPUT_ARGUMENT,
                     },

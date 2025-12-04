@@ -591,6 +591,8 @@ export class AIAgentSession {
         expectedJsonSchema,
         disableProgressTool: !enableProgressTool,
         maxToolCallsPerTurn: resolvedMaxToolCallsPerTurn,
+        toolTransport: this.toolTransport,
+        xmlSessionNonce: this.xmlTransport?.getSessionNonce(),
         logError: (message: string) => {
           const entry: LogEntry = {
             timestamp: Date.now(),
@@ -1259,8 +1261,12 @@ export class AIAgentSession {
         }
           } catch (e) { warn(`startup verbose log failed: ${e instanceof Error ? e.message : String(e)}`); }
 
-      // Build enhanced system prompt with tool instructions
-      const toolInstructions = this.toolTransport === 'native' ? (this.toolsOrchestrator?.getCombinedInstructions() ?? '') : '';
+      // Build enhanced system prompt with tool instructions (native and xml-final, but not xml)
+      // In xml mode, all tools use XML format and instructions come from XML-NEXT
+      // In xml-final mode, regular tools (including progress_report) are native, only final_report uses XML
+      const toolInstructions = this.toolTransport !== 'xml'
+        ? (this.toolsOrchestrator?.getCombinedInstructions() ?? '')
+        : '';
       const enhancedSystemPrompt = this.enhanceSystemPrompt(systemExpanded, toolInstructions);
       this.resolvedSystemPrompt = enhancedSystemPrompt;
 

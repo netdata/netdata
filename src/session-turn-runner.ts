@@ -1199,9 +1199,9 @@ export class TurnRunner {
                             const finalReportStatus = statusCandidate === 'success' || statusCandidate === 'failure'
                                 ? statusCandidate
                                 : 'missing';
-                            const finalReportSucceeded = finalReportStatus === 'success';
-                            if (finalReportSucceeded) {
-                                // Final report succeeded, we're done
+                            // Both 'success' and 'failure' are valid final report outcomes
+                            // Only 'missing' (incomplete/malformed) should trigger retry
+                            if (finalReportStatus !== 'missing') {
                                 return this.finalizeWithCurrentFinalReport(conversation, logs, accounting, currentTurn);
                             }
                             const warnEntry = {
@@ -1213,26 +1213,18 @@ export class TurnRunner {
                                 type: 'llm' as const,
                                 remoteIdentifier: 'agent:final-report',
                                 fatal: false,
-                                message: `Final report returned status='${finalReportStatus}', retrying.`,
+                                message: `Final report incomplete (status='${finalReportStatus}'), retrying.`,
                             };
                             this.log(warnEntry);
-                            // Track that the model attempted a final_report even though it failed or was incomplete.
+                            // Track that the model attempted a final_report even though it was incomplete.
                             turnHadFinalReportAttempt = true;
-                            if (finalReportStatus === 'missing') {
-                                collapseRemainingTurns('incomplete_final_report');
-                            }
-                            else {
-                                collapseRemainingTurns('final_report_attempt');
-                            }
+                            collapseRemainingTurns('incomplete_final_report');
                             this.state.llmSyntheticFailures++;
                             lastError = `final_report_status_${finalReportStatus}`;
                             lastErrorType = 'invalid_response';
                             if (cycleComplete) {
                                 rateLimitedInCycle = 0;
                                 maxRateLimitWaitMs = 0;
-                            }
-                            if (finalReportStatus !== 'missing') {
-                                this.ctx.finalReportManager.clear();
                             }
                             this.pushSystemRetryMessage(conversation, this.buildFinalReportReminder());
                             continue;
@@ -2631,7 +2623,7 @@ export class TurnRunner {
                     if (isRootSession && trimmedThinking.length > 0) {
                         this.ctx.opTree.setLatestStatus(trimmedThinking);
                     }
-                    if (lastShownThinkingHeaderTurn !== currentTurn) {
+                    if (!shownThinking && lastShownThinkingHeaderTurn !== currentTurn) {
                         const thinkingHeader = {
                             timestamp: Date.now(),
                             severity: 'THK' as const,
