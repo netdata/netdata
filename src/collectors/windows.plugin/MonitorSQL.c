@@ -84,8 +84,8 @@ static ULONGLONG netdata_MSSQL_fill_long_value(SQLHSTMT *stmt, const char *mask,
         return (ULONGLONG)ULONG_LONG_MAX;
     }
 
-    SQLLEN rows = 0;
-    ret = SQLRowCount(stmt, &rows);
+    SQLLEN row_count = 0;
+    ret = SQLRowCount(stmt, &row_count);
     if (likely(netdata_mssql_check_result(ret))) {
         netdata_MSSQL_release_results(stmt);
         return (ULONGLONG)ULONG_LONG_MAX;
@@ -141,7 +141,7 @@ void dict_mssql_fill_instance_transactions(struct mssql_db_instance *mdi)
 
     SQLLEN row_count = 0;
     ret = SQLRowCount(mdi->parent->conn->dbInstanceTransactionSTMT, &row_count);
-    if (likely(netdata_mssql_check_result(ret)) || row_count <= 0)
+    if (likely(netdata_mssql_check_result(ret)))
         goto enditransactions;
 
     ret = SQLBindCol(
@@ -270,7 +270,7 @@ void dict_mssql_fill_transactions(struct mssql_db_instance *mdi, const char *dbn
 
     SQLLEN row_count = 0;
     ret = SQLRowCount(mdi->parent->conn->dbTransactionSTMT, &row_count);
-    if (likely(netdata_mssql_check_result(ret)) || row_count <= 0)
+    if (likely(netdata_mssql_check_result(ret)))
         goto endtransactions;
 
     ret = SQLBindCol(
@@ -370,7 +370,7 @@ void dict_mssql_fill_locks(struct mssql_db_instance *mdi, const char *dbname)
 
     SQLLEN row_count = 0;
     ret = SQLRowCount(mdi->parent->conn->dbLocksSTMT, &row_count);
-    if (likely(netdata_mssql_check_result(ret)) || row_count <= 0)
+    if (likely(netdata_mssql_check_result(ret)))
         goto endlocks;
 
     ret = SQLBindCol(
@@ -439,7 +439,7 @@ int dict_mssql_fill_waits(struct mssql_instance *mi)
 
     SQLLEN row_count = 0;
     ret = SQLRowCount(mi->conn->dbWaitsSTMT, &row_count);
-    if (likely(netdata_mssql_check_result(ret)) || row_count <= 0)
+    if (likely(netdata_mssql_check_result(ret)))
         goto endwait;
 
     ret = SQLBindCol(mi->conn->dbWaitsSTMT, 1, SQL_C_CHAR, wait_type, sizeof(wait_type), &col_wait_type_len);
@@ -573,7 +573,7 @@ void dict_mssql_fill_replication(struct mssql_db_instance *mdi)
 
     SQLLEN row_count = 0;
     ret = SQLRowCount(mdi->parent->conn->dbReplicationPublisher, &row_count);
-    if (likely(netdata_mssql_check_result(ret)) || row_count <= 0)
+    if (likely(netdata_mssql_check_result(ret)))
         goto endreplication;
 
     ret = SQLBindCol(
@@ -800,7 +800,7 @@ long netdata_mssql_check_permission(struct mssql_instance *mi)
 
     SQLLEN row_count = 0;
     ret = SQLRowCount(mi->conn->checkPermSTMT, &row_count);
-    if (likely(netdata_mssql_check_result(ret)) || row_count <= 0)
+    if (likely(netdata_mssql_check_result(ret)))
         goto endperm;
 
     ret = SQLBindCol(mi->conn->checkPermSTMT, 1, SQL_C_LONG, &perm, sizeof(perm), &col_data_len);
@@ -847,7 +847,7 @@ void netdata_mssql_fill_mssql_status(struct mssql_instance *mi)
 
     SQLLEN row_count = 0;
     ret = SQLRowCount(mi->conn->dbSQLState, &row_count);
-    if (likely(netdata_mssql_check_result(ret)) || row_count <= 0)
+    if (likely(netdata_mssql_check_result(ret)))
         goto enddbstate;
 
     ret = SQLBindCol(mi->conn->dbSQLState, 1, SQL_C_TINYINT, &state, sizeof(state), &col_data_len);
@@ -904,7 +904,7 @@ void netdata_mssql_fill_job_status(struct mssql_instance *mi)
 
     SQLLEN row_count = 0;
     ret = SQLRowCount(mi->conn->dbSQLJobs, &row_count);
-    if (likely(netdata_mssql_check_result(ret)) || row_count <= 0)
+    if (likely(netdata_mssql_check_result(ret)))
         goto enddbjobs;
 
     ret = SQLBindCol(mi->conn->dbSQLJobs, 1, SQL_C_CHAR, job, sizeof(job), &col_job_len);
@@ -959,7 +959,7 @@ void netdata_mssql_fill_user_connection(struct mssql_instance *mi)
 
     SQLLEN row_count = 0;
     ret = SQLRowCount(mi->conn->dbSQLConnections, &row_count);
-    if (likely(netdata_mssql_check_result(ret)) || row_count <= 0)
+    if (likely(netdata_mssql_check_result(ret)))
         goto enduserconn;
 
     ret = SQLBindCol(
