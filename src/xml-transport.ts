@@ -217,7 +217,6 @@ export class XmlToolTransport {
       tools: toolsForRender,
       slotTemplates,
       progressSlot: includeProgress && slotToolNames.length > 0 ? { slotId: progressSlotId } : undefined,
-      finalReportSlot: { slotId: finalSlotId },
       mode: xmlMode,
       expectedFinalFormat: (config.resolvedFormat ?? 'markdown') as XmlNextPayload['expectedFinalFormat'],
       finalSchema: config.resolvedFormat === 'json' ? config.expectedJsonSchema : undefined,

@@ -1,5 +1,5 @@
 import type { ConversationMessage, AIAgentResult } from '../types.js';
-import { warn } from '../utils.js';
+import { parseJsonValueDetailed, warn } from '../utils.js';
 import { SessionManager } from './session-manager.js';
 import { buildSnapshotFromOpTree, formatSlackStatus, buildStatusBlocks, formatFooterLines } from './status-aggregator.js';
 
@@ -81,6 +81,26 @@ function extractSlackMessages(result: AIAgentResult | undefined): { blocks?: unk
   if (!Array.isArray(msgs)) return undefined;
   const isRecord = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);
   const arr = msgs.filter(isRecord) as { blocks?: unknown[] }[];
+  return arr.length > 0 ? arr : undefined;
+}
+
+// Fallback: parse finalReport.content (stringified JSON) into Slack messages when metadata.slack.messages is absent.
+function extractSlackMessagesFromContent(result: AIAgentResult | undefined): { blocks?: unknown[] }[] | undefined {
+  if (!result?.finalReport) return undefined;
+  const fr = result.finalReport;
+  if (fr.format !== 'slack-block-kit') return undefined;
+  if (typeof fr.content !== 'string' || fr.content.trim().length === 0) return undefined;
+  const parsed = parseJsonValueDetailed(fr.content.trim()).value;
+  const candidate = (() => {
+    if (Array.isArray(parsed)) return parsed;
+    if (parsed !== null && typeof parsed === 'object' && Array.isArray((parsed as { messages?: unknown }).messages)) {
+      return (parsed as { messages: unknown[] }).messages;
+    }
+    return undefined;
+  })();
+  if (!Array.isArray(candidate)) return undefined;
+  const isRecord = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);
+  const arr = candidate.filter(isRecord) as { blocks?: unknown[] }[];
   return arr.length > 0 ? arr : undefined;
 }
 
@@ -557,7 +577,7 @@ const elog = (msg: string): void => { try { process.stderr.write(`[SRV] ← [0.0
     closed.add(key);
     const pending = updating.get(key); if (pending) { clearTimeout(pending); updating.delete(key); }
     const result = sm.getResult(runId);
-    let slackMessages = extractSlackMessages(result);
+    let slackMessages = extractSlackMessages(result) ?? extractSlackMessagesFromContent(result);
     let finalText = extractFinalText(sm, runId);
 
     if ((!slackMessages || slackMessages.length === 0) && typeof finalText === 'string' && finalText.trim().length > 0) {

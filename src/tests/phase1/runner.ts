@@ -384,20 +384,35 @@ const estimateMessagesBytesLocal = (messages: readonly ConversationMessage[]): n
 };
 
 const extractNonceFromMessages = (messages: readonly ConversationMessage[], scenarioId: string): string => {
-  const candidate = messages.find((msg) =>
-    msg.noticeType === 'xml-next' ||
-    (msg.role === 'user' && typeof msg.content === 'string' && msg.content.includes('Nonce:'))
-  );
-  invariant(candidate !== undefined && typeof candidate.content === 'string', `Missing XML-NEXT with nonce for ${scenarioId}.`);
-  const matchLine = /Nonce:\s*([a-z0-9]+)/i.exec(candidate.content);
-  if (matchLine !== null && typeof matchLine[1] === 'string' && matchLine[1].length > 0) {
-    return matchLine[1];
+  const asString = (msg: ConversationMessage): string | undefined => (typeof msg.content === 'string' ? msg.content : undefined);
+
+  // 1) Prefer explicit Nonce line in xml-next
+  const notice = messages.find((msg) => msg.noticeType === 'xml-next')
+    ?? messages.find((msg) => msg.role === 'user' && typeof msg.content === 'string' && msg.content.includes('Nonce:'));
+  const noticeContent = notice !== undefined ? asString(notice) : undefined;
+  if (noticeContent !== undefined) {
+    const matchLine = /Nonce:\s*([a-z0-9]+)/i.exec(noticeContent);
+    if (matchLine !== null && typeof matchLine[1] === 'string' && matchLine[1].length > 0) {
+      return matchLine[1];
+    }
+    const matchSlotNotice = /<ai-agent-([a-z0-9]+)-(FINAL|PROGRESS|0001)/i.exec(noticeContent);
+    if (matchSlotNotice !== null && typeof matchSlotNotice[1] === 'string' && matchSlotNotice[1].length > 0) {
+      return matchSlotNotice[1];
+    }
   }
-  const matchSlot = /<ai-agent-([a-z0-9]+)-FINAL/i.exec(candidate.content)
-    ?? /<ai-agent-([a-z0-9]+)-PROGRESS/i.exec(candidate.content)
-    ?? /<ai-agent-([a-z0-9]+)-0001/i.exec(candidate.content);
-  invariant(matchSlot !== null && typeof matchSlot[1] === 'string' && matchSlot[1].length > 0, `Nonce parse failed for ${scenarioId}.`);
-  return matchSlot[1];
+
+  // 2) Fallback: scan all messages (system prompt included) for any ai-agent-* tag
+  const tagNonce = messages
+    .map(asString)
+    .filter((c): c is string => c !== undefined)
+    .map((content) => /<ai-agent-([a-z0-9]+)-(FINAL|PROGRESS|0001)/i.exec(content))
+    .find((m) => m !== null && typeof m[1] === 'string' && m[1].length > 0);
+  if (tagNonce !== undefined && tagNonce !== null) {
+    return tagNonce[1];
+  }
+
+  invariant(false, `Nonce parse failed for ${scenarioId}.`);
+  return '';
 };
 
 function buildInMemoryConfigLayers(configuration: Configuration): ResolvedConfigLayer[] {
