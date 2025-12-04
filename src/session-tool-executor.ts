@@ -24,6 +24,7 @@ export interface ToolExecutionState {
   trimmedToolCallIds: Set<string>;
   turnHasSuccessfulToolOutput: boolean;
   incompleteFinalReportDetected: boolean;
+  toolLimitExceeded: boolean;
 }
 
 export interface SessionContext {
@@ -142,6 +143,7 @@ export class SessionToolExecutor {
           message: msg,
         };
         this.log(warn);
+        state.toolLimitExceeded = true;
         throw new Error('tool_calls_per_turn_limit_exceeded');
       }
 
@@ -557,6 +559,9 @@ export class SessionToolExecutor {
           options.toolCallId.length > 0
         ) {
           state.toolFailureMessages.set(options.toolCallId, renderedFailure);
+          if (failureDetail.includes('per-turn tool limit')) {
+            state.toolLimitExceeded = true;
+          }
           if (
             !state.turnHasSuccessfulToolOutput &&
             failureDetail.toLowerCase().includes('context window budget exceeded')

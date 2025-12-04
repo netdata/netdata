@@ -423,7 +423,6 @@ export interface Configuration {
     reasoningValue?: ProviderReasoningValue | null;
     contextWindowBufferTokens?: number;
   };
-  tooling?: { transport?: 'native' | 'xml' | 'xml-final' };
   telemetry?: TelemetryConfig;
   // Server headend configuration (optional)
   slack?: {
@@ -609,7 +608,6 @@ export interface AIAgentSessionConfig {
   stopRef?: { stopping: boolean };
   // Ancestors chain of sub-agent prompt paths (for recursion prevention across nested sessions)
   ancestors?: string[];
-  toolingTransport?: 'native' | 'xml' | 'xml-final';
   // Override context window for all targets (applies uniformly regardless of provider/model config)
   contextWindow?: number;
 }

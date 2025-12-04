@@ -116,7 +116,7 @@ export interface FinalReportMetricsRecord {
   agentId?: string;
   callPath?: string;
   headendId?: string;
-  source: 'tool-call' | 'text-fallback' | 'tool-message' | 'synthetic';
+  source: 'tool-call' | 'synthetic';
   turnsCompleted: number;
   finalReportAttempts: number;
   forcedFinalReason?: 'context' | 'max_turns';

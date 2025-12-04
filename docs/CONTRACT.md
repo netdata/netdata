@@ -450,14 +450,14 @@ Any deviation from the guarantees above is a **contract violation** and must be 
 ## 11. XML Tool Transport Contract (XML-PAST / XML-NEXT)
 
 **Modes**
-- `xml-final` (default): provider tools stay native (tool_calls), but the final report must be emitted via XML. Progress follows tools transport (native). Tool choice set to `auto`; provider tool definitions remain visible to the LLM for native calls.
+- `xml-final` (default and only supported transport): provider tools stay native (tool_calls), but the final report must be emitted via XML. Progress follows tools transport (native). Tool choice set to `auto`; provider tool definitions remain visible to the LLM for native calls. Legacy `native`/`xml` transports have been removed.
 - `native`: unchanged tool-call behavior, tool choice may be `required`.
 - `xml`: all tools may be invoked via XML tags; tool choice set to `auto`, and provider tool definitions are withheld (XML is the only invocation path). Progress uses the XML channel when enabled.
 
 **Session nonce and slots**
 - Each session defines a fixed nonce (e.g., `<8hex>`) that remains constant across all turns.
 - Numbered invocation slots increment across turns: turn 1 uses `NONCE-0001`, `NONCE-0002`, etc.; turn 2 continues from where turn 1 left off (e.g., `NONCE-0004`, `NONCE-0005`).
-- Special slots: `NONCE-FINAL` for final report; `NONCE-PROGRESS` for progress (xml mode only, not xml-final).
+- Special slots: `NONCE-FINAL` for final report. (Progress slot via XML was used only in the deprecated `xml` transport.)
 - Tags are detected by substring only (no XML parser): `<ai-agent-NONCE-000X tool="...">payload</ai-agent-NONCE-000X>`.
 
 **Messages**

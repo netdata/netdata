@@ -1562,7 +1562,6 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
 
       // Detect final report request strictly by tool name, after normalization
       const normalizeName = (name: string) => sanitizeToolName(name);
-      const finalReportRequested = lastAssistantMessage?.toolCalls?.some(tc => normalizeName(tc.name) === 'agent__final_report') === true;
 
       // Only count tool calls that target currently available tools
       const validToolNames = tools !== undefined ? Object.keys(tools) : [];
@@ -1585,8 +1584,8 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
       const hasReasoningFromConversation = conversationMessages.some((message) => Array.isArray(message.reasoning) && message.reasoning.length > 0);
       const hasReasoning = hasReasoningFromRaw || hasReasoningFromConversation;
       
-      // FINAL ANSWER POLICY: only when agent_final_report tool is requested (normalized), regardless of other conditions
-      const finalAnswer = finalReportRequested;
+      // FINAL ANSWER POLICY: orchestrator determines final answer after sanitization (XML/text). Providers report false.
+      const finalAnswer = false;
 
       // Do not error on reasoning-only responses; allow agent loop to decide retries.
       
@@ -1802,7 +1801,6 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
       const normalizeName = (name: string) => sanitizeToolName(name);
       const hasNewToolCalls = lastAssistantMessage?.toolCalls !== undefined &&
         lastAssistantMessage.toolCalls.filter(tc => validToolNames.includes(normalizeName(tc.name))).length > 0;
-      const finalReportRequested = lastAssistantMessage?.toolCalls?.some(tc => normalizeName(tc.name) === 'agent__final_report') === true;
       const hasAssistantText = (lastAssistantMessage?.content.trim().length ?? 0) > 0;
 
       // Detect reasoning parts in non-streaming response
@@ -1818,7 +1816,7 @@ export abstract class BaseLLMProvider implements LLMProviderInterface {
       const hasReasoning = hasReasoningFromRaw || hasReasoningFromConversation;
       
       // FINAL ANSWER POLICY: only when agent_final_report tool is requested (normalized), regardless of other conditions
-      const finalAnswer = finalReportRequested;
+      const finalAnswer = false;
 
       // Do not error on reasoning-only responses; allow agent loop to decide retries.
       

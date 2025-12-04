@@ -140,10 +140,14 @@ export class ContextGuard {
    * Estimate token count for tool schemas
    */
   estimateToolSchemaTokens(tools: readonly { name: string; description?: string; instructions?: string; inputSchema?: unknown }[]): number {
-    if (tools.length === 0) {
+    let filtered = tools.filter((tool) => tool.name !== 'agent__progress_report' && tool.name !== 'agent__final_report');
+    if (filtered.length === 0) {
+      filtered = [...tools];
+    }
+    if (filtered.length === 0) {
       return 0;
     }
-    const serialized = tools.map((tool) => {
+    const serialized = filtered.map((tool) => {
       const payload = {
         name: tool.name,
         description: tool.description,
@@ -156,8 +160,9 @@ export class ContextGuard {
       } satisfies ConversationMessage;
     });
     const estimated = this.estimateTokens(serialized);
-    this.debug('schema-estimate', { toolCount: tools.length, estimated });
-    return estimated;
+    const scaled = Math.ceil(estimated * 2.09);
+    this.debug('schema-estimate', { toolCount: filtered.length, estimated: scaled });
+    return scaled;
   }
 
   /**
@@ -224,6 +229,17 @@ export class ContextGuard {
   evaluateForProvider(provider: string, model: string): 'ok' | 'skip' | 'final' {
     const targets = this.getTargets();
     const evaluation = this.evaluate(this.schemaCtxTokens);
+
+    // If the only overflow comes from schema tokens, allow one attempt before forcing final turn
+    const target = targets.find((cfg) => cfg.provider === provider && cfg.model === model) ?? targets[0];
+    const limit = Math.max(0, target.contextWindow - target.bufferTokens - this.computeMaxOutputTokens(target.contextWindow));
+    const baseProjected = this.currentCtxTokens + this.pendingCtxTokens + this.newCtxTokens;
+    if (limit > 0 && baseProjected <= limit) {
+      const blockedCurrent = evaluation.blocked.find((entry) => entry.provider === provider && entry.model === model);
+      if (blockedCurrent !== undefined) {
+        return 'ok';
+      }
+    }
 
     this.debug('provider-eval', {
       provider,

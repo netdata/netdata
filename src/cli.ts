@@ -980,17 +980,6 @@ const isCachingMode = (value: string): value is 'none' | 'full' => {
   return normalized === 'none' || normalized === 'full';
 };
 
-const parseToolingTransport = (value: unknown, source: string): 'native' | 'xml' | 'xml-final' => {
-  if (typeof value !== 'string') {
-    exitWith(4, `invalid ${source} tooling transport (expected native|xml|xml-final)`, 'EXIT-CLI-TOOLING-TRANSPORT');
-  }
-  const normalized = value.trim().toLowerCase();
-  if (normalized === 'native' || normalized === 'xml' || normalized === 'xml-final') {
-    return normalized;
-  }
-  exitWith(4, `invalid ${source} tooling transport '${value}' (use native|xml|xml-final)`, 'EXIT-CLI-TOOLING-TRANSPORT');
-};
-
 const parseCachingModeStrict = (value: string): 'none' | 'full' => {
   if (!isCachingMode(value)) {
     throw new Error("caching override requires 'none' or 'full'");
@@ -1240,10 +1229,6 @@ async function runHeadendMode(config: HeadendModeConfig): Promise<void> {
     traceMCP: traceMCPFlag,
     traceSdk: traceSdkFlag,
   };
-  const cliTransportRaw = config.options.toolingTransport;
-  if (cliTransportRaw !== undefined) {
-    loadOptions.toolingTransport = parseToolingTransport(cliTransportRaw, '--tooling-transport');
-  }
   if (typeof config.options.reasoning === 'string' && config.options.reasoning.length > 0) {
     try {
       loadOptions.reasoning = parseReasoningOverrideStrict(config.options.reasoning);
@@ -1657,11 +1642,6 @@ program
         }
       }
 
-      let cliToolingTransport: 'native' | 'xml' | 'xml-final' | undefined;
-      if (optSrc('toolingTransport') === 'cli') {
-        cliToolingTransport = parseToolingTransport(options.toolingTransport, '--tooling-transport');
-      }
-
       let cliReasoningValue: ProviderReasoningValue | null | undefined;
       if (optSrc(REASONING_TOKENS_OPTION) === 'cli' || optSrc(REASONING_TOKENS_ALT_OPTION) === 'cli') {
         const raw = options[REASONING_TOKENS_OPTION]
@@ -1750,7 +1730,6 @@ program
         reasoning: cliReasoning,
         reasoningValue: cliReasoningValue,
         caching: cliCaching,
-        toolingTransport: cliToolingTransport,
       });
 
       const cliTelemetryOverrides = extractTelemetryOverrides(options, getOptionSource);

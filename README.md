@@ -12,8 +12,8 @@ Key features at a glance:
 - Multi-provider support (OpenAI, Anthropic, Google, OpenRouter, Ollama, Test LLM)
 - MCP/REST/sub-agent/internal tools with concurrency queues and context guard
 - Deterministic Phase 1/2 harnesses for regression coverage
-- XML transport option (`tooling.transport=xml|xml-final`): `xml` hides tool defs and requires XML tags for tools; `xml-final` keeps provider tools native but requires the final report via XML (`<ai-agent-NONCE-XXXX tool="agent__final_report">…</ai-agent-NONCE-XXXX>`); progress shares the XML channel in `xml` and is suppressed in `xml-final`
-- CLI override `--tooling-transport native|xml|xml-final` to switch transports without editing config/frontmatter (CLI wins over file defaults)
+- XML transport: fixed to `xml-final` (native tool calls for tools; final report must be emitted via `<ai-agent-NONCE-XXXX tool="agent__final_report">…</ai-agent-NONCE-XXXX>`). Progress remains native.
+- CLI override for tool transport has been removed; xml-final is mandatory.
 
 ## Architecture: Recursive Autonomous Agents
 

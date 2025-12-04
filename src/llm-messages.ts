@@ -424,7 +424,7 @@ export const renderXmlPastTemplate = (past: XmlPastTemplatePayload): string => {
 
 /**
  * Tool-based final_report instructions (for native mode).
- * Used in: internal-provider.ts buildInstructions() when toolTransport === 'native'
+ * Used in: internal-provider.ts buildInstructions() for native tools
  */
 export const finalReportToolInstructions = (
   _formatId: string,
@@ -442,7 +442,7 @@ Include optional \`metadata\` only when explicitly relevant.
 
 /**
  * XML-based final_report instructions (for xml-final mode).
- * Used in: internal-provider.ts buildInstructions() when toolTransport === 'xml-final'
+ * Used in: internal-provider.ts buildInstructions() (xml-final final-report slot)
  */
 export const finalReportXmlInstructions = (
   formatId: string,
@@ -506,7 +506,7 @@ export const MANDATORY_TOOLS_RULES = `### MANDATORY RULE FOR TOOLS
 
 /**
  * Mandatory rules for XML final report.
- * Used in: internal-provider.ts buildInstructions() when toolTransport === 'xml-final'
+ * Used in: internal-provider.ts buildInstructions() (xml-final final-report slot)
  */
 export const MANDATORY_XML_FINAL_RULES = `### MANDATORY RULE FOR FINAL REPORT
 - You run in agentic mode, interfacing with software tools with specific formatting requirements.

@@ -1,7 +1,7 @@
 # final_report Tool
 
 ## TL;DR
-Mandatory tool for agent to deliver final answer. Captures format, encoding, content, optional JSON payload, and metadata. Terminates session execution. `report_content` may be `raw` or `base64`; `content_json` is schema-validated with a light repair loop for stringified nested JSON. In XML transport (`tooling.transport=xml|xml-final`) the model must call `agent__final_report` via the XML slot in XML-NEXT. In `xml`, provider tool definitions are hidden and native tool_calls are ignored; in `xml-final`, provider tools remain native but the final report still must be sent via the XML tag.
+Mandatory tool for agent to deliver final answer. Captures format, encoding, content, optional JSON payload, and metadata. Terminates session execution. `report_content` may be `raw` or `base64`; `content_json` is schema-validated with a light repair loop for stringified nested JSON. The model must call `agent__final_report` via the XML slot in XML-NEXT (single transport path: native tools + XML final report). Provider tool definitions remain native, but the final report must be sent via the XML tag.
 
 ## Source Files
 - `src/tools/internal-provider.ts` - Tool definition and handler

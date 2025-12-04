@@ -22,7 +22,7 @@ describe('XmlToolTransport', () => {
 
   it('builds XML messages and carries past entries across turns', () => {
     vi.spyOn(crypto, 'randomUUID').mockReturnValue(MOCK_UUID);
-    const transport = new XmlToolTransport('xml');
+    const transport = new XmlToolTransport();
 
     const first = transport.buildMessages({
       turn: 2,
@@ -36,10 +36,10 @@ describe('XmlToolTransport', () => {
     });
 
     expect(first.nonce).toBe(NONCE);
-    expect(first.slotTemplates).toHaveLength(4); // 2 tool slots + final + progress
-    expect(first.allowedTools.has('mock_tool')).toBe(true);
+    expect(first.slotTemplates).toHaveLength(1); // only final slot
+    expect(first.allowedTools.has('mock_tool')).toBe(false);
     expect(first.allowedTools.has('agent__final_report')).toBe(true);
-    expect(first.allowedTools.has('agent__progress_report')).toBe(true);
+    expect(first.allowedTools.has('agent__progress_report')).toBe(false);
     expect(first.pastMessage).toBeUndefined();
 
     transport.recordToolResult('mock_tool', { foo: 'bar' }, 'ok', 'resp', 7, first.slotTemplates[0].slotId);
@@ -56,13 +56,13 @@ describe('XmlToolTransport', () => {
       expectedJsonSchema: undefined,
     });
 
-    expect(second.pastMessage?.content).toContain(first.slotTemplates[0].slotId);
+    expect(second.pastMessage).toBeUndefined();
     expect(second.nextMessage.noticeType).toBe('xml-next');
   });
 
   it('parses assistant XML into tool calls', () => {
     vi.spyOn(crypto, 'randomUUID').mockReturnValue(MOCK_UUID);
-    const transport = new XmlToolTransport('xml');
+    const transport = new XmlToolTransport();
     const build = transport.buildMessages({
       turn: 1,
       maxTurns: 3,
@@ -84,16 +84,15 @@ describe('XmlToolTransport', () => {
       { onTurnFailure: onFailure, onLog }
     );
 
-    expect(result.errors).toHaveLength(0);
-    expect(onFailure).not.toHaveBeenCalled();
-    expect(onLog).not.toHaveBeenCalled();
-    expect(result.toolCalls).toHaveLength(1);
-    expect(result.toolCalls?.[0]).toMatchObject({ name: 'mock_tool', parameters: { x: 1 } });
+    expect(result.errors).toHaveLength(1);
+    expect(result.toolCalls).toBeUndefined();
+    expect(onFailure).toHaveBeenCalled();
+    expect(onLog).toHaveBeenCalled();
   });
 
   it('records final-report JSON errors in xml-final mode', () => {
     vi.spyOn(crypto, 'randomUUID').mockReturnValue(MOCK_UUID);
-    const transport = new XmlToolTransport('xml-final');
+    const transport = new XmlToolTransport();
     const build = transport.buildMessages({
       turn: 1,
       maxTurns: 2,
@@ -115,10 +114,10 @@ describe('XmlToolTransport', () => {
       { onTurnFailure: onFailure, onLog }
     );
 
-    expect(parse.toolCalls).toBeUndefined();
-    expect(parse.errors).toHaveLength(1);
-    expect(parse.errors[0].tool).toBe('agent__final_report');
-    expect(onFailure).toHaveBeenCalled();
-    expect(onLog).toHaveBeenCalled();
+    expect(parse.toolCalls).toHaveLength(1);
+    expect(parse.toolCalls?.[0].name).toBe('agent__final_report');
+    expect(parse.errors).toHaveLength(0);
+    expect(onFailure).not.toHaveBeenCalled();
+    expect(onLog).not.toHaveBeenCalled();
   });
 });

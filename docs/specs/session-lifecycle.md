@@ -92,7 +92,7 @@ Session created via static factory, executes main loop with turn-level retries, 
 for turn = 1 to maxTurns:
   check cancellation/stop
   begin turn in opTree
-  if transport=xml|xml-final: rebuild XML-NEXT (nonce, slots, schemas, final-report slot, optional progress) and XML-PAST (previous turn results); append to conversation. In `xml`, provider tools list is withheld; in `xml-final`, provider tools remain native.
+  if transport=xml-final: rebuild XML-NEXT (nonce, slots, schemas, final-report slot) and XML-PAST (previous turn results); append to conversation. Provider tool lists remain native.
 
   attempts = 0
   while attempts < maxRetries and not successful:

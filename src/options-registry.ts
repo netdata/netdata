@@ -237,16 +237,6 @@ export const OPTIONS_REGISTRY: OptionDef[] = [
     render: { showInFrontmatterTemplate: true },
     default: 'full',
   }),
-  strDef({
-    key: 'toolingTransport',
-    description: 'Tool transport layer: native (default), xml, or xml-final; overrides config.tooling.transport',
-    cli: { names: ['--tooling-transport'], showInHelp: true },
-    fm: { allowed: false },
-    scope: 'masterDefault',
-    groups: [G_MASTER_DEFAULTS],
-    default: undefined,
-  }),
-
   // All Models Overrides
   strArrDef({
     key: 'override',

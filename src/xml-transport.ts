@@ -26,14 +26,10 @@ import {
   buildToolCallFromParsed,
   createXmlParser,
   renderXmlNext,
-  renderXmlPast,
   type XmlNextPayload,
   type XmlPastEntry,
   type XmlSlotTemplate,
 } from './xml-tools.js';
-
-// Transport mode type
-export type XmlTransportMode = 'xml' | 'xml-final';
 
 // XML tag prefix for detection
 const XML_TAG_PREFIX = '<ai-agent-';
@@ -106,8 +102,9 @@ export interface XmlToolResultEntry {
  * XmlToolTransport manages the XML tool calling protocol state and operations.
  */
 export class XmlToolTransport {
-  private readonly mode: XmlTransportMode;
   private parser: ReturnType<typeof createXmlParser>;
+
+  private readonly mode = 'xml-final';
 
   // Session-level state: fixed nonce and incrementing slot counter
   private readonly sessionNonce: string;
@@ -122,17 +119,9 @@ export class XmlToolTransport {
   private pastEntries: XmlPastEntry[] = [];
   private thisTurnEntries: XmlPastEntry[] = [];
 
-  constructor(mode: XmlTransportMode) {
-    this.mode = mode;
+  constructor() {
     this.parser = createXmlParser();
     this.sessionNonce = crypto.randomUUID().replace(/-/g, '').slice(0, 8);
-  }
-
-  /**
-   * Get the transport mode.
-   */
-  getMode(): XmlTransportMode {
-    return this.mode;
   }
 
   /**
@@ -166,58 +155,18 @@ export class XmlToolTransport {
     this.thisTurnEntries = [];
 
     const nonce = this.sessionNonce;
-    const maxCalls = Math.max(1, config.maxToolCallsPerTurn);
-    const allTools = config.tools.map((t) => ({ ...t, name: sanitizeToolName(t.name) }));
-    const xmlMode: 'xml' | 'xml-final' = this.mode;
-
-    const includeProgress = config.progressToolEnabled && xmlMode !== 'xml-final';
     const finalReportToolName = config.finalReportToolName;
-
-    const toolsForSlots = xmlMode === 'xml-final'
-      ? []
-      : allTools.filter((t) => {
-          const n = sanitizeToolName(t.name);
-          return n !== finalReportToolName && n !== 'agent__progress_report';
-        });
-
-    const slotToolNames = toolsForSlots.map((t) => t.name);
-    // Use incrementing slot numbers across turns for consistency
-    const startSlot = this.nextSlotNumber;
-    const slotTemplatesBase: XmlSlotTemplate[] = slotToolNames.length === 0
-      ? []
-      : Array.from({ length: maxCalls }, (_v, idx) => ({
-          slotId: `${nonce}-${String(startSlot + idx).padStart(4, '0')}`,
-          tools: slotToolNames
-        }));
-    // Advance counter for next turn
-    if (slotToolNames.length > 0) {
-      this.nextSlotNumber = startSlot + maxCalls;
-    }
-
     const finalSlotId = `${nonce}-FINAL`;
-    const progressSlotId = `${nonce}-PROGRESS`;
-
-    const slotTemplates: XmlSlotTemplate[] = [...slotTemplatesBase];
-    slotTemplates.push({ slotId: finalSlotId, tools: [finalReportToolName] });
-    if (includeProgress && slotToolNames.length > 0) {
-      slotTemplates.push({ slotId: progressSlotId, tools: ['agent__progress_report'] });
-    }
-
-    const toolsForRender = allTools
-      .filter((t) => {
-        const n = sanitizeToolName(t.name);
-        return n !== finalReportToolName && n !== 'agent__progress_report';
-      })
-      .map((t) => ({ name: t.name, schema: t.inputSchema }));
+    const slotTemplates: XmlSlotTemplate[] = [{ slotId: finalSlotId, tools: [finalReportToolName] }];
 
     const nextContent = renderXmlNext({
       nonce,
       turn: config.turn,
       maxTurns: config.maxTurns,
-      tools: toolsForRender,
+      tools: [],
       slotTemplates,
-      progressSlot: includeProgress && slotToolNames.length > 0 ? { slotId: progressSlotId } : undefined,
-      mode: xmlMode,
+      progressSlot: undefined,
+      mode: 'xml-final',
       expectedFinalFormat: (config.resolvedFormat ?? 'markdown') as XmlNextPayload['expectedFinalFormat'],
       finalSchema: config.resolvedFormat === 'json' ? config.expectedJsonSchema : undefined,
     });
@@ -228,33 +177,16 @@ export class XmlToolTransport {
       noticeType: 'xml-next'
     };
 
-    let pastMessage: ConversationMessage | undefined;
-    if (this.mode !== 'xml-final' && this.pastEntries.length > 0) {
-      pastMessage = {
-        role: 'user',
-        content: renderXmlPast({ entries: this.pastEntries }),
-        noticeType: 'xml-past'
-      };
-    }
-
     const allowedToolNames = new Set<string>();
-    if (xmlMode === 'xml-final') {
-      allowedToolNames.add(finalReportToolName);
-      if (includeProgress && slotToolNames.length > 0) {
-        allowedToolNames.add('agent__progress_report');
-      }
-    } else {
-      allTools.forEach((t) => allowedToolNames.add(t.name));
-      if (includeProgress && slotToolNames.length > 0) {
-        allowedToolNames.add('agent__progress_report');
-      }
-      allowedToolNames.add(finalReportToolName);
-    }
+    allowedToolNames.add(finalReportToolName);
 
     // Store state for response parsing
     this.nonce = nonce;
     this.slots = slotTemplates;
     this.allowedTools = allowedToolNames;
+
+    // xml-final mode does not send past entries
+    const pastMessage: ConversationMessage | undefined = undefined;
 
     return {
       pastMessage,
@@ -549,14 +481,14 @@ export class XmlToolTransport {
    * Check if native tool calls should be ignored (xml mode only).
    */
   shouldIgnoreNativeToolCalls(): boolean {
-    return this.mode === 'xml';
+    return false;
   }
 
   /**
    * Check if native tool calls should be merged with XML (xml-final mode).
    */
   shouldMergeNativeToolCalls(): boolean {
-    return this.mode === 'xml-final';
+    return true;
   }
 }
 

@@ -1,7 +1,7 @@
 # XML Tool Transport
 
 ## TL;DR
-Opt-in transport (`tooling.transport=xml|xml-final`) that replaces native tool_calls with XML tags (xml) or keeps native tool_calls while requiring the final report over XML (xml-final). Each turn advertises XML-NEXT (nonce, slots, schemas, final-report + optional progress) and optionally XML-PAST (last turn tool responses). Tags are parsed by substring; valid tags map to existing tools with the same orchestrator, budgets, and accounting. CLI override: `--tooling-transport native|xml|xml-final` beats config/frontmatter when present.
+XML transport is fixed to xml-final: native tool_calls remain for regular tools, while the final report must be sent over XML. Each turn advertises XML-NEXT (nonce, slots, schemas, final-report slot; progress slot omitted). Tags are parsed by substring; valid tags map to existing tools with the same orchestrator, budgets, and accounting. CLI override for transport has been removed.
 
 ## Modes
 - `native` (default): provider sees tools; standard tool_calls.

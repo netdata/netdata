@@ -16,10 +16,8 @@ import {
   FINAL_REPORT_FIELDS_JSON,
   FINAL_REPORT_FIELDS_SLACK,
   finalReportFieldsText,
-  finalReportToolInstructions,
   finalReportXmlInstructions,
   MANDATORY_JSON_NEWLINES_RULES,
-  MANDATORY_TOOLS_RULES,
   MANDATORY_XML_FINAL_RULES,
   PROGRESS_TOOL_BATCH_RULES,
   PROGRESS_TOOL_DESCRIPTION,
@@ -28,8 +26,6 @@ import {
 import { parseJsonRecord, parseJsonValueDetailed, truncateUtf8WithNotice } from '../utils.js';
 
 import { ToolProvider } from './types.js';
-
-type ToolTransportMode = 'native' | 'xml' | 'xml-final';
 
 interface InternalToolProviderOptions {
   enableBatch: boolean;
@@ -45,7 +41,6 @@ interface InternalToolProviderOptions {
   getCurrentTurn: () => number;
   toolTimeoutMs?: number;
   disableProgressTool?: boolean;
-  toolTransport?: ToolTransportMode;
   xmlSessionNonce?: string;  // For xml-final mode: the session-wide nonce for final report tag
 }
 
@@ -80,7 +75,6 @@ export class InternalToolProvider extends ToolProvider {
   private instructions: string;
   private cachedBatchSchemas?: { schemas: Record<string, unknown>[]; summaries: { name: string; required: string[] }[] };
   private readonly disableProgressTool: boolean;
-  private readonly toolTransport: ToolTransportMode;
   private readonly xmlSessionNonce?: string;
 
   constructor(
@@ -91,7 +85,6 @@ export class InternalToolProvider extends ToolProvider {
     this.formatId = opts.outputFormat;
     this.formatDescription = describeFormatParameter(this.formatId);
     this.maxToolCallsPerTurn = opts.maxToolCallsPerTurn;
-    this.toolTransport = opts.toolTransport ?? 'native';
     const expected = opts.expectedOutputFormat;
     if (expected !== undefined && expected !== this.formatId) {
       throw new Error(`Output format mismatch: expectedOutput.format=${expected} but session outputFormat=${this.formatId}`);
@@ -186,11 +179,6 @@ export class InternalToolProvider extends ToolProvider {
   }
 
   private buildInstructions(): string {
-    // For xml mode, all instructions come from XML-NEXT (no system prompt instructions)
-    if (this.toolTransport === 'xml') {
-      return '';
-    }
-
     const lines: string[] = ['### Internal Tools', ''];
 
     lines.push('You have access to the following internal tools to assist you in completing your task effectively.');
@@ -226,29 +214,20 @@ export class InternalToolProvider extends ToolProvider {
       }
     }
 
-    // Final report instructions: XML-based for xml-final, tool-based for native
+    // Final report instructions: XML-based for xml-final (only mode)
     lines.push('');
-    if (this.toolTransport === 'xml-final' && this.xmlSessionNonce !== undefined) {
-      // XML-based final report instructions with actual nonce
+    {
       const schemaBlock = this.buildFinalReportSchemaBlock();
-      lines.push(finalReportXmlInstructions(this.formatId, this.formatDescription, schemaBlock, this.xmlSessionNonce));
-    } else if (this.toolTransport === 'xml-final') {
-      // XML-based but no nonce (shouldn't happen, but fallback)
-      const schemaBlock = this.buildFinalReportSchemaBlock();
-      lines.push(finalReportXmlInstructions(this.formatId, this.formatDescription, schemaBlock));
-    } else {
-      // Tool-based final report instructions (native mode)
-      const formatFields = this.buildFinalReportFormatFields();
-      lines.push(finalReportToolInstructions(this.formatId, formatFields));
+      if (this.xmlSessionNonce !== undefined) {
+        lines.push(finalReportXmlInstructions(this.formatId, this.formatDescription, schemaBlock, this.xmlSessionNonce));
+      } else {
+        lines.push(finalReportXmlInstructions(this.formatId, this.formatDescription, schemaBlock));
+      }
     }
 
     // Mandatory rules section
     lines.push('');
-    if (this.toolTransport === 'xml-final') {
-      lines.push(MANDATORY_XML_FINAL_RULES);
-    } else {
-      lines.push(MANDATORY_TOOLS_RULES);
-    }
+    lines.push(MANDATORY_XML_FINAL_RULES);
     if (this.opts.enableBatch) {
       lines.push(`- Per turn you can invoke at most ${String(this.maxToolCallsPerTurn)} tools in total (including those inside a batch request). Plan your tools accordingly.`);
     } else {

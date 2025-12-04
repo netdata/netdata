@@ -11,7 +11,7 @@ import type { AIAgentSessionConfig, AIAgentResult, ConversationMessage, LogEntry
 
 import { validateProviders, validateMCPServers, validatePrompts } from './config.js';
 import { ContextGuard, type ContextGuardBlockedEntry, type ContextGuardEvaluation, type TargetContextConfig } from './context-guard.js';
-import { FinalReportManager, FINAL_REPORT_SOURCE_TEXT_FALLBACK, FINAL_REPORT_SOURCE_TOOL_MESSAGE, type PendingFinalReportPayload } from './final-report-manager.js';
+import { FinalReportManager, type PendingFinalReportPayload } from './final-report-manager.js';
 import { parseFrontmatter, parsePairs, extractBodyWithoutFrontmatter } from './frontmatter.js';
 import { LLMClient } from './llm-client.js';
 import { CONTEXT_FINAL_MESSAGE } from './llm-messages.js';
@@ -60,9 +60,6 @@ type ExitCode =
   | 'EXIT-UNCAUGHT-EXCEPTION'
   | 'EXIT-SIGNAL-RECEIVED'
   | 'EXIT-UNKNOWN';
-
-// PendingFinalReportSource type alias for internal use
-type PendingFinalReportSource = typeof FINAL_REPORT_SOURCE_TEXT_FALLBACK | typeof FINAL_REPORT_SOURCE_TOOL_MESSAGE;
 
 interface ToolSelection {
   availableTools: MCPTool[];
@@ -127,9 +124,7 @@ export class AIAgentSession {
   private readonly progressReporter: SessionProgressReporter;
   private readonly progressToolEnabled: boolean;
   private readonly expectedJsonSchema?: Record<string, unknown>;
-  private readonly toolTransport: 'native' | 'xml' | 'xml-final';
-  // XML transport encapsulates all XML-related state when toolTransport !== 'native'
-  private readonly xmlTransport?: XmlToolTransport;
+  private readonly xmlTransport: XmlToolTransport;
   private turnFailureReasons: string[] = [];
   // Per-turn planned subturns (tool call count) discovered when LLM yields toolCalls
   private plannedSubturns: Map<number, number> = new Map<number, number>();
@@ -169,7 +164,6 @@ export class AIAgentSession {
     this.finalReportManager.commit(payload, 'synthetic');
   }
   private get finalReportSource() { return this.finalReportManager.getSource(); }
-  private get pendingFinalReport() { return this.finalReportManager.getPending(); }
   private get finalReportAttempts() { return this.finalReportManager.finalReportAttempts; }
   private currentLlmOpId?: string;
   private systemTurnBegan = false;
@@ -574,11 +568,7 @@ export class AIAgentSession {
       const wantsProgressUpdates = this.sessionConfig.headendWantsProgressUpdates !== false;
     const enableProgressTool = wantsProgressUpdates && (hasNonInternalDeclaredTools || hasSubAgentsConfigured);
     this.progressToolEnabled = enableProgressTool;
-    this.toolTransport = this.sessionConfig.toolingTransport ?? 'xml-final';
-    // Initialize XML transport when not using native tool calling
-    if (this.toolTransport !== 'native') {
-      this.xmlTransport = new XmlToolTransport(this.toolTransport);
-    }
+    this.xmlTransport = new XmlToolTransport();
       const enableBatch = declaredTools.includes('batch');
       const eo = this.sessionConfig.expectedOutput;
       const expectedJsonSchema = (eo?.format === 'json') ? eo.schema : undefined;
@@ -590,8 +580,6 @@ export class AIAgentSession {
         expectedJsonSchema,
         disableProgressTool: !enableProgressTool,
         maxToolCallsPerTurn: resolvedMaxToolCallsPerTurn,
-        toolTransport: this.toolTransport,
-        xmlSessionNonce: this.xmlTransport?.getSessionNonce(),
         logError: (message: string) => {
           const entry: LogEntry = {
             timestamp: Date.now(),
@@ -1258,12 +1246,8 @@ export class AIAgentSession {
         }
           } catch (e) { warn(`startup verbose log failed: ${e instanceof Error ? e.message : String(e)}`); }
 
-      // Build enhanced system prompt with tool instructions (native and xml-final, but not xml)
-      // In xml mode, all tools use XML format and instructions come from XML-NEXT
-      // In xml-final mode, regular tools (including progress_report) are native, only final_report uses XML
-      const toolInstructions = this.toolTransport !== 'xml'
-        ? (this.toolsOrchestrator?.getCombinedInstructions() ?? '')
-        : '';
+      // Build enhanced system prompt with tool instructions (xml-final only)
+      const toolInstructions = this.toolsOrchestrator?.getCombinedInstructions() ?? '';
       const enhancedSystemPrompt = this.enhanceSystemPrompt(systemExpanded, toolInstructions);
       this.resolvedSystemPrompt = enhancedSystemPrompt;
 
@@ -1309,7 +1293,6 @@ export class AIAgentSession {
         resolvedSystemPrompt: this.resolvedSystemPrompt,
         expectedJsonSchema: this.expectedJsonSchema,
         progressToolEnabled: this.progressToolEnabled,
-        toolTransport: this.toolTransport,
         abortSignal: this.sessionConfig.abortSignal,
         stopRef: this.sessionConfig.stopRef,
         isCanceled: () => this.canceled,
@@ -1845,10 +1828,10 @@ export class AIAgentSession {
     this.finalTurnEntryLogged = true;
   }
 
-  private logFinalReportAccepted(source: 'tool-call' | PendingFinalReportSource | 'synthetic', turn: number): void {
+  private logFinalReportAccepted(source: 'tool-call' | 'synthetic', turn: number): void {
     const entry: LogEntry = {
       timestamp: Date.now(),
-      severity: source === 'tool-call' ? 'VRB' : (source === 'synthetic' ? 'ERR' : 'WRN'),
+      severity: source === 'tool-call' ? 'VRB' : 'ERR',
       turn,
       subturn: 0,
       direction: 'response',
@@ -1857,36 +1840,13 @@ export class AIAgentSession {
       fatal: false,
       message: source === 'tool-call'
         ? 'Final report accepted from tool call.'
-        : source === FINAL_REPORT_SOURCE_TEXT_FALLBACK
-          ? 'Final report accepted from text extraction fallback.'
-          : source === FINAL_REPORT_SOURCE_TOOL_MESSAGE
-            ? 'Final report accepted from tool-message fallback.'
-            : 'Synthetic final report generated.',
+        : 'Synthetic final report generated.',
       details: { source }
     };
     this.log(entry);
   }
 
-  private logFallbackAcceptance(source: PendingFinalReportSource, turn: number): void {
-    const entry: LogEntry = {
-      timestamp: Date.now(),
-      severity: 'WRN',
-      turn,
-      subturn: 0,
-      direction: 'response',
-      type: 'llm',
-      remoteIdentifier: 'agent:fallback-report',
-      fatal: false,
-      message: source === FINAL_REPORT_SOURCE_TEXT_FALLBACK
-        ? 'Accepting final report from text extraction as last resort (final turn, no valid tool call).'
-        : 'Accepting final report from tool-message fallback as last resort (final turn, no valid tool call).'
-    };
-    this.log(entry);
-  }
-
-
-
-  private commitFinalReport(payload: PendingFinalReportPayload, source: 'tool-call' | PendingFinalReportSource | 'synthetic'): void {
+  private commitFinalReport(payload: PendingFinalReportPayload, source: 'tool-call' | 'synthetic'): void {
     this.finalReportManager.commit(payload, source);
   }
 
@@ -1919,20 +1879,8 @@ export class AIAgentSession {
   }
 
   private resolveToolChoice(provider: string, model: string, toolsCount: number): ToolChoiceMode | undefined {
-    const transport = this.sessionConfig.toolingTransport ?? 'xml-final';
-    if (transport !== 'native') {
-      if (toolsCount === 0) return undefined;
-      return 'auto';
-    }
-    const providerConfig = this.sessionConfig.config.providers[provider] as (Configuration['providers'][string] | undefined);
-    if (providerConfig === undefined) {
-      return undefined;
-    }
-    const modelChoice = providerConfig.models?.[model]?.toolChoice;
-    if (modelChoice !== undefined) {
-      return modelChoice;
-    }
-    return providerConfig.toolChoice;
+    if (toolsCount === 0) return undefined;
+    return 'auto';
   }
 
   private resolveReasoningValue(provider: string, model: string, level: ReasoningLevel, maxOutputTokens: number | undefined): ProviderReasoningValue | null | undefined {

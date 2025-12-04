@@ -20,18 +20,10 @@ import { parseJsonRecord } from './utils.js';
 // Reusable type definitions
 export type FinalReportPayload = NonNullable<AIAgentResult['finalReport']>;
 export type PendingFinalReportPayload = Omit<FinalReportPayload, 'ts'>;
-export type FinalReportSource = 'tool-call' | 'text-fallback' | 'tool-message' | 'synthetic';
+export type FinalReportSource = 'tool-call' | 'synthetic';
 
 export const FINAL_REPORT_FORMAT_VALUES = ['json', 'markdown', 'markdown+mermaid', 'slack-block-kit', 'tty', 'pipe', 'sub-agent', 'text'] as const satisfies readonly FinalReportPayload['format'][];
 
-export const FINAL_REPORT_SOURCE_TEXT_FALLBACK = 'text-fallback' as const;
-export const FINAL_REPORT_SOURCE_TOOL_MESSAGE = 'tool-message' as const;
-
-// Internal pending report wrapper
-interface PendingReport {
-  source: typeof FINAL_REPORT_SOURCE_TEXT_FALLBACK | typeof FINAL_REPORT_SOURCE_TOOL_MESSAGE;
-  payload: PendingFinalReportPayload;
-}
 
 // Configuration for FinalReportManager
 export interface FinalReportManagerConfig {
@@ -58,9 +50,6 @@ export class FinalReportManager {
   // Committed final report
   private finalReport?: FinalReportPayload;
   private finalReportSource?: FinalReportSource;
-
-  // Pending report (before acceptance)
-  private pendingFinalReport?: PendingReport;
 
   // Attempt tracking
   private _finalReportAttempts = 0;
@@ -108,20 +97,6 @@ export class FinalReportManager {
   }
 
   /**
-   * Check if there's a pending report waiting for acceptance
-   */
-  hasPending(): boolean {
-    return this.pendingFinalReport !== undefined;
-  }
-
-  /**
-   * Get the pending report (for compatibility with legacy code)
-   */
-  getPending(): { source: typeof FINAL_REPORT_SOURCE_TEXT_FALLBACK | typeof FINAL_REPORT_SOURCE_TOOL_MESSAGE; payload: PendingFinalReportPayload } | undefined {
-    return this.pendingFinalReport;
-  }
-
-  /**
    * Get the committed final report
    */
   getReport(): FinalReportPayload | undefined {
@@ -154,25 +129,6 @@ export class FinalReportManager {
       ts: Date.now()
     };
     this.finalReportSource = source;
-    this.pendingFinalReport = undefined;
-  }
-
-  /**
-   * Set a pending report (extracted from text or tool message)
-   */
-  setPending(payload: PendingFinalReportPayload, source: typeof FINAL_REPORT_SOURCE_TEXT_FALLBACK | typeof FINAL_REPORT_SOURCE_TOOL_MESSAGE): void {
-    this.pendingFinalReport = { source, payload };
-  }
-
-  /**
-   * Accept the pending report as the final report
-   * Returns the source if accepted, undefined if no pending report
-   */
-  acceptPending(): (typeof FINAL_REPORT_SOURCE_TEXT_FALLBACK | typeof FINAL_REPORT_SOURCE_TOOL_MESSAGE) | undefined {
-    if (this.pendingFinalReport === undefined) return undefined;
-    const pending = this.pendingFinalReport;
-    this.commit(pending.payload, pending.source);
-    return pending.source;
   }
 
   /**
@@ -181,7 +137,6 @@ export class FinalReportManager {
   clear(): void {
     this.finalReport = undefined;
     this.finalReportSource = undefined;
-    this.pendingFinalReport = undefined;
   }
 
   /**
