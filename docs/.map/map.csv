@@ -1,6 +1,6 @@
 custom_edit_url,sidebar_label,learn_status,learn_rel_path,keywords,description
-https://github.com/netdata/netdata/edit/master/docs/welcome-to-netdata.md,Welcome to Netdata,Published,Welcome to Netdata,"[testing,keyword,kekw,multi word]",
-https://github.com/netdata/netdata/edit/master/docs/netdata-enterprise-evaluation-corrected.md,Enterprise Evaluation Guide,Published,Welcome to Netdata,,
+https://github.com/netdata/netdata/edit/master/docs/welcome-to-netdata.md,Welcome to Netdata,Published,Welcome to Netdata,,
+https://github.com/netdata/netdata/edit/master/docs/netdata-enterprise-evaluation-corrected.md,Enterprise Evaluation Guide,Published,Welcome to Netdata,"[real-time observability, infrastructure monitoring]",
 https://github.com/netdata/netdata/edit/master/docs/realtime-monitoring.md,Real-time Monitoring,Published,Welcome to Netdata,,
 https://github.com/netdata/netdata/edit/master/docs/scalability.md,Scalability,Published,Welcome to Netdata,,
 https://github.com/netdata/netdata/edit/master/src/collectors/COLLECTORS.md,Monitor Anything,Published,Welcome to Netdata,,Netdata gathers real-time metrics from hundreds of data sources using collectors. Most require zero configuration and are pre-configured out of the box.
