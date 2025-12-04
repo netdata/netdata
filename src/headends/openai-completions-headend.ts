@@ -698,7 +698,10 @@ export class OpenAICompletionsHeadend implements Headend {
     const telemetryLabels = { ...getTelemetryLabels(), headend: this.id };
 
     const baseCallbacks: AIAgentCallbacks = {
-      onOutput: (chunk) => {
+      onOutput: (chunk, meta) => {
+        // Drop sub-agent output in streaming mode; only surface root agent
+        const agentId = meta?.agentId ?? agent.id;
+        if (agentId !== agent.id) return;
         output += chunk;
         if (streamed) {
           emitAssistantRole();
@@ -721,7 +724,9 @@ export class OpenAICompletionsHeadend implements Headend {
           }
         }
       },
-      onThinking: (chunk) => {
+      onThinking: (chunk, meta) => {
+        const agentId = meta?.agentId ?? agent.id;
+        if (agentId !== agent.id) return;
         if (chunk.length === 0) return;
         // Don't call ensureHeader here - wait for progress event with txnId
         // Header will be created when thinking is flushed or progress event arrives

@@ -1105,57 +1105,19 @@ export class TurnRunner {
                                 if (this.finalReport === undefined) {
                                     if (!turnResult.status.finalAnswer && !sanitizedHasToolCalls && sanitizedHasText) {
                                         const syntheticMessage = 'Synthetic retry: assistant returned content without tool calls and without final_report.';
-                                        const assistantPreview = (() => {
-                                            const textBlocks = sanitizedMessages
-                                                .filter((msg): msg is ConversationMessage & { content: string } => msg.role === 'assistant' && typeof msg.content === 'string')
-                                                .map((msg) => msg.content.trim())
-                                                .filter((t) => t.length > 0);
-                                            if (textBlocks.length === 0) return undefined;
-                                            return textBlocks.join('\n');
-                                        })();
-                                        const rawResponse = typeof turnResult.response === 'string' ? turnResult.response : undefined;
-                                        const reasoningBytes = (() => {
-                                            const sum = sanitizedMessages
-                                                .filter((msg): msg is ConversationMessage & { reasoning?: string } => msg.role === 'assistant' && typeof (msg as { reasoning?: unknown }).reasoning === 'string')
-                                                .map((msg) => Buffer.byteLength((msg as { reasoning: string }).reasoning, 'utf8'))
-                                                .reduce((acc, n) => acc + n, 0);
-                                            return sum > 0 ? sum : undefined;
-                                        })();
-                                        const contentBytes = (() => {
-                                            const sum = sanitizedMessages
-                                                .filter((msg): msg is ConversationMessage & { content: string } => msg.role === 'assistant' && typeof msg.content === 'string')
-                                                .map((msg) => Buffer.byteLength(msg.content, 'utf8'))
-                                                .reduce((acc, n) => acc + n, 0);
-                                            return sum > 0 ? sum : undefined;
-                                        })();
-                                        const enrichedMessageParts: string[] = [syntheticMessage];
-                                        if (contentBytes !== undefined) enrichedMessageParts.push(`content_bytes=${String(contentBytes)}`);
-                                        if (reasoningBytes !== undefined) enrichedMessageParts.push(`reasoning_bytes=${String(reasoningBytes)}`);
-                                        if (assistantPreview !== undefined) enrichedMessageParts.push(`preview="${assistantPreview}"`);
-                                        const orchestratorWarnEntry = {
-                                            timestamp: Date.now(),
-                                            severity: 'WRN' as const,
+                                        this.logNoToolsNoReport({
                                             turn: currentTurn,
-                                            subturn: 0,
-                                            direction: 'response' as const,
-                                            type: 'llm' as const,
-                                            remoteIdentifier: REMOTE_ORCHESTRATOR,
+                                            remoteId: REMOTE_ORCHESTRATOR,
+                                            severity: 'WRN',
                                             fatal: false,
-                                            message: enrichedMessageParts.join(' | '),
-                                            details: {
-                                                provider,
-                                                model,
-                                                finish_reason: turnResult.stopReason ?? (turnResult.status as { finishReason?: string }).finishReason,
-                                                tool_calls: Array.isArray(turnResult.toolCalls) ? turnResult.toolCalls.length : 0,
-                                                has_text: sanitizedHasText,
-                                                has_tool_calls: sanitizedHasToolCalls,
-                                                assistant_preview: assistantPreview,
-                                                content_bytes: contentBytes,
-                                                reasoning_bytes: reasoningBytes,
-                                                raw_response: rawResponse,
-                                            },
-                                        } as LogEntry;
-                                        this.log(orchestratorWarnEntry);
+                                            message: syntheticMessage,
+                                            provider,
+                                            model,
+                                            turnResult,
+                                            sanitizedMessages,
+                                            sanitizedHasText,
+                                            sanitizedHasToolCalls,
+                                        });
                                         if (isFinalTurn && !finalTurnRetryWarnLogged) {
                                             const agentWarn = {
                                                 timestamp: Date.now(),
@@ -1184,18 +1146,19 @@ export class TurnRunner {
                             // Log warning and retry this turn on another provider/model
                             const metadata = turnResult.providerMetadata;
                             const remoteId = this.composeRemoteIdentifier(provider, model, metadata);
-                            const warnEntry = {
-                                timestamp: Date.now(),
-                                severity: 'WRN' as const,
+                            this.logNoToolsNoReport({
                                 turn: currentTurn,
-                                subturn: 0,
-                                direction: 'response' as const,
-                                type: 'llm' as const,
-                                remoteIdentifier: remoteId,
+                                remoteId: remoteId,
+                                severity: 'WRN',
                                 fatal: false,
-                                message: 'Empty response without tools; retrying with next provider/model in this turn.'
-                            };
-                            this.log(warnEntry);
+                                message: 'Empty response without tools; retrying with next provider/model in this turn.',
+                                provider,
+                                model,
+                                turnResult,
+                                sanitizedMessages,
+                                sanitizedHasText,
+                                sanitizedHasToolCalls,
+                            });
                             this.state.llmSyntheticFailures++;
                             lastError = 'invalid_response: empty_without_tools';
                             lastErrorType = 'invalid_response';
@@ -1858,10 +1821,93 @@ export class TurnRunner {
                     message: `Raw assistant content:\n${rawContent}`,
                 });
             }
-        } catch {
+        }
+        catch {
             // ignore serialization errors
         }
     }
+
+  private logNoToolsNoReport(opts: {
+    turn: number;
+    remoteId: string;
+    severity?: LogEntry['severity'];
+    fatal?: boolean;
+    message: string;
+    provider: string;
+    model: string;
+    turnResult: TurnResult;
+    sanitizedMessages: ConversationMessage[];
+    sanitizedHasText: boolean;
+    sanitizedHasToolCalls: boolean;
+  }): void {
+    const {
+      turn,
+      remoteId,
+      severity = 'WRN',
+      fatal = false,
+      message,
+      provider,
+      model,
+      turnResult,
+      sanitizedMessages,
+      sanitizedHasText,
+      sanitizedHasToolCalls,
+    } = opts;
+
+    const assistantPreview = (() => {
+      const textBlocks = sanitizedMessages
+        .filter((msg): msg is ConversationMessage & { content: string } => msg.role === 'assistant' && typeof msg.content === 'string')
+        .map((msg) => msg.content.trim())
+        .filter((t) => t.length > 0);
+      if (textBlocks.length === 0) return undefined;
+      return textBlocks.join('\n');
+    })();
+
+    const contentBytes = sanitizedMessages
+      .filter((msg): msg is ConversationMessage & { content: string } => msg.role === 'assistant' && typeof msg.content === 'string')
+      .map((msg) => Buffer.byteLength(msg.content, 'utf8'))
+      .reduce((acc, n) => acc + n, 0);
+
+    const reasoningBytes = sanitizedMessages
+      .filter((msg): msg is ConversationMessage & { reasoning?: string } => msg.role === 'assistant' && typeof (msg as { reasoning?: unknown }).reasoning === 'string')
+      .map((msg) => Buffer.byteLength((msg as { reasoning: string }).reasoning, 'utf8'))
+      .reduce((acc, n) => acc + n, 0);
+
+    const responseBytes = typeof turnResult.response === 'string' ? Buffer.byteLength(turnResult.response, 'utf8') : 0;
+
+    const enrichedMessageParts: string[] = [message];
+    if (contentBytes > 0) enrichedMessageParts.push(`content_bytes=${String(contentBytes)}`);
+    if (reasoningBytes > 0) enrichedMessageParts.push(`reasoning_bytes=${String(reasoningBytes)}`);
+    if (responseBytes > 0) enrichedMessageParts.push(`response_bytes=${String(responseBytes)}`);
+    if (assistantPreview !== undefined) enrichedMessageParts.push(`preview="${assistantPreview}"`);
+
+    const warnEntry: LogEntry = {
+      timestamp: Date.now(),
+      severity,
+      turn,
+      subturn: 0,
+      direction: 'response',
+      type: 'llm',
+      remoteIdentifier: remoteId,
+      fatal,
+      message: enrichedMessageParts.join(' | '),
+      details: {
+        provider,
+        model,
+        finish_reason: (turnResult.stopReason ?? (turnResult.status as { finishReason?: string }).finishReason) ?? '',
+        tool_calls: Array.isArray(turnResult.toolCalls) ? turnResult.toolCalls.length : 0,
+        has_text: sanitizedHasText,
+        has_tool_calls: sanitizedHasToolCalls,
+        has_reasoning: Boolean(turnResult.hasReasoning),
+        assistant_preview: assistantPreview ?? '',
+        content_bytes: contentBytes,
+        reasoning_bytes: reasoningBytes,
+        response_bytes: responseBytes,
+        raw_response: typeof turnResult.response === 'string' ? turnResult.response : '',
+      },
+    };
+    this.log(warnEntry);
+  }
     private commitFinalReport(payload: PendingFinalReportPayload, source: FinalReportSource): void {
         this.ctx.finalReportManager.commit(payload, source);
     }

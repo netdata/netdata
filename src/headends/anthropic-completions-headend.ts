@@ -687,7 +687,9 @@ export class AnthropicCompletionsHeadend implements Headend {
     const telemetryLabels = { ...getTelemetryLabels(), headend: this.id };
 
     const callbacks: AIAgentCallbacks = {
-      onOutput: (chunk) => {
+      onOutput: (chunk, meta) => {
+        const agentId = meta?.agentId ?? agent.id;
+        if (agentId !== agent.id) return;
         output += chunk;
         if (streamed) {
           if (thinkingBlockOpen) closeThinkingBlock();
@@ -702,7 +704,9 @@ export class AnthropicCompletionsHeadend implements Headend {
           }
         }
       },
-      onThinking: (chunk) => {
+      onThinking: (chunk, meta) => {
+        const agentId = meta?.agentId ?? agent.id;
+        if (agentId !== agent.id) return;
         if (chunk.length === 0) return;
         reasoning += chunk;
         // Don't call ensureHeader here - wait for progress event with txnId
