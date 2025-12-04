@@ -46,7 +46,7 @@ import {
 } from './llm-messages.js';
 import { addSpanAttributes, addSpanEvent, recordContextGuardMetrics, recordFinalReportMetrics, recordLlmMetrics, recordRetryCollapseMetrics, runWithSpan } from './telemetry/index.js';
 import { processLeakedToolCalls } from './tool-call-fallback.js';
-import { estimateMessagesBytes, formatToolRequestCompact, parseJsonValueDetailed, sanitizeToolName, truncateUtf8WithNotice, warn } from './utils.js';
+import { estimateMessagesBytes, formatToolRequestCompact, parseJsonValueDetailed, sanitizeToolName, warn } from './utils.js';
 import { XmlFinalReportFilter } from './xml-transport.js';
 
 /**
@@ -1111,8 +1111,27 @@ export class TurnRunner {
                                                 .map((msg) => msg.content.trim())
                                                 .filter((t) => t.length > 0);
                                             if (textBlocks.length === 0) return undefined;
-                                            return truncateUtf8WithNotice(textBlocks.join('\n'), 2000);
+                                            return textBlocks.join('\n');
                                         })();
+                                        const rawResponse = typeof turnResult.response === 'string' ? turnResult.response : undefined;
+                                        const reasoningBytes = (() => {
+                                            const sum = sanitizedMessages
+                                                .filter((msg): msg is ConversationMessage & { reasoning?: string } => msg.role === 'assistant' && typeof (msg as { reasoning?: unknown }).reasoning === 'string')
+                                                .map((msg) => Buffer.byteLength((msg as { reasoning: string }).reasoning, 'utf8'))
+                                                .reduce((acc, n) => acc + n, 0);
+                                            return sum > 0 ? sum : undefined;
+                                        })();
+                                        const contentBytes = (() => {
+                                            const sum = sanitizedMessages
+                                                .filter((msg): msg is ConversationMessage & { content: string } => msg.role === 'assistant' && typeof msg.content === 'string')
+                                                .map((msg) => Buffer.byteLength(msg.content, 'utf8'))
+                                                .reduce((acc, n) => acc + n, 0);
+                                            return sum > 0 ? sum : undefined;
+                                        })();
+                                        const enrichedMessageParts: string[] = [syntheticMessage];
+                                        if (contentBytes !== undefined) enrichedMessageParts.push(`content_bytes=${String(contentBytes)}`);
+                                        if (reasoningBytes !== undefined) enrichedMessageParts.push(`reasoning_bytes=${String(reasoningBytes)}`);
+                                        if (assistantPreview !== undefined) enrichedMessageParts.push(`preview="${assistantPreview}"`);
                                         const orchestratorWarnEntry = {
                                             timestamp: Date.now(),
                                             severity: 'WRN' as const,
@@ -1122,7 +1141,7 @@ export class TurnRunner {
                                             type: 'llm' as const,
                                             remoteIdentifier: REMOTE_ORCHESTRATOR,
                                             fatal: false,
-                                            message: syntheticMessage,
+                                            message: enrichedMessageParts.join(' | '),
                                             details: {
                                                 provider,
                                                 model,
@@ -1131,7 +1150,9 @@ export class TurnRunner {
                                                 has_text: sanitizedHasText,
                                                 has_tool_calls: sanitizedHasToolCalls,
                                                 assistant_preview: assistantPreview,
-                                                raw_response: turnResult.response,
+                                                content_bytes: contentBytes,
+                                                reasoning_bytes: reasoningBytes,
+                                                raw_response: rawResponse,
                                             },
                                         } as LogEntry;
                                         this.log(orchestratorWarnEntry);
@@ -1439,23 +1460,32 @@ export class TurnRunner {
             if (!turnSuccessful) {
                 const isInvalidResponse = lastErrorType === 'invalid_response' || (typeof lastError === 'string' && lastError.startsWith('invalid_response'));
                 const isLlmError = lastErrorType === 'network_error' || lastErrorType === 'timeout';
-                // For invalid_response errors, continue to next turn (or let loop exit on final turn to generate synthetic report)
+                // For invalid_response errors: fail the session once attempts are exhausted to avoid runaway retries
                 if (isInvalidResponse) {
-                    if (currentTurn < maxTurns) {
-                        const warnEntry = {
-                            timestamp: Date.now(),
-                            severity: 'WRN' as const,
-                            turn: currentTurn,
-                            subturn: 0,
-                            direction: 'response' as const,
-                            type: 'llm' as const,
-                            remoteIdentifier: REMOTE_ORCHESTRATOR,
-                            fatal: false,
-                            message: `Turn ${String(currentTurn)} exhausted ${String(maxRetries)} attempt${maxRetries === 1 ? '' : 's'} with invalid responses; advancing to the next turn.`,
-                        };
-                        this.log(warnEntry);
-                    }
-                    // Continue to next turn, or let loop exit naturally on final turn (synthetic report will be generated)
+                    const errReason = `Turn ${String(currentTurn)} exhausted ${String(maxRetries)} attempt${maxRetries === 1 ? '' : 's'} with invalid responses; aborting session.`;
+                    const warnEntry = {
+                        timestamp: Date.now(),
+                        severity: 'WRN' as const,
+                        turn: currentTurn,
+                        subturn: 0,
+                        direction: 'response' as const,
+                        type: 'llm' as const,
+                        remoteIdentifier: REMOTE_ORCHESTRATOR,
+                        fatal: true,
+                        message: errReason,
+                        details: { last_error: (lastError ?? lastErrorType) ?? 'unknown' }
+                    };
+                    this.log(warnEntry);
+                    this.logExit('EXIT-INVALID-RESPONSES-EXHAUSTED', errReason, currentTurn, { fatal: true, severity: 'ERR' });
+                    this.emitFinalSummary(logs, accounting);
+                    return {
+                        success: false,
+                        error: errReason,
+                        conversation,
+                        logs,
+                        accounting,
+                        childConversations: this.state.childConversations,
+                    };
                 }
                 else if (isLlmError && currentTurn === maxTurns) {
                     // On final turn with LLM errors (network_error, timeout), allow synthetic report generation
